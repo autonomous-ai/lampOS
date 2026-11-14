@@ -2,43 +2,58 @@
 
 Each of these cost someone a run on a real lamp.
 
-## On a customer lamp today (stable 10824)
+## On a customer lamp today (the stable build)
 
-Customer lamps run stable build 10824. lamp-control is on every lamp and
-answers once the owner turns on developer access in the app. Five gaps:
+Customer lamps run the stable build lampos-stable serves; the GUIDE's Plan and
+status table says the build and date each row works from (the newest stable its
+rows name is 12587, 13 Nov 2026). lamp-control is on every lamp and answers once
+the owner turns on developer access in the app. Four gaps below. Already in:
+skill push (from 11091; the owner says yes at the lamp), `joints` for `roll`,
+`shoulder` and `elbow` (from build 11102, the body's pose, only while the lamp
+stands), a head tap as a `touch` event (from 11372; a pet is sent too but not shown on a lamp yet), a new motion that
+replaces the one playing (from 11048), a motion's end with `wait=True` (from
+11716) and `play` (from build 12171).
 
-1. **Skill push is not yet on customer lamps.** `push_skill`, `skills`,
-   `remove_skill` (`lamp skill push/list/remove`, `lamp_skill_push`, …) are
-   refused, `refused`, "skill push is not on this lamp". Try a push on
-   `lamp fake`, or write the behaviour as a program that runs on the
-   computer while connected. `lamp skill check` works anywhere.
-2. **Joints and play.** `joints` takes `yaw` and `pitch` only; `roll`,
-   `shoulder` and `elbow` are refused, "not routed yet: …". With the body
-   silent for 15 s, name both yaw and pitch. `play` is refused, "not routed
-   yet: waits for client packages". Use `look`, `gesture` or `move`.
-   `sound` works.
-3. **Limp and pose** (letting the arm go limp, holding a pose) can't be
+1. **Limp and pose** (letting the arm go limp, holding a pose) can't be
    reached from a computer.
-4. **No mDNS.** No lamp announces itself: `lamp find` finds nothing, and
+2. **No mDNS.** No lamp announces itself: `lamp find` finds nothing, and
    `lamp pair` without `--host` finds nothing. Pair with
    `--host lamp-xxxx.local` (the lamp's host name) or its IP address. The
    pairing keeps the address, so later connects need nothing.
-5. **Event times are UTC.** `at` ends in `Z` (`2026-10-27T08:40:01Z`).
+3. **Event times are UTC.** `at` ends in `Z` (`2026-10-27T08:40:01Z`).
    Convert to local time yourself.
+4. **A look at a face** was refused, "not in this release", on 11091 and older.
+   Since then lamp-control takes it, but on a customer lamp (lamp-body runs with
+   no `--gaze`; stable 12587, 13 Nov 2026) the body ends it `done` `dropped`,
+   "this lamp's gaze is not measured, so it cannot look at a face". It turns
+   toward a face only on a lamp with a measured `--gaze`, and ends `dropped`
+   "no face in view" without one in view. Never promise a face look. `look` at
+   `name` is still refused (no sound direction); `ahead`, and a yaw and pitch,
+   work. The lamp doesn't track hands yet either (the GUIDE's Follow a hand row:
+   in development; nothing publishes `humans/hands/tracked`, and lamp-body
+   refuses a hold that says `follow`), so don't promise `look` at `hand` or
+   `follow_hand`.
 
-And three more:
-- **A motion asked while another plays is refused `busy`**, "busy: a motion
-  plays for N ms more", with `retry_ms`, while the last gesture, move or
-  feeling's move lamp-control sent (from any computer) still plays; the
-  lamp's own motions don't count. Wait `retry_ms` and ask again. Builds after 10824 replace
-  the playing motion instead (below).
-- **`look` on a resting lamp may end `cut_short`**, "not there in time:
-  something holds the head", with no hand on it. Treat a `cut_short` close
-  to the target as arrived, ask again, or lift the head with a gesture
-  first. `look` at `face` and `name` are refused, "not in this release";
-  `ahead`, a yaw and pitch, and `hand` work.
-- **The camera** sends the eyes' newest frame, about 1 to 2 a second; the
-  fast path (`fast: true`) is not on customer lamps.
+What older stables did, if a lamp is behind:
+- **`wait=True` on `gesture`, `move` and `express`** returned when the lamp took
+  the motion, not when it ended, on 11450 and older; from 11716 it ends at the
+  body's `done` (hello's `limits.motion_done`). `look` and `joints` with
+  `wait=True` returned the body's `done` already.
+- **`play`** was refused, "not routed yet: waits for client packages", on 11913
+  and before; from 12171 it plays a move recorded in a pushed skill's `moves/`.
+  On an older lamp send a recorded move as `move`; with the body silent for
+  15 s, name both yaw and pitch in `joints`. `sound` works.
+
+And on older stables (10824 and before):
+- **A motion asked while another plays was refused `busy`**, "busy: a motion
+  plays for N ms more", with `retry_ms`: wait `retry_ms` and ask again. From 11048
+  a new motion replaces the playing one instead (below).
+- **`look` on a resting lamp could end `cut_short`**, "not there in time:
+  something holds the head", with no hand on it. From 11048 it ends `finished`
+  or `clamped` with where the head stopped.
+- **The camera** sent the eyes' newest frame, about 1 to 2 a second; the fast
+  path (`fast: true`) is in the product's lamp-eyes unit from build 12104 and
+  shown on 12587 (about 16 to 17 a second over Wi-Fi).
 
 `lamp fake` refuses every `look` (but with `--hands`) and every `joints` by
 default, which a customer lamp takes in part; and it takes a skill push and
@@ -66,7 +81,7 @@ against the gaps above, not only the fake.
 
 ## Body
 
-- **A new motion cuts the one playing short** (after stable 10824). A
+- **A new motion cuts the one playing short** (from stable 11048). A
   gesture, move or feeling's move asked while another plays (whoever asked
   it) replaces it, eased out from where the body is under its own caps.
   While the person is using the lamp (a conversation, a hand on it), the

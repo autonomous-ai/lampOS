@@ -20,7 +20,7 @@ camera = true
 
 [choice]
 name = "toward"
-about = "Where the thing is in the lamp's view: ahead the first time; left or right only after the look showed it off to that side."
+about = "ahead first; left or right once more, only if the look showed it there."
 one_of = ["ahead", "left", "right"]
 # A call with none is a first look: ahead.
 default = "ahead"

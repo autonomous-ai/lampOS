@@ -34,6 +34,8 @@ NoNewPrivileges=yes
 # removes at each restart of actions (lamp-4ace, 19 Oct 04:33).
 RuntimeDirectory=lampos-skills
 RuntimeDirectoryMode=0755
+# Kept through a restart, not a stop: holds.json there keeps a long held trigger's start (docs/skills.md).
+RuntimeDirectoryPreserve=restart
 
 [Install]
 WantedBy=lampos.target

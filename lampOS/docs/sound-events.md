@@ -3,13 +3,16 @@
 Status: the first builder accepted this topic and model direction on
 [19 October at 09:02](https://github.com/autonomous-ai/lampOS/issues/1669#issuecomment-6258073073).
 Third reviewed the typed contract on 19 October. A publisher now exists in
-Ears behind `LAMP_EARS_CLASSES=on`, off unless set and only with
+Ears behind `LAMP_EARS_CLASSES=on`, off unless set (on in the product unit since 9 Nov, #5748) and only with
 `LAMP_PRIVACY_CONTROLS=on`, or `no-slide` with a stored yes (see "The publisher behind LAMP_EARS_CLASSES"
 below). Third's privacy read of its two-second retention found no P1 or P2
 (19 October); its scores still need the empty-room and busy-room
-measurement, and the owner's word, before any unit sets it.
-No deployment unit changes; by default Ears publishes levels and sudden
-changes, not music or laughter.
+measurement, and the owner's word, before any unit sets it. The product's
+`lamp-ears.service` sets it since 9 Nov (the lead's ask on #5748), with
+`LAMP_EARS_CLASSES_MODEL=/opt/lampOS/ears/models/yamnet.onnx`, where
+`models.json` places our own conversion's two files (#6232, below); a lamp
+without them publishes `invalid_model`. Without the switch Ears publishes levels and sudden changes,
+not music or laughter.
 
 ## Purpose and boundaries
 
@@ -113,9 +116,12 @@ privacy-owner read before any unit sets the switch.
 YAMNet is one candidate: TensorFlow's maintained implementation classifies
 521 AudioSet classes with MobileNet-v1, accepting 16 kHz mono audio. The existing
 Rust inference stack and model/operator compatibility still need a concrete
-check. The switch-gated publisher pins Qualcomm AI Hub's YAMNet ONNX float
-export, release v0.59.0, for evaluation only; distribution review of its
-weights is outstanding, so they are not committed or deployed.
+check. The switch-gated publisher first pinned Qualcomm AI Hub's YAMNet ONNX
+float export, release v0.59.0, for evaluation only. After the weights'
+distribution review below ("Where the weights come from", READ-OK on #6119)
+it pins our own conversion of Google's `yamnet.h5` instead (#6232), released
+in `models-2026-11-11` and placed by `models.json`; the measurements on this
+page were taken with Qualcomm's export, whose scores ours matches.
 
 Primary sources:
 - [TensorFlow YAMNet tutorial](https://www.tensorflow.org/hub/tutorials/yamnet)
@@ -174,10 +180,10 @@ on a jazz vocal (60 s and 22 s in), never on the empty office, and not on an
 upbeat track whose 60 s held under the bar too often. Each skill keeps one
 case made of that run's own scores.
 
-The first of them, the music sway, is installed on in the product since
-#2834 (`skills/music-sway`), but the product's `lamp-ears.service` doesn't set
-`LAMP_EARS_CLASSES` until the weights' distribution review above is done, so
-on a product lamp it has nothing to read and never sways; it reads
+The first of them, the music sway (`skills/music-sway`, #2834), is on in
+the product since #5770. The product's `lamp-ears.service` sets
+`LAMP_EARS_CLASSES` since 9 Nov (#5748), with YAMNet's two files from our own
+conversion (below) in `models.json`. Music sway reads
 `scores.music` and does nothing without this topic. It never sways to the
 lamp's own music (#2833): a requested recording (#1757) plays while
 `voice/state` is `listening`, which its `resting` condition holds back, and
@@ -191,6 +197,115 @@ person addressing it. Departure is not inferred from sound classification.
 
 The offline voice-eval exporter recognizes `ears/classes` in its omitted-topic
 counts. It does not export score payloads or make them behavioral evidence.
+
+## Where the weights come from (#5748)
+
+The review the first builder asked for on #5748 before any release of the
+weights. Read on 10 November 2026 from each source's own page or licence file;
+where a source says nothing, it says so here.
+
+**The chain behind `yamnet-qai-v0.59.0`.**
+1. **Google's YAMNet.** Trained by Google on AudioSet. Its Keras weights are
+   `https://storage.googleapis.com/audioset/yamnet.h5`, the file
+   [tensorflow/models research/audioset/yamnet](https://github.com/tensorflow/models/tree/master/research/audioset/yamnet)'s
+   README downloads. That repository's
+   [LICENSE](https://github.com/tensorflow/models/blob/master/LICENSE) is
+   Apache 2.0 ("Copyright 2022 Google LLC") and names `/research` among the
+   folders it covers. The README states no separate terms for `yamnet.h5`.
+2. **A PyTorch port.** [w-hc/torch_audioset](https://github.com/w-hc/torch_audioset)
+   (MIT, "Copyright (c) 2021 Haochen"; master `daed697ddc`) converts
+   `yamnet.h5` with `tf_2_torch/convert_yamnet.py` and publishes the result as
+   `yamnet.pth` (release v0.1). Its model takes one mel patch, `[1, 1, 96, 64]`,
+   the input this publisher feeds.
+3. **Qualcomm's export.** [qai-hub-models](https://github.com/quic/ai-hub-models)
+   (BSD-3-Clause) v0.59.0, `models/yamnet/model.py`, loads that port
+   (`YAMNET_PROXY_REPOSITORY` torch_audioset, `DEFAULT_WEIGHTS = "yamnet.pth"`,
+   fetched from Qualcomm's own asset store) and exports the ONNX graph and its
+   `yamnet.data`. Its README's licence section points only to torch_audioset's
+   MIT licence. Qualcomm states no separate terms for the exported files, and
+   the conversion itself runs in their tooling, not in a command we can repeat.
+
+So the bytes we pin went through two conversions by others. Neither says
+which `yamnet.h5` it took, and Qualcomm's step has no recorded command we can
+repeat.
+
+**The class names.** `yamnet_class_map.csv` sits in the Apache 2.0 tree
+above. Its display names are AudioSet's ontology, which Google publishes under
+[CC BY-SA 4.0](https://research.google.com/audioset/download.html). The
+AudioSet labels and segments themselves are CC BY 4.0. The lamp ships no
+label file. It ships five class indices and their names in the code and in
+this document (Speech, Music, Laughter, Walk/footsteps, and the door group).
+
+**Recommended: we convert it ourselves, from Google's file.**
+- **Steps:** run torch_audioset's `convert_yamnet.py` at `daed697ddc` on
+  `yamnet.h5`, then `torch.onnx.export` the same `[1, 1, 96, 64]` → `[1, 521]`
+  model, with external data.
+- **What the release records:** the sha256 of `yamnet.h5` as downloaded, the
+  Python, TensorFlow, PyTorch and ONNX versions, and the exact commands.
+- **The output** is a new `yamnet.onnx` and `yamnet.data`. Their sizes and
+  sha256 replace the pins in `classes.rs` (`MODEL_ID` becomes ours) in the
+  switch-on PR.
+- **Equal or not:** `score_wav` runs on the 21 October clips (#1669) through
+  both models. The new one ships only if its scores match Qualcomm's to
+  within rounding. Otherwise the thresholds above were set on a different
+  model, and that is said rather than shipped.
+- **Why:** this takes Qualcomm's untraceable step out of the chain. Every
+  remaining link then has a written licence: Apache 2.0 for Google's weights
+  and code, and MIT for the conversion script.
+
+**What the `models-2026-11-11` release carries beside the two files.**
+- Apache 2.0's text, with a NOTICE that says:
+  - the weights are Google's YAMNet, from `yamnet.h5` (link and sha256), and
+    converted by us to ONNX (the commands above);
+  - torch_audioset's MIT licence and copyright line, for the conversion
+    script.
+- The AudioSet attribution for the class names the lamp uses: "AudioSet
+  ontology by Google, CC BY-SA 4.0", with the link. If the release ever
+  carries `yamnet_class_map.csv`, that file keeps CC BY-SA 4.0.
+
+**Not answered by any source:**
+- whether Google's `yamnet.h5` download has terms of its own beyond the
+  repository's Apache 2.0 (the README states none);
+- what terms Qualcomm's asset store puts on its `yamnet.pth` and export.
+
+The recommendation above doesn't depend on either.
+
+**Our conversion (#6232, 11 November 2026).** Done as recommended, by
+`lampOS/tools/yamnet-convert.sh WORKDIR` (every input pinned in it; the
+Python half is `tools/yamnet-convert.py`, run with `python -I`):
+- **Input:** `yamnet.h5` from the URL above, 15,296,092 bytes, sha256
+  `13c3308955bbfaef262f175ac9c40e47b134573a93984f009220dd7cc12a1744`, the
+  same from two downloads into separate folders at 14:00 and 16:25 (+07).
+- **Sources:** torch_audioset at `daed697ddcd1d2f7304cc3c2b1b4295ac7e304e4`
+  (its `YAMNet` module and `convert_yamnet.py`'s weight mapping; its
+  `TFYamn` check is written for an older YAMNet API and isn't run), and
+  Google's YAMNet code, tensorflow/models at
+  `c14bf9ad91962cf189f9f58db2132c06247fcd53`, as the reference.
+- **Tools:** Python 3.11.13, tensorflow 2.18.0, tf_keras 2.18.0, torch
+  2.5.1 (`torch.onnx.export`, opset 17, TorchScript exporter), onnx 1.17.0,
+  onnxruntime 1.20.1, h5py 3.12.1, numpy 1.26.4, pyyaml 6.0.2; made on an
+  Apple Silicon Mac. Two runs gave byte-identical files.
+- **Output:** `yamnet.onnx` 29,489 bytes, sha256
+  `c7e501792262e7335b309e67ed68f8e99773a869719397b479593a82fa69657d`, and
+  `yamnet.data` 14,917,924 bytes, sha256
+  `26771b4915f21765ec6605f89cfb6da9121631c2e1c6a1e767d9ef95248cc6bd`;
+  input `patch` `[1, 1, 96, 64]`, output `logits` `[1, 521]`. `classes.rs`
+  pins them, `model_id` `yamnet-h5-lampos-2026-11-11`.
+- **Against Google's Keras model** with the same `yamnet.h5`, on Google's
+  own patches of five synthesized 4 s clips (silence, a 440 Hz tone, white
+  noise, a chord progression with a kick, and a vowel-formant pulse train;
+  no recording of anyone), 40 patches: the largest logit difference is
+  6.1e-4 (on silence, whose logits are far below zero; 8.4e-5 on the rest),
+  the largest score difference 2.4e-6; the script fails over 1e-3. Keras
+  tops music at Music (0.984) and the vowels at Speech (0.981).
+- **In lamp-ears' own code** (tract-onnx 0.23.8): the five scores it
+  publishes on those patches are within 4.6e-6 of Keras's (Qualcomm's
+  export: 4.3e-6). `score_wav` over the five clips (35 windows) prints the
+  same scores to its two decimals with either model, and the same verdicts;
+  silence scores speech 8.63e-8 and music 7.07e-15, as before. So the
+  thresholds above, set on Qualcomm's export, hold. The model-backed test
+  passes with it (load 98 ms, a patch 2.8 ms on the Mac). The 21 October
+  clips (#1669) weren't on the Mac and were not rerun.
 
 ## The publisher behind LAMP_EARS_CLASSES
 
@@ -206,8 +321,10 @@ exists: no queue, thread or model.
 
 **Model.** `LAMP_EARS_CLASSES_MODEL` is the absolute path to `yamnet.onnx`,
 with `yamnet.data` beside it. Both are pinned in the code by size and
-SHA256 (graph 25,789 bytes `970ea63f…6471`, weights 14,915,108 bytes
-`1d6dff48…7ed31`; `model_id` `yamnet-qai-v0.59.0`). They are read once,
+SHA256 (graph 29,489 bytes `c7e50179…657d`, weights 14,917,924 bytes
+`26771b49…c6bd`; `model_id` `yamnet-h5-lampos-2026-11-11`, our conversion
+above). The product's `lamp-ears.service` names
+`/opt/lampOS/ears/models/yamnet.onnx`, where `models.json` places both. They are read once,
 checked, and parsed from the checked bytes in memory, so a file swapped
 after the check is never loaded. A missing, relative or mismatched model
 publishes `invalid_model` every 500 ms and retains no audio. Loading and
@@ -215,7 +332,13 @@ inference run on their own thread (`ears-classes`), never on capture or the
 Bus pump. Scores are independent sigmoids of the logits for Speech (0),
 Music (132) and Laughter (13), and Walk, footsteps (48) and a door for
 guard mode (#2562; read by `lamp-skills` only with `LAMP_GUARD_SOUNDS=on`).
-`door` is the highest of the door group: Door (348), Sliding door (351),
+A patch none of whose 20 ms blocks rose 6 dB over the room's quiet (the
+level floor of `ears/level`, once it is known) is not run through the
+model: it is published as scored with every score 0, on time, as YAMNet
+scores silence. A silent room then costs the classifier nothing
+(lamp-52e6, #5770: 14.8 % of a core with classes on at rest, 6.5 % off);
+music sway's 5 s gap and its 5 minutes under 0.3 to rearm read those zeros
+as before. `door` is the highest of the door group: Door (348), Sliding door (351),
 Slam (352) and Knock (353), since a knock on a door is AudioSet's Knock, not
 Door. Tap (354) is left out: desk taps and typing raise it all day. The
 indices are `yamnet_class_map.csv`'s, the same in qai-hub-models v0.59.0's

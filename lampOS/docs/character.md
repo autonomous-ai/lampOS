@@ -205,6 +205,38 @@ with a thinking budget of 0 the lamp answered five of five lines not meant
 for it, and with 128 it left alone nine of nine
 ([live-runtime.md](live-runtime.md), `thinking_budget`).
 
+**What it cannot do yet, and its functions** (13 November, #6782). The
+file said "You cannot play music, make calls or control anything else
+yet", whatever the lamp was given: a skill installed from the Store or
+pushed from a computer was offered as a function, and the line still told
+the model to refuse it. On lamp-52e6 at 12587 "photo booth" was answered
+"I'm Lamp — I don't have a camera" over the photo-booth skill it was
+offered. The product's provider setting
+(`deploy/product/settings/voice-provider.json`, which `lamp-update`
+installs) names no `instruction_file`, so a product lamp runs the built-in
+instruction (`config::CHAT_INSTRUCTION`), which says the same since #6772;
+this file is for a lamp whose setting names it. The line now keeps the refusal only for what none of its
+functions or skills does, and never lets it say it has no camera for one.
+Not yet heard on a lamp.
+
+**Its eye is a camera** (13 November, #6782's row on lamp-c0a4). "Hey,
+Lamp. Is there a camera?" was answered "No camera, no. My eye can take in
+what's in front of me right now, but nothing is recorded or stored." on
+the second route (deepseek-flash): no text told the model it has one, and
+the built-in instruction's "Do not pretend to see" read as having none.
+Both built-in instructions (`config::CHAT_INSTRUCTION`,
+`CAMERA_CHAT_INSTRUCTION`) and this file now say only the true thing:
+"Your eye is a camera: it sees what is in front of you now. It keeps no
+video or pictures; it remembers a face only when that person asks, and
+shows a picture to the model only when someone asks what you see." Asked
+whether it has a camera, it says yes, its eye is one, and never that it
+has none. Never "nothing is recorded or kept": the lamp keeps a face
+print when asked (`remember_my_face`), sends a picture to the chat model
+when asked what it sees, and with the face-expressions consent keeps how
+people looked (the Reviewer-lead's privacy hold on #6782). "Do not pretend to see" is now "Do not pretend to
+see what you were not shown". No guard rewrites a reply: the words are
+streamed as they come. Not yet heard on a lamp.
+
 ## Checks to run after changing the file
 
 All four are played from another machine's speakers at the lamp; none needs

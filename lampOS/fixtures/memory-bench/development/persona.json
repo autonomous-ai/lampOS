@@ -1,0 +1,526 @@
+{
+  "id": "owner-a",
+  "fictional": true,
+  "timezone": "Asia/Ho_Chi_Minh",
+  "start_date": "2030-04-01",
+  "seed": 731,
+  "facts": [
+    {
+      "id": "fact-01",
+      "label": "preferred tea",
+      "value": "jasmine tea",
+      "revised": "peppermint tea",
+      "revision_day": 15,
+      "forget_day": null
+    },
+    {
+      "id": "fact-02",
+      "label": "writing notebook color",
+      "value": "blue",
+      "revised": "green",
+      "revision_day": 15,
+      "forget_day": null
+    },
+    {
+      "id": "fact-03",
+      "label": "regular lunch day",
+      "value": "Tuesday",
+      "revised": "Wednesday",
+      "revision_day": 15,
+      "forget_day": null
+    },
+    {
+      "id": "fact-04",
+      "label": "walking route",
+      "value": "canal path",
+      "revised": "cedar path",
+      "revision_day": 15,
+      "forget_day": null
+    },
+    {
+      "id": "fact-05",
+      "label": "project codename",
+      "value": "Quartz",
+      "revised": "Meadow",
+      "revision_day": 15,
+      "forget_day": null
+    },
+    {
+      "id": "fact-06",
+      "label": "reading lamp setting",
+      "value": "warm amber",
+      "revised": "soft gold",
+      "revision_day": 15,
+      "forget_day": null
+    },
+    {
+      "id": "fact-07",
+      "label": "lunch soup",
+      "value": "lentil soup",
+      "revised": "pumpkin soup",
+      "revision_day": 15,
+      "forget_day": null
+    },
+    {
+      "id": "fact-08",
+      "label": "preferred meeting room",
+      "value": "Cove room",
+      "revised": "Fern room",
+      "revision_day": 15,
+      "forget_day": null
+    },
+    {
+      "id": "fact-09",
+      "label": "weekend activity",
+      "value": "cycling",
+      "revised": "hiking",
+      "revision_day": 15,
+      "forget_day": null
+    },
+    {
+      "id": "fact-10",
+      "label": "desk plant",
+      "value": "fern",
+      "revised": "spider plant",
+      "revision_day": 15,
+      "forget_day": null
+    },
+    {
+      "id": "fact-11",
+      "label": "morning drink",
+      "value": "oat milk",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-12",
+      "label": "favorite snack",
+      "value": "roasted chickpeas",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-13",
+      "label": "preferred pen ink",
+      "value": "violet",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-14",
+      "label": "headphone color",
+      "value": "teal",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-15",
+      "label": "keyboard layout",
+      "value": "split layout",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-16",
+      "label": "preferred breakfast",
+      "value": "porridge",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-17",
+      "label": "notebook size",
+      "value": "A5",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-18",
+      "label": "favorite fabric",
+      "value": "linen",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-19",
+      "label": "music for focus",
+      "value": "quiet piano",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-20",
+      "label": "usual stretch time",
+      "value": "eleven oclock",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-21",
+      "label": "water bottle color",
+      "value": "orange",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-22",
+      "label": "preferred chair cushion",
+      "value": "gray felt",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-23",
+      "label": "reusable bag color",
+      "value": "burgundy",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-24",
+      "label": "favorite fruit",
+      "value": "pear",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-25",
+      "label": "favorite board game",
+      "value": "Cloud Garden",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-26",
+      "label": "book on the desk",
+      "value": "The Glass Orchard",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-27",
+      "label": "fictional hometown",
+      "value": "Pebbleford",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-28",
+      "label": "current study topic",
+      "value": "woodland ecology",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-29",
+      "label": "preferred drawing tool",
+      "value": "charcoal",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-30",
+      "label": "preferred vacation setting",
+      "value": "a quiet lake",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-31",
+      "label": "preferred dessert",
+      "value": "lemon sorbet",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-32",
+      "label": "favorite season",
+      "value": "autumn",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-33",
+      "label": "favorite kitchen herb",
+      "value": "basil",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-34",
+      "label": "preferred mug material",
+      "value": "ceramic",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-35",
+      "label": "exercise goal",
+      "value": "walk three times a week",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-36",
+      "label": "craft project",
+      "value": "a paper kite",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-37",
+      "label": "preferred screen brightness",
+      "value": "low",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-38",
+      "label": "preferred lunch spice level",
+      "value": "mild",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": null
+    },
+    {
+      "id": "fact-39",
+      "label": "locker passphrase",
+      "value": "amber orchard",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": 10
+    },
+    {
+      "id": "fact-40",
+      "label": "private sketch label",
+      "value": "silver acorn",
+      "revised": null,
+      "revision_day": null,
+      "forget_day": 11
+    }
+  ],
+  "traits": [
+    {
+      "id": "vegetarian",
+      "statements": [
+        "I eat vegetarian meals.",
+        "I do not eat meat.",
+        "Please suggest plant-based lunches for me."
+      ],
+      "question": "What lunch would suit me?",
+      "criterion": "Suggests a vegetarian meal without meat.",
+      "forbidden": [
+        "beef steak",
+        "chicken sandwich"
+      ]
+    },
+    {
+      "id": "brief_morning",
+      "statements": [
+        "Before ten in the morning, keep answers brief.",
+        "Early mornings are for short answers.",
+        "Please be concise with me before ten."
+      ],
+      "question": "How should you answer my early morning question?",
+      "criterion": "Keeps an early morning response brief.",
+      "forbidden": [
+        "long lecture"
+      ]
+    },
+    {
+      "id": "calls",
+      "statements": [
+        "Do not interrupt me while I am on a call.",
+        "If I am in a meeting call, wait quietly.",
+        "Please stay silent during my calls."
+      ],
+      "question": "How should you behave while I am on a call?",
+      "criterion": "Waits silently during a call and does not interrupt.",
+      "forbidden": [
+        "interrupt the call"
+      ]
+    },
+    {
+      "id": "focus",
+      "statements": [
+        "I like one uninterrupted hour to focus.",
+        "I work best with an hour free of distractions.",
+        "Protect my one-hour focus block."
+      ],
+      "question": "How should I organize a focused work block?",
+      "criterion": "Suggests one uninterrupted hour.",
+      "forbidden": [
+        "constant interruptions"
+      ]
+    },
+    {
+      "id": "breaks",
+      "statements": [
+        "Short walks help when I get stuck.",
+        "When frustrated I prefer a little walk.",
+        "If I am stuck, a walking break usually helps."
+      ],
+      "question": "I feel stuck on work; what would help me?",
+      "criterion": "Suggests a short walking break.",
+      "forbidden": [
+        "work without breaks"
+      ]
+    },
+    {
+      "id": "planning",
+      "statements": [
+        "I prefer planning tomorrow at the end of today.",
+        "Let us prepare the next day before leaving.",
+        "Evening planning helps me start calmly."
+      ],
+      "question": "When should I plan the next workday?",
+      "criterion": "Plans the next day at the end of the current day.",
+      "forbidden": []
+    },
+    {
+      "id": "quiet",
+      "statements": [
+        "Silence helps me think better than loud music.",
+        "Keep the desk quiet when I am thinking.",
+        "I prefer a quiet room for difficult work."
+      ],
+      "question": "What sound environment helps me think?",
+      "criterion": "Favors silence or a quiet room.",
+      "forbidden": [
+        "loud music"
+      ]
+    },
+    {
+      "id": "one_step",
+      "statements": [
+        "Give me one next step when I am overwhelmed.",
+        "When stressed, a single action is enough.",
+        "Please do not give a huge checklist if I am overwhelmed."
+      ],
+      "question": "I am overwhelmed; how should you help?",
+      "criterion": "Offers one clear next action.",
+      "forbidden": [
+        "twenty steps"
+      ]
+    },
+    {
+      "id": "feedback",
+      "statements": [
+        "I like direct but kind feedback.",
+        "Be candid without being harsh.",
+        "Please tell me the problem clearly and kindly."
+      ],
+      "question": "How should you give feedback to me?",
+      "criterion": "Gives clear kind feedback without flattery or harshness.",
+      "forbidden": []
+    },
+    {
+      "id": "weekends",
+      "statements": [
+        "I reserve weekends for rest.",
+        "I avoid scheduling work on weekends.",
+        "Please leave Saturday and Sunday free of work."
+      ],
+      "question": "When should I schedule another work task?",
+      "criterion": "Prefers a weekday and protects weekend rest.",
+      "forbidden": [
+        "work all weekend"
+      ]
+    },
+    {
+      "id": "uncertainty",
+      "statements": [
+        "Tell me when you are unsure.",
+        "Please do not pretend to know something.",
+        "I value an honest admission of uncertainty."
+      ],
+      "question": "How should you handle something you cannot remember?",
+      "criterion": "Admits uncertainty rather than inventing a fact.",
+      "forbidden": []
+    },
+    {
+      "id": "privacy",
+      "statements": [
+        "Do not tell visitors my private matters.",
+        "My personal information is not for guests.",
+        "Keep my private memories to yourself around other people."
+      ],
+      "question": "A visitor asks about me; how should you respond?",
+      "criterion": "Does not disclose private owner information to a visitor.",
+      "forbidden": []
+    }
+  ],
+  "background": [
+    "I am sorting a few papers on the desk.",
+    "Let me finish this paragraph.",
+    "I am taking a short stretch.",
+    "There is a notebook beside the keyboard.",
+    "I am checking the next item on my list.",
+    "I need a quiet minute to think.",
+    "I will refill my water bottle.",
+    "The light is comfortable for reading.",
+    "I am putting the loose pages in order.",
+    "Let us pause this topic for now.",
+    "I am back from a short break.",
+    "I will tidy the desk before I leave."
+  ],
+  "plans": [
+    {
+      "id": "plan-1",
+      "label": "dentist appointment",
+      "day": 14
+    },
+    {
+      "id": "plan-2",
+      "label": "book club visit",
+      "day": 15
+    },
+    {
+      "id": "plan-3",
+      "label": "bicycle fitting",
+      "day": 16
+    },
+    {
+      "id": "plan-4",
+      "label": "pottery exhibit",
+      "day": 17
+    },
+    {
+      "id": "plan-5",
+      "label": "garden tour",
+      "day": 18
+    },
+    {
+      "id": "plan-6",
+      "label": "music lesson",
+      "day": 19
+    }
+  ]
+}

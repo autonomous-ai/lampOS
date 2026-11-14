@@ -92,7 +92,7 @@ The agent then, in this order:
    fills what it knows (the person is whoever started the session; no lamp
    unless told; branches `lamp-<name>` and `<name>/*`; it owns nothing
    yet), shows it to its person, pushes it as its first commit on
-   `lamp-<name>`, and comments on the Queue issue (#4710, continued from #3997): "new builder
+   `lamp-<name>`, and comments on the Queue issue (currently #6811, see below): "new builder
    <name>, role file at <link>, no tasks yet". It takes no task until the
    PM has taken the file onto `lamp-voice`, corrected where it
    must be, and labelled issues `builder:<name>`.
@@ -103,16 +103,20 @@ The agent then, in this order:
 5. Reads its own log on its own branch, newest first.
 6. If it has a lamp: that lamp's `deploy/<lamp>/LAMP.md` and `README.md`.
 7. Finds its next task: the first issue in its own list in the pinned
-   [Queue issue](https://github.com/autonomous-ai/lampOS/issues/4710) that
-   is open and not `status:taken` (`gh issue view 4710`;
+   [Queue issue](https://github.com/autonomous-ai/lampOS/issues/6811) that
+   is open and not `status:taken` (`gh issue view 6811`;
    `gh issue list --label builder:<name> --state open` shows them all),
    claimed as "Claiming an issue" says. It reads the comments on its
    issues: answers come there. A Swarm builder's task is given to it in the
    Swarm, with its issue linked.
 
-The current Queue is **#4710**, continued from #3997 on 31 October after
-GitHub stopped accepting comments there. If this link becomes full too,
-follow the continuation link in its body. The current issue is labelled
+The current Queue is **#6811**, continued from #6059 on 13 November after
+GitHub stopped accepting comments there (an issue takes 2,500). The
+newest open Queue is always the last entry of `COORD_QUEUE_ISSUES` in
+`.github/tools/coordination/lib.sh` (the train bot posts there, and reads a
+Queue `HOLD` on every entry): when the number here and that entry
+differ, the entry is right. If a Queue becomes full, follow the
+continuation link in its body. The current issue is labelled
 `lampos-queue`; older full Queues may remain open as records. Read the
 continuation before choosing where to post, even if a role file is older.
 
@@ -288,8 +292,8 @@ building all the time. never sit idle!"):
 - "Waiting on others" is not a state. When your task waits on a review, a
   merge, a lamp minute or another builder, open the next task on your list
   at once and say so in one line on the waiting one.
-- Your list in Queue #4710 is kept at least three deep by the PM.
-  If it ever has nothing you can do now, say so on #4710 with your name, and
+- Your list in Queue #6811 is kept at least three deep by the PM.
+  If it ever has nothing you can do now, say so on #6811 with your name, and
   meanwhile take an unowned open issue in your parts (a flaky test, a doc
   that lies, a missing test) rather than wait.
 - Post or push at least every 20 minutes while you work. The idle watch
@@ -304,7 +308,7 @@ building all the time. never sit idle!"):
   2. your pull requests rebased onto the newest `origin/lamp-voice`, gates
      run again: the train bot merges only ready, current ones, so never
      wait for the first builder to merge;
-  3. a task on #4710 addressed to you, or a row in `docs/build-rows.md`
+  3. a task on #6811 addressed to you, or a row in `docs/build-rows.md`
      under 1.0 whose part has no pull request: check open *and merged*
      pull requests first, then post `taken`;
   4. a stalled pull request whose author has said nothing for 2 hours or
@@ -313,9 +317,9 @@ building all the time. never sit idle!"):
   5. a ready pull request with fewer than two readers: read it, run its
      tests, and post `READ-OK <sha>` or `HOLD <sha>` with what you found.
   Only when all five are empty, stay in your turn: wait in a shell loop
-  that checks #4710 and your pull requests every 5 minutes for a comment
+  that checks #6811 and your pull requests every 5 minutes for a comment
   naming you or a new `READ-OK`/`HOLD`, and go back to 1 when one comes.
-  Post one status line on #4710 each hour: what you pushed, and what
+  Post one status line on #6811 each hour: what you pushed, and what
   you're on.
 
 ## What a result on a lamp is
@@ -518,7 +522,7 @@ another builder's branch.
 ## Talking with the first builder
 
 Since 21 October this is done in comments on the Queue issue (currently
-#4710, continued from #3997), and since the 4 November cutover the one
+#6811, continued from #6059), and since the 4 November cutover the one
 answering is the PM, as
 [AGENTS.md](../AGENTS.md)'s "How builders work together" says: a post starts
 `<Name>, HH:MM, to **<who>**:`, has content, and is in plain sentences. The
@@ -561,7 +565,7 @@ PM has to read, place or close before anyone may do it.
   to: the task you are on, or the issue of the part where it showed (for
   example a flaky test of another part's: a comment on that part's open
   issue). Only when no issue fits, it is one comment on the Queue issue
-  ([#4710](https://github.com/autonomous-ai/lampOS/issues/4710)). Head it
+  ([#6811](https://github.com/autonomous-ai/lampOS/issues/6811)). Head it
   `<name>-P<n>` for a proposal or `Found by <name>` for a fault, with what
   was seen, how to see it, and what it would cost (and still a line in
   your log). The first builder answers there: it widens an issue, opens a
@@ -594,16 +598,21 @@ writes.
   assignee cannot tell agents apart, since every agent works through the
   same account, so the name is a label.
 - **Order:** one pinned "Queue" issue the first builder keeps in order,
-  currently [#4710](https://github.com/autonomous-ai/lampOS/issues/4710),
+  currently [#6811](https://github.com/autonomous-ai/lampOS/issues/6811)
+  (the last entry of `COORD_QUEUE_ISSUES`, above),
   labelled `lampos-queue`. Earlier Queues remain as records:
   [#705](https://github.com/autonomous-ai/lampOS/issues/705),
   [#1722](https://github.com/autonomous-ai/lampOS/issues/1722) from
   2026-10-19, [#2602](https://github.com/autonomous-ai/lampOS/issues/2602)
   from 2026-10-21, [#3126](https://github.com/autonomous-ai/lampOS/issues/3126)
   from 2026-10-23, [#3504](https://github.com/autonomous-ai/lampOS/issues/3504)
-  from 2026-10-26 and [#3997](https://github.com/autonomous-ai/lampOS/issues/3997)
-  from 2026-10-28. Each was continued when it reached GitHub's comment
-  limit; #4710 opened on 2026-10-31. No priority labels.
+  from 2026-10-26, [#3997](https://github.com/autonomous-ai/lampOS/issues/3997)
+  from 2026-10-28, [#4710](https://github.com/autonomous-ai/lampOS/issues/4710)
+  from 2026-10-31, [#5385](https://github.com/autonomous-ai/lampOS/issues/5385)
+  from 2026-11-05 and [#6059](https://github.com/autonomous-ai/lampOS/issues/6059)
+  from 2026-11-10 (#6809, opened beside #6811 on 2026-11-13, is closed).
+  Each was continued when it reached GitHub's comment limit; #6811 opened
+  on 2026-11-13. No priority labels.
 - **Questions and answers** are comments on the issue they are about.
 - **Pull requests** say `Part of #N`, never a closing keyword (above); the
   PM closes the issue at the promote that carries its fix. No GitHub
@@ -643,7 +652,7 @@ was busy. Since then:
    builder holds is never taken**, even if its owner is quiet. That goes to
    the first builder, under the 6-hour rule above. (Since the cutover the
    PM keeps each list at least three deep, so a builder seldom needs this;
-   if you do pick a piece, the 15 minutes run on #4710 as before.)
+   if you do pick a piece, the 15 minutes run on #6811 as before.)
 5. **A pull request carries its builder's label** (`builder:<name>`) from
    the moment it opens, so a builder's open work can be listed. A builder
    whose account cannot add labels (read access only) asks the first
@@ -743,13 +752,13 @@ What was agreed in chat and the lead's agent's messages, written down so a
 new builder finds it here.
 
 **Slots.** The lock above says who is acting on a lamp now; a slot says when.
-Slots are comments on **#3336**:
+Slots are comments on **#6831** (#3336 until it filled on 13 November):
 
 - Post `PLAYING <lamp> HH:MM–HH:MM` before any played round, and
   `QUIET <lamp> HH:MM–HH:MM` before a step that needs silence (a mic check,
   an empty camera view). A post reads `PLAYING lamp-X · who · from–to ·
   what · build N`, then `QUIET`, then `FREE`. A kit's other-lamp gate reads
-  #3336, so a slot posted anywhere else does not count. End the round with
+  #6831, so a slot posted anywhere else does not count. End the round with
   the put-back and say so. One lamp has one holder, and a builder's own lamp
   is scheduled by nobody else.
 - The PM sets the priority of waiting lamp checks, in this order: a hotfix's
@@ -770,9 +779,9 @@ Slots are comments on **#3336**:
 lamp (29e7, 3e83, 0529, e82d, 220c) runs only after the lead's agent's yes on
 **its sha256**. A builder's own in-house lamp (9adf, 06c1, c0a4, 75c9, fc4b,
 a63e, 0c89, each by its holder) needs no such yes (the PM, on the lead's word,
-4 November): its holder still posts PLAYING, QUIET and FREE on #3336 and
+4 November): its holder still posts PLAYING, QUIET and FREE on #6831 and
 does the put-back. A yes (name, sha256, verdict) is
-posted on #3336, or on the issue, never only in a message between agents.
+posted on #6831, or on the issue, never only in a message between agents.
 (After the lead's agent's handover on 5 November 11:00, a Swarm kit-review
 agent gives the yes with the same checklist; the PM never does.) The kit
 shows, and the lead's agent checks:
@@ -837,9 +846,53 @@ runs on the PM's machine, one bot at a time. A pull request is carried when:
   (a plain rebase keeps a read, and TWO READS count the reads on an earlier
   head with the same patch);
 - its ARM64 and clippy runs are green, and a lamp test has passed where one
-  was needed; and
+  was needed;
+- it has its **lamp row** (below); and
 - its branch has **no merge commit**. A pull request rebased onto a merge of
   `lamp-voice`, rather than onto `lamp-voice`, has one: rebase it again.
+
+**A lamp row comes before the train** (the lead, 14 November). Before a
+behaviour pull request rides a train, post its row on the pull request. The
+row names its own pull request, the lamp and the build (its sequence or
+commit), and quotes the journal lines that show the behaviour. A row
+missing any of the three doesn't count. Its first line, then the journal
+lines in a fenced block:
+
+````
+ROW #7031 0a997fa7f3 on lamp-c0a4 build 13031: PASS 3/3
+```
+<the journal lines that show it, as the lamp wrote them>
+```
+````
+
+The bot reads the lamp and the build in the comment's first 400
+characters. The lamp is its hostname: `lamp-` and four hex characters with
+at least one digit (`lamp-c0a4`). A part's name, such as `lamp-body`, is
+not a lamp. The build is five digits right after `build`, `installed` or
+`on` (`build 13031`, `installed **12987**`, `on 13000`), or `build
+<commit>`. The journal is a fenced block with a non-empty line, or a quoted
+line (`> …`) with `lamp-` in it. A row that
+says `FAIL` or `VOID` (or `FAILED`, `VOIDED`), and not `PASS`, is not a
+row. A docs, tests or switched-off change needs no row: then a reader
+writes "no row needed" in the `READ-OK` on this head. A pull request that
+turns a switch on in the product always needs its row, and "no row
+needed" doesn't carry it. That is any new `LAMP_…` line in a product unit
+or a product settings file (`lampOS/deploy/product/settings/*.env`) whose
+value isn't `off`, `0`, `false` or empty: `on`, and words like `checked`
+or `busy-near`, too. The bot enforces it: without a row, the pull request
+sits out, and the log says so once per head, naming any part a row lacks.
+
+The rest of the lead's rule (14 November, 15:40):
+
+- **A bug from a pull request goes back to its builder first.** If it isn't
+  fixed by the next promote window, the pull request is reverted in the
+  next train and its issue is reopened.
+- **A ROW that says PASS when the lamp's journal doesn't match** gets the
+  pull request reverted. The builder is named on the Queue, and that
+  builder's next pull request needs a second person's row.
+- **Spot checks.** Each train, V2 or Fifth reads one builder's ROW against
+  that lamp's journal. A spot check doesn't replace the builder's own
+  testing.
 
 A `HOLD` stands until the same reader's later `READ-OK` (it is keyed by the
 reader's account and signed name). A `HOLD <sha>` as the first line of a
@@ -877,7 +930,7 @@ hotfix ships and the rest becomes a follow-up issue. The steps:
    takes N on its lamp with its kit and slot, runs its rows plus the basics
    (every unit active, `listening_ready`, a spoken turn answered, not
    muted), and posts `PASS N #<pull request>` or `FAIL N #<pull request>`
-   on #4710. When every lamp-visible pull request in N has a `PASS`, the PM
+   on #6811. When every lamp-visible pull request in N has a `PASS`, the PM
    promotes N; a `FAIL` holds N for that change. A docs-only or test-only
    pull request needs no lamp check. **Every `PASS` also covers the core
    rows:** a light colour change, a one-minute timer set and rung, "what
@@ -964,7 +1017,7 @@ train bot counts only comments (until #5212 lands).
   the PM names the second.
 - A lamp check: the tester posts the verdict with the journal excerpt and
   removes `needs:lamp-check`; at a promote, `PASS N #PR` or `FAIL N #PR`
-  goes on #4710.
+  goes on #6811.
 - "Done" is not a pull request marker: a Swarm agent sets its task done once
   its pull request has merged and its lamp check has passed. A Swarm reviewer
   also records its verdict as its review step's result.
@@ -988,7 +1041,7 @@ request body has a **"Lamp check" section**, and a tester runs it.
 - **The tester** builds the head, assembles the kit from `~/lamp-rows/KITS.md`,
   gets the lead's agent's yes on its sha (not needed on a builder's own
   in-house lamp; Fifth's GO on 52e6), posts
-  PLAYING and QUIET on #3336, and then posts the verdict on the pull request
+  PLAYING and QUIET on #6831, and then posts the verdict on the pull request
   with the journal excerpt for the scene's window, and removes
   `needs:lamp-check`. The excerpt has played clips only: no real person's
   words, no audio and no images.
@@ -1049,7 +1102,7 @@ lamp people talk to all day.
 - **No Live sessions on a lamp,** except a comparison the first builder names
   on #1712, the issue where the flow is built.
 - **A suite, tool or script that starts a Live session** is named on the
-  Queue (#4710), and it is moved to the second route.
+  Queue (#6811), and it is moved to the second route.
 - **Live stays a setting** (`LAMP_VOICE_ROUTE=gemini`) for a lamp that is
   set up with it, not the lamp to build against.
 
@@ -1107,7 +1160,7 @@ kept by `hw-first` ([builders/hw-first.md](../builders/hw-first.md)).
   defect closes on repair evidence plus a verified retest.
 - **The first builder comes in only for software:** when a hardware finding
   needs a software change, the hardware lead posts a linked proposal on the
-  Queue (#4710) and the first builder assigns it to a software builder.
+  Queue (#6811) and the first builder assigns it to a software builder.
 - **The hardware lead** (a person) approves the suite's limits, durations,
   fixtures and stop conditions, and the shipment gate. A changed limit is a
   versioned decision.

@@ -162,6 +162,20 @@ CREATE TABLE IF NOT EXISTS nightly_jobs (
     result TEXT NOT NULL DEFAULT '',
     UNIQUE(person,day,after_id)
 );
+-- Weekly chapters (B2, `chapters.rs`): a week's job, the item ids it gave,
+-- never their text. One chapter a person a week (`state` done). Kept a day
+-- past its making; goes with `forget_all` and `forget_person`. Older builds
+-- pass this table over; `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS nightly_weeks (
+    job INTEGER PRIMARY KEY AUTOINCREMENT,
+    person TEXT NOT NULL,
+    week TEXT NOT NULL,
+    at_unix_ms INTEGER NOT NULL,
+    ids TEXT NOT NULL,
+    state TEXT NOT NULL CHECK(state IN ('pending','done')),
+    result TEXT NOT NULL DEFAULT '',
+    UNIQUE(person,week)
+);
 -- A forget by a known person (El's option 2 on #5333): the latest time of
 -- one local day they asked any forget. The night passes over their
 -- exchanges of that day said before it, so a line a topic forget had
@@ -194,4 +208,57 @@ CREATE TABLE IF NOT EXISTS roles (
     person TEXT PRIMARY KEY REFERENCES people(person),
     name TEXT NOT NULL,
     at_unix_ms INTEGER NOT NULL
+);
+-- Service records (the voice's LAMP_SERVICE_RECORDS, the connector records
+-- plan, PR 1a; `service_records.rs`): one row for each thing a known person
+-- asked of a linked service, keyed by the voice's own `key`, updated in
+-- place until its status is no longer `prepared`. Kept until forgotten: no
+-- expiry, tidy or nightly pass reads this table; forget everything, forget
+-- the person and a forget about a thing remove rows. `links`: the keys of
+-- the records it came from (a redo); `replaced_by`: the key of the record
+-- that replaced it (set even on a final one); `result_id`: the service's
+-- own id of what was made (an event id), for a later edit. Older builds pass this
+-- table over; `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS service_records (
+    person TEXT NOT NULL REFERENCES people(person),
+    key TEXT NOT NULL,
+    service TEXT NOT NULL,
+    action TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('prepared','done','cancelled','refused','failed','timed_out','no_result')),
+    reason TEXT NOT NULL DEFAULT '',
+    detail TEXT NOT NULL DEFAULT '{}',
+    result_id TEXT NOT NULL DEFAULT '',
+    asked_unix_ms INTEGER NOT NULL,
+    changed_unix_ms INTEGER NOT NULL,
+    links TEXT NOT NULL DEFAULT '[]',
+    replaced_by TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY(person,key)
+);
+CREATE INDEX IF NOT EXISTS service_records_by ON service_records(person,changed_unix_ms);
+-- When each known person's everything was last forgotten (forget everything,
+-- forget the person; '' for everyone's): a service record asked before it is
+-- refused, so a change the voice sent before the forget and the memory took
+-- after it is never kept (Jarvis's P2 on #6073). The person's id and a time
+-- only, never what was forgotten.
+CREATE TABLE IF NOT EXISTS service_records_forgot (
+    person TEXT PRIMARY KEY,
+    at_unix_ms INTEGER NOT NULL
+);
+-- Service contacts (the voice's LAMP_SERVICE_CONTACTS, beside
+-- LAMP_SERVICE_RECORDS, the connector records plan, PR 1c;
+-- `service_contacts.rs`): the owner's mail contacts, one address a name,
+-- keyed by the name folded (lower case, without accents). The voice saves
+-- one only for an address in a mail read-back the owner confirmed with a
+-- send, named from their own words or their draft's greeting. Kept until
+-- forgotten, as the records are: forget everything, forget the person and a
+-- forget about a thing remove rows. Older builds pass this table over;
+-- `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS service_contacts (
+    person TEXT NOT NULL REFERENCES people(person),
+    name_key TEXT NOT NULL,
+    name TEXT NOT NULL,
+    address TEXT NOT NULL,
+    saved_unix_ms INTEGER NOT NULL,
+    changed_unix_ms INTEGER NOT NULL,
+    PRIMARY KEY(person,name_key)
 );

@@ -13,21 +13,26 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import hashlib
 import inspect
 import json
+import logging
 import os
 import re
 import socket
 import ssl
+import stat
 import sys
+import time
 import unicodedata
+import wave
 import warnings
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Callable
 
-from websockets.asyncio.client import ClientConnection, connect as ws_connect
+from websockets.asyncio.client import ClientConnection, connect as ws_connect, unix_connect
 from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from . import debug, errors, schema
@@ -43,11 +48,37 @@ KEEPALIVE_S = 20.0
 # The actions lamp-control answers `{"to":"body"}` with no `done` after
 # (docs/control.md): a wait for them ends at that answer. `say` and
 # `turn.start` answer `{"to":"voice"}` and their `done` does follow.
-ENDS_AT_REPLY = frozenset({"gesture", "move"})
+# Ended at their answer by a lamp-control that doesn't say `motion_done` in
+# hello's limits (from before #4209): it hands them to the body and says
+# nothing back.
+ENDS_AT_REPLY = frozenset({"gesture", "move", "express", "play"})
 # A phrase's floor in letters and digits, lamp-control's PHRASE_MIN_LETTERS.
 # The SDK's check is a pre-check: it may let through what the lamp refuses,
 # never the other way.
 PHRASE_MIN_LETTERS = 8
+
+
+class _OnPhrases:
+    """A `phrase.heard` handler given `phrases=`: called only for those phrases, not for every phrase another
+    handler of the same connection listens for (the lamp is asked for all of them, once). Phrases compare
+    lowercased, as lamp-control lowercases them (`str::to_lowercase`, `protocol::phrase_words`) and as the JS SDK does
+    (`toLowerCase`), never case-folded: the same rule everywhere, so a handler never misses a phrase the lamp said. It compares equal to
+    the handler it wraps, so `off()` and a refused subscription take it back off by the handler itself."""
+
+    def __init__(self, handler: Handler, phrases: list[str]) -> None:
+        self.handler = handler
+        self.phrases = {phrase.lower() for phrase in phrases}
+
+    def __call__(self, event: dict) -> Any:
+        said = event.get("phrase")
+        if isinstance(said, str) and said.lower() not in self.phrases:
+            return None
+        return self.handler(event)
+
+    def __eq__(self, other: object) -> bool:
+        return other is self or other == self.handler
+
+    __hash__ = None  # type: ignore[assignment]
 
 
 def _short_phrase(phrases: list[str] | None) -> None:
@@ -87,6 +118,38 @@ async def _open(host: str, port: int, pin: str) -> ClientConnection:
         await ws.close()
         raise WrongLamp(f"the certificate at {host} is not the lamp's: {seen[:16]}..., not {pin[:16]}...")
     return ws
+
+
+# lamp-control's control socket for a skill's run: the same WebSocket door over a unix socket, no TLS, no pairing,
+# let in by a one-run token (docs/control.md, "The control socket"). Not the local agent's socket.
+LOCAL_SOCKET = "/run/lampos-control/control.sock"
+
+
+# The local agent's socket (docs/control.md, "The local agent"): where a
+# program of the user the owner named, on the lamp itself, reaches the door
+# with no pairing. `LAMPOS_AGENT_SOCKET` names another place.
+AGENT_SOCKET = "/run/lampos-agent/agent.sock"
+AGENT_SOCKET_ENV = "LAMPOS_AGENT_SOCKET"
+
+
+def _agent_socket() -> str | None:
+    """The agent socket's path if there is one here (a socket file), else None."""
+    path = os.environ.get(AGENT_SOCKET_ENV) or AGENT_SOCKET
+    try:
+        return path if stat.S_ISSOCK(os.stat(path).st_mode) else None
+    except OSError:
+        return None
+
+
+async def _open_local(path: str) -> ClientConnection:
+    """The door's WebSocket on the agent socket: no TLS and no pin; the socket's
+    own check (the kernel's word on who connects) is what lets this program in."""
+    return await unix_connect(
+        path,
+        f"ws://lamp.local/v{schema.VERSION}",
+        max_size=1 << 20,
+        ping_interval=KEEPALIVE_S,
+    )
 
 
 async def _welcome(ws: ClientConnection) -> dict:
@@ -146,11 +209,39 @@ def _check(op: str, fields: dict) -> None:
             raise LampError(f"{field} {value!r}: one of {', '.join(names)}", code="bad_request")
     for value in fields.get("events", ()):
         if value not in schema.events():
-            raise LampError(f"no event {value!r}", code="bad_request")
+            raise _no_event(value)
     # A lease's parts; a `sound.upload`'s or `skill.push`'s `parts` is a count.
     for value in fields.get("parts", ()) if op == "lease.take" else ():
         if value not in schema.parts():
             raise LampError(f"no part {value!r}", code="bad_request")
+
+
+def _no_event(name: str, *, on: bool = False) -> LampError:
+    """The refusal for a name that is no event, with the event the name was
+    meant for when it is a lease's or a look's end (`lease.ended` is `lease`,
+    state `lost`)."""
+    if name in ("lease", "done"):
+        # Known to `on`, but sent to you with no subscription.
+        return LampError(
+            f"no event {name!r} to subscribe to: it comes without subscribing, "
+            f"hear it with lamp.on({name!r}, handler)",
+            code="bad_request",
+        )
+    if name.startswith("lease"):
+        hint = (
+            "a lease's changes come as the event 'lease' (state held, suspended or lost, "
+            "and why): lamp.on('lease', handler)"
+        )
+    elif name.startswith("done"):
+        hint = "the end of a look or a move comes as the event 'done': lamp.on('done', handler)"
+    else:
+        if on:
+            # What `on` takes: the schema's, the streams' and the two that come unasked.
+            names = sorted({*schema.events(), *CAMERA_EVENTS, *MICROPHONE_EVENTS, *SPEAKER_EVENTS})
+            hint = f"one of {', '.join(names)}, or 'lease' or 'done'"
+        else:
+            hint = f"one of {', '.join(sorted(schema.events()))}"
+    return LampError(f"no event {name!r}: {hint}", code="bad_request")
 
 
 def binary_frame(message: bytes) -> dict:
@@ -167,11 +258,30 @@ def binary_frame(message: bytes) -> dict:
 # and a microphone stream's.
 CAMERA_EVENTS = ("camera.frame", "camera.ended")
 MICROPHONE_EVENTS = ("microphone.audio", "microphone.ended")
+# A speaker stream's, also never subscribed to: its stats every 2 s and its end.
+SPEAKER_EVENTS = ("speaker.stats", "speaker.ended")
+
+# What the lamp takes of a speaker stream (docs/control.md, "The speaker"):
+# mono S16LE at 16 kHz (the default) or 24 kHz, in binary messages of at most
+# 9,600 bytes of samples; this client sends 100 ms at most, the frame length
+# the lamp announces (`frame_ms`).
+SPEAKER_RATES = (16_000, 24_000)
+SPEAKER_FRAME_MAX_BYTES = 9_600
+SPEAKER_FRAME_MS = 100
 
 # `keep_connected`'s pauses before connecting again, in seconds: the first
 # after a closed connection, then longer while the lamp can't be reached (a
 # restart takes a few seconds; an update about a minute).
 RECONNECT_PAUSES = (1.0, 2.0, 5.0, 10.0)
+
+_log = logging.getLogger("lampos")
+
+
+def _said(task: "asyncio.Future", name: str) -> None:
+    """Says an async handler's exception: nobody else awaits it."""
+    if not task.cancelled() and task.exception() is not None:
+        _log.error("your handler for %s raised", name, exc_info=task.exception())
+
 
 class Subscription:
     """What `Lamp.on` returns: an awaitable, not a future. Awaited, it raises
@@ -346,6 +456,165 @@ class Following:
         await self.stop()
 
 
+class SpeakerStream:
+    """A running `speaker.stream` (see `Lamp.speaker_stream`): write mono
+    S16LE sound with `speaker_write`, or play a WAV with `play_wav`. `info`
+    is the lamp's answer (`sample_rate`, `format`, `frame_ms`, `buffer_ms`,
+    `source`, `turn`); `stats` is the newest `speaker.stats` (every 2 s);
+    `ended` is the lamp's why once it ended the stream (`speaker.ended` of
+    this stream's `turn`), None while it runs."""
+
+    def __init__(self, lamp: "Lamp", info: dict):
+        self.lamp = lamp
+        self.info = info
+        self.sample_rate: int = info.get("sample_rate", 16_000)
+        self.turn = info.get("turn")
+        self.stats: dict | None = None
+        self.ended: str | None = None
+        self.sequence = 0
+        # An odd last byte of a write waits for the next one's first (a sample is two bytes).
+        self._rest = b""
+        # When the sound written so far has played, on the monotonic clock.
+        self._plays_until = 0.0
+        self._early: list[dict] = []
+
+    def _event(self, event: dict) -> None:
+        # Another stream's end (an old one this computer replaced, whose
+        # `turn` is not ours) is not this stream's. Until the answer gives
+        # our turn, events are kept and judged then.
+        if self.turn is None:
+            self._early.append(event)
+            return
+        if event.get("turn", self.turn) != self.turn:
+            return
+        if event["ev"] == "speaker.ended":
+            self.ended = str(event.get("why", "ended"))
+        else:
+            self.stats = event
+
+    @property
+    def frame_bytes(self) -> int:
+        return self.sample_rate * 2 * SPEAKER_FRAME_MS // 1000
+
+    async def speaker_write(self, pcm: bytes) -> None:
+        """Send `pcm` (mono signed 16-bit little-endian samples at this
+        stream's rate) in binary frames of 100 ms at most, each with its
+        `sequence`. It paces nothing: the lamp buffers 300 ms and drops what
+        a slow computer's queue can't hold, so a caller sending a clip waits
+        between writes (`drain`, or `play_wav`). Raises `closed` once the lamp
+        ended the stream (see `ended`)."""
+        data = self._rest + bytes(pcm)
+        whole = len(data) - len(data) % 2
+        data, self._rest = data[:whole], data[whole:]
+        for at in range(0, len(data), self.frame_bytes):
+            await self._send(data[at : at + self.frame_bytes])
+
+    write = speaker_write
+
+    async def _send(self, samples: bytes) -> None:
+        if self.ended is not None:
+            raise LampError(f"the speaker stream ended: {self.ended}", code="closed")
+        header = json.dumps({"ev": "speaker.audio", "sequence": self.sequence}, separators=(",", ":")).encode()
+        try:
+            await self.lamp._ws.send(len(header).to_bytes(4, "big") + header + samples)
+        except ConnectionClosed as error:
+            raise LampError("the connection to the lamp closed", code="closed") from error
+        self.sequence += 1
+        now = time.monotonic()
+        self._plays_until = max(self._plays_until, now) + len(samples) / (self.sample_rate * 2)
+
+    async def drain(self) -> None:
+        """Wait until the sound written so far has played, in real time (the
+        stream's own count of it, not the lamp's), so the next write or the
+        end of the stream doesn't cut it."""
+        wait = self._plays_until - time.monotonic()
+        if wait > 0:
+            await asyncio.sleep(wait)
+
+    async def play_wav(self, path: str | os.PathLike) -> None:
+        """Play a WAV file of 16-bit mono PCM at this stream's rate, written
+        in real time, in 20 ms frames; returns when it has been played
+        (the lamp's own buffer too). Any other WAV is a `bad_request`."""
+        try:
+            clip = wave.open(str(path), "rb")
+        except (OSError, EOFError, wave.Error) as error:
+            raise LampError(f"{path}: not a WAV that can be read: {error}", code="bad_request") from error
+        with clip:
+            if clip.getnchannels() != 1 or clip.getsampwidth() != 2 or clip.getcomptype() != "NONE":
+                raise LampError(f"{path}: a WAV of 16-bit mono PCM is needed", code="bad_request")
+            rate = clip.getframerate()
+            if rate not in SPEAKER_RATES:
+                raise LampError(f"{path}: {rate} Hz; a speaker stream takes 16000 or 24000", code="bad_request")
+            if rate != self.sample_rate:
+                raise LampError(
+                    f"{path}: {rate} Hz, but this stream takes {self.sample_rate}: "
+                    f"open it with speaker_stream(sample_rate={rate})",
+                    code="bad_request",
+                )
+            pcm = clip.readframes(clip.getnframes())
+        await self.play_pcm(pcm)
+
+    async def play_pcm(self, pcm: bytes) -> None:
+        """`pcm` written in real time as `play_wav` does, in 20 ms frames,
+        returning when it has been played."""
+        start = time.monotonic()
+        step = self.sample_rate * 2 * 20 // 1000
+        sent = 0
+        for at in range(0, len(pcm), step):
+            # A frame goes at its own time, so a slow send is caught up, not added to.
+            wait = start + sent / (self.sample_rate * 2) - time.monotonic()
+            if wait > 0:
+                await asyncio.sleep(wait)
+            piece = pcm[at : at + step]
+            await self.speaker_write(piece)
+            sent += len(piece)
+        await self.drain()
+        await asyncio.sleep(self.info.get("buffer_ms", 0) / 1000)
+
+
+class Notes:
+    """This computer's notes on the lamp: `await lamp.notes.set("mood",
+    {"calm": True})`, `get`, `delete`, `list` (see `Lamp.notes_set`)."""
+
+    def __init__(self, lamp: "Lamp") -> None:
+        self._lamp = lamp
+
+    async def set(self, key: str, value: Any) -> dict:
+        return await self._lamp.notes_set(key, value)
+
+    async def get(self, key: str, default: Any = None) -> Any:
+        return await self._lamp.notes_get(key, default)
+
+    async def delete(self, key: str) -> bool:
+        return await self._lamp.notes_delete(key)
+
+    async def list(self, prefix: str = "") -> dict:
+        return await self._lamp.notes_list(prefix)
+
+
+class LightHold:
+    """A light kept on by `Lamp.hold_light`: asked again every half of the hold
+    limit until `stop()` or a refusal."""
+
+    def __init__(self, lamp: "Lamp", colour: str, level: int, pattern: str | None, hold_ms: int, on_error: Callable | None):
+        self._task = asyncio.create_task(self._keep(lamp, colour, level, pattern, hold_ms, on_error))
+
+    async def _keep(self, lamp, colour, level, pattern, hold_ms, on_error) -> None:
+        while True:
+            await asyncio.sleep(max(1.0, hold_ms / 2000))
+            try:
+                await lamp.light(colour, level, hold_ms, pattern)
+            except LampError as error:
+                if on_error is not None:
+                    on_error(error)
+                else:
+                    warnings.warn(f"lampos: hold_light ended: {error}")
+                return
+
+    def stop(self) -> None:
+        self._task.cancel()
+
+
 class Lamp:
     """A connection to one paired lamp."""
 
@@ -356,6 +625,10 @@ class Lamp:
         self.grants: list[str] = hello.get("grants", [])
         self.limits: dict = hello.get("limits", {})
         self._next_id = 1
+        self.close_reason: str | None = None  # why the lamp closed the connection, when it said
+        # The run this connection is for, when the lamp says (a token's `hello`).
+        self.run: str | None = hello.get("run")
+        self.skill: str | None = hello.get("skill")  # and the skill it runs for
         self._waiting: dict[int, asyncio.Future] = {}
         self._done: dict[int, asyncio.Future] = {}
         self._handlers: dict[str, list[Handler]] = defaultdict(list)
@@ -437,16 +710,64 @@ class Lamp:
         keyring: Keyring | None = None,
     ) -> "Lamp":
         """Connect to a paired lamp (by its id, or the only one paired) and
-        say hello."""
+        say hello. With no pairing and no `host`, inside a skill's run on the
+        lamp (`LAMP_CONTROL_TOKEN` set and not empty) it is `Lamp.local(token)`:
+        the run's own grants, not the local agent's. A pairing, when there is
+        one, wins as before."""
         keyring = keyring or Keyring()
         pairing = keyring.pairing(lamp)
+        local = None
+        if pairing is None and not host:
+            token = (os.environ.get("LAMP_CONTROL_TOKEN") or "").strip()
+            if token:
+                return await cls.local(token)
         if pairing is None:
-            raise NotPaired("no pairing here for that lamp: run `lamp pair` first")
-        ws = await _open(host or pairing.host, pairing.port, pairing.fp)
+            # On the lamp itself, as the user the owner turned on: no pairing,
+            # the agent socket. Never when a `host` was asked for.
+            local = None if host else _agent_socket()
+            if local is None:
+                raise NotPaired("no pairing here for that lamp: run `lamp pair` first")
+            ws = await _open_local(local)
+        else:
+            ws = await _open(host or pairing.host, pairing.port, pairing.fp)
         try:
             welcome = await _welcome(ws)
-            sig = keyring.hello(welcome["nonce_bytes"])
-            hello = {"id": 0, "op": "hello", "client": pairing.client, "sig": b64(sig)}
+            if local is not None:
+                # The socket's peer check has already said who this is: a
+                # well-formed client and signature, neither read.
+                hello = {"id": 0, "op": "hello", "client": "c_0", "sig": b64(bytes(64))}
+            else:
+                sig = keyring.hello(welcome["nonce_bytes"])
+                hello = {"id": 0, "op": "hello", "client": pairing.client, "sig": b64(sig)}
+            debug.frame("->", hello)
+            await ws.send(json.dumps(hello))
+            reply = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
+            debug.frame("<-", reply)
+        except BaseException:
+            await ws.close()
+            raise
+        if not reply.get("ok"):
+            await ws.close()
+            raise from_reply(reply.get("error", {}))
+        return cls(ws, welcome, reply)
+
+    @classmethod
+    async def local(cls, token: str | None = None, *, path: str | None = None) -> "Lamp":
+        """Connect to lamp-control's control socket on the lamp itself, as a skill's run: the same door as a paired
+        computer's, over a unix socket, let in by the run's one-run `token` (default: `LAMP_CONTROL_TOKEN` in the
+        environment) with exactly the grants the owner's yes for that skill named. `path` defaults to
+        `LAMP_CONTROL_SOCKET`, then `/run/lampos-control/control.sock`. No pairing and no certificate pin: the
+        socket's owner check and the token are the trust. A missing, wrong or ended token is refused `no_grant`
+        in the lamp's words; `lamp.run` is the run the lamp says this is."""
+        token = token or os.environ.get("LAMP_CONTROL_TOKEN")
+        if not token:
+            raise BY_CODE["no_grant"]("no token for this run: pass one, or set LAMP_CONTROL_TOKEN")
+        path = path or os.environ.get("LAMP_CONTROL_SOCKET") or LOCAL_SOCKET
+        ws = await unix_connect(path, uri=f"ws://localhost/v{schema.VERSION}", max_size=1 << 20, ping_interval=KEEPALIVE_S)
+        try:
+            welcome = await _welcome(ws)
+            # The usual hello with no key: client c_0 and a zero signature, and the token.
+            hello = {"id": 0, "op": "hello", "client": "c_0", "sig": b64(bytes(64)), "token": token}
             debug.frame("->", hello)
             await ws.send(json.dumps(hello))
             reply = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
@@ -590,10 +911,12 @@ class Lamp:
         here then, even if the wait is cancelled (Reviewer-two's P2 on #5837).
         `request` takes the next id before it first yields, so this is it."""
         id_ = self._next_id
-        # Handed to the body, which says nothing back, `gesture` and `move`
-        # get no `done` (docs/control.md): their wait ends at the answer, so
-        # none is kept for them.
-        done = asyncio.get_running_loop().create_future() if wait and op not in ENDS_AT_REPLY else None
+        # A lamp that says `motion_done` ends `gesture`, `move`, `play` (a move, by another
+        # name) and an express's move with a `done` once the body says what became of
+        # them; on one that doesn't, their wait ends at the answer, so none
+        # is kept for them.
+        at_reply = op in ENDS_AT_REPLY and not self.limits.get("motion_done")
+        done = asyncio.get_running_loop().create_future() if wait and not at_reply else None
         if done is not None:
             self._done[id_] = done
         try:
@@ -604,6 +927,11 @@ class Lamp:
             raise
         if taken is not None:
             taken()
+        # An express too slight to move (`"move": null`) sends the body
+        # nothing, so no `done` follows: its wait ends at the answer.
+        if done is not None and op == "express" and reply.get("move") is None:
+            self._done.pop(id_, None)
+            return reply
         return reply if done is None else await done
 
     # The reader.
@@ -615,6 +943,13 @@ class Lamp:
             # The lamp went away without a close (a restart, its Wi-Fi):
             # `wait_closed` returns, and the waiting requests fail below.
             pass
+        # When the lamp said why it closed ("grants changed by the owner",
+        # "this computer was revoked by the owner", "the lamp restarts"), one
+        # line says it, so a developer is not left guessing.
+        why = getattr(self._ws, "close_reason", None)
+        if why:
+            self.close_reason = why
+            _log.warning("the lamp closed the connection: %s", why)
 
     async def _frames(self) -> None:
         try:
@@ -637,6 +972,11 @@ class Lamp:
             for future in [*self._waiting.values(), *self._done.values()]:
                 if not future.done():
                     future.set_exception(LampError("the connection to the lamp closed", code="closed"))
+            # The lamp ends a computer's leases when its last connection
+            # closes and tells nobody: none of ours is held any more.
+            for lease in self._leases.values():
+                if lease.state in ("held", "suspended"):
+                    lease.state, lease.lost_why = "lost", "the connection closed"
 
     def _event(self, event: dict) -> None:
         name = event["ev"]
@@ -649,11 +989,18 @@ class Lamp:
             if future and not future.done():
                 future.set_result(event)
         for handler in self._handlers.get(name, []):
-            result = handler(event)
+            # A handler that raises must neither end the connection (this runs in the reader) nor vanish:
+            # it is said, with its traceback, on the `lampos` logger (stderr by default).
+            try:
+                result = handler(event)
+            except Exception:
+                _log.exception("your handler for %s raised", name)
+                continue
             if inspect.isawaitable(result):
                 task = asyncio.ensure_future(result)
                 self._tasks.add(task)
                 task.add_done_callback(self._tasks.discard)
+                task.add_done_callback(lambda done, name=name: _said(done, name))
 
     # Events and state.
 
@@ -663,10 +1010,11 @@ class Lamp:
         `await lamp.on(...)` raises the lamp's refusal (`NoGrantError` without
         the event's grant). Not awaited, a refusal is raised by
         `wait_closed` instead, never lost."""
-        if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS, *MICROPHONE_EVENTS):
-            raise LampError(f"no event {event!r}", code="bad_request")
+        if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS, *MICROPHONE_EVENTS, *SPEAKER_EVENTS):
+            raise _no_event(event, on=True)
         _short_phrase(phrases)
-        self._handlers[event].append(handler)
+        # A handler given `phrases` hears only those; with none it hears every `phrase.heard`.
+        self._handlers[event].append(_OnPhrases(handler, phrases) if phrases and event == "phrase.heard" else handler)
         if phrases:
             self._phrases = sorted(set(self._phrases) | set(phrases))
         if event not in schema.events():
@@ -766,8 +1114,8 @@ class Lamp:
 
     # Actions.
 
-    async def express(self, feeling: str, strength: float | None = None) -> dict:
-        return await self._act("express", False, feeling=feeling, strength=strength)
+    async def express(self, feeling: str, strength: float | None = None, *, wait: bool = False) -> dict:
+        return await self._act("express", wait, feeling=feeling, strength=strength)
 
     async def gesture(self, name: str, *, wait: bool = False) -> dict:
         return await self._act("gesture", wait, name=name)
@@ -811,8 +1159,13 @@ class Lamp:
         frames = poses_to_frames(poses, step_ms=POSES_STEP_MS, hold_ms=hold_ms)
         return await self.move(frames, POSES_STEP_MS, wait=wait)
 
-    async def play(self, name: str, *, wait: bool = False) -> dict:
-        return await self._act("play", wait, name=name)
+    async def play(self, name: str, *, skill: str | None = None, wait: bool = False) -> dict:
+        """Play a move recorded in a skill this computer pushed (its
+        `moves/NAME.json`, kept when `push_skill` installed it), as a `move`
+        of the same frames is played: the same body lease, caps and answer.
+        `skill` says which when two of your skills have the name; the lamp
+        refuses an ambiguous name, naming them."""
+        return await self._act("play", wait, name=name, skill=skill)
 
     async def joints(self, lease: Lease, within_ms: int, *, wait: bool = False, **targets: float) -> dict:
         """Aim the joints named, in degrees, under `lease`. Its answer when the
@@ -823,6 +1176,23 @@ class Lamp:
 
     async def light(self, colour: str, level: int, for_ms: int, pattern: str | None = None) -> dict:
         return await self._act("light", False, colour=colour, level=level, pattern=pattern, for_ms=for_ms)
+
+
+    async def hold_light(self, colour: str, level: int, pattern: str | None = None, *, on_error: Callable | None = None) -> "LightHold":
+        """Keeps a light on past the 30 s one ask lasts: asks it now and again
+        at half of the lamp's hold limit (`limits["hold_max_ms"]`) until
+        `stop()`. A later ask the lamp refuses ends the holding; the error goes
+        to `on_error` (else a warning)."""
+        hold_ms = int(self.limits.get("hold_max_ms", 30_000))
+        await self.light(colour, level, hold_ms, pattern)
+        return LightHold(self, colour, level, pattern, hold_ms, on_error)
+    @property
+    def language(self) -> str:
+        """The owner's language, from hello: `en`, `vi`, `ja`, `zh` or `ko`, so a
+        program's own lines can follow it. `en` from a lamp that says none (one
+        from before this), and from a code this SDK does not know."""
+        said = self.info.get("language")
+        return said if said in ("en", "vi", "ja", "zh", "ko") else "en"
 
     @property
     def ring_pixels(self) -> int | None:
@@ -856,11 +1226,23 @@ class Lamp:
         `(r, g, b)`, for `for_ms`, at `brightness` 0-100."""
         return await self._act("light", False, rgb=_hex(rgb), brightness=brightness, fade_ms=fade_ms, for_ms=for_ms)
 
-    async def say(self, text: str, *, rephrase: bool = False) -> dict:
+    async def light_off(self, *, for_ms: int = 30_000) -> dict:
+        """Put the lamp's light out for `for_ms` (30 s at most), as a black
+        ring: there is no level 0 for `light`, and a ring of black pixels is
+        how a program turns the light off. The lamp's own light comes back
+        when it lapses or at `stop()`; ask again before it lapses to keep it
+        out. Needs a lamp with a pixel ring (`ring_pixels`)."""
+        count = self.ring_pixels
+        if count is None:
+            raise LampError("light_off needs a lamp with a pixel ring: this one has none", code="bad_request")
+        return await self.ring(["#000000"] * count, for_ms=for_ms)
+
+    async def say(self, text: str, *, rephrase: bool = False, wait: bool = False) -> dict:
         """Say `text` in the lamp's voice, exactly as written, once the person
         isn't talking. `rephrase=True` lets the lamp's model say it in its own
-        words instead, as before."""
-        return await self._act("say", False, text=text, rephrase=True if rephrase else None)
+        words instead, as before. `wait=True` returns its `done` once it has
+        been said (`finished`), or `dropped`/`cut_short` with the voice's why."""
+        return await self._act("say", wait, text=text, rephrase=True if rephrase else None)
 
     # The camera (the `camera` grant): the eyes' own newest picture, never
     # while the lamp is private.
@@ -910,6 +1292,64 @@ class Lamp:
         (the lamp doesn't share its microphone, `LAMP_BUS_AUDIO`)."""
         return await self.request("microphone.stream", on=on)
 
+    # The speaker (the `speaker` grant, never given by default): any sound
+    # through the lamp's speaker, never while the lamp is private or muted,
+    # only on the lamp's own network.
+
+    async def speaker_stream_request(self, on: bool = True, sample_rate: int | None = None) -> dict:
+        """The plain `speaker.stream` request, as `microphone_stream` is:
+        `on` True opens it (replacing any stream of this lamp, whose
+        connection is told `speaker.ended` `replaced`), False ends it.
+        `sample_rate` is 16000 (the lamp's default) or 24000. Answers
+        `sample_rate`, `format` (`s16le`), `frame_ms`, `buffer_ms`, `source`
+        and `turn`. Prefer `speaker_stream`, which also sends the sound."""
+        fields: dict[str, Any] = {"on": on}
+        if sample_rate is not None:
+            fields["sample_rate"] = sample_rate
+        return await self.request("speaker.stream", **fields)
+
+    @contextlib.asynccontextmanager
+    async def speaker_stream(self, sample_rate: int = 16_000):
+        """Play sound of your own through the lamp's speaker:
+
+            async with lamp.speaker_stream() as out:
+                await out.speaker_write(pcm)   # mono S16LE, 16 kHz
+                await out.play_wav("clip.wav")
+
+        Needs the `speaker` grant, which the owner ticks at pairing and is
+        never pre-ticked: it lets a program sound like a person, so the
+        pairing screen says so. The lamp plays it through its own speaker
+        path (the person's volume; never while private or muted; words the
+        lamp speaks and a stream don't mix), shows the ring's mark, and ends
+        the stream after 2 s with no frame, 10 minutes, or when the lamp or
+        the person speaks: `out.ended` says why. `sample_rate` is 16000
+        (the default) or 24000. Leaving the block ends the stream."""
+        if sample_rate not in SPEAKER_RATES:
+            raise LampError(f"sample_rate: 16000 or 24000, not {sample_rate!r}", code="bad_request")
+        # Heard from before the request, so an end that comes with or right
+        # after the answer is not missed; its turn is known at the answer.
+        out = SpeakerStream(self, {})
+        for event in SPEAKER_EVENTS:
+            self._handlers[event].append(out._event)
+        try:
+            info = await self.speaker_stream_request(True, sample_rate)
+            out.info, out.sample_rate, out.turn = info, info.get("sample_rate", sample_rate), info.get("turn", 0)
+            early, out._early = out._early, []
+            for event in early:
+                out._event(event)
+            yield out
+        finally:
+            for event in SPEAKER_EVENTS:
+                handlers = self._handlers.get(event, [])
+                if out._event in handlers:
+                    handlers.remove(out._event)
+                if not handlers:
+                    self._handlers.pop(event, None)
+            # An end the lamp told is already over; and a closed connection has nothing to end.
+            if out.ended is None and out.turn is not None:
+                with contextlib.suppress(LampError):
+                    await self.speaker_stream_request(False)
+
     async def sound(self, name: str) -> dict:
         """Play `hum`, the lamp's own, or one of this computer's clips by
         name (`upload_sound`), once the person isn't talking."""
@@ -918,7 +1358,9 @@ class Lamp:
     async def upload_sound(self, name: str, wav: bytes | str | os.PathLike) -> dict:
         """Keep a clip on the lamp as `name`, over one of the same name, to
         play with `sound(name)`: a WAV of 16-bit mono PCM at 24 kHz, at most
-        30 s, within the voice's loudness cap. `wav` is its bytes or a path.
+        30 s, within the voice's loudness cap: no sample past -12 dBFS and no
+        10 ms past -30 dBFS RMS (so a steady tone peaks near -27 dBFS at most).
+        `wav` is its bytes or a path.
         Sent in parts, as the lamp takes them; the lamp checks it whole and
         refuses it with why. Returns the clip as kept: name, bytes, ms."""
         data = wav if isinstance(wav, bytes) else Path(wav).read_bytes()
@@ -946,6 +1388,54 @@ class Lamp:
     async def remove_sound(self, name: str) -> dict:
         """Delete one of this computer's clips from the lamp."""
         return await self.request("sound.remove", name=name)
+
+    # Notes (the `notes` grant, docs/control.md "Notes"): this computer's own
+    # small key/value memory on the lamp. It outlives the program and the
+    # lamp's restart, belongs to this computer alone, and goes when the owner
+    # lets it go.
+
+    @property
+    def notes(self) -> "Notes":
+        """`lamp.notes.get/set/delete/list`: this computer's own notes."""
+        return Notes(self)
+
+    async def notes_set(self, key: str, value: Any) -> dict:
+        """Keep `value` (any JSON, at most 16384 bytes serialized) under
+        `key` (up to 64 of letters, digits and `. _ : -`): `{"key", "bytes"}`.
+        A computer keeps 256 keys and 256 KiB at most (`limits["notes"]`)."""
+        reply = await self.request("notes.set", key=key, value=value)
+        return {"key": reply["key"], "bytes": reply["bytes"]}
+
+    async def notes_get(self, key: str, default: Any = None) -> Any:
+        """The value under `key`, or `default` when none is kept (a stored
+        `None` is returned as `None`)."""
+        reply = await self.request("notes.get", key=key)
+        return reply["value"] if reply.get("found") else default
+
+    async def notes_delete(self, key: str) -> bool:
+        """Drop `key`; whether it was kept."""
+        return bool((await self.request("notes.delete", key=key)).get("deleted"))
+
+    async def notes_list(self, prefix: str = "") -> dict:
+        """This computer's keys that start with `prefix`, sorted:
+        `keys` (each `{"key", "bytes"}`), `count`, `total`, `bytes`,
+        `keys_max` and `bytes_max`."""
+        reply = await self.request("notes.list", prefix=prefix) if prefix else await self.request("notes.list")
+        return {k: v for k, v in reply.items() if k not in ("re", "ok")}
+
+    # A skill run's linked services (the control socket only, #6432).
+
+    async def service_read(self, service: str, args: dict | None = None) -> Any:
+        """One read of `service` (a lamp-services code, such as `gmail`)
+        with `service_read`'s own `args`: lamp-services' `result`. Needs
+        `<service>-read`."""
+        return (await self.request("service.read", service=service, args=args or {})).get("result")
+
+    async def service_write(self, service: str, args: dict | None = None) -> Any:
+        """A write to `service`, only prepared: `result` holds its
+        `read_back` and `held: True`, and the person's spoken yes sends it,
+        never the run. Needs `<service>-write`."""
+        return (await self.request("service.write", service=service, args=args or {})).get("result")
 
     # Turns and listening (docs/control.md): the person wins over each.
 
@@ -1017,7 +1507,19 @@ class Lamp:
                 parts=len(parts),
                 data=data,
             )
-        return reply.get("skill", {})
+        skill = reply.get("skill", {})
+        # What the lamp kept of the package's `moves/` for `play` (a lamp
+        # that has it): `{"kept": [...], "left_out": [{"name", "why"}]}`. A
+        # lamp that doesn't say gets the check's own: the moves it would
+        # refuse, with `kept` None (not known here).
+        if "moves" in reply:
+            return {**skill, "moves": reply["moves"]}
+        left = [
+            {"name": w.split(":", 1)[0].removeprefix("moves/").removesuffix(".json"), "why": w.split(": ", 1)[1]}
+            for w in report.warnings
+            if w.startswith("moves/")
+        ]
+        return {**skill, "moves": {"kept": None, "left_out": left}} if left else skill
 
     async def skills(self) -> list[dict]:
         """This computer's own pushed skills."""

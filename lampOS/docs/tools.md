@@ -230,7 +230,8 @@ Unknown private fields and enum values are refused. Neither direct calls nor
 `use_skill` can obtain authority through model arguments; both preserve the
 original context and deadlines. Written and Messages requests, including
 `speak=true`, cannot supply spoken context. Ordinary calls retain their
-existing wire. See [requested audio](requested-audio.md) for default-off
+existing wire. Off unless set; on in the product's voice, skills and actions
+units since #5749. See [requested audio](requested-audio.md) for switch-off
 advertisement, confirmation retirement, immutable asset checks and terminal
 cancellation. This does not extend autonomous three-second sound cues.
 
@@ -261,12 +262,47 @@ and none of the skills' own (`crate::use_skill`):
 - **What the session is told:** after the rest of its instruction, "Your
   skills": one line each, its name, its description, and its choice's name
   and words and its yes-or-no's name, each with what its parameter says.
-  At most 4,096 bytes (`SECTION_MOST_BYTES`): skills past that are named
-  alone while their names fit, then left out of the lines; the setup line
-  counts both (`; use_skill's lines: N named alone, M left out`). The Live route keeps that
+  At most 4,096 bytes (`SECTION_MOST_BYTES`). While every line fits they
+  are told whole in the tools file's order, as before. Past it the lines
+  keep that order, but the core skills' (the tools file's `core`:
+  `dance`, `lamp_help`, `set_pose`, `wellbeing_nudges`, and
+  `prepare_to_unplug` and `stay_plugged_in` with `LAMP_UNPLUG=on`) are
+  kept whole first; every other skill is given a short line, its name and
+  its description's first sentence, at most 200 bytes of it
+  (`SHORT_MOST_BYTES`, cut at a word's end with "…"), then its choice's
+  name and words and its yes-or-no's name; then, in order, those short
+  lines are made whole again while there is room. A skill whose short line
+  doesn't fit is named alone while its name fits, then left out of the
+  lines; the setup line counts all three (`; use_skill's lines: S
+  shortened, N named alone, M left out`). With the Skills Store's nine
+  packages installed beside the product's skills (lamp-voice 90525c3717),
+  the lines were 3,989 bytes with `set_pose`, `wellbeing_nudges`,
+  `study_buddy` and `who_was_here` named alone, so the model no longer knew
+  when to call them; now 4,065, every core line whole, six Store skills
+  shortened and none named alone (`use_skill::tests`). The Live route keeps that
   room from the thread as it keeps the room for what it can't do right now;
   the cascade (`LAMP_VOICE_ROUTE=second`) tells it in each turn's system
   message.
+- **`when` lines** (#6218, `LAMP_USE_SKILL_SUMMARY=on` on lamp-skills, off
+  unless set). With the switch, the tools file gives a `when` beside its tools
+  (`lamp_skills::tools_file`): by tool, a line of at most 200 bytes. It comes
+  from `SKILL.md`'s `when:`, a `[stop]`'s `when`, or `stay_plugged_in`'s own
+  line, and says when to call the skill and when not. It also keeps what the
+  lamp says or doesn't say as it calls (the first builder's ruling: a realtime
+  model often speaks in the same turn as the call, before its answer comes).
+  - **The line told:** a skill with a `when` is told it in place of its
+    description (`use_skill::section_told`, `tools::skill_whens`): its name,
+    its `when`, then its choice's name and words and its yes-or-no's name, as
+    on a short line. That is the same line whole and short.
+  - **The answer:** the skill's whole line, as the session would have been
+    told it, comes with its call's answer under `now` ("Now, as dance's own
+    words say: …", `use_skill::now`), after `ran`, and never on a refusal.
+    So the how-to and after-the-call words are read on the turn the model
+    acts on them.
+  - **Without a `when`:** a skill with none (a Store skill, or an older file)
+    is told and answered as before. With no `when` at all, the section is the
+    same byte for byte
+    (`a_skill_with_a_when_line_is_told_it_and_answered_with_its_words`).
 - **A call:** routed as `Route::UseSkill` and made the skill's own call
   when it runs (`use_skill::translate`). The choice and the yes-or-no go
   under the skill's own parameters' names. The skill's own names are taken
@@ -311,9 +347,49 @@ and none of the skills' own (`crate::use_skill`):
   before. On lamp-52e6 on 9 Nov (build 10883) both skills were offered with
   lines naming those asks, and "Lamp, movie light." (2 of 2) and "Lamp,
   show me a light show." (3 of 3) were answered in words with no call;
-  "reading light" and "light my book" did call. Host tests:
+  "reading light" and "light my book" did call. A line that is only a
+  plain question about the lamp itself, whole ("who made you", "who
+  built you", "what company made you", "where can I buy you", "where can
+  I get you", "where can I buy one", "where can I buy a lamp like you",
+  "how much do you cost", "how much are you", "what's your price" and the
+  like; `tools::skill_asked::asks_about`), with only a greeting, the
+  lamp's name, "please" or "thanks" around it, is forced the same way to
+  the help skill: `skill` told only `lamp_help` (faq's function: `use_skill`
+  names a skill by its function, as `light_scene` for light-scenes); the
+  topic is still the model's. A question with any other word ("who made
+  you sad", "where can I buy milk", "do you know who made you") is the
+  model's. The same questions asked in Vietnamese, with diacritics as
+  speech-to-text writes them ("Ai làm ra bạn?", "Ai tạo ra bạn?", "Công
+  ty nào làm ra bạn?", "Mua bạn ở đâu?", "Bạn giá bao nhiêu?" and the
+  like), are forced too, with "ơi", "đèn", "chào", "vậy", "thế", "ạ",
+  "nhỉ" or "cảm ơn" also allowed around them; "ai làm bạn buồn" (who made
+  you sad), "mua sữa ở đâu" (where to buy milk) and two questions in one
+  line stay the model's. Those Vietnamese words never let a light ask
+  through. On build 11756 on 11 Nov (#6216's row) "Hey Lamp, who made
+  you?" and "Hey Lamp, where can I buy you?" called nothing, and the
+  second said "autonomous.ai" without faq's /lamp page. Host tests:
   `a_plain_ask_for_a_scene_or_a_show_is_told_apart`,
-  `a_plain_ask_forces_its_skill_only_when_offered`.
+  `a_plain_ask_forces_its_skill_only_when_offered`,
+  `a_plain_question_about_the_lamp_asks_its_help`,
+  `a_plain_question_about_the_lamp_in_vietnamese_asks_its_help`,
+  `a_plain_question_about_the_lamp_forces_its_help_only_when_offered`.
+- **A skill asked for by its name** (the second route,
+  `LAMP_SKILL_NAMED=on`, off unless set, on in the product's
+  `lamp-voice.service`, #6772): a line that is only an
+  installed, non-core skill's name ("photo booth", "run photo booth"), for
+  a skill that takes no choice or yes-or-no, has its function called in
+  code as round 1, through the round's call path (the Policy's hold, a
+  look its answer asks for), and the model words the result; see
+  [skills.md](skills.md#a-skill-asked-for-by-its-name-runs-in-code-6772).
+- **A plain ask to make a skill** (`LAMP_MAKE_SKILL_ASKED=on`, the second
+  route, on in the product unit; #6835): a line that is one sentence, opens with "make (me) a (new) skill" or the
+  like, says what it does, and has no word that may take it back, doubt it
+  or put it off ("no", "wait", "actually", "not", "later", …) has its first chat round sent
+  with `tool_choice` naming `make_skill`, when `make_skill` is declared
+  (`tools::make_skill_asked`; docs/skills.md, "A plain ask to make one
+  calls it"). Host tests: `a_plain_ask_to_make_a_skill_is_told_apart`,
+  `the_force_names_make_skill_for_an_ask_and_nothing_else`,
+  `the_played_make_sends_a_tool_choice_for_make_skill_when_declared`.
 - **A skill installed or removed** changes no function's name, so each skill
   `use_skill` reaches is counted as `use_skill:<skill>` against what the
   session was given, and the session is renewed for it as for any change.
@@ -482,10 +558,14 @@ a skill cut for it is named on the setup line (#1706).
 
 The switch declares two functions, `reports_stop` and `reports_state`
 (below), so a session is told two more than without it. The product's
-unit sets it: a product lamp's chat request offers 40 of the lamp's own
+unit sets it: a product lamp's chat request offers 45 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
-voice's own 21 with these two among them, the actions part's 17, Dance's
-`dance` and Pose's `set_pose` (#4135). At the bound a core skill's function is never the one cut (the
+voice's own 27 with these two among them (and `set_role` and `end_role`
+since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov, and `go_to_sleep`
+since `LAMP_SLEEP_ASKED` is on in the product, #6853), the actions part's
+17 and `use_skill`, which reaches Dance's `dance` and Pose's `set_pose`
+(#4135, #2826), Light show's `light_show` (#5745), and Light scenes'
+`light_scene` and Point the light's `point_light` (#5744). At the bound a core skill's function is never the one cut (the
 owner's rule, on #2614; [install.md](install.md)), and on the chat route
 neither is `reports_stop` nor any of the actions part's (the first builder,
 on #2644): the cut takes the second route's fetch, then its time
@@ -733,10 +813,12 @@ the call in one generation and speaks in another, after the answer; with
 `provider.json`'s thinking budget of 128 each may think first.
 
 This mode measures that against the model alone, with nothing on the lamp
-touched (`crates/voice/src/tool_turns.rs`). It asks six written requests,
+touched (`crates/voice/src/tool_turns.rs`). It asks seven written requests,
 ROUNDS times (1 to 20), each on a connection of its own told of the
-voice's `not_for_me`, a sample `light_colour` and the agent tasks'
-three functions as on the lamp:
+voice's `not_for_me`, the actions part's light functions (`light_on`,
+`light_off`, `light_colour`, `light_brighter`, `light_dimmer`,
+`light_warmer`, `light_cooler`, #6456) and the agent tasks' three
+functions as on the lamp:
 
 | Request | Function expected |
 |---|---|
@@ -746,6 +828,7 @@ three functions as on the lamp:
 | "Can you ask Claude Code on my office computer to write a short poem about a desk lamp?" | `start_agent_task` |
 | the same, then "Yes, go ahead." (only the second is timed) | `confirm_agent_task` |
 | "How is the work you gave Claude Code going?" | `check_agent_task` |
+| "Tell me a short story about a fox.", then the cut-in "Hold on. Hey, Lamp. Make the light a little warm." as lamp-52e6 heard it (#6456; only the second is timed) | `light_warmer` |
 
 Every call is answered at once by a stand-in of the real answer's shape
 (`tool_turns::stand_in`), so nothing reaches the tasks part or the
@@ -845,6 +928,34 @@ expected (`as_expected`), how many of those spoke before the call
     lamp-voice provider-check /etc/lampOS/voice/provider.json --hand-overs 5
     LAMP_TASKS_ASKED=on lamp-voice provider-check /etc/lampOS/voice/provider.json --hand-overs 5
     LAMP_TASKS_ASKED=on LAMP_TOOL_LEAD_IN=on lamp-voice provider-check /etc/lampOS/voice/provider.json --hand-overs 5
+
+**The route, not only the start (#6547).** `--hand-overs` also asks 30
+requests labelled `route_`, each with the route it should take
+(`tool_turns::Route`): the lamp's own answer (4: the weather, a fact, a joke,
+a poem said aloud), one of its own functions (9: a timer, two reminders such
+as "remind me to email Bob a summary", warmer, dimmer, off, blue, the time
+in English and in Vietnamese), a skill (5: two light scenes, "check my
+homework", which also sounds like work, look for my phone, dance), or
+`start_agent_task` (12): on the lamp (a file such as fruits.md, research, a
+website, a spreadsheet, "do it yourself on the lamp", a file asked in
+Vietnamese, "Hermes, look up the weather" by Hermes) or on a computer ("ask
+Claude Code to fix my repo", the same garbled as "cloud code", Codex named,
+"on my computer, make a doc", "on the Mac"). A skill counts through
+`use_skill` or by its own function; a hand-over's place and engine are read
+as the voice maps them (`agent_tasks::route_of`): no machine named is the
+lamp's own engine, `where` `computer` or an agent named on a computer is
+that agent, else the paired computer's. For these the session is declared
+as the lamp's own is, from its environment (its actions, skills, clock,
+`use_skill`; `agent_tasks::tools_on_the_lamp`), with its own target, and
+no computer paired unless `LAMP_HAND_OVERS_COMPUTER=ENGINE` (`claude`,
+`codex`) pairs one; so run it on the lamp, with the environment of its
+`lamp-voice.service`. The earlier requests, declared the same way now, are
+scored as before. Each line says `class`, `route` and `route_ok`, the
+summary counts `route_ok` per request and by class (`by_class`), and a
+table follows: a line a request, then the totals by class.
+
+    env $(systemctl show lamp-voice -p Environment --value) lamp-voice provider-check /etc/lampOS/voice/provider.json --hand-overs 2
+    env $(systemctl show lamp-voice -p Environment --value) LAMP_HAND_OVERS_COMPUTER=claude lamp-voice provider-check /etc/lampOS/voice/provider.json --hand-overs 2
 
 `provider-check` declares the functions with one of the staff (`who`
 off), so the length that left lamp-4ace's sessions without functions does

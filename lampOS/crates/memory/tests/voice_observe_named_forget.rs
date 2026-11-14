@@ -160,7 +160,10 @@ fn a_named_forget_said_in_a_conversation_closes_its_job_unsent() {
         &ToolCall {
             id: "c".into(),
             name: FORGET.into(),
-            args: json!({"about":"Tokyo"}),
+            // Not every word of it is in the line, so the line stays to
+            // close its job unsent; "Tokyo" alone takes the line itself
+            // (`exchanges_forget`, lamp-06c1, 11 Nov) and leaves no job.
+            args: json!({"about":"Tokyo trip"}),
         },
         BUDGET,
         Some(ANA),

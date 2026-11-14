@@ -1,0 +1,46 @@
+Retained raw failure excerpt: https://github.com/autonomous-ai/lampOS/actions/runs/42757338768
+
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0421425Z         FAIL [   0.008s] (12929/14988) lamp-voice second_provider::tests::replaced_warm_listeners_hear_current_words_and_current_music_identity
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0423210Z   stdout ───
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0423322Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0423452Z     running 1 test
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0424034Z     test second_provider::tests::replaced_warm_listeners_hear_current_words_and_current_music_identity ... FAILED
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0424524Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0424695Z     failures:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0424808Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0425145Z     failures:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0425721Z         second_provider::tests::replaced_warm_listeners_hear_current_words_and_current_music_identity
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0426084Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0426349Z     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5566 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0426719Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0426893Z   stderr ───
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0427283Z     lamp-voice second: request 7: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0427824Z     lamp-voice second: request 7 heard 5 words, the last 0 ms after the line ended
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0428271Z     lamp-voice second: request 7 chat round 1 first event in 0 ms
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0429113Z     lamp-voice second: request 7 chat round 1 called play_relaxing_music
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0429547Z     lamp-voice second: request 7 chat round 2 first event in 0 ms
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0430034Z     lamp-voice second: request 7 first piece to the voice 0 ms after the words were heard, 1 words
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0430580Z     lamp-voice second: request 7 first answer audio 0 ms after the words were heard
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0431119Z     lamp-voice second: request 8: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0431659Z     lamp-voice second: request 8 heard 5 words, the last 0 ms after the line ended
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0432172Z     lamp-voice second: request 8: of its 5 words, 0 in the lamp's answer to request 7 so far
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0432642Z     lamp-voice second: request 8 chat round 1 first event in 0 ms
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0433054Z     lamp-voice second: request 8 chat round 1 called play_relaxing_music
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0433767Z     lamp-voice second: request 8: play_relaxing_music offered a recording for a line that did not ask to play; refused
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0434328Z     lamp-voice second: request 8 chat round 2 first event in 0 ms
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0434814Z     lamp-voice second: request 8 first piece to the voice 0 ms after the words were heard, 1 words
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0435563Z     lamp-voice second: request 8 first answer audio 0 ms after the words were heard
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0435867Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0436394Z     thread 'second_provider::tests::replaced_warm_listeners_hear_current_words_and_current_music_identity' (70562) panicked at crates/voice/src/second_provider/tests.rs:16725:9:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0437092Z     assertion `left == right` failed: closed
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0437344Z       left: []
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0438021Z      right: [(8, 42, RequestedAudioContext { worker_boot: "25252525252525252525252525252525", provider_session: 42, request: 8, privacy_generation: 1, call_id: "after-replacement", issued_us: 4273184874 })]
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0438883Z     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0439171Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0439302Z   Cancelling due to test failure: 3 tests still running
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0448587Z         PASS [   0.011s] (12930/14988) lamp-voice second_provider::tests::requested_audio_runner_preserves_news_until_engine_takes_out_its_key
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.0668949Z         PASS [   0.041s] (12931/14988) lamp-voice second_provider::tests::remember_speaker::remember_speaker_without_a_live_request_scope_never_records_evidence
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.3490742Z         PASS [   0.656s] (12932/14988) lamp-voice second_provider::tests::policy::an_action_waits_no_longer_than_its_decision_takes_or_the_cap
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.3512556Z ────────────
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.3512905Z      Summary [ 272.146s] 12932/14988 tests run: 12931 passed, 1 failed, 113 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T04:59:19.3513606Z         PASS [   5.012s] (  182/14988) lamp-health::it program::between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone

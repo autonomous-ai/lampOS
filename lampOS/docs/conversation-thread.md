@@ -371,6 +371,53 @@ note of each scope's conversation:
 It costs one DeepSeek call per batch, off the turn's path, and up to about
 6.5 KB more in a turn's prompt once a conversation has a note.
 
+### Told once: after the note, not again as history (`LAMP_HISTORY_AFTER_NOTE`)
+
+With `LAMP_HISTORY_AFTER_NOTE=on` too (off in the product; #6218), the
+exchanges a stored note holds are told in it alone, not again as the
+thread's lines and the chat's history. Off, a given exchange stays in both
+until the thread drops it, so a turn is told the same talk twice: in the
+note and word for word.
+
+- **Marked only when kept.** Being given to the summary
+  (`summarized`) is not enough: an exchange is marked `folded` only once
+  the job that gave it had its note kept (`Thread::folded`, called by the
+  summary's thread after the note is stored and its lock let go), and only
+  the exact exchanges of that job (the scope's, not held, the same request
+  and the same words). A job dropped with the queue full, a model that
+  fails, takes too long or gives an empty note, and a forget while it
+  answers mark nothing: those exchanges are told in full, as before.
+- **Tied to the note told.** Each note has a lineage, the same for a note
+  made from the one before it (it holds what that one held), new for one
+  begun from nothing, unique across scopes, and each kept note a version
+  of its own, only ever larger; an exchange is marked with the lineage and
+  version it was folded into. It is left out only of a turn told its
+  scope's note of that lineage at that version or a later one
+  (`conversation_summary::told_with_lineage`). A turn reads its note before
+  it takes the thread's lock (a forget takes the thread's lock and then the
+  notes'), so a batch folded into a newer version in between is in neither
+  the note it tells nor out of its history: it stays told (the
+  Reviewer-lead's P3 on #6474). With no note told (gone at
+  10 minutes, taken at its conversation's end, or too long for the room)
+  every exchange is told as before.
+- **The same window, less the folded.** The thread's lines and the
+  history choose the same newest exchanges as with the switch off; the
+  folded ones then leave, with their kept calls. The room's lines told to
+  a person's turn (`LAMP_CONVERSATION_ROOM_LINES_TOLD`) stay: the room's
+  note is never told there. A withheld name is taken out as before.
+- **Not in the file.** The mark is never written to the thread file: the
+  note lives in the worker's memory alone, so a thread read back after a
+  restart, which has no note, tells every exchange. A reload of the file in
+  the same process (another route wrote it) keeps the mark, as it keeps
+  `summarized` and `held`, since the note is still there; the folded mark
+  only on the very exchange it was set on: the same scope and words, and
+  read back within 250 ms of its own time, the nearest, each mark once. A
+  newer exchange with the same words ("Yes.") stays told (the
+  Reviewer-lead's P3 on #6474).
+
+In the unit test, 12 exchanges with 7 folded tell the thread's lines and
+history in 1,456 bytes fewer (2,945 to 1,489) (`exchanges_a_stored_note_holds_are_told_in_it_alone`).
+
 ### Talk notes: the note kept at a conversation's end
 
 With the same switch, a conversation's end (the memory writer's, after 45 s

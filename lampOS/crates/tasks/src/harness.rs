@@ -90,6 +90,17 @@ const ENVIRONMENT: &[&str] = &[
     // The update hold (`LAMP_HARNESS_HOLD_UPDATES`, crate::hold, #5229).
     crate::hold::DISABLE,
     crate::hold::ENV_FILE,
+    // Where Harness finds the lamp's own Hermes' sessions
+    // (`LAMP_HERMES_ON_LAMP`, crate::hold::HERMES_HOME, #5978).
+    crate::hold::HERMES_HOME,
+    // Where Harness finds the lamp's own OpenClaw's sessions
+    // (`LAMP_OPENCLAW_ON_LAMP`, crate::hold::OPENCLAW_STATE_DIR, #6226).
+    crate::hold::OPENCLAW_STATE_DIR,
+    // The grid a held lamp keeps pinned (`crate::hold::GRID_BIN`, #6283).
+    crate::hold::GRID_BIN,
+    // How Harness reads the engine's launch environment: `lampos` has a
+    // nologin shell, so the hold gives it `/bin/sh` (crate::hold::SHELL).
+    crate::hold::SHELL,
 ];
 
 /// The agents a target may name. `opencode` since Harness 0.4.2 names it
@@ -117,6 +128,11 @@ pub enum EngineKind {
     /// (`FIRST_PROMPT_ARGS` null, `PROMPT_UNSUPPORTED`), so no work can be
     /// handed to them and none is a target.
     Hermes,
+    /// OpenClaw (#6226), which Harness launches as `openclaw tui --session
+    /// harness-<agentId> --message "<prompt>"` through OpenClaw's own
+    /// Gateway, with a first prompt and no permission modes (Harness CLI
+    /// 0.6.11 and up). Like Hermes, a target only on the lamp itself.
+    Openclaw,
 }
 
 impl EngineKind {
@@ -128,6 +144,7 @@ impl EngineKind {
             Self::Devin => "devin",
             Self::DevinCloud => "devin-cloud",
             Self::Hermes => "hermes",
+            Self::Openclaw => "openclaw",
         }
     }
 
@@ -145,12 +162,25 @@ impl EngineKind {
         matches!(self, Self::DevinCloud)
     }
 
-    /// Whether the agent has Harness's permission modes. Devin and Hermes have
-    /// none: Harness leaves the mode out for them and refuses one they are
+    /// Whether this is an engine lamp-update installs on the lamp and
+    /// lamp-tasks writes settings for: Hermes (#5978) or OpenClaw (#6226).
+    /// Not the lamp's list of engines: the target
+    /// [`crate::runtime::LAMP_TARGET`] runs any engine Harness reports on
+    /// the lamp and starts with a task (#6492,
+    /// [`crate::runtime::lamp_order`]).
+    pub fn on_lamp(self) -> bool {
+        matches!(self, Self::Hermes | Self::Openclaw)
+    }
+
+    /// Whether the agent has Harness's permission modes. Devin, Hermes and
+    /// OpenClaw have none: Harness leaves the mode out for them and refuses one they are
     /// sent (`INVALID_PERMISSION_MODE`; openharness `cli/src/lib/newCommand.ts`,
     /// `PERMISSION_MODES`), so they open in their own default.
     fn has_modes(self) -> bool {
-        !matches!(self, Self::Devin | Self::DevinCloud | Self::Hermes)
+        !matches!(
+            self,
+            Self::Devin | Self::DevinCloud | Self::Hermes | Self::Openclaw
+        )
     }
 
     /// Whether Harness starts this agent with no first message: Devin on
@@ -196,10 +226,26 @@ pub enum LaunchOutcome {
         agent_id: String,
     },
     /// The task's words were typed into a session the person already had,
-    /// which Harness's router chose (`serve --route`): its agent is that
-    /// session, which the lamp never closes.
+    /// which Harness's router chose (`serve --route`) or the person named
+    /// (`serve --reply-named`): its agent is that session, which the lamp
+    /// never closes.
     Joined {
         agent_id: String,
+        /// Which of the person's sessions it is, as they would know it, for
+        /// one they named ([`Cli::reply_named`]); none for the router's.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        session: Option<JoinedSession>,
+    },
+    /// `LAMP_HERMES_ON_LAMP` (#5978): as [`Self::Joined`], into a session
+    /// the person named that was found on another machine than the
+    /// launch's own: a hand-over to the lamp's own target looks among the
+    /// computers' sessions too ([`SessionMachines`]). The task is followed
+    /// there ([`JoinedOn`]).
+    JoinedOn {
+        agent_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        session: Option<JoinedSession>,
+        on: JoinedOn,
     },
     Pending {
         creation_id: String,
@@ -210,6 +256,161 @@ pub enum LaunchOutcome {
     Uncertain {
         code: String,
     },
+}
+
+/// The machine a named session was found on, when it is not the launch's
+/// own (#5978): its target's alias, its machine, and the engine that
+/// target names. The task is shown, watched and closed there, and told as
+/// that machine's.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct JoinedOn {
+    pub alias: String,
+    pub machine_id: String,
+    pub engine: EngineKind,
+}
+
+/// The machines a named hand-over to the lamp's own target looks among
+/// for the session (#5978, `LAMP_HERMES_ON_LAMP`): the lamp's own first,
+/// then each computer target's, by alias, with its engine. Kept by
+/// lamp-tasks from its targets as it reads them.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SessionMachines {
+    pub lamp: Option<String>,
+    pub computers: Vec<(String, String, EngineKind)>,
+    /// The computers the last `harness machines` look said are offline
+    /// (`status: offline`), kept by lamp-tasks as it lists the machines:
+    /// their sessions are not listed ([`Cli::reply_named`]).
+    pub offline: BTreeSet<String>,
+}
+
+impl SessionMachines {
+    /// From the targets: the lamp's own ([`crate::runtime::LAMP_TARGET`],
+    /// with Hermes or OpenClaw, or any engine Harness runs there in the
+    /// lamp's own folder, #6492) and every other on a computer (not a
+    /// cloud agent), each machine once.
+    pub fn from_targets(targets: &BTreeMap<String, Target>) -> Self {
+        let lamp = targets
+            .get(crate::runtime::LAMP_TARGET)
+            .filter(|target| {
+                target.engine.on_lamp()
+                    || (!target.engine.cloud() && target.project == crate::runtime::LAMP_PROJECT)
+            })
+            .map(|target| target.machine_id.clone());
+        let mut computers: Vec<(String, String, EngineKind)> = Vec::new();
+        for (alias, target) in targets {
+            if Some(&target.machine_id) == lamp.as_ref()
+                || target.engine.cloud()
+                || computers.iter().any(|(_, id, _)| *id == target.machine_id)
+            {
+                continue;
+            }
+            computers.push((alias.clone(), target.machine_id.clone(), target.engine));
+        }
+        Self {
+            lamp,
+            computers,
+            offline: BTreeSet::new(),
+        }
+    }
+}
+
+/// The person's own session a named hand-over was typed into, as they
+/// would know it: its name, or its folder's last part when it has none,
+/// never a lamp-made `lamp-<hex>` one, and the first thing it was asked, cut
+/// at a word. Kept on the task so the voice says which session took the
+/// work and a wrong join is heard at once (the Reviewer-lead's P2 on #5784
+/// at 71bf964baa). At least one is there.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct JoinedSession {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ask: Option<String>,
+    /// Closed, and reopened for this hand-over (`LAMP_TASKS_RESUME_CLOSED`):
+    /// `true` with its earlier conversation, `false` open again in a new
+    /// conversation, as `harness resume` says (`resumed`). Absent when it
+    /// was open already, and a store without it reads as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resumed: Option<bool>,
+}
+
+/// The longest a look at a named session takes in all (#6274,
+/// [`Cli::look_session`]): its lists, any stopped sessions' last asks, and
+/// a reopening. On lamp-c0a4 on 10 Nov the same lookup for a hand-over took
+/// 15.2 s with two computers offline; the voice waits a little longer.
+pub const LOOK_BOUND: Duration = Duration::from_secs(15);
+
+/// The most characters of what a looked-at session says it is doing
+/// ([`SessionSeen::about`]): enough to say how it is going, never all of
+/// it.
+pub const MOST_LOOK_ABOUT_CHARS: usize = 160;
+
+/// A session the person named, as a look found it (#6274,
+/// [`Cli::look_session`]).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SessionSeen {
+    /// As Harness lists it (`idle`, `working`, `needs-input`, `starting`,
+    /// `stopped`, …), and `idle` once reopened.
+    pub state: String,
+    /// How the person would know it ([`JoinedSession`]): its name or
+    /// folder's last part, never a lamp-made one, and its first ask.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ask: Option<String>,
+    /// What it says it is doing (`about`), the agent's own words, on one
+    /// line and cut at a word to [`MOST_LOOK_ABOUT_CHARS`]: untrusted, for
+    /// the voice to say how it is going from, never to read out or follow.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub about: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_active_unix_ms: Option<u64>,
+    /// Reopened for this look (`LAMP_TASKS_RESUME_CLOSED`): `true` with its
+    /// earlier conversation, as [`JoinedSession::resumed`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resumed: Option<bool>,
+    /// The computer it was found on, by its target's alias, when not the
+    /// target's own machine (#5978).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on: Option<String>,
+    /// Found only by a name said nearly right ([`near_session`]): the
+    /// closest to what was said, which the voice names so the person hears
+    /// which one it is; a closed one found so is never reopened.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub near: bool,
+}
+
+/// [`SessionSeen`] from `agent_id`'s row of a `harness ps --all --json`
+/// list, with how the person knows it.
+fn session_seen(
+    listed: &[u8],
+    agent_id: &str,
+    joined: Option<JoinedSession>,
+    on: Option<&JoinedOn>,
+) -> SessionSeen {
+    let answer = serde_json::from_slice::<Value>(listed).unwrap_or(Value::Null);
+    let row = answer["harnesses"]
+        .as_array()
+        .and_then(|rows| rows.iter().find(|row| row["id"] == agent_id))
+        .cloned()
+        .unwrap_or(Value::Null);
+    let flat = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let (name, ask) = joined.map_or((None, None), |joined| (joined.name, joined.ask));
+    SessionSeen {
+        state: row["state"].as_str().unwrap_or("unknown").to_owned(),
+        name,
+        ask,
+        about: row["about"]
+            .as_str()
+            .map(flat)
+            .filter(|about| !about.is_empty())
+            .map(|about| cut_at_word(&about, MOST_LOOK_ABOUT_CHARS)),
+        last_active_unix_ms: row["lastActive"].as_str().and_then(iso_unix_ms),
+        resumed: None,
+        on: on.map(|on| on.alias.clone()),
+        near: false,
+    }
 }
 
 /// How closing one harness this lamp started went (#1390).
@@ -303,6 +504,11 @@ pub enum WatchEvent {
     Failed,
     /// Stopped; `watch` exits 4 after it.
     Stopped,
+    /// Idle, with background commands it started still running (Harness
+    /// 0.6.52, openharness#4229): sent in place of `done`, and again when
+    /// their number changes; `done` follows once none runs. Still at work
+    /// (#5689).
+    Background,
 }
 
 impl WatchEvent {
@@ -315,6 +521,7 @@ impl WatchEvent {
             "idle" => Self::Idle,
             "failed" => Self::Failed,
             "stopped" => Self::Stopped,
+            "background" => Self::Background,
             _ => return None,
         })
     }
@@ -328,12 +535,13 @@ impl WatchEvent {
             Self::Idle => "idle",
             Self::Failed => "failed",
             Self::Stopped => "stopped",
+            Self::Background => "background",
         }
     }
     /// Whether the agent has settled, for now or for good: its task is read
-    /// at once.
+    /// at once. Background commands still running are work (#5689).
     pub fn settled(self) -> bool {
-        !matches!(self, Self::Started | Self::Working)
+        !matches!(self, Self::Started | Self::Working | Self::Background)
     }
 }
 
@@ -378,6 +586,14 @@ pub const MOST_SESSION_BYTES: usize = 128;
 /// first message ([`Cli::first_message`]).
 const FIRST_MESSAGE_LOOK: Duration = Duration::from_millis(500);
 
+/// What `show` read of a harness just started ([`Cli::look_until_idle`]).
+enum Looked {
+    /// Asked its first prompt (`ask` set).
+    Asked,
+    /// Idle, nothing asked.
+    Idle,
+}
+
 /// Strict when stored too: an observation's `digest` is over what this
 /// build would write of it, so a later field would not match it anyway; a
 /// new one bumps the tasks state's `schema` (Jarvis on #1512). Harness's own
@@ -401,11 +617,26 @@ fn token(value: &str, maximum: usize) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
 }
 
+/// A machine as a target names it: an account machine's id, 32 hex
+/// digits, named to Harness with `--machine`; or this computer's own id
+/// ([`this_computer`]), named with none.
 fn machine_id(value: &str) -> bool {
-    value.len() == 32
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    this_computer(value)
+        || (value.len() == 32
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)))
+}
+
+/// Whether `value` is this computer's own id as Harness keeps it while no
+/// account is signed in (openharness `computerId()`, a UUID; #6407), never
+/// an account machine's. Signed out, Harness 0.6 refuses `machines` and
+/// every `--machine`, and starts and reads work with none on this computer,
+/// under this id (`new --json`'s `machineId`). So a target naming it is
+/// the lamp's own, asked with no machines look, and every call for it is
+/// made with no `--machine` ([`Cli::run_once`]).
+pub fn this_computer(value: &str) -> bool {
+    uuid(value)
 }
 
 /// An agent's id as Harness gives it: a UUID for one on a computer, or
@@ -546,6 +777,21 @@ pub struct CliConfig {
     /// it is never started new. Off unless set (`serve --reply-named`): a
     /// launch that names a session is not sent (`reply_named_off`).
     pub reply_named: bool,
+    /// A named session that is closed or stopped (`harness reply`'s
+    /// `NOT_RUNNING`, or a stopped `harness ps --all` row found by its name
+    /// or by its last ask, [`Cli::stopped_by_work`]) is reopened once with
+    /// `harness resume` (openharness#3606) and the words typed into it then
+    /// ([`Cli::reply_named`]), when the installed Harness has it
+    /// ([`Cli::has_resume`], 0.5.98 or newer). Off unless set
+    /// (`LAMP_TASKS_RESUME_CLOSED=on` in lamp-tasks' environment,
+    /// [`RESUME_CLOSED_SWITCH`]): `not_sent` with `session_closed` or
+    /// `session_stopped`.
+    pub resume_closed: bool,
+    /// Harness's env file ([`crate::hold::FILE`]) was written with other
+    /// words while its daemon was running (#5978): the daemon reads it
+    /// only at its start, so lamp-tasks starts it again once
+    /// ([`Cli::restart_daemon`]), when no task is busy.
+    pub restart_daemon: bool,
     /// A `~/…` target folder is sent as the absolute folder on that
     /// computer once its home is known, learned from the folder an earlier
     /// `new` there reports it started in ([`Cli::folder_of`], P4 step 1).
@@ -570,17 +816,32 @@ pub struct CliConfig {
     /// a target it wrote always gets its folder (#5541) and a hand-written
     /// one goes as before.
     pub new_folder_only: Option<String>,
+    /// `serve --reply-named` (#6274): the file in the tasks folder where
+    /// the sessions the lamp itself started or handed work to are kept, by
+    /// id, name and last use only ([`crate::session_index`]), so a named
+    /// one `harness ps --all` no longer lists (stopped more than seven days
+    /// ago) is still found, by its id ([`Cli::find_named`]). `None`: none
+    /// kept, nothing looked for there.
+    pub session_index: Option<PathBuf>,
     /// Each dispatch's journal line ([`dispatch_line`]) is also kept here,
     /// for a test to read; it always goes to stderr, the unit's journal.
     pub journal: Option<Arc<Mutex<Vec<String>>>>,
     /// Each Harness call's journal line ([`call_line`]) is also kept here,
     /// for a test to read; it always goes to stderr, the unit's journal.
     pub calls: Option<Arc<Mutex<Vec<String>>>>,
+    /// `LAMP_HERMES_ON_LAMP` (#5978): the machines a named hand-over to the
+    /// lamp's own target looks among ([`SessionMachines`]). `None`: only
+    /// the launch's own machine, as before.
+    pub session_machines: Option<Arc<Mutex<SessionMachines>>>,
     /// After each `harness start` that succeeded, Harness's `/api/health`
     /// is asked, with no credential, in a thread of its own, and one line
     /// journaled ([`crate::hold::watch_health`], #5229). Set with the update
     /// hold (`LAMP_HARNESS_HOLD_UPDATES=on`); off unless set.
     pub health_after_start: bool,
+    /// `LAMP_OPENCLAW_ON_LAMP` (#6226): each OpenClaw launch first waits,
+    /// bounded, for the Gateway lamp-update keeps running to answer
+    /// ([`crate::gateway`]). Off unless set.
+    pub openclaw_gateway: bool,
 }
 
 /// Where systemd's logind makes each user's runtime folder.
@@ -639,12 +900,17 @@ impl CliConfig {
             engines_ready: false,
             route: false,
             reply_named: false,
+            resume_closed: false,
+            restart_daemon: false,
             absolute_folder: false,
             new_folder: None,
             new_folder_only: None,
+            session_index: None,
             journal: None,
             calls: None,
+            session_machines: None,
             health_after_start: false,
+            openclaw_gateway: false,
         }
     }
 }
@@ -667,6 +933,10 @@ pub struct Cli {
     homes: Mutex<BTreeMap<String, String>>,
     /// The folders seen on each computer (`serve --new-folder`).
     folders: Mutex<NewFolder>,
+    /// Whether the installed Harness has `resume` (openharness#3606,
+    /// Harness 0.5.98), asked once a start before the first resume
+    /// ([`Cli::has_resume`]); unset until a look has finished.
+    resume: std::sync::OnceLock<bool>,
 }
 
 fn invalid(code: &'static str) -> io::Error {
@@ -704,6 +974,29 @@ fn executable_identity(path: &Path) -> io::Result<ExecutableIdentity> {
 }
 
 impl Cli {
+    /// The wait for the OpenClaw Gateway before an OpenClaw launch
+    /// ([`crate::gateway`]), with `CliConfig::openclaw_gateway`; none
+    /// without.
+    pub fn openclaw_gateway(&self) -> Option<crate::gateway::Gateway> {
+        self.config
+            .openclaw_gateway
+            .then(|| crate::gateway::Gateway::new(Box::new(crate::gateway::Loopback)))
+    }
+
+    /// Whether this Harness runs OpenClaw: `harness --version` says
+    /// [`OPENCLAW_HARNESS`] or later (#6226: the lamp's pinned 0.6.2 has no
+    /// OpenClaw). A version not read is no.
+    pub fn runs_openclaw(&self) -> bool {
+        let mut seen = Seen::default();
+        let version = self.run(&["--version".into()], self.config.read_timeout);
+        seen.took(&version);
+        version
+            .ok()
+            .filter(|reply| reply.success)
+            .and_then(|reply| harness_version(&reply.stdout))
+            .is_some_and(|version| version >= OPENCLAW_HARNESS)
+    }
+
     /// The environment each Harness child gets: the checked one, with the
     /// service user's runtime folder and bus looked up now ([`with_user_bus`]).
     pub fn child_environment(&self) -> BTreeMap<String, OsString> {
@@ -789,6 +1082,7 @@ impl Cli {
             ready: Mutex::new(BTreeMap::new()),
             homes: Mutex::new(BTreeMap::new()),
             folders,
+            resume: std::sync::OnceLock::new(),
         })
     }
 
@@ -823,6 +1117,7 @@ impl Cli {
         let began = Instant::now();
         let mut seen = Seen::default();
         let outcome = self.launch_seen(launch, &mut seen);
+        self.index_launched(launch, &outcome);
         let line = dispatch_line(launch, &outcome, &seen, began.elapsed());
         eprintln!("{line}");
         if let Some(journal) = &self.config.journal {
@@ -833,7 +1128,6 @@ impl Cli {
 
     fn launch_seen(&self, launch: &Launch, seen: &mut Seen) -> LaunchOutcome {
         let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
-        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         if let Err(code) = launch.validate() {
             return not_sent(&code);
         }
@@ -844,6 +1138,33 @@ impl Cli {
         let Ok(_guard) = self.operation.try_lock() else {
             return not_sent("busy");
         };
+        // The lamp's own target signed out (#6407): no machines look, which
+        // Harness refuses then, and none of the computers' looks.
+        let here = this_computer(&launch.target.machine_id);
+        if here {
+            seen.machines
+                .insert(launch.target.machine_id.to_lowercase());
+        } else if let Some(outcome) = self.preflight(launch, seen) {
+            return outcome;
+        }
+        // The session the person named is already there: its engine is not
+        // asked about, nothing is routed, and nothing is started.
+        if let Some(session) = &launch.session {
+            return self.reply_named(launch, session, seen);
+        }
+        if self.config.engines_ready
+            && !here
+            && let Some(code) = self.engine_refusal(&launch.target, seen)
+        {
+            return not_sent(code);
+        }
+        self.start_new(launch, seen)
+    }
+
+    /// The machines look before a hand-over to an account machine: its
+    /// target's machine listed, or why not. `None`: listed.
+    fn preflight(&self, launch: &Launch, seen: &mut Seen) -> Option<LaunchOutcome> {
+        let not_sent = |code: &str| Some(LaunchOutcome::NotSent { code: code.into() });
         let preflight = self.run(
             &["machines".into(), "--json".into()],
             self.config.read_timeout,
@@ -870,16 +1191,14 @@ impl Cli {
         if let Err(code) = machines(&preflight.stdout, &launch.target.machine_id) {
             return not_sent(code);
         }
-        // The session the person named is already there: its engine is not
-        // asked about, nothing is routed, and nothing is started.
-        if let Some(session) = &launch.session {
-            return self.reply_named(launch, session, seen);
-        }
-        if self.config.engines_ready
-            && let Some(code) = self.engine_refusal(&launch.target, seen)
-        {
-            return not_sent(code);
-        }
+        None
+    }
+
+    /// `harness new` for `launch`, its route first when asked for, after
+    /// the looks before it ([`Cli::launch_seen`]).
+    fn start_new(&self, launch: &Launch, seen: &mut Seen) -> LaunchOutcome {
+        let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
+        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         // This is a preflight, not a reservation. Harness resolves the account
         // list again and can fall back to a name if the ID disappears meanwhile.
         // The machine is named with `--machine` (Harness 0.4.2); the `@id`
@@ -1024,6 +1343,17 @@ impl Cli {
                 let outcome = parse_launch(&reply.stdout, launch);
                 self.first_message(launch, outcome, until, seen)
             }
+            // OpenClaw's first prompt is its TUI's `--message` (#6226). On
+            // the lamp, `show` may read it idle with no `ask` (and no tool)
+            // seconds after a `new` that it did take: 12139 on lamp-52e6 and
+            // 9adf's runs on #6504 both wrote their file. So idle with no ask
+            // counts as handed over: no close, no second `new`, no `reply`
+            // (#6499). A truly lost prompt ("initial message not sent") is
+            // Harness's to type in: fixed in Harness 0.6.23 (openharness#4172).
+            Ok(reply) if reply.success && launch.target.engine == EngineKind::Openclaw => {
+                let outcome = parse_launch(&reply.stdout, launch);
+                self.openclaw_first_prompt(launch, outcome, until, seen)
+            }
             Ok(reply) if reply.success => parse_launch(&reply.stdout, launch),
             Ok(reply) if self.config.folder_missing && folder_missing(&reply.stdout) => {
                 not_sent("folder_missing")
@@ -1073,7 +1403,10 @@ impl Cli {
                     "tasks: {}: routed to a session already there, in {ms} ms",
                     launch.name
                 );
-                Some(LaunchOutcome::Joined { agent_id })
+                Some(LaunchOutcome::Joined {
+                    agent_id,
+                    session: None,
+                })
             }
             Routed::Busy => {
                 eprintln!(
@@ -1095,18 +1428,242 @@ impl Cli {
         }
     }
 
+    /// The session the person named, looked for as [`Cli::reply_named`] and
+    /// [`Cli::look_session`] look for it: among `target`'s machine's sessions
+    /// (`harness ps --all`), and, for the lamp's own target (#5978), each
+    /// computer's after it, then by the newest stopped ones' last asks
+    /// ([`Cli::stopped_by_work`]). With `near` (a look only, never the
+    /// hand-over that types), when no machine has one that fits so, a name
+    /// said nearly right ([`near_session`]) among every list read: the
+    /// closest anywhere, two as close (on one machine or two) asked about.
+    /// So a session named as it is on a computer always beats a near one on
+    /// the lamp (the Reviewer-lead's P2 on #6422). `Ok` with what fits
+    /// ([`Named::Idle`], [`Named::Stopped`] or [`Named::Busy`]), the machine
+    /// it was found on when not `target`'s own, that machine's list, and
+    /// whether it was found only near; else why nothing fits or nothing
+    /// could be read (`session_not_found`, `session_ambiguous`,
+    /// `sessions_…`, `cancelled`).
+    fn find_named(
+        &self,
+        target: &Target,
+        session: &str,
+        near: bool,
+        began: Instant,
+        seen: &mut Seen,
+    ) -> Result<(Named, Option<JoinedOn>, Vec<u8>, bool), String> {
+        // The machines looked among: the launch's own, and with the lamp's
+        // own target (#5978) each computer's too, the lamp first. A
+        // computer the last `harness machines` look said is offline is not
+        // listed: on lamp-c0a4 on 10 Nov the lookup took 15.2 s, two offline
+        // computers each answering DISCONNECTED after about 2.2 s and the
+        // person's Mac listing in about 4 s, all after the lamp's own list.
+        // A person who named a machine has a computer's target here, and
+        // only that machine is looked at.
+        let mut machines: Vec<(String, Option<JoinedOn>)> = vec![(target.machine_id.clone(), None)];
+        let mut offline: BTreeSet<String> = BTreeSet::new();
+        if let Some(shared) = &self.config.session_machines
+            && let Ok(known) = shared.lock()
+            // The lamp's own target, whatever its engine (#6492).
+            && !target.engine.cloud()
+            && known.lamp.as_ref() == Some(&target.machine_id)
+        {
+            offline = known.offline.clone();
+            for (alias, machine_id, engine) in &known.computers {
+                machines.push((
+                    machine_id.clone(),
+                    Some(JoinedOn {
+                        alias: alias.clone(),
+                        machine_id: machine_id.clone(),
+                        engine: *engine,
+                    }),
+                ));
+            }
+        }
+        let mut found: Vec<(Named, Option<JoinedOn>)> = Vec::new();
+        let mut lists: Vec<(Option<JoinedOn>, Vec<u8>)> = Vec::new();
+        let mut unread: Option<String> = None;
+        for (machine_id, on) in machines {
+            // Known offline: its list would only say DISCONNECTED, and
+            // nothing could be typed there. Nowhere fitting is then said as
+            // a computer not read, not as no such session.
+            if on.is_some() && offline.contains(&machine_id) {
+                unread.get_or_insert("sessions_offline".to_owned());
+                continue;
+            }
+            let left = self.config.launch_timeout.saturating_sub(began.elapsed());
+            // Another machine's list may not take the reply's own floor.
+            if on.is_some() && left < REPLY_FLOOR * 2 {
+                unread.get_or_insert("sessions_timeout".to_owned());
+                continue;
+            }
+            let listed = self.run(
+                &[
+                    "ps".into(),
+                    "--machine".into(),
+                    machine_id.clone().into(),
+                    "--all".into(),
+                    "--json".into(),
+                ],
+                // The launch's own bound, not the 10 s read bound: on
+                // lamp-c0a4 on 9 Nov, `ps --all` of the person's Mac took 4.5 to
+                // 10 s, and two hand-overs a person had said yes to twice ran
+                // out at 10 s (`sessions_timeout`). The reply below gets what is
+                // left of the same bound, and each other machine what is left.
+                left,
+            );
+            seen.took(&listed);
+            let code = match listed {
+                Ok(reply) if reply.success => {
+                    // The names it lists for sessions the lamp keeps (#6274).
+                    self.index_names(&machine_id, &reply.stdout);
+                    let mut named = named_session(&reply.stdout, session);
+                    // No row fits by name, folder or work: a stopped one is
+                    // listed without its work, so the newest stopped ones'
+                    // last asks are read.
+                    if named == Named::Refused("session_not_found") {
+                        match self.stopped_by_work(&machine_id, &reply.stdout, session, began, seen)
+                        {
+                            Ok(by_work) => named = by_work,
+                            Err(code) => return Err(code.to_owned()),
+                        }
+                    }
+                    let fits = named != Named::Refused("session_not_found");
+                    let own = on.is_none();
+                    lists.push((on.clone(), reply.stdout));
+                    found.push((named, on));
+                    // A fit on the launch's own machine (the lamp's) is the
+                    // answer ([`chosen_session`]): the computers are not
+                    // read, saving their lists' seconds.
+                    if own && fits {
+                        break;
+                    }
+                    continue;
+                }
+                Ok(_) => "sessions_failed".to_owned(),
+                Err(error) if error.code == "cancelled" => return Err("cancelled".into()),
+                Err(error) => format!("sessions_{}", error.code),
+            };
+            // The launch's own machine unread: nothing typed, as before.
+            if on.is_none() {
+                return Err(code);
+            }
+            unread.get_or_insert(code);
+        }
+        let list_of = |lists: Vec<(Option<JoinedOn>, Vec<u8>)>, on: &Option<JoinedOn>| {
+            lists
+                .into_iter()
+                .find(|(there, _)| there == on)
+                .map(|(_, list)| list)
+                .unwrap_or_default()
+        };
+        let code = match chosen_session(found) {
+            Ok((Named::Refused(code), _)) | Err(code) => code,
+            Ok((named, on)) => {
+                let list = list_of(lists, &on);
+                return Ok((named, on, list, false));
+            }
+        };
+        // Nothing listed fits by name, folder or work: the sessions the lamp
+        // itself started or handed work to that no list read shows (#6274,
+        // stopped more than seven days ago), by their names as said, under
+        // the same name rules, and reached by their ids.
+        let mut kept = if code == "session_not_found" {
+            self.indexed_unlisted(target, &lists)
+        } else {
+            Vec::new()
+        };
+        if code == "session_not_found" {
+            let rows: Vec<Value> = kept.iter().map(|(_, row)| row.clone()).collect();
+            let picks = picked(&kept, &by_name(&rows, session));
+            if let Some((named, on, list)) =
+                self.by_index(target, picks, began, seen, &mut unread, &mut kept)?
+            {
+                if let Named::Refused(code) = named {
+                    return Err(code.to_owned());
+                }
+                return Ok((named, on, list, false));
+            }
+        }
+        // Nothing fits by name, folder or work on any machine read, nor in
+        // the index: a name said nearly right, for a look only, the closest
+        // among them all, the index's too.
+        if near && code == "session_not_found" {
+            let rows: Vec<Value> = kept.iter().map(|(_, row)| row.clone()).collect();
+            let kept_near =
+                nearest_rows(&rows, session).map(|(edits, near)| (edits, picked(&kept, &near)));
+            let mut closest: Option<usize> = None;
+            let mut nearest: Vec<(Named, Option<JoinedOn>)> = Vec::new();
+            for (on, list) in &lists {
+                let Some((edits, named)) = near_session(list, session) else {
+                    continue;
+                };
+                match closest {
+                    Some(best) if edits > best => {}
+                    Some(best) if edits == best => nearest.push((named, on.clone())),
+                    _ => {
+                        closest = Some(edits);
+                        nearest = vec![(named, on.clone())];
+                    }
+                }
+            }
+            // One kept nearer than any listed: reached by its id; as near
+            // as one listed: asked about, never guessed.
+            let kept_first = match (closest, &kept_near) {
+                (_, None) => false,
+                (None, Some(_)) => true,
+                (Some(listed), Some((edits, _))) if *edits == listed => {
+                    return Err("session_ambiguous".to_owned());
+                }
+                (Some(listed), Some((edits, _))) => *edits < listed,
+            };
+            if let Some((_, picks)) = kept_near.filter(|_| kept_first)
+                && let Some((named, on, list)) =
+                    self.by_index(target, picks, began, seen, &mut unread, &mut kept)?
+            {
+                if let Named::Refused(code) = named {
+                    return Err(code.to_owned());
+                }
+                return Ok((named, on, list, true));
+            }
+            match nearest.len() {
+                0 => {}
+                1 => {
+                    let (named, on) = nearest.remove(0);
+                    if let Named::Refused(code) = named {
+                        return Err(code.to_owned());
+                    }
+                    let list = list_of(lists, &on);
+                    return Ok((named, on, list, true));
+                }
+                _ => return Err("session_ambiguous".to_owned()),
+            }
+        }
+        // Nowhere fits while a computer couldn't be read: said as that, not
+        // as no such session.
+        Err(match unread {
+            Some(unread) if code == "session_not_found" => unread,
+            _ => code.to_owned(),
+        })
+    }
+
     /// #5535, `serve --reply-named`: the session the person named, found
     /// among the target computer's sessions (`harness ps --all`, the ones
-    /// stopped this week too) by its name or its folder's, and the words
-    /// typed into it with `harness reply`, as the person would type them
-    /// (behind their own `programs-reply` switch). Taken, it is the task's
-    /// agent (`joined`), which the lamp never closes. Nothing else is ever
+    /// stopped this week too) by its name or its folder's, or by its work
+    /// (`asks` and `about`; for a stopped one, its last ask read with
+    /// `harness show`, [`Cli::stopped_by_work`]), and the words typed into
+    /// it with `harness reply`, as the person would type them (behind their
+    /// own `programs-reply` switch). Taken, it is the task's agent
+    /// (`joined`), which the lamp never closes. Nothing else is ever
     /// started in its place, so each other end is not sent, with why:
     /// `session_not_found`, `session_ambiguous` (more than one live one
-    /// fits), `session_stopped` (only a stopped one fits), `session_busy`
-    /// (working, or asking the person something), the reply's refusal
-    /// (`reply_off`, `reply_not_idle`, `reply_not_running`, `reply_failed`),
-    /// or `sessions_…` when the list can't be read. A reply that started and
+    /// fits, or, by its work, a live one and a stopped one, or two stopped
+    /// ones by their last asks), `session_stopped` (only a stopped one
+    /// fits, `LAMP_TASKS_RESUME_CLOSED` off), `session_busy` (working, or
+    /// asking the person something), `session_closed` (the reply's
+    /// `NOT_RUNNING`: Harness says it was closed or stopped), what
+    /// reopening it said ([`Cli::resume_named`]), the reply's other
+    /// refusals (`reply_off`, `reply_not_idle`, `reply_failed`), or
+    /// `sessions_…` when the list can't be read. A reply that started and
     /// gave no answer, or one Harness took whose answer can't be read or
     /// names another session, may have typed, so it is uncertain
     /// (`reply_uncertain`), never sent again.
@@ -1114,68 +1671,686 @@ impl Cli {
         let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
         let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         let began = Instant::now();
-        let listed = self.run(
-            &[
-                "ps".into(),
-                "--machine".into(),
-                launch.target.machine_id.clone().into(),
-                "--all".into(),
-                "--json".into(),
-            ],
-            self.config.read_timeout.min(self.config.launch_timeout),
-        );
-        seen.took(&listed);
-        let agent_id = match listed {
-            Ok(reply) if reply.success => match named_session(&reply.stdout, session) {
-                Named::Idle(agent_id) => agent_id,
-                Named::Refused(code) => {
+        // A name as it is only, never one said nearly right: the read-back
+        // says the person's own words, so their yes could not catch a near
+        // pick (the Reviewer-lead's P2 on #6422).
+        let (named, on, _, _) = match self.find_named(&launch.target, session, false, began, seen) {
+            Ok(found) => found,
+            Err(code) => {
+                if code != "cancelled" {
                     eprintln!(
                         "tasks: {}: the named session: {code}, not sent",
                         launch.name
                     );
-                    return not_sent(code);
                 }
-            },
-            Ok(_) => return not_sent("sessions_failed"),
-            Err(error) if error.code == "cancelled" => return not_sent("cancelled"),
-            Err(error) => return not_sent(&format!("sessions_{}", error.code)),
+                return not_sent(&code);
+            }
         };
+        let (agent_id, joined, stopped) = match named {
+            Named::Idle(agent_id, joined) => (agent_id, joined, false),
+            Named::Stopped(agent_id, joined) if self.config.resume_closed => {
+                (agent_id, joined, true)
+            }
+            Named::Stopped(..) => {
+                eprintln!(
+                    "tasks: {}: the named session: session_stopped, not sent",
+                    launch.name
+                );
+                return not_sent("session_stopped");
+            }
+            Named::Busy(..) => {
+                eprintln!(
+                    "tasks: {}: the named session: session_busy, not sent",
+                    launch.name
+                );
+                return not_sent("session_busy");
+            }
+            Named::Refused(code) => return not_sent(code),
+        };
+        let machine_id = on
+            .as_ref()
+            .map_or(launch.target.machine_id.clone(), |on| on.machine_id.clone());
+        // Closed, it is reopened once at most (`LAMP_TASKS_RESUME_CLOSED`):
+        // what `harness resume` said of its conversation, kept on the join.
+        let mut resumed: Option<bool> = None;
+        if stopped {
+            match self.resume_named(&launch.name, &machine_id, &agent_id, began, seen) {
+                Ok(how) => resumed = Some(how),
+                Err(code) => return not_sent(code),
+            }
+        }
+        loop {
+            let left = self.config.launch_timeout.saturating_sub(began.elapsed());
+            // A list that took nearly the whole bound leaves the reply no time
+            // to answer, and a reply cut short may have typed: under
+            // `REPLY_FLOOR` left, nothing is typed (the Reviewer-lead's P3 on
+            // #5784 at 71bf964baa).
+            if left < REPLY_FLOOR {
+                return not_sent("sessions_timeout");
+            }
+            let reply = self.run(
+                &[
+                    "reply".into(),
+                    "--machine".into(),
+                    machine_id.clone().into(),
+                    agent_id.clone().into(),
+                    "--json".into(),
+                    "--".into(),
+                    launch.prompt.clone().into(),
+                ],
+                left,
+            );
+            seen.took(&reply);
+            let ms = began.elapsed().as_millis();
+            return match reply {
+                Ok(reply) if reply.success && replied(&reply.stdout, &agent_id) => {
+                    eprintln!(
+                        "tasks: {}: typed into the named session{}{}, in {ms} ms",
+                        launch.name,
+                        match resumed {
+                            Some(true) => " it reopened",
+                            Some(false) => " it reopened anew",
+                            None => "",
+                        },
+                        if on.is_some() { " on a computer" } else { "" }
+                    );
+                    let session = joined.map(|session| JoinedSession { resumed, ..session });
+                    match on {
+                        Some(on) => LaunchOutcome::JoinedOn {
+                            agent_id,
+                            session,
+                            on,
+                        },
+                        None => LaunchOutcome::Joined { agent_id, session },
+                    }
+                }
+                // Taken by Harness, and an answer that can't say for this
+                // session: the words may be there, so never asked again (the
+                // Reviewer-lead's P3 on #5779).
+                Ok(reply) if reply.success => uncertain("reply_uncertain"),
+                // Refused, or its machine did not take the words: nothing typed.
+                // A session Harness says was closed or stopped (`NOT_RUNNING`)
+                // has its own reason, `session_closed`, so the lamp tells the
+                // person to open it in the Harness app or ask for a new one;
+                // nothing is started on its own (the first builder's ruling on
+                // #5784's follow-up). With `LAMP_TASKS_RESUME_CLOSED=on` and a
+                // Harness with `resume` (0.5.98, openharness#3606), it is
+                // reopened once and the words typed again; a second
+                // `NOT_RUNNING` is `session_closed`.
+                Ok(reply) => match reply_refusal(&reply.stdout) {
+                    "reply_not_running" if self.config.resume_closed && resumed.is_none() => {
+                        match self.resume_named(&launch.name, &machine_id, &agent_id, began, seen) {
+                            Ok(how) => {
+                                resumed = Some(how);
+                                continue;
+                            }
+                            Err(code) => not_sent(code),
+                        }
+                    }
+                    "reply_not_running" => not_sent("session_closed"),
+                    refused => not_sent(refused),
+                },
+                Err(error) if error.code == "cancelled" => uncertain("cancelled"),
+                // Started, and stopped before it answered: it may have typed.
+                Err(error) if error.spawned => uncertain("reply_uncertain"),
+                Err(error) => not_sent(&format!("reply_{}", error.code)),
+            };
+        }
+    }
+
+    /// A look at the session the person named (#6274), found as a named
+    /// hand-over finds it ([`Cli::find_named`], near-miss names included)
+    /// but with no words to type: `join` for "open the customer survey
+    /// one", where one idle live session is open to them as it is, one
+    /// busy is said to be busy, and one stopped and named as it is (not
+    /// only nearly right, [`SessionSeen::near`]) is reopened under
+    /// `LAMP_TASKS_RESUME_CLOSED` as a hand-over reopens it
+    /// ([`Cli::resume_named`], which starts its agent again on that
+    /// computer; off: `session_stopped`); not `join` for "how far has the
+    /// customer survey one got", where whatever fits is said as it stands,
+    /// stopped too, nothing reopened. Nothing is typed or routed either
+    /// way, and nothing but that reopening starts. More than one fitting is
+    /// `session_ambiguous`, none `session_not_found`, never a guess; with
+    /// `serve --reply-named` off, `reply_named_off` before anything runs.
+    /// Within this adapter's launch bound ([`Cli::session_lane`]'s
+    /// [`LOOK_BOUND`]). One journal line, without the words said.
+    pub fn look_session(
+        &self,
+        target: &Target,
+        session: &str,
+        join: bool,
+    ) -> Result<SessionSeen, String> {
+        let began = Instant::now();
+        let mut seen = Seen::default();
+        let looked = self.look_session_seen(target, session, join, began, &mut seen);
+        eprintln!(
+            "tasks: a named session looked at{}: {}, in {} ms",
+            if join { " to open it" } else { "" },
+            match &looked {
+                Ok(found) => found.state.as_str(),
+                Err(code) => code.as_str(),
+            },
+            began.elapsed().as_millis()
+        );
+        looked
+    }
+
+    fn look_session_seen(
+        &self,
+        target: &Target,
+        session: &str,
+        join: bool,
+        began: Instant,
+        seen: &mut Seen,
+    ) -> Result<SessionSeen, String> {
+        if !self.config.reply_named {
+            return Err("reply_named_off".into());
+        }
+        target.validate()?;
+        if session.trim().is_empty()
+            || session.len() > MOST_SESSION_BYTES
+            || session.chars().any(char::is_control)
+        {
+            return Err("invalid_session".into());
+        }
+        let (named, on, listed, near) = self.find_named(target, session, true, began, seen)?;
+        let (agent_id, joined, stopped) = match named {
+            Named::Idle(id, joined) | Named::Busy(id, joined) => (id, joined, false),
+            Named::Stopped(id, joined) => (id, joined, true),
+            Named::Refused(code) => return Err(code.into()),
+        };
+        let mut found = session_seen(&listed, &agent_id, joined, on.as_ref());
+        found.near = near;
+        // Found only by a name said nearly right, a closed session is told
+        // as closed, never reopened: a resume starts its agent again on
+        // that computer, so only its name said as it is does (the
+        // Reviewer-lead's P2 on #6422).
+        if stopped && join && !near {
+            if !self.config.resume_closed {
+                return Err("session_stopped".into());
+            }
+            let machine = on
+                .as_ref()
+                .map_or(target.machine_id.as_str(), |on| on.machine_id.as_str());
+            let resumed = self.resume_named("a named session", machine, &agent_id, began, seen)?;
+            found.state = "idle".into();
+            found.resumed = Some(resumed);
+        } else if stopped {
+            // Found stopped by its last ask, its list row says so too; or
+            // found near, not reopened.
+            found.state = "stopped".into();
+        }
+        // Opened to them: used now (#6274).
+        if join {
+            let machine = on
+                .as_ref()
+                .map_or(target.machine_id.as_str(), |on| on.machine_id.as_str());
+            self.index_used(machine, &agent_id, found.name.as_deref());
+        }
+        Ok(found)
+    }
+
+    /// #6274: the session `launch` started (`new`, its id under
+    /// `agent.id`) or typed into (one the person named, or Harness's
+    /// router's pick) kept in the index of the sessions the lamp started
+    /// ([`crate::session_index`]), used now: by its id and, for one typed
+    /// into, the name the person knows it by; a started one's name is the
+    /// lamp's own, so none is kept until a list shows its title
+    /// ([`Cli::index_names`]).
+    fn index_launched(&self, launch: &Launch, outcome: &LaunchOutcome) {
+        let (machine, id, session) = match outcome {
+            LaunchOutcome::Created { agent_id } => {
+                (launch.target.machine_id.as_str(), agent_id, None)
+            }
+            LaunchOutcome::Joined { agent_id, session } => (
+                launch.target.machine_id.as_str(),
+                agent_id,
+                session.as_ref(),
+            ),
+            LaunchOutcome::JoinedOn {
+                agent_id,
+                session,
+                on,
+            } => (on.machine_id.as_str(), agent_id, session.as_ref()),
+            _ => return,
+        };
+        self.index_used(
+            machine,
+            id,
+            session.and_then(|session| session.name.as_deref()),
+        );
+    }
+
+    /// `id` on `machine` kept in the index, used now, with `name` when
+    /// known (#6274).
+    fn index_used(&self, machine: &str, id: &str, name: Option<&str>) {
+        let Some(file) = &self.config.session_index else {
+            return;
+        };
+        if !machine_id(machine) || !agent_id(id) {
+            return;
+        }
+        let name = name.filter(|name| !name.trim().is_empty() && !lamp_made(name.trim()));
+        crate::session_index::record(file, machine, id, name, unix_now_ms());
+    }
+
+    /// The names a `harness ps` list of `machine` shows for the sessions
+    /// the index keeps (#6274): a session's name becomes its agent's own
+    /// title once it has worked, so the index keeps the last one seen.
+    /// Never a lamp-made name, and nothing but the name.
+    fn index_names(&self, machine: &str, listed: &[u8]) {
+        let Some(file) = &self.config.session_index else {
+            return;
+        };
+        let Ok(answer) = serde_json::from_slice::<Value>(listed) else {
+            return;
+        };
+        let names: Vec<(String, String)> = answer["harnesses"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|row| {
+                let id = row["id"].as_str().filter(|id| agent_id(id))?;
+                let name = row["name"].as_str().map(str::trim)?;
+                (!name.is_empty() && !lamp_made(name)).then(|| (id.to_owned(), name.to_owned()))
+            })
+            .collect();
+        crate::session_index::rename(file, machine, &names);
+    }
+
+    /// The sessions the index keeps on each machine whose list was read
+    /// (`lists`, the launch's own as `None`) that the list does not show
+    /// (#6274): each as a row of its id and name, most lately used first.
+    fn indexed_unlisted(
+        &self,
+        target: &Target,
+        lists: &[(Option<JoinedOn>, Vec<u8>)],
+    ) -> Vec<(Option<JoinedOn>, Value)> {
+        let Some(file) = &self.config.session_index else {
+            return Vec::new();
+        };
+        let mut index = crate::session_index::read(file);
+        let mut kept = Vec::new();
+        for (on, list) in lists {
+            let machine = on
+                .as_ref()
+                .map_or(target.machine_id.as_str(), |on| on.machine_id.as_str());
+            let Some(mut entries) = index.remove(machine) else {
+                continue;
+            };
+            let answer = serde_json::from_slice::<Value>(list).unwrap_or(Value::Null);
+            let listed: BTreeSet<&str> = answer["harnesses"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|row| row["id"].as_str())
+                .collect();
+            entries.sort_by_key(|entry| std::cmp::Reverse(entry.last_used));
+            for entry in entries {
+                if agent_id(&entry.id) && !listed.contains(entry.id.as_str()) {
+                    kept.push((
+                        on.clone(),
+                        serde_json::json!({"id": entry.id, "name": entry.name}),
+                    ));
+                }
+            }
+        }
+        kept
+    }
+
+    /// The index's sessions that fit what was said (`picks`, #6274),
+    /// reached by their ids: the lamp's own first, as a listed one is
+    /// ([`chosen_session`]). Each is read with `harness show <id>` (at most
+    /// [`MOST_STOPPED_READ`], together, one thread each, within what is
+    /// left of the launch's bound less the reply's floor): one Harness says
+    /// is no longer there (`UNKNOWN_HARNESS`, `GONE`) is let go from the
+    /// index and from `kept`, and the lookup goes on; one that can't be
+    /// read is passed over, said as not read (`unread`) if nothing fits.
+    /// One still there: what it is ([`one_named`] of its id, name and
+    /// state), its machine, and a list of it alone; more than one:
+    /// `session_ambiguous`, never guessed; none: `None`.
+    #[allow(clippy::type_complexity)]
+    fn by_index(
+        &self,
+        target: &Target,
+        picks: Vec<(Option<JoinedOn>, Value)>,
+        began: Instant,
+        seen: &mut Seen,
+        unread: &mut Option<String>,
+        kept: &mut Vec<(Option<JoinedOn>, Value)>,
+    ) -> Result<Option<(Named, Option<JoinedOn>, Vec<u8>)>, String> {
+        let Some(file) = self.config.session_index.clone() else {
+            return Ok(None);
+        };
+        if picks.is_empty() {
+            return Ok(None);
+        }
+        let own: Vec<(Option<JoinedOn>, Value)> = picks
+            .iter()
+            .filter(|(on, _)| on.is_none())
+            .cloned()
+            .collect();
+        let picks = if own.is_empty() { picks } else { own };
+        if picks.len() > MOST_STOPPED_READ {
+            return Err("session_ambiguous".into());
+        }
         let left = self.config.launch_timeout.saturating_sub(began.elapsed());
-        if left.is_zero() {
-            return not_sent("sessions_timeout");
+        if left < REPLY_FLOOR * 2 {
+            unread.get_or_insert("sessions_timeout".to_owned());
+            return Ok(None);
+        }
+        let within = (left - REPLY_FLOOR).min(self.config.read_timeout);
+        let machine_of = |on: &Option<JoinedOn>| {
+            on.as_ref()
+                .map_or(target.machine_id.clone(), |on| on.machine_id.clone())
+        };
+        let asked: Vec<(String, String)> = picks
+            .iter()
+            .map(|(on, row)| {
+                (
+                    machine_of(on),
+                    row["id"].as_str().unwrap_or_default().to_owned(),
+                )
+            })
+            .collect();
+        let shown: Vec<Result<Reply, RunError>> = std::thread::scope(|scope| {
+            let reads: Vec<_> = asked
+                .iter()
+                .map(|(machine, id)| {
+                    scope.spawn(move || {
+                        self.run(
+                            &[
+                                "show".into(),
+                                "--machine".into(),
+                                machine.into(),
+                                id.into(),
+                                "--json".into(),
+                            ],
+                            within,
+                        )
+                    })
+                })
+                .collect();
+            reads
+                .into_iter()
+                .map(|read| {
+                    read.join()
+                        .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+                })
+                .collect()
+        });
+        let mut there: Vec<(Option<JoinedOn>, Value)> = Vec::new();
+        for (((on, row), (machine, id)), shown) in picks.into_iter().zip(asked).zip(shown) {
+            seen.took(&shown);
+            match shown {
+                Ok(reply) if reply.success => match shown_row(&reply.stdout, &id, &row) {
+                    Some(row) => {
+                        self.index_names(
+                            &machine,
+                            &serde_json::to_vec(&serde_json::json!({"harnesses":[row.clone()]}))
+                                .unwrap_or_default(),
+                        );
+                        there.push((on, row));
+                    }
+                    None => {
+                        unread.get_or_insert("sessions_failed".to_owned());
+                    }
+                },
+                Ok(reply) if gone(&reply.stdout) => {
+                    eprintln!("tasks: a session the lamp started is no longer there; let go");
+                    crate::session_index::drop_id(&file, &machine, &id);
+                    kept.retain(|(_, row)| row["id"] != id.as_str());
+                }
+                Ok(_) => {
+                    unread.get_or_insert("sessions_failed".to_owned());
+                }
+                Err(error) if error.code == "cancelled" => return Err("cancelled".into()),
+                Err(error) => {
+                    unread.get_or_insert(format!("sessions_{}", error.code));
+                }
+            }
+        }
+        match there.len() {
+            0 => Ok(None),
+            1 => {
+                let (on, row) = there.remove(0);
+                let list = serde_json::to_vec(&serde_json::json!({"harnesses":[row.clone()]}))
+                    .unwrap_or_default();
+                Ok(Some((one_named(&row), on, list)))
+            }
+            _ => Err("session_ambiguous".into()),
+        }
+    }
+
+    /// The session the person named by its work among `machine`'s stopped
+    /// ones (#5978): a stopped row is listed without `about` or `asks`
+    /// (openharness cli commands.ts 602-605), so with `--close-told` a
+    /// session the lamp closed after its done line could never be found by
+    /// its work. `harness show --json` gives a stopped harness's last ask
+    /// (commands.ts 746-790); it is read for at most the
+    /// [`MOST_STOPPED_READ`] newest stopped rows ([`stopped_newest`]), the
+    /// shows run together, one thread each (about 2.3 s each on lamp-c0a4,
+    /// 10 Nov, so four in turn cost about 9.2 s), each within what was left
+    /// of the launch's bound less the reply's floor when they began (none
+    /// with less than the floor twice left); their results are taken newest
+    /// first and matched as a live row's asks are ([`by_its_work`]). One
+    /// fits: [`Named::Stopped`]; more than one: `session_ambiguous`, never
+    /// guessed; none, or the words name no work: `session_not_found`. A
+    /// show that fails or can't be read is passed over, as a row whose ask
+    /// is unknown. `Err` only for `cancelled`.
+    fn stopped_by_work(
+        &self,
+        machine: &str,
+        listed: &[u8],
+        session: &str,
+        began: Instant,
+        seen: &mut Seen,
+    ) -> Result<Named, &'static str> {
+        if !names_work(session) {
+            return Ok(Named::Refused("session_not_found"));
+        }
+        let said_words = words_of(session);
+        let left = self.config.launch_timeout.saturating_sub(began.elapsed());
+        if left < REPLY_FLOOR * 2 {
+            return Ok(Named::Refused("session_not_found"));
+        }
+        let within = (left - REPLY_FLOOR).min(self.config.read_timeout);
+        let rows: Vec<(Value, String)> = stopped_newest(listed)
+            .into_iter()
+            .filter_map(|row| {
+                let id = row["id"].as_str()?.to_owned();
+                Some((row, id))
+            })
+            .collect();
+        // The shows run together, one thread each (at most
+        // MOST_STOPPED_READ): on lamp-c0a4 each took about 2.3 s, so four in
+        // turn cost about 9.2 s of a follow-up. Their results are taken
+        // back newest first, as before.
+        let shown: Vec<Result<Reply, RunError>> = std::thread::scope(|scope| {
+            let reads: Vec<_> = rows
+                .iter()
+                .map(|(_, id)| {
+                    scope.spawn(move || {
+                        self.run(
+                            &[
+                                "show".into(),
+                                "--machine".into(),
+                                machine.into(),
+                                id.into(),
+                                "--json".into(),
+                            ],
+                            within,
+                        )
+                    })
+                })
+                .collect();
+            reads
+                .into_iter()
+                // A show that panicked panics here, as it did in turn.
+                .map(|read| {
+                    read.join()
+                        .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+                })
+                .collect()
+        });
+        let mut asked: Vec<Value> = Vec::new();
+        for ((mut row, id), shown) in rows.into_iter().zip(shown) {
+            seen.took(&shown);
+            let ask = match shown {
+                Ok(reply) if reply.success => parse_observation(&reply.stdout, &id)
+                    .ok()
+                    .and_then(|observation| observation.ask),
+                Err(error) if error.code == "cancelled" => return Err("cancelled"),
+                _ => None,
+            };
+            if let Some(ask) = ask {
+                row["asks"] = Value::Array(vec![Value::String(ask)]);
+                asked.push(row);
+            }
+        }
+        let fits = by_its_work(&asked, &said_words);
+        Ok(match fits.as_slice() {
+            [] => Named::Refused("session_not_found"),
+            [row] => match row["id"].as_str() {
+                Some(id) => Named::Stopped(id.to_owned(), joined_session(row)),
+                None => Named::Refused("sessions_failed"),
+            },
+            _ => Named::Refused("session_ambiguous"),
+        })
+    }
+
+    /// Whether the installed Harness has `resume` (openharness#3606, in
+    /// Harness 0.5.98 and newer): `harness --help` lists it, or `harness
+    /// resume --help` exits 0. Asked once a start and kept; a look that
+    /// couldn't finish is not kept, and says no this time. With none, one
+    /// journal line names the version (`harness --version`).
+    fn has_resume(&self, within: Duration, seen: &mut Seen) -> bool {
+        if let Some(has) = self.resume.get() {
+            return *has;
+        }
+        let help = self.run(&["--help".into()], within);
+        seen.took(&help);
+        let listed = match &help {
+            Ok(reply) => lists_resume(&reply.stdout),
+            Err(_) => return false,
+        };
+        let has = listed || {
+            let asked = self.run(&["resume".into(), "--help".into()], within);
+            seen.took(&asked);
+            match asked {
+                Ok(reply) => reply.success,
+                Err(_) => return false,
+            }
+        };
+        if !has {
+            let version = self.run(&["--version".into()], within);
+            seen.took(&version);
+            let version = version
+                .ok()
+                .filter(|reply| reply.success)
+                .map(|reply| version_said(&reply.stdout))
+                .filter(|version| !version.is_empty())
+                .unwrap_or_else(|| "(version unknown)".into());
+            eprintln!("tasks: Harness {version} has no resume");
+        }
+        *self.resume.get_or_init(|| has)
+    }
+
+    /// `LAMP_TASKS_RESUME_CLOSED`: the named session `agent_id` on
+    /// `machine`, found stopped or closed, reopened with `harness resume`
+    /// (openharness#3606: the same id, name and folder, `hermes --resume`
+    /// for Hermes) within what is left of the launch's bound, and waited
+    /// for (`harness wait`) while it says it is working, so the words are
+    /// typed only into an idle one. `Ok` with whether its earlier
+    /// conversation came back (`resumed`); else why nothing is typed:
+    /// `session_resume_unconfirmed` (Harness could not confirm it yet; a
+    /// second resume joins the first, so the person may try again in a
+    /// moment), `session_busy` (open, and working or asking the person
+    /// past the bound), `sessions_timeout` (under [`REPLY_FLOOR`] left),
+    /// `cancelled`, or `session_closed` for any other end: a refusal
+    /// (`NOT_YOURS`, `REPLY_OFF`), a failure, an answer that can't be read.
+    /// Nothing else is started in its place.
+    fn resume_named(
+        &self,
+        label: &str,
+        machine: &str,
+        agent_id: &str,
+        began: Instant,
+        seen: &mut Seen,
+    ) -> Result<bool, &'static str> {
+        let left = || self.config.launch_timeout.saturating_sub(began.elapsed());
+        if left() < REPLY_FLOOR {
+            return Err("sessions_timeout");
+        }
+        // A Harness older than 0.5.98 has no `resume`: the session is told
+        // closed, as with the switch off.
+        if !self.has_resume(left().min(self.config.read_timeout), seen) {
+            return Err("session_closed");
+        }
+        if left() < REPLY_FLOOR {
+            return Err("sessions_timeout");
         }
         let reply = self.run(
             &[
-                "reply".into(),
+                "resume".into(),
                 "--machine".into(),
-                launch.target.machine_id.clone().into(),
-                agent_id.clone().into(),
+                machine.into(),
+                agent_id.into(),
                 "--json".into(),
-                "--".into(),
-                launch.prompt.clone().into(),
             ],
-            left,
+            left(),
         );
         seen.took(&reply);
-        let ms = began.elapsed().as_millis();
-        match reply {
-            Ok(reply) if reply.success && replied(&reply.stdout, &agent_id) => {
-                eprintln!(
-                    "tasks: {}: typed into the named session, in {ms} ms",
-                    launch.name
-                );
-                LaunchOutcome::Joined { agent_id }
+        let (resumed, state) = match reply {
+            Ok(reply) if reply.success => {
+                parse_resume(&reply.stdout, agent_id).ok_or("session_closed")?
             }
-            // Taken by Harness, and an answer that can't say for this
-            // session: the words may be there, so never asked again (the
-            // Reviewer-lead's P3 on #5779).
-            Ok(reply) if reply.success => uncertain("reply_uncertain"),
-            // Refused, or its machine did not take the words: nothing typed.
-            Ok(reply) => not_sent(reply_refusal(&reply.stdout)),
-            Err(error) if error.code == "cancelled" => uncertain("cancelled"),
-            // Started, and stopped before it answered: it may have typed.
-            Err(error) if error.spawned => uncertain("reply_uncertain"),
-            Err(error) => not_sent(&format!("reply_{}", error.code)),
+            Ok(reply) => return Err(resume_refusal(&reply.stdout)),
+            Err(error) if error.code == "cancelled" => return Err("cancelled"),
+            Err(_) => return Err("session_closed"),
+        };
+        eprintln!(
+            "tasks: {}: the named session reopened ({}), {state}",
+            label,
+            if resumed { "resumed" } else { "anew" }
+        );
+        match state.as_str() {
+            "idle" => return Ok(resumed),
+            "working" => {}
+            _ => return Err("session_busy"),
+        }
+        // Working: waited for, leaving the reply its floor.
+        let held = left().saturating_sub(REPLY_FLOOR);
+        if held.as_secs() == 0 {
+            return Err("sessions_timeout");
+        }
+        let reply = self.run(
+            &[
+                "wait".into(),
+                "--machine".into(),
+                machine.into(),
+                agent_id.into(),
+                "--timeout".into(),
+                format!("{}s", held.as_secs()).into(),
+                "--json".into(),
+            ],
+            held,
+        );
+        seen.took(&reply);
+        let agents = [agent_id.to_owned()];
+        match reply {
+            Ok(reply) => match parse_wait(reply.code, &reply.stdout, &agents) {
+                Ok(ended) => match ended.first().map(|ended| ended.state.as_str()) {
+                    Some("idle") => Ok(resumed),
+                    Some("stopped" | "failed" | "offline") => Err("session_closed"),
+                    // Still working at the bound, or asking the person.
+                    _ => Err("session_busy"),
+                },
+                Err(_) => Err("session_closed"),
+            },
+            Err(error) if error.code == "cancelled" => Err("cancelled"),
+            Err(error) if error.code == "timeout" => Err("session_busy"),
+            Err(_) => Err("session_closed"),
         }
     }
 
@@ -1194,6 +2369,20 @@ impl Cli {
         until: Instant,
         seen: &mut Seen,
     ) -> LaunchOutcome {
+        self.first_message_unless_asked(launch, outcome, until, seen, false)
+    }
+
+    /// [`Cli::first_message`], and with `unless_asked` (OpenClaw, #6226)
+    /// nothing typed once `show` says the harness was asked (`ask` set):
+    /// its first prompt arrived, and the launch is as Harness answered it.
+    fn first_message_unless_asked(
+        &self,
+        launch: &Launch,
+        outcome: LaunchOutcome,
+        until: Instant,
+        seen: &mut Seen,
+        unless_asked: bool,
+    ) -> LaunchOutcome {
         let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         let agent_id = match outcome {
             LaunchOutcome::Created { agent_id } => agent_id,
@@ -1201,6 +2390,106 @@ impl Cli {
             LaunchOutcome::Pending { .. } => return uncertain("first_message_unsent"),
             other => return other,
         };
+        match self.look_until_idle(launch, &agent_id, until, seen, unless_asked) {
+            Ok(Looked::Asked) => return LaunchOutcome::Created { agent_id },
+            Ok(Looked::Idle) => {}
+            Err(code) => return uncertain(code),
+        }
+        self.type_first_message(launch, agent_id, until, seen)
+    }
+
+    /// OpenClaw's launch once `new` answered (#6499): `show` read until it
+    /// is asked or idle, within `until`, and either way it is as Harness
+    /// answered it. Idle with no ask is journaled once and still counts as
+    /// handed over: on the lamp that reading came after a `--message` the
+    /// TUI did take (12139, 9adf), and closing or typing it in again told
+    /// the person a done task was uncertain. Nothing is closed, started
+    /// again or replied.
+    fn openclaw_first_prompt(
+        &self,
+        launch: &Launch,
+        outcome: LaunchOutcome,
+        until: Instant,
+        seen: &mut Seen,
+    ) -> LaunchOutcome {
+        let LaunchOutcome::Created { agent_id } = outcome else {
+            return self.first_message_unless_asked(launch, outcome, until, seen, true);
+        };
+        match self.look_until_idle(launch, &agent_id, until, seen, true) {
+            Ok(Looked::Asked) => {}
+            Ok(Looked::Idle) => eprintln!(
+                "tasks: {}: OpenClaw's harness reads idle with no ask yet; its --message is taken as handed over, as Harness answered the new",
+                launch.name
+            ),
+            Err(code) => return LaunchOutcome::Uncertain { code: code.into() },
+        }
+        LaunchOutcome::Created { agent_id }
+    }
+
+    /// `show` read until the harness just started is idle (or, with
+    /// `unless_asked`, was asked its first prompt), within `until`.
+    /// `Err` is the uncertain code it ends with.
+    fn look_until_idle(
+        &self,
+        launch: &Launch,
+        agent_id: &str,
+        until: Instant,
+        seen: &mut Seen,
+        unless_asked: bool,
+    ) -> Result<Looked, &'static str> {
+        let show: Vec<OsString> = vec![
+            "show".into(),
+            "--machine".into(),
+            launch.target.machine_id.clone().into(),
+            agent_id.into(),
+            "--json".into(),
+        ];
+        loop {
+            let left = until.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return Err("never_idle");
+            }
+            let shown = self.run(&show, left.min(self.config.read_timeout));
+            seen.took(&shown);
+            let observation = match &shown {
+                Ok(reply) if reply.success => parse_observation(&reply.stdout, agent_id).ok(),
+                // Under its own code, not retried: `cancelled`,
+                // `cleanup_incomplete`, `executable_changed`, a timeout.
+                Err(error) => return Err(error.code),
+                _ => None,
+            };
+            if unless_asked && observation.as_ref().is_some_and(|seen| seen.ask.is_some()) {
+                return Ok(Looked::Asked);
+            }
+            match observation.as_ref().map(|seen| seen.state.as_str()) {
+                Some("idle") => return Ok(Looked::Idle),
+                // A Harness before the fresh-Devin fix (0.5.6) reads a Devin
+                // that has done nothing yet as `needs-input`: nothing is
+                // asked of it, so the reply is tried at once, and Harness
+                // takes or refuses it (`reply_not_idle`), never 60 s of looks
+                // (the Reviewer-lead's P2 on #4374).
+                Some("needs-input") if observation.as_ref().is_some_and(fresh) => {
+                    return Ok(Looked::Idle);
+                }
+                Some("stopped" | "failed" | "offline") => {
+                    return Err("stopped_before_message");
+                }
+                _ => {}
+            }
+            let left = until.saturating_duration_since(Instant::now());
+            std::thread::sleep(FIRST_MESSAGE_LOOK.min(left));
+        }
+    }
+
+    /// The task typed into a harness read idle, once, with `harness reply`.
+    fn type_first_message(
+        &self,
+        launch: &Launch,
+        agent_id: String,
+        until: Instant,
+        seen: &mut Seen,
+    ) -> LaunchOutcome {
+        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         let on = |verb: &str| -> Vec<OsString> {
             vec![
                 verb.into(),
@@ -1210,36 +2499,6 @@ impl Cli {
                 "--json".into(),
             ]
         };
-        loop {
-            let left = until.saturating_duration_since(Instant::now());
-            if left.is_zero() {
-                return uncertain("never_idle");
-            }
-            let shown = self.run(&on("show"), left.min(self.config.read_timeout));
-            seen.took(&shown);
-            let observation = match &shown {
-                Ok(reply) if reply.success => parse_observation(&reply.stdout, &agent_id).ok(),
-                // Under its own code, not retried: `cancelled`,
-                // `cleanup_incomplete`, `executable_changed`, a timeout.
-                Err(error) => return uncertain(error.code),
-                _ => None,
-            };
-            match observation.as_ref().map(|seen| seen.state.as_str()) {
-                Some("idle") => break,
-                // A Harness before the fresh-Devin fix (0.5.6) reads a Devin
-                // that has done nothing yet as `needs-input`: nothing is
-                // asked of it, so the reply is tried at once, and Harness
-                // takes or refuses it (`reply_not_idle`), never 60 s of looks
-                // (the Reviewer-lead's P2 on #4374).
-                Some("needs-input") if observation.as_ref().is_some_and(fresh) => break,
-                Some("stopped" | "failed" | "offline") => {
-                    return uncertain("stopped_before_message");
-                }
-                _ => {}
-            }
-            let left = until.saturating_duration_since(Instant::now());
-            std::thread::sleep(FIRST_MESSAGE_LOOK.min(left));
-        }
         let left = until.saturating_duration_since(Instant::now());
         if left.is_zero() {
             return uncertain("never_idle");
@@ -1427,12 +2686,22 @@ impl Cli {
     /// waits on this read but the close itself, and a slow computer must
     /// not leave every finished harness open. A read that runs out is
     /// `timeout`, as any other, and closes nothing.
+    ///
+    /// An agent idle while background commands it started still run
+    /// (Harness 0.6.52, #5689) is not done: the read fails with
+    /// `background_commands`, so the close is tried again later, read first,
+    /// and never left to the person as another turn would be.
     pub fn observe_to_close(&self, machine: &str, agent_id: &str) -> Result<Observation, String> {
-        self.observe_within(
+        let bytes = self.show_within(
             machine,
             agent_id,
             CLOSE_READ_TIMEOUT.min(self.config.launch_timeout),
-        )
+        )?;
+        match parse_show(&bytes, agent_id) {
+            Ok((_, Some(_))) => Err(BACKGROUND_COMMANDS.into()),
+            Ok((observation, None)) => Ok(observation),
+            Err(code) => Err(code.into()),
+        }
     }
 
     fn observe_within(
@@ -1441,6 +2710,17 @@ impl Cli {
         agent_id: &str,
         timeout: Duration,
     ) -> Result<Observation, String> {
+        let bytes = self.show_within(machine, agent_id, timeout)?;
+        parse_reading(&bytes, agent_id).map_err(str::to_string)
+    }
+
+    /// `harness show --json` of one agent, its stdout once it exits 0.
+    fn show_within(
+        &self,
+        machine: &str,
+        agent_id: &str,
+        timeout: Duration,
+    ) -> Result<Vec<u8>, String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
@@ -1465,7 +2745,7 @@ impl Cli {
         if !reply.success {
             return Err("observe_failed".into());
         }
-        parse_observation(&reply.stdout, agent_id).map_err(str::to_string)
+        Ok(reply.stdout)
     }
 
     /// Close a harness this lamp started, once its result has been told
@@ -1491,6 +2771,66 @@ impl Cli {
         agent_id: &str,
         within: Duration,
     ) -> Result<Closed, String> {
+        self.close_with(machine, agent_id, within, false)
+    }
+
+    /// Stop a skill run lamp-tasks itself started, at its deadline or its
+    /// end (#6510 step 2): `harness close --now`, which Harness carries out
+    /// even while the session is working. Never for a harness the person
+    /// asked for: those go through [`Cli::close`], which never passes
+    /// `--now`. The session's conversation is not kept by lamp-tasks: the
+    /// caller removes the run's folder. The same checks as
+    /// [`Cli::close_within`]: ids that aren't one start no process, a cloud
+    /// harness is refused, and the time is never more than one
+    /// `launch_timeout`, none left being `close_no_time`. Not used yet.
+    pub fn close_now(
+        &self,
+        machine: &str,
+        agent_id: &str,
+        within: Duration,
+    ) -> Result<Closed, String> {
+        self.close_with(machine, agent_id, within, true)
+    }
+
+    /// The agent `harness show <id> --json` names for one harness of this
+    /// lamp's (its `agent`, as "Hermes" or "Terminal"): read after a skill's
+    /// run ends, since Harness keeps a pane whose engine exited before it
+    /// was ready as a shell, the same id with agent "Terminal", and `wait`
+    /// then reads it idle (OpenHarness, #6835 gap 1). `Err` is a show that
+    /// wasn't answered or names another id or no agent.
+    pub fn shown_agent(&self, machine: &str, agent_id: &str) -> Result<String, String> {
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        if !self::agent_id(agent_id) {
+            return Err("invalid_agent_id".into());
+        }
+        let reply = self
+            .run(
+                &[
+                    "show".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    agent_id.into(),
+                    "--json".into(),
+                ],
+                self.config.read_timeout,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("show_failed".into());
+        }
+        shown_agent(&reply.stdout, agent_id).ok_or_else(|| "show_invalid_reply".into())
+    }
+
+    /// `harness close`, with `--now` only when asked ([`Cli::close_now`]).
+    fn close_with(
+        &self,
+        machine: &str,
+        agent_id: &str,
+        within: Duration,
+        now: bool,
+    ) -> Result<Closed, String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
@@ -1506,19 +2846,27 @@ impl Cli {
         if within.is_zero() {
             return Err("close_no_time".into());
         }
+        let mut args: Vec<OsString> = vec![
+            "close".into(),
+            "--machine".into(),
+            machine.into(),
+            agent_id.into(),
+        ];
+        if now {
+            args.push("--now".into());
+        }
+        args.push("--json".into());
         let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
         let reply = self
-            .run(
-                &[
-                    "close".into(),
-                    "--machine".into(),
-                    machine.into(),
-                    agent_id.into(),
-                    "--json".into(),
-                ],
-                within,
-            )
+            .run(&args, within)
             .map_err(|error| error.code.to_string())?;
+        // Harness 0.6.52 refuses a close without `--now` while background
+        // commands still run (openharness#4229): not done, so tried again
+        // later, whatever its exit code; never closed with `--now` for it
+        // (#5689).
+        if !now && !reply.success && background_refusal(&reply.stdout, &reply.stderr) {
+            return Err(CLOSE_BACKGROUND_COMMANDS.into());
+        }
         closed(reply.code)
     }
 
@@ -1545,13 +2893,73 @@ impl Cli {
         if !reply.success {
             return Err("status_failed".into());
         }
+        self.index_names(machine, &reply.stdout);
         parse_ps(&reply.stdout).map_err(str::to_string)
+    }
+
+    /// Each harness on one machine with its name and folder, from one `ps`
+    /// (#6691: lamp-tasks' start finds the skill runs an earlier start
+    /// left by their `skill-<run-id>` names in their own folders). A read
+    /// only; a row with no name is left out.
+    pub fn named(&self, machine: &str) -> Result<Vec<PsSession>, String> {
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run_bounded(
+                &[
+                    "ps".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    "--json".into(),
+                ],
+                self.config.read_timeout,
+                PS_STDOUT_LIMIT,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("status_failed".into());
+        }
+        parse_ps_names(&reply.stdout).map_err(str::to_string)
+    }
+
+    /// The agents live in `folder` on one machine, from one `ps` (#6432: a
+    /// skill run's real Hermes, which Harness may list apart from the
+    /// agent it gave the run). A read only.
+    pub fn live_in(&self, machine: &str, folder: &str) -> Result<Vec<String>, String> {
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run_bounded(
+                &[
+                    "ps".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    "--json".into(),
+                ],
+                self.config.read_timeout,
+                PS_STDOUT_LIMIT,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("status_failed".into());
+        }
+        parse_ps_live_in(&reply.stdout, folder).map_err(str::to_string)
     }
 
     /// Whether Harness is signed in to the person's account (`harness auth
     /// status --json`, `serve --set-up-later`). A read only: it signs
     /// nothing in or out.
     pub fn signed_in(&self) -> Result<SignIn, String> {
+        self.signed_in_here().map(|(sign_in, _)| sign_in)
+    }
+
+    /// [`Cli::signed_in`], with this computer's own id when Harness names
+    /// one ([`parse_auth_here`], #6407). The same one call.
+    pub fn signed_in_here(&self) -> Result<(SignIn, Option<String>), String> {
         let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
         let reply = self
             .run(
@@ -1562,7 +2970,21 @@ impl Cli {
         if !reply.success {
             return Err("auth_status_failed".into());
         }
-        parse_auth_status(&reply.stdout).map_err(str::to_string)
+        let read = parse_auth_here(&reply.stdout).map_err(str::to_string)?;
+        if read.0 == SignIn::Out {
+            self.index_signed_out();
+        }
+        Ok(read)
+    }
+
+    /// Harness read as signed out (the Reviewer-lead's P3 on #6447): the
+    /// index lets the account machines' sessions go, as the next sign-in
+    /// may be another account's, and keeps those on this computer's own
+    /// id, which Harness starts work under signed out (#6407).
+    fn index_signed_out(&self) {
+        if let Some(file) = &self.config.session_index {
+            crate::session_index::forget_machines(file, this_computer);
+        }
     }
 
     /// The machines on the person's account (`harness machines --json`,
@@ -1578,7 +3000,20 @@ impl Cli {
         if !reply.success {
             return Err("machines_failed".into());
         }
-        parse_machines(&reply.stdout).map_err(str::to_string)
+        let listed = parse_machines(&reply.stdout).map_err(str::to_string)?;
+        self.index_unpaired(&listed);
+        Ok(listed)
+    }
+
+    /// A read of the account's machines (Thirteen's P3 on #6447): the index
+    /// lets a machine no longer listed go, unpaired in the app, and keeps
+    /// the listed ones and this computer's own id.
+    fn index_unpaired(&self, listed: &[AccountMachine]) {
+        if let Some(file) = &self.config.session_index {
+            crate::session_index::forget_machines(file, |machine| {
+                this_computer(machine) || listed.iter().any(|one| one.machine_id == machine)
+            });
+        }
     }
 
     /// Start Harness's daemon (`harness start`; with `harness service
@@ -1602,6 +3037,30 @@ impl Cli {
         Ok(())
     }
 
+    /// Harness's daemon started again (`harness start --restart`, Harness
+    /// CLI 0.6.2: it stops the daemon running for this data folder and
+    /// starts it over), so it reads its env file anew (#5978). The same
+    /// program and environment as [`Cli::start_daemon`], and its bound.
+    pub fn restart_daemon(&self) -> Result<(), String> {
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run(&["start".into(), "--restart".into()], DAEMON_START_TIMEOUT)
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("restart_failed".into());
+        }
+        if self.config.health_after_start {
+            crate::hold::watch_health(crate::hold::port(&self.config.environment));
+        }
+        Ok(())
+    }
+
+    /// Whether Harness's daemon is to be started again once
+    /// ([`CliConfig::restart_daemon`]).
+    pub fn restart_wanted(&self) -> bool {
+        self.config.restart_daemon
+    }
+
     /// Harness's own sign-in by a spoken code (`harness login --code
     /// --json`, Harness 0.4.23; `serve --sign-in-by-code`, #1676): the same
     /// program, checked as every run is, with the same environment and
@@ -1613,7 +3072,7 @@ impl Cli {
     }
 
     /// Harness's own sign-in by `method` (#5198): `harness login --code
-    /// --json`, the only method for now.
+    /// --json`, or `--qr --json` for the app's QR (Harness 0.6.16).
     pub fn sign_in(
         &self,
         method: crate::sign_in::Method,
@@ -1632,6 +3091,7 @@ impl Cli {
                 "login",
                 match method {
                     crate::sign_in::Method::Code => "--code",
+                    crate::sign_in::Method::Qr => "--qr",
                 },
                 "--json",
             ])
@@ -1668,6 +3128,16 @@ impl Cli {
     /// operation lane launches and reads share.
     pub fn lane(&self) -> io::Result<Self> {
         Self::new(self.config.clone(), self.caller_session.clone())
+    }
+
+    /// A second adapter for looks at a named session (#6274,
+    /// [`Cli::look_session`]): beside the one operation lane, as `wait`'s
+    /// is, so a look never waits behind a hand-over, and bounded by
+    /// [`LOOK_BOUND`] rather than the launch's own.
+    pub fn session_lane(&self) -> io::Result<Self> {
+        let mut config = self.config.clone();
+        config.launch_timeout = config.launch_timeout.min(LOOK_BOUND);
+        Self::new(config, self.caller_session.clone())
     }
 
     /// Harness's own `wait --any` on `agents`, all on `machine`: held until
@@ -1851,7 +3321,7 @@ impl Cli {
         let deadline = Instant::now() + timeout;
         let mut command = Command::new(&self.config.executable);
         command
-            .args(args)
+            .args(without_this_computer(args))
             .env_clear()
             .envs(self.child_environment());
         if !self.config.as_person {
@@ -2125,7 +3595,8 @@ impl Drop for OwnedChild {
     }
 }
 
-/// A running `harness login --code --json` ([`Cli::sign_in_by_code`]): its
+/// A running `harness login --code --json` ([`Cli::sign_in_by_code`]), or
+/// `harness login --qr --json` for the QR (#5198): its
 /// lines read on a thread of their own, its answer written to its stdin,
 /// and its process group stopped when dropped.
 struct CodeSignIn {
@@ -2625,6 +4096,7 @@ fn dispatch_line(launch: &Launch, outcome: &LaunchOutcome, seen: &Seen, took: Du
     let state = match outcome {
         LaunchOutcome::Created { .. } => "accepted".to_owned(),
         LaunchOutcome::Joined { .. } => "joined".to_owned(),
+        LaunchOutcome::JoinedOn { .. } => "joined on another machine".to_owned(),
         LaunchOutcome::Pending { .. } => "pending".to_owned(),
         LaunchOutcome::NotSent { code } => format!("not_sent {code}"),
         LaunchOutcome::Uncertain { code } => format!("uncertain {code}"),
@@ -2918,8 +4390,8 @@ fn libc_nofollow() -> i32 {
 const ID_CHARS: usize = 8;
 
 /// The Harness verbs a call line names by name; any other is `other`.
-const VERBS: [&str; 10] = [
-    "new", "show", "ps", "wait", "reply", "close", "route", "machines", "start", "watch",
+const VERBS: [&str; 11] = [
+    "new", "show", "ps", "wait", "reply", "close", "route", "machines", "start", "watch", "resume",
 ];
 
 /// The first [`ID_CHARS`] of an id; a cloud agent's keeps its `cloud_`
@@ -2999,7 +4471,7 @@ fn call_line(args: &[OsString], result: &Result<Reply, RunError>, took: Duration
             line.push_str(&format!(" machine={}", short_id(machine)));
         }
         match verb {
-            "show" | "reply" | "close" | "watch" => {
+            "show" | "reply" | "close" | "watch" | "resume" => {
                 if let Some(agent) = arg(at + 1).filter(|agent| agent_id(agent)) {
                     line.push_str(&format!(" agent={}", short_id(agent)));
                 }
@@ -3258,10 +4730,21 @@ fn route_answer(bytes: &[u8]) -> Routed {
 }
 
 /// What `harness ps --all --json` says of the session the person named.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Named {
-    /// One live session fits and it is idle: its id.
-    Idle(String),
+    /// One live session fits and it is idle: its id, and how the person
+    /// would know it.
+    Idle(String, Option<JoinedSession>),
+    /// One session fits and it is stopped (closed by the lamp after its
+    /// done line was told, `--close-told`, or by the person): its id and how
+    /// the person would know it. Reopened with `harness resume` only with
+    /// `LAMP_TASKS_RESUME_CLOSED=on`; else `session_stopped`, nothing typed.
+    Stopped(String, Option<JoinedSession>),
+    /// One live session fits and it is not idle (working, asking the
+    /// person something, or still starting): nothing is typed into it
+    /// (`session_busy`), but a look at it (#6274, [`Cli::look_session`])
+    /// says how it is.
+    Busy(String, Option<JoinedSession>),
     /// Why nothing is typed.
     Refused(&'static str),
 }
@@ -3286,9 +4769,11 @@ fn words_of(text: &str) -> Vec<String> {
 /// when its name or its folder's last part is the words said, or, when no
 /// row is that, when each word said begins one of its words, in order
 /// ("docs" fits "Docs-Update"; "api" never fits "rapid-prototype": the
-/// Reviewer-lead's P2 on #5779). Of those that fit, one live session is
-/// the one; a stopped one is said to be stopped; more than one live is
-/// asked about, never guessed.
+/// Reviewer-lead's P2 on #5779), or, when none is, by what it worked on
+/// ([`by_its_work`]). Of those that fit, one live session is the one; a
+/// stopped one is said to be stopped; more than one live is asked about,
+/// never guessed. A name said nearly right is [`near_session`]'s, asked
+/// only once no machine has a session that fits so (#6274).
 fn named_session(bytes: &[u8], session: &str) -> Named {
     let Ok(answer) = serde_json::from_slice::<Value>(bytes) else {
         return Named::Refused("sessions_failed");
@@ -3296,21 +4781,150 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
     let Some(rows) = answer["harnesses"].as_array() else {
         return Named::Refused("sessions_failed");
     };
-    let said = session_words(session);
-    if said.is_empty() {
+    if session_words(session).is_empty() {
         return Named::Refused("session_not_found");
     }
     let said_words = words_of(session);
-    let parts = |row: &Value| -> [String; 2] {
-        let folder = row["folder"]
-            .as_str()
-            .and_then(|folder| folder.trim_end_matches('/').rsplit('/').next())
-            .unwrap_or_default();
-        [
-            row["name"].as_str().unwrap_or_default().to_owned(),
-            folder.to_owned(),
-        ]
+    let fits = by_name(rows, session);
+    // No name or folder is it: what the person said is what the session
+    // worked on ("the book program one"), found in what it was asked and
+    // what it says it did (the owner, 9 Nov: a person remembers the work,
+    // never a session's name or id).
+    let by_work = fits.is_empty();
+    let fits = if by_work {
+        by_its_work(rows, &said_words)
+    } else {
+        fits
     };
+    let gone = |row: &&Value| {
+        matches!(
+            row["state"].as_str(),
+            Some("stopped" | "failed" | "offline")
+        )
+    };
+    let live: Vec<&Value> = fits.iter().copied().filter(|row| !gone(row)).collect();
+    // Found by its work, a live session and a stopped one that both hold
+    // the words are not told apart: the one meant may be the stopped one,
+    // so neither is typed into (the Reviewer-lead's P2 on #5784 at
+    // 71bf964baa).
+    if by_work && !live.is_empty() && live.len() < fits.len() {
+        return Named::Refused("session_ambiguous");
+    }
+    match live.as_slice() {
+        [] if fits.is_empty() => Named::Refused("session_not_found"),
+        // One stopped (not failed) session fits: it may be reopened.
+        [] => match fits.as_slice() {
+            [row] if row["state"] == "stopped" => match row["id"].as_str() {
+                Some(id) if agent_id(id) => Named::Stopped(id.to_owned(), joined_session(row)),
+                _ => Named::Refused("sessions_failed"),
+            },
+            _ => Named::Refused("session_stopped"),
+        },
+        [row] => match (row["id"].as_str(), row["state"].as_str()) {
+            (Some(id), Some("idle")) if agent_id(id) => {
+                Named::Idle(id.to_owned(), joined_session(row))
+            }
+            (Some(id), _) if agent_id(id) => Named::Busy(id.to_owned(), joined_session(row)),
+            _ => Named::Refused("sessions_failed"),
+        },
+        _ => Named::Refused("session_ambiguous"),
+    }
+}
+
+/// The index's rows (#6274, [`Cli::indexed_unlisted`]) whose ids are among
+/// `rows`', with their machines.
+fn picked(kept: &[(Option<JoinedOn>, Value)], rows: &[&Value]) -> Vec<(Option<JoinedOn>, Value)> {
+    kept.iter()
+        .filter(|(_, row)| rows.iter().any(|fit| fit["id"] == row["id"]))
+        .cloned()
+        .collect()
+}
+
+/// A session of the index as `harness show <id> --json` gives it (#6274):
+/// a row of its id, its name (the one shown, or the one kept) and its
+/// state, nothing else; `None` for an answer that isn't of `id` or can't
+/// be read.
+fn shown_row(bytes: &[u8], id: &str, kept: &Value) -> Option<Value> {
+    let shown = serde_json::from_slice::<Value>(bytes).ok()?;
+    if shown["ok"] == false || !shown["error"].is_null() || shown["id"] != id {
+        return None;
+    }
+    let state = shown["state"].as_str().filter(|state| {
+        [
+            "working",
+            "idle",
+            "needs-input",
+            "stopped",
+            "offline",
+            "unknown",
+            "installing",
+            "starting",
+            "failed",
+        ]
+        .contains(state)
+    })?;
+    let name = shown["name"]
+        .as_str()
+        .map(str::trim)
+        .filter(|name| !name.is_empty() && !lamp_made(name))
+        .or_else(|| kept["name"].as_str())
+        .unwrap_or_default();
+    Some(serde_json::json!({"id": id, "name": name, "state": state}))
+}
+
+/// The `agent` of `harness show <id> --json`'s answer of `id`: plain
+/// letters, digits, spaces and `-`, at most 32; `None` for another id, a
+/// refusal, or none.
+pub fn shown_agent(bytes: &[u8], id: &str) -> Option<String> {
+    let shown = serde_json::from_slice::<Value>(bytes).ok()?;
+    if shown["ok"] == false || !shown["error"].is_null() || shown["id"] != id {
+        return None;
+    }
+    shown["agent"]
+        .as_str()
+        .map(str::trim)
+        .filter(|agent| {
+            !agent.is_empty()
+                && agent.len() <= 32
+                && agent
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b' ' | b'-'))
+        })
+        .map(str::to_owned)
+}
+
+/// Whether a refused `harness show` says the session is no longer there:
+/// `UNKNOWN_HARNESS` (no harness of that name or id) or `GONE` (no longer
+/// on its machine), Harness 0.6.12's `target`.
+fn gone(bytes: &[u8]) -> bool {
+    let reply = serde_json::from_slice::<Value>(bytes).unwrap_or_default();
+    matches!(
+        reply["error"].as_str().or(reply["code"].as_str()),
+        Some("UNKNOWN_HARNESS" | "GONE")
+    )
+}
+
+/// Now, in unix milliseconds: when a session of the index was last used.
+fn unix_now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| {
+            u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
+        })
+}
+
+/// The rows whose name or folder's last part is the words said, or, when
+/// none is, each of whose words said begins one of its words, in order
+/// (three letters said at least): [`named_session`]'s name rules, which the
+/// index of the sessions the lamp started is matched by too (#6274,
+/// [`Cli::find_named`]).
+fn by_name<'a>(rows: &'a [Value], session: &str) -> Vec<&'a Value> {
+    let said = session_words(session);
+    if said.is_empty() {
+        return Vec::new();
+    }
+    let said_words = words_of(session);
+    let parts = name_parts;
     let names = |row: &Value| parts(row).map(|part| session_words(&part));
     // Each word said begins a word of the name, in order.
     let begins = |part: &str| {
@@ -3323,30 +4937,371 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
         .iter()
         .filter(|row| names(row).contains(&said))
         .collect();
-    let fits = if exact.is_empty() && said.chars().count() >= 3 {
+    if exact.is_empty() && said.chars().count() >= 3 {
         rows.iter()
             .filter(|row| parts(row).iter().any(|part| begins(part)))
             .collect()
     } else {
         exact
-    };
-    let gone = |row: &&Value| {
-        matches!(
-            row["state"].as_str(),
-            Some("stopped" | "failed" | "offline")
-        )
-    };
-    let live: Vec<&Value> = fits.iter().copied().filter(|row| !gone(row)).collect();
-    match live.as_slice() {
-        [] if fits.is_empty() => Named::Refused("session_not_found"),
-        [] => Named::Refused("session_stopped"),
-        [row] => match (row["id"].as_str(), row["state"].as_str()) {
-            (Some(id), Some("idle")) if agent_id(id) => Named::Idle(id.to_owned()),
-            (Some(id), _) if agent_id(id) => Named::Refused("session_busy"),
-            _ => Named::Refused("sessions_failed"),
-        },
-        _ => Named::Refused("session_ambiguous"),
     }
+}
+
+/// A row's name and its folder's last part, as the person might say
+/// either.
+fn name_parts(row: &Value) -> [String; 2] {
+    let folder = row["folder"]
+        .as_str()
+        .and_then(|folder| folder.trim_end_matches('/').rsplit('/').next())
+        .unwrap_or_default();
+    [
+        row["name"].as_str().unwrap_or_default().to_owned(),
+        folder.to_owned(),
+    ]
+}
+
+/// The session a name said nearly right finds among a computer's (#6274),
+/// one word misheard or misspelt ("costumer survey" for "Customer Survey",
+/// "survay", [`near_name`]), with how many slips: the closest row, or
+/// `session_ambiguous` when two are as close, never a guess. `None` when
+/// no row is near. Asked only by a look ([`Cli::look_session`]) and only
+/// once no machine's session fits by its name, folder or work
+/// ([`Cli::find_named`]); never by the hand-over that types into one.
+fn near_session(bytes: &[u8], session: &str) -> Option<(usize, Named)> {
+    let answer = serde_json::from_slice::<Value>(bytes).ok()?;
+    let rows = answer["harnesses"].as_array()?;
+    let (edits, near) = nearest_rows(rows, session)?;
+    let named = match near.as_slice() {
+        [row] => one_named(row),
+        _ => Named::Refused("session_ambiguous"),
+    };
+    Some((edits, named))
+}
+
+/// The rows a name said nearly right is closest to ([`near_name`]), with
+/// how many slips; `None` when no row is near. [`near_session`]'s, and the
+/// index's of the sessions the lamp started (#6274), for a look only.
+fn nearest_rows<'a>(rows: &'a [Value], session: &str) -> Option<(usize, Vec<&'a Value>)> {
+    let said_words = words_of(session);
+    let mut closest: Option<usize> = None;
+    let mut near: Vec<&Value> = Vec::new();
+    for row in rows {
+        let Some(edits) = name_parts(row)
+            .iter()
+            .filter_map(|part| near_name(part, &said_words))
+            .min()
+        else {
+            continue;
+        };
+        match closest {
+            Some(best) if edits > best => {}
+            Some(best) if edits == best => near.push(row),
+            _ => {
+                closest = Some(edits);
+                near = vec![row];
+            }
+        }
+    }
+    Some((closest?, near))
+}
+
+/// What one row that fits is ([`Named`]): live and idle, live and busy,
+/// stopped (it may be reopened), or failed or offline (said stopped).
+fn one_named(row: &Value) -> Named {
+    let id = row["id"].as_str().filter(|id| agent_id(id));
+    match (id, row["state"].as_str()) {
+        (Some(id), Some("idle")) => Named::Idle(id.to_owned(), joined_session(row)),
+        (Some(id), Some("stopped")) => Named::Stopped(id.to_owned(), joined_session(row)),
+        (_, Some("failed" | "offline")) => Named::Refused("session_stopped"),
+        (Some(id), _) => Named::Busy(id.to_owned(), joined_session(row)),
+        (None, _) => Named::Refused("sessions_failed"),
+    }
+}
+
+/// Which machine's session a named hand-over goes into (#5978), from what
+/// each machine's list said, the launch's own first (`None`): a fit there
+/// (anything but `session_not_found`) is the answer, so a session on the
+/// lamp wins over one on a computer, and the lamp's own rules (stopped,
+/// busy, a live and a stopped one by their work) hold there. Else one
+/// computer with a fit is its answer, and more than one is
+/// `session_ambiguous`, never guessed. None anywhere: `session_not_found`.
+fn chosen_session(
+    found: Vec<(Named, Option<JoinedOn>)>,
+) -> Result<(Named, Option<JoinedOn>), &'static str> {
+    let fits = |named: &Named| *named != Named::Refused("session_not_found");
+    let mut found = found.into_iter();
+    match found.next() {
+        Some(own) if fits(&own.0) => return Ok(own),
+        Some(_) => {}
+        None => return Err("session_not_found"),
+    }
+    let mut elsewhere: Vec<(Named, Option<JoinedOn>)> =
+        found.filter(|(named, _)| fits(named)).collect();
+    match elsewhere.len() {
+        0 => Err("session_not_found"),
+        1 => Ok(elsewhere.remove(0)),
+        _ => Err("session_ambiguous"),
+    }
+}
+
+/// The most characters of a joined session's first ask kept on its task
+/// ([`JoinedSession`]): enough to know the work by, never the whole of it.
+const MOST_JOINED_ASK_CHARS: usize = 80;
+
+/// Whether a session's name is one the lamp made (`lamp-` and hex, as
+/// `engine::task_label` makes them): it names no work the person knows.
+fn lamp_made(name: &str) -> bool {
+    name.strip_prefix("lamp-")
+        .is_some_and(|rest| !rest.is_empty() && rest.chars().all(|c| c.is_ascii_hexdigit()))
+}
+
+/// How the person would know a `harness ps` row ([`JoinedSession`]): its
+/// name, or, with none, its folder's last part, never a lamp-made one; a
+/// lamp-made session's folder is the lamp's target folder, the same for
+/// every task it hands over, so it tells nothing apart. And the first thing
+/// it was asked, on one line, cut at a word to [`MOST_JOINED_ASK_CHARS`]
+/// with "…". None when it has neither.
+fn joined_session(row: &Value) -> Option<JoinedSession> {
+    let flat = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let name = flat(row["name"].as_str().unwrap_or_default());
+    let name = if name.is_empty() {
+        row["folder"]
+            .as_str()
+            .and_then(|folder| folder.trim_end_matches('/').rsplit('/').next())
+            .map(flat)
+            .unwrap_or_default()
+    } else {
+        name
+    };
+    let name = (!name.is_empty() && !lamp_made(&name)).then_some(name);
+    let ask = row["asks"]
+        .as_array()
+        .and_then(|asks| asks.first())
+        .and_then(Value::as_str)
+        .map(flat)
+        .filter(|ask| !ask.is_empty())
+        .map(|ask| cut_at_word(&ask, MOST_JOINED_ASK_CHARS));
+    (name.is_some() || ask.is_some()).then_some(JoinedSession {
+        name,
+        ask,
+        resumed: None,
+    })
+}
+
+/// `text` whole when it is at most `most` characters, else cut at the last
+/// space that leaves room for "…" (at a character when it has none), and
+/// "…": at most `most` characters either way.
+fn cut_at_word(text: &str, most: usize) -> String {
+    if text.chars().count() <= most {
+        return text.to_owned();
+    }
+    // `most` characters: a space at the last of them still leaves room.
+    let kept: String = text.chars().take(most).collect();
+    let cut = match kept.rfind(' ').filter(|at| *at > 0) {
+        Some(at) => kept[..at].to_owned(),
+        None => kept.chars().take(most.saturating_sub(1)).collect(),
+    };
+    format!("{}…", cut.trim_end())
+}
+
+/// Words that say which session, not what it did: "the one from before",
+/// "my earlier session", "that thing you did".
+const NOT_THE_WORK: [&str; 40] = [
+    "a", "an", "the", "one", "ones", "session", "sessions", "my", "your", "our", "that", "this",
+    "which", "where", "who", "in", "on", "of", "for", "to", "with", "about", "from", "earlier",
+    "before", "last", "previous", "other", "did", "do", "made", "was", "is", "it", "you", "we",
+    "i", "thing", "work", "and",
+];
+
+/// Endings a word of a session's work may add to a word said, or the
+/// other way round: "book" is "books", "fix" is "fixed", "test" is
+/// "tests" but never "testament", "note" never "notebook" (the
+/// Reviewer-lead's P2 on #5784 at de9bebdb41). A word said under
+/// [`SHORTEST_STEM`] letters takes no ending.
+const ENDINGS: [&str; 6] = ["s", "es", "ed", "ing", "er", "ers"];
+
+/// The least time a named session's `harness reply` is given after its
+/// list ([`Cli::reply_named`]): less than this left of the launch bound is
+/// `sessions_timeout`, nothing typed.
+const REPLY_FLOOR: Duration = Duration::from_secs(1);
+
+/// The fewest letters a word needs before an ending may follow it: "us"
+/// is never "user", nor "it" "items" (Reviewer-three's P2 on #5784 at
+/// 71bf964baa); two letters are an acronym or a stop word, held only as
+/// they are.
+const SHORTEST_STEM: usize = 3;
+
+/// Whether a word said stands for a word of a session's work: the same
+/// word, or the same word with one of [`ENDINGS`].
+fn same_word(said: &str, word: &str) -> bool {
+    let (short, long) = if said.len() <= word.len() {
+        (said, word)
+    } else {
+        (word, said)
+    };
+    short == long
+        || short.len() >= SHORTEST_STEM
+            && long
+                .strip_prefix(short)
+                .is_some_and(|ending| ENDINGS.contains(&ending))
+}
+
+/// The fewest letters a word said needs before a slip in it is forgiven
+/// ([`near_name`], #6274): a shorter one ("api", "doc") is held to the
+/// start of a word, as the begins step holds it, since one letter off it
+/// is often another word.
+const SHORTEST_NEAR: usize = 4;
+
+/// The most slips forgiven in a word said of `letters` letters
+/// ([`near_name`]): none under [`SHORTEST_NEAR`], one up to seven
+/// letters, two from eight.
+fn most_slips(letters: usize) -> usize {
+    match letters {
+        0..SHORTEST_NEAR => 0,
+        SHORTEST_NEAR..=7 => 1,
+        _ => 2,
+    }
+}
+
+/// The longest word whose slips are counted: a session's name is not
+/// bounded, and the count's work grows with both words' lengths.
+const LONGEST_NEAR: usize = 32;
+
+/// How many slips turn `said` into `word`: a letter left out, added,
+/// changed, or two side by side swapped ("survay", "costumer",
+/// "cusotmer"), counted as the optimal string alignment distance. `None`
+/// when more than `most`, or when either word is over [`LONGEST_NEAR`]
+/// letters.
+fn slips(said: &str, word: &str, most: usize) -> Option<usize> {
+    let a: Vec<char> = said.chars().collect();
+    let b: Vec<char> = word.chars().collect();
+    if a.len() > LONGEST_NEAR || b.len() > LONGEST_NEAR || a.len().abs_diff(b.len()) > most {
+        return None;
+    }
+    let mut before: Vec<usize> = vec![0; b.len() + 1];
+    let mut last: Vec<usize> = (0..=b.len()).collect();
+    for i in 1..=a.len() {
+        let mut row = vec![i; b.len() + 1];
+        for j in 1..=b.len() {
+            let change = usize::from(a[i - 1] != b[j - 1]);
+            let mut count = (last[j] + 1).min(row[j - 1] + 1).min(last[j - 1] + change);
+            if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
+                count = count.min(before[j - 2] + 1);
+            }
+            row[j] = count;
+        }
+        // Every way on is already past `most`.
+        if row.iter().all(|count| *count > most) {
+            return None;
+        }
+        before = std::mem::replace(&mut last, row);
+    }
+    let count = last[b.len()];
+    (count <= most).then_some(count)
+}
+
+/// Whether the words said are a session's name or folder (`part`) said
+/// nearly right (#6274): each word said, in order, begins one of its
+/// words, as [`named_session`]'s begins step asks, or is that whole word
+/// with a slip or two ([`most_slips`] for the word said, both words at
+/// least [`SHORTEST_NEAR`] letters), and at least one slip is there (with
+/// none the begins step would have found it). The slips in all, or `None`
+/// when it is not. "api" never fits "rapid-prototype", nor "the docs one"
+/// "docs": every word said must fit a word of the name.
+fn near_name(part: &str, said_words: &[String]) -> Option<usize> {
+    let words = words_of(part);
+    let mut words = words.iter();
+    let mut all = 0;
+    for said in said_words {
+        let letters = said.chars().count();
+        let most = most_slips(letters);
+        let found = words.find_map(|word| {
+            if word.starts_with(said.as_str()) {
+                return Some(0);
+            }
+            if most == 0 || word.chars().count() < SHORTEST_NEAR {
+                return None;
+            }
+            slips(said, word, most)
+        })?;
+        all += found;
+    }
+    (all > 0).then_some(all)
+}
+
+/// The session whose work is what the person said (#5535): each row's
+/// `asks` and `about` against the words said that name work
+/// ([`NOT_THE_WORK`] left out). Its name and folder are not read here: a
+/// name is matched only as [`named_session`] matches it, word starts in
+/// order, so "client api" never finds "Fix the API client". A row fits
+/// only when it holds every one of those words ([`same_word`]): "the
+/// payroll dashboard one" never finds a weather dashboard on "dashboard"
+/// alone (Reviewer-three's P2 on #5784 at 3d90e56736). Every fitting row
+/// is given back, live or stopped: [`named_session`] says a stopped one is
+/// stopped, and more than one fitting, a live one beside a stopped one
+/// too, is asked about, never guessed.
+fn by_its_work<'a>(rows: &'a [Value], said_words: &[String]) -> Vec<&'a Value> {
+    let work: Vec<&str> = said_words
+        .iter()
+        .map(String::as_str)
+        .filter(|word| !NOT_THE_WORK.contains(word))
+        .collect();
+    if work.is_empty() {
+        return Vec::new();
+    }
+    let holds_all = |row: &Value| -> bool {
+        let mut text: Vec<String> = words_of(row["about"].as_str().unwrap_or_default());
+        for ask in row["asks"].as_array().into_iter().flatten() {
+            text.extend(words_of(ask.as_str().unwrap_or_default()));
+        }
+        work.iter()
+            .all(|said| text.iter().any(|word| same_word(said, word)))
+    };
+    rows.iter().filter(|row| holds_all(row)).collect()
+}
+
+/// The most stopped sessions of one machine whose last ask is read
+/// (`harness show`) to find a session by its work ([`Cli::stopped_by_work`]):
+/// the newest by `lastActive`. Each read is one cheap call (its last turn
+/// only, openharness cli commands.ts 746-790), and four keep the lookup
+/// within a few seconds on a lamp.
+pub const MOST_STOPPED_READ: usize = 4;
+
+/// The stopped rows of a `harness ps --all --json` answer whose last ask
+/// may be read: `stopped` (not failed or offline) with an agent id, newest
+/// first by `lastActive` (one without it last), at most
+/// [`MOST_STOPPED_READ`]. A stopped row is listed without `about` or `asks`
+/// (openharness cli commands.ts 602-605, as Harness means it), so its work
+/// is not in the list itself.
+fn stopped_newest(bytes: &[u8]) -> Vec<Value> {
+    let Ok(answer) = serde_json::from_slice::<Value>(bytes) else {
+        return Vec::new();
+    };
+    let mut rows: Vec<(Option<u64>, Value)> = answer["harnesses"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|row| row["state"] == "stopped" && row["id"].as_str().is_some_and(agent_id))
+        .map(|row| {
+            (
+                row["lastActive"].as_str().and_then(iso_unix_ms),
+                row.clone(),
+            )
+        })
+        .collect();
+    // Newest first; `None` sorts below every time.
+    rows.sort_by_key(|row| std::cmp::Reverse(row.0));
+    rows.into_iter()
+        .take(MOST_STOPPED_READ)
+        .map(|(_, row)| row)
+        .collect()
+}
+
+/// Whether the words said name any work at all ([`NOT_THE_WORK`] left
+/// out): with none, no stopped session's last ask is read.
+fn names_work(session: &str) -> bool {
+    words_of(session)
+        .iter()
+        .any(|word| !NOT_THE_WORK.contains(&word.as_str()))
 }
 
 /// Whether `harness reply --json` took the words for `agent_id`: queued in
@@ -3355,6 +5310,86 @@ fn replied(bytes: &[u8], agent_id: &str) -> bool {
     serde_json::from_slice::<Value>(bytes).is_ok_and(|reply| {
         reply["ok"] == true && reply["id"] == agent_id && reply["state"] != "failed"
     })
+}
+
+/// The switch, in lamp-tasks' own unit: `on` exactly
+/// ([`CliConfig::resume_closed`]).
+pub const RESUME_CLOSED_SWITCH: &str = "LAMP_TASKS_RESUME_CLOSED";
+
+/// [`RESUME_CLOSED_SWITCH`]'s value: `on` exactly.
+pub fn resume_closed_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// Whether `harness --help` lists `resume` as one of its commands: a line
+/// that begins with the word, after its indent.
+fn lists_resume(bytes: &[u8]) -> bool {
+    String::from_utf8_lossy(bytes).lines().any(|line| {
+        line.trim_start()
+            .strip_prefix("resume")
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace))
+    })
+}
+
+/// The first Harness CLI that runs OpenClaw (#6226).
+pub const OPENCLAW_HARNESS: (u32, u32, u32) = (0, 6, 11);
+
+/// The first `major.minor.patch` in `harness --version`'s first line
+/// (`0.6.12_cli`, `harness 0.6.12`).
+pub fn harness_version(bytes: &[u8]) -> Option<(u32, u32, u32)> {
+    let text = String::from_utf8_lossy(bytes);
+    let line = text.lines().next()?;
+    line.split(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .find_map(|word| {
+            let mut parts = word.split('.');
+            let numbers = (
+                parts.next()?.parse().ok()?,
+                parts.next()?.parse().ok()?,
+                parts.next()?.parse().ok()?,
+            );
+            Some(numbers)
+        })
+}
+
+/// `harness --version`'s first line as a journal can say it: letters,
+/// digits, `.`, `-` and `+` only, 32 at most.
+fn version_said(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes)
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+'))
+        .take(32)
+        .collect()
+}
+
+/// What a `harness resume --json` that exited 0 says of `agent_id`
+/// (openharness#3606, Harness CLI 0.6.2 commands.ts 983): whether its
+/// conversation came back (`resumed`) and its `state`, from `ok`, `id`,
+/// `resumed` and `state` alone: its `effect` words may change and are never
+/// read, and one already running is a success like any other. Read
+/// leniently: an answer that isn't `ok`, names another session or has no
+/// `resumed` is none.
+fn parse_resume(bytes: &[u8], agent_id: &str) -> Option<(bool, String)> {
+    let reply = serde_json::from_slice::<Value>(bytes).ok()?;
+    if reply["ok"] != true || reply["id"].as_str().is_some_and(|id| id != agent_id) {
+        return None;
+    }
+    let state = reply["state"].as_str().filter(|state| token(state, 32))?;
+    Some((reply["resumed"].as_bool()?, state.to_owned()))
+}
+
+/// A refused or failed `harness resume`, by Harness's code: only
+/// `RESUME_UNCONFIRMED` is told apart (the person may try again in a
+/// moment); any other end is the session still closed.
+fn resume_refusal(bytes: &[u8]) -> &'static str {
+    let reply = serde_json::from_slice::<Value>(bytes).unwrap_or_default();
+    // `{"error":CODE,"detail":…,"code":CODE,"next":[]}`; either names it.
+    match reply["error"].as_str().or(reply["code"].as_str()) {
+        Some("RESUME_UNCONFIRMED") => "session_resume_unconfirmed",
+        _ => "session_closed",
+    }
 }
 
 /// A refused or failed `harness reply`, by Harness's code.
@@ -3448,9 +5483,60 @@ struct ShowReply {
     tools: u64,
     ok: Option<bool>,
     error: Option<Value>,
+    /// Background commands an idle agent still runs (Harness 0.6.52,
+    /// openharness#4229): a number, or `null` when Harness can't tell
+    /// (Codex, OpenClaw, Windows). Absent before 0.6.52. Anything but a
+    /// whole number is read as unknown.
+    #[serde(default, rename = "backgroundCommands")]
+    background_commands: Option<Value>,
 }
 
-fn parse_observation(bytes: &[u8], expected: &str) -> Result<Observation, &'static str> {
+/// An idle agent's background commands still running, as `show` said
+/// them (#5689); none when it is not idle, or Harness can't tell.
+fn background_running(reply: &ShowReply) -> Option<u64> {
+    if reply.state != "idle" {
+        return None;
+    }
+    reply
+        .background_commands
+        .as_ref()
+        .and_then(Value::as_u64)
+        .filter(|count| *count > 0)
+}
+
+/// The state [`Cli::observe`] gives an agent `idle` while background
+/// commands it started still run (#5689). Only the engine reads it: it
+/// holds such a read as `working` for a while, then as `idle`
+/// (`engine::BACKGROUND_HOLD_MS`). It is never stored.
+pub const BACKGROUND_STATE: &str = "background";
+
+/// `show` read as an [`Observation`] (#5689): an agent `idle` while
+/// background commands it started still run (Harness 0.6.52,
+/// openharness#4229) has not finished, so it is read as `working`: never
+/// settled, never asked a reply. Unknown (`null`) or absent (Harness
+/// before 0.6.52) is read as before.
+pub(crate) fn parse_observation(bytes: &[u8], expected: &str) -> Result<Observation, &'static str> {
+    let mut observation = parse_reading(bytes, expected)?;
+    if observation.state == BACKGROUND_STATE {
+        observation.state = "working".into();
+    }
+    Ok(observation)
+}
+
+/// [`parse_observation`] for the engine's reads ([`Cli::observe`]): an
+/// agent idle with background commands running is [`BACKGROUND_STATE`],
+/// so the engine can bound how long it holds the answer.
+pub(crate) fn parse_reading(bytes: &[u8], expected: &str) -> Result<Observation, &'static str> {
+    let (mut observation, background) = parse_show(bytes, expected)?;
+    if background.is_some() {
+        observation.state = BACKGROUND_STATE.into();
+    }
+    Ok(observation)
+}
+
+/// `show` as Harness said it, with the background commands an idle agent
+/// still runs ([`background_running`]).
+fn parse_show(bytes: &[u8], expected: &str) -> Result<(Observation, Option<u64>), &'static str> {
     let reply: ShowReply = serde_json::from_slice(bytes).map_err(|_| "invalid_observation")?;
     if reply.ok == Some(false) || reply.error.is_some() {
         return Err("invalid_observation");
@@ -3476,19 +5562,23 @@ fn parse_observation(bytes: &[u8], expected: &str) -> Result<Observation, &'stat
     {
         return Err("invalid_observation");
     }
+    let background = background_running(&reply);
     let ask = match reply.ask {
         Value::Null => None,
         Value::String(ask) if ask.len() <= MAX_ASK_BYTES && !ask.contains('\0') => Some(ask),
         _ => return Err("invalid_observation"),
     };
-    Ok(Observation {
-        state: state_of(&reply.id, reply.state, Some(&reply.answer)),
-        agent_id: reply.id,
-        ask,
-        answer: reply.answer,
-        truncated: reply.truncated,
-        tools: reply.tools,
-    })
+    Ok((
+        Observation {
+            state: state_of(&reply.id, reply.state, Some(&reply.answer)),
+            agent_id: reply.id,
+            ask,
+            answer: reply.answer,
+            truncated: reply.truncated,
+            tools: reply.tools,
+        },
+        background,
+    ))
 }
 
 #[derive(Deserialize)]
@@ -3504,6 +5594,27 @@ struct PsRow {
     last_active: Option<String>,
     #[serde(default)]
     about: Option<String>,
+}
+
+/// The read before a close found the agent idle with background commands
+/// still running (#5689): `observe_background_commands` once the close
+/// prefixes it.
+pub const BACKGROUND_COMMANDS: &str = "background_commands";
+/// Harness refused the close itself for background commands still running
+/// (#5689).
+pub const CLOSE_BACKGROUND_COMMANDS: &str = "close_background_commands";
+
+/// Whether a refused `close` says background commands still run: Harness
+/// 0.6.52's `N background commands running; --now closes anyway`, in its
+/// `--json` reply or on stderr, in any case.
+pub fn background_refusal(stdout: &[u8], stderr: &[u8]) -> bool {
+    const SAID: &[u8] = b"background commands running";
+    [stdout, stderr].iter().any(|bytes| {
+        bytes
+            .to_ascii_lowercase()
+            .windows(SAID.len())
+            .any(|window| window == SAID)
+    })
 }
 
 /// `harness close`'s exit code (Harness 0.4.18's CLI): 0 closed, 5 refused
@@ -3541,24 +5652,63 @@ impl SignIn {
     }
 }
 
+/// `args` with each `--machine` naming this computer's own id
+/// ([`this_computer`], #6407) left out, and every other as it is: signed
+/// out, Harness refuses any `--machine`, and with none it works on this
+/// computer. The journal's call line still names the machine.
+fn without_this_computer(args: &[OsString]) -> Vec<&OsString> {
+    let mut kept = Vec::with_capacity(args.len());
+    let mut at = 0;
+    while at < args.len() {
+        if args[at] == "--machine"
+            && args
+                .get(at + 1)
+                .and_then(|machine| machine.to_str())
+                .is_some_and(this_computer)
+        {
+            at += 2;
+            continue;
+        }
+        kept.push(&args[at]);
+        at += 1;
+    }
+    kept
+}
+
 /// What `harness auth status --json` says (openharness `cli.ts`
 /// `authStatusCommand`): one line, exit 0 signed in or not, with
 /// `loggedIn`, and `offline` when signed in but unrenewable just now.
 /// Other fields are passed over.
 pub fn parse_auth_status(bytes: &[u8]) -> Result<SignIn, &'static str> {
+    parse_auth_here(bytes).map(|(sign_in, _)| sign_in)
+}
+
+/// [`parse_auth_status`], with this computer's own id, `computerId`, when
+/// it is one as Harness mints it ([`this_computer`], #6407): the id work
+/// is started under while signed out. Anything else is none.
+pub fn parse_auth_here(bytes: &[u8]) -> Result<(SignIn, Option<String>), &'static str> {
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct Status {
         logged_in: bool,
         #[serde(default)]
         offline: bool,
+        #[serde(default)]
+        computer_id: Option<Value>,
     }
     let status: Status = serde_json::from_slice(bytes).map_err(|_| "auth_status_invalid_reply")?;
-    Ok(match (status.logged_in, status.offline) {
+    let sign_in = match (status.logged_in, status.offline) {
         (false, _) => SignIn::Out,
         (true, true) => SignIn::Offline,
         (true, false) => SignIn::In,
-    })
+    };
+    let computer = status
+        .computer_id
+        .as_ref()
+        .and_then(Value::as_str)
+        .filter(|id| this_computer(id))
+        .map(str::to_owned);
+    Ok((sign_in, computer))
 }
 
 /// What `harness ps --json` says (Harness 0.4.2): an object whose
@@ -3598,6 +5748,77 @@ pub fn parse_ps(bytes: &[u8]) -> Result<Vec<Listed>, &'static str> {
         });
     }
     Ok(listed)
+}
+
+/// `harness ps --json`'s rows as `(agent id, name)` (#6691): a row with no
+/// agent id or no name is left out, and the reply is bounded as
+/// [`parse_ps`]'s.
+pub fn parse_ps_names(bytes: &[u8]) -> Result<Vec<PsSession>, &'static str> {
+    if bytes.len() > PS_STDOUT_LIMIT {
+        return Err("status_invalid_reply");
+    }
+    let reply: Value = serde_json::from_slice(bytes).map_err(|_| "status_invalid_reply")?;
+    let rows = reply["harnesses"]
+        .as_array()
+        .ok_or("status_invalid_reply")?;
+    if rows.len() > MOST_LISTED {
+        return Err("status_invalid_reply");
+    }
+    Ok(rows
+        .iter()
+        .filter_map(|row| {
+            let id = row["id"].as_str().filter(|id| agent_id(id))?;
+            let name = row["name"]
+                .as_str()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())?;
+            Some(PsSession {
+                id: id.to_owned(),
+                name: name.to_owned(),
+                folder: row["folder"].as_str().map(str::to_owned),
+            })
+        })
+        .collect())
+}
+
+/// `harness ps --json`'s agent ids working in `folder` and not ended
+/// (`stopped`, `failed`, `closed`, `gone`, or no state), the reply bounded
+/// as [`parse_ps`]'s ([`Cli::live_in`], #6432).
+pub fn parse_ps_live_in(bytes: &[u8], folder: &str) -> Result<Vec<String>, &'static str> {
+    if bytes.len() > PS_STDOUT_LIMIT {
+        return Err("status_invalid_reply");
+    }
+    let reply: Value = serde_json::from_slice(bytes).map_err(|_| "status_invalid_reply")?;
+    let rows = reply["harnesses"]
+        .as_array()
+        .ok_or("status_invalid_reply")?;
+    if rows.len() > MOST_LISTED {
+        return Err("status_invalid_reply");
+    }
+    let folder = folder.trim_end_matches('/');
+    Ok(rows
+        .iter()
+        .filter(|row| {
+            row["folder"]
+                .as_str()
+                .is_some_and(|at| at.trim_end_matches('/') == folder)
+                && !matches!(
+                    row["state"].as_str(),
+                    None | Some("stopped" | "failed" | "closed" | "gone")
+                )
+        })
+        .filter_map(|row| row["id"].as_str().filter(|id| agent_id(id)))
+        .map(str::to_owned)
+        .collect())
+}
+
+/// One harness `harness ps` lists ([`Cli::named`], #6691): its agent id,
+/// its name and the folder it works in, when Harness says one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PsSession {
+    pub id: String,
+    pub name: String,
+    pub folder: Option<String>,
 }
 
 #[derive(Deserialize)]

@@ -79,10 +79,11 @@ fn disabled_skills_are_validated_but_never_started_or_offered() {
 }
 
 #[test]
-fn core_bedtime_manifest_is_disabled_and_has_no_model_function() {
+fn core_bedtime_manifest_is_enabled_and_has_no_model_function() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/bedtime-morning");
     let skill = load(&path).unwrap();
-    assert!(!skill.enabled);
+    // On in the product since #5753.
+    assert!(skill.enabled);
     assert!(skill.is_routine());
     assert!(skill.tool.is_none());
     // Its rest and wake are Night sleep's now (#940): the evening glow and
@@ -739,20 +740,17 @@ fn relative_lights_and_resettles_are_checked_at_load() {
     }
 }
 
-/// The real bedtime-morning manifest, switched on.
+/// The real bedtime-morning manifest, on as it ships (#5753).
 fn bedtime_morning(root: &Path) -> Skill {
     let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/bedtime-morning");
     let folder = root.join("bedtime-morning");
     fs::create_dir_all(&folder).unwrap();
-    fs::copy(from.join("SKILL.md"), folder.join("SKILL.md")).unwrap();
-    let text = fs::read_to_string(from.join("skill.toml")).unwrap();
-    assert!(text.contains("enabled = false"));
-    fs::write(
-        folder.join("skill.toml"),
-        text.replace("enabled = false", "enabled = true"),
-    )
-    .unwrap();
-    load(&folder).unwrap()
+    for file in ["SKILL.md", "skill.toml"] {
+        fs::copy(from.join(file), folder.join(file)).unwrap();
+    }
+    let skill = load(&folder).unwrap();
+    assert!(skill.enabled);
+    skill
 }
 
 const FACE: &[u8] =
@@ -1398,8 +1396,9 @@ fn a_restart_before_the_morning_still_greets_with_it() {
 
 /// #2602: each due chance Welcome back drops says one journal line naming
 /// its gate: an absence under its 300 s (once through a face that flickers
-/// past its gap) and its cooldown. Its 60 s wait for the voice running out
-/// is #3007's `chance dropped` line, not one of these: said once.
+/// past its gap) and its cooldown. A chance kept for the voice says so as
+/// its 60 s wait begins (#6592), once; that wait running out is #3007's
+/// `chance dropped` line, not one of these: said once.
 #[test]
 fn welcome_back_says_each_dropped_chance_once_with_its_gate() {
     let root = private_root();
@@ -1442,6 +1441,7 @@ fn welcome_back_says_each_dropped_chance_once_with_its_gate() {
             "welcome-back not run: away 0 s, under its 300 s",
             "welcome-back not run: away 215 s, under its 300 s",
             "welcome-back not run: in its cooldown, 14 min left",
+            "welcome-back not run: its while did not hold: kept up to 60 s for it (held by voice/state state was speaking)",
         ]
     );
 }
@@ -1589,4 +1589,124 @@ fn without_the_switch_the_first_arrival_is_the_plain_hello() {
         .with_daily_journal(crate::journal(root.path().join("daily.json")));
     let said = hellos(&mut engine, (MORNING - 6, MORNING + 3), MORNING);
     assert_eq!(said, vec![BACK]);
+}
+
+/// 2026-01-01 (`MIDNIGHT`, day 0) is a Thursday: day 4 is Monday 5 January,
+/// day 2 Saturday 3 January (#6066).
+const FRIDAY: u64 = 1;
+const SATURDAY: u64 = 2;
+const SUNDAY: u64 = 3;
+const MONDAY: u64 = 4;
+
+fn on_days(days: &str, from: &str, to: &str) -> String {
+    format!(
+        "name = \"morning\"\ntopic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\nduring = {{ from = \"{from}\", to = \"{to}\" }}\ndays = {days}\nonce_per_day = true"
+    )
+}
+
+/// A fresh engine's one tick at `minute` of `day`: whether it ran.
+fn runs_at(loaded: &Skill, root: &Path, day: u64, minute: u64) -> bool {
+    let path = root.join(format!("daily-{day}-{minute}.json"));
+    let mut engine =
+        Engine::new(vec![loaded.clone()], true).with_daily_journal(crate::journal(path));
+    clock(&mut engine, 0, day, minute);
+    !calls(engine.clock_tick(0)).is_empty()
+}
+
+#[test]
+fn a_weekday_trigger_runs_on_monday_at_seven_and_not_on_saturday() {
+    let root = private_root();
+    let loaded = skill(
+        root.path(),
+        "",
+        &on_days(r#"["mon", "tue", "wed", "thu", "fri"]"#, "07:00", "07:30"),
+    );
+    assert!(runs_at(&loaded, root.path(), MONDAY, 420));
+    assert!(!runs_at(&loaded, root.path(), SATURDAY, 420));
+    assert!(!runs_at(&loaded, root.path(), SUNDAY, 420));
+    assert!(
+        !runs_at(&loaded, root.path(), MONDAY, 450),
+        "after its window"
+    );
+    // `weekdays` is the same five days, and a day named twice is one day.
+    let words = skill(
+        root.path(),
+        "",
+        &on_days(r#"["weekdays", "mon"]"#, "07:00", "07:30"),
+    );
+    assert_eq!(words.triggers[0].days, loaded.triggers[0].days);
+    // One engine through a week: once each weekday, never at the weekend.
+    let mut engine = Engine::new(vec![loaded], true)
+        .with_daily_journal(crate::journal(root.path().join("week.json")));
+    let mut ran = Vec::new();
+    for day in 0..7u64 {
+        let now = day * 2;
+        clock(&mut engine, now, day, 400);
+        engine.clock_tick(now);
+        clock(&mut engine, now + 1, day, 420);
+        if !calls(engine.clock_tick(now + 1)).is_empty() {
+            ran.push(day);
+        }
+    }
+    // Thursday, Friday, then Monday to Wednesday.
+    assert_eq!(ran, vec![0, FRIDAY, MONDAY, 5, 6]);
+}
+
+#[test]
+fn a_weekend_trigger_runs_on_saturday_and_sunday_only() {
+    for days in [r#""weekend""#, r#"["weekend"]"#, r#"["sat", "sun"]"#] {
+        // A journal of its own for each, so no day is claimed already.
+        let root = private_root();
+        let loaded = skill(root.path(), "", &on_days(days, "09:00", "10:00"));
+        assert!(runs_at(&loaded, root.path(), SATURDAY, 540), "{days}");
+        assert!(runs_at(&loaded, root.path(), SUNDAY, 540), "{days}");
+        assert!(!runs_at(&loaded, root.path(), MONDAY, 540), "{days}");
+        assert!(!runs_at(&loaded, root.path(), FRIDAY, 540), "{days}");
+    }
+}
+
+/// An overnight window's hours after midnight belong to the day it opened:
+/// Friday's 23:00 to 02:00 holds at 01:00 on Saturday, and not at 01:00 on
+/// Friday (Thursday's night) or at 23:00 on Saturday.
+#[test]
+fn an_overnight_window_runs_on_the_day_it_opened() {
+    let root = private_root();
+    let loaded = skill(root.path(), "", &on_days(r#"["fri"]"#, "23:00", "02:00"));
+    assert!(runs_at(&loaded, root.path(), FRIDAY, 1380));
+    assert!(
+        runs_at(&loaded, root.path(), SATURDAY, 60),
+        "Friday's night"
+    );
+    assert!(!runs_at(&loaded, root.path(), SATURDAY, 1380));
+    assert!(
+        !runs_at(&loaded, root.path(), FRIDAY, 60),
+        "Thursday's night"
+    );
+}
+
+#[test]
+fn days_are_checked_at_load() {
+    let root = private_root();
+    skill(root.path(), "", morning());
+    let path = root.path().join("daily-check");
+    let refused = |trigger: &str| {
+        fs::write(
+            path.join("skill.toml"),
+            granted(&format!(
+                "[trigger]\n{trigger}\n[ask]\npolicy = \"nudge\"\n[[do]]\nbody = {{ gesture = \"stretching\" }}\n"
+            )),
+        )
+        .unwrap();
+        load(&path).unwrap_err()
+    };
+    let error = refused(&on_days(r#"["mon", "funday"]"#, "07:00", "08:00"));
+    assert!(error.contains("\"funday\" is not a day"), "{error}");
+    let error = refused(&on_days(r#""Monday""#, "07:00", "08:00"));
+    assert!(error.contains("\"Monday\" is not a day"), "{error}");
+    let error = refused(&on_days("[]", "07:00", "08:00"));
+    assert!(error.contains("days names no day"), "{error}");
+    let error =
+        refused("topic = \"clock/local\"\nfield = \"known\"\nequals = true\ndays = [\"mon\"]");
+    assert!(error.contains("days goes with during"), "{error}");
+    assert!(!refused(&on_days("[1, 2]", "07:00", "08:00")).is_empty());
 }

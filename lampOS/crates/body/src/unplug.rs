@@ -24,6 +24,8 @@ const PERIOD: Duration = Duration::from_millis(50);
 const FRESH_US: u64 = 100_000;
 const SETTLE_US: u64 = 500_000;
 const TIMEOUT: Duration = Duration::from_secs(30);
+/// How often a body held at start by a kept request looks again.
+const HOLD: Duration = Duration::from_secs(1);
 /// After an accepted cancel the lamp stays down this long, so the spoken
 /// "Okay, I'll stay." comes before any motion.
 const RISE_AFTER_US: u64 = 3_000_000;
@@ -257,9 +259,6 @@ pub struct Adapter {
     worker: Option<thread::JoinHandle<()>>,
 }
 impl Adapter {
-    pub fn from_environment() -> io::Result<Option<Self>> {
-        Self::configured(Bus::from_environment()?, enabled())
-    }
     fn configured(bus: Bus, enabled: bool) -> io::Result<Option<Self>> {
         // The switch controls new live requests, not recovery from an existing
         // latch. Check before actuator access even after the switch was removed.
@@ -270,30 +269,55 @@ impl Adapter {
         let mut publisher = bus.publisher_declared(STATE_TOPIC, &State::declaration(), "body")?;
         let shared = Arc::new(Shared::default());
         let worker_shared = Arc::clone(&shared);
-        let worker = thread::Builder::new()
-            .name("body-unplug".into())
-            .spawn(move || {
-                let shared = worker_shared;
-                let mut preparation: Option<Preparation> = None;
-                loop {
-                    let stopping = shared.stopped.load(Ordering::SeqCst);
-                    shared.tick(
-                        &bus,
-                        &mut publisher,
-                        &mut preparation,
-                        stopping,
-                        lamp_ipc::monotonic_us,
-                    );
-                    if stopping {
-                        break;
-                    }
-                    thread::sleep(PERIOD);
+        // Made before lamp-body blocks SIGTERM for its signalfd: it never
+        // takes a signal, or systemd's stop ends the process here (#6834).
+        let worker = lamp_ipc::spawn_without_signals("body-unplug", move || {
+            let shared = worker_shared;
+            let mut preparation: Option<Preparation> = None;
+            loop {
+                let stopping = shared.stopped.load(Ordering::SeqCst);
+                shared.tick(
+                    &bus,
+                    &mut publisher,
+                    &mut preparation,
+                    stopping,
+                    lamp_ipc::monotonic_us,
+                );
+                if stopping {
+                    break;
                 }
-            })?;
+                thread::sleep(PERIOD);
+            }
+        })?;
         Ok(Some(Self {
             shared,
             worker: Some(worker),
         }))
+    }
+    /// The adapter as the environment asks. A refused start never exits the
+    /// process
+    /// (#5777's P1: on lamp-52e6, 10 Nov, a body restarted after a failed
+    /// fold exited, restart-looped and was left stopped by systemd). It is
+    /// held before any actuator access, telling `holding` why each round,
+    /// and looks again every `HOLD`: a refusal that clears (a read that
+    /// failed once) starts it; a kept request holds it until a reboot clears
+    /// the bus. `false` from `holding` gives the refusal back. Nothing here
+    /// clears or rewrites the request.
+    pub fn held(holding: impl FnMut(&io::Error) -> bool) -> io::Result<Option<Self>> {
+        Self::held_on(Bus::from_environment()?, enabled(), HOLD, holding)
+    }
+    fn held_on(
+        bus: Bus,
+        enabled: bool,
+        pause: Duration,
+        mut holding: impl FnMut(&io::Error) -> bool,
+    ) -> io::Result<Option<Self>> {
+        loop {
+            match Self::configured(bus.clone(), enabled) {
+                Err(error) if holding(&error) => thread::sleep(pause),
+                done => return done,
+            }
+        }
     }
     pub fn latched(&self) -> bool {
         self.shared.latched.load(Ordering::SeqCst)
@@ -1011,8 +1035,10 @@ mod tests {
                 }
                 assert!(shared.latched.load(Ordering::SeqCst));
                 let took = Duration::from_micros(offset - began);
+                // The 2 s bound is on the fake timeline and is what the test
+                // proves; it does not depend on how fast the host runs.
                 assert!(
-                    took < Duration::from_secs(2) && host_began.elapsed() < Duration::from_secs(2),
+                    took < Duration::from_secs(2),
                     "{label}: no {want:?} in 2 s: {:?}",
                     phase()
                 );
@@ -1022,6 +1048,15 @@ mod tests {
                     }
                     assert_ne!(now, Phase::Failed, "{label}: waiting for {want:?}: {why}");
                 }
+                // The host bound only stops a hang. It was 2 s and judged
+                // before the phase was read: a loaded CI runner spent over
+                // 2 s of wall time on the ~60 bus round trips of the first
+                // proof and failed with Ready already published.
+                assert!(
+                    host_began.elapsed() < Duration::from_secs(20),
+                    "{label}: hung for 20 s waiting for {want:?}: {:?}",
+                    phase()
+                );
                 // Read the synchronous bus result before advancing time.
                 elapsed.set(offset + 10_000);
             }
@@ -1059,13 +1094,12 @@ mod tests {
                 },
             )
             .unwrap();
+        // Waits on the published phase. The bound only stops a hang: the
+        // worker is a real thread on a 50 ms period, and a loaded CI runner
+        // can starve it for longer than the 2 s this once allowed.
         let until = |want: Phase| {
             let began = std::time::Instant::now();
             loop {
-                assert!(
-                    began.elapsed() < Duration::from_secs(2),
-                    "no {want:?} in 2 s"
-                );
                 if let Some(message) = bus.latest(STATE_TOPIC).unwrap() {
                     let state = message.parse::<State>().unwrap();
                     assert_eq!(state.request, "live-1");
@@ -1074,6 +1108,10 @@ mod tests {
                     }
                     assert_ne!(state.phase, Phase::Failed, "{}", state.why);
                 }
+                assert!(
+                    began.elapsed() < Duration::from_secs(20),
+                    "no {want:?} in 20 s"
+                );
                 thread::sleep(Duration::from_millis(1));
             }
         };
@@ -1097,11 +1135,15 @@ mod tests {
         let stopped = until(Phase::Failed);
         assert!(stopped.why.contains("body stopped"), "{}", stopped.why);
         assert!(adapter.latched());
+        // The worker has published Failed on its stopping tick and broke out
+        // of its loop, so the join only waits for the thread to be
+        // scheduled; the bound catches a worker that never ends, not a slow
+        // runner.
         let began = std::time::Instant::now();
         drop(adapter);
         assert!(
-            began.elapsed() < Duration::from_secs(2),
-            "worker join took 2 s"
+            began.elapsed() < Duration::from_secs(20),
+            "worker join took 20 s"
         );
         std::fs::remove_dir_all(&root).unwrap();
         assert!(!root.exists());
@@ -1284,5 +1326,136 @@ mod tests {
             "malformed kept bytes cannot permit startup"
         );
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// #5777's P1, lamp-52e6 on 10 Nov 14:54: the fold rested 26 counts off
+    /// on the arm, the preparation failed, and the body restarted with its
+    /// request kept. It refused, exited and restart-looped until systemd
+    /// gave up. A body held so stays up with the latch (no actuator access
+    /// before `configured` passes), and holds until a reboot clears the bus.
+    #[test]
+    fn a_failed_fold_kept_at_restart_holds_the_body_up_and_still() {
+        let root = std::env::temp_dir().join(format!("unplug-held-{}", std::process::id()));
+        let fresh = |case: &str| {
+            let root = root.join(case);
+            let _ = std::fs::remove_dir_all(&root);
+            let bus = Bus::new(&root).unwrap();
+            publish(
+                &bus,
+                REQUEST_TOPIC,
+                "skills",
+                1,
+                serde_json::json!({"request": "r1"}),
+            );
+            bus.publisher_declared(STATE_TOPIC, &State::declaration(), "body")
+                .unwrap()
+                .publish_json(
+                    2,
+                    &State {
+                        request: "r1".into(),
+                        phase: Phase::Failed,
+                        why: "physical folded position was not verified within 30 seconds".into(),
+                    },
+                )
+                .unwrap();
+            bus
+        };
+        let kept = |bus: &Bus| {
+            let message = bus.latest(REQUEST_TOPIC).unwrap().unwrap();
+            (
+                message.header.source.clone(),
+                message.parse::<Request>().unwrap(),
+            )
+        };
+        for (case, cancel) in [("uncancelled", false), ("cancelled", true)] {
+            let bus = fresh(case);
+            if cancel {
+                // A "never mind" after it failed: a failed preparation still
+                // needs inspection (unplug.md), so it starts nothing either.
+                publish(
+                    &bus,
+                    CANCEL_TOPIC,
+                    "skills",
+                    3,
+                    serde_json::json!({"request": "r1"}),
+                );
+            }
+            let before = kept(&bus);
+            let mut rounds = 0;
+            let held = Adapter::held_on(bus.clone(), true, Duration::ZERO, |error| {
+                assert!(error.to_string().contains("startup motion inhibited"));
+                rounds += 1;
+                rounds < 5
+            });
+            assert!(held.is_err(), "{case}: it never starts while held");
+            assert_eq!(rounds, 5, "{case}: the process stays up, held, not exited");
+            assert_eq!(
+                kept(&bus),
+                before,
+                "{case}: holding never clears the request"
+            );
+            let state = bus
+                .latest(STATE_TOPIC)
+                .unwrap()
+                .unwrap()
+                .parse::<State>()
+                .unwrap();
+            assert_eq!((state.request.as_str(), state.phase), ("r1", Phase::Failed));
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// The documented recovery is unchanged by the hold: a kept request with
+    /// its matching cancel, never failed, starts at once and unlatched.
+    #[test]
+    fn a_held_start_with_its_cancel_starts_at_once() {
+        let root = std::env::temp_dir().join(format!("unplug-held-ok-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let bus = Bus::new(&root).unwrap();
+        publish(
+            &bus,
+            REQUEST_TOPIC,
+            "skills",
+            1,
+            serde_json::json!({"request": "r1"}),
+        );
+        publish(
+            &bus,
+            CANCEL_TOPIC,
+            "skills",
+            2,
+            serde_json::json!({"request": "r1"}),
+        );
+        let mut rounds = 0;
+        let adapter = Adapter::held_on(bus.clone(), true, Duration::ZERO, |_| {
+            rounds += 1;
+            false
+        })
+        .unwrap()
+        .unwrap();
+        assert_eq!(rounds, 0);
+        assert!(!adapter.latched());
+        assert!(bus.latest(REQUEST_TOPIC).unwrap().is_some(), "still kept");
+        drop(adapter);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// The never-clear rule (unplug.md, "Lifetime and restart"): nothing in
+    /// the body writes or removes the kept request; only Skills publishes it.
+    #[test]
+    fn no_body_path_clears_the_kept_request() {
+        let source = include_str!("unplug.rs");
+        let code = &source[..source.find("#[cfg(test)]").unwrap()];
+        for forbidden in [
+            "remove_file",
+            "remove_dir",
+            "fs::write",
+            "publisher_declared(REQUEST_TOPIC",
+        ] {
+            assert!(
+                !code.contains(forbidden),
+                "unplug.rs must not use {forbidden}"
+            );
+        }
     }
 }

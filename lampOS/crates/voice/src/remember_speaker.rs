@@ -195,6 +195,23 @@ mod tests {
         guarded: bool,
         reply: Value,
     ) -> (Value, Vec<Value>) {
+        let chosen = if guarded {
+            switches()
+        } else {
+            known_faces::FaceSwitches::default()
+        };
+        own_name_exchange_with(words, name, apart, chosen, reply)
+    }
+
+    /// [`own_name_exchange`] under the given switches, such as a save at
+    /// setup (`at_setup`).
+    fn own_name_exchange_with(
+        words: &str,
+        name: &str,
+        apart: bool,
+        chosen: known_faces::FaceSwitches,
+        reply: Value,
+    ) -> (Value, Vec<Value>) {
         let home = crate::process::SessionDirectory::create().unwrap();
         let socket = home.path.join("eyes.sock");
         let listener = UnixListener::bind(&socket).unwrap();
@@ -231,11 +248,7 @@ mod tests {
         let answer = known_faces::run_scoped(
             &socket,
             &call(json!({"name": name, "apart": apart})),
-            if guarded {
-                switches()
-            } else {
-                known_faces::FaceSwitches::default()
-            },
+            chosen,
             None,
             Some(&line),
             REQUEST,
@@ -437,6 +450,90 @@ mod tests {
         assert_eq!(answer, json!({"ok": true, "remembered": "Kesh"}));
         assert_eq!(requests.len(), 1);
         assert_eq!(requests[0]["remember_speaker"]["name"], "Kesh");
+    }
+
+    /// B3472 (#3472): at setup a name alone is no yes to the face. The
+    /// speaker's own line must ask to keep their face, or agree to the
+    /// lamp's face question just asked; otherwise the eyes are never asked.
+    #[test]
+    fn remember_speaker_at_setup_a_name_alone_keeps_no_face() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        let at_setup = known_faces::FaceSwitches {
+            at_setup: true,
+            ..switches()
+        };
+        for words in ["I'm Kesh.", "My name is Kesh.", "Kesh.", "K E S H."] {
+            let apart = words == "K E S H.";
+            let (answer, requests) = own_name_exchange_with(
+                words,
+                "Kesh",
+                apart,
+                at_setup,
+                json!({"remembered": "Kesh"}),
+            );
+            assert!(requests.is_empty(), "{words}: {requests:?}");
+            assert_eq!(answer["error"], known_faces::FACE_LEAVE, "{words}");
+        }
+        for words in [
+            "My name is Kesh, remember my face.",
+            "Lamp, remember my face, I’m Kesh.",
+            "Please remember my face. My name is Kesh.",
+        ] {
+            let (answer, requests) = own_name_exchange_with(
+                words,
+                "Kesh",
+                false,
+                at_setup,
+                json!({"remembered": "Kesh"}),
+            );
+            assert_eq!(answer, json!({"ok": true, "remembered": "Kesh"}), "{words}");
+            assert_eq!(requests.len(), 1, "{words}");
+        }
+        // Past setup a name alone keeps its face as before.
+        let (answer, requests) = own_name_exchange(
+            "I'm Kesh.",
+            "Kesh",
+            false,
+            true,
+            json!({"remembered": "Kesh"}),
+        );
+        assert_eq!(answer, json!({"ok": true, "remembered": "Kesh"}));
+        assert_eq!(requests.len(), 1);
+    }
+
+    #[test]
+    fn remember_speaker_at_setup_leave_is_the_face_questions_yes_or_their_own_ask() {
+        const ASKED: &str = "May I remember your face, so I know you next time?";
+        for (words, lamp, leave) in [
+            ("Yes, my name is Kesh.", Some(ASKED), true),
+            ("Sure, I'm Kesh.", Some(ASKED), true),
+            (
+                "Vâng, tên tôi là Minh.",
+                Some("Mình nhớ khuôn mặt bạn được không?"),
+                true,
+            ),
+            ("My name is Kesh, remember my face.", None, true),
+            ("Can you remember my face? I'm Kesh.", None, true),
+            ("Yes, my name is Kesh.", Some("What's your name?"), false),
+            ("Yes, my name is Kesh.", None, false),
+            ("I'm Kesh.", Some(ASKED), false),
+            ("No, my name is Kesh.", Some(ASKED), false),
+            ("Yes? My name is Kesh.", Some(ASKED), false),
+            ("Don't remember my face, I'm Kesh.", None, false),
+            ("I'm Kesh, never remember my face.", Some(ASKED), false),
+            ("I'm Kesh, remember her face.", None, false),
+            (
+                "Yes, my name is Kesh.",
+                Some("Would you rather I didn't remember your face?"),
+                false,
+            ),
+        ] {
+            assert_eq!(
+                known_faces::speaker_gave_face_leave(words, lamp),
+                leave,
+                "{words} after {lamp:?}"
+            );
+        }
     }
 
     #[test]

@@ -157,6 +157,28 @@ pub(crate) fn take_cut_short() -> Vec<String> {
     CUT_SHORT.with(|cut| std::mem::take(&mut *cut.borrow_mut()))
 }
 
+thread_local! {
+    /// The news whose telling began ([`begun`]), for the coordinator to
+    /// hand to [`TaskNews::begun`] at its next tick. Of the coordinator's
+    /// own thread.
+    static BEGUN: std::cell::RefCell<Vec<(u64, String)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The news `keys` the voice's `request` began to tell: its words reached
+/// the speaker (#6530), heard whole or not.
+pub(crate) fn begun(request: u64, keys: &[String]) {
+    BEGUN.with(|begun| {
+        begun
+            .borrow_mut()
+            .extend(keys.iter().map(|key| (request, key.clone())));
+    });
+}
+
+/// The news begun since the last call ([`begun`]), each with its request.
+pub(crate) fn take_begun() -> Vec<(u64, String)> {
+    BEGUN.with(|begun| std::mem::take(&mut *begun.borrow_mut()))
+}
+
 /// Whether news is told at the first pause ([`AT_PAUSE_ENVIRONMENT`]):
 /// `on`, and nothing else.
 pub fn at_pause(value: Option<&str>) -> bool {
@@ -214,7 +236,7 @@ const WOKEN_GAP: Duration = Duration::from_secs(1);
 
 /// What wakes the reading thread before its next read.
 #[derive(Debug, PartialEq, Eq)]
-enum Wake {
+pub(crate) enum Wake {
     /// News just told: kept in the file at once.
     Told(String),
     /// A task newly settled on `tasks/status` (#560): read now, not at the
@@ -223,6 +245,10 @@ enum Wake {
     /// News not heard whole, to tell once more ([`RETELL_ENVIRONMENT`]):
     /// offered again at the next read though it is kept as told.
     Retell(String),
+    /// A sign-in's question told (`Told` before) but talked over or cut
+    /// short, its key (#5198): offered again at once, to be asked at the
+    /// next pause, not once [`crate::sign_in::ASK_AGAIN_AFTER`] is past.
+    Cut(String),
 }
 
 /// A sign-in by voice followed by the news (#1676), with its switch: the
@@ -332,6 +358,22 @@ impl Retelling {
     }
 }
 
+/// Where a turn's news not heard whole goes ([`TaskNews::not_heard`]):
+/// kept on the turn, so a turn cancelled anywhere tells it (#5198).
+#[derive(Debug, Clone)]
+pub struct NotHeard(pub(crate) Sender<Wake>);
+
+impl NotHeard {
+    /// [`TaskNews::not_heard`]. Never waits.
+    pub fn not_heard(&self, keys: Vec<String>) {
+        for key in keys {
+            if crate::sign_in::asked_of(&key).is_some() {
+                let _ = self.0.send(Wake::Cut(key));
+            }
+        }
+    }
+}
+
 pub struct TaskNews {
     offered: Receiver<News>,
     told: Sender<Wake>,
@@ -354,7 +396,14 @@ pub struct TaskNews {
     retell: bool,
     /// News not heard whole, by key ([`Self::not_heard`]).
     retelling: BTreeMap<String, Retelling>,
+    /// The newest news sent to the tasks part as begun ([`Self::begun`]),
+    /// at most [`BEGUN_KEPT`]: each is sent once.
+    begun: VecDeque<String>,
 }
+
+/// How many keys of news begun [`TaskNews`] keeps, so that one is sent to
+/// the tasks part once: more than are told in any one stretch of talk.
+const BEGUN_KEPT: usize = 64;
 
 impl Drop for TaskNews {
     fn drop(&mut self) {
@@ -848,6 +897,7 @@ impl TaskNews {
             heard,
             retell: retell_on(std::env::var(RETELL_ENVIRONMENT).ok().as_deref()),
             retelling: BTreeMap::new(),
+            begun: VecDeque::new(),
         })
     }
 
@@ -857,7 +907,8 @@ impl TaskNews {
     /// started is closed (#1390), and a sign-in's question may be answered
     /// in a later request (#1676). News taken to tell but cut short, or not
     /// heard, never comes here ([`Self::not_heard`]). Heard, it is never
-    /// told once more. Never waits.
+    /// told once more. One sent as begun already ([`Self::begun`]) is not
+    /// sent again. Never waits.
     pub fn heard(&mut self, request: u64, keys: Vec<String>) {
         for key in keys {
             if let Some(retelling) = self.retelling.get_mut(&key)
@@ -865,17 +916,59 @@ impl TaskNews {
             {
                 *retelling = Retelling::Spent(retelling.since());
             }
+            if crate::sign_in::asked_of(&key).is_none() && self.begun.contains(&key) {
+                continue;
+            }
             let _ = self.heard.send((key, request));
         }
     }
 
-    /// News taken to tell, unasked or in an answer, whose turn was cut
-    /// short, never played or played with gaps (`coordinator`): with [`RETELL_ENVIRONMENT`]
-    /// on, each settled piece is told once more at the next quiet pause
+    /// News whose telling began: the turn's words reached the speaker,
+    /// heard whole or not (#6530). The tasks part is told so at once, as
+    /// for news heard ([`Self::heard`]), so that with `--close-told` the
+    /// finished task's harness is closed a few seconds after its news
+    /// begins. On a lamp on 12 Nov a news played with gaps
+    /// (`audio_written_with_playback_gaps_unscored`) kept its harness open
+    /// 71 s after the task went idle. Whether it was heard whole still
+    /// decides only whether it is told once more ([`Self::not_heard`],
+    /// [`RETELL_ENVIRONMENT`]): this leaves that as it is, and news told
+    /// once more is read from the tasks part's store, which a closed
+    /// harness leaves as it was. The tasks part closes only an agent idle
+    /// with an answer: one waiting for the person or failed stays open. A
+    /// sign-in's question is never sent here: its answer waits on it being
+    /// heard whole (#1676). Each key is sent once. Never waits.
+    pub fn begun(&mut self, request: u64, keys: Vec<String>) {
+        for key in keys {
+            if crate::sign_in::asked_of(&key).is_some()
+                || observation_of(&key).is_none()
+                || self.begun.contains(&key)
+            {
+                continue;
+            }
+            if self.begun.len() >= BEGUN_KEPT {
+                self.begun.pop_front();
+            }
+            self.begun.push_back(key.clone());
+            let _ = self.heard.send((key, request));
+        }
+    }
+
+    /// News taken to tell, unasked or in an answer, whose turn was not
+    /// heard whole (talked over, cut short, never played or played with
+    /// gaps), as the turn ends (`coordinator`). A sign-in's question among
+    /// it is offered again now, to be asked at the next pause (#5198), not
+    /// [`crate::sign_in::ASK_AGAIN_AFTER`] later, whatever
+    /// [`RETELL_ENVIRONMENT`] says. With [`RETELL_ENVIRONMENT`]
+    /// on, each other settled piece is told once more at the next quiet pause
     /// ([`Self::retelling_first`]), offered again by the reader though it
     /// is kept as told. One not heard a second time is never told again
-    /// unasked: two tries at most. Off, nothing changes. Never waits.
+    /// unasked: two tries at most. Off, other news is left as it was.
+    /// Never waits.
     pub fn not_heard(&mut self, keys: Vec<String>) {
+        let (asked, keys): (Vec<String>, Vec<String>) = keys
+            .into_iter()
+            .partition(|key| crate::sign_in::asked_of(key).is_some());
+        self.not_heard_by().not_heard(asked);
         if !self.retell {
             return;
         }
@@ -900,6 +993,13 @@ impl TaskNews {
                 }
             }
         }
+    }
+
+    /// [`Self::not_heard`] for a sign-in's question, to be called where
+    /// only the turn is at hand: put on the turn that tells the news, for
+    /// when it is cancelled (#5198).
+    pub fn not_heard_by(&self) -> NotHeard {
+        NotHeard(self.told.clone())
     }
 
     /// Whether the news first in line is news told once more
@@ -1049,6 +1149,7 @@ impl TaskNews {
             heard,
             retell: false,
             retelling: BTreeMap::new(),
+            begun: VecDeque::new(),
         };
         (news, heard_out)
     }
@@ -1196,6 +1297,9 @@ fn read_forever(
                     offered.remove(&key);
                     retelling.insert(key);
                 }
+                Wake::Cut(key) => {
+                    again.cut(&key);
+                }
                 Wake::Settled => {}
             }
         }
@@ -1285,6 +1389,13 @@ fn read_forever(
                     offered.remove(&key);
                     retelling.insert(key);
                     next = next.min(read_at + woken_gap);
+                }
+                // A question talked over (#5198): read now, so it is
+                // offered again by the next pause.
+                Ok(Wake::Cut(key)) => {
+                    if again.cut(&key) {
+                        next = next.min(read_at + woken_gap);
+                    }
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => break,
                 Err(mpsc::RecvTimeoutError::Disconnected) => return,
@@ -1403,6 +1514,37 @@ fn read_once_with(
             let Some(id) = item["id"].as_u64() else {
                 continue;
             };
+            // Work the person said yes to that went into one of their
+            // earlier sessions (lamp-tasks' `serve --reply-named`, #5535):
+            // which one is told at once, so a wrong one is heard (the
+            // Reviewer-lead's P2 on #5784 at 71bf964baa). Its finish is
+            // news of its own, below.
+            if let Some(session) = joined_hand_over(item, now) {
+                let key = format!("{store}:{id}:joined");
+                let until = if retelling.contains(&key) {
+                    let ended = item["dispatch"]["finished"]["monotonic_ms"]
+                        .as_u64()
+                        .unwrap_or_default();
+                    retell_until(now.ms.saturating_sub(ended)).map(Some)
+                } else {
+                    Some(None)
+                };
+                if let Some(until) = until
+                    && !told.contains(&key)
+                    && !offered.contains(&key)
+                    && let Some(task) = ask(socket, &json!({"op":"get_task","id":id}))
+                    && let Some(note) = note_joined(&words, &task, session)
+                {
+                    news.push(News {
+                        key,
+                        note,
+                        until,
+                        progress: None,
+                        finished: None,
+                        also: Vec::new(),
+                    });
+                }
+            }
             // Work the person said yes to that never reached its agent is
             // news too: the lamp said it was handing it over.
             if let Some(failed) = failed_hand_over(item, now) {
@@ -1428,6 +1570,10 @@ fn read_once_with(
                 if !told.contains(&key)
                     && !offered.contains(&key)
                     && let Some(task) = ask(socket, &json!({"op":"get_task","id":id}))
+                    // A make handed to the lamp's agent
+                    // (`LAMP_MAKE_SKILL_AGENT`): the voice says what became
+                    // of it, never this news.
+                    && !crate::made_skill::is_brief(task["text"].as_str().unwrap_or_default())
                     && let Some(note) = note_failed(&words, &task, failed, code)
                 {
                     news.push(News {
@@ -1574,6 +1720,64 @@ fn failed_hand_over(item: &Value, now: &BootClock) -> Option<bool> {
         .then_some(unsure)
 }
 
+/// The earlier session of the person's that a task they said yes to went
+/// into within the last [`JUST_MS`] of this boot, as lamp-tasks keeps it
+/// (`dispatch.joined`: its `name`, its first `ask`); none for a new
+/// session, or one the router chose, which keep none.
+fn joined_hand_over<'a>(item: &'a Value, now: &BootClock) -> Option<&'a Value> {
+    let dispatch = &item["dispatch"];
+    if dispatch["state"].as_str()? != "accepted"
+        || dispatch["confirmed"].is_null()
+        || !dispatch["joined"].is_object()
+    {
+        return None;
+    }
+    let finished = &dispatch["finished"];
+    (finished["boot_id"].as_str() == Some(now.boot_id.as_str())
+        && now.ms.saturating_sub(finished["monotonic_ms"].as_u64()?) <= JUST_MS)
+        .then_some(&dispatch["joined"])
+}
+
+/// The most of a joined session's name or first ask quoted in its note:
+/// lamp-tasks keeps 80 characters of an ask.
+const MOST_SESSION_CHARS: usize = 80;
+
+/// Which earlier session a task went into ([`joined_hand_over`]), fitted
+/// to one written turn: by its name, or, with none, by what it was first
+/// asked; none with neither.
+fn note_joined(words: &NewsWords, task: &Value, session: &Value) -> Option<String> {
+    let (asked, _) = quoted(asked_text(task)?, MOST_TASK_CHARS);
+    let who = who(task);
+    let said = |key: &str| {
+        session[key]
+            .as_str()
+            .map(|text| quoted(text, MOST_SESSION_CHARS).0)
+            .filter(|text| !text.is_empty())
+    };
+    let (line, slot, value) = match (said("name"), said("ask")) {
+        (Some(name), _) => (&words.joined, "session", name),
+        (None, Some(ask)) => (&words.joined_asked, "earlier", ask),
+        (None, None) => return None,
+    };
+    // Closed, and reopened for it (lamp-tasks' `LAMP_TASKS_RESUME_CLOSED`):
+    // said so, and whether its earlier conversation came back.
+    let reopened = match session["resumed"].as_bool() {
+        Some(true) => Some(&words.joined_reopened),
+        Some(false) => Some(&words.joined_fresh),
+        None => None,
+    };
+    fitted(&asked, "", false, |asked, _, _| {
+        let said = fill(
+            line,
+            &[("asked", asked), ("who", who), (slot, value.as_str())],
+        );
+        unprompted(&match reopened {
+            Some(reopened) => format!("{said} {reopened}"),
+            None => said,
+        })
+    })
+}
+
 /// A hand-over that did not reach its agent, fitted to one written turn
 /// like other news ([`fitted`]): the task's words are cut first
 /// (reviewer-two's P2 on #2875). A missing folder's note with a computer
@@ -1599,7 +1803,16 @@ fn note_failed(
         Some("folder_missing") => Some(&words.failed_folder),
         Some("engine_signed_out") => Some(&words.failed_signed_out),
         Some("engine_no_prompt") => Some(&words.failed_no_prompt),
-        Some("agent_busy") => Some(&words.failed_busy),
+        // A session the person named that is busy (#5535, `serve
+        // --reply-named`) is told as a busy routed one.
+        Some("agent_busy" | "session_busy" | "reply_not_idle") => Some(&words.failed_busy),
+        // A named session that is closed or only stopped (#5535, the first
+        // builder's ruling on #5784's follow-up): how to open it again, or
+        // a new one in the same project; nothing is started on its own.
+        Some("session_closed" | "session_stopped") => Some(&words.failed_closed),
+        // Reopening it could not be confirmed yet (`LAMP_TASKS_RESUME_CLOSED`):
+        // the same, and that they may try again in a moment.
+        Some("session_resume_unconfirmed") => Some(&words.failed_closed_soon),
         _ => None,
     };
     if let Some(line) = refused
@@ -1629,7 +1842,7 @@ pub(crate) fn unprompted(words: &str) -> String {
 /// work to is named in its news (a Hermes task was told as Claude Code's);
 /// Claude Code, the default target's, for a task naming no known engine.
 pub(crate) fn who(task: &Value) -> &'static str {
-    task["target"]["engine"]
+    engine_of(task)
         .as_str()
         .and_then(crate::agent_tasks::name_of)
         .unwrap_or("Claude Code")
@@ -1640,10 +1853,13 @@ pub(crate) fn who(task: &Value) -> &'static str {
 /// computer", as without it; for Devin Cloud, which works on no computer,
 /// "the Devin session in Harness".
 pub(crate) fn their_computer(task: &Value) -> String {
-    if task["target"]["engine"] == "devin-cloud" {
+    if engine_of(task) == "devin-cloud" {
         return "the Devin session in Harness".to_owned();
     }
-    task["target_alias"]
+    if on_the_lamp(task) {
+        return "the lamp".to_owned();
+    }
+    alias_of(task)
         .as_str()
         .and_then(crate::agent_tasks::machine_name)
         .map_or_else(
@@ -1651,6 +1867,46 @@ pub(crate) fn their_computer(task: &Value) -> String {
             |name| format!("their {name}"),
         )
 }
+
+/// Whether the work was done on the lamp itself, by OpenClaw or Hermes
+/// there (`lamp-tasks` with `LAMP_OPENCLAW_ON_LAMP` or `LAMP_HERMES_ON_LAMP`,
+/// #5978, #6226).
+pub(crate) fn on_the_lamp(task: &Value) -> bool {
+    *alias_of(task) == crate::agent_tasks::LAMP_TARGET
+        && (*engine_of(task) == "hermes" || *engine_of(task) == "openclaw")
+}
+
+/// Where the task's work is, as a `get_task` answer names it: the machine
+/// its named session was found on (`task.dispatch.joined_on`, #5978) when
+/// the lamp's hand-over joined one on a computer, else its target's alias
+/// (`task.target_alias`, or `target_alias` as a shaped entry names it).
+fn alias_of(task: &Value) -> &Value {
+    let joined = &task["task"]["dispatch"]["joined_on"]["alias"];
+    if joined.is_string() {
+        return joined;
+    }
+    let alias = &task["task"]["target_alias"];
+    if alias.is_string() {
+        alias
+    } else {
+        &task["target_alias"]
+    }
+}
+
+/// The engine of the agent doing the work: the joined session's (#5978),
+/// else the launch target's.
+fn engine_of(task: &Value) -> &Value {
+    let joined = &task["task"]["dispatch"]["joined_on"]["engine"];
+    if joined.is_string() {
+        joined
+    } else {
+        &task["target"]["engine"]
+    }
+}
+
+/// What a note of work done on the lamp itself adds (#5978): the person
+/// hears that the lamp did it, here.
+const ON_THE_LAMP: &str = " It was done here on the lamp itself, not on their computer: say so in the same breath (\"I did it here on the lamp\").";
 
 /// At most `most` characters of `text` on one line, with no double quotes
 /// to end the note's quotation early.
@@ -1671,6 +1927,7 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
     // A question task (`agent_tasks::QUESTION`) is told as its answer.
     let question = crate::agent_tasks::question_of(task["text"].as_str()?).is_some();
     let computer = their_computer(task);
+    let lamp = on_the_lamp(task) && data["state"] == "idle";
     let (asked, _) = quoted(asked_text(task)?, MOST_TASK_CHARS);
     let (answer, cut) = quoted(
         data["answer"].as_str().unwrap_or_default(),
@@ -1731,7 +1988,7 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
             ),
             _ => (&words.stopped, "", String::new()),
         };
-        unprompted(&fill(
+        let filled = fill(
             line,
             &[
                 ("who", who),
@@ -1742,7 +1999,12 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
                 ("no_question", no_question),
                 ("waiting", &waiting),
             ],
-        ))
+        );
+        if lamp {
+            unprompted(&format!("{filled}{ON_THE_LAMP}"))
+        } else {
+            unprompted(&filled)
+        }
     };
     fitted(&asked, &answer, cut, say)
 }
@@ -2857,6 +3119,7 @@ mod tests {
             ("codex", "Codex"),
             ("opencode", "OpenCode"),
             ("hermes", "Hermes"),
+            ("openclaw", "OpenClaw"),
         ] {
             let told = note(&own(), &task(engine, json!([])), &waiting, 0).unwrap();
             assert_eq!(
@@ -2884,6 +3147,7 @@ mod tests {
             ("devin", "Devin"),
             ("devin-cloud", "Devin"),
             ("hermes", "Hermes"),
+            ("openclaw", "OpenClaw"),
         ] {
             assert_eq!(who(&json!({"target":{"engine":engine}})), name, "{engine}");
         }
@@ -3164,6 +3428,182 @@ mod tests {
             note_failed(&own(), &task("claude", json!([])), true, FOLDER),
             note_failed(&own(), &task("claude", json!([])), true, None)
         );
+    }
+
+    /// `serve --reply-named` (#5535): a session the person named that is
+    /// busy is told as a busy one, as the router's pick is; the other ends
+    /// of a named session are told as a plain failure.
+    #[test]
+    fn a_busy_named_session_is_told_as_busy_and_its_other_ends_as_a_failure() {
+        let busy = note_failed(
+            &own(),
+            &task("claude", json!([])),
+            false,
+            Some("agent_busy"),
+        );
+        assert!(
+            busy.as_deref().is_some_and(|told| told.contains("is busy")),
+            "{busy:?}"
+        );
+        for code in ["session_busy", "reply_not_idle"] {
+            assert_eq!(
+                note_failed(&own(), &task("claude", json!([])), false, Some(code)),
+                busy,
+                "{code}"
+            );
+        }
+        let plain = note_failed(&own(), &task("claude", json!([])), false, None);
+        for code in [
+            "session_not_found",
+            "session_ambiguous",
+            "reply_off",
+            "reply_named_off",
+        ] {
+            assert_eq!(
+                note_failed(&own(), &task("claude", json!([])), false, Some(code)),
+                plain,
+                "{code}"
+            );
+        }
+    }
+
+    /// `serve --reply-named` (#5535), the first builder's ruling on #5784's
+    /// follow-up: a named session that is closed (`session_closed`, Harness's
+    /// `NOT_RUNNING`) or only stopped (`session_stopped`) is told with the
+    /// plain line of how to open it again or start a new one, never as a
+    /// plain failure; one the lamp can't be sure of is told as before.
+    #[test]
+    fn a_closed_named_session_is_told_how_to_open_it_again() {
+        const LINE: &str = "That session is closed. Open it in the Harness app and ask me again, or I can start a new one in the same project.";
+        let plain = note_failed(&own(), &task("claude", json!([])), false, None);
+        for code in ["session_closed", "session_stopped"] {
+            let told = note_failed(&own(), &task("claude", json!([])), false, Some(code));
+            assert!(
+                told.as_deref().is_some_and(|told| told.contains(LINE)),
+                "{code}: {told:?}"
+            );
+            assert_ne!(told, plain, "{code}");
+            assert_eq!(
+                note_failed(&own(), &task("claude", json!([])), true, Some(code)),
+                note_failed(&own(), &task("claude", json!([])), true, None),
+                "{code}"
+            );
+        }
+    }
+
+    /// `LAMP_TASKS_RESUME_CLOSED` (openharness#3606): a named session that was
+    /// closed and reopened for the work is said reopened, and whether it
+    /// starts fresh; one whose reopening wasn't confirmed is told closed,
+    /// and to try again in a moment.
+    #[test]
+    fn a_reopened_named_session_is_said_reopened_and_an_unconfirmed_one_closed() {
+        let task = task("claude", json!([]));
+        let open = note_joined(&own(), &task, &json!({"name":"docs"})).unwrap();
+        assert!(!open.contains("reopened"), "{open}");
+        let back = note_joined(&own(), &task, &json!({"name":"docs","resumed":true})).unwrap();
+        assert!(back.contains("\"I reopened that session\""), "{back}");
+        assert!(
+            back.contains("\"docs\"") && !back.contains("fresh"),
+            "{back}"
+        );
+        let fresh = note_joined(&own(), &task, &json!({"ask":"Fix it","resumed":false})).unwrap();
+        assert!(fresh.contains("\"I reopened that session\""), "{fresh}");
+        assert!(
+            fresh.contains("starts fresh, without the earlier conversation"),
+            "{fresh}"
+        );
+        let soon = note_failed(&own(), &task, false, Some("session_resume_unconfirmed")).unwrap();
+        assert!(soon.contains("That session is closed. Open it in the Harness app and ask me again, or I can start a new one in the same project. Or try again in a moment."), "{soon}");
+    }
+
+    /// `serve --reply-named` (#5535), the Reviewer-lead's P2 on #5784 at
+    /// 71bf964baa: work said yes to that went into one of the person's
+    /// earlier sessions is told at once, naming that session by its name,
+    /// or else by what it was first asked, so a wrong one is heard: once,
+    /// beside its later finish, never for a new session, one not said yes
+    /// to, or one from long ago.
+    #[test]
+    fn work_that_joined_an_earlier_session_names_that_session_once() {
+        let root = std::env::temp_dir().join(format!("task-news-joined-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let socket = root.join("request.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let joined = |id: u64, joined: Value, confirmed: bool, ms: u64| {
+            json!({"id":id,"observations": if id == 1 { 1 } else { 0 },"dispatch":{"state":"accepted",
+                "confirmed": if confirmed { json!({"boot_id":"boot-a"}) } else { Value::Null },
+                "finished":{"boot_id":"boot-a","monotonic_ms":ms},"joined":joined}})
+        };
+        let items = json!([
+            joined(
+                1,
+                json!({"name":"Docs-Update","ask":"Update the setup page"}),
+                true,
+                NOW - 5_000
+            ),
+            joined(
+                2,
+                json!({"ask":"Write a short book program."}),
+                true,
+                NOW - 5_000
+            ),
+            // A new session the lamp started: no `joined`.
+            joined(3, Value::Null, true, NOW - 5_000),
+            joined(4, json!({"name":"Docs-Update"}), false, NOW - 5_000),
+            joined(5, json!({"name":"Docs-Update"}), true, NOW - JUST_MS - 1),
+        ]);
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                let answer = match (asked["op"].as_str().unwrap(), asked["id"].as_u64()) {
+                    ("list", _) => json!({"ok":true,"store_id":"s1","items":items}),
+                    ("get_task", Some(1)) => {
+                        task("claude", json!([seen(1, "idle", "boot-a", NOW - 1_000)]))
+                    }
+                    ("get_task", Some(_)) => task("claude", json!([])),
+                    ("get_observation", Some(1)) => {
+                        json!({"ok":true,"data":{"state":"idle","answer":"Lumi, Sunny and Archie.","truncated":false}})
+                    }
+                    _ => json!({"ok":false}),
+                };
+                writeln!(stream, "{answer}").unwrap();
+            }
+        });
+        let news = read_once(&socket, &now(), &BTreeSet::new(), &BTreeSet::new());
+        let keys: Vec<&str> = news.iter().map(|news| news.key.as_str()).collect();
+        assert_eq!(keys, ["s1:1:joined", "s1:1:1", "s1:2:joined"]);
+        let named = &news[0].note;
+        assert!(
+            named.starts_with("(Nobody has spoken. ")
+                && named.contains("\"Docs-Update\"")
+                && !named.contains("Update the setup page")
+                && named.contains("wrong one")
+                && named.contains("Claude Code"),
+            "{named}"
+        );
+        let asked = &news[2].note;
+        assert!(
+            asked.contains("asked to \"Write a short book program.\"")
+                && asked.contains("wrong one")
+                && !asked.contains("Docs-Update"),
+            "{asked}"
+        );
+        for note in [named, asked] {
+            assert!(!note.contains("lamp-") && !note.contains('/'), "{note}");
+        }
+        // Told once: offered or told, not again; the finish is its own.
+        let offered: BTreeSet<String> = keys.iter().map(|key| (*key).to_owned()).collect();
+        assert!(read_once(&socket, &now(), &BTreeSet::new(), &offered).is_empty());
+        let told = BTreeSet::from(["s1:1:joined".to_owned(), "s1:2:joined".to_owned()]);
+        let keys: Vec<String> = read_once(&socket, &now(), &told, &BTreeSet::new())
+            .into_iter()
+            .map(|news| news.key)
+            .collect();
+        assert_eq!(keys, ["s1:1:1"]);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     /// `serve --engines-ready` (openharness#1788): a hand-over refused as
@@ -3563,6 +4003,7 @@ mod tests {
             heard: mpsc::channel().0,
             retell: false,
             retelling: BTreeMap::new(),
+            begun: VecDeque::new(),
         };
         let soon = News {
             key: "s:3:progress-1".into(),
@@ -3594,6 +4035,7 @@ mod tests {
             heard: mpsc::channel().0,
             retell: false,
             retelling: BTreeMap::new(),
+            begun: VecDeque::new(),
         };
         let waiting = |key: &str| News {
             key: key.into(),
@@ -3631,6 +4073,7 @@ mod tests {
             heard: mpsc::channel().0,
             retell: false,
             retelling: BTreeMap::new(),
+            begun: VecDeque::new(),
         };
         assert!(news.waiting().is_none());
         let one = News {
@@ -3730,6 +4173,7 @@ mod tests {
             heard: mpsc::channel().0,
             retell: false,
             retelling: BTreeMap::new(),
+            begun: VecDeque::new(),
         };
         (news, offer, heard)
     }
@@ -4073,6 +4517,88 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    /// #5198: a sign-in's question talked over ([`Wake::Cut`], from
+    /// [`TaskNews::not_heard`]) is offered again at once, to be asked at
+    /// the next pause, not [`crate::sign_in::ASK_AGAIN_AFTER`] later: the
+    /// person's "Yes." to the question asked again is taken. Here the wait
+    /// is the lamp's own 30 s, and the question comes back within a second.
+    #[test]
+    fn a_sign_ins_question_talked_over_is_offered_again_at_once() {
+        let root = std::env::temp_dir().join(format!("task-news-ask-cut-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        for (name, answer) in [
+            (
+                "request.sock",
+                json!({"ok":true,"store_id":"s1","items":[]}),
+            ),
+            (
+                "voice.sock",
+                json!({"ok":true,"sign_in":"asking","email":"someone@example.com","id":7}),
+            ),
+        ] {
+            let listener = UnixListener::bind(root.join(name)).unwrap();
+            std::thread::spawn(move || {
+                for stream in listener.incoming() {
+                    let mut stream = stream.unwrap();
+                    let mut line = String::new();
+                    BufReader::new(&stream).read_line(&mut line).unwrap();
+                    writeln!(stream, "{answer}").unwrap();
+                }
+            });
+        }
+        let (offer, offered) = mpsc::channel();
+        let (wake, woken) = mpsc::channel();
+        let told_file = root.join("told");
+        let follow = SignInFollow {
+            on: true,
+            slow: false,
+            heard: Arc::new(Mutex::new(BTreeSet::new())),
+            again_after: crate::sign_in::ASK_AGAIN_AFTER,
+        };
+        let reader = {
+            let (directory, told_file, follow) = (root.clone(), told_file.clone(), follow.clone());
+            std::thread::spawn(move || {
+                let shared = Mutex::new(BTreeSet::new());
+                read_forever(
+                    &directory,
+                    &told_file,
+                    &offer,
+                    &woken,
+                    &shared,
+                    &|| Some(now()),
+                    Duration::from_millis(20),
+                    &follow,
+                );
+            })
+        };
+        let first = offered.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(first.key, "sign-in-7-asking");
+        // Taken to be told, then talked over as the turn ends.
+        wake.send(Wake::Told("sign-in-7-asking".into())).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        let cut_at = Instant::now();
+        wake.send(Wake::Cut("sign-in-7-asking".into())).unwrap();
+        let again = offered
+            .recv_timeout(Duration::from_secs(1))
+            .expect("the question talked over is offered again within a second");
+        assert_eq!(again.key, "sign-in-7-asking");
+        assert!(cut_at.elapsed() < crate::sign_in::ASK_AGAIN_AFTER / 10);
+        assert!(!read_told(&told_file).contains("sign-in-7-asking"));
+        // Told again and heard whole: never offered again, and kept.
+        wake.send(Wake::Told("sign-in-7-asking".into())).unwrap();
+        follow.heard.lock().unwrap().insert(7);
+        for _ in 0..3 {
+            std::thread::sleep(Duration::from_millis(60));
+            wake.send(Wake::Settled).unwrap();
+        }
+        assert!(offered.recv_timeout(Duration::from_millis(200)).is_err());
+        assert!(read_told(&told_file).contains("sign-in-7-asking"));
+        drop(wake);
+        reader.join().unwrap();
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     /// #560: the tasks part is read at once when a task settles, not at the
     /// next of the ten-second reads; news told is kept at once and has
     /// nothing read. The least gap between two woken reads is 200 ms here,
@@ -4361,10 +4887,81 @@ mod tests {
         assert!(wakes.try_recv().is_err());
     }
 
+    /// #6530, on a lamp on 12 Nov: news played with gaps kept its finished
+    /// task's harness open 71 s after the task went idle. News whose telling
+    /// began is sent to the tasks part at once, heard whole or not, so its
+    /// harness closes; each key once, and never a sign-in's question,
+    /// progress or a hand-over, which close nothing. Whether it was heard
+    /// whole still decides alone whether it is told once more.
+    #[test]
+    fn news_begun_closes_its_harness_at_once_and_is_still_told_once_more() {
+        let (mut news, offer, wakes) = waiting_news();
+        let (heard, sent) = mpsc::channel();
+        news.heard = heard;
+        news.retell = true;
+        let one = plain_news("s:1:1");
+        offer.send(one.clone()).unwrap();
+        assert_eq!(news.waiting(), Some(&one));
+        assert_eq!(news.tell(), Some(one.clone()));
+        assert_eq!(wakes.try_recv().unwrap(), Wake::Told("s:1:1".into()));
+        news.told_already.lock().unwrap().insert("s:1:1".into());
+        // Its first words reach the speaker: sent at once, before the turn
+        // ends, and once only.
+        news.begun(
+            3,
+            vec![
+                "s:1:1".into(),
+                "s:1:1".into(),
+                "sign-in-1-asking".into(),
+                "s:3:progress-1-2".into(),
+                "s:4:hand-over".into(),
+            ],
+        );
+        news.begun(4, vec!["s:1:1".into()]);
+        assert_eq!(sent.try_iter().collect::<Vec<_>>(), [("s:1:1".into(), 3)]);
+        // Not heard whole: told once more all the same.
+        news.not_heard(vec!["s:1:1".into()]);
+        assert_eq!(wakes.try_recv().unwrap(), Wake::Retell("s:1:1".into()));
+        offer.send(one.clone()).unwrap();
+        assert_eq!(news.waiting(), Some(&one), "due once more");
+        assert!(news.retelling_first());
+        assert_eq!(news.tell(), Some(one.clone()));
+        // Heard whole the second time: spent, and not sent again.
+        news.heard(9, vec!["s:1:1".into()]);
+        assert!(sent.try_recv().is_err());
+        news.not_heard(vec!["s:1:1".into()]);
+        assert!(!matches!(
+            news.retelling.get("s:1:1"),
+            Some(Retelling::Due(_))
+        ));
+
+        // Heard whole the first time, without a begun before: sent as heard.
+        let (mut news, _offer, _wakes) = waiting_news();
+        let (heard, sent) = mpsc::channel();
+        news.heard = heard;
+        news.heard(7, vec!["s:2:1".into()]);
+        assert_eq!(sent.try_iter().collect::<Vec<_>>(), [("s:2:1".into(), 7)]);
+    }
+
+    /// Only the newest [`BEGUN_KEPT`] keys are kept to send each once.
+    #[test]
+    fn news_begun_keeps_a_bounded_list() {
+        let (mut news, _offer, _wakes) = waiting_news();
+        news.begun(
+            1,
+            (0..BEGUN_KEPT as u64 + 5)
+                .map(|id| format!("s:{id}:1"))
+                .collect(),
+        );
+        assert_eq!(news.begun.len(), BEGUN_KEPT);
+        assert_eq!(news.begun.front().map(String::as_str), Some("s:5:1"));
+    }
+
     /// #4342 (b): without `LAMP_TASK_NEWS_RETELL=on` news not heard whole is
     /// as before: kept as told, never offered again. Heard after all (the
     /// person asked and heard the answer whole), news due once more is not
-    /// told again. Progress and a sign-in's question never are.
+    /// told again. Progress and a sign-in's question never are (the
+    /// question is offered again at once instead, #5198).
     #[test]
     fn news_is_told_once_more_only_with_the_switch_and_not_once_heard() {
         let (mut news, offer, wakes) = waiting_news();
@@ -4388,6 +4985,12 @@ mod tests {
             "sign-in-1-asking".into(),
             "nonsense".into(),
         ]);
+        // A sign-in's question is offered again at once instead (#5198),
+        // never told once more.
+        assert_eq!(
+            wakes.try_recv().unwrap(),
+            Wake::Cut("sign-in-1-asking".into())
+        );
         assert!(wakes.try_recv().is_err());
         assert_eq!(
             news.retelling.keys().collect::<Vec<_>>(),
@@ -4549,5 +5152,54 @@ mod tests {
         cut_short(&["s:1:1".into(), "s:2:1".into()]);
         assert_eq!(take_cut_short(), ["s:1:1", "s:2:1"]);
         assert!(take_cut_short().is_empty());
+    }
+
+    /// #5978: work done on the lamp itself is told as done here on the
+    /// lamp, and the rest as on the lamp; work on a computer as before.
+    #[test]
+    fn work_done_on_the_lamp_is_told_as_done_here() {
+        let done =
+            json!({"state":"idle","answer":"A short poem about the rain.","truncated":false});
+        let fetched = |joined: Value| {
+            json!({"text":"Write a poem","target":{"engine":"hermes"},
+            "task":{"target_alias":"lamp","dispatch":{"joined_on":joined}}})
+        };
+        assert!(on_the_lamp(&fetched(Value::Null)));
+        assert_eq!(their_computer(&fetched(Value::Null)), "the lamp");
+        assert_eq!(who(&fetched(Value::Null)), "Hermes");
+        let elsewhere = fetched(json!({"alias":"office","machine_id":"m","engine":"codex"}));
+        assert!(!on_the_lamp(&elsewhere));
+        assert_eq!(their_computer(&elsewhere), "their computer");
+        assert_eq!(who(&elsewhere), "Codex");
+        let on = |alias: &str, engine: &str| json!({"text":"Write a poem","target":{"engine":engine},"target_alias":alias});
+        let lamp = note(&own(), &on("lamp", "hermes"), &done, 0).unwrap();
+        assert!(lamp.contains("Hermes"), "{lamp}");
+        assert!(lamp.ends_with(&format!("{ON_THE_LAMP})")), "{lamp}");
+        assert_eq!(their_computer(&on("lamp", "hermes")), "the lamp");
+        let office = note(&own(), &on("office", "claude"), &done, 0).unwrap();
+        assert!(!office.contains("on the lamp"), "{office}");
+        assert_eq!(their_computer(&on("office", "claude")), "their computer");
+        // A computer someone named `lamp` by hand is no lamp.
+        assert_eq!(their_computer(&on("lamp", "claude")), "their computer");
+    }
+
+    /// #6226: work done by OpenClaw on the lamp itself is told as done
+    /// here on the lamp, by OpenClaw, as Hermes's.
+    #[test]
+    fn work_done_by_openclaw_on_the_lamp_is_told_as_done_here() {
+        let done =
+            json!({"state":"idle","answer":"A short poem about the rain.","truncated":false});
+        let on =
+            json!({"text":"Write a poem","target":{"engine":"openclaw"},"target_alias":"lamp"});
+        assert!(on_the_lamp(&on));
+        assert_eq!(who(&on), "OpenClaw");
+        assert_eq!(their_computer(&on), "the lamp");
+        let lamp = note(&own(), &on, &done, 0).unwrap();
+        assert!(lamp.contains("OpenClaw"), "{lamp}");
+        assert!(lamp.ends_with(&format!("{ON_THE_LAMP})")), "{lamp}");
+        let office =
+            json!({"text":"Write a poem","target":{"engine":"openclaw"},"target_alias":"office"});
+        assert!(!on_the_lamp(&office));
+        assert_eq!(their_computer(&office), "their computer");
     }
 }

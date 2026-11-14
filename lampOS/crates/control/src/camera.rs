@@ -45,6 +45,13 @@ pub const RATE_OVER: Duration = Duration::from_secs(2);
 /// go as they come, not on a clock of their own.
 const LOOK_EVERY: Duration = Duration::from_millis(20);
 
+const CAMERA_CLOSED: &str = "the camera is closed";
+
+/// How long after the ask a camera that opens on demand (the ring has 1 s of
+/// that to draw the mark, [`MARK_SHOWN_WITHIN`]) has to give its first
+/// frame to a snapshot.
+pub const OPENS_WITHIN: Duration = Duration::from_millis(3_000);
+
 /// A stream's `fps`: the frames it may send, on a schedule a gap apart
 /// rather than a gap after the last one sent. A camera at the rate asked
 /// sends its frames about a gap apart, some a hair early: a gap after the
@@ -88,32 +95,28 @@ impl Pace {
 }
 
 /// The source's rate, for `fps_now`: when each new frame of the eyes was
-/// first seen, whichever stream saw it, and the last one's time on the file,
-/// so a frame two streams see counts once, and a slow stream's skipped
-/// frames still count.
+/// first seen, whichever stream saw it, with the frame's time on the file,
+/// so a frame two streams see counts once, however late one of them notes
+/// it, and a slow stream's skipped frames still count.
 #[derive(Default)]
-pub struct Rate(
-    std::sync::Mutex<(
-        std::collections::VecDeque<std::time::Instant>,
-        Option<SystemTime>,
-    )>,
-);
+pub struct Rate(std::sync::Mutex<std::collections::VecDeque<(std::time::Instant, SystemTime)>>);
 
 impl Rate {
-    /// A frame written at `modified` seen at `at`: counted once.
+    /// A frame written at `modified` seen at `at`: counted once. A stream
+    /// that read the frame's time and was descheduled before it got here
+    /// notes it after the other has noted the next frame; the frames of the
+    /// last [`RATE_OVER`] are all remembered, so that is not a second count.
     fn saw(&self, modified: SystemTime, at: std::time::Instant) {
         if let Ok(mut held) = self.0.lock() {
-            let (times, last) = &mut *held;
-            if *last == Some(modified) {
+            if held.iter().any(|(_, seen)| *seen == modified) {
                 return;
             }
-            *last = Some(modified);
-            times.push_back(at);
-            while times
+            held.push_back((at, modified));
+            while held
                 .front()
-                .is_some_and(|first| at.duration_since(*first) > RATE_OVER)
+                .is_some_and(|(first, _)| at.duration_since(*first) > RATE_OVER)
             {
-                times.pop_front();
+                held.pop_front();
             }
         }
     }
@@ -122,9 +125,9 @@ impl Rate {
     /// before two were seen in it.
     pub fn now(&self) -> Option<f64> {
         let held = self.0.lock().ok()?;
-        let times = &held.0;
-        let fresh: Vec<_> = times
+        let fresh: Vec<_> = held
             .iter()
+            .map(|(at, _)| at)
             .filter(|at| at.elapsed() <= RATE_OVER)
             .collect();
         let (first, last) = (fresh.first()?, fresh.last()?);
@@ -301,6 +304,11 @@ pub struct Camera {
     rate: Arc<Rate>,
     /// The eyes' frames socket and where its frames go: the fast stream.
     fast: Option<(PathBuf, Sink)>,
+    /// A camera that opens when asked (a desktop's, `--camera-opens-on-demand`):
+    /// the ring's mark is asked before the sight file is read, and a closed
+    /// camera has [`OPENS_WITHIN`] to give its first frame. Off, as the eyes'
+    /// camera is: a closed camera is told at once, with no mark.
+    on_demand: bool,
 }
 
 impl Camera {
@@ -313,7 +321,14 @@ impl Camera {
             mark: None,
             rate: Arc::default(),
             fast: None,
+            on_demand: false,
         }
+    }
+
+    /// The camera opens when asked: see the field.
+    pub fn on_demand(mut self, yes: bool) -> Self {
+        self.on_demand = yes;
+        self
     }
 
     /// The fast stream: every frame the camera makes, from the eyes' frames
@@ -345,10 +360,19 @@ impl Camera {
             return Err(Error::new(ErrorCode::Private, "the lamp is private"));
         }
         let (mark, drawn) = self.mark()?;
-        let frame = newest(&self.sight, SystemTime::now())
-            .map_err(|why| Error::new(ErrorCode::Refused, why))?;
+        // Off, a closed camera is told at once, before any mark.
+        let first = if self.on_demand {
+            None
+        } else {
+            Some(
+                newest(&self.sight, SystemTime::now())
+                    .map_err(|why| Error::new(ErrorCode::Refused, why))?,
+            )
+        };
         // The blink asked, the picture goes once the ring says it drew it,
-        // and not at all if it doesn't within a second.
+        // and not at all if it doesn't within a second. A camera that opens on
+        // demand has up to [`OPENS_WITHIN`] after the ask to give its first
+        // frame.
         let asked = std::time::Instant::now();
         mark(client, true);
         while !drawn_since(drawn, client, asked) {
@@ -357,6 +381,20 @@ impl Camera {
             }
             std::thread::sleep(Duration::from_millis(10));
         }
+        let frame = match first {
+            Some(frame) => frame,
+            None => loop {
+                match newest(&self.sight, SystemTime::now()) {
+                    Ok(frame) => break frame,
+                    // Only a closed camera is waited for; a frame caught
+                    // mid-write or too big is told at once, as before.
+                    Err(why) if why != CAMERA_CLOSED || asked.elapsed() >= OPENS_WITHIN => {
+                        return Err(Error::new(ErrorCode::Refused, why));
+                    }
+                    Err(_) => std::thread::sleep(Duration::from_millis(20)),
+                }
+            },
+        };
         if (self.private)() {
             return Err(Error::new(ErrorCode::Private, "the lamp is private"));
         }
@@ -390,6 +428,7 @@ impl Camera {
         let (sight, private, client) =
             (self.sight.clone(), self.private.clone(), client.to_owned());
         let rate = self.rate.clone();
+        let on_demand = self.on_demand;
         // The fast stream when the eyes serve their frames: every frame the
         // camera makes, at the size asked. Else the eyes' newest frame.
         let asked = size.unwrap_or(SIZES[0]);
@@ -430,9 +469,16 @@ impl Camera {
                         &|event| events(&client, with_turn(event, turn)),
                     );
                 }
-                None => run(&sight, fps, &running, &private, &marked, &rate, &|event| {
-                    events(&client, with_turn(event, turn))
-                }),
+                None => run(
+                    &sight,
+                    fps,
+                    on_demand,
+                    &running,
+                    &private,
+                    &marked,
+                    &rate,
+                    &|event| events(&client, with_turn(event, turn)),
+                ),
             }
         });
         Ok(match fast_size {
@@ -469,9 +515,11 @@ impl Camera {
 
 /// One stream, on its own thread, until `running` is cleared, the lamp is
 /// private or the camera has been gone [`GONE_AFTER`].
+#[allow(clippy::too_many_arguments)]
 fn run(
     sight: &Path,
     fps: u8,
+    on_demand: bool,
     running: &AtomicBool,
     private: &Private,
     marked: &dyn Fn(&mut Option<std::time::Instant>) -> Shown,
@@ -526,7 +574,13 @@ fn run(
                 tell(json!({"ev": "camera.ended", "why": "the camera is closed"}));
                 return;
             }
-            Err(_) => {}
+            // No frame yet: ask the ring for the mark all the same, so that a
+            // camera which opens on demand (a desktop's) has been asked to.
+            Err(_) => {
+                if on_demand {
+                    let _ = marked(&mut marked_at);
+                }
+            }
         }
         std::thread::sleep(LOOK_EVERY);
     }
@@ -696,6 +750,40 @@ mod tests {
     }
 
     #[test]
+    fn a_snapshot_waits_for_a_camera_that_opens_on_demand() {
+        let sight = dir().join("sight.jpg");
+        let camera = Camera::new(sight.clone(), Arc::new(|| false))
+            .marking(Arc::new(|_, _| {}), drawn_now())
+            .on_demand(true);
+        let late = sight.clone();
+        let opening = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(400));
+            std::fs::write(&late, JPEG).unwrap();
+        });
+        let reply = camera.snapshot("c_1").unwrap();
+        assert_eq!(reply["bytes"], 7);
+        opening.join().unwrap();
+    }
+
+    #[test]
+    fn by_default_a_closed_camera_is_told_at_once_and_no_mark_is_asked() {
+        let sight = dir().join("sight.jpg");
+        let asked: Arc<Mutex<Vec<(String, bool)>>> = Arc::default();
+        let into = asked.clone();
+        let camera = Camera::new(sight, Arc::new(|| false)).marking(
+            Arc::new(move |client, blink| into.lock().unwrap().push((client.to_owned(), blink))),
+            drawn_now(),
+        );
+        let started = std::time::Instant::now();
+        assert_eq!(
+            camera.snapshot("c_1").unwrap_err().why,
+            "the camera is closed"
+        );
+        assert!(started.elapsed() < Duration::from_millis(500));
+        assert!(asked.lock().unwrap().is_empty());
+    }
+
+    #[test]
     fn the_ring_marks_every_picture_and_with_no_mark_there_is_no_camera() {
         let sight = dir().join("sight.jpg");
         std::fs::write(&sight, JPEG).unwrap();
@@ -790,6 +878,27 @@ mod tests {
     }
 
     #[test]
+    fn a_frame_noted_late_by_a_stalled_stream_still_counts_once() {
+        let rate = Rate::default();
+        let t0 = std::time::Instant::now() - Duration::from_millis(1500);
+        let m = |ms: u64| SystemTime::UNIX_EPOCH + Duration::from_millis(ms);
+        // The eyes write a frame every 100 ms: 10 a second. Two streams look.
+        // Now and then one of them read a frame's time, stalled, and notes it
+        // only after the other has noted the NEXT frame.
+        for i in 0..15u64 {
+            let at = t0 + Duration::from_millis(100 * i);
+            rate.saw(m(1000 + 100 * i), at);
+            if i % 3 == 2 {
+                // The stalled stream's note of frame i - 1, then the other's of i again.
+                rate.saw(m(1000 + 100 * (i - 1)), at + Duration::from_millis(30));
+                rate.saw(m(1000 + 100 * i), at + Duration::from_millis(31));
+            }
+        }
+        let fps = rate.now().expect("measured");
+        assert!((9.5..=10.5).contains(&fps), "{fps}");
+    }
+
+    #[test]
     fn a_stream_that_sent_nothing_for_a_while_is_owed_one_frame_not_many() {
         let start = std::time::Instant::now();
         let mut pace = Pace::new(10);
@@ -837,11 +946,12 @@ mod tests {
             std::fs::rename(&next, &sight).unwrap();
         }
         // 10 a second written. Neither doubled by two streams nor halved by
-        // the slow one: under 12 and over 5. The low bound is wide, since a
+        // the slow one: under 15 and over 5. Both bounds are wide, since a
         // loaded runner reads 6.3 (the full gate, 3 Nov) as its sleeps
-        // stretch; the bug it guards would read 20 or 1.
+        // stretch, and 12.6 (train 865's ARM64, 13 Nov) as late frames
+        // bunch; the bug it guards would read 20 or 1.
         let fps = camera.rate.now().expect("measured");
-        assert!((5.0..=12.0).contains(&fps), "{fps}");
+        assert!((5.0..=15.0).contains(&fps), "{fps}");
         // The first frame each sent said none yet: null, never 0.
         let seen = seen.lock().unwrap();
         assert!(seen.iter().any(|event| event["fps_now"].is_null()));

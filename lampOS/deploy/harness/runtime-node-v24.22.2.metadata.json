@@ -1,0 +1,46 @@
+{
+  "node": {
+    "darwin-arm64": {
+      "version": "v24.22.2",
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/node/v24.22.2/node-v24.22.2-darwin-arm64.tar.gz",
+      "sha256": "aa9549349e47dffaa42dcf95d6e06ade8c4bdafc980979883b88767670df385a",
+      "size": 53068959,
+      "archiveRoot": "node-v24.22.2-darwin-arm64"
+    },
+    "darwin-x64": {
+      "version": "v24.22.2",
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/node/v24.22.2/node-v24.22.2-darwin-x64.tar.gz",
+      "sha256": "d5e336d588c45be0c37dbd52cc29895593009ca4997a77a1fd02815131ed0e52",
+      "size": 54383415,
+      "archiveRoot": "node-v24.22.2-darwin-x64"
+    },
+    "linux-arm64": {
+      "version": "v24.22.2",
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/node/v24.22.2/node-v24.22.2-linux-arm64.tar.gz",
+      "sha256": "95c264150aceb7f3437a29fd6984924f5f8d1511ea3cbd6c508b83f6c555dae2",
+      "size": 58030966,
+      "archiveRoot": "node-v24.22.2-linux-arm64"
+    },
+    "linux-x64": {
+      "version": "v24.22.2",
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/node/v24.22.2/node-v24.22.2-linux-x64.tar.gz",
+      "sha256": "361718c444e49af2ca5a110c83ba6a8901143f23ab285ebbef0341f391f482a9",
+      "size": 58299872,
+      "archiveRoot": "node-v24.22.2-linux-x64"
+    },
+    "win32-arm64": {
+      "version": "v24.22.2",
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/node/v24.22.2/node-v24.22.2-win-arm64.zip",
+      "sha256": "f47968c213105077f64c6510f007632c0ca2574802a0b5067c327c49abe1c468",
+      "size": 33789289,
+      "archiveRoot": "node-v24.22.2-win-arm64"
+    },
+    "win32-x64": {
+      "version": "v24.22.2",
+      "url": "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/node/v24.22.2/node-v24.22.2-win-x64.zip",
+      "sha256": "ca1bff5d8ead13c9f2ea404a176db46bd430704d5b5113734049fa365e7799e2",
+      "size": 37754834,
+      "archiveRoot": "node-v24.22.2-win-x64"
+    }
+  }
+}

@@ -27,6 +27,9 @@ RuntimeDirectoryPreserve=restart
 StateDirectory=lampos-output-caps
 StateDirectoryMode=0700
 Environment=LAMP_OUTPUT_CAPS_DIR=/var/lib/lampos-output-caps
+# Bedtime and Morning's night caps (#5753): light 24 and raw volume 35 from 21:00 to 06:00, never unmuting
+# and never writing an old volume back (#2804: all five cases on lamp-06c1, 22-23 Oct).
+Environment=LAMP_OUTPUT_CAPS=on
 Environment=LAMP_SCHEDULE_TOOLS=on
 Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
 # A reminder every so many minutes or hours, 15 minutes to 24 hours (repeat_reminder's interval, #4710 2 Nov):
@@ -43,6 +46,11 @@ Environment=LAMP_SHORT_DONE=on
 # alsa-restore never stores the mixer and every boot came back at 100%. Kept in LAMP_OUTPUT_CAPS_DIR/kept-volume
 # after each change (never a mute) and set back at the start. An older lamp-actions ignores the line.
 Environment=LAMP_VOLUME_KEPT=on
+# Music to relax (#1685, #5749): a spoken request for a skill's checked local recording plays it after the
+# confirmation; Stop, an interruption, the privacy slide or mute ends it, and nothing resumes (requested-audio.md).
+# The same line in lamp-voice, lamp-skills and lamp-actions; played on lamp-4ace on 6963 (#2793). Installing
+# the skill (relaxing-music, a Store skill) is separate: with none installed nothing plays.
+Environment=LAMP_REQUESTED_AUDIO=on
 ExecStart=/opt/lampOS/actions/current/lamp-actions --dir /run/lampos-actions --mixer-card allwinnerhdmi --mixer-control Speaker --volume-ceiling 100 --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=2s

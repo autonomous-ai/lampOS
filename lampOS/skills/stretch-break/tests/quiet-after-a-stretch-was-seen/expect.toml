@@ -1,0 +1,4 @@
+# As acts-after-50-minutes, and lamp-seen saw a stretch at 40 minutes
+# (#6543): at 50 break_s_ago is 600, under its 30 minutes, so the stretch is
+# held through its ten minutes' wait and let go.
+none = true

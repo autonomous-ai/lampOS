@@ -20,13 +20,17 @@ pub mod evidence;
 #[cfg(unix)]
 pub mod notice;
 pub mod ownership;
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 pub mod pcm;
+#[cfg(unix)]
+mod pcm_types;
 pub mod playout;
 pub mod process_wav;
 pub mod qualification;
 #[cfg(unix)]
 pub mod replay;
+#[cfg(unix)]
+pub mod soft_pcm;
 pub mod steady;
 #[cfg(unix)]
 pub mod testing;

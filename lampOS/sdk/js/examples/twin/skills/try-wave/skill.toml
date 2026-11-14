@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# The try-it app's skill for `play`: it only carries a move; nothing speaks or runs.
+kind = "installable"
+version = "1.0.0"
+tool = "try_wave_move"
+
+[permissions]
+body = true
+speak = true
+
+[[do]]
+say = "Say nothing."

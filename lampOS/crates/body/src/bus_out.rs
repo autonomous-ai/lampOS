@@ -327,6 +327,10 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
                 if resisted == 1 { "" } else { "s" }
             ),
         )
+    } else if let Some(ask) = glimpse.stand_ask {
+        // A run that will not stand is not well, and says why in words
+        // its owner can act on (#6834).
+        (Level::Warn, ask.to_owned())
     } else {
         (Level::Ok, String::new())
     };
@@ -351,6 +355,8 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
         // Each joint's own, for lamp-control's `body.state`, after the
         // facts above so that none of theirs moves.
         .chain(warmth.map(|(joint, reading)| fact(&format!("temperature_{joint}"), reading)))
+        // Whatever else it says, so the ask is one ask for the whole run.
+        .chain(glimpse.stand_ask.map(|ask| fact(crate::ask::ASKS, ask)))
         .collect(),
     }
 }
@@ -1077,6 +1083,7 @@ mod tests {
             seated: None,
             home: None,
             waiting: None,
+            stand_ask: None,
         }
     }
 
@@ -1845,21 +1852,27 @@ mod tests {
             .unwrap();
         let mut out = BusOut::on(&bus).unwrap();
         // Passed on: steps 0, 4, 8, 12, 16. Pushed on 4 and 8 (and 12, 16 not).
+        // Each passed-on step's hand is waited for before the next is
+        // offered. Offering all five at once queued them behind each
+        // other's file writes, and on a loaded CI runner the last ones
+        // aged past LASTS in the queue and were rightly not said.
+        let mut said: Vec<Hand> = Vec::new();
         for step in 0..20 {
             let mut seen = glimpse(step);
             seen.hand = (4..12).contains(&step);
             out.offer(&seen);
+            if offered(&seen) {
+                said.push(
+                    hands
+                        .recv(Duration::from_secs(20))
+                        .unwrap()
+                        .expect("a hand")
+                        .parse()
+                        .unwrap(),
+                );
+            }
         }
-        let said: Vec<Hand> = (0..5)
-            .map(|_| {
-                hands
-                    .recv(Duration::from_secs(5))
-                    .unwrap()
-                    .expect("a hand")
-                    .parse()
-                    .unwrap()
-            })
-            .collect();
+        assert_eq!(out.let_go, 0, "every passed-on step had room");
         assert_eq!(
             said.iter().map(|h| h.pushed).collect::<Vec<_>>(),
             [false, true, true, false, false]

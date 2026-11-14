@@ -4,7 +4,11 @@
 //! 1. Once a round's parts run a build whose `lamp-update` is not the one
 //!    `update/current` names, the round installs it beside, writes
 //!    `self.json` (the build named before and the new one) and moves the
-//!    link; `serve` then `exec`s the new binary in its own place.
+//!    link; `serve` then `exec`s the new binary in its own place. That
+//!    `exec` replaces only the process whose round switched: a `serve`
+//!    beside a `once` that switched would run on in the old build, so
+//!    `serve` also checks its own binary against `update/current` at its
+//!    start and after each round ([`reexec`], #6898).
 //! 2. The new binary confirms itself only when it has read the channel's
 //!    manifest and checked its signature, a dry round: then `self.json`
 //!    goes. Until then no round acts.
@@ -568,4 +572,236 @@ pub fn back(
     // old updater starts telling again (#1683's update alerts).
     held.log_round("self-put-back", &line, None);
     Ok(Back::PutBack(pending))
+}
+
+/// What a running `serve` reads of its own binary (#6898), on the lamp's
+/// root: the file this process runs, even after `update/current` moved.
+pub const SELF_EXE: &str = "/proc/self/exe";
+/// Set on a lamp-update that started `update/current`'s binary in its own
+/// place ([`reexec`]): the build it went to, so it never goes again.
+pub const REEXECED: &str = "LAMP_UPDATE_REEXECED";
+
+/// Whether a running `serve` must start `update/current`'s binary in its
+/// own place (#6898).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Reexec {
+    /// This program is `update/current`'s binary, or either is not known.
+    Same,
+    /// A switch of its own waits to be confirmed: its phases decide.
+    Waits,
+    /// This program is another build's: `program` (the resolved binary of
+    /// `update/current`, build `build`) runs in its place.
+    To { program: PathBuf, build: String },
+    /// Started in its place once already for `build` and still not it:
+    /// not again.
+    Looped(String),
+    /// This program is no build's binary (not `<FOLDER>/<build>/<BINARY>`),
+    /// such as a test binary a drop-in names: it serves on as it is.
+    Outside(PathBuf),
+}
+
+/// Compares the binary this process runs (`self_exe`, [`SELF_EXE`] on the
+/// lamp) with `update/current`'s under `root`. `marker` is the build this
+/// process was started in place for already ([`REEXECED`]).
+pub fn reexec(root: &Path, self_exe: &Path, records: &Path, marker: Option<&str>) -> Reexec {
+    // Both resolved: the link's target, and the file this process runs.
+    // A binary removed since it started (its build folder cleaned away)
+    // does not resolve: Linux reads it as `<path> (deleted)`, another file.
+    let (Ok(running), Ok(wanted)) = (
+        self_exe.canonicalize().or_else(|_| fs::read_link(self_exe)),
+        on_root(root, CURRENT).join(BINARY).canonicalize(),
+    ) else {
+        return Reexec::Same;
+    };
+    if running == wanted {
+        return Reexec::Same;
+    }
+    let Some(build) = wanted
+        .parent()
+        .and_then(Path::file_name)
+        .map(|name| name.to_string_lossy().into_owned())
+        .filter(|name| is_build(name))
+    else {
+        return Reexec::Same;
+    };
+    // Only a build's own binary goes: one run from anywhere else (a test
+    // binary a drop-in's `ExecStart` names) serves on, so a row of it runs
+    // its own code.
+    if !is_builds_binary(root, &running) {
+        return Reexec::Outside(running);
+    }
+    // Mid-switch (phase 1 done, phase 2 not): the process that switched
+    // runs its phases; this one goes only to a confirmed link.
+    if !matches!(waiting(records), Ok(None)) {
+        return Reexec::Waits;
+    }
+    if marker == Some(build.as_str()) {
+        return Reexec::Looped(build);
+    }
+    Reexec::To {
+        program: wanted,
+        build,
+    }
+}
+
+/// Whether `running` (resolved, or read as `<path> (deleted)` once removed)
+/// is a build's binary: `<FOLDER>/<build>/<BINARY>` under `root`.
+fn is_builds_binary(root: &Path, running: &Path) -> bool {
+    let text = running.to_string_lossy();
+    let path = Path::new(text.strip_suffix(" (deleted)").unwrap_or(&text));
+    let (Some(folder), Some(name)) = (path.parent(), path.file_name()) else {
+        return false;
+    };
+    let (Some(builds), Some(build)) = (folder.parent(), folder.file_name()) else {
+        return false;
+    };
+    let resolved = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+    name == BINARY
+        && is_build(&build.to_string_lossy())
+        && resolved(builds) == resolved(&on_root(root, FOLDER))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    /// A root with builds A and B, `update/current` naming `current`, and
+    /// `proc/self/exe` a link to the build this "process" runs.
+    fn lamp(current: &str, running: &str) -> (tempfile::TempDir, PathBuf, PathBuf) {
+        let root = tempfile::tempdir().unwrap();
+        for build in [A, B] {
+            let folder = on_root(root.path(), FOLDER).join(build);
+            fs::create_dir_all(&folder).unwrap();
+            fs::write(folder.join(BINARY), build).unwrap();
+        }
+        std::os::unix::fs::symlink(current, on_root(root.path(), CURRENT)).unwrap();
+        let exe = root.path().join("proc/self/exe");
+        fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(
+            on_root(root.path(), FOLDER).join(running).join(BINARY),
+            &exe,
+        )
+        .unwrap();
+        let records = root.path().join("records");
+        fs::create_dir_all(&records).unwrap();
+        (root, exe, records)
+    }
+
+    #[test]
+    fn a_serve_on_another_build_than_current_starts_current_in_its_place() {
+        // lamp-52e6, 13 Nov (#6898): the link moved to B, the serving
+        // process still ran A.
+        let (root, exe, records) = lamp(B, A);
+        let wanted = on_root(root.path(), FOLDER)
+            .join(B)
+            .join(BINARY)
+            .canonicalize()
+            .unwrap();
+        assert_eq!(
+            reexec(root.path(), &exe, &records, None),
+            Reexec::To {
+                program: wanted,
+                build: B.to_owned()
+            }
+        );
+        // A marker for another build does not hold it back.
+        assert!(matches!(
+            reexec(root.path(), &exe, &records, Some(A)),
+            Reexec::To { .. }
+        ));
+    }
+
+    #[test]
+    fn a_serve_on_current_s_build_stays() {
+        let (root, exe, records) = lamp(B, B);
+        assert_eq!(reexec(root.path(), &exe, &records, None), Reexec::Same);
+        assert_eq!(reexec(root.path(), &exe, &records, Some(B)), Reexec::Same);
+    }
+
+    #[test]
+    fn started_in_place_once_for_a_build_it_never_goes_again() {
+        let (root, exe, records) = lamp(B, A);
+        assert_eq!(
+            reexec(root.path(), &exe, &records, Some(B)),
+            Reexec::Looped(B.to_owned())
+        );
+    }
+
+    #[test]
+    fn a_switch_waiting_to_be_confirmed_is_left_to_its_phases() {
+        let (root, exe, records) = lamp(B, A);
+        begin(&records, A, B).unwrap();
+        assert_eq!(reexec(root.path(), &exe, &records, None), Reexec::Waits);
+    }
+
+    #[test]
+    fn an_unknown_self_or_a_link_to_no_build_is_left_alone() {
+        let (root, _, records) = lamp(B, A);
+        let nowhere = root.path().join("proc/1/exe");
+        assert_eq!(reexec(root.path(), &nowhere, &records, None), Reexec::Same);
+        let (root, exe, records) = lamp(B, A);
+        let link = on_root(root.path(), CURRENT);
+        fs::remove_file(&link).unwrap();
+        let other = on_root(root.path(), FOLDER).join("not-a-build");
+        fs::create_dir_all(&other).unwrap();
+        fs::write(other.join(BINARY), "x").unwrap();
+        std::os::unix::fs::symlink("not-a-build", &link).unwrap();
+        assert_eq!(reexec(root.path(), &exe, &records, None), Reexec::Same);
+    }
+
+    #[test]
+    fn a_binary_run_from_outside_the_builds_serves_on() {
+        // A drop-in's `ExecStart` names a test binary: it runs its own code.
+        let (root, exe, records) = lamp(B, A);
+        let test_bin = root.path().join("opt/test/lamp-update");
+        fs::create_dir_all(test_bin.parent().unwrap()).unwrap();
+        fs::write(&test_bin, "test").unwrap();
+        fs::remove_file(&exe).unwrap();
+        std::os::unix::fs::symlink(&test_bin, &exe).unwrap();
+        assert!(matches!(
+            reexec(root.path(), &exe, &records, None),
+            Reexec::Outside(_)
+        ));
+        // Under a folder named like a build but outside the builds' folder.
+        let fake = root.path().join("opt/test").join(A).join(BINARY);
+        fs::create_dir_all(fake.parent().unwrap()).unwrap();
+        fs::write(&fake, "test").unwrap();
+        fs::remove_file(&exe).unwrap();
+        std::os::unix::fs::symlink(&fake, &exe).unwrap();
+        assert!(matches!(
+            reexec(root.path(), &exe, &records, None),
+            Reexec::Outside(_)
+        ));
+    }
+
+    #[test]
+    fn a_removed_build_s_binary_read_as_deleted_still_goes() {
+        let root = tempfile::tempdir().unwrap();
+        let deleted = format!(
+            "{} (deleted)",
+            on_root(root.path(), FOLDER).join(A).join(BINARY).display()
+        );
+        fs::create_dir_all(on_root(root.path(), FOLDER)).unwrap();
+        assert!(is_builds_binary(root.path(), Path::new(&deleted)));
+        let elsewhere = format!(
+            "{} (deleted)",
+            root.path().join("tmp/lamp-update").display()
+        );
+        assert!(!is_builds_binary(root.path(), Path::new(&elsewhere)));
+    }
+
+    #[test]
+    fn a_serve_whose_own_binary_was_removed_still_goes_to_current() {
+        // The old build's folder cleaned away while it served: its
+        // /proc/self/exe no longer resolves.
+        let (root, exe, records) = lamp(B, A);
+        fs::remove_dir_all(on_root(root.path(), FOLDER).join(A)).unwrap();
+        assert!(matches!(
+            reexec(root.path(), &exe, &records, None),
+            Reexec::To { build, .. } if build == B
+        ));
+    }
 }

@@ -666,10 +666,16 @@ prints the Policy's `like_asker` never reads (below), so no lamp says it.
 
 ## For the services only (`LAMP_SAME_VOICE_FOR=services`, 4 November)
 
-The linked services judge two lines by their prints ([services.md](services.md)):
-a write's "send" must be in the voice that asked (`VoiceAsk::Alike`, at
-`SERVICES_SAME_FROM`, 0.55, or over), and a read is said in full only for a line in the
-conversation's voice (`VoiceAsk::Conversation`). Both need the model, and
+The linked services judge a line by its print ([services.md](services.md)):
+a read is said in full only for a line in the conversation's voice
+(`VoiceAsk::Conversation`, at `SERVICES_SAME_FROM`, 0.55, or over). A
+write's send is held to no voice since the owner's call of 10 Nov (natural
+confirmations, no read-back or asker condition: whoever agrees sends it),
+but in a line begun in the lamp's 1.5 s echo tail with any of its words
+(#6009, `services::Turn::in_echo_tail`): that one must be in the asker's
+voice (`VoiceAsk::Alike` against the line that prepared the write, or
+`VoiceAsk::Owner` with the owner's enrolled print, at 0.55 or over), so the
+lamp's own short "Yes." or "Send it." heard back never sends. It needs the model, and
 until now the model came with every conversation rule that reads a print.
 `LAMP_SAME_VOICE_FOR=services`, beside `LAMP_SAME_VOICE_MODEL`, makes the
 prints for the services alone:
@@ -721,8 +727,7 @@ prints for the services alone:
   conversation's voice.
 - **Any other value** (`Services`, `everything`, empty) fails closed, said
   once in the journal: the coordinator passes no model, so no print is made
-  for anything, as without one; a send is refused for a voice not heard and
-  a read is brief (the reader's P3 on #5293: it had been every use, the
+  for anything, as without one; a read is brief (the reader's P3 on #5293: it had been every use, the
   widest). The journal holds counts and cosines only, never a print.
 
 Shown in tests only (`the_services_alone_start_the_same_voice_for_themselves`,
@@ -736,7 +741,7 @@ product's `lamp-voice.service` sets it, beside `LAMP_SAME_VOICE_MODEL` at
 CAM++'s pinned path, since 4 November, with `LAMP_SERVICES_WRITE=on` in
 `lamp-services.service` ([services.md](services.md)); a lamp whose voice
 folder lacks the model or `lamp-same-voice` has the check off after its
-three starts (`MOST_UNREADY`), and every send stays refused.
+three starts (`MOST_UNREADY`), and no read is said in full.
 
 ## The owner's voice print (`LAMP_SAME_VOICE_FOR=services`, 4 November)
 
@@ -748,6 +753,13 @@ and hold a send to that print (`crates/voice/src/owner_voice.rs`). Nothing
 of it runs without `LAMP_SAME_VOICE_FOR=services` and the services on (the
 second route calls `owner_voice::enable` where it starts the services'
 prints).
+
+**Since the owner's call of 10 Nov** (natural confirmations, no read-back or
+asker condition) a send is held to no voice, but in a line begun in the
+lamp's echo tail with any of its words (#6009), and `services::run` no
+longer asks after a send (`owner_voice::ask_after_send` is no longer
+called): a print already kept is still used for a read in full and for such
+a send, and the rules below are otherwise as they were.
 
 - **Asked once, of the setup owner alone.** After a `service_write` send by
   the owner (`person::owner_ids`, as the send gate's owner), sent or
@@ -812,12 +824,14 @@ prints).
   the room's forget leaves it. A sign-out wipes it too, with the services'
   tokens: the voice reads `account/state` every 5 s and removes it once a
   spell (`owner_voice::watch_sign_outs`).
-- **Used:** a send is held to it (`VoiceAsk::Owner`, at
-  `SERVICES_SAME_FROM`, 0.55) in place of the preparing line's print, and a read in full is too in place
-  of the conversation's voice ([services.md](services.md)); with none,
-  both are as before.
+- **Used:** a read in full is held to it (`VoiceAsk::Owner`, at
+  `SERVICES_SAME_FROM`, 0.55) in place of the conversation's voice
+  ([services.md](services.md)); with none, as before. A send was held to it
+  too until the owner's call of 10 Nov; since then only a send in a line
+  begun in the lamp's echo tail with any of its words (#6009).
 - **The services' bar, 0.55** (`same_voice::SERVICES_SAME_FROM`): the
-  send gate and a read in full pass at 0.55 or over, looser than the
+  read in full passes (and so does a send in the lamp's echo tail; every
+  send did until the owner's call of 10 Nov) at 0.55 or over, looser than the
   conversation's `SAME_FROM`, 0.70, which every conversation rule keeps.
   Most owners are alone with the lamp, so a lower bar keeps the owner from
   being refused while still turning away a clearly different voice: CAM++
@@ -840,7 +854,13 @@ The memory owner's decision (4 Nov, 01:1x): CAM++ is used one way only,
 as a sign that confirms a line is the known person's, never as one that
 ends, holds or splits a conversation. `LAMP_SAME_VOICE_CONFIRMS=on`, beside
 `LAMP_SAME_VOICE_MODEL`, on the second route only (the coordinator reads it
-and passes `--same-voice-confirms BAR` after the model's path):
+and passes `--same-voice-confirms BAR` after the model's path). Off in the
+product: the memory owner switched it on on 10 Nov, and the lead's ruling of 11 Nov (#1711) turned it
+off again, as the lead's 20 Oct ruling stands. The CAM++ weights are
+Apache-2.0 but trained on VoxCeleb (YouTube speech, released for research),
+so the switch stays off until a speaker model whose training data is cleared
+for commercial use. The code lands dark; where it is set, beside
+`LAMP_SAME_VOICE_FOR=services`:
 
 - **Their own voice, in RAM only** (`same_voice::OwnerVoice`). Nothing on
   the lamp stores an enrolled voice print, so the known person's voice is
@@ -851,11 +871,47 @@ and passes `--same-voice-confirms BAR` after the model's path):
   loose to tell them from another voice. A line the voice confirmed is never
   learnt from, so the voice never vouches for itself. Another known person
   starts it afresh, and so does a restart of the voice. Nothing is written.
+  Validated `memory/forgot` events also clear the same Engine cache, including
+  app removal and a completed deletion whose tool receipt was lost. One bus
+  reader runs whenever its bus is available and polls every 500 ms;
+  cleanup does not depend on the summary switch. A person's id clears only their
+  prints and advances the observation generation; a null person clears all.
+  The literal room id `everyone` and rules scopes do not clear personal prints.
+  The existing source and payload checks still apply. Until an event is delivered
+  and handled, old prints may remain usable; this is not an atomic cross-process
+  cutoff or a guarantee of replay after a lost bus event.
+  Each poll handles at most eight messages; scheduling and backlog can delay
+  cleanup beyond one polling interval.
+  An update round must also install `lamp-same-voice` and its model; the
+  switch alone cannot provide confirmation when those artifacts are absent.
+  That round-install repair is a separate deployment dependency.
+
+  A successful reply to a heard and confirmed "forget everything" for the
+  admitted person clears their confirmation prints too; a successful face
+  forget reply clears the actual deleted person's prints. This applies to
+  both ordinary and optional requested-audio dispatch: capture the identity
+  before invoking either runner, then inspect its receipt before later
+  scope/output checks, preserving the complete reply and private audio offer.
+  Declined, failed, unheard or
+  unadmitted whole-forget results do not clear them. Another person's
+  stored prints remain. This RAM cache is separate from persisted services
+  enrollment, whose existing deletion path is unchanged.
+  Each spoken Start captures a cache generation when the Engine starts
+  processing that event, before `begin`, callbacks, locks or task spawning.
+  Events still queued upstream are outside this boundary. Both
+  normal and delayed face/print observations carry that generation into
+  learning and judging, checked under the same lock as the prints. A
+  forget advances it even if that person's prints are already absent, so
+  old work cannot restore them or use freshly relearned prints. Fresh
+  post-forget observations can learn again. One scalar generation keeps
+  this bookkeeping bounded without retaining forgotten person identifiers;
+  an unrelated person's forget can discard pending observations while
+  preserving the currently stored other-person prints.
 - **A confirm.** A line admitted as the known person's that no face was seen
   speaking, their known face the one face in view through it, whose print
   scores the bar or over against their kept prints, is taken as seen said
   by them: the faces seen speaking it become their face
-  (`second_provider::confirmed_by_voice`). Every check after reads it so:
+  (`second_provider::confirmed_by_voice_at`). Every check after reads it so:
   its keeps and reads (`speaking_faces::not_theirs`), the late look's
   keeper, and the "seen saying" checks of `LAMP_PERSON_SCOPE_ONE_FACE`.
   It is never done for a face not in view, another face, or two faces.
@@ -892,7 +948,8 @@ and passes `--same-voice-confirms BAR` after the model's path):
   owner's lowest (0.43) is under the relative's highest (0.57), so no bar
   separates them. The switch stays off until a real related pair (two
   people of one home, on a lamp mic) is measured, beside the eyes-and-model
-  run below.
+  run below. (The memory owner switched it on with this risk accepted on
+  10 Nov; the lead's ruling of 11 Nov (#1711) keeps it off in the product, see above.)
   Before, from Friday's Mac matrix (4 Nov, clean files with no speaker, room
   or mic, `drafts/memory-architecture/campp-mac-matrix.md`): other voices
   reached 0.62 on long lines and 0.53 on short ones against a mean of 3,
@@ -909,21 +966,54 @@ and passes `--same-voice-confirms BAR` after the model's path):
   follows a face). So no score ends a conversation, holds a line or marks
   another voice, and none joins or carries one either. The Live route,
   which has no confirm, starts no check at all with the switch on.
-- **The services' voice checks fail closed.** `services::judging_voices`
-  reads the same voices (`kept_voices()`), so under `confirming_only` its
-  `VoiceAsk::Alike`, `VoiceAsk::Conversation` and `VoiceAsk::Owner` all
-  return None: with `--same-voice-for-services` and a service linked, a
-  send has no voice cosine and is refused, a read is never in full, and
-  `owner_voice::offer` learns nothing. That is no worse than without the
-  model, but turning the switch on removes those positive checks.
+- **With the prints for every rule, the services' voice checks fail
+  closed.** `services::judging_voices` reads the same voices
+  (`kept_voices()`), so under `confirming_only` its `VoiceAsk::Alike` (a send
+  begun in the lamp's echo tail), `VoiceAsk::Conversation` and
+  `VoiceAsk::Owner` all return None.
+- **Beside `LAMP_SAME_VOICE_FOR=services`, as in the product,** the confirm
+  reads the services' own prints (`worker::confirming_where`,
+  `confirm_print_of`). They are never `confirming_only`, so a read in full, a
+  send in the lamp's echo tail and the owner's enrolled print judge by them
+  as before, and no conversation rule reads a print either way. Every heard
+  line is printed, whether or not a service is linked
+  (`worker::services_prints_while`): the confirm needs the known person's
+  lines. Before 10 Nov the confirm ran only with the prints for every rule,
+  so beside the services it confirmed nothing.
+- **A confirm never stands in for the face at a linked service.** The line
+  the eyes' reading is kept with is marked `LineSeen::by_voice` when only
+  the voice made it theirs. Memory reads it as theirs
+  (`remember::speaker_of`), but `services::seen_saying_owner` does not: a
+  send, a read in full and the owner's enrolled print
+  (`owner_voice::offer`) still need their face seen saying the line. So a
+  voice like the owner's off camera, while they sit silent in view, sends
+  nothing and teaches the owner's print nothing.
+- **No other person is shown by a voice that only confirms.** The carry past
+  a silent face (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`) is safe only where
+  a voice can say "someone else". With the confirm on, none can, so it stays
+  inactive, as without a voice, said once at start
+  (`worker::voice_shows_another`). Before 10 Nov it acted beside the confirm
+  with the prints for every rule, and a guest off camera, their mouth not
+  read, was carried into the person's conversation. A carried line read as
+  theirs (`LAMP_CONVERSATION_CARRIED_MEMORY`) acts as it does with no voice
+  print for the rules (the memory owner's call of 10 Nov, #6004): another
+  voice is told apart only by the rule's other signs and the faces.
 
 Off, nothing changes: no flag is passed and the voices judge as above.
 Shown in tests only (`a_high_match_with_their_face_in_view_is_seen_said_by_them`,
 `a_high_match_with_no_face_in_view_does_nothing`, `a_low_match_does_nothing`,
 `a_low_match_confirming_only_ends_and_holds_nothing`,
-`the_switch_off_changes_nothing`, `the_confirm_bar_is_read_from_the_environment`).
-`lamp-same-voice` and the model are not in the product build yet, so no
-product lamp can turn it on.
+`the_switch_off_changes_nothing`, `the_confirm_bar_is_read_from_the_environment`,
+`the_voice_confirms_from_the_services_prints_and_they_still_judge`,
+`a_voice_that_only_confirms_shows_no_other_person_to_the_carry`,
+`services::tests::a_line_their_voice_alone_confirmed_is_not_their_face_seen_saying_it`).
+`lamp-same-voice` ships beside the voice (#5175) and the model is fetched by
+the updater (`LAMP_UPDATE_MODELS=on`, #5193). The switch stays off in the
+product (the lead's ruling of 11 Nov (#1711)): training data not cleared for commercial use. **Known
+risk, wherever it is set:** a voice like the owner's (a relative) off camera
+while they sit silent alone in view is read and kept as theirs, as the similar
+pair showed on lamp-c0a4; it never sends, reads in full or enrols for a linked
+service. A real related pair is still unmeasured.
 
 ## Not shown
 
@@ -935,3 +1025,9 @@ product lamp can turn it on.
   their definition (a tone lights its band; the mean is off), not against
   torchaudio's numbers. The same voice scoring 0.95 says they are close.
 - **Many voices.** Three voices, 47 clips.
+
+### Pending writes and confirmation forget delivery
+
+With a bus available, the second worker always subscribes to memory forgets, including when confirmation and summaries are both off. Each batch drains at most eight messages once. Pending writes for all matching events retire first: person IDs, `everyone`, or null clear them; rules scopes and malformed messages do not. One awaited blocking job then applies optional summary cleanup and invalidates the actual Engine confirmation cache. A person forget clears only that person's cached prints and fences pending observations; null clears all, while `everyone` and rules scopes do not erase personal prints. No enrollment-at-setup code or switch is part of this standalone confirmation change.
+
+The early boundary includes the existing pending mutex and log call; its unloaded host p95 target is below 1 ms, not yet measured for this head and not a hard bound under lock or log-sink contention. Summary locks and confirmation cleanup run off the reactor. The same subscriber returns only after cleanup, so later batches can wait; 500 ms polling is not a completion deadline. Existing `Thread::forget` still performs its later pending cleanup. A failed blocking job ends the listener. `shutdown_background` does not join a running cleanup, which process exit may interrupt; no replay or durable cross-process cutoff is promised.

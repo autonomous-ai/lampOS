@@ -465,6 +465,14 @@ struct RequestContext {
     /// This request's own ask for everything was shown for its
     /// `forget_everything` ([`ScopeLease::mark_everything_asked`]).
     everything: AtomicBool,
+    /// The id of this request's own new keep that the second route takes
+    /// back on its own doubt (`LAMP_MEMORY_DOUBT_UNDOES`, C37), 0 for none
+    /// ([`ScopeLease::mark_own_keep_undone`]).
+    own_keep_undone: AtomicU64,
+    /// The id of the named forget a one-face line's person agreed to on this
+    /// line, the lamp having asked them once (#5627), 0 for none
+    /// ([`ScopeLease::mark_forget_agreed`]).
+    forget_agreed: AtomicU64,
     /// Narrowed to the room, its reply still told the admitted person's
     /// name ([`ScopeLease::name_for_reply`]).
     named: AtomicBool,
@@ -488,6 +496,11 @@ struct RequestContext {
     /// it (#4339, [`ScopeLease::carry_conversation`]): that person's scope
     /// held ([`ScopeSnapshot::held`]) from then on, unless narrowed.
     carried: OnceLock<ScopeSnapshot>,
+    /// A carried line with no words of its own that answers, in its place,
+    /// words this person's own face was seen saying in the line it cut
+    /// short (`LAMP_HELD_WORDS_SEEN`, [`ScopeLease::answer_words_seen`]):
+    /// their scope, not held, as that line's was.
+    seen_words: OnceLock<ScopeSnapshot>,
     /// Carried for this person's keep only ([`ScopeLease::carry_keep_only`]):
     /// [`Self::carried`] is then the room's, held, and only the keep is
     /// theirs, held for their seen yes.
@@ -573,6 +586,67 @@ static ONE_FACE_LINES: Mutex<std::collections::VecDeque<(u64, String, bool)>> =
     Mutex::new(std::collections::VecDeque::new());
 const ONE_FACE_LINES_MOST: usize = 64;
 
+/// How a line's words were settled as a known person's, once its own
+/// checks were done ([`mark_said_line`]): their own face seen saying it
+/// (`Seen`), or carried in full for their conversation and read as theirs,
+/// the rule having judged its voice (`ReadCarried`,
+/// `LAMP_CONVERSATION_CARRIED_MEMORY`). A held line answering those words
+/// in its place, cut short, answers them in that settled scope, never in a
+/// narrower one its own lack of words gave it (lamp-0c4e, 10 Nov).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SaidAs {
+    Seen,
+    ReadCarried,
+}
+
+/// Lines settled as a known person's, by request, with that person's
+/// memory id and how ([`mark_said_line`]): read after the line is over,
+/// when its lease is gone, by a held line answering its words in its place
+/// ([`ScopeLease::answer_words_seen`], `second_provider::said_saying`). A
+/// narrow takes a line off.
+static SETTLED_LINES: Mutex<std::collections::VecDeque<(u64, String, SaidAs)>> =
+    Mutex::new(std::collections::VecDeque::new());
+
+/// `request`'s line was settled as `person`'s, so (`SaidAs`), or (`None`)
+/// no longer so (a narrow).
+pub fn mark_said_line(request: u64, said: Option<(&str, SaidAs)>) {
+    let mut lines = SETTLED_LINES.lock().unwrap_or_else(|e| e.into_inner());
+    lines.retain(|(line, _, _)| *line != request);
+    if let Some((person, how)) = said {
+        if lines.len() == ONE_FACE_LINES_MOST {
+            lines.pop_front();
+        }
+        lines.push_back((request, person.to_owned(), how));
+    }
+}
+
+/// `request`'s line was seen spoken by `person`'s own face, or (`None`) no
+/// longer so (a narrow).
+pub fn mark_seen_line(request: u64, person: Option<&str>) {
+    mark_said_line(request, person.map(|person| (person, SaidAs::Seen)));
+}
+
+/// Whose `request`'s line was settled as, and how, as last marked
+/// ([`mark_said_line`]); `None` for any other line, one narrowed, or one
+/// forgotten past [`ONE_FACE_LINES_MOST`].
+pub fn said_line(request: u64) -> Option<(String, SaidAs)> {
+    SETTLED_LINES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .find(|(line, _, _)| *line == request)
+        .map(|(_, person, how)| (person.clone(), *how))
+}
+
+/// Whose own face was seen speaking `request`'s line, as last marked
+/// ([`mark_seen_line`]); `None` for any other line, one only read as
+/// carried, one narrowed, or one forgotten past [`ONE_FACE_LINES_MOST`].
+pub fn seen_line(request: u64) -> Option<String> {
+    said_line(request)
+        .filter(|(_, how)| *how == SaidAs::Seen)
+        .map(|(person, _)| person)
+}
+
 /// `request`'s line is `person`'s keep by the one-face rule, or (`None`)
 /// no longer anyone's. What the lease does; public for the memory's
 /// contract tests, which have no lease.
@@ -637,6 +711,7 @@ impl RequestScope {
                 key,
                 scope,
                 carried: OnceLock::new(),
+                seen_words: OnceLock::new(),
                 keep_for: OnceLock::new(),
                 carried_saves: AtomicBool::new(false),
                 released_keep: OnceLock::new(),
@@ -645,6 +720,8 @@ impl RequestScope {
                 carried_reads: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
+                own_keep_undone: AtomicU64::new(0),
+                forget_agreed: AtomicU64::new(0),
                 named: AtomicBool::new(false),
                 named_by_one_face: AtomicBool::new(false),
                 named_conversation: AtomicBool::new(false),
@@ -691,6 +768,7 @@ impl RequestScope {
                 key,
                 scope,
                 carried: OnceLock::new(),
+                seen_words: OnceLock::new(),
                 keep_for: OnceLock::new(),
                 carried_saves: AtomicBool::new(false),
                 released_keep: OnceLock::new(),
@@ -699,6 +777,8 @@ impl RequestScope {
                 carried_reads: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
+                own_keep_undone: AtomicU64::new(0),
+                forget_agreed: AtomicU64::new(0),
                 named: AtomicBool::new(false),
                 named_by_one_face: AtomicBool::new(false),
                 named_conversation: AtomicBool::new(false),
@@ -743,6 +823,8 @@ impl ScopeLease {
         self.is_current().then(|| {
             if self.context.narrowed.load(Ordering::Acquire) {
                 &self.context.room
+            } else if let Some(seen) = self.context.seen_words.get() {
+                seen
             } else if let Some(reads) = self.context.carried_reads.get() {
                 reads
             } else if let Some(carried) = self.context.carried.get() {
@@ -778,6 +860,8 @@ impl ScopeLease {
         if one_face.take().is_some() {
             mark_one_face_line(self.context.key.request, None);
         }
+        // Nor were its words theirs, seen said or read ([`said_line`]).
+        mark_said_line(self.context.key.request, None);
     }
 
     /// A line narrowed to the room ([`Self::narrow_to_room`]) with no face
@@ -878,6 +962,50 @@ impl ScopeLease {
         carried.person().is_none()
     }
 
+    /// A carried line with no words of its own answers, in its place, words
+    /// `person`'s own face was seen saying in the line it cut short
+    /// ([`seen_line`], `LAMP_HELD_WORDS_SEEN`): the words are theirs, seen
+    /// said, so they are answered in their scope as that line's would have
+    /// been, not held, their keeps, corrections and forgets run, and its
+    /// exchange is journalled. lamp-06c1, build 11091, 10 Nov rerun, S1:
+    /// "Lamp. Actually, my bike is blue now." (request 83) was seen spoken
+    /// by her face, cut by a 0-word line (84), and answered in 85's place
+    /// as a carried line: no memory note, no reads, its correction held for
+    /// a yes, so the lamp said it had nothing about the bike's colour, and
+    /// blue was never kept. Only a line carried in full for `person`'s
+    /// conversation ([`Self::carry_conversation`]: no face seen speaking
+    /// it, their own face in view, no other) takes it; `false`, and nothing
+    /// changed, for one revoked, narrowed, admitted held by a gap, carried
+    /// for a keep only, or carried for someone else. A later narrow still
+    /// makes it the room's.
+    pub fn answer_words_seen(&self, person: &str) -> bool {
+        let mut one_face = self
+            .context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if !self.is_current()
+            || self.context.narrowed.load(Ordering::Acquire)
+            || self.context.scope.held
+            || self.context.keep_for.get().is_some()
+            || self.context.carried.get().and_then(ScopeSnapshot::person) != Some(person)
+        {
+            return false;
+        }
+        let seen = self.context.seen_words.get_or_init(|| ScopeSnapshot {
+            person: Some(Arc::from(person)),
+            held: false,
+        });
+        if seen.person() != Some(person) {
+            return false;
+        }
+        // Theirs, seen said: no one-face refusal, nothing held for a yes.
+        *one_face = None;
+        self.context.one_face_reads.store(false, Ordering::Release);
+        self.context.carried_saves.store(false, Ordering::Release);
+        true
+    }
+
     /// A carried line ([`Self::carry_conversation`]) may save: its
     /// `remember` is held, in memory only, for the carried person's yes,
     /// their own face seen saying it, and then written in their scope, the
@@ -907,7 +1035,10 @@ impl ScopeLease {
     /// [`Self::scope`] is theirs, not held: recall, hits, the memory note and
     /// their thread; its `remember` is written in their scope at once
     /// ([`Self::kept_by_one_face`]). No forget of any kind, no correction,
-    /// rule or yes runs on it ([`Self::forgets_need_mouth`]), and it is
+    /// rule or yes runs on it ([`Self::forgets_need_mouth`]), but for the
+    /// held face rename's yes behind `LAMP_NAMES_RENAME_YES`, taken only
+    /// from its carried person (`second_provider::held_rename`, the memory
+    /// owner's OK on #6859, 13 Nov), and it is
     /// still never journalled or summarised ([`Self::reads_carried`]). Who
     /// counts as carried is unchanged: only a line already carried in full
     /// for `person`'s conversation. Any later narrow makes it the room's.
@@ -924,6 +1055,7 @@ impl ScopeLease {
             || self.context.narrowed.load(Ordering::Acquire)
             || self.context.scope.held
             || self.context.keep_for.get().is_some()
+            || self.context.seen_words.get().is_some()
         {
             return false;
         }
@@ -955,6 +1087,7 @@ impl ScopeLease {
     pub fn reads_carried(&self) -> bool {
         self.is_current()
             && !self.context.narrowed.load(Ordering::Acquire)
+            && self.context.seen_words.get().is_none()
             && self.context.carried_reads.get().is_some()
     }
 
@@ -964,6 +1097,7 @@ impl ScopeLease {
     pub fn saves_carried(&self) -> Option<&str> {
         (self.is_current()
             && !self.context.narrowed.load(Ordering::Acquire)
+            && self.context.seen_words.get().is_none()
             && self.context.carried_saves.load(Ordering::Acquire))
         .then(|| match self.context.keep_for.get() {
             Some(person) => Some(&**person),
@@ -1169,7 +1303,8 @@ impl ScopeLease {
     /// lease is current and no narrow came after. Never a read, a forget or
     /// a yes: only a keep reads it. The one named exception is the held face
     /// rename behind `LAMP_NAMES_RENAME_YES`, whose yes it may take, as a
-    /// written risk accepted (`second_provider::held_rename`, docs/eyes.md).
+    /// written risk accepted (`second_provider::held_rename`, docs/eyes.md),
+    /// on a carried line read as theirs too ([`Self::read_carried`], #6859).
     pub fn kept_by_one_face(&self) -> Option<String> {
         if !self.is_current() {
             return None;
@@ -1224,10 +1359,12 @@ impl ScopeLease {
     /// the lease is current and not narrowed. Never authority to act: only
     /// the by-default name reads it, for the reply (`person::someone_else_now`).
     pub fn carried_for(&self) -> Option<&str> {
-        (self.is_current() && !self.context.narrowed.load(Ordering::Acquire))
-            .then(|| self.context.carried.get())
-            .flatten()
-            .and_then(ScopeSnapshot::person)
+        (self.is_current()
+            && !self.context.narrowed.load(Ordering::Acquire)
+            && self.context.seen_words.get().is_none())
+        .then(|| self.context.carried.get())
+        .flatten()
+        .and_then(ScopeSnapshot::person)
     }
 
     /// The known person this line was admitted as, whatever came after:
@@ -1247,6 +1384,55 @@ impl ScopeLease {
     /// P2s). It lives with the request and goes with it.
     pub(crate) fn mark_everything_asked(&self, _shown: &crate::second_provider::EverythingShown) {
         self.context.everything.store(true, Ordering::Release);
+    }
+
+    /// The forget by id `id` that takes back this request's own new keep,
+    /// which this request's next round doubted (`LAMP_MEMORY_DOUBT_UNDOES`,
+    /// C37): run on a line its person's by their face alone in view too
+    /// ([`Self::forgets_need_mouth`]), as it only undoes what the lamp kept
+    /// for them a moment ago. Only the second route makes the
+    /// [`crate::second_provider::OwnKeepUndone`] it needs, and only for the
+    /// id of the keep it just ran. It lives with the request.
+    pub(crate) fn mark_own_keep_undone(
+        &self,
+        _undone: &crate::second_provider::OwnKeepUndone,
+        id: u64,
+    ) {
+        self.context.own_keep_undone.store(id, Ordering::Release);
+    }
+
+    /// Whether `args`, a `forget`'s, takes back exactly the keep marked by
+    /// [`Self::mark_own_keep_undone`]: its `source_id` alone.
+    pub(crate) fn undoes_own_keep(&self, args: &serde_json::Value) -> bool {
+        let marked = self.context.own_keep_undone.load(Ordering::Acquire);
+        marked != 0
+            && args["source_id"].as_u64() == Some(marked)
+            && args.as_object().is_some_and(|args| args.len() == 1)
+    }
+
+    /// The forget by id `id` their yes on this line agreed to, the lamp
+    /// having asked them once about it on a line theirs only by their face
+    /// alone in view (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, the PM's cost
+    /// ruling on #5627): it runs on this line though it is theirs by one
+    /// face too ([`Self::forgets_need_mouth`]), where the yes was the
+    /// private room's. Only the second route makes the
+    /// [`crate::second_provider::OneFaceForgetYes`] it needs, and only for
+    /// the held call's own id. It lives with the request.
+    pub(crate) fn mark_forget_agreed(
+        &self,
+        _agreed: &crate::second_provider::OneFaceForgetYes,
+        id: u64,
+    ) {
+        self.context.forget_agreed.store(id, Ordering::Release);
+    }
+
+    /// Whether `args`, a `forget`'s, is exactly the forget marked by
+    /// [`Self::mark_forget_agreed`]: its `source_id` alone.
+    pub(crate) fn agreed_forget(&self, args: &serde_json::Value) -> bool {
+        let marked = self.context.forget_agreed.load(Ordering::Acquire);
+        marked != 0
+            && args["source_id"].as_u64() == Some(marked)
+            && args.as_object().is_some_and(|args| args.len() == 1)
     }
 
     /// Whether [`Self::mark_everything_asked`] was marked for this request.
@@ -1466,6 +1652,33 @@ mod tests {
     /// room's, keeps and forgets alike. A carried, held, revoked or
     /// nobody's line takes none. Without it (`take_by_one_face`) no forget
     /// is refused by this, as before.
+    /// C37, the memory owner's call A (11 Nov): only the forget by id of
+    /// the keep the second route marked as its own, taken back on its own
+    /// doubt, is that keep's undo; any other forget, or one with more than
+    /// that id, is not. Nothing is marked at first.
+    #[test]
+    fn only_the_marked_own_keeps_forget_undoes_it() {
+        let key = RequestKey {
+            worker: lamp_turn_owner::BootId::new([56; 16]).unwrap(),
+            session: 1,
+            request: 1,
+        };
+        let scope = RequestScope::new(key, ScopeSnapshot::of("A"));
+        let lease = scope.lease();
+        let own = serde_json::json!({"source_id": 391});
+        assert!(!lease.undoes_own_keep(&own), "nothing marked");
+        lease.mark_own_keep_undone(&crate::second_provider::own_keep_undone_for_test(), 391);
+        assert!(lease.undoes_own_keep(&own));
+        for other in [
+            serde_json::json!({"source_id": 390}),
+            serde_json::json!({"source_id": 391, "about": "flowers"}),
+            serde_json::json!({"about": "flowers"}),
+            serde_json::json!({}),
+        ] {
+            assert!(!lease.undoes_own_keep(&other), "{other}");
+        }
+    }
+
     #[test]
     fn a_one_face_line_with_reads_is_read_as_its_persons_and_forgets_need_the_mouth() {
         let key = RequestKey {
@@ -1697,6 +1910,89 @@ mod tests {
         );
         assert_eq!(lease.kept_by_one_face().as_deref(), Some(a_id.as_str()));
     }
+    /// S1, lamp-06c1, 10 Nov rerun (requests 83 to 85): a 0-word line that
+    /// cut a line A's face was seen saying, carried for A's conversation,
+    /// answers those words in A's scope, not held: no keep waits for a yes
+    /// and a correction runs, as on the line A said them in. Carried with
+    /// reads too, it drops the one-face refusals. A line carried for a keep
+    /// only, for B, held by a gap, narrowed, revoked or not carried takes
+    /// none, and a narrow after it makes it the room's.
+    #[test]
+    fn a_held_line_answering_words_seen_said_is_answered_in_their_scope() {
+        let a = ScopeSnapshot::of("A");
+        let a_id = a.person().unwrap().to_owned();
+        for (worker, reads) in [(31, false), (32, true)] {
+            let scope = RequestScope::new(key(worker), a.clone());
+            let lease = scope.lease();
+            assert!(!lease.answer_words_seen(&a_id), "{worker}: not carried");
+            assert!(lease.carry_conversation(&a_id));
+            assert!(lease.save_carried());
+            if reads {
+                assert!(lease.read_carried());
+                assert!(lease.forgets_need_mouth());
+            }
+            assert!(lease.answer_words_seen(&a_id), "{worker}");
+            assert_eq!(lease.scope(), Some(&a), "{worker}: A's, not held");
+            assert!(!lease.forgets_need_mouth(), "{worker}: a correction runs");
+            assert_eq!(lease.saves_carried(), None, "{worker}: kept at once");
+            assert!(!lease.reads_carried(), "{worker}: journalled");
+            assert_eq!(lease.carried_for(), None, "{worker}: a seen line's");
+            assert_eq!(lease.kept_by_one_face(), None, "{worker}");
+            assert!(!lease.read_carried(), "{worker}: never carried again");
+            lease.narrow_to_room();
+            assert_eq!(lease.scope(), Some(&ScopeSnapshot::room()), "{worker}");
+        }
+        let b_id = ScopeSnapshot::of("B").person().unwrap().to_owned();
+        let other = RequestScope::new(key(33), ScopeSnapshot::room());
+        assert!(other.lease().carry_conversation(&b_id));
+        assert!(!other.lease().answer_words_seen(&a_id), "carried for B");
+        assert!(other.lease().scope().unwrap().held());
+        let keep_only = RequestScope::new(key(34), ScopeSnapshot::room());
+        assert!(keep_only.lease().carry_keep_only(&a_id));
+        assert!(!keep_only.lease().answer_words_seen(&a_id), "keep only");
+        let gap = RequestScope::new(key(35), ScopeSnapshot::held_of("A"));
+        assert!(gap.lease().carry_conversation(&a_id));
+        assert!(!gap.lease().answer_words_seen(&a_id), "held by a gap");
+        let narrowed = RequestScope::new(key(36), a.clone());
+        assert!(narrowed.lease().carry_conversation(&a_id));
+        narrowed.lease().narrow_to_room();
+        assert!(!narrowed.lease().answer_words_seen(&a_id), "narrowed");
+        let revoked = RequestScope::new(key(37), a);
+        let lease = revoked.lease();
+        assert!(lease.carry_conversation(&a_id));
+        revoked.revoke();
+        assert!(!lease.answer_words_seen(&a_id), "revoked");
+    }
+
+    /// A line seen spoken is marked with whose face said it, and a narrow
+    /// takes the mark off.
+    #[test]
+    fn a_line_seen_spoken_is_marked_until_a_narrow() {
+        let request = 9_101;
+        mark_seen_line(request, Some("p-a"));
+        assert_eq!(seen_line(request).as_deref(), Some("p-a"));
+        assert_eq!(seen_line(request + 1), None);
+        let scope = RequestScope::new(
+            RequestKey {
+                worker: BootId::new([38; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            ScopeSnapshot::of("A"),
+        );
+        scope.lease().narrow_to_room();
+        assert_eq!(seen_line(request), None, "a narrow takes it off");
+        // Read as carried: said, not seen; a narrow takes it off too.
+        mark_said_line(request, Some(("p-a", SaidAs::ReadCarried)));
+        assert_eq!(
+            said_line(request),
+            Some(("p-a".to_owned(), SaidAs::ReadCarried))
+        );
+        assert_eq!(seen_line(request), None, "read, not seen");
+        scope.lease().narrow_to_room();
+        assert_eq!(said_line(request), None, "a narrow takes it off");
+    }
+
     fn key(worker: u8) -> RequestKey {
         RequestKey {
             worker: BootId::new([worker; 16]).unwrap(),

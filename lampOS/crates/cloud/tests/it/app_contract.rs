@@ -44,6 +44,17 @@ const READ: &[(&str, &str, Type)] = &[
     // only with LAMP_APP_ONBOARDING_DONE on, so the app waits for the event
     // on such a lamp alone.
     ("system.info", "onboarding_done_supported", Type::Flag),
+    // This lamp will send `onboarding.step` as each walk step ends (#5979),
+    // with the same switch.
+    ("system.info", "onboarding_step_supported", Type::Flag),
+    // This lamp takes `onboarding.page` and sends `onboarding.page_done`
+    // (#6076), with the same switch.
+    ("system.info", "onboarding_page_supported", Type::Flag),
+    // This lamp sends `update.started` and `update.ended` (#6284): said only
+    // with LAMP_APP_UPDATE_EVENTS on.
+    ("system.info", "update_events_supported", Type::Flag),
+    // Which page contract (#6366): 2 is per-tap Add and the `done` page.
+    ("system.info", "onboarding_page_version", Type::Whole),
     ("volume.get", "volume", Type::Percent),
     ("volume.get", "raw", Type::Whole),
     ("volume.get", "max_volume", Type::Whole),
@@ -163,6 +174,8 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         .unwrap();
     // The switch on, with a state folder (#5812); no other test here reads it.
     lamp_cloud::onboarding_done::switch(Some(root.join(lamp_cloud::onboarding_done::FILE)));
+    // And the update's events' switch (#6284).
+    lamp_cloud::update_events::switch(Some(root.join(lamp_cloud::update_events::FILE)));
     // The voice's heartbeat, its walk ended (#5812).
     let mut walk = ring
         .publisher_declared(
@@ -204,6 +217,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         services: None,
         control: None,
         consent: None,
+        monitor: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -318,6 +332,7 @@ fn the_faces_page_reads_names_and_removes_one() {
         services: None,
         control: None,
         consent: None,
+        monitor: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -478,6 +493,7 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
         services: None,
         control: None,
         consent: None,
+        monitor: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -603,6 +619,7 @@ fn face_remove_entirely_cancels_the_persons_reminders() {
         services: None,
         control: None,
         consent: None,
+        monitor: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -663,6 +680,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         services: None,
         control: None,
         consent: None,
+        monitor: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -719,6 +737,8 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
                     commit: "5b40a1523".into(),
                 }),
             }),
+            refused: None,
+            engines: None,
         },
     )
     .unwrap();
@@ -774,6 +794,8 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         last: None,
         harness: None,
         round: None,
+        refused: None,
+        engines: None,
     };
     says.publish_json(0, &idle).unwrap();
     assert!(
@@ -883,6 +905,149 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
     let _ = std::fs::remove_dir_all(root);
 }
 
+/// #6240: the lamp's agents in `update.status`, with the field types the
+/// app takes, only with `LAMP_APP_ENGINES=on` beside `LAMP_APP_UPDATE=on`;
+/// `engines.install` in the reply the app reads, refused for an agent that
+/// is not missing or failed, and not here without the switch.
+#[test]
+fn the_lamps_agents_are_answered_and_a_missing_one_installed() {
+    let root = PathBuf::from(format!("/tmp/lce-{}", std::process::id()));
+    let places = lamp(&root);
+    let bus_root = root.join("bus");
+    std::fs::create_dir_all(&bus_root).unwrap();
+    let mut real = Real {
+        places,
+        bus: Some(Bus::new(&bus_root).unwrap()),
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
+        update_page: true,
+        update_checks: lamp_cloud::update::Checks::with_engines(true),
+        restart: None,
+        guard: None,
+        make_skill: None,
+        write_skill: None,
+        share: None,
+        services: None,
+        control: None,
+        consent: None,
+        monitor: None,
+        upload: None,
+        shutdown: None,
+        harness_sign_in: None,
+    };
+    let me = Identity {
+        device: "lamp".into(),
+        version: "812+460a1a1aa2b3".into(),
+        id: "d-42".into(),
+        mac: "lamp-7f72".into(),
+        ..Identity::default()
+    };
+    let sent = |real: &mut Real, kind: &str, data: Value| -> Value {
+        let result = answer(real, kind, &data);
+        let sent = me.data("2026-11-11T09:00:00Z", kind, &result).to_string();
+        serde_json::from_str(&sent).unwrap()
+    };
+    let update = Bus::new(&bus_root).unwrap();
+    let mut says = update
+        .publisher_declared(
+            lamp_msgs::UpdateStatus::TOPIC,
+            &lamp_msgs::UpdateStatus::declaration(),
+            "update",
+        )
+        .unwrap();
+    let with = |state: &str, version: Option<&str>, reason: Option<&str>| lamp_msgs::UpdateStatus {
+        running: None,
+        now: "idle".into(),
+        last: None,
+        harness: None,
+        round: None,
+        refused: None,
+        engines: Some(std::collections::BTreeMap::from([(
+            "hermes".to_owned(),
+            lamp_msgs::EngineInstall {
+                state: state.into(),
+                version: version.map(str::to_owned),
+                reason: reason.map(str::to_owned),
+                at_unix_ms: Some(1_762_850_000_000),
+            },
+        )])),
+    };
+    says.publish_json(0, &with("installed", Some("0.22.2"), None))
+        .unwrap();
+    let told = sent(&mut real, "update.status", json!({}));
+    assert_eq!(told["status"], "success", "{told}");
+    for (path, kind_of_value) in [
+        ("engines.hermes.state", Type::Text),
+        ("engines.hermes.version", Type::Text),
+        ("engines.hermes.at_unix_ms", Type::Whole),
+    ] {
+        let value = field(&told["data"], path);
+        assert!(
+            value.is_some_and(|value| is(value, kind_of_value)),
+            "update.status {path}: the app takes {kind_of_value:?}, lamp-cloud said {value:?}"
+        );
+    }
+    let refused = sent(&mut real, "engines.install", json!({"engine": "hermes"}));
+    assert_eq!(refused["status"], "failure", "{refused}");
+    assert_eq!(refused["error"], lamp_cloud::update::NOT_MISSING);
+    // #6492: the default agent, an empty name refused before lamp-tasks is
+    // asked; the reply the app reads carries the refusal's code.
+    let unknown = sent(&mut real, "engines.default", json!({"engine": ""}));
+    assert_eq!(unknown["status"], "failure", "{unknown}");
+    assert_eq!(
+        unknown["error"],
+        lamp_cloud::engine_default::ENGINE_UNKNOWN,
+        "{unknown}"
+    );
+
+    says.publish_json(0, &with("failed", None, Some("no_memory")))
+        .unwrap();
+    let told = sent(&mut real, "update.status", json!({}));
+    assert_eq!(
+        told["data"]["engines"]["hermes"],
+        json!({"state": "failed", "reason": "no_memory", "at_unix_ms": 1_762_850_000_000_u64}),
+        "{told}"
+    );
+    let mut serve = update
+        .subscribe_typed(
+            lamp_msgs::EngineInstallAsk::TOPIC,
+            "update",
+            lamp_msgs::EngineInstallAsk::TYPE,
+        )
+        .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    let started = sent(&mut real, "engines.install", json!({"engine": "hermes"}));
+    assert_eq!(started["status"], "success", "{started}");
+    assert_eq!(started["data"], json!({"install": "started"}));
+    let heard = serve
+        .recv(std::time::Duration::from_secs(1))
+        .unwrap()
+        .expect("one ask on the bus");
+    assert_eq!(
+        heard.parse::<lamp_msgs::EngineInstallAsk>().unwrap().engine,
+        "hermes"
+    );
+    let again = sent(&mut real, "engines.install", json!({"engine": "hermes"}));
+    assert_eq!(again["error"], lamp_cloud::update::TOO_SOON, "{again}");
+
+    // Without the agents' switch: no `engines`, and the kind is not here.
+    real.update_checks = Default::default();
+    let told = sent(&mut real, "update.status", json!({}));
+    assert!(told["data"].get("engines").is_none(), "{told}");
+    assert!(answer(&mut real, "engines.install", &json!({"engine": "hermes"})).is_err());
+    assert!(answer(&mut real, "engines.default", &json!({"engine": "hermes"})).is_err());
+    let _ = std::fs::remove_dir_all(root);
+}
+
 /// A stand-in for setup's change helper on its socket: each request
 /// answered by the helper's own [`lamp_setup::change::power`] against a
 /// lamp-update lock in `root`, held by an update or not, in turn; the lines
@@ -948,6 +1113,7 @@ fn a_restart_from_the_app_is_the_helpers_answered_first_and_refused_under_an_upd
         services: None,
         control: None,
         consent: None,
+        monitor: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -1024,6 +1190,7 @@ fn a_shutdown_from_the_app_is_the_helpers_answered_once_and_refused_under_an_upd
         services: None,
         control: None,
         consent: None,
+        monitor: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -1128,6 +1295,7 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
         services: None,
         control: None,
         consent: None,
+        monitor: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -1242,6 +1410,7 @@ fn system_info_and_health_say_signed_out_only_while_the_bus_says_so() {
         services: None,
         control: None,
         consent: None,
+        monitor: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,

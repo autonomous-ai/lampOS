@@ -15,6 +15,10 @@
 # person to a login: it merges into that login's signed reader(s), and a login whose READ-OKs on the head are all
 # unsigned is one reader. (A restate whose signature the parser misses filed as a second reader before.)
 #
+# 13 Nov 21:2x (the lead, after #6386 and then #6921, #6931, #6940, #6945 and #6948 rode trains on one read): with
+# --always (the train bot and still-eligible.sh pass it), every PR needs two readers, asked or not, and a ONE READ
+# opt-out no longer lowers it. Two readers are still two signed names (above), never one login counted twice.
+#
 # 4 Nov 04:1x: a READ-OK on an earlier head with the same patch (a plain rebase; the caller passes those heads, lib.sh's
 # coord_same_patch) counts as one on the head, as it does for one read. #5043's two reads were on e05764f95b; rebased
 # to 91ccaf30bb, the same patch, it sat out "short 0" from 00:42.
@@ -133,12 +137,13 @@ def queue_asks(queue, heads, pr, writers, commits=()):
     return False
 
 
-def two_reads(items, heads, writers, queue=None, pr=None, commits=()):
+def two_reads(items, heads, writers, queue=None, pr=None, commits=(), always=False):
     """items: dicts {login, body} in posting order, the PR body as {pr_body: true}. heads: the head sha, or a list of it
-    and earlier heads with the same patch. queue: the Queue's comments (queue_asks), pr: the PR's number, commits: the PR's commits (Queue asks only). Returns "none",
+    and earlier heads with the same patch. queue: the Queue's comments (queue_asks), pr: the PR's number, commits: the PR's commits (Queue asks only).
+    always: two reads are asked of every PR, whatever it says (13 Nov, the lead: two real readers). Returns "none",
     "met N" or "short N"."""
     heads = [heads] if isinstance(heads, str) else list(heads)
-    asked = queue_asks(queue, heads, pr, writers, commits); signed = {}; unsigned = set()
+    asked = always or queue_asks(queue, heads, pr, writers, commits); signed = {}; unsigned = set()
     for c in items:
         body = c["body"].lstrip()
         # 3 Nov 14:1x: the PR body is read too (a line {"pr_body": true}). 14:5x: anywhere in the body: #5049 says
@@ -175,10 +180,12 @@ def main():
                 print(s)
         return
     writers, args = writers_from_args(sys.argv[1:], "reads2")
-    queue, pr, heads, commits = None, None, [], []
+    queue, pr, heads, commits, always = None, None, [], [], False
     i = 0
     while i < len(args):
-        if args[i] == "--queue" and i + 1 < len(args):
+        if args[i] == "--always":
+            always = True; i += 1
+        elif args[i] == "--queue" and i + 1 < len(args):
             with open(args[i + 1]) as f:
                 queue = [json.loads(line) for line in f if line.strip()]
             i += 2
@@ -191,7 +198,7 @@ def main():
         else:
             heads.append(args[i]); i += 1
     items = [json.loads(line) for line in sys.stdin if line.strip()]
-    print(two_reads(items, heads, writers, queue, pr, commits))
+    print(two_reads(items, heads, writers, queue, pr, commits, always))
 
 
 if __name__ == "__main__":

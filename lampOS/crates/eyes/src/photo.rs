@@ -195,6 +195,9 @@ pub struct Unconfirmeds {
     seen: Vec<(String, Vec<Vec<f32>>)>,
     /// The last record's number given ([`Unconfirmed::record`]).
     records: u64,
+    /// A staging copy is still there that could not be removed: every look
+    /// ([`Self::expire`]) tries again, whether or not a face is kept.
+    staging_left: std::cell::Cell<bool>,
 }
 
 impl Unconfirmeds {
@@ -224,11 +227,20 @@ impl Unconfirmeds {
             },
             Err(_) => Vec::new(),
         };
+        // A save cut between its write and its rename leaves its staging
+        // copy, names and prints in it: never read, so removed.
+        let staging_left = !Self::drop_staging(&path);
+        if staging_left {
+            eprintln!(
+                "lamp-eyes: the staging copy of the faces from photos could not be removed; each look tries again"
+            );
+        }
         let mut faces = Self {
             path,
             kept,
             seen: Vec::new(),
             records: 0,
+            staging_left: std::cell::Cell::new(staging_left),
         };
         for at in 0..faces.kept.len() {
             faces.kept[at].record = faces.next_record();
@@ -247,6 +259,25 @@ impl Unconfirmeds {
         self.find(name).map(|at| self.kept[at].record)
     }
 
+    /// The staging copy a save writes before its rename:
+    /// `<people>.from-photos.new`, which the product reset wipes too.
+    fn staging(path: &Path) -> std::path::PathBuf {
+        let mut temporary = path.as_os_str().to_owned();
+        temporary.push(".new");
+        temporary.into()
+    }
+
+    /// Removes the staging copy beside `path`; false when one is there and
+    /// could not be removed.
+    fn drop_staging(path: &Path) -> bool {
+        match std::fs::remove_file(Self::staging(path)) {
+            Ok(()) => true,
+            Err(error) => error.kind() == io::ErrorKind::NotFound,
+        }
+    }
+
+    /// Written whole or not at all: a write or rename that fails removes
+    /// its staging copy, so no print is left beside the file.
     fn save(&self) -> io::Result<()> {
         use std::io::Write;
         use std::os::unix::fs::OpenOptionsExt;
@@ -254,17 +285,23 @@ impl Unconfirmeds {
             version: 1,
             unconfirmed: self.kept.clone(),
         })?;
-        let mut temporary = self.path.clone().into_os_string();
-        temporary.push(".new");
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&temporary)?;
-        file.write_all(&text)?;
-        file.sync_all()?;
-        std::fs::rename(&temporary, &self.path)
+        let temporary = Self::staging(&self.path);
+        let written = (|| {
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&temporary)?;
+            file.write_all(&text)?;
+            file.sync_all()?;
+            std::fs::rename(&temporary, &self.path)
+        })();
+        // A renamed copy is gone; a failed one is removed, or left to the
+        // next look.
+        self.staging_left
+            .set(written.is_err() && !Self::drop_staging(&self.path));
+        written
     }
 
     /// Keeps `print` for `name`, unconfirmed, in place of any for that name.
@@ -391,30 +428,44 @@ impl Unconfirmeds {
         self.save()
     }
 
-    /// Their no, no answer, or "forget my face": the print deleted.
+    /// Their no, no answer, or "forget my face": the print deleted. A save
+    /// that fails keeps the face as it was, in memory as on disk, so the
+    /// next let-go tries again.
     pub fn let_go(&mut self, name: &str) -> io::Result<bool> {
         let Some(at) = self.find(name) else {
             return Ok(false);
         };
-        self.kept.remove(at);
+        let kept = self.kept.remove(at);
+        if let Err(error) = self.save() {
+            self.kept.insert(at, kept);
+            return Err(error);
+        }
         self.take_seen(name);
-        self.save().map(|()| true)
+        Ok(true)
     }
 
-    /// Deletes those added [`UNCONFIRMED_FOR_S`] ago or more; how many.
+    /// Deletes those added [`UNCONFIRMED_FOR_S`] ago or more; how many. A
+    /// save that fails deletes none, so the next look tries again. A staging
+    /// copy left behind is removed first, kept faces or not.
     pub fn expire(&mut self, now_unix_s: u64) -> io::Result<usize> {
-        let before = self.kept.len();
+        if self.staging_left.get() {
+            self.staging_left.set(!Self::drop_staging(&self.path));
+        }
+        let before = self.kept.clone();
         self.kept
             .retain(|kept| now_unix_s.saturating_sub(kept.added_unix_s) < UNCONFIRMED_FOR_S);
-        let gone = before - self.kept.len();
+        let gone = before.len() - self.kept.len();
+        if gone > 0
+            && let Err(error) = self.save()
+        {
+            self.kept = before;
+            return Err(error);
+        }
         let kept = &self.kept;
         self.seen.retain(|(name, _)| {
             kept.iter()
                 .any(|face| crate::who::same_name(&face.name, name))
         });
-        if gone > 0 {
-            self.save()?;
-        }
         Ok(gone)
     }
 
@@ -923,6 +974,109 @@ mod tests {
         std::fs::write(&path, b"not json").unwrap();
         assert!(Unconfirmeds::open(path.clone()).is_empty());
         assert!(!path.exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A no, a meeting's end or the 30 days whose save fails (here its
+    /// rename, onto a folder in the file's place) deletes nothing: the face
+    /// stays, in memory as on disk, no staging copy is left, and the next
+    /// try deletes it.
+    #[test]
+    fn a_let_go_whose_save_fails_keeps_the_face_and_deletes_it_on_the_next_try() {
+        let dir = folder("let-go-retry");
+        let path = Unconfirmeds::beside(&dir.join("people.json"));
+        let staging = Unconfirmeds::staging(&path);
+        let mut faces = Unconfirmeds::open(path.clone());
+        faces.add("Lan", unit(0), 1_000).unwrap();
+        faces.saw("Lan", unit(1));
+        let on_disk = std::fs::read(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir_all(path.join("blocker")).unwrap();
+        assert!(faces.let_go("Lan").is_err());
+        assert!(!staging.exists());
+        assert_eq!(faces.names(), ["Lan"]);
+        assert_eq!(faces.seen.len(), 1);
+        std::fs::remove_dir_all(&path).unwrap();
+        std::fs::write(&path, &on_disk).unwrap();
+        assert!(faces.let_go("Lan").unwrap());
+        assert!(faces.seen.is_empty());
+        assert!(Unconfirmeds::open(path.clone()).is_empty());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn an_expiry_whose_save_fails_keeps_the_face_and_deletes_it_on_the_next_look() {
+        let dir = folder("expire-retry");
+        let path = Unconfirmeds::beside(&dir.join("people.json"));
+        let staging = Unconfirmeds::staging(&path);
+        let mut faces = Unconfirmeds::open(path.clone());
+        faces.add("Minh", unit(0), 1_000).unwrap();
+        let on_disk = std::fs::read(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir_all(path.join("blocker")).unwrap();
+        let late = 1_000 + UNCONFIRMED_FOR_S;
+        assert!(faces.expire(late).is_err());
+        assert!(!staging.exists());
+        assert_eq!(faces.names(), ["Minh"]);
+        std::fs::remove_dir_all(&path).unwrap();
+        std::fs::write(&path, &on_disk).unwrap();
+        assert_eq!(faces.expire(late).unwrap(), 1);
+        assert!(Unconfirmeds::open(path.clone()).is_empty());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A save cut between its write and its rename (a crash) leaves its
+    /// staging copy: the next start removes it.
+    #[test]
+    fn a_staging_copy_left_by_a_cut_save_is_removed_at_start() {
+        let dir = folder("cut-save");
+        let path = Unconfirmeds::beside(&dir.join("people.json"));
+        let staging = Unconfirmeds::staging(&path);
+        assert!(staging.ends_with("people.json.from-photos.new"));
+        std::fs::write(&staging, br#"{"version":1,"unconfirmed":[]}"#).unwrap();
+        assert!(Unconfirmeds::open(path.clone()).is_empty());
+        assert!(!staging.exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A staging copy that can't be removed at start (here a folder in its
+    /// place) is tried again on every look, with no face from a photo kept
+    /// at all, and goes once it can be: its prints never wait for another
+    /// save.
+    #[test]
+    fn a_staging_copy_not_removed_at_start_goes_on_a_later_look_with_none_kept() {
+        let dir = folder("staging-retry");
+        let path = Unconfirmeds::beside(&dir.join("people.json"));
+        let staging = Unconfirmeds::staging(&path);
+        std::fs::create_dir_all(staging.join("blocker")).unwrap();
+        let mut faces = Unconfirmeds::open(path.clone());
+        assert!(faces.is_empty());
+        assert!(staging.exists());
+        assert_eq!(faces.expire(1_000).unwrap(), 0);
+        assert!(staging.exists());
+        // The way is clear again, the copy still there: the next look takes it.
+        std::fs::remove_dir_all(&staging).unwrap();
+        std::fs::write(&staging, br#"{"version":1,"unconfirmed":[]}"#).unwrap();
+        assert_eq!(faces.expire(1_001).unwrap(), 0);
+        assert!(!staging.exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A save whose write fails and whose staging copy can't be removed
+    /// either leaves the copy to the next look, not to the next save.
+    #[test]
+    fn a_staging_copy_a_failed_save_could_not_remove_goes_on_a_later_look() {
+        let dir = folder("save-staging-retry");
+        let path = Unconfirmeds::beside(&dir.join("people.json"));
+        let staging = Unconfirmeds::staging(&path);
+        let mut faces = Unconfirmeds::open(path.clone());
+        std::fs::create_dir_all(staging.join("blocker")).unwrap();
+        assert!(faces.add("Tuan", unit(0), 1_000).is_err());
+        assert!(faces.is_empty());
+        std::fs::remove_dir_all(&staging).unwrap();
+        std::fs::write(&staging, b"prints").unwrap();
+        assert_eq!(faces.expire(1_001).unwrap(), 0);
+        assert!(!staging.exists());
         std::fs::remove_dir_all(dir).unwrap();
     }
 

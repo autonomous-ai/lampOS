@@ -31,6 +31,270 @@ fn arguments(value: Option<&str>) -> Vec<String> {
     }
 }
 
+/// What the model is told when a recording offer is refused because the line
+/// that led to the call did not ask for one ([`asks_to_play`]).
+pub const NOT_ASKED_TO_PLAY: &str = "Nothing is playing and nothing will: a recording plays only when what they said asks you to play it, in words such as \"play some music\" or \"can you put on something relaxing\". Talk about music is not an ask. Do not say you are playing anything or that you will; answer what they said.";
+
+/// What may stand before the ask at a sentence's start.
+const BEFORE: &[&str] = &[
+    "hey", "hi", "hello", "ok", "okay", "lamp", "so", "and", "oh", "now", "please", "just",
+];
+/// "Can you …", "Could I …", "I'd like to …", "Let's …": a lead-in to the ask.
+const LEAD_INS: &[&[&str]] = &[
+    &["can", "you"],
+    &["could", "you"],
+    &["would", "you"],
+    &["will", "you"],
+    &["can", "i"],
+    &["could", "i"],
+    &["may", "i"],
+    &["can", "we"],
+    &["could", "we"],
+    &["i", "want", "to"],
+    &["i", "wanna"],
+    &["i'd", "like", "to"],
+    &["i", "would", "like", "to"],
+    &["let's"],
+    &["lets"],
+    &["let", "me"],
+    &["let", "us"],
+];
+/// The asks themselves, right after any [`BEFORE`] words and one lead-in.
+const ASKS: &[&[&str]] = &[
+    &["play"],
+    &["put", "on"],
+    &["put", "some"],
+    &["put", "something"],
+    &["turn", "on"],
+    &["start"],
+    &["hear"],
+    &["listen", "to"],
+    // Vietnamese, accents folded: "mở nhạc", "bật nhạc", "phát nhạc",
+    // "cho tôi nghe".
+    &["mo", "nhac"],
+    &["bat", "nhac"],
+    &["phat", "nhac"],
+    &["mo", "bai"],
+    &["bat", "bai"],
+    &["phat", "bai"],
+    &["cho", "toi", "nghe"],
+    &["cho", "minh", "nghe"],
+    &["cho", "em", "nghe"],
+];
+/// A word that, anywhere in the line, takes the ask back, doubts it or turns
+/// it into something else ("don't play anything", "play some music.
+/// Actually, don't.", "maybe later", "đừng mở nhạc", "thôi").
+const NOT: &[&str] = &[
+    "don't",
+    "dont",
+    "not",
+    "never",
+    "nevermind",
+    "no",
+    "stop",
+    "cancel",
+    "actually",
+    "wait",
+    "maybe",
+    "dung",
+    "thoi",
+];
+/// Exact whole-word retractions anywhere in the line override an earlier
+/// request. Do not reject an unrelated use of "scratch" or "changed" alone.
+const RETRACTIONS: &[&[&str]] = &[
+    &["forget", "it"],
+    &["scratch", "that"],
+    &["changed", "my", "mind"],
+];
+/// The recording noun must be the requested object, not a word in a later
+/// clause ("turn on the light so I can read sheet music" is not an ask).
+const AUDIO: &[&str] = &[
+    "music",
+    "song",
+    "songs",
+    "recording",
+    "recordings",
+    "sound",
+    "sounds",
+    "track",
+    "tracks",
+    "tune",
+    "tunes",
+    "playlist",
+    "melody",
+    "lullaby",
+    "nhac",
+    "bai",
+];
+/// Adjectives allowed directly before a recording noun or after "something".
+const MOODS: &[&str] = &[
+    "relaxing", "calm", "calming", "quiet", "soft", "soothing", "gentle", "peaceful", "chill",
+];
+
+fn starts_with_words(words: &[String], prefix: &[&str]) -> bool {
+    words.len() >= prefix.len()
+        && words
+            .iter()
+            .zip(prefix)
+            .all(|(word, expected)| word == expected)
+}
+
+/// A conservative object grammar: an optional recipient and determiner,
+/// then a recording noun (with one position word and at most three mood
+/// adjectives), or one of
+/// the explicit "something ..." constructions heard on the lamp. Never
+/// skip an unrelated object, "with me", or "like chess" to find a mood.
+fn audio_object(mut words: &[String]) -> bool {
+    if words
+        .first()
+        .is_some_and(|word| matches!(word.as_str(), "me" | "us"))
+    {
+        words = &words[1..];
+    }
+    if words
+        .first()
+        .is_some_and(|word| matches!(word.as_str(), "a" | "an" | "some" | "the"))
+    {
+        words = &words[1..];
+    }
+    if words.first().is_some_and(|word| word == "something") {
+        let rest = &words[1..];
+        let used = if rest
+            .first()
+            .is_some_and(|word| MOODS.contains(&word.as_str()))
+        {
+            1
+        } else if starts_with_words(rest, &["to", "help", "me"])
+            && rest
+                .get(3)
+                .is_some_and(|word| matches!(word.as_str(), "relax" | "unwind" | "sleep"))
+        {
+            4
+        } else if rest.first().is_some_and(|word| word == "to")
+            && rest
+                .get(1)
+                .is_some_and(|word| matches!(word.as_str(), "relax" | "unwind" | "sleep"))
+        {
+            2
+        } else {
+            return false;
+        };
+        // Do not turn "something calm like chess" into a recording ask.
+        return rest[used..]
+            .iter()
+            .all(|word| matches!(word.as_str(), "please" | "now" | "on"));
+    }
+    // A bounded position selects a recording, not an unrelated object
+    // followed later by music or a mood. It cannot qualify "something".
+    if words.first().is_some_and(|word| {
+        matches!(
+            word.as_str(),
+            "first" | "second" | "next" | "previous" | "last" | "another" | "different"
+        )
+    }) {
+        words = &words[1..];
+    }
+    for _ in 0..3 {
+        if words
+            .first()
+            .is_some_and(|word| MOODS.contains(&word.as_str()))
+        {
+            words = &words[1..];
+        } else {
+            break;
+        }
+    }
+    let Some(noun) = words.first().filter(|word| AUDIO.contains(&word.as_str())) else {
+        return false;
+    };
+    let mut rest = &words[1..];
+    // The noun must end the object: "music trivia" is a game, not
+    // requested music. Accept only bounded known request endings.
+    if matches!(noun.as_str(), "nhac" | "bai") {
+        if starts_with_words(rest, &["thu", "gian"]) {
+            rest = &rest[2..];
+        }
+        if rest.first().is_some_and(|word| word == "cho")
+            && rest
+                .get(1)
+                .is_some_and(|word| matches!(word.as_str(), "toi" | "minh" | "em"))
+        {
+            rest = &rest[2..];
+        }
+        rest.len() <= 3
+            && rest
+                .iter()
+                .all(|word| matches!(word.as_str(), "di" | "nhe" | "nha"))
+    } else {
+        rest.len() <= 3
+            && rest
+                .iter()
+                .all(|word| matches!(word.as_str(), "please" | "now" | "on"))
+    }
+}
+
+/// Whether `said`, the line that led to a requested-audio call, plainly asks
+/// to play something (#5764). Some sentence of it must start, past greetings
+/// ([`BEFORE`]) and at most one lead-in ([`LEAD_INS`]), with an ask
+/// ([`ASKS`]) with a recording object ([`audio_object`]). No word of the
+/// whole line may be one of [`NOT`], and [`RETRACTIONS`] override the ask.
+/// On lamp-52e6 on 9 Nov, "Lamp, I
+/// listened to some relaxing music on the train this morning, it was really
+/// nice." got a `use_skill` call to the relaxing-music skill: talk about
+/// music, not an ask, so it is refused here, not left to the skill's text.
+/// "Lamp, can you play some relaxing music?" and "Put on something calm,
+/// please." ask.
+// ponytail: an English and Vietnamese word list, not a classifier; an ask in
+// another language or phrasing is refused (the model is told so, and the
+// person can say it plainly). Widen ASKS when a lamp run shows one.
+pub fn asks_to_play(said: &str) -> bool {
+    let whole = crate::known_faces::folded_words(said);
+    if whole.iter().any(|word| NOT.contains(&word.as_str()))
+        || RETRACTIONS.iter().any(|phrase| {
+            whole
+                .windows(phrase.len())
+                .any(|words| starts_with_words(words, phrase))
+        })
+    {
+        return false;
+    }
+    said.split(['.', '!', '?', ';']).any(|sentence| {
+        let words = crate::known_faces::folded_words(sentence);
+        let starts = |at: usize, phrase: &[&str]| {
+            words.len() >= at + phrase.len()
+                && words[at..at + phrase.len()]
+                    .iter()
+                    .zip(phrase)
+                    .all(|(word, want)| word == want)
+        };
+        let mut at = 0;
+        while words
+            .get(at)
+            .is_some_and(|word| BEFORE.contains(&word.as_str()))
+        {
+            at += 1;
+        }
+        if let Some(lead) = LEAD_INS.iter().find(|lead| starts(at, lead)) {
+            at += lead.len();
+            if words.get(at).is_some_and(|word| word == "please") {
+                at += 1;
+            }
+        }
+        ASKS.iter().any(|ask| {
+            if !starts(at, ask) {
+                return false;
+            }
+            // These prefixes already include the object's first word:
+            // "put some/ something" and Vietnamese "mở nhạc / bật bài".
+            let includes_object = ask
+                .last()
+                .is_some_and(|word| matches!(*word, "some" | "something") || AUDIO.contains(word));
+            let object_at = at + ask.len() - usize::from(includes_object);
+            audio_object(&words[object_at..])
+        })
+    })
+}
+
 /// Samples and the digest of the exact file image from which they were decoded.
 /// Later edits to the path cannot change this recording's bytes.
 #[derive(Debug)]
@@ -131,5 +395,115 @@ mod tests {
         assert_eq!(checked.sha256, format!("{:x}", Sha256::digest(&bytes)));
         assert_ne!(checked.sha256, read_sound(&file).unwrap().sha256);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    // A later explicit retraction overrides the earlier recording request.
+    #[test]
+    fn a_later_scratch_that_retracts_the_recording_ask() {
+        assert!(!asks_to_play("Play some music. Scratch that."));
+        assert!(asks_to_play("Scratch the chair. Play some music."));
+    }
+
+    #[test]
+    fn a_changed_mind_retracts_the_recording_ask() {
+        assert!(!asks_to_play("Play some music. I changed my mind."));
+        assert!(!asks_to_play("Play some music; I've changed my mind."));
+        assert!(asks_to_play("I changed my playlist. Play some music."));
+    }
+
+    #[test]
+    #[ignore = "manual host admission latency diagnostic"]
+    fn recording_retraction_admission_latency() {
+        let cases = [
+            ("Play some music. Scratch that.", false),
+            ("Play some music. I changed my mind.", false),
+            ("I changed my playlist. Play some music.", true),
+            ("Now play the second recording.", true),
+        ];
+        let mut samples = Vec::with_capacity(256);
+        for index in 0..256 {
+            let (words, expected) = cases[index % cases.len()];
+            let started = std::time::Instant::now();
+            let admitted = asks_to_play(words);
+            samples.push(started.elapsed());
+            assert_eq!(admitted, expected, "{words}");
+        }
+        let first = samples[0];
+        samples.sort_unstable();
+        let p95 = samples[samples.len() * 95 / 100];
+        let maximum = *samples.last().unwrap();
+        eprintln!(
+            "recording admission, 256 calls: first {first:?}, p95 {p95:?}, max {maximum:?}; input allocation excluded, folding and phrase checks included"
+        );
+        assert!(maximum < std::time::Duration::from_millis(1));
+    }
+
+    /// #5764: case on3a's two lines talk about music and ask nothing; the
+    /// first got a `use_skill` call on lamp-52e6 on 9 Nov (request 15).
+    #[test]
+    fn only_a_line_that_asks_to_play_is_an_ask() {
+        for talk in [
+            "Lamp, I listened to some relaxing music on the train this morning, it was really nice.",
+            "Lamp, what kind of music helps people relax?",
+            "I love relaxing music.",
+            "Lamp, don't play anything, I'm on a call.",
+            "Can you not play music right now?",
+            "My sister plays the piano every night.",
+            "I want to know which songs calm a baby.",
+            "Tôi đã nghe nhạc trên tàu sáng nay.",
+            "Đừng mở nhạc nhé.",
+            // #5802: a later cancel in the line, and asks for something else.
+            "Lamp, play some relaxing music. Actually, don't.",
+            "Play some music; stop, never mind.",
+            "Lamp, turn on the light.",
+            "Lamp, play chess with me.",
+            "Play something with me.",
+            "Lamp, turn on the light so I can read my sheet music.",
+            "Can you play chess while I listen to music?",
+            "Play something like chess to relax.",
+            "Play something with me to relax.",
+            "Play the second game while I listen to music.",
+            "Play another game to relax.",
+            "Play the next something to relax.",
+            "Play music trivia with me.",
+            "Play a music quiz.",
+            "Play the next music game.",
+            "Play music trivia now.",
+            "Play recording games with me.",
+            "Lamp, play some music. Forget it.",
+            "",
+        ] {
+            assert!(!asks_to_play(talk), "{talk}");
+        }
+        for ask in [
+            "Lamp, can you play some relaxing music?",
+            "Play some relaxing music.",
+            "Hey lamp, please play something calm.",
+            "Put on something relaxing, please.",
+            "Could you please put some music on?",
+            "I'd like to hear some relaxing music.",
+            "I'm stressed. Play something quiet.",
+            "Let's listen to some music.",
+            "Please play a quiet recording.",
+            "Now play the second recording.",
+            "Play the first recording.",
+            "Play the next recording.",
+            "Play the previous recording.",
+            "Play the last recording.",
+            "Play another recording.",
+            "Play a different recording.",
+            "Please play a quiet recording now.",
+            "Play music, please.",
+            "Lamp, mở nhạc thư giãn đi.",
+            "Bật nhạc cho mình nhé.",
+            // #5802: lamp-52e6 on 10 Nov, clips relax and relax2.
+            "Lamp, play me something to relax.",
+            "Lamp, can you play some relaxing music?",
+            "Play something to help me sleep.",
+            "Put on something calm.",
+            "Could you put on something to help me unwind?",
+        ] {
+            assert!(asks_to_play(ask), "{ask}");
+        }
     }
 }

@@ -383,6 +383,91 @@ pub(crate) fn plain_agreement_to_keep(turn: &str) -> bool {
     })
 }
 
+/// What a yes to a held forget may say it forgets, right after "forget"
+/// ([`plain_agreement_to_forget`]): "forget it", "forget that".
+const FORGET_WHAT: &[&str] = &["it", "that", "this", "those", "them"];
+
+/// What may stand beside a yes, or a forget said back alone, in the answer
+/// to the lamp's "Shall I forget …?" ([`plain_agreement_to_forget`]):
+/// "Yes, please go ahead and forget it.", "Ừ, quên nó đi nhé.", "Vâng,
+/// quên đi ạ.". "Quên" is Vietnamese "forget"; "đi" makes it a go-ahead.
+const BESIDE_A_FORGET: &[&str] = &[
+    "please",
+    "lamp",
+    "go",
+    "ahead",
+    "and",
+    "just",
+    "thanks",
+    "thank",
+    "you",
+    "qu\u{ea}n",
+    "\u{111}i",
+    "n\u{f3}",
+    "\u{1ea1}",
+    "nh\u{e9}",
+    "lu\u{f4}n",
+    "gi\u{fa}p",
+    "m\u{ec}nh",
+];
+
+/// Words that make an answer to the lamp's "Shall I forget …?" anything but
+/// a yes to it ([`plain_agreement_to_forget`]): any no ([`DISAGREE`]),
+/// "don't" in Vietnamese ("đừng"), and a keep or a wait.
+const NOT_A_FORGET: &[&str] = &[
+    "never",
+    "keep",
+    "wait",
+    "stop",
+    "later",
+    "\u{111}\u{1eeb}ng",
+    "gi\u{1eef}",
+    "khoan",
+];
+
+/// [`plain_agreement`], or a plain yes that also says to forget it, the
+/// natural answer to the lamp's "Shall I forget what you kept about …?" on
+/// a one-face line (Thirteen's P2 on #6673, as lamp-06c1's S4 taught for
+/// keeps, [`plain_agreement_to_keep`]): "Yes, forget it.", "Yes, please
+/// forget that.", "Sure, go ahead and forget it.", "Ừ, quên đi.", "Vâng,
+/// quên đi ạ.". The forget said back alone, with no yes word, counts too
+/// ("Forget it.", "Quên đi."): it is only ever read as the answer to that
+/// question, by the same person, within its 30 s, and one that says no,
+/// keep, wait or stop never counts. Any such word ([`DISAGREE`],
+/// [`NOT_A_FORGET`]) or a question refuses.
+pub(crate) fn plain_agreement_to_forget(turn: &str) -> bool {
+    if turn.trim_end().ends_with('?') {
+        return false;
+    }
+    let words = lower_words(turn);
+    if words.is_empty() {
+        return false;
+    }
+    let covered = agreeing_words(&words);
+    // A no inside a yes's own phrase ("no problem") takes nothing back.
+    if words.iter().zip(&covered).any(|(word, covered)| {
+        !covered && (DISAGREE.contains(&word.as_str()) || NOT_A_FORGET.contains(&word.as_str()))
+    }) {
+        return false;
+    }
+    let after_forget = |at: usize| {
+        at > 0 && words[at - 1] == "forget" && FORGET_WHAT.contains(&words[at].as_str())
+    };
+    let says_forget = words
+        .iter()
+        .any(|word| word == "forget" || word == "qu\u{ea}n");
+    if !agrees(turn) && !says_forget {
+        return false;
+    }
+    (0..words.len()).all(|at| {
+        covered[at]
+            || words[at] == "forget"
+            || after_forget(at)
+            || BESIDE_A_FORGET.contains(&words[at].as_str())
+            || (agrees(turn) && BESIDE_A_YES.contains(&words[at].as_str()))
+    })
+}
+
 /// What may stand around a keep said back with no yes word
 /// ([`plain_agreement_to_keep`]): "Please keep that for me, thanks.", "Lamp,
 /// keep it.". Not [`BESIDE_A_YES`]'s "do", "would", "i", "i'd" or a "you" of
@@ -693,7 +778,7 @@ const TURNS_IT_ROUND_VI: &[&str] = &[
 /// không?") it is the "nhớ" right before "khuôn mặt", and the "không"
 /// that asks is after it; a "không" or "chưa" before it ("Mình nhớ tên
 /// thôi, không nhớ khuôn mặt nhé?") turns it round.
-fn asks_for_the_face(lamp: &str) -> bool {
+pub(crate) fn asks_for_the_face(lamp: &str) -> bool {
     let words = lower_words(lamp);
     if !lamp.contains('?') {
         return false;
@@ -762,6 +847,30 @@ pub(crate) fn face_agreed(name: &str, said: &Said) -> bool {
         && plain_yes_beside(name, &said.this, BESIDE_THE_SAVE)
 }
 
+/// Whether the speaker's own line gives leave to keep their face, which a
+/// speaker-bound first save at setup needs (`LAMP_REMEMBER_SPEAKER`, B3472
+/// after #3472): the line asks to keep their own face ("My name is Kesh,
+/// remember my face."), or the lamp's last line was the face question
+/// ([`asks_for_the_face`]) and the line agrees to it, asking nothing ("Yes,
+/// my name is Kesh."). Never with a refusal in it ([`NOT_A_PLAIN_ASK`]),
+/// never someone else's face, and never a name alone: "I'm Kesh." keeps
+/// nothing, after "What's your name?" or after the face question.
+pub(crate) fn speaker_gave_face_leave(heard: &str, lamp_before: Option<&str>) -> bool {
+    let words = lower_words(heard);
+    if words
+        .iter()
+        .any(|word| NOT_A_PLAIN_ASK.contains(&word.as_str()) || word.ends_with("n't"))
+    {
+        return false;
+    }
+    let asks_for_their_face = words.windows(2).any(|two| two == ["my", "face"])
+        && words
+            .iter()
+            .any(|word| ["remember", "keep", "save"].contains(&word.as_str()));
+    asks_for_their_face
+        || (lamp_before.is_some_and(asks_for_the_face) && agrees(heard) && !heard.contains('?'))
+}
+
 /// The name a setup face save runs under with no save called
 /// ([`face_agreed`]): the latest name the person gave
 /// (`remember::named::name_in`) that the turn in hand agrees to keeping
@@ -804,7 +913,7 @@ pub(crate) fn refused_for_the_read_back(told: &Value) -> bool {
 /// own: a line that also asks about their face ("Nice to meet you, Marie!
 /// May I remember your face?") is not one, since its yes may answer only
 /// the face (El's P3 on #5159).
-fn said_back(name: &str, lamp: &str) -> bool {
+pub(crate) fn said_back(name: &str, lamp: &str) -> bool {
     let words = lower_words(lamp);
     said_by_them(name, lamp)
         && !words.iter().any(|word| word == "face" || word == "faces")
@@ -1715,6 +1824,11 @@ const NOT_HEARD_SPELLED: &str = "You did not hear that name in what they said, a
 const NOT_HEARD_SAY_AGAIN: &str = "You did not hear that name in what they said, and they were already asked to spell it, so do not ask them to spell it again, and do not say a name back to them. Ask them to say their name once more, then call this again with the name as they say it.";
 /// What the model is told at setup, before the first save, when the name
 /// was not said back and agreed to (#5140 row 5).
+/// What a speaker-bound first save at setup is told without the speaker's
+/// own leave for their face ([`speaker_gave_face_leave`],
+/// `LAMP_REMEMBER_SPEAKER`, B3472 after #3472): a name alone is no yes to
+/// keeping a face.
+pub(crate) const FACE_LEAVE: &str = "I have not kept their face yet: a name alone is no yes to keeping a face. Ask them \"May I remember your face, so I know you next time?\" and only if they say yes with their name in that same answer, call this again.";
 pub(crate) const SAY_IT_BACK: &str = "I have not kept their face yet. First say the name back to them and ask if you have it right, the name as a word only, never its letters and never as a choice between the name and its spelling. Only if they say yes, call this again with that name; if they correct it, say the new one back the same way.";
 /// What the model is told when the name was only the word that called the
 /// lamp ([`only_the_call`]).
@@ -2087,6 +2201,21 @@ fn run_speaker(
     if !speaker_named_self(name, &said.this) {
         return (json!({"error": NOT_OWN_NAME}), true);
     }
+    // The first save at setup keeps a face only with the speaker's own
+    // leave for it in this line: a name alone is no yes to the face (B3472,
+    // after #3472). The lamp's last line is its own words, never a name.
+    if switches.at_setup {
+        let lamp = crate::thread::THREAD.lock().ok().and_then(|thread| {
+            thread
+                .names_window(1)
+                .before
+                .last()
+                .map(|(_, lamp)| lamp.clone())
+        });
+        if !speaker_gave_face_leave(&said.this, lamp.as_deref()) {
+            return (json!({"error": FACE_LEAVE}), true);
+        }
+    }
     let replace = call.args.get("replace").and_then(Value::as_bool) == Some(true);
     // No earlier speaker confirmation is proven. Keep the existing
     // replacement check; it conservatively refuses on this scoped path.
@@ -2207,6 +2336,7 @@ pub fn refusal_reason(error: &str) -> &'static str {
         (NOT_HEARD_SAY_AGAIN, "not_heard_say_again"),
         (ONLY_THE_CALL, "only_the_call"),
         (NOT_OWN_NAME, "not_own_name"),
+        (FACE_LEAVE, "face_leave"),
         (NAME_UNCHANGED, "name_unchanged"),
         (NOT_AGREED, "not_agreed"),
         (NEAR_TO, "near_to"),
@@ -6560,6 +6690,7 @@ mod tests {
             speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
             known: known.map(|(name, face)| (name.to_owned(), face.to_owned())),
             enrollment: None,
+            by_voice: false,
         };
         let theirs_said = seen(&["f1"], Some(("Alex", "f1")));
         for known in [Some(&alex), Some(&bo), None] {
@@ -6638,6 +6769,7 @@ mod tests {
             speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
             known: known_with_face(&known),
             enrollment: None,
+            by_voice: false,
         };
         let refused = |line: Option<&LineSeen>| {
             let told = run_for(&socket, &call("Alex"), switches, None, line);
@@ -6787,6 +6919,7 @@ mod tests {
             speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
             known: known_with_face(&known),
             enrollment: None,
+            by_voice: false,
         };
         let theirs = heard(&["f1"]);
         let kept = "Nothing was changed: the face of the one asking is kept as Loren. Use that name to forget or rename it.";
@@ -6860,6 +6993,7 @@ mod tests {
             (NOT_HEARD_SAY_AGAIN, "not_heard_say_again"),
             (ONLY_THE_CALL, "only_the_call"),
             (NOT_OWN_NAME, "not_own_name"),
+            (FACE_LEAVE, "face_leave"),
             (NAME_UNCHANGED, "name_unchanged"),
             (NOT_AGREED, "not_agreed"),
             (NEAR_TO, "near_to"),

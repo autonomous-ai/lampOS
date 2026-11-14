@@ -501,6 +501,39 @@ fn full_unread_stderr_cannot_hold_storage_failure_exit_or_socket_cleanup() {
     );
 }
 
+/// Without `--set-up-later`, a missing targets file stops the part at start
+/// with an error naming that file, not a bare "No such file or directory".
+#[test]
+fn a_missing_targets_file_stops_serve_with_its_path() {
+    let root = private_root();
+    let config = config(root.path());
+    let targets = root.path().join("targets.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_lamp-tasks"))
+        .args(["serve", "--enable", "--boot-id", "missing-targets", "--dir"])
+        .arg(&config.dir)
+        .arg("--socket")
+        .arg(&config.socket)
+        .arg("--voice-socket")
+        .arg(&config.voice_socket)
+        .arg("--bus-root")
+        .arg(&config.bus_root)
+        .arg("--targets")
+        .arg(&targets)
+        .arg("--harness")
+        .arg(root.path().join("no-harness"))
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!output.status.success(), "started with no targets file");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(&format!("{}: No such file or directory", targets.display())),
+        "{stderr}"
+    );
+}
+
 /// #1676: with `--set-up-later`, the part starts on a lamp that has neither
 /// Harness nor a targets file yet, and refuses a task with why. Without
 /// it, the same lamp's part stops at start, as before.
@@ -585,5 +618,34 @@ fn set_up_later_runs_with_no_harness_and_no_targets_and_refuses_with_why() {
             .values
             .iter()
             .any(|pair| pair.key == "handovers_off" && pair.value == "no_harness")
+    );
+}
+
+/// #6685 PR 3, the first builder's ask: the product unit starts lamp-tasks on
+/// a lamp with no Harness program, so it runs as the test above does (hand-overs
+/// off, each refused as `no_harness`, its health ok) and a skill's run can still
+/// go to the lamp's own agent. Only setup's marker holds it back.
+#[test]
+fn the_product_unit_starts_the_part_with_no_harness_program() {
+    let unit = include_str!("../../../deploy/product/lamp-tasks.service");
+    let conditions: Vec<&str> = unit
+        .lines()
+        .filter(|line| line.starts_with("Condition"))
+        .collect();
+    assert_eq!(
+        conditions,
+        ["ConditionPathExists=/var/lib/lampos-setup/done"],
+        "only setup's marker"
+    );
+    let exec = unit
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .expect("the unit's ExecStart");
+    let args: Vec<&str> = exec.split_whitespace().collect();
+    assert!(args.contains(&"--set-up-later"), "{exec}");
+    assert!(
+        args.windows(2)
+            .any(|pair| pair == ["--harness", "/usr/local/bin/harness"]),
+        "{exec}"
     );
 }

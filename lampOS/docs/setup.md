@@ -106,8 +106,8 @@ What lamp-4ace's units read today (`deploy/lamp-4ace/`):
 From the units (lamp-4ace's and the product's) and the reset plans: memory `/var/lib/lampos-memory`, faces
 `/var/lib/lampos-eyes/people.json`, its exact interrupted-write siblings
 `people.json.new` and `people.json.repair.new` in the same directory, the
-faces from photos not yet confirmed (`people.json.from-photos`, only with
-`--photo-dir`), what the eyes set aside beside it
+faces from photos not yet confirmed (`people.json.from-photos`, and
+`people.json.from-photos.new` a cut save left, only with `--photo-dir`), what the eyes set aside beside it
 (`/var/lib/lampos-eyes/set-aside`, #1505), a labelled session's face reads
 (`seems.log`), the glance log (`glance.log`) and the owner's voice print for
 the linked services' sends (`owner-voice.json`, and `owner-voice.json.new`
@@ -136,11 +136,15 @@ the tasks part's home (`/var/lib/lampos-tasks/.harness/` `auth`,
 `connections`, `computer-id`, `cli/data`, `agent-messages`, `hook-routes`
 and `logs`: the sign-in, the pairings and what they left; not `.harness`
 whole, which is Harness itself, its CLI and its own Node, and not the
-Harness service `install` set up, #934; Nine on #1016), the user's key
+Harness service `install` set up, #934; Nine on #1016), the work folder
+Hermes and OpenClaw share on the lamp (`/var/lib/lampos-tasks/harnesses/lamp-tasks`,
+emptied; lamp-tasks writes the lamp's `AGENTS.md` again at its start), and
+Hermes's and OpenClaw's own per-person files, in a step of their own after
+the plan's paths (`reset::forget_agents`, #6343, below), the user's key
 (`/etc/lampOS/voice/credential` and `/etc/lampOS/policy/jev.key`, #806,
 16:13), the person's own keys (`/etc/lampOS/voice/own`, `LAMP_OWN_KEYS`), the
 name (`/etc/lampOS/person/name`), the owner's place from the app
-(`/etc/lampOS/person/place`, #4333), the lamp's name in the app given after setup (`/etc/lampOS/setup/display-name`, #1959), the owner's chosen voice and character words from the app (`/etc/lampOS/setup/voice` and `/etc/lampOS/setup/character`, #5394), the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), lamp-control's certificate and paired computers (`/var/lib/lampos-control`) and the owner's developer setting, its drop-in (`/etc/systemd/system/lamp-control.service.d/developer.conf`, `control.set`), the person's linked services' tokens (`/var/lib/lampos-services`, `lamp-services`' store, Queue #4710), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration (`/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`) and
+(`/etc/lampOS/person/place`, #4333), the lamp's name in the app given after setup (`/etc/lampOS/setup/display-name`, #1959), the owner's chosen voice and character words from the app (`/etc/lampOS/setup/voice` and `/etc/lampOS/setup/character`, #5394), the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), lamp-control's certificate and paired computers (`/var/lib/lampos-control`) and the owner's developer setting, its drop-in (`/etc/systemd/system/lamp-control.service.d/developer.conf`, `control.set`), and the owner's local agent switch, its drop-in (`/etc/systemd/system/lamp-control.service.d/agent.conf`, `control.set_agent`), the owner's dev monitor, lamp-peek's drop-in (`/etc/systemd/system/lamp-peek.service.d/monitor.conf`, `monitor.set`, #5883), lamp-seen's record of the opt-in said back (`/var/lib/lampos-seen`, #6543), the person's linked services' tokens (`/var/lib/lampos-services`, `lamp-services`' store, Queue #4710), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration (`/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`) and
 the setup marker. Kept: the
 software, its releases, the update key, the touch calibration and other
 per-lamp facts (the servos' daily load and temperature peaks in
@@ -151,7 +155,8 @@ checkpoint and transient handoff files share its root-owned 0700 directory.
 The room sounds yes (#1722 item 1) is `/var/lib/lampOS/consent/room-sounds.json`,
 0640 root:lampos so lamp-ears can read it, and the face expressions yes
 (`LAMP_FACE_EXPRESSIONS_ASK`) is `/var/lib/lampOS/consent/face-expressions.json`
-beside it; both reset plans wipe both files.
+beside it, and lamp-seen's opt-in (#6543, seen.md) is `seen-activity.json` there
+too; both reset plans wipe all three files.
 The product unit names that canonical file and turns `LAMP_ONBOARDING` on.
 Both reset plans wipe the entire directory's contents, including pending writes,
 temporary files and mailbox descendants, retaining the empty private container.
@@ -180,6 +185,7 @@ shutdown.md.
 lamp-setup check --plan PLAN.json
 lamp-setup resume-reset --plan PLAN.json --enable      # at start, before the lamp
 lamp-setup watch-reset --plan PLAN.json --bus-root /run/lampos-bus --enable
+lamp-setup forget-agents --dry-run [--root DIR]         # what a reset does to the agents' folders
 ```
 
 Controls already turns the reset button (chip 0 line 100) held 5 s or more and
@@ -219,11 +225,21 @@ lamp-setup reset-now`). That unit, in this order:
    for 600 s after setup, its recovery, the loaded `lamp-setup-change@`,
    `-keys@` and `-wifi@` instances, `lamp-skills-manage@` instances,
    `lamp-records`, the updater with its apply, the boot's Wi-Fi
-   restore, and an office lamp's `lamp-peek`, which a reboot kept off by
+   restore, and `lamp-peek` (an office lamp's page or the owner's dev
+   monitor, #5883), which a reboot kept off by
    its setup condition and which would otherwise keep port 80 from setup's
    page after a start in place (#4574; not started again until the next
-   boot). What starts them (`reset::STARTERS`: the helpers' and the
-   skills' sockets, the records' timer, the updater's way back, its timer
+   boot), and `lampos`'s own systemd manager, `user@<uid>.service`, its uid
+   read from `/etc/passwd` at the reset (`reset::agent_manager_unit`; no
+   other user's manager is named, and a lamp without `lampos` stops none
+   and says so): on a product lamp it lingers, and it runs Harness's
+   daemon (`harnessd.service`) and the panes it launched, the lamp's own Hermes among them. On lamp-c0a4 on 13 and 14 Nov
+   a reset in place left both running: the old daemon kept the last
+   owner's connection and computer id, so `harness start` failed until a
+   reboot, and the old Hermes kept writing its state (#6343). The manager,
+   when it was running, is started again in place, before setup (step 5), so
+   the daemon starts fresh on the wiped folders. What starts them
+   (`reset::STARTERS`: the helpers' and the skills' sockets, the records' timer, the updater's way back, its timer
    and a worker already running, which can restart the updater for a pending
    self-switch, and the keeper's restart socket) is stopped first, so none
    starts after they are listed, and they
@@ -257,19 +273,86 @@ lamp-setup reset-now`). That unit, in this order:
    even before they have a package mark, through the same durable rename.
    `NAME` and `PID` follow the installer's bounds (1–64
    lowercase letters, digits or hyphens, and 1–10 digits). A link there is
-   passed over, and links inside a removed folder are unlinked, never followed;
+   passed over, and links inside a removed folder are unlinked, never followed.
+   Then Hermes's and OpenClaw's per-person files go, each folder by what it
+   keeps (`reset::AGENT_FOLDERS`, #6343): every other name in it is the
+   person's and removed, a name the reset does not know among them, so a
+   newer Hermes's new store goes too. Said by count. Kept, so neither needs a
+   reinstall: in `/var/lib/lampos-hermes` (Hermes's `HOME`, where its tools
+   write), `.hermes` and, in `.local`, only `bin/hermes` (the one command
+   the installer publishes; a script a tool saved in `bin`, or a `uv tool`
+   entry point, goes) and `share/uv/python` (the uv-managed
+   Python the installer puts there); `.bashrc` and `.profile` are written
+   again as exactly the installer's text (`reset::HERMES_SHELL_TEXT`, its
+   `.local/bin` `PATH` line), so a person's `export TOKEN=…` a tool added
+   there goes; `.cache` and `.npm` are emptied and kept. The rest goes: a
+   `pip --user` install (`.local/lib`), a `uv tool` install
+   (`.local/share/uv/tools`) and anything else; in
+   `HERMES_HOME` (`.hermes`), the checkout `hermes-agent`, `tools` (uv,
+   ffmpeg), `installs`, the public model lists' caches
+   (`models_dev_cache.json`, `models_dev_cache.etag`,
+   `provider_models_cache.json`) and `config.yaml`, cut to lamp-update's
+   install-time settings (`hermes_install::CONFIG`) and Harness's own
+   hooks, the `hooks:` items that are exactly Harness's: one `command` of
+   the form `harness hook ENGINE EVENT` with nothing after it, and only
+   `matcher` and `timeout` beside it
+   (`reset::cut_hermes_config`): a person's own hooks, `mcp_servers`,
+   `skills.external_dirs`, personality and every other key go, and
+   lamp-tasks merges the lamp's provider back in at its next start; a
+   `config.yaml` the cut can't read (not UTF-8, a tab, a document marker, a
+   top-level line that is not a key) is removed; the installer's
+   folders `cron`, `sessions`, `logs`, `pairing`, `hooks`, `image_cache`,
+   `audio_cache`, `memories` and `skills` are emptied and kept (Hermes copies
+   its bundled skills back, and writes `SOUL.md` again, at its next start).
+   Removed there: `.env` (the keys; lamp-tasks writes the forwarder's token
+   line again), `state.db*`, `runtime`, `terminal-sessions`, `sandboxes`,
+   `spawn-ledger.json`, `backups`, `cache`, `SOUL.md`, the skills snapshot,
+   the hooks allow-list, `auth.lock` and anything else. In
+   `/var/lib/lampos-openclaw`, kept: `node`, `npm` (and an earlier `pkg`),
+   `.npm`, `.cache`, the lamp's `gateway-token` and `state`; in its `state`,
+   only `openclaw.json`, cut to its `gateway` key, which lamp-update writes
+   only at an install (`reset::cut_openclaw_config`): another provider's
+   key, a channel's token, a person's skill folders and plugins go, and
+   lamp-tasks merges the lamp's keys back in at each start; one that is not
+   a JSON object is removed. The lamp's `gateway-token` is kept as it is:
+   made once per lamp, it is the lamp's, not the person's. The Hermes a pin
+   change moved aside (`/var/lib/lampos-hermes.old`,
+   `hermes_install::ASIDE`), with the old Hermes's sessions, memories and
+   keys, is removed whole. Removed: the
+   gateway's log, OpenClaw's database, `agents`, `workspace`, `media`, `tmp`,
+   `plugin-skills`, `openclaw.json.last-good` and anything else. A missing
+   folder removes nothing, and no link is followed. OpenClaw's gateway
+   (`lamp-openclaw-gateway.service`, outside `lampos.target`) is among the
+   writers stopped before the wipe, and `resume-reset` stops it too before
+   it finishes an interrupted reset, since it starts at boot under
+   `multi-user.target`, not ordered against setup; the next boot or the
+   updater's next round starts it again. `resume-reset` stops `lampos`'s
+   manager too (a boot starts it, lingering, with Harness's daemon signed
+   in as the last owner), and starts it again, when it was running, once
+   the wipe is done; a start that fails is said and setup
+   goes on. `lamp-setup forget-agents
+   --dry-run [--root DIR]` lists what this step would do under DIR (`/` by
+   default) and changes nothing: one line an entry, `keep PATH`, `remove
+   PATH`, `empty PATH`, or `cut PATH (keys: kept …; dropped …)` for a kept
+   settings file, key names only, never values. It is the reset's own walk
+   (`reset::plan_agents`), only not acted on, so the list cannot drift from
+   the reset;
 5. it removes the journal, syncs, and **starts setup again in place, with no
    reboot** (#4500), on a product lamp: one whose stop is `systemctl stop
    lampos.target` and which has `lamp-setup.service`. It runs `systemctl
    start` on what it stopped that a boot starts outside the target and was
    running (`reset::STARTERS`, but not the updater's way back, whose timer
-   starts it, and `lamp-update.service`), and `lamp-setup.service`
+   starts it, and `lamp-update.service`), `lampos`'s manager when it was
+   running (`reset::agent_manager_unit`), and `lamp-setup.service`
    (`reset::stop_and_wait_keeping`). First it empties what a reboot
    emptied by being memory, `reset::VOLATILE`: every folder a part keeps in
    `/run` past its stop, the tmpfiles' `/run/lampos-bus` (the bus's latest
-   messages, which can say a person's name or words) and
-   `/run/lampos-photos`, and the voice's and the records' own folders
-   (`RuntimeDirectoryPreserve=yes`: the thread's set-aside words, the room).
+   messages, which can say a person's name or words),
+   `/run/lampos-photos`, `/run/lampos-eyes-kept` (the eyes' sitting kept
+   across a restart, eyes.md) and `/run/lampos-eyes-frames` (the frame
+   link's socket for lamp-seen), and the voice's, the records' and
+   lamp-seen's own folders (`RuntimeDirectoryPreserve=yes`: the thread's
+   set-aside words, the room, the frame link's boots).
    Every other part's `RuntimeDirectory=` goes as its unit stops. If they
    can't be emptied it reboots instead. Then, best effort, it forgets what
    else a reboot dropped from memory (`reset::FORGET`): `wpa_cli -i wlan0
@@ -317,7 +400,8 @@ lamp with no marker starts only `lamp-setup.service`. So if the stop fails,
 `lamp-setup` reboots at once without wiping; if the power goes during the
 wipe, the lamp also comes back with no marker and a journal. Either way
 `resume-reset`, the first thing `lamp-setup.service` runs, finishes the wipe
-with nothing of the lamp running, without a second reboot. A power cut between
+with nothing of the lamp running, without a second reboot; only OpenClaw's
+gateway, which starts at boot outside the lamp's target, is stopped first. A power cut between
 the journal and the marker's removal leaves both, so the lamp starts; then
 `watch-reset` finds the journal at its start and carries on with the reset. A plan is refused unless every path is absolute and
 plain (no `.` or `..`, read from the text itself), at least two levels below a
@@ -385,7 +469,8 @@ example plan covering every store of the person's listed above.
 `lamp_setup::wifi` is V1's join (`system/network/service.go`, `SetupNetwork`;
 `setup_failure.go`) in Rust, with V1's numbers: up to 60 s for the named
 network **and** the Internet (ping `8.8.8.8`, else, as V1's `tlsReach`, a TLS
-handshake with the voice's service), checked every second; on every third
+handshake with the voice's service, `generativelanguage.googleapis.com:443`),
+checked every second; on every third
 check, two keys rejected by the router end it early as `wrong_password`. A
 failure is named as V1 names it (`wrong_password`, `association_rejected`,
 `ssid_not_found`, `no_dhcp`, `no_internet`, `ssid_too_long`,
@@ -415,10 +500,18 @@ stop, since a router can refuse a right password's first handshake: the join
 keeps waiting, a join at 20 s is kept, and one that never joins gets the whole
 minute, then `wrong_password` (#4348).
 
+**PARKED (#6386).** #6256's check for a lamp in China (ping `223.5.5.5`, then
+`8.8.8.8`, each for at most 2 s, then TLS to the backend named in `llm_base_url`
+or `campaign-api.autonomous.ai:443`, never Gemini; 5 s for the reach and the
+Wi-Fi change's broker; a journal line `the internet answered: ping 223.5.5.5 in
+48 ms`) is commented out in `crates/setup/src/{wifi,wifi_change,main}.rs`;
+re-enable when China is scheduled and stable's lamp-update carries #6810.
+
 **The TLS reach.** A TCP connection alone is not the Internet: anything that
 accepts and stays silent, or answers in plain text, would pass. So, as V1, the
 handshake must complete, and the name's lookup, the connection and the
-handshake together take at most 3 s (V1's `cloudProbeTimeout`). The lookup
+handshake together take at most 3 s (V1's `cloudProbeTimeout`; 5 s is
+PARKED (#6386), above). The lookup
 runs on a thread of its own, since the system's has no time limit and cannot
 be stopped; one that has not come back is waited on by the next check, never
 started twice, and the whole service shares that one (`LookupSlot::process`),
@@ -633,7 +726,7 @@ setup the app changes them through root's keys helper,
 `lamp-setup keys` on `lamp-setup-keys.socket`. All of it is in
 [own-keys.md](own-keys.md).
 
-## A new lamp's first volume (#5551, built, off unless set)
+## A new lamp's first volume (#5551, on for the product)
 
 The speaker's volume is the softvol control "Speaker" on the HDMI card
 (`allwinnerhdmi`, `device_speaker` in `/etc/asound.conf`, -30 to 0 dB over
@@ -658,7 +751,8 @@ app's slider. Read from the code on 6 Nov, before this switch:
   (`lamp-cmedia-speaker.service`'s drop-in), a different control,
   re-pinned at every boot.
 
-With `LAMP_FIRST_VOLUME=on` in `lamp-setup.service`, a setup run that has
+With `LAMP_FIRST_VOLUME=on` in `lamp-setup.service` (on in the product's
+unit, `deploy/product/lamp-setup.service`), a setup run that has
 joined the Wi-Fi and saved the settings sets that control to 70 % (about
 9 dB below full) and stores that card alone (`alsactl store allwinnerhdmi`,
 so a power cut before the first clean shutdown keeps it), just before the
@@ -679,6 +773,39 @@ setup. The C-Media hardware level and `--volume-ceiling` are unchanged.
 
 Not shown on a lamp: the hello at 70 % after a reset and setup, and the
 person's level after a reboot and after a power cut.
+
+## The first update after setup (#6284, on for the product)
+
+With `LAMP_FIRST_UPDATE=on` in `lamp-setup`'s unit, setup writes
+`/var/lib/lampos-setup/first-update` (`lamp_msgs::FIRST_UPDATE_FILE`, 0644,
+`{"at_unix_ms": <ms>, "boot": {"id", "ms"}}`) just before its marker, after the first volume
+(`crates/setup/src/first_update.rs`). The marker starts the lamp as before;
+the file asks for one thing more: the lamp's first update, before the setup
+walk begins.
+
+- lamp-update, with the same switch, starts a round at once while the file
+  is there and removes it when that round ends, whatever its outcome
+  ([updates.md](updates.md), "The first update after setup").
+- The voice, with the same switch, holds the walk's beginning while it is
+  there, and says one line in the owner's language once a build with changes
+  is being fetched ([onboarding.md](onboarding.md), "Held for the first
+  update").
+- lamp-cloud tells the app when an update starts and ends
+  ([cloud.md](cloud.md), `update.started`, `update.ended`).
+- The file counts as gone for every reader twenty minutes after `at_unix_ms`
+  (`FIRST_UPDATE_WITHIN_MS`, the product's call on #6284: 10 min, raised to 20
+  after a 0.17 MB/s office network on lamp-e82d), so a lamp-update
+  that never ran or died never holds the walk longer. Within the boot that
+  wrote it, the twenty minutes are counted on that boot's own clock (`boot`:
+  `/proc/sys/kernel/random/boot_id` and `/proc/uptime` in ms), since a new
+  lamp joins Wi-Fi on its last saved wall clock, often hours behind, and
+  timesyncd sets it a minute later; that jump would otherwise end the hold
+  at once.
+
+Best effort: a write that fails is a journal line (`the first update's file
+was not written`), never a failed setup, and the lamp starts as before.
+Recovery's network-only run never writes it. A lamp already current loses a
+few seconds: one round that finds nothing to change.
 
 ## Changed after setup (#1959, on for the product)
 
@@ -704,7 +831,12 @@ a `lampos` process connect, and the helper then takes its peer's credentials
 (`SO_PEERCRED`) and refuses any peer outside `lamp-cloud.service`'s cgroup,
 before its line is read, with `{"refused": "only the app's link may change the
 lamp's settings"}` and nothing changed (`keys::socket_peer_refused`, as the keys
-helper does). Run by hand, its standard input not a socket, it takes the line
+helper does). The one other peer is `lamp-skills.service`, by its cgroup
+(`keys::TURN_OFF_CGROUP`), for the unplug's turn-off alone (#5747,
+unplug.md step 7): its line is read, and only exactly `{"shutdown":"lamp"}`
+is taken (`change::turn_off_asker_may`); any other line from it, a restart
+or a setting included, gets the same refusal with nothing changed. Run by
+hand, its standard input not a socket, it takes the line
 as before. `LAMP_SETTINGS_CHANGE` decides whether `lamp-cloud` asks. A
 refusal never holds the value asked, and the
 journal says what changed, never a name ("the person's name was changed (8
@@ -733,7 +865,9 @@ own switches' (`LAMP_APP_RESTART`, `LAMP_SHUTDOWN`; cloud.md).
 | The time zone | an IANA name the lamp's zone data has (`zone_known`, as setup) **and** the parts' bundled zone data has, else refused, so `zone.env` and `/etc/localtime` never disagree | `/etc/localtime`, `/etc/timezone` and `/etc/lampOS/zone.env`, as setup writes them | the voice, memory, Expression and skills follow `/etc/localtime` at each reading. `lamp-schedule` takes `LAMP_ZONE` at start, so after a zone that changed `zone.env` the helper waits for the lamp to be quiet, as an update does before it restarts the voice (`lamp_update::quiet`: resting, nobody heard and nothing said for 45 s), then for no update at work, taking lamp-update's lock and holding it through `systemctl try-restart lamp-schedule.service` (`change::quiet_and_unlocked`): a round puts its build back when a unit it restarted changes process in its watch (`updates.md` step 9), so the zone's restart never falls in one; while an update holds the lock it looks again 10 s later, after the quiet again. The zone's files are written before the wait, so a round running then reads the new `zone.env` at its own restart of `lamp-schedule`, which is the person's zone, with no extra restart in its watch; and a round `serve` starts while the helper holds the lock (a few seconds, as for the app's restart and shutdown) ends `not-quiet` ("another lamp-update is at work"), as after no quiet moment, so neither the app's update page nor an update alert says it failed, and the next round tries again (Second's and Reviewer-two's P3s on #4490; `updates.md`). It waits at most 30 minutes in all; then schedule keeps the old zone until it next starts, and the journal says so. Reminders already set keep the zone they were set in (`schedule.md`) |
 | The owner's language (#4473, `language.set`) | exactly `en`, `vi`, `ja`, `zh` or `ko`, else refused, "language must be one of en, vi, ja, zh, ko", with the file untouched. lamp-update's lock is taken first, so no round's watch sees the voice restart: held (by the change before it, until the voice has restarted, or by an update), it is waited for, looked for every 1 s, at most 8 s (`change::CLOSE_LOCK_MOST`, under lamp-cloud's 10 s wait), so a change made while the last one is still applying applies after it and the app hears `success` (#5394); still held then, refused, "the lamp is still applying a change; try again in a moment", and nothing written; otherwise held through the write and the voice's restart, and let go at once when the language is the same | `/etc/lampOS/setup/language`, 644 root, one line, staged and renamed into place as setup writes it, before the answer, so `host.language` reads it at once | the voice reads it at start (`LAMP_LANGUAGE_FILE`), so after a language that changed the file the helper waits for the voice to rest between turns (5 s resting, nobody heard, nothing said; at most 45 s, then all the same, as the app's restart) and runs `systemctl try-restart lamp-voice.service`. The same language again restarts nothing. `lamp-cloud` keeps running, so `system.info`, `mic.get` and the link stay answered through it |
 | The owner's place (#4333, [owner-place.md](owner-place.md); a set sent by `lamp-cloud` only with `LAMP_OWNER_PLACE=on`, a clear whatever it is, #4356) | `{"owner_place": {"name", "lat", "lon", "set_at"}}`: rounded again here to about a kilometre (`lamp_msgs::owner_place::fit`), the name as the person's name's rule, `set_at` ISO 8601 UTC; `{"owner_place": null}` clears it | `/etc/lampOS/person/place`, beside the name, 600 root, one JSON line; removed for `null`, and a clear with none kept is no error. The journal says only that it was set or cleared | the voice reads it again for each line that needs a place: nothing restarts |
-| The owner's developer setting (`control.set`, [control.md](control.md)) | `{"control": bool}`, a boolean only | on: `/etc/systemd/system/lamp-control.service.d/developer.conf` (`control_dropin` in the settings), 644 root, exactly `[Service]` and `Environment=LAMP_CONTROL=on`, written beside and renamed into place, its folder made; off: removed, and none there is no error. Only a change asks for a restart; the journal says "developer access is on" or "off" (with "already" when nothing changed) | never waits for quiet (lamp-control's restart makes no sound), only for lamp-update's lock (`change::unlocked`). **On:** written and answered, then the lock (looked for every 10 s, at most 30 minutes, else lamp-control follows at its next start) held through `systemctl daemon-reload` and `systemctl restart lamp-control.service` (restart, so an enabled unit that exited off starts): the door opens within moments after `success`, or once an update finishes (`change::restart_control_when_unlocked`). **Off with the drop-in there:** closed before the answer (`change::close_before_answer`): the lock first (every 1 s, at most 8 s, under lamp-cloud's 10 s wait; else refused, "an update is installing: try again in a few minutes", the drop-in kept), then, holding it, the drop-in removed, `systemctl daemon-reload` and `systemctl stop lamp-control.service`, and only then `{"done": {"on": false, "closed": true}}`; a stop that fails answers `"closed": false` with a note that the door may stay open until the lamp next restarts. **Off with none there:** a plain `{"done": {"on": false}}`, no systemctl. A reset wipes the drop-in |
+| The owner's developer setting (`control.set`, [control.md](control.md)) | `{"control": bool}`, a boolean only | on: `/etc/systemd/system/lamp-control.service.d/developer.conf` (`control_dropin` in the settings), 644 root, exactly `[Service]` and `Environment=LAMP_CONTROL=on`, written beside and renamed into place, its folder made; off: removed, and none there is no error. Only a change asks for a restart; the journal says "developer access is on" or "off" (with "already" when nothing changed) | never waits for quiet (lamp-control's restart makes no sound), only for lamp-update's lock (`change::unlocked`). **On:** written and answered, then the lock (looked for every 10 s, at most 30 minutes, else lamp-control follows at its next start) held through `systemctl daemon-reload` and `systemctl restart lamp-control.service` (restart, so an enabled unit that exited off starts): the door opens within moments after `success`, or once an update finishes (`change::restart_control_when_unlocked`). **Off with the drop-in there:** closed before the answer (`change::close_before_answer`): the lock first (every 1 s, at most 8 s, under lamp-cloud's 10 s wait; else refused, "an update is installing: try again in a few minutes", the drop-in kept), then, holding it, the drop-in removed (and the local agent's drop-in with it, so a later developer yes never reopens the agent's socket without the owner's own yes), `systemctl daemon-reload` and `systemctl stop lamp-control.service`, and only then `{"done": {"on": false, "closed": true}}`; a stop that fails answers `"closed": false` with a note that the door may stay open until the lamp next restarts. A drop-in that cannot be removed still gets the reload and the stop, and is then refused in words that say what could not be saved and whether lamp-control was stopped for now (it comes back at its next start while the drop-in is there) or did not stop either. **Off with none there:** a plain `{"done": {"on": false}}`, no systemctl. A reset wipes the drop-in |
+| The owner's local agent switch (`control.set_agent`, [control.md](control.md), "The local agent") | `{"local_agent": bool}`, a boolean only; no user is ever named in a request | on: refused ("turn developer access on first: the local agent's socket is the developer door's") while the developer setting's drop-in is not there, and, where the lamp has not had the installer's step (the group `lamp-agents` is not in the group file (`agent_group_file`, `/etc/group`), the user `lampagent` is not in the passwd file, or the socket's folder (`agent_folder`, `/run/lampos-agent`) is not there), **made first by the owner's tap** (`change::make_agent_account`, before the answer: under lamp-update's lock, `groupadd --system lamp-agents`, `useradd --create-home --shell /bin/bash --no-user-group --gid lamp-agents lampagent`, `install -d -m 0755 -o lampos -g lampos /run/lampos-agent`, all from the constants of `lamp_msgs::local_agent`, nothing from the request (each step is run by systemd as a transient unit, `systemd-run --wait --collect`, one fixed program with the constants' arguments, and not by the helper itself: the helper's own unit stays sandboxed, `ProtectSystem=strict` and `ProtectHome=yes` unchanged, so it never gets `/home` or `/run` to write); a step that fails is refused in words, "the agent's user could not be set up: ...", and no drop-in is written; `change::AGENT_NOT_READY` is only said where that step was not run): a unit naming either does not start, and the developer door goes down with it; else `/etc/systemd/system/lamp-control.service.d/agent.conf` (`agent_dropin` in the settings), 644 root, exactly `lamp_msgs::local_agent::DROPIN_TEXT` (`LAMP_CONTROL_LOCAL_AGENT=lampagent`, `SupplementaryGroups=lamp-agents`, `ReadWritePaths=/run/lampos-agent`: the user, the group and the folder are constants in the code), written beside and renamed into place; off with the drop-in there: closed before the answer, as developer access is (`change::close_before_answer`): the lock first (every 1 s, at most 8 s; else refused, "an update is installing: try again in a few minutes", the drop-in kept), then the drop-in removed, `systemctl daemon-reload` and `systemctl restart lamp-control.service` (a `stop` when the developer drop-in is gone too), and only then `{"done": {"on": false, "closed": true}}`; a restart that fails answers `"closed": false` with the note that the door may stay open until the lamp next restarts; with none there, a plain `{"done": {"on": false}}`. On asks for the restart after the answer (the journal says "the local agent is on" or "off", "already" when nothing changed); the developer setting's drop-in stays when only the agent is turned off, the agent's switch is its own, but developer access off takes the agent's drop-in with it | on: as the developer setting's: lamp-update's lock, then `systemctl daemon-reload` and `systemctl restart lamp-control.service`; the user, the group and the socket's folder are made by lamp-update's installer, not here |
+| The owner's dev monitor (`monitor.set`, #5883, [peek.md](peek.md); sent by `lamp-cloud` only with `LAMP_APP_MONITOR=on`) | `{"monitor": bool}`, a boolean only | on: `/etc/systemd/system/lamp-peek.service.d/monitor.conf` (`monitor_dropin` in the settings), 644 root, exactly `[Service]` and `Environment=LAMP_PEEK=monitor`, written as lamp-control's; off: removed. The journal says "the dev monitor is on" or "off" (with "already" when nothing changed) | as the developer setting, for `lamp-peek.service`: **on:** written and answered, then lamp-update's lock held through `daemon-reload` and `restart lamp-peek.service` (`change::restart_peek_when_unlocked`); **off with the drop-in there:** the lock, the drop-in removed, `daemon-reload` and `stop lamp-peek.service`, and only then `{"done": {"on": false, "closed": true}}` (`change::close_before_answer`), so no page stays open once the app says off; a stop that fails answers `"closed": false` with a note that the page may stay open until the lamp next restarts. A reset wipes the drop-in |
 | The owner's chosen voice and character words (#5394, [chosen-voice.md](chosen-voice.md); sent by `lamp-cloud` only with `LAMP_CHOSEN_VOICE=on`) | `{"voice": s}`: a name of `lamp_msgs::chosen_voice::ELEVENLABS_VOICES`; `{"character": s}`: plain text on one line, at most 200 characters, no `<`, `>`, `[`, `]`, `{`, `}` or backticks (`lamp_msgs::chosen_voice::fit_character`); `""` clears either. Anything else is refused with nothing written | `/etc/lampOS/setup/voice` and `/etc/lampOS/setup/character`, beside the language, 644 root, one line each, removed for `""`. The journal names the voice, and only the length of the words | the voice reads both at start: after a change that altered the file, restarted as for a new language (rested, under lamp-update's lock); the same value again restarts nothing |
 | The owner's two yeses from the app (#5500, [onboarding.md](onboarding.md) "The two yeses from the app"; sent by `lamp-cloud` only with `LAMP_APP_CONSENT=on`, room sounds only on a lamp with no slide) | `{"consent": {"face_expressions": bool}}` or `{"consent": {"room_sounds": bool}}`, exactly one key, a boolean only; anything else refused with nothing written | `/var/lib/lampOS/consent/face-expressions.json` and `room-sounds.json` (`consent` in the settings, the folder 0750 root:lampos), `{"version":1,KEY:"yes","at_unix_s":N,"by":"app"}` written whole beside and renamed into place, 0640 and the folder's group (0600 where it is root's); off removes it, none there is no error; a yes already there is left as it is. The journal says "the face expressions yes is on from the app" or "off" (with "already" when nothing changed) | lamp-eyes reads its yes every 2 s: nothing restarts. A new room sounds yes is answered, then lamp-ears is restarted (`systemctl try-restart lamp-ears.service`) holding lamp-update's lock alone, looked for every 10 s, at most 30 minutes (`change::restart_ears_when_unlocked`); an off is followed by lamp-ears within 2 s. A reset wipes both |
 
@@ -790,7 +924,7 @@ the end, `{"done": {"ssid"}}` or `{"refused": why}`.
    restarts the radio, as setup's join does.
 3. **Proven** = the new name is the one joined, with a station address,
    and a TCP connection to the broker `lamp-cloud` is on is made and closed
-   (3 s at most, name lookup included), within 60 s (setup's own bound). Two
+   (3 s at most, name lookup included; 5 s is PARKED (#6386)), within 60 s (setup's own bound). Two
    rejected keys stop early, as setup's join does. **Kept** only once the app
    also confirms through it: the helper writes `{"joined": {"ssid",
    "online_within_ms", "confirm_within_ms"}}`, `lamp-cloud` makes its link
@@ -1070,7 +1204,8 @@ Wi-Fi without a put-back to V1:
   gone (#3020, below), with `LAMP_WIFI_RECOVERY=on` on its
   `lamp-setup-recover.service` (Fourteen's P2 on #2977). Off, the unit says
   so and exits at once; main's adapter (#2977) doesn't wait for it. The
-  first builder signs off before the switch goes on, as for product lamps.
+  first builder signs off before the switch goes on, as for product lamps
+  (on there since #5758).
 
 **What a moved lamp keeps of V1:** prepare never touches V1's own files,
 and the product's reset plan names V2's stores only, so V1's person data
@@ -1086,8 +1221,9 @@ setup writes it. Not run on a lamp.
 
 ## When the saved network is gone (#3020)
 
-With `LAMP_WIFI_RECOVERY=on` (off unless set, a drop-in on
-`lamp-setup-recover.service`, which the product installs), a set-up lamp
+With `LAMP_WIFI_RECOVERY=on` (off unless set; on in the product since
+#5758, set in `lamp-setup-recover.service` itself, which the product
+installs; a moved lamp's unit still needs a drop-in), a set-up lamp
 whose saved network is gone (a new router, a changed password, a move)
 opens setup's own hotspot after 90 s, as V1 did (`system/network/recovery.go`
 in the parent repository), so the app's setup flow sets the new network
@@ -1141,8 +1277,8 @@ its only way back once its package carries the unit.
   line (`http::Refusals`), never the key, as an open hotspot can be asked
   many times a second and the journal is in RAM; a lamp without its key file refuses every one. Without it, someone
   in radio range could set **their own** network (the Reviewer-lead on
-  #3024). The first builder signs off before `LAMP_WIFI_RECOVERY` goes on
-  anywhere.
+  #3024). The first builder signed off on `LAMP_WIFI_RECOVERY` on in the
+  product on 11 Nov (#5758); the row on lamp-52e6 is owed.
 - **Back to the station when the hotspot closes** (#4863). `device-ap-mode`
   masks `wpa_supplicant@wlan0`, adds `denyinterfaces wlan0` to
   `/etc/dhcpcd.conf` and enables `hostapd` and `dnsmasq`, and all of it
@@ -1184,7 +1320,8 @@ its only way back once its package carries the unit.
   the round stays switched. So a lamp updated to a build with `recover`
   and its switch on watches from that round; one given only the switch
   watches from its next start or its next switching round. A build's
-  settings can't write a drop-in, so no round turns the switch on.
+  settings can't write a drop-in, but since #5758 the product unit itself
+  sets the switch on, so a round that writes that unit turns it on.
 - **Said:** the journal (`lamp-setup-recover`) says when it opens and why,
   each retry, and when recovery ends; lamp-cloud's `system.info` says
   `"recovery": true` while it runs with its switch on, so the app names the
@@ -1260,6 +1397,8 @@ readlink /etc/localtime
 | `/etc/lampOS/setup/voice` and `/etc/lampOS/setup/character` (the owner's chosen voice and character words, #5394) | not written by setup; 644 root after the app's `voice.set` or `character.set` with `LAMP_CHOSEN_VOICE=on` | wiped: the default voice and no character words again ([chosen-voice.md](chosen-voice.md)) |
 | `/etc/lampOS/voice/own` (the person's own keys, #2094) | absent; with `LAMP_OWN_KEYS=on` (off in the product), a 700 root folder with each key that worked when checked, 600 | wiped |
 | `/etc/systemd/system/lamp-control.service.d/developer.conf` (the owner's developer setting, `control.set`, docs/control.md) | absent; 644 root while developer access is on in the app | wiped |
+| `/etc/systemd/system/lamp-control.service.d/agent.conf` (the owner's local agent switch, `control.set_agent`, docs/control.md) | absent; 644 root while the local agent is on in the app | wiped |
+| `/etc/systemd/system/lamp-peek.service.d/monitor.conf` (the owner's dev monitor, `monitor.set`, #5883, docs/peek.md) | absent; 644 root while the dev monitor is on in the app | wiped |
 | `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf` | 600 root | wiped |
 
 Setup saves them in this order: the name, the zone, the language, the backend's link, the
@@ -1289,6 +1428,34 @@ health, memory, mood, name, policy, schedule, the self-test's timer, the
 reset's watcher, skills, tasks and voice, and the change, keys and Wi-Fi
 helpers' sockets. `lamp-setup` itself stops being started once the
 marker is there; `lamp-update` and `lamp-records` don't wait for it.
+
+**The parts a target already up leaves behind (`lamp_setup::parts`).** When
+`lampos.target` is already active as the marker comes, the path's start of
+it does nothing, so its `Wants=` are not pulled in again. A part its own
+condition skipped at boot, before the marker was there, then stayed dead
+until the next reboot. A tester's lamp showed it with `lamp-services`: it
+was skipped at boot by `ConditionPathExists=/var/lib/lampos-setup/done`, the
+path fired when setup finished, and the part stayed dead for five days,
+until an update round restarted it. The app showed accounts linked, and the
+links went nowhere. So, just after the marker is written, setup
+(`Save::start_parts`, only on a first setup, never in recovery's
+network-only run) does three things:
+
+1. It reads what the target wants (`systemctl show --property=Wants --value
+   -- lampos.target`). Those are the units enabled into it.
+2. It reads how each of them and the target are (`systemctl show
+   --property=Id,ActiveState,Type`).
+3. If the target is active, it starts each wanted unit that is `inactive`,
+   is not a template, and whose `Type=` is not `oneshot`, with `systemctl
+   start --no-block -- <unit>`. `lamp-services.service` goes first.
+
+Each start writes one log line: `started <unit>, which lampos.target wants
+and was not running`, or `<unit> could not be started (…); it starts at the
+next boot`. A running part is never restarted. A failed part is left, and so
+is a one-shot, which reads as inactive once it has run and would run again.
+When the target is not active, the path's start of it pulls in every part,
+and nothing more is done. The two reads are bounded at 5 s each, and each
+start returns once systemd has the job (5 s at most). None of it fails setup.
 
 ```sh
 systemctl is-active lampos.target lamp-voice lamp-setup-reset lamp-policy

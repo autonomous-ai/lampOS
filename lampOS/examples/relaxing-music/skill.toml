@@ -4,6 +4,9 @@ needs = ["voice"]
 kind = "installable"
 version = "1.0.0"
 tool = "play_relaxing_music"
+# What asks for it, matched whole on the voice's second route with
+# LAMP_SKILL_NAMED=on (#6772): Sixth's two lines on #5749 run it.
+asks = ["relaxing music", "play me something to relax"]
 
 [permissions]
 speak = true

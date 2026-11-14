@@ -98,48 +98,30 @@ fn main() -> std::process::ExitCode {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(unix))]
 fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     // The host parser is testable; no device backend is compiled on this host.
     let _ = (arguments.unit_id, arguments.report_status_faults);
-    Err("read-only motor inspection requires Linux; no device was opened".into())
+    Err("read-only motor inspection requires a unix system; no device was opened".into())
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     use lamp_body::linux::{InspectionConfig, inspect_once, inspect_once_reporting_faults};
-    use nix::sys::{
-        signal::{SigSet, Signal},
-        signalfd::{SfdFlags, SignalFd},
-    };
+    use lamp_body::stop_signal::StopSignal;
     use std::io::Write;
 
     // This finite CLI is single-threaded. Mask restoration follows device close.
-    struct SignalMask(SigSet);
-    impl Drop for SignalMask {
-        fn drop(&mut self) {
-            let _ = self.0.thread_set_mask();
-        }
-    }
     let config = InspectionConfig::new(
         arguments.device,
         arguments.unit_id,
         arguments.lock_directory,
     )?;
-    let old_mask = SigSet::thread_get_mask()?;
-    let mut mask = SigSet::empty();
-    mask.add(Signal::SIGINT);
-    mask.add(Signal::SIGTERM);
-    mask.thread_block()?;
-    let restore = SignalMask(old_mask);
-    let signal_fd = SignalFd::with_flags(&mask, SfdFlags::SFD_CLOEXEC | SfdFlags::SFD_NONBLOCK)?;
+    let signal = StopSignal::new()?;
     let mut cancelled = false;
     let poll = || {
         if !cancelled {
-            cancelled = signal_fd
-                .read_signal()
-                .map_err(|error| std::io::Error::from_raw_os_error(error as i32))?
-                .is_some();
+            cancelled = signal.requested()?;
         }
         Ok(cancelled)
     };
@@ -153,7 +135,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     serde_json::to_writer(&mut output, &result)?;
     writeln!(output)?;
     output.flush()?;
-    restore.0.thread_set_mask()?;
+    signal.restore()?;
     // A redundant set on Drop is safe; it owns no hardware and performs no wait.
     Ok(result.completed)
 }

@@ -71,6 +71,9 @@ struct FakeMemory {
     prepared: Arc<Mutex<Vec<Value>>>,
     applied: Arc<Mutex<Vec<Value>>>,
     refuse: Arc<AtomicBool>,
+    /// Weekly answers in order; when empty, `"reason":"nothing"`.
+    weeklies: Arc<Mutex<VecDeque<Value>>>,
+    weekly_lines: Arc<Mutex<Vec<Value>>>,
 }
 impl FakeMemory {
     fn with(answers: Vec<Value>) -> Self {
@@ -83,6 +86,9 @@ impl FakeMemory {
     }
     fn applied(&self) -> Vec<Value> {
         self.applied.lock().unwrap().clone()
+    }
+    fn weekly_lines(&self) -> Vec<Value> {
+        self.weekly_lines.lock().unwrap().clone()
     }
 }
 impl Memory for FakeMemory {
@@ -106,6 +112,16 @@ impl Memory for FakeMemory {
             "dropped":{"episode":0,"fact":1,"profile":0,"pattern":1,"ahead":0,"feeling":0},
             "reasons":{"lamp_words":1,"off":1,"made_up_reason":7},
             "ids":[88,89,90,91]}))
+    }
+    fn weekly(&mut self, line: &Value) -> Option<Value> {
+        self.weekly_lines.lock().unwrap().push(line.clone());
+        Some(
+            self.weeklies
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or_else(|| json!({"ok":true,"reason":"nothing"})),
+        )
     }
 }
 
@@ -648,5 +664,149 @@ fn nothing_of_the_night_is_said_or_shown() {
         ] {
             assert!(!code.contains(part), "{part}");
         }
+    }
+}
+
+/// 2026-10-08 15:00 UTC, a Thursday of last week as NIGHT_MS sees it.
+const LAST_WEEK_MS: u64 = NOON_MS - 5 * 86_400_000 + 3 * 3_600_000;
+const CHAPTER: &str = r#"{"chapter":{"text":"A week of tea","cites":[1,2]}}"#;
+
+/// The night with weekly chapters on, `heard` noted after.
+fn weekly(
+    memory: FakeMemory,
+    heard: &[(&str, u64)],
+    model: FakeModel,
+    chapters: bool,
+) -> (FakeNight, Logged) {
+    let mut night = Night::new(memory, FakeLamp::default(), model, LocalTime::Offset(0)).unwrap();
+    night.chapters = chapters;
+    for (person, at) in heard {
+        night.note(person, *at);
+    }
+    night.clock = Box::new(|| NIGHT_MS);
+    let logged = Arc::new(Mutex::new(Vec::new()));
+    let into = logged.clone();
+    night.log = Arc::new(move |line| into.lock().unwrap().push(line.to_owned()));
+    (night, logged)
+}
+
+fn week_input(job: &str) -> Value {
+    json!({"ok":true,"input":{"job":job,"person":ANNA,"from":"2026-10-05","to":"2026-10-11",
+        "items":[{"id":1,"kind":"episode","day":"2026-10-08","text":SECRET},
+                 {"id":2,"kind":"fact","day":"2026-10-09","text":"likes tea"}]}})
+}
+
+#[test]
+fn a_week_over_gets_one_chapter_call_after_the_days_with_counts_only_logged() {
+    let memory = FakeMemory::default();
+    *memory.weeklies.lock().unwrap() = vec![
+        week_input("w3"),
+        json!({"ok":true,"accepted":1,"reasons":{},"id":9}),
+    ]
+    .into();
+    let model = FakeModel::answering(CHAPTER);
+    let asked = model.asked.clone();
+    let (mut night, logged) = weekly(memory.clone(), &[(ANNA, LAST_WEEK_MS)], model, true);
+    // Last Thursday is past DAYS_BACK for a day's pass; its week is over.
+    assert_eq!(
+        night.step(),
+        Step::Chapter {
+            kept: true,
+            reasons: "none".into()
+        }
+    );
+    assert!(memory.prepared().is_empty(), "no day's pass");
+    assert_eq!(
+        memory.weekly_lines(),
+        vec![
+            json!({"op":"weekly_prepare","person":ANNA,"week":"2026-10-05"}),
+            json!({"op":"weekly_apply","person":ANNA,"job":"w3",
+                "proposal":serde_json::from_str::<Value>(CHAPTER).unwrap()}),
+        ]
+    );
+    let asked = asked.lock().unwrap();
+    assert!(asked[0].0.contains("week's chapter"));
+    assert!(asked[0].1.contains("<data>") && asked[0].1.contains(SECRET));
+    // Once a week: let go, nothing more.
+    assert_eq!(night.step(), Step::NoWork);
+    assert_eq!(night.weeks_waiting(), 0);
+    for line in logged.lock().unwrap().iter() {
+        for word in [SECRET, "A week of tea", ANNA, "w3"] {
+            assert!(!line.contains(word), "{word} in {line}");
+        }
+    }
+}
+
+#[test]
+fn with_the_switch_off_no_week_is_asked_for() {
+    let memory = FakeMemory::default();
+    *memory.weeklies.lock().unwrap() = vec![week_input("w3")].into();
+    let model = FakeModel::answering(CHAPTER);
+    let calls = model.calls.clone();
+    let (mut night, _) = weekly(memory.clone(), &[(ANNA, LAST_WEEK_MS)], model, false);
+    assert_eq!(night.step(), Step::NoWork);
+    assert_eq!(night.weeks_waiting(), 0);
+    assert!(memory.weekly_lines().is_empty());
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn the_days_come_first_and_a_week_not_over_waits() {
+    let memory = FakeMemory::with(vec![input(ANNA, "n1", 1, 2, false)]);
+    let (mut night, _) = weekly(
+        memory.clone(),
+        &[(ANNA, YESTERDAY_MS)],
+        FakeModel::answering(PROPOSAL),
+        true,
+    );
+    assert!(matches!(night.step(), Step::Applied(_)));
+    // Yesterday's week (from Monday 12 Oct) is not over yet.
+    assert_eq!(night.step(), Step::NoWork);
+    assert!(memory.weekly_lines().is_empty());
+    assert_eq!(night.weeks_waiting(), 1);
+    // Not the room's, nor a guest's.
+    let (mut room, _) = weekly(
+        FakeMemory::default(),
+        &[("everyone", LAST_WEEK_MS), ("guest", LAST_WEEK_MS)],
+        FakeModel::answering(CHAPTER),
+        true,
+    );
+    assert_eq!(room.weeks_waiting(), 0);
+    assert_eq!(room.step(), Step::NoWork);
+}
+
+#[test]
+fn a_dropped_chapter_logs_only_known_reasons_and_nothing_or_refused_lets_go() {
+    let memory = FakeMemory::default();
+    *memory.weeklies.lock().unwrap() = vec![
+        week_input("w3"),
+        json!({"ok":true,"accepted":0,"reasons":{"grounded":1,"made_up_reason":4}}),
+    ]
+    .into();
+    let (mut night, _) = weekly(
+        memory.clone(),
+        &[(ANNA, LAST_WEEK_MS)],
+        FakeModel::answering(CHAPTER),
+        true,
+    );
+    assert_eq!(
+        night.step(),
+        Step::Chapter {
+            kept: false,
+            reasons: "grounded 1".into()
+        }
+    );
+    for (answer, step) in [
+        (json!({"ok":true,"reason":"nothing"}), Step::Nothing),
+        (json!({"ok":false,"error":"done"}), Step::Refused),
+    ] {
+        let memory = FakeMemory::default();
+        *memory.weeklies.lock().unwrap() = vec![answer].into();
+        let model = FakeModel::answering(CHAPTER);
+        let calls = model.calls.clone();
+        let (mut night, _) = weekly(memory.clone(), &[(ANNA, LAST_WEEK_MS)], model, true);
+        assert_eq!(night.step(), step);
+        assert_eq!(night.weeks_waiting(), 0);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
 }

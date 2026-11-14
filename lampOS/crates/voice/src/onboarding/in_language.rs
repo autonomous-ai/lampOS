@@ -1093,6 +1093,12 @@ pub(super) const LINES: &[Line] = &[
         "轻轻地，在我头顶上。",
         "부드럽게, 제 머리 맨 위를요.",
     ]),
+    ("May I remember your face, so I know you next time?", [
+        "Mình nhớ khuôn mặt bạn nhé, để lần sau mình nhận ra bạn?",
+        "次に会ったときにわかるように、顔を覚えてもいいですか？",
+        "我可以记住你的脸吗？这样下次就能认出你。",
+        "다음에 알아볼 수 있게 얼굴을 기억해도 될까요?",
+    ]),
     ("Mmm, that feels nice.", [
         "Ưm, dễ chịu quá.",
         "んー、気持ちいいです。",
@@ -1521,6 +1527,30 @@ pub(super) const LINES: &[Line] = &[
         "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
         "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
         "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
+    ]),
+    // The first update's line (#6284, `FIRST_UPDATE_LINE`), said while the
+    // walk waits for it.
+    ("I'm updating my software first. This takes a few minutes.", [
+        "Mình cập nhật phần mềm trước nhé, mất vài phút thôi.",
+        "先にソフトウェアを更新しますね。数分かかります。",
+        "我先更新一下软件，需要几分钟。",
+        "먼저 소프트웨어를 업데이트할게요. 몇 분 걸려요.",
+    ]),
+    // Said to a person who talks to the lamp while that first update holds
+    // the walk (#6284, `FIRST_UPDATE_WAIT_LINE`).
+    ("I'm still updating my software. Please wait a moment, I'll be ready soon.", [
+        "Mình vẫn đang cập nhật phần mềm. Bạn chờ mình một chút nhé, mình sắp xong rồi.",
+        "まだソフトウェアを更新しています。少しお待ちください、もうすぐ準備できます。",
+        "我还在更新软件，请稍等一下，马上就好。",
+        "아직 소프트웨어를 업데이트하고 있어요. 조금만 기다려 주세요, 곧 준비돼요.",
+    ]),
+    // Said once that first update has switched the lamp (#6284,
+    // `FIRST_UPDATE_DONE_LINE`), just before the walk begins.
+    ("My software update is finished, and I'm ready now.", [
+        "Mình đã cập nhật phần mềm xong rồi, giờ mình sẵn sàng rồi nhé.",
+        "ソフトウェアの更新が終わりました。もう準備できましたよ。",
+        "我的软件更新完成了，现在准备好了。",
+        "소프트웨어 업데이트가 끝났어요. 이제 준비됐어요.",
     ]),
     ("That's fine, you can redo the setup later. Just ask me to redo the setup.", [
         "Không sao, bạn có thể cài đặt lại sau. Chỉ cần bảo mình cài đặt lại.",

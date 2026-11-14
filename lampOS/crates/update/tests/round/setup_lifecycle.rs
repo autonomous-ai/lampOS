@@ -447,3 +447,72 @@ fn recovery_rechecks_effective_aliases_after_restoring_the_old_unit() {
         PathBuf::from(sha("setup 1"))
     );
 }
+
+/// #6284: the first update after setup runs inside setup's phone grace
+/// period, and setup's unit may differ between the lamp's build and the
+/// newest (lamp-e82d, 12 Nov: put back as `lamp-setup.service stopped`).
+/// Owed, a setup done is not restarted while its new unit still skips once
+/// setup is done; without the first update, the same change keeps the
+/// normal watch rules.
+#[test]
+fn the_first_update_leaves_a_done_setup_whose_unit_changed() {
+    let changed = format!("{PRODUCT}\n[Service]\nEnvironment=LAMP_SOMETHING_NEW=on\n");
+    for owed in [true, false] {
+        let mut lamp = Lamp::new();
+        setup(&mut lamp, true);
+        if owed {
+            lamp.config.first_update = true;
+            let file = lamp
+                .root
+                .join(lamp_msgs::FIRST_UPDATE_FILE.trim_start_matches('/'));
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(
+                file,
+                format!(r#"{{"at_unix_ms":{}}}"#, lamp_update::records::unix_ms()),
+            )
+            .unwrap();
+        }
+        lamp.publish(2, &[("lamp-setup", "setup 2")], &[(SETUP, &changed)]);
+        let outcome = lamp.round();
+        if owed {
+            assert_eq!(outcome, Outcome::Switched(2), "{:?}", lamp.said);
+            assert_eq!(setup_restarts(&lamp), 0);
+        } else {
+            assert!(matches!(outcome, Outcome::RolledBack { .. }), "{outcome:?}");
+        }
+    }
+}
+
+/// #6820, a customer lamp on 12 Nov: a first update switched while setup
+/// was still running, and setup finished inside the watch minute (its
+/// marker written, its unit ended with exit 0). That is setup done, not a
+/// part stopping: the build stays. A setup that fails, or ends without its
+/// marker, is still not well.
+#[test]
+fn setup_finishing_inside_the_watch_keeps_the_build() {
+    for (result, marker, stays) in [
+        ("success", true, true),
+        ("exit-code", true, false),
+        ("success", false, false),
+    ] {
+        let mut lamp = Lamp::new();
+        setup(&mut lamp, false);
+        lamp.config.first_update = true;
+        lamp.systemd.setup_ends_in_watch = Some((result, marker));
+        publish(&mut lamp);
+        let outcome = lamp.round();
+        if stays {
+            assert_eq!(outcome, Outcome::Switched(2), "{:?}", lamp.said);
+            assert_eq!(setup_restarts(&lamp), 1);
+            assert_eq!(
+                fs::read_link(lamp.root.join("opt/lampOS/setup/current")).unwrap(),
+                PathBuf::from(sha("setup 2"))
+            );
+        } else {
+            assert!(
+                matches!(outcome, Outcome::RolledBack { .. }),
+                "{result} {marker}: {outcome:?}"
+            );
+        }
+    }
+}

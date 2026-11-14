@@ -2,11 +2,18 @@
 //! Off unless `LAMP_PEEK=on`. Answers on `LAMP_PEEK_LISTEN` (127.0.0.1:8077
 //! unless set); anywhere but this machine only with a token, from
 //! `$CREDENTIALS_DIRECTORY/peek-token` (`LoadCredential=peek-token:...`).
+//! `LAMP_PEEK=monitor` is monitor mode instead (#5883): on 0.0.0.0:80
+//! unless set, to the local network only, by one-time codes from the admin
+//! socket (`LAMP_PEEK_ADMIN_SOCKET`), never the token.
 use lamp_bus::Bus;
 use lamp_peek::{
     DEFAULT_LISTEN, DEFAULT_SESSIONS, LISTEN, SESSIONS, SWITCH, TOKEN_CREDENTIAL, check_listen,
+    monitor::{self, Conn, Monitor},
+    monitor_mode,
     serve::{self, Peek},
-    switched_on, units,
+    switched_on,
+    timeline::Timeline,
+    units,
     watch::{self, Seen},
 };
 use std::{
@@ -30,21 +37,30 @@ fn token() -> Option<String> {
 }
 
 fn main() -> ExitCode {
-    if !switched_on(env::var(SWITCH).ok().as_deref()) {
+    let switch = env::var(SWITCH).ok();
+    let monitor = monitor_mode(switch.as_deref());
+    if !monitor && !switched_on(switch.as_deref()) {
         eprintln!("lamp-peek: off ({SWITCH} is not on)");
         return ExitCode::SUCCESS;
     }
-    let listen = env::var(LISTEN).unwrap_or_else(|_| DEFAULT_LISTEN.to_owned());
+    let default_listen = if monitor {
+        monitor::DEFAULT_LISTEN
+    } else {
+        DEFAULT_LISTEN
+    };
+    let listen = env::var(LISTEN).unwrap_or_else(|_| default_listen.to_owned());
     let Ok(listen) = listen.parse::<SocketAddr>() else {
         eprintln!("lamp-peek: {LISTEN}={listen} is not an address and port");
         return ExitCode::from(2);
     };
-    let token = token();
-    if let Err(why) = check_listen(listen, token.as_deref()) {
+    // Monitor mode drops the static token for one-time codes.
+    let token = if monitor { None } else { token() };
+    if !monitor && let Err(why) = check_listen(listen, token.as_deref()) {
         eprintln!("lamp-peek: {why}");
         return ExitCode::from(2);
     }
-    match run(listen, token) {
+    let monitor = monitor.then(|| Arc::new(Monitor::new(monitor::own_names())));
+    match run(listen, token, monitor) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("lamp-peek: {error}");
@@ -53,9 +69,34 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(listen: SocketAddr, token: Option<String>) -> std::io::Result<()> {
+fn run(
+    listen: SocketAddr,
+    token: Option<String>,
+    monitor: Option<Arc<Monitor>>,
+) -> std::io::Result<()> {
     let bus = Bus::from_environment()?;
-    let seen = Arc::new(Mutex::new(Seen::default()));
+    if let Some(monitor) = &monitor {
+        let path = env::var_os(monitor::ADMIN_SOCKET).map_or_else(
+            || PathBuf::from(monitor::DEFAULT_ADMIN_SOCKET),
+            PathBuf::from,
+        );
+        let admin = monitor::bind_admin(&path)?;
+        let monitor = Arc::clone(monitor);
+        // Ends with the process.
+        thread::Builder::new()
+            .name("lamp-peek-admin".into())
+            .spawn(move || monitor::admin(&admin, &monitor))?;
+    }
+    let mode = if monitor.is_some() {
+        "dev monitor, local network only"
+    } else {
+        "read-only"
+    };
+    // Words heard and said are kept in monitor mode only.
+    let seen = Arc::new(Mutex::new(Seen {
+        timeline: Timeline::new(monitor.is_some()),
+        ..Seen::default()
+    }));
     let stop = Arc::new(AtomicBool::new(false));
     let watching = thread::Builder::new()
         .name("lamp-peek-watch".into())
@@ -70,6 +111,7 @@ fn run(listen: SocketAddr, token: Option<String>) -> std::io::Result<()> {
         sessions: env::var_os(SESSIONS)
             .map_or_else(|| PathBuf::from(DEFAULT_SESSIONS), PathBuf::from),
         units: Arc::new(units::read),
+        monitor,
     });
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -78,8 +120,9 @@ fn run(listen: SocketAddr, token: Option<String>) -> std::io::Result<()> {
         let mut stopped =
             tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
         let listener = tokio::net::TcpListener::bind(listen).await?;
-        eprintln!("lamp-peek: read-only, on {listen}");
-        axum::serve(listener, serve::router(peek))
+        eprintln!("lamp-peek: {mode}, on {listen}");
+        let service = serve::router(peek).into_make_service_with_connect_info::<Conn>();
+        axum::serve(listener, service)
             .with_graceful_shutdown(async move {
                 tokio::select! {
                     _ = stopped.recv() => {}

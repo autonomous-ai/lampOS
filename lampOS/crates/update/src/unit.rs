@@ -326,10 +326,13 @@ mod tests {
         // print is for the linked services alone (`LAMP_SAME_VOICE_FOR=services`): no rule on
         // whom the voice answers reads it (docs/same-voice.md, "For the services only").
         // A "Ma'am,"/"Sir," start said to a person needs `LAMP_NAME_SECOND_SIGN`'s
-        // second sign, which a moved lamp's voice does not carry either (#5233).
-        const NOT_THE_GROUP: [&str; 10] = [
+        // second sign, which a moved lamp's voice does not carry either (#5233). A misheard first
+        // word said as a sentence is the name only on lamp-name's near hearing, which a moved
+        // lamp's voice does not carry either (#6078).
+        const NOT_THE_GROUP: [&str; 11] = [
             "LAMP_FIRST_OUTPUT",
             "LAMP_HEAD_TOUCH",
+            "LAMP_NAME_AS_A_SENTENCE",
             "LAMP_NAME_SAID_TO_A_PERSON",
             "LAMP_PROVIDER_PATIENCE",
             "LAMP_REPORTS",

@@ -132,6 +132,22 @@
         <ellipse cx="229" cy="104" rx="6" ry="8" fill="#ffe2ad" stroke="#111216" stroke-width="3"/>
       </g>
     </symbol>
+    <!-- The lamp at rest, folded, as it boots: only the ring wakes, a warm glow at its bottom (setup/src/wake.rs). -->
+    <symbol id="lamp-folded" viewBox="0 0 300 320">
+      <ellipse cx="130" cy="304" rx="118" ry="9" fill="#111216" opacity=".25"/>
+      <rect x="28" y="280" width="136" height="22" rx="10" fill="#2b2f45" stroke="#111216" stroke-width="5"/>
+      <circle cx="140" cy="272" r="12" fill="#2b2f45" stroke="#111216" stroke-width="5"/>
+      <rect x="44" y="256" width="104" height="16" rx="8" fill="#3b4060" stroke="#111216" stroke-width="5" transform="rotate(-6 96 264)"/>
+      <circle cx="48" cy="254" r="11" fill="#2b2f45" stroke="#111216" stroke-width="5"/>
+      <rect x="48" y="232" width="130" height="16" rx="8" fill="#3b4060" stroke="#111216" stroke-width="5" transform="rotate(4 113 240)"/>
+      <circle cx="180" cy="246" r="10" fill="#2b2f45" stroke="#111216" stroke-width="5"/>
+      <g transform="translate(206 250) rotate(-90) scale(.82)">
+        <path d="M-52 -24 Q0 -70 52 -24 L41 36 Q0 56 -41 36 Z" fill="#3b4060" stroke="#111216" stroke-width="5" stroke-linejoin="round"/>
+        <circle cx="-18" cy="44" r="34" fill="#ffb347" opacity=".18"/>
+        <ellipse cx="0" cy="36" rx="42" ry="11" fill="#1d2033" stroke="#111216" stroke-width="5"/>
+        <path d="M-40 38 Q-22 48 2 47" fill="none" stroke="#ffb347" stroke-width="5" stroke-linecap="round"/>
+      </g>
+    </symbol>
     <symbol id="beam" viewBox="0 0 300 320"><path d="M190 160 L110 318 L300 318 L262 150 Z" fill="#ffe680" opacity=".85"/></symbol>
   </defs>
 </svg>
@@ -169,7 +185,7 @@
     </div>
     <div class="panel halftone-s">
       <svg viewBox="0 0 300 320" preserveAspectRatio="xMidYMid meet"><use href="#lamp"/></svg>
-      <div class="balloon lamp down" style="top:10%;left:8%"><span class="who">LAMP</span>Turn the page. Let's meet.</div>
+      <div class="caption tl">Turn the page. Let's meet.</div>
     </div>
   </div>
 
@@ -191,8 +207,8 @@
       <div class="caption bl">Plug me in.</div>
     </div>
     <div class="panel nightfill">
-      <svg viewBox="0 0 300 320" preserveAspectRatio="xMidYMax meet"><circle cx="214" cy="196" r="110" fill="#fff3d1" opacity=".35"/><use href="#lamp"/></svg>
-      <div class="caption tl">I glow softly while I wake up…</div>
+      <svg viewBox="10 170 280 145" preserveAspectRatio="xMidYMax meet"><use href="#lamp-folded" width="300" height="320"/></svg>
+      <div class="caption tl">I stay folded while I wake up. Only my light glows, softly, from its bottom edge.</div>
     </div>
   </div>
 
@@ -214,7 +230,7 @@
     </div>
     <div class="panel text-panel">
       <h3>PICK YOUR WI-FI. TYPE ITS PASSWORD.</h3>
-      <p>I blink blue while I join. If I can't, the app tells you, and you try again.</p>
+      <p>I breathe a soft blue while I join. If I can't, I glow amber, the app tells you why, and you try again.</p>
     </div>
   </div>
 
@@ -232,7 +248,8 @@
     <div class="panel text-panel halftone-y"><h3>A FEW MINUTES LATER…</h3><p style="font-weight:700">I get my voice ready. Then I speak first.</p></div>
     <div class="panel burst-r">
       <svg viewBox="0 0 300 320" preserveAspectRatio="xMidYMax meet"><use href="#beam"/><use href="#lamp"/></svg>
-      <div class="balloon lamp down" style="top:8%;left:8%;font-size:22px"><span class="who">LAMP</span>Hello!</div>
+      <div class="balloon lamp down" style="top:6%;left:6%;max-width:76%"><span class="who">LAMP</span>Hi! I'm your lamp. Come sit in front of me, and we'll get to know each other.</div>
+      <div class="caption bl">Already sitting with me? Then I start with "Hi! I'm your lamp. Let's get to know each other…"</div>
     </div>
   </div>
 
@@ -283,15 +300,6 @@
     </div>
   </div>
 
-  <div class="page" data-chapter="2 · The first chat" style="grid-template-rows: 1fr;">
-    <div class="panel text-panel halftone-y">
-      <h3>IF A STEP WENT WRONG</h3>
-      <p>"Hey Lamp, can we redo the touch step?" (or the name step, and so on) redoes just that one step, and the rest stays.</p>
-      <p>"Hey Lamp, remember my face." saves your face any time, if setup didn't.</p>
-      <p>Skip a step, or don't answer, and I remind you once, then move on. You can redo the setup later.</p>
-    </div>
-  </div>
-
   <div class="page" data-chapter="3 · Your first skill" style="grid-template-rows: auto;">
     <div class="panel halftone-r text-panel" style="color:#fff">
       <h2 class="title chap">CHAPTER 3: YOUR FIRST SKILL</h2>
@@ -320,11 +328,20 @@
     </div>
   </div>
 
+  <div class="page" data-chapter="Tips" style="grid-template-rows: 1fr;">
+    <div class="panel text-panel halftone-y">
+      <h3>TIPS: IF A STEP WENT WRONG</h3>
+      <p>"Hey Lamp, can we redo the touch step?" (or the name step, and so on) redoes just that one step, and the rest stays.</p>
+      <p>"Hey Lamp, remember my face." saves your face any time, if setup didn't.</p>
+      <p>Don't answer, and I ask once more, then move on. Say "skip", and I move on. You can redo any step later.</p>
+    </div>
+  </div>
+
   <div class="page" data-chapter="The end" style="grid-template-rows: 1fr auto;">
     <div class="panel burst-r">
       <svg viewBox="0 0 300 320" preserveAspectRatio="xMidYMax meet"><use href="#beam"/><use href="#lamp"/></svg>
       <div style="position:absolute;z-index:3;top:6%;left:6%;right:6%"><div class="title" style="color:var(--yellow)">THE END…<br>IS JUST THE<br>BEGINNING.</div></div>
-      <div class="balloon lamp down" style="bottom:12%;left:6%"><span class="who">LAMP</span>Say "Hey Lamp."</div>
+      <div class="caption bl">Say "Hey Lamp" whenever you need me.</div>
     </div>
     <div class="panel text-panel" style="gap:6px">
       <p><b>Start over:</b> push a paperclip into the hole marked RESET on the back of my base, beside the round POWER button, and hold it for 5 seconds.</p>

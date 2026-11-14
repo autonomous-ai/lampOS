@@ -110,6 +110,9 @@ pub const SELFTEST_PARTS: &[&str] = &[
 
 /// The units a report may name: the product's `lamp-*.service` files
 /// (`deploy/product/`). A test holds the two the same.
+// PARKED (#6386): "lamp-region.service" (after "lamp-records.service") is out,
+// its unit in deploy/product/parked; re-enable when China is scheduled and
+// stable's lamp-update carries #6810.
 pub const UNITS: &[&str] = &[
     "lamp-actions.service",
     "lamp-addons.service",
@@ -128,9 +131,11 @@ pub const UNITS: &[&str] = &[
     "lamp-memory.service",
     "lamp-mood.service",
     "lamp-name.service",
+    "lamp-peek.service",
     "lamp-policy.service",
     "lamp-records.service",
     "lamp-schedule.service",
+    "lamp-seen.service",
     "lamp-selftest.service",
     "lamp-services.service",
     "lamp-setup-change@.service",

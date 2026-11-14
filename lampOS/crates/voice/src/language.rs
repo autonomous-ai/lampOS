@@ -159,6 +159,21 @@ pub const SIGNED_OUT: &str = "I've been signed out. Please set me up again in th
 /// lamp still plays the sigh (`docs/failure-notices.md`).
 pub const TURN_LOST: &str = "Sorry, I couldn't answer that. Could you ask me again?";
 
+/// The prepare-unplug skill's `[unplug]` lines (`skills/prepare-unplug`,
+/// lamp-skills' `UnplugLines::built_in`): sent as exact words (#5777), so
+/// kept here to be said in the owner's language (#5777's P3).
+pub const UNPLUG_READY: &str = "My arm is folded. You can unplug me now.";
+pub const UNPLUG_FAILED: &str =
+    "I could not confirm a safe folded position. Please do not unplug yet.";
+pub const UNPLUG_STAY: &str = "Okay, I'll stay.";
+pub const UNPLUG_TIMEOUT: &str = "I'm still plugged in, so I'm getting back up.";
+pub const UNPLUG_CHECK: &str = "I can't get up by myself; I need to be checked.";
+pub const UNPLUG_NOT_OFF: &str =
+    "I couldn't turn myself off just now, so please don't unplug me yet.";
+pub const UNPLUG_ASK_OFF: &str =
+    "My arm is folded. Shall I turn myself off now? Say yes, and I will.";
+pub const UNPLUG_UPDATING: &str = "I'm in the middle of an update, so I can't turn myself off yet. I'll get back up; ask me again once it's done.";
+
 /// What a lamp woken by its name says in place of its "hm?"
 /// (`LAMP_SLEEP_HEARS_NAME=on`, migrate-P2, the design owner on #4877): only
 /// from the speech cache ([`crate::say::tts_cache::TtsCache::wake_line`]).
@@ -381,6 +396,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "미안해요, 하려던 말을 놓쳤어요. 다시 한 번 물어봐 주세요.",
         ],
     ),
+    // What it says when the round asked past the round cap, with no
+    // function, has no words either (#5826).
+    (
+        crate::second_provider::UNFINISHED_LINE,
+        [
+            "Xin lỗi, mình chưa làm xong việc đó. Bạn hỏi lại mình được không?",
+            "ごめんね、最後までできなかった。もう一度聞いてくれる？",
+            "抱歉，我没能完成。你能再问我一次吗？",
+            "미안해요, 끝까지 하지 못했어요. 다시 한 번 물어봐 주세요.",
+        ],
+    ),
     // What it says when an answer to its own question gets no words
     // (`LAMP_ANSWER_ASK_AGAIN`, off in the product; Queue #4710, item 3).
     (
@@ -446,6 +472,165 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "좋아요, 시작할게요.",
         ],
     ),
+    // The prepare-unplug skill's lines, sent as exact words (#5777's P3):
+    // never English to an owner who chose another language.
+    (
+        UNPLUG_READY,
+        [
+            "Mình gập tay xong rồi. Giờ bạn rút điện cho mình được rồi nhé.",
+            "アームをたたんだよ。もうプラグを抜いても大丈夫だよ。",
+            "我的手臂已经收好了。现在可以拔掉电源了。",
+            "팔을 접었어요. 이제 플러그를 뽑아도 돼요.",
+        ],
+    ),
+    (
+        UNPLUG_FAILED,
+        [
+            "Mình chưa chắc là đã gập tay an toàn. Bạn đừng rút điện vội nhé.",
+            "安全にたためたか確認できなかったよ。まだプラグを抜かないでね。",
+            "我没能确认手臂已经安全收好。请先不要拔掉电源。",
+            "팔이 안전하게 접혔는지 확인하지 못했어요. 아직 플러그를 뽑지 말아 주세요.",
+        ],
+    ),
+    (
+        UNPLUG_STAY,
+        [
+            "Được rồi, mình ở lại nhé.",
+            "わかった、このままでいるね。",
+            "好的，那我留下来。",
+            "알겠어요, 그대로 있을게요.",
+        ],
+    ),
+    (
+        UNPLUG_TIMEOUT,
+        [
+            "Mình vẫn đang cắm điện, nên mình đứng dậy lại nhé.",
+            "まだプラグがささったままだから、起き上がるね。",
+            "我还插着电，那我先起来了。",
+            "아직 플러그가 꽂혀 있어서 다시 일어날게요.",
+        ],
+    ),
+    (
+        UNPLUG_CHECK,
+        [
+            "Mình không tự đứng dậy được, cần có người kiểm tra giúp mình.",
+            "自分では起き上がれないよ。点検してもらわないと。",
+            "我自己起不来了，需要有人帮我检查一下。",
+            "혼자서는 일어날 수 없어요. 점검이 필요해요.",
+        ],
+    ),
+    (
+        UNPLUG_NOT_OFF,
+        [
+            "Mình vừa không tự tắt được, nên bạn đừng rút điện vội nhé.",
+            "今は自分で電源を切れなかったから、まだプラグを抜かないでね。",
+            "我刚才没能自己关机，所以请先不要拔掉电源。",
+            "방금 스스로 전원을 끄지 못했어요. 아직 플러그를 뽑지 말아 주세요.",
+        ],
+    ),
+    (
+        UNPLUG_ASK_OFF,
+        [
+            "Mình gập tay xong rồi. Mình tự tắt luôn nhé? Bạn nói “có” là mình tắt.",
+            "アームをたたんだよ。このまま電源を切ろうか？「はい」って言ってくれたら切るね。",
+            "我的手臂已经收好了。要我现在关机吗？说“好”，我就关。",
+            "팔을 접었어요. 지금 전원을 끌까요? '네'라고 하시면 끌게요.",
+        ],
+    ),
+    (
+        UNPLUG_UPDATING,
+        [
+            "Mình đang cập nhật dở nên chưa tự tắt được. Mình sẽ đứng dậy lại; cập nhật xong thì bạn nhờ mình lần nữa nhé.",
+            "今アップデートの途中だから、まだ電源を切れないんだ。いったん起き上がるね。終わったらもう一度言ってね。",
+            "我正在更新，所以现在还不能关机。我先起来，更新完了再叫我关吧。",
+            "지금 업데이트 중이라 아직 전원을 끌 수 없어요. 다시 일어날게요. 업데이트가 끝나면 다시 말해 주세요.",
+        ],
+    ),
+    // The skills' own words, sent as exact words (#5999): Smoky air's and
+    // Dusty air's lines (`skills/smoky-air`, `skills/dusty-air`) and each of
+    // Head pat's (`skills/head-pat`). A line reworded in its skill file is
+    // no longer one of these, and is said as written, in English.
+    (
+        "The air reads like smoke. If something's burning, please check it.",
+        [
+            "Không khí có vẻ như có khói. Nếu có gì đang cháy, bạn kiểm tra giúp nhé.",
+            "空気が煙っぽいよ。何か燃えていたら、確かめてね。",
+            "空气里像是有烟。如果有东西烧着了，请去看一下。",
+            "공기에 연기가 있는 것 같아요. 뭔가 타고 있다면 확인해 주세요.",
+        ],
+    ),
+    (
+        "The air here has been very dusty for about an hour. I can't tell where it's coming from.",
+        [
+            "Không khí ở đây nhiều bụi lắm, khoảng một tiếng rồi. Mình không biết bụi từ đâu ra.",
+            "ここの空気、1時間くらいずっとほこりっぽいよ。どこから来ているのかはわからないんだ。",
+            "这里的空气差不多一个小时都很多灰尘。我不知道是从哪里来的。",
+            "여기 공기가 한 시간쯤 계속 먼지가 많아요. 어디서 오는지는 모르겠어요.",
+        ],
+    ),
+    (
+        "Mm, that's nice.",
+        [
+            "Ưm, dễ chịu quá.",
+            "んー、いい感じ。",
+            "嗯，真舒服。",
+            "음, 좋네요.",
+        ],
+    ),
+    (
+        "Oh, I like that.",
+        [
+            "Ồ, mình thích thế.",
+            "わあ、それ好き。",
+            "哦，我喜欢这样。",
+            "오, 이거 좋아요.",
+        ],
+    ),
+    (
+        "Hehe, that tickles.",
+        [
+            "Hihi, nhột quá.",
+            "えへへ、くすぐったい。",
+            "嘿嘿，好痒。",
+            "헤헤, 간지러워요.",
+        ],
+    ),
+    (
+        "Aw, thank you.",
+        [
+            "Ôi, cảm ơn bạn.",
+            "えへ、ありがとう。",
+            "哎呀，谢谢你。",
+            "아, 고마워요.",
+        ],
+    ),
+    (
+        "That feels good.",
+        [
+            "Thích ghê.",
+            "気持ちいいなあ。",
+            "好舒服呀。",
+            "기분 좋아요.",
+        ],
+    ),
+    (
+        "Mmm. More of that, please.",
+        [
+            "Ưmm. Nữa đi mà.",
+            "んー。もっとして。",
+            "嗯……再来一点嘛。",
+            "음. 더 해 주세요.",
+        ],
+    ),
+    (
+        "Oh, hello to you too.",
+        [
+            "Ồ, chào bạn nha.",
+            "あ、こんにちは。",
+            "哦，你也好呀。",
+            "오, 안녕하세요.",
+        ],
+    ),
 ];
 
 impl Language {
@@ -479,6 +664,12 @@ impl Language {
             .iter()
             .map(move |(_, words)| words[self.column()])
     }
+}
+
+/// Whether `english` is one of the lamp's fixed lines ([`FIXED_LINES`]):
+/// built-in words, never a computer's, a pin or a service's read.
+pub fn is_fixed(english: &str) -> bool {
+    FIXED_LINES.iter().any(|(line, _)| *line == english)
 }
 
 /// `english`, a fixed line, as `language` says it: English as it is.
@@ -607,7 +798,11 @@ pub fn announce(asks: crate::say::OwnAsks) {
             let outcome = loop {
                 match answered.recv() {
                     Ok(crate::say::Answer::Done(outcome)) => break outcome,
-                    Ok(crate::say::Answer::Begun(_) | crate::say::Answer::BegunTurn { .. }) => {}
+                    Ok(
+                        crate::say::Answer::Begun(_)
+                        | crate::say::Answer::BegunTurn { .. }
+                        | crate::say::Answer::Stream(_),
+                    ) => {}
                     Err(_) => {
                         break crate::say::Outcome::Dropped("the voice has gone".into());
                     }
@@ -802,11 +997,26 @@ mod tests {
         }
     }
 
+    /// Only the lamp's fixed lines are kept as said: an exact line of other
+    /// words (a computer's, the pairing pin, a service's read) never is.
+    #[test]
+    fn only_a_fixed_line_is_kept_as_said() {
+        assert!(is_fixed(UNPLUG_STAY));
+        assert!(is_fixed(UNPLUG_ASK_OFF));
+        // The skills' own words (#5999).
+        assert!(is_fixed(
+            "The air reads like smoke. If something's burning, please check it."
+        ));
+        assert!(is_fixed("Hehe, that tickles."));
+        assert!(!is_fixed("My pairing check is 3 F 9 A, 0 B 2 C."));
+        assert!(!is_fixed("Two new mails, from the bakery."));
+    }
+
     /// #4473 (c): every fixed line has its own words in each language, none
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 28);
+        assert_eq!(FIXED_LINES.len(), 46);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }

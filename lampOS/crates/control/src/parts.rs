@@ -57,8 +57,11 @@
 //!   the lease the door holds for the computer (`crate::body_lease`); its
 //!   end comes later as a `done` event, with the angles the head reached.
 //!
-//! `look` at `face` and at `name` are not in this release, and refused as
-//! that. `joints`' `yaw` and `pitch` go as the holder's look, the same
+//! `look` at `face` goes the same way as `{"look":"face"}`: the body turns
+//! once toward the face the eyes last showed, by the gaze's measure, and
+//! answers `refused` (a `done` `dropped`) with "no face in view" when there
+//! is none. `look` at `name` is not in this release (the lamp has no sound
+//! direction), and refused as that. `joints`' `yaw` and `pitch` go as the holder's look, the same
 //! degrees from home; its `roll`, `shoulder` and `elbow` as the holder's
 //! pose, on the same socket. Not routed yet, each refused with what it waits for: `play`
 //! and `sound` (a client's package,
@@ -133,6 +136,10 @@ pub type Binary = Arc<dyn Fn(&str, Media, Option<u64>, &[u8]) -> bool + Send + S
 pub enum Media {
     Camera,
     Microphone,
+    /// Not a frame to a computer: the one kind that goes the other way. It
+    /// names the speaker's stream, so a re-pairing without its grant ends it
+    /// as it ends the camera's and the microphone's.
+    Speaker,
 }
 
 impl Media {
@@ -141,6 +148,7 @@ impl Media {
         match self {
             Self::Camera => crate::protocol::Grant::Camera,
             Self::Microphone => crate::protocol::Grant::Microphone,
+            Self::Speaker => crate::protocol::Grant::Speaker,
         }
     }
 }
@@ -160,8 +168,14 @@ impl LightOut for lamp_bus::Publisher {
     }
 }
 
-/// `look` at `face` and at `name`: out of this release.
-pub const NOT_IN_THIS_RELEASE: &str = "not in this release: look at a face or a name";
+/// The name a computer's `move` is given to the body, and said back on
+/// `body/gesture`.
+pub const MOVE_NAME: &str = "control";
+
+/// `look` at `name`: out of this release, the lamp having no direction of a
+/// voice.
+pub const NOT_IN_THIS_RELEASE: &str =
+    "not in this release: look at who said the lamp's name (the lamp has no sound direction)";
 
 /// The lamp's parts, as `lamp-control` reaches them.
 pub struct Lamp {
@@ -205,6 +219,14 @@ pub struct Lamp {
     next_say: u64,
     /// The microphone, the ears' blocks on the bus; none without the bus.
     microphone: Option<crate::microphone::Microphone>,
+    /// The speaker, through the voice and the bus; none without both.
+    speaker: Option<Arc<crate::speaker::Speaker>>,
+    /// Each computer's motion handed to the body and not yet told, when
+    /// the body's `body/gesture` is read (#4209, `crate::motion_done`).
+    motions: Option<Arc<Mutex<crate::motion_done::Motions>>>,
+    /// The connection the request in hand came on (`Parts::asking`), for a
+    /// motion's `done`.
+    asking: Option<u64>,
 }
 
 /// What each computer has going on the voice.
@@ -305,7 +327,74 @@ impl Lamp {
             says: Says::default(),
             next_say: 0,
             microphone: None,
+            speaker: None,
+            motions: None,
+            asking: None,
         }
+    }
+
+    /// Each `gesture`, `move` and feeling's move told with a `done` once
+    /// the body says on `body/gesture` (read through `gestures`) what
+    /// became of it: `finished`, `cut_short` or `dropped` with the body's
+    /// why (#4209). A thread of its own reads it and checks every second
+    /// for a motion the body never began or never said the end of.
+    pub fn telling_motions(mut self, mut gestures: lamp_bus::Subscriber) -> Self {
+        let motions: Arc<Mutex<crate::motion_done::Motions>> = Arc::default();
+        let kept = motions.clone();
+        let events = self.events.clone();
+        let clock = self.clock;
+        std::thread::spawn(move || {
+            loop {
+                let told = match gestures.recv(std::time::Duration::from_secs(1)) {
+                    Ok(Some(message)) => match message.json() {
+                        Ok(payload) => kept.lock().expect("motions").said(&payload, clock()),
+                        Err(_) => continue,
+                    },
+                    Ok(None) => kept.lock().expect("motions").lapse(clock()),
+                    Err(_) => {
+                        std::thread::sleep(std::time::Duration::from_millis(200));
+                        kept.lock().expect("motions").lapse(clock())
+                    }
+                };
+                for (client, done) in told {
+                    events(&client, done);
+                }
+            }
+        });
+        self.motions = Some(motions);
+        self
+    }
+
+    /// `client`'s request `re`, a motion named `name`, sent to the body
+    /// with `send`: kept for its `done` **before** it is sent, so the
+    /// body's `began` can never come first and be missed (Second's on
+    /// #5835), and taken back if the body didn't take it.
+    fn motion_sending(
+        &mut self,
+        client: &str,
+        re: u64,
+        name: &str,
+        send: impl FnOnce(&mut Self) -> Result<Value, Error>,
+    ) -> Result<Value, Error> {
+        if let Some(motions) = &self.motions {
+            let told = motions.lock().expect("motions").sent(
+                client,
+                self.asking,
+                re,
+                name,
+                (self.clock)(),
+            );
+            for (client, done) in told {
+                (self.events)(&client, done);
+            }
+        }
+        let sent = send(self);
+        if sent.is_err()
+            && let Some(motions) = &self.motions
+        {
+            motions.lock().expect("motions").withdraw(client, re);
+        }
+        sent
     }
 
     /// The computers' own clips, kept under `folder` (the door's
@@ -323,6 +412,12 @@ impl Lamp {
     /// sent through `sink` once the server has set it.
     pub fn fast_frames(mut self, socket: PathBuf, sink: crate::camera::Sink) -> Self {
         self.camera = self.camera.map(|camera| camera.fast(socket, sink));
+        self
+    }
+
+    /// A camera that opens when asked (`--camera-opens-on-demand`).
+    pub fn camera_on_demand(mut self, yes: bool) -> Self {
+        self.camera = self.camera.map(|camera| camera.on_demand(yes));
         self
     }
 
@@ -414,6 +509,14 @@ impl Lamp {
                 .room(room)
                 .marking(mark, drawn),
         );
+        self
+    }
+
+    /// `speaker.stream` through `speaker`, built by the caller with this
+    /// lamp's watch ([`crate::speaker::gates`]); given too to the server,
+    /// which hands it each binary frame.
+    pub fn speaking(mut self, speaker: Arc<crate::speaker::Speaker>) -> Self {
+        self.speaker = Some(speaker);
         self
     }
 
@@ -529,7 +632,13 @@ impl Lamp {
         self.to_body(ask, client)
     }
 
-    fn express(&mut self, client: &str, feeling: &str, strength: f32) -> Result<Value, Error> {
+    fn express(
+        &mut self,
+        client: &str,
+        re: u64,
+        feeling: &str,
+        strength: f32,
+    ) -> Result<Value, Error> {
         let feeling =
             feelings::named(feeling).map_err(|why| Error::new(ErrorCode::BadRequest, why))?;
         let mut answer = json!({"to": "body"});
@@ -539,7 +648,10 @@ impl Lamp {
         {
             Some(scaled) => {
                 answer["move"] = json!(scaled.name);
-                self.motion(json!({"move": scaled}), client)?;
+                let name = scaled.name.clone();
+                self.motion_sending(client, re, &name, |lamp| {
+                    lamp.motion(json!({"move": scaled}), client)
+                })?;
             }
             None => answer["move"] = Value::Null,
         }
@@ -574,8 +686,10 @@ impl Lamp {
             }
             LookAt::Angles(Angles { yaw, pitch }) => json!({"yaw": yaw, "pitch": pitch}),
             LookAt::Target(LookTarget::Ahead) => json!("ahead"),
+            // One turn toward the face the eyes last showed, said by the body.
+            LookAt::Target(LookTarget::Face) => json!("face"),
             // Out of this release, said as that (the local leader, 29 Oct).
-            LookAt::Target(LookTarget::Face | LookTarget::Name) => {
+            LookAt::Target(LookTarget::Name) => {
                 return Err(Error::new(ErrorCode::Refused, NOT_IN_THIS_RELEASE));
             }
         };
@@ -719,7 +833,19 @@ impl Lamp {
                 ErrorCode::Refused,
                 "the ring took no light request (LAMP_LIGHT_REQUESTS off?)",
             )),
-            Ok(_) => Ok(()),
+            Ok(_) => {
+                // Its own pixels are kept to be shown as `shows.pixels` while it
+                // holds them; any other light from it (or its stop) ends that.
+                if let Some(watch) = &self.watch
+                    && let Ok(mut watch) = watch.lock()
+                {
+                    match &request.pixels {
+                        Some(pixels) => watch.hold_pixels(client, &request.light, pixels, until_us),
+                        None => watch.release_pixels(client),
+                    }
+                }
+                Ok(())
+            }
             Err(error) => Err(Error::new(
                 ErrorCode::Refused,
                 format!("the ring did not take it: {error}"),
@@ -735,6 +861,10 @@ impl Lamp {
         let mut line = json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS});
         if !rephrase {
             line["exact"] = json!(true);
+            // Who had it said, so the voice can tell `lamp.said` to this
+            // computer alone; a voice from before refuses it and the line
+            // is said again without (`say_to_voice`).
+            line["by"] = json!(client);
         }
         self.say_to_voice(client, re, line)
     }
@@ -1013,17 +1143,30 @@ impl Lamp {
         // connection). The outcome comes when the turn ends, as `done`; a
         // voice that can't be reached is a `done` dropped, with why.
         std::thread::spawn(move || {
-            let (how, why) = match ask_voice_for_say(&path, &line, &says, &client, number) {
-                Ok(Some(stream)) => {
-                    let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
-                    outcome(BufReader::new(stream))
-                }
-                Ok(None) => ("dropped", Some(format!("dropped: {STOPPED_BY_ASKER}"))),
-                Err(error) => (
-                    "dropped",
-                    Some(format!("the voice did not take it: {error}")),
-                ),
-            };
+            let attempt =
+                |line: &Value| match ask_voice_for_say(&path, line, &says, &client, number) {
+                    Ok(Some(stream)) => {
+                        let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
+                        outcome(BufReader::new(stream))
+                    }
+                    Ok(None) => ("dropped", Some(format!("dropped: {STOPPED_BY_ASKER}"))),
+                    Err(error) => (
+                        "dropped",
+                        Some(format!("the voice did not take it: {error}")),
+                    ),
+                };
+            let mut result = attempt(&line);
+            // A voice from before `by` refuses the field it doesn't know as
+            // no say request: said again without it, so a computer's line
+            // is still said (only `lamp.said` can't name it then).
+            if line.get("by").is_some()
+                && result.1.as_deref() == Some(&format!("refused: {NOT_ITS_PROTOCOL}"))
+            {
+                let mut plain = line.clone();
+                plain.as_object_mut().map(|fields| fields.remove("by"));
+                result = attempt(&plain);
+            }
+            let (how, why) = result;
             forget_say(&says, &client, number);
             let mut done = json!({"ev": "done", "re": re, "how": how});
             if let Some(why) = why {
@@ -1329,11 +1472,15 @@ fn waits_for(what: &str) -> Error {
 impl Parts for Lamp {
     fn act(&mut self, client: &str, re: u64, op: &Op, _now_us: u64) -> Result<Value, Error> {
         match op {
-            Op::Gesture { name } => self.motion(json!({"gesture": name}), client),
-            Op::Move { step_ms, frames } => self.motion(
-                json!({"move": {"name": "control", "step_ms": step_ms, "frames": frames}}),
-                client,
-            ),
+            Op::Gesture { name } => self.motion_sending(client, re, name, |lamp| {
+                lamp.motion(json!({"gesture": name}), client)
+            }),
+            Op::Move { step_ms, frames } => self.motion_sending(client, re, MOVE_NAME, |lamp| {
+                lamp.motion(
+                    json!({"move": {"name": MOVE_NAME, "step_ms": step_ms, "frames": frames}}),
+                    client,
+                )
+            }),
             Op::Light {
                 colour: Some(colour),
                 level,
@@ -1398,9 +1545,25 @@ impl Parts for Lamp {
                     .ok_or_else(|| not_here("the microphone"))?
                     .stream(client, *on, events)
             }
-            Op::Express { feeling, strength } => self.express(client, feeling, *strength),
+            Op::SpeakerStream { on, sample_rate } => {
+                let events = self.events.clone();
+                let speaker = self
+                    .speaker
+                    .clone()
+                    .ok_or_else(|| not_here("the speaker"))?;
+                // The stream is the connection's own: its frames come on it.
+                let conn = self.asking.ok_or_else(|| {
+                    Error::new(
+                        ErrorCode::Refused,
+                        "a speaker stream needs its own connection",
+                    )
+                })?;
+                speaker.stream(conn, client, client, *on, *sample_rate, events)
+            }
+            Op::Express { feeling, strength } => self.express(client, re, feeling, *strength),
             Op::Sound { name } => self.sound(client, re, name),
-            Op::Play { .. } => Err(waits_for("client packages")),
+            // The door sends a recorded move as a `move` (session.rs).
+            Op::Play { .. } => Err(waits_for("the door's recorded moves")),
             Op::TurnStart { prompt } => self.turn_start(client, re, prompt.as_deref()),
             _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
         }
@@ -1421,6 +1584,9 @@ impl Parts for Lamp {
     /// person, as before. Shut off the lock: a shutdown never waits.
     fn gone(&mut self, client: &str, now_us: u64) {
         self.stop(client, now_us);
+        if let Some(motions) = &self.motions {
+            motions.lock().expect("motions").gone(client);
+        }
         let (held, turns) = {
             let mut voice = self.voice.lock().expect("voice");
             (voice.mutes.remove(client), voice.turns.remove(client))
@@ -1434,6 +1600,14 @@ impl Parts for Lamp {
         {
             let _ = held.shutdown(Shutdown::Both);
         }
+    }
+
+    fn motion_done(&self) -> bool {
+        self.motions.is_some()
+    }
+
+    fn asking(&mut self, connection: Option<u64>) {
+        self.asking = connection;
     }
 
     fn state(&self, kind: StateKind) -> Value {
@@ -1455,6 +1629,10 @@ impl Parts for Lamp {
                 .microphone
                 .as_ref()
                 .is_some_and(|microphone| microphone.streaming(client, turn)),
+            Media::Speaker => self
+                .speaker
+                .as_ref()
+                .is_some_and(|speaker| speaker.streaming(client)),
         }
     }
 
@@ -1465,6 +1643,7 @@ impl Parts for Lamp {
                 .microphone
                 .as_ref()
                 .and_then(|microphone| microphone.newest_turn(client)),
+            Media::Speaker => None,
         }
     }
 
@@ -1480,10 +1659,18 @@ impl Parts for Lamp {
                     microphone.end(client);
                 }
             }
+            Media::Speaker => {
+                if let Some(speaker) = &self.speaker {
+                    speaker.end_client(client);
+                }
+            }
         }
     }
 
     fn stop(&mut self, client: &str, _: u64) {
+        if let Some(speaker) = &self.speaker {
+            speaker.end_client(client);
+        }
         if let Some(camera) = &mut self.camera {
             camera.end(client);
         }
@@ -1996,7 +2183,7 @@ mod tests {
         let asked = voice.join().unwrap();
         assert_eq!(
             asked,
-            json!({"skill": "control", "text": "Build passed.", "expires_in_ms": 30000, "exact": true})
+            json!({"skill": "control", "text": "Build passed.", "expires_in_ms": 30000, "exact": true, "by": "c_1"})
         );
         for _ in 0..200 {
             if !told.lock().unwrap().is_empty() {
@@ -2010,6 +2197,58 @@ mod tests {
                 "c_1".to_owned(),
                 json!({"ev": "done", "re": 14, "how": "finished"})
             )
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A voice from before `by` refuses the field as no say request: the
+    /// line is said again without it, and the computer's `done` is the
+    /// second try's, not a refusal.
+    #[test]
+    fn a_voice_that_refuses_by_is_asked_again_without_it() {
+        let dir = dir("say-older");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let voice = std::thread::spawn(move || {
+            let mut asked = Vec::new();
+            for answer in [
+                r#"{"outcome":"refused","why":"not a say request"}"#,
+                r#"{"outcome":"spoken"}"#,
+            ] {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                asked.push(serde_json::from_str::<Value>(&line).unwrap());
+                let mut out = &stream;
+                writeln!(out, "{answer}").unwrap();
+            }
+            asked
+        });
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        lamp.act(
+            "c_1",
+            14,
+            &op(r#"{"id":14,"op":"say","text":"Build passed."}"#),
+            0,
+        )
+        .unwrap();
+        let asked = voice.join().unwrap();
+        assert_eq!(asked[0]["by"], "c_1");
+        assert!(asked[1].get("by").is_none(), "{:?}", asked[1]);
+        assert_eq!(asked[1]["text"], "Build passed.");
+        for _ in 0..200 {
+            if !told.lock().unwrap().is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(
+            told.lock().unwrap()[0].1,
+            json!({"ev": "done", "re": 14, "how": "finished"})
         );
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -2168,6 +2407,16 @@ mod tests {
         lamp.act("c_1", 11, &op(r#"{"id":11,"op":"look","at":"ahead"}"#), 0)
             .unwrap();
         assert_eq!(looked.try_recv().unwrap().line, r#"{"look":"ahead"}"#);
+        // A face: the body's own line, for it to turn once toward the face
+        // the eyes last showed (row 34); a name is out of this release.
+        lamp.act("c_1", 12, &op(r#"{"id":12,"op":"look","at":"face"}"#), 0)
+            .unwrap();
+        assert_eq!(looked.try_recv().unwrap().line, r#"{"look":"face"}"#);
+        let error = lamp
+            .act("c_1", 13, &op(r#"{"id":13,"op":"look","at":"name"}"#), 0)
+            .unwrap_err();
+        assert_eq!(error.why, NOT_IN_THIS_RELEASE);
+        assert!(looked.try_recv().is_err(), "nothing sent for a name");
     }
 
     /// `sound` is the lamp's own short hum: the voice's built-in cue on the
@@ -2398,9 +2647,8 @@ mod tests {
                 r#"{"id":1,"op":"look","at":"ahead"}"#,
                 "lease socket is not on",
             ),
-            (r#"{"id":1,"op":"look","at":"face"}"#, NOT_IN_THIS_RELEASE),
             (r#"{"id":1,"op":"look","at":"name"}"#, NOT_IN_THIS_RELEASE),
-            (r#"{"id":1,"op":"play","name":"wave"}"#, "packages"),
+            (r#"{"id":1,"op":"play","name":"wave"}"#, "recorded moves"),
         ] {
             let error = lamp.act("c_1", 1, &op(frame), 0).unwrap_err();
             assert!(error.why.contains(waits), "{frame}: {}", error.why);

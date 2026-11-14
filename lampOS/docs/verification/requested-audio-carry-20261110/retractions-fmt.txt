@@ -1,0 +1,11 @@
+Diff in /private/tmp/third-requested-audio-carry-1110/lampOS/crates/voice/src/requested_audio.rs:433:
+         samples.sort_unstable();
+         let p95 = samples[samples.len() * 95 / 100];
+         let maximum = *samples.last().unwrap();
+-        eprintln!("recording admission, 256 calls: first {first:?}, p95 {p95:?}, max {maximum:?}; input allocation excluded, folding and phrase checks included");
++        eprintln!(
++            "recording admission, 256 calls: first {first:?}, p95 {p95:?}, max {maximum:?}; input allocation excluded, folding and phrase checks included"
++        );
+         assert!(maximum < std::time::Duration::from_millis(1));
+     }
+ 

@@ -5,14 +5,18 @@ what an office lamp sees and is doing. It came out of `where_you_sit` failing
 twice on lamp-52e6 on 20 Oct 2026. The cause was a person sitting to the side,
 and only a Mac's camera pointed at the lamp showed it.
 
-It is **off unless `LAMP_PEEK=on`**. It is **never in `deploy/product`**, and
-**never on a person's lamp**: putting it there would loosen privacy, which is
-the owner's call.
+It is **off unless `LAMP_PEEK=on`**. The office page (`on`) is **never on a
+person's lamp**: putting it there would loosen privacy, which is the owner's
+call. Monitor mode (`LAMP_PEEK=monitor`, [below](#monitor-mode-lamp_peekmonitor-5883-first-piece))
+is the way the owner's own lamp offers it: `deploy/product/lamp-peek.service`
+is on every lamp with neither set, and only the owner's switch in the app
+writes `monitor` (#5883).
 
 ## The one page
 
-`/` is one page with a sidebar: **Overview, Turns, Camera, Body, Health**
-(the lead's second step on #1711, 20 Oct, after V1's monitor). One event
+`/` is one page with a sidebar: **Overview, Timeline, Turns, Camera, Body,
+Health** (the lead's second step on #1711, 20 Oct, after V1's monitor;
+Timeline is #5883's second piece). One event
 stream (`GET /events`, server-sent events) keeps every section fresh: the
 camera's frame four times a second (`serve::PUSH_EVERY`), the others once a
 second. Each section is HTML made and escaped on the lamp (`crates/peek/src/page.rs`).
@@ -21,11 +25,44 @@ from the address but which section is shown.
 
 | Section | What it shows | Where it comes from |
 |---|---|---|
-| Overview | The voice's state; someone here or not; the camera's state, faces in view and who is followed; the lamp's health level and its worst item; the newest turn's first audio and the median of the last ten; any unit running another build than its release | the kept values below, the turns, `/status`'s rows |
+| Overview | The voice's state; the light shown (`on, blue at 3`, `off`); someone here or not; the camera's state, faces in view and who is followed; the lamp's health level and its worst item; the newest turn's first audio and the median of the last ten; any unit running another build than its release | the kept values below, `light/state`, the turns, `/status`'s rows |
+| Timeline | The newest 30 turns, newest first, step by step as V1's Flow Monitor: **heard**, **understood** (answered or held back, with the record's `admission_basis` and final words' time), **did** (the light asked for, when it changes, and each skill's stage), **said** (with the record's first audio and how it ended). Each step's time from the end of speech, the slowest wait marked, and the clock time in UTC. In monitor mode only, the words heard and said, and on top of the page and the section "Words anyone says to the lamp show here while this is on." | the bus ([below](#the-timeline-from-the-bus-5883-second-piece)), joined with the turns' records |
 | Turns | The newest 20 turns, newest first, as V1's Flow: what took the turn (`local_speech`, or the lamp's own: `skill_says`, `lamp_tells_news`...; `lamp_speaks_first` in records from before #2825), then from the end of speech the final words, the first token and the first audio, each with its own time in brackets and the slowest marked; then how it ended (`played`, `no audio`, `failed`, or why it was cut) and what held it, if anything did | the voice's own session records ([below](#turns-from-the-voices-records)) |
 | Camera | The frame `/cam.svg` draws, faces as boxes | as `/cam` |
 | Body | Each joint where it is against where it was last asked to be (`commanded`), how far off (marked past 0.05 rad) and its effort; the body's own word: its level and sentence, its state (`ready`, `paused`, `stopping`), `standing` from 0 folded to 1 standing, the warmest joint, "met resistance" in the last minute and since it started; its last stop and why, as it said it | `body/joint_states`; the body's diagnostic, sent by the body about the body (`watch::body_of`) |
 | Health | Each part's item as `lamp-health show` gives it: its level, its message as it says it (cut to 160 characters, escaped), and how long ago; the parts never heard from; each unit's build | `lamp/health`; `/status`'s rows |
+
+### The timeline from the bus (#5883, second piece)
+
+`timeline::Timeline` is fed by the same watcher as `/bus`, from the request
+number `voice/heard`, `voice/turn` and `voice/said` share (the records'
+`turn` is the same number):
+
+- **heard**: `voice/heard`, finished, with a request number; the end of
+  speech is its bus time. A turn the lamp began itself has no heard, and
+  its first step stands for the end of speech.
+- **understood**: `voice/turn`'s verdict. Held back ends the turn.
+- **did**: `light/command` when it differs from the light last asked for
+  (it is asked for again each second), and `skills/events`' skill and
+  stage (`triggered`, `asked`, `allowed`, `not allowed`, `done`), never its
+  `why`. Each goes to the newest turn that holds its time: from the turn's
+  first step until it ended, at most 60 s (`timeline::TURN_LASTS_MS`).
+  Outside a turn it is not shown. A function's name is not on the bus, so a
+  tool call shows only by the light or a skill it moved.
+- **said**: `voice/said`, finished. It ends the turn.
+
+A request number seen again more than 60 s after its turn began is another
+turn: the voice counts again from its start. The newest 30 turns are kept,
+in memory only (`timeline::KEPT`). These two topics are read only for the
+timeline: `/bus` neither counts nor lists them.
+
+**Words, in monitor mode only.** `main.rs` makes the timeline with words
+only for `LAMP_PEEK=monitor`. Then it keeps the finished words heard and
+said, each cut to 300 characters (`timeline::WORD_CHARS`), and the page
+shows them escaped. With `LAMP_PEEK=on` the words are never kept, so the
+office page shows the steps and times only. They are everyone's words in
+the room, not only the owner's (the first builder on #5883, 10 Nov), as
+the line on top of the page says.
 
 ### Turns from the voice's records
 
@@ -228,8 +265,11 @@ Tests: `tools/day-stages-test.sh`. Needs `jq`.
   say `closed` (the privacy switch, a mute), `not opening` or `failed`, or say
   nothing, the frame shows just that, with no box, point or presence. The
   faces kept on the bus are not even read.
-- **No words.** Of `voice/heard` and `voice/said` it keeps only whether the
-  piece is finished, the request number and the locale, never `text`. Of a
+- **No words, except monitor mode's timeline.** On `/bus`, and anywhere with
+  `LAMP_PEEK=on`, of `voice/heard` and `voice/said` it keeps only whether the
+  piece is finished, the request number and the locale, never `text`. In
+  monitor mode the Timeline shows the finished words heard and said
+  ([above](#the-timeline-from-the-bus-5883-second-piece)), and nowhere else. Of a
   diagnostic it keeps the part's name and level, and the eyes' `camera`
   value. A diagnostic's message is never shown on `/bus`. The one page
   shows two sentences the lamp makes about itself: the body's own (its
@@ -237,7 +277,7 @@ Tests: `tools/day-stages-test.sh`. Needs `jq`.
   and each part's health item, as the lead asked (#1711, 20 Oct). Both are
   cut to 160 characters and escaped. The turns are numbers and kinds only.
 - **No audio, no recording, and nothing kept.** What `/bus` holds is in memory,
-  60 lines at most.
+  60 lines at most; the timeline, 30 turns.
 
 ## It reads, it never writes
 
@@ -290,7 +330,7 @@ and it is not started again, since on port 80 it would keep the port from
 setup, which ends serving at once on a port still held (`serve.rs`). It
 comes back at the lamp's next boot once setup is done. Before this, an
 in-place reset on such a lamp left setup with no page on the hotspot
-(#4536). Product lamps don't install it. It has no `Conflicts=`
+(#4536). The product's unit (`deploy/product/lamp-peek.service`, monitor mode only) sits outside `lampos.target` for the same reasons. It has no `Conflicts=`
 with `lamp-setup.service`: both are wanted by `multi-user.target`, and at
 boot after a reset systemd would keep this unit's start and drop setup's,
 and then this unit's condition fails and nothing listens (the reviewer on
@@ -325,6 +365,62 @@ token, or with one too short, it refuses to start (exit 2).
 - Without the token, a request gets only the form: nothing of the lamp.
 - Every answer is `Cache-Control: no-store`, `Referrer-Policy: no-referrer`,
   `X-Frame-Options: DENY`.
+
+## Monitor mode: `LAMP_PEEK=monitor` (#5883, first piece)
+
+A developer who owns the lamp opens the same page from a computer or phone
+on the same Wi-Fi, by a one-time link from the app. The product installs
+`deploy/product/lamp-peek.service` (outside `lampos.target`, as `lampos`)
+with no `LAMP_PEEK`, so nothing listens; lamp-cloud's `monitor.set` (with
+`LAMP_APP_MONITOR=on`, cloud.md, "The dev monitor") has root's helper write
+the drop-in below and restart it, or stop it and remove the drop-in, and
+`monitor.link` asks the admin socket for the code. Its second piece, the
+[timeline](#the-timeline-from-the-bus-5883-second-piece), shows the words
+heard and said in this mode only; camera frames are a later piece of #5883's
+plan. **Off by default:** with `LAMP_PEEK` unset, or anything but `on` or
+`monitor` exactly, the binary ends at once, nothing listens and no admin
+socket is made.
+
+```ini
+# /etc/systemd/system/lamp-peek.service.d/monitor.conf
+[Service]
+Environment=LAMP_PEEK=monitor
+```
+
+- **Where:** `0.0.0.0:80` unless `LAMP_PEEK_LISTEN` says otherwise, so the
+  page is `http://lamp-xxxx.local/`. The static token is not read: no
+  `/token` form or `Authorization` header opens it.
+- **Local network only.** A request from a peer outside 10/8, 172.16/12,
+  192.168/16, 169.254/16, fe80::/10, fc00::/7 or loopback (IPv4 mapped in
+  IPv6 read as IPv4) gets 403 and nothing of the lamp. `Host` must be the
+  lamp's host name, its `.local` name (`/proc/sys/kernel/hostname`), or the
+  address the request came to, with or without a port; any other name gets
+  403 (DNS rebinding). Both checks come before anything else, on every path.
+- **The way in, a one-time code.** lamp-cloud asks on the admin socket,
+  `/run/lampos-peek/admin.sock` (`LAMP_PEEK_ADMIN_SOCKET`; the unit's
+  `RuntimeDirectory=lampos-peek`, mode 0700, socket 0600: the lamp's user
+  and root only). Each connection gets one code, 32 random bytes as 64 hex
+  digits, followed by a newline. A code is good **once**, for **5 minutes**
+  (`monitor::CODE_LASTS`); at most 8 wait at once, the oldest going first.
+- **The link carries the code in its fragment**, `http://lamp-xxxx.local/in#<code>`,
+  so it is never in a request line or a log. `/in`'s few lines of script
+  wipe the fragment from the address and history, post the code once
+  (`POST /in`, `code=...`), and open `/`. A code in the address (`?code=`)
+  is refused (400) and not spent.
+- **A session cookie, in memory only:** `peek_session=<64 hex>; HttpOnly;
+  SameSite=Strict; Path=/`, a random value, not the code. It opens every
+  view and the stream. Sessions end after 12 hours, when peek stops or
+  restarts (nothing is written), or when the switch goes off; a stream
+  already open ends with its session, checked before each push and again
+  before a push's sections are sent; a push still reading when the session
+  ends is dropped there and sends nothing. At most 4 are
+  open; a fifth code gets 429 and is kept for when one ends.
+- A used, expired or unknown code gets 401: "This link was used or is out of
+  date: get a new one in the app." Without a session, every view gets 401 and
+  only "Open the dev monitor from its link in the app."
+- **Plain HTTP, as V1's monitor was:** on the home network the cookie
+  crosses in clear; anyone on that Wi-Fi who reads it can open the page
+  until it ends.
 
 ## What it cannot see
 
@@ -393,7 +489,7 @@ own, and asks for it over HTTP:
   for the network with no token or a short one, and 0, saying it is off,
   without `LAMP_PEEK=on`.
 - `the_one_page_streams_each_section_and_never_a_word`: on a real bus and a
-  session folder of its own, the stream carries all five sections:
+  session folder of its own, the stream carries all six sections:
   - a turn's steps with their own times and the slowest marked;
   - a turn the lamp began itself, and what held it;
   - an elbow 0.2 off where it was asked to be;
@@ -401,7 +497,8 @@ own, and asks for it over HTTP:
   - a health item's `<script>` escaped, and a part never heard from.
 
   A word planted in a `transcript` record, in `voice/heard` and among the
-  body's values is in no section, nor on the page.
+  body's values is in no section, nor on the page; the timeline has the
+  turn heard without its words, and no words line.
 - `the_stream_reads_only_and_asks_for_the_token`: POST, PUT, DELETE and
   PATCH get 405; without the token, 401 and no event; with its cookie, the
   sections.
@@ -415,6 +512,42 @@ own, and asks for it over HTTP:
   setup condition, no `Conflicts=` with setup, and its one capability.
 - `the_units_are_read_once_however_many_ask_at_once`: four asking at once
   while the rows have run out make one read.
+- Monitor mode (#5883):
+  - `monitor_mode_is_off_by_default_and_nothing_listens`: `LAMP_PEEK`
+    unset, `off`, `MONITOR` or `monitor ` ends the binary at 0; nothing
+    answers on the port and no admin socket is made.
+  - `monitor_mode_refuses_an_off_lan_peer_and_a_foreign_host`: a peer at
+    203.0.113.9 gets 403 on every view, `/in` and the stream; from the
+    LAN, `Host` other than the lamp's names or address gets 403, and the
+    lamp's own gets the way in, the views 401 without a session.
+  - `monitor_mode_a_code_opens_once_and_its_cookie_dies_with_a_restart`:
+    the binary on a real socket; the admin socket is 0600; `?code=` is 400;
+    the code posted once sets the cookie, which opens every view; posted
+    again it is 401; the token's form opens nothing; after a restart the
+    cookie gets 401.
+  - `monitor_mode_an_open_stream_ends_with_its_session`: an open `/events`
+    ends when its session does; then `/bus` with the cookie is 401.
+  - `monitor_mode_a_session_ending_during_a_read_sends_nothing_read_after`:
+    units read slowly, returning a row of their own 1 s after the session's
+    end; the stream ends within 500 ms of the end without that row, and
+    `/bus` is 401.
+  - `monitor::tests`: a code works once; on a fake clock it is good at
+    4:59 and refused at 5:00; a fifth browser is refused and sessions end at
+    12 h; a new gate (a restart) knows no session or code; the LAN and
+    `Host` tables.
+  - `tests::only_monitor_asks_for_monitor_mode`.
+  - `monitor_mode_the_timeline_shows_a_turn_in_order_with_its_words_escaped`:
+    a turn planted on a real bus (heard, verdict, light, the same light
+    again, a skill, said) and a record of its stages: the timeline shows
+    heard, understood with the final words' time, the light once, the
+    skill, said with the first audio, in that order with rising times from
+    +0 ms and one step marked slowest; `<script>` in the words is escaped;
+    the skill's `why` is not shown; `/bus` has no word; the page carries the
+    words line.
+  - `timeline::tests`: the newest 30 kept; what the lamp did goes to the
+    turn that holds its time, and not before it, after it ended or after a
+    held-back verdict; a number seen again 60 s later is another turn;
+    words cut to 300 characters.
 - `units::tests::a_command_past_its_deadline_is_killed_and_tells_nothing`:
   a command that ends tells its output; `sleep 30` with a 200 ms deadline
   tells nothing, well within 5 s; past the deadline none is started.

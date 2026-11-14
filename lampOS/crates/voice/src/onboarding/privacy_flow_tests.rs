@@ -444,6 +444,7 @@ fn stalled_old_done_cannot_overwrite_redo_or_publish_its_acknowledgement() {
             framing: None,
             offered_at_unix_s: None,
             later_offers: 0,
+            ended_at_unix_ms: None,
         },
     );
     walk.desired.privacy_done_attempt = Some(BootId::new([9; 16]).unwrap());
@@ -487,6 +488,7 @@ fn older_completion_never_replaces_a_newer_desired_snapshot() {
             framing: None,
             offered_at_unix_s: None,
             later_offers: 0,
+            ended_at_unix_ms: None,
         },
     );
     walk.save();
@@ -501,6 +503,7 @@ fn older_completion_never_replaces_a_newer_desired_snapshot() {
             framing: None,
             offered_at_unix_s: None,
             later_offers: 0,
+            ended_at_unix_ms: None,
         },
     );
     walk.save();
@@ -588,6 +591,7 @@ fn a_storage_failure_retries_no_write_until_an_explicit_mailbox_redo() {
             framing: None,
             offered_at_unix_s: None,
             later_offers: 0,
+            ended_at_unix_ms: None,
         },
     );
     walk.save();
@@ -653,6 +657,7 @@ fn a_consumed_redo_mailbox_batch_is_not_replayed_by_the_next_voice_cycle() {
             framing: None,
             offered_at_unix_s: None,
             later_offers: 0,
+            ended_at_unix_ms: None,
         },
     );
     first.save();

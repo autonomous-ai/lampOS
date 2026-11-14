@@ -261,6 +261,23 @@ next step (`Grids::first`), so a name a later grid hears best is heard up
 to 0.4 s after it was said, plus the time the catch-up takes, within the two
 bounds below; past them it is let go.
 
+**Dated by the sound, not by when its score came (#6114).** A step's score
+says how many steps back the sound its name score is of (`Score::late`: 0
+for the first grid's own and a later grid's on time). lamp-name dates a
+hearing from that sound (`Hearings::score_of`): the newest step is the one
+that just came, each step before it is 80 ms older, and a late score is
+`late` steps older again. So `name/heard`'s and `name/rising`'s `ago_ms`
+reach back to where the name was said, and the voice, which dates a hearing
+as its arrival less `ago_ms`, finds a "Lamp" at a line's start inside its
+start window, even when only a woken grid's score a second later reached
+the bar (lamp-52e6, #6078: the first grid gave 0.27–0.79 at the start, and
+the 0.89–0.94 that came 2.0–2.7 s in were of that same "Lamp"). A late score
+of sound inside the hold-off after a hearing is passed over, so one call is
+still one hearing. The hold-off counts from the sound that ended the
+hearing, not from when its scores came (#6114): in a woken grid's batch, a
+stray hearing early in the batch no longer passes over a call 1.5 s later
+in the same batch. `check` dates its lines the same way.
+
 The later grids run on a thread of their own (`hear::Woken`), so the first
 grid's steps, and its own hearing, never wait for them: a wake's catch-up
 took 0.95 to 1.16 s of one core on lamp-75c9. Done on lamp-name's own loop,
@@ -330,8 +347,28 @@ a skipped count, or half a second or more between two by the voice's own
 monotonic clock (the bus message's `at_us`), or a new publisher (the voice
 restarted). Not by when lamp-name got to them, since a woken grid's
 catch-up can keep blocks waiting, and not by a wall clock, which a lamp
-with no battery clock has set 30 to 70 s after boot (#2759). Then the models start afresh: they need about two seconds of sound
-before they give a score again. A hearing that was open at that moment is
+with no battery clock has set 30 to 70 s after boot (#2759). Then the models start afresh.
+
+**The silence before a start (#6114).** A score is of 2.03 s of sound, so
+from nothing the models gave no score for the first two seconds after a
+start or a fresh start, and a "Lamp" said in the first second and a half
+had no score of its own: on 52e6, the first "Lamp, …" after a restart was
+missed with `heard=0` and no near hearing. On a clip, said 0 to 1 s after a
+start it scored 0.0000 to 0.04, and 0.95 at 2 s. Now a start and every
+fresh start take 1.95 s of silence as heard before them (`quiet::LEAD`, a
+window less a step): the first 80 ms of sound already gives a score, and
+the same clips score 0.88 to 0.9999 at `--step-ms 10` (four lines without
+the name, at most 0.21). It is digital zeros, never a guess at the room.
+With no `--quiet-below` the models' state after it is worked out once, at
+load (`Hearer::with_lead`), and each start and fresh start copies it back:
+no model runs for it on the loop (#6462; heard at every fresh start, it
+cost 0.3 to 0.7 s of lamp-4ace, and a lost block is a fresh start, so
+blocks waiting behind it could be lost in turn). So `longest_block_ms`
+never holds it. With `--quiet-below` it is kept, and heard only when sound
+comes, as part of the start after a rest. `check` dates each score from
+the file's start: the first is of its first 80 ms.
+
+A hearing that was open at that moment is
 said then, dated from its first high score (it was dated 0.8 s earlier
 than that until 2026-10-14, which left a call 0.7 s, not 1.5 s, to count
 for the request after it).
@@ -446,7 +483,13 @@ looks at whether the lamp speaks, and as the message arrives). With
 `voice/state` and passes over a hearing that began while it said
 `speaking`, or within 0.6 s after (a score reaches the bar a little after
 its sound, and the room rings on). Its first sign and its final word are
-judged once, together. A voice unheard for 2.5 s, or gone, is not speaking.
+judged once, together. With `--near`, a name hearing is judged from the
+call's first sound: the near bar's hearing going on, when it began up to
+0.5 s before the name's (`not_self::call_began`, `CALL_LEAD`, #6114). On
+lamp-52e6 on 12 Nov a "Lamp" called as the lamp began to speak went out on
+`name/near` at 0.972, its near hearing begun before the speech, while the
+name's own hearing, begun a step later inside it, was passed over, and no
+request opened. Now the two are judged as one call. A voice unheard for 2.5 s, or gone, is not speaking.
 Each one passed over is a journal line ("passed over a hearing that began
 while the lamp spoke", with its score), no sound, and the minute line counts
 them (`passed_over_in_all`). Any hearing that began within 3 s after the

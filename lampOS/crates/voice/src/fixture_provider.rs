@@ -467,6 +467,11 @@ impl FixtureProvider {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::WalkUnderWay {
+                request,
+                privacy_generation,
+                ..
+            }
             | ProviderInput::WokenByName {
                 request,
                 privacy_generation,
@@ -577,6 +582,7 @@ impl FixtureProvider {
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. }
             | ProviderInput::TurnOpened { .. }
+            | ProviderInput::WalkUnderWay { .. }
             | ProviderInput::WokenByName { .. } => {}
             ProviderInput::End { .. } => {
                 let input = self
@@ -747,6 +753,7 @@ impl FixtureProvider {
                         .ok_or_else(|| invalid("fixture output sequence exhausted"))?;
                     // Each fixed-size event is its own bounded provider packet.
                     ProviderOutput::Audio {
+                        spoken: true,
                         request,
                         sequence: self.output_sequence,
                         provider_event_at_us: now_us,

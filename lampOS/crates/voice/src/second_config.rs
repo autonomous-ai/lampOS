@@ -436,7 +436,7 @@ fn load_reporting(path: &Path) -> io::Result<(SecondConfig, Option<String>)> {
     let stt = match given(raw.deepgram_credential_file) {
         Some(file) => Stt::Deepgram { key: key(&file)? },
         None => Stt::Autonomous {
-            base_url: checked_url(stt_base_url)?,
+            base_url: checked_service_url(stt_base_url)?,
             key: key(&stt_file)?,
         },
     };
@@ -521,7 +521,7 @@ fn load_reporting(path: &Path) -> io::Result<(SecondConfig, Option<String>)> {
         stt_language: given(raw.stt_language),
         stt_key_terms: Vec::new(),
         stt_flux: false,
-        tts_base_url: checked_url(tts_base_url)?,
+        tts_base_url: checked_service_url(tts_base_url)?,
         tts_key: key(&tts_file)?,
         tts_provider,
         tts_voice: given(raw.tts_voice),
@@ -761,11 +761,11 @@ impl SecondConfig {
             self.pinned.chat = true;
         }
         if let Some(url) = given(SPEECH_BASE_URL_ENV)? {
-            self.tts_base_url = checked_url(url).map_err(named(SPEECH_BASE_URL_ENV))?;
+            self.tts_base_url = checked_service_url(url).map_err(named(SPEECH_BASE_URL_ENV))?;
             self.pinned.speech = true;
         }
         if let Some(url) = given(LISTENING_BASE_URL_ENV)? {
-            let url = checked_url(url).map_err(named(LISTENING_BASE_URL_ENV))?;
+            let url = checked_service_url(url).map_err(named(LISTENING_BASE_URL_ENV))?;
             if let Stt::Autonomous { base_url, .. } = &mut self.stt {
                 *base_url = url;
             }
@@ -821,6 +821,73 @@ impl SecondConfig {
         }
         Ok(self)
     }
+}
+
+/// The desktop-only switch that lets the speech-to-text and text-to-speech
+/// base URLs be plain `http://127.0.0.1:PORT` or `http://[::1]:PORT` (a local
+/// service, lamp-sim's, reached by the real voice). Off unless it is exactly
+/// `on`; no product unit sets it (a test reads the units).
+pub const LOOPBACK_SERVICES_ENV: &str = "LAMP_VOICE_LOOPBACK_SERVICES";
+
+/// Whether [`LOOPBACK_SERVICES_ENV`] is `on`.
+pub(crate) fn loopback_services_on() -> bool {
+    switch_is_on(std::env::var(LOOPBACK_SERVICES_ENV).ok().as_deref())
+}
+
+/// `on`, and nothing else (not `ON`, `1`, `true` or ` on`).
+fn switch_is_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// The parsed `url` when it is a plain local service address: scheme `http`
+/// (or `ws`), its PARSED host the literal `127.0.0.1` or `::1` (never
+/// `localhost`, a name or another address), no user, password, query or
+/// fragment, at most 2048 bytes. Says nothing about the switch.
+fn loopback_parsed(url: &str) -> Option<reqwest::Url> {
+    let parsed = reqwest::Url::parse(url).ok()?;
+    // `host_str` is the parsed host: an IPv4 as its dotted form, an IPv6 in
+    // brackets; a name stays a name, so `localhost` is not either.
+    (url.len() <= 2048
+        && matches!(parsed.scheme(), "http" | "ws")
+        && parsed.username().is_empty()
+        && parsed.password().is_none()
+        && parsed.query().is_none()
+        && parsed.fragment().is_none()
+        && matches!(parsed.host_str(), Some("127.0.0.1" | "[::1]")))
+    .then_some(parsed)
+}
+
+/// Whether `url` is a plain local service address ([`loopback_parsed`]).
+pub(crate) fn is_loopback_literal(url: &str) -> bool {
+    loopback_parsed(url).is_some()
+}
+
+/// [`checked_url`] for a speech-to-text or text-to-speech base URL (and for
+/// them only, never the language model's, Gemini's, DeepSeek's or the search's):
+/// https as ever, or, with [`LOOPBACK_SERVICES_ENV`] `on`, a local plain
+/// `http` address ([`loopback_parsed`]), kept as it parsed, so the address
+/// stored is the one checked. Anything else is refused as before.
+pub(crate) fn checked_service_url(url: String) -> io::Result<String> {
+    checked_service_url_with(url, loopback_services_on())
+}
+
+/// [`checked_service_url`] with the switch given (the tests', so that none
+/// sets a process-wide variable).
+fn checked_service_url_with(url: String, loopback_on: bool) -> io::Result<String> {
+    if loopback_on
+        && let Some(parsed) = loopback_parsed(&url).filter(|parsed| parsed.scheme() == "http")
+    {
+        // The parsed form writes a bare host's path as `/`; the base URLs are
+        // kept without a trailing slash.
+        let stored = parsed.as_str();
+        let stored = if parsed.path() == "/" {
+            stored.trim_end_matches('/')
+        } else {
+            stored
+        };
+        return Ok(stored.to_owned());
+    }
+    checked_url(url)
 }
 
 /// A service URL as the file's are taken: https, a host, no `?`, `#` or `@`,
@@ -1677,5 +1744,166 @@ mod tests {
         assert_eq!(spoken.stt_language.as_deref(), Some("ja"));
         assert_eq!(spoken.tts_model.as_deref(), Some("eleven_v4_turbo"));
         assert_eq!(spoken.tts_voice, None);
+    }
+}
+
+#[cfg(test)]
+mod loopback_tests {
+    use super::*;
+
+    const ADDRESSES: [&str; 6] = [
+        "http://127.0.0.1:8123",
+        "http://127.0.0.1:8123/v1",
+        "http://[::1]:8123",
+        "http://[::1]:8123/v1",
+        "ws://127.0.0.1:8123",
+        "ws://[::1]:9",
+    ];
+
+    #[test]
+    fn only_the_two_loopback_literals_are_local_plain_addresses() {
+        for url in ADDRESSES {
+            assert!(is_loopback_literal(url), "{url}");
+        }
+        for url in [
+            "http://localhost:8123",
+            "http://127.0.0.2:8123",
+            "http://0.0.0.0:8123",
+            "http://192.168.1.5:8123",
+            "http://example.invalid:8123",
+            "http://127.0.0.1.example.invalid:8123",
+            "http://user@127.0.0.1:8123",
+            "http://user:pass@127.0.0.1:8123",
+            "http://127.0.0.1:8123/?a=1",
+            "http://127.0.0.1:8123/#x",
+            "https://127.0.0.1:8123",
+            "wss://127.0.0.1:8123",
+            "ftp://127.0.0.1",
+            "127.0.0.1:8123",
+            "",
+        ] {
+            assert!(!is_loopback_literal(url), "{url}");
+        }
+        let long = format!("http://127.0.0.1:8123/{}", "a".repeat(2048));
+        assert!(!is_loopback_literal(&long));
+    }
+
+    #[test]
+    fn a_local_plain_address_needs_the_switch_and_everything_else_is_as_before() {
+        for url in ADDRESSES {
+            // A base URL is `http` only (the STT socket's `ws` is made from
+            // it); a `ws` address is a literal, not a base.
+            assert_eq!(
+                checked_service_url_with(url.to_owned(), true).is_ok(),
+                url.starts_with("http://"),
+                "{url}"
+            );
+            // Off: the refusal every plain address has always had.
+            let refused = checked_service_url_with(url.to_owned(), false);
+            if url.starts_with("http://") {
+                assert_eq!(
+                    refused.unwrap_err().to_string(),
+                    "service URL must be https with a host",
+                    "{url}"
+                );
+            }
+        }
+        // On, a plain address that is not local is still refused, and an https
+        // address is taken as ever.
+        for url in [
+            "http://localhost:8123",
+            "http://example.invalid",
+            "http://127.0.0.2:8123",
+            "http://user@127.0.0.1:8123",
+        ] {
+            assert_eq!(
+                checked_service_url_with(url.to_owned(), true)
+                    .unwrap_err()
+                    .to_string(),
+                "service URL must be https with a host",
+                "{url}"
+            );
+        }
+        assert!(checked_service_url_with("https://stt.example.invalid/v1".into(), true).is_ok());
+        assert!(checked_service_url_with("https://stt.example.invalid/v1".into(), false).is_ok());
+    }
+
+    /// The address kept is the parsed one, the one that was checked: the
+    /// looser spellings of 127.0.0.1 come out as it, and a stray newline or
+    /// tab is gone.
+    #[test]
+    fn the_address_kept_is_the_one_that_was_checked() {
+        for (given, kept) in [
+            ("http://127.0.0.1:8123", "http://127.0.0.1:8123"),
+            ("http://127.0.0.1:8123/", "http://127.0.0.1:8123"),
+            ("http://127.0.0.1:8123/v1", "http://127.0.0.1:8123/v1"),
+            ("http://0x7f.0.0.1:8123", "http://127.0.0.1:8123"),
+            ("http://127.1:8123", "http://127.0.0.1:8123"),
+            ("HTTP://127.0.0.1:8123", "http://127.0.0.1:8123"),
+            ("http://127.0.0.1:8123\n", "http://127.0.0.1:8123"),
+            ("http://[::1]:8123", "http://[::1]:8123"),
+        ] {
+            assert_eq!(
+                checked_service_url_with(given.to_owned(), true).unwrap(),
+                kept,
+                "{given:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_language_models_address_never_takes_a_plain_local_one() {
+        // `checked_url`, which the language model's, Gemini's, DeepSeek's and the
+        // search's addresses use, knows nothing of the switch.
+        for url in ADDRESSES {
+            assert!(checked_url(url.to_owned()).is_err(), "{url}");
+        }
+    }
+
+    #[test]
+    fn the_switch_is_on_only_when_it_says_on() {
+        assert!(switch_is_on(Some("on")));
+        for value in [
+            None,
+            Some(""),
+            Some("ON"),
+            Some("On"),
+            Some("1"),
+            Some("true"),
+            Some(" on"),
+            Some("on "),
+        ] {
+            assert!(!switch_is_on(value), "{value:?}");
+        }
+    }
+
+    #[test]
+    fn no_product_unit_sets_the_loopback_switch() {
+        let directory =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+        let mut seen = 0;
+        for entry in std::fs::read_dir(&directory).unwrap() {
+            let path = entry.unwrap().path();
+            // The units and the drop-ins (`own-keys-voice.conf`, ...) all
+            // carry `Environment=` lines.
+            if path
+                .extension()
+                .is_none_or(|extension| extension != "service" && extension != "conf")
+            {
+                continue;
+            }
+            seen += 1;
+            let text = std::fs::read_to_string(&path).unwrap();
+            assert!(
+                !text.contains(LOOPBACK_SERVICES_ENV),
+                "{} sets {LOOPBACK_SERVICES_ENV}: a desktop-only switch, never a product's",
+                path.display()
+            );
+        }
+        assert!(
+            seen > 20,
+            "only {seen} product units found in {}",
+            directory.display()
+        );
     }
 }

@@ -13,6 +13,11 @@ enum Lamp {
     Says(&'static str),
     Calls(&'static str, &'static str),
     CallsWithStale(&'static str, &'static str),
+    /// A `remember` of this text, then a line.
+    Keeps(&'static str, &'static str),
+    /// A `remember` of this text with a line in the same round, then the
+    /// line again.
+    KeepsAsking(&'static str, &'static str),
 }
 
 impl Lamp {
@@ -21,6 +26,7 @@ impl Lamp {
         match self {
             Lamp::Says(_) => "",
             Lamp::Calls(name, _) | Lamp::CallsWithStale(name, _) => name,
+            Lamp::Keeps(..) | Lamp::KeepsAsking(..) => crate::remember::REMEMBER,
         }
     }
 }
@@ -35,6 +41,9 @@ const WROTE: &str = "(the lamp wrote) ";
 
 /// What the engine ran and what the model was told over `turns`.
 struct Ran {
+    second_audio_calls: usize,
+    second_voice_prints: usize,
+    second_voice_judgment: crate::same_voice::Confirmed,
     /// Each forget run, by name and arguments.
     forgets: Vec<(String, Value)>,
     /// What each chat round was asked.
@@ -48,6 +57,9 @@ struct Ran {
     marked: Vec<(String, bool)>,
     /// Every call run, by name and arguments, in order.
     calls: Vec<(String, Value)>,
+    /// For each `remember` run, the words its scope was marked as a yes to
+    /// a held keep about ([`crate::memory_scope::ScopeLease::released_keep`]).
+    released: Vec<Option<String>>,
 }
 
 async fn run(turns: &[Turn]) -> Ran {
@@ -111,8 +123,20 @@ async fn run_full(
     turns: &[Turn],
     sight: Option<&[Sight]>,
     first: u64,
+    switches: (bool, bool),
+    result: Value,
+) -> Ran {
+    run_full_with_audio(turns, sight, first, switches, result, false).await
+}
+
+/// The same actual Engine fixture through the optional spoken-audio runner.
+async fn run_full_with_audio(
+    turns: &[Turn],
+    sight: Option<&[Sight]>,
+    first: u64,
     (spelling, doubt_undoes): (bool, bool),
     result: Value,
+    requested_audio: bool,
 ) -> Ran {
     use crate::speaking_faces::{SpeakingFaces, known_face_of};
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -120,6 +144,20 @@ async fn run_full(
     for (who, _, lamp, _) in turns {
         match lamp {
             Lamp::Says(line) => chats.push_back(vec![text(line), Ok(ChatEvent::Done)]),
+            Lamp::Keeps(kept, line) => {
+                let calls = vec![call("c1", crate::remember::REMEMBER, json!({"text": kept}))];
+                chats.push_back(vec![Ok(ChatEvent::ToolCalls(calls)), Ok(ChatEvent::Done)]);
+                chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
+            }
+            Lamp::KeepsAsking(kept, line) => {
+                let calls = vec![call("c1", crate::remember::REMEMBER, json!({"text": kept}))];
+                chats.push_back(vec![
+                    text(line),
+                    Ok(ChatEvent::ToolCalls(calls)),
+                    Ok(ChatEvent::Done),
+                ]);
+                chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
+            }
             Lamp::Calls(name, line) | Lamp::CallsWithStale(name, line) => {
                 let mut calls = vec![call("c1", name, json!({"name": who}))];
                 if matches!(lamp, Lamp::CallsWithStale(_, _)) {
@@ -151,7 +189,15 @@ async fn run_full(
     let lines_seen = lines.clone();
     let marked = Arc::new(Mutex::new(Vec::new()));
     let marks = marked.clone();
+    let released = Arc::new(Mutex::new(Vec::new()));
+    let releases = released.clone();
     let runner: ScopedToolRunner = Arc::new(move |request, heard, name, args, scope| {
+        if name == crate::remember::REMEMBER {
+            releases
+                .lock()
+                .unwrap()
+                .push(scope.released_keep().map(str::to_owned));
+        }
         if crate::remember::is_forget(&name) {
             marks
                 .lock()
@@ -178,12 +224,23 @@ async fn run_full(
     ));
     let cache = Arc::new(FaceCache::default());
     let (engine, _, now) = scripted(script.clone());
+    let second_owner = Arc::new(crate::same_voice::OwnerVoice::new(0.45));
+    // The cache keys are memory person IDs, not the display names used by
+    // the scripted eyes. Match the admitted ScopeSnapshot's identity.
+    let second_person = crate::remember::person_id("A");
+    for request in 100..104 {
+        assert!(second_owner.learn(&second_person, request, vec![1.0, 0.0, 0.0]));
+    }
+    let engine = engine.confirming_by_voice(super::super::VoiceConfirms {
+        owner: second_owner.clone(),
+        print_of: Arc::new(|_| None),
+    });
     let eyes = Arc::new(SpeakingFaces::default());
     let mut engine = engine
         .with_memory_scope(
             lamp_turn_owner::BootId::new([12; 16]).unwrap(),
             cache.clone(),
-            runner,
+            runner.clone(),
             Some(Arc::new(|_: &crate::memory_scope::ScopeLease| Told {
                 text: "SYSTEM with old private context".into(),
                 after: Some("old private context".into()),
@@ -192,7 +249,20 @@ async fn run_full(
         )
         .announcing(false)
         .holding_forgets_through_spelling(spelling)
-        .undoing_doubted_keeps(doubt_undoes);
+        .undoing_doubted_keeps(doubt_undoes)
+        .asking_near_heard_words(NEAR_ASKS.with(|on| on.replace(false)));
+    let audio_calls = Arc::new(AtomicUsize::new(0));
+    if requested_audio {
+        let seen = audio_calls.clone();
+        engine = engine.requesting_audio(
+            lamp_turn_owner::BootId::new([12; 16]).unwrap(),
+            Arc::new(move |context, call, scope| {
+                seen.fetch_add(1, Ordering::SeqCst);
+                let running = runner(context.request, true, call.name, call.args, scope);
+                Box::pin(async move { crate::tools::ToolAnswer::plain(running.await) })
+            }),
+        );
+    }
     if sight.is_some() {
         engine = engine.confirming_forgets_by_sight(eyes.clone(), path.clone());
     }
@@ -296,13 +366,24 @@ async fn run_full(
     let asked = script.asked.lock().unwrap().clone();
     let lines = lines.lock().unwrap().clone();
     let marked = marked.lock().unwrap().clone();
+    let released = released.lock().unwrap().clone();
     Ran {
+        second_audio_calls: audio_calls.load(Ordering::SeqCst),
+        second_voice_prints: second_owner.known(&second_person),
+        second_voice_judgment: second_owner.judge(&second_person, &[1.0, 0.0, 0.0]),
         forgets,
         asked,
         lines,
         marked,
         calls,
+        released,
     }
+}
+
+thread_local! {
+    /// `LAMP_MEMORY_ASK_NEAR_HEARD` ([`Engine::asking_near_heard_words`])
+    /// for the next [`run_full`] on this thread, once.
+    static NEAR_ASKS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 const FACE: &str = crate::known_faces::FORGET;
@@ -1356,6 +1437,7 @@ async fn a_lines_end_records_who_was_seen_saying_it() {
                 speakers: vec![format!("eyes/{speaker}")],
                 known: Some(("A".to_owned(), "eyes/f1".to_owned())),
                 enrollment: None,
+                by_voice: false,
             }),
         )
     };
@@ -1658,6 +1740,133 @@ async fn a_keep_the_next_round_doubts_is_taken_back_until_their_yes() {
     }
 }
 
+/// C37, the memory owner's call A (11 Nov). On lamp-06c1 on 10 Nov, twice,
+/// "ranunculus" was heard as "renunctinus", kept in round 1, and round 2
+/// asked "Kept as you said it … is that ranunculus?". That keep is taken
+/// back at once, nothing of the misheard word stays kept, and their yes
+/// keeps the word asked. A no keeps nothing; a reply asking nothing, or a
+/// keep someone else made, is never taken back.
+#[tokio::test]
+async fn a_keep_its_next_round_offers_another_word_for_waits_for_their_yes_to_that_word() {
+    const REMEMBER: &str = crate::remember::REMEMBER;
+    const FORGET: &str = crate::remember::FORGET;
+    const MISHEARD: &str = "Their favorite flower is a renunctinus.";
+    const SAID: &str = "Remember that my favorite flower is a renunctinus.";
+    let asks = Lamp::Keeps(MISHEARD, "Kept as you said it \u{2026} is that ranunculus?");
+    let a: Sight = (&["A"], true);
+    let b: Sight = (&["B"], true);
+    let keep = |text: &str| (REMEMBER.to_owned(), json!({ "text": text }));
+    let undo = (FORGET.to_owned(), json!({"source_id": 391}));
+    let kept_misheard = vec![keep(MISHEARD)];
+    let undone = vec![keep(MISHEARD), undo.clone()];
+    let kept_asked = vec![
+        keep(MISHEARD),
+        undo,
+        keep("Their favorite flower is a ranunculus."),
+    ];
+    /// The turns, their eyes, the calls run, and the case.
+    type Case<'a> = (&'a [Turn], &'a [Sight], &'a [(String, Value)], &'a str);
+    let cases: &[Case] = &[
+        (
+            &[("A", SAID, asks, 0)],
+            &[a],
+            &undone,
+            "the 06c1 sequence: renunctinus is not left kept",
+        ),
+        (
+            &[("A", SAID, asks, 0), ("A", "Yes.", Lamp::Says("Kept."), 5)],
+            &[a, a],
+            &kept_asked,
+            "their yes keeps ranunculus",
+        ),
+        (
+            &[
+                ("A", SAID, asks, 0),
+                ("A", "No.", Lamp::Says("Okay, how is it said?"), 5),
+            ],
+            &[a, a],
+            &undone,
+            "their no keeps nothing",
+        ),
+        (
+            &[
+                (
+                    "A",
+                    SAID,
+                    Lamp::Keeps(MISHEARD, "Kept: your favorite flower is a renunctinus."),
+                    0,
+                ),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            &[a, a],
+            &kept_misheard,
+            "no confirm question: nothing undone",
+        ),
+        (
+            &[
+                ("B", SAID, Lamp::Keeps(MISHEARD, "Kept."), 0),
+                (
+                    "A",
+                    "What's my favorite flower?",
+                    Lamp::Says("Is that ranunculus?"),
+                    5,
+                ),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            &[b, a, a],
+            &kept_misheard,
+            "another person's keep is never undone",
+        ),
+    ];
+    for (at, (turns, sight, calls, case)) in cases.iter().enumerate() {
+        let ran = run_full(
+            turns,
+            Some(sight),
+            9501 + 10 * at as u64,
+            (false, true),
+            json!({"ok": true}),
+        )
+        .await;
+        assert_eq!(ran.calls, *calls, "{case}");
+        // Their yes is a yes to the lamp's question about those words, so
+        // the memory's route keeps them for a line that is only "Yes."
+        // (`remember::heard::yes_alone`, `LAMP_MEMORY_KEEP_HEARD`).
+        if *calls == kept_asked {
+            assert_eq!(
+                ran.released,
+                [
+                    None,
+                    Some("Their favorite flower is a ranunculus.".to_owned())
+                ],
+                "{case}"
+            );
+        }
+    }
+}
+
+/// The same question beside the keep, in its own round: the keep is not
+/// run (#3504 finding N5), so nothing misheard is kept.
+#[tokio::test]
+async fn a_keep_beside_a_question_offering_another_word_is_not_run() {
+    let ran = run_full(
+        &[(
+            "A",
+            "Remember that my favorite flower is a renunctinus.",
+            Lamp::KeepsAsking(
+                "Their favorite flower is a renunctinus.",
+                "Is that ranunculus?",
+            ),
+            0,
+        )],
+        Some(&[(&["A"], true)]),
+        9601,
+        (false, true),
+        json!({"ok": true}),
+    )
+    .await;
+    assert_eq!(ran.calls, []);
+}
+
 /// Without the eyes' sight no yes could keep it again, so nothing is taken
 /// back.
 #[tokio::test]
@@ -1924,4 +2133,379 @@ async fn cut_during_held_face_forget_drops_prior_recall_from_resumed_request() {
 #[tokio::test]
 async fn cut_during_plain_forget_drops_prior_recall_from_resumed_request() {
     cut_during_forget_discards_recalled_round(crate::remember::FORGET, false).await;
+}
+
+/// C37 (lamp-06c1, 5 Nov, `LAMP_MEMORY_ASK_NEAR_HEARD`): "ranunculus" was
+/// heard as "renunculus" and the model's `remember` wrote "ranunculus", so
+/// `LAMP_MEMORY_KEEP_HEARD` kept the heard line while the lamp said the
+/// other word. The keep is held and asked about instead: their yes keeps
+/// the model's sentence, a no or nothing keeps nothing. A sentence of the
+/// words heard, or a word near nothing heard, runs as before; so does every
+/// keep with the switch off, or without the eyes.
+#[tokio::test]
+async fn a_keep_with_a_near_spelling_of_a_heard_word_waits_for_their_yes() {
+    const REMEMBER: &str = crate::remember::REMEMBER;
+    const SAID: &str = "Remember that my favourite flower is a renunculus.";
+    const NEAR: &str = "Their favorite flower is a ranunculus.";
+    const HEARD: &str = "My favourite flower is a renunculus.";
+    const TULIP: &str = "Their favourite flower is a tulip.";
+    const UNASKED: &str = "My favourite flower is a renunculus.";
+    const ASKS_NEAR: Lamp = Lamp::Keeps(NEAR, "Is that ranunculus?");
+    const A: Sight = (&["A"], true);
+    let keep = |text: &str| vec![(REMEMBER.to_owned(), json!({ "text": text }))];
+    /// The turns, their eyes, the switch, the calls run, and the case.
+    type Case<'a> = (
+        &'a [Turn],
+        Option<&'a [Sight]>,
+        bool,
+        Vec<(String, Value)>,
+        &'a str,
+    );
+    let cases: Vec<Case> = vec![
+        (
+            &[("A", SAID, ASKS_NEAR, 0)],
+            Some(&[A]),
+            true,
+            vec![],
+            "asked, not kept silently",
+        ),
+        (
+            &[
+                ("A", SAID, ASKS_NEAR, 0),
+                ("A", "Yes.", Lamp::Says("Kept."), 5),
+            ],
+            Some(&[A, A]),
+            true,
+            keep(NEAR),
+            "their yes keeps ranunculus",
+        ),
+        (
+            &[
+                ("A", SAID, ASKS_NEAR, 0),
+                ("A", "No.", Lamp::Says("Okay, how is it said?"), 5),
+            ],
+            Some(&[A, A]),
+            true,
+            vec![],
+            "their no keeps nothing",
+        ),
+        (
+            &[
+                ("A", SAID, Lamp::Keeps(NEAR, "What a lovely flower."), 0),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            Some(&[A, A]),
+            true,
+            vec![],
+            "an answer that never asked: dropped, nothing kept",
+        ),
+        (
+            &[("A", SAID, Lamp::Keeps(HEARD, "Kept."), 0)],
+            Some(&[A]),
+            true,
+            keep(HEARD),
+            "the words heard: kept at once",
+        ),
+        (
+            &[("A", SAID, Lamp::Keeps(TULIP, "Kept."), 0)],
+            Some(&[A]),
+            true,
+            keep(TULIP),
+            "a word near nothing heard: as before (the heard line, in the memory's route)",
+        ),
+        (
+            &[
+                ("A", UNASKED, ASKS_NEAR, 0),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            Some(&[A, A]),
+            true,
+            keep(NEAR),
+            "a keep the line didn't ask for: not held, keep_quietly's",
+        ),
+        (
+            &[("A", SAID, ASKS_NEAR, 0)],
+            Some(&[A]),
+            false,
+            keep(NEAR),
+            "off: as before",
+        ),
+        (
+            &[("A", SAID, ASKS_NEAR, 0)],
+            None,
+            true,
+            keep(NEAR),
+            "without the eyes: as before",
+        ),
+    ];
+    for (at, (turns, sight, near, calls, case)) in cases.into_iter().enumerate() {
+        NEAR_ASKS.with(|on| on.set(near));
+        let ran = run_full(
+            turns,
+            sight,
+            9701 + 10 * at as u64,
+            (false, false),
+            json!({"remembered": true}),
+        )
+        .await;
+        assert_eq!(ran.calls, calls, "{case}");
+        if case == "their yes keeps ranunculus" {
+            // Their "Yes." is a yes to the lamp's question about the
+            // model's sentence, which the memory's route keeps
+            // (`remember::heard::released`).
+            assert_eq!(ran.released, [Some(NEAR.to_owned())], "{case}");
+        }
+        if case.starts_with("a keep the line didn't ask for") {
+            // Not held: the model is never told to ask, and their "Yes."
+            // releases nothing. The call goes on to `keep_quietly::unheard`
+            // (`LAMP_KEEP_QUIETLY`, on in the product), which refuses it:
+            // "ranunculus" was not heard, so nothing is kept.
+            assert_eq!(ran.released, [None], "{case}");
+            assert!(
+                !format!("{:?}", ran.asked).contains("Not kept yet"),
+                "{case}"
+            );
+            assert!(
+                crate::keep_quietly::refused(NEAR, Some(UNASKED), false),
+                "{case}"
+            );
+        }
+    }
+}
+
+/// Thirteen's row on #5627: a yes dropped as not the held forget's person
+/// says why (no one known on the line, theirs in a later session, or
+/// another person), each still opening "not the same person" so old greps
+/// match, and never with an id.
+#[test]
+fn a_yes_not_the_held_persons_says_why() {
+    let held: HeldAsker = (3, "p-a".to_owned());
+    assert_eq!(not_theirs(Some(&held), &held), None);
+    let cases = [
+        (None, "not the same person: no one known on the line"),
+        (
+            Some((4, "p-a".to_owned())),
+            "not the same person: theirs, in a later session",
+        ),
+        (
+            Some((3, "p-b".to_owned())),
+            "not the same person: another person",
+        ),
+    ];
+    for (line, said) in cases {
+        let why = not_theirs(line.as_ref(), &held).unwrap();
+        assert_eq!(why, said);
+        assert!(!why.contains("p-"), "no id is said: {why}");
+    }
+}
+
+/// Friday's follow-up on #6990: a late one-face yes reads "too late" from
+/// anyone on the line, another person or no one known included; only an
+/// in-time yes says whose it is not.
+#[test]
+fn a_late_one_face_yes_reads_too_late_whoever_says_it() {
+    let held: HeldAsker = (3, "p-a".to_owned());
+    let lines = [
+        None,
+        Some(held.clone()),
+        Some((4, "p-a".to_owned())),
+        Some((3, "p-b".to_owned())),
+    ];
+    for line in &lines {
+        assert_eq!(
+            late_or_not_theirs(true, line.as_ref(), &held),
+            Some("too late"),
+            "{line:?}"
+        );
+        assert_eq!(
+            late_or_not_theirs(false, line.as_ref(), &held),
+            not_theirs(line.as_ref(), &held),
+            "{line:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn second_admitted_forget_everything_drops_learned_confirmation_prints() {
+    let ran = run_seen_from_result(
+        &[
+            (
+                "A",
+                "Forget everything about me.",
+                Lamp::Calls(
+                    EVERYTHING,
+                    "Shall I forget everything I know about you, including your name?",
+                ),
+                0,
+            ),
+            ("A", "Yes.", Lamp::Says("Done, it's all gone."), 5),
+        ],
+        None,
+        45001,
+        json!({"forgotten": true, "everything": true, "face": "forgotten too"}),
+    )
+    .await;
+    assert_eq!(ran.forgets.len(), 1, "forget must actually run");
+    assert_eq!(ran.marked, vec![(EVERYTHING.to_owned(), true)]);
+    assert_eq!(
+        ran.second_voice_prints, 0,
+        "after admitted forget: {:?}",
+        ran.second_voice_judgment
+    );
+    assert_eq!(
+        ran.second_voice_judgment,
+        crate::same_voice::Confirmed::Unknown
+    );
+}
+
+#[tokio::test]
+async fn second_declined_forget_keeps_learned_confirmation_prints() {
+    let ran = run(&[
+        (
+            "A",
+            "Forget everything about me.",
+            Lamp::Calls(
+                EVERYTHING,
+                "Shall I forget everything I know about you, including your name?",
+            ),
+            0,
+        ),
+        ("A", "No.", Lamp::Says("Okay, I won't forget it."), 5),
+    ])
+    .await;
+    assert!(ran.forgets.is_empty());
+    assert_eq!(ran.second_voice_prints, 4);
+    assert!(matches!(
+        ran.second_voice_judgment,
+        crate::same_voice::Confirmed::Theirs(_)
+    ));
+}
+
+#[tokio::test]
+async fn confirmation_prints_survive_failed_or_other_persons_forget() {
+    for (person, receipt) in [
+        ("A", json!({"forgotten":false, "error":"unavailable"})),
+        ("B", json!({"forgotten":true, "everything":true})),
+    ] {
+        let ran = run_seen_from_result(
+            &[
+                (
+                    person,
+                    "Forget everything about me.",
+                    Lamp::Calls(
+                        EVERYTHING,
+                        "Shall I forget everything I know about you, including your name?",
+                    ),
+                    0,
+                ),
+                (person, "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            None,
+            45002,
+            receipt,
+        )
+        .await;
+        assert_eq!(ran.forgets.len(), 1);
+        assert_eq!(ran.second_voice_prints, 4);
+        assert!(matches!(
+            ran.second_voice_judgment,
+            crate::same_voice::Confirmed::Theirs(_)
+        ));
+    }
+}
+
+/// Exercise the Engine's actual run_tool target capture, not just its
+/// cleanup helper. Receipts are synthetic; real eyes deletion is separate.
+#[tokio::test]
+async fn face_forget_receipts_clear_only_the_successfully_deleted_persons_voice() {
+    for (at, (person, receipt, kept)) in [
+        ("A", json!({"ok": true}), 0),
+        ("A", json!({"error": "face deletion failed"}), 4),
+        ("B", json!({"ok": true}), 4),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let ran = run_seen_from_result(
+            &[(person, "Forget my face.", Lamp::Calls(FACE, "Okay."), 0)],
+            None,
+            45_100 + at as u64 * 10,
+            receipt,
+        )
+        .await;
+        assert_eq!(ran.forgets, [(FACE.to_owned(), json!({"name": person}))]);
+        assert_eq!(ran.second_voice_prints, kept);
+        if kept == 0 {
+            assert_eq!(
+                ran.second_voice_judgment,
+                crate::same_voice::Confirmed::Unknown
+            );
+        } else {
+            assert!(matches!(
+                ran.second_voice_judgment,
+                crate::same_voice::Confirmed::Theirs(_)
+            ));
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_held_face_forget_clears_confirmation_voice_only_after_yes() {
+    for (answer, runs, kept) in [("Yes.", 1, 0), ("No.", 0, 4)] {
+        let ran = run_seen_from_result(
+            &[
+                ("A", "What's my name?", ASKS, 0),
+                ("A", answer, Lamp::Says("Okay."), 5),
+            ],
+            None,
+            45_200,
+            json!({"ok": true}),
+        )
+        .await;
+        assert_eq!(ran.forgets.len(), runs);
+        assert_eq!(ran.second_voice_prints, kept);
+    }
+}
+
+#[tokio::test]
+async fn a_successful_face_forget_clears_confirmation_prints_through_the_audio_runner() {
+    for requested_audio in [false, true] {
+        let ran = run_full_with_audio(
+            &[("A", "Forget my face.", Lamp::Calls(FACE, "Done."), 0)],
+            None,
+            46_100 + u64::from(requested_audio),
+            (false, false),
+            json!({"ok": true}),
+            requested_audio,
+        )
+        .await;
+        assert_eq!(ran.forgets.len(), 1);
+        assert_eq!(ran.second_audio_calls, usize::from(requested_audio));
+        assert_eq!(
+            ran.second_voice_prints, 0,
+            "requested audio: {requested_audio}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn the_audio_runner_preserves_confirmation_prints_after_failed_or_other_person_deletion() {
+    for (index, who, result) in [
+        (0, "A", json!({"ok": false, "error": "storage"})),
+        (1, "A", json!({"ok": false})),
+        (2, "B", json!({"ok": true})),
+    ] {
+        let ran = run_full_with_audio(
+            &[(who, "Forget my face.", Lamp::Calls(FACE, "Okay."), 0)],
+            None,
+            46_120 + index,
+            (false, false),
+            result,
+            true,
+        )
+        .await;
+        assert_eq!(ran.forgets.len(), 1);
+        assert_eq!(ran.second_audio_calls, 1);
+        assert_eq!(ran.second_voice_prints, 4, "case {index}");
+    }
 }

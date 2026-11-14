@@ -1007,6 +1007,37 @@ impl Drop for Worker {
     }
 }
 
+// The sound session's names, to the two workers that open a sound device, only on a computer that named its devices
+// (`--speaker-device`, `--microphone-device`: a developer's, never a product unit's, which names neither): the
+// workers start with an empty environment, so ALSA's `default` on a desktop's PipeWire or PulseAudio cannot find the sound
+// server's socket without `XDG_RUNTIME_DIR` (and `PULSE_*`, `PIPEWIRE_*`). `environment` is the voice's own.
+fn sound_session_worker_environment(
+    role: &str,
+    devices_named: bool,
+    environment: impl Iterator<Item = (std::ffi::OsString, std::ffi::OsString)>,
+) -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
+    use std::os::unix::ffi::OsStrExt;
+    if !devices_named || !matches!(role, "capture" | "speaker") {
+        return Vec::new();
+    }
+    environment
+        .filter(|(name, _)| {
+            let name = name.as_bytes();
+            name == b"XDG_RUNTIME_DIR"
+                || name.starts_with(b"PULSE_")
+                || name.starts_with(b"PIPEWIRE_")
+        })
+        .collect()
+}
+
+static DEVICES_NAMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Said once at start by the coordinator: the options named a speaker or a microphone device, so the audio workers are
+/// given the sound session's names ([`sound_session_worker_environment`]).
+pub fn name_devices(named: bool) {
+    DEVICES_NAMED.store(named, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// The command a worker starts with: its arguments, and a cleared
 /// environment with only what its role is given, the switches read with
 /// `var` from the voice's own.
@@ -1027,6 +1058,11 @@ fn worker_command(
         .arg(boot_text(boot))
         .args(extra)
         .env_clear()
+        .envs(sound_session_worker_environment(
+            role,
+            DEVICES_NAMED.load(std::sync::atomic::Ordering::Relaxed),
+            std::env::vars_os(),
+        ))
         .envs(crate::stalls::passed_on())
         .envs(crate::code_lock::passed_on())
         .envs(memory_days_worker_environment(
@@ -1073,6 +1109,26 @@ fn worker_command(
             role,
             var(crate::remember::role::ENVIRONMENT).as_deref(),
         ))
+        .envs(service_records_worker_environment(
+            role,
+            var(crate::service_records::ENVIRONMENT).as_deref(),
+        ))
+        .envs(service_records_told_worker_environment(
+            role,
+            var(crate::service_records::told::ENVIRONMENT).as_deref(),
+        ))
+        .envs(service_contacts_worker_environment(
+            role,
+            var(crate::service_contacts::ENVIRONMENT).as_deref(),
+        ))
+        .envs(service_redo_worker_environment(
+            role,
+            var(crate::service_records::redo::ENVIRONMENT).as_deref(),
+        ))
+        .envs(service_read_ids_worker_environment(
+            role,
+            var(crate::service_read_ids::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_early_words_worker_environment(
             role,
             var(crate::early_words::ENVIRONMENT).as_deref(),
@@ -1084,6 +1140,10 @@ fn worker_command(
         .envs(memory_forget_about_worker_environment(
             role,
             var(crate::remember::FORGET_ABOUT_ENVIRONMENT).as_deref(),
+        ))
+        .envs(memory_forget_just_kept_worker_environment(
+            role,
+            var(crate::remember::FORGET_JUST_KEPT_ENVIRONMENT).as_deref(),
         ))
         .envs(memory_room_not_asker_worker_environment(
             role,
@@ -1120,6 +1180,14 @@ fn worker_command(
         .envs(skill_asked_worker_environment(
             role,
             var(crate::tools::skill_asked::ENVIRONMENT).as_deref(),
+        ))
+        .envs(skill_named_worker_environment(
+            role,
+            var(crate::skill_named::ENVIRONMENT).as_deref(),
+        ))
+        .envs(make_skill_asked_worker_environment(
+            role,
+            var(crate::tools::make_skill_asked::ENVIRONMENT).as_deref(),
         ))
         .envs(memory_observe_worker_environment(
             role,
@@ -1185,6 +1253,10 @@ fn worker_command(
             role,
             var(crate::capture_cores::ENVIRONMENT),
         ))
+        .envs(bus_root_worker_environment(
+            role,
+            var(lamp_bus::ROOT_VARIABLE),
+        ))
         .envs(capture_stages_worker_environment(
             role,
             var(crate::stage_cost::ENVIRONMENT).as_deref(),
@@ -1242,10 +1314,51 @@ fn worker_command(
             role,
             var(crate::made_skill::READS_ENVIRONMENT).as_deref(),
         ))
+        .envs(skill_writes_worker_environment(
+            role,
+            var(crate::made_skill::WRITES_ENVIRONMENT).as_deref(),
+        ))
+        .envs(skill_tasks_worker_environment(
+            role,
+            var(crate::skill_task_yes::ENVIRONMENT).as_deref(),
+        ))
+        .envs(made_scripts_worker_environment(
+            role,
+            var(crate::made_skill::SCRIPTS_ENVIRONMENT).as_deref(),
+        ))
+        .envs(agent_services_worker_environment(
+            role,
+            var(crate::made_skill::AGENT_SERVICES_ENVIRONMENT).as_deref(),
+        ))
+        .envs(made_code_at_once_worker_environment(
+            role,
+            var(crate::made_skill::CODE_AT_ONCE_ENVIRONMENT).as_deref(),
+        ))
+        .envs(upload_agent_worker_environment(
+            role,
+            var(crate::upload_agent::ENVIRONMENT).as_deref(),
+        ))
+        .envs(task_net_worker_environment(
+            role,
+            var(crate::skill_task_yes::NET_ENVIRONMENT).as_deref(),
+        ))
+        .envs(skill_secrets_worker_environment(
+            role,
+            var(crate::upload_agent::SECRETS_ENVIRONMENT).as_deref(),
+        ))
+        .envs(skill_loose_worker_environment(
+            role,
+            var(crate::made_skill::LOOSE_ENVIRONMENT).as_deref(),
+        ))
+        .envs(made_said_worker_environment(
+            role,
+            var(crate::made_skill::SAID_ENVIRONMENT).as_deref(),
+        ))
         .envs(onboarding_worker_environment(
             role,
             var(crate::onboarding::ENVIRONMENT).as_deref(),
             var(crate::onboarding::FILE_ENVIRONMENT).as_deref(),
+            var(crate::onboarding::NUDGE_ENVIRONMENT).as_deref(),
         ))
         .envs(private_room_worker_environment(
             role,
@@ -1312,6 +1425,117 @@ fn skill_reads_worker_environment(
         .then_some((crate::made_skill::READS_ENVIRONMENT, "on"))
 }
 
+// A made skill's writes (#6066), passed the same narrow way: the exact
+// `on`, to the two routes whose `make_skill` briefs, checks and takes the
+// yes to one (`made_skill::writes_on`).
+fn skill_writes_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::WRITES_ENVIRONMENT, "on"))
+}
+
+// The lamp's agent's connectors (`LAMP_AGENT_SERVICES`), passed the same
+// narrow way: the exact `on`, to the two routes whose `make_skill` makes a
+// service skill as a `do.task` and says its service grants back
+// (`made_skill::agent_services_here`).
+fn agent_services_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::AGENT_SERVICES_ENVIRONMENT, "on"))
+}
+
+// A made skill's code (#6307), passed the same narrow way: the exact `on`,
+// to the two routes whose `make_skill` makes a skill, says its code back
+// and takes the yes to it (`made_skill::scripts_on`).
+fn made_scripts_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::SCRIPTS_ENVIRONMENT, "on"))
+}
+
+// A made skill's code put on at once (`LAMP_MADE_CODE_ON_AT_ONCE`), passed
+// the same narrow way: the exact `on`, to the two routes whose
+// `make_skill` makes a skill with code and puts it on
+// (`made_skill::code_on_at_once`).
+fn made_code_at_once_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::CODE_AT_ONCE_ENVIRONMENT, "on"))
+}
+
+// A skill's tasks (#6305), passed the same narrow way: the exact `on`, to
+// the two routes whose `make_skill` reads a skill's task back and takes the
+// yes to it (`skill_task_yes::on`).
+fn skill_tasks_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::skill_task_yes::ENVIRONMENT, "on"))
+}
+
+// An agent skill added from a file (`upload_agent::on`), passed the same
+// narrow way: the exact `on`, to the two routes whose tool call asks its
+// first run's yes and whose `make_skill` takes it.
+fn upload_agent_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::upload_agent::ENVIRONMENT, "on"))
+}
+
+// A task's `net` grant (`skill_task_yes::net_on`), passed the same narrow
+// way: the exact `on`, to the two routes that say a task's grants back.
+fn task_net_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::skill_task_yes::NET_ENVIRONMENT, "on"))
+}
+
+// A skill's keys given in the app (`upload_agent::secrets_on`), passed the
+// same narrow way: the exact `on`, to the two routes whose agent skill's
+// tool call checks its keys and whose `make_skill` keeps an upload.
+fn skill_secrets_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::upload_agent::SECRETS_ENVIRONMENT, "on"))
+}
+
+// A made skill loosened (#6059, `made_skill::loose_on`), passed the same
+// narrow way: the exact `on`, to the two routes whose `make_skill` briefs,
+// paces, says and checks the skill.
+fn skill_loose_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::LOOSE_ENVIRONMENT, "on"))
+}
+
+// A made skill's said start (#6526, `made_skill::said_on`), passed the same
+// narrow way: the exact `on`, to the two routes whose `make_skill` briefs
+// and keeps it.
+fn made_said_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::SAID_ENVIRONMENT, "on"))
+}
+
 // The second route's scoped context (#1675, #1839), passed the same narrow
 // way: the exact `on`, to the second route only, which reads it.
 fn second_scoped_context_worker_environment(
@@ -1356,6 +1580,16 @@ fn memory_forget_about_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::FORGET_ABOUT_ENVIRONMENT, "on"))
+}
+
+// A bare "forget that" right after the person's own keep forgets that keep
+// (C88, #5022), passed the same narrow way, to the same two routes.
+fn memory_forget_just_kept_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::FORGET_JUST_KEPT_ENVIRONMENT, "on"))
 }
 
 // Journalling resumed with a fresh session (#2176 row 1b), passed the same
@@ -1415,6 +1649,60 @@ fn memory_role_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::role::ENVIRONMENT, "on"))
+}
+
+// Service records (the connector records plan, PR 1a), passed the same
+// narrow way: the exact `on`, to the second route alone, the one that sends.
+fn service_records_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_records::ENVIRONMENT, "on"))
+}
+
+// Service records told (the connector records plan, PR 1b), passed the
+// same narrow way: the exact `on`, to the second route alone, where the
+// records are kept.
+fn service_records_told_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_records::told::ENVIRONMENT, "on"))
+}
+
+// Service contacts (the connector records plan, PR 1c), passed the same
+// narrow way as the records they need: the exact `on`, to the second route
+// alone.
+fn service_contacts_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_contacts::ENVIRONMENT, "on"))
+}
+
+// A write redone from its record (the connector records plan, PR 1d),
+// passed the same narrow way: the exact `on`, to the second route alone.
+// It acts only beside `LAMP_SERVICE_RECORDS` (`service_records::redo::on`).
+fn service_redo_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_records::redo::ENVIRONMENT, "on"))
+}
+
+// A calendar read's event ids kept for the next request (tracker row
+// C132), passed the same narrow way: the exact `on`, to the second route
+// alone, the one that prepares writes.
+fn service_read_ids_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_read_ids::ENVIRONMENT, "on"))
 }
 
 // A remember of what is kept already (#2176), passed the same narrow way:
@@ -1529,24 +1817,32 @@ fn ledger_refence_worker_environment(
     switch.into_iter().chain(directory).collect()
 }
 
+// With the walk's file above, the nudge (`LAMP_ONBOARDING_NUDGE`, the exact
+// `on`): with the nudge off, a line that spells the person's name is told
+// its read-back there (`onboarding::spelled_name_note_now`, #5580 row 2).
 fn onboarding_worker_environment(
     role: &str,
     switch: Option<&std::ffi::OsStr>,
     file: Option<&std::ffi::OsStr>,
+    nudge: Option<&std::ffi::OsStr>,
 ) -> Vec<(&'static str, std::ffi::OsString)> {
     if role != "second" {
         return Vec::new();
     }
-    let Some(file) = crate::onboarding::switched_on(
+    // The nudge on its own does nothing there: the read-back note also
+    // needs the walk's file below.
+    let mut environment = Vec::new();
+    if nudge == Some(std::ffi::OsStr::new("on")) {
+        environment.push((crate::onboarding::NUDGE_ENVIRONMENT, "on".into()));
+    }
+    if let Some(file) = crate::onboarding::switched_on(
         switch.and_then(std::ffi::OsStr::to_str),
         file.and_then(std::ffi::OsStr::to_str),
-    ) else {
-        return Vec::new();
-    };
-    vec![
-        (crate::onboarding::ENVIRONMENT, "on".into()),
-        (crate::onboarding::FILE_ENVIRONMENT, file.into_os_string()),
-    ]
+    ) {
+        environment.push((crate::onboarding::ENVIRONMENT, "on".into()));
+        environment.push((crate::onboarding::FILE_ENVIRONMENT, file.into_os_string()));
+    }
+    environment
 }
 
 // A correction replacing a kept thing (#2510), passed the same narrow way:
@@ -1706,8 +2002,8 @@ fn reminders_asked_worker_environment(
         .then_some((crate::tools::reminders_asked::ENVIRONMENT, "on"))
 }
 
-// A plain ask for a light scene or a light show calls its skill
-// (`tools::skill_asked`), passed the same narrow way: the exact `on`, to the
+// A plain ask for a light scene or a light show, or a plain question about
+// the lamp itself, calls its skill (`tools::skill_asked`), passed the same narrow way: the exact `on`, to the
 // second route, whose chat can be made to call a function.
 fn skill_asked_worker_environment(
     role: &str,
@@ -1715,6 +2011,28 @@ fn skill_asked_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::tools::skill_asked::ENVIRONMENT, "on"))
+}
+
+// A plain ask for an installed skill by its name calls it in round 1, in
+// code (`skill_named`, #6772), passed the same narrow way: the exact `on`,
+// to the second route alone.
+fn skill_named_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::skill_named::ENVIRONMENT, "on"))
+}
+
+// A plain ask to make a skill calls make_skill (`tools::make_skill_asked`,
+// #6835), passed the same narrow way: the exact `on`, to the second route,
+// whose chat can be made to call a function.
+fn make_skill_asked_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::tools::make_skill_asked::ENVIRONMENT, "on"))
 }
 
 // The clock's switch (#830), passed the same narrow way: the exact `on`, to
@@ -1785,6 +2103,19 @@ fn vad_input_worker_environment(
     let value =
         crate::activity::DetectorInput::parse(value.and_then(std::ffi::OsStr::to_str)).value()?;
     (role == "capture").then_some((crate::activity::INPUT_ENVIRONMENT, value))
+}
+
+// The bus folder (`LAMP_BUS_ROOT`), to the capture and the speaker worker only, as set and only
+// when an absolute path: `--microphone-device bus:mic1` and `--speaker-device bus:speaker1` open
+// the bus there, and a worker without it opened `/run/lampos-bus`, never the folder beside
+// lamp-sim.
+fn bus_root_worker_environment(
+    role: &str,
+    value: Option<std::ffi::OsString>,
+) -> Option<(&'static str, std::ffi::OsString)> {
+    value
+        .filter(|path| matches!(role, "capture" | "speaker") && Path::new(path).is_absolute())
+        .map(|path| (lamp_bus::ROOT_VARIABLE, path))
 }
 
 // The capture worker's cores (#705), to capture only, as set: the worker
@@ -1887,10 +2218,15 @@ fn second_route_worker_environment(
         crate::second_config::DEEPSEEK_BASE_URL_ENV,
         crate::second_config::SPEECH_BASE_URL_ENV,
         crate::second_config::LISTENING_BASE_URL_ENV,
+        // A desktop-only switch (never in a product unit): plain loopback
+        // addresses for the two addresses above, checked by the worker.
+        crate::second_config::LOOPBACK_SERVICES_ENV,
         crate::second_config::SPEECH_MODEL_ENV,
         crate::second_config::KEY_TERMS_ENV,
         // The owner's language (#4473): the worker's speech and character.
         crate::language::FILE_ENVIRONMENT,
+        // The region file (#6414): a lamp in China waits longer for a first round.
+        crate::second_provider::REGION_FILE_ENVIRONMENT,
         crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
         crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
@@ -1935,6 +2271,8 @@ fn second_route_worker_environment(
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
+        // Functions offered only while they apply (#6218).
+        crate::second_provider::worker::WHILE_THEY_APPLY_ENVIRONMENT,
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
         crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
         // A plain keep answered at once, with no second round (C59).
@@ -1953,14 +2291,20 @@ fn second_route_worker_environment(
         crate::cut_in_wordless::ENVIRONMENT,
         // Or, in a busy room or soon after another, picks the answer up again.
         crate::cut_in_wordless::RESUMES_ENVIRONMENT,
+        // A cut-in's prompt journaled, a debug switch (#6218).
+        crate::cut_in_prompt_log::ENVIRONMENT,
         // An empty answer to the lamp's own question asked again (Queue #4710).
         crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
+        // An ask cut by a line let out that only declines is answered (#5961).
+        crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT,
         crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
         crate::remember::HITS_ENVIRONMENT,
         // A don't-know about the person recalls their kept things first (C57).
         crate::dont_know::ENVIRONMENT,
         // A keep the round after it doubts is taken back for their yes (C37).
         crate::remember::doubted::UNDOES_ENVIRONMENT,
+        // A keep with a near spelling of a heard word asks first (C37).
+        crate::remember::heard::NEAR_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
         // Untied talk keeps no conversation going (#3882).
@@ -1972,6 +2316,8 @@ fn second_route_worker_environment(
         // A skill made by this worker's own chat (Fourteen's proposal on #4710),
         // the only maker since 3 Nov.
         crate::made_skill::ENVIRONMENT,
+        // A make it didn't make handed to the lamp's agent (#6059's proposal).
+        crate::make_skill_agent::ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).
         crate::remark_about_it::ENVIRONMENT,
@@ -1992,11 +2338,17 @@ fn second_route_worker_environment(
         crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
         // A carried line read and kept as its person's (9 Nov, #5842).
         crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT,
+        // A 0-word line answering words seen said, in their scope (S1, 10 Nov).
+        crate::second_provider::HELD_WORDS_SEEN_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
         crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
         crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT,
         // An earlier turn's calls told with its words (lamp build 9699).
         crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
+        // The exchanges a stored running note holds told in it alone (#6218).
+        crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT,
+        // A recent exchange told once, as history, not again (#6218).
+        crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
         // A one-face line read as its person's, forgets refused (#5522).
         crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
@@ -2093,6 +2445,47 @@ fn rest_through_sounds_worker_environment(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_audio_workers_get_the_sound_session_only_when_devices_are_named() {
+        use std::ffi::OsString;
+        let voice_environment = || {
+            [
+                ("XDG_RUNTIME_DIR", "/run/user/1000"),
+                ("PULSE_SERVER", "unix:/run/user/1000/pulse/native"),
+                ("PIPEWIRE_RUNTIME_DIR", "/run/user/1000"),
+                ("FOO_TOKEN", "not-for-a-worker"),
+                ("LAMP_BUS", "on"),
+            ]
+            .into_iter()
+            .map(|(name, value)| (OsString::from(name), OsString::from(value)))
+        };
+        for role in ["capture", "speaker"] {
+            // Named devices: the three sound-session names reach the worker, nothing else of the voice's.
+            let given = sound_session_worker_environment(role, true, voice_environment());
+            let names: Vec<_> = given
+                .iter()
+                .map(|(name, _)| name.to_str().unwrap())
+                .collect();
+            assert_eq!(
+                names,
+                ["XDG_RUNTIME_DIR", "PULSE_SERVER", "PIPEWIRE_RUNTIME_DIR"],
+                "{role}"
+            );
+            // A product unit names none: its workers stay exactly as they were.
+            assert!(
+                sound_session_worker_environment(role, false, voice_environment()).is_empty(),
+                "{role}"
+            );
+        }
+        // And only the two workers that open a sound device.
+        for role in ["provider", "second", "controls"] {
+            assert!(
+                sound_session_worker_environment(role, true, voice_environment()).is_empty(),
+                "{role}"
+            );
+        }
+    }
 
     /// The ledger's re-fence (#5560) reaches both routes, the switch only as
     /// the exact `on`, with the delivery directory; no other worker gets
@@ -2191,6 +2584,7 @@ mod tests {
             crate::second_provider::STEADY_FIRST_ENVIRONMENT,
             crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
+            crate::second_provider::worker::WHILE_THEY_APPLY_ENVIRONMENT,
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
             crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
             crate::keep_at_once::ENVIRONMENT,
@@ -2202,16 +2596,20 @@ mod tests {
             crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
             crate::cut_in_wordless::ENVIRONMENT,
             crate::cut_in_wordless::RESUMES_ENVIRONMENT,
+            crate::cut_in_prompt_log::ENVIRONMENT,
             crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
+            crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::dont_know::ENVIRONMENT,
             crate::remember::doubted::UNDOES_ENVIRONMENT,
+            crate::remember::heard::NEAR_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::untied_going_on::ENVIRONMENT,
             crate::untied_going_on::GRACE_ENVIRONMENT,
             crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT,
             crate::made_skill::ENVIRONMENT,
+            crate::make_skill_agent::ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
             crate::opens_further::ENVIRONMENT,
@@ -2238,10 +2636,13 @@ mod tests {
             crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT,
+            crate::second_provider::HELD_WORDS_SEEN_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
             crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
             crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT,
             crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
+            crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT,
+            crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
             crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
@@ -2346,6 +2747,46 @@ mod tests {
             ),
             (
                 crate::made_skill::READS_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::WRITES_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::skill_task_yes::ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::SCRIPTS_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::AGENT_SERVICES_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::CODE_AT_ONCE_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::upload_agent::ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::skill_task_yes::NET_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::upload_agent::SECRETS_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::LOOSE_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::SAID_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
         ] {
@@ -2593,6 +3034,36 @@ mod tests {
                         "LAMP_MEMORY_ROLE",
                         ["second"].as_slice(),
                     ),
+                    // Service records: the second route alone.
+                    (
+                        service_records_worker_environment,
+                        "LAMP_SERVICE_RECORDS",
+                        ["second"].as_slice(),
+                    ),
+                    // Told them: the second route alone too.
+                    (
+                        service_records_told_worker_environment,
+                        "LAMP_SERVICE_RECORDS_TOLD",
+                        ["second"].as_slice(),
+                    ),
+                    // Service contacts: the second route alone.
+                    (
+                        service_contacts_worker_environment,
+                        "LAMP_SERVICE_CONTACTS",
+                        ["second"].as_slice(),
+                    ),
+                    // Redo from a record: the second route alone.
+                    (
+                        service_redo_worker_environment,
+                        "LAMP_SERVICE_REDO",
+                        ["second"].as_slice(),
+                    ),
+                    // A read's event ids kept: the second route alone.
+                    (
+                        service_read_ids_worker_environment,
+                        "LAMP_SERVICE_READ_IDS_KEPT",
+                        ["second"].as_slice(),
+                    ),
                     // So does keeping a fact as heard (#2176).
                     (
                         memory_keep_heard_worker_environment,
@@ -2645,6 +3116,12 @@ mod tests {
                     (
                         memory_forget_about_worker_environment,
                         "LAMP_MEMORY_FORGET_ABOUT",
+                        ["provider", "second"].as_slice(),
+                    ),
+                    // And "forget that" right after a keep (C88).
+                    (
+                        memory_forget_just_kept_worker_environment,
+                        "LAMP_MEMORY_FORGET_JUST_KEPT",
                         ["provider", "second"].as_slice(),
                     ),
                     // The room's kept things as someone's (#2176): both routes.
@@ -2704,6 +3181,20 @@ mod tests {
                     (
                         skill_asked_worker_environment,
                         "LAMP_SKILL_ASKED",
+                        ["second"].as_slice(),
+                    ),
+                    // A plain ask for a skill by its name calls it in code:
+                    // the second route alone.
+                    (
+                        skill_named_worker_environment,
+                        "LAMP_SKILL_NAMED",
+                        ["second"].as_slice(),
+                    ),
+                    // A plain ask to make a skill calls make_skill: the
+                    // second route alone (#6835).
+                    (
+                        make_skill_asked_worker_environment,
+                        "LAMP_MAKE_SKILL_ASKED",
                         ["second"].as_slice(),
                     ),
                     // The observation pass, the route with a model (#1693 (2)).
@@ -2776,6 +3267,62 @@ mod tests {
             }
         }
     }
+
+    /// The bus folder reaches the capture and the speaker worker only, and only as an absolute path.
+    #[test]
+    fn the_bus_root_reaches_capture_and_speaker_only_as_an_absolute_path() {
+        use std::ffi::OsString;
+        for role in BUS_ROOT_ROLES {
+            for (value, passes) in [
+                (Some("/x/bus"), true),
+                (Some("x/bus"), false),
+                (Some(""), false),
+                (None, false),
+            ] {
+                let got = bus_root_worker_environment(role, value.map(OsString::from));
+                let expected = (passes && matches!(role, "capture" | "speaker"))
+                    .then(|| ("LAMP_BUS_ROOT", OsString::from("/x/bus")));
+                assert_eq!(got, expected, "role {role}, value {value:?}");
+            }
+        }
+    }
+
+    /// Started through `worker_command`, the capture and the speaker worker have
+    /// `LAMP_BUS_ROOT` and no other worker does.
+    #[test]
+    fn the_bus_root_is_in_the_started_capture_and_speaker_workers_environment_alone() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = SessionDirectory::create().unwrap();
+        let script = home.path.join("worker.sh");
+        std::fs::write(&script, "#!/bin/sh\n/usr/bin/env > \"$3/env-$2.txt\"\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let only =
+            |name: &str| (name == "LAMP_BUS_ROOT").then(|| std::ffi::OsString::from("/x/bus"));
+        let boot = new_boot().unwrap();
+        for role in BUS_ROOT_ROLES {
+            let status = status_of_fresh(&mut worker_command(
+                &script,
+                &home.path,
+                role,
+                (boot, boot),
+                &[],
+                only,
+            ));
+            assert!(status.success(), "{role}");
+            let written =
+                std::fs::read_to_string(home.path.join(format!("env-{role}.txt"))).unwrap();
+            assert_eq!(
+                written.lines().any(|line| line == "LAMP_BUS_ROOT=/x/bus"),
+                matches!(role, "capture" | "speaker"),
+                "{role}"
+            );
+        }
+    }
+
+    const BUS_ROOT_ROLES: [&str; 10] = [
+        "capture", "provider", "second", "speaker", "ring", "camera", "denoise", "echo", "privacy",
+        "unknown",
+    ];
 
     /// The detector's input (#828) goes to the capture worker only, and only
     /// as one of its two exact values.
@@ -2946,6 +3493,7 @@ mod tests {
                     crate::remember::ROOM_AFTER_FORGET_ENVIRONMENT,
                     crate::remember::needs_face::ENVIRONMENT,
                     crate::remember::FORGET_ABOUT_ENVIRONMENT,
+                    crate::remember::FORGET_JUST_KEPT_ENVIRONMENT,
                     crate::remember::JOURNAL_RESUMES_ENVIRONMENT,
                     crate::remember::LINK_USED_ENVIRONMENT,
                     crate::remember::ROOM_SPEAKER_ENVIRONMENT,
@@ -2953,6 +3501,8 @@ mod tests {
                     crate::tools::schedule_asked::ENVIRONMENT,
                     crate::tools::reminders_asked::ENVIRONMENT,
                     crate::tools::skill_asked::ENVIRONMENT,
+                    crate::skill_named::ENVIRONMENT,
+                    crate::tools::make_skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
@@ -2963,6 +3513,11 @@ mod tests {
                     crate::remember::STRENGTH_ENVIRONMENT,
                     crate::remember::PROFILE_ENVIRONMENT,
                     crate::remember::role::ENVIRONMENT,
+                    crate::service_records::ENVIRONMENT,
+                    crate::service_records::told::ENVIRONMENT,
+                    crate::service_contacts::ENVIRONMENT,
+                    crate::service_records::redo::ENVIRONMENT,
+                    crate::service_read_ids::ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::keep_quietly::ENVIRONMENT,
                     crate::remember::REMEMBER_ONCE_ENVIRONMENT,
@@ -3001,6 +3556,8 @@ mod tests {
                     "/etc/lampOS/person/name"
                 } else if name == crate::language::FILE_ENVIRONMENT {
                     "/etc/lampOS/setup/language"
+                } else if name == crate::second_provider::REGION_FILE_ENVIRONMENT {
+                    "/var/lib/lampos-cloud/region"
                 } else if name == crate::task_news::TOLD_ENVIRONMENT {
                     "/var/lib/lampOS/voice/tasks-told"
                 } else if name == crate::second_config::CREDENTIALS_ENV {
@@ -3013,6 +3570,8 @@ mod tests {
                     || name == crate::second_config::LISTENING_BASE_URL_ENV
                 {
                     "https://near.example.invalid/ai"
+                } else if name == crate::second_config::LOOPBACK_SERVICES_ENV {
+                    "on"
                 } else if name == crate::second_config::SPEECH_MODEL_ENV {
                     "gemini-3.8-flash-lite-tts"
                 } else if name == crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT {
@@ -3042,6 +3601,7 @@ mod tests {
                     || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
                     || name == crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
+                    || name == crate::second_provider::worker::WHILE_THEY_APPLY_ENVIRONMENT
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
                     || name == crate::second_provider::SAY_WITH_CALL_ENVIRONMENT
                     || name == crate::keep_at_once::ENVIRONMENT
@@ -3053,17 +3613,21 @@ mod tests {
                     || name == crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT
                     || name == crate::cut_in_wordless::ENVIRONMENT
                     || name == crate::cut_in_wordless::RESUMES_ENVIRONMENT
+                    || name == crate::cut_in_prompt_log::ENVIRONMENT
                     || name == crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT
+                    || name == crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::dont_know::ENVIRONMENT
                     || name == crate::remember::doubted::UNDOES_ENVIRONMENT
+                    || name == crate::remember::heard::NEAR_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::untied_going_on::ENVIRONMENT
                     || name == crate::untied_going_on::GRACE_ENVIRONMENT
                     || name == crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT
                     || name == crate::made_skill::ENVIRONMENT
+                    || name == crate::make_skill_agent::ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
                     || name == crate::opens_further::ENVIRONMENT
@@ -3090,10 +3654,13 @@ mod tests {
                     || name == crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT
+                    || name == crate::second_provider::HELD_WORDS_SEEN_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT
                     || name == crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT
                     || name == crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT
+                    || name == crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT
+                    || name == crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT
                     || name == crate::second_provider::NAME_ONE_FACE_ENVIRONMENT
@@ -3167,6 +3734,7 @@ mod tests {
                     "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
                     "LAMP_MEMORY_FORGET_ASKS=on",
+                    "LAMP_MEMORY_FORGET_JUST_KEPT=on",
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_LINK_USED=on",
@@ -3207,6 +3775,8 @@ mod tests {
                     "LAMP_CONVERSATION_CARRIES_PAST_SILENT=on",
                     "LAMP_CONVERSATION_ROOM_LINES_TOLD=on",
                     "LAMP_CONVERSATION_SUMMARY=on",
+                    "LAMP_CUT_ASK_ANSWERED=on",
+                    "LAMP_CUT_IN_PROMPT_LOG=on",
                     "LAMP_CUT_IN_WORDLESS_ASKS=on",
                     "LAMP_CUT_IN_WORDLESS_RESUMES=on",
                     "LAMP_DECLINE_SILENT=on",
@@ -3217,7 +3787,10 @@ mod tests {
                     "LAMP_FIRST_SECONDS_QUIET=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
+                    "LAMP_HELD_WORDS_SEEN=on",
+                    "LAMP_HISTORY_AFTER_NOTE=on",
                     "LAMP_HISTORY_KEEPS_CALLS=on",
+                    "LAMP_HISTORY_SAID_ONCE=on",
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KEEP_ANSWERS_AT_ONCE=on",
                     "LAMP_KEEP_QUIETLY=on",
@@ -3226,6 +3799,9 @@ mod tests {
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
                     "LAMP_MAKE_SKILL=on",
+                    "LAMP_MAKE_SKILL_AGENT=on",
+                    "LAMP_MAKE_SKILL_ASKED=on",
+                    "LAMP_MEMORY_ASK_NEAR_HEARD=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_DONT_KNOW_RECALLS=on",
                     "LAMP_MEMORY_DOUBT_UNDOES=on",
@@ -3234,6 +3810,7 @@ mod tests {
                     "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
                     "LAMP_MEMORY_FORGET_ASKS=on",
+                    "LAMP_MEMORY_FORGET_JUST_KEPT=on",
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_ASKED=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
@@ -3281,6 +3858,7 @@ mod tests {
                     "LAMP_PERSON_SCOPE_SEEN=on",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
+                    "LAMP_REGION_FILE=/var/lib/lampos-cloud/region",
                     "LAMP_RELAY_ROUTES=on",
                     "LAMP_REMARK_ABOUT_IT=on",
                     "LAMP_REMINDERS_ASKED=on",
@@ -3328,10 +3906,17 @@ mod tests {
                     "LAMP_SECOND_STT_WARM=on",
                     "LAMP_SECOND_UNFINISHED_WAIT=on",
                     "LAMP_SECOND_WEATHER=on",
+                    "LAMP_SECOND_WHILE_THEY_APPLY=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
                     "LAMP_SERVICES_TOLD=on",
+                    "LAMP_SERVICE_CONTACTS=on",
+                    "LAMP_SERVICE_READ_IDS_KEPT=on",
+                    "LAMP_SERVICE_RECORDS=on",
+                    "LAMP_SERVICE_RECORDS_TOLD=on",
+                    "LAMP_SERVICE_REDO=on",
                     "LAMP_SHORT_DONE=on",
                     "LAMP_SKILL_ASKED=on",
+                    "LAMP_SKILL_NAMED=on",
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
@@ -3341,6 +3926,7 @@ mod tests {
                     "LAMP_UNTIED_ANSWER_GRACE=on",
                     "LAMP_UNTIED_CALLER_SPEAKING=on",
                     "LAMP_UNTIED_GOING_ON=on",
+                    "LAMP_VOICE_LOOPBACK_SERVICES=on",
                     "LAMP_WINDOW_FROM_START=on",
                 ],
             ),
@@ -3434,7 +4020,11 @@ mod tests {
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
         let boot = new_boot().unwrap();
         let walk = "/var/lib/lamp-voice/onboarding.json";
-        let given = |role: &str, switch: &'static str, file: &'static str| -> Vec<String> {
+        let given = |role: &str,
+                     switch: &'static str,
+                     file: &'static str,
+                     nudge: Option<&'static str>|
+         -> Vec<String> {
             let status = status_of_fresh(&mut worker_command(
                 &script,
                 &home.path,
@@ -3446,6 +4036,8 @@ mod tests {
                         Some(switch.into())
                     } else if name == crate::onboarding::FILE_ENVIRONMENT {
                         Some(file.into())
+                    } else if name == crate::onboarding::NUDGE_ENVIRONMENT {
+                        nudge.map(Into::into)
                     } else {
                         None
                     }
@@ -3459,7 +4051,7 @@ mod tests {
                 .map(str::to_owned)
                 .collect()
         };
-        let mut got = given("second", "on", walk);
+        let mut got = given("second", "on", walk, None);
         got.sort_unstable();
         assert_eq!(
             got,
@@ -3469,14 +4061,35 @@ mod tests {
             ]
         );
         for role in ["provider", "privacy", "ring", "speaker"] {
-            assert!(given(role, "on", walk).is_empty(), "{role}");
+            assert!(given(role, "on", walk, None).is_empty(), "{role}");
         }
-        assert!(given("second", "off", walk).is_empty(), "off");
+        assert!(given("second", "off", walk, None).is_empty(), "off");
         assert!(
-            given("second", "on", "onboarding.json").is_empty(),
+            given("second", "on", "onboarding.json", None).is_empty(),
             "relative"
         );
-        assert!(given("second", "on", "").is_empty(), "empty");
+        assert!(given("second", "on", "", None).is_empty(), "empty");
+        // The nudge, the exact `on` only, and only with the walk (#5580 row 2).
+        let mut got = given("second", "on", walk, Some("on"));
+        got.sort_unstable();
+        assert_eq!(
+            got,
+            [
+                "LAMP_ONBOARDING=on".to_owned(),
+                format!("LAMP_ONBOARDING_FILE={walk}"),
+                "LAMP_ONBOARDING_NUDGE=on".to_owned(),
+            ]
+        );
+        assert_eq!(given("second", "on", walk, Some("yes")).len(), 2, "not on");
+        assert_eq!(
+            given("second", "off", walk, Some("on")),
+            ["LAMP_ONBOARDING_NUDGE=on".to_owned()],
+            "the nudge alone"
+        );
+        assert!(
+            given("provider", "on", walk, Some("on")).is_empty(),
+            "provider"
+        );
     }
 
     /// `LAMP_PRIVACY_CONTROLS=no-slide`: the privacy worker's environment is

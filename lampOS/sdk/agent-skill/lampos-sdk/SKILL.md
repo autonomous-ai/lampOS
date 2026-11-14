@@ -22,10 +22,25 @@ The packages aren't on PyPI or npm yet (`pip install lampos` and
 `lamp-mcp` needs `lampos` in the same `pip` command, or pip looks for it on
 PyPI and fails.
 
-**On a customer lamp (stable 10824)** five things are missing: skill push,
-joints past yaw and pitch and `play`, limp and pose, mDNS (pair with
-`--host`), and local event times (`at` is UTC). Read
-[references/gotchas.md](references/gotchas.md#on-a-customer-lamp-today-stable-10824)
+**An MCP client usually starts `lamp-mcp` without your shell's environment**, so
+`LAMPOS_HOME` is lost, the pairing isn't found, and the client shows only
+"Connection closed". Give the folder `lamp pair` used: `--home PATH` in the
+client's config (`claude mcp add lamp -- lamp-mcp --home ~/.config/lampos`), or
+`python -m lamp_mcp` from the venv's python when the client can't find `lamp-mcp`
+on its PATH. An unpaired start says in one stderr line which folder it looked in.
+
+**On a customer lamp (the stable build; the GUIDE's Plan and status rows say
+the build and date each row works from)** four things are missing: limp and
+pose, mDNS (pair with `--host`), local event times (`at` is UTC), and a look at
+a face. `look` at a name is refused, and the lamp doesn't track hands yet (the
+GUIDE's Follow a hand row: in development; lamp-body refuses a hold that says
+`follow`). Skill push (from 11091), `joints` for `roll`, `shoulder` and
+`elbow` (from build 11102, while the lamp stands), a head tap as a `touch`
+event (from 11372), a motion's end (`wait=True`, from 11716) and `play` (from
+12171) are in; a look at a face is taken by lamp-control, but on a customer lamp the
+body drops it ("this lamp's gaze is not measured, so it cannot look at a
+face"): never promise one, nor a hand follow. Read
+[references/gotchas.md](references/gotchas.md#on-a-customer-lamp-today-the-stable-build)
 before promising any of them.
 
 ## Start without a lamp
@@ -55,13 +70,14 @@ owner for the grants your program needs, by what it does:
 | lights the ring | `light` |
 | speaks or plays sounds | `speak` |
 | moves (gestures, feelings, looks, moves) | `body` (a feeling needs `light` too) |
-| knows who's there, follows a hand | `look` |
+| knows who's there (a hand follow is in development) | `look` |
 | hears a phrase or its name | `hear` |
 | hears music, laughter, the door, footsteps | `sound` |
 | puts skills of its own on the lamp | `skills` |
 | reads the room's air, the lamp's own computer | `air`, `device` |
 | sees pictures | `camera` |
 | hears the room's sound (20 ms blocks of samples) | `microphone` |
+| plays sound of its own through the speaker | `speaker` |
 
 **A grant added later needs a new pairing code:** the owner can't widen a pairing. Then, on the computer:
 
@@ -102,10 +118,11 @@ elsewhere:
 ## The mental model (read before writing code)
 
 - **Grants:** the owner ticks what this computer may do: `body` (move),
-  `light`, `speak`, `look` (presence, hands, face/hand targets), `hear`
+  `light`, `speak`, `look` (presence; hand and face targets are not tracked on a customer lamp yet), `hear`
   (phrases, the name), `sound` (sound classes), `skills` (push skills),
   `air` (the air sensor), `device` (the lamp's own computer), `camera`
-  (pictures), `microphone` (the room's sound).
+  (pictures), `microphone` (the room's sound), `speaker` (sound of
+  its own, through the lamp's speaker).
   A call without its grant is refused `no_grant`. Grants are read at hello.
 - **Leases:** moving the body (`look`, `move`, `play`, `joints`) needs a
   `body` lease. Hold one with `async with lamp.lease("body"):` (JS
@@ -128,7 +145,7 @@ elsewhere:
 - **A new motion cuts the one playing short:** a gesture, move or
   feeling's move asked while another plays replaces it, eased out from where
   the body is. While the person is using the lamp, the body drops the new
-  one ("the person is using the lamp"). Stable 10824 and older refuse it
+  one ("the person is using the lamp"). Stable 10824 and older refused it
   `busy` with `retry_ms` instead: wait and ask again.
 - **Quiet hours:** a lamp setting (`limits.quiet_hours`, `off` by default,
   or a `{from, to}` window the lamp sets). `say` and `sound` are refused `quiet_hours` then; the
@@ -166,7 +183,7 @@ Every refusal is a `LampError` with `code` and `why`, the lamp's own words;
 ## Reading the lamp
 
 - **Events** come by edge, when something changes: `person.arrived`,
-  `person.left`, `person.facing`, `person.stood_up`, `hand`, `phrase.heard`,
+  `person.left`, `person.facing`, `person.stood_up`, `hand` (none comes on a customer lamp yet), `phrase.heard`,
   `name.heard`, `sound.heard`, `touch`, `button`, `lamp.changed`, `time`;
   `lease` and `done` come unasked. Subscribe with `lamp.on(event, handler)`.
 - **State** with `lamp.get("presence", "light", "mood", "lamp")`; the
@@ -186,7 +203,15 @@ Every refusal is a `LampError` with `code` and `why`, the lamp's own words;
   `microphoneStream(false)`, `stop`, or `microphone.ended`; off unless the
   owner switched it on, never while private or with someone else in view,
   never off the lamp's own network:
-  [references/api.md](references/api.md#the-microphone). `body.state` and
+  [references/api.md](references/api.md#the-microphone).
+- **The speaker** (the `speaker` grant, never ticked for you): Python
+  `async with lamp.speaker_stream() as out: await out.speaker_write(pcm)`
+  (plain call `speaker_stream_request`), JS `lamp.speakerStream()` with
+  `speakerWrite`, the command `lamp speaker FILE.wav` and the MCP tool
+  `lamp_play_audio` play sound of your own through the lamp's speaker
+  (mono S16LE, 16000 or 24000 Hz); off unless the owner switched it on,
+  never while private or muted, never off the lamp's own network:
+  [references/api.md](references/api.md#the-speaker). `body.state` and
   routed `joints` come next; this skill gains them as they land.
 
 ## Patterns

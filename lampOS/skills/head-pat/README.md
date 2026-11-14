@@ -16,7 +16,12 @@ does and `tests/README.md` for its cases.
   three `[[do]]` steps.
   - A spoken line (the default): `say = { text = [...] }`, one of the lines
     at random but never the one said last, said as written through the
-    voice's say service. Change the words freely, 2 to 16 different lines.
+    voice's say service as its exact words, with no model turn (#5999),
+    after the same quiet a say at priority 8 waits for. Change the words
+    freely, 2 to 16 different lines; the seven here are among the voice's
+    fixed lines (`lamp_voice::language::FIXED_LINES`), so they go exact, in
+    the owner's language; a new or reworded line is no fixed line, and goes
+    as a text the model says as written, until it is added there.
   - **How often** is `cooldown` in `[trigger]`: 10 s since 29 Oct (15 s
     after the lamp check on lamp-06c1, where a second pet within the minute
     got nothing and read as "pet not working"; then 10 s, with the wiggle
@@ -34,6 +39,7 @@ does and `tests/README.md` for its cases.
 - **Latency:** the line is a say at priority 8 (a second's quiet since the
   last turn) that expires if it can't start within 3 s, so it is said at
   once or not at all, never late (lamp-voice's
-  `a_pets_line_is_said_at_once_or_dropped_never_late`); a spoken text costs
-  about a second of model time. To be measured on lamp-06c1 from the
+  `a_pets_line_is_said_at_once_or_dropped_never_late`); an exact line
+  costs no model time, only its render the first time, after which it is
+  kept (#5999). To be measured on lamp-06c1 from the
   `controls/pet` message to the first sound.

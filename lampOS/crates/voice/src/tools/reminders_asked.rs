@@ -26,7 +26,7 @@ pub fn on() -> bool {
 pub const LIST: &str = "list_reminders";
 
 /// The questions, as words in a row.
-const ASKS: &[&[&str]] = &[
+pub(crate) const ASKS: &[&[&str]] = &[
     &["what", "reminders", "do", "i", "have"],
     &["what", "reminders", "i", "have"],
     &["what", "reminders", "have", "i", "got"],
@@ -87,6 +87,7 @@ pub(crate) fn force() -> Force {
         asks_for_reminders(last.words()?).then_some(Forced {
             name: LIST,
             only: None,
+            fields: None,
         })
     })
 }

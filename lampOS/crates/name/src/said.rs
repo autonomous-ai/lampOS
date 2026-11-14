@@ -56,9 +56,22 @@ impl Hearings {
         })
     }
 
+    /// When the hearing going on began, if one is.
+    pub fn began(&self) -> Option<Instant> {
+        self.open.map(|(began, _)| began)
+    }
+
     fn close(&mut self, now: Instant) -> Option<NameHeard> {
+        self.close_at(now, now)
+    }
+
+    /// [`Self::close`], the hold-off counted from `heard`, the time of the
+    /// sound that ended the hearing (#6114): a woken grid's batch holds off
+    /// only the second after the call, never one counted from when the
+    /// batch came, which would pass over a later call in the same batch.
+    fn close_at(&mut self, now: Instant, heard: Instant) -> Option<NameHeard> {
         let (began, score) = self.open.take()?;
-        self.quiet_until = Some(now + HOLD_OFF);
+        self.quiet_until = Some(heard.min(now) + HOLD_OFF);
         Some(NameHeard {
             score,
             ago_ms: u32::try_from(now.saturating_duration_since(began).as_millis())
@@ -66,21 +79,33 @@ impl Hearings {
         })
     }
 
-    /// A score that came at `now`. A hearing, if one is over with it.
+    /// A score that came at `now`, of the sound at `now`. A hearing, if one
+    /// is over with it.
     pub fn score(&mut self, score: f32, now: Instant) -> Option<NameHeard> {
-        if self.quiet_until.is_some_and(|until| now < until) {
+        self.score_of(score, now, now)
+    }
+
+    /// A score that came at `now`, of the sound at `at` (#6114): a woken
+    /// grid's best for a name can come a second or more after the name was
+    /// said, and a hearing it opens is dated from `at`, so its `ago_ms`
+    /// reaches back to the sound and the voice puts the name where it was
+    /// said. A score of sound inside the hold-off of the last hearing is
+    /// passed over, so a late score of the same call is not a second one.
+    pub fn score_of(&mut self, score: f32, at: Instant, now: Instant) -> Option<NameHeard> {
+        if self.quiet_until.is_some_and(|until| at.min(now) < until) {
             return None;
         }
         match (&mut self.open, score >= self.least) {
             (Some((began, highest)), true) => {
                 *highest = highest.max(score.min(1.0));
+                *began = (*began).min(at.min(now));
                 (now.saturating_duration_since(*began) >= LONGEST)
-                    .then(|| self.close(now))
+                    .then(|| self.close_at(now, at))
                     .flatten()
             }
-            (Some(_), false) => self.close(now),
+            (Some(_), false) => self.close_at(now, at),
             (None, true) => {
-                self.open = Some((now, score.min(1.0)));
+                self.open = Some((at.min(now), score.min(1.0)));
                 self.rising_said = false;
                 None
             }
@@ -137,6 +162,55 @@ impl Stops {
 mod tests {
     use super::*;
 
+    /// #6114, cause 1 ruled out: a score that dips under the name's bar
+    /// inside one call ends the name's hearing at its first peak, and the
+    /// higher peak after the dip is held off. The name is still heard
+    /// once, at the bar or over it: the dip lowers the score said, it never
+    /// loses the call. Fifth's 52e6 clue (a near at 0.972 and no request)
+    /// is cause 2 in `not_self`.
+    #[test]
+    fn issue_6114_a_dip_inside_a_call_still_says_the_name_once() {
+        let start = Instant::now();
+        let (mut name, mut nears) = (Hearings::new(0.9), Hearings::new(0.5));
+        let (mut heard, mut near) = (Vec::new(), Vec::new());
+        for (step, score) in [0.2, 0.93, 0.7, 0.972, 0.6, 0.2, 0.1]
+            .into_iter()
+            .enumerate()
+        {
+            let at = start + Duration::from_millis(80 * step as u64);
+            heard.extend(name.score(score, at));
+            near.extend(nears.score(score, at));
+        }
+        assert_eq!(heard.len(), 1, "{heard:?}");
+        assert!(heard[0].score >= 0.9, "{heard:?}");
+        assert_eq!(near.len(), 1, "{near:?}");
+    }
+
+    /// #6114, cause 3 (late scores held off by when they came): a woken
+    /// grid's scores come in one batch, dated by their sound. A stray
+    /// hearing early in the batch closes at the batch's arrival, and the
+    /// hold-off then counts from the arrival, so a call whose sound is a
+    /// second and a half later in the same batch is never heard.
+    #[test]
+    fn issue_6114_a_late_call_after_a_stray_in_the_same_batch_is_heard() {
+        let start = Instant::now();
+        let came = start + Duration::from_millis(2_400);
+        let mut name = Hearings::new(0.9);
+        let mut heard = Vec::new();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        for (sound, score) in [
+            (0, 0.95),
+            (80, 0.3),
+            (1_500, 0.97),
+            (1_580, 0.98),
+            (1_660, 0.3),
+        ] {
+            heard.extend(name.score_of(score, at(sound), came));
+        }
+        heard.extend(name.tick(came + Duration::from_secs(1)));
+        assert_eq!(heard.len(), 2, "the stray and the call: {heard:?}");
+    }
+
     fn ms(n: u64) -> Duration {
         Duration::from_millis(n)
     }
@@ -168,6 +242,43 @@ mod tests {
         let again = opened + ms(1_600);
         assert_eq!(hearings.score(0.95, again), None);
         assert_eq!(hearings.rising(again).map(|sign| sign.score), Some(0.95));
+    }
+
+    /// #6114 (lamp-52e6, #6078): "Lamp" at a line's start reached the bar
+    /// only on a woken grid's score, given about a second after it was said.
+    /// Dated by when it came, its `ago_ms` put the name past the voice's
+    /// 1.3 s start window; dated by the sound it is of, it reaches back to
+    /// the start. A late score of the same call is not a second hearing.
+    #[test]
+    fn a_hearing_is_dated_by_the_sound_its_score_is_of() {
+        let start = Instant::now();
+        let mut hearings = Hearings::new(0.9);
+        // The first grid alone: under the bar at the start.
+        assert_eq!(hearings.score(0.4, start), None);
+        // At 1.2 s the woken grid's 0.94 comes, of the sound at 0.08 s.
+        let came = start + ms(1_200);
+        assert_eq!(hearings.score_of(0.94, start + ms(80), came), None);
+        let first = hearings.rising(came).unwrap();
+        assert_eq!(first.ago_ms, 1_120, "back to the sound, not 0");
+        // Its next score falls: the hearing is said, dated from the sound.
+        let said = hearings
+            .score_of(0.2, start + ms(160), came + ms(80))
+            .unwrap();
+        assert_eq!((said.score, said.ago_ms), (0.94, 1_200));
+        // The same call's next late score, inside the hold-off: passed over.
+        assert_eq!(
+            hearings.score_of(0.95, start + ms(240), came + ms(160)),
+            None
+        );
+        assert!(!hearings.is_open());
+        // A first-grid hearing that a late score of earlier sound joins is
+        // dated from the earlier sound.
+        let mut joined = Hearings::new(0.9);
+        let at = start + ms(5_000);
+        assert_eq!(joined.score(0.92, at), None);
+        assert_eq!(joined.score_of(0.97, at - ms(400), at + ms(80)), None);
+        let said = joined.score(0.1, at + ms(160)).unwrap();
+        assert_eq!((said.score, said.ago_ms), (0.97, 560));
     }
 
     #[test]

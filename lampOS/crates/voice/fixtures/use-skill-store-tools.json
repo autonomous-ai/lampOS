@@ -1,0 +1,220 @@
+{
+  "body": [
+    "dance",
+    "focus_timer",
+    "home_welcome",
+    "keep_watch",
+    "look_for",
+    "pet_companion",
+    "set_pose",
+    "sleep_routine",
+    "study_buddy"
+  ],
+  "core": [
+    "dance",
+    "lamp_help",
+    "set_pose",
+    "wellbeing_nudges"
+  ],
+  "searches": {
+    "look_for": {
+      "default": "desk",
+      "looked": {
+        "desk": "at the desk",
+        "far_left": "far to the left",
+        "far_right": "far to the right",
+        "left": "to the left",
+        "right": "to the right"
+      },
+      "note": "Not found yet? Call look_for with the next place: left, right, far_left, then far_right. If you can see it, say where and stop.",
+      "walk": [
+        "left",
+        "right",
+        "far_left",
+        "far_right",
+        "desk"
+      ]
+    }
+  },
+  "tools": [
+    {
+      "description": "When someone asks the lamp to dance (\"Lamp, dance\", \"show me a dance\", \"dance to this\"), it says one short playful line and dances one of its dances, calm, upbeat or jazzy to suit the ask; a long one if they asked for long. Only when asked.",
+      "name": "dance",
+      "parameters": {
+        "properties": {
+          "long": {
+            "description": "True when they asked for a long dance.",
+            "type": "boolean"
+          },
+          "style": {
+            "description": "The mood of the dance they asked for: calm, upbeat, or jazz. Leave it out when they gave none.",
+            "enum": [
+              "calm",
+              "upbeat",
+              "jazz"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "Call when someone wants to start a focus session or take a rest after one - \"focus mode\", \"let's do a focus session\", \"pomodoro\", \"time for a rest\". Focus sets a bright white light and a nod; rest softens the light and stretches. It does not time them itself; a timer is set by asking the lamp for one.",
+      "name": "focus_timer",
+      "parameters": {
+        "properties": {
+          "mode": {
+            "description": "focus when they want to start a focus session, rest when the session is over and they want a short rest.",
+            "enum": [
+              "focus",
+              "rest"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "Call when someone tells the lamp they have just come home - \"I'm home\", \"I'm back home\", \"hi, I just got in\". The lamp warms its light, greets them with a wave and asks how their day was. Only when they say so; the lamp's own hello when it sees someone at the desk is a different skill.",
+      "name": "home_welcome"
+    },
+    {
+      "description": "Keeps an eye on the desk while the person is out and texts them once if someone comes to it. Call keep_watch with turn on only when the person at the lamp asks you out loud (\"keep an eye on things while I'm out\", \"watch my desk\"), never on your own and never for a typed message; call it with turn off when they ask you to stop or tell you they're back. While it's on, the ring shows a faint blue mark. It says who came only as someone they've introduced you to or someone you don't know, and by name only where the lamp allows it and only for someone whose face it knows who said yes to being named; it never records, takes or sends a picture or a sound.",
+      "name": "keep_watch",
+      "parameters": {
+        "properties": {
+          "turn": {
+            "description": "on: the person at the lamp asked you out loud to keep an eye on things while they're out; off: they asked you to stop, or said they're back",
+            "enum": [
+              "on",
+              "off"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "How to use this lamp. Call when someone asks \"how do I...?\", \"what can you do?\", \"where do I link Gmail or my calendar?\", \"what does the button do?\", \"who made you?\", \"where can I buy you?\", \"what's your website?\", \"help\". Answer only from what it tells you.",
+      "name": "lamp_help",
+      "parameters": {
+        "properties": {
+          "topic": {
+            "description": "What they asked about; abilities for anything else.",
+            "enum": [
+              "abilities",
+              "connectors",
+              "controls",
+              "light",
+              "reminders",
+              "nudges",
+              "guard_mode",
+              "skills",
+              "updates",
+              "unplug",
+              "memory",
+              "setup",
+              "about"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "Call when someone asks the lamp to find something on or near the desk - \"where are my keys\", \"can you find my glasses\", \"look for my phone\". The lamp looks at the desk first, then a few places to either side, saying what it sees as it goes, and stays on the thing when it sees it. Give place = desk the first time, unless they named a place; after each look, only if the thing is not yet seen, call once more with the next place: left, right, far_left, far_right. Only when asked.",
+      "name": "look_for",
+      "parameters": {
+        "properties": {
+          "place": {
+            "description": "Where to look: desk the first time, unless they named a place; then left, right, far_left, far_right, one at a time, only while the thing is not yet seen. found, once you see it: the lamp stays looking at it.",
+            "enum": [
+              "desk",
+              "left",
+              "right",
+              "far_left",
+              "far_right",
+              "found"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "Call when someone asks the lamp to greet or play with their pet - \"say hi to my cat\", \"say hello to Max\", \"play with the dog\". The lamp perks up, glows warm for a moment and says a playful hello to the pet. It does not look for the pet or watch it.",
+      "name": "pet_companion"
+    },
+    {
+      "description": "Call when someone asks the lamp to change its height - \"get lower\", \"sit down\", \"you're too tall\", \"stand up tall\", \"back to normal\". pose = lower to get lower, sit to sit down low, normal to stand up tall or go back to normal. The lamp cannot stand taller than its usual height. Asked to stand taller than that, do not call it; say so in words, \"This is as tall as I stand.\" Only when asked.",
+      "name": "set_pose",
+      "parameters": {
+        "properties": {
+          "pose": {
+            "description": "How tall to stand: lower or sit when asked to get lower or sit down, normal when asked to stand up tall or go back to normal. Always give one.",
+            "enum": [
+              "normal",
+              "lower",
+              "sit"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "Call when someone says they are going to bed or going to sleep and is saying good night to the lamp - \"I'm going to bed\", \"good night\", \"time to sleep\". The lamp dims to a soft warm glow, says one gentle line and settles down.",
+      "name": "sleep_routine"
+    },
+    {
+      "description": "Call when someone says they are about to study, do homework or read, or asks for a break from it - \"help me study\", \"study time\", \"reading time\", \"take a break\". Study and reading set the light and lean the lamp over the desk; break softens the light. This does not check their work.",
+      "name": "study_buddy",
+      "parameters": {
+        "properties": {
+          "mode": {
+            "description": "study when they start studying or working on paper, reading when they sit down to read, break when they want to take a break.",
+            "enum": [
+              "study",
+              "reading",
+              "break"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder.",
+      "name": "wellbeing_nudges",
+      "parameters": {
+        "properties": {
+          "all": {
+            "description": "true for every one of them; left out for the one that came last",
+            "type": "boolean"
+          },
+          "how": {
+            "description": "snooze: none until tomorrow morning; off: none until they ask for them again; on: as before again",
+            "enum": [
+              "snooze",
+              "off",
+              "on"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "Call when someone asks whether anyone was at the lamp while they were away - \"was anyone here while I was out?\", \"did someone come by?\", \"has anyone been at my desk?\". The lamp answers from its record of the room over the last twelve hours, times only: when someone was there and for about how long. It never knows who; with its switch on, at most that someone was a person the lamp knows, and with names on, the name of someone who said yes to being named. Only when asked.",
+      "name": "who_was_here"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+[package]
+name = "lamp-sim"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# The virtual desktop lamp (docs/simulator-lamp.md): the hardware edge of a
+# lamp that runs on a desktop. The real lamp-control and lamp-body run as they
+# are; this crate stands in for what they touch: the servo bus (a simulated
+# STS3215 chain on a pty), the ring, the voice and the speaker's volume.
+
+[[bin]]
+name = "lamp-sim"
+path = "src/main.rs"
+
+[dependencies]
+lamp-bus = { path = "../bus" }
+lamp-ipc = { path = "../ipc" }
+lamp-msgs = { path = "../msgs" }
+serde.workspace = true
+serde_json.workspace = true
+# The developer's voice keys file (keys.rs): the workspace's own toml line, as control, skills and voice have it.
+toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
+# The eyes' own JPEG decoder and encoder: the warped camera picture.
+zune-jpeg = "=0.4.21"
+jpeg-encoder = "=0.7.1"
+rustix = { version = "=1.1.5", features = ["fs", "pty", "termios", "event", "process"] }
+# The local speech-to-text socket (listen.rs, sim-3-P4 step 2): the blocking
+# tungstenite under lamp-control's tokio-tungstenite, already in Cargo.lock.
+tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
+
+# The resident speech synthesizer on macOS (apple_speech.rs, sim-3-P4 step 1b,
+# the first builder on #6811, 13 Nov 21:28): Apple's AVFAudio through the objc2
+# bindings, macOS only, so a Linux build and every product crate pull none of
+# them. Licences: objc2, objc2-encode, block2, objc2-foundation MIT; the
+# generated framework crates "Zlib OR Apache-2.0 OR MIT".
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "=0.6.5"
+block2 = "=0.6.2"
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSDate", "NSObjCRuntime", "NSRunLoop", "NSString"] }
+objc2-avf-audio = { version = "=0.3.2", default-features = false, features = ["std", "block2", "AVAudioBuffer", "AVAudioFormat", "AVAudioTypes", "AVSpeechSynthesis"] }
+
+[lints]
+workspace = true

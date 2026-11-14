@@ -1,8 +1,9 @@
 # lampOS skills: physical skills, each a folder in /var/lib/lampOS/skills (lampOS/docs/skills.md).
 # The product unit (lampOS/docs/install.md); install puts every product skill in that folder
-# (lamp-update's install::PRODUCT_SKILLS: every core skill). Seventeen are enabled; Bedtime and Morning
-# stays off until its lamp comparison, and install::PRODUCT_SKILLS_OFF's seven are installed off
-# until their lamp checks. A skill speaks only through the voice's say service
+# (lamp-update's install::PRODUCT_SKILLS: every core skill). Twenty-six are enabled, Bedtime and Morning
+# among them since #5753, Light show since #5745, Light scenes and Point the light since #5744, Music sway since #5770;
+# Comfort break is on by its [present] with LAMP_NUDGES_PRESENT below, and install::PRODUCT_SKILLS_OFF's four are
+# installed off until their lamp checks. A skill speaks only through the voice's say service
 # (LAMP_SAY=on in lamp-voice.service, its socket in the group lampos); the voice has no hello of its own (#2825), so only
 # Welcome back greets, and its reminders and task news wait for their skills' asks (=skill).
 # LAMP_SKILLS_ASK=skip acts without asking the Policy, but for Welcome back's hello: a skill whose
@@ -28,6 +29,8 @@ Nice=10
 Environment=LAMP_SKILLS_ASK=skip
 # Night sleep (#940): its rest leased to Expression, and its claim on the night said every minute.
 Environment=LAMP_SKILL_ROUTINES=on
+# Bedtime and Morning's night caps (#5753): its [limits] sent to Actions, with LAMP_SKILL_ROUTINES above.
+Environment=LAMP_OUTPUT_CAPS=on
 # A skill's light is asked of the ring (#1132): the ring's half is the voice's LAMP_LIGHT_REQUESTS (17 Oct).
 Environment=LAMP_LIGHT_REQUESTS=on
 # A stand asked by voice (#4135): the Pose skill's stand step, read by lamp-body's LAMP_BODY_POSE_ASK.
@@ -35,6 +38,43 @@ Environment=LAMP_BODY_POSE_ASK=on
 # A made skill reads a linked service to its owner alone (#5288, #5303): a skill's read step, said behind its
 # gate (the owner's face alone, no voice, not private), through lamp-services' tools socket. Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
+# The private room (the owner's call, 6 Nov), as in lamp-voice.service: a made skill's read runs no ownership check,
+# so it needs no owner's name or known face, but still one face alone in view: two faces hold it, a second face
+# mid-read stops it. No voice heard, not private, not paused and not in quiet hours still hold it, and a voice heard
+# mid-read still stops it.
+Environment=LAMP_PRIVATE_ROOM=on
+# A Store or pushed skill's `do.task` (#6305, #6071 PR 2, docs/skills.md "A skill's task"): handed to lamp-tasks
+# only with lamp-control's kept yes to its grants and folder's SHA-256; at most 3 a skill and 10 in all a day.
+Environment=LAMP_SKILL_TASKS=on
+# Where a `do.task` is handed to lamp-tasks (its skill-task.sock, #6306); without it nothing is handed over.
+Environment=LAMP_SKILLS_TASKS_SOCKET=/run/lampos-tasks/skill-task.sock
+# A skill made here is the person's own (#6059, docs/skills.md "A made skill loosened"): a made say's cooldown
+# as asked, at least a minute. The same line in lamp-voice and lamp-skills-manage@.
+Environment=LAMP_MADE_SKILL_LOOSE=on
+# "I'm unplugging you" folds the arm first (#1674, unplug.md): set on Body, Expression, Skills and Voice together
+# (#5747); lamp-52e6 20 Oct, #1699 row 1: ask, fold 6.7 s, head and base home, ready, Expression asleep.
+Environment=LAMP_UNPLUG=on
+# A confirmed fold turns the lamp off through setup's change helper, as the app's Turn off does, so a running lamp
+# never says it may be unplugged (#5763's P1, shutdown.md): its runner stops every part, syncs and powers off.
+Environment=LAMP_UNPLUG_OFF_SOCKET=/run/lampos-setup-change/change.sock
+# The owner's language, as the voice reads it (#4473): the turn-off's spoken yes is heard by English words only, so
+# an owner who speaks another language is never asked for one, and the lamp stays (#5777, unplug.md step 7).
+Environment=LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language
+# A made skill's write (#6066, #6142): a skill with one fixed write step loads, and its write goes out through
+# lamp-services only after the owner's yes to its content, at most three a day, never a public post. On in the
+# product (owner, 11 Nov).
+Environment=LAMP_SKILL_WRITES=on
+# A made skill's code of its own (#6307, docs/skills.md "Made by voice"): a `made: here` skill put on as a package
+# loads its `do.task`, its script said to come from the lamp's own model (task::made_with_code).
+Environment=LAMP_MADE_SCRIPTS=on
+# The lamp's agent's connectors (#6664, docs/skills.md): a `do.task`'s grants may name a linked service's
+# <code>-read / <code>-write (task::grants_of), said back plainly and kept in the owner's yes. The same line in
+# lamp-tasks, lamp-skills-manage@, lamp-voice and lamp-control. On in the product (owner, 13 Nov).
+Environment=LAMP_AGENT_SERVICES=on
+# A made skill's fixed write through the lamp's agent (#6824, docs/services.md "Through the lamp's agent"): handed
+# to lamp-tasks as a skill's run with its one write grant, sent straight only when the agent couldn't take it.
+# The same line in lamp-tasks, lamp-control and lamp-services. On in the product (owner, 13 Nov).
+Environment=LAMP_SKILL_WRITE_AGENT=on
 # The owner's typed setup name, for a made skill's read (#5288). A blank fallback when there is none, so the read
 # is skipped ("no owner's face enrolled"), never the unit refused (SetCredential= is LoadCredential='s default,
 # systemd 252). One newline, never empty: an empty SetCredential= in a unit file fails the start at CREDENTIALS
@@ -62,12 +102,20 @@ Environment=LAMP_SKILLS_DAILY_FILE=/var/lib/lampos-skills-state/daily.json
 # LAMP_WHO_WAS_HERE_KNOWN=on. An Environment= line too, as --known-file is as new as guard mode
 # (19 Oct) and would end an older lamp-skills at its start (#2157).
 Environment=LAMP_SKILLS_KNOWN_FILE=/run/lampos-eyes/known
+# Guard mode's tool described off first (#2827, #5752): "I'm back" turns it off; lamp-06c1, 22 Oct, 5 of 5 off
+# and 5 of 5 on. Its names, sounds and turning it on from the app stay off until their own lamp checks.
+Environment=LAMP_GUARD_WORDS_V2=on
 # The developer folder: skills a paired computer pushed over lamp-control
 # (#3869, docs/skills.md "Skills pushed from a computer"), loaded after the
 # skills folder and held to the protocol's grants. Read only here; the
 # manage helper alone writes it. An Environment= line, as an older
 # lamp-skills ignores it where it would end at an unknown flag (#2157).
 Environment=LAMP_SKILLS_DEV_DIR=/var/lib/lampOS/skills-dev
+# Music to relax (#1685, #5749): a spoken request for a skill's checked local recording plays it after the
+# confirmation; Stop, an interruption, the privacy slide or mute ends it, and nothing resumes (requested-audio.md).
+# The same line in lamp-voice, lamp-skills and lamp-actions; played on lamp-4ace on 6963 (#2793). Installing
+# the skill (relaxing-music, a Store skill) is separate: with none installed nothing plays.
+Environment=LAMP_REQUESTED_AUDIO=on
 ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --state-dir /var/lib/lampos-skills-state --zone system
 Restart=on-failure
 RestartSec=5s
@@ -81,6 +129,9 @@ NoNewPrivileges=yes
 # functions until this restarted (lamp-4ace, 19 Oct 04:33).
 RuntimeDirectory=lampos-skills
 RuntimeDirectoryMode=0755
+# Kept through a restart (an update's), not a stop: holds.json there keeps a long held trigger's start,
+# so a 50- or 90-minute nudge does not begin again at each update; tmpfs, so never across a reboot.
+RuntimeDirectoryPreserve=restart
 # Its own state, made by systemd for its user and writable under ProtectSystem=strict.
 StateDirectory=lampos-skills-state
 StateDirectoryMode=0700

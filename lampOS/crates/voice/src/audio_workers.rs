@@ -328,6 +328,26 @@ pub fn capture_with_noise_suppression(
     diagnostic_directory: Option<&Path>,
     noise_suppression: NoiseSuppression,
 ) -> Result<()> {
+    // `--microphone-device bus:mic1` (a developer's computer): the bus's sound,
+    // by the same loop. Any other name is the board's ALSA device, as ever.
+    // The bus device has no `wait`, so the loop ticks every [`TICK`] and each pass is one
+    // non-blocking read of the bus (more in `bus_capture`).
+    if crate::bus_capture::is_bus_device(device) {
+        return capture_on::<crate::bus_capture::BusCapture>(
+            channels,
+            controller,
+            worker,
+            directory,
+            device,
+            diagnostic_directory,
+            noise_suppression,
+            ReferenceClock::Fixed,
+            ReferenceRecovery::Off,
+            lamp_audio::Reference::AsGiven,
+            Source::Processed,
+            capture_wait_from_environment(),
+        );
+    }
     capture_on::<AlsaCapture>(
         channels,
         controller,
@@ -354,6 +374,22 @@ pub fn capture_with_options(
     device: &str,
     options: &AudioWorkerOptions,
 ) -> Result<()> {
+    if crate::bus_capture::is_bus_device(device) {
+        return capture_on::<crate::bus_capture::BusCapture>(
+            channels,
+            controller,
+            worker,
+            directory,
+            device,
+            options.diagnostic_directory.as_deref(),
+            options.noise_suppression,
+            options.reference_clock,
+            options.reference_recovery,
+            options.echo_reference.reference(),
+            options.stop_words,
+            capture_wait_from_environment(),
+        );
+    }
     capture_on::<AlsaCapture>(
         channels,
         controller,
@@ -1252,6 +1288,11 @@ fn open_speaker(
     device: &str,
     controller: BootId,
 ) -> Result<Speaker> {
+    // `--speaker-device bus:speaker1` (a developer's computer): the voice's sound put on the
+    // bus for a simulator, by the same speaker; no sound card, so nothing to wait out.
+    if crate::bus_speaker::is_bus_device(device) {
+        return crate::bus_speaker::open(controller);
+    }
     let (speaker, waited) = open_waiting_out_busy(
         || Speaker::open_clock(device, controller),
         lamp_audio::pcm::open_fault,

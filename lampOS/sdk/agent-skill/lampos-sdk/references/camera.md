@@ -23,8 +23,9 @@ without it, the calls are refused, or the `camera` grant can't be given.
     each frame as the camera made it, `size` `640x480` (the default when you
     give none) or `1280x720`, the JPEG as bytes in `data`.
   - **Otherwise:** the eyes' newest frame, about 1 to 2 a second, the JPEG
-    as base64 `jpeg`. This is the only path on customer lamps (stable 10824):
-    their eyes don't serve every frame, so `fast` is never true there.
+    as base64 `jpeg`. On older stables (11450 and before) this is the only
+    path; the fast path is in the product's lamp-eyes unit from build 12104 (shown on
+    12587), so `fast` is true there.
 
   The answer and each frame carry `fps_now`, the rate the lamp is actually
   sending. Measured on lamp-75c9 with the fast path: asked 24 fps at 640×480, the lamp said

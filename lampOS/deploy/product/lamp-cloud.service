@@ -51,9 +51,18 @@ Environment=LAMP_NUDGES_PRESENT=on
 # The owner's approximate place from the app (#4333): owner.place and owner.place.clear, rounded to about a
 # kilometre and kept in the person's folder through `lamp-setup change`. The lead's yes on 3 Nov.
 Environment=LAMP_OWNER_PLACE=on
+# The owner's chosen voice and character words from the app (#5394): voice.set and character.set, kept through
+# `lamp-setup change`; the same line in lamp-voice.service. On in the product on 12 Nov for the lead (#6590).
+Environment=LAMP_CHOSEN_VOICE=on
 # A skill typed in the app (#2813, fourteen-P15): `can` names skills.make only while lamp-voice's maker
 # has a computer to hand it to (make_skill::watch, asked every 60 s).
 Environment=LAMP_APP_MAKE_SKILL=on
+# The lamp's own Hermes chats through lamp-cloud's loopback forwarder (127.0.0.1:7741) to the relay
+# (#5978, docs/cloud.md); it serves only once Hermes is installed and asks.
+Environment=LAMP_HERMES_ON_LAMP=on
+# OpenClaw on the lamp, its second engine beside Hermes (#6498), chats through the same forwarder, port and token
+# (#6226, docs/cloud.md); either switch serves it.
+Environment=LAMP_OPENCLAW_ON_LAMP=on
 # Health and crash reports to the company (#2862, docs/cloud.md, "Health and crash reports"): only after
 # the person's yes at setup (share_reports) or from the app (reports.set). With no recorded yes, nothing
 # is sent; a reset wipes the choice.
@@ -65,13 +74,24 @@ EnvironmentFile=-/etc/lampOS/skills/store.env
 # A skill made on this lamp sent to the Skills Store (fourteen-P13): only on the owner's Share in the app,
 # packed unsigned from its own files and sent with the lamp's key; a reviewer reads it before it is listed.
 Environment=LAMP_SKILLS_SHARE=on
+# Guard mode's texts, an installable skill from the Store (#5752, #1685): only lamp-skills' lines on messages/out
+# go up as unasked news (visit times and lengths, never a name, picture or sound; kept 90 days for the owner).
+# LAMP_MESSAGES stays off: no app texts onto chat/in, no text turns. Shown on lamp-9adf, 7 Nov 15:33-15:42.
+Environment=LAMP_SKILL_MESSAGES=on
 # A skill added from a file in the app, on a spoken yes (#5080): skills.upload, the file fetched from the backend
 # and handed to lamp-voice's app-make socket, the same line there.
 Environment=LAMP_SKILL_UPLOAD=on
 Environment=LAMP_APP_UPDATE=on
+# The lamp's agents for the app (#6240): `engines` in update.status and engines.install for a missing Hermes,
+# on in the product by the owner's rule of 11 Nov; `off` here takes it away.
+Environment=LAMP_APP_ENGINES=on
 # The app's connectors (Queue #4710): a link set or removed through lamp-services' admin socket. Reads, and
 # sends, which lamp-services.service sets on (LAMP_SERVICES_WRITE=on); the same line there and in lamp-voice.service.
 Environment=LAMP_SERVICES=on
+# A skill that needs a connector not linked, told to the app so it opens that Connect (#6059, the owner's ask):
+# skills.list rows carry needs_link, from lamp-services' admin list, and an install or an app make that lands one
+# sends skills.needs_link on the account channel, codes and names only.
+Environment=LAMP_SKILL_LINK_APP=on
 # On after the checks: the button and the app on lamp-52e6 (#3697, 2 Nov), the app's power-off on lamp-0c89 (#3698, 30 Oct).
 Environment=LAMP_SHUTDOWN=on
 Environment=LAMP_APP_RESTART=on
@@ -82,6 +102,16 @@ Environment=LAMP_TASKS_SIGN_IN_APP=on
 # The app told once that setup is done (#5812, onboarding.done; system.info's onboarding_done_supported),
 # its acked date kept in the state folder below: on, the lead's call (9 Nov).
 Environment=LAMP_APP_ONBOARDING_DONE=on
+# The app told when an update starts and when it ends (#6284, update.started, update.ended; system.info's
+# update_events_supported), what is owed kept in the state folder below until the broker's ack. On after a run on
+# lamp-e82d (11 Nov: update.started 1.9 s after setup, update.ended at the round's end, both acked).
+Environment=LAMP_APP_UPDATE_EVENTS=on
+# The app's faces.add_photo (#1968, cloud.md "A face from the app's photo"; on with the eyes' --photo-dir and the
+# voice's asking, #5750): a JPEG of at most 8 MiB from the lamp's own account written as a new 0600 file in the
+# photo folder, the eyes asked, and the file removed after, answered or not; nothing of a photo leaves the lamp.
+Environment=LAMP_PHOTO_FACES=on
+Environment=LAMP_EYES_PHOTO_DIR=/run/lampos-photos
+Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos
@@ -115,8 +145,9 @@ ProtectSystem=strict
 # lamp-skills' call socket, for guard mode from the app with LAMP_GUARD_FROM_APP=on (#2562); and
 # lamp-voice's app-make socket, for a skill typed in the app with LAMP_APP_MAKE_SKILL=on (#2813);
 # lamp-tasks' app route, for Harness signed in from the app with LAMP_TASKS_SIGN_IN_APP=on (#5198);
-# and lamp-control's admin socket, while developer access is on.
-ReadWritePaths=/run/lampos-bus /run/lampos-actions -/run/lampos-photos -/run/lampos-skills -/run/lampos-app-make -/run/lampos-services -/run/lampos-tasks -/run/lampos-control
+# lamp-control's admin socket, while developer access is on; and lamp-voice's say socket, for
+# the app's onboarding pages said done (#6076).
+ReadWritePaths=/run/lampos-bus /run/lampos-actions -/run/lampos-photos -/run/lampos-skills -/run/lampos-app-make -/run/lampos-services -/run/lampos-tasks -/run/lampos-control -/run/lampos-say
 ProtectHome=yes
 PrivateTmp=yes
 # No capability is needed (Fourth on #1404): the broker, the ping and the bus. Netlink is for `iw`,

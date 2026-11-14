@@ -74,9 +74,126 @@ pub enum Part {
     Voice,
 }
 
-/// What the owner granted a paired client, as the app shows it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+/// The linked services a skill's run may be granted, by the code the person
+/// sees (`lamp_services::catalog::SERVICES`, the second code of a service
+/// folded to its first, [`SERVICE_CODES_FOLDED`]): their grants are
+/// `<code>-read` and `<code>-write` (#6432). One list, which lamp-tasks'
+/// grant check follows; a test holds it to lamp-services' catalog.
+pub const SERVICE_CODES: [&str; 14] = [
+    "gmail",
+    "google_calendar",
+    "google_drive",
+    "figma",
+    "github",
+    "linear",
+    "asana",
+    "ahrefs",
+    "facebook",
+    "slack",
+    "mondaydotcom",
+    "hubspot",
+    "amplitude",
+    "notion",
+];
+
+/// A service's second catalog code, and the code its grant names: a Gmail
+/// link by app password is `gmail-app`, and is granted as `gmail`.
+pub const SERVICE_CODES_FOLDED: [(&str, &str); 2] =
+    [("gmail-app", "gmail"), ("figma-api", "figma")];
+
+/// The code a service's grant names, for catalog code `code`; `None` for a
+/// service the lamp has no grant for.
+pub fn service_grant_code(code: &str) -> Option<&'static str> {
+    let code = SERVICE_CODES_FOLDED
+        .iter()
+        .find_map(|(other, folded)| (*other == code).then_some(*folded))
+        .unwrap_or(code);
+    SERVICE_CODES.iter().copied().find(|known| *known == code)
+}
+
+/// What a service grant lets a skill's run do: read, or prepare a write
+/// that the person's spoken yes sends, never the run.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Access {
+    Read,
+    Write,
+}
+
+/// One linked service's grant, `<code>-read` or `<code>-write`: a skill
+/// run's alone, never a paired computer's or the local agent's (#6432).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ServiceGrant {
+    /// One of [`SERVICE_CODES`].
+    pub code: &'static str,
+    pub access: Access,
+}
+
+impl ServiceGrant {
+    /// The grant for catalog code `code` (folded) and `access`.
+    pub fn of(code: &str, access: Access) -> Option<Self> {
+        service_grant_code(code).map(|code| Self { code, access })
+    }
+
+    /// Its wire name, `<code>-read` or `<code>-write`.
+    pub fn wire(self) -> String {
+        match self.access {
+            Access::Read => format!("{}-read", self.code),
+            Access::Write => format!("{}-write", self.code),
+        }
+    }
+
+    /// The grant a wire name names, if it is one: the code exactly as
+    /// [`SERVICE_CODES`] lists it, never a second code.
+    pub fn from_wire(name: &str) -> Option<Self> {
+        let (code, access) = if let Some(code) = name.strip_suffix("-read") {
+            (code, Access::Read)
+        } else {
+            (name.strip_suffix("-write")?, Access::Write)
+        };
+        let code = SERVICE_CODES.iter().copied().find(|known| *known == code)?;
+        Some(Self { code, access })
+    }
+}
+
+/// The plain grants' wire names, in [`Grant::ALL`]'s order.
+const PLAIN_WIRE: [&str; 14] = [
+    "body",
+    "light",
+    "speak",
+    "look",
+    "hear",
+    "sound",
+    "skills",
+    "air",
+    "device",
+    "camera",
+    "microphone",
+    "speaker",
+    "notes",
+    "speech",
+];
+
+impl Serialize for Grant {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.wire())
+    }
+}
+
+impl<'de> Deserialize<'de> for Grant {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let name = String::deserialize(deserializer)?;
+        Grant::from_wire(&name).ok_or_else(|| {
+            serde::de::Error::custom(format!(
+                "unknown grant `{name}`, expected one of {}, or <service>-read or <service>-write",
+                PLAIN_WIRE.join(", ")
+            ))
+        })
+    }
+}
+
+/// What the owner granted a paired client, as the app shows it; and, for a
+/// skill's run alone, a linked service ([`Grant::Service`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Grant {
     /// Gestures, its own moves, looking, joints under a lease, feelings.
     Body,
@@ -108,9 +225,82 @@ pub enum Grant {
     /// The microphone's sound as it is heard, never while the lamp is
     /// private.
     Microphone,
+    /// Sound played through the lamp's speaker, any sound and not only the
+    /// lamp's own voice (`speaker.stream`, docs/control.md, "The speaker"):
+    /// never pre-ticked, and never while the lamp is private.
+    Speaker,
+    /// Its own small notes kept on the lamp (`notes.set`, `notes.get`,
+    /// `notes.delete`, `notes.list`): only its own, gone with its revoke
+    /// (docs/control.md, "Notes").
+    Notes,
+    /// Every line the lamp says out loud, as `lamp.said`: its own words and
+    /// what it reads to the person, never what a person says to it
+    /// (docs/control.md, "What the lamp says").
+    Speech,
+    /// One linked service, read or a write prepared, through lamp-services
+    /// (`service.read`, `service.write`): only in a skill run's token, from
+    /// the owner's yes, used only with `LAMP_SKILL_TASKS=on`
+    /// (docs/control.md, "A skill run's linked services"). Never in
+    /// [`Grant::ALL`].
+    Service(ServiceGrant),
 }
 
 impl Grant {
+    /// Its wire name: `body` … `speech`, or `<code>-read` / `<code>-write`.
+    pub fn wire(self) -> String {
+        match self {
+            Self::Service(service) => service.wire(),
+            plain => Self::ALL
+                .iter()
+                .position(|grant| *grant == plain)
+                .map(|at| PLAIN_WIRE[at].to_owned())
+                .unwrap_or_default(),
+        }
+    }
+
+    /// The grant a wire name names, if this build knows it.
+    pub fn from_wire(name: &str) -> Option<Self> {
+        PLAIN_WIRE
+            .iter()
+            .position(|plain| *plain == name)
+            .map(|at| Self::ALL[at])
+            .or_else(|| ServiceGrant::from_wire(name).map(Self::Service))
+    }
+
+    /// A linked service's grant: a skill run's alone.
+    pub fn is_service(self) -> bool {
+        matches!(self, Self::Service(_))
+    }
+
+    /// Every grant this build knows, in the pairing screen's order.
+    pub const ALL: [Grant; 14] = [
+        Self::Body,
+        Self::Light,
+        Self::Speak,
+        Self::Look,
+        Self::Hear,
+        Self::Sound,
+        Self::Skills,
+        Self::Air,
+        Self::Device,
+        Self::Camera,
+        Self::Microphone,
+        Self::Speaker,
+        Self::Notes,
+        Self::Speech,
+    ];
+
+    /// The words for every grant this build knows, by wire name: what the
+    /// owner's app shows for a grant it has no label of its own for, so the
+    /// words never drift from the lamp's (`control.clients`, `control.set_grants`).
+    pub fn shown_all() -> serde_json::Value {
+        Self::ALL
+            .iter()
+            .map(|grant| (grant_wire(*grant), serde_json::json!(grant.shown())))
+            .collect::<serde_json::Map<_, _>>()
+            .into()
+    }
+
     /// What the pairing screen says the owner is granting, word for word:
     /// the owner's admin socket gives these with the code, and the app
     /// shows them. `skills` says that what it puts on keeps running after
@@ -132,8 +322,35 @@ impl Grant {
             Self::Microphone => {
                 "can hear what the lamp's microphone hears, never while it is private"
             }
+            Self::Speaker => {
+                "can play any sound through the lamp's speaker, not only the lamp's own voice, so it can sound like a person; never while the lamp is private"
+            }
+            Self::Notes => {
+                "can keep small notes of its own on the lamp, which stay until it is let go"
+            }
+            Self::Service(ServiceGrant {
+                access: Access::Read,
+                ..
+            }) => "can read one of your linked services, for one run of a skill",
+            Self::Service(ServiceGrant {
+                access: Access::Write,
+                ..
+            }) => {
+                "can prepare a write to one of your linked services, for one run of a skill: the lamp reads it back and sends it only on your spoken yes"
+            }
+            Self::Speech => {
+                "can read everything the lamp says out loud, which can be personal: it includes what it repeats back to you and what it reads to you from your mail and calendar, never what you say to it; every computer you give this to reads the same lines; what it has sent can't be taken back, and the computer may pass it on"
+            }
         }
     }
+}
+
+/// A grant's wire name.
+fn grant_wire(grant: Grant) -> String {
+    serde_json::json!(grant)
+        .as_str()
+        .unwrap_or_default()
+        .to_owned()
 }
 
 /// An event a client may subscribe to.
@@ -174,6 +391,9 @@ pub enum EventKind {
     /// Where each joint is, up to 25 a second, and the lamp's own state.
     #[serde(rename = "body.state")]
     BodyState,
+    /// A line the lamp said out loud: `text`, `by`, `source`, `cut`.
+    #[serde(rename = "lamp.said")]
+    LampSaid,
 }
 
 impl EventKind {
@@ -190,6 +410,7 @@ impl EventKind {
             Self::AirChanged => Some(Grant::Air),
             Self::VolumeChanged => Some(Grant::Speak),
             Self::BodyState => Some(Grant::Body),
+            Self::LampSaid => Some(Grant::Speech),
             Self::Touch | Self::Button | Self::Time | Self::LampChanged => None,
         }
     }
@@ -260,6 +481,12 @@ pub struct Angles {
 /// built-in hum. Any other name is one of the computer's own clips
 /// (`sound.upload`, `crate::sounds`).
 pub const SOUNDS: [&str; 1] = ["hum"];
+/// The sample rates a speaker stream takes (mono S16LE): 16 kHz, the radio
+/// demo's (#6257), which the door resamples, and the voice's own speaker
+/// path's 24 kHz.
+pub const SPEAKER_RATES: [u32; 2] = [16_000, 24_000];
+/// The sample rate a speaker stream is given when it names none.
+pub const SPEAKER_RATE_DEFAULT: u32 = 16_000;
 /// The most parts one clip is sent in: a 30 s clip, about 1.4 MB, is 40
 /// parts of [`SKILL_PART_MAX_CHARS`].
 pub const SOUND_PARTS_MAX: u32 = 64;
@@ -324,9 +551,16 @@ pub enum Op {
         proof: String,
     },
     /// Every connection: the client's id and its signature over the lamp's
-    /// nonce.
+    /// nonce. On the run socket only, `token` is the one-run token the
+    /// connection holds (the id and the signature are then not read: an SDK
+    /// sends `c_0` and 64 zero bytes).
     #[serde(rename = "hello")]
-    Hello { client: String, sig: String },
+    Hello {
+        client: String,
+        sig: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        token: Option<String>,
+    },
     #[serde(rename = "subscribe")]
     Subscribe {
         events: Vec<EventKind>,
@@ -364,9 +598,14 @@ pub enum Op {
     /// elbow, in the body's counts from home), starting and ending at home.
     #[serde(rename = "move")]
     Move { step_ms: u32, frames: Vec<[i32; 5]> },
-    /// A recorded move of the client's package, by name.
+    /// A recorded move of the client's pushed skills, by name (their
+    /// `moves/NAME.json`), `skill` saying which when two have the name.
     #[serde(rename = "play")]
-    Play { name: String },
+    Play {
+        name: String,
+        #[serde(default)]
+        skill: Option<String>,
+    },
     #[serde(rename = "joints")]
     Joints {
         lease: String,
@@ -423,6 +662,21 @@ pub enum Op {
     /// One of the computer's own clips, deleted.
     #[serde(rename = "sound.remove")]
     SoundRemove { name: String },
+    /// A note of the client's own kept under a key: any JSON, small.
+    #[serde(rename = "notes.set")]
+    NotesSet { key: String, value: Value },
+    /// One of the client's own notes.
+    #[serde(rename = "notes.get")]
+    NotesGet { key: String },
+    /// One of the client's own notes dropped.
+    #[serde(rename = "notes.delete")]
+    NotesDelete { key: String },
+    /// The client's own keys, those that start with `prefix`.
+    #[serde(rename = "notes.list")]
+    NotesList {
+        #[serde(default)]
+        prefix: String,
+    },
     /// Opens a conversation turn as a tap on the head does: the person's
     /// next line is answered as spoken to the lamp. With `prompt`, the lamp
     /// says it first (docs/control.md, "Turns and listening").
@@ -491,7 +745,43 @@ pub enum Op {
     /// (`microphone.ended`, with why).
     #[serde(rename = "microphone.stream")]
     MicrophoneStream { on: bool },
+    /// A skill's run only: one read of a linked service through
+    /// lamp-services' `service_read`, its `args` as that function takes
+    /// them, `service` beside them (docs/control.md, "A skill run's linked
+    /// services"). Needs `<service>-read`.
+    #[serde(rename = "service.read")]
+    ServiceRead {
+        service: String,
+        #[serde(default)]
+        args: Map<String, Value>,
+    },
+    /// A skill's run only: one write to a linked service, **prepared** by
+    /// lamp-services' `service_write` and held for the person's spoken yes,
+    /// never sent by the run (no `send_id`, no `said`). Needs
+    /// `<service>-write`.
+    #[serde(rename = "service.write")]
+    ServiceWrite {
+        service: String,
+        #[serde(default)]
+        args: Map<String, Value>,
+    },
+    /// Sound to the lamp's speaker: after `on: true` the connection sends
+    /// binary `speaker.audio` frames of 10 to 100 ms (`sample_rate` 16000, the
+    /// default, or 24000; mono S16LE), played through the voice's own speaker
+    /// path until `on: false`, `stop`, the client goes, or the lamp ends it
+    /// (`speaker.ended`, with why): private, muted, the lamp or the person
+    /// speaking, the ring's mark not shown, 2 s with no frame, 10 minutes.
+    #[serde(rename = "speaker.stream")]
+    SpeakerStream {
+        on: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sample_rate: Option<u32>,
+    },
 }
+
+/// What a skill run's `service.write` that tries to send is told: the
+/// person's spoken yes sends a write, never the run.
+pub const RUN_PREPARES_ONLY: &str = "a skill's run only prepares a write: the lamp reads it back and the person's spoken yes sends it, so send_id and said are not taken here";
 
 impl Op {
     /// The grants it needs (all of them).
@@ -539,6 +829,20 @@ impl Op {
             }
             Self::CameraSnapshot {} | Self::CameraStream { .. } => vec![Grant::Camera],
             Self::MicrophoneStream { .. } => vec![Grant::Microphone],
+            Self::SpeakerStream { .. } => vec![Grant::Speaker],
+            Self::NotesSet { .. }
+            | Self::NotesGet { .. }
+            | Self::NotesDelete { .. }
+            | Self::NotesList { .. } => vec![Grant::Notes],
+            // `check` has refused a service with no grant before this.
+            Self::ServiceRead { service, .. } => ServiceGrant::of(service, Access::Read)
+                .map(Grant::Service)
+                .into_iter()
+                .collect(),
+            Self::ServiceWrite { service, .. } => ServiceGrant::of(service, Access::Write)
+                .map(Grant::Service)
+                .into_iter()
+                .collect(),
         };
         needs.sort();
         needs.dedup();
@@ -581,7 +885,12 @@ impl Op {
                     return Err("proof: an HMAC-SHA256, 32 bytes as base64".to_owned());
                 }
             }
-            Self::Hello { client, sig } => {
+            Self::Hello { client, sig, token } => {
+                if let Some(token) = token
+                    && !crate::runs::token_shape(token)
+                {
+                    return Err("token: the one-run token, 43 characters".to_owned());
+                }
                 if !client_id(client) {
                     return Err("client: the id pairing gave, c_ and 1 to 32 hex".to_owned());
                 }
@@ -691,8 +1000,14 @@ impl Op {
             // Any gesture the body has, `idle` and `scanning` too: the body
             // answers a name it doesn't know (the owner's "no limits for
             // developers", 30 Oct).
-            Self::Gesture { name } | Self::Play { name } => {
+            Self::Gesture { name } => {
                 plain_name(name, "name")?;
+            }
+            Self::Play { name, skill } => {
+                plain_name(name, "name")?;
+                if let Some(skill) = skill {
+                    skill_name(skill).map_err(|why| why.replace("name", "skill"))?;
+                }
             }
             // The lamp's own short hum, or a clip of the computer's own by
             // its name; the recorded notices (no Wi-Fi) are never a
@@ -768,7 +1083,7 @@ impl Op {
                     step_ms: u16::try_from(*step_ms).unwrap_or(u16::MAX),
                     frames,
                 };
-                lamp_body::moves::check(&file)
+                lamp_body::moves::check_reach(&file, &lamp_body::moves::door_reach())
                     .map_err(|why| format!("frames: a move this body cannot play: {why}"))?;
             }
             // Any `within_ms`: the body's caps pace each step (the owner's
@@ -868,7 +1183,21 @@ impl Op {
             | Self::SkillList {}
             | Self::SoundList {}
             | Self::CameraSnapshot {}
-            | Self::MicrophoneStream { .. } => {}
+            | Self::MicrophoneStream { .. }
+            | Self::NotesSet { .. }
+            | Self::NotesGet { .. }
+            | Self::NotesDelete { .. }
+            | Self::NotesList { .. } => {}
+            Self::SpeakerStream { sample_rate, .. } => {
+                if let Some(rate) = sample_rate
+                    && !SPEAKER_RATES.contains(rate)
+                {
+                    return Err(format!(
+                        "sample_rate: one of {}",
+                        SPEAKER_RATES.map(|rate| rate.to_string()).join(", ")
+                    ));
+                }
+            }
             Self::Volume { to, step, mute } => {
                 let asked = usize::from(to.is_some())
                     + usize::from(step.is_some())
@@ -878,6 +1207,27 @@ impl Op {
                 }
                 if to.is_some_and(|to| to > 100) {
                     return Err("to: from 0 to 100".to_owned());
+                }
+            }
+            Self::ServiceRead { service, args } | Self::ServiceWrite { service, args } => {
+                if service_grant_code(service).is_none() {
+                    return Err(format!(
+                        "service: one of the lamp's services, {}, or {}",
+                        SERVICE_CODES.join(", "),
+                        SERVICE_CODES_FOLDED
+                            .iter()
+                            .map(|(other, _)| *other)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ));
+                }
+                if args.contains_key("service") {
+                    return Err("args: the service is named beside them, not in them".to_owned());
+                }
+                if matches!(self, Self::ServiceWrite { .. })
+                    && (args.contains_key("send_id") || args.contains_key("said"))
+                {
+                    return Err(RUN_PREPARES_ONLY.to_owned());
                 }
             }
         }
@@ -1244,7 +1594,7 @@ mod tests {
             words.contains("a move this body cannot play: it lasts 600 ms, not 1500 to 10000"),
             "{words}"
         );
-        assert!(why(r#"{"id":5,"op":"move","step_ms":1000,"frames":[[0,0,0,0,0],[0,0,151,0,0],[0,0,0,0,0]]}"#).1.contains("farther than 150"));
+        assert!(why(r#"{"id":5,"op":"move","step_ms":1000,"frames":[[0,0,0,0,0],[0,0,251,0,0],[0,0,0,0,0]]}"#).1.contains("farther than 250"));
         assert!(
             why(r#"{"id":6,"op":"move","step_ms":20,"frames":[[0,0,0,0,0],[0,0,0,0,0]]}"#)
                 .1
@@ -1381,7 +1731,7 @@ mod tests {
             // (lamp_body::moves::check; Ten's finding on #3997).
             r#"{"id":1,"op":"move","step_ms":200,"frames":[[0,0,0,0,0],[20,0,0,0,0],[20,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":20,"frames":[[0,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),
-            r#"{"id":1,"op":"move","step_ms":1000,"frames":[[0,0,0,0,0],[0,0,151,0,0],[0,0,0,0,0]]}"#.to_owned(),
+            r#"{"id":1,"op":"move","step_ms":1000,"frames":[[0,0,0,0,0],[0,0,251,0,0],[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":100,"frames":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":40,"frames":[[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":40,"frames":[[10,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),
@@ -1433,6 +1783,103 @@ mod tests {
         }
     }
 
+    /// Every op the door takes has an entry in the schema, and the schema names no op the door
+    /// does not take: a new `Op` forgotten in `docs/control.schema.json` (as `speaker.stream`
+    /// was, for a while) is caught here. The door's ops are read from this file's own `enum Op`
+    /// (each variant carries a `#[serde(rename = "...")]`, which the second assertion holds to),
+    /// the schema's from the `op` const of every request in `$defs.request`.
+    #[test]
+    fn every_op_the_door_takes_has_a_schema_entry() {
+        let source = include_str!("protocol.rs");
+        let start = source.find("pub enum Op {").expect("enum Op");
+        let body = &source[start..];
+        let body = &body[..body.find("\n}\n").expect("end of enum Op")];
+        let variants = body
+            .lines()
+            .filter(|line| {
+                line.starts_with("    ")
+                    && !line.starts_with("     ")
+                    && line
+                        .trim_start()
+                        .starts_with(|c: char| c.is_ascii_uppercase())
+                    && (line.ends_with(" {") || line.ends_with(','))
+            })
+            .count();
+        let ours: std::collections::BTreeSet<String> = body
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix("#[serde(rename = \""))
+            .map(|rest| rest.split('"').next().unwrap().to_owned())
+            .collect();
+        assert_eq!(
+            variants,
+            ours.len(),
+            "every variant of Op carries a serde rename, so its wire name is read here"
+        );
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../docs/control.schema.json")).unwrap();
+        let defs = &schema["$defs"];
+        let named: std::collections::BTreeSet<String> = defs["request"]["oneOf"]
+            .as_array()
+            .expect("the schema's request list")
+            .iter()
+            .map(|entry| {
+                let name = entry["$ref"].as_str().unwrap().rsplit('/').next().unwrap();
+                defs[name]["properties"]["op"]["const"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("request {name} has no op const"))
+                    .to_owned()
+            })
+            .collect();
+        let missing: Vec<_> = ours.difference(&named).collect();
+        let extra: Vec<_> = named.difference(&ours).collect();
+        assert!(
+            missing.is_empty() && extra.is_empty(),
+            "ops the door takes with no schema entry: {missing:?}; schema ops the door does not take: {extra:?}"
+        );
+    }
+
+    /// `Grant::ALL` is every grant the schema names (`$defs.grant` in control.schema.json), so a grant added to
+    /// one and forgotten in the other is caught here, and `shown_all` says it.
+    #[test]
+    fn grant_all_is_the_schemas_grant_list() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../docs/control.schema.json")).unwrap();
+        let named: std::collections::BTreeSet<String> = schema["$defs"]["grant"]["enum"]
+            .as_array()
+            .expect("the schema's grant list")
+            .iter()
+            .map(|grant| grant.as_str().unwrap().to_owned())
+            .collect();
+        let ours: std::collections::BTreeSet<String> = Grant::ALL
+            .iter()
+            .map(|grant| json!(grant).as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(ours, named);
+        assert_eq!(
+            Grant::shown_all()
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>(),
+            named
+        );
+    }
+
+    /// `Grant::ALL` names every grant once, and `shown_all` says each one's words by wire name.
+    #[test]
+    fn shown_all_says_every_grant_by_its_wire_name() {
+        let all: std::collections::BTreeSet<_> = Grant::ALL.iter().collect();
+        assert_eq!(all.len(), Grant::ALL.len(), "each once");
+        let shown = Grant::shown_all();
+        let shown = shown.as_object().expect("a map");
+        assert_eq!(shown.len(), Grant::ALL.len());
+        for grant in Grant::ALL {
+            assert_eq!(shown[json!(grant).as_str().unwrap()], grant.shown());
+        }
+        assert_eq!(shown["microphone"], Grant::Microphone.shown());
+    }
+
     /// Fourteen's note on #3869: the pairing screen's words are pinned,
     /// `skills`' above all, which says what it puts on keeps running.
     #[test]
@@ -1449,6 +1896,9 @@ mod tests {
             Grant::Device,
             Grant::Camera,
             Grant::Microphone,
+            Grant::Speaker,
+            Grant::Notes,
+            Grant::Speech,
         ]
         .into_iter()
         .map(|grant| (json!(grant), grant.shown()))
@@ -1485,6 +1935,18 @@ mod tests {
                     json!("microphone"),
                     "can hear what the lamp's microphone hears, never while it is private"
                 ),
+                (
+                    json!("speaker"),
+                    "can play any sound through the lamp's speaker, not only the lamp's own voice, so it can sound like a person; never while the lamp is private"
+                ),
+                (
+                    json!("notes"),
+                    "can keep small notes of its own on the lamp, which stay until it is let go"
+                ),
+                (
+                    json!("speech"),
+                    "can read everything the lamp says out loud, which can be personal: it includes what it repeats back to you and what it reads to you from your mail and calendar, never what you say to it; every computer you give this to reads the same lines; what it has sent can't be taken back, and the computer may pass it on"
+                ),
             ]
         );
     }
@@ -1502,6 +1964,31 @@ mod tests {
     }
 
     #[test]
+    fn a_speaker_stream_is_on_or_off_under_the_speaker_grant_at_a_rate_it_takes() {
+        for on in ["true", "false"] {
+            let frame = format!(r#"{{"id":1,"op":"speaker.stream","on":{on}}}"#);
+            assert_eq!(op(&frame).check(), Ok(()), "{on}");
+            assert_eq!(op(&frame).needs(), [Grant::Speaker]);
+        }
+        for rate in [16_000, 24_000] {
+            let frame =
+                format!(r#"{{"id":1,"op":"speaker.stream","on":true,"sample_rate":{rate}}}"#);
+            assert_eq!(op(&frame).check(), Ok(()), "{rate}");
+            assert_eq!(op(&frame).needs(), [Grant::Speaker]);
+        }
+        // Another rate, a stray field or no `on` is refused in words.
+        assert_eq!(
+            why(r#"{"id":1,"op":"speaker.stream","on":true,"sample_rate":44100}"#).1,
+            "sample_rate: one of 16000, 24000"
+        );
+        assert_eq!(
+            why(r#"{"id":1,"op":"speaker.stream","on":true,"fps":5}"#).0,
+            Some(1)
+        );
+        assert_eq!(why(r#"{"id":1,"op":"speaker.stream"}"#).0, Some(1));
+    }
+
+    #[test]
     fn a_microphone_stream_is_on_or_off_under_the_microphone_grant() {
         for on in [true, false] {
             let frame = format!(r#"{{"id":1,"op":"microphone.stream","on":{on}}}"#);
@@ -1514,6 +2001,130 @@ mod tests {
             Some(1)
         );
         assert_eq!(why(r#"{"id":1,"op":"microphone.stream"}"#).0, Some(1));
+    }
+
+    /// #6432: a service's grants are `<code>-read` and `<code>-write`, for
+    /// the codes lamp-services' catalog has, each pair of codes for one
+    /// service folded to one; every name passes lamp-tasks' check (`a-z`,
+    /// `0-9`, `-`, `_`, at most 64).
+    #[test]
+    fn service_grants_are_the_catalogs_codes_read_and_write() {
+        let mut folded: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+        for service in lamp_services::catalog::SERVICES {
+            folded.insert(
+                service_grant_code(service.code)
+                    .unwrap_or_else(|| panic!("{} has no grant", service.code)),
+            );
+        }
+        assert_eq!(
+            folded,
+            SERVICE_CODES.iter().copied().collect(),
+            "every listed code is the catalog's"
+        );
+        for (other, code) in SERVICE_CODES_FOLDED {
+            assert!(lamp_services::catalog::service(other).is_some(), "{other}");
+            assert!(SERVICE_CODES.contains(&code) && !SERVICE_CODES.contains(&other));
+        }
+        for code in SERVICE_CODES {
+            for access in [Access::Read, Access::Write] {
+                let grant = Grant::Service(ServiceGrant::of(code, access).unwrap());
+                let name = json!(grant).as_str().unwrap().to_owned();
+                assert!(
+                    name.len() <= 64
+                        && name.bytes().all(|b| b.is_ascii_lowercase()
+                            || b.is_ascii_digit()
+                            || matches!(b, b'-' | b'_')),
+                    "{name}"
+                );
+                assert_eq!(serde_json::from_value::<Grant>(json!(name)).unwrap(), grant);
+                assert!(!Grant::ALL.contains(&grant));
+            }
+        }
+        assert_eq!(json!(Grant::Light), json!("light"));
+        assert_eq!(
+            json!(Grant::Service(
+                ServiceGrant::of("gmail-app", Access::Read).unwrap()
+            )),
+            json!("gmail-read")
+        );
+        assert_eq!(
+            json!(Grant::Service(
+                ServiceGrant::of("google_calendar", Access::Write).unwrap()
+            )),
+            json!("google_calendar-write")
+        );
+        // A second code, an unknown one or another spelling is no grant.
+        for name in [
+            "gmail-app-read",
+            "calendar-write",
+            "gmail-send",
+            "gmail",
+            "Gmail-read",
+            "gmail:read",
+        ] {
+            assert!(
+                serde_json::from_value::<Grant>(json!(name)).is_err(),
+                "{name}"
+            );
+        }
+    }
+
+    /// control.schema.json's `service_grant` pattern and `service_code`
+    /// list are `SERVICE_CODES` and its folded codes, so the SDKs' schema
+    /// can't drift from the door's grants.
+    #[test]
+    fn the_schemas_service_grants_are_service_codes() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../docs/control.schema.json")).unwrap();
+        assert_eq!(
+            schema["$defs"]["service_grant"]["pattern"],
+            format!("^({})-(read|write)$", SERVICE_CODES.join("|"))
+        );
+        let codes: std::collections::BTreeSet<&str> = schema["$defs"]["service_code"]["enum"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|code| code.as_str().unwrap())
+            .collect();
+        let ours: std::collections::BTreeSet<&str> = SERVICE_CODES
+            .iter()
+            .copied()
+            .chain(SERVICE_CODES_FOLDED.iter().map(|(other, _)| *other))
+            .collect();
+        assert_eq!(codes, ours);
+    }
+
+    #[test]
+    fn a_service_call_names_a_known_service_and_a_write_never_sends() {
+        let checked = |frame: &str| parse(frame).map(|request| request.op);
+        let op =
+            checked(r#"{"id":1,"op":"service.read","service":"gmail","args":{"what":"search"}}"#)
+                .unwrap();
+        assert_eq!(
+            op.needs(),
+            [Grant::Service(ServiceGrant {
+                code: "gmail",
+                access: Access::Read
+            })]
+        );
+        let op = checked(r#"{"id":1,"op":"service.write","service":"figma-api"}"#).unwrap();
+        assert_eq!(
+            op.needs(),
+            [Grant::Service(ServiceGrant {
+                code: "figma",
+                access: Access::Write
+            })]
+        );
+        for frame in [
+            r#"{"id":1,"op":"service.read","service":"calendar","args":{}}"#,
+            r#"{"id":1,"op":"service.read","service":"gmail","args":{"service":"github"}}"#,
+            r#"{"id":1,"op":"service.read","service":"gmail","args":[]}"#,
+            r#"{"id":1,"op":"service.read","args":{}}"#,
+            r#"{"id":1,"op":"service.write","service":"gmail","args":{"send_id":"x"}}"#,
+            r#"{"id":1,"op":"service.write","service":"gmail","args":{"said":"send"}}"#,
+        ] {
+            assert!(checked(frame).is_err(), "{frame}");
+        }
     }
 
     #[test]
@@ -1538,6 +2149,16 @@ mod tests {
         );
         assert_eq!(needs(r#"{"id":1,"op":"look","at":"ahead"}"#), [Grant::Body]);
         assert_eq!(needs(r#"{"id":1,"op":"say","text":"Hi."}"#), [Grant::Speak]);
+        for frame in [
+            r#"{"id":1,"op":"notes.set","key":"k","value":{"a":[1]}}"#,
+            r#"{"id":1,"op":"notes.get","key":"k"}"#,
+            r#"{"id":1,"op":"notes.delete","key":"k"}"#,
+            r#"{"id":1,"op":"notes.list"}"#,
+            r#"{"id":1,"op":"notes.list","prefix":"a."}"#,
+        ] {
+            assert_eq!(needs(frame), [Grant::Notes], "{frame}");
+            assert_eq!(op(frame).needs_lease(), None, "{frame}");
+        }
         assert_eq!(
             needs(
                 r#"{"id":1,"op":"subscribe","events":["person.arrived","sound.heard","touch","phrase.heard"],"phrases":["lights please"]}"#
@@ -1687,5 +2308,8 @@ mod tests {
         assert_eq!(op.needs(), vec![Grant::Speak]);
         assert_eq!(StateKind::Volume.needs(), Some(Grant::Speak));
         assert_eq!(EventKind::VolumeChanged.needs(), Some(Grant::Speak));
+        // Every line the lamp says needs its own grant, not `speak`: what a
+        // computer has the lamp say is not the same as reading all it says.
+        assert_eq!(EventKind::LampSaid.needs(), Some(Grant::Speech));
     }
 }

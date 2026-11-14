@@ -4515,3 +4515,34 @@ fn profile_frozen_note_reuse_is_unchanged() {
     );
     assert_eq!(reply["ok"], false, "{reply}");
 }
+
+#[test]
+fn an_unfenced_role_set_cannot_restore_a_person_after_forget() {
+    let scratch = Scratch::new("role-forget-fence");
+    let mut store = scratch.open(30, NOW);
+    let person = person("p-0123456789abcdef");
+    store
+        .session_open(&person, "before-forget", NOTE_BYTES)
+        .unwrap();
+    store.forget_person(&person).unwrap();
+    let (reply, _) = request(
+        &mut store,
+        json!({
+            "op": "role_set",
+            "person": person.as_str(),
+            "name": "Stale role",
+        }),
+        NOW,
+    );
+    let restored = store.role(&person).unwrap();
+    assert!(
+        reply["ok"] == false && restored.is_none(),
+        "an old request must not restore forgotten state: reply={reply}, stored={restored:?}",
+    );
+    let (fresh, _) = request(
+        &mut store,
+        json!({"op":"session_open","person":person.as_str(),"session":"after-forget","role":true}),
+        NOW,
+    );
+    assert_eq!(fresh["role"], Value::Null);
+}

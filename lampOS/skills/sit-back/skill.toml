@@ -21,7 +21,7 @@ most_a_day = 3
 # short line, worded by the voice.
 [permissions]
 speak = true
-topics = ["room/activity", "humans/faces/tracked", "voice/state"]
+topics = ["room/activity", "humans/faces/tracked", "voice/state", "humans/posture"]
 body = true
 
 # Leaned in for ten minutes: the eyes say `leaning_in` once it has held 10 s
@@ -54,6 +54,11 @@ follows = { trigger = "leaned_in", within = "15m" }
 topic = "room/activity"   # coming back (a gap over 2 minutes is a new sitting, sitting_s from 0); the
 field = "sitting_s"       # word itself can't come sooner (2 minutes' baseline, then ten leaned in)
 above = 720
+[[while]]                 # how they sat reads bad over lamp-seen's window too (#6543): a better
+topic = "humans/posture"  # trigger only, the word as ever never speaks of the body. Without
+field = "bad_share"       # lamp-seen, with it gone quiet, or with no sample in its window, the
+above = 0.5               # topic is never said or has run out, and it runs as before.
+unknown = "holds_stale"
 
 [[while]]                 # nobody else in view: never said in front of others
 topic = "humans/faces/tracked"
@@ -97,6 +102,9 @@ per_hour = 1
 [stop]
 tool = "wellbeing_nudges"
 about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, a word to take a short break, a mealtime question, a word to sit back, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder."
+# In short, with LAMP_USE_SKILL_SUMMARY on (#6218); the same in every
+# wellbeing skill, so whichever is first in folder order says it.
+when = "When asked to snooze, turn off or turn on again the lamp's own wellbeing nudges (water, eyes, stand up, a break, a meal, sit back, wind down). Never for a reminder they set: that is cancel_reminder."
 
 [ask]
 policy = "nudge"

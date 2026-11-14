@@ -8,7 +8,9 @@ This page maps each capability to its lamp-control op or event, its call in
 each SDK and in lamp-mcp, its status and its owner. Use it to find what is
 missing and who is building it.
 
-- Python: [`python/`](python/README.md), `pip install ./lampOS/sdk/python`
+- Python: [`python/`](python/README.md), `pip install ./lampOS/sdk/python`, or without a clone:
+  `pip install "git+https://github.com/autonomous-ai/lampOS@lamp-voice#subdirectory=lampOS/sdk/python"`
+  (installed in a clean virtual environment on 10 Nov 2026; `lamp --help` runs)
 - JavaScript: [`js/`](js/README.md), `npm i --install-links /path/to/lampOS/lampOS/sdk/js`
 - MCP server for agents: [`mcp/`](mcp/README.md), `lamp-mcp`
   (`pip install ./lampOS/sdk/python ./lampOS/sdk/mcp`)
@@ -21,16 +23,48 @@ none): `git clone --branch lamp-voice https://github.com/autonomous-ai/lampOS.gi
 - The protocol: [`docs/control.md`](../docs/control.md) and
   [`docs/control.schema.json`](../docs/control.schema.json)
 
-## On a customer lamp today (stable 10824)
+## Try it without a lamp: the virtual desktop lamp
 
-Customer lamps run the stable build, **10824** (lamp-voice `65991c7229`,
-stable since 9 Nov). This page and the SDK pages describe lamp-voice, which
-is newer; where stable does less, it is said here. Check again after the next
-stable: this list names the build so you can tell when it is old.
+A lamp that runs on your computer, drawn in 3D, that the SDKs and lamp-mcp drive like a real one: the
+real `lamp-control` (pairing, grants, leases, rates, refusals, events) and the real `lamp-body` (its
+limits, speeds, gestures and lease) run as they are, on a simulated body. Only the hardware is
+stood in for: the servos, the light ring, the speaker, and the camera, microphone and the room's
+people, air and hands, by your computer's camera and microphone or by hand. Linux for now.
+
+```sh
+cd lampOS
+cargo build -p lamp-sim -p lamp-body -p lamp-control
+cd sdk/js && npm ci
+node examples/twin/virtual-lamp.js --lamp-sim ../../target/debug/lamp-sim
+```
+
+It prints the twin's URL and opens it, and pairs this computer in a keyring of its own: run your
+programs with `LAMPOS_HOME=~/.lampsim/virtual/sdk` (or the `--dir` you gave) and they drive the lamp on
+the screen, with no special mode: the same Python and JavaScript SDK calls and lamp-mcp tools, the same
+refusals and limits.
+
+What is not the real thing: it moves no real servo and draws no real ring, a `sound` clip is played by the host's
+`paplay`, `aplay`, `afplay` or `ffplay` where there is one (else a short silence),
+there are no face, hand or sound-class models (the room's people, hands, words and air are made with
+`lamp-sim people|hear|hand|air`), and the body's numbers are one lamp's. A lamp check on a real
+lamp stays a lamp check. To see where it differs from the SDK's own fake or from a real lamp, run
+`node conformance/conformance.js --compare` in `sdk/js`; the same steps run against any of them.
+
+## On a customer lamp today
+
+Customer lamps run the stable build, the newest one as lampos-stable serves it.
+The build each row was shown on, and its date, are in the GUIDE's
+[Plan and status](GUIDE.md) table; the newest stable named there is **12587**
+(lamp-75c9, 13 Nov 2026). This page and the SDK pages describe lamp-voice,
+which is newer; where stable does less, it is said here. A row that names a
+build tells you when it is old: check it against the GUIDE after the next
+stable.
 
 **What works on a customer lamp:** pairing through the app, `hello`, every
 state (`get`) and event, leases, `gesture`, `move`, `express`, `look` at
-`ahead`, an angle or a `hand`, `joints` for `yaw` and `pitch`, `light` (named
+`ahead` or an angle (a look at a `hand` is not on a customer lamp: the lamp doesn't track hands yet, see Follow a hand), `joints` for all five joints (`roll`, `shoulder`
+and `elbow` while the lamp stands), a head tap and pet as `touch` events,
+`body.state`, `light` (named
 colours, RGB, each pixel), `say`, `sound` (the hum and your own clips),
 `volume`, `stop`, `turn.start`/`turn.end`, `listen.set`,
 `camera.snapshot` and `camera.stream`. lamp-control is on every lamp, and
@@ -39,33 +73,32 @@ and quiet hours are off.
 
 **The gaps, and what to do instead:**
 
-| # | What | On stable 10824 | Do instead |
+| # | What | On a customer lamp (stable) | Do instead |
 |---|---|---|---|
-| 1 | Skill push (`lamp skill push/list/remove`, `push_skill`, `lamp_skill_push`) | Refused `refused`, "skill push is not on this lamp": the product unit doesn't start lamp-control with `--manage-socket`. Not yet on customer lamps | Try it on the fake lamp (`lamp fake`). On a real lamp, run the same behaviour as a program on your computer while it is connected. `lamp skill check` works anywhere, offline |
-| 2 | `joints` beyond yaw and pitch; `play` | `roll`, `shoulder` and `elbow` are refused, "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now". `play` is refused, "not routed yet: waits for client packages". `sound` is served | Name only `yaw` and `pitch` (both, if the body hasn't said where it is in the last 15 s). For a whole-body motion, use `move` (your own frames of all 5 joints) or a built-in `gesture` |
+| 1 | Skill push (`lamp skill push/list/remove`, `push_skill`, `lamp_skill_push`) | **Works on a stock lamp from 11091**, onto the developer's own lamp: the product unit passes `--manage-socket` (shown on a stock 11091 lamp, 9 Nov; the tag `lampos-lamp-voice-11308`'s `deploy/product/lamp-control.service` passes it too (line 31)). Only 11048 and older refuse it, "skill push is not on this lamp". This is the developer's own lamp: there is no route to the Store from the SDK yet (`lamp skill submit` waits for the Store's side) | Push, list and remove on the lamp (`lamp skill push NAME`; the owner says yes at the lamp). On 11048 and older, use the fake lamp (`lamp fake`). `lamp skill check` works anywhere, offline |
+| 2 | `play`; a look at a face or a name | `play` of a pushed skill's recorded move works from build 12171 (on lamp-75c9 at 12226, 12 Nov 2026: the GUIDE's "`play` a recorded move by name" row); on 11913 and before it is refused, "not routed yet: waits for client packages". `look` at `face` ends `dropped`, "this lamp's gaze is not measured, so it cannot look at a face" (shown on stable 12587, lamp-75c9, 13 Nov 2026: the product's `lamp-body.service` has no `--gaze`); it turns toward a face only on a lamp with a measured `--gaze`, where it can still end "no face in view"; `look` at `name` is refused, "not in this release: look at who said the lamp's name (the lamp has no sound direction)". `joints` for `roll`, `shoulder` and `elbow` works (the body's pose, only while the lamp stands; shown on 12226; 11048 and older refuse them, "not routed yet") | `play` a pushed skill's recorded move by name, or send your own frames of all 5 joints as `move`; look at `ahead` or an angle; or a built-in `gesture` |
 | 3 | Letting the base go limp, a holder's pose | Only in lamp-body's own lease socket; lamp-control sends neither, so no SDK call reaches them | None from a computer yet |
+| 3a | A motion's end (`wait=True`) | Works from stable 11716 (the GUIDE's "Knowing when a motion ended" row): the wait ends at the body's `done` (hello's `limits.motion_done`, #5835). On 11450 and older, `gesture`, `move` and `express` answer `{"to":"body"}` and no `done` follows: a wait returns when the lamp takes the motion | On 11450 and older, treat the answer as "taken" and watch `body.state` for where the joints are |
 | 4 | Finding the lamp by mDNS | Nothing on the lamp announces `_lampos._tcp`, so `lamp find` finds nothing, and `lamp pair` without `--host` finds nothing | Pass the lamp's address: `--host lamp-xxxx.local` (the lamp's own name) or its IP address. After pairing the address is kept |
 | 5 | Event times | `at` is UTC, written `…Z` (`2026-11-09T06:30:01Z`), on every build, not the lamp's local time with an offset | Turn it into local time on your side |
 
-**Two more differences from lamp-voice:**
+**On older stables** (10824 and before): a motion asked while another plays was
+refused `busy`, "busy: a motion plays for N ms more", with `retry_ms`: wait
+`retry_ms` and ask again. From 11048 a new `gesture`, `move` or `express`
+replaces the one playing instead (the body may still drop yours for the
+person); and a `look` on a resting lamp, which on 10579 and 10824 could end
+`cut_short`, "not there in time: something holds the head", now ends
+`finished` or `clamped` with where the head stopped.
 
-- **A motion while another plays is refused `busy`** on stable 10824, "busy:
-  a motion plays for N ms more", with `retry_ms`, while the last motion
-  lamp-control sent (from any computer) still plays: wait `retry_ms` and ask
-  again. The lamp's own motions don't count; the body may still drop yours
-  for one of those. On lamp-voice a new `gesture`, `move` or `express` replaces the one
-  playing instead; that comes with the next stable.
-- **A `look` on a resting lamp may end `cut_short`**, "not there in time:
-  something holds the head", with no hand on it (lamp-75c9, stable 10579). The
-  head has stopped just short of where it was asked. Treat a `cut_short` close
-  to your target as there, or ask again. Fixed on lamp-voice (#5711): the
-  next stable answers `there` with where the head stopped, `clamped`.
-
-Also not on customer lamps: the camera's fast frame path (lamp-eyes doesn't
-serve its frames socket there; `camera.stream` sends the lamp's working
-frames instead), the microphone's audio (a grant only, not routed), and
-`body.state` (on lamp-voice since #4564, with the next stable). `look` at `face` or `name` is "not in
-this release" on every build.
+The camera's fast frame path is on in the product (`LAMP_EYES_FAST_STREAM=on`
+in `lamp-eyes.service`; shown on 12587, `fast: true`), so `camera.stream` sends
+every frame at 640x480 or 1280x720 as asked; on a lamp without it the stream
+is the working frames, about 1 to 2 a second. The microphone's audio is merged
+but off by default (`--microphone`), so it is not on a customer lamp. `look`
+at `name` is "not in this release" on every build; `look` at `face` is
+"not in this release" on 11091 and older; on a customer lamp (stable 12587, no `--gaze` in
+`lamp-body.service`) it ends `dropped`, "this lamp's gaze is not measured, so it cannot look
+at a face".
 
 ## Pair a computer with a customer lamp
 
@@ -80,7 +113,7 @@ once per computer".
    computer's connection.
 2. **Get a code.** The owner chooses to add a developer computer and ticks
    what it may do (the grants: `body`, `light`, `speak`, `look`, `hear`,
-   `sound`, `camera`, …). The lamp says the first 8 characters of its pin
+   `sound`, `skills`, `air`, `device`: not `camera`, `microphone` or `notes`, which the app does not offer; see the GUIDE's "Granting camera, microphone and notes today"). The lamp says the first 8 characters of its pin
    aloud, and the app shows the same 8 for the owner to confirm they match:
    that is how you know the app is talking to the lamp in front of you. Only
    after that does the app show the 8-digit code and the lamp's full pin (64
@@ -133,8 +166,8 @@ time; a revoke closes its connections at once.
 ## Status
 
 - **done**: on lamp-voice, in lamp-control, both SDKs and lamp-mcp. Where
-  stable 10824 (customer lamps) does less, the row says so; see
-  [On a customer lamp today](#on-a-customer-lamp-today-stable-10824).
+  a customer lamp's stable build does less, the row says so; see
+  [On a customer lamp today](#on-a-customer-lamp-today).
 - **SDK missing**: lamp-control has it, a client doesn't yet.
 - **PR #n**: open pull request; the call named is what it adds.
 - **missing**: nothing in lamp-control yet.
@@ -146,7 +179,7 @@ done and validated.
 
 ## Coverage map
 
-As of lamp-voice `0df9b3b749` (9 Nov); stable is 10824 (`65991c7229`). `lamp` below is a connected client:
+As of lamp-voice `0df9b3b749` (9 Nov), with the stable column read against the GUIDE's Plan and status table (newest stable named there: 12587, 13 Nov); the evidence column still names the build each run was made on. `lamp` below is a connected client:
 Python names first, JavaScript where it differs.
 
 ### Connection and state
@@ -154,29 +187,30 @@ Python names first, JavaScript where it differs.
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
 | Pair a computer, connect | `pair`, `hello` | `pair`, `connect` | (paired at start) | done; no mDNS announcement on any build, so pair with `--host` | Nine | 75c9, 9 Nov, stable 10824's binaries, by blue: paired through a code with `--host lamp-75c9.local`, `hello` |
-| Who is there (never who) | `get presence` | `get("presence")` | `lamp_state`, `lamp://state/presence` | done | Nine | not yet |
-| The light now | `get light` | `get("light")` | `lamp_state` | done | Nine | not yet |
-| The lamp's mood | `get mood` | `get("mood")` | `lamp_state` | done | Nine | not yet |
-| Talking, paused, private, asleep | `get lamp`, `lamp.changed` | `get("lamp")`, `on("lamp.changed")` | `lamp_state`, `lamp_events` | done (quiet hours not produced yet) | Nine | not yet |
+| Who is there (never who) | `get presence` | `get("presence")` | `lamp_state`, `lamp://state/presence` | done | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `{count: 0, near: 0.0, facing: false}` with nobody in view |
+| The light now | `get light` | `get("light")` | `lamp_state` | done | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): the person's light read (`blue`, level 1, off) with `shows` |
+| The lamp's mood | `get mood` | `get("mood")` | `lamp_state` | done | Nine | not yet: on 75c9 (10824) `mood` answered `null`, no mood state on the bus then |
+| Talking, paused, private, asleep | `get lamp`, `lamp.changed` | `get("lamp")`, `on("lamp.changed")` | `lamp_state`, `lamp_events` | done (quiet hours not produced yet) | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `get lamp` answered; `lamp.changed` not seen (nothing changed in the run) |
 | A stored grant a build doesn't know: kept, not granted | lamp-control's start (#4936) | — | — | done | harness-reviewer | 75c9, 2 Nov, harness-reviewer's run (root steps by the local leader): an unknown stored grant kept and written back, only `light` granted |
-| The door's limits | `hello` `limits` | `lamp.limits` | — | done; policy-only limits lifted, rates and quiet hours off | Nine | not yet |
+| The door's limits | `hello` `limits` | `lamp.limits` | — | done; policy-only limits lifted, rates and quiet hours off | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `rates: off`, `lease_max_ms` 600000, `say_max_bytes` 900, `ring.pixels` 32 |
 | lamp-control on every lamp | product unit | — | — | done: on stable, off until the owner turns developer access on in the app | Nine | not yet |
 
 ### Body
 
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
-| Hold the body | `lease.take/renew/release` | `lease("body")` / `withLease` | `lamp://lease`, held per call | done | Nine | not yet |
-| Built-in gestures | `gesture` | `gesture` | `lamp_gesture` | done | Nine | not yet |
-| A feeling in body and light | `express` | `express` | `lamp_express` | done (3 feelings) | Nine | not yet |
-| Look at face, hand, name, angle | `look` | `look` | `lamp_look` | done for `ahead`, an angle and `hand`; `face` and `name` "not in this release". On a resting lamp a look may end `cut_short` on stable 10824 (fixed on lamp-voice, #5711) | Nine | not yet |
-| Follow a hand | `look at hand` | `follow_hand` / `followHand` | `lamp_follow_hand`, `lamp_follow_stop` | done, on stable too | Nine | not yet |
-| Each joint (pitch, roll, yaw, shoulder, elbow) | `joints` | `joints` | `lamp_joints` | `yaw` and `pitch` only; `roll`, `shoulder`, `elbow` refused "not routed yet" | Ten | 75c9, 7 Nov, stable 10579: pitch alone went; roll refused (again 9 Nov, 10824) |
-| A move of your own | `move` | `move` | `lamp_move` | done | Nine | not yet |
-| A recorded move | `play` | `play` | `lamp_play` | in the clients; lamp-control refuses it, "not routed yet: waits for client packages" | Nine | refused as written: 75c9, 9 Nov, 10824 |
-| A new motion interrupts the one playing | `gesture`, `move`, `express` replace | (no new call) | — | on lamp-voice (`6167fe37a1`), not on stable 10824, which refuses `busy` with `retry_ms` | Nine | not yet |
+| Hold the body | `lease.take/renew/release` | `lease("body")` / `withLease` | `lamp://lease`, held per call | done | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `lease.take` held, `release`d |
+| Built-in gestures | `gesture` | `gesture` | `lamp_gesture` | done | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `nod` played (the body's journal: `gesture nod`, `gesture over` 3 s later) |
+| A feeling in body and light | `express` | `express` | `lamp_express` | done (3 feelings) | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `glad` 0.6: `glad-lift` played; light "the light is off" (the person's light was off) |
+| Look at face, hand, name, angle | `look` | `look` | `lamp_look` | done for `ahead` and an angle; `hand` is in development (the lamp doesn't track hands yet, see Follow a hand); `name` "not in this release" (no sound direction); `face`: on a customer lamp (stable 12587, no `--gaze` in `lamp-body.service`) it ends `dropped`, "this lamp's gaze is not measured, so it cannot look at a face"; it turns toward a face only on a lamp with a measured `--gaze`, where it can still end "no face in view" (11091 and older: "not in this release"). On a resting lamp a look could end `cut_short` on 10824; from 11048 it ends `finished` or `clamped` (#5711) | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `look` yaw 15 taken; `look` at `face` refused "not in this release: look at a face or a name" |
+| Follow a hand | `look at hand` | `follow_hand` / `followHand` | `lamp_follow_hand`, `lamp_follow_stop` | in development: the door is in; nothing publishes `humans/hands/tracked` and lamp-body refuses `follow` | Nine | not yet |
+| Each joint (pitch, roll, yaw, shoulder, elbow) | `joints` | `joints` | `lamp_joints` | all five on stable from build 11102 (`roll`, `shoulder` and `elbow` as the body's pose, only while the lamp stands, d2da8d8914); 11048 and older: `yaw` and `pitch` only, the others refused "not routed yet" | Ten | 75c9, 7 Nov, stable 10579: pitch alone went; roll refused (again 9 Nov, 10824) |
+| A move of your own | `move` | `move` | `lamp_move` | done | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): a 2 s yaw move played (`gesture control`, `over` 2 s later) |
+| A recorded move | `play` | `play` | `lamp_play` | done: lamp-control sends a pushed skill's `moves/NAME.json` as a `move` from build 12171 (the GUIDE's "`play` a recorded move by name" row); 11913 and before refuse it, "not routed yet: waits for client packages" | Nine, Blue | refused as written: 75c9, 9 Nov, 10824; played: 75c9, 12 Nov, 12226 |
+| A new motion interrupts the one playing | `gesture`, `move`, `express` replace | (no new call) | — | from 11048 (the GUIDE's "A new motion replaces the one playing" row; in 11450 `6167fe37a1`); 10824 and older refuse `busy` with `retry_ms` | Nine | not yet |
+| A motion's end told: `wait` ends when it has | `done` on gesture, move, express; hello `limits.motion_done` | `wait=True` / `{ wait: true }` | `lamp_gesture`, `lamp_move` | done from stable 11716 (#5835); 11450 and older, and 10824, return at the answer | Nine | 75c9, 9 Nov, lamp-built lamp-control and lamp-body: each wait matched the body's own start and end (a 2 s move 2075 ms; a replaced move `cut_short`) |
 | Each joint's degrees, bounds and caps | `get body` | `get("body")` | `lamp_state` | done | Ten | 75c9, 7 Nov, stable 10579: known, each joint's range |
-| Where each joint is, live; model and twin | `body.state` | model, JS twin | — | done on lamp-voice (#4564); not on stable 10824 | Eighth | 75c9, 9 Nov, #4564's lamp-control: 12.5 events a second |
+| Where each joint is, live; model and twin | `body.state` | model, JS twin | — | done, on stable from 11048 (#4564); not on 10824 | Eighth | 75c9, 9 Nov, #4564's lamp-control: 12.5 events a second |
 | Record a move from poses (degrees, eased) | `move`, made by the client | `move_poses`, `poses_to_frames` / `movePoses`, `posesToFrames` | `lamp_move_poses` | done in the clients (it sends `move`, which stable 10824 takes) | Ten | 75c9, 9 Nov, stock 10824: played 2.8 s as computed; a 40° pose refused before sending |
 | Let the base go limp; a holder's pose | — (lamp-body's lease socket only) | — | — | missing in lamp-control | — | not yet |
 
@@ -194,6 +228,7 @@ Python names first, JavaScript where it differs.
 |---|---|---|---|---|---|---|
 | Speak a line exactly as sent, or in the lamp's own words | `say`, `rephrase` | `say(text, rephrase=…)` / `say(text, { rephrase })` | `lamp_say` | done (≤ 900 UTF-8 bytes) | Eighth | 75c9, 2 Nov, by the local leader: exact, journal and done (finished in 6.1 s; 4 Nov, 5.1 s). Not confirmed by ear |
 | The lamp's hum, or a computer's own clips | `sound`, `sound.upload`, `sound.list`, `sound.remove` | `sound`, `upload_sound`, `sounds`, `remove_sound` / `uploadSound`, `removeSound` | `lamp_sound`, `lamp_sounds` | done | Eighth | 75c9, 4 Nov, build 10114, by the local leader: a clip uploaded, listed, played and removed |
+| A computer's own notes on the lamp (small key/value memory, kept across restarts) | `notes.set`, `notes.get`, `notes.delete`, `notes.list` | `notes.set`, `notes.get`, `notes.delete`, `notes.list` / `notesSet`, `notesGet`, `notesDelete`, `notesList` | `lamp_notes_set`, `lamp_notes_get`, `lamp_notes_delete`, `lamp_notes_list` | fake lamp, tests | Banana | not yet (lamp run pending) |
 | Speaker volume: a level, a step, mute | `volume`, `get volume`, `volume.changed` | `volume(to=…, step=…, mute=…)`, `get("volume")`, `on("volume.changed")` / `volume({ to, step, mute })` | `lamp_volume`, `lamp_state` | done | Eighth | 75c9, 4 Nov, build 10139, by the local leader |
 | Stop what it does | `stop` | `stop` | `lamp_stop` | done | Nine | not yet |
 
@@ -207,6 +242,7 @@ Python names first, JavaScript where it differs.
 | Open a conversation turn, or end its own | `turn.start`, `turn.end` | `start_turn`, `end_turn` / `startTurn`, `endTurn` | `lamp_start_turn`, `lamp_end_turn` | done | Nine | 75c9 3–4 Nov, combined builds: turn answered, same computer continuing, own end cutting a story (by ear) |
 | A computer's own mute | `listen.set` | `set_listening` / `setListening` | `lamp_set_listening` | done | Nine | not yet |
 | The microphone's audio, local only | `microphone.stream`, `microphone.audio` (binary 20 ms blocks), `microphone.ended`; off unless `--microphone on` | `microphone_stream` / `microphoneStream`, `on("microphone.audio")` | — (a stream is for a program, as the camera's) | missing (local, waits for the owner's privacy yes) | banana | not yet |
+| A computer's own sound through the speaker, local only | `speaker.stream`, `speaker.stats`, `speaker.ended`; binary 10–100 ms frames in; off unless `--speaker on` | `speaker_stream` / `speakerStream`, `on("speaker.ended")`, `lamp speaker FILE.wav` | `lamp_play_audio` | in review (door #6483; the voice's half, the ring's mark and the app's grant come after) | eighth | not yet |
 
 ### Eyes and camera
 
@@ -235,7 +271,7 @@ Python names first, JavaScript where it differs.
 
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
-| Put a skill on the lamp, list, remove | `skill.push`, `skill.list`, `skill.remove` | `push_skill`, `skills`, `remove_skill` / `pushSkill`, `skills`, `removeSkill`; `lamp skill push/list/remove` | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | done; on customer lamps from the next build (the product unit passes `--manage-socket`, #5819); stable 10824's unit doesn't, so it refuses "skill push is not on this lamp" (75c9, 9 Nov) | blue | 75c9, 4 Nov, build 10114, by the local leader: check, push, list, remove; 75c9, 9 Nov, 10824's lamp-control under the next build's unit: push, list, remove, push, revoke turned it off |
+| Put a skill on the lamp, list, remove | `skill.push`, `skill.list`, `skill.remove` | `push_skill`, `skills`, `remove_skill` / `pushSkill`, `skills`, `removeSkill`; `lamp skill push/list/remove` | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | done; on customer lamps from 11091 on (the product unit passes `--manage-socket`, #5819); stable 10824's unit didn't, so it refused "skill push is not on this lamp" (75c9, 9 Nov) | blue | 75c9, 4 Nov, build 10114, by the local leader: check, push, list, remove; 75c9, 9 Nov, 10824's lamp-control under the next build's unit: push, list, remove, push, revoke turned it off |
 | Check a skill folder before pushing | — | `lamp skill check` | — | done | blue | not yet |
 
 ## Never readable

@@ -29,16 +29,24 @@ use tokio::net::{TcpListener, UnixListener};
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
+use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
+use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 
 use crate::cert::Identity;
 use crate::parts::Media;
 use crate::protocol::{EventKind, Grant, Op};
-use crate::session::{Door, Parts, event_of};
+use crate::session::{Door, Parts, SetGrantsRefused, event_of};
 use crate::watch::{Out, Watch, phrases_in};
 
 /// The largest frame a client may send.
 pub const FRAME_MAX: usize = 64 * 1024;
+/// What the close frame says when the owner revoked the computer.
+pub const CLOSED_REVOKED: &str = "this computer was revoked by the owner";
+/// What the close frame says when the owner changed the computer's grants (`set_grants`): it connects again
+/// and reads its new grants at its next `hello`.
+pub const CLOSED_GRANTS: &str = "grants changed by the owner";
+
 /// Binary frames (camera frames, microphone blocks) queued for one
 /// connection at most; past that one is dropped.
 pub const FRAMES_QUEUED: usize = 4;
@@ -174,19 +182,38 @@ pub struct Shared {
     /// Each open connection's client (once hello'd) and its outbox.
     open: Mutex<HashMap<u64, Open>>,
     next: AtomicU64,
+    /// The speaker, once the lamp has built it: each connection's binary
+    /// messages go to it, never through the door's or the parts' locks.
+    speaker: crate::speaker::Handle,
     started: Instant,
     /// How far tests have moved the door's clock on ([`Shared::move_clock_on`]).
     ahead_us: AtomicU64,
     pin: String,
     limits: Mutex<Limits>,
+    /// Where the owner's yes for a skill is read, once the run socket is on:
+    /// none, and no token is minted (`crate::runs`).
+    yes: Mutex<Option<Arc<dyn crate::runs::SkillYes>>>,
     /// Open connections by address, handshakes included.
     peers: Mutex<HashMap<std::net::IpAddr, usize>>,
     /// The manage helper's socket, root's, which installs, lists and
     /// removes pushed skills (`crate::push`).
     manage: Mutex<Option<PathBuf>>,
+    /// Where the owner's yeses to skills' tasks are kept (`--state-dir`,
+    /// [`crate::task_yes`]): none, and the yes requests are refused.
+    task_yes: Mutex<Option<PathBuf>>,
     /// Whether computers beyond the lamp's own network may connect
     /// (`--remote on`): off unless given.
     remote: std::sync::atomic::AtomicBool,
+    /// Whether the door listens on the network: false while lamp-control serves only the owner's side
+    /// and skill runs (`LAMP_CONTROL` not on, #6059). What `{"clients": true}` says as `listening`, so
+    /// the app does not show "On" for a socket with no door behind it (#5299, the App Only E2E).
+    listening: std::sync::atomic::AtomicBool,
+    /// Why the lamp ended a connection (a revoke, a change of grants), by connection:
+    /// said in the close frame, so the computer's SDK can log why it was cut off.
+    close_reasons: Mutex<HashMap<u64, &'static str>>,
+    /// Whether the camera's, the microphone's and the speaker's streams are usable on
+    /// this lamp now (wired, and the owner's switch on): what `{"features": true}` says.
+    features: Mutex<Features>,
     /// What the helper is told of pairings, one at a time in the door's
     /// order, by one thread started at the first (Reviewer-two on #3504: a
     /// late wider grant change must never be served after a newer narrower
@@ -194,21 +221,135 @@ pub struct Shared {
     changes: Mutex<Option<std::sync::mpsc::Sender<Value>>>,
 }
 
+/// Whether the camera's, the microphone's and the speaker's streams are usable on
+/// this lamp: wired to their parts, and for the microphone and the speaker the
+/// owner's switch (`--microphone on`, `--speaker on`) is on. Not whether the ears
+/// share their sound right now (they do on demand), so `true` means a stream is
+/// allowed, not that one starts.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Features {
+    pub camera: bool,
+    pub microphone: bool,
+    pub speaker: bool,
+}
+
 impl Shared {
+    /// The owner's yes for skills is read through `yes`: from now a one-run
+    /// token can be minted (docs/control.md, "The run socket").
+    pub fn set_skill_yes(&self, yes: Arc<dyn crate::runs::SkillYes>) {
+        *self.yes.lock().expect("yes") = Some(yes);
+    }
+
+    /// `{"mint": {"skill", "run", "expires_in_ms"?}}` on the admin socket:
+    /// lamp-control reads the owner's yes itself and names exactly its grants.
+    /// A yes kept with no grant (a skill whose code uses nothing of the
+    /// lamp's) mints a token that names none: its run may say hello and
+    /// nothing that needs a grant. No yes, or one that no longer holds, is
+    /// refused.
+    fn mint(&self, asked: &Value, now: u64) -> Value {
+        let (Some(skill), Some(run)) = (asked["skill"].as_str(), asked["run"].as_str()) else {
+            return json!({"error": "mint: a skill and a run, both text"});
+        };
+        if !crate::runs::plain(skill) || !crate::runs::plain(run) {
+            return json!({"error": "mint: a skill and a run of plain characters, at most 64"});
+        }
+        let for_ms = match asked.get("expires_in_ms") {
+            None | Some(Value::Null) => None,
+            Some(value) => match value.as_u64() {
+                Some(ms) if ms > 0 => Some(ms),
+                _ => return json!({"error": "mint: expires_in_ms is a whole number above 0"}),
+            },
+        };
+        let Some(yes) = self.yes.lock().expect("yes").clone() else {
+            return json!({"error": "skill runs are off on this lamp"});
+        };
+        let grants = match yes.grants(skill) {
+            Ok(grants) => grants,
+            Err(why) => return json!({"error": why}),
+        };
+        let fixed_write = yes.fixed_write(skill);
+        let Some(token) = crate::runs::new_token(&ring::rand::SystemRandom::new()) else {
+            return json!({"error": "no token could be made"});
+        };
+        let minted = {
+            let mut door = self.door.lock().expect("door");
+            let minted = door.mint_run(&token, run, skill, grants, for_ms, now);
+            if let (Some(write), true) = (&fixed_write, minted.is_ok()) {
+                door.mark_fixed_write(run, write);
+            }
+            minted
+        };
+        let live = match minted {
+            Ok(live) => live,
+            Err(why) => {
+                eprintln!("lamp-control: run {run} of skill {skill}: no token made: {why}");
+                return json!({"error": why});
+            }
+        };
+        // A token minted again for a run that had one: its old connections end.
+        self.close_client(&live.client, crate::runs::CLOSED_AGAIN);
+        let names = grant_names(&live.grants.iter().copied().collect::<Vec<_>>());
+        let expires_in_ms = live.until_us.saturating_sub(now) / 1_000;
+        eprintln!(
+            "lamp-control: run {run} of skill {skill}: a token for [{names}], {} s",
+            expires_in_ms / 1_000
+        );
+        json!({"token": token, "run": run, "skill": skill, "grants": live.grants, "expires_in_ms": expires_in_ms})
+    }
+
+    /// Ends a run: its connections close, what it asked for that still goes
+    /// stops, as its `stop` would.
+    fn end_run(&self, run: &str, serial: Option<u64>, now: u64, why: &str) -> bool {
+        let ended = self.door.lock().expect("door").end_run(run, serial);
+        let Some(ended) = ended else {
+            return false;
+        };
+        self.parts.lock().expect("parts").gone(&ended.client, now);
+        self.close_client(&ended.client, crate::runs::CLOSED_ENDED);
+        eprintln!("lamp-control: run {run} of skill {}: {why}", ended.skill);
+        true
+    }
+
+    /// Ends every run whose time has come.
+    pub fn sweep_runs(&self) {
+        let now = self.now_us();
+        let ended = self.door.lock().expect("door").sweep_runs(now);
+        for run in ended {
+            self.parts.lock().expect("parts").gone(&run.client, now);
+            self.close_client(&run.client, crate::runs::CLOSED_ENDED);
+            eprintln!(
+                "lamp-control: run {} of skill {}: its time is up",
+                run.run, run.skill
+            );
+        }
+    }
+
+    /// The local agent `user`'s record, made if the lamp had none; its id
+    /// (`Door::ensure_local`).
+    pub fn ensure_local(&self, user: &str, wall_s: u64) -> std::io::Result<String> {
+        self.door.lock().expect("door").ensure_local(user, wall_s)
+    }
+
     pub fn new(door: Door, parts: Box<dyn Parts + Send>, pin: String) -> Arc<Self> {
         Arc::new(Self {
             door: Mutex::new(door),
             parts: Mutex::new(parts),
             open: Mutex::new(HashMap::new()),
             next: AtomicU64::new(1),
+            speaker: Arc::default(),
             started: Instant::now(),
             ahead_us: AtomicU64::new(0),
             pin,
             limits: Mutex::new(Limits::default()),
+            yes: Mutex::new(None),
             peers: Mutex::new(HashMap::new()),
             manage: Mutex::new(None),
+            task_yes: Mutex::new(None),
             changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
+            listening: std::sync::atomic::AtomicBool::new(false),
+            close_reasons: Mutex::new(HashMap::new()),
+            features: Mutex::new(Features::default()),
         })
     }
 
@@ -219,8 +360,24 @@ impl Shared {
         self.remote.store(remote, Ordering::Relaxed);
     }
 
+    /// That the door listens on the network (said once at start, when it is bound).
+    pub fn set_listening(&self, listening: bool) {
+        self.listening.store(listening, Ordering::Relaxed);
+    }
+
+    /// What streams this lamp can serve now, for the app's grants screen.
+    pub fn set_features(&self, features: Features) {
+        *self.features.lock().expect("features") = features;
+    }
+
     pub fn set_manage_socket(&self, socket: PathBuf) {
         *self.manage.lock().expect("manage") = Some(socket);
+    }
+
+    /// The folder the owner's yeses to skills' tasks are kept in
+    /// ([`crate::task_yes`], lamp-control's `--state-dir`).
+    pub fn set_task_yes_folder(&self, folder: PathBuf) {
+        *self.task_yes.lock().expect("task_yes") = Some(folder);
     }
 
     /// `ask` of the manage helper off the door's lock and the runtime's
@@ -237,6 +394,55 @@ impl Shared {
                 Some(socket) => crate::push::ask_helper(&socket, &ask.request, ask.wait()),
                 None => Err("no manage socket given".to_owned()),
             };
+            // The moves of the package an install took, read before the door
+            // deletes it, and kept for `play` before the answer is sent; the
+            // moves of a skill removed are deleted. Off the door's lock: a
+            // file or two.
+            let folders = {
+                let door = shared.door.lock().expect("door");
+                door.moves_folder().zip(door.pushed_package())
+            };
+            let helper_done = answer.as_ref().is_ok_and(|said| said.get("done").is_some());
+            let mut found = None;
+            if let (Some((folder, package)), true) = (&folders, helper_done) {
+                let store = crate::pushed_moves::Moves::new(folder.clone());
+                match ask.kind {
+                    crate::push::AskKind::Install => {
+                        found = std::fs::read(package).ok().and_then(|bytes| {
+                            crate::pushed_moves::found_in(&bytes, &lamp_body::moves::check)
+                                .map_err(|why| {
+                                    eprintln!("lamp-control: skill.push: its moves: {why}")
+                                })
+                                .ok()
+                        });
+                        // Kept under the door's lock and only while the pairing is the
+                        // one the install was asked under: a revoke in between has
+                        // deleted the computer's folder, and keeping would write it
+                        // back (nine's P2 on #6039). A file or two, a few ms.
+                        if let Some(moves) = found.take() {
+                            let door = shared.door.lock().expect("door");
+                            if door.rev_of(&ask.client) != ask.rev {
+                                eprintln!(
+                                    "lamp-control: skill.push: its moves not kept: the pairing changed"
+                                );
+                            } else {
+                                if let Err(error) = store.keep(&ask.client, &moves) {
+                                    eprintln!(
+                                        "lamp-control: skill.push: keeping its moves: {error}"
+                                    );
+                                }
+                                found = Some(moves);
+                            }
+                        }
+                    }
+                    crate::push::AskKind::Remove => {
+                        if let Some(name) = ask.request["remove_pushed"]["name"].as_str() {
+                            store.remove_skill(&ask.client, name);
+                        }
+                    }
+                    crate::push::AskKind::List => {}
+                }
+            }
             // A pairing changed while the install was with the helper: its
             // change may have been served first, so the door tells it
             // again now, after the install (Fourteen's P2 on #3910).
@@ -249,7 +455,13 @@ impl Shared {
             }
             shared.tell_helper();
             if let Some(outbox) = outbox.upgrade() {
-                let _ = outbox.send(ask.answer(answer));
+                let mut reply = ask.answer(answer);
+                if reply["ok"] == true
+                    && let Some(found) = &found
+                {
+                    reply["moves"] = found.told();
+                }
+                let _ = outbox.send(reply);
             }
         });
     }
@@ -349,14 +561,20 @@ impl Shared {
                 parts: Mutex::new(parts(events)),
                 open: Mutex::new(HashMap::new()),
                 next: AtomicU64::new(1),
+                speaker: Arc::default(),
                 started: Instant::now(),
                 ahead_us: AtomicU64::new(0),
                 pin,
                 limits: Mutex::new(Limits::default()),
+                yes: Mutex::new(None),
                 peers: Mutex::new(HashMap::new()),
                 manage: Mutex::new(None),
+                task_yes: Mutex::new(None),
                 changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
+                listening: std::sync::atomic::AtomicBool::new(false),
+                close_reasons: Mutex::new(HashMap::new()),
+                features: Mutex::new(Features::default()),
             }
         })
     }
@@ -388,6 +606,12 @@ impl Shared {
 
     /// Binary frames for a client (`crate::camera`'s fast stream,
     /// `crate::microphone`'s blocks).
+    /// Gives the speaker the lamp built, once: from then on a connection's
+    /// binary messages reach its stream.
+    pub fn set_speaker(&self, speaker: Arc<crate::speaker::Speaker>) {
+        let _ = self.speaker.set(speaker);
+    }
+
     pub fn binary(self: &Arc<Self>) -> crate::parts::Binary {
         let shared = Arc::downgrade(self);
         Arc::new(
@@ -399,15 +623,25 @@ impl Shared {
         )
     }
 
-    fn send_to(&self, client: &str, event: Value) {
-        for open in self.open.lock().expect("open").values() {
-            if open.client.as_deref() == Some(client) {
+    fn send_to(&self, client: &str, mut event: Value) {
+        // An action's end for one connection (`motion_done`'s
+        // [`crate::motion_done::CONNECTION`]): to that connection alone,
+        // the tag taken off, so another program of the same computer, with
+        // its own request numbers, never takes it as its own.
+        let only = event
+            .as_object_mut()
+            .and_then(|fields| fields.remove(crate::motion_done::CONNECTION))
+            .and_then(|connection| connection.as_u64());
+        for (id, open) in self.open.lock().expect("open").iter() {
+            if open.client.as_deref() == Some(client) && only.is_none_or(|only| only == *id) {
                 let _ = open.outbox.send(event.clone());
             }
         }
         // A stream's end is in the journal with its why, as its start was
         // (Thirteen's P3 on #4521): the camera's and the microphone's.
-        if let Some(ev @ ("camera.ended" | "microphone.ended")) = event["ev"].as_str() {
+        if let Some(ev @ ("camera.ended" | "microphone.ended" | "speaker.ended")) =
+            event["ev"].as_str()
+        {
             let why = event["why"].as_str().unwrap_or("ended");
             let now = self.now_us();
             self.door
@@ -493,6 +727,12 @@ impl Shared {
                 }
                 Out::Heard(text) => {
                     let mut heard = Vec::new();
+                    // Counted, never the words (ten's phrase.heard finding on
+                    // lamp-75c9, 9 Nov): how many computers listen for phrases
+                    // and with how many phrases between them, and how many
+                    // phrases were told in this line.
+                    let mut listening = 0usize;
+                    let mut phrases = 0usize;
                     for open in self.open.lock().expect("open").values() {
                         if open.client.is_none()
                             || !open.grants.contains(&Grant::Hear)
@@ -500,6 +740,8 @@ impl Shared {
                         {
                             continue;
                         }
+                        listening += 1;
+                        phrases += open.phrases.len();
                         for phrase in phrases_in(&text, &open.phrases) {
                             if open.outbox.send(serde_json::json!({"ev": "phrase.heard", "at": at, "phrase": phrase})).is_ok()
                                 && let Some(client) = &open.client
@@ -508,8 +750,39 @@ impl Shared {
                             }
                         }
                     }
+                    eprintln!(
+                        "lamp-control: a finished line heard ({} words): {listening} listening for {phrases} phrases, {} told",
+                        crate::protocol::phrase_words(&text).len(),
+                        heard.len()
+                    );
                     // The kind alone: never the phrase, nor what was said.
                     self.journal_events(&heard, &serde_json::json!("phrase.heard"), now);
+                }
+                Out::Said { fields, to } => {
+                    let mut event = fields;
+                    event["ev"] = serde_json::json!("lamp.said");
+                    event["at"] = Value::String(at.clone());
+                    let mut sent = Vec::new();
+                    for open in self.open.lock().expect("open").values() {
+                        let Some(client) = &open.client else {
+                            continue;
+                        };
+                        let mine = match &to {
+                            crate::watch::SaidTo::Everyone => true,
+                            crate::watch::SaidTo::Client(id) => id == client,
+                        };
+                        if !mine
+                            || !open.grants.contains(&Grant::Speech)
+                            || !open.events.contains(&EventKind::LampSaid)
+                        {
+                            continue;
+                        }
+                        if open.outbox.send(event.clone()).is_ok() {
+                            sent.push(client.clone());
+                        }
+                    }
+                    // The kind alone: never what was said.
+                    self.journal_events(&sent, &event["ev"], now);
                 }
                 Out::Suspend(part, why) => {
                     let changes = self
@@ -575,11 +848,16 @@ impl Shared {
     /// Closes every connection of `client` at once, a listener's included:
     /// dropping its outbox ends the connection once what's queued (its
     /// leases' `lost`) is sent (harness-reviewer's P2 on #3778).
-    fn close_client(&self, client: &str) {
-        self.open
-            .lock()
-            .expect("open")
-            .retain(|_, open| open.client.as_deref() != Some(client));
+    fn close_client(&self, client: &str, why: &'static str) {
+        let mut open = self.open.lock().expect("open");
+        let mut reasons = self.close_reasons.lock().expect("close reasons");
+        open.retain(|id, each| {
+            let ours = each.client.as_deref() == Some(client);
+            if ours {
+                reasons.insert(*id, why);
+            }
+            !ours
+        });
     }
 }
 
@@ -813,8 +1091,11 @@ pub fn is_local_peer(
         .is_some_and(|iface| on_link.holds_on(iface, peer.ip()))
 }
 
-pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared: Arc<Shared>) {
-    let ticking = shared.clone();
+/// The door's own clock, every [`LEASE_TICK`]: the journal's tick and the
+/// leases that lapsed, told. Started by [`serve`], or by `serve` with only
+/// the skills' runs (no door, `LAMP_SKILL_TASKS=on`), where a run's leases
+/// lapse the same way.
+pub fn keep_ticking(ticking: Arc<Shared>) {
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(LEASE_TICK);
         loop {
@@ -828,6 +1109,10 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
             ticking.tell(changes);
         }
     });
+}
+
+pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared: Arc<Shared>) {
+    keep_ticking(shared.clone());
     loop {
         let (stream, peer) = match listener.accept().await {
             Ok(accepted) => accepted,
@@ -870,8 +1155,150 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
             })
             .await;
             if let Ok(Some(socket)) = opened {
-                connection(socket, shared, remote).await;
+                connection(socket, shared, remote, None, false).await;
             }
+        });
+    }
+}
+
+/// The most connections the agent socket holds at once.
+const AGENT_MAX: usize = 16;
+
+/// Whether the agent socket's peer is the named user: only its uid is the
+/// answer, never the socket's mode or group (`lampos`, whose processes run
+/// the lamp's skills, is in the socket's group, and is refused here).
+pub fn agent_peer_ok(peer_uid: u32, named_uid: u32) -> bool {
+    peer_uid == named_uid
+}
+
+/// The local agent's socket (docs/control.md, "The local agent"): the same
+/// WebSocket protocol as the door's, on a unix socket with no TLS, for the
+/// one user the owner turned on. The kernel says who connects
+/// (`SO_PEERCRED`); a peer with any other uid is closed before a byte is
+/// read, and said in the journal. The connection says `hello` with no key and
+/// is the local agent `client`, with the grants the owner left it.
+pub async fn serve_agent(
+    listener: tokio::net::UnixListener,
+    named_uid: u32,
+    user: String,
+    client: String,
+    shared: Arc<Shared>,
+) {
+    let held = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    loop {
+        let (stream, _) = match listener.accept().await {
+            Ok(accepted) => accepted,
+            Err(_) => {
+                tokio::time::sleep(ACCEPT_BACKOFF).await;
+                continue;
+            }
+        };
+        let cred = match stream.peer_cred() {
+            Ok(cred) => cred,
+            Err(error) => {
+                eprintln!(
+                    "lamp-control: local agent socket: refused a peer: no credentials: {error}"
+                );
+                continue;
+            }
+        };
+        if !agent_peer_ok(cred.uid(), named_uid) {
+            eprintln!(
+                "lamp-control: local agent socket: refused uid {} (pid {}): only {user} (uid {named_uid})",
+                cred.uid(),
+                cred.pid().unwrap_or(-1)
+            );
+            continue;
+        }
+        if held.fetch_add(1, Ordering::AcqRel) >= AGENT_MAX {
+            held.fetch_sub(1, Ordering::AcqRel);
+            continue;
+        }
+        eprintln!(
+            "lamp-control: local agent {user}: a connection from pid {}",
+            cred.pid().unwrap_or(-1)
+        );
+        let (shared, client, held) = (shared.clone(), client.clone(), held.clone());
+        tokio::spawn(async move {
+            let within = shared.limits.lock().expect("limits").handshake;
+            let config = WebSocketConfig::default()
+                .max_message_size(Some(FRAME_MAX))
+                .max_frame_size(Some(FRAME_MAX));
+            let opened = tokio::time::timeout(
+                within,
+                tokio_tungstenite::accept_hdr_async_with_config(stream, only_v1, Some(config)),
+            )
+            .await;
+            if let Ok(Ok(socket)) = opened {
+                connection(socket, shared, false, Some(client), false).await;
+            }
+            held.fetch_sub(1, Ordering::AcqRel);
+        });
+    }
+}
+
+/// The run socket (docs/control.md, "The run socket"): the same WebSocket
+/// protocol on a unix socket with no TLS, for one named user (the one that
+/// runs lamp-tasks' work), and only for a connection that then says `hello`
+/// with a live one-run token. The kernel names the peer (`SO_PEERCRED`); any
+/// other uid is closed before a byte is read. Runs whose time is past end here
+/// too, once a second.
+pub async fn serve_run(
+    listener: tokio::net::UnixListener,
+    named_uid: u32,
+    user: String,
+    shared: Arc<Shared>,
+) {
+    let sweeper = shared.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            sweeper.sweep_runs();
+        }
+    });
+    let held = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    loop {
+        let (stream, _) = match listener.accept().await {
+            Ok(accepted) => accepted,
+            Err(_) => {
+                tokio::time::sleep(ACCEPT_BACKOFF).await;
+                continue;
+            }
+        };
+        let cred = match stream.peer_cred() {
+            Ok(cred) => cred,
+            Err(error) => {
+                eprintln!("lamp-control: run socket: refused a peer: no credentials: {error}");
+                continue;
+            }
+        };
+        if !agent_peer_ok(cred.uid(), named_uid) {
+            eprintln!(
+                "lamp-control: run socket: refused uid {} (pid {}): only {user} (uid {named_uid})",
+                cred.uid(),
+                cred.pid().unwrap_or(-1)
+            );
+            continue;
+        }
+        if held.fetch_add(1, Ordering::AcqRel) >= AGENT_MAX {
+            held.fetch_sub(1, Ordering::AcqRel);
+            continue;
+        }
+        let (shared, held) = (shared.clone(), held.clone());
+        tokio::spawn(async move {
+            let within = shared.limits.lock().expect("limits").handshake;
+            let config = WebSocketConfig::default()
+                .max_message_size(Some(FRAME_MAX))
+                .max_frame_size(Some(FRAME_MAX));
+            let opened = tokio::time::timeout(
+                within,
+                tokio_tungstenite::accept_hdr_async_with_config(stream, only_v1, Some(config)),
+            )
+            .await;
+            if let Ok(Ok(socket)) = opened {
+                connection(socket, shared, false, None, true).await;
+            }
+            held.fetch_sub(1, Ordering::AcqRel);
         });
     }
 }
@@ -895,6 +1322,8 @@ async fn connection<S>(
     mut socket: tokio_tungstenite::WebSocketStream<S>,
     shared: Arc<Shared>,
     remote: bool,
+    local: Option<String>,
+    run: bool,
 ) where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
@@ -909,7 +1338,15 @@ async fn connection<S>(
     let mut body_open = true;
     // Weak, so a revoke that drops the connection's outbox still closes it.
     let answers = outbox.downgrade();
-    let (mut session, welcome) = shared.door.lock().expect("door").open();
+    let (mut session, welcome) = {
+        let mut door = shared.door.lock().expect("door");
+        match &local {
+            Some(client) => door.open_local(client),
+            None if run => door.open_run(),
+            None => door.open(),
+        }
+    };
+    session.set_connection(id);
     if remote {
         session.set_remote();
     }
@@ -951,8 +1388,21 @@ async fn connection<S>(
                             }
                             continue;
                         }
-                        Some(Ok(Message::Binary(_))) => {
-                            let _ = socket.send(Message::text(crate::protocol::refused(None, &crate::protocol::Error::new(crate::protocol::ErrorCode::BadRequest, "text frames only")).to_string())).await;
+                        // A binary message is sound for the speaker, from a
+                        // known computer's own stream, and nothing else: any
+                        // other is dropped with no answer at all (before
+                        // hello, with no stream, from a revoked grant), so a
+                        // flood costs a counter and nothing more. It takes no
+                        // lock of the door's or the parts', is not a request
+                        // (the rates never count it), and the stream's own
+                        // frames keep the connection from going quiet.
+                        Some(Ok(Message::Binary(data))) => {
+                            if session.client().is_some()
+                                && let Some(speaker) = shared.speaker.get()
+                                && speaker.frame(id, &data)
+                            {
+                                quiet_until = tokio::time::Instant::now() + quiet;
+                            }
                             continue;
                         }
                         _ => break,
@@ -1037,7 +1487,9 @@ async fn connection<S>(
                     if remote
                         && event["ev"]
                             .as_str()
-                            .is_some_and(|ev| ev.starts_with("camera.") || ev.starts_with("microphone."))
+                            .is_some_and(|ev| ev.starts_with("camera.")
+                                || ev.starts_with("microphone.")
+                                || ev.starts_with("speaker."))
                     {
                         continue;
                     }
@@ -1113,7 +1565,23 @@ async fn connection<S>(
             }
         }
     }
-    let _ = socket.close(None).await;
+    // The close frame says why when the lamp cut the connection (a revoke, a
+    // change of the computer's grants): one line the SDKs log.
+    let why = shared
+        .close_reasons
+        .lock()
+        .expect("close reasons")
+        .remove(&id);
+    let _ = socket
+        .close(why.map(|why| CloseFrame {
+            code: CloseCode::Normal,
+            reason: why.into(),
+        }))
+        .await;
+    // The stream this connection opened ends with it.
+    if let Some(speaker) = shared.speaker.get() {
+        speaker.end_conn(id);
+    }
     shared.open.lock().expect("open").remove(&id);
     let now = shared.now_us();
     let changes = shared.door.lock().expect("door").closed(&session, now);
@@ -1147,6 +1615,17 @@ async fn connection<S>(
 ///   `{"taken": N}`: every lease of that computer, or of every computer, is
 ///   lost as `taken_by_owner_app` and its holder told; the computers stay
 ///   paired;
+/// - `{"set_grants": {"client": "c_…", "grants": [...]}}` → `{"client",
+///   "grants", "added", "removed", "saved": true}`: the computer's grants
+///   become exactly that list, with no new code (the app's `control.set_grants`,
+///   the owner's tap being the consent); saved at once, or an `error` and the
+///   old grants kept. A stream whose grant goes ends at once, its pushed skills
+///   are held to the new grants and its connections close so it reads them at
+///   its next `hello`;
+/// - `{"features": true}` → `{"camera": bool, "microphone": bool, "speaker": bool}`:
+///   whether a camera, microphone or speaker stream is usable on this lamp
+///   (wired, and for the microphone and the speaker the owner's switch on), for
+///   the app's grants screen;
 /// - `{"cancel_code": true}` → `{"dropped": true|false}`: the code out is
 ///   dropped, so nobody can pair with it (the app's answer to a spoken check
 ///   that doesn't match), and whether there was one;
@@ -1154,7 +1633,10 @@ async fn connection<S>(
 ///   false` with an `error` when the file couldn't take it yet;
 /// - `{"clients": true}` → `{"clients": [{id, name, grants, paired_at,
 ///   paired_at_unix_ms}]}`, `paired_at` in Unix seconds as the file keeps it
-///   (for older readers) and `paired_at_unix_ms` the same in milliseconds.
+///   (for older readers) and `paired_at_unix_ms` the same in milliseconds; and
+///   `listening`, whether the door listens on the network (false when lamp-control
+///   serves only the owner's side and skill runs), so the admin socket's being
+///   there is not read as the door's being open;
 ///
 /// [`CODE_FOR_US`]: crate::pairing::CODE_FOR_US
 pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
@@ -1163,11 +1645,15 @@ pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
             continue;
         };
         let shared = shared.clone();
+        // Whether the peer is the voice, by its pid's cgroup: the one part
+        // that may record the person's yes to a skill's task.
+        let from_the_voice =
+            crate::task_yes::peer_is_voice(stream.peer_cred().ok().and_then(|peer| peer.pid()));
         tokio::spawn(async move {
             let (read, mut write) = stream.into_split();
             let mut lines = BufReader::new(read).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                let answer = admin_answer(&shared, &line);
+                let answer = admin_answer(&shared, &line, from_the_voice);
                 if write
                     .write_all(format!("{answer}\n").as_bytes())
                     .await
@@ -1180,16 +1666,40 @@ pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
     }
 }
 
-fn admin_answer(shared: &Shared, line: &str) -> Value {
+/// Grants as a journal line says them: their wire names, comma separated.
+fn grant_names(grants: &[Grant]) -> String {
+    grants
+        .iter()
+        .map(|grant| json!(grant).as_str().unwrap_or_default().to_owned())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
     let Ok(Value::Object(asked)) = serde_json::from_str::<Value>(line) else {
         return json!({"error": "one JSON object a line"});
     };
+    // The owner's yes to a skill's task (#6305): recorded by the voice
+    // alone, checked by lamp-skills, taken back by a remove.
+    let folder = shared.task_yes.lock().expect("task_yes").clone();
+    if let Some(answer) = crate::task_yes::answer(
+        folder.as_deref(),
+        &asked,
+        from_the_voice,
+        crate::task_yes::on(),
+        wall_ms(),
+    ) {
+        return answer;
+    }
     let now = shared.now_us();
     if let Some(code) = asked.get("code") {
         let say_pin = code.get("say_pin") == Some(&json!(true));
         let grants: Result<BTreeSet<Grant>, _> =
             serde_json::from_value(code.get("grants").cloned().unwrap_or(json!([])));
         return match grants {
+            Ok(grants) if grants.iter().any(|grant| grant.is_service()) => {
+                json!({"error": format!("grants: {}", crate::services::RUNS_ONLY)})
+            }
             Ok(grants) => {
                 // The pairing screen's words for what is granted.
                 let shown: Vec<&str> = grants.iter().map(|grant| grant.shown()).collect();
@@ -1225,6 +1735,62 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
         );
         return json!({"taken": taken});
     }
+    if let Some(Value::Object(set)) = asked.get("set_grants") {
+        let Some(Value::String(client)) = set.get("client") else {
+            return json!({"error": "set_grants: client: a computer's id"});
+        };
+        // The whole list is asked for, so it must be there: a missing `grants` is a slip that would take
+        // every grant from the computer; none is an explicit `[]`.
+        let Some(asked_grants) = set.get("grants").cloned() else {
+            return json!({"error": "set_grants: grants: the whole list, [] for none"});
+        };
+        let grants: Result<BTreeSet<Grant>, _> = serde_json::from_value(asked_grants);
+        let grants = match grants {
+            Ok(grants) if grants.iter().any(|grant| grant.is_service()) => {
+                return json!({"error": format!("grants: {}", crate::services::RUNS_ONLY)});
+            }
+            Ok(grants) => grants,
+            Err(error) => return json!({"error": format!("grants: {error}")}),
+        };
+        let set = shared.door.lock().expect("door").set_grants(client, grants);
+        return match set {
+            Err(SetGrantsRefused::NoSuchComputer) => json!({"error": "no such computer"}),
+            Err(SetGrantsRefused::NotSaved(error)) => json!({
+                "error": format!("not saved, so the computer keeps the grants it had: {error}")
+            }),
+            Ok(set) => {
+                if !set.added.is_empty() || !set.removed.is_empty() {
+                    eprintln!(
+                        "lamp-control: the owner's app changed the grants of {client}: added [{}], removed [{}]",
+                        grant_names(&set.added),
+                        grant_names(&set.removed)
+                    );
+                    // A stream whose grant went ends now; its pushed skills are
+                    // held to the new grants; its connections close, so it reads
+                    // the new grants at its next hello.
+                    for media in &set.media {
+                        shared
+                            .parts
+                            .lock()
+                            .expect("parts")
+                            .media_end(client, *media);
+                    }
+                    shared.tell_helper();
+                    shared.close_client(client, CLOSED_GRANTS);
+                }
+                json!({"client": client, "grants": set.grants, "added": set.added, "removed": set.removed, "saved": true, "shown": Grant::shown_all()})
+            }
+        };
+    }
+    if let Some(mint) = asked.get("mint") {
+        return shared.mint(mint, now);
+    }
+    if let Some(end) = asked.get("end") {
+        return match end["run"].as_str() {
+            Some(run) => json!({"ended": shared.end_run(run, None, now, "ended")}),
+            None => json!({"error": "end: a run, as text"}),
+        };
+    }
     if asked.get("cancel_code") == Some(&json!(true)) {
         let dropped = shared.door.lock().expect("door").cancel_code();
         eprintln!(
@@ -1253,8 +1819,18 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
             }),
         };
         // Refused in memory either way, so its connections go now.
-        shared.close_client(client);
+        shared.close_client(client, CLOSED_REVOKED);
         return answer;
+    }
+    // What the app's grants screen may offer: whether a camera or microphone
+    // stream is usable here (`system.info`'s `developer`).
+    if asked.get("features") == Some(&json!(true)) {
+        let features = *shared.features.lock().expect("features");
+        return json!({
+            "camera": features.camera,
+            "microphone": features.microphone,
+            "speaker": features.speaker,
+        });
     }
     if asked.get("clients").is_some() {
         let door = shared.door.lock().expect("door");
@@ -1272,9 +1848,15 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
                 })
             })
             .collect();
-        return json!({"clients": clients});
+        // The words for every grant this build knows, once: the app shows them for
+        // a grant it has no label of its own for.
+        return json!({
+            "clients": clients,
+            "shown": Grant::shown_all(),
+            "listening": shared.listening.load(Ordering::Relaxed),
+        });
     }
-    json!({"error": "ask for code, cancel_code, take_back, revoke or clients"})
+    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, task_yes_record, task_yes_check or task_yes_forget"})
 }
 
 /// Who says the spoken pin check, as the voice's say socket and a `stop`
@@ -1335,12 +1917,13 @@ fn wall_ms() -> u64 {
 
 /// The bus topics the door reads, each subscribed on its own thread, every
 /// message handed to `watch` and what it means delivered.
-pub const TOPICS: [&str; 22] = [
+pub const TOPICS: [&str; 24] = [
     "humans/faces/tracked",
     "humans/hands/tracked",
     "room/stood_up",
     "name/heard",
     "voice/heard",
+    "voice/line",
     "ears/classes",
     "controls/gesture",
     "body/hand",
@@ -1352,6 +1935,7 @@ pub const TOPICS: [&str; 22] = [
     "light/drawn",
     "mood/state",
     "controls/touch",
+    "controls/pet",
     "air/state",
     "board/state",
     "speaker/volume",
@@ -1374,6 +1958,10 @@ pub fn watch_bus(
         let sent = sent.clone();
         let clock = shared.clone();
         std::thread::spawn(move || {
+            // A payload that can't be read is passed over, said once per
+            // topic so a lamp shows why its events stopped (ten's
+            // phrase.heard finding on lamp-75c9, 9 Nov).
+            let mut unread_said = false;
             // What `watch` last read from this topic, and when: a state
             // message that says the same is passed over here, not handed on
             // (lamp-75c9's idle CPU was `voice/privacy`'s hundred a second),
@@ -1382,8 +1970,17 @@ pub fn watch_bus(
             loop {
                 match subscriber.recv(Duration::from_secs(1)) {
                     Ok(Some(message)) => {
-                        let Ok(payload) = message.json() else {
-                            continue;
+                        let payload = match message.json() {
+                            Ok(payload) => payload,
+                            Err(error) => {
+                                if !unread_said {
+                                    unread_said = true;
+                                    eprintln!(
+                                        "lamp-control: {topic}: a message not read, passed over: {error}"
+                                    );
+                                }
+                                continue;
+                            }
                         };
                         // When it came, not when the runtime gets to it: a
                         // runtime held up (a slow save) mustn't make a lease

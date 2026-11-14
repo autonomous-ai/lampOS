@@ -1,19 +1,24 @@
 //! `lamp-skills`'s integration tests, one module a file, built as one binary so
 //! the crate is linked once for them, not once a file (#1806).
 mod addon;
+mod asks;
 mod call_wait;
 mod daily_engine;
+mod faq;
 mod format;
+mod holds;
 mod journal_output;
 mod made;
 mod night_sleep;
 mod package;
 mod pushed;
+mod remind;
 mod routine_service;
 mod shared;
 mod skills;
 mod stands_in;
 mod store;
+mod stuffy_unknown;
 mod welcome_stuck;
 
 /// The daily journal at `path`, opened as the next process would. A test

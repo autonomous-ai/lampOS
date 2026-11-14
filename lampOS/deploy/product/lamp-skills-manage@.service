@@ -27,6 +27,21 @@ Environment=LAMP_SKILLS_STORE=on
 # A made skill reads a linked service to its owner alone (#5288, #5303): a made skill's read step is held
 # to its cap again as it is put on (install_made, lamp_voice::made_skill::put_on_cap). Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
+# A made skill's write (#6066, #6142): a made skill with one fixed write step loads as it is put on; it sends
+# only after the owner's yes to its content, at most three a day, never a public post. On in the product (owner, 11 Nov).
+Environment=LAMP_SKILL_WRITES=on
+# A Store or pushed skill's `do.task` (#6305): its task and grants read for the voice's say-back (task_asks).
+# The same line in lamp-skills, lamp-voice, lamp-control, lamp-services, lamp-tasks and lamp-update.
+Environment=LAMP_SKILL_TASKS=on
+# A made skill's code of its own (#6307): install_made holds its scripts/ to the made cap again as it is put on
+# (made_skill::put_on_scripts), and its `do.task` reads back (task_asks). The same line in lamp-skills and lamp-voice.
+Environment=LAMP_MADE_SCRIPTS=on
+# The lamp's agent's connectors (#6664): a `do.task`'s linked-service grants held as it is put on. The same line in
+# lamp-tasks, lamp-skills, lamp-voice and lamp-control. On in the product (owner, 13 Nov).
+Environment=LAMP_AGENT_SERVICES=on
+# A skill made here is the person's own (#6059): a made say's cooldown held to a minute, not an hour, as it is
+# put on (made_skill::capped). The same line in lamp-voice and lamp-skills.
+Environment=LAMP_MADE_SKILL_LOOSE=on
 # Wellbeing nudges at a present spacing and Comfort break (#5207): the skills' [present] values, as lamp-skills
 # loads them, so the app's on and off act on the skills as they run. The same line in lamp-skills.service and lamp-cloud.service.
 Environment=LAMP_NUDGES_PRESENT=on

@@ -860,6 +860,7 @@ mod tests {
                         framing: None,
                         offered_at_unix_s: None,
                         later_offers: 0,
+                        ended_at_unix_ms: None,
                     },
                 );
             }
@@ -928,6 +929,7 @@ mod tests {
                     framing: None,
                     offered_at_unix_s: None,
                     later_offers: 0,
+                    ended_at_unix_ms: None,
                 },
             );
             progress
@@ -1006,6 +1008,7 @@ mod tests {
                 framing: None,
                 offered_at_unix_s: None,
                 later_offers: 0,
+                ended_at_unix_ms: None,
             },
         );
         progress
@@ -1374,6 +1377,7 @@ mod tests {
                 framing: None,
                 offered_at_unix_s: None,
                 later_offers: 0,
+                ended_at_unix_ms: None,
             },
         );
         done.privacy_done_attempt = Some(lamp_turn_owner::BootId::new([7; 16]).unwrap());

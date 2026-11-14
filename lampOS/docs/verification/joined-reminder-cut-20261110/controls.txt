@@ -1,0 +1,18 @@
+
+running 3 tests
+lamp-voice schedule-consumer: reminder id 1 delivery 1: due, offered to the voice (attempt 1, late)
+lamp-voice: the reminder was cut after 27200 of its 32000 samples had played: counted as said, not offered again
+lamp-voice schedule-consumer: reminder id 1 delivery 1: said; its completion is kept, to be acknowledged
+lamp-voice schedule-consumer: reminder id 1 delivery 1: due, offered to the voice (attempt 1, late, 1 more as late in the same line)
+lamp-voice schedule-consumer: reminder id 2 delivery 1: not completed: this attempt can no longer speak, cut after some of it played: to be offered again once, said as a repeat
+lamp-voice schedule-consumer: reminder id 1 delivery 1: not completed: this attempt can no longer speak, cut after some of it played: to be offered again once, said as a repeat
+.lamp-voice schedule-consumer: reminder id 1 delivery 1: due, offered to the voice (attempt 1, late, 1 more as late in the same line)
+lamp-voice schedule-consumer: reminder id 1 delivery 1: said; its completion is kept, to be acknowledged
+lamp-voice schedule-consumer: reminder id 2 delivery 1: said in one line with another late one; its completion is kept, to be acknowledged
+.lamp-voice schedule-consumer: reminder id 1 delivery 1: due, offered to the voice (attempt 1, late)
+receipt decision joined=false: first=7.165 us, p95=0.201 us, max=7.165 us, n=256
+lamp-voice schedule-consumer: reminder id 1 delivery 1: due, offered to the voice (attempt 1, late, 1 more as late in the same line)
+receipt decision joined=true: first=0.396 us, p95=0.055 us, max=0.396 us, n=256
+.
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 5488 filtered out; finished in 5.03s
+

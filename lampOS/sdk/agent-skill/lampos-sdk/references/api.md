@@ -14,13 +14,14 @@ naming every public call, tool, event and error code they have.
 | pair once (owner's code and pin) | `await Lamp.pair(code, host, pin=pin, name=name)` | `await Lamp.pair(code, host, { pin, name })` | run `lamp pair` first |
 | connect, say hello | `await Lamp.connect()` (or `Lamp.connect(lamp_id, host=..., keyring=...)`) | `await Lamp.connect()` (or `Lamp.connect(lampId, { host, keyring })`) | `lamp-mcp` connects at start (`--lamp ID`) |
 | the lamp, grants, limits | `lamp.info`, `lamp.grants`, `lamp.limits` | `lamp.info`, `lamp.grants`, `lamp.limits` | in `lamp_state("lamp")` and the tool list |
+| the owner's language (`en`, `vi`, `ja`, `zh`, `ko`), from hello, so a program's own lines follow it | `lamp.language` | `lamp.language` | — |
 | close | `await lamp.close()`, or `async with` | `await lamp.close()` | — |
 | wait until it ends | `await lamp.wait_closed()` | `await lamp.closed()` | — |
 | keep running across the lamp's restarts (every update) | `await Lamp.keep_connected(setup)`: connects, runs `setup(lamp)`, connects again after each close; raises on what can't mend (`NotPaired`, `no_grant`, ...) | `await Lamp.keepConnected(setup, { signal })` | — (an agent's tools have no setup to keep: lamp-mcp's README says how it meets a restart) |
 | find lamps on this network | `await find()` (`lampos.discovery`, the `[find]` extra) | `await find()` | — |
 | any op of the schema | `await lamp.request(op, **fields)` (`on_id=` is told its id before it is sent) | `lamp.request(op, fields)` | — |
 
-No lamp announces itself by mDNS yet (stable 10824): `find()` and `lamp find`
+No lamp announces itself by mDNS yet (any build): `find()` and `lamp find`
 return none, so give `host` (`lamp-xxxx.local` or the IP address). The
 pairing keeps it for later connects.
 
@@ -45,14 +46,15 @@ pairing keeps it for later connects.
 | `person.left` (look) | `count`: 0 | nobody in view for 5 s, after someone was |
 | `person.facing` (look) | `facing` | someone turns to the lamp, or the last one turns away |
 | `person.stood_up` (look) | `side` | someone in view stands up |
-| `hand` (look) | `seen`; when seen `x`, `y`, `size`, `open`, `confidence` | a hand seen, moved, opened, closed or gone, at most 4 a second |
+| `hand` (look) | `seen`; when seen `x`, `y`, `size`, `open`, `confidence` | a hand seen, moved, opened, closed or gone, at most 4 a second; in development: nothing publishes `humans/hands/tracked` on a customer lamp yet, so none comes |
 | `phrase.heard` (hear) | `phrase`: one of yours | a line the lamp heard holds your phrase; register up to 16 with `phrases` |
 | `name.heard` (hear) | none | someone says the lamp's name |
 | `sound.heard` (sound) | `class` (`music`, `laughter`, `door`, `footsteps`), `score` | a class's score rises past 0.5 |
-| `touch` | `kind`: `tap` or `pet` | a tap or a pet |
+| `touch` | `kind`: `tap` or `pet` | a tap (shown from 11372) or a pet (not shown on a lamp yet) |
 | `button` | `press`: `long_press` | the button is held |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` | one of them changes |
 | `volume.changed` (speak) | `level` (0–100 of what the lamp allows), `muted` | the speaker's volume changes, whoever changed it: the person by voice or in the app, or a computer |
+| `lamp.said` (speech) | `text`, `by` (`lamp`, `computer`), `source` (`reply`, `exact`, `cached`), `cut` | a line the lamp said out loud: its fixed phrases, a computer's own say back to it, a reply only when said to the owner; never what a person says; what it sends can't be taken back |
 | `air.changed` (air) | `pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`, `feel` (`fresh`, `fine`, `stuffy`, `very_stuffy`, `unknown`); a value the sensor doesn't know is left out | the first reading, then a value moves by its step (particles 5, CO2 50 ppm, humidity 3, temperature 0.5 °C) or `feel` changes; at most every 5 s |
 | `time` | your schedule | accepted, not produced yet |
 | `lease` (unasked) | `lease`, `state` (`held`, `suspended`, `lost`), `why` | the lamp takes your lease back, or gives it again |
@@ -87,20 +89,28 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 |---|---|---|---|---|
 | a feeling (move and light) | `await lamp.express("glad", 0.5)` (`glad`, `lively`, `low`) | `lamp.express('glad', 0.5)` | `lamp_express(feeling, strength)` | body and light |
 | a gesture | `await lamp.gesture("nod", wait=False)` | `lamp.gesture('nod', { wait })` | `lamp_gesture(name)` | body |
-| look (`face`, `name` refused on stable 10824) | `await lamp.look("ahead")`, `look(yaw=20, pitch=5)`, `look("hand")` | `lamp.look('ahead')`, `lamp.look({ yaw, pitch })` | `lamp_look(at, yaw, pitch)` | body, a body lease |
-| follow a hand | `async with lamp.follow_hand() as following:` | `lamp.withHand(async (following) => …)`, `lamp.followHand().start()` | `lamp_follow_hand(seconds)`, `lamp_follow_stop()` | body and look |
+| look (`name` refused; `hand`: the lamp doesn't track hands yet, the GUIDE's Follow a hand row; `face` is taken by lamp-control but a customer lamp's body drops it, "gaze is not measured"; refused "not in this release" on 11091 and older) | `await lamp.look("ahead")`, `look(yaw=20, pitch=5)` | `lamp.look('ahead')`, `lamp.look({ yaw, pitch })` | `lamp_look(at, yaw, pitch)` | body, a body lease |
+| follow a hand (in development: the lamp doesn't track hands yet; lamp-body refuses a hold that says `follow`) | `async with lamp.follow_hand() as following:` | `lamp.withHand(async (following) => …)`, `lamp.followHand().start()` | `lamp_follow_hand(seconds)`, `lamp_follow_stop()` | body and look |
 | a move of your own | `await lamp.move(frames, step_ms)` | `lamp.move(frames, stepMs)` | `lamp_move(step_ms, frames)` | body, a body lease |
 | a move through poses in degrees, eased | `await lamp.move_poses([{"pitch": 10}, {"yaw": -8}])` | `lamp.movePoses([{ pitch: 10 }, { yaw: -8 }])` | `lamp_move_poses(poses)` | body, a body lease |
-| a recorded move (refused on every lamp today) | `await lamp.play(name)` | `lamp.play(name)` | `lamp_play(name)` | body, a body lease |
-| aim the joints (stable 10824: `yaw`, `pitch` only) | `await lamp.joints(lease, 1000, pitch=5)` | `lamp.joints(lease, 1000, { pitch: 5 })` | `lamp_joints(within_ms, pitch, roll, yaw, shoulder, elbow)` | body, the lease named |
+| a recorded move in one of your pushed skills (plays from build 12171; refused "not routed yet" on 11913 and before) | `await lamp.play(name)` | `lamp.play(name)` | `lamp_play(name)` | body, a body lease |
+| aim the joints (from build 11102: all five, `roll`, `shoulder`, `elbow` while the lamp stands; 11048 and older: `yaw`, `pitch` only) | `await lamp.joints(lease, 1000, pitch=5)` | `lamp.joints(lease, 1000, { pitch: 5 })` | `lamp_joints(within_ms, pitch, roll, yaw, shoulder, elbow)` | body, the lease named |
 | light | `await lamp.light("green", 3, 10_000, pattern="breathe")` (no `pattern`: steady) | `lamp.light('green', 3, 10000, 'breathe')` (`undefined`: steady) | `lamp_light(colour, level, for_ms, pattern)` | light |
 | ring, pixel by pixel | `await lamp.ring(pixels, for_ms=3_000, brightness=50)`: `lamp.ring_pixels` colours (`"#rrggbb"` or `(r, g, b)`), from pixel 0 around the ring | `lamp.ring(pixels, { forMs: 3000, brightness: 50 })` (`lamp.ringPixels` of them) | `lamp_ring(pixels, rgb, brightness, for_ms)` | light |
 | one colour of your own | `await lamp.light_rgb("#ff8000", for_ms=10_000, brightness=40)` | `lamp.lightRgb('#ff8000', { forMs: 10000, brightness: 40 })` | | light |
+| the light out (a black ring for a while; no level 0) | `await lamp.light_off(for_ms=30_000)` | `lamp.lightOff({ forMs: 30000 })` | | light |
+| keep a light on past 30 s | `holding = await lamp.hold_light("warm", 3)`; `holding.stop()` | `const holding = await lamp.holdLight('warm', 3)`; `holding.stop()` | asked again at half the hold limit; a refusal goes to `on_error` / `onError` | light |
 | say | `await lamp.say("Build passed.")` | `lamp.say('Build passed.')` | `lamp_say(text)` | speak |
 | a sound (`hum`, or a clip of yours) | `await lamp.sound(name)` | `lamp.sound(name)` | `lamp_sound(name)` | speak |
 | keep a clip on the lamp | `await lamp.upload_sound(name, "chime.wav")` | `lamp.uploadSound(name, bytes)` | `lamp_upload_sound(name, path)` | speak |
 | your clips | `await lamp.sounds()` | `lamp.sounds()` | `lamp_sounds()` | speak |
 | delete a clip | `await lamp.remove_sound(name)` | `lamp.removeSound(name)` | `lamp_remove_sound(name)` | speak |
+| keep a note of your own (any JSON, small) | `await lamp.notes.set("mood", {"calm": True})` or `notes_set(key, value)` | `lamp.notes.set('mood', { calm: true })` or `notesSet(key, value)` | `lamp_notes_set(key, value)` | notes |
+| read a note | `await lamp.notes.get("mood", default=None)` or `notes_get(key)` | `lamp.notes.get('mood', fallback)` or `notesGet(key)` | `lamp_notes_get(key)` | notes |
+| drop a note | `await lamp.notes.delete("mood")` or `notes_delete(key)` | `lamp.notes.delete('mood')` or `notesDelete(key)` | `lamp_notes_delete(key)` | notes |
+| your note keys | `await lamp.notes.list("mo")` or `notes_list(prefix)` | `lamp.notes.list('mo')` or `notesList(prefix)` | `lamp_notes_list(prefix)` | notes |
+| read a linked service (a skill's run on the control socket only) | `await lamp.service_read("gmail", {"what": "recent"})` | `lamp.serviceRead('gmail', { what: 'recent' })` | — | `<service>-read` |
+| prepare a write for the person's spoken yes (a skill's run only; never sent by the run) | `await lamp.service_write("gmail", {...})` | `lamp.serviceWrite('gmail', {...})` | — | `<service>-write` |
 | the speaker's volume, the person's own (one of `to` 0–100, `step` `up`/`down`, `mute`) | `await lamp.volume(to=30)`, `volume(step="down")`, `volume(mute=True)` | `lamp.volume({ to: 30 })` | `lamp_volume(to, step, mute)`, `lamp://state/volume` | speak |
 | start a turn (the lamp asks, the person answers) | `await lamp.start_turn("Shall we start?", wait=True)` | `lamp.startTurn('Shall we start?', { wait: true })` | `lamp_start_turn(prompt, wait)` | speak and hear |
 | end the turn you started | `await lamp.end_turn()` | `lamp.endTurn()` | `lamp_end_turn()` | speak |
@@ -117,12 +127,19 @@ Ranges, from lamp-control and the body:
   `dance_waltz`, `dance_jazz`.
 - **move:** 2 frames at least (at most what 10 s allows: 251 at 40 ms) of 5 joints (pitch, roll, yaw, shoulder, elbow) in
   counts from home, first and last all 0; `step_ms` 40–1,000; 1.5 to 10 s
-  in all; each joint within reach (200, 200, 150, 350, 350 counts) and speed.
+  in all; each joint within reach (200, 200, 250, 350, 350 counts on a lamp as shipped;
+  a lamp with `LAMP_BODY_APP_REACH` takes 90% of its hardware, up to 1,300, 1,300, 1,300, 1,000, 1,000) and speed.
 - **clips:** a WAV of 16-bit mono PCM at 24 kHz, up to 30 s, no sample past
   −12 dBFS and no 10 ms past −30 dBFS RMS; a name of a lowercase letter,
   then lowercase letters, digits, `_` or `-`, never `hum`. Up to 64 clips and
   20 MB a computer (`limits.sounds`); a revoke deletes them. A clip plays
   as an exact `say` does: once the person isn't talking.
+- **notes:** a key of 1 to 64 bytes of letters, digits and `. _ : -`; a value
+  of any JSON, at most 16384 bytes serialized; up to 256 keys and 256 KiB of
+  keys and values a computer (`limits.notes`), one past either refused
+  whole. Only yours (the lamp knows you by your pairing), kept across your
+  program's and the lamp's restarts, deleted by a revoke. 30 writes and 120
+  reads a minute.
 - **say:** at most 900 UTF-8 bytes (the voice's own cap), no control characters, said exactly as written since #4958;
   `rephrase=True` (`{ rephrase: true }`, `lamp_say(text, rephrase)`) for the
   model's own words, every say's behaviour before it. **look:** `yaw` and `pitch` in degrees,
@@ -160,6 +177,24 @@ The answer is `{"stream": "on", "sample_rate": 16000, "channels": 1,
   makes a gap; `set_private()` / `setPrivate()` and `set_in_view(2)` /
   `setInView(2)` end it.
 
+## The speaker
+
+| what | Python | JavaScript | MCP | grant |
+|---|---|---|---|---|
+| play sound of your own | `async with lamp.speaker_stream(16000) as out:` then `await out.speaker_write(pcm)` or `await out.play_wav(path)` (the plain call: `await lamp.speaker_stream_request(True, 16000)`) | `const out = await lamp.speakerStream(16000)`, `await out.speakerWrite(pcm)`, `await out.playWav(path)` | `lamp_play_audio` (a WAV, real time, at most 60 s) | speaker |
+| stop it | leave the `async with`, or `speaker_stream_request(False)` | `await out.stop()` | — | none |
+
+`pcm` is mono signed 16-bit little-endian samples at the stream's rate (16000 by default, or 24000), sent as binary messages of 10 to 100 ms (at most 9,600 bytes). The answer is `{stream, sample_rate, format, frame_ms, buffer_ms, source: "speaker", turn}`. Then, unasked:
+
+| event | fields | fires when |
+|---|---|---|
+| `speaker.stats` (speaker) | `buffered_ms`, `lost`, `underruns`, `limited`, `stray` | every 2 s while a stream runs, so a sender can pace itself |
+| `speaker.ended` (speaker) | `why`, `turn` | the lamp turned private or was muted, another computer's stream replaced it (`replaced`), no sound for 2 s (`idle`), 10 minutes (`limit`), or the ring did not show its mark; a `speaker.ended` of another `turn` is not this stream's end |
+
+- **It is a grant of its own, never ticked for you,** because it lets a program sound like a person; the app does not offer it. **Off unless the owner switched it on** (`--speaker on`). **Never while the lamp is private or muted. Only on the lamp's own network.** The lamp is speaking or in a conversation: `busy`.
+- Listen with `lamp.on("speaker.stats", h)` and `lamp.on("speaker.ended", h)`: no subscription, they come with the stream you asked for. Command line: `lamp speaker FILE.wav`.
+- The fake lamp plays nothing and keeps what was sent (`played_samples()` / `played()`); `end_speaker(why)` / `endSpeaker(why)` and `set_private()` / `setPrivate()` end it.
+
 ## Skills of your own
 
 | what | Python | JavaScript | command line |
@@ -174,9 +209,9 @@ computer goes, never beyond the computer's other grants, and a revoke turns it
 off. `lamp skill push` checks the folder first, as `lamp skill check` does.
 A push needs `skills` plus every grant the skill's `[permissions]` asks, is
 1 MiB at most packed, and needs lamp-control started with `--manage-socket`.
-**Not on stable 10824's customer lamps:** their product unit doesn't pass it,
-so every skill op is refused, "skill push is not on this lamp". The next
-build's product unit passes it. Try it on `lamp fake` meanwhile. To try it:
+**On customer lamps from stable 11091 on**: the product unit
+passes it. On 11048 and older every skill op is refused, "skill push is not on
+this lamp"; try it on `lamp fake`. To try it:
 `lampOS/sdk/examples/hello-skill`, which asks only `speak`.
 From lamp-mcp, with the same grant: `lamp_skill_push(folder)`, `lamp_skills()`
 and `lamp_skill_remove(name)`.

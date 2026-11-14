@@ -74,6 +74,16 @@ pub fn unit_of(cgroup: &str) -> Option<String> {
     })
 }
 
+/// Whether the kernel named `caller` as the system service `unit` run as
+/// `uid`: both, never one alone (another unit as the same user, or a login
+/// user's own unit of that name, is not it). No caller (off Linux, or its
+/// pid gone) or no uid known is never it.
+pub fn is_unit_as(caller: Option<&Caller>, uid: Option<u32>, unit: &str) -> bool {
+    caller.is_some_and(|caller| {
+        uid.is_some_and(|uid| caller.uid == uid) && caller.unit.as_deref() == Some(unit)
+    })
+}
+
 /// The uid of the user `name` in `passwd`'s text (`/etc/passwd`'s form),
 /// for a part that holds a unit to the user it runs as (`lampos`).
 pub fn uid_in_passwd(passwd: &str, name: &str) -> Option<u32> {
@@ -176,6 +186,43 @@ pub fn recv_with_caller(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A unit and its user, both, from the kernel's naming only.
+    #[test]
+    fn a_unit_as_its_user_is_both_never_one_alone() {
+        let caller = |uid, unit: Option<&str>| Caller {
+            pid: 7,
+            uid,
+            unit: unit.map(str::to_owned),
+        };
+        let seen = Some("lamp-seen.service");
+        assert!(is_unit_as(
+            Some(&caller(990, seen)),
+            Some(990),
+            "lamp-seen.service"
+        ));
+        assert!(!is_unit_as(
+            Some(&caller(990, Some("lamp-skills.service"))),
+            Some(990),
+            "lamp-seen.service"
+        ));
+        assert!(!is_unit_as(
+            Some(&caller(1000, seen)),
+            Some(990),
+            "lamp-seen.service"
+        ));
+        assert!(!is_unit_as(
+            Some(&caller(990, None)),
+            Some(990),
+            "lamp-seen.service"
+        ));
+        assert!(!is_unit_as(
+            Some(&caller(990, seen)),
+            None,
+            "lamp-seen.service"
+        ));
+        assert!(!is_unit_as(None, Some(990), "lamp-seen.service"));
+    }
 
     /// The unit from either hierarchy's line, a service's own sub-cgroup
     /// included; none outside a service.

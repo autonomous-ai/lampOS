@@ -18,6 +18,7 @@ from __future__ import annotations
 import array
 import asyncio
 import base64
+import contextlib
 import datetime
 import hashlib
 import io
@@ -26,6 +27,7 @@ import json
 import math
 import os
 import random
+import shutil
 import ssl
 import sys
 import tempfile
@@ -39,12 +41,12 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, generate_private_key
 from cryptography.x509.oid import NameOID
-from websockets.asyncio.server import ServerConnection, serve
+from websockets.asyncio.server import ServerConnection, serve, unix_serve
 from websockets.exceptions import ConnectionClosed
 
 from . import schema
 from .keys import HELLO, b64, pin_of, proof, unb64
-from .moves import move_refusal
+from .moves import MOVE_FARTHEST, SKILL_FARTHEST, move_refusal, move_why
 
 # The fake's camera picture: the smallest whole JPEG (start and end markers).
 FAKE_JPEG = bytes([0xFF, 0xD8, 0xFF, 0xD9])
@@ -57,6 +59,16 @@ AUDIO_EVERY_S = 0.02
 # Why lamp-control refuses or ends a microphone stream with more than one
 # person in view (microphone.rs `SOMEONE_ELSE`).
 SOMEONE_ELSE = "someone else is here"
+
+# The fake's speaker, as lamp-control's speaker.rs takes it: mono S16LE at 16
+# kHz (the default) or 24 kHz, each binary frame at most 9,600 bytes of
+# samples; the voice buffers 300 ms, and frames of 10 to 100 ms are asked of a
+# program. Its words, as that file has them.
+SPEAKER_RATES = (16_000, 24_000)
+SPEAKER_FRAME_MAX = 9_600
+SPEAKER_BUFFER_MS = 300
+SPEAKER_PRIVATE = "the lamp is private"
+SPEAKER_MUTED = "the lamp is muted"
 
 
 def tone_block(sequence: int, hz: float = 440.0, level: int = 1000) -> bytes:
@@ -95,11 +107,15 @@ def _certificate() -> tuple[bytes, bytes]:
     return cert.public_bytes(serialization.Encoding.PEM), pem_key
 
 
-# `look`'s targets lamp-control doesn't route yet, in parts.rs's words.
+# `look`'s targets lamp-control doesn't route, in parts.rs's words: `name`
+# (the lamp has no sound direction). A lamp-control before the face look
+# (stable 11091 and older) refuses `face` too: `face_look=False`.
 LOOK_WAITS = {
-    "face": "not in this release: look at a face or a name",
-    "name": "not in this release: look at a face or a name",
+    "name": "not in this release: look at who said the lamp's name (the lamp has no sound direction)",
 }
+LOOK_FACE_OLD = "not in this release: look at a face or a name"
+# What the body says when it has no face to turn to.
+NO_FACE_IN_VIEW = "no face in view"
 
 # What lamp-control refuses today, in its own words (crates/control/src/
 # parts.rs, `waits_for`): pass it as `refuses=` for a fake that answers as a
@@ -166,6 +182,14 @@ LIMITS = {
         "parts_max": 64,
         "clips_max": 64,
         "store_max_bytes": 20_000_000,
+    },
+    "notes": {
+        "key_max_bytes": 64,
+        "value_max_bytes": 16_384,
+        "keys_max": 256,
+        "bytes_max": 262_144,
+        "writes": [{"most": 30, "within_ms": 60_000}],
+        "reads": [{"most": 120, "within_ms": 60_000}],
     },
     "ring": {"pixels": 32},
     "quiet_hours": "off",
@@ -341,6 +365,106 @@ def hand_events(track: list[dict]) -> list[tuple[int, dict]]:
     return events
 
 
+# lamp-control's `light` limits (protocol.rs, msgs' arbitration.rs): a ring
+# light's fade, how long it is held, the ring's pixels, the colour levels.
+LIGHT_FADE_MS = (1_000, 60_000)
+LIGHT_FOR_MS = (1, 30_000)
+LIGHT_LEVELS = (1, 5)
+RING_PIXELS = 32
+
+
+def _hex_rgb(text: Any) -> bool:
+    return (
+        isinstance(text, str)
+        and len(text) == 7
+        and text[0] == "#"
+        and all(c in "0123456789abcdefABCDEF" for c in text[1:])
+    )
+
+
+# lamp_msgs::Light::TINTS: the ten colours' tints, to name the light nearest a computer's own pixels.
+_TINTS = (
+    ("yellow", (1.0, 0.80, 0.0)),
+    ("red", (1.0, 0.0, 0.0)),
+    ("green", (0.0, 1.0, 0.12)),
+    ("blue", (0.0, 0.22, 1.0)),
+    ("cyan", (0.0, 0.90, 1.0)),
+    ("purple", (0.62, 0.0, 1.0)),
+    ("orange", (1.0, 0.34, 0.0)),
+    ("pink", (1.0, 0.22, 0.42)),
+    ("white", (1.0, 0.88, 0.72)),
+    ("warm", (1.0, 0.55, 0.0)),
+)
+
+
+def _rgb(text: str) -> tuple[int, int, int]:
+    return int(text[1:3], 16), int(text[3:5], 16), int(text[5:7], 16)
+
+
+def _drawn_pixels(given: list[str], brightness: int | None) -> list[tuple[int, int, int]]:
+    """Each pixel at `brightness` (0 to 100, 100 when none), as lamp-control asks the
+    ring for them (parts.rs `own_light`): the channel times the share, rounded."""
+    share = (100 if brightness is None else min(brightness, 100)) / 100
+    return [tuple(int(channel * share + 0.5) for channel in _rgb(pixel)) for pixel in given]
+
+
+def _nearest_light(pixels: list[tuple[int, int, int]]) -> dict:
+    """The named light nearest a computer's own pixels (parts.rs `nearest_light`):
+    the tint of the mean of the lit ones, at the brightest channel's level."""
+    brightest = max((max(pixel) for pixel in pixels), default=0)
+    if brightest == 0:
+        return {"on": False, "colour": "warm", "level": 1}
+    lit = [pixel for pixel in pixels if any(pixel)]
+    mean = [sum(pixel[at] for pixel in lit) / len(lit) for at in range(3)]
+    top = max(max(mean), 1.0)
+    tint = [channel / top for channel in mean]
+    colour = min(_TINTS, key=lambda named: sum((named[1][at] - tint[at]) ** 2 for at in range(3)))[0]
+    level = min(max(int(brightest / 255 * 5 + 0.5), 1), 5)
+    return {"on": True, "colour": colour, "level": level}
+
+
+def light_refusal(request: dict) -> str | None:
+    """lamp-control's refusal of a computer's `light` (protocol.rs), in its
+    words, as `bad_request`, in its order; None for one it takes. Only for a
+    light it parses (whole numbers where it wants them): anything else is the
+    schema's to refuse."""
+    for field in ("level", "brightness", "fade_ms", "for_ms"):
+        value = request.get(field)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
+            return None
+    colour, rgb, pixels = request.get("colour"), request.get("rgb"), request.get("pixels")
+    if sum(given is not None for given in (colour, rgb, pixels)) != 1:
+        return "one of colour, rgb or pixels"
+    if colour is not None:
+        if colour not in schema.colours():
+            return f"colour: one of {', '.join(schema.colours())}"
+        level = request.get("level")
+        if level is None or not LIGHT_LEVELS[0] <= level <= LIGHT_LEVELS[1]:
+            return f"level: from {LIGHT_LEVELS[0]} to {LIGHT_LEVELS[1]}, with colour"
+        if request.get("brightness") is not None:
+            return "brightness goes with rgb or pixels; colour has level"
+    else:
+        if request.get("level") is not None or request.get("pattern") is not None:
+            return "level and pattern go with colour"
+        brightness = request.get("brightness")
+        if brightness is not None and not 0 <= brightness <= 100:
+            return "brightness: from 0 to 100"
+    if rgb is not None and not _hex_rgb(rgb):
+        return "rgb: #rrggbb"
+    if pixels is not None:
+        if not isinstance(pixels, list) or len(pixels) != RING_PIXELS:
+            return f"pixels: {RING_PIXELS} of them, one per pixel of the ring"
+        if not all(_hex_rgb(pixel) for pixel in pixels):
+            return "pixels: each #rrggbb"
+    fade = request.get("fade_ms")
+    if fade is not None and not LIGHT_FADE_MS[0] <= fade <= LIGHT_FADE_MS[1]:
+        return f"fade_ms: from {LIGHT_FADE_MS[0]} to {LIGHT_FADE_MS[1]}"
+    for_ms = request.get("for_ms")
+    if for_ms is not None and not LIGHT_FOR_MS[0] <= for_ms <= LIGHT_FOR_MS[1]:
+        return f"for_ms: from {LIGHT_FOR_MS[0]} to {LIGHT_FOR_MS[1]}"
+    return None
+
+
 def _whole(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
@@ -365,6 +489,54 @@ AIR = {"pm1_0": 2.1, "pm2_5": 5.3, "pm4_0": 6.8, "pm10": 7.9, "co2_ppm": 620, "h
 DEVICE = {"cpu_load": 0.25, "memory_used": 0.4, "disk_free": 0.6, "uptime_s": 3600,
           "temperature_c": {"cpu_thermal": 55.0}, "known": True}
 
+def _not_granted(missing: list[str]) -> str:
+    """What the lamp says for a missing grant (lamp-control's `not_granted`): for `camera` and `microphone` it
+    says the way out."""
+    said = f"not granted: {', '.join(missing)}"
+    if any(g in ("camera", "microphone") for g in missing):
+        return f"{said} (only the owner can add it: with a new pairing code that names it, or by changing the grants of this computer)"
+    return said
+
+
+def _pushed_moves(tar, skill: str) -> tuple[dict, list[tuple[str, str]]]:
+    """The `moves/NAME.json` of a pushed package, as lamp-control keeps them
+    (`pushed_moves::found_in`): each held to a move's check, the ones that
+    fail left out with why, at most 64 by name."""
+    import re
+
+    kept: dict[str, dict] = {}
+    left: list[tuple[str, str]] = []
+    prefix = f"{skill}/moves/"
+    files = sorted(
+        (m for m in tar.getmembers() if m.isfile() and m.name.startswith(prefix) and m.name.endswith(".json")
+         and "/" not in m.name[len(prefix):-5]),
+        key=lambda m: m.name,
+    )
+    for member in files:
+        stem = member.name[len(prefix):-5]
+        if len(kept) >= 64:
+            left.append((stem, "more than 64 moves: the first 64 by name are kept"))
+        elif member.size > 256 * 1024:
+            left.append((stem, "more than 262144 bytes"))
+        elif not re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", stem):
+            left.append((stem, "a name of a letter then letters, digits, _ and -, at most 32"))
+        else:
+            try:
+                body = json.loads(tar.extractfile(member).read())
+                if not isinstance(body, dict) or set(body) != {"name", "step_ms", "frames"}:
+                    raise ValueError("a move is exactly name, step_ms and frames")
+            except ValueError as error:
+                left.append((stem, f"not a move: {error}"))
+                continue
+            if body["name"] != stem:
+                left.append((stem, f"the file is moves/{stem}.json but the move's name is {body['name']!r}"))
+            elif (why := move_why(body["step_ms"], body["frames"])) is not None:
+                left.append((stem, why))
+            else:
+                kept[stem] = {"step_ms": body["step_ms"], "frames": body["frames"]}
+    return kept, sorted(left)
+
+
 class FakeLamp:
     """A lamp that speaks the protocol on 127.0.0.1 and records what it's asked."""
 
@@ -374,26 +546,64 @@ class FakeLamp:
         self,
         *,
         code: str = "12345678",
-        grants: tuple[str, ...] = ("body", "light", "speak"),
+        grants: tuple[str, ...] | str = ("body", "light", "speak"),
         lamp_id: str = "lamp-fake",
         name: str = "Fake lamp",
+        language: str | None = "en",
         auto_done: bool = True,
         refuses: dict[str, str] | None = None,
         follows_hand: bool = True,
+        motion_done: bool = True,
+        face_look: bool = True,
+        face: dict[str, float] | None = None,
+        app_reach: bool = False,
+        local: bool = False,
     ):
+        # `local`: also serve lamp-control's control socket (a unix socket, `local_path`) for a skill's run,
+        # where a one-run token from `mint_token` is what lets a connection in (`Lamp.local`).
+        self.local = local
+        self.local_path: str | None = None
+        self._local_server = None
+        self._local_dir: tempfile.TemporaryDirectory | None = None
+        self._local_ws: set[int] = set()
+        self.tokens: dict[str, dict[str, Any]] = {}
         self.code = code
+        # True says `motion_done` in hello's limits and ends a gesture or a
+        # move with a `done`, as lamp-control reading the body's word does
+        # (#4209); False answers them as a lamp-control from before it:
+        # taken, and no `done` follows.
+        self.motion_done = motion_done
+        # False holds a move to the caps every shipped lamp has (the yaw of
+        # --reach 250 at most); True is a lamp started with LAMP_BODY_APP_REACH,
+        # which takes a move to 90% of its hardware (the ceiling here).
+        self.app_reach = app_reach
         # Ops refused `refused` with this why, as a lamp that doesn't route
         # them yet does (LAMP_CONTROL_REFUSES); none by default.
         self.refuses = dict(refuses or {})
         # False answers a look at `hand` as a lamp-control from before #4183
         # does: taken, with no `follow`, and nothing follows it.
         self.follows_hand = follows_hand
-        # gesture, move and play end with `done` at once; False leaves it to
-        # the test (`done`).
+        # False answers a look at `face` as a lamp-control before it does
+        # (refused, LOOK_FACE_OLD). `face` is where a face is from the head,
+        # `{"yaw": .., "pitch": ..}` in degrees: a look at it is one turn
+        # there; none, and the look is dropped, "no face in view".
+        self.face_look = face_look
+        self.face = face
+        # gesture, move (with motion_done) and play end with `done` at once;
+        # False leaves it to the test (`done`).
         self.auto_done = auto_done
         self._asker: dict[int, ServerConnection] = {}
-        self.grants = list(grants)
+        # "all": every grant the protocol names, as `lamp fake` pairs with. The
+        # default stays narrow, as a real pairing the owner chose is.
+        if isinstance(grants, str) and grants != "all":
+            # A bare string would be split into letters: grants="hear" is a slip.
+            raise ValueError(f'grants is "all" or a list of grant names, not {grants!r}')
+        self.grants = list(schema.grants()) if grants == "all" else list(grants)
         self.lamp = {"id": lamp_id, "name": name, "v": schema.VERSION}
+        # The owner's language the lamp says in welcome and hello; None leaves
+        # it out, as a lamp from before it does.
+        if language is not None:
+            self.lamp["language"] = language
         self.host = "127.0.0.1"
         self.port = 0
         # The certificate's pin (full SHA-256), as the owner's app shows it,
@@ -409,15 +619,22 @@ class FakeLamp:
         # flight: as lamp-control's sounds.rs, without its loudness check.
         self.clips: dict[str, dict[str, bytes]] = defaultdict(dict)
         self._uploads: dict[str, dict] = {}
+        # Each computer's notes (`notes.set`), as lamp-control's notes.rs keeps
+        # them: its keys and values, held to the same caps, and gone with a
+        # `revoke`.
+        self.notes: dict[str, dict[str, Any]] = {}
         # The newest light a computer asked for, and until when (the fake's
         # `clock`): what the ring shows while it lasts (`light_state`).
-        self.shown: tuple[dict, float] | None = None
+        self.shown: tuple[dict, float, list[str] | None] | None = None
         # Each pulse the ring would play, and each it would drop as a second
         # within a minute from the same computer: (client, the light request).
         self.pulses_played: list[tuple[str, dict]] = []
         self.pulses_dropped: list[tuple[str, dict]] = []
         self._pulsed: dict[str, float] = {}
         self.clock = time.monotonic
+        # The picture `camera.snapshot` and a stream's frames carry: the
+        # smallest whole JPEG unless a test sets a real one (`fake.picture = jpeg`).
+        self.picture: bytes = FAKE_JPEG
         # Pushed skills by name, and the one push in flight on the lamp.
         self.pushed: dict[str, dict] = {}
         self._pushing: dict | None = None
@@ -456,8 +673,23 @@ class FakeLamp:
         # made-up ears' next block's `sequence`.
         self.listening: dict[int, asyncio.Task] = {}
         self.audio_sequence = 0
+        # The one speaker stream (`speaker.stream`) of this lamp, if running:
+        # its connection, computer, turn, rate and counters; the sound played
+        # by each computer; and how long a stream may go with no frame and
+        # how often it says its stats (the lamp's 2 s each; a test may
+        # shorten them).
+        self.speaker: dict[str, Any] | None = None
+        self.speaker_turns = 0
+        self.speaker_played: dict[str, bytearray] = defaultdict(bytearray)
+        self.speaker_played_all = bytearray()
+        # Each accepted frame's (sequence, sample bytes), in order.
+        self.speaker_frames: list[tuple[Any, int]] = []
+        self.speaker_idle_after = 2.0
+        self.speaker_stats_every = 2.0
         self._next_lease = 1
         self._server = None
+        self._connected: list = []
+        self._folders: list[str] = []
         self._validator = (
             jsonschema.Draft202012Validator({**schema.schema(), "oneOf": [{"$ref": "#/$defs/request"}]})
             if jsonschema
@@ -478,11 +710,51 @@ class FakeLamp:
             context.load_cert_chain(cert_path, key_path)
         self._server = await serve(self._serve, self.host, 0, ssl=context)
         self.port = self._server.sockets[0].getsockname()[1]
+        if self.local:
+            self._local_dir = tempfile.TemporaryDirectory()
+            self.local_path = os.path.join(self._local_dir.name, "control.sock")
+            self._local_server = await unix_serve(self._serve_local, self.local_path)
         return self
 
     async def __aexit__(self, *_exc) -> None:
+        for lamp in self._connected:
+            # A test may have dropped or closed it already (a lease held on a dead
+            # socket): that must not mask the test's own result.
+            with contextlib.suppress(Exception):
+                await lamp.close()
+        self._connected.clear()
         self._server.close()
         await self._server.wait_closed()
+        if self._local_server is not None:
+            self._local_server.close()
+            await self._local_server.wait_closed()
+            self._local_dir.cleanup()
+        for folder in self._folders:
+            shutil.rmtree(folder, ignore_errors=True)
+        self._folders.clear()
+
+    async def connect(self, *, name: str | None = None) -> Any:
+        """A `Lamp` paired with this fake and connected, for a test of your own
+        program: no code, pin or keyring to set up. Its keyring is a folder of its
+        own (removed on exit, your `LAMPOS_HOME` untouched), and it is closed when
+        the fake is. Call it again for a second computer.
+
+            async with FakeLamp() as fake:
+                lamp = await fake.connect()
+                await lamp.say("hello")
+                assert fake.asked("say") == [{"text": "hello"}]
+        """
+        from .client import Lamp
+        from .keys import Keyring
+
+        name = name or f"test app {len(self._connected) + 1}"  # each computer has its own name
+        folder = tempfile.mkdtemp(prefix="lampos-fake-")
+        self._folders.append(folder)
+        ring = Keyring(folder)
+        await Lamp.pair(self.code, self.host, pin=self.pin, port=self.port, name=name, keyring=ring)
+        lamp = await Lamp.connect(keyring=ring)
+        self._connected.append(lamp)
+        return lamp
 
     # What a test asks of it.
 
@@ -523,11 +795,21 @@ class FakeLamp:
         before, self.state["volume"] = self.state["volume"], now
         if before != now:
             await self.emit("volume.changed", **now)
+        if now["muted"]:
+            await self.end_speaker(SPEAKER_MUTED)
 
-    def _show(self, request: dict) -> None:
-        """The ring shows a computer's light while it lasts."""
-        light = {"on": True, "colour": request["colour"], "level": request["level"]}
-        self.shown = (light, self.clock() + request["for_ms"] / 1000)
+    def _show(self, request: dict, pixels: list[str] | None = None) -> None:
+        """The ring shows a computer's light while it lasts; with `pixels`, a
+        computer's own colours (each `#rrggbb`, as asked of the ring): the nearest
+        named light beside them, and `shows.pixels` while it lasts (docs/control.md)."""
+        if pixels is None:
+            light = {"on": True, "colour": request["colour"], "level": request["level"]}
+        else:
+            drawn = _drawn_pixels(pixels, request.get("brightness"))
+            light = _nearest_light(drawn)
+            self.shown_pixels = pixels
+            pixels = ["#{:02x}{:02x}{:02x}".format(*pixel) for pixel in drawn]
+        self.shown = (light, self.clock() + request.get("for_ms", 30_000) / 1000, pixels)
 
     def light_state(self) -> dict:
         """`get`'s light, as lamp-control answers it (Nine's light/drawn): the
@@ -540,6 +822,8 @@ class FakeLamp:
         own = dict(self.state.get("light") or {})
         if self.shown is not None and self.shown[1] > self.clock():
             own["shows"] = dict(self.shown[0])
+            if self.shown[2] is not None:
+                own["shows"]["pixels"] = list(self.shown[2])
         elif any(key in own for key in ("on", "colour", "level")):
             own["shows"] = {key: own[key] for key in ("on", "colour", "level") if key in own}
         return own or None
@@ -581,6 +865,7 @@ class FakeLamp:
         self.state["lamp"]["private"] = private
         if private:
             await self._end_listening("the lamp is private")
+            await self.end_speaker(SPEAKER_PRIVATE)
 
     async def set_in_view(self, count: int) -> None:
         """How many people are in view (`presence`'s `count`): above one,
@@ -590,6 +875,122 @@ class FakeLamp:
         self.state["presence"]["count"] = count
         if count > 1:
             await self._end_listening(SOMEONE_ELSE)
+
+    def played_samples(self, client: str | None = None) -> bytes:
+        """The sound the speaker played: the samples (mono S16LE, as sent)
+        of every accepted frame, of `client`'s (a computer's id, `c_...`) or, with none given, of all of them in the order
+        they came."""
+        if client is not None:
+            return bytes(self.speaker_played.get(client, b""))
+        return bytes(self.speaker_played_all)
+
+    def speaker_stray_total(self) -> int:
+        """How many binary messages the speaker dropped as stray, over the
+        stream that runs (what its next `speaker.stats` says)."""
+        return self.speaker["stray"] if self.speaker is not None else 0
+
+    async def end_speaker(self, why: str) -> None:
+        """The speaker stream ends at once with `speaker.ended` (`why`: the
+        lamp's words, `private`, `muted`, `idle`, `limit`, ...) to its
+        computer, as lamp-control's does; nothing if none runs."""
+        run, self.speaker = self.speaker, None
+        if run is None:
+            return
+        run["task"].cancel()
+        with contextlib.suppress(ConnectionClosed):
+            await run["ws"].send(json.dumps({"ev": "speaker.ended", "why": why, "turn": run["turn"]}))
+
+    async def _speaker_watch(self, run: dict) -> None:
+        """What lamp-control's run thread does for a stream: `speaker.stats`
+        every `speaker_stats_every`, and the end, `idle`, once no frame of
+        sound has come for `speaker_idle_after`."""
+        loop = asyncio.get_running_loop()
+        next_stats = loop.time() + self.speaker_stats_every
+        while True:
+            now = loop.time()
+            until = min(next_stats, run["last_frame"] + self.speaker_idle_after)
+            await asyncio.sleep(max(until - now, 0))
+            if self.speaker is not run:
+                return
+            now = loop.time()
+            if now >= run["last_frame"] + self.speaker_idle_after:
+                self.speaker = None
+                with contextlib.suppress(ConnectionClosed):
+                    await run["ws"].send(json.dumps({"ev": "speaker.ended", "why": "idle", "turn": run["turn"]}))
+                return
+            if now >= next_stats:
+                next_stats = now + self.speaker_stats_every
+                with contextlib.suppress(ConnectionClosed):
+                    await run["ws"].send(json.dumps({
+                        "ev": "speaker.stats", "turn": run["turn"], "buffered_ms": 0, "lost": 0,
+                        "underruns": 0, "limited": 0, "stray": run["stray"],
+                    }))
+
+    def _speaker_frame(self, ws: ServerConnection, client: str, message: bytes) -> None:
+        """A binary message, as lamp-control's `Speaker::frame`: dropped with
+        no answer unless a stream runs; another connection's, or one of a
+        size a stream doesn't take (empty, odd, over 9,600 bytes of samples,
+        or a header that isn't `speaker.audio`'s), is counted `stray`; only
+        real sound keeps the stream's idle clock going."""
+        run = self.speaker
+        if run is None:
+            return
+        if run["ws"] is not ws:
+            run["stray"] += 1
+            return
+        samples = b""
+        try:
+            length = int.from_bytes(message[:4], "big")
+            header = json.loads(message[4 : 4 + length])
+            if len(message) >= 4 + length and header.get("ev") == "speaker.audio":
+                samples = message[4 + length :]
+        except (ValueError, AttributeError):
+            pass
+        if not samples or len(samples) > SPEAKER_FRAME_MAX or len(samples) % 2:
+            run["stray"] += 1
+            return
+        run["last_frame"] = asyncio.get_running_loop().time()
+        self.speaker_frames.append((header.get("sequence"), len(samples)))
+        self.speaker_played[client].extend(samples)
+        self.speaker_played_all.extend(samples)
+
+    async def _speaker_stream(self, ws: ServerConnection, client: str, id_, request: dict) -> None:
+        """`speaker.stream`, as lamp-control's speaker.rs: off ends this
+        connection's own stream with no event; on again, from any computer,
+        replaces the one that runs (its connection is told `speaker.ended`,
+        `replaced`); never while the lamp is private or muted."""
+        run = self.speaker
+        if not request["on"]:
+            if run is not None and run["ws"] is ws:
+                self.speaker = None
+                run["task"].cancel()
+            await self._ok(ws, id_, stream="off")
+            return
+        if self.state["lamp"]["private"]:
+            await self._refuse(ws, id_, "private", SPEAKER_PRIVATE)
+            return
+        if self.state["volume"]["muted"]:
+            await self._refuse(ws, id_, "refused", SPEAKER_MUTED)
+            return
+        rate = request.get("sample_rate", 16_000)
+        if rate not in SPEAKER_RATES:
+            await self._refuse(ws, id_, "bad_request", "sample_rate: 16000 or 24000")
+            return
+        self.speaker_turns += 1
+        new: dict[str, Any] = {
+            "ws": ws, "client": client, "turn": self.speaker_turns, "rate": rate, "stray": 0,
+            "last_frame": asyncio.get_running_loop().time(),
+        }
+        self.speaker = new
+        if run is not None:
+            run["task"].cancel()
+            with contextlib.suppress(ConnectionClosed):
+                await run["ws"].send(json.dumps({"ev": "speaker.ended", "why": "replaced", "turn": run["turn"]}))
+        new["task"] = asyncio.ensure_future(self._speaker_watch(new))
+        await self._ok(
+            ws, id_, stream="on", sample_rate=rate, channels=1, format="s16le", frame_ms=[10, 100],
+            buffer_ms=SPEAKER_BUFFER_MS, source="speaker", turn=new["turn"],
+        )
 
     async def _end_listening(self, why: str) -> None:
         for key, task in list(self.listening.items()):
@@ -667,7 +1068,7 @@ class FakeLamp:
         for ws, re in mutes.values():
             await ws.send(json.dumps({"ev": "done", "re": re, "how": "cut_short", "why": "a hand on the head"}))
 
-    async def _look_done(self, ws: ServerConnection, id_: int, yaw: float, pitch: float) -> None:
+    async def _look_done(self, ws: ServerConnection, id_: int, yaw: float, pitch: float, drop: str | None = None) -> None:
         """A look the door takes (`{"to": "body"}`), and the body's answer as
         its `done`: there, or, while the computer's body lease is suspended (a
         conversation), dropped as the body says it (body_lease.rs `done_of`)."""
@@ -677,6 +1078,8 @@ class FakeLamp:
         suspended = any(h["ws"] is ws and "body" in h["parts"] and h.get("state") == "suspended" for h in self.leases.values())
         if suspended:
             await self._send_done(id_, {"how": "dropped", "why": "the body is not held"})
+        elif drop is not None:
+            await self._send_done(id_, {"how": "dropped", "why": drop})
         else:
             await self._send_done(id_, {"how": "finished", "yaw": yaw, "pitch": pitch, "clamped": False})
 
@@ -687,6 +1090,29 @@ class FakeLamp:
 
     # The protocol.
 
+    def mint_token(self, grants: tuple[str, ...] | list[str], run: str = "run-1", skill: str = "skill") -> str:
+        """A one-run token for `run` with exactly `grants`, as lamp-control mints one from the owner's yes for a
+        skill (`Lamp.local(token)` on `local_path`). One live token a run: a second mint replaces the first."""
+        for token in [t for t, held in self.tokens.items() if held["run"] == run]:
+            self.tokens.pop(token)
+        token = b64(os.urandom(32)).replace("+", "-").replace("/", "_").rstrip("=")
+        self.tokens[token] = {"grants": list(grants), "run": run, "skill": skill}
+        return token
+
+    async def end_run(self, run: str) -> None:
+        """The run ended: its token is no good and its connections close, saying why."""
+        for token in [t for t, held in self.tokens.items() if held["run"] == run]:
+            self.tokens.pop(token)
+        for ws in [ws for ws in list(self._connections) if self._client_of.get(id(ws), "").endswith(f"_{run}")]:
+            await ws.close(1000, "the run ended")
+
+    async def _serve_local(self, ws: ServerConnection) -> None:
+        self._local_ws.add(id(ws))
+        try:
+            await self._serve(ws)
+        finally:
+            self._local_ws.discard(id(ws))
+
     async def _serve(self, ws: ServerConnection) -> None:
         nonce = os.urandom(32)
         client: str | None = None
@@ -694,6 +1120,12 @@ class FakeLamp:
         try:
             await ws.send(json.dumps({"ev": "welcome", "at": _now(), "nonce": b64(nonce), "lamp": self.lamp}))
             async for text in ws:
+                if isinstance(text, bytes):
+                    # Binary: sound for the speaker, from a computer known.
+                    known = self._client_of.get(id(ws))
+                    if known is not None:
+                        self._speaker_frame(ws, known, text)
+                    continue
                 try:
                     request = json.loads(text)
                 except json.JSONDecodeError:
@@ -711,7 +1143,16 @@ class FakeLamp:
                     and _whole(request.get("step_ms"))
                     and _frames(request.get("frames"))
                 ):
-                    refusal = move_refusal(request["step_ms"], request["frames"])
+                    refusal = move_refusal(
+                        request["step_ms"], request["frames"], MOVE_FARTHEST if self.app_reach else SKILL_FARTHEST
+                    )
+                    if refusal is not None:
+                        await self._refuse(ws, id_, "bad_request", refusal)
+                        continue
+                # As lamp-control's protocol.rs for a light: its own limits, in its
+                # words, whether or not jsonschema is installed here.
+                if request.get("op") == "light" and id_ is not None:
+                    refusal = light_refusal(request)
                     if refusal is not None:
                         await self._refuse(ws, id_, "bad_request", refusal)
                         continue
@@ -727,6 +1168,9 @@ class FakeLamp:
                     await self._refuse(ws, id_, "bad_request", "frames: each frame is five whole counts")
                     continue
                 op = request.get("op")
+                if op == "pair" and id(ws) in self._local_ws:
+                    await self._refuse(ws, id_, "bad_request", "this socket is not for pairing: it is a skill run's")
+                    continue
                 if op == "pair":
                     await self._pair(ws, request, nonce)
                     continue
@@ -748,6 +1192,10 @@ class FakeLamp:
             if gone is not None and gone not in self._client_of.values():
                 self.mutes.pop(gone, None)
             self._stop_listening(ws)
+            # Its connection closed: its speaker stream ends, with no event.
+            if self.speaker is not None and self.speaker["ws"] is ws:
+                self.speaker["task"].cancel()
+                self.speaker = None
             for lease in [l for l, held in self.leases.items() if held["ws"] is ws]:
                 self.leases.pop(lease)
 
@@ -770,6 +1218,8 @@ class FakeLamp:
         await self._ok(ws, request["id"], client=client, grants=self.grants)
 
     async def _hello(self, ws, request: dict, nonce: bytes) -> str | None:
+        if id(ws) in self._local_ws or "token" in request:
+            return await self._hello_token(ws, request)
         paired = self.clients.get(request["client"])
         try:
             if paired is None:
@@ -779,8 +1229,32 @@ class FakeLamp:
             await self._refuse(ws, request["id"], "unpaired", "not paired, or a bad signature")
             await ws.close()
             return None
-        await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits=LIMITS)
+        limits = {**LIMITS, "motion_done": True} if self.motion_done else LIMITS
+        await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits=limits)
         return request["client"]
+
+    async def _hello_token(self, ws, request: dict) -> str | None:
+        """A hello on the control socket: a live one-run token and no key (client c_0, a zero signature)."""
+        if id(ws) not in self._local_ws:
+            # As lamp-control's other doors: a token is no part of hello there.
+            await self._refuse(ws, request["id"], "bad_request", "token: only on a skill run's socket")
+            return None
+        # The hello an SDK sends here, exactly: client c_0 and the zero signature beside the token. A real client's id or
+        # signature is refused, not ignored, as lamp-control does (bad_request).
+        if request.get("client") != "c_0" or request.get("sig") != base64.b64encode(bytes(64)).decode():
+            await self._refuse(ws, request["id"], "bad_request", "on this socket hello is client c_0, a zero sig and the token")
+            await ws.close()
+            return None
+        held = self.tokens.get(request.get("token", ""))
+        if held is None:
+            await self._refuse(ws, request["id"], "no_grant", "no token for this run")
+            await ws.close()
+            return None
+        client = f"t_{held['run']}"
+        self.clients[client] = {"key": b"", "name": f"skill (run {held['run']})", "grants": held["grants"]}
+        limits = {**LIMITS, "motion_done": True} if self.motion_done else LIMITS
+        await self._ok(ws, request["id"], lamp=self.lamp, grants=held["grants"], limits=limits, run=held["run"], skill=held["skill"])
+        return client
 
     # The grant each event and state needs, as lamp-control's own (#3736).
     EVENT_GRANT = {
@@ -789,6 +1263,8 @@ class FakeLamp:
         "phrase.heard": "hear", "name.heard": "hear", "sound.heard": "sound",
         "air.changed": "air",
         "volume.changed": "speak",
+        "body.state": "body",
+        "lamp.said": "speech",
     }
     STATE_GRANT = {"presence": "look", "air": "air", "device": "device", "volume": "speak", "body": "body"}
 
@@ -813,6 +1289,10 @@ class FakeLamp:
             "sound.upload": ["speak"],
             "sound.list": ["speak"],
             "sound.remove": ["speak"],
+            "notes.set": ["notes"],
+            "notes.get": ["notes"],
+            "notes.delete": ["notes"],
+            "notes.list": ["notes"],
             "skill.push": ["skills"],
             "skill.list": ["skills"],
             "skill.remove": ["skills"],
@@ -822,7 +1302,64 @@ class FakeLamp:
             "listen.set": ["hear"],
             "volume": ["speak"],
             "microphone.stream": ["microphone"],
+            "speaker.stream": ["speaker"],
         }.get(op, [])
+
+    def revoke(self, client: str) -> None:
+        """The owner lets `client` go, as lamp-control's revoke: its key, its
+        clips and its notes are gone."""
+        self.clients.pop(client, None)
+        self.clips.pop(client, None)
+        self.notes.pop(client, None)
+        # Its speaker stream ends with it, with no event (`end_of`).
+        if self.speaker is not None and self.speaker["client"] == client:
+            self.speaker["task"].cancel()
+            self.speaker = None
+
+    async def _notes(self, ws, client: str, request: dict) -> None:
+        """One `notes.*` op, as lamp-control's notes.rs answers it: this
+        computer's own keys only, the value at most 16384 bytes serialized, 256
+        keys and 262144 bytes of keys and values in all."""
+        id_, op = request["id"], request["op"]
+        room = self.notes.get(client, {})
+
+        def size(value: Any) -> int:
+            return len(json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode())
+
+        def held(keys: dict) -> int:
+            return sum(len(k.encode()) + size(v) for k, v in keys.items())
+
+        if op == "notes.set":
+            key, value = request["key"], request["value"]
+            bytes_ = size(value)
+            if bytes_ > 16_384:
+                await self._refuse(ws, id_, "bad_request", f"value: {bytes_} bytes, over the 16384 one note may take")
+                return
+            after = {**room, key: value}
+            if len(after) > 256 or held(after) > 262_144:
+                await self._refuse(
+                    ws, id_, "refused",
+                    f"this computer's notes are full: it keeps 256 keys at most and 262144 bytes in all (now {len(room)} keys, {held(room)} bytes)",
+                )
+                return
+            self.notes[client] = after
+            await self._ok(ws, id_, key=key, bytes=bytes_)
+        elif op == "notes.get":
+            if request["key"] in room:
+                await self._ok(ws, id_, key=request["key"], found=True, value=room[request["key"]])
+            else:
+                await self._ok(ws, id_, key=request["key"], found=False)
+        elif op == "notes.delete":
+            deleted = request["key"] in room
+            if deleted:
+                del room[request["key"]]
+            await self._ok(ws, id_, key=request["key"], deleted=deleted)
+        else:
+            prefix = request.get("prefix", "")
+            keys = [{"key": k, "bytes": size(v)} for k, v in sorted(room.items()) if k.startswith(prefix)]
+            await self._ok(
+                ws, id_, keys=keys, count=len(keys), total=len(room), bytes=held(room), keys_max=256, bytes_max=262_144
+            )
 
     async def _upload(self, ws, client: str, request: dict) -> None:
         """One `sound.upload` part, as lamp-control's sounds.rs gathers it:
@@ -890,6 +1427,7 @@ class FakeLamp:
         with tarfile.open(fileobj=io.BytesIO(data)) as tar:
             names = tar.getnames()
             manifest = json.loads(tar.extractfile("lamp-skill.json").read())
+            moves, left_out = _pushed_moves(tar, manifest["name"])
         if names[0] != "lamp-skill.json" or manifest["name"] != request["name"]:
             await self._refuse(ws, id_, "refused", "not a package of that skill")
             return
@@ -914,15 +1452,21 @@ class FakeLamp:
             "pushed_at_unix_ms": int(at.timestamp() * 1000),
             "author": None,
             "client": client,
+            # The moves of its `moves/` kept for `play` (lamp-control's
+            # `pushed_moves`): this fake's, never listed.
+            "moves": moves,
         }
-        await self._ok(ws, id_, skill={**skill, "asks": [], "shown": []})
+        await self._ok(
+            ws, id_, skill={**skill, "asks": [], "shown": []},
+            moves={"kept": sorted(moves), "left_out": [{"name": n, "why": w} for n, w in left_out]},
+        )
 
     async def _op(self, ws, client: str, request: dict) -> None:
         op, id_ = request["op"], request["id"]
         grants = self.clients[client]["grants"]
         missing = [g for g in self._needs(op, request) if g not in grants]
         if missing:
-            await self._refuse(ws, id_, "no_grant", f"needs {missing[0]}")
+            await self._refuse(ws, id_, "no_grant", _not_granted(missing))
             return
         if self._refusals[op]:
             code, why, retry_ms = self._refusals[op].pop(0)
@@ -932,6 +1476,20 @@ class FakeLamp:
             held = [l for l, h in self.leases.items() if h["ws"] is ws and "body" in h["parts"]]
             if not held or (op == "joints" and request["lease"] not in held):
                 await self._refuse(ws, id_, "no_lease", "take a body lease first")
+                return
+            # A lease a conversation suspended is still this computer's: the
+            # door refuses the op as the suspension it is (session.rs), and
+            # only a body op taken before the suspension is dropped by the
+            # body, in its `done` (`fake.done(re, "dropped", ...)`).
+            if all(self.leases[l].get("state") == "suspended" for l in held):
+                await self._refuse(
+                    ws,
+                    id_,
+                    "busy",
+                    "suspended while someone talks to the lamp"
+                    if op == "joints"
+                    else "your lease on the body is suspended while someone talks to the lamp: it is yours again when they stop",
+                )
                 return
         if op in self.refuses:
             await self._refuse(ws, id_, "refused", self.refuses[op])
@@ -970,11 +1528,45 @@ class FakeLamp:
             # and its microphone stream, with no event.
             self.stop_following(ws)
             self._stop_listening(ws)
+            # `stop` ends this connection's speaker stream too, with no event.
+            if self.speaker is not None and self.speaker["ws"] is ws:
+                self.speaker["task"].cancel()
+                self.speaker = None
             await self._ok(ws, id_)
-        elif op in ("gesture", "move"):
-            # As lamp-control routes them: the body takes them, and no
-            # `done` follows.
+        elif op == "play":
+            # As lamp-control: one of this computer's pushed skills' moves,
+            # sent as a `move` is (the body takes it; with motion_done a `done` follows).
+            name, skill = request["name"], request.get("skill")
+            mine = {n: s.get("moves", {}) for n, s in sorted(self.pushed.items()) if s["client"] == client}
+            if skill is not None:
+                if not mine.get(skill):
+                    why = f"no skill {skill} of yours has recorded moves"
+                elif name not in mine[skill]:
+                    why = f"no move {name} in your skill {skill}"
+                else:
+                    why = None
+            else:
+                have = [n for n, moves in mine.items() if name in moves]
+                why = (
+                    f"no move {name} in your pushed skills: skill.push one with moves/{name}.json" if not have
+                    else f"the move {name} is in more than one of your skills ({', '.join(have)}): say which with skill"
+                    if len(have) > 1 else None
+                )
+            if why:
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "refused", why)
+                return
             await self._ok(ws, id_, to="body")
+            # Sent as a move: with motion_done its `done` follows.
+            if self.motion_done and self.auto_done:
+                await self.done(id_)
+        elif op in ("gesture", "move"):
+            # As lamp-control routes them: the body takes them; with
+            # motion_done a `done` follows once the body says it ended
+            # (`finished`, or `dropped`/`cut_short` with the body's why).
+            await self._ok(ws, id_, to="body")
+            if self.motion_done and self.auto_done:
+                await self.done(id_)
         elif op == "light" and ("pixels" in request or "rgb" in request):
             # A computer's own colours (the ring, pixel by pixel), as
             # lamp-control's parts.rs: to the ring, each pixel at the brightness.
@@ -983,7 +1575,7 @@ class FakeLamp:
                 self.requests.remove(request)
                 await self._refuse(ws, id_, "bad_request", "pixels: 32 of them, one per pixel of the ring")
                 return
-            self.shown_pixels = given
+            self._show(request, list(given))
             await self._ok(ws, id_, to="ring", pixels=len(given))
         elif op == "light":
             # As lamp-control's parts.rs: the pattern checked first, then to the
@@ -1007,19 +1599,28 @@ class FakeLamp:
             await self._ok(ws, id_, to="ring")
         elif op == "express":
             # As lamp-control's feelings.rs: the feelings skill's three, its
-            # move to the body (smaller below strength 0.5) and its light; no
-            # `done` follows. The fake always shows the light.
+            # move to the body (smaller below strength 0.5) and its light; with
+            # motion_done its move's `done` follows (none when no move was
+            # sent). The fake always shows the light.
             if request["feeling"] not in FEELING_MOVES:
                 await self._refuse(ws, id_, "bad_request", "feeling: one of glad, lively, low")
                 return
-            await self._ok(ws, id_, to="body", move=_feeling_move(request), light=True)
+            move = _feeling_move(request)
+            await self._ok(ws, id_, to="body", move=move, light=True)
+            if move is not None and self.motion_done and self.auto_done:
+                await self.done(id_)
         elif op == "look":
-            # As lamp-control with --lease-socket (parts.rs `look`): `face`
-            # and `name` aren't routed; `hand` is followed until a stop,
-            # another look or the lease ends, so no `done` follows it; the
-            # body takes the rest, and its `done` says where the head got to.
+            # As lamp-control with --lease-socket (parts.rs `look`): `name`
+            # isn't routed (nor `face`, with `face_look=False`); `hand` is
+            # followed until a stop, another look or the lease ends, so no
+            # `done` follows it; the body takes the rest, and its `done` says
+            # where the head got to. A `face` is one turn toward `self.face`,
+            # or dropped, "no face in view", when none is set.
             if isinstance(request["at"], str) and request["at"] in LOOK_WAITS:
                 await self._refuse(ws, id_, "refused", LOOK_WAITS[request["at"]])
+                return
+            if request["at"] == "face" and not self.face_look:
+                await self._refuse(ws, id_, "refused", LOOK_FACE_OLD)
                 return
             # Another look ends a following. At `hand`, the body follows the
             # hand, waiting while it's gone; `follows_hand=False` is a
@@ -1033,6 +1634,12 @@ class FakeLamp:
                 lease = next(l for l, h in self.leases.items() if h["ws"] is ws and "body" in h["parts"])
                 self.following[id(ws)] = (ws, lease)
                 await self._ok(ws, id_, to="body", follow="hand")
+                return
+            if request["at"] == "face":
+                if self.face is None:
+                    await self._look_done(ws, id_, 0.0, 0.0, drop=NO_FACE_IN_VIEW)
+                else:
+                    await self._look_done(ws, id_, self.face["yaw"], self.face["pitch"])
                 return
             at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
             await self._look_done(ws, id_, at["yaw"], at["pitch"])
@@ -1079,7 +1686,7 @@ class FakeLamp:
         elif op == "skill.push":
             await self._push(ws, client, id_, request)
         elif op == "skill.list":
-            await self._ok(ws, id_, skills=[{k: v for k, v in s.items() if k != "client"} for s in self.pushed.values() if s["client"] == client])
+            await self._ok(ws, id_, skills=[{k: v for k, v in s.items() if k not in ("client", "moves")} for s in self.pushed.values() if s["client"] == client])
         elif op == "skill.remove":
             kept = self.pushed.get(request["name"])
             if not kept or kept["client"] != client:
@@ -1087,6 +1694,8 @@ class FakeLamp:
                 return
             del self.pushed[request["name"]]
             await self._ok(ws, id_)
+        elif op.startswith("notes."):
+            await self._notes(ws, client, request)
         elif op == "sound.upload":
             await self._upload(ws, client, request)
         elif op == "sound.list":
@@ -1110,12 +1719,12 @@ class FakeLamp:
                 await self.done(id_)
         elif op == "camera.snapshot":
             # A picture with no camera behind it: the smallest whole JPEG.
-            await self._ok(ws, id_, jpeg=base64.b64encode(FAKE_JPEG).decode(), bytes=len(FAKE_JPEG), age_ms=0)
+            await self._ok(ws, id_, jpeg=base64.b64encode(self.picture).decode(), bytes=len(self.picture), age_ms=0)
         elif op == "camera.stream":
             if request["on"]:
                 fps = request.get("fps", 2)
                 await self._ok(ws, id_, stream="on", fps=fps, fps_now=None)
-                frame = {"ev": "camera.frame", "jpeg": base64.b64encode(FAKE_JPEG).decode(), "bytes": len(FAKE_JPEG), "age_ms": 0, "fps_now": None}
+                frame = {"ev": "camera.frame", "jpeg": base64.b64encode(self.picture).decode(), "bytes": len(self.picture), "age_ms": 0, "fps_now": None}
                 await ws.send(json.dumps(frame))
             else:
                 await self._ok(ws, id_, stream="off")
@@ -1158,6 +1767,8 @@ class FakeLamp:
                     block_ms=int(AUDIO_EVERY_S * 1000), source="mic1",
                 )
                 self.listening[id(ws)] = asyncio.ensure_future(self._listen(ws))
+        elif op == "speaker.stream":
+            await self._speaker_stream(ws, client, id_, request)
         else:
             await self._ok(ws, id_)
             if op == "play" and self.auto_done:

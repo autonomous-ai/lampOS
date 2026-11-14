@@ -105,6 +105,18 @@ def test_pairing_keeps_the_key_private_and_the_lamp_pinned(tmp_path):
     assert "12345678" not in (tmp_path / "lamps.json").read_text()
 
 
+def test_the_lamps_language_comes_from_hello_and_is_english_when_it_says_none(tmp_path):
+    async def go():
+        for said, shown in (("en", "en"), ("vi", "vi"), ("ko", "ko"), (None, "en"), ("klingon", "en")):
+            async with FakeLamp(language=said) as fake:
+                ring = await paired(fake, tmp_path / f"{said}")
+                async with await Lamp.connect(keyring=ring) as lamp:
+                    assert lamp.language == shown, said
+                    assert lamp.info.get("language") == said, said
+
+    run(go())
+
+
 def test_a_wrong_code_is_refused_and_nothing_is_kept(tmp_path):
     async def go():
         async with FakeLamp() as fake:
@@ -156,8 +168,10 @@ def test_the_debug_log_redacts_what_would_pair_or_hello_as_this_computer():
     assert shown["lamp"] == {"id": "lamp-1", "fp": "<redacted>"}
     assert shown["skills"] == [{"sig": "<redacted>"}, {"pin": "<redacted>"}]
     # Fails closed: a field nobody decided (a newer lamp's) is hidden, at any depth.
-    unknown = debug.redact({"ev": "lamp.changed", "token": "t0ps3cret", "lamp": {"id": "lamp-1", "badge": "b4dge"}})
-    assert unknown == {"ev": "lamp.changed", "token": "<not shown>", "lamp": {"id": "lamp-1", "badge": "<not shown>"}}
+    unknown = debug.redact({"ev": "lamp.changed", "ticket": "t0ps3cret", "lamp": {"id": "lamp-1", "badge": "b4dge"}})
+    assert unknown == {"ev": "lamp.changed", "ticket": "<not shown>", "lamp": {"id": "lamp-1", "badge": "<not shown>"}}
+    # A control-socket hello's one-run token is a secret too.
+    assert debug.redact({"op": "hello", "token": "T" * 43})["token"] == "<redacted>"
     # What a lamp sends beyond the schema's own fields is decided too.
     for sample in ({"re": 3, "ok": True, "to": "body", "move": "glad-lift", "light": True},
                   {"re": 1, "ok": True, "limits": {"rates": "off", "refused": [{"most": 20, "within_ms": 1_000}], "phrases": [{"most": 6, "within_ms": 60_000}]}},
@@ -291,6 +305,37 @@ def test_request_tells_its_id_before_sending_so_an_early_done_can_be_matched(tmp
     run(go())
 
 
+def test_a_name_that_is_no_event_says_which_event_it_meant(tmp_path):
+    """`lease.ended` is the event `lease` (state `lost`), the end of a look is
+    `done`; `lease` and `done` come with no subscription (blue's desk-app log)."""
+
+    async def go():
+        async with FakeLamp(grants=("body",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(LampError) as lost:
+                    lamp.on("lease.ended", lambda event: None)
+                assert lost.value.code == "bad_request"
+                assert "no event 'lease.ended'" in str(lost.value)
+                assert "lamp.on('lease', handler)" in str(lost.value)
+                assert "lost" in str(lost.value)
+                with pytest.raises(LampError) as end:
+                    lamp.on("done.finished", lambda event: None)
+                assert "lamp.on('done', handler)" in str(end.value)
+                with pytest.raises(LampError) as other:
+                    lamp.on("camera.zoomed", lambda event: None)
+                assert "person.arrived" in str(other.value) and "'lease' or 'done'" in str(other.value)
+                # `on` also takes the streams' events: its list is all it accepts.
+                assert "camera.frame" in str(other.value) and "microphone.audio" in str(other.value)
+                # Not a subscription: `lease` and `done` are sent without one.
+                with pytest.raises(LampError) as sub:
+                    await lamp.subscribe(["lease"])
+                assert "without subscribing" in str(sub.value)
+                assert fake.asked("subscribe") == []
+
+    asyncio.run(go())
+
+
 def test_greet_a_person_who_arrives(tmp_path):
     async def go():
         async with FakeLamp(grants=("body", "look")) as fake:
@@ -352,6 +397,26 @@ def test_keep_connected_carries_a_program_across_the_lamps_restart(tmp_path):
     run(go())
 
 
+def test_the_fake_refuses_a_body_state_subscription_without_the_body_grant_as_the_lamp_does(tmp_path):
+    """lamp-control's `EventKind::needs` gives `body.state` the body grant; the fake's table lacked it, so a program paired
+    for speech alone could subscribe to it here and meet the refusal only on a lamp (the try-it run on lamp-75c9, 13 Nov;
+    the JS fake got it in #6779)."""
+
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path / "a")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(LampError) as refused:
+                    await lamp.on("body.state", print)
+                assert refused.value.code == "no_grant" and "body" in str(refused.value)
+        async with FakeLamp(grants=("light", "body")) as fake:
+            ring = await paired(fake, tmp_path / "b")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                await lamp.on("body.state", print)
+
+    run(go())
+
+
 def test_keep_connected_stops_on_what_connecting_again_cant_mend(tmp_path):
     """No pairing, and an error in the program's own setup, end it at once;
     it doesn't retry them."""
@@ -391,6 +456,59 @@ def test_phrases_go_with_their_subscription_and_events_carry_only_the_phrase(tmp
                 assert fake.asked("subscribe") == [{"events": ["phrase.heard"], "phrases": ["good night lamp"]}]
                 await fake.emit("phrase.heard", phrase="good night lamp")
                 assert (await heard.get())["phrase"] == "good night lamp"
+
+    run(go())
+
+
+def test_a_phrase_handler_hears_only_its_own_phrases_and_one_with_none_hears_all(tmp_path):
+    """The study-buddy friction log, 10 Nov: two handlers with their own phrases both fired on every phrase."""
+
+    async def go():
+        async with FakeLamp(grants=("body", "light", "speak", "hear")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                started, finished, any_phrase = [], [], []
+                start = lambda event: started.append(event["phrase"])  # noqa: E731
+
+                async def finish(event):  # a coroutine handler is filtered the same way
+                    finished.append(event["phrase"])
+
+                lamp.on("phrase.heard", start, phrases=["start studying"])
+                lamp.on("phrase.heard", finish, phrases=["all done here"])
+                lamp.on("phrase.heard", lambda event: any_phrase.append(event["phrase"]))
+                while len(fake.asked("subscribe")) < 3:
+                    await asyncio.sleep(0.01)
+                await fake.emit("phrase.heard", phrase="start studying")
+                await fake.emit("phrase.heard", phrase="All Done Here")  # the case the lamp says is not the handler's business
+                await asyncio.sleep(0.2)
+                assert started == ["start studying"]
+                assert finished == ["All Done Here"]
+                assert any_phrase == ["start studying", "All Done Here"]
+                # off() takes a filtered handler off by the handler itself.
+                lamp.off("phrase.heard", start)
+                await fake.emit("phrase.heard", phrase="start studying")
+                await asyncio.sleep(0.2)
+                assert started == ["start studying"]
+
+    run(go())
+
+
+def test_phrases_compare_lowercased_as_the_lamp_and_the_js_sdk_do_not_case_folded(tmp_path):
+    """lamp-control lowercases (`str::to_lowercase`); `casefold()` would turn "Straße" into "strasse" and the JS SDK's
+    `toLowerCase()` would not: one rule everywhere."""
+
+    async def go():
+        async with FakeLamp(grants=("body", "light", "speak", "hear")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                heard = []
+                lamp.on("phrase.heard", lambda event: heard.append(event["phrase"]), phrases=["Große Straße"])
+                while not fake.asked("subscribe"):
+                    await asyncio.sleep(0.01)
+                await fake.emit("phrase.heard", phrase="große straße")  # what the lamp says: lowercased
+                await fake.emit("phrase.heard", phrase="GROSSE STRASSE")  # not the same lowercase: not this handler's
+                await asyncio.sleep(0.2)
+                assert heard == ["große straße"]
 
     run(go())
 
@@ -452,10 +570,18 @@ def test_the_fake_answers_look_as_lamp_control_does(tmp_path):
                 dones = []
                 lamp.on("done", dones.append)
                 async with lamp.lease("body", for_ms=5000):
-                    for at, why in [("face", "not in this release: look at a face or a name"), ("name", "not in this release: look at a face or a name")]:
-                        with pytest.raises(errors.BY_CODE["refused"]) as raised:
-                            await lamp.look(at)
-                        assert why in raised.value.why
+                    with pytest.raises(errors.BY_CODE["refused"]) as raised:
+                        await lamp.look("name")
+                    assert "the lamp has no sound direction" in raised.value.why
+                    # A face: taken, then dropped "no face in view" while the
+                    # fake sees none.
+                    assert (await lamp.look("face"))["to"] == "body"
+                    for _ in range(50):
+                        if dones:
+                            break
+                        await asyncio.sleep(0.01)
+                    assert (dones[0]["how"], dones[0]["why"]) == ("dropped", "no face in view")
+                    dones.clear()
                     assert (await lamp.look(yaw=-10, pitch=5))["to"] == "body"
                     for _ in range(50):
                         if dones:
@@ -483,15 +609,16 @@ def test_a_look_or_joints_waits_for_the_bodys_done_and_says_when_a_conversation_
                     assert (aimed["how"], aimed["yaw"], aimed["pitch"]) == ("finished", -4.0, 2.0)
                     # Without `wait`, only the door's answer, as before.
                     assert (await lamp.joints(lease, 300, yaw=1.0))["to"] == "body"
-                    # A conversation suspends the lease: the door still takes
-                    # the look, and the body's `done` says it was dropped.
+                    # A conversation suspends the lease: the door refuses a
+                    # body op as the suspension it is (session.rs), not as
+                    # "take a lease first" nor "another computer".
                     await fake.lease_event(lease.id, "suspended", "conversation")
                     while lease.state != "suspended":
                         await asyncio.sleep(0.01)
-                    dropped = await lamp.joints(lease, 300, wait=True, yaw=-13.0)
-                    assert (dropped["how"], dropped["why"]) == ("dropped", "the body is not held")
-                    dropped = await lamp.look(yaw=3, pitch=1, wait=True)
-                    assert (dropped["how"], dropped["why"]) == ("dropped", "the body is not held")
+                    with pytest.raises(errors.BY_CODE["busy"], match="suspended while someone talks"):
+                        await lamp.joints(lease, 300, wait=True, yaw=-13.0)
+                    with pytest.raises(errors.BY_CODE["busy"], match="your lease on the body is suspended"):
+                        await lamp.look(yaw=3, pitch=1, wait=True)
                     await fake.lease_event(lease.id, "held")
                     while lease.state != "held":
                         await asyncio.sleep(0.01)
@@ -502,6 +629,26 @@ def test_a_look_or_joints_waits_for_the_bodys_done_and_says_when_a_conversation_
             assert fake.asked("joints")[0] == {"lease": "l_1", "targets": {"pitch": 2.0, "yaw": -4.0}, "within_ms": 300}
 
     run(go())
+
+def test_a_look_taken_just_before_a_conversation_is_dropped_by_the_body_in_its_done(tmp_path):
+    """The race the door cannot see: a look taken, then the conversation
+    suspends the lease before the body answers: the body's `done` says it was
+    dropped (body_lease.rs `done_of`), and the program's wait ends with it."""
+    async def go():
+        async with FakeLamp(grants=("body", "look"), auto_done=False) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                async with lamp.lease("body", for_ms=5000) as lease:
+                    waiting = asyncio.ensure_future(lamp.look(yaw=3, pitch=1, wait=True))
+                    while not fake.asked("look"):
+                        await asyncio.sleep(0.01)
+                    await fake.lease_event(lease.id, "suspended", "conversation")
+                    await fake.done(fake.requests[-1]["id"], "dropped", "the body is not held")
+                    dropped = await waiting
+                    assert (dropped["how"], dropped["why"]) == ("dropped", "the body is not held")
+
+    run(go())
+
 
 def test_a_waiting_look_ends_a_hand_follow_when_taken_not_at_its_done(tmp_path):
     """Reviewer-two's P2 on #5837: lamp-control ends a hand-follow as soon as
@@ -533,7 +680,7 @@ def test_a_waiting_look_ends_a_hand_follow_when_taken_not_at_its_done(tmp_path):
                 # A refused look leaves a following alone.
                 again = await lamp.follow_hand().start()
                 with pytest.raises(errors.BY_CODE["refused"]):
-                    await lamp.look("face", wait=True)
+                    await lamp.look("name", wait=True)
                 assert again.following
                 await again.stop()
                 async with lamp.lease("body", for_ms=5000) as lease:
@@ -562,8 +709,9 @@ def test_actions_send_the_schemas_fields_and_wait_for_done(tmp_path):
                 await lamp.light("warm", 3, 10_000, pattern="breathe")
                 await lamp.say("Build passed.")
                 await lamp.express("glad")
-                taken = await lamp.gesture("nod", wait=True)
-                assert taken["to"] == "body"
+                # The lamp says `motion_done`: the wait returns the gesture's `done`.
+                ended = await lamp.gesture("nod", wait=True)
+                assert (ended["ev"], ended["how"]) == ("done", "finished")
                 await lamp.stop()
             assert fake.asked("light") == [{"colour": "warm", "level": 3, "pattern": "breathe", "for_ms": 10000}]
             assert fake.asked("say") == [{"text": "Build passed."}]
@@ -666,6 +814,27 @@ def test_a_lease_the_lamp_takes_back_is_lost_with_its_why(tmp_path):
     run(go())
 
 
+def test_a_lease_whose_connection_closed_is_lost_not_held(tmp_path):
+    """The lamp ends a computer's leases when its last connection closes and
+    tells nobody; `Lease.state` must not go on saying `held` (the lead's
+    4-lamp show, 10 Nov: held, then no_lease on the next look)."""
+
+    async def go():
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                lease = lamp.lease("body", for_ms=60_000)
+                await lease.take()
+                assert lease.held
+                await fake.restart()
+                await asyncio.wait_for(lamp.wait_closed(), timeout=5)
+                assert lease.state == "lost"
+                assert lease.lost_why == "the connection closed"
+                assert not lease.held
+
+    run(go())
+
+
 def test_refusals_are_typed_and_say_when_to_try_again(tmp_path):
     async def go():
         async with FakeLamp(grants=("body",)) as fake:
@@ -699,6 +868,38 @@ def test_get_answers_the_states_asked(tmp_path):
 
 
 
+def test_lamp_said_needs_the_speech_grant_and_comes_with_who_had_it_said(tmp_path):
+    """Every line the lamp says out loud, as `lamp.said` (the `speech` grant):
+    its text, who had it said, where it came from, and `cut` when it was cut
+    short. The debug log never shows the text."""
+
+    async def go():
+        async with FakeLamp(grants=("speech",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                said: asyncio.Queue = asyncio.Queue()
+                await lamp.on("lamp.said", said.put_nowait)
+                await fake.emit("lamp.said", text="It is a long", by="lamp", source="reply", cut=True)
+                event = await said.get()
+                assert (event["text"], event["by"], event["source"], event["cut"]) == ("It is a long", "lamp", "reply", True)
+        async with FakeLamp(grants=("speak",)) as fake:
+            ring = await paired(fake, tmp_path / "other")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(LampError, match="no_grant"):
+                    await lamp.on("lamp.said", lambda event: None)
+
+    run(go())
+
+
+def test_the_debug_log_never_shows_what_the_lamp_said(monkeypatch, capsys):
+    from lampos import debug
+
+    monkeypatch.setenv("LAMPOS_LOG", "debug")
+    debug.frame("<-", {"ev": "lamp.said", "text": "Your mail says the code is 4821", "by": "lamp", "source": "reply", "cut": True})
+    err = capsys.readouterr().err
+    assert "4821" not in err and "by" in err, err
+
+
 def test_air_and_device_need_their_grants_and_air_changed_comes_on_a_new_reading(tmp_path):
     from lampos.testing import AIR, DEVICE
 
@@ -727,6 +928,51 @@ def test_air_and_device_need_their_grants_and_air_changed_comes_on_a_new_reading
     run(go())
 
 
+def test_the_fakes_light_state_shows_pixels_while_a_computer_holds_its_own(tmp_path):
+    """`shows.pixels` (docs/control.md): the pixels as asked of the ring (each at the
+    brightness), while that light lasts; the nearest named light beside them as
+    lamp-control names it (parts.rs `nearest_light`, the real lamp's own answer for
+    these: purple, level 4); none for a named light, once it lapses, or for no pixels."""
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                now = [100.0]
+                fake.clock = lambda: now[0]
+                pixels = ["#000000"] * 32
+                pixels[0], pixels[31] = "#ff0000", "#0010ff"
+                await lamp.ring(pixels, for_ms=4_000, brightness=80)
+                shows = (await lamp.get("light"))["light"]["shows"]
+                assert shows["pixels"][0] == "#cc0000" and shows["pixels"][31] == "#000dcc" and len(shows["pixels"]) == 32
+                assert (shows["on"], shows["colour"], shows["level"]) == (True, "purple", 4)
+                # A named light replaces it: no pixels.
+                await lamp.light("green", 3, 2_000)
+                assert (await lamp.get("light"))["light"]["shows"] == {"on": True, "colour": "green", "level": 3}
+                # Pixels again, then they lapse: the person's own, no pixels.
+                fake.state["light"] = {"on": True, "colour": "warm", "level": 1}
+                await lamp.ring(pixels, for_ms=1_500)
+                assert "pixels" in (await lamp.get("light"))["light"]["shows"]
+                now[0] += 1.6
+                assert (await lamp.get("light"))["light"]["shows"] == {"on": True, "colour": "warm", "level": 1}
+                # All dark: the light is off, warm, level 1, and still the pixels asked.
+                await lamp.ring(["#000000"] * 32, for_ms=1_000)
+                dark = (await lamp.get("light"))["light"]["shows"]
+                assert (dark["on"], dark["colour"], dark["level"]) == (False, "warm", 1) and dark["pixels"] == ["#000000"] * 32
+
+    run(go())
+
+
+def test_the_debug_log_shows_a_light_s_pixels_as_they_are():
+    from lampos import debug
+
+    reply = {"re": 2, "ok": True, "state": {"light": {"on": True, "colour": "purple", "level": 4,
+                                                      "shows": {"on": True, "colour": "purple", "level": 4,
+                                                                "pixels": ["#cc0000"] + ["#000000"] * 30 + ["#000dcc"]}}}}
+    shown = debug.redact(reply)
+    assert shown["state"]["light"]["shows"]["pixels"][0] == "#cc0000", shown
+    assert "<not shown>" not in str(shown), shown
+
+
 def test_the_fakes_light_state_shows_what_the_ring_draws(tmp_path):
     async def go():
         async with FakeLamp(grants=("light",)) as fake:
@@ -747,6 +993,26 @@ def test_the_fakes_light_state_shows_what_the_ring_draws(tmp_path):
                 fake.state["light"] = {}
                 await lamp.light("blue", 4, 2_000)
                 assert await lamp.get("light") == {"light": {"shows": {"on": True, "colour": "blue", "level": 4}}}
+
+    run(go())
+
+
+def test_light_off_is_a_black_ring_for_a_while(tmp_path):
+    """No level 0 for `light`: the way to put the light out is a ring of
+    black pixels (blue's bedtime app)."""
+
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                count = lamp.ring_pixels
+                assert count
+                await lamp.light_off(for_ms=5_000)
+                asked = fake.asked("light")[-1]
+                assert asked["pixels"] == ["#000000"] * count and asked["for_ms"] == 5_000
+                # By default 30 s, the longest a light asks.
+                await lamp.light_off()
+                assert fake.asked("light")[-1]["for_ms"] == 30_000
 
     run(go())
 
@@ -897,7 +1163,7 @@ def test_the_readme_reference_names_every_public_call_command_and_option():
 # the JS SDK's test has the same list).
 UNPLAYABLE = [
     ([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 200, "frames: a move this body cannot play: it lasts 600 ms, not 1500 to 10000"),
-    ([[0, 0, 0, 0, 0], [0, 0, 151, 0, 0], [0, 0, 0, 0, 0]], 1000, "frames: a move this body cannot play: frame 1 takes joint 2 151 counts, farther than 150"),
+    ([[0, 0, 0, 0, 0], [0, 0, 1301, 0, 0], [0, 0, 0, 0, 0]], 1000, "frames: a move this body cannot play: frame 1 takes joint 2 1301 counts, farther than 1300, this lamp's yaw reach (--reach)"),
     ([[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 1000, None),  # 2 s: one the body plays
     ([[0, 0, 0, 0, 0]] * 7 + [[0, 0, 0, 0, 300]] * 8 + [[0, 0, 0, 0, 0]], 100, "frames: a move this body cannot play: frame 7 asks joint 4 for 3000 counts a second, faster than 800"),
     ([[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 500, "frames: start and end at home, all five 0"),
@@ -922,8 +1188,10 @@ def test_the_move_rules_are_the_bodys_and_lamp_controls_own():
         return [float(n.replace("_", "")) for n in re.findall(r"[0-9][0-9_]*(?:\.[0-9]+)?", text)]
 
     farthest = re.search(r"pub const FARTHEST: \[i16; 5\] = \[([^\]]*)\]", body).group(1)
+    ceiling = re.search(r"pub const CEILING: \[u16; 5\] = \[([^\]]*)\]", body).group(1)
     fastest = re.search(r"pub const FASTEST: \[f32; 5\] = \[([^\]]*)\]", body).group(1)
-    assert numbers(farthest) == list(moves.MOVE_FARTHEST)
+    assert numbers(farthest) == list(moves.SKILL_FARTHEST)
+    assert numbers(ceiling) == list(moves.MOVE_FARTHEST)
     assert numbers(fastest) == list(moves.MOVE_FASTEST)
     shortest = numbers(re.search(r"const SHORTEST_US: u64 = ([0-9_]+);", body).group(1))[0]
     longest = numbers(re.search(r"const LONGEST_US: u64 = ([0-9_]+);", body).group(1))[0]
@@ -977,7 +1245,8 @@ def test_the_fake_refuses_a_move_the_body_would_drop_with_its_words_before_the_l
     assert move_refusal(500, [[0, 0, 0, 0, 0]]) == "frames: at least 2"
 
     async def go():
-        async with FakeLamp() as fake:
+        # An app-reach lamp takes a move up to the ceiling (the 1301 above is past it).
+        async with FakeLamp(app_reach=True) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 # Refused before the lease is asked for, as lamp-control's protocol.rs checks it.
@@ -993,6 +1262,70 @@ def test_the_fake_refuses_a_move_the_body_would_drop_with_its_words_before_the_l
                         assert raised.value.why == refusal
                     await lamp.move(PLAYABLE, 500)
                 assert len(fake.asked("move")) == 2
+
+    run(go())
+
+
+LIGHT_REFUSALS = [
+    ({"rgb": "#ff8000", "for_ms": 1000, "fade_ms": 500}, "fade_ms: from 1000 to 60000"),
+    ({"rgb": "#ff8000", "for_ms": 1000, "fade_ms": 60001}, "fade_ms: from 1000 to 60000"),
+    ({"rgb": "#ff8000", "for_ms": 30001}, "for_ms: from 1 to 30000"),
+    ({"rgb": "#ff8000", "for_ms": 0}, "for_ms: from 1 to 30000"),
+    ({"rgb": "#ff8000", "for_ms": 1000, "brightness": 101}, "brightness: from 0 to 100"),
+    ({"rgb": "ff8000", "for_ms": 1000}, "rgb: #rrggbb"),
+    ({"pixels": ["#000000"] * 31, "for_ms": 1000}, "pixels: 32 of them, one per pixel of the ring"),
+    ({"pixels": ["#000000"] * 33, "for_ms": 1000}, "pixels: 32 of them, one per pixel of the ring"),
+    ({"pixels": ["#000000"] * 31 + ["red"], "for_ms": 1000}, "pixels: each #rrggbb"),
+    ({"pixels": ["#000000"] * 31 + ["#00000"], "for_ms": 1000}, "pixels: each #rrggbb"),
+    ({"rgb": "#ff8000", "colour": "red", "level": 3, "for_ms": 1000}, "one of colour, rgb or pixels"),
+    ({"for_ms": 1000}, "one of colour, rgb or pixels"),
+    ({"colour": "mauve", "level": 3, "for_ms": 1000}, "colour: one of yellow, red, green, blue, cyan, purple, orange, pink, white, warm"),
+    ({"colour": "red", "level": 6, "for_ms": 1000}, "level: from 1 to 5, with colour"),
+    ({"colour": "red", "for_ms": 1000}, "level: from 1 to 5, with colour"),
+    ({"colour": "red", "level": 3, "brightness": 50, "for_ms": 1000}, "brightness goes with rgb or pixels; colour has level"),
+    ({"rgb": "#ff8000", "level": 3, "for_ms": 1000}, "level and pattern go with colour"),
+]
+LIGHT_TAKEN = [
+    {"rgb": "#FF8000", "for_ms": 1, "fade_ms": 1000},
+    {"rgb": "#ff8000", "for_ms": 30000, "fade_ms": 60000, "brightness": 0},
+    {"pixels": ["#000000"] * 32, "for_ms": 1000, "brightness": 100},
+    {"colour": "warm", "level": 3, "for_ms": 1000},
+]
+
+
+def test_light_refusal_is_lamp_controls_words_in_its_order():
+    from lampos.testing import light_refusal
+
+    for fields, refusal in LIGHT_REFUSALS:
+        assert light_refusal({"op": "light", **fields}) == refusal, fields
+    for fields in LIGHT_TAKEN:
+        assert light_refusal({"op": "light", **fields}) is None, fields
+
+
+@pytest.mark.parametrize("schema_check", [True, False])
+def test_the_fake_refuses_a_light_the_lamp_would_refuse_with_or_without_jsonschema(tmp_path, monkeypatch, schema_check):
+    import lampos.client
+
+    # Sent past the client's own check, as another computer's code might (a ring
+    # light with a fade of 500 ms was refused by a real lamp but taken by this
+    # fake when jsonschema was not installed).
+    monkeypatch.setattr(lampos.client, "_check", lambda op, fields: None)
+
+    async def go():
+        async with FakeLamp() as fake:
+            if not schema_check:
+                fake._validator = None
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                for fields, refusal in LIGHT_REFUSALS:
+                    with pytest.raises(errors.BY_CODE["bad_request"]) as raised:
+                        await lamp.request("light", **fields)
+                    if not schema_check or "colour" not in fields:
+                        assert raised.value.why == refusal, fields
+                for fields in LIGHT_TAKEN:
+                    await lamp.request("light", **fields)
+                # The connection is still good, and only the taken lights were shown.
+                assert len(fake.asked("light")) == len(LIGHT_TAKEN)
 
     run(go())
 
@@ -1032,8 +1365,8 @@ def test_poses_a_move_cannot_make_are_refused_with_the_joint_before_sending(tmp_
         ([{"nose": 3}], "'nose' is not a joint"),
         ([{"pitch": True}], "pitch must be a number of degrees"),
         ([{"pitch": float("nan")}], "pitch must be a number of degrees"),
-        ([{"pitch": 40}], "pitch 40° is farther than a move may take it, 17.6° either way"),
-        ([{"yaw": -14}], "yaw -14° is farther than a move may take it, 13.2° either way"),
+        ([{"pitch": 130}], "pitch 130° is farther than a move may take it, 114.3° either way"),
+        ([{"yaw": -130}], "yaw -130° is farther than a move may take it, 114.3° either way"),
         ([{"shoulder": 30, "elbow": -30}] * 12, "longer than a move's 10000"),
     ):
         with pytest.raises(errors.BY_CODE["bad_request"], match=re.escape(words)):
@@ -1047,7 +1380,7 @@ def test_poses_a_move_cannot_make_are_refused_with_the_joint_before_sending(tmp_
             async with await Lamp.connect(keyring=ring) as lamp:
                 async with lamp.lease("body", for_ms=5000):
                     with pytest.raises(LampError, match="farther than a move may take it") as raised:
-                        await lamp.move_poses([{"pitch": 40}])
+                        await lamp.move_poses([{"pitch": 130}])
                     assert raised.value.code == "bad_request"
                     assert fake.asked("move") == []
                     await lamp.move_poses([{"pitch": 10}, {"yaw": -8}], hold_ms=200)
@@ -1084,12 +1417,13 @@ def test_off_takes_a_handler_off_and_unsubscribes_the_last(tmp_path):
 
 def test_the_fake_says_done_and_lease_changes_to_whoever_they_are_for(tmp_path):
     async def go():
-        async with FakeLamp(auto_done=False) as fake:
+        async with FakeLamp(auto_done=False, grants=("body", "light", "speak", "hear")) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 async with lamp.lease("body", for_ms=5000) as lease:
-                    waiting = asyncio.ensure_future(lamp.play("wave", wait=True))
-                    while not fake.asked("play"):
+                    # A turn, whose `done` the test says.
+                    waiting = asyncio.ensure_future(lamp.start_turn(wait=True))
+                    while not fake.asked("turn.start"):
                         await asyncio.sleep(0.01)
                     await fake.lease_event(lease.id, "suspended", "conversation")
                     while lease.state != "suspended":
@@ -1281,9 +1615,10 @@ def test_a_refusal_awaited_after_it_came_is_the_callers_alone(tmp_path):
 
 def test_a_waiting_gesture_or_move_returns_at_the_bodys_answer(tmp_path):
     async def go():
-        # lamp-control's reply shape: `{"re":N,"ok":true,"to":"body"}` and no
-        # `done` after it; auto_done off, so nothing else ever comes.
-        async with FakeLamp(auto_done=False) as fake:
+        # A lamp-control from before #4209 (no `motion_done` in hello's
+        # limits): `{"re":N,"ok":true,"to":"body"}` and no `done` after it;
+        # auto_done off, so nothing else ever comes.
+        async with FakeLamp(auto_done=False, motion_done=False) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 async with lamp.lease("body", for_ms=5000):
@@ -1291,6 +1626,64 @@ def test_a_waiting_gesture_or_move_returns_at_the_bodys_answer(tmp_path):
                     move = await asyncio.wait_for(lamp.move(PLAYABLE, 500, wait=True), timeout=2)
                 assert (nod["ok"], nod["to"]) == (True, "body")
                 assert (move["ok"], move["to"]) == (True, "body")
+                assert lamp._done == {}
+
+    run(go())
+
+
+def test_a_waiting_motion_ends_at_its_done_where_the_lamp_says_motion_done(tmp_path):
+    async def go():
+        # #4209: hello's limits say `motion_done`, so `wait=True` returns the
+        # `done` the lamp sends once the body says what became of the motion:
+        # `finished` at its end, or `dropped` with the body's why.
+        async with FakeLamp(auto_done=False) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                assert lamp.limits["motion_done"] is True
+                async with lamp.lease("body", for_ms=5000):
+                    nod = asyncio.ensure_future(lamp.gesture("nod", wait=True))
+                    await asyncio.sleep(0.2)
+                    assert not nod.done(), "a wait that ended before the motion's done"
+                    asked = next(r for r in fake.requests if r["op"] == "gesture")
+                    await fake.done(asked["id"])
+                    assert (await asyncio.wait_for(nod, timeout=2))["how"] == "finished"
+                    move = asyncio.ensure_future(lamp.move(PLAYABLE, 500, wait=True))
+                    await asyncio.sleep(0.2)
+                    asked = next(r for r in fake.requests if r["op"] == "move")
+                    await fake.done(asked["id"], "dropped", "dropped: the person is using the lamp")
+                    dropped = await asyncio.wait_for(move, timeout=2)
+                assert (dropped["how"], dropped["why"]) == ("dropped", "dropped: the person is using the lamp")
+                glad = asyncio.ensure_future(lamp.express("glad", wait=True))
+                await asyncio.sleep(0.2)
+                assert not glad.done(), "an express's wait that ended before its move's done"
+                asked = next(r for r in fake.requests if r["op"] == "express")
+                await fake.done(asked["id"])
+                assert (await asyncio.wait_for(glad, timeout=2))["how"] == "finished"
+                # Too slight to move: no move, no `done`, the answer at once.
+                still = await asyncio.wait_for(lamp.express("glad", 0.01, wait=True), timeout=2)
+                assert (still["to"], still["move"]) == ("body", None)
+                assert lamp._done == {}
+
+    run(go())
+
+
+def test_a_waiting_say_ends_at_its_done(tmp_path):
+    async def go():
+        # A say's `done` comes once the voice has said it: `wait=True`
+        # returns it, `dropped` with the voice's why too.
+        async with FakeLamp(auto_done=False) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                said = asyncio.ensure_future(lamp.say("Word for word.", wait=True))
+                await asyncio.sleep(0.2)
+                assert not said.done(), "a say's wait that ended before its done"
+                await fake.done(next(r["id"] for r in fake.requests if r["op"] == "say"))
+                assert (await asyncio.wait_for(said, timeout=2))["how"] == "finished"
+                dropped = asyncio.ensure_future(lamp.say("Not now.", wait=True))
+                await asyncio.sleep(0.2)
+                asked = [r["id"] for r in fake.requests if r["op"] == "say"][-1]
+                await fake.done(asked, "dropped", "dropped: the lamp is private")
+                assert (await asyncio.wait_for(dropped, timeout=2))["how"] == "dropped"
                 assert lamp._done == {}
 
     run(go())
@@ -1343,7 +1736,7 @@ def test_wait_closed_woken_by_a_refusal_taken_elsewhere_keeps_waiting(tmp_path):
 
 def test_a_waiting_gesture_keeps_no_done(tmp_path):
     async def go():
-        async with FakeLamp(auto_done=False) as fake:
+        async with FakeLamp(auto_done=False, motion_done=False) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 pending = asyncio.ensure_future(lamp.gesture("nod", wait=True))
@@ -1456,7 +1849,7 @@ def test_the_fake_takes_look_and_yaw_and_pitch_as_a_stable_lamp_does(tmp_path):
         from lampos.testing import JOINTS_WAIT, LAMP_CONTROL_REFUSES
 
         async with FakeLamp(
-            grants=schema.grants(), refuses=LAMP_CONTROL_REFUSES
+            grants=schema.grants(), refuses=LAMP_CONTROL_REFUSES, face_look=False
         ) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
@@ -1832,6 +2225,25 @@ def test_lamp_skill_push_list_and_remove_run_as_the_js_clis_do(tmp_path):
     run(go())
 
 
+def test_the_fake_camera_gives_the_picture_a_test_sets(tmp_path):
+    """An app that reads its picture (a brightness meter) needs a real image: `fake.picture` is
+    what a snapshot and a stream's frames carry; the default is the smallest whole JPEG."""
+
+    async def go():
+        async with FakeLamp(grants=("camera",)) as fake:
+            fake.picture = b"\xff\xd8not-really-but-mine\xff\xd9"
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                assert await lamp.camera_snapshot() == fake.picture
+                frames = asyncio.Queue()
+                lamp.on("camera.frame", frames.put_nowait)
+                await lamp.camera_stream(fps=3)
+                frame = await asyncio.wait_for(frames.get(), 5)
+                assert base64.b64decode(frame["jpeg"]) == fake.picture
+
+    run(go())
+
+
 def test_the_camera_gives_a_picture_and_a_stream_with_the_camera_grant_only(tmp_path):
     async def go():
         from lampos.testing import FAKE_JPEG
@@ -1953,6 +2365,127 @@ def test_a_skill_is_pushed_in_parts_listed_and_removed(tmp_path, monkeypatch):
                 assert int(at.timestamp() * 1000) == listed["pushed_at_unix_ms"]
                 await lamp.remove_skill("desk-wave")
                 assert await lamp.skills() == []
+
+    run(go())
+
+
+def _move_file(path: Path, name: str, yaw: int = 100) -> None:
+    """A recorded move: an 8 s lean of `yaw` counts and back, no step over half of it."""
+    path.parent.mkdir(exist_ok=True)
+    frames = [[0, 0, count, 0, 0] for count in (0, yaw // 2, yaw, yaw // 2, 0, yaw // 2, yaw, yaw // 2, 0)]
+    path.write_text(json.dumps({"name": name, "step_ms": 1000, "frames": frames}))
+
+
+def test_a_package_whose_moves_fail_the_check_still_installs_and_the_answer_names_them(tmp_path):
+    """`lamp skill check` and `push_skill` warn of a recorded move the body
+    would refuse (never stricter than the lamp) and send the skill; the lamp
+    installs it and says which moves it left out and why. A lamp that says
+    nothing of moves gets the check's own list, with `kept` None."""
+
+    async def go():
+        async with FakeLamp(grants=("light", "skills")) as fake:
+            ring = await paired(fake, tmp_path / "keys")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                folder = _skill(tmp_path, "desk-bad")
+                _move_file(folder / "moves" / "ok.json", "ok")
+                _move_file(folder / "moves" / "far.json", "far", 1400)
+                with pytest.warns(UserWarning, match="moves/far.json.*farther than.*leaves it out"):
+                    skill = await lamp.push_skill(folder)
+                assert skill["name"] == "desk-bad"
+                assert skill["moves"]["kept"] == ["ok"]
+                assert [(left["name"], "farther than" in left["why"]) for left in skill["moves"]["left_out"]] == [("far", True)]
+                assert [listed["name"] for listed in await lamp.skills()] == ["desk-bad"]
+                # A lamp that doesn't tell of moves: the check's own list.
+                request = lamp.request
+
+                async def old_lamp(op, **fields):
+                    reply = await request(op, **fields)
+                    reply.pop("moves", None)
+                    return reply
+
+                lamp.request = old_lamp
+                other = _skill(tmp_path, "desk-old")
+                _move_file(other / "moves" / "far.json", "far", 1400)
+                with pytest.warns(UserWarning):
+                    told = await lamp.push_skill(other)
+                assert told["moves"]["kept"] is None
+                assert [left["name"] for left in told["moves"]["left_out"]] == ["far"]
+
+    run(go())
+
+
+def test_a_waiting_play_ends_at_the_answer_or_the_done_as_a_move_does(tmp_path):
+    """`play` is sent as a `move`: its wait ends at the answer on a lamp
+    that does not say `motion_done`, and at the body's `done` (told by the
+    test here) on one that does (Second's composition check on #6039)."""
+    from lampos.errors import LampError
+
+    async def go():
+        for motion_done in (False, True):
+            async with FakeLamp(grants=("body", "light", "skills"), motion_done=motion_done, auto_done=False) as fake:
+                ring = await paired(fake, tmp_path / f"keys-{motion_done}")
+                async with await Lamp.connect(keyring=ring) as lamp:
+                    one = _skill(tmp_path, "desk-wave-on" if motion_done else "desk-wave-off")
+                    _move_file(one / "moves" / "wave.json", "wave")
+                    await lamp.push_skill(one)
+                    async with lamp.lease("body", for_ms=5000):
+                        waiting = asyncio.ensure_future(lamp.play("wave", wait=True))
+                        if not motion_done:
+                            assert (await asyncio.wait_for(waiting, 2))["to"] == "body"
+                        else:
+                            await until(lambda: fake.asked("play"))
+                            await asyncio.sleep(0.05)
+                            assert not waiting.done()
+                            await fake.done(fake.requests[-1]["id"], "finished")
+                            assert (await asyncio.wait_for(waiting, 2))["how"] == "finished"
+
+    run(go())
+
+
+def test_a_recorded_move_of_a_pushed_skill_is_played_by_name(tmp_path):
+    """lamp-control keeps a pushed package's `moves/` when the skill installs
+    (the answer names the kept and the left out) and `play` sends one as a
+    `move`; a name in two skills is refused naming them unless `skill` says
+    which; a removed skill's moves are gone."""
+    from lampos.errors import LampError, NoLeaseError
+
+    async def go():
+        async with FakeLamp(grants=("body", "light", "skills")) as fake:
+            ring = await paired(fake, tmp_path / "keys")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                one = _skill(tmp_path, "desk-wave")
+                _move_file(one / "moves" / "wave.json", "wave")
+                _move_file(one / "moves" / "wiggle.json", "wiggle", 120)
+                skill = await lamp.push_skill(one)
+                assert skill["name"] == "desk-wave"
+                assert skill["moves"] == {"kept": ["wave", "wiggle"], "left_out": []}
+                # The listing is the helper's shape: the moves are the door's, not the skill's.
+                assert "moves" not in (await lamp.skills())[0]
+                # Taken only under a body lease, as a move is.
+                with pytest.raises(NoLeaseError):
+                    await lamp.play("wave")
+                async with lamp.lease("body", for_ms=5000):
+                    assert (await lamp.play("wave"))["to"] == "body"
+                    assert fake.asked("play") == [{"name": "wave"}]
+                    # A wait ends at the body's `done`, as `move`'s does where the lamp says `motion_done`.
+                    assert (await asyncio.wait_for(lamp.play("wave", wait=True), 2))["how"] == "finished"
+                    with pytest.raises(LampError, match="no move nothing in your pushed skills: skill.push one with moves/nothing.json"):
+                        await lamp.play("nothing")
+                    # The same name in a second skill: refused, naming both.
+                    two = _skill(tmp_path, "desk-greet")
+                    _move_file(two / "moves" / "wave.json", "wave", 90)
+                    await lamp.push_skill(two)
+                    with pytest.raises(LampError, match=r"more than one of your skills \(desk-greet, desk-wave\): say which with skill"):
+                        await lamp.play("wave")
+                    assert (await lamp.play("wave", skill="desk-greet"))["to"] == "body"
+                    assert fake.asked("play")[-1] == {"name": "wave", "skill": "desk-greet"}
+                    with pytest.raises(LampError, match="no skill gamma of yours has recorded moves"):
+                        await lamp.play("wave", skill="gamma")
+                    with pytest.raises(LampError, match="no move wiggle in your skill desk-greet"):
+                        await lamp.play("wiggle", skill="desk-greet")
+                    await lamp.remove_skill("desk-wave")
+                    with pytest.raises(LampError, match="no move wiggle in your pushed skills"):
+                        await lamp.play("wiggle")
 
     run(go())
 
@@ -2086,6 +2619,80 @@ def _wav(seconds: float, level: int = 1_000) -> bytes:
         file.setframerate(24_000)
         file.writeframes(level.to_bytes(2, "little", signed=True) * int(24_000 * seconds))
     return out.getvalue()
+
+
+def test_notes_are_set_read_listed_and_deleted_as_this_computers_own(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("notes",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                assert lamp.limits["notes"]["keys_max"] == 256
+                assert await lamp.notes.get("mood") is None
+                assert await lamp.notes.get("mood", default="calm") == "calm"
+                assert await lamp.notes.set("mood", {"calm": [1, 2, 3]}) == {"key": "mood", "bytes": 16}
+                assert await lamp.notes.get("mood") == {"calm": [1, 2, 3]}
+                # A stored null is found, not a missing key.
+                await lamp.notes.set("nothing", None)
+                assert await lamp.notes.get("nothing", default="missing") is None
+                await lamp.notes.set("mode", 7)
+                listed = await lamp.notes.list("mo")
+                assert listed["keys"] == [{"key": "mode", "bytes": 1}, {"key": "mood", "bytes": 16}]
+                assert (listed["count"], listed["total"]) == (2, 3)
+                assert listed["keys_max"] == 256 and listed["bytes_max"] == 262_144
+                assert (await lamp.notes.list())["count"] == 3
+                assert await lamp.notes.delete("mood") is True
+                assert await lamp.notes.delete("mood") is False
+                assert fake.asked("notes.delete") == [{"key": "mood"}, {"key": "mood"}]
+                # The same calls by their op names, as every op has one.
+                assert await lamp.notes_get("mode") == 7
+                assert (await lamp.notes_list("m"))["count"] == 1
+
+    run(go())
+
+
+def test_notes_are_held_to_the_lamps_bounds_and_belong_to_one_computer(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("notes",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["bad_request"]):
+                    await lamp.notes.set("a b", 1)
+                with pytest.raises(errors.BY_CODE["bad_request"]):
+                    await lamp.notes.set("", 1)
+                with pytest.raises(errors.BY_CODE["bad_request"]):
+                    await lamp.notes.get("k" * 65)
+                with pytest.raises(errors.BY_CODE["bad_request"]):
+                    await lamp.notes.list("a/b")
+                big = "x" * (16_384 - 2)
+                assert (await lamp.notes.set("big", big))["bytes"] == 16_384
+                with pytest.raises(errors.BY_CODE["bad_request"], match="16384"):
+                    await lamp.notes.set("big", big + "x")
+                assert await lamp.notes.get("big") == big
+                await lamp.notes.delete("big")
+                for at in range(256):
+                    await lamp.notes.set(f"k{at:04}", at)
+                with pytest.raises(errors.BY_CODE["refused"], match="full"):
+                    await lamp.notes.set("one-more", 1)
+                await lamp.notes.set("k0000", "replaced")
+                client = ring.pairing().client
+                # Another computer's notes are its own: the fake keeps them apart.
+                assert set(fake.notes) == {client}
+                fake.revoke(client)
+                assert fake.notes.get(client) in (None, {})
+
+    run(go())
+
+
+def test_notes_need_their_grant(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("speak",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                for call in (lamp.notes.get("k"), lamp.notes.set("k", 1), lamp.notes.delete("k"), lamp.notes.list()):
+                    with pytest.raises(errors.BY_CODE["no_grant"]):
+                        await call
+
+    run(go())
 
 
 def test_a_clip_is_uploaded_in_parts_played_listed_and_removed(tmp_path):
@@ -2354,6 +2961,26 @@ def test_the_volume_needs_the_speak_grant(tmp_path):
     run(go())
 
 
+def test_the_fake_turns_once_toward_a_face_in_view(tmp_path):
+    # The next build (row 34): a look at a face is one turn toward the face
+    # the body sees, its `done` saying where the head got to.
+    async def go():
+        async with FakeLamp(grants=schema.grants(), face={"yaw": 12.0, "pitch": -4.0}) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                dones = []
+                lamp.on("done", dones.append)
+                async with lamp.lease("body", for_ms=5000):
+                    assert (await lamp.look("face"))["to"] == "body"
+                    for _ in range(50):
+                        if dones:
+                            break
+                        await asyncio.sleep(0.01)
+                    assert (dones[0]["how"], dones[0]["yaw"], dones[0]["pitch"]) == ("finished", 12.0, -4.0)
+
+    run(go())
+
+
 # Every example but the tour (which has its own test), run from sdk/python as
 # the README runs it, against a fake lamp that grants everything: its
 # arguments, the event it waits for (said once it has subscribed), the ops it exists to send
@@ -2376,13 +3003,26 @@ EXAMPLE_RUNS = {
         "lease.take",
         ("move", {"frames": poses_to_frames([{"pitch": 3}, {"pitch": 2, "yaw": -3}, {"pitch": 2, "yaw": 3}], hold_ms=400)}),
     )),
-    "follow.py": ([], "arrived", ("lease.take", ("look", {"at": "face"})), "not now: refused: not in this release: look at a face or a name"),
+    "follow.py": ([], "arrived", ("lease.take", ("look", {"at": "face"}))),
     "follow_hand.py": ([], "hand", ("lease.take", ("look", {"at": "hand"}))),
+    "heat_watch.py": ([], "hot", (("light", {"colour": "orange", "level": 2, "pattern": "pulse"}),)),
+    # Stuffy air, a short wait (DESK_STUFFY_AFTER_S below), one line said, then the glow.
+    "desk_health.py": ([], "stuffy", ("say", ("light", {"colour": "orange", "level": 2, "pattern": "breathe"}))),
     "greet.py": ([], "arrived", (("gesture", {"name": "greeting"}),)),
+    "notes.py": ([], None, (("notes.get", {"key": "runs"}), ("notes.set", {"key": "runs", "value": 1}), ("light", {"colour": "warm", "level": 1}))),
+    # A long stretch at the desk (SIT_AFTER_S below): one slow tilt, counted in the day's note.
+    "posture.py": ([], "arrived", (
+        "lease.take",
+        ("move", {"frames": poses_to_frames([{"roll": 3, "pitch": 1}, {"roll": -2}], hold_ms=600)}),
+        ("notes.set", {"value": 1}),
+    )),
     "phrase.py": ([], "phrase", (("light", {"colour": "warm", "level": 2, "pattern": "breathe"}), ("gesture", {"name": "nod"}))),
     "pomodoro.py": ([], None, (("light", {"colour": "warm", "level": 2}),)),
     "push_skill.py": (["../examples/hello-skill"], None, ("skill.push",)),
     # Pixel 0 white, a green pixel walking, the whole ring blue, given back.
+    # An arrival is counted in the day's note, quietly: no say, no light.
+    "visitors.py": ([], "arrived", (("notes.get", {}), ("notes.set", {"value": 1}))),
+    "touch.py": ([], "tap", (("light", {"colour": "warm", "level": 3}),)),
     "ring_walk.py": (["50"], None, (
         ("light", {"pixels": lambda px: isinstance(px, list) and px[0] == "#ffffff" and set(px[1:]) == {"#000000"}}),
         ("light", {"pixels": lambda px: isinstance(px, list) and px.count("#00ff00") == 1}),
@@ -2415,12 +3055,15 @@ def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_pat
     assert {path.name for path in examples.glob("*.py")} - {"tour.py"} == set(EXAMPLE_RUNS)
     nudges = {
         "air": lambda fake: fake.set_air(pm2_5=41.0, co2_ppm=1350, feel="stuffy"),
+        "stuffy": lambda fake: fake.set_air(co2_ppm=1500, feel="stuffy"),
         "arrived": lambda fake: fake.emit("person.arrived", count=1, near=0.3),
         # Paced as a lamp says them, as the JS test does: all at once, the
         # track's last `seen: false` can land before the example waits for a
         # hand, and it waits on for one (Python 3.10 CI on #5864).
         "hand": lambda fake: fake.emit_hand_track(hand_track("wave", seconds=1.0), realtime=True),
+        "hot": lambda fake: fake.emit("body.state", joints={"yaw": {"deg": 0.0, "temp_c": 41}, "elbow": {"deg": 30.0, "temp_c": 66}}, lamp={"light": "off", "talking": False, "private": False}),
         "phrase": lambda fake: fake.emit("phrase.heard", phrase="good night lamp"),
+        "tap": lambda fake: fake.emit("touch", kind="tap"),
     }
 
     async def one(name, home):
@@ -2429,7 +3072,7 @@ def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_pat
             await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, keyring=Keyring(home))
             ran = await asyncio.create_subprocess_exec(
                 sys.executable, str(examples / name), *args, cwd=home if name in WRITES_FILES else examples.parent,
-                env={**os.environ, "LAMPOS_HOME": str(home), "PYTHONUNBUFFERED": "1"},
+                env={**os.environ, "LAMPOS_HOME": str(home), "PYTHONUNBUFFERED": "1", "DESK_STUFFY_AFTER_S": "1", "SIT_AFTER_S": "1"},
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
             )
             said = asyncio.ensure_future(ran.communicate())
@@ -2503,3 +3146,198 @@ def test_a_microphone_block_is_its_header_and_the_samples_as_data():
     block = binary_frame(len(header).to_bytes(4, "big") + header + samples)
     assert (block["ev"], block["sequence"], block["lost"]) == ("microphone.audio", 7, 2)
     assert block["data"] == samples and len(samples) == 640
+
+
+def test_fake_connect_gives_a_connected_lamp_with_its_own_keyring_and_cleans_up(tmp_path, monkeypatch):
+    monkeypatch.setenv("LAMPOS_HOME", str(tmp_path / "home"))  # a test must not touch the developer's own
+
+    async def scenario():
+        async with FakeLamp() as fake:
+            lamp = await fake.connect()
+            third = await fake.connect()
+            other = await fake.connect(name="second computer")
+            names = [client["name"] for client in fake.clients.values()]
+            assert names == ["test app 1", "test app 2", "second computer"], names
+            await third.close()
+            reply = await lamp.say("hello")
+            assert fake.asked("say") == [{"text": "hello"}]
+            assert reply["ok"] and other is not lamp
+            await other.close()  # the test closed one itself: the fake's exit must not trip on it
+            folders = list(fake._folders)
+            assert len(folders) == 3 and all(Path(folder).is_dir() for folder in folders)
+        return lamp, folders
+
+    lamp, folders = run(scenario())
+    assert not any(Path(folder).exists() for folder in folders)  # their keyrings are gone
+    assert not (tmp_path / "home").exists()  # LAMPOS_HOME was never written
+    with pytest.raises(LampError):
+        run(lamp.say("after the fake is gone"))
+
+
+def test_a_fake_lamp_with_grants_all_takes_every_grant_the_protocol_names_and_the_default_stays_narrow():
+    async def scenario():
+        async with FakeLamp() as narrow:
+            lamp = await narrow.connect()
+            with pytest.raises(errors.NoGrantError):
+                await lamp.on("phrase.heard", lambda event: None, phrases=["good night lamp"])
+        async with FakeLamp(grants="all") as wide:
+            lamp = await wide.connect()
+            await lamp.on("phrase.heard", lambda event: None, phrases=["good night lamp"])
+            return wide.grants
+
+    assert run(scenario()) == list(schema.grants())
+    for slip in ("hear", "All", ""):
+        with pytest.raises(ValueError):
+            FakeLamp(grants=slip)
+
+
+def test_a_missing_camera_grant_says_the_app_does_not_grant_it_and_another_keeps_its_short_words(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path / "light")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"]) as camera:
+                    await lamp.camera_snapshot()
+                assert camera.value.why == "not granted: camera (only the owner can add it: with a new pairing code that names it, or by changing the grants of this computer)"
+                with pytest.raises(errors.BY_CODE["no_grant"]) as say:
+                    await lamp.say("x")
+                assert say.value.why == "not granted: speak"
+
+    run(go())
+
+
+def test_the_fake_holds_a_move_to_the_caps_every_shipped_lamp_has_unless_told_it_has_app_reach(tmp_path):
+    """A program that passes its fake test with a sway the shipped lamps refuse
+    would fail on the lamp: the default fake takes a yaw of 250 counts at most."""
+    ramp = [0, 150, 300, 450, 600, 681]
+    sway = [[0, 0, n, 0, 0] for n in ramp + ramp[::-1]]
+
+    async def go(app_reach):
+        async with FakeLamp(app_reach=app_reach) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                async with lamp.lease("body", for_ms=5000):
+                    if app_reach:
+                        await lamp.move(sway, 200)
+                        return None
+                    with pytest.raises(errors.BY_CODE["bad_request"]) as raised:
+                        await lamp.move(sway, 200)
+                    return raised.value.why
+
+    why = run(go(False))
+    assert why is not None and "joint 2 300 counts, farther than 250, this lamp's yaw reach (--reach)" in why
+    assert run(go(True)) is None
+
+
+def test_a_close_the_lamp_explains_is_logged_once_with_its_reason(tmp_path, caplog):
+    async def go():
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with caplog.at_level("WARNING", logger="lampos"):
+                    await fake.restart()
+                    await asyncio.wait_for(lamp.wait_closed(), timeout=5)
+                assert lamp.close_reason == "the lamp restarts"
+
+    run(go())
+    lines = [r.getMessage() for r in caplog.records if r.name == "lampos"]
+    assert lines == ["the lamp closed the connection: the lamp restarts"]
+
+
+def test_a_skills_run_connects_on_the_control_socket_with_its_token(monkeypatch):
+    """`Lamp.local(token)`: the token's grants and no more, the run it is for, refused without a good token, the
+    environment's token and socket when none are given, and its connection closed when the run ends."""
+
+    async def go():
+        async with FakeLamp(local=True, grants=("body", "light")) as fake:
+            token = fake.mint_token(["light"], run="r1", skill="water")
+            async with await Lamp.local(token, path=fake.local_path) as lamp:
+                assert (lamp.grants, lamp.run, lamp.skill) == (["light"], "r1", "water")
+                assert (await lamp.light("warm", 3, 1000))["to"] == "ring"
+                with pytest.raises(errors.BY_CODE["no_grant"], match="not granted: body"):
+                    await lamp.gesture("nod")
+                await fake.end_run("r1")
+                await asyncio.wait_for(lamp.wait_closed(), timeout=5)
+                assert lamp.close_reason == "the run ended"
+            for bad in ("A" * 43, token):
+                with pytest.raises(errors.BY_CODE["no_grant"], match="no token for this run"):
+                    await Lamp.local(bad, path=fake.local_path)
+            monkeypatch.delenv("LAMP_CONTROL_TOKEN", raising=False)
+            with pytest.raises(errors.BY_CODE["no_grant"], match="LAMP_CONTROL_TOKEN"):
+                await Lamp.local(path=fake.local_path)
+            second = fake.mint_token(["body"], run="r2")
+            monkeypatch.setenv("LAMP_CONTROL_TOKEN", second)
+            monkeypatch.setenv("LAMP_CONTROL_SOCKET", fake.local_path)
+            async with await Lamp.local() as lamp:
+                assert (lamp.grants, lamp.run) == (["body"], "r2")
+            # A second mint for one run replaces the first.
+            third = fake.mint_token(["light"], run="r2")
+            with pytest.raises(errors.BY_CODE["no_grant"]):
+                await Lamp.local(second, path=fake.local_path)
+            async with await Lamp.local(third, path=fake.local_path) as lamp:
+                assert lamp.grants == ["light"]
+
+    run(go())
+
+
+def test_the_control_socket_is_not_for_pairing(tmp_path):
+    async def go():
+        async with FakeLamp(local=True) as fake:
+            from websockets.asyncio.client import unix_connect
+
+            ws = await unix_connect(fake.local_path, uri="ws://localhost/v1")
+            await ws.recv()
+            await ws.send(json.dumps({"id": 1, "op": "pair", "name": "x", "key": "A" * 43 + "=", "proof": "A" * 43 + "="}))
+            reply = json.loads(await ws.recv())
+            assert (reply["error"]["code"], reply["error"]["why"]) == ("bad_request", "this socket is not for pairing: it is a skill run's"), reply
+            await ws.close()
+
+    run(go())
+
+
+def test_the_control_socket_refuses_a_real_clients_id_or_signature_beside_a_token(tmp_path):
+    """As lamp-control: a hello here is client c_0, the zero signature and the token; any other id or signature is
+    `bad_request`, not a token refusal."""
+
+    async def go():
+        async with FakeLamp(local=True) as fake:
+            from websockets.asyncio.client import unix_connect
+
+            token = fake.mint_token(["light"])
+            zero = base64.b64encode(bytes(64)).decode()
+            for client, sig in (("c_1", zero), ("c_0", base64.b64encode(b"\x01" * 64).decode())):
+                ws = await unix_connect(fake.local_path, uri="ws://localhost/v1")
+                await ws.recv()
+                await ws.send(json.dumps({"id": 1, "op": "hello", "client": client, "sig": sig, "token": token}))
+                reply = json.loads(await ws.recv())
+                assert reply["error"]["code"] == "bad_request", reply
+                assert reply["error"]["why"] == "on this socket hello is client c_0, a zero sig and the token", reply
+                await ws.close()
+
+    run(go())
+
+
+def test_a_token_is_never_logged_by_the_debug_trace(monkeypatch, capsys):
+    from lampos import debug
+
+    monkeypatch.setattr(debug, "on", lambda: True)
+    debug.frame("->", {"id": 0, "op": "hello", "client": "c_0", "sig": "x", "token": "SECRETTOKEN" + "A" * 32})
+    seen = capsys.readouterr().err
+    assert "SECRETTOKEN" not in seen, seen
+
+
+def test_a_token_on_the_tls_door_is_refused_as_the_lamp_does():
+    async def go():
+        async with FakeLamp(local=True) as fake:
+            token = fake.mint_token(["light"], run="r1")
+            from lampos.client import _open
+            from lampos.keys import b64
+
+            ws = await _open(fake.host, fake.port, fake.pin)
+            await ws.recv()
+            await ws.send(json.dumps({"id": 1, "op": "hello", "client": "c_0", "sig": b64(bytes(64)), "token": token}))
+            reply = json.loads(await ws.recv())
+            assert (reply["error"]["code"], reply["error"]["why"]) == ("bad_request", "token: only on a skill run's socket"), reply
+            await ws.close()
+
+    run(go())

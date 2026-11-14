@@ -87,6 +87,32 @@ pub fn client_id(key: &[u8; 32]) -> String {
     format!("c_{hex}")
 }
 
+/// The id of the local agent `user`'s record (docs/control.md, "The local
+/// agent"): `c_` and 16 hex digits like every client's, but of a name, not a
+/// key, so no key made by a computer can be paired into it.
+pub fn local_agent_id(user: &str) -> String {
+    let digest = Sha256::digest(format!("local-agent:{user}").as_bytes());
+    let hex: String = digest[..8]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!("c_{hex}")
+}
+
+/// What the local agent has the first time it is made, and only then: the
+/// owner's app changes it with `set_grants` after that. Never the camera, the
+/// microphone, what the lamp says, its logs or its speaker.
+pub fn local_agent_grants() -> BTreeSet<Grant> {
+    [
+        Grant::Body,
+        Grant::Light,
+        Grant::Speak,
+        Grant::Look,
+        Grant::Skills,
+    ]
+    .into()
+}
+
 /// Base64 to exactly `N` bytes.
 pub fn bytes_of<const N: usize>(text: &str) -> Option<[u8; N]> {
     STANDARD.decode(text).ok()?.try_into().ok()
@@ -196,6 +222,15 @@ pub struct Client {
     pub paired_at: u64,
 }
 
+impl Client {
+    /// The local agent's record: it has no key, so no signature can say
+    /// `hello` as it and no pairing code can replace it; it is reached only
+    /// by the agent socket, by the named user's uid.
+    pub fn is_local(&self) -> bool {
+        self.key.is_empty()
+    }
+}
+
 /// [`Client`] as `clients.json` holds it: one `grants` list of names, known
 /// to this build or not. A grant a newer lamp-control added (`air`, say) is
 /// read as not granted rather than stopping lamp-control at its start: an
@@ -215,11 +250,13 @@ impl From<StoredClient> for Client {
     fn from(stored: StoredClient) -> Self {
         let (mut grants, mut unknown_grants) = (BTreeSet::new(), BTreeSet::new());
         for name in stored.grants {
+            // A linked service's grant is a skill run's alone: in the file it
+            // is kept, never held.
             match serde_json::from_value::<Grant>(serde_json::Value::String(name.clone())) {
-                Ok(grant) => {
+                Ok(grant) if !grant.is_service() => {
                     grants.insert(grant);
                 }
-                Err(_) => {
+                _ => {
                     unknown_grants.insert(name);
                 }
             }
@@ -259,6 +296,11 @@ impl From<Client> for StoredClient {
 #[serde(deny_unknown_fields)]
 pub struct Clients {
     pub clients: Vec<Client>,
+    /// The clients of the skill runs now going (`crate::runs`): kept in
+    /// memory only, never in the file, never listed to the app, and never
+    /// changed by `set_grants` or a revoke: a run's token ends them.
+    #[serde(skip)]
+    pub runs: Vec<Client>,
 }
 
 impl Clients {
@@ -297,7 +339,32 @@ impl Clients {
 
     /// The client with `id`.
     pub fn get(&self, id: &str) -> Option<&Client> {
-        self.clients.iter().find(|client| client.id == id)
+        self.clients
+            .iter()
+            .chain(self.runs.iter())
+            .find(|client| client.id == id)
+    }
+
+    /// The client of one skill run, with no key (no signature or pairing
+    /// code reaches it) and the grants its token names; a second mint for the
+    /// same run replaces it.
+    pub fn add_run(&mut self, id: &str, skill: &str, grants: BTreeSet<Grant>, at: u64) {
+        self.runs.retain(|client| client.id != id);
+        self.runs.push(Client {
+            id: id.to_owned(),
+            name: format!("skill {skill}"),
+            key: String::new(),
+            grants,
+            unknown_grants: BTreeSet::new(),
+            paired_at: at,
+        });
+    }
+
+    /// Ends one run's client: whether it was there.
+    pub fn end_run(&mut self, id: &str) -> bool {
+        let before = self.runs.len();
+        self.runs.retain(|client| client.id != id);
+        self.runs.len() != before
     }
 
     /// Whether `key` could be added: paired already, or room for one more.
@@ -318,6 +385,12 @@ impl Clients {
             return Err(PairRefused::Full);
         }
         let id = client_id(key);
+        // The local agent's record is never replaced by a pairing: its id
+        // is a name's, so a key reaching it would be a collision, and the
+        // proof is said wrong.
+        if self.get(&id).is_some_and(Client::is_local) {
+            return Err(PairRefused::WrongProof);
+        }
         let before = self
             .clients
             .iter()
@@ -334,6 +407,33 @@ impl Clients {
         Ok((id, before))
     }
 
+    /// Replaces the grants of the computer `id` with exactly `grants` (the whole list: a grant this build does not
+    /// know, kept from a newer lamp-control's file, is cleared too, so it cannot come back with an update the owner
+    /// never said yes to): the grants and the unknown ones it had, or `None` when no such computer.
+    pub fn set_grants(
+        &mut self,
+        id: &str,
+        grants: BTreeSet<Grant>,
+    ) -> Option<(BTreeSet<Grant>, BTreeSet<String>)> {
+        let client = self.clients.iter_mut().find(|client| client.id == id)?;
+        Some((
+            std::mem::replace(&mut client.grants, grants),
+            std::mem::take(&mut client.unknown_grants),
+        ))
+    }
+
+    /// Puts back what [`Clients::set_grants`] took, when keeping the change failed.
+    pub fn restore_grants(
+        &mut self,
+        id: &str,
+        (grants, unknown): (BTreeSet<Grant>, BTreeSet<String>),
+    ) {
+        if let Some(client) = self.clients.iter_mut().find(|client| client.id == id) {
+            client.grants = grants;
+            client.unknown_grants = unknown;
+        }
+    }
+
     /// Puts back what an [`Clients::add`] replaced (or removes what it added),
     /// when keeping the change failed.
     pub fn undo_add(&mut self, id: &str, before: Option<Client>) {
@@ -345,9 +445,40 @@ impl Clients {
 
     /// Removes a client: whether it was there.
     pub fn revoke(&mut self, id: &str) -> bool {
+        // The local agent keeps its record with no grants, so a restart
+        // cannot make it again with the first grants: only `set_grants` (the
+        // owner's app changing what a computer may do) widens it; turning the
+        // agent's socket off and on does not.
+        if let Some(local) = self
+            .clients
+            .iter_mut()
+            .find(|client| client.id == id && client.is_local())
+        {
+            local.grants.clear();
+            return true;
+        }
         let before = self.clients.len();
         self.clients.retain(|client| client.id != id);
         self.clients.len() != before
+    }
+
+    /// The local agent `user`'s record, made with [`local_agent_grants`] if
+    /// there is none (never again once there is one, whatever its grants
+    /// are now); its id, and whether it was just made.
+    pub fn ensure_local(&mut self, user: &str, paired_at: u64) -> (String, bool) {
+        let id = local_agent_id(user);
+        if self.get(&id).is_some() {
+            return (id, false);
+        }
+        self.clients.push(Client {
+            id: id.clone(),
+            name: format!("local agent {user}"),
+            key: String::new(),
+            grants: local_agent_grants(),
+            unknown_grants: BTreeSet::new(),
+            paired_at,
+        });
+        (id, true)
     }
 
     /// The client `id` names, if its `sig` over `nonce` holds.
@@ -363,6 +494,45 @@ impl Clients {
 mod tests {
     use super::*;
     use ring::signature::KeyPair as _;
+
+    /// The record without a key is the local agent's: no pairing replaces
+    /// it, and no signature can say hello as it.
+    #[test]
+    fn no_code_pairing_and_no_signature_reaches_the_record_without_a_key() {
+        let mut clients = Clients::default();
+        let (id, made) = clients.ensure_local("agent", 5);
+        assert!(made);
+        assert_eq!(id, local_agent_id("agent"));
+        assert_eq!(clients.get(&id).unwrap().grants, local_agent_grants());
+        // A second call keeps it, whatever its grants have become.
+        clients.set_grants(&id, BTreeSet::new());
+        assert_eq!(clients.ensure_local("agent", 6), (id.clone(), false));
+        assert!(clients.get(&id).unwrap().grants.is_empty());
+        // A key whose id is the record's (a collision, made here by hand)
+        // cannot replace it.
+        let key = [9u8; 32];
+        clients.clients.push(Client {
+            id: client_id(&key),
+            name: "agent".to_owned(),
+            key: String::new(),
+            grants: BTreeSet::new(),
+            unknown_grants: BTreeSet::new(),
+            paired_at: 1,
+        });
+        assert_eq!(
+            clients.add("thief", &key, [Grant::Body].into(), 7).err(),
+            Some(PairRefused::WrongProof)
+        );
+        assert!(clients.get(&client_id(&key)).unwrap().is_local());
+        // No signature says hello as a record with no key.
+        let nonce = [1u8; 32];
+        assert!(
+            clients
+                .hello(&id, &nonce, &STANDARD.encode([0u8; 64]))
+                .is_none()
+        );
+        assert!(clients.hello(&id, &nonce, "").is_none());
+    }
 
     /// A grant this build doesn't know (a newer lamp-control's) is read as
     /// not granted, never stops the load, and is written back as it was.

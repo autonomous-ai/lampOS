@@ -191,6 +191,7 @@ impl CloudRequest {
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. }
             | ProviderInput::TurnOpened { .. }
+            | ProviderInput::WalkUnderWay { .. }
             | ProviderInput::WokenByName { .. }
             | ProviderInput::End { .. }
                 if self.start_submitted && !self.input_end_submitted =>
@@ -212,6 +213,8 @@ impl CloudRequest {
         // A line handed on stops the memory's nightly pass
         // (`LAMP_MEMORY_NIGHTLY`); off, one load.
         crate::nightly::stir();
+        // A line handed on stops the memory's night (`LAMP_MEMORY_TIERS`).
+        crate::tiers_night::stir();
         match command {
             ProviderInput::Start { .. } => self.start_submitted = true,
             ProviderInput::End { .. } => self.input_end_submitted = true,
@@ -224,6 +227,7 @@ impl CloudRequest {
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. }
             | ProviderInput::TurnOpened { .. }
+            | ProviderInput::WalkUnderWay { .. }
             | ProviderInput::WokenByName { .. } => {}
             ProviderInput::Written { .. } | ProviderInput::Reminder { .. } => {
                 self.start_submitted = true;
@@ -575,6 +579,7 @@ mod tests {
             reminder: None,
             say: None,
             news: Vec::new(),
+            news_not_heard: None,
             down_line_said: false,
             owner: turn,
             cloud: CloudRequest::new(1).unwrap(),

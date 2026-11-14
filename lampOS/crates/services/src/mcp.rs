@@ -19,7 +19,11 @@ use crate::net::{self, Call, Http, Reply};
 use crate::reads;
 use crate::store::Entry;
 use serde_json::{Map, Value, json};
-use std::{fmt, time::Duration};
+use std::{
+    fmt,
+    sync::atomic::{AtomicBool, Ordering},
+    time::Duration,
+};
 
 /// The MCP revision the lamp asks for.
 pub const PROTOCOL_VERSION: &str = "2025-06-18";
@@ -293,6 +297,71 @@ pub struct Endpoint {
     pub url: String,
     header: (String, String),
     secrets: Vec<String>,
+    /// Set when the service refused the link itself: a 401, or its words
+    /// for a dead token ([`DEAD_TOKEN`]). Never on a 403.
+    refused: AtomicBool,
+}
+
+/// An MCP service's or Slack's own words for a token it no longer takes.
+pub const DEAD_TOKEN: &[&str] = &["invalid_auth", "token_expired", "token_revoked"];
+
+/// Whether one of the service's own error fields says the token is dead:
+/// the field is a [`DEAD_TOKEN`] word, alone or leading its explanation
+/// ("invalid_auth: ..."), after an optional "error:". The word anywhere
+/// else (a message or an issue the service quotes) is not its refusal.
+pub fn says_dead_token(said: &str) -> bool {
+    let said = said.trim_start();
+    let said = match said.get(..6) {
+        Some(head) if head.eq_ignore_ascii_case("error:") => said[6..].trim_start(),
+        _ => said,
+    };
+    DEAD_TOKEN.iter().any(|word| {
+        said.strip_prefix(word)
+            .is_some_and(|rest| !rest.starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_'))
+    })
+}
+
+/// Whether an error object of the service's own says the token is dead in
+/// its own fields: `error`, `code` or `message` as text, the same in its
+/// `data`, or `data` itself as text. Nothing else in it is read.
+fn error_says_dead_token(error: &Value) -> bool {
+    let own = |value: &Value| {
+        ["error", "code", "message"]
+            .into_iter()
+            .filter_map(|key| value.get(key).and_then(Value::as_str))
+            .any(says_dead_token)
+    };
+    own(error)
+        || error
+            .get("data")
+            .is_some_and(|data| data.as_str().is_some_and(says_dead_token) || own(data))
+}
+
+/// Whether a tool's error result is the service saying the token is dead:
+/// by its `structuredContent`'s own fields, or by its first content block,
+/// the error itself, as text or as a JSON object's own fields (Slack's
+/// `{"ok":false,"error":"invalid_auth"}`). Any later block, and any text the
+/// error quotes, is the service's content, not its refusal.
+fn tool_error_says_dead_token(result: &Value) -> bool {
+    if result
+        .get("structuredContent")
+        .is_some_and(error_says_dead_token)
+    {
+        return true;
+    }
+    let Some(first) = result
+        .get("content")
+        .and_then(Value::as_array)
+        .and_then(|content| content.first())
+        .and_then(|block| block.get("text"))
+        .and_then(Value::as_str)
+    else {
+        return false;
+    };
+    match serde_json::from_str::<Value>(first) {
+        Ok(value) if value.is_object() => error_says_dead_token(&value),
+        _ => says_dead_token(first),
+    }
 }
 
 impl fmt::Debug for Endpoint {
@@ -322,7 +391,17 @@ impl Endpoint {
                 .filter(|secret| !secret.is_empty())
                 .cloned()
                 .collect(),
+            refused: AtomicBool::new(false),
         })
+    }
+
+    /// Whether the service refused the link itself in a call through here.
+    pub fn refused(&self) -> bool {
+        self.refused.load(Ordering::Relaxed)
+    }
+
+    fn mark_refused(&self) {
+        self.refused.store(true, Ordering::Relaxed);
     }
 
     /// `text` with every secret of the link taken out.
@@ -468,6 +547,7 @@ impl<'a, H: Http> Client<'a, H> {
                 url: endpoint.url.clone(),
                 headers,
                 body: Some(message.to_string().into_bytes()),
+                most: crate::net::BODY_MOST,
             })
             .await?;
         let name = endpoint.name;
@@ -476,9 +556,14 @@ impl<'a, H: Http> Client<'a, H> {
             300..=399 => Err(format!(
                 "{name} answered with a redirect, which the lamp doesn't follow"
             )),
-            401 | 403 => Err(format!(
-                "{name} refused the lamp's link: it may need linking again in the app"
-            )),
+            401 | 403 => {
+                if reply.status == 401 {
+                    endpoint.mark_refused();
+                }
+                Err(format!(
+                    "{name} refused the lamp's link: it may need linking again in the app"
+                ))
+            }
             404 if self.session.is_some() => Err(format!("{name} ended the session: try again")),
             429 => Err(format!("{name} is busy: try again in a while")),
             _ => Err(format!("{name} answered with an error")),
@@ -507,6 +592,9 @@ impl<'a, H: Http> Client<'a, H> {
             .ok_or_else(|| format!("{name}'s answer had no reply to the lamp's call"))?;
         if let Some(error) = message.get("error") {
             let said = error.get("message").and_then(Value::as_str).unwrap_or("");
+            if error_says_dead_token(error) {
+                self.endpoint.mark_refused();
+            }
             return Err(format!(
                 "{name} refused the call (its words, quoted: \"{}\")",
                 self.endpoint.scrub(&mail::tidy(said, 200))
@@ -557,9 +645,18 @@ impl<'a, H: Http> Client<'a, H> {
     }
 
     /// Call one tool; its result.
+    /// A tool's error that says the token is dead marks the link refused
+    /// ([`tool_error_says_dead_token`]); a result quoting the words doesn't.
     pub async fn call(&mut self, tool: &str, arguments: &Value) -> Result<Value, String> {
-        self.request("tools/call", json!({"name": tool, "arguments": arguments}))
-            .await
+        let result = self
+            .request("tools/call", json!({"name": tool, "arguments": arguments}))
+            .await?;
+        if result.get("isError").and_then(Value::as_bool) == Some(true)
+            && tool_error_says_dead_token(&result)
+        {
+            self.endpoint.mark_refused();
+        }
+        Ok(result)
     }
 }
 
@@ -867,6 +964,10 @@ pub(crate) mod fake {
         pub sse: bool,
         /// The text a call's answer carries, beside its echo.
         pub said: String,
+        /// An error every `tools/list` answers with, when set.
+        pub refusal: Mutex<Option<Value>>,
+        /// Answer each `tools/call` as a tool's error (`isError`).
+        pub tool_error: bool,
     }
 
     impl FakeMcp {
@@ -920,6 +1021,16 @@ pub(crate) mod fake {
                         ..Reply::default()
                     });
                 }
+                "tools/list" if self.refusal.lock().unwrap().is_some() => {
+                    let error = self.refusal.lock().unwrap().clone();
+                    return Ok(Reply {
+                        status: 200,
+                        body: json!({"jsonrpc":"2.0","id":message["id"],"error":error})
+                            .to_string()
+                            .into_bytes(),
+                        headers: vec![("content-type".into(), "application/json".into())],
+                    });
+                }
                 "tools/list" => json!({"tools": tools()}),
                 "tools/call" => json!({"content": [
                     {"type": "text", "text": format!("called {} with {}", message["params"]["name"], message["params"]["arguments"])},
@@ -927,7 +1038,7 @@ pub(crate) mod fake {
                     // not the echo (`reads::quoted` hides a neighbour).
                     {"type": "text", "text": "and then:"},
                     {"type": "text", "text": self.said},
-                ]}),
+                ], "isError": self.tool_error}),
                 _ => {
                     return Ok(Reply {
                         status: 200,
@@ -1279,5 +1390,63 @@ mod tests {
         assert!(arguments(&json!({"arguments": {"t": "x".repeat(ARGUMENTS_MOST)}})).is_err());
         assert!(tool_name(&json!({"tool":"a b"})).is_err());
         assert!(tool_name(&json!({"tool":"slack_send_message"})).is_ok());
+    }
+
+    #[test]
+    fn a_link_is_refused_by_the_services_own_error_never_by_text_it_quotes() {
+        // The service's own error fields mark it.
+        for error in [
+            json!({"code":-32000,"message":"invalid_auth"}),
+            json!({"code":-32000,"message":"Error: token_expired."}),
+            json!({"code":-32000,"message":"failed","data":"token_revoked"}),
+            json!({"code":-32000,"message":"failed","data":{"error":"invalid_auth"}}),
+        ] {
+            assert!(error_says_dead_token(&error), "{error}");
+        }
+        // Words it quotes, in its message or anywhere else, don't.
+        for error in [
+            json!({"code":-32000,"message":"no channel named \"invalid_auth\""}),
+            json!({"code":-32000,"message":"ratelimited","data":{"text":"invalid_auth"}}),
+            json!({"code":-32000,"message":"invalid_authority"}),
+        ] {
+            assert!(!error_says_dead_token(&error), "{error}");
+        }
+        // A tool's error: its first block or its structured error marks it.
+        for result in [
+            json!({"isError":true,"content":[{"type":"text","text":"{\"ok\":false,\"error\":\"invalid_auth\"}"}]}),
+            json!({"isError":true,"content":[{"type":"text","text":"token_revoked: the token was revoked"}]}),
+            json!({"isError":true,"structuredContent":{"error":"token_expired"},"content":[]}),
+        ] {
+            assert!(tool_error_says_dead_token(&result), "{result}");
+        }
+        // A message or an issue it quotes doesn't, in the error or after it.
+        for result in [
+            json!({"isError":true,"content":[{"type":"text","text":"{\"ok\":false,\"error\":\"msg_too_long\",\"message\":{\"text\":\"invalid_auth\"}}"}]}),
+            json!({"isError":true,"content":[{"type":"text","text":"not posted: \"why do I get invalid_auth?\" is too long"}]}),
+            json!({"isError":true,"content":[{"type":"text","text":"not found"},{"type":"text","text":"invalid_auth"}]}),
+        ] {
+            assert!(!tool_error_says_dead_token(&result), "{result}");
+        }
+        // Through a call: a good result, and a tool's error whose echo and
+        // later block quote the words, leave the link as it was.
+        for tool_error in [false, true] {
+            let fake = FakeMcp {
+                said: "invalid_auth".into(),
+                tool_error,
+                ..FakeMcp::default()
+            };
+            let entry = slack(json!({}));
+            let endpoint = Endpoint::new(catalog::service("slack").unwrap(), &entry).unwrap();
+            let result = run(async {
+                let mut client = Client::open(&fake, &endpoint).await?;
+                client
+                    .call("slack_send_message", &json!({"text":"invalid_auth again"}))
+                    .await
+            })
+            .unwrap();
+            assert_eq!(result["isError"], tool_error);
+            assert!(result.to_string().contains("invalid_auth"));
+            assert!(!endpoint.refused(), "isError {tool_error}");
+        }
     }
 }

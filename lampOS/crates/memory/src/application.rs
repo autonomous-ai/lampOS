@@ -3,6 +3,7 @@ use lamp_memory::{
     health::{CountSource, Reporter, State},
     server::Server,
     store::{LocalTime, Options, Store, private_dir},
+    tiers,
 };
 use std::{
     ffi::OsString,
@@ -280,7 +281,28 @@ fn serve(arguments: &Arguments, server: Server, health: Option<&State>) -> io::R
             health.counts(counts.map_err(io::Error::other));
         }
         log(&days_start_line(arguments));
+        // The tiered store beside Days, off unless LAMP_MEMORY_TIERS is set
+        // (#4746, docs/memory-design.md). An unknown value is said and the
+        // tiers stay off: memory itself starts as always.
+        let switch = std::env::var(tiers::SWITCH).ok();
+        match tiers::Mode::parse(switch.as_deref()) {
+            Ok(Some(mode)) => {
+                let options = tiers::Options::new(arguments.dir.clone(), mode, local(arguments)?);
+                let mut tiered = tiers::Tiered::start(store, options);
+                log(&format!("tiers mode={}", mode.name()));
+                return server.run_reporting(&mut tiered, &mut now_unix_ms, &mut log, health);
+            }
+            Ok(None) => {}
+            Err(tiers::UnknownMode) => log("LAMP_MEMORY_TIERS is not off, shadow or on; the tiers stay off"),
+        }
+        // Off: a forget can't reach a tiered copy an earlier run left.
+        if let Some(line) = tiers::clear_left(&arguments.dir) {
+            log(&line);
+        }
         return server.run_reporting(&mut store, &mut now_unix_ms, &mut log, health);
+    }
+    if std::env::var_os(tiers::SWITCH).is_some_and(|value| value != "off" && !value.is_empty()) {
+        log("LAMP_MEMORY_TIERS needs --memory-days; the tiers stay off");
     }
     let mut store = Store::open(
         Options {

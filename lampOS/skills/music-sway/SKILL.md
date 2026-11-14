@@ -30,10 +30,13 @@ the voice rests: its twenty seconds were counted while the lamp's music
 played, even if the room's music began later. The resting condition also
 puts the sway that waited for a turn 2 s after the turn ends.
 
-It hears music by the ears' room sound scores (`ears/classes`, with
+It hears music by the ears' room sound scores (`ears/classes`, only with
 `LAMP_EARS_CLASSES=on` in lamp-ears): a score from 0 to 1 the lamp works out
 on the lamp itself, from the room microphone, keeping no sound. Without them
 it does nothing.
+
+A core skill, on on product lamps: the product's ears score room sounds
+since the sound-class model ships with the update.
 
 If asked about it: "When there's music on, I sometimes sway along a little.
 It's the music, not you; I'll stop if you'd rather."

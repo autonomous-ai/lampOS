@@ -16,9 +16,10 @@ use rustix::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    ffi::OsStr,
     fs::{self, File, OpenOptions},
     io::{self, Write},
-    os::unix::fs::OpenOptionsExt,
+    os::unix::{ffi::OsStrExt, fs::OpenOptionsExt},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -311,6 +312,15 @@ pub trait Effects {
     /// The skills a person put on from a package removed,
     /// [`remove_installed_skills`] in [`SKILLS`]; how many.
     fn remove_installed_skills(&mut self) -> io::Result<usize>;
+    /// Hermes's and OpenClaw's per-person files removed and both programs
+    /// kept, [`forget_agents`] in [`AGENT_FOLDERS`] (#6343); how many.
+    fn forget_agents(&mut self) -> io::Result<usize>;
+    /// [`AGENT_USER`]'s own systemd manager, `user@<uid>.service`, its uid
+    /// read from [`PASSWD`] at the reset ([`agent_manager_unit`]); none when
+    /// there is no such user or the file can't be read (#6343).
+    fn agent_manager(&mut self) -> Option<String> {
+        agent_manager_unit(&fs::read_to_string(PASSWD).ok()?)
+    }
 }
 
 /// The product's skills folder (`lamp_update::product_skills::FOLDER`).
@@ -415,16 +425,740 @@ fn remove_installed_skills_with(
     Ok(skills)
 }
 
+/// One of the lamp's agents' folders (#6343): what in it is the program,
+/// kept, and the folders the program makes, emptied and kept; everything
+/// else in it is the person's and removed.
+pub struct AgentFolder {
+    pub folder: &'static str,
+    pub keep: &'static [&'static str],
+    pub empty: &'static [&'static str],
+}
+
+/// Hermes's (`lamp_update::hermes_install::PLACE`, `HERMES_HOME`) and
+/// OpenClaw's (`lamp_update::openclaw_install::PLACE`, `STATE`) folders,
+/// each by what it keeps, never by what it removes (#6343): Hermes keeps
+/// its sessions, memories, keys, databases, pastes and caches under names
+/// that change between its releases, and a name the reset does not know is
+/// the person's, so it is removed. Not plan paths: a plan empties a path
+/// and keeps it, and a plan of 64 paths at most has no room for each.
+/// Kept, and why:
+/// - Hermes's home (its `HOME`, where its terminal tool runs): `.hermes`
+///   (below), `.local` (below), and the shell's `.bashrc` and `.profile`,
+///   written again as exactly what the installer writes there
+///   ([`HERMES_SHELL_TEXT`]), so a person's `export TOKEN=…` a tool added
+///   goes (the Reviewer-lead's P2); `.cache` and `.npm` are emptied and
+///   kept. Everything else goes;
+/// - `.local`: `bin`, in which only `hermes` ([`HERMES_COMMAND`], the one
+///   command the installer publishes there and `hermes_install::present`
+///   reads; a script a tool saved there, or a `uv tool` entry point, goes:
+///   Thirteen's P2), and `share/uv`'s
+///   `python` (the uv-managed Python the installer's `bootstrap_python`
+///   puts there, with `HOME` set to Hermes's); a `pip --user` install
+///   (`lib`), a `uv tool` install (`share/uv/tools`) and anything else go;
+/// - `HERMES_HOME`: the checkout `hermes-agent`, `tools` (uv, ffmpeg),
+///   `installs`, the public model lists' caches, and `config.yaml`, cut
+///   to lamp-update's install-time settings (no update check, no language
+///   servers: `hermes_install::CONFIG`) and Harness's own `hooks:` items
+///   ([`cut_hermes_config`]): a person's hooks, `mcp_servers`, skill folders,
+///   personality and the rest go; lamp-tasks merges the lamp's provider
+///   back in at its next start. Its key file `.env` is removed, and
+///   written again by lamp-tasks with the forwarder's new token;
+/// - emptied in `HERMES_HOME`: the folders the installer makes
+///   (`stage_config`), the bundled skills among them, which Hermes copies
+///   back at its next start, as it writes `SOUL.md` again when missing;
+/// - OpenClaw's folder: its Node (`node`), its package (`npm`, `pkg` of
+///   earlier installs), npm's cache `.npm`, `.cache`, the lamp's own
+///   gateway token `gateway-token`, and `state` (below);
+/// - OpenClaw's state: `openclaw.json`, cut to its `gateway` block (the
+///   token's auth), which lamp-update writes only at an install
+///   ([`cut_openclaw_config`]); lamp-tasks merges the rest in at each
+///   start, so another provider's key, a channel's token and a person's
+///   skill folders or plugins go.
+///
+/// Beside them, the Hermes a pin change moved aside
+/// (`hermes_install::ASIDE`, kept until a new Hermes runs) is removed
+/// whole: it holds the old Hermes's sessions, memories and keys.
+pub const AGENT_FOLDERS: [AgentFolder; 8] = [
+    AgentFolder {
+        folder: "/var/lib/lampos-hermes",
+        keep: &[".hermes", ".local", ".bashrc", ".profile"],
+        empty: &[".cache", ".npm"],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-hermes/.local",
+        keep: &["bin", "share"],
+        empty: &[],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-hermes/.local/bin",
+        keep: &[HERMES_COMMAND],
+        empty: &[],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-hermes/.local/share",
+        keep: &["uv"],
+        empty: &[],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-hermes/.local/share/uv",
+        keep: &["python"],
+        empty: &[],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-hermes/.hermes",
+        keep: &[
+            "hermes-agent",
+            "tools",
+            "installs",
+            "config.yaml",
+            "models_dev_cache.json",
+            "models_dev_cache.etag",
+            "provider_models_cache.json",
+        ],
+        empty: &[
+            "cron",
+            "sessions",
+            "logs",
+            "pairing",
+            "hooks",
+            "image_cache",
+            "audio_cache",
+            "memories",
+            "skills",
+        ],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-openclaw",
+        keep: &[
+            "node",
+            "npm",
+            "pkg",
+            ".npm",
+            ".cache",
+            "gateway-token",
+            "state",
+        ],
+        empty: &[],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-openclaw/state",
+        keep: &["openclaw.json"],
+        empty: &[],
+    },
+];
+
+/// What a reset does to one entry of the agents' folders (#6343), as
+/// [`plan_agents`] lists it and [`forget_agents`] does it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AgentStep {
+    /// Kept as it is: the program.
+    Keep(PathBuf),
+    /// Removed, a folder with all it holds.
+    Remove(PathBuf),
+    /// A folder emptied and kept.
+    Empty(PathBuf),
+    /// A kept file cut to the lamp's own keys: the top-level key names it
+    /// keeps and drops, never their values.
+    Cut {
+        path: PathBuf,
+        kept: Vec<String>,
+        dropped: Vec<String>,
+    },
+}
+
+impl std::fmt::Display for AgentStep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AgentStep::Keep(path) => write!(f, "keep {}", path.display()),
+            AgentStep::Remove(path) => write!(f, "remove {}", path.display()),
+            AgentStep::Empty(path) => write!(f, "empty {}", path.display()),
+            AgentStep::Cut {
+                path,
+                kept,
+                dropped,
+            } => write!(
+                f,
+                "cut {} (keys: kept {}; dropped {})",
+                path.display(),
+                if kept.is_empty() {
+                    "none".into()
+                } else {
+                    kept.join(", ")
+                },
+                if dropped.is_empty() {
+                    "none".into()
+                } else {
+                    dropped.join(", ")
+                },
+            ),
+        }
+    }
+}
+
+/// The person's files in each of [`AGENT_FOLDERS`] under `root` (`/` on a
+/// lamp) removed, the program kept; how many entries were removed, emptied
+/// or cut. A folder that is missing, or a link, is passed over, so a lamp
+/// without Hermes or OpenClaw removes nothing; nothing is followed through
+/// a link. Run again after a cut, it finishes what is left.
+pub fn forget_agents(root: &Path) -> io::Result<usize> {
+    walk_agents(root, true, &mut Vec::new())
+}
+
+/// What [`forget_agents`] would do under `root`, one step an entry, with
+/// nothing changed (`lamp-setup forget-agents --dry-run`): the same walk and
+/// the same decisions, only not acted on, so the listing cannot drift from
+/// the reset. Nothing is followed through a link.
+pub fn plan_agents(root: &Path) -> io::Result<Vec<AgentStep>> {
+    let mut steps = Vec::new();
+    walk_agents(root, false, &mut steps)?;
+    Ok(steps)
+}
+
+fn walk_agents(root: &Path, act: bool, steps: &mut Vec<AgentStep>) -> io::Result<usize> {
+    if !root.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "the reset's agents' root must be absolute",
+        ));
+    }
+    let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+    let mut removed = 0;
+    for agent in &AGENT_FOLDERS {
+        let folder = root.join(agent.folder.trim_start_matches('/'));
+        let dir = match open_dir(&folder) {
+            Ok(dir) => dir,
+            Err(rustix::io::Errno::NOENT | rustix::io::Errno::NOTDIR | rustix::io::Errno::LOOP) => {
+                continue;
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let mut names = Vec::new();
+        for entry in rustix::fs::Dir::read_from(&dir)? {
+            let name = entry?.file_name().to_owned();
+            let bytes = name.as_bytes();
+            if bytes == b"." || bytes == b".." {
+                continue;
+            }
+            if agent.keep.iter().any(|kept| kept.as_bytes() == bytes) {
+                steps.push(AgentStep::Keep(folder.join(OsStr::from_bytes(bytes))));
+            } else {
+                names.push(name);
+            }
+        }
+        names.sort();
+        for name in names {
+            let path = folder.join(OsStr::from_bytes(name.as_bytes()));
+            let stat = match rustix::fs::statat(&dir, name.as_c_str(), AtFlags::SYMLINK_NOFOLLOW) {
+                Ok(stat) => stat,
+                Err(rustix::io::Errno::NOENT) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let emptied = agent
+                .empty
+                .iter()
+                .any(|kept| kept.as_bytes() == name.as_bytes());
+            if is_dir(&stat) {
+                let child = rustix::fs::openat(&dir, name.as_c_str(), flags, Mode::empty())?;
+                let had = rustix::fs::Dir::read_from(&child)?
+                    .filter_map(Result::ok)
+                    .any(|entry| !matches!(entry.file_name().to_bytes(), b"." | b".."));
+                if emptied {
+                    steps.push(AgentStep::Empty(path));
+                    if act {
+                        empty(&child)?;
+                        rustix::fs::fsync(&child)?;
+                    }
+                    removed += usize::from(had);
+                    continue;
+                }
+                steps.push(AgentStep::Remove(path));
+                if act {
+                    empty(&child)?;
+                    rustix::fs::unlinkat(&dir, name.as_c_str(), AtFlags::REMOVEDIR)?;
+                }
+            } else {
+                steps.push(AgentStep::Remove(path));
+                if act {
+                    rustix::fs::unlinkat(&dir, name.as_c_str(), AtFlags::empty())?;
+                }
+            }
+            removed += 1;
+        }
+        if act {
+            rustix::fs::fsync(&dir)?;
+        }
+    }
+    removed += usize::from(remove_whole(
+        root,
+        Path::new(lamp_update::hermes_install::ASIDE),
+        act,
+        steps,
+    )?);
+    let kept = Kept { root, act };
+    removed += usize::from(kept.cut(
+        lamp_update::hermes_install::HERMES_HOME,
+        "config.yaml",
+        cut_hermes_config,
+        yaml_keys,
+        steps,
+    )?);
+    removed += usize::from(kept.cut(
+        OPENCLAW_STATE,
+        "openclaw.json",
+        cut_openclaw_config,
+        json_keys,
+        steps,
+    )?);
+    for shell in [".bashrc", ".profile"] {
+        removed += usize::from(kept.cut(
+            lamp_update::hermes_install::PLACE,
+            shell,
+            |_| Some(HERMES_SHELL_TEXT.as_bytes().to_vec()),
+            |_| Vec::new(),
+            steps,
+        )?);
+    }
+    Ok(removed)
+}
+
+/// What the Hermes installer writes in Hermes's `.bashrc` and `.profile`
+/// (`append_shell_path` with `SHELL_PATH_LINE`, `SHELL=/bin/sh`), and all
+/// a reset leaves there: `.local/bin` on `PATH`.
+pub const HERMES_SHELL_TEXT: &str = "\n# Hermes Agent command\ncase \":$PATH:\" in *\":$HOME/.local/bin:\"*) ;; *) export PATH=\"$HOME/.local/bin:$PATH\" ;; esac\n";
+
+/// The `hermes` command's name in `.local/bin`, the file name of
+/// [`lamp_update::hermes_install::HERMES`] (a test checks they agree).
+pub const HERMES_COMMAND: &str = "hermes";
+
+/// OpenClaw's state folder (`lamp_update::openclaw_install::STATE`).
+const OPENCLAW_STATE: &str = "/var/lib/lampos-openclaw/state";
+
+/// A kept settings file larger than this is not read but removed.
+const MOST_KEPT: u64 = 1 << 20;
+
+/// `path` under `root` removed whole (when `act`), a link as a link,
+/// nothing followed on the way; whether there was one. A missing parent or
+/// entry, or a parent reached only through a link, is passed over, as
+/// [`forget_agents`] passes over its folders; any other error is returned,
+/// so the reset fails closed.
+fn remove_whole(
+    root: &Path,
+    path: &Path,
+    act: bool,
+    steps: &mut Vec<AgentStep>,
+) -> io::Result<bool> {
+    let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+        return Err(io::Error::other("a removed path has a parent and a name"));
+    };
+    let parent_path = root.join(parent.strip_prefix("/").unwrap_or(parent));
+    let parent = match open_dir(&parent_path) {
+        Ok(parent) => parent,
+        Err(rustix::io::Errno::NOENT | rustix::io::Errno::NOTDIR | rustix::io::Errno::LOOP) => {
+            return Ok(false);
+        }
+        Err(error) => return Err(error.into()),
+    };
+    let there = remove_at(&parent, name, act)?;
+    if there {
+        steps.push(AgentStep::Remove(parent_path.join(name)));
+    }
+    Ok(there)
+}
+
+/// `name` in `dir` removed (when `act`), a folder with all it holds;
+/// whether it was there.
+fn remove_at(dir: &OwnedFd, name: impl rustix::path::Arg + Copy, act: bool) -> io::Result<bool> {
+    let stat = match rustix::fs::statat(dir, name, AtFlags::SYMLINK_NOFOLLOW) {
+        Ok(stat) => stat,
+        Err(rustix::io::Errno::NOENT) => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
+    if !act {
+        return Ok(true);
+    }
+    if is_dir(&stat) {
+        let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+        let child = rustix::fs::openat(dir, name, flags, Mode::empty())?;
+        empty(&child)?;
+        rustix::fs::unlinkat(dir, name, AtFlags::REMOVEDIR)?;
+    } else {
+        rustix::fs::unlinkat(dir, name, AtFlags::empty())?;
+    }
+    rustix::fs::fsync(dir)?;
+    Ok(true)
+}
+
+/// The top-level key names of a YAML file as [`cut_hermes_config`] reads
+/// it: column-0 `key:` lines.
+fn yaml_keys(text: &[u8]) -> Vec<String> {
+    String::from_utf8_lossy(text)
+        .lines()
+        .filter(|line| !line.starts_with([' ', '#', '-']))
+        .filter_map(top_key)
+        .map(str::to_owned)
+        .collect()
+}
+
+/// The top-level key names of a JSON object.
+fn json_keys(text: &[u8]) -> Vec<String> {
+    match serde_json::from_slice(text) {
+        Ok(serde_json::Value::Object(all)) => all.keys().cloned().collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// The kept settings files' cut, acted on or only listed.
+struct Kept<'a> {
+    root: &'a Path,
+    act: bool,
+}
+
+impl Kept<'_> {
+    /// A kept settings file `name` in `folder` under the root cut by `cut`
+    /// to the lamp's own keys, in place, its owner and mode kept; whether it
+    /// changed. A file that is not a regular one, is too large, or that
+    /// `cut` can't read (`None`) is removed: a reset fails toward wiping.
+    /// The cut is written beside it as `NAME.cut` and renamed over it, so a
+    /// cut stopped half-way leaves the old file whole and the leftover, a
+    /// name the folder does not keep, is removed by the next run. A missing
+    /// folder or file is nothing to do. `keys` names the top-level keys for
+    /// the step listed, never their values.
+    fn cut(
+        &self,
+        folder: &str,
+        name: &str,
+        cut: fn(&[u8]) -> Option<Vec<u8>>,
+        keys: fn(&[u8]) -> Vec<String>,
+        steps: &mut Vec<AgentStep>,
+    ) -> io::Result<bool> {
+        use std::io::Read;
+        let folder = self.root.join(folder.trim_start_matches('/'));
+        let path = folder.join(name);
+        let dir = match open_dir(&folder) {
+            Ok(dir) => dir,
+            Err(rustix::io::Errno::NOENT | rustix::io::Errno::NOTDIR | rustix::io::Errno::LOOP) => {
+                return Ok(false);
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let stat = match rustix::fs::statat(&dir, name, AtFlags::SYMLINK_NOFOLLOW) {
+            Ok(stat) => stat,
+            Err(rustix::io::Errno::NOENT) => return Ok(false),
+            Err(error) => return Err(error.into()),
+        };
+        // Listed again below with what is done to it.
+        steps.retain(|step| *step != AgentStep::Keep(path.clone()));
+        let regular =
+            rustix::fs::FileType::from_raw_mode(stat.st_mode) == rustix::fs::FileType::RegularFile;
+        if !regular || stat.st_size as u64 > MOST_KEPT {
+            steps.push(AgentStep::Remove(path));
+            return remove_at(&dir, name, self.act);
+        }
+        let file = rustix::fs::openat(
+            &dir,
+            name,
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
+        )?;
+        let mut text = Vec::new();
+        File::from(file)
+            .take(MOST_KEPT + 1)
+            .read_to_end(&mut text)?;
+        let Some(new) = cut(&text) else {
+            steps.push(AgentStep::Remove(path));
+            return remove_at(&dir, name, self.act);
+        };
+        if new == text {
+            steps.push(AgentStep::Keep(path));
+            return Ok(false);
+        }
+        let kept = keys(&new);
+        let dropped = keys(&text)
+            .into_iter()
+            .filter(|key| !kept.contains(key))
+            .collect();
+        steps.push(AgentStep::Cut {
+            path,
+            kept,
+            dropped,
+        });
+        if !self.act {
+            return Ok(true);
+        }
+        let staged = format!("{name}.cut");
+        match rustix::fs::unlinkat(&dir, staged.as_str(), AtFlags::empty()) {
+            Ok(()) | Err(rustix::io::Errno::NOENT) => {}
+            Err(error) => return Err(error.into()),
+        }
+        let mode = Mode::from_raw_mode(stat.st_mode);
+        let out = rustix::fs::openat(
+            &dir,
+            staged.as_str(),
+            OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            mode,
+        )?;
+        rustix::fs::fchown(
+            &out,
+            Some(rustix::fs::Uid::from_raw(stat.st_uid)),
+            Some(rustix::fs::Gid::from_raw(stat.st_gid)),
+        )?;
+        rustix::fs::fchmod(&out, mode)?;
+        let mut out = File::from(out);
+        out.write_all(&new)?;
+        out.sync_all()?;
+        rustix::fs::renameat(&dir, staged.as_str(), &dir, name)?;
+        rustix::fs::fsync(&dir)?;
+        Ok(true)
+    }
+}
+
+/// Hermes's `config.yaml` cut to what the lamp wrote (#6343): the keys of
+/// `lamp_update::hermes_install::CONFIG`, written again with their values,
+/// and Harness's own entries of the top-level `hooks:` block
+/// ([`harness_hooks`]). Everything else, a
+/// person's `mcp_servers`, `skills.external_dirs`, personality and the
+/// rest, goes; lamp-tasks merges the lamp's provider back in at its next
+/// start, and with `LAMP_AGENT_SERVICES=on` the lamp's own
+/// `mcp_servers.lamp-services` entry too (cut here with the person's, so
+/// nothing a person wrote beside it or into it survives). The workspace has no YAML crate, so it is read line by line, as
+/// lamp-tasks's `hermes_config` reads it, over the block style Hermes and
+/// Harness write. A file it can't read so (not UTF-8, a tab, a document
+/// marker, a top-level line that is not a key, `hooks` twice) is `None`,
+/// and the reset removes it rather than keep what it can't sort.
+pub fn cut_hermes_config(text: &[u8]) -> Option<Vec<u8>> {
+    let text = std::str::from_utf8(text).ok()?;
+    let mut hooks: Option<Vec<&str>> = None;
+    let mut in_hooks = false;
+    let mut in_key = false;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        let blank = trimmed.is_empty() || trimmed.starts_with('#');
+        if line.contains('\t') && !trimmed.starts_with('#') {
+            return None;
+        }
+        if trimmed == "---" || trimmed == "..." || trimmed.starts_with("--- ") {
+            return None;
+        }
+        let top = !blank && !line.starts_with(' ');
+        // PyYAML writes a list under a key at the key's own indent.
+        let list_item = line.starts_with("- ") || line == "-";
+        if top && !(list_item && in_key) {
+            let key = top_key(line)?;
+            in_key = true;
+            in_hooks = key == "hooks";
+            if in_hooks {
+                if hooks.is_some() {
+                    return None;
+                }
+                hooks = Some(vec![line]);
+            }
+            continue;
+        }
+        if in_hooks && let Some(lines) = hooks.as_mut() {
+            lines.push(line);
+        }
+    }
+    let mut out = String::new();
+    let mut tops: Vec<&str> = Vec::new();
+    for (key, _) in lamp_update::hermes_install::CONFIG {
+        let (top, _) = key.split_once('.')?;
+        if !tops.contains(&top) {
+            tops.push(top);
+        }
+    }
+    for top in tops {
+        out.push_str(top);
+        out.push_str(":\n");
+        for (key, value) in lamp_update::hermes_install::CONFIG {
+            if let Some((_, sub)) = key.split_once('.').filter(|(at, _)| *at == top) {
+                out.push_str(&format!("  {sub}: {value}\n"));
+            }
+        }
+    }
+    if let Some(lines) = hooks {
+        out.push_str(&harness_hooks(&lines));
+    }
+    Some(out.into_bytes())
+}
+
+/// The `hooks:` block's lines cut to Harness's own entries (the
+/// Reviewer-lead's P3): under each event, only the list items whose
+/// `command` starts with `harness hook `; an event left with none, and the
+/// block left with no event, go. A person's hook, whose command can carry
+/// a token, goes, as does anything not in the block style Harness writes
+/// (an inline value, a comment, a nested mapping outside an item).
+fn harness_hooks(lines: &[&str]) -> String {
+    let Some((first, body)) = lines.split_first() else {
+        return String::new();
+    };
+    let inline = first
+        .split_once(':')
+        .map(|(_, rest)| rest.trim())
+        .unwrap_or("");
+    if !(inline.is_empty() || inline.starts_with('#')) {
+        return String::new();
+    }
+    let content = |line: &&&str| {
+        let trimmed = line.trim();
+        !trimmed.is_empty() && !trimmed.starts_with('#')
+    };
+    let is_item = |line: &str| {
+        let trimmed = line.trim_start();
+        trimmed.starts_with("- ") || trimmed == "-"
+    };
+    let indent = |line: &str| line.len() - line.trim_start_matches(' ').len();
+    let body: Vec<&str> = body.iter().filter(content).copied().collect();
+    let Some(events_at) = body
+        .iter()
+        .filter(|line| !is_item(line))
+        .map(|line| indent(line))
+        .min()
+    else {
+        return String::new();
+    };
+    // (event line, whether it stands alone, its items' lines)
+    let mut events: Vec<(&str, bool, Vec<Vec<&str>>)> = Vec::new();
+    for line in body {
+        if !is_item(line) && indent(line) == events_at {
+            let alone = line
+                .split_once(':')
+                .is_some_and(|(_, rest)| rest.trim().is_empty());
+            events.push((line, alone, Vec::new()));
+        } else if let Some((_, _, items)) = events.last_mut() {
+            if is_item(line) {
+                items.push(vec![line]);
+            } else if let Some(item) = items.last_mut() {
+                item.push(line);
+            } else {
+                // A mapping under the event, not a list: not Harness's.
+                events.last_mut().unwrap().1 = false;
+            }
+        }
+    }
+    let harness = |item: &Vec<&str>| {
+        let mut commands = 0;
+        let fits = item.iter().all(|line| {
+            let line = line.trim_start();
+            let line = line.strip_prefix('-').unwrap_or(line).trim_start();
+            let Some((key, value)) = line.split_once(':') else {
+                return false;
+            };
+            let value = unquoted(value.trim());
+            match key {
+                "command" => {
+                    commands += 1;
+                    harness_command(value)
+                }
+                "matcher" => value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"*|._-".contains(&byte)),
+                "timeout" => !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()),
+                _ => false,
+            }
+        });
+        fits && commands == 1
+    };
+    let mut out = String::new();
+    for (event, alone, items) in events {
+        let kept: Vec<&Vec<&str>> = items.iter().filter(|item| harness(item)).collect();
+        if !alone || kept.is_empty() {
+            continue;
+        }
+        out.push_str(event);
+        out.push('\n');
+        for line in kept.into_iter().flatten() {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    if out.is_empty() {
+        return out;
+    }
+    format!("{first}\n{out}")
+}
+
+/// A YAML scalar with one pair of matching quotes taken off.
+fn unquoted(value: &str) -> &str {
+    for quote in ['"', '\''] {
+        if let Some(inner) = value
+            .strip_prefix(quote)
+            .and_then(|rest| rest.strip_suffix(quote))
+        {
+            return inner;
+        }
+    }
+    value
+}
+
+/// Harness's own hook command, exactly: `harness hook` and its engine and
+/// event (`harness hook hermes session-start`), one or two plain words
+/// with nothing after them, so no shell text rides along (Thirteen's P3).
+fn harness_command(value: &str) -> bool {
+    let Some(rest) = value.strip_prefix("harness hook ") else {
+        return false;
+    };
+    let words: Vec<&str> = rest.split(' ').collect();
+    (1..=2).contains(&words.len())
+        && words.iter().all(|word| {
+            !word.is_empty()
+                && word
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+        })
+}
+
+/// The key of a top-level `key:` or `key: value` line, quotes allowed;
+/// `None` for any other line.
+fn top_key(line: &str) -> Option<&str> {
+    if line.starts_with(['-', '{', '[']) {
+        return None;
+    }
+    let (key, rest) = if let Some(quoted) = line.strip_prefix('"') {
+        let end = quoted.find('"')?;
+        (&quoted[..end], &quoted[end + 1..])
+    } else if let Some(quoted) = line.strip_prefix('\'') {
+        let end = quoted.find('\'')?;
+        (&quoted[..end], &quoted[end + 1..])
+    } else {
+        let end = line.find(':')?;
+        (&line[..end], &line[end..])
+    };
+    let rest = rest.strip_prefix(':')?;
+    (!key.is_empty() && (rest.is_empty() || rest.starts_with(' '))).then_some(key)
+}
+
+/// OpenClaw's `openclaw.json` cut to its top-level `gateway` key, the
+/// gateway's auth lamp-update wrote at the install (#6343); `{}` without
+/// one. lamp-tasks merges the lamp's own keys back in at each start. A file
+/// that is not a JSON object is `None`, and the reset removes it.
+pub fn cut_openclaw_config(text: &[u8]) -> Option<Vec<u8>> {
+    let serde_json::Value::Object(mut all) = serde_json::from_slice(text).ok()? else {
+        return None;
+    };
+    let mut kept = serde_json::Map::new();
+    if let Some(gateway) = all.remove("gateway") {
+        kept.insert("gateway".into(), gateway);
+    }
+    let mut out = serde_json::to_vec_pretty(&serde_json::Value::Object(kept)).ok()?;
+    out.push(b'\n');
+    Some(out)
+}
+
 /// What a part keeps in `/run` past its own stop: the tmpfiles' folders (the
-/// bus's latest messages, which can say a person's name or words, and the
-/// app's photos for the eyes) and each `RuntimeDirectory=` its unit keeps
-/// (`RuntimeDirectoryPreserve=yes`: the voice's, with the thread's set-aside
-/// words and the room, and the records'). Every other `RuntimeDirectory=` is
+/// bus's latest messages, which can say a person's name or words, the app's
+/// photos for the eyes, the eyes' sitting kept across a restart, and the
+/// frame link's folder for lamp-seen) and each `RuntimeDirectory=` its unit
+/// keeps (`RuntimeDirectoryPreserve=yes`: the voice's, with the thread's
+/// set-aside words and the room, the records', and lamp-seen's, with the
+/// frame link's boots). Every other `RuntimeDirectory=` is
 /// removed by systemd as its unit stops. A reboot empties `/run`; a reset
 /// that starts setup in place empties these, with every part stopped.
-pub const VOLATILE: [&str; 4] = [
+pub const VOLATILE: [&str; 7] = [
     "/run/lampos-bus",
     "/run/lampos-photos",
+    "/run/lampos-eyes-kept",
+    "/run/lampos-eyes-frames",
+    "/run/lampos-seen",
     "/run/lampos-voice",
     "/run/lamp-records",
 ];
@@ -463,6 +1197,9 @@ impl Effects for System {
     fn remove_installed_skills(&mut self) -> io::Result<usize> {
         remove_installed_skills(Path::new(SKILLS)).map(|removed| removed.len())
     }
+    fn forget_agents(&mut self) -> io::Result<usize> {
+        forget_agents(Path::new("/"))
+    }
 }
 
 /// `argv` run and killed with its children once `most` has passed
@@ -491,6 +1228,9 @@ pub enum Step {
     /// count, never by name, since a made skill's name is the person's words
     /// and the journal outlives the reset (Reviewer-two's P3 on the branch).
     InstalledSkillsRemoved,
+    /// Hermes's and OpenClaw's per-person files removed, [`forget_agents`]
+    /// (#6343): by count, never by name.
+    AgentsForgotten,
     /// Setup and what a boot starts, started in place of a reboot (#4500).
     Started,
     Rebooting,
@@ -663,10 +1403,17 @@ pub fn stop_and_wait_keeping(
         argv.extend(starters.iter().cloned());
         effects.run(&argv)?;
     }
+    let manager = if product {
+        agent_manager(effects)
+    } else {
+        None
+    };
+    let mut writer_names: Vec<&str> = WRITERS.to_vec();
+    writer_names.extend(manager.as_deref());
     let writers = |effects: &mut _| -> io::Result<(Vec<String>, Listed)> {
         let mut parts = parts_of(stop, effects)?;
         let found = if product {
-            listed(&stop[0], &WRITERS, effects)?
+            listed(&stop[0], &writer_names, effects)?
         } else {
             Vec::new()
         };
@@ -686,6 +1433,12 @@ pub fn stop_and_wait_keeping(
     {
         again.push("lamp-update.service".into());
     }
+    again.extend(
+        listed_writers
+            .iter()
+            .filter(|(unit, active)| *active && Some(unit) == manager.as_ref())
+            .map(|(unit, _)| unit.clone()),
+    );
     if listed_writers.iter().any(|(unit, _)| unit == SETUP_UNIT) {
         again.push(SETUP_UNIT.into());
     } else {
@@ -767,13 +1520,19 @@ pub const STARTERS: [&str; 8] = [
 /// records' check (`/var/lib/lampOS/voice/sessions`), and the updater and
 /// its apply (the skills' state, `/var/lib/lampOS`; the reboot after the
 /// reset would end them all the same), and the boot's Wi-Fi restore (the
-/// Wi-Fi file; Third on #3579). And `lamp-peek`, an office lamp's page,
+/// Wi-Fi file; Third on #3579). And `lamp-peek`, an office lamp's page or
+/// the owner's dev monitor (#5883),
 /// which a reboot kept off by its setup condition: a start in place would
 /// leave it holding port 80 from setup's page (#4536); stopped, it is not
-/// started again until the lamp next boots. Patterns name only loaded
-/// units (no product lamp has `lamp-peek`), and none matches
-/// `lamp-setup-wipe.service`, the reset's own unit.
-pub const WRITERS: [&str; 11] = [
+/// started again until the lamp next boots. And OpenClaw's gateway
+/// (`lamp_update::openclaw_install::UNIT`, #6226), always on under
+/// `multi-user.target` and writing its state as it runs: stopped before
+/// [`forget_agents`] empties that state (#6343), started again by the
+/// lamp's next boot or the updater's next round. Beside them, `lampos`'s own
+/// manager ([`agent_manager_unit`], [`Effects::agent_manager`]). Patterns
+/// name only loaded units, and none matches `lamp-setup-wipe.service`, the
+/// reset's own unit.
+pub const WRITERS: [&str; 12] = [
     "lamp-setup.service",
     "lamp-setup-recover.service",
     "lamp-setup-change@*.service",
@@ -785,7 +1544,54 @@ pub const WRITERS: [&str; 11] = [
     "lamp-update-apply.service",
     "lamp-setup-wifi-restore.service",
     "lamp-peek.service",
+    OPENCLAW_GATEWAY,
 ];
+
+/// The parts' user, whose own systemd manager the reset stops
+/// (`lamp_update::install::USER`).
+pub const AGENT_USER: &str = lamp_update::install::USER;
+
+/// Where [`Effects::agent_manager`] looks [`AGENT_USER`] up, as setup's
+/// accounts and lamp-update's install do.
+pub const PASSWD: &str = "/etc/passwd";
+
+/// [`AGENT_USER`]'s own systemd manager, `user@<uid>.service`, from the text
+/// of `/etc/passwd`; none when there is no such user. On a product lamp it
+/// lingers (`lamp_update::install::harness_at_boot_with`), outside
+/// `lampos.target`, and runs Harness's daemon (`harnessd.service`) and the
+/// panes it launched, the lamp's own Hermes among them (#6343, lamp-c0a4,
+/// 13 and 14 Nov: a reset in place left the old daemon running with the
+/// last owner's connection and computer id, so `harness start` failed until
+/// a reboot, and the old Hermes kept writing its state). Its uid is the
+/// lamp's own, so it is read at the reset, and no other user's manager is
+/// named. Stopped with the lamp, before the wipe; one that was running is
+/// started again in place, as a boot starts it, so the daemon starts fresh
+/// on the wiped folders.
+pub fn agent_manager_unit(passwd: &str) -> Option<String> {
+    passwd.lines().find_map(|line| {
+        let mut fields = line.split(':');
+        (fields.next() == Some(AGENT_USER)).then_some(())?;
+        let uid = fields.nth(1)?;
+        (!uid.is_empty() && uid.bytes().all(|b| b.is_ascii_digit()))
+            .then(|| format!("user@{uid}.service"))
+    })
+}
+
+/// [`Effects::agent_manager`]'s answer, with a line when there is none: no
+/// [`AGENT_USER`] (or no `/etc/passwd`) means no manager of it to stop, and
+/// the reset goes on.
+fn agent_manager(effects: &mut impl Effects) -> Option<String> {
+    let unit = effects.agent_manager();
+    if unit.is_none() {
+        eprintln!(
+            "lamp-setup: reset: no user {AGENT_USER} in {PASSWD}; its manager is not stopped"
+        );
+    }
+    unit
+}
+
+/// OpenClaw's gateway unit (`lamp_update::openclaw_install::UNIT`).
+pub const OPENCLAW_GATEWAY: &str = "lamp-openclaw-gateway.service";
 
 /// Units as [`listed`] gives them: each name, and whether it is active.
 type Listed = Vec<(String, bool)>;
@@ -1031,17 +1837,64 @@ fn reboot(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) {
 }
 
 /// At start, before anything else: finish a reset a power cut interrupted.
-/// Nothing of the lamp is running yet, so nothing is stopped and there is no
-/// second reboot. Returns the steps taken, empty when there was no reset.
+/// Nothing of the lamp's target is running yet, and there is no second
+/// reboot. But OpenClaw's gateway ([`OPENCLAW_GATEWAY`]) starts at boot
+/// under `multi-user.target`, not ordered against setup, and writes its
+/// state as it runs: it is stopped first, when loaded and the plan's stop
+/// is systemd's, as the reset itself stops it ([`WRITERS`]), so it never
+/// writes into what [`forget_agents`] empties (#6343). So is the lingering
+/// `lampos`'s manager ([`agent_manager_unit`]), which a boot starts with Harness's
+/// daemon signed in as the last owner; one that was running is started
+/// again after the wipe, so the daemon starts fresh. A stop that fails
+/// fails the start, and nothing is wiped; a start again that fails is said
+/// and the start goes on, the wipe done. Returns the steps taken, empty
+/// when there was no reset.
 pub fn resume(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> {
     plan.check().map_err(io::Error::other)?;
     let mut steps = Vec::new();
     match fs::symlink_metadata(&plan.journal) {
-        Ok(_) => finish(plan, effects, &mut steps)?,
+        Ok(_) => {
+            let again = stop_agents(plan, effects)?;
+            finish(plan, effects, &mut steps)?;
+            if !again.is_empty() {
+                let mut argv = vec![plan.stop[0].clone(), "start".into()];
+                argv.extend(again);
+                if let Err(error) = effects.run(&argv) {
+                    eprintln!(
+                        "lamp-setup: resume-reset: not started again ({error}): {}",
+                        argv[2..].join(" ")
+                    );
+                }
+            }
+        }
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
         Err(error) => return Err(error),
     }
     Ok(steps)
+}
+
+/// OpenClaw's gateway and `lampos`'s manager stopped before a resumed
+/// reset, those loaded, when the plan stops by `systemctl`; the manager,
+/// when it was running, to start again after it.
+fn stop_agents(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<String>> {
+    let systemctl = &plan.stop[0];
+    if Path::new(systemctl).file_name() != Some("systemctl".as_ref()) {
+        return Ok(Vec::new());
+    }
+    let manager = agent_manager(effects);
+    let mut units = vec![OPENCLAW_GATEWAY];
+    units.extend(manager.as_deref());
+    let loaded = listed(systemctl, &units, effects)?;
+    if !loaded.is_empty() {
+        let mut argv = vec![systemctl.clone(), "stop".into()];
+        argv.extend(loaded.iter().map(|(unit, _)| unit.clone()));
+        effects.run(&argv)?;
+    }
+    Ok(loaded
+        .into_iter()
+        .filter(|(unit, active)| *active && Some(unit) == manager.as_ref())
+        .map(|(unit, _)| unit)
+        .collect())
 }
 
 fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io::Result<()> {
@@ -1064,6 +1917,13 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
     if removed > 0 {
         eprintln!("lamp-setup: reset: removed {removed} skills put on from a package");
         steps.push(Step::InstalledSkillsRemoved);
+    }
+    let forgotten = effects.forget_agents()?;
+    if forgotten > 0 {
+        eprintln!(
+            "lamp-setup: reset: removed {forgotten} of Hermes's and OpenClaw's per-person files"
+        );
+        steps.push(Step::AgentsForgotten);
     }
     // Already gone after `reset`; this covers a journal found without one.
     if remove_if_present(&plan.marker)? {

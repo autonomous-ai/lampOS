@@ -743,7 +743,7 @@ fn a_message_over_the_limit_is_refused_and_nothing_is_sent_or_kept() {
 }
 
 #[test]
-fn a_message_of_exactly_the_limit_goes_through_whole_where_the_system_takes_one_that_long() {
+fn a_message_of_exactly_the_limit_goes_through_whole() {
     let root = Root::new();
     let bus = root.bus();
     let mut subscriber = bus.subscribe("mic1", "follow").unwrap();
@@ -756,29 +756,13 @@ fn a_message_of_exactly_the_limit_goes_through_whole_where_the_system_takes_one_
     let one_more = [&payload[..], &[0]].concat();
     let error = publisher.publish_bytes(1, "x", &one_more).unwrap_err();
     assert!(error.to_string().contains("of 60001 bytes"), "{error}");
-    let whole = publisher.publish_bytes(1, "x", &payload);
-    if cfg!(target_os = "linux") {
-        assert_eq!(whole.unwrap(), ONE);
-        let message = subscriber.recv(WAIT).unwrap().expect("the whole message");
-        assert_eq!((message.header.seq, message.gap), (2, 0));
-        assert_eq!(message.payload.len() + header, MOST_BYTES);
-        assert!(message.payload == payload);
-    } else {
-        // macOS gives a local datagram socket 2,048 bytes to send with and
-        // the standard library has no way to ask for more: the refusal is
-        // the system's, is said so, and leaves the count where it was.
-        let error = whole.unwrap_err();
-        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
-        assert!(error.to_string().contains("operating system"), "{error}");
-        assert!(subscriber.recv(BRIEF).unwrap().is_none());
-        assert_eq!(
-            publisher.publish_bytes(1, "x", &payload[..1_500]).unwrap(),
-            ONE
-        );
-        let message = subscriber.recv(WAIT).unwrap().expect("a shorter message");
-        assert_eq!((message.header.seq, message.gap), (2, 0));
-        assert!(message.payload == payload[..1_500]);
-    }
+    // On macOS too: the bus gives its sockets room for it (room.rs), where
+    // the system's default is 2,048 bytes.
+    assert_eq!(publisher.publish_bytes(1, "x", &payload).unwrap(), ONE);
+    let message = subscriber.recv(WAIT).unwrap().expect("the whole message");
+    assert_eq!((message.header.seq, message.gap), (2, 0));
+    assert_eq!(message.payload.len() + header, MOST_BYTES);
+    assert!(message.payload == payload);
     assert_eq!(publisher.totals().published, 2);
 }
 

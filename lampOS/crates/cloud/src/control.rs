@@ -25,12 +25,13 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// The kinds, in `can`'s order.
-pub const KINDS: [&str; 5] = [
+pub const KINDS: [&str; 6] = [
     "control.code",
     "control.clients",
     "control.revoke",
     "control.code_cancel",
     "control.take_back",
+    "control.set_grants",
 ];
 
 /// lamp-control's admin socket on a lamp (`lamp-control serve
@@ -50,6 +51,9 @@ pub const WAIT: Duration = Duration::from_secs(3);
 /// The most bytes read of lamp-control's answer: 16 computers' rows at most.
 const ANSWER_MOST: u64 = 64 * 1024;
 
+/// How long `system.info` waits for lamp-control's `features`.
+const FEATURES_WAIT: Duration = Duration::from_millis(300);
+
 /// A code lasts this long on lamp-control (`pairing::CODE_FOR_US`), for an
 /// older lamp-control that doesn't say `until_unix_ms`.
 const CODE_FOR_MS: u64 = 5 * 60 * 1_000;
@@ -60,6 +64,10 @@ pub const NO_REQUEST_ID: &str = "this app must send a request_id with control.co
 pub const BAD_GRANTS: &str = "grants must be a list of names";
 pub const UNKNOWN_GRANT: &str = "a grant this lamp doesn't know";
 pub const BAD_CLIENT: &str = "client must be a computer's id";
+/// The computer `control.set_grants` names is not paired.
+pub const NO_SUCH_COMPUTER: &str = "no such computer";
+/// lamp-control could not keep the new grants: the computer keeps the ones it had.
+pub const GRANTS_NOT_SAVED: &str = "not saved, so the computer keeps the grants it had";
 /// lamp-control's socket isn't there or refused the connection: its switch
 /// is off, or it isn't running.
 pub const OFF: &str = "developer access is off on this lamp";
@@ -85,6 +93,40 @@ impl Door {
     }
 }
 
+/// `system.info`'s `developer`: `{"camera": bool, "microphone": bool, "speaker": bool}`,
+/// whether a camera, microphone or speaker stream is usable on this lamp (wired, and
+/// the owner's switch for the microphone and the speaker), asked of lamp-control; `None` while its admin
+/// socket is gone (developer access off), so the app offers no grants screen.
+/// A lamp-control that can't say (an older one) reads as all false, and one that
+/// says nothing of the speaker reads it false: the ticks stay off rather than
+/// promise a stream the lamp may refuse.
+pub fn developer(door: &Door) -> Option<Value> {
+    if !door.here() {
+        return None;
+    }
+    // `system.info` is answered on the broker's loop and must never hold its keepalive: lamp-control answers
+    // at once, so a short bound is enough, and one that hangs reads as both false.
+    let told = ask_within(
+        &door.socket,
+        &json!({"features": true}),
+        "system.info",
+        &mut |_| {},
+        FEATURES_WAIT,
+    )
+    .ok();
+    let flag = |key: &str| {
+        told.as_ref()
+            .and_then(|told| told.get(key))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    };
+    Some(json!({
+        "camera": flag("camera"),
+        "microphone": flag("microphone"),
+        "speaker": flag("speaker"),
+    }))
+}
+
 /// `kind`, one of [`KINDS`], with the app's `data`: its reply's `data`, or
 /// the refusal the app shows. What it did goes to the journal.
 pub fn answer(door: &Door, kind: &str, data: &Value) -> Result<Option<Value>, String> {
@@ -106,6 +148,7 @@ pub fn answer_saying(
         "control.revoke" => revoke(door, data, say),
         "control.code_cancel" => code_cancel(door, say),
         "control.take_back" => take_back(door, data, say),
+        "control.set_grants" => set_grants(door, data, say),
         other => Err(crate::wire::not_here(other)),
     }
 }
@@ -193,7 +236,8 @@ fn code(door: &Door, data: &Value, say: &mut dyn FnMut(&str)) -> Result<Option<V
     })))
 }
 
-/// `{}` → `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}]}`.
+/// `{}` → `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}], "shown", "listening"}`, `listening`
+/// whether the door listens on the network (left out by a lamp-control that does not say).
 fn clients(door: &Door, say: &mut dyn FnMut(&str)) -> Result<Option<Value>, String> {
     let listed = ask(
         &door.socket,
@@ -229,7 +273,22 @@ fn clients(door: &Door, say: &mut dyn FnMut(&str)) -> Result<Option<Value>, Stri
         "control.clients from the app: {} computers",
         clients.len()
     ));
-    Ok(Some(json!({"clients": clients})))
+    // The words for every grant the lamp knows, once, for a grant the app has no
+    // label of its own for; an older lamp-control says none.
+    let mut answer = json!({"clients": clients});
+    if let Some(shown) = listed.get("shown").filter(|shown| shown.is_object()) {
+        answer["shown"] = shown.clone();
+    }
+    // Whether the door listens on the network: an admin socket with no door behind it (lamp-control
+    // serving only the owner's side and skill runs) must not read as "On" in the app (#5299). An
+    // older lamp-control says nothing, and the field is then left out.
+    if let Some(listening) = listed
+        .get("listening")
+        .filter(|listening| listening.is_boolean())
+    {
+        answer["listening"] = listening.clone();
+    }
+    Ok(Some(answer))
 }
 
 /// `{"client": "c_…"}` → `{"revoked", "saved"}`, with lamp-control's words
@@ -325,9 +384,76 @@ fn take_back(
     Ok(Some(json!({"taken": taken})))
 }
 
+/// `{"client": "c_1", "grants": ["body", "camera"]}` → `{"client", "grants",
+/// "added", "removed", "saved": true}`: the computer's grants become exactly
+/// that list, with no new code. The owner's tap in the app is the consent
+/// (the same channel and guard as a code); lamp-control saves it, ends a
+/// stream whose grant goes, and closes the computer's connections so it reads
+/// its new grants at its next `hello`.
+fn set_grants(
+    door: &Door,
+    data: &Value,
+    say: &mut dyn FnMut(&str),
+) -> Result<Option<Value>, String> {
+    let client = data
+        .get("client")
+        .and_then(Value::as_str)
+        .filter(|id| !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_graphic()))
+        .ok_or(BAD_CLIENT)?;
+    let grants = match data.get("grants") {
+        Some(Value::Array(grants)) if grants.iter().all(Value::is_string) => grants.clone(),
+        _ => return Err(BAD_GRANTS.to_owned()),
+    };
+    let asked = json!({"set_grants": {"client": client, "grants": grants}});
+    let answered = ask(&door.socket, &asked, "control.set_grants", say)?;
+    if let Some(error) = answered.get("error").and_then(Value::as_str) {
+        say(&format!(
+            "control.set_grants from the app refused: {}",
+            short(error)
+        ));
+        return Err(if error == "no such computer" {
+            NO_SUCH_COMPUTER.to_owned()
+        } else if error.starts_with("set_grants: grants") {
+            // lamp-control wants the whole list (a missing `grants` is refused): the app sends it, so this is a slip.
+            BAD_GRANTS.to_owned()
+        } else if error.starts_with("grants") {
+            UNKNOWN_GRANT.to_owned()
+        } else if error.starts_with("not saved") {
+            GRANTS_NOT_SAVED.to_owned()
+        } else {
+            UNREACHED.to_owned()
+        });
+    }
+    let names = |key: &str| answered.get(key).filter(|v| v.is_array()).cloned();
+    let (Some(now), Some(added), Some(removed), Some(true)) = (
+        names("grants"),
+        names("added"),
+        names("removed"),
+        answered.get("saved").and_then(Value::as_bool),
+    ) else {
+        say("control.set_grants from the app: lamp-control's answer can't be read");
+        return Err(UNREACHED.to_owned());
+    };
+    say(&format!(
+        "control.set_grants from the app: {client} now has {} grant(s), added {added}, removed {removed}",
+        now.as_array().map_or(0, Vec::len)
+    ));
+    let mut answer = json!({
+        "client": client,
+        "grants": now,
+        "added": added,
+        "removed": removed,
+        "saved": true,
+    });
+    if let Some(shown) = answered.get("shown").filter(|shown| shown.is_object()) {
+        answer["shown"] = shown.clone();
+    }
+    Ok(Some(answer))
+}
+
 /// The app's one-time X25519 public key: 32 bytes of base64url, padded or
 /// not.
-fn key_of(text: &str) -> Option<[u8; crate::seal::KEY_BYTES]> {
+pub(crate) fn key_of(text: &str) -> Option<[u8; crate::seal::KEY_BYTES]> {
     URL_SAFE_NO_PAD
         .decode(text.trim_end_matches('='))
         .ok()?
@@ -342,6 +468,17 @@ fn ask(
     kind: &str,
     say: &mut dyn FnMut(&str),
 ) -> Result<Value, String> {
+    ask_within(socket, asked, kind, say, WAIT)
+}
+
+/// [`ask`], waiting at most `wait` for lamp-control's answer.
+fn ask_within(
+    socket: &Path,
+    asked: &Value,
+    kind: &str,
+    say: &mut dyn FnMut(&str),
+    wait: Duration,
+) -> Result<Value, String> {
     let mut stream = UnixStream::connect(socket).map_err(|error| {
         say(&format!(
             "{kind} from the app: lamp-control not reached: {error}"
@@ -349,8 +486,8 @@ fn ask(
         OFF.to_owned()
     })?;
     let mut exchanged = || -> std::io::Result<String> {
-        stream.set_read_timeout(Some(WAIT))?;
-        stream.set_write_timeout(Some(WAIT))?;
+        stream.set_read_timeout(Some(wait))?;
+        stream.set_write_timeout(Some(wait))?;
         stream.write_all(format!("{asked}\n").as_bytes())?;
         let mut line = String::new();
         BufReader::new((&stream).take(ANSWER_MOST)).read_line(&mut line)?;
@@ -598,6 +735,46 @@ mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 
+    /// Whether the door listens comes through as lamp-control says it; an older lamp-control says none and
+    /// the answer has no `listening` (#5299: the app must not read the admin socket as an open door).
+    #[test]
+    fn whether_the_door_listens_comes_with_the_list() {
+        let dir = folder("clients-listening");
+        let (door, _asked) = admin(&dir, |_| json!({"clients": [], "listening": false}));
+        assert_eq!(
+            answer(&door, "control.clients", &json!({})),
+            Ok(Some(json!({"clients": [], "listening": false})))
+        );
+        let other = folder("clients-listening-text");
+        let (door, _asked) = admin(&other, |_| json!({"clients": [], "listening": "yes"}));
+        assert_eq!(
+            answer(&door, "control.clients", &json!({})),
+            Ok(Some(json!({"clients": []})))
+        );
+        let _ = std::fs::remove_dir_all(dir);
+        let _ = std::fs::remove_dir_all(other);
+    }
+
+    /// The words for every grant, once per answer, when lamp-control says them
+    /// (an older one says none, and the answer has no `shown`).
+    #[test]
+    fn the_words_for_every_grant_come_once_with_the_list() {
+        let dir = folder("clients-shown");
+        let (door, _asked) = admin(&dir, |_| {
+            json!({"clients": [{"id": "c_1", "name": "laptop", "grants": ["body"], "paired_at_unix_ms": 1u64}],
+                   "shown": {"body": "can move the lamp's body", "microphone": "can hear what the lamp's microphone hears"}})
+        });
+        let answered = answer(&door, "control.clients", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            answered["shown"]["microphone"],
+            "can hear what the lamp's microphone hears"
+        );
+        assert_eq!(answered["clients"].as_array().unwrap().len(), 1);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
     /// A revoke passes lamp-control's answer on, its words as `why` when
     /// not saved; a bad id is refused without asking.
     #[test]
@@ -632,6 +809,102 @@ mod tests {
         }
         assert!(asked.try_recv().is_err());
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// `control.set_grants` passes lamp-control's answer on, and says its
+    /// refusals plainly; a bad id or a grants list that isn't names is
+    /// refused without asking.
+    #[test]
+    fn set_grants_passes_the_answer_and_says_the_refusals() {
+        let dir = folder("set-grants");
+        let (door, asked) = admin(&dir, |asked| match asked["set_grants"]["client"].as_str() {
+            Some("c_1") => json!({
+                "client": "c_1", "grants": ["camera", "light"],
+                "added": ["camera"], "removed": [], "saved": true,
+                "shown": {"camera": "can see what the lamp's camera sees"}
+            }),
+            Some("c_2") => json!({"error": "no such computer"}),
+            Some("c_3") => json!({"error": "grants: unknown variant `teleport`"}),
+            Some("c_5") => json!({"error": "set_grants: grants: the whole list, [] for none"}),
+            _ => json!({"error": "not saved, so the computer keeps the grants it had: disk full"}),
+        });
+        let ask = |client: &str| {
+            answer(
+                &door,
+                "control.set_grants",
+                &json!({"client": client, "grants": ["light"]}),
+            )
+        };
+        assert_eq!(
+            ask("c_1"),
+            Ok(Some(json!({
+                "client": "c_1", "grants": ["camera", "light"],
+                "added": ["camera"], "removed": [], "saved": true,
+                "shown": {"camera": "can see what the lamp's camera sees"}
+            })))
+        );
+        assert_eq!(
+            asked.recv().unwrap(),
+            json!({"set_grants": {"client": "c_1", "grants": ["light"]}})
+        );
+        assert_eq!(ask("c_2"), Err(NO_SUCH_COMPUTER.to_owned()));
+        assert_eq!(ask("c_3"), Err(UNKNOWN_GRANT.to_owned()));
+        assert_eq!(ask("c_4"), Err(GRANTS_NOT_SAVED.to_owned()));
+        assert_eq!(ask("c_5"), Err(BAD_GRANTS.to_owned()));
+        for _ in 0..4 {
+            asked.recv().unwrap();
+        }
+        for bad in [
+            json!({"grants": ["light"]}),
+            json!({"client": "", "grants": []}),
+            json!({"client": "c_1"}),
+            json!({"client": "c_1", "grants": [3]}),
+        ] {
+            assert!(answer(&door, "control.set_grants", &bad).is_err(), "{bad}");
+        }
+        assert!(asked.try_recv().is_err());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// `developer` says what lamp-control says about its streams; an older
+    /// lamp-control (an error) reads as all false, one that does not know the
+    /// speaker reads it false; no socket, none.
+    #[test]
+    fn developer_says_which_streams_are_usable() {
+        let dir = folder("developer");
+        let (door, asked) = admin(
+            &dir,
+            |_| json!({"camera": true, "microphone": false, "speaker": true}),
+        );
+        assert_eq!(
+            developer(&door),
+            Some(json!({"camera": true, "microphone": false, "speaker": true}))
+        );
+        assert_eq!(asked.recv().unwrap(), json!({"features": true}));
+        let _ = std::fs::remove_dir_all(dir);
+        let dir = folder("developer-old");
+        let (door, _asked) = admin(
+            &dir,
+            |_| json!({"error": "ask for code, cancel_code, take_back, revoke or clients"}),
+        );
+        assert_eq!(
+            developer(&door),
+            Some(json!({"camera": false, "microphone": false, "speaker": false}))
+        );
+        let _ = std::fs::remove_dir_all(dir);
+        // A lamp-control from before the speaker says camera and microphone only.
+        let dir = folder("developer-no-speaker");
+        let (door, _asked) = admin(&dir, |_| json!({"camera": true, "microphone": true}));
+        assert_eq!(
+            developer(&door),
+            Some(json!({"camera": true, "microphone": true, "speaker": false}))
+        );
+        let _ = std::fs::remove_dir_all(dir);
+        let gone = Door {
+            socket: PathBuf::from("/nowhere/admin.sock"),
+            device_id: "d-42".into(),
+        };
+        assert_eq!(developer(&gone), None);
     }
 
     /// No socket: the door is off, said plainly, and not `here`.

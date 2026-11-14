@@ -9,11 +9,27 @@
 // of its rotation that changes), its origin and rest rotation from its node.
 // What is not in the CAD is said as such: each joint's zero (the servo's
 // reading at the CAD's rest pose) and direction are "cad" until measured
-// on a lamp, and its reach is the product's (`lamp-body --reach`).
+// on a lamp (MEASURED below holds what has been), and its reach is the
+// product's (`lamp-body --reach`).
 import { readFileSync } from 'node:fs';
 
 // The body's servos in their bus order (lamp-body's `bus_out::JOINTS`), the
 // protocol's names for them, and each one's bone in lamp.glb.
+// Zero and direction measured from a lamp's own numbers. Shoulder and elbow: the
+// zero is the lamp-75c9's stand angle (stand counts less home counts, of 4096 a
+// turn: 2639 - 2076 and 2570 - 2045), so the CAD's upright pose is the stood lamp
+// and deg 0 the folded one; photos of the lamp standing agree with it (11 Nov: the
+// stand-up is +541 / +488 counts, 47.5 / 42.9 deg, to the rest at 2617 / 2534).
+// The elbow's sign -1 closes the arm as the real fold does (the angle between the
+// two segments narrows by the 43 deg of counts). The shoulder's sign is +1: it was -1
+// from the render, which drew the folded lamp with its lower arm standing and the shade
+// through the base (64 head vertices inside it, 12 below the table); +1 lays the lower
+// arm low over the base, as in a frame of lamp-75c9 folded by itself (18:05 and 18:19,
+// 11 Nov: arms low and compact, head on top, shade clear of the base), and the CAD
+// scan (tools/model-collisions.html) finds no collision at the fold, the stand or between.
+// Both signs were judged from frames and counts, not yet from a measured angle.
+const MEASURED = { shoulder: { sign: 1, zero_deg: 49.5 }, elbow: { sign: -1, zero_deg: 46.1 } };
+
 const JOINTS = [
   { name: 'yaw', bus: 'base_yaw', servo: 1, bone: 'base_yaw', mesh: '1_base_yaw' },
   { name: 'shoulder', bus: 'shoulder', servo: 2, bone: 'base_pitch', mesh: '2_base_pitch' },
@@ -97,8 +113,8 @@ function model(path) {
       origin_m: (node.translation ?? [0, 0, 0]).map((v) => round(v, 4)),
       rest_quat: rest.map((v) => round(v, 4)),
       axis: axisOf(rest, keys),
-      sign: 1,
-      zero_deg: 0,
+      sign: MEASURED[joint.name]?.sign ?? 1,
+      zero_deg: MEASURED[joint.name]?.zero_deg ?? 0,
       reach_counts: reach ?? null,
       reach_deg: reach
         ? Object.fromEntries(Object.entries(reach).map(([way, counts]) => [way, round(counts * DEG_A_COUNT, 1)]))
@@ -125,7 +141,7 @@ function model(path) {
     frame: 'glTF: y up, metres; each joint turns its bone about axis, in the bone\'s own frame after rest_quat',
     measured: {
       origins: 'cad',
-      zero_and_sign: 'cad: zero_deg is the joint\'s deg (body.state, degrees from its home) at the CAD\'s rest pose, sign +1, until measured on a lamp',
+      zero_and_sign: 'shoulder and elbow: zero_deg at lamp-75c9\'s stand angle (stand 2639 / 2570 counts less home 2076 / 2045: 49.5 / 46.1 deg), so the CAD\'s upright pose is the stood lamp and deg 0 the folded one; photos of lamp-75c9 standing agree with the zero. Signs: the elbow\'s -1 closes the arm as the real fold does; the shoulder\'s +1 (it was -1) lays the lower arm low over the base at the fold, as in frames of lamp-75c9 folded by itself on 11 Nov, and the CAD scan (tools/model-collisions.html) finds no collision at the fold, the stand or between; both signs judged from frames and counts, not yet from a measured angle. Another lamp\'s own stand angle differs by a few degrees. The others: cad, zero_deg is the joint\'s deg (body.state, degrees from its home) at the CAD\'s rest pose, sign +1, until measured on a lamp',
       reach: 'product: lamp-body --reach around each lamp\'s home; a lamp\'s home is its own (/etc/lampOS/body/lamp.env)',
     },
     chain: order,

@@ -6,7 +6,11 @@
 //! and a proxy's log). Without one, it answers only to this machine's own
 //! names in `Host`, so that no other page in the browser can reach it
 //! under a name of its own (DNS rebinding; the reviewer on #2150, P3 6).
+//! In monitor mode ([`crate::monitor`]) no token is taken: only a peer on
+//! the local network, asking as the lamp's own name or address, with a
+//! session from a one-time code.
 use crate::{
+    monitor::{self, Conn, Monitor, Redeemed},
     page,
     turns::{ReadFailure, Snapshot, Turns},
     units::{self, UnitRow},
@@ -16,7 +20,7 @@ use crate::{
 use axum::{
     Router,
     body::Bytes,
-    extract::{Request, State},
+    extract::{ConnectInfo, Request, State, connect_info::MockConnectInfo},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     middleware::{self, Next},
     response::{
@@ -70,6 +74,9 @@ pub struct Peek {
     /// The units, as `/status` lists them: systemd's on the lamp
     /// ([`units::read`]), a stand-in in the tests.
     pub units: Arc<dyn Fn() -> Vec<UnitRow> + Send + Sync>,
+    /// Monitor mode's gate, when `LAMP_PEEK=monitor`; then `token` is none.
+    /// Its requests need [`Conn`] (`into_make_service_with_connect_info`).
+    pub monitor: Option<Arc<Monitor>>,
 }
 
 pub fn router(peek: Arc<Peek>) -> Router {
@@ -87,6 +94,7 @@ pub fn router(peek: Arc<Peek>) -> Router {
         .route("/bus", get(bus))
         .route("/status", get(status))
         .route("/token", post(token))
+        .route("/in", get(way_in).post(redeem))
         .layer(middleware::from_fn_with_state(Arc::clone(&served), guard))
         .with_state(served)
 }
@@ -108,7 +116,7 @@ fn local_host(headers: &HeaderMap) -> bool {
 }
 
 /// `a` and `b` the same, taking as long whatever they share.
-fn same(a: &str, b: &str) -> bool {
+pub(crate) fn same(a: &str, b: &str) -> bool {
     a.len() == b.len()
         && a.bytes()
             .zip(b.bytes())
@@ -125,6 +133,11 @@ fn carried(headers: &HeaderMap) -> Option<String> {
     if let Some(bearer) = bearer {
         return Some(bearer.to_owned());
     }
+    cookie(headers, COOKIE)
+}
+
+/// The value of the cookie `name`.
+fn cookie(headers: &HeaderMap, name: &str) -> Option<String> {
     headers
         .get_all(header::COOKIE)
         .iter()
@@ -132,17 +145,62 @@ fn carried(headers: &HeaderMap) -> Option<String> {
         .flat_map(|value| value.split(';'))
         .find_map(|pair| {
             pair.trim()
-                .strip_prefix(&format!("{COOKIE}="))
+                .strip_prefix(&format!("{name}="))
                 .map(str::to_owned)
         })
 }
 
-/// Whether the address names a token: refused even when it is the right one.
-fn token_in_address(request: &Request) -> bool {
+/// Whether the address names `key`: refused even when it is right.
+fn in_address(request: &Request, key: &str) -> bool {
     request.uri().query().is_some_and(|query| {
         query
             .split('&')
-            .any(|pair| pair.split('=').next() == Some("token"))
+            .any(|pair| pair.split('=').next() == Some(key))
+    })
+}
+
+/// Monitor mode's refusal, if any, before anything else: a peer off the
+/// local network, a `Host` not the lamp's, a code in the address.
+fn monitor_refuses(monitor: &Monitor, request: &Request) -> Option<Response> {
+    // As axum's `ConnectInfo` extractor reads it: the server's, or the
+    // tests' `MockConnectInfo`.
+    let extensions = request.extensions();
+    let conn = extensions
+        .get::<ConnectInfo<Conn>>()
+        .map(|info| info.0)
+        .or_else(|| extensions.get::<MockConnectInfo<Conn>>().map(|info| info.0));
+    let Some(conn) = conn.filter(|conn| monitor::lan_peer(conn.peer.ip())) else {
+        return Some(
+            (
+                StatusCode::FORBIDDEN,
+                "The dev monitor answers only on the lamp's own network.",
+            )
+                .into_response(),
+        );
+    };
+    let host = request
+        .headers()
+        .get(header::HOST)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default();
+    if !monitor::host_allowed(host, &monitor.names, conn.local.ip()) {
+        return Some(
+            (
+                StatusCode::FORBIDDEN,
+                "The dev monitor answers only as the lamp's own name or address.",
+            )
+                .into_response(),
+        );
+    }
+    in_address(request, "code").then(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Html(view::way_in_page(
+                "A code in the address is refused: open the link from the app.",
+                false,
+            )),
+        )
+            .into_response()
     })
 }
 
@@ -150,6 +208,27 @@ fn token_in_address(request: &Request) -> bool {
 /// one; and nothing a page answers is kept by the browser or passed on.
 async fn guard(State(served): State<Arc<Served>>, request: Request, next: Next) -> Response {
     let peek = &served.peek;
+    if let Some(monitor) = &peek.monitor {
+        let mut response = match monitor_refuses(monitor, &request) {
+            Some(refused) => refused,
+            None if request.uri().path() == "/in"
+                || cookie(request.headers(), monitor::SESSION_COOKIE)
+                    .is_some_and(|session| monitor.gate().admits(&session, Instant::now())) =>
+            {
+                next.run(request).await
+            }
+            None => (
+                StatusCode::UNAUTHORIZED,
+                Html(view::way_in_page(
+                    "Open the dev monitor from its link in the app.",
+                    false,
+                )),
+            )
+                .into_response(),
+        };
+        kept_by_nobody(response.headers_mut());
+        return response;
+    }
     if peek.token.is_none() && !local_host(request.headers()) {
         return (
             StatusCode::FORBIDDEN,
@@ -157,7 +236,7 @@ async fn guard(State(served): State<Arc<Served>>, request: Request, next: Next) 
         )
             .into_response();
     }
-    if token_in_address(&request) {
+    if in_address(&request, "token") {
         return (
             StatusCode::BAD_REQUEST,
             Html(view::token_page(
@@ -179,7 +258,12 @@ async fn guard(State(served): State<Arc<Served>>, request: Request, next: Next) 
         )
             .into_response()
     };
-    let headers = response.headers_mut();
+    kept_by_nobody(response.headers_mut());
+    response
+}
+
+/// Nothing a page answers is kept by the browser or passed on.
+fn kept_by_nobody(headers: &mut HeaderMap) {
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     headers.insert(
         header::REFERRER_POLICY,
@@ -190,7 +274,52 @@ async fn guard(State(served): State<Arc<Served>>, request: Request, next: Next) 
         HeaderValue::from_static("nosniff"),
     );
     headers.insert("x-frame-options", HeaderValue::from_static("DENY"));
-    response
+}
+
+/// `/in`: the page whose few lines of script post the link's fragment once.
+async fn way_in(State(served): State<Arc<Served>>) -> Response {
+    if served.peek.monitor.is_none() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    Html(view::way_in_page("Opening the dev monitor…", true)).into_response()
+}
+
+/// A code (`code=...`, form-encoded) to a session cookie, once.
+async fn redeem(State(served): State<Arc<Served>>, body: Bytes) -> Response {
+    let Some(monitor) = served.peek.monitor.as_ref() else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let given = String::from_utf8_lossy(&body)
+        .split('&')
+        .find_map(|pair| pair.strip_prefix("code=").map(form_decoded))
+        .unwrap_or_default();
+    let redeemed = monitor.gate().redeem(&given, Instant::now());
+    match redeemed {
+        Ok(Redeemed::Session(session)) => {
+            let mut response = StatusCode::NO_CONTENT.into_response();
+            if let Ok(cookie) = HeaderValue::from_str(&format!(
+                "{}={session}; HttpOnly; SameSite=Strict; Path=/",
+                monitor::SESSION_COOKIE
+            )) {
+                response.headers_mut().insert(header::SET_COOKIE, cookie);
+            }
+            response
+        }
+        Ok(Redeemed::Refused) => (
+            StatusCode::UNAUTHORIZED,
+            "This link was used or is out of date: get a new one in the app.",
+        )
+            .into_response(),
+        Ok(Redeemed::Full) => (
+            StatusCode::TOO_MANY_REQUESTS,
+            "The dev monitor is open in four browsers already, the most it takes.",
+        )
+            .into_response(),
+        Err(error) => {
+            eprintln!("lamp-peek: no session made: {error}");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
 }
 
 /// The form's token (`token=...`, form-encoded) to a cookie.
@@ -244,8 +373,8 @@ fn form_decoded(value: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-async fn index() -> Html<String> {
-    Html(page::main_page())
+async fn index(State(served): State<Arc<Served>>) -> Html<String> {
+    Html(page::main_page(served.peek.monitor.is_some()))
 }
 
 async fn cam() -> Html<String> {
@@ -397,14 +526,18 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         read(lamp_msgs::Health::TOPIC),
         read(lamp_msgs::JointState::TOPIC),
     );
-    let report = peek
-        .seen
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .body
-        .clone();
+    let (report, entries, words) = {
+        let seen = peek.seen.lock().unwrap_or_else(PoisonError::into_inner);
+        (
+            seen.body.clone(),
+            seen.timeline.newest(),
+            seen.timeline.words(),
+        )
+    };
+    let light = read(lamp_msgs::Light::TOPICS[1]);
     let overview = page::overview(&page::Glance {
         voice: voice.as_ref(),
+        light: light.as_ref(),
         faces: faces.as_ref(),
         body: body.as_ref(),
         presence: presence.as_ref(),
@@ -414,6 +547,11 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         units: &units,
     });
     events.push(Event::default().event("overview").data(overview));
+    events.push(
+        Event::default()
+            .event("timeline")
+            .data(page::timeline(&entries, &turns, words)),
+    );
     events.push(Event::default().event("turns").data(page::turns(&turns)));
     events.push(Event::default().event("body").data(page::body(
         joints.as_ref(),
@@ -435,20 +573,42 @@ fn now_unix_ms() -> u64 {
 }
 
 /// The one page's stream: a push now, then every [`PUSH_EVERY`], for as
-/// long as the page is open.
+/// long as the page is open; in monitor mode, only while the session that
+/// opened it lasts, read before each push as the guard reads it. A push
+/// still reading when the session ends is dropped there, and what a push
+/// read is sent only if the session lasts once it is read.
 async fn events(
     State(served): State<Arc<Served>>,
+    headers: HeaderMap,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let pushes = stream::unfold((served, 0u32), |(served, count)| async move {
-        if count > 0 {
-            tokio::time::sleep(PUSH_EVERY).await;
-        }
-        let events = push(&served, count).await;
-        Some((
-            stream::iter(events.into_iter().map(Ok)),
-            (served, count.wrapping_add(1)),
-        ))
-    });
+    let session = cookie(&headers, monitor::SESSION_COOKIE).unwrap_or_default();
+    let pushes = stream::unfold(
+        (served, session, 0u32),
+        |(served, session, count)| async move {
+            if count > 0 {
+                tokio::time::sleep(PUSH_EVERY).await;
+            }
+            let events = match &served.peek.monitor {
+                None => push(&served, count).await,
+                Some(monitor) => {
+                    let until = monitor.gate().lasts_until(&session, Instant::now())?;
+                    // Dropping the push is what closing the page does: the
+                    // reads it waits on keep their cache as they do then.
+                    let events = tokio::time::timeout_at(until.into(), push(&served, count))
+                        .await
+                        .ok()?;
+                    if !monitor.gate().admits(&session, Instant::now()) {
+                        return None;
+                    }
+                    events
+                }
+            };
+            Some((
+                stream::iter(events.into_iter().map(Ok)),
+                (served, session, count.wrapping_add(1)),
+            ))
+        },
+    );
     Sse::new(pushes.flatten())
 }
 
@@ -468,6 +628,7 @@ mod tests {
                 token: None,
                 sessions: root.join("sessions"),
                 units: Arc::new(Vec::new),
+                monitor: None,
             }),
             status: tokio::sync::Mutex::new(None),
             turns: Arc::default(),

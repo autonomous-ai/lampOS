@@ -910,6 +910,8 @@ fn the_real_helper_refuses_on_its_own() {
     let ask_binary = |line: String, store: Option<&str>| {
         let (mut ours, theirs) = UnixStream::pair().unwrap();
         let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+        // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+        command.env("LAMP_SKILLS_ANY_ASKER", "on");
         command.env_remove(package::STORE_SWITCH);
         command.env(package::ANY_ASKER, "on");
         if let Some(store) = store {

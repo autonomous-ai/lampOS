@@ -44,7 +44,7 @@
 //!   before every line's start.
 use lamp_name::{
     hear::{Hearer, STEP, WINDOW},
-    quiet::{Models, Quiet},
+    quiet::{LEAD, Models, Quiet},
     said::Stops,
 };
 use std::{
@@ -144,7 +144,9 @@ fn bars_of(value: &str) -> Result<Vec<f32>> {
 
 fn run(args: Vec<String>) -> Result<()> {
     let options = options(&args)?;
-    let hearer = Hearer::load(&options.models)?.with_stop(&options.models)?;
+    let hearer = Hearer::load(&options.models)?
+        .with_stop(&options.models)?
+        .with_lead(LEAD)?;
     let mut quiet = Quiet::new(hearer, None);
     let mut scratch = Scratch::default();
     let mut all = Vec::new();
@@ -446,8 +448,9 @@ fn scores<M: Models>(
         let first = (newest + 1).saturating_sub(heard.scores.len());
         for (step, score) in (first..).zip(heard.scores) {
             let stop = score.stop.ok_or("the stop model gave no score")?;
-            // Step k (from 1) ends at sample WINDOW + (k - 1) * STEP.
-            all.push((clock.at(WINDOW + (step - 1) * STEP - 1), stop));
+            // Step k (from 1) ends at sample WINDOW + (k - 1) * STEP counted
+            // from the start's silence (`quiet::LEAD`, #6114).
+            all.push((clock.at(WINDOW + (step - 1) * STEP - LEAD - 1), stop));
         }
     }
     Ok(all)
@@ -648,6 +651,7 @@ mod tests {
                         name: 0.0,
                         stop: Some(if loud { 0.99 } else { 0.01 }),
                         rescue: None,
+                        late: 0,
                     });
                 }
             }

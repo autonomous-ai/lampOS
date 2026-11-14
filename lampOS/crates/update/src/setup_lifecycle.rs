@@ -138,6 +138,22 @@ pub(crate) fn completed(root: &Path, units: &Path, name: &str, before: &str, aft
     done(root)
 }
 
+/// Whether the first update after setup (#6284) leaves `name` unrestarted:
+/// it is setup's unit, setup is done, and the unit it would run still skips
+/// itself once setup is done. Unlike [`completed`], its text need not be
+/// this build's: a first update runs right after setup, inside its phone
+/// grace period, and between the lamp's image and the newest build setup's
+/// unit may differ (lamp-e82d, 12 Nov: `LAMP_FIRST_UPDATE=on` added to it,
+/// the restart stopped setup and its condition skipped the start, and the
+/// build was put back as not well).
+pub(crate) fn first_update_leaves(root: &Path, name: &str, unit: &str) -> bool {
+    name == SETUP
+        && done(root)
+        && unit
+            .lines()
+            .any(|line| line.trim() == "ConditionPathExists=!/var/lib/lampos-setup/done")
+}
+
 pub(crate) fn done(root: &Path) -> bool {
     let marker = Path::new("var/lib/lampos-setup/done");
     plain(root, marker) && fs::symlink_metadata(root.join(marker)).is_ok_and(|meta| meta.is_file())

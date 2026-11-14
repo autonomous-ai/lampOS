@@ -26,7 +26,7 @@ const BEFORE: &[&str] = &[
 /// "Can you …", "Could you …": an ask, even ending in a question mark.
 const ASKING: &[&str] = &["can", "could", "would", "will"];
 /// The plain asks to keep something, at a sentence's start.
-const ASKS: &[&[&str]] = &[
+pub(crate) const ASKS: &[&[&str]] = &[
     &["remember", "that"],
     &["remember", "my"],
     &["remember", "i"],
@@ -168,6 +168,7 @@ pub(crate) fn force() -> crate::second_provider::net::Force {
         asks_to_keep(last.words()?).then_some(crate::second_provider::net::Forced {
             name: super::REMEMBER,
             only: None,
+            fields: None,
         })
     })
 }

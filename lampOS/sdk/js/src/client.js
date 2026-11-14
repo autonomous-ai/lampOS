@@ -6,9 +6,10 @@
 // Every message is docs/control.schema.json's. Names the schema enumerates are
 // checked before sending, and a refusal rejects with its typed error.
 import { createHash } from 'node:crypto';
+import { statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
-import WebSocket from 'ws';
+import { WebSocket } from './ws.js';
 import * as debug from './debug.js';
 import * as schema from './schema.js';
 import { LampError, NotPaired, WrongLamp, byCode, fromReply } from './errors.js';
@@ -25,9 +26,18 @@ export function binaryFrame(message) {
 }
 
 // Events that come with a request, never subscribed to: a camera stream's,
-// and a microphone stream's.
+// a microphone stream's, and a speaker stream's.
 const CAMERA_EVENTS = ['camera.frame', 'camera.ended'];
 const MICROPHONE_EVENTS = ['microphone.audio', 'microphone.ended'];
+export const SPEAKER_EVENTS = ['speaker.stats', 'speaker.ended'];
+
+// A speaker stream's frames (docs/control.md, "The speaker"): at most 9,600 bytes of samples a message, 10 to 100 ms
+// each; this client sends 20 ms.
+export const SPEAKER_FRAME_MAX = 9600;
+export const SPEAKER_RATES = Object.freeze([16000, 24000]);
+const SPEAKER_FRAME_MS = 20;
+// How far ahead of real time a paced WAV is sent: the lamp buffers 300 ms before it plays, so it never runs dry.
+const SPEAKER_LEAD_MS = 100;
 
 // `keepConnected`'s pauses before connecting again, in seconds: the first after
 // a closed connection, then longer while the lamp can't be reached (a restart
@@ -37,7 +47,10 @@ export const RECONNECT_PAUSES = Object.freeze([1, 2, 5, 10]);
 // The actions lamp-control answers `{"to":"body"}` with no `done` after
 // (docs/control.md): a wait for them ends at that answer. `say` and
 // `turn.start` answer `{"to":"voice"}` and their `done` does follow.
-export const ENDS_AT_REPLY = new Set(['gesture', 'move']);
+// Ended at their answer by a lamp-control that doesn't say `motion_done` in
+// hello's limits (from before #4209): it hands them to the body and says
+// nothing back.
+export const ENDS_AT_REPLY = new Set(['gesture', 'move', 'express', 'play']);
 // A phrase's floor in letters and digits, lamp-control's PHRASE_MIN_LETTERS.
 // The SDK's check is a pre-check: it may let through what the lamp refuses,
 // never the other way.
@@ -51,22 +64,42 @@ function shortPhrase(phrases) {
   return new byCode.bad_request(`phrases: ${JSON.stringify(short)} is too short: ${PHRASE_MIN_LETTERS} letters at least`);
 }
 
+// lamp-control's control socket for a skill's run (docs/control.md, "The control socket"), not the local agent's.
+const LOCAL_SOCKET = '/run/lampos-control/control.sock';
+
+// The local agent's socket (docs/control.md, "The local agent"): where a program of
+// the user the owner named, on the lamp itself, reaches the door with no pairing.
+// `LAMPOS_AGENT_SOCKET` names another place.
+export const AGENT_SOCKET = '/run/lampos-agent/agent.sock';
+
+function agentSocket() {
+  const path = process.env.LAMPOS_AGENT_SOCKET || AGENT_SOCKET;
+  try { return statSync(path).isSocket() ? path : null; } catch { return null; }
+}
+
 // One connection: its frames as they come, and the first frame, which must be
 // the lamp's welcome. The certificate is checked against `pin` before any
 // frame is sent.
-function open(host, port, pin) {
+// With `socketPath`: a unix socket, no TLS and no pin. The agent socket's own check (the kernel's word on
+// who connects) is what lets this program in; the control socket's is its owner check and the run's token.
+function open(host, port, pin, socketPath) {
   return new Promise((resolve, reject) => {
-    if (!isPin(pin)) {
+    if (!socketPath && !isPin(pin)) {
       reject(new WrongLamp("no pin to check the lamp by: the 64 hex the owner's app shows with the code"));
       return;
     }
     // The lamp's certificate is its own, self-signed: it is checked against its
     // pin (the full SHA-256 the owner's app shows), not a CA.
-    const ws = new WebSocket(`wss://${host}:${port}/v${schema.VERSION}`, { rejectUnauthorized: false, maxPayload: 1 << 20 });
+    // With `socketPath` (lamp-control's control socket on the lamp itself) the door is a unix socket: no TLS, no
+    // pin; the socket's owner check and the run's token are the trust.
+    const ws = socketPath
+      ? new WebSocket(`ws+unix://${socketPath}:/v${schema.VERSION}`, { maxPayload: 1 << 20 })
+      : new WebSocket(`wss://${host}:${port}/v${schema.VERSION}`, { rejectUnauthorized: false, maxPayload: 1 << 20 });
     const frames = [];
     let wake = null;
     let seen = null;
     ws.on('upgrade', (response) => {
+      if (socketPath) return;
       seen = pinOf(response.socket.getPeerCertificate(true).raw);
       if (seen !== pin) {
         ws.terminate();
@@ -120,6 +153,27 @@ function hex(colour) {
 // MOST_WORDS_BYTES), checked here at the same bytes, never stricter.
 export const SAY_MAX_BYTES = 900;
 
+// The refusal for a name that is no event, with the event the name was meant
+// for when it is a lease's or a look's end (`lease.ended` is `lease`, state
+// `lost`); `lease` and `done` come with no subscription.
+function noEvent(name, on = false) {
+  if (name === 'lease' || name === 'done') {
+    return new LampError(`no event '${name}' to subscribe to: it comes without subscribing, hear it with lamp.on('${name}', handler)`, { code: 'bad_request' });
+  }
+  let hint;
+  if (name.startsWith('lease')) {
+    hint = "a lease's changes come as the event 'lease' (state held, suspended or lost, and why): lamp.on('lease', handler)";
+  } else if (name.startsWith('done')) {
+    hint = "the end of a look or a move comes as the event 'done': lamp.on('done', handler)";
+  } else {
+    // With `on`: what it takes: the schema's, the streams' and the two that come unasked.
+    hint = on
+      ? `one of ${[...new Set([...schema.events, ...CAMERA_EVENTS, ...MICROPHONE_EVENTS, ...SPEAKER_EVENTS])].sort().join(', ')}, or 'lease' or 'done'`
+      : `one of ${[...schema.events].sort().join(', ')}`;
+  }
+  return new LampError(`no event '${name}': ${hint}`, { code: 'bad_request' });
+}
+
 function check(op, fields) {
   if (!schema.ops.includes(op)) throw new LampError(`no op ${op} in v${schema.VERSION}`, { code: 'bad_request' });
   if (op === 'say' && typeof fields.text === 'string') {
@@ -143,11 +197,125 @@ function check(op, fields) {
     }
   }
   for (const event of fields.events ?? []) {
-    if (!schema.events.includes(event)) throw new LampError(`no event ${event}`, { code: 'bad_request' });
+    if (!schema.events.includes(event)) throw noEvent(event);
   }
   // A lease's parts; a `sound.upload`'s or `skill.push`'s `parts` is a count.
   for (const part of op === 'lease.take' ? fields.parts ?? [] : []) {
     if (!schema.parts.includes(part)) throw new LampError(`no part ${part}`, { code: 'bad_request' });
+  }
+}
+
+// The samples of a WAV of PCM16 mono at 16000 or 24000 Hz, and its rate; anything else is refused in words.
+export function wavSamples(wav) {
+  const bad = (why) => new LampError(`wav: ${why}`, { code: 'bad_request' });
+  if (wav.length < 12 || wav.toString('latin1', 0, 4) !== 'RIFF' || wav.toString('latin1', 8, 12) !== 'WAVE') throw bad('not a WAV file');
+  let format = null;
+  for (let at = 12; at + 8 <= wav.length;) {
+    const id = wav.toString('latin1', at, at + 4);
+    const size = wav.readUInt32LE(at + 4);
+    const body = at + 8;
+    if (id === 'fmt ' && size >= 16 && body + 16 <= wav.length) {
+      format = { tag: wav.readUInt16LE(body), channels: wav.readUInt16LE(body + 2), rate: wav.readUInt32LE(body + 4), bits: wav.readUInt16LE(body + 14) };
+    } else if (id === 'data') {
+      if (!format) throw bad('no fmt chunk before the sound');
+      if (format.tag !== 1 || format.bits !== 16 || format.channels !== 1) throw bad('16-bit mono PCM only');
+      if (!SPEAKER_RATES.includes(format.rate)) throw bad(`${format.rate} Hz: the speaker takes ${SPEAKER_RATES.join(' or ')} Hz`);
+      // A data chunk may claim more than the file holds (a stream's WAV): take what is there, whole samples.
+      const end = Math.min(body + size, wav.length);
+      return { rate: format.rate, samples: wav.subarray(body, end - ((end - body) % 2)) };
+    }
+    at = body + size + (size % 2);
+  }
+  throw bad('no sound in it');
+}
+
+/** A speaker stream's handle (`lamp.speakerStream()`). */
+export class SpeakerStream {
+  constructor(lamp, reply) {
+    this.lamp = lamp;
+    this.sampleRate = reply.sample_rate;
+    this.turn = reply.turn;
+    this.frameMs = reply.frame_ms;
+    this.bufferMs = reply.buffer_ms;
+    this.reply = reply;
+    this.sequence = 0;
+    this.endedWhy = null; // why the lamp ended it, once it has
+    this.stats = null; // the last `speaker.stats`
+    this.over = false;
+    // Only this stream's own end: a `speaker.ended` of another turn (an older stream's) is not it.
+    this.onEnded = (event) => { if (event.turn === this.turn) this.endedWhy = event.why ?? 'ended'; };
+    this.onStats = (event) => { if (event.turn === undefined || event.turn === this.turn) this.stats = event; };
+    lamp.on('speaker.ended', this.onEnded);
+    lamp.on('speaker.stats', this.onStats);
+  }
+
+  /** Whether the lamp (or `stop`) has ended it. */
+  get ended() { return this.over || this.endedWhy !== null; }
+
+  /** Send `pcm`, mono signed 16-bit little-endian samples at `sampleRate` (a Buffer or Uint8Array), as 20 ms frames
+   * of at most 9,600 bytes each. Resolves when sent, not when played. */
+  async speakerWrite(pcm) {
+    const data = Buffer.from(pcm);
+    if (data.length % 2) throw new LampError('speakerWrite: whole 16-bit samples', { code: 'bad_request' });
+    const step = Math.min(((this.sampleRate * SPEAKER_FRAME_MS) / 1000) * 2, SPEAKER_FRAME_MAX);
+    for (let at = 0; at < data.length; at += step) await this.frame(data.subarray(at, at + step));
+  }
+
+  async frame(samples) {
+    if (this.endedWhy !== null) throw new LampError(`the speaker stream ended: ${this.endedWhy}`, { code: 'closed' });
+    if (this.over) throw new LampError('the speaker stream was stopped', { code: 'closed' });
+    const ws = this.lamp.ws;
+    if (ws.readyState !== WebSocket.OPEN) throw new LampError('the connection to the lamp closed', { code: 'closed' });
+    const header = Buffer.from(JSON.stringify({ ev: 'speaker.audio', sequence: this.sequence }));
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(header.length);
+    this.sequence += 1;
+    debug.frame('->', { ev: 'speaker.audio', sequence: this.sequence - 1 });
+    await new Promise((resolve, reject) => ws.send(Buffer.concat([length, header, samples]), (error) => (error ? reject(new LampError(`the connection to the lamp closed: ${error.message}`, { code: 'closed' })) : resolve())));
+  }
+
+  /** Play a WAV file (PCM16 mono at this stream's rate, 16000 or 24000 Hz) in real time. Resolves to
+   * `{ ms, ended }`: the sound sent, and why the lamp ended the stream before the end of the file (else null). */
+  async playWav(path) {
+    const { rate, samples } = wavSamples(await readFile(path));
+    if (rate !== this.sampleRate) {
+      throw new LampError(`wav: ${rate} Hz, but this stream is ${this.sampleRate} Hz: open it with speakerStream(${rate})`, { code: 'bad_request' });
+    }
+    return this.playPcm(samples);
+  }
+
+  /** `speakerWrite` paced in real time (a little ahead, inside the lamp's 300 ms buffer), as `playWav` sends a file:
+   * resolves to `{ ms, ended }` as it does, once the sound has played (the stream's own count of it, then the lamp's
+   * buffer), so `stop()` right after does not cut its tail. */
+  async playPcm(pcm) {
+    const samples = Buffer.from(pcm);
+    if (samples.length % 2) throw new LampError('playPcm: whole 16-bit samples', { code: 'bad_request' });
+    const step = ((this.sampleRate * SPEAKER_FRAME_MS) / 1000) * 2;
+    const start = Date.now();
+    let sent = 0;
+    for (let at = 0; at < samples.length && this.endedWhy === null; at += step, sent += 1) {
+      // Frame k is due at its play time less the lead.
+      const wait = start + sent * SPEAKER_FRAME_MS - SPEAKER_LEAD_MS - Date.now();
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+      if (this.endedWhy !== null) break;
+      await this.frame(samples.subarray(at, at + step));
+    }
+    // Sent a little ahead of real time: wait for the last of it to play, then for the lamp's own buffer.
+    if (this.endedWhy === null) {
+      const playsUntil = start + (samples.length / 2 / this.sampleRate) * 1000 + (this.bufferMs ?? 0);
+      const wait = playsUntil - Date.now();
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+    return { ms: (sent * SPEAKER_FRAME_MS), ended: this.endedWhy };
+  }
+
+  /** End the stream (`on: false`); safe after the lamp has ended it. */
+  async stop() {
+    if (this.over) return;
+    this.over = true;
+    this.lamp.off('speaker.ended', this.onEnded);
+    this.lamp.off('speaker.stats', this.onStats);
+    if (this.lamp.ws.readyState === WebSocket.OPEN) await this.lamp.request('speaker.stream', { on: false }).catch(() => {});
   }
 }
 
@@ -287,9 +455,13 @@ export class Lamp {
     this.info = hello.lamp ?? welcome.lamp;
     this.grants = hello.grants ?? [];
     this.limits = hello.limits ?? {};
+    // The run this connection is for, when the lamp says (a token's `hello`).
+    this.run = hello.run ?? null;
+    this.skill = hello.skill ?? null; // and the skill it runs for
     this.nextId = 1;
     // The hand this connection's head follows, if any (`followHand`).
     this.following = null;
+    this.closeReason = null; // why the lamp closed the connection, when it said
     this.waiting = new Map();
     this.done = new Map();
     this.handlers = new Map();
@@ -317,12 +489,27 @@ export class Lamp {
       ws.ping();
     }, Lamp.KEEPALIVE_MS);
     this.keepalive.unref?.();
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
+      // When the lamp said why it closed ("grants changed by the owner", "this computer was revoked by the
+      // owner", "the lamp restarts"), one line says it, so a developer is not left guessing.
+      const why = reason?.toString();
+      if (why) {
+        this.closeReason = why;
+        console.error(`lampos: the lamp closed the connection: ${why}`);
+      }
       clearInterval(this.keepalive);
       for (const { reject } of [...this.waiting.values(), ...this.done.values()]) {
         reject(new LampError('the connection to the lamp closed', { code: 'closed' }));
       }
-      for (const lease of this.leases.values()) clearInterval(lease.timer);
+      // The lamp ends a computer's leases when its last connection closes
+      // and tells nobody: none of ours is held any more.
+      for (const lease of this.leases.values()) {
+        clearInterval(lease.timer);
+        if (lease.state === 'held' || lease.state === 'suspended') {
+          lease.state = 'lost';
+          lease.lostWhy = 'the connection closed';
+        }
+      }
     });
   }
 
@@ -356,14 +543,51 @@ export class Lamp {
     return pairing;
   }
 
-  // Connect to a paired lamp (by its id, or the only one paired) and say hello.
-  static async connect(lamp, { host, keyring = new Keyring() } = {}) {
-    const pairing = keyring.pairing(lamp);
-    if (!pairing) throw new NotPaired('no pairing here for that lamp: run `lamp pair` first');
-    const { ws, welcome, next, frames } = await open(host ?? pairing.host, pairing.port, pairing.fp);
+  // Connect to lamp-control's control socket on the lamp itself, as a skill's run: the same door as a paired
+  // computer's, over a unix socket, let in by the run's one-run `token` (default `LAMP_CONTROL_TOKEN`) with exactly
+  // the grants the owner's yes for that skill named. `path` defaults to `LAMP_CONTROL_SOCKET`, then
+  // `/run/lampos-control/control.sock`. No pairing and no pin. A missing, wrong or ended token is refused
+  // `no_grant`; `lamp.run` is the run the lamp says this is.
+  static async local(token, { path } = {}) {
+    token ??= process.env.LAMP_CONTROL_TOKEN;
+    if (!token) throw new byCode.no_grant('no token for this run: pass one, or set LAMP_CONTROL_TOKEN');
+    path ??= process.env.LAMP_CONTROL_SOCKET || LOCAL_SOCKET;
+    const { ws, welcome, next, frames } = await open(undefined, undefined, undefined, path);
     let reply;
     try {
-      const hello = { id: 0, op: 'hello', client: pairing.client, sig: b64(keyring.hello(welcome.nonceBytes)) };
+      // The usual hello with no key: client c_0, a zero signature, and the token.
+      const hello = { id: 0, op: 'hello', client: 'c_0', sig: b64(Buffer.alloc(64)), token };
+      debug.frame('->', hello);
+      ws.send(JSON.stringify(hello));
+      reply = await next();
+    } catch (error) { ws.close(); throw error; }
+    if (!reply.ok) { ws.close(); throw fromReply(reply.error); }
+    return new Lamp(ws, welcome, reply, frames);
+  }
+
+  // Connect to a paired lamp (by its id, or the only one paired) and say hello. With no pairing and no `host`,
+  // inside a skill's run on the lamp (`LAMP_CONTROL_TOKEN` set and not empty) it is `Lamp.local(token)`: the run's
+  // own grants. A pairing, when there is one, wins as before.
+  static async connect(lamp, { host, keyring = new Keyring() } = {}) {
+    const pairing = keyring.pairing(lamp);
+    if (!pairing && !host) {
+      const token = (process.env.LAMP_CONTROL_TOKEN ?? '').trim();
+      if (token) return Lamp.local(token);
+    }
+    // With no pairing, on the lamp itself, as the user the owner turned on: the
+    // agent socket. Never when a `host` was asked for.
+    const local = pairing || host ? null : agentSocket();
+    if (!pairing && !local) throw new NotPaired('no pairing here for that lamp: run `lamp pair` first');
+    const { ws, welcome, next, frames } = local
+      ? await open(null, null, null, local)
+      : await open(host ?? pairing.host, pairing.port, pairing.fp);
+    let reply;
+    try {
+      // On the agent socket the peer check has already said who this is: a
+      // well-formed client and signature, neither read.
+      const hello = local
+        ? { id: 0, op: 'hello', client: 'c_0', sig: b64(Buffer.alloc(64)) }
+        : { id: 0, op: 'hello', client: pairing.client, sig: b64(keyring.hello(welcome.nonceBytes)) };
       debug.frame('->', hello);
       ws.send(JSON.stringify(hello));
       reply = await next();
@@ -478,10 +702,11 @@ export class Lamp {
     // and every id is this call's own.
     try { check(op, clean); } catch (error) { return Promise.reject(error); }
     const id = this.nextId++;
-    // Handed to the body, which says nothing back, `gesture` and `move` get
-    // no `done` (docs/control.md): their wait ends at the answer, so none is
-    // kept for them.
-    const done = wait && !ENDS_AT_REPLY.has(op)
+    // A lamp that says `motion_done` ends `gesture`, `move`, `play` (a move, by another
+    // name) and an express's move with a `done` once the body says what became of them; on one that
+    // doesn't, their wait ends at the answer, so none is kept for them.
+    const atReply = ENDS_AT_REPLY.has(op) && !this.limits?.motion_done;
+    const done = wait && !atReply
       ? new Promise((resolve, reject) => this.done.set(id, { resolve, reject }))
       : null;
     // A close rejects every `done`; when it comes before the reply, `taken`
@@ -493,7 +718,15 @@ export class Lamp {
     if (!done) return taken;
     // A refused action takes its `done` back, so nothing is left to reject,
     // unheard, when the connection closes.
-    return taken.then(() => done, (error) => { this.done.delete(id); throw error; });
+    // An express too slight to move (`"move": null`) sends the body nothing,
+    // so no `done` follows: its wait ends at the answer.
+    return taken.then(
+      (reply) => {
+        if (op === 'express' && reply.move == null) { this.done.delete(id); return reply; }
+        return done;
+      },
+      (error) => { this.done.delete(id); throw error; },
+    );
   }
 
   frame(frame) {
@@ -509,19 +742,32 @@ export class Lamp {
       if (done) { this.done.delete(frame.re); done.resolve(frame); }
     }
     for (const handler of this.handlers.get(frame.ev) ?? []) {
-      Promise.resolve().then(() => handler(frame)).catch((error) => this.ws.emit('handlerError', error));
+      Promise.resolve().then(() => handler(frame)).catch((error) => {
+        // Said, not swallowed: a handler that throws (a refused `light` inside `person.arrived`, say) must not vanish
+        // silently. Listen for 'handlerError' on `lamp.ws` to take it over.
+        if (this.ws.listenerCount('handlerError') > 0) this.ws.emit('handlerError', error);
+        else console.error(`lampos: your handler for ${frame.ev} threw: ${error?.stack ?? error}`);
+      });
     }
   }
 
   // Call `handler(event)` for each `event` the lamp says; subscribes at once.
   on(event, handler, { phrases } = {}) {
     if (!schema.events.includes(event) && event !== 'lease' && event !== 'done' && !CAMERA_EVENTS.includes(event)
-      && !MICROPHONE_EVENTS.includes(event)) {
-      throw new LampError(`no event ${event}`, { code: 'bad_request' });
+      && !MICROPHONE_EVENTS.includes(event) && !SPEAKER_EVENTS.includes(event)) {
+      throw noEvent(event, true);
     }
     const short = shortPhrase(phrases);
     if (short) throw short;
-    this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler]);
+    // A handler given `phrases` hears only those; with none it hears every `phrase.heard`. The lamp is asked for
+    // all the connection's phrases once, so the filter is here.
+    let registered = handler;
+    if (phrases?.length && event === 'phrase.heard') {
+      const own = new Set(phrases.map((p) => p.toLowerCase()));
+      registered = (frame) => (typeof frame.phrase === 'string' && !own.has(frame.phrase.toLowerCase()) ? undefined : handler(frame));
+      registered.original = handler;
+    }
+    this.handlers.set(event, [...(this.handlers.get(event) ?? []), registered]);
     if (phrases) this.phrases = [...new Set([...this.phrases, ...phrases])].sort();
     if (!schema.events.includes(event)) return Promise.resolve();
     // A refused subscription takes its handler back off, so a later `on()`
@@ -530,7 +776,7 @@ export class Lamp {
       // Only the copy this call added: the same function may be there
       // already for a granted subscription.
       const left = [...(this.handlers.get(event) ?? [])];
-      const at = left.lastIndexOf(handler);
+      const at = left.lastIndexOf(registered);
       if (at >= 0) left.splice(at, 1);
       if (left.length) this.handlers.set(event, left);
       else this.handlers.delete(event);
@@ -541,7 +787,7 @@ export class Lamp {
   // Stop calling `handler` for `event`; with none left for an event the lamp
   // says, unsubscribe from it.
   off(event, handler) {
-    const left = (this.handlers.get(event) ?? []).filter((h) => h !== handler);
+    const left = (this.handlers.get(event) ?? []).filter((h) => h !== handler && h.original !== handler);
     if (left.length) {
       this.handlers.set(event, left);
       return Promise.resolve();
@@ -590,7 +836,7 @@ export class Lamp {
     try { return await body(lease); } finally { await lease.release(); }
   }
 
-  express(feeling, strength) { return this.act('express', { feeling, strength }); }
+  express(feeling, strength, { wait = false } = {}) { return this.act('express', { feeling, strength }, wait); }
   gesture(name, { wait = false } = {}) { return this.act('gesture', { name }, wait); }
   // Turn the head (`at`, or `{ yaw, pitch }` in degrees). Its answer when the
   // door takes it; with `wait`, the body's `done` instead: `finished` with
@@ -622,14 +868,37 @@ export class Lamp {
     try { frames = posesToFrames(poses, { stepMs: POSES_STEP_MS, holdMs }); } catch (error) { return Promise.reject(error); }
     return this.move(frames, POSES_STEP_MS, { wait });
   }
-  play(name, { wait = false } = {}) { return this.act('play', { name }, wait); }
+  // Play a move recorded in a skill this computer pushed (its `moves/NAME.json`, kept when `pushSkill` installed it), as
+  // a `move` of the same frames is played: the same body lease, caps and answer. `skill` says which when two of your
+  // skills have the name; the lamp refuses an ambiguous name, naming them.
+  play(name, { skill, wait = false } = {}) { return this.act('play', { name, ...(skill !== undefined ? { skill } : {}) }, wait); }
   // Aim the joints named, in degrees, under `lease`. Its answer when the door
   // takes it; with `wait`, the body's `done`, as look's.
   // lamp-control sends yaw and pitch as the holder's look, so taking it ends a
   // following too (parts.rs `joints`).
   joints(lease, withinMs, targets, { wait = false } = {}) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }, wait, () => this.#anotherLook()); }
   light(colour, level, forMs, pattern) { return this.act('light', { colour, level, pattern, for_ms: forMs }); }
+  // Keep a light on past the 30 s a single ask lasts: asks it now and again at half of the lamp's hold limit
+  // (`limits.hold_max_ms`) until `stop()`. `ask` is one of light()'s argument lists: `holdLight('warm', 3, 'breathe')`.
+  // A later ask that the lamp refuses ends the holding and is passed to `onError` (else logged), as a lease's loss.
+  async holdLight(colour, level, pattern, { onError } = {}) {
+    const holdMs = this.limits.hold_max_ms ?? 30_000;
+    const every = Math.max(1000, holdMs / 2);
+    const ask = () => this.light(colour, level, holdMs, pattern);
+    await ask();
+    let timer = setInterval(() => {
+      ask().catch((error) => {
+        clearInterval(timer);
+        if (onError) onError(error); else console.error(`lampos: holdLight ended: ${error?.message ?? error}`);
+      });
+    }, every);
+    return { stop: () => clearInterval(timer) };
+  }
   // How many pixels the ring has, from hello's limits (undefined from a lamp before pixel lights).
+  // The owner's language, from hello: 'en', 'vi', 'ja', 'zh' or 'ko', so a program's own lines can follow it. 'en' from a lamp
+  // that says none (one from before this), and from a code this SDK does not know.
+  get language() { return ['en', 'vi', 'ja', 'zh', 'ko'].includes(this.info.language) ? this.info.language : 'en'; }
+
   get ringPixels() { return this.limits.ring?.pixels; }
   // Light the ring pixel by pixel for `forMs` (30 s at most): one colour per pixel, from pixel 0 around the ring,
   // each '#rrggbb' or [r, g, b] from 0 to 255, exactly `ringPixels` of them, at `brightness` 0-100 (100 by default).
@@ -647,9 +916,18 @@ export class Lamp {
     try { colour = hex(rgb); } catch (error) { return Promise.reject(error); }
     return this.act('light', { rgb: colour, brightness, fade_ms: fadeMs, for_ms: forMs });
   }
+  // Put the lamp's light out for `forMs` (30 s at most), as a black ring: there is no level 0 for `light`, and a ring
+  // of black pixels is how a program turns the light off. The lamp's own light comes back when it lapses or at
+  // `stop()`; ask again before it lapses to keep it out. Needs a lamp with a pixel ring (`ringPixels`).
+  lightOff({ forMs = 30_000 } = {}) {
+    if (this.ringPixels === undefined) {
+      return Promise.reject(new LampError('light_off needs a lamp with a pixel ring: this one has none', { code: 'bad_request' }));
+    }
+    return this.ring(Array(this.ringPixels).fill('#000000'), { forMs });
+  }
   // Say `text` in the lamp's voice, exactly as written, once the person isn't talking; `{ rephrase: true }` lets the
   // lamp's model say it in its own words instead, as before.
-  say(text, { rephrase } = {}) { return this.act('say', { text, rephrase: rephrase ? true : undefined }); }
+  say(text, { rephrase, wait = false } = {}) { return this.act('say', { text, rephrase: rephrase ? true : undefined }, wait); }
   // The speaker's volume, the person's own: one of `to` (0-100), `step` ('up' or 'down'), or `mute` (true or
   // false). Resolves to the level it left, `{ level, muted }`.
   async volume({ to, step, mute } = {}) {
@@ -693,10 +971,28 @@ export class Lamp {
   microphoneStream(on = true) {
     return this.request('microphone.stream', { on });
   }
+  // The speaker (the `speaker` grant, a new one, never ticked for you): any sound through the lamp's speaker, not only
+  // its own voice, so a program can sound like a person. Never while the lamp is private or muted, only on the lamp's
+  // own network, and the ring shows a mark while it plays.
+
+  /** Open a speaker stream at `sampleRate` (16000, the default, or 24000; mono signed 16-bit little-endian) and give
+   * its handle: `speakerWrite(pcm)` sends sound (a Buffer of samples, cut into 20 ms frames), `playWav(path)` plays a
+   * PCM16 mono WAV in real time, `stop()` ends it. The lamp says `speaker.stats` every 2 s and `speaker.ended` with
+   * `why` (`lamp.on('speaker.stats', ...)`). Needs the `speaker` grant. The plain request is
+   * `lamp.request('speaker.stream', { on, sample_rate })`. */
+  async speakerStream(sampleRate = 16000) {
+    if (!SPEAKER_RATES.includes(sampleRate)) {
+      throw new LampError(`sample_rate: one of ${SPEAKER_RATES.join(', ')}`, { code: 'bad_request' });
+    }
+    const reply = await this.request('speaker.stream', { on: true, sample_rate: sampleRate });
+    return new SpeakerStream(this, reply);
+  }
+
   // `hum`, the lamp's own, or one of this computer's clips by name (`uploadSound`), once the person isn't talking.
   sound(name) { return this.act('sound', { name }); }
   // Keep a clip on the lamp as `name`, over one of the same name, to play with `sound(name)`: a WAV of 16-bit mono PCM
-  // at 24 kHz, at most 30 s, within the voice's loudness cap. `wav` is its bytes (a Buffer or Uint8Array) or a path.
+  // at 24 kHz, at most 30 s, within the voice's loudness cap: no sample past -12 dBFS and no 10 ms past -30 dBFS RMS (so a
+  // steady tone peaks near -27 dBFS at most). `wav` is its bytes (a Buffer or Uint8Array) or a path.
   // Sent in parts, as the lamp takes them; the lamp checks it whole and refuses it with why. Resolves to the clip as
   // kept: name, bytes, ms.
   async uploadSound(name, wav) {
@@ -718,6 +1014,42 @@ export class Lamp {
   async sounds() { return (await this.request('sound.list', {})).sounds ?? []; }
   // Delete one of this computer's clips from the lamp.
   removeSound(name) { return this.request('sound.remove', { name }); }
+  // Notes (the `notes` grant, docs/control.md "Notes"): this computer's own small key/value memory on the lamp. It
+  // outlives the program and the lamp's restart, belongs to this computer alone, and goes when the owner lets it go.
+  // `lamp.notes.get/set/delete/list` are the same as `notesGet/notesSet/notesDelete/notesList`.
+  get notes() {
+    return {
+      get: (key, fallback) => this.notesGet(key, fallback),
+      set: (key, value) => this.notesSet(key, value),
+      delete: (key) => this.notesDelete(key),
+      list: (prefix) => this.notesList(prefix),
+    };
+  }
+  // Keep `value` (any JSON, at most 16384 bytes serialized) under `key` (up to 64 of letters, digits and `. _ : -`):
+  // `{ key, bytes }`. A computer keeps 256 keys and 256 KiB at most (`lamp.limits.notes`).
+  async notesSet(key, value) {
+    const reply = await this.request('notes.set', { key, value });
+    return { key: reply.key, bytes: reply.bytes };
+  }
+  // The value under `key`, or `fallback` (undefined) when none is kept; a stored null comes back as null.
+  async notesGet(key, fallback = undefined) {
+    const reply = await this.request('notes.get', { key });
+    return reply.found ? reply.value : fallback;
+  }
+  // Drop `key`; whether it was kept.
+  async notesDelete(key) { return Boolean((await this.request('notes.delete', { key })).deleted); }
+  // This computer's keys that start with `prefix`, sorted: `keys` (each `{ key, bytes }`), `count`, `total`, `bytes`,
+  // `keys_max` and `bytes_max`.
+  async notesList(prefix = '') {
+    const { re: _re, ok: _ok, ...rest } = await this.request('notes.list', prefix ? { prefix } : {});
+    return rest;
+  }
+  // A skill run's linked services (the control socket only, #6432): one read of `service` (a lamp-services code,
+  // such as `gmail`) with `service_read`'s own `args`; lamp-services' `result`. Needs `<service>-read`.
+  async serviceRead(service, args = {}) { return (await this.request('service.read', { service, args })).result; }
+  // A write to `service`, only prepared: `result` holds its `read_back` and `held: true`, and the person's spoken
+  // yes sends it, never the run. Needs `<service>-write`.
+  async serviceWrite(service, args = {}) { return (await this.request('service.write', { service, args })).result; }
   // Turns and listening (docs/control.md): the person wins over each.
   // Opens a conversation turn, as a tap on the head does: the person's next
   // line is answered as spoken to the lamp; with `prompt`, the lamp says it
@@ -759,7 +1091,8 @@ export class Lamp {
         name: pkg.name, sha256: pkg.sha256, size: pkg.data.length, part, parts: pkg.parts.length, data,
       });
     }
-    return reply.skill ?? {};
+    // What the lamp kept of the package's `moves/` for `play`, when it has it: { kept: [...], left_out: [{ name, why }] }.
+    return reply.moves ? { ...(reply.skill ?? {}), moves: reply.moves } : reply.skill ?? {};
   }
 
   async skills() { return (await this.request('skill.list')).skills ?? []; }

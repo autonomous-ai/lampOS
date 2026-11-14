@@ -135,6 +135,12 @@ struct Fake {
     /// How many skills [`reset::remove_installed_skills`] removed in the
     /// product's skills folder, which a test can't reach.
     installed: usize,
+    /// How many of Hermes's and OpenClaw's per-person files
+    /// [`reset::forget_agents`] removed in the lamp's folders.
+    agents: usize,
+    /// `lampos`'s own manager, as [`reset::agent_manager_unit`] reads it
+    /// from `/etc/passwd`; none: no such user.
+    manager: Option<String>,
 }
 impl Effects for Fake {
     fn run(&mut self, argv: &[String]) -> io::Result<()> {
@@ -235,6 +241,13 @@ impl Effects for Fake {
         self.calls.borrow_mut().push("skills".into());
         Ok(self.installed)
     }
+    fn forget_agents(&mut self) -> io::Result<usize> {
+        self.calls.borrow_mut().push("agents".into());
+        Ok(self.agents)
+    }
+    fn agent_manager(&mut self) -> Option<String> {
+        self.manager.clone()
+    }
 }
 
 /// A unit name against a `systemctl` pattern, `*` standing for any run of
@@ -302,6 +315,7 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
             "list-units",
             "stop",
             "skills",
+            "agents",
             "sync",
             "sync",
             "reboot"
@@ -768,7 +782,10 @@ fn a_failed_stop_reboots_at_once_into_setup_which_finishes_the_wipe() {
     let steps = reset::resume(&plan, &mut start).unwrap();
     wiped(&root);
     assert!(!steps.contains(&Step::Rebooting));
-    assert_eq!(*start.calls.borrow(), ["skills", "sync", "sync"]);
+    assert_eq!(
+        *start.calls.borrow(),
+        ["list-units", "skills", "agents", "sync", "sync"]
+    );
     // Nothing left to finish.
     assert!(
         reset::resume(&plan, &mut Fake::default())
@@ -895,7 +912,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 45] = [
+const PERSON_STORES: [&str; 47] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -908,6 +925,9 @@ const PERSON_STORES: [&str; 45] = [
     // Faces added from photos, not yet agreed to by their person, beside
     // the people's file (#1968): `photo::Unconfirmeds::beside`.
     "/var/lib/lampos-eyes/people.json.from-photos",
+    // Its staging copy, left by a save cut between its write and its rename
+    // (`photo::Unconfirmeds::staging`): names and prints too.
+    "/var/lib/lampos-eyes/people.json.from-photos.new",
     // The face reads of a labelled session (`lamp-eyes --seems-log`, #1671),
     // the one path the eyes take for it (`seems_log::PATH`).
     "/var/lib/lampos-eyes/seems.log",
@@ -952,6 +972,9 @@ const PERSON_STORES: [&str; 45] = [
     // slide, read by lamp-ears (#1722 item 1, docs/onboarding.md).
     "/var/lib/lampOS/consent/room-sounds.json",
     "/var/lib/lampOS/consent/face-expressions.json",
+    // The owner's yes to what the lamp sees for its skills, read by
+    // lamp-seen (#6543, Fourteen's ruling, docs/seen.md).
+    "/var/lib/lampOS/consent/seen-activity.json",
     "/var/lib/lampOS/voice/schedule-delivery",
     "/var/lib/lampOS/voice/first-output",
     "/run/lampos-voice/thread.json",
@@ -1045,6 +1068,35 @@ fn current_reset_plans_wipe_people_and_both_temporaries_without_widening_the_dir
             0o700
         );
     }
+}
+
+/// A save of the faces from photos cut between its write and its rename
+/// leaves `people.json.from-photos.new`, names and prints in it: the product
+/// reset takes it with the file, and nothing else beside them.
+#[test]
+fn a_product_reset_removes_the_photo_faces_staging_copy() {
+    let plan: Plan =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    plan.check().unwrap();
+    let root = Root::new();
+    let directory = root.0.join("var/lib/lampos-eyes");
+    fs::create_dir_all(&directory).unwrap();
+    let files = ["people.json.from-photos", "people.json.from-photos.new"];
+    for file in files {
+        fs::write(directory.join(file), br#"{"name":"Rin","print":[0.5]}"#).unwrap();
+    }
+    let kept = directory.join("people.json.from-photos.new.keep");
+    fs::write(&kept, b"unrelated synthetic setting").unwrap();
+    for path in &plan.wipe {
+        reset::wipe(&root.0.join(path.strip_prefix("/").unwrap())).unwrap();
+    }
+    for file in files {
+        assert!(
+            fs::symlink_metadata(directory.join(file)).is_err(),
+            "{file}"
+        );
+    }
+    assert_eq!(fs::read(kept).unwrap(), b"unrelated synthetic setting");
 }
 
 /// Harness's real layout under the tasks part's home (Nine on #1016, from
@@ -1823,7 +1875,7 @@ fn check_reads_the_product_plan_install_places() {
 }
 
 /// How far after its folder a store's rest may be named: the farthest on
-/// 1 Nov, `people.json.from-photos`, ends 187 bytes after
+/// 10 Nov, `people.json.from-photos.new`, ends 222 bytes after
 /// `/var/lib/lampos-eyes/`.
 const NAMED_NEAR: usize = 240;
 
@@ -2338,7 +2390,8 @@ fn run_not_emptied_reboots_instead_of_starting_in_place() {
 
 /// What starting in place empties is every folder a part keeps in `/run`
 /// past its stop, and only those: each `/run/lampos-*` folder the product's
-/// tmpfiles make (but the locks, which hold no one's words), and each
+/// tmpfiles make (but the locks and the local agent's socket folder, which
+/// hold no one's words), and each
 /// product unit's `RuntimeDirectory=` with `RuntimeDirectoryPreserve=yes`.
 /// A unit that starts keeping its folder fails this until it is named.
 #[test]
@@ -2350,7 +2403,9 @@ fn what_starting_in_place_empties_is_every_folder_kept_in_run_past_a_stop() {
         .filter_map(|line| line.strip_prefix("d "))
         .filter_map(|rest| rest.split_whitespace().next())
         .filter(|folder| {
-            folder.starts_with("/run/lampos-") && !folder.starts_with("/run/lampos-locks")
+            folder.starts_with("/run/lampos-")
+                && !folder.starts_with("/run/lampos-locks")
+                && *folder != lamp_msgs::local_agent::SOCKET_DIR
         })
         .map(String::from)
         .collect();
@@ -2655,4 +2710,821 @@ fn a_skill_the_skills_install_put_on_from_a_package_goes_and_the_lamps_own_stays
     assert_eq!(removed, [skills.join("desk-tutor")]);
     assert!(!skills.join("desk-tutor").exists());
     assert!(lamp_skills::load(&skills.join("onboarding")).is_ok());
+}
+
+/// Hermes's and OpenClaw's real layouts on lamp-c0a4 (Hermes 0.22.2,
+/// OpenClaw 2026.11.3, read on 11 Nov, #6343): a reset removes every
+/// per-person file of both, a name it does not know among them, and keeps
+/// both programs, so no reinstall follows; the folders Hermes's installer
+/// makes are emptied and kept. The product plan empties the agents' work
+/// folder, and a lamp without either agent removes nothing.
+#[test]
+fn a_reset_forgets_hermes_and_openclaw_per_person_files_and_keeps_both_programs() {
+    let root = Root::new();
+    let files = [
+        // Hermes's home: the program, kept.
+        ("var/lib/lampos-hermes/.local/bin/hermes", true),
+        (
+            "var/lib/lampos-hermes/.local/share/uv/python/cpython-3.11/bin/python3",
+            true,
+        ),
+        // Hermes's HOME, where its tools write: the person's.
+        ("var/lib/lampos-hermes/.cache/uv/x", false),
+        ("var/lib/lampos-hermes/.cache/downloads/report.pdf", false),
+        ("var/lib/lampos-hermes/.npm/_cacache/x", false),
+        ("var/lib/lampos-hermes/.bashrc", true),
+        ("var/lib/lampos-hermes/.profile", true),
+        (
+            "var/lib/lampos-hermes/.local/lib/python3.11/site-packages/mine.py",
+            false,
+        ),
+        ("var/lib/lampos-hermes/.local/share/uv/tools/mine/x", false),
+        ("var/lib/lampos-hermes/.local/bin/backup.sh", false),
+        ("var/lib/lampos-hermes/.local/bin/mine", false),
+        ("var/lib/lampos-hermes/.local/state/x", false),
+        (
+            "var/lib/lampos-hermes/.hermes/hermes-agent/run_agent.py",
+            true,
+        ),
+        ("var/lib/lampos-hermes/.hermes/tools/uv", true),
+        ("var/lib/lampos-hermes/.hermes/tools/ffmpeg", true),
+        ("var/lib/lampos-hermes/.hermes/installs/x.json", true),
+        ("var/lib/lampos-hermes/.hermes/config.yaml", true),
+        ("var/lib/lampos-hermes/.hermes/models_dev_cache.json", true),
+        (
+            "var/lib/lampos-hermes/.hermes/provider_models_cache.json",
+            true,
+        ),
+        // Hermes: the person's.
+        ("var/lib/lampos-hermes/.bash_history", false),
+        ("var/lib/lampos-hermes/.hermes/.env", false),
+        ("var/lib/lampos-hermes/.hermes/state.db", false),
+        ("var/lib/lampos-hermes/.hermes/state.db-wal", false),
+        ("var/lib/lampos-hermes/.hermes/state.db-shm", false),
+        ("var/lib/lampos-hermes/.hermes/sessions/s1.json", false),
+        ("var/lib/lampos-hermes/.hermes/memories/MEMORY.md", false),
+        ("var/lib/lampos-hermes/.hermes/logs/agent.log", false),
+        ("var/lib/lampos-hermes/.hermes/pairing/p.json", false),
+        ("var/lib/lampos-hermes/.hermes/cron/jobs.json", false),
+        ("var/lib/lampos-hermes/.hermes/hooks/h.sh", false),
+        ("var/lib/lampos-hermes/.hermes/audio_cache/a.mp3", false),
+        ("var/lib/lampos-hermes/.hermes/image_cache/i.png", false),
+        (
+            "var/lib/lampos-hermes/.hermes/runtime/active_sessions.json",
+            false,
+        ),
+        ("var/lib/lampos-hermes/.hermes/terminal-sessions/t", false),
+        ("var/lib/lampos-hermes/.hermes/sandboxes/s/x", false),
+        ("var/lib/lampos-hermes/.hermes/spawn-ledger.json", false),
+        ("var/lib/lampos-hermes/.hermes/backups/b", false),
+        ("var/lib/lampos-hermes/.hermes/cache/scratch/x", false),
+        (
+            "var/lib/lampos-hermes/.hermes/.skills_prompt_snapshot.json",
+            false,
+        ),
+        (
+            "var/lib/lampos-hermes/.hermes/shell-hooks-allowlist.json",
+            false,
+        ),
+        ("var/lib/lampos-hermes/.hermes/auth.lock", false),
+        ("var/lib/lampos-hermes/.hermes/SOUL.md", false),
+        (
+            "var/lib/lampos-hermes/.hermes/skills/made-by-me/SKILL.md",
+            false,
+        ),
+        (
+            "var/lib/lampos-hermes/.hermes/skills/.bundled_manifest",
+            false,
+        ),
+        ("var/lib/lampos-hermes/.hermes/kanban.db", false),
+        // lamp-c0a4's own names, 14 Nov 15:47 (#6343): Hermes 0.22.2's
+        // logins and locks, gone; its dependency record, kept.
+        ("var/lib/lampos-hermes/.hermes/auth.json", false),
+        ("var/lib/lampos-hermes/.hermes/shared/nous_auth.json", false),
+        ("var/lib/lampos-hermes/.hermes/.mcp-discovery.lock", false),
+        (
+            "var/lib/lampos-hermes/.hermes/installs/3ecd8e65a8ac18db/facts.json",
+            true,
+        ),
+        // OpenClaw: the program, kept.
+        ("var/lib/lampos-openclaw/node/bin/node", true),
+        ("var/lib/lampos-openclaw/npm/bin/openclaw", true),
+        ("var/lib/lampos-openclaw/pkg/package.json", true),
+        ("var/lib/lampos-openclaw/.npm/_cacache/x", true),
+        ("var/lib/lampos-openclaw/gateway-token", true),
+        ("var/lib/lampos-openclaw/state/openclaw.json", true),
+        // OpenClaw: the person's.
+        ("var/lib/lampos-openclaw/gateway.log", false),
+        ("var/lib/lampos-openclaw/state/state/openclaw.sqlite", false),
+        (
+            "var/lib/lampos-openclaw/state/state/openclaw.sqlite-wal",
+            false,
+        ),
+        (
+            "var/lib/lampos-openclaw/state/agents/main/sessions/s.jsonl",
+            false,
+        ),
+        ("var/lib/lampos-openclaw/state/workspace/USER.md", false),
+        ("var/lib/lampos-openclaw/state/workspace/IDENTITY.md", false),
+        ("var/lib/lampos-openclaw/state/workspace/.git/HEAD", false),
+        ("var/lib/lampos-openclaw/state/media/m.png", false),
+        ("var/lib/lampos-openclaw/state/tmp/t", false),
+        (
+            "var/lib/lampos-openclaw/state/plugin-skills/p/SKILL.md",
+            false,
+        ),
+        (
+            "var/lib/lampos-openclaw/state/openclaw.json.last-good",
+            false,
+        ),
+        (
+            "var/lib/lampos-openclaw/state/config-journal-fingerprint.key",
+            false,
+        ),
+        // lamp-c0a4's own names, 14 Nov 15:47 (#6343): OpenClaw's databases.
+        (
+            "var/lib/lampos-openclaw/state/state/openclaw.sqlite-wal",
+            false,
+        ),
+        (
+            "var/lib/lampos-openclaw/state/state/openclaw-quarantine.sqlite",
+            false,
+        ),
+        (
+            "var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite",
+            false,
+        ),
+    ];
+    for (file, _) in files {
+        let path = root.path(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, b"x").unwrap();
+    }
+    // A token a tool appended to the shell's file goes with it.
+    fs::write(
+        root.path("var/lib/lampos-hermes/.bashrc"),
+        b"export PATH=\"$HOME/.local/bin:$PATH\"\nexport GITHUB_TOKEN=ghp_person\n",
+    )
+    .unwrap();
+    // The kept settings as the lamp writes them, already cut.
+    fs::write(
+        root.path("var/lib/lampos-hermes/.hermes/config.yaml"),
+        reset::cut_hermes_config(b"").unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        root.path("var/lib/lampos-openclaw/state/openclaw.json"),
+        reset::cut_openclaw_config(b"{}").unwrap(),
+    )
+    .unwrap();
+    // A link in a kept place is removed, never followed.
+    fs::write(root.path("outside"), b"keep").unwrap();
+    symlink(
+        root.path("outside"),
+        root.path("var/lib/lampos-hermes/.hermes/linked"),
+    )
+    .unwrap();
+    assert!(reset::forget_agents(&root.0).unwrap() > 0);
+    for (file, kept) in files {
+        assert_eq!(root.path(file).exists(), kept, "{file}");
+    }
+    assert!(fs::symlink_metadata(root.path("var/lib/lampos-hermes/.hermes/linked")).is_err());
+    assert_eq!(fs::read(root.path("outside")).unwrap(), b"keep");
+    // The installer's folders stay, empty; the rest of the person's go.
+    let hermes = root.path("var/lib/lampos-hermes/.hermes");
+    for folder in ["sessions", "memories", "skills", "logs", "hooks"] {
+        assert!(hermes.join(folder).is_dir(), "{folder}");
+        assert_eq!(fs::read_dir(hermes.join(folder)).unwrap().count(), 0);
+    }
+    let home = root.path("var/lib/lampos-hermes");
+    for folder in [".cache", ".npm"] {
+        assert!(home.join(folder).is_dir(), "{folder}");
+        assert_eq!(fs::read_dir(home.join(folder)).unwrap().count(), 0);
+    }
+    for gone in [".local/lib", ".local/state", ".local/share/uv/tools"] {
+        assert!(!home.join(gone).exists(), "{gone}");
+    }
+    // The shell's files are the installer's text again: the token is gone.
+    for shell in [".bashrc", ".profile"] {
+        assert_eq!(
+            fs::read_to_string(home.join(shell)).unwrap(),
+            reset::HERMES_SHELL_TEXT,
+            "{shell}"
+        );
+    }
+    let installer = std::str::from_utf8(lamp_update::hermes_install::INSTALLER).unwrap();
+    let line = reset::HERMES_SHELL_TEXT
+        .trim()
+        .strip_prefix("# Hermes Agent command\n")
+        .unwrap();
+    assert!(installer.contains(&format!("SHELL_PATH_LINE='{line}'")));
+    assert!(installer.contains("printf '\\n# Hermes Agent command\\n%s\\n' \"$line\" >> \"$rc\""));
+    // The one command the installer publishes is the one kept.
+    assert_eq!(
+        Path::new(lamp_update::hermes_install::HERMES).file_name(),
+        Some(reset::HERMES_COMMAND.as_ref())
+    );
+    assert_eq!(
+        fs::read_dir(home.join(".local/bin")).unwrap().count(),
+        1,
+        "only hermes in .local/bin"
+    );
+    // What `hermes_install::present` reads in the folder stays.
+    assert!(
+        root.path(lamp_update::hermes_install::HERMES.trim_start_matches('/'))
+            .exists()
+    );
+    for gone in ["runtime", "cache", "sandboxes"] {
+        assert!(!hermes.join(gone).exists(), "{gone}");
+    }
+    assert!(
+        !root
+            .path("var/lib/lampos-openclaw/state/workspace")
+            .exists()
+    );
+    // Again, and on a lamp with neither agent: nothing left to remove.
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 0);
+    assert_eq!(reset::forget_agents(&root.path("none")).unwrap(), 0);
+    assert_eq!(
+        reset::forget_agents(Path::new("relative"))
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::InvalidInput
+    );
+    // The folders are the installs' (`lamp_update::hermes_install`,
+    // #6226's `openclaw_install`).
+    let folders: Vec<&str> = reset::AGENT_FOLDERS
+        .iter()
+        .map(|agent| agent.folder)
+        .collect();
+    assert_eq!(
+        folders,
+        [
+            lamp_update::hermes_install::PLACE,
+            "/var/lib/lampos-hermes/.local",
+            "/var/lib/lampos-hermes/.local/bin",
+            "/var/lib/lampos-hermes/.local/share",
+            "/var/lib/lampos-hermes/.local/share/uv",
+            lamp_update::hermes_install::HERMES_HOME,
+            "/var/lib/lampos-openclaw",
+            "/var/lib/lampos-openclaw/state",
+        ]
+    );
+    // The agents' work folder (`hermes_install::WORK`) is the plan's, and
+    // the plan never takes a program's folder whole.
+    let plan: Plan =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    plan.check().unwrap();
+    assert!(
+        plan.wipe
+            .iter()
+            .any(|path| path == Path::new(lamp_update::hermes_install::WORK))
+    );
+    for program in [
+        "/var/lib/lampos-hermes/.hermes/hermes-agent",
+        "/var/lib/lampos-hermes/.hermes/tools",
+        "/var/lib/lampos-openclaw/npm",
+        "/var/lib/lampos-openclaw/node",
+    ] {
+        assert!(
+            !plan
+                .wipe
+                .iter()
+                .any(|path| Path::new(program).starts_with(path)),
+            "{program}"
+        );
+    }
+    // OpenClaw's gateway, outside the lamp's target, is stopped first.
+    assert!(reset::WRITERS.contains(&"lamp-openclaw-gateway.service"));
+}
+
+/// The Hermes a pin change moved aside (`hermes_install::ASIDE`), with the
+/// old owner's sessions and keys, goes whole; a link there is removed, never
+/// followed, and none at all is fine (#6343).
+#[test]
+fn a_reset_removes_the_hermes_moved_aside() {
+    let root = Root::new();
+    let aside = root.path("var/lib/lampos-hermes.old");
+    assert_eq!(
+        lamp_update::hermes_install::ASIDE,
+        "/var/lib/lampos-hermes.old"
+    );
+    fs::create_dir_all(aside.join(".hermes/sessions")).unwrap();
+    fs::write(aside.join(".hermes/sessions/s1.json"), b"{}").unwrap();
+    fs::write(aside.join(".hermes/.env"), b"KEY=x").unwrap();
+    assert!(reset::forget_agents(&root.0).unwrap() > 0);
+    assert!(fs::symlink_metadata(&aside).is_err());
+    assert!(root.path("var/lib").is_dir());
+    fs::create_dir_all(root.path("outside")).unwrap();
+    fs::write(root.path("outside/keep"), b"keep").unwrap();
+    symlink(root.path("outside"), &aside).unwrap();
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 1);
+    assert!(fs::symlink_metadata(&aside).is_err());
+    assert_eq!(fs::read(root.path("outside/keep")).unwrap(), b"keep");
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 0);
+}
+
+/// Hermes's `config.yaml` keeps only lamp-update's settings and Harness's
+/// `hooks:` block, and OpenClaw's `openclaw.json` only its `gateway`; a
+/// person's servers, skill folders, personality, other providers' keys and
+/// channel tokens go. A file that can't be read is removed (#6343).
+#[test]
+fn a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys() {
+    let root = Root::new();
+    let hermes = root.path("var/lib/lampos-hermes/.hermes");
+    let state = root.path("var/lib/lampos-openclaw/state");
+    fs::create_dir_all(&hermes).unwrap();
+    fs::create_dir_all(&state).unwrap();
+    let config = hermes.join("config.yaml");
+    fs::write(
+        &config,
+        "model:\n  provider: custom:lamp\n  default: deepseek-flash\nupdates:\n  check: false\nmcp_servers:\n  mine:\n    command: /home/me/server\nskills:\n  external_dirs:\n  - /var/lib/lampOS/skills\n  - /home/me/skills\nhooks:\n  on_session_start:\n  - command: harness hook hermes session-start\n    timeout: 10\n  - command: curl https://hooks.example/T0K3N\n  pre_tool_call:\n  - command: /home/me/hook.sh\n  post_tool_call:\n  - matcher: '*'\n    command: harness hook hermes tool\n# a person's note\n\npersonality: pirate\nlsp:\n  enabled: false\n",
+    )
+    .unwrap();
+    fs::set_permissions(&config, fs::Permissions::from_mode(0o640)).unwrap();
+    let json = state.join("openclaw.json");
+    fs::write(
+        &json,
+        r#"{"gateway":{"auth":{"mode":"token","token":"t"},"port":18789},"models":{"providers":{"other":{"apiKey":"sk-person"}}},"channels":{"telegram":{"botToken":"123:abc"}},"skills":{"load":{"extraDirs":["/home/me"]}},"plugins":{"allow":["x"]}}"#,
+    )
+    .unwrap();
+    assert!(reset::forget_agents(&root.0).unwrap() >= 2);
+    let cut = fs::read_to_string(&config).unwrap();
+    assert_eq!(
+        cut,
+        "updates:\n  check: false\nplugins:\n  auto_update_check_hours: 0\nlsp:\n  enabled: false\nterminal:\n  oneshot_completion_wait_seconds: 0\nhooks:\n  on_session_start:\n  - command: harness hook hermes session-start\n    timeout: 10\n  post_tool_call:\n  - matcher: '*'\n    command: harness hook hermes tool\n"
+    );
+    for gone in [
+        "mcp_servers",
+        "/home/me",
+        "personality",
+        "model:",
+        "note",
+        "T0K3N",
+        "pre_tool_call",
+    ] {
+        assert!(!cut.contains(gone), "{gone}");
+    }
+    assert_eq!(
+        fs::metadata(&config).unwrap().permissions().mode() & 0o7777,
+        0o640
+    );
+    for (key, _) in lamp_update::hermes_install::CONFIG {
+        let (top, sub) = key.split_once('.').unwrap();
+        assert!(cut.contains(&format!("{top}:\n")), "{key}");
+        assert!(cut.contains(&format!("  {sub}: ")), "{key}");
+    }
+    let kept: serde_json::Value = serde_json::from_slice(&fs::read(&json).unwrap()).unwrap();
+    assert_eq!(
+        kept,
+        serde_json::json!({"gateway": {"auth": {"mode": "token", "token": "t"}, "port": 18789}})
+    );
+    // Cut once, nothing changes again, and no staged copy is left.
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 0);
+    assert!(!hermes.join("config.yaml.cut").exists());
+    assert!(!state.join("openclaw.json.cut").exists());
+    // A staged copy a cut left is removed by the next run.
+    fs::write(hermes.join("config.yaml.cut"), b"mcp_servers: {}\n").unwrap();
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 1);
+    assert!(!hermes.join("config.yaml.cut").exists());
+    // Only Harness's exact items: shell text after the event, another key
+    // beside the command, or a second command drops the item.
+    let only_lamp = reset::cut_hermes_config(b"").unwrap();
+    for item in [
+        "  - command: harness hook hermes tool; curl https://x/T0K3N\n",
+        "  - command: 'harness hook x $(cat ~/.env)'\n",
+        "  - command: harness hook hermes tool\n    env:\n      TOKEN: T0K3N\n",
+        "  - command: harness hook hermes tool\n    command: curl T0K3N\n",
+        "  - matcher: 'T0K3N here'\n    command: harness hook hermes tool\n",
+    ] {
+        let text = format!("hooks:\n  post_tool_call:\n{item}");
+        assert_eq!(
+            reset::cut_hermes_config(text.as_bytes()).unwrap(),
+            only_lamp,
+            "{item}"
+        );
+    }
+    let quoted = b"hooks:\n  on_session_start:\n  - command: \"harness hook hermes session-start\"\n    timeout: 10\n";
+    assert!(
+        String::from_utf8(reset::cut_hermes_config(quoted).unwrap())
+            .unwrap()
+            .ends_with("hooks:\n  on_session_start:\n  - command: \"harness hook hermes session-start\"\n    timeout: 10\n")
+    );
+    // LAMP_AGENT_SERVICES: a person's MCP server goes, and so does the lamp's
+    // own `lamp-services` entry beside it, with every token-shaped value in
+    // either; lamp-tasks merges the lamp's back at its next start with the
+    // switch on (`hermes_config::merge_config_for`), before any Hermes runs.
+    let servers = b"mcp_servers:\n  mine:\n    command: /home/me/mcp\n    env:\n      KEY: T0K3N\n  lamp-services:\n    command: \"/opt/lampOS/services/current/lamp-services\"\n    args:\n    - \"mcp\"\n    env:\n      LAMP_CONTROL_SOCKET: \"${LAMP_CONTROL_SOCKET}\"\n      LAMP_CONTROL_TOKEN: \"${LAMP_CONTROL_TOKEN}\"\n";
+    let cut = reset::cut_hermes_config(servers).unwrap();
+    assert_eq!(cut, only_lamp);
+    let cut = String::from_utf8(cut).unwrap();
+    assert!(
+        !cut.contains("mcp_servers") && !cut.contains("T0K3N"),
+        "{cut}"
+    );
+    // Without hooks, only the lamp's settings; a file not read is removed.
+    assert_eq!(
+        reset::cut_hermes_config(b"personality: pirate\n").unwrap(),
+        reset::cut_hermes_config(b"").unwrap()
+    );
+    for unreadable in [
+        &b"\tkey: x\n"[..],
+        b"---\nhooks: {}\n",
+        b"- a\n",
+        b"not a key\n",
+        b"hooks: {}\nhooks: {}\n",
+        b"\xff\n",
+    ] {
+        assert!(reset::cut_hermes_config(unreadable).is_none());
+    }
+    assert_eq!(
+        reset::cut_openclaw_config(br#"{"models":{}}"#).unwrap(),
+        b"{}\n"
+    );
+    for unreadable in [&b"[]"[..], b"{", b"null"] {
+        assert!(reset::cut_openclaw_config(unreadable).is_none());
+    }
+    fs::write(&config, b"\tbroken: yes\n").unwrap();
+    fs::write(&json, b"{ not json").unwrap();
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 2);
+    assert!(!config.exists());
+    assert!(!json.exists());
+    // A link in a kept file's place is removed, never followed.
+    fs::write(root.path("outside"), b"{}").unwrap();
+    symlink(root.path("outside"), &json).unwrap();
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 1);
+    assert!(fs::symlink_metadata(&json).is_err());
+    assert_eq!(fs::read(root.path("outside")).unwrap(), b"{}");
+}
+
+/// Every path under `at`, with a file's bytes or a link's target, never
+/// followed.
+fn snapshot(at: &Path, found: &mut Vec<(PathBuf, Vec<u8>)>) {
+    for entry in fs::read_dir(at).unwrap() {
+        let path = entry.unwrap().path();
+        let meta = fs::symlink_metadata(&path).unwrap();
+        if meta.file_type().is_symlink() {
+            let target = fs::read_link(&path).unwrap();
+            found.push((path, target.into_os_string().into_encoded_bytes()));
+        } else if meta.is_dir() {
+            found.push((path.clone(), Vec::new()));
+            snapshot(&path, found);
+        } else {
+            found.push((path.clone(), fs::read(&path).unwrap()));
+        }
+    }
+}
+
+/// `forget-agents --dry-run` changes nothing and lists what the reset then
+/// does: each path the real run takes away is under a listed removal, each
+/// listed one is gone, each kept or emptied one is there, and a cut names
+/// keys, never values (#6343).
+#[test]
+fn the_agents_dry_run_changes_nothing_and_lists_what_the_reset_does() {
+    let root = Root::new();
+    for (file, text) in [
+        ("var/lib/lampos-hermes/.local/bin/hermes", "x"),
+        ("var/lib/lampos-hermes/.local/lib/python3/mine.py", "x"),
+        ("var/lib/lampos-hermes/.cache/uv/x", "x"),
+        (
+            "var/lib/lampos-hermes/.bashrc",
+            "export GITHUB_TOKEN=ghp_person\n",
+        ),
+        (
+            "var/lib/lampos-hermes/.hermes/hermes-agent/run_agent.py",
+            "x",
+        ),
+        ("var/lib/lampos-hermes/.hermes/.env", "KEY=sk-person"),
+        ("var/lib/lampos-hermes/.hermes/sessions/s1.json", "{}"),
+        (
+            "var/lib/lampos-hermes/.hermes/config.yaml",
+            "updates:\n  check: false\nmcp_servers:\n  mine:\n    command: secret-server\n",
+        ),
+        ("var/lib/lampos-hermes.old/.hermes/.env", "KEY=old"),
+        (
+            "var/lib/lampos-openclaw/state/openclaw.json",
+            r#"{"gateway":{"port":1},"channels":{"telegram":{"botToken":"123:abc"}}}"#,
+        ),
+        ("var/lib/lampos-openclaw/state/workspace/USER.md", "me"),
+        ("var/lib/lampos-openclaw/gateway-token", "t"),
+    ] {
+        let path = root.path(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    let var = root.path("var");
+    let mut before = Vec::new();
+    snapshot(&var, &mut before);
+    let plan = reset::plan_agents(&root.0).unwrap();
+    let mut after_plan = Vec::new();
+    snapshot(&var, &mut after_plan);
+    assert_eq!(before, after_plan, "a dry run changes nothing");
+    let lines: Vec<String> = plan.iter().map(ToString::to_string).collect();
+    let text = lines.join("\n");
+    for secret in ["ghp_person", "sk-person", "secret-server", "123:abc"] {
+        assert!(!text.contains(secret), "{secret}");
+    }
+    let line = |kind: &str, file: &str| format!("{kind} {}", root.path(file).display());
+    for expected in [
+        line("keep", "var/lib/lampos-hermes/.local/bin"),
+        line("remove", "var/lib/lampos-hermes/.local/lib"),
+        line("empty", "var/lib/lampos-hermes/.cache"),
+        line("cut", "var/lib/lampos-hermes/.bashrc"),
+        line("remove", "var/lib/lampos-hermes/.hermes/.env"),
+        line("empty", "var/lib/lampos-hermes/.hermes/sessions"),
+        line("remove", "var/lib/lampos-hermes.old"),
+        line("remove", "var/lib/lampos-openclaw/state/workspace"),
+        line("keep", "var/lib/lampos-openclaw/gateway-token"),
+    ] {
+        assert!(
+            lines.iter().any(|listed| listed.starts_with(&expected)),
+            "{expected} in {text}"
+        );
+    }
+    assert!(text.contains(&format!(
+        "cut {} (keys: kept updates, plugins, lsp, terminal; dropped mcp_servers)",
+        root.path("var/lib/lampos-hermes/.hermes/config.yaml").display()
+    )));
+    assert!(text.contains(&format!(
+        "cut {} (keys: kept gateway; dropped channels)",
+        root.path("var/lib/lampos-openclaw/state/openclaw.json").display()
+    )));
+    // The real run does what was listed.
+    assert!(reset::forget_agents(&root.0).unwrap() > 0);
+    let mut after = Vec::new();
+    snapshot(&var, &mut after);
+    let removals: Vec<&PathBuf> = plan
+        .iter()
+        .filter_map(|step| match step {
+            reset::AgentStep::Remove(path) => Some(path),
+            _ => None,
+        })
+        .collect();
+    for (path, _) in &before {
+        let gone = !after.iter().any(|(there, _)| there == path);
+        let listed = removals.iter().any(|removed| path.starts_with(removed))
+            || plan.iter().any(|step| {
+                matches!(step, reset::AgentStep::Empty(emptied) if path.starts_with(emptied) && path != emptied)
+            });
+        assert_eq!(gone, listed, "{}", path.display());
+    }
+    for step in &plan {
+        match step {
+            reset::AgentStep::Remove(path) => assert!(fs::symlink_metadata(path).is_err()),
+            reset::AgentStep::Keep(path) | reset::AgentStep::Cut { path, .. } => {
+                assert!(fs::symlink_metadata(path).is_ok(), "{}", path.display());
+            }
+            reset::AgentStep::Empty(path) => {
+                assert_eq!(fs::read_dir(path).unwrap().count(), 0);
+            }
+        }
+    }
+    // The command prints the same lines, and refuses to run without --dry-run.
+    let out = std::process::Command::new(PROGRAM)
+        .args(["forget-agents", "--dry-run", "--root"])
+        .arg(&root.0)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let printed = String::from_utf8(out.stdout).unwrap();
+    let again: Vec<String> = reset::plan_agents(&root.0)
+        .unwrap()
+        .iter()
+        .map(|step| format!("{step}\n"))
+        .collect();
+    assert_eq!(printed, again.concat());
+    let refused = std::process::Command::new(PROGRAM)
+        .args(["forget-agents", "--root"])
+        .arg(&root.0)
+        .output()
+        .unwrap();
+    assert!(!refused.status.success());
+}
+
+/// A reset finished after a power cut stops OpenClaw's gateway first, as the
+/// reset itself does: it starts at boot outside the lamp's target and would
+/// write its state while the reset empties it (#6343). A stop that fails
+/// wipes nothing.
+#[test]
+fn a_resumed_reset_stops_the_openclaw_gateway_before_finishing() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    fs::write(&plan.journal, b"{}").unwrap();
+    let gateway = "lamp-openclaw-gateway.service loaded active running OpenClaw\n";
+    let mut failing = Fake {
+        writers: gateway.into(),
+        fail_stop: true,
+        ..Fake::default()
+    };
+    assert!(reset::resume(&plan, &mut failing).is_err());
+    assert!(root.path("people.json").exists());
+    assert!(plan.journal.exists());
+    let mut fake = Fake {
+        writers: gateway.into(),
+        agents: 1,
+        ..Fake::default()
+    };
+    let steps = reset::resume(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert!(steps.contains(&Step::AgentsForgotten));
+    let argvs = fake.argvs.borrow();
+    assert_eq!(
+        argvs[1],
+        ["/bin/systemctl", "stop", reset::OPENCLAW_GATEWAY].map(String::from)
+    );
+    assert_eq!(
+        *fake.calls.borrow(),
+        ["list-units", "stop", "skills", "agents", "sync", "sync"]
+    );
+    assert!(reset::WRITERS.contains(&reset::OPENCLAW_GATEWAY));
+}
+
+/// `lampos` and another user, each with a running manager, as systemd
+/// lists them.
+const MANAGERS: &str = "user@996.service loaded active running User Manager for UID 996\nuser@1000.service loaded active running User Manager for UID 1000\n";
+
+/// No argv named another user's manager.
+fn others_untouched(fake: &Fake) {
+    for argv in fake.argvs.borrow().iter() {
+        assert!(
+            !argv.iter().any(|unit| unit == "user@1000.service"),
+            "another user's manager named: {argv:?}"
+        );
+    }
+}
+
+/// lamp-c0a4, 13 and 14 Nov (#6343): `lampos`'s own systemd manager,
+/// lingering outside `lampos.target`, runs Harness's daemon and the Hermes
+/// it launched. A reset in place left both running: the old daemon kept the
+/// last owner's connection and computer id, `harness start` failed until a
+/// reboot, and the old Hermes kept writing its state. A product reset stops
+/// that manager, its uid read at the reset, with the lamp, before the wipe,
+/// and starts it again in place, before setup, as a boot would. No other
+/// user's manager is named.
+#[test]
+fn a_product_reset_stops_the_agents_user_manager_and_starts_it_again() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = product_lamp();
+    fake.writers.push_str(MANAGERS);
+    fake.agents = 1;
+    fake.manager = Some("user@996.service".into());
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Started));
+    others_untouched(&fake);
+    let argvs = fake.argvs.borrow();
+    let calls = fake.calls.borrow();
+    let stop = argvs
+        .iter()
+        .position(|argv| argv[1] == "stop" && argv.iter().any(|unit| unit == "lampos.target"))
+        .unwrap();
+    assert!(
+        argvs[stop].iter().any(|unit| unit == "user@996.service"),
+        "stopped with the lamp: {:?}",
+        argvs[stop]
+    );
+    assert!(stop < calls.iter().position(|call| call == "agents").unwrap());
+    assert_eq!(
+        argvs.last().unwrap(),
+        &[
+            "/bin/systemctl",
+            "start",
+            "lamp-skills-manage.socket",
+            "lamp-update-back.timer",
+            "lamp-update.service",
+            "user@996.service",
+            "lamp-setup.service"
+        ]
+        .map(String::from)
+    );
+    drop((argvs, calls));
+    // An inactive manager (Harness off, no linger) is stopped, never started.
+    let mut fake = product_lamp();
+    fake.writers
+        .push_str("user@996.service loaded inactive dead User Manager for UID 996\n");
+    fake.manager = Some("user@996.service".into());
+    let plan = lamp(&root);
+    reset::reset(&plan, &mut fake).unwrap();
+    assert!(
+        !fake
+            .argvs
+            .borrow()
+            .last()
+            .unwrap()
+            .iter()
+            .any(|unit| unit == "user@996.service")
+    );
+    // No `lampos` on the lamp: no manager is stopped, and the reset goes on.
+    let mut fake = product_lamp();
+    fake.writers.push_str(MANAGERS);
+    let plan = lamp(&root);
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Started));
+    others_untouched(&fake);
+    assert!(
+        !fake
+            .argvs
+            .borrow()
+            .iter()
+            .any(|argv| argv.iter().any(|unit| unit == "user@996.service"))
+    );
+}
+
+/// `lampos`'s manager is read from `/etc/passwd` by its uid; no other line
+/// counts, and no such user gives none.
+#[test]
+fn the_agents_manager_is_lampos_own_by_its_uid() {
+    let passwd = "root:x:0:0:root:/root:/bin/bash\nlampos-memory:x:995:995::/nonexistent:/usr/sbin/nologin\nlampos:x:996:996::/nonexistent:/usr/sbin/nologin\norangepi:x:1000:1000::/home/orangepi:/bin/bash\n";
+    assert_eq!(
+        reset::agent_manager_unit(passwd).as_deref(),
+        Some("user@996.service")
+    );
+    assert_eq!(
+        reset::agent_manager_unit("root:x:0:0::/root:/bin/sh\n"),
+        None
+    );
+    assert_eq!(
+        reset::agent_manager_unit("lampos:x::996::/:/bin/sh\n"),
+        None
+    );
+    assert_eq!(
+        reset::agent_manager_unit("lampos:x:9a:996::/:/bin/sh\n"),
+        None
+    );
+    assert_eq!(reset::AGENT_USER, "lampos");
+}
+
+/// A reset finished at boot after a power cut: `lampos`'s manager started
+/// at boot, its Harness daemon with the old owner's sign-in. It is stopped
+/// before the wipe, as OpenClaw's gateway is, and started again after it, so
+/// the daemon starts fresh (#6343). No other user's manager is named.
+#[test]
+fn a_resumed_reset_stops_the_agents_user_manager_and_starts_it_after() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    fs::write(&plan.journal, b"{}").unwrap();
+    let mut fake = Fake {
+        writers: MANAGERS.into(),
+        agents: 1,
+        manager: Some("user@996.service".into()),
+        ..Fake::default()
+    };
+    let steps = reset::resume(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert!(steps.contains(&Step::AgentsForgotten));
+    others_untouched(&fake);
+    let argvs = fake.argvs.borrow();
+    assert_eq!(
+        argvs[1],
+        ["/bin/systemctl", "stop", "user@996.service"].map(String::from)
+    );
+    assert_eq!(
+        argvs.last().unwrap(),
+        &["/bin/systemctl", "start", "user@996.service"].map(String::from)
+    );
+    assert_eq!(
+        *fake.calls.borrow(),
+        [
+            "list-units",
+            "stop",
+            "skills",
+            "agents",
+            "sync",
+            "sync",
+            "start"
+        ]
+    );
+}
+
+/// The agents' files go after the plan's wipes and the skills, said by no
+/// name, before the marker and the journal.
+#[test]
+fn the_reset_forgets_the_agents_after_the_plans_wipes() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        agents: 3,
+        ..Fake::default()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    let at = steps
+        .iter()
+        .position(|step| *step == Step::AgentsForgotten)
+        .expect("the agents forgotten said");
+    assert_eq!(
+        steps[..at]
+            .iter()
+            .filter(|step| matches!(step, Step::Wiped(_)))
+            .count(),
+        plan.wipe.len()
+    );
+    assert_eq!(steps[at + 1..].first(), Some(&Step::JournalRemoved));
+    assert_eq!(
+        serde_json::to_value(&steps[at]).unwrap(),
+        serde_json::json!({"step": "agents_forgotten"})
+    );
+    let steps = reset::reset(&lamp(&Root::new()), &mut Fake::default()).unwrap();
+    assert!(!steps.contains(&Step::AgentsForgotten));
 }

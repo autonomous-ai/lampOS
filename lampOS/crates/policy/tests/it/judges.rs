@@ -152,8 +152,14 @@ impl Rig {
             let _ = finish.send(result);
         });
         health.recv(WAIT).unwrap().expect("startup report");
-        room.publish_json(0, &RoomState { state: Room::Quiet })
-            .unwrap();
+        room.publish_json(
+            0,
+            &RoomState {
+                state: Room::Quiet,
+                another_voice: None,
+            },
+        )
+        .unwrap();
         voice
             .publish_json(
                 0,

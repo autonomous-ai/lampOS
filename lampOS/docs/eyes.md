@@ -771,7 +771,7 @@ this room" until someone asks to be recognised.
   remembered, and at the first look after someone is remembered at the
   lamp, so the known file names them within one look, not two seconds
   later (#3108; `who::recognise_due`). With `LAMP_FACE_REFOUND=on` (off
-  unless set, #4486) a check is also due at once when the near face's
+  unless set, #4486; on in the product unit since C65) a check is also due at once when the near face's
   passing id is not among the ids a print was read for (the newest 16), so
   a face turned away and back, which comes back with a new id, is known in
   its first look. A face too small to be near has no near id and forces
@@ -1135,7 +1135,9 @@ times in a day and a half, and a line said while the file named nobody,
 with their face still in view, is the room's.
 
 **The followed id** (#4885), only with both `LAMP_FACE_KNOWN_HOLD=on` and
-`LAMP_FACE_REFOUND=on` (off unless set; `bus_out::follows_from_environment`).
+`LAMP_FACE_REFOUND=on` (off unless set, both on in the product unit,
+`LAMP_FACE_REFOUND` since C65, the memory owner's call;
+`bus_out::follows_from_environment`).
 A face turned away and back usually comes back on a new passing id, and the
 hold, which needs the match's id, let them go. With both on:
 
@@ -1149,7 +1151,12 @@ hold, which needs the match's id, let them go. With both on:
   face whose new id follows the id at the match (`who::Held::follow`), a
   print of that face at least 0.30 alike to the held person makes the new
   id the match's (`who::Held::carry`), and the known face beside the known
-  file is rewritten to it with the name as it was. Until such a print, the
+  file is rewritten to it with the name as it was. A new id always comes
+  after a look with a near face but not the match's id, so that print must
+  first read at least 0.363 (`SAME_PERSON`) to the eyes' own print of them
+  (`who::Held::printed`, #5546): someone else beside their lost id, alike
+  enough to their kept prints, is still let go
+  (`a_followed_id_after_its_gap_carries_only_a_print_read_as_theirs`). Until such a print, the
   new id is another id: seen but not printed (turned, too small), it lets
   them go at once and the known file is removed, as before the followed id,
   so their name never goes on an id no print has shown is theirs (the
@@ -1470,6 +1477,9 @@ With the switch:
   spelled name back as a name only, never as letters nor as a choice
   between the name and its spelling (`SAY_IT_BACK`, `NOT_HEARD`,
   `NOT_HEARD_SPELLED`, `NEAR_TO`); `NOT_HEARD_SAY_AGAIN` says no name back.
+  At setup, with the onboarding nudge off, a person's line that spells
+  their name is told the read-back to say beside it, the name as a word
+  ([onboarding.md](onboarding.md), #5580 row 2).
 
   Why the turn in hand, from lamp-4ace on 16 October at 16:46 (the first
   builder on #1057, the records described without the words): a
@@ -1678,8 +1688,9 @@ With the switch:
     as the held setup save): when a `remember_my_face` answer asks about
     it (the eyes' `known_as`, or a `replace` refused before the yes), it
     keeps `{"name":A,"replace":true}` with the asker (the line's own known
-    person, or theirs by the one-face rule; never a gap-held or carried
-    line). The same session's next spoken turn, within 60 s, runs it with
+    person, or theirs by the one-face rule; never a gap-held line, nor a
+    carried line unless it is read as its carried person's, below). The
+    same session's next spoken turn, within 60 s, runs it with
     no model round when that turn is a yes by the guards above and either
     their face is the one seen saying it, or no face was seen saying it
     and theirs is alone in view with no other voice heard
@@ -1693,8 +1704,23 @@ With the switch:
     is off, and is to be confirmed before it is turned on. It runs through the same runner as a
     model call, so every name and owner check still applies, and the
     model is told the result. Any other turn drops it: a no, another name,
-    another face seen saying the yes (told), a carried line, another
-    session, a new save call. While a rename asked has not run, each turn
+    another face seen saying the yes (told), a carried line not read as
+    the asker's, another session, a new save call. A line carried into the
+    asker's conversation going on and read as theirs
+    (`LAMP_CONVERSATION_CARRIED_MEMORY`, `ScopeLease::read_carried`: their
+    own face the one face in view, none seen saying it, no other voice
+    shown) may ask the rename and give the yes, the carried person being
+    the asker (`ScopeLease::kept_by_one_face`,
+    `held_rename::carried_one_face`); its journal line says the yes ran
+    on a carried line read as theirs, with request ids only. This extends
+    the one-face risk above to a rename on a carried line, accepted by the
+    memory owner on 13 Nov (#6859, lamp-52e6: the yes and the second ask
+    were carried lines and were dropped). Still refused: a carry for a keep
+    only or whose keep waits for a yes (`saves_carried`), a gap-held line,
+    a carried line with `LAMP_CONVERSATION_CARRIED_MEMORY` off or narrowed
+    after (another voice), and another person's line. No forget runs on a
+    carried line (`forgets_need_mouth`), as before. While a rename asked
+    has not run, each turn
     of its session by the asker, for as long as the thread remembers the
     conversation, is told the face is still B (the asker by the same test
     as the yes: their face seen saying it, or none seen and theirs alone
@@ -1942,6 +1968,17 @@ introduction. Both the heard line and raw requested name are limited to
 4 KiB. Existing spelling and letter-count checks still apply. A word name
 that collides with the refusal vocabulary needs a spelling-only response.
 Earlier exchanges and model-supplied face identifiers are not evidence.
+At setup (while "who you are" is open), a name alone keeps no face
+(B3472, after #3472): the same line must also give the speaker's own leave
+for their face. Either it asks to keep their own face ("My name is Kess,
+remember my face."), or the lamp's last line was setup's face question
+("May I remember your face, so I know you next time?") and the line agrees
+to it without asking anything ("Yes, my name is Kess."). A refusal word
+anywhere in the line, someone else's face ("remember her face") or a plain
+"I'm Kess." refuses before Eyes is asked, and the model is told to ask the
+face question and wait for a yes that includes the name. The lamp's last
+line is its own words and never supplies a name. Past setup, and with the
+switch off, nothing changes.
 With `LAMP_MEMORY_ROOM_SPEAKER` also on, its background attribution keeps
 this same request's enrollment proof through the live scope check. It does
 not replace the proof with visibility or a room speaker. A cancelled,
@@ -2141,7 +2178,8 @@ looking.
 
 ### A face from a photo (`--photo-dir`, faces from a photo)
 
-Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given, which needs the
+Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given (the product unit
+gives `--photo-dir /run/lampos-photos` since 9 Nov, #5750), which needs the
 recogniser (`--recogniser`, `--people`, `--who-socket`). On a lamp the
 folder is `/run/lampos-photos` (`lampos`'s, 0700), made at boot by the
 product's tmpfiles and belonging to neither the eyes' unit nor lamp-cloud's
@@ -2173,7 +2211,9 @@ kept **unconfirmed**, until its person says yes at the lamp:
   `people.json`. An older build never reads it, so never takes it for
   someone who asked. At most 20. It's **never named, counted, greeted or
   used for "who is this?"**: recognition, the known file, `humans/familiar`
-  and the hello read the people's file only. The answer is
+  and the hello read the people's file only. With such a face at the lamp the
+  second voice is told only that it is not anyone the lamp knows
+  (`worker::nobody_known_told`, #5750). The answer is
   `{"added":NAME,"unconfirmed":true}`. A face already someone's who asked is
   theirs: `{"remembered":NAME}` for the same name, `known_as` for another.
 - **When it's at the lamp:** recognition finds nobody who asked, but an
@@ -2246,15 +2286,25 @@ kept **unconfirmed**, until its person says yes at the lamp:
     five at most, as one remembered at the lamp keeps, and the remembering's
     own answers. A yes the store refuses (`full`)
     leaves it unconfirmed as it was.
-  - `{"photo_no":NAME}` deletes it (`{"let_go":true}`).
+  - `{"photo_no":NAME}` deletes it (`{"let_go":true}`); `{"let_go":false}`
+    when there was no such face, and `storage` when the deletion couldn't be
+    saved. The voice says "let go" only on `{"let_go":true}`.
   - **No answer:** once asked, a face not seen for 20 s, the meeting over,
     is let go (`photo::unanswered`, `MEETING_GAP_US`).
   - **"Forget my face"** deletes it too.
 - **Never confirmed:** deleted 30 days after it was added
   (`UNCONFIRMED_FOR_S`), looked at once a second. A `.from-photos` file that
   can't be read is removed, so no print sits out of that reach.
-- **The product reset** wipes `<people>.from-photos` with `people.json`
-  (`reset-plan-product.json`).
+- **A deletion not saved** (a no, a meeting's end, the 30 days, "forget my
+  face") deletes nothing: the face stays in memory as on disk, and the next
+  no, look or forget tries again (`photo::Unconfirmeds::let_go`, `expire`).
+- **Its staging copy** `<people>.from-photos.new`: a save writes it, then
+  renames it over the file. A write or rename that fails removes it, and one
+  a crash left is removed at the next start (`Unconfirmeds::open`). One that
+  can't be removed then is tried again on every look, about once a second,
+  whether or not any face from a photo is kept (`expire`).
+- **The product reset** wipes `<people>.from-photos` and
+  `<people>.from-photos.new` with `people.json` (`reset-plan-product.json`).
 - **The answers** are the voice's: `photos_off`, `not_a_name`, `unreadable`
   (no file, a link, too large, not a JPEG), `no_face`, `too_far`,
   `two_faces`, `known_as`, `full`, `not_here`, `not_asked`, `not_that_face`,
@@ -2276,7 +2326,14 @@ socket; `crates/voice/src/photo_faces.rs`):
   was asked isn't asked again, even after the voice restarts. The
   voice then says, once, as its own written turn (`photo_face_ask`): "Someone
   added your face from a photo, as NAME. Shall I remember you?" It doesn't
-  use the name as theirs unless they agree.
+  use the name as theirs unless they agree. In English these are the lamp's
+  own words, said as they are with no chat (`photo_faces::turn`,
+  `onboarding::said_as_is`), so nothing in the thread changes them: on
+  lamp-52e6 (10 Nov, #5907) the model, writing the ask, once said "I didn't
+  catch that. Try once more when I stop talking." and, for a photo added
+  again after a no, "I already asked, and you said no", and the yes after
+  that was never taken. In another language, or for a name with a `"`, the
+  model still says the question in its own words.
 - **Their spoken answer** calls `photo_face_yes` or `photo_face_no`. These
   run in the provider's worker, a process apart from the coordinator that
   asked, so they take the face from the eyes, the unconfirmed one
@@ -2716,6 +2773,49 @@ Arithmetic on the looks the eyes already make, and with the recogniser the
 few prints above, on frames the eyes already have: no model or frame is
 added. Its cost on a lamp is #1678's CPU run; how well the states are told
 apart is its scripted sitting.
+
+#### A sitting kept across a restart
+
+`sitting_s` is counted in the eyes' memory from the sitting's first face,
+so before this every restart of lamp-eyes (an update restarts it, several
+times a day) began it at 0, and every nudge that waits on it (a sip of
+water after 50 minutes, rest your eyes after 45, stand up after 100, a
+comfort break after 90) waited its whole time again. Now, while activity is
+said, the eyes keep the sitting in `/run/lampos-eyes-kept/sitting.json`
+(`crates/eyes/src/sitting.rs`): written at once when a sitting begins, ends
+(removed) or changes its baseline or state, and every 30 s while it goes on;
+0600, written whole beside it and moved over it, never through a link. The
+folder is `lampos`'s, 0700, made at boot by the product's tmpfiles
+(install.md), on tmpfs, so a reboot empties it. It is not the eyes'
+runtime folder `/run/lampos-eyes`, which a restart still empties, so no
+sight frame, full look or known file outlives the run that wrote it. The
+file holds the boot id, when it was written, when the sitting began, when
+and where the sitter's face was last seen (its box and pitch), the
+sitting's baseline and the state said, on the bus's monotonic clock. Never
+a print, a yawn count or a picture: after a restart the yawns begin at 0,
+and with the recogniser the sitter's prints are taken again.
+
+At the start it is read only if it is this boot's
+(`/proc/sys/kernel/random/boot_id`) and was written within the sitting's
+two-minute gap (`RoomActivity::SITTING_GAP_S`), and taken back only at the
+run's first look, only if the sitter was last seen within that gap of the
+look and a near face of that look is at the sitter's place, or where they
+sat. The restart's seconds then count as a gap in the sitting, exactly as a
+look away of as long does, so `sitting_s` is never longer than a sitting
+the eyes could have seen. A file of another boot, an older one, nobody at
+the first look, or a face elsewhere: nothing is taken, and the sitting
+begins at that look as before. With `LAMP_ACTIVITY=on` and the recogniser
+(the sitter told by face) it is never taken back: their prints are never
+written, so after a restart no print could tell them from someone else
+sitting down in their place (`LAMP_ACTIVITY=place`, the product's, takes it
+back by place). Until the first look has tried it, the file is left as it
+is, so a second restart before the camera opens does not lose it. With no
+look within the gap (the camera closed), it is let go and the file removed.
+A reset that starts setup in place empties the folder (`reset::VOLATILE`,
+setup.md). The journal says what was kept and whether it was taken back.
+Pure tests in `sitting.rs`: kept across a 10 s restart on one boot; not past
+the gap, across a boot, or without the sitter at their place; told by face,
+someone else at the place begins a new sitting.
 
 #### A sitting's yawns (`LAMP_EYES_YAWN=on`, #3709)
 
@@ -3197,6 +3297,159 @@ face reads speaking, so the lamp turns to nobody. On ([`answered.rs`](../crates/
 **What a lamp still has to show:** two people at the lamp, one asking. The
 `speaking` it rests on holds only for a near face (above), so the asker sits
 within about half a metre. Tested on the host only.
+
+## The camera's frame link for lamp-seen (`--frame-link`, #6543)
+
+`lamp-seen` ([#6543](https://github.com/autonomous-ai/lampOS/issues/6543),
+what the lamp sees from cloud perception) reads camera frames through the
+camera's private frame link, `lamp_camera::frames`, as its `perception`
+reader. On a lamp where the voice's camera worker owns the camera, that
+worker serves the link. In the product the eyes own the camera and that
+worker does not run, so **the eyes serve the same link**, from the same
+server (`FrameServer`), with the same rules (`crates/eyes/src/frame_link.rs`).
+**`lamp-seen` reads from here.** Nothing is new on the wire: `lamp-seen`'s
+client (`FrameClient`) is unchanged.
+
+It is off unless given; the product's unit gives it (below):
+
+```text
+--frame-link /run/lampos-eyes-frames/camera.frames --frame-link-boots /run/lampos-seen/frame-link.env
+```
+
+The two go together. **The two boots come from the file, never the command
+line**: every process running as the eyes' user could read a boot on the
+command line in `/proc/<pid>/cmdline`. `--frame-link-controller` and
+`--frame-link-reader` are refused with that reason. The file is the one
+`lamp-seen frame-link` keeps (#6693, `lamp_seen::link`), read once when the
+eyes start:
+
+```text
+LAMP_EYES_FRAME_LINK=--frame-link SOCKET --frame-link-controller HEX32 --frame-link-reader HEX32
+LAMP_EYES_VISITS=--visits on
+```
+
+- The `LAMP_EYES_FRAME_LINK` line must name the same socket as
+  `--frame-link`. Its two boots are 32 hex digits each, not all zero, and
+  differ. The `LAMP_EYES_VISITS` line may be there and is not read here; any
+  other line is refused.
+- The file must be a regular file, not a link, of the eyes' user, mode 0600
+  or 0640. Its folder must be the eyes' user's or root's, with no group write
+  or other access. The file is read up to 1 KiB.
+- No file means the switch is off, so no link is served, and the journal
+  says so once. A file that does not pass stops the eyes with the reason.
+
+The two boots are the ones `lamp-seen` says as its controller and own boot.
+A hello with any other boot, or a second connection, is refused.
+
+**In the product** (#6543, [seen.md](seen.md#the-product-unit)),
+`lamp-eyes.service` always passes `--frame-link
+/run/lampos-eyes-frames/camera.frames --frame-link-boots
+/run/lampos-seen/frame-link.env`. Only `lamp-seen.service` with
+`LAMP_SEEN_ACTIVITY=on` writes that file, before the eyes start, as
+`lampos`, 0600, in its own 0700 runtime folder: two boots from
+`/dev/urandom` as the voice makes its camera worker's, kept until the lamp
+restarts. With the switch off the file is removed, so the eyes serve no
+link, as before. The file is never an `EnvironmentFile=`: the boots are
+in neither the eyes' environment nor their command line. Beside it,
+`lamp-seen frame-link` keeps `/run/lampos-seen/eyes-visits.env`, only
+`LAMP_EYES_VISITS=--visits on`, which the unit loads (`EnvironmentFile=-`)
+and puts on the line: `humans/familiar` for `lamp-seen`'s stranger check
+only, a level with no name, face or picture (the first builder's yes on
+#6543); with the switch off it is removed and the eyes run without it. The
+folder `/run/lampos-eyes-frames` is made 0700 `lampos` by `lampos.conf`;
+`lamp-seen` runs as `lampos` too, so it may connect. The eyes take a new
+link only at their next start.
+
+- **Only `lamp-seen`.** The eyes run as `lampos`, as lamp-skills, lamp-cloud,
+  lamp-actions and other parts do, so the socket's mode lets every one of
+  them connect. Each connection's peer is therefore checked as the kernel
+  names it (`SO_PEERCRED` and its pid's cgroup, `lamp_ipc::caller`), before
+  a byte of it is read. Only `lamp-seen.service` run as the eyes' own user is
+  taken (`frame_link::reader_may`). This is the same check `tap.rs` makes for
+  lamp-control's frames, through the same helper
+  (`lamp_ipc::caller::is_unit_as`), but here root is not let in either. Any
+  other peer is closed (`PeerRefused`), counted (`peer_refused`) and said in
+  the journal. Off Linux the kernel names no peer, so every connection is
+  refused. The tests take a check of their own (`FrameLink::new_allowing`).
+  The check lives in `FrameServer::with_peer_check`, given by each caller. The
+  voice's camera worker sets none: its readers are its own workers in
+  `lamp-voice.service`, run as root, and its socket is in root's private
+  folder.
+- **Private.** The socket is mode 0600, in a directory owned by the eyes' user
+  with no group or other access, checked when the eyes start (a directory
+  that is not private stops them with the reason). A socket left at the path
+  by an eyes that ended is replaced; anything else there is refused.
+- **Nothing while privacy is closed.** The link is bound only while the
+  eyes' camera permission holds. When the permission ends, or a new hold
+  begins (a close and reopen between two turns of the loop), the reader is
+  closed, any frame still being written is abandoned unfinished, and the
+  socket is removed. The closed link's events are kept before it is dropped,
+  so the journal says the reader was cut (`PrivacyClosed`: "cut, the camera's
+  permission ended or changed"). The next hold binds a new link, and the
+  reader reconnects.
+- **Each frame carries its `CameraGrant`.** The grant comes from a
+  turn-owner `Controller` of the eyes' own, under the controller boot given.
+  Each hold is a new camera generation, so `lamp-seen`, which keeps the first
+  grant and drops a frame under another, sees every privacy change. A frame
+  read under an earlier hold is never offered.
+- **Pull, one frame per request.** A frame is copied only when the reader has
+  asked and has nothing in transit: one copy of the newest frame read in that
+  turn of the loop, with its size, the driver's sequence and timestamp, and
+  the host time around the read. A frame older than the request allows is not
+  sent. A frame that does not start and end as a JPEG is not offered.
+- **A slow reader is dropped, never waited for.** Writes are nonblocking and
+  sliced, from one buffer per reader allocated when it connects. A frame left
+  unsent for 0.5 s closes that reader. Nothing is queued.
+
+The frames are the camera's as the eyes open it: 320 by 240 by default, the
+`--full-look` size with it, or a `--frames-socket` reader's size while one is
+connected.
+
+**What it costs the eyes.** With no reader, each turn of the loop makes one
+nonblocking `accept` and nothing else: no frame is copied. With a reader, one
+copy per request. Measured on a MacBook (Intel, release build) with
+`cargo run --release -p lamp-eyes --example frame_link_bench`. The loop's
+frame work is the look's decode and shrink of a 640 by 480 JPEG. The reader
+asks for every frame it can, far more often than `lamp-seen`'s one frame in
+5 s. Times are per frame:
+
+| Run (2,000 frames, 106 KB each) | Loop, mean | Loop, p99 | Link's part, mean | Link's part, p99 |
+|---|---|---|---|---|
+| No link | 4.14 ms | 5.86 ms | — | — |
+| Link bound, no reader | 4.04 ms | 5.73 ms | 8 µs | 24 µs |
+| One reader, asking for every frame it can (286 frames delivered) | 3.80 ms | 5.23 ms | 27 µs | 90 µs |
+
+The loop's own spread between runs, about 0.3 ms, is larger than the link's
+part, so the loop shows no slowdown. The link's part is the turn (`accept`,
+reading requests, continuing a write) and, with a reader, one copy. That is
+under 1% of a 4 ms frame here, and of a 52 to 55 ms look on lamp-4ace.
+
+Tests (`cargo test -p lamp-eyes --lib frame_link`) use real sockets and
+`lamp-seen`'s client. They cover:
+- a reader gets each frame with its grant;
+- nothing is bound or served without the permission;
+- the permission ending closes the reader, abandons a frame in transit and
+  removes the socket;
+- each hold has a new grant, and a frame from the old hold is not offered;
+- a reader that has not asked gets no copy;
+- a slow reader is dropped at the deadline with every call returning at once;
+- a stranger's boot is refused;
+- a peer that is not `lamp-seen.service` is refused and counted, even with
+  the right boots, and a peer the check takes is accepted;
+- only `lamp-seen.service` as the eyes' user passes `reader_may`: not another
+  `lampos` part, root, another user, or a peer with no unit;
+- the boots come from the file `lamp-seen` keeps (0600 or 0640). The file is
+  refused when it is open to others, a link, in an open folder, names another
+  socket, has a bad or repeated boot, or has a line of another kind. No file
+  means no link;
+- a reader cut for privacy is journaled;
+- a directory that is not private is refused.
+
+The parser's test (`cargo test -p lamp-eyes --bin lamp-eyes frame_link`)
+refuses `--frame-link-controller` and `--frame-link-reader` on the command
+line.
+
+Not yet shown on a lamp.
 
 ## Running it
 

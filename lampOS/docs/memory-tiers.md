@@ -1,9 +1,15 @@
-# Tiered memory: isolated store and sleep validation
+# Tiered memory: isolated engine and benchmark adapter
 
 This experimental Rust library has its own SQLite database. No product crate
-uses it, no service starts it, and it changes nothing on a lamp. The first
-implementation contains storage and validated consolidation; cue recall and
-the memory-bench adapter follow separately. The approved design is in
+uses it, no service starts it, and it changes nothing on a lamp. The library contains storage, validated consolidation, cue recall and
+registered ablations. Its benchmark adapter is an ordinary binary target, listed
+as development-only in the release inventory and never packaged for a lamp.
+Only that binary can create disposable probe copies; the library has no copy or
+restore API. Its own dependencies (`tempfile`, rusqlite `backup`, tokio
+`io-std`/`io-util`) sit behind the `bench` feature it requires. The feature is
+on by default, so ordinary workspace and CI targets build and test the adapter,
+and lamp-memory takes the library with `default-features = false`, so its
+graph does not widen. The approved design is in
 [memory-design.md](memory-design.md); the benchmark boundary is
 [memory-bench.md](memory-bench.md).
 
@@ -41,6 +47,8 @@ This library does not recognize a face or voice and does not infer a different
 speaker from a model's output. `Incoming` includes an explicit addressed-to-lamp
 flag, topic, absolute timestamp, source strength and optional speech confidence.
 Unknown confidence remains `None`; it is not converted to a guessed number.
+The adapter closes an episode on departure/session end only when both the
+observed owner label and person id match this store, as speech capture requires.
 
 | Stored item | Evidence and lifetime |
 |---|---|
@@ -81,7 +89,7 @@ network request inside Store:
    for that local day's pass. The database is released before any model call.
 3. `ModelClient::propose` sends that input using its configured transport.
    Nightly and weekly use the same client. Tests inject fixture responses;
-   the bench adapter will use the runner's broker. No key is needed by an arm.
+   the bench adapter uses the runner's broker and single cost client instead. No key is needed by an arm.
 4. `apply_sleep` parses at most 32 KiB, with at most 32 facts, 32 lines and
    32 episode changes. It rechecks identity, generation, revision and exact
    source content, and validates every proposal inside one write transaction.
@@ -118,8 +126,11 @@ latest source, so late consolidation cannot give an old plan a fresh lifetime.
 Preferences, habits and identity have no age expiry unless an explicit validity
 end was supplied. Expiry keeps fact history while removing its active views.
 Low-importance episodes (below 0.5) lose copied detail after 90 days without a
-recall; their gist and original record remain. Recall reinforcement is part of
-the next implementation, not demonstrated by this first one.
+recall; their gist and original record remain. `recall` is read-only. A caller can separately acknowledge context it actually
+consumed with `acknowledge_recall`; only that action reinforces the episode.
+The benchmark protocol has no consumption acknowledgement, so the adapter does
+not reinforce on selection or on a possibly late response. Probe mutations
+would be discarded in any case.
 
 ## Forgetting and cancellation
 
@@ -156,6 +167,124 @@ The library never caches a serialized request internally after completion.
 Already transmitted bytes cannot be recalled from a provider, and a caller that
 copies source data is responsible for erasing its own conversation/snapshot
 caches. Raw exported records are privileged data, not a revocable capability.
+
+## Cue recall and the session snapshot
+
+A recall receives observed people, activity, objects, topic, words heard so far,
+time, access scope, and a byte limit. It ranks eligible FTS5 matches with
+recency and episode importance, follows fact links to people/place/life-story
+lines, and considers a bounded recent fallback. Up to eight distinct cue terms
+are reserved before question words. Excluded kinds and expired facts do not
+consume the 128-candidate FTS limit. At most eight items are returned; a
+session snapshot may return the bounded 60 owner-model lines.
+
+Facts keep their exact quotes and source certainty. Episode summaries persist
+the actual cited record ids, rather than treating the whole episode as evidence;
+missing or future sources withhold the summary. Unsummarized recent episodes
+use at most four exact owner records. Faded detail is never reconstructed from
+the record on the ordinary recall path. An explicit history request may still
+retrieve an original record, because fading is not forgetting. The adapter
+maps internal numeric ids back to the fixture's stable source ids.
+
+The local budgets are 200 ms for recall and 300 ms for a session snapshot.
+SQLite progress callbacks interrupt expensive reads; a late result is empty.
+Storage contention is an error, not a successful empty lookup. The runner owns
+the complete pipe-to-response deadline and ignores late responses. These limits
+do not promise an operating-system storage latency or first-audio bound.
+
+Byte accounting includes context, owner-model text, memory instructions and any
+memory tools. This adapter advertises no tools. It subtracts a cached session
+snapshot's bytes from each recall allowance and returns no duplicate owner-model
+lines in recall. Forget, sleep changes, session end, and scope changes invalidate
+its snapshot accounting. The caller must also discard previously delivered
+context on those boundaries. The agreed runner rule invalidates all cached
+memory after every ingestion or state-changing operation and refreshes the
+snapshot before reuse, so ordinary forgetting requires no intent guess by the
+runner; a library cannot erase bytes copied by a caller.
+
+## Benchmark protocol and registered arms
+
+Build the isolated adapter from the repository root with its exact revision:
+
+```sh
+LAMP_MEMORY_TIERS_REVISION=$(git rev-parse HEAD) cargo build --manifest-path lampOS/Cargo.toml -p lamp-memory-tiers --bin lamp-memory-tiers-arm
+```
+
+A source-only build can set the same variable from its recorded source manifest.
+Without it, initialization reports `unversioned`, unsuitable for scored runs.
+The process speaks [contract v2](memory-bench.md#json-lines-arm-contract-draft-v21),
+pinned at `5cfcb7455`, on standard input/output. It requires a fresh private
+state directory and an explicit IANA zone. Frames are bounded to 4 MiB. Unknown
+operations, bad ordering, duplicate request ids and backward clocks fail.
+Diagnostics contain no source text. It opens no socket and loads no credential.
+
+Each sleep handles one bounded batch, with one runner-brokered chat request,
+at most 8192 output tokens and a timeout no longer than 60 seconds. Successful
+apply reports whether work remains and an opaque cursor. A rejected proposal
+keeps its records pending. Broker refusal, timeout or identity mismatch ends the
+process without retry; the runner records the failure and keeps its reservation.
+A storage error also ends the process, so an uncertain deletion cannot be
+followed by another answer using possibly stale state. It is recorded as a
+failed run, never a successful privacy result.
+The shared memory-text cap counts the UTF-8 owner-model, recalled context and
+memory-instruction text returned by the arm. Runner JSON framing is outside that
+cap and reported separately for every arm; it still belongs to the total model
+input and cost accounting. The 500-byte protocol regression covers text that fits
+while its serialized reply framing exceeds 500 bytes.
+
+The runner is the sole model-cost owner, including calls during isolated probes.
+Unknown provider usage is accepted without substituting zero; the runner keeps
+its full reservation. Owner ids accept the contract's 128-byte limit.
+
+Ordinary English input recognizes explicit remember, pause/resume and forget
+requests using documented deterministic prefixes. Remember copies the owner
+line. Forget supports "forget …", "please forget …", "do not remember …"
+and "do not keep …" (including contractions), the previous line, or an explicit
+full-memory target. A lexical target selects matching record/fact words; code
+then performs the same cascading deletion and fingerprinting. Commands are not
+stored as new evidence. "Don't remember this" pauses capture until an explicit
+resume. An identified owner can erase or pause even with other people present;
+the owner-alone restriction applies to capture and disclosure. This is a limited recognizer, not a claim of general
+paraphrase or multilingual understanding. The main benchmark must measure its
+misses and excessive deletions. No hidden intent flag is accepted. Ingestion
+retains only attributed owner speech in an observed owner-alone room; assistant,
+visitor, unsure and mixed-room speech is not retained by this conservative arm.
+
+Version 2 ingest and forget replies include `forget_effect`: `ran` records
+an admitted forget attempt, including a no-match attempt; it stays false for
+an earlier identity/target refusal or a bare word. `suppress_confirmation` is
+true after actual removal, and false for an explicit no-removal result. The
+runner clears its common recent conversation when the attempt ran and omits
+the confirmation when requested. Direct protocol forgetting uses this admitted
+path; it is not a store-only diagnostic. This adapter accepts v2 requests only
+and echoes unsupported request versions in errors; older recorded v1 data and
+its unknown effect remain the runner reader's responsibility.
+
+`probe_begin` copies the SQLite state and fingerprint key into a private temporary
+child directory owned by the development binary. The main store stays open and
+untouched. The child includes fingerprints, cursors and policy state; `probe_end`
+closes and removes it before resuming the main store. Cleanup failure ends the run.
+Costs and request identities remain outside the child and never roll back. The
+library has no public copy, connection-import or restore API in any build; compile-
+fail tests enforce that boundary. A process crash may leave a private child
+directory in the runner-owned scratch directory, which the runner must dispose of
+after the run. This is synthetic benchmark state, not a product restore facility.
+
+The ordered [arm manifest](../crates/memory-tiers/arm-manifest.json) registers
+all eleven arms before any candidate score. Every arm runs three times and is
+reported, including failures. Protocol name `tiers` is labelled `ours (tiers)`.
+The seven component removals are episodes, life story, facts/people/places,
+owner model, how-to-be, what is ahead, and feelings. The three mechanism removals
+are nightly sleep, importance, and fading. Nightly removal retains weekly
+reflection. Importance removal stores zero proposed importance, removes it
+from ranking and treats all old episodes equally for fading.
+
+The facts arm is exactly **facts not recalled; kept only as evidence**.
+Proof rows still validate the other components, but fact/people/place text is
+never recalled by that arm. All arms preserve provenance, owner attribution,
+uncertainty and forgetting. Prompts and bounds stay the same; code filters the
+removed outputs. The manifest also records the agreed three-run-spread test
+for keeping or removing a tier. No score has yet been used to select a tier.
 
 ## Model transport and cost
 
@@ -195,10 +324,22 @@ rewrite limits, absolute expiry, word-for-word taught rules, deletion in SQLite
 and FTS bytes, stale-input cancellation, input bounds, cost and timeouts.
 They use made-up people and source text only.
 
-Not yet shown: live relay extraction or actual billed cost, native ARM64 CI,
-cue-recall latency, the bench adapter and ablation scorecard, cross-owner voice
-attribution, natural-language forgetting, device first-audio latency, and any
-real-owner or lamp trial. No product integration or device deployment is part
-of this phase. The adapter target is contract revision `a51e3024f`, with 200 ms
-recall, 300 ms session snapshot, aggregate prompt-byte accounting, and isolated
-probe state that never resets the runner's costs.
+The store/sleep checkpoint passed native Linux ARM64 and Linux clippy. The
+recall/adapter checkpoint adds source-citation, access, aggregate-byte, deadline,
+contention, fading, arm-manifest and subprocess protocol tests. A synthetic
+3000-record lookup test reports first-use and repeated host lookup times; it
+measures local recall only, not a voice turn or a live provider. On macOS x86_64
+with Rust 1.96.0, the first lookup after synthetic ingestion took 1.599 ms and
+the slowest of 20 subsequent lookups took 1.426 ms. The in-memory SQLite pages
+were populated by ingestion; this is not a cold-disk measurement. The ordinary
+workspace ARM64 build/tests and all-target Linux clippy include the adapter.
+The subprocess harness bounds responses and expected child exits at ten
+seconds, retains stderr diagnostics, and checks deadline counters alongside
+empty privacy/forget results. Its broker-timeout case requires the configured
+20 ms timeout to return within a two-second host scheduling allowance.
+
+Not yet shown: live extraction or billed cost, the three-run ledger scorecard
+against every baseline, real STT, held-back human review, cross-owner voice
+attribution, device first-audio latency, or any real-owner/lamp trial. Recorded
+proposals and scripted forgetting tests establish implementation behavior only.
+No product integration or device deployment is part of this phase.

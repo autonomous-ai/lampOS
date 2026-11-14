@@ -1,0 +1,8 @@
+# 08:00, 90 minutes at the desk alone: one read at 20 minutes, never again.
+clock = "08:00"
+
+[[expect]]
+at = "20m"
+within = "1m"
+call = "read"
+args = { service = "gmail", what = "recent", count = 5 }

@@ -51,6 +51,17 @@ Environment=LAMP_SERVICES_WRITE=on
 # A made skill reads a linked service to its owner alone (#5288, #5303): the lamp-skills.service cgroup
 # onto the tools socket for service_read alone, any other call refused. Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
+# A made skill's write (#6066, #6142): its one fixed write sent, with LAMP_SERVICES_WRITE above, only when the
+# owner's yes holds that content's SHA-256, at most 10 a skill and 30 in all a day, never a public post. On in the
+# product (owner, 11 Nov).
+Environment=LAMP_SKILL_WRITES=on
+# A made skill's fixed write sent by its run on the lamp's agent (#6824, services.md "Through the lamp's agent"):
+# only through skill_write, on the owner's kept yes to that exact content, once a run. The same line in
+# lamp-skills, lamp-tasks and lamp-control. On in the product (owner, 13 Nov).
+Environment=LAMP_SKILL_WRITE_AGENT=on
+# A skill's run on the lamp's Hermes (#6432, services.md): the lamp-control.service cgroup onto the tools socket
+# for service_read and service_write alone, by the run's grants; a write still waits for the person's yes.
+Environment=LAMP_SKILL_TASKS=on
 ExecStart=/opt/lampOS/services/current/lamp-services --store /var/lib/lampos-services --run /run/lampos-services
 Restart=on-failure
 RestartSec=5s
@@ -84,6 +95,10 @@ RestrictSUIDSGID=yes
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources
+# Back from @resources for the PDF reader's child alone (lamp-services --pdf-text, services.md): it
+# caps its own memory (RLIMIT_AS, RLIMIT_DATA, 128 MiB) before it parses. With no capability a limit
+# is only ever lowered, or a soft one raised to its hard one.
+SystemCallFilter=setrlimit prlimit64
 # The services and the backend (AF_INET, AF_INET6); its own sockets (AF_UNIX).
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 

@@ -78,6 +78,12 @@ usage: lamp-setup COMMAND [OPTIONS]
       voice is restarted at a quiet moment to take it. One reply line on
       standard output. A key is never printed.
       Without --enable every request is refused.
+  forget-agents --dry-run [--root DIR]
+      List what a reset would do to Hermes's and OpenClaw's folders under
+      DIR (/ by default), changing nothing and following no link (#6343):
+      one line an entry, `keep PATH`, `remove PATH`, `empty PATH`, or
+      `cut PATH (keys: kept …; dropped …)` for a kept settings file, key
+      names only, never values. The reset's own walk, only not acted on.
   wake
       From power-on until the voice asks for the ring: the waking face
       (#1681). Only with LAMP_WAKING_FACE=on; otherwise it exits at once.
@@ -154,6 +160,30 @@ fn clock_id(given: Option<&String>) -> io::Result<String> {
     }
 }
 
+/// `forget-agents --dry-run [--root DIR]`: [`reset::plan_agents`] printed,
+/// one step a line. Without `--dry-run` it is refused: the reset itself
+/// runs only as part of a reset.
+fn forget_agents_dry_run(
+    mut given: impl Iterator<Item = String>,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let mut dry_run = false;
+    let mut root = PathBuf::from("/");
+    while let Some(option) = given.next() {
+        match option.as_str() {
+            "--dry-run" => dry_run = true,
+            "--root" => root = PathBuf::from(given.next().ok_or("--root takes a folder")?),
+            _ => return Err("forget-agents takes --dry-run and --root DIR".into()),
+        }
+    }
+    if !dry_run {
+        return Err("forget-agents runs only with --dry-run".into());
+    }
+    for step in reset::plan_agents(&root)? {
+        println!("{step}");
+    }
+    Ok(true)
+}
+
 fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let mut given = std::env::args().skip(1);
     let command = given.next().ok_or("a command is required")?;
@@ -166,6 +196,9 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             return Err("wake takes no options".into());
         }
         return wake();
+    }
+    if command == "forget-agents" {
+        return forget_agents_dry_run(given);
     }
     if command == "change" {
         return change(given);
@@ -590,9 +623,11 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         return Err("change takes --config, --bus-root and --enable".into());
     }
     let config = serve_config(&config_path)?;
-    // Only lamp-cloud may ask on the socket, as for the keys: any other
-    // peer is refused before its line is read.
-    if lamp_setup::keys::socket_peer_refused() {
+    // Only lamp-cloud may ask on the socket, as for the keys, and
+    // lamp-skills for the unplug's turn-off alone (#5747): any other peer is
+    // refused before its line is read.
+    let turn_off_only = lamp_setup::keys::socket_peer_refused();
+    if turn_off_only && !lamp_setup::keys::peer_is_turn_off_asker() {
         let mut out = io::stdout().lock();
         writeln!(out, "{}", serde_json::json!({"refused": NOT_THE_CLOUD}))?;
         out.flush()?;
@@ -607,6 +642,16 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         .lock()
         .take(change::LINE_MOST as u64 + 1)
         .read_line(&mut line)?;
+    if turn_off_only && !change::turn_off_asker_may(&line) {
+        let mut out = io::stdout().lock();
+        writeln!(out, "{}", serde_json::json!({"refused": NOT_THE_CLOUD}))?;
+        out.flush()?;
+        eprintln!(
+            "lamp-setup: change refused: {} may ask the turn-off only",
+            lamp_setup::keys::TURN_OFF_UNIT
+        );
+        return Ok(true);
+    }
     let records = lamp_update::records::Records::new(PathBuf::from(lamp_update::install::RECORDS));
     if let Some((power, reply, lock)) = change::power(&line, enabled, &records) {
         {
@@ -648,7 +693,28 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
             }
         };
     }
-    // Developer access turned off with its drop-in there: the door is closed
+    // The local agent turned on where the installer's step was never made
+    // (a lamp updated by the channel): the owner's tap makes its group, user
+    // and folder first, from the fixed names, under lamp-update's lock.
+    if let Some(refused) = change::make_agent_account(
+        &line,
+        &config,
+        enabled,
+        &records,
+        &mut change::Clock::default(),
+        &mut change::System,
+    ) {
+        {
+            let mut out = io::stdout().lock();
+            writeln!(out, "{refused}")?;
+            out.flush()?;
+        }
+        if let Some(why) = refused.get("refused") {
+            eprintln!("lamp-setup: change refused: {}", why.as_str().unwrap_or(""));
+        }
+        return Ok(true);
+    }
+    // Developer access or the dev monitor turned off with its drop-in there: the door is closed
     // (lamp-update's lock, the drop-in removed, reload, stop) before the
     // reply is written. Every other change is answered first, and a new
     // language, voice or character waits for lamp-update's lock (at most
@@ -687,6 +753,15 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
     // restart makes no sound.
     if done.as_ref().is_some_and(|done| done.restart_control) {
         let said = change::restart_control_when_unlocked(
+            &mut change::Clock::default(),
+            &records,
+            &mut change::Systemctl,
+        );
+        eprintln!("lamp-setup: change: {said}");
+    }
+    // The dev monitor turned on (#5883): as lamp-control, no quiet.
+    if done.as_ref().is_some_and(|done| done.restart_peek) {
+        let said = change::restart_peek_when_unlocked(
             &mut change::Clock::default(),
             &records,
             &mut change::Systemctl,
@@ -1440,6 +1515,19 @@ fn answer(
                     let interface = config.interface.clone();
                     let hotspot = config.hotspot_address.clone();
                     let station = move || lamp_setup::serve::station_ip(&interface, &hotspot);
+                    let mut host = ImageHost::new();
+                    // PARKED (#6386): the internet check's TLS to the backend this
+                    // request names, or the product's relay (#6256); re-enable when
+                    // China is scheduled and stable's lamp-update carries #6810:
+                    // host.reach = lamp_setup::wifi::Reach::new(
+                    //     lamp_setup::wifi::reach_address(
+                    //         accepted
+                    //             .backend
+                    //             .as_ref()
+                    //             .map_or("", |backend| backend.llm_base_url.as_str()),
+                    //     ),
+                    //     lamp_setup::wifi::REACH_TIMEOUT,
+                    // );
                     if recovering {
                         // A set-up lamp's: the network only, every other
                         // field ignored (El's P1 on #3024).
@@ -1447,7 +1535,7 @@ fn answer(
                             &status,
                             &accepted,
                             &config.country,
-                            &mut ImageHost::new(),
+                            &mut host,
                             &mut lamp_setup::serve::NetworkOnly(Files(&config)),
                             station,
                         );
@@ -1456,7 +1544,7 @@ fn answer(
                             &status,
                             &accepted,
                             &config.country,
-                            &mut ImageHost::new(),
+                            &mut host,
                             // The ring let go just before the marker starts the lamp.
                             &mut ReleasingSave {
                                 save: Files(&config),

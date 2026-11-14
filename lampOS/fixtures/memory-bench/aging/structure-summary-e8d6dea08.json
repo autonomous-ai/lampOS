@@ -1,0 +1,18 @@
+{
+  "revision": "e8d6dea08",
+  "inspection": "Timestamps, event kinds, session membership and byte caps only; no question/answer text or evidence inspected",
+  "events": 2856,
+  "questions": 42,
+  "query_turn_timestamps": 42,
+  "local_activity_days": 120,
+  "nightly_boundaries_after_90_days": 29,
+  "query_turns_after_90_days": 26,
+  "event_span_days": 118.99622685185186,
+  "latest_query_age_days": 119.3704861111111,
+  "closed_sessions": 346,
+  "closed_sessions_older_than_90_days_at_latest_query": 256,
+  "query_byte_caps": [
+    4096
+  ],
+  "qualifier": "Age eligibility only. Actual fading also requires accepted nonempty detail, importance below 0.5, and no recall within 90 days; those require observed run state."
+}

@@ -70,6 +70,11 @@ pub struct Computer {
     pub status: Option<Reading<String>>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub engines: BTreeMap<String, EngineKnown>,
+    /// The engines in the order the last look gave them (Harness's order,
+    /// #6492): the lamp's own engines are offered in it after the default.
+    /// Kept in memory only, never in the engines file.
+    #[serde(skip)]
+    pub order: Vec<String>,
 }
 
 impl EngineKnown {
@@ -117,13 +122,46 @@ impl Computer {
         Self {
             status: self.status.clone().filter(|r| fresh(r.read_ms)),
             engines,
+            order: self.order.clone(),
         }
+    }
+
+    /// The engines known installed here now, by Harness's name, in
+    /// Harness's order (#6492): the order its last look gave, then any
+    /// other known installed, by name.
+    pub fn installed_in_order(&self) -> Vec<String> {
+        let installed = |name: &String| {
+            self.engines
+                .get(name)
+                .and_then(|known| known.installed.as_ref())
+                .is_some_and(|r| r.value)
+        };
+        let mut names: Vec<String> = self
+            .order
+            .iter()
+            .filter(|n| installed(n))
+            .cloned()
+            .collect();
+        for name in self.engines.keys() {
+            if installed(name) && !names.contains(name) {
+                names.push(name.clone());
+            }
+        }
+        names
     }
 
     fn installed(&self, engine: EngineKind) -> Option<bool> {
         self.engines
             .get(engine.argument())?
             .installed
+            .as_ref()
+            .map(|r| r.value)
+    }
+
+    fn signed_in(&self, engine: EngineKind) -> Option<bool> {
+        self.engines
+            .get(engine.argument())?
+            .signed_in
             .as_ref()
             .map(|r| r.value)
     }
@@ -138,7 +176,7 @@ impl Computer {
         if engine.cloud() {
             return None;
         }
-        if self.status.as_ref().is_some_and(|s| s.value == "offline") {
+        if self.offline() {
             return Some((
                 COMPUTER_OFFLINE,
                 "That computer seems to be asleep or offline; nothing was handed over.",
@@ -158,6 +196,11 @@ impl Computer {
             ));
         }
         None
+    }
+
+    /// Whether the computer is known offline.
+    pub fn offline(&self) -> bool {
+        self.status.as_ref().is_some_and(|s| s.value == "offline")
     }
 
     /// Whether `engine` wasn't found on this computer.
@@ -239,6 +282,7 @@ impl Known {
             }
         }
         computer.engines.retain(|_, known| !known.is_empty());
+        computer.order = rows.iter().map(|row| row.engine.clone()).collect();
     }
 
     /// What is known of `machine`, fresh at `now_ms`.
@@ -249,24 +293,37 @@ impl Known {
             .filter(|computer| !computer.is_empty())
     }
 
-    /// The engine a target written from the machines gives `machine`:
-    /// `wanted` (the person's, `--targets-from-machines ENGINE`) where it
-    /// is known installed there, else the first of [`ENGINE_ORDER`] known
-    /// installed, else `wanted`, as before anything was known.
+    /// The engine a target written from the machines gives `machine`, of
+    /// those known installed there, by what can run (#6657, the first
+    /// builder's (b)): one known signed in, then one whose sign-in is
+    /// unknown, then one known signed out; within each, `wanted` (the
+    /// person's, `--targets-from-machines ENGINE`) first, then
+    /// [`ENGINE_ORDER`]. So a known signed-out engine never wins over one
+    /// that can run, which [`Computer::refusal`] would refuse at prepare.
+    /// None known installed: `wanted`, as before anything was known.
     pub fn chosen(&self, machine: &str, wanted: EngineKind, now_ms: u64) -> EngineKind {
         let Some(computer) = self.computer(machine, now_ms) else {
             return wanted;
         };
-        if computer.installed(wanted) == Some(true) {
-            return wanted;
-        }
-        ENGINE_ORDER
-            .into_iter()
-            .find(|engine| computer.installed(*engine) == Some(true))
-            .unwrap_or(wanted)
+        // 0 signed in, 1 unknown, 2 signed out; none when not installed.
+        let can_run = |engine: EngineKind| {
+            (computer.installed(engine) == Some(true)).then(|| match computer.signed_in(engine) {
+                Some(true) => 0,
+                None => 1,
+                Some(false) => 2,
+            })
+        };
+        // `min_by_key` keeps the first of equals: `wanted`, then the order.
+        std::iter::once(wanted)
+            .chain(ENGINE_ORDER)
+            .filter_map(|engine| can_run(engine).map(|rank| (rank, engine)))
+            .min_by_key(|(rank, _)| *rank)
+            .map_or(wanted, |(_, engine)| engine)
     }
 
-    /// The engine [`Known::chosen`] gives each machine, by machine id.
+    /// The engine [`Known::chosen`] gives each machine, by machine id: the
+    /// lamp's own (`current`) never, as it is no computer of the person's;
+    /// it is a target only with [`Known::lamp_engine`].
     pub fn choices(
         &self,
         machines: &[AccountMachine],
@@ -275,6 +332,7 @@ impl Known {
     ) -> BTreeMap<String, EngineKind> {
         machines
             .iter()
+            .filter(|m| !m.current)
             .map(|m| {
                 (
                     m.machine_id.clone(),
@@ -282,6 +340,40 @@ impl Known {
                 )
             })
             .collect()
+    }
+}
+
+impl Known {
+    /// The engines the lamp's own machine (the one Harness marks
+    /// `current`) is known to have installed now, in Harness's order
+    /// ([`Computer::installed_in_order`], #6492). None when that machine
+    /// is not listed or no fresh look at its engines is known.
+    pub fn lamp_installed(&self, machines: &[AccountMachine], now_ms: u64) -> Option<Vec<String>> {
+        let lamp = machines.iter().find(|m| m.current)?;
+        let computer = self
+            .computer(&lamp.machine_id, now_ms)
+            .filter(|computer| !computer.engines.is_empty())?;
+        Some(computer.installed_in_order())
+    }
+
+    /// `LAMP_OPENCLAW_ON_LAMP` and `LAMP_HERMES_ON_LAMP` (#5978, #6226):
+    /// the lamp's own machine, the one Harness marks `current`, with the
+    /// first engine of `order` (the lamp's engines switched on, the chosen
+    /// one first) known installed there now (its engines' look said
+    /// `installed: true`): its id and that engine. None otherwise: not
+    /// looked at yet, none of them there, or the reading stale.
+    pub fn lamp_engine(
+        &self,
+        machines: &[AccountMachine],
+        order: &[EngineKind],
+        now_ms: u64,
+    ) -> Option<(String, EngineKind)> {
+        let lamp = machines.iter().find(|m| m.current)?;
+        let computer = self.computer(&lamp.machine_id, now_ms)?;
+        order
+            .iter()
+            .find(|engine| computer.installed(**engine) == Some(true))
+            .map(|engine| (lamp.machine_id.clone(), *engine))
     }
 }
 
@@ -642,8 +734,91 @@ mod tests {
         assert_eq!(known.computer(&id, NOW), None);
     }
 
+    /// #6657 (the first builder's (b)): of the engines installed, one
+    /// signed in first, then one not known either way, never a known
+    /// signed-out one over either; the person's first among equals.
+    #[test]
+    fn the_engine_chosen_is_one_that_can_run() {
+        let id = "a".repeat(32);
+        // Thirteen's laptop (12 Nov, 12337 and 12391): claude installed
+        // and signed out, codex signed in, opencode installed.
+        let mut known = Known::default();
+        known.probed(
+            &id,
+            &[
+                row("claude", Some(true), Some(false)),
+                row("codex", Some(true), Some(true)),
+                row("opencode", Some(true), None),
+            ],
+            NOW,
+        );
+        for wanted in [EngineKind::Claude, EngineKind::Codex, EngineKind::Opencode] {
+            assert_eq!(
+                known.chosen(&id, wanted, NOW),
+                EngineKind::Codex,
+                "{wanted:?}"
+            );
+        }
+        let computer = known.computer(&id, NOW).unwrap();
+        assert_eq!(computer.refusal(EngineKind::Codex), None);
+        // Codex signs out: the one not known either way, never claude.
+        known.probed(&id, &[row("codex", Some(true), Some(false))], NOW);
+        assert_eq!(
+            known.chosen(&id, EngineKind::Claude, NOW),
+            EngineKind::Opencode
+        );
+        // Claude signs in: the person's again, within the next look.
+        known.probed(&id, &[row("claude", Some(true), Some(true))], NOW + 1);
+        assert_eq!(
+            known.chosen(&id, EngineKind::Claude, NOW + 1),
+            EngineKind::Claude
+        );
+        // Among the signed in, the person's first, then the order.
+        known.probed(&id, &[row("opencode", Some(true), Some(true))], NOW + 2);
+        assert_eq!(
+            known.chosen(&id, EngineKind::Opencode, NOW + 2),
+            EngineKind::Opencode
+        );
+        assert_eq!(
+            known.chosen(&id, EngineKind::Codex, NOW + 2),
+            EngineKind::Claude
+        );
+        // All signed out: the person's where installed, else the order's
+        // first, as before (the hand-over is then refused with its words).
+        let mut out = Known::default();
+        out.probed(
+            &id,
+            &[
+                row("claude", Some(true), Some(false)),
+                row("codex", Some(true), Some(false)),
+            ],
+            NOW,
+        );
+        assert_eq!(out.chosen(&id, EngineKind::Codex, NOW), EngineKind::Codex);
+        assert_eq!(
+            out.chosen(&id, EngineKind::Opencode, NOW),
+            EngineKind::Claude
+        );
+        // Signed in but not known installed is not chosen over the person's.
+        let mut odd = Known::default();
+        odd.probed(&id, &[row("codex", None, Some(true))], NOW);
+        assert_eq!(odd.chosen(&id, EngineKind::Claude, NOW), EngineKind::Claude);
+        // Nothing known: the person's.
+        assert_eq!(
+            Known::default().chosen(&id, EngineKind::Opencode, NOW),
+            EngineKind::Opencode
+        );
+        // A stale reading is unknown: the person's, as before anything
+        // was known.
+        assert_eq!(
+            known.chosen(&id, EngineKind::Codex, NOW + STALE_AFTER_MS + 3),
+            EngineKind::Codex
+        );
+    }
+
     /// The person's engine where it is there, else the first there of
-    /// Claude Code, Codex and OpenCode, else the person's.
+    /// Claude Code, Codex and OpenCode, else the person's: sign-in not
+    /// known for any (signed in first is the test above, #6657).
     #[test]
     fn the_engine_chosen_is_one_the_computer_has() {
         let id = "a".repeat(32);
@@ -657,7 +832,7 @@ mod tests {
             &id,
             &[
                 row("claude", None, None),
-                row("codex", Some(true), Some(true)),
+                row("codex", Some(true), None),
                 row("opencode", Some(true), None),
             ],
             NOW,
@@ -724,10 +899,11 @@ mod tests {
         assert_eq!(mode, 0o600);
         let read = read_engines(&path).unwrap();
         assert_eq!(read.keys().collect::<Vec<_>>(), ["office"]);
-        assert_eq!(
-            read["office"],
-            known.computer(&"a".repeat(32), NOW).unwrap()
-        );
+        // Harness's order is kept in memory only (#6492).
+        let mut computer = known.computer(&"a".repeat(32), NOW).unwrap();
+        assert_eq!(computer.order, ["claude"]);
+        computer.order.clear();
+        assert_eq!(read["office"], computer);
         assert_eq!(
             serde_json::from_slice::<serde_json::Value>(&fs::read(&path).unwrap()).unwrap(),
             serde_json::json!({"version":1,"computers":{"office":{
@@ -823,6 +999,133 @@ mod tests {
         assert_eq!(
             probe_line(&Err("unreachable".into()), 30_001),
             "a computer's engines not read in 30001 ms (unreachable); what was known is kept"
+        );
+    }
+
+    /// #5978: the lamp's own machine is the lamp only where its look said
+    /// Hermes is installed; never a choice for a computer's target.
+    /// #6492: the lamp's own machine's engines known installed, in the
+    /// order Harness's look gave them, not by name; a computer's never.
+    #[test]
+    fn the_lamps_installed_engines_keep_harness_s_order() {
+        let lamp = AccountMachine {
+            current: true,
+            ..machine('a', Some("running"))
+        };
+        let listed = [lamp.clone(), machine('b', Some("running"))];
+        let mut known = Known::default();
+        known.listed(&listed, NOW);
+        assert_eq!(known.lamp_installed(&listed, NOW), None, "not looked at");
+        known.probed(
+            &lamp.machine_id,
+            &[
+                row("openclaw", Some(true), None),
+                not_found("codex"),
+                row("hermes", Some(true), None),
+                row("claude", Some(true), None),
+            ],
+            NOW,
+        );
+        assert_eq!(
+            known.lamp_installed(&listed, NOW).unwrap(),
+            ["openclaw", "hermes", "claude"]
+        );
+        known.probed(&"b".repeat(32), &[row("pi", Some(true), None)], NOW);
+        assert!(
+            !known
+                .lamp_installed(&listed, NOW)
+                .unwrap()
+                .contains(&"pi".to_owned())
+        );
+        assert_eq!(
+            known.lamp_installed(&listed, NOW + STALE_AFTER_MS + 1),
+            None,
+            "stale"
+        );
+    }
+
+    #[test]
+    fn the_lamp_is_kept_only_where_hermes_is_known_installed() {
+        let lamp = AccountMachine {
+            current: true,
+            ..machine('a', Some("running"))
+        };
+        let listed = [lamp.clone(), machine('b', Some("running"))];
+        let mut known = Known::default();
+        known.listed(&listed, NOW);
+        let hermes = [EngineKind::Hermes];
+        assert_eq!(
+            known.lamp_engine(&listed, &hermes, NOW),
+            None,
+            "not looked at"
+        );
+        known.probed(&lamp.machine_id, &[not_found("hermes")], NOW);
+        assert_eq!(known.lamp_engine(&listed, &hermes, NOW), None, "not there");
+        known.probed(&lamp.machine_id, &[row("hermes", Some(true), None)], NOW);
+        assert_eq!(
+            known.lamp_engine(&listed, &hermes, NOW),
+            Some((lamp.machine_id.clone(), EngineKind::Hermes))
+        );
+        assert_eq!(
+            known.lamp_engine(&listed, &hermes, NOW + STALE_AFTER_MS + 1),
+            None,
+            "stale"
+        );
+        // Only a computer's: the lamp's own machine gets no engine choice.
+        let chosen = known.choices(&listed, EngineKind::Claude, NOW);
+        assert_eq!(chosen.keys().collect::<Vec<_>>(), [&"b".repeat(32)]);
+    }
+
+    /// #6226: the lamp's engine is the first of the order installed there:
+    /// Hermes by default with both (#6498), OpenClaw when it is chosen first, and
+    /// the one installed when only one is; none when neither is switched on.
+    #[test]
+    fn the_lamps_engine_is_the_first_of_the_order_installed_there() {
+        let lamp = AccountMachine {
+            current: true,
+            ..machine('a', Some("running"))
+        };
+        let listed = [lamp.clone(), machine('b', Some("running"))];
+        let id = lamp.machine_id.clone();
+        let default = [EngineKind::Hermes, EngineKind::Openclaw];
+        let openclaw_first = [EngineKind::Openclaw, EngineKind::Hermes];
+        let mut known = Known::default();
+        known.listed(&listed, NOW);
+        let both = [
+            row("hermes", Some(true), None),
+            row("openclaw", Some(true), None),
+        ];
+        known.probed(&id, &both, NOW);
+        assert_eq!(
+            known.lamp_engine(&listed, &default, NOW),
+            Some((id.clone(), EngineKind::Hermes))
+        );
+        assert_eq!(
+            known.lamp_engine(&listed, &openclaw_first, NOW),
+            Some((id.clone(), EngineKind::Openclaw))
+        );
+        assert_eq!(known.lamp_engine(&listed, &[], NOW), None);
+        known.probed(
+            &id,
+            &[row("hermes", Some(true), None), not_found("openclaw")],
+            NOW,
+        );
+        assert_eq!(
+            known.lamp_engine(&listed, &default, NOW),
+            Some((id.clone(), EngineKind::Hermes))
+        );
+        assert_eq!(
+            known.lamp_engine(&listed, &[EngineKind::Openclaw], NOW),
+            None
+        );
+        known.probed(
+            &id,
+            &[not_found("hermes"), row("openclaw", Some(true), None)],
+            NOW,
+        );
+        assert_eq!(
+            known.lamp_engine(&listed, &default, NOW),
+            Some((id, EngineKind::Openclaw))
         );
     }
 }

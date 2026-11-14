@@ -219,7 +219,14 @@ is not a reason to stop or to refuse: lamp-4ace's elbow has carried `0x20`
 since the head test of 2026-10-12. A change of that byte is.
 
 It also ends on SIGINT or SIGTERM, after easing back to its home (three
-seconds at most), and prints one JSON report either way.
+seconds at most), and prints one JSON report either way. Every thread it
+makes before `main` blocks the two for its signalfd is made with every
+signal blocked (`lamp_ipc::spawn_without_signals`: the log relay, and the
+unplug worker with `LAMP_UNPLUG=on`), or the kernel hands it the stop and
+its default ends the process at once, with no easing back and no report
+(#6834: a customer lamp restarted by systemd printed none;
+`tests/stop_signals.rs`). A body held at start by a kept unplug request
+(below) has not run, and ends on the stop without a report.
 
 ### Every arm goal inside its window
 
@@ -891,7 +898,22 @@ the shoulder (servo 2) and the elbow (servo 3):
 - It also does not stand, and says why, when it was given no home, when
   either joint has torque off, another flag, or is at 62 or warmer, or when
   the two are not found within 80 counts of one point on the way between
-  folded and stood up. Found part of the way up, on that way, it takes the
+  folded and stood up. Each of these also asks its owner, once, in words
+  the voice can say (#6834; before, the only why was in the exit report,
+  and a customer's lamp that never stood said nothing): every report of
+  the run carries the same `asks` fact, so the voice (`LAMP_BODY_ASK=on`)
+  says it once and again only when called by name, as a let-go body's ask
+  ([speaking-first.md](speaking-first.md)), and the journal's "it will not
+  stand this run" line says it too:
+  an arm off that way, "My arm isn't folded all the way down, so I won't
+  stand up. Please fold it down gently, then unplug me and plug me back
+  in."; torque off or a flag, "Something in my arm isn't right, so I won't
+  stand up. Please unplug me and plug me back in."; 62 or warmer, "My arm
+  is too warm to stand up. Once it has cooled, please unplug me and plug me
+  back in."; no home, "I don't know where my resting place is, so I won't
+  stand up. I need someone to set me up again."
+  (`a_run_that_will_not_stand_asks_the_owner_once_why`). The report's
+  `stand_ask` holds it. Found part of the way up, on that way, it takes the
   lamp as it is and stays up as if it had just been spoken to; but found
   up with only an arm at 62 or warmer (or over 100 on every first read),
   it folds down first, as when asked to stop, and is let go folded, on
@@ -1292,7 +1314,8 @@ mood socket, and says it again at least once every 1.5 s
   and followed at `--speed` through the same window and rules as every pose.
   Held while `reading` with it is said; a `reading` without it, or the pose
   let go, takes it away at the same speed. Nothing without `--gaze`, which
-  alone says how far a place in the picture is, and nothing in any other
+  alone says how far a place in the picture is (so Skills refuses such a
+  call aloud when nothing listens on the gaze socket, skills.md), and nothing in any other
   mood or paused. A `toward` past -1 to 1 turns nothing. The place is the
   model's, from the voice's look at the desk (Point the light,
   `skills/point-light`): the eyes find faces only. A body before this
@@ -1723,7 +1746,12 @@ What the body does with the request:
 - Its offsets are laid over whatever the mood and the eyes have the lamp
   doing, outside the filter that follows the mood, and leave the lamp where
   it was. They change by at most 24, 34, 26, 21 and 21 counts a step and
-  take no joint further than 220, 220, 170, 360 and 360 counts.
+  take no joint further than 220, 220, 250, 360 and 360 counts (the base's
+  250 is the lamp's own yaw reach at most: a move the check takes is played
+  whole; the base is never asked past home plus `--reach`'s yaw, or past where the look
+  alone has it, whatever is laid over the look: a sway over a turned look stops
+  at the reach, and the journal says `gesture's yaw cut to the reach`, once a
+  gesture; the way back toward home is never cut).
 - While one plays, and for half a second after, a joint of the head may be
   150 counts from its goal and read a load of 700, and the shoulder and
   elbow may be 260 from theirs. A quick move lags and reverses hard. If a
@@ -1813,9 +1841,47 @@ report counts. It is held to what the generator promises the clips:
   name order keeps it);
 - `step_ms` from 40 to 1000, and 1.5 to 10 s in all;
 - the first and the last frame nothing;
-- no joint farther than 200, 200, 150, 350 and 350 counts, nor asked to
-  go faster than 900, 1,300, 1,000, 800 and 800 counts a second (with a
-  count of rounding at each end of a step).
+- no joint farther than 200, 200, the lamp's own yaw reach (`--reach`'s
+  last figure, 250 counts, about 22 degrees, on lamp-75c9 and lamp-a63e; 150
+  without `--reach`; never past the 250 any lamp may be given), 350 and 350
+  counts, nor asked to go faster than 900, 1,300, 1,000, 800 and 800 counts a
+  second (with a count of rounding at each end of a step). A wider sway is
+  only slower: the speed and acceleration caps are the same. A move past the
+  reach is refused with it in the words (`farther than 250, this lamp's yaw
+  reach (--reach)`). The built-in clips keep to 150 and are unchanged.
+  A lamp started without `--reach` has a yaw reach of 40 (`Limits::FOLDED`) but its moves are admitted to 150, and only on such a lamp (`Limits::yaw_unset`) is the base held to no less than those 150 whatever is laid over the look (`gesture_yaw_reach`), so an accepted move of 150 is played whole, as before; a lamp started with a `--reach` keeps its yaw as configured, even under 150.
+  With `LAMP_BODY_APP_REACH=on` (the person, 14:04 on 10 Nov, for the dev lamps
+  75c9 and a63e until the hardware team signs the numbers) a move may instead
+  take each joint 90% of its hardware range from the pose, on each side
+  (`moves::Reach::of_hardware`, `body::app_reach_of`): the head's pitch, roll
+  and the base's yaw from the servos' own stored ranges, read at start (it
+  turns `LAMP_BODY_OWN_RANGES` on), the shoulder and the elbow from the arm's
+  window (the way between folded and stood up and `ARM_WINDOW_MARGIN` either
+  side). On 75c9 (yaw 820..3,268 from 2,015, roll 897..3,153 from 2,044, pitch
+  1,457..3,029 from 1,900) that is yaw 1,075 down and 1,127 up (-94 and +99
+  degrees), roll 1,032 and 998, pitch 398 up and 1,016 down. The head's pitch
+  floor then follows the servo's own lower limit less the margin (1,477 on
+  75c9), not the 1,670 tuned for lamp-4ace's head. The body judges the move
+  as it begins: one past that reach is dropped whole and said (`dropped: past
+  this lamp's reach`), never played cut short (with the switch on but the
+  servos' ranges unread, the reach is not known: a gesture past
+  `GESTURE_REACH` is dropped and said, `dropped: this lamp's reach is not
+  known`), and the door and the SDKs let a
+  move through up to the most any lamp may take (`moves::CEILING`). The
+  gesture's reach (`GESTURE_REACH`), the base's reach the look and a gesture
+  are held to together, the arm's ease reach and the head's roll in a
+  gesture (a lamp whose `--reach` roll is 1 does not tilt for a gesture, but
+  does for an app's move) follow it. A head or base joint whose servo stores the whole turn
+  (`0..=4095`, never calibrated) has no range to take 90% of: it keeps today's reach, and
+  its pitch floor is left alone. On such a lamp (lamp-sim's servos today) the switch lifts the door's pre-check but not the body's reach: a move past today's caps
+  is no longer refused `bad_request` at the door, it is taken and then dropped by the body (`done`
+  `dropped`, "past this lamp's reach"), which the SDK sees as a `done`, not an error. The head's pitch floor follows the servo's own limit
+  less a margin everywhere in the run, so with the switch on the lamp's own look and idle
+  may take the head that low too, not only an app's move. The lamp's own life (but for that
+  pitch floor), the anti-tip rule
+  (which refuses a shoulder alone past about 300 counts from the standing pose:
+  the arm's usable reach is the rule's, not 90%), the heat stop and every speed
+  and acceleration cap are as before.
 
 A file that breaks any of these, is not JSON of exactly these three fields
 or is longer than 256 KiB is refused, and its reason is said in the log.
@@ -1975,8 +2041,14 @@ The lamp programming protocol's server, `lamp-control`, keeps its own
 leases, clients and the 10-minute cap. The body knows one holder only.
 With `--lease-socket PATH` the body listens there for one stream at a time,
 and lets one in only if the kernel names it `lamp-control.service` run as
-`lampos`, or root (`lamp_ipc::caller`). A second, or anyone else, is
-answered `refused` with why and closed. Lines of JSON each way
+`lampos`, or root (`lamp_ipc::caller`); with `--lease-holder-uid N` (the
+virtual lamp's, where nothing runs under systemd; no product unit passes it),
+also any caller running as uid N, whatever its unit. The flag depends on the
+kernel naming the peer (Linux peer credentials): it cannot make an unidentified
+caller one, and it does not bypass the socket's filesystem permissions. "For
+the virtual lamp only" is a deployment rule (no product unit passes it), not
+something the body checks. A second, or anyone else, is answered `refused`
+with why and closed. Lines of JSON each way
 (`lamp_body::lease`):
 
 | Asked | Answered |
@@ -2049,7 +2121,13 @@ stopped (its position still within a count) within 50 counts of it
 88 and 152). One stopped farther short is held by something: the pose stays
 owed and is cut short in time. `there` says the degrees the positions
 reached, sag and all, and `clamped` when the window or the reach cut the
-goal by more than half a degree. A pose not there in 6 s (`LONGEST_POSE`) is
+goal by more than half a degree, or when a joint stopped more than 2 degrees
+(`POSE_SHORT_WITHIN`) short of what was asked, measured from where it reached, for the joints the line named
+(an arm joint not named is not judged: a standing arm sags on its own weight; a
+roll whose goal still moves is not settled)
+(lamp-75c9: an elbow asked 43.0 degrees stood at 39.5 and was said unclamped
+before: a `there` that says reached while short is a silent failure).
+`a_pose_that_stopped_short_of_what_was_asked_says_clamped`. A pose not there in 6 s (`LONGEST_POSE`) is
 cut short, "something holds the arm". A conversation keeps it for when the lease is
 held again; any other end lets it go, back to the stand. Tests:
 `a_held_standing_lamp_takes_its_holders_pose_inside_the_arms_window`,
@@ -2232,7 +2310,7 @@ four rows, "Without it" is what `off` leaves.
 | `--torque on` | take hold of a joint found without torque: its goal written as where it is, then torque on, and refused if it then moves more than 12 counts | a joint without torque is refused, and torque is not written | on or off |
 | `--wake on` (default) | with `--home`, a joint found out of where it may start but within 400 counts of home is brought home slowly before anything else; a shoulder left up with its elbow folded is lowered first; in the run, a joint held 30 to 50 counts short of its goal, still, rests where it is (see "Waking") | such a joint is refused | on or off |
 | `--let-go-at-stop on\|off` (default off; the factory's, #1682) | asked to stop (SIGINT or SIGTERM), a lamp that got down, its head within 20 counts of home and its arm of its folded counts (inside the tracking bound and the arm's goal step, so an arm left a little short of folded keeps holding), has its last goals written and is then let go, torque off on all five, so that `lamp-body-measure` can read it at rest; a standing lamp folds first, as always, and one that did not get down in time keeps holding (`asked_to_stop_standing_it_folds_first_and_only_then_lets_go_with_let_go_at_stop`, `asked_to_stop_folded_at_rest_it_lets_go_only_with_let_go_at_stop`, `asked_to_stop_with_its_elbow_short_of_folded_it_keeps_holding_with_let_go_at_stop`). A let-go run (with it, no `--home`, so no `--stand`, and no `--torque on`), all it writes being torque off, may take `--folded-arm SHOULDER,ELBOW` alone; then it is not refused for a head found outside its start window (lamp-0c89 rested at pitch 1755, under 1760, held with torque on) when its shoulder and elbow are each found within 20 counts of those, the same bound the let-go at a stop uses: it is let go at once, torque off on all five and no goal written, stays let go until asked to stop, and its report says why in `let_go_outside_window`. Its arm found standing, no `--folded-arm`, or any other run is refused there as before, nothing written (`a_let_go_run_outside_the_window_with_its_arm_folded_writes_torque_off_only`, `a_let_go_run_outside_the_window_standing_or_without_folded_counts_is_refused`, `a_run_that_is_not_only_a_let_go_outside_the_window_is_still_refused`). The folded counts must come from a read the person confirmed was folded, never from this run's own read of where the arm is now. The product's unit never passes it | a stop keeps the lamp held, torque on, until the power goes | on or off |
-| `--refused-let-go on\|off` (default on, #2602) | a lamp found folded whose start is refused only because the head or the base is found out of where it may start (the head outside its start window when not waking, a joint farther from home than the start reach, or than `WAKE_REACH` (400) when waking) is let go instead of left as it was: torque off on the three it commands, and on the shoulder and the elbow too with `--stand`, no goal written. Each step while let go (every 100 ms) is watched with what it asks of a person, so the body's diagnostic on the bus is an error with that sentence and state `starting`, sent once per change, not with each read (#2938, the Reviewer-lead's P3 on #2940): every waiting step is passed on, the report goes when what it says changes, and the same again only every 2 s (`WAITING_RESEND`), so that `lamp-health`, which takes a part as stale after 5 s, still has it fresh (`a_body_let_go_reports_once_per_change_and_slowly_again`); the voice says the sentence aloud once, and again when called by name, with `LAMP_BODY_ASK=on` ([speaking-first.md](speaking-first.md)) ("My head is tipped too far. Please move it gently back toward the middle, and I will start by myself."; "twisted" for the roll, "My base is turned too far" for the yaw), the journal says it once, and the first watched step says READY to systemd so the wait is not killed as a slow start. Once pitch, roll and yaw have been inside the start's own bounds, and all five still (3 counts a read at most), for ten reads in a row (a second), it takes hold where they are (goal, then torque, as `--torque on`) and starts as it would have, `--wake` bringing the head home slowly, each wake step watched; a joint that moves as it is taken hold of is let go again and waited for. Only what gravity already holds is let go (#2938): a head found tipped up out of range (its pitch under the range, the side it lifts toward, against its weight) keeps its torque, since let go it would drop onto the base or a hand; the roll, the base and a folded arm are let go, and it says "My head is tipped up too far, and I am holding it so it does not drop. I need someone to help me set it straight." (`refused_with_its_head_tipped_up_it_keeps_holding_the_head`). Ten minutes after it first let go in the run (`WAIT_ASKING`; a failed take-hold does not restart it), nobody having set it straight, it stops asking: it stays let go, reads every 0.5 s instead of 100 ms, and its diagnostic says "Nobody has set me straight, so I have stopped asking. I am let go, and I will start by myself once I am set straight."; set straight then, it still starts (`nobody_setting_it_straight_it_stops_asking_and_reads_less`). **A joint still held while the rest waits is judged by the run's own bounds** (El's P2 on #2940): a head tipped up keeps its pitch held, so that pitch counts steps over its load bound (`load_steps`) and at its temperature bound (`temperature_steps`) as the run does, and over either the wait ends on that stop (`Load` or `Temperature`) rather than pushing or heating on unchecked (`a_head_held_while_it_waits_is_judged_by_the_runs_load_and_heat`). **A shoulder that stops short while lowered on waking** (El's lamp-06c1 case, 22 Oct: lowered from 2,149 for 2,050, settled 2,140, past `Standing::FOUND_SLACK`, so every start ended on `Tracking` and systemd gave up after three) is let go too: the shoulder and the elbow, the head held where it is and judged by the same bounds, asking "My arm is not folded all the way down. Please fold it gently down, and I will start by myself.", and once a hand has folded it (the shoulder within `FOUND_SLACK` of folded, all still, for a second) it takes hold and starts again, the head judged then as any start's (`a_shoulder_that_stops_short_while_lowered_is_let_go_and_waited_for`). Any other stop while lowering ends the run as before. **A start after a wait is watched from its first step** (the Reviewer-lead's P2 on #3168): the wait has sent READY=1, so systemd's 5 s watchdog is armed; a shoulder lowered then is watched each step, and the run's schedule counts from the steps already taken, so its first step is due a tick later, never the wait's steps later (`a_shoulder_lowered_in_a_start_after_a_wait_is_watched_each_step`, `after_a_wait_its_run_is_watched_without_a_gap`; lamp-52e6's `Watchdog timeout` 4.4 s after taking hold). Asked to stop while let go, it ends let go (`Cancelled`). A lamp found up, a home given outside the start window, or any other refusal is refused as before. The exit report's `refused_let_go` holds what it last asked (`refused_for_its_pose_it_lets_go_says_so_and_stays_let_go_while_out_of_range`, `set_back_in_range_it_takes_hold_where_it_is_and_starts_by_itself`, `found_standing_out_of_range_it_is_refused_as_before_and_not_let_go`, `the_ranges_waited_for_are_the_starts_own_bounds`). It does not walk a joint home from farther than `--wake` already does: within 400 counts that is waking's job | refused with torque left as it was: on lamp-e82d a head knocked 1,060 counts from home kept torque on, systemd gave up after three starts, and only a power cut let a hand set it straight | on or off |
+| `--refused-let-go on\|off` (default on, #2602) | a lamp found folded whose start is refused only because the head or the base is found out of where it may start (the head outside its start window when not waking, a joint farther from home than the start reach, or than `WAKE_REACH` (400) when waking) is let go instead of left as it was: torque off on the three it commands, and on the shoulder and the elbow too with `--stand`, no goal written. Each step while let go (every 100 ms) is watched with what it asks of a person, so the body's diagnostic on the bus is an error with that sentence and state `starting`, sent once per change, not with each read (#2938, the Reviewer-lead's P3 on #2940): every waiting step is passed on, the report goes when what it says changes, and the same again only every 2 s (`WAITING_RESEND`), so that `lamp-health`, which takes a part as stale after 5 s, still has it fresh (`a_body_let_go_reports_once_per_change_and_slowly_again`); the voice says the sentence aloud once, and again when called by name, with `LAMP_BODY_ASK=on` ([speaking-first.md](speaking-first.md)) ("My head is tipped too far. Please move it gently back toward the middle, and I will start by myself."; "twisted" for the roll, "My base is turned too far" for the yaw), the journal says it once, and the first watched step says READY to systemd so the wait is not killed as a slow start. Once pitch, roll and yaw have been inside the start's own bounds, and all five still (3 counts a read at most), for ten reads in a row (a second), it takes hold where they are (goal, then torque, as `--torque on`) and starts as it would have, `--wake` bringing the head home slowly, each wake step watched; a joint that moves as it is taken hold of is let go again and waited for. Only what gravity already holds is let go (#2938): a head found tipped up out of range (its pitch under the range, the side it lifts toward, against its weight) keeps its torque, since let go it would drop onto the base or a hand; the roll, the base and a folded arm are let go, and it says "My head is tipped up too far, and I am holding it so it does not drop. I need someone to help me set it straight." (`refused_with_its_head_tipped_up_it_keeps_holding_the_head`). Ten minutes after it first let go in the run (`WAIT_ASKING`; a failed take-hold does not restart it), nobody having set it straight, it stops asking: it stays let go, reads every 0.5 s instead of 100 ms, and its diagnostic says "Nobody has set me straight, so I have stopped asking. I am let go, and I will start by myself once I am set straight."; set straight then, it still starts (`nobody_setting_it_straight_it_stops_asking_and_reads_less`). **A joint still held while the rest waits is judged by the run's own bounds** (El's P2 on #2940): a head tipped up keeps its pitch held, so that pitch counts steps over its load bound (`load_steps`) and at its temperature bound (`temperature_steps`) as the run does, and over either the wait ends on that stop (`Load` or `Temperature`) rather than pushing or heating on unchecked (`a_head_held_while_it_waits_is_judged_by_the_runs_load_and_heat`). **A shoulder that stops short while lowered on waking** (El's lamp-06c1 case, 22 Oct: lowered from 2,149 for 2,050, settled 2,140, past `Standing::FOUND_SLACK`, so every start ended on `Tracking` and systemd gave up after three) is let go too: the shoulder and the elbow, the head held where it is and judged by the same bounds, asking "My arm is not folded all the way down. Please fold it gently down, and I will start by myself.", and once a hand has folded it (the shoulder within `FOUND_SLACK` of folded, all still, for a second) it takes hold and starts again, the head judged then as any start's (`a_shoulder_that_stops_short_while_lowered_is_let_go_and_waited_for`). Any other stop while lowering ends the run as before. **An arm joint found limp outside its window** at a `--torque on` start (#6834: a customer lamp's elbow sagged to 3,226, its window 1,740..=2,991, after a stop let it go, so every start ended on `Window` within a second and systemd gave up) is never given that goal; what the start took hold of is let go again, as it was found, and it asks the same "My arm is not folded all the way down…", starting by itself once the shoulder is within `FOUND_SLACK` of folded and both arm joints are inside their windows, all still, for a second (`an_arm_joint_found_limp_outside_its_window_asks_to_be_folded_and_starts_once_it_is`). It does not drive the joint back into its window itself: a goal outside an arm joint's window is never written, and a person folds it. Off, it ends on `Window` as before (`an_arm_joint_taken_hold_of_outside_its_window_is_not_given_that_goal`). **A start after a wait is watched from its first step** (the Reviewer-lead's P2 on #3168): the wait has sent READY=1, so systemd's 5 s watchdog is armed; a shoulder lowered then is watched each step, and the run's schedule counts from the steps already taken, so its first step is due a tick later, never the wait's steps later (`a_shoulder_lowered_in_a_start_after_a_wait_is_watched_each_step`, `after_a_wait_its_run_is_watched_without_a_gap`; lamp-52e6's `Watchdog timeout` 4.4 s after taking hold). Asked to stop while let go, it ends let go (`Cancelled`). A lamp found up, a home given outside the start window, or any other refusal is refused as before. The exit report's `refused_let_go` holds what it last asked (`refused_for_its_pose_it_lets_go_says_so_and_stays_let_go_while_out_of_range`, `set_back_in_range_it_takes_hold_where_it_is_and_starts_by_itself`, `found_standing_out_of_range_it_is_refused_as_before_and_not_let_go`, `the_ranges_waited_for_are_the_starts_own_bounds`). It does not walk a joint home from farther than `--wake` already does: within 400 counts that is waking's job | refused with torque left as it was: on lamp-e82d a head knocked 1,060 counts from home kept torque on, systemd gave up after three starts, and only a power cut let a hand set it straight | on or off |
 | `--overload release` | any joint at a load of 800 (80% of `--force-limit` for a joint held to one) for 1.5 s: torque off on all five for 120 s, then held where they are and the head brought home slowly; a second time within ten minutes ends the run, torque off (see "Letting go under overload") | torque is written off only as a run ends on a surprise | release |
 | `--gaze-socket PATH` with `--gaze Y,P` | where the eyes report, and the signed counts of yaw and pitch that a half-picture is worth; the socket without `--gaze`, `--gaze-reach` given or not (a factory `lamp.env` before its gaze is measured, as the product unit passes it) is gaze off, said at start (thirteen-P1) | never looks | 900 either way |
 | `--gaze-reach Y,P` | the farthest the gaze takes yaw and pitch; the yaw may be wider than `--reach`'s | 250,120 | 500, 200 |
@@ -2241,6 +2319,7 @@ four rows, "Without it" is what `off` leaves.
 | `--arbitration on` | a gesture or a move may say who asks (`source`, `priority`), and one asked higher ends the one playing (see "Who may ask over whom") | as before: `source` and `priority` are ignored, and a gesture asked while another plays is dropped, except lamp-control's `replace`, which ends one at `skill` or lower (see "Gestures") | on or off |
 | `--caller-caps on` | who asks is the kernel's word: a gesture or a move is held to its unit's most, and the gaze socket takes sights from the eyes, skills or root only (see "Who asks, from the kernel") | as before: any process in group `lampos` may ask at any priority and send a sight | on or off |
 | `--lease-socket ABSOLUTE_PATH` | lamp-control may hold the body for up to 30 s at a time, renewed, while the lamp's own life stands back (see "Held by lamp-control") | no lease: nobody can ask the lamp's own life to stand back | a short absolute path |
+| `--lease-holder-uid N` | with `--lease-socket`: a caller running as user id N (above 0) may hold the body too, whatever its unit; for the virtual lamp only | only `lamp-control.service` as `lampos`, or root | a user id above 0, given once, and only with `--lease-socket` |
 | `--hold-from ABSOLUTE_FILE` | a test input, for tests on a lamp only: while the file's first word is `held`, the head's pitch is taken as held by a hand (see "Test input: --hold-from" under "Giving way to a hand") | off: only a joint that gave way is a hand. No product unit passes it | an absolute file; `held`, or anything else for no hand |
 | `--head-stall-load LOAD` | the head pitch's stall bound, this lamp's own (see "Giving way to a hand": a head that holds more than 100 to stand) | 100 | 100 to 230 |
 | `--stand-roll N` | the head's tilt reach once the lamp has stood up, where that is more than the roll of `--reach` | no more than folded | 200 |
@@ -2568,12 +2647,13 @@ The report is `ok` with no message, or a warning:
 | `warn` | `elbow is warming fast: from 42 to 50 within 5 min, and it is said warm at 55` | With the strain guard, a joint 8 °C warmer within 5 min while under 55 |
 | `warn` | `its arm sat down for a strain three times in half an hour: it rests folded and may rise again in N min` | Without the strain guard, during the long rest |
 | `warn` | `a joint met resistance and stopped pushing, 2 times in the last minute` | A commanded joint gave way within the last minute |
+| `warn` | `My arm isn't folded all the way down, so I won't stand up. …`, or another of the run's asks above | The run will not stand, and nothing above is said; the `asks` fact carries it on every report of the run, whatever the level (#6834) |
 | `warn` | `stopped, as it was asked to` | Its last word after SIGINT or SIGTERM |
 | `error` | `stopped: head_pitch was pushed against (load 260)`, and one such sentence for each other reason in "When it stops" | Its last word when it stopped itself or would not start |
 
 Its facts are the mood, how far it has stood up, the warmest joint and
 its reading, and how often a joint gave way in the last minute and since
-it started.
+it started, and, in a run that will not stand, `asks`.
 
 **Paused.** Whether or not it publishes, a body that can reach the bus
 reads `lamp/pause` at most once a second ([keeper.md](keeper.md), "Named
@@ -3516,7 +3596,12 @@ half its bound and over its own resting load by a quarter of its bound (a
 press at 300 easing to 130 on a pitch bound 240, that read 25 before, is
 still a push), and it ends on the first step that is neither (the next
 `body/hand` after a release says it is gone). A hand that keeps the joint
-off, re-held where it is each second, stays a push until it lets go;
+off, re-held where it is each second, stays a push until it lets go, or
+until it has not moved 15 counts for 20 s (`HAND_STILL_STEPS`): its hold
+is then not renewed and it is let go, and a hand truly still on it gives
+way again. A joint moved and left there reads the same as one a hand holds
+still: lamp-06c1's head, its weight 130 over the 100 a moved joint is
+judged by, was said `pushed` until lamp-body was restarted (#5196);
 `since_us` is when that push began, on the body's
 own clock (0 when not pushed). A joint held at its rest that reads only its
 own weight and jitters a few counts is not a push, whichever lamp's

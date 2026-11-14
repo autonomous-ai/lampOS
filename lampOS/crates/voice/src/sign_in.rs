@@ -59,10 +59,11 @@ pub const ASK_AGAIN_AFTER: Duration = Duration::from_secs(30);
 pub const ASKED_MOST: u32 = 3;
 
 /// Each sign-in's question taken to be told, by id: when it was last taken
-/// (`None` once offered again) and how many times ([`ASK_AGAIN_AFTER`]).
+/// (`None` once offered again), how many times ([`ASK_AGAIN_AFTER`]), and
+/// whether that telling was talked over (#5198), so it is due at once.
 #[derive(Debug, Default)]
 pub struct AskAgain {
-    told: std::collections::BTreeMap<u64, (Option<Instant>, u32)>,
+    told: std::collections::BTreeMap<u64, (Option<Instant>, u32, bool)>,
 }
 
 impl AskAgain {
@@ -72,9 +73,10 @@ impl AskAgain {
         let Some(id) = asked_of(key) else {
             return false;
         };
-        let (at, times) = self.told.entry(id).or_insert((None, 0));
+        let (at, times, cut) = self.told.entry(id).or_insert((None, 0, false));
         *at = Some(now);
         *times += 1;
+        *cut = false;
         true
     }
 
@@ -97,24 +99,49 @@ impl AskAgain {
     }
 
     /// The questions to offer again at `now`: taken to be told `after` ago
-    /// or more, not heard whole (call [`Self::heard`] first), and taken
-    /// fewer than [`ASKED_MOST`] times. Each is given once a telling. One
-    /// told the last time is let go once its wait has passed (the
-    /// reviewer-lead's P3 2 on #2702): it is in `offered` and never
-    /// offered again.
+    /// or more, or talked over ([`Self::cut`]), not heard whole (call
+    /// [`Self::heard`] first), and taken fewer than [`ASKED_MOST`] times.
+    /// Each is given once a telling. One told the last time is let go once
+    /// its wait has passed (the reviewer-lead's P3 2 on #2702): it is in
+    /// `offered` and never offered again.
     pub fn due(&mut self, after: Duration, now: Instant) -> Vec<String> {
         let waited =
             |at: &Option<Instant>| at.is_some_and(|at| now.saturating_duration_since(at) >= after);
         self.told
-            .retain(|_, (at, times)| *times < ASKED_MOST || !waited(at));
+            .retain(|_, (at, times, _)| *times < ASKED_MOST || !waited(at));
         let mut due = Vec::new();
-        for (id, (at, _)) in &mut self.told {
-            if waited(at) {
+        for (id, (at, _, cut)) in &mut self.told {
+            if waited(at) || (at.is_some() && *cut) {
                 *at = None;
+                *cut = false;
                 due.push(key(*id, "asking"));
             }
         }
         due
+    }
+
+    /// The question `key`, taken to be told, was talked over or cut short
+    /// as its turn ended (#5198): due at once, to be asked at the next
+    /// pause, not [`ASK_AGAIN_AFTER`] later. Whether it was a telling
+    /// followed here and not offered again yet: not news not followed
+    /// here. The last of [`ASKED_MOST`] tellings cut is let go, never asked
+    /// again.
+    pub fn cut(&mut self, key: &str) -> bool {
+        let Some(id) = asked_of(key) else {
+            return false;
+        };
+        let Some((at, times, cut)) = self.told.get_mut(&id) else {
+            return false;
+        };
+        if at.is_none() {
+            return false;
+        }
+        if *times >= ASKED_MOST {
+            self.told.remove(&id);
+            return true;
+        }
+        *cut = true;
+        true
     }
 
     /// How many questions are followed: for a test.
@@ -262,8 +289,9 @@ pub fn tools() -> Vec<Tool> {
         Tool {
             name: START.into(),
             description: "Sign this lamp in to the person's Harness, so it can hand work to \
-                          their own computer. Call it only when the person asks to sign the lamp \
-                          in, or to set up hand-overs to their computer. It gives a code to say \
+                          their own computer. Call it when the person asks to sign the lamp in, to \
+                          connect the lamp to their computer or to Harness, or to set up \
+                          hand-overs to their computer. It gives a code to say \
                           and where they type it. If they ask for the code again, call it again: \
                           while the sign-in is open it gives back the same code. Never say a \
                           sign-in code's digits from memory."
@@ -1621,6 +1649,8 @@ mod tests {
                 questions: false,
                 now: false,
                 one_yes: false,
+                reply_named: false,
+                harness_status: false,
                 sign_in: true,
                 sign_in_app: false,
             }
@@ -2114,6 +2144,8 @@ mod tests {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
+            harness_status: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -2266,6 +2298,8 @@ mod tests {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
+            harness_status: false,
             sign_in: true,
             sign_in_app: false,
         };
@@ -2783,6 +2817,39 @@ mod tests {
         assert_eq!(again.heard(&heard), ["sign-in-2-asking"]);
         assert!(again.heard(&heard).is_empty());
         assert!(again.due(after, at(100)).is_empty());
+        assert_eq!(again.followed(), 0);
+    }
+
+    /// #5198: a question talked over is due at once, not
+    /// [`ASK_AGAIN_AFTER`] later, once; told again, its wait begins anew.
+    /// One not followed, other news, and the last of [`ASKED_MOST`]
+    /// tellings are never due by a cut.
+    #[test]
+    fn a_question_talked_over_is_due_at_once() {
+        let after = ASK_AGAIN_AFTER;
+        let start = Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        let mut again = AskAgain::default();
+        // Not followed: nothing to make due.
+        assert!(!again.cut("sign-in-1-asking"));
+        assert!(!again.cut("s1:2:3"));
+        assert!(again.due(after, at(1)).is_empty());
+        assert!(again.told("sign-in-1-asking", at(0)));
+        assert!(again.cut("sign-in-1-asking"));
+        assert_eq!(again.due(after, at(1)), ["sign-in-1-asking"]);
+        // Once: offered already, a second cut makes nothing due.
+        assert!(!again.cut("sign-in-1-asking"));
+        assert!(again.due(after, at(2)).is_empty());
+        // Told again: its own wait, unless it is cut too.
+        assert!(again.told("sign-in-1-asking", at(3)));
+        assert!(again.due(after, at(4)).is_empty());
+        assert!(again.cut("sign-in-1-asking"));
+        assert_eq!(again.due(after, at(4)), ["sign-in-1-asking"]);
+        // The third telling is the last: cut, it is let go, not asked a
+        // fourth time.
+        assert!(again.told("sign-in-1-asking", at(5)));
+        assert!(again.cut("sign-in-1-asking"));
+        assert!(again.due(after, at(6)).is_empty());
         assert_eq!(again.followed(), 0);
     }
 

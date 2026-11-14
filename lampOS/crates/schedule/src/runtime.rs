@@ -477,7 +477,20 @@ fn serve_client(
             "A complete request line did not arrive within 300 ms.",
         ),
     };
-    let _ = write_line(&mut stream, &answer, accepted + CLIENT_DEADLINE);
+    let _ = write_line(
+        &mut stream,
+        &answer,
+        reply_deadline(accepted, request_deadline),
+    );
+}
+
+/// When a reply must be written by: [`CLIENT_DEADLINE`] after the accept on a
+/// lamp, where a request is answered within [`REQUEST_DEADLINE`], which is
+/// shorter. A host test that gives a request longer passes that, or a commit
+/// held past 1200 ms by a loaded runner would finish and its reply be dropped,
+/// the caller reading `uncertain` for a change that committed.
+fn reply_deadline(accepted: Instant, request_deadline: Duration) -> Instant {
+    accepted + request_deadline.max(CLIENT_DEADLINE)
 }
 
 fn publish(out: &mut Publisher, at_us: u64, value: &impl serde::Serialize, errors: &mut u64) {
@@ -699,6 +712,21 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
 mod tests {
     use super::*;
     use std::cell::RefCell;
+
+    #[test]
+    fn a_reply_may_be_written_for_as_long_as_the_request_was_allowed() {
+        let accepted = Instant::now();
+        // On a lamp the request deadline is the shorter: the reply bound is unchanged.
+        assert_eq!(
+            reply_deadline(accepted, REQUEST_DEADLINE),
+            accepted + CLIENT_DEADLINE
+        );
+        // A test that allows a request 10 s may have its reply written up to then.
+        assert_eq!(
+            reply_deadline(accepted, Duration::from_secs(10)),
+            accepted + Duration::from_secs(10)
+        );
+    }
 
     thread_local! {
         /// Runs in the service's loop just before it looks at its store

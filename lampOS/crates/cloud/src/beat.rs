@@ -104,8 +104,11 @@ pub async fn once(
 
 /// Pings every `every` with the newest account and identity until
 /// `accounts` closes. `key` is the bearer. `keep` is given each account a
-/// reply moved to, before it is sent on. `login`, with `LAMP_SIGNED_OUT=on`,
-/// is told what each ping's answer says of the login.
+/// reply moved to, before it is sent on. `heard` is given each reply, for
+/// its region (`ping::Region`, #6414) and its WSS address (#6256 F9):
+/// neither is part of the account, so neither moves the broker. `login`, with `LAMP_SIGNED_OUT=on`, is told what each
+/// ping's answer says of the login.
+#[allow(clippy::too_many_arguments)]
 pub async fn pings(
     accounts: watch::Sender<Option<Account>>,
     identity: watch::Receiver<Identity>,
@@ -113,6 +116,7 @@ pub async fn pings(
     every: Duration,
     say: &mut impl Say,
     keep: &mut impl FnMut(&Account),
+    heard: &mut impl FnMut(&ping::Reply),
     mut login: Option<&mut Login>,
 ) {
     let mut client = match client() {
@@ -123,6 +127,8 @@ pub async fn pings(
         }
     };
     let mut address = identity.borrow().local_ip.clone();
+    // The unit's switch, read once: the ping says it (#6031).
+    let tls = crate::online::tls_on();
     // The ping's last state, said only when it changes.
     let mut failing: Option<String> = None;
     loop {
@@ -140,7 +146,7 @@ pub async fn pings(
         if let Some(account) = account
             && let Some(url) = ping::url(&account)
         {
-            let result = once(&client, &url, &key, &Payload::of(&me)).await;
+            let result = once(&client, &url, &key, &Payload::of(&me).with_tls(tls)).await;
             if let Some(login) = login.as_deref_mut() {
                 let answer = match &result {
                     Ok(body) => Answer::of_body(body),
@@ -153,9 +159,11 @@ pub async fn pings(
                     if failing.take().is_some() {
                         say.line("the backend's ping answers again");
                     }
-                    if let Some(next) =
-                        ping::reply(&body).and_then(|reply| ping::after(&account, &reply))
-                    {
+                    let reply = ping::reply(&body);
+                    if let Some(reply) = &reply {
+                        heard(reply);
+                    }
+                    if let Some(next) = reply.and_then(|reply| ping::after(&account, &reply)) {
                         keep(&next);
                         say.line(&format!(
                             "the backend gave a new broker: {}:{}",
@@ -281,6 +289,7 @@ mod tests {
                 Duration::from_millis(20),
                 &mut say,
                 &mut keep,
+                &mut |_: &ping::Reply| {},
                 None,
             )
             .await;
@@ -359,6 +368,7 @@ mod tests {
                 Duration::from_millis(2),
                 &mut say,
                 &mut |_: &Account| {},
+                &mut |_: &ping::Reply| {},
                 Some(&mut login),
             )
             .await;

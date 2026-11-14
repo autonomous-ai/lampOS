@@ -11,9 +11,10 @@ use crate::{
     ownership::{OwnershipFailure, PlaybackCursor, PlaybackOwnership, QueuedRange},
     underrun::UnderrunBudget,
 };
+#[cfg(target_os = "linux")]
 use alsa::{
     Direction, ValueOr,
-    pcm::{Access, Format, HwParams, PCM, State},
+    pcm::{Access, Format, HwParams, PCM},
 };
 use lamp_ipc::monotonic_us;
 use lamp_turn_owner::{
@@ -21,6 +22,8 @@ use lamp_turn_owner::{
 };
 use serde::Serialize;
 use std::{fmt, io};
+
+pub use crate::pcm_types::{PcmError, PcmResult, PcmState};
 
 /// 40 ms maximum negotiated PCM queue plus 60 ms scheduling/device margin.
 const MAX_FINISH_US: u64 = 100_000;
@@ -79,8 +82,57 @@ pub struct PlaybackStatus {
     pub range: QueuedRange,
 }
 
+/// What [`Speaker`] asks of the queue it plays into: the seven calls it made on
+/// ALSA's `PCM`, and no others. The ownership ledger, the privacy guard,
+/// the underrun budget and the echo reference all sit above this and do not
+/// know which queue is below. `PCM` is the board's; a developer's computer
+/// beside a simulator can give the speaker another. The errors and the state
+/// are ALSA's own on Linux and a portable copy elsewhere (`pcm_types`).
+pub trait PlaybackPcm: Send {
+    /// Available frames and total queued delay, as `snd_pcm_avail_delay`.
+    fn avail_delay(&self) -> PcmResult<(i64, i64)>;
+    /// Starts playback of what is queued.
+    fn start(&self) -> PcmResult<()>;
+    /// Writes at most `samples.len()` frames and returns how many were taken;
+    /// never blocks (`EAGAIN` is the queue being full).
+    fn writei(&self, samples: &[i16]) -> PcmResult<usize>;
+    /// Plays out what is queued, `EAGAIN` while it has not finished.
+    fn drain(&self) -> PcmResult<()>;
+    /// Makes the queue ready to be written again.
+    fn prepare(&self) -> PcmResult<()>;
+    /// The queue's state.
+    fn state(&self) -> PcmState;
+    /// Throws away what is queued, never plays it.
+    fn discard(&self) -> PcmResult<()>;
+}
+
+#[cfg(target_os = "linux")]
+impl PlaybackPcm for PCM {
+    fn avail_delay(&self) -> PcmResult<(i64, i64)> {
+        PCM::avail_delay(self)
+    }
+    fn start(&self) -> PcmResult<()> {
+        PCM::start(self)
+    }
+    fn writei(&self, samples: &[i16]) -> PcmResult<usize> {
+        self.io_i16()?.writei(samples)
+    }
+    fn drain(&self) -> PcmResult<()> {
+        PCM::drain(self)
+    }
+    fn prepare(&self) -> PcmResult<()> {
+        PCM::prepare(self)
+    }
+    fn state(&self) -> PcmState {
+        PCM::state(self)
+    }
+    fn discard(&self) -> PcmResult<()> {
+        PCM::drop(self)
+    }
+}
+
 pub struct Speaker {
-    pcm: PCM,
+    pcm: Box<dyn PlaybackPcm>,
     format: PcmFormat,
     guard: BoundaryGuard,
     pending: PlaybackOwnership,
@@ -105,10 +157,11 @@ pub struct Speaker {
 /// the speaker (#4332). None for an error that is not ALSA's.
 pub fn open_fault(error: &(dyn std::error::Error + Send + Sync + 'static)) -> Option<DeviceFault> {
     error
-        .downcast_ref::<alsa::Error>()
+        .downcast_ref::<PcmError>()
         .map(|error| DeviceFault::new(error.func(), error.errno()))
 }
 
+#[cfg(target_os = "linux")]
 impl Speaker {
     pub fn open(device: &str, boot: BootId) -> Result<Self> {
         Self::open_mode(device, boot, false)
@@ -165,7 +218,43 @@ impl Speaker {
             pcm.sw_params(&software)?;
             format
         };
-        Ok(Self {
+        Ok(Self::from_parts(Box::new(pcm), format, boot, clock_mode))
+    }
+}
+
+impl Speaker {
+    /// A speaker that plays into `pcm` rather than into an ALSA device (a software queue: see
+    /// [`crate::soft_pcm`]), in the same modes as [`Speaker::open`] and [`Speaker::open_clock`].
+    /// `format` must be one the speaker accepts of ALSA: the rendering rate, a period of at most a
+    /// block, a buffer of at most four blocks and, with `clock_mode`, at least two.
+    pub fn with_pcm(
+        pcm: Box<dyn PlaybackPcm>,
+        format: PcmFormat,
+        boot: BootId,
+        clock_mode: bool,
+    ) -> Result<Self> {
+        if format.rate != RENDER_RATE
+            || format.period_frames <= 0
+            || format.period_frames > RENDER_SAMPLES as i64
+            || format.buffer_frames <= 0
+            || format.buffer_frames > (RENDER_SAMPLES * 4) as i64
+            || (clock_mode && format.buffer_frames < (RENDER_SAMPLES * 2) as i64)
+        {
+            return Err(io::Error::other(format!(
+                "the playback queue cannot meet the bounded speaker format: {format:?}"
+            ))
+            .into());
+        }
+        Ok(Self::from_parts(pcm, format, boot, clock_mode))
+    }
+
+    fn from_parts(
+        pcm: Box<dyn PlaybackPcm>,
+        format: PcmFormat,
+        boot: BootId,
+        clock_mode: bool,
+    ) -> Self {
+        Self {
             pcm,
             format,
             guard: BoundaryGuard::new(boot, now()),
@@ -183,7 +272,7 @@ impl Speaker {
             post_write_check_at: None,
             #[cfg(test)]
             avail_errno: None,
-        })
+        }
     }
 
     pub fn format(&self) -> PcmFormat {
@@ -276,7 +365,7 @@ impl Speaker {
         // never retire ownership using buffer_frames - available.
         #[cfg(test)]
         let observed = match self.avail_errno.take() {
-            Some(errno) => Err(alsa::Error::new("snd_pcm_avail_delay", errno)),
+            Some(errno) => Err(PcmError::new("snd_pcm_avail_delay", errno)),
             None => self.pcm.avail_delay(),
         };
         #[cfg(not(test))]
@@ -296,7 +385,7 @@ impl Speaker {
             Err(error)
                 if self.expected_end_state()
                     && (error.errno() == rustix::io::Errno::PIPE.raw_os_error()
-                        || error.errno() == rustix::io::Errno::BADFD.raw_os_error()) =>
+                        || error.errno() == crate::device::errno::BADFD) =>
             {
                 (0, 0)
             }
@@ -502,7 +591,7 @@ impl Speaker {
         let written = if offered == 0 {
             Ok(0)
         } else {
-            self.pcm.io_i16()?.writei(&samples[..offered])
+            self.pcm.writei(&samples[..offered])
         };
         let frames = match written {
             Ok(frames) => frames,
@@ -615,7 +704,7 @@ impl Speaker {
             Err(error)
                 if self.expected_end_state()
                     && (error.errno() == rustix::io::Errno::PIPE.raw_os_error()
-                        || error.errno() == rustix::io::Errno::BADFD.raw_os_error()) =>
+                        || error.errno() == crate::device::errno::BADFD) =>
             {
                 true
             }
@@ -644,7 +733,7 @@ impl Speaker {
     }
 
     fn expected_end_state(&self) -> bool {
-        self.is_finishing() && matches!(self.pcm.state(), State::XRun | State::Setup)
+        self.is_finishing() && matches!(self.pcm.state(), PcmState::XRun | PcmState::Setup)
     }
 
     pub fn is_finishing(&self) -> bool {
@@ -681,7 +770,7 @@ impl Speaker {
         self.last_poll = None;
         self.finish_deadline = None;
         self.clock_started = false;
-        if let Err(error) = self.pcm.drop() {
+        if let Err(error) = self.pcm.discard() {
             // A failed discard is not confirmation that queued speech stopped.
             // Keep its authorization metadata and latch further output closed.
             self.guard.invalidate();
@@ -704,7 +793,7 @@ impl Speaker {
     /// A retiring tail, an unreported discard or underrun receipt, a
     /// disconnect or suspend (ENODEV, EBADFD, ESTRPIPE), or more underruns
     /// than `crate::underrun` allows latch the guard closed.
-    fn discontinuity(&mut self, error: alsa::Error) -> Box<dyn std::error::Error + Send + Sync> {
+    fn discontinuity(&mut self, error: PcmError) -> Box<dyn std::error::Error + Send + Sync> {
         if error.errno() == rustix::io::Errno::PIPE.raw_os_error()
             && !self.pending.is_retiring_tail()
             && self.discarded.is_none()
@@ -770,7 +859,7 @@ impl Speaker {
 
 impl Drop for Speaker {
     fn drop(&mut self) {
-        let _ = self.pcm.drop();
+        let _ = self.pcm.discard();
     }
 }
 
@@ -778,7 +867,7 @@ fn now() -> MonoTime {
     MonoTime::from_micros(monotonic_us())
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod finish_tests {
     use super::*;
     use lamp_turn_owner::{AdmissionState, AdmittedInput, CaptureState, Controller, Permission};
@@ -1062,7 +1151,7 @@ mod finish_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod underrun_tests {
     use super::*;
     use crate::underrun::MAX_UNDERRUNS;
@@ -1213,5 +1302,85 @@ mod underrun_tests {
         let error = underrun(&mut speaker, rustix::io::Errno::PIPE);
         assert!(error.downcast_ref::<Underrun>().is_none(), "{error}");
         assert!(speaker.zero_authority().is_err(), "the guard is closed");
+    }
+}
+
+#[cfg(test)]
+mod soft_queue_tests {
+    use super::*;
+    use crate::soft_pcm::{self, SoftPcm};
+    use lamp_turn_owner::{AdmissionState, CaptureState, Controller, Permission};
+    use std::sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    };
+
+    /// The seam in use: a speaker over a software queue primes, starts its clock and sees the queue
+    /// drain by the clock, with every frame it was given told to the sink. Nothing here is ALSA.
+    #[test]
+    fn a_speaker_plays_into_a_software_queue_as_into_alsa() {
+        let clock = Arc::new(AtomicU64::new(5_000_000));
+        let told = Arc::new(Mutex::new(0usize));
+        let (read, count) = (clock.clone(), told.clone());
+        let pcm = SoftPcm::with_clock(
+            move || read.load(Ordering::SeqCst),
+            move |frames| *count.lock().unwrap() += frames.len(),
+        );
+        let boot = BootId::new([122; 16]).unwrap();
+        let mut speaker = Speaker::with_pcm(Box::new(pcm), soft_pcm::FORMAT, boot, true).unwrap();
+        assert_eq!(speaker.format().buffer_frames, soft_pcm::DEPTH_FRAMES);
+        let mut controller = Controller::new(boot, now());
+        controller
+            .set_microphone_permission(now(), Permission::Allowed)
+            .unwrap();
+        let until = now().checked_add(500_000).unwrap();
+        controller
+            .set_capture(now(), CaptureState::RetainingUntil(until))
+            .unwrap();
+        controller
+            .set_admission(now(), AdmissionState::OpenUntil(until))
+            .unwrap();
+        speaker
+            .install(controller.snapshot(now()).unwrap())
+            .unwrap();
+        let token = speaker.zero_authority().unwrap();
+        speaker.try_write_silence(token, 240).unwrap();
+        speaker.try_write_silence(token, 240).unwrap();
+        assert_eq!(*told.lock().unwrap(), 480);
+        // Not started: the clock has not begun, so nothing has drained, however long it waits.
+        clock.fetch_add(1_000_000, Ordering::SeqCst);
+        speaker.maintain().unwrap();
+        assert!(speaker.pending.has_pending());
+        speaker.start_clock(token).unwrap();
+        // 480 frames at 24 kHz are 20 ms; after that the speaker sees an empty queue.
+        clock.fetch_add(20_000, Ordering::SeqCst);
+        speaker.maintain().unwrap();
+        assert!(!speaker.pending.has_pending());
+    }
+
+    /// A format the speaker would not take of ALSA is not taken of a queue either.
+    #[test]
+    fn a_queue_of_a_format_the_speaker_refuses_is_refused() {
+        let boot = BootId::new([123; 16]).unwrap();
+        for format in [
+            PcmFormat {
+                rate: 16_000,
+                ..soft_pcm::FORMAT
+            },
+            PcmFormat {
+                buffer_frames: (RENDER_SAMPLES * 5) as i64,
+                ..soft_pcm::FORMAT
+            },
+            PcmFormat {
+                buffer_frames: RENDER_SAMPLES as i64,
+                ..soft_pcm::FORMAT
+            },
+        ] {
+            let pcm = SoftPcm::with_clock(|| 0, |_| {});
+            assert!(
+                Speaker::with_pcm(Box::new(pcm), format, boot, true).is_err(),
+                "{format:?}"
+            );
+        }
     }
 }

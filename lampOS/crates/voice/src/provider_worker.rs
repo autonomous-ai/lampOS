@@ -307,6 +307,10 @@ pub struct Files {
     /// Whether a known person's face read is told to the second voice
     /// beside what they say (`--second-seems`, `crate::seems_told`).
     pub second_seems: bool,
+    /// Whether what a known person was last seen doing is told to the
+    /// second voice beside what they say (`--second-doing`,
+    /// `crate::doing_told`).
+    pub second_doing: bool,
     /// Whether an unwell part is told beside what a person says
     /// (`--health-facts`, `crate::health_told`).
     pub health_facts: bool,
@@ -507,6 +511,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (room_file, flags) = crate::room_told::take_file(flags)?;
     let (air_facts, flags) = crate::air_told::take(flags);
     let (second_seems, flags) = crate::seems_told::take(flags);
+    let (second_doing, flags) = crate::doing_told::take(flags);
     let (health_facts, flags) = crate::health_told::take(flags);
     let (keep_link, flags) = take_keep_link(flags);
     let (wait_for_room, flags) = take_wait_for_room(flags);
@@ -569,6 +574,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         room_file,
         air_facts,
         second_seems,
+        second_doing,
         health_facts,
         keep_link,
         wait_for_room,
@@ -898,6 +904,21 @@ pub enum ProviderInput {
         request: u64,
         privacy_generation: u64,
     },
+    /// Whether the walk is under way (`onboarding::set_under_way`), told
+    /// the worker with each turn in hand while it is, and once as it ends:
+    /// the second route's replies drop the walk's step words in its own
+    /// process, which never reads the coordinator's (#5931). The Live
+    /// worker takes nothing from it.
+    WalkUnderWay {
+        request: u64,
+        privacy_generation: u64,
+        on: bool,
+        /// The first update's waiting line while it holds the walk (#6284,
+        /// `onboarding::set_updating`), for the worker's process: a person's
+        /// line is answered with it, no chat. Absent otherwise.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        updating: Option<String>,
+    },
     /// A whole request in writing, for a turn the lamp begins itself: it is
     /// a start and an end at once and carries no sound.
     Written {
@@ -956,6 +977,7 @@ impl ProviderInput {
             | Self::StepCall { request, .. }
             | Self::Onboarding { request, .. }
             | Self::TurnOpened { request, .. }
+            | Self::WalkUnderWay { request, .. }
             | Self::WokenByName { request, .. }
             | Self::Written { request, .. }
             | Self::Reminder { request, .. } => *request,
@@ -996,6 +1018,9 @@ impl ProviderInput {
             | Self::TurnOpened {
                 privacy_generation, ..
             }
+            | Self::WalkUnderWay {
+                privacy_generation, ..
+            }
             | Self::WokenByName {
                 privacy_generation, ..
             }
@@ -1031,6 +1056,11 @@ pub enum ProviderOutput {
         waiting_for_barrier: bool,
     },
     Audio {
+        /// Provider answer audio: Second speech packets or Live model output,
+        /// never a locally injected wait cue or announcement.
+        /// Older workers omit it and therefore cannot establish this proof.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        spoken: bool,
         request: u64,
         sequence: u64,
         /// Wrapper event observation, not a socket-read or acoustic timestamp.
@@ -4883,6 +4913,9 @@ fn forward_origin(
                     .checked_add(1)
                     .ok_or_else(|| io::Error::other("provider output counter exhausted"))?;
                 push(ProviderOutput::Audio {
+                    // Live model answer output; this path never injects the
+                    // Second route's local wait cue or announcement.
+                    spoken: true,
                     request: lineage.request.get(),
                     sequence: *output_sequence,
                     provider_event_at_us,
@@ -6560,6 +6593,8 @@ impl InputHandoff {
             ProviderInput::PauseJoin { .. } => {}
             // The second route's (`LAMP_STOP_WORDS_COMMIT_WAITS`).
             ProviderInput::StopWords { .. } => {}
+            // The second route's (#5931).
+            ProviderInput::WalkUnderWay { .. } => {}
             // Onboarding's sentence (#1803): from now its words and the
             // answer to it are kept out of the thread.
             ProviderInput::CountOnly { .. } => {
@@ -7607,6 +7642,54 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn live_model_audio_retains_answer_provenance_when_forwarded() {
+        let mut output = VecDeque::new();
+        forward(
+            Event::Audio {
+                lineage: lamp_gemini::Lineage {
+                    session: lamp_gemini::SessionId::new(7).unwrap(),
+                    request: RequestId::new(23).unwrap(),
+                },
+                sequence: 1,
+                pcm: vec![7; PACKET_SAMPLES + 1],
+            },
+            &mut output,
+            &mut 0,
+            &mut DiscardLog::default(),
+        )
+        .unwrap();
+        assert_eq!(output.len(), 2);
+        assert!(output.iter().all(|event| matches!(event,
+            Outbound::Output(ProviderOutput::Audio { request: 23, spoken: true, samples, .. })
+                if !samples.is_empty()
+        )));
+    }
+
+    #[test]
+    fn audio_spoken_provenance_defaults_false_and_roundtrips_true() {
+        let mut value = serde_json::json!({
+            "kind": "audio", "request": 1, "sequence": 1,
+            "provider_event_at_us": 1, "source_frames": 1,
+            "source_offset": 0, "samples": [7]
+        });
+        let legacy: ProviderOutput = serde_json::from_value(value.clone()).unwrap();
+        assert!(matches!(
+            legacy,
+            ProviderOutput::Audio { spoken: false, .. }
+        ));
+        assert!(
+            serde_json::to_value(&legacy)
+                .unwrap()
+                .get("spoken")
+                .is_none()
+        );
+        value["spoken"] = serde_json::json!(true);
+        let speech: ProviderOutput = serde_json::from_value(value).unwrap();
+        assert!(matches!(speech, ProviderOutput::Audio { spoken: true, .. }));
+        assert_eq!(serde_json::to_value(&speech).unwrap()["spoken"], true);
+    }
+
+    #[test]
     fn started_wire_retains_actual_source_session_and_requires_it_on_decode() {
         let mut output = VecDeque::new();
         forward(
@@ -7693,6 +7776,7 @@ pub(crate) mod tests {
         let mut queue = VecDeque::new();
         for sequence in 0..MAX_QUEUED_OUTPUT - 4 {
             queue.push_back(Outbound::Output(ProviderOutput::Audio {
+                spoken: true,
                 request: 1,
                 sequence: sequence as u64 + 1,
                 provider_event_at_us: NOW,
@@ -9992,6 +10076,7 @@ pub(crate) mod tests {
         let mut output = VecDeque::new();
         for sequence in 1..=MAX_QUEUED_OUTPUT {
             output.push_back(Outbound::Output(ProviderOutput::Audio {
+                spoken: true,
                 request: 6,
                 sequence: sequence as u64,
                 provider_event_at_us: NOW,
@@ -11225,6 +11310,8 @@ pub(crate) mod tests {
                 questions: false,
                 now: false,
                 one_yes: false,
+                reply_named: false,
+                harness_status: false,
                 sign_in: false,
                 sign_in_app: false,
             }),
@@ -11376,6 +11463,8 @@ pub(crate) mod tests {
                 questions: false,
                 now: false,
                 one_yes: false,
+                reply_named: false,
+                harness_status: false,
                 sign_in: false,
                 sign_in_app: false,
             }),

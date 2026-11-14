@@ -5,12 +5,21 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+# The bench adapter's own needs (probe copies, stdio framing), behind its
+# feature so a product crate's graph stays narrow: lamp-memory takes this
+# crate with `default-features = false`. On by default, so ordinary workspace
+# and CI targets still build and test the adapter.
+[features]
+default = ["bench"]
+bench = ["rusqlite/backup", "tokio/io-std", "tokio/io-util", "dep:tempfile"]
+
 [dependencies]
+tempfile = { version = "3", optional = true }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 hmac = "0.12"
-rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint"] }
+rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint", "hooks"] }
 unicode-normalization = "0.1"
 lamp-local-time = { path = "../local-time" }
 jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
@@ -26,3 +35,8 @@ tokio = { version = "=1.53.1", features = ["test-util", "net", "io-util"] }
 
 [lints]
 workspace = true
+
+[[bin]]
+name = "lamp-memory-tiers-arm"
+path = "src/bin/arm.rs"
+required-features = ["bench"]

@@ -285,11 +285,19 @@ fn candidate(remote: &mut impl Remote, context: &Context) -> Result<Candidate> {
             && job.status == "completed"
             && job.conclusion.as_deref() == Some("success")
     };
+    // A push that published the train pull request's tested build of the same
+    // tree (#6556) skipped its own ARM64 jobs; its reuse job stands for them.
+    // The reuse job is green on a refusal too: publish's own condition (both
+    // ARM64 jobs green, or a reuse that named a run) guards what was signed.
+    let reused = jobs
+        .iter()
+        .any(|j| j.name == "lampOS — reuse the train's tested ARM64 build" && good(&j));
     let arm: Vec<_> = jobs
         .iter()
         .filter(|j| {
             j.name
                 .starts_with("lampOS — build and test on Linux ARM64 (")
+                && !(reused && j.conclusion.as_deref() == Some("skipped"))
         })
         .collect();
     let publish: Vec<_> = jobs
@@ -297,7 +305,11 @@ fn candidate(remote: &mut impl Remote, context: &Context) -> Result<Candidate> {
         .filter(|j| j.name == "lampOS — sign and publish the tested lamp-voice artifact")
         .collect();
     require(
-        arm.len() == 1 && arm.iter().all(good) && publish.len() == 1 && publish.iter().all(good),
+        // One ARM64 job per test runner: one before #6320, three on lamp-voice's push since.
+        (!arm.is_empty() || reused)
+            && arm.iter().all(good)
+            && publish.len() == 1
+            && publish.iter().all(good),
         "successful source build and publication jobs are absent",
     )?;
     let inventory = assets(remote, release.id)?;

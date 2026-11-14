@@ -119,6 +119,9 @@ impl Effects for Removal<'_> {
         })
         .map(|removed| removed.len())
     }
+    fn forget_agents(&mut self) -> io::Result<usize> {
+        Ok(0)
+    }
 }
 
 fn interrupt_each_removal(name: &str, nested: bool, marked: bool) {

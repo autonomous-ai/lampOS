@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lamp twin</title>
 <style>
-  :root { --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1c1a; --soft: #6b6862; --line: #dcd8d0; --accent: #c8742c; }
+  :root { --view-w: 75%; --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1c1a; --soft: #6b6862; --line: #dcd8d0; --accent: #c8742c; }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #161513; --panel: #201f1c; --ink: #ece9e3; --soft: #9a968e; --line: #34322e; --accent: #e3954f; }
   }
@@ -28,27 +28,64 @@
   details label { display: grid; grid-template-columns: 70px 1fr 60px; gap: 6px; align-items: center; margin: 4px 0; font-size: 12px; }
   details input[type=number] { width: 100%; }
   #ring { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 6px; border: 1px solid var(--line); }
+  .load { height: 4px; background: var(--line); border-radius: 2px; margin: 4px 0 2px; overflow: hidden; }
+  .load > i { display: block; height: 100%; width: 0; background: var(--accent, #e0902f); transition: width .15s; }
+  .load.high > i { background: #d9534f; }
+  #speaking { display: none; margin-left: 8px; padding: 0 7px; border-radius: 9px; background: var(--accent, #e0902f); color: #111; font-size: 11px; animation: speak .8s ease-in-out infinite alternate; }
+  #speaking.on { display: inline-block; }
+  @keyframes speak { from { opacity: .45; } to { opacity: 1; } }
+  #sees img { width: 100%; border-radius: 4px; background: #000; display: block; margin-top: 6px; }
+  #sees .sub { margin: 6px 0 0; }
   #log { font-size: 12px; color: var(--soft); margin-top: 12px; white-space: pre-wrap; }
   @media (max-width: 720px) { body { grid-template-columns: 1fr; grid-template-rows: 55vh auto; height: auto; } aside { border-left: 0; border-top: 1px solid var(--line); } }
+  /* The try-it page (body.try, set when panel.js loads): three columns, the view's width the ONE variable --view-w, the other two
+     sharing the rest; the columns scroll alone, so the view stays in sight; long text wraps, never widens a column. */
+  body.try { grid-template-columns: var(--view-w) minmax(0, 1fr) minmax(0, 1fr); overflow-x: hidden; }
+  body.try > * { min-width: 0; }
+  body.try #view { overflow: hidden; }
+  body.try aside { padding: 10px 8px; overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; font-size: 13px; }
+  body.try .joint .facts, body.try details label { overflow-wrap: anywhere; }
+  body.try details label { grid-template-columns: 52px minmax(0, 1fr) 48px; }
+  body.try #sees img { max-width: 100%; height: auto; }
+  body.try #log { font-size: 12px; overflow-wrap: anywhere; }
+  /* A real lamp's banner (panel.js adds body.real) spans all three columns on a row of its own above them. */
+  body.try #realbanner { grid-column: 1 / -1; }
+  body.try.real { grid-template-rows: auto minmax(0, 1fr); }
+  /* At 900 px the two small columns are 112 px each (the view takes 75%), and narrower they only shrink, so below 900 px it is one column, in the order the view, the buttons, then the events, the camera and the log; the view is capped at about half the screen so the first buttons are in sight; the banner stays on top. */
+  @media (max-width: 900px) {
+    body.try { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; height: auto; }
+    body.try.real { grid-template-rows: none; }
+    body.try #realbanner { order: -1; }
+    body.try #view { order: 0; height: min(50vh, 420px); min-height: 0; }
+    body.try aside#side { order: 1; overflow-y: visible; border-left: 0; border-top: 1px solid var(--line); }
+    body.try aside#col-log { order: 2; overflow-y: visible; border-left: 0; border-top: 1px solid var(--line); }
+  }
 </style>
 <script type="importmap">
 { "imports": {
-  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  "three": "/vendor/three/three.module.min.js",
+  "three/addons/": "/vendor/three/jsm/"
 } }
 </script>
 </head>
 <body>
 <div id="view"><div id="status">loading the lamp…</div></div>
-<aside>
+<aside id="side">
   <h1>Lamp twin</h1>
-  <p class="sub"><span id="ring"></span><span id="lampline">waiting for body.state</span></p>
+  <p class="sub"><span id="ring"></span><span id="lampline">waiting for body.state</span><span id="speaking">speaking</span></p>
   <div id="joints"></div>
   <details>
     <summary>Calibrate (zero and direction)</summary>
     <p class="sub">The model's zero and sign are the CAD's until measured. Hold the lamp in a known pose, set each joint so the twin matches, then copy the values into lamp.model.json.</p>
     <div id="cal"></div>
     <button id="copy">Copy as JSON</button>
+  </details>
+  <details id="sees">
+    <summary>What the lamp sees</summary>
+    <p class="sub">The lamp's own newest picture, asked of it about once a second: each ask lights the lamp's camera mark, and a private lamp gives none. It may show you; it stays on this page.</p>
+    <button id="seesButton">Show</button>
+    <img id="seesImage" alt="the lamp's camera" hidden>
+    <p class="sub" id="seesNote"></p>
   </details>
   <div id="log"></div>
 </aside>
@@ -60,7 +97,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // The token the server printed, on every request (guard.js).
 const token = new URLSearchParams(location.search).get('t') ?? '';
 const withToken = (path) => `${path}?t=${encodeURIComponent(token)}`;
-const model = await (await fetch(withToken('/model.json'))).json();
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const lost = (what, error) => { const line = document.getElementById('status'); if (line) { line.textContent = `${what} ${refusedText(error) ?? 'could not load: reload the page'}`; line.style.color = '#d9534f'; } };
+const model = await retrying((n) => fetched(withToken('/model.json') + (n ? `&again=${n}` : ''), (r) => r.json()), { wait, said: (error) => lost("the lamp's description", error) });
 const view = document.getElementById('view');
 const status = document.getElementById('status');
 const log = (text) => {
@@ -96,6 +135,8 @@ const resize = () => {
   camera.updateProjectionMatrix();
 };
 addEventListener('resize', resize);
+// The view's column can change size without the window changing (the try-it page's layout arrives after this runs).
+new ResizeObserver(resize).observe(view);
 resize();
 
 // The light: a glow where the head's light is, coloured as the ring draws
@@ -104,11 +145,12 @@ const TINTS = { yellow: [1, 0.8, 0], red: [1, 0, 0], green: [0, 1, 0.12], blue: 
   purple: [0.62, 0, 1], orange: [1, 0.34, 0], pink: [1, 0.22, 0.42], white: [1, 0.88, 0.72], warm: [1, 0.55, 0] };
 const glow = new THREE.PointLight(0xffb060, 0, 0.6);
 const glowRange = (size) => (glow.distance = size);
+// `disc` is no longer drawn: it only carries the light's colour for the status swatch below.
 const disc = new THREE.Mesh(new THREE.SphereGeometry(0.012, 24, 16), new THREE.MeshBasicMaterial({ color: 0x222222 }));
 
 const bones = {};
 const rest = {};
-const gltf = await new GLTFLoader().loadAsync(withToken('/lamp.glb'));
+const gltf = await retrying((n) => new GLTFLoader().loadAsync(withToken('/lamp.glb') + (n ? `&again=${n}` : '')), { wait, said: (error) => lost('the lamp model', error) });
 scene.add(gltf.scene);
 gltf.scene.traverse((node) => {
   for (const joint of model.joints) if (node.name === joint.bone) { bones[joint.name] = node; rest[joint.name] = node.quaternion.clone(); }
@@ -128,7 +170,21 @@ floor.scale.setScalar(size * 2);
 floor.position.y = box.min.y;
 glowRange(size);
 const head = bones[model.chain[model.chain.length - 1]];
-if (head) { head.add(glow); head.add(disc); disc.position.set(0, 0.05, 0); glow.position.copy(disc.position); }
+// The ring: 32 small lights round the head's opening, in the head bone's own
+// frame (y along the shade's axis; measured from lamp.glb: the rim is at
+// y 0.07 to 0.08 m, 0.10 m out, so the ring sits just inside it). Each shows
+// one pixel of the ring when the lamp says them (`light.shows.pixels`, 32 of
+// `#rrggbb`), else the light's one colour on all 32.
+const RING = { pixels: 32, y: 0.072, radius: 0.072, centre: [0, -0.017] };
+const DOT_GAIN = 1.8;
+const pixelDots = [];
+for (let i = 0; i < RING.pixels; i++) {
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.0045, 12, 8), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+  const turn = (i / RING.pixels) * Math.PI * 2;
+  dot.position.set(RING.centre[0] + Math.cos(turn) * RING.radius, RING.y, RING.centre[1] + Math.sin(turn) * RING.radius);
+  pixelDots.push(dot);
+}
+if (head) { head.add(glow); glow.position.set(RING.centre[0], RING.y - 0.01, RING.centre[1]); for (const dot of pixelDots) head.add(dot); }
 status.textContent = `the lamp: ${model.hardware}, ${model.chain.join(' → ')}; origins ${model.measured.origins}`;
 
 // Each joint turns its bone about its axis by sign × (deg − zero), after rest.
@@ -155,6 +211,7 @@ for (const name of model.chain) {
   row.className = 'joint';
   row.innerHTML = `<header><b>${name}</b><span class="now">–</span></header>
     <input type="range" min="-180" max="180" step="0.5" value="0" aria-label="${name}">
+    <div class="load" title="load the body reads on this joint"><i></i></div>
     <div class="facts">servo ${joint.servo} · ${joint.bus}</div>`;
   const slider = row.querySelector('input');
   let dragging = false;
@@ -169,7 +226,7 @@ for (const name of model.chain) {
     send({ type: 'drag', joint: name, deg: Number(slider.value) });
   });
   slider.addEventListener('change', () => send({ type: 'drag', joint: name, deg: Number(slider.value) }));
-  rows[name] = { row, slider, now: row.querySelector('.now'), facts: row.querySelector('.facts'), dragging: () => dragging };
+  rows[name] = { row, slider, now: row.querySelector('.now'), facts: row.querySelector('.facts'), load: row.querySelector('.load'), dragging: () => dragging };
   panel.append(row);
 }
 
@@ -188,16 +245,164 @@ document.getElementById('copy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(text); log('calibration copied'); } catch { log(text); }
 });
 
+// What the lamp sees: off until asked, then its newest picture about once a second.
+{
+  const [button, image, note] = ['seesButton', 'seesImage', 'seesNote'].map((id) => document.getElementById(id));
+  let timer = null;
+  let n = 0;
+  const ask = async () => {
+    try {
+      // On the network the server gives a picture only while a page says the camera is on.
+      window.twinSend?.({ type: 'camera_on' });
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const response = await fetch(withToken(`/camera.jpg`) + `&n=${n++}`);
+      if (response.ok) { const old = image.src; image.src = URL.createObjectURL(await response.blob()); if (old.startsWith('blob:')) URL.revokeObjectURL(old); image.hidden = false; note.textContent = ''; }
+      else { image.hidden = true; note.textContent = decodeURIComponent(response.headers.get('x-reason') ?? 'no picture'); }
+    } catch { note.textContent = 'no answer'; }
+  };
+  button.addEventListener('click', () => {
+    if (timer) { clearInterval(timer); timer = null; button.textContent = 'Show'; image.hidden = true; note.textContent = ''; return; }
+    button.textContent = 'Hide';
+    ask();
+    timer = setInterval(ask, 1000);
+  });
+}
+
+// Touching the lamp's head in the picture (the try-it app, where the server has stimuli): a click or tap on it is a
+// tap, a hold of 0.6 s without moving is a pet, sent as the room's `touch` stimulus (the head's sensor is the lamp's,
+// not the page's). A drag turns the view as before.
+{
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const onHead = (event) => {
+    const box = renderer.domElement.getBoundingClientRect();
+    pointer.set(((event.clientX - box.left) / box.width) * 2 - 1, -((event.clientY - box.top) / box.height) * 2 + 1);
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.intersectObject(gltf.scene, true)[0]?.object;
+    // The meshes sit under CAD groups named like the bones ('5_wrist_pitch' for 'wrist_pitch'): the head is the
+    // last two joints of the chain (the roll and the pitch of the wrist).
+    const names = model.chain.slice(-2).map((name) => model.joints.find((j) => j.name === name).bone);
+    for (let node = hit; node; node = node.parent) if (names.some((bone) => node.name === bone || node.name.endsWith(`_${bone}`))) return true;
+    return false;
+  };
+  // One touch per press: `latched` from the press on the head until the pointer is up or cancelled (a browser that
+  // repeats a press, or a long-press menu, adds no second touch), and never two touches within 0.8 s.
+  let down = null;
+  let pet = null;
+  let latched = false;
+  let pressedId = null; // the pointer that made the press: another finger's release or cancel is not its release
+  let lastSent = 0;
+  const touch = (kind) => {
+    const now = Date.now();
+    if (now - lastSent < 800) return;
+    lastSent = now;
+    window.twinSend?.({ type: 'stim', id: now, name: 'touch', args: { kind } });
+  };
+  const finish = () => {
+    clearTimeout(pet);
+    if (down && Date.now() - down.at < 600) touch('tap');
+    down = null;
+    latched = false;
+  };
+  renderer.domElement.addEventListener('pointerdown', (event) => {
+    if (latched || !onHead(event)) return;
+    latched = true;
+    pressedId = event.pointerId;
+    // The pointer stays this canvas's until it is up, even if it leaves the canvas first: the release is
+    // always seen, so the hold never stays latched (a lost release would block every later touch).
+    try { renderer.domElement.setPointerCapture(event.pointerId); } catch { /* a pointer that is already gone */ }
+    down = { x: event.clientX, y: event.clientY, at: Date.now() };
+    pet = setTimeout(() => { if (down) { down = null; touch('pet'); } }, 600);
+  });
+  renderer.domElement.addEventListener('pointermove', (event) => {
+    if (down && Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6) { down = null; clearTimeout(pet); }
+  });
+  renderer.domElement.addEventListener('pointerup', (event) => { if (event.pointerId === pressedId) finish(); });
+  renderer.domElement.addEventListener('pointercancel', (event) => { if (event.pointerId === pressedId) { down = null; finish(); } });
+  // A release outside the canvas, or the page losing focus mid-hold (a switched tab, a dialog), ends the hold too:
+  // no pet from a hold nobody is making, and the latch is let go.
+  window.addEventListener('pointerup', (event) => { if (latched && event.pointerId === pressedId) finish(); });
+  window.addEventListener('blur', () => { down = null; finish(); });
+  renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
+}
+
 // The live link.
 let ws;
 const send = (message) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
+window.twinSend = send;
+// The try-it panel, when the server has one (--stim-dir): its buttons, its log. A first import can still be lost (a browser aborts
+// a request now and then, and then remembers that URL as failed), so it is tried again under another URL (a counter in the
+// query), a few times; and if it never comes, the page says so plainly. (The twin's idle-connection limit was the cause seen:
+// server.js IDLE_MS.)
+// <panel-load>
+// Work a browser can lose (its request aborted, no status): tried again, `tries` times, under another URL (the attempt's number
+// goes in the query); when none comes, `said()` puts a plain line on the page and the last error is thrown, never silence.
+// A refusal (403: the token or the address) will not change by asking again: said at once, with the way out, and thrown.
+// (A function declaration, so the page's first fetches, above this block, can use it: a const here would not be set yet.)
+function refusedText(error) {
+  return error?.status === 403 || /\b403\b/.test(String(error?.message ?? '')) ? 'was refused (403): open the page from the link the terminal printed, with its token' : undefined;
+}
+// A fetch that throws, with its HTTP status, when the answer is not ok (a body that is not the file never reads as the file).
+async function fetched(url, how) {
+  const reply = await fetch(url);
+  if (!reply.ok) throw Object.assign(new Error(`the server answered ${reply.status}`), { status: reply.status });
+  return how(reply);
+}
+async function retrying(work, { tries = 4, wait, said = () => {} }) {
+  let last;
+  for (let attempt = 0; attempt < tries; attempt += 1) {
+    try { return await work(attempt); } catch (error) {
+      last = error;
+      if (refusedText(error)) break;
+    }
+    await wait(300 * (attempt + 1));
+  }
+  said(last);
+  throw last;
+}
+// A module import that FAILED TO FETCH (each browser words it its own way) never ran panel.js, so it is safe to try again; any
+// other error came from panel.js running, which may already have put its part on the page (a banner each on a real lamp): never run twice.
+const lostFetch = (error) => /dynamically imported module|importing a module script failed/i.test(String(error?.message ?? error));
+// `probe(attempt)` answers the HTTP status of panel.js (404: this twin has no panel; 403: the page's token was refused).
+async function loadPanel({ probe, load, say, wait, tries = 4 }) {
+  let answer;
+  for (let attempt = 0; attempt < tries; attempt += 1) {
+    try { answer = await probe(attempt); } catch { answer = undefined; }
+    // The server answered that it has no panel (a plain twin): nothing to load, nothing to say.
+    if (answer === 404) return 'none';
+    if (answer === 403) {
+      say('the buttons were refused (403): open the page from the link the terminal printed, with its token');
+      return 'refused';
+    }
+    if (answer === 200) {
+      try { await load(attempt); return 'loaded'; } catch (error) {
+        if (!lostFetch(error)) {
+          say(`the buttons started but stopped (${error?.message ?? error}): reload the page`);
+          return 'failed';
+        }
+        /* the next attempt, under another URL */
+      }
+    }
+    await wait(300 * (attempt + 1));
+  }
+  say(typeof answer === 'number' && answer !== 200 ? `the buttons could not load (the server answered ${answer}): reload the page` : 'the buttons could not load: reload the page');
+  return 'failed';
+}
+// </panel-load>
+loadPanel({
+  probe: async (attempt) => (await fetch(withToken('/panel.js') + (attempt ? `&again=${attempt}` : ''))).status,
+  load: (attempt) => import(withToken('/panel.js') + (attempt ? `&again=${attempt}` : '')),
+  say: (text) => { status.textContent = text; status.style.color = '#d9534f'; },
+  wait,
+});
 function connect() {
   ws = new WebSocket(`ws://${location.host}${withToken('/live')}`);
-  ws.onopen = () => log('connected');
+  ws.onopen = () => { log('connected'); window.dispatchEvent(new CustomEvent('twin-open')); };
   ws.onclose = () => { log('disconnected; retrying'); setTimeout(connect, 1000); };
   ws.onmessage = (message) => {
     const data = JSON.parse(message.data);
     if (data.type === 'said') return log(data.text);
+    if (data.type === 'result' || data.type === 'event' || data.type === 'picture' || data.type === 'audio' || data.type === 'hear') return window.dispatchEvent(new CustomEvent('twin-message', { detail: data }));
     if (data.type !== 'state') return;
     const { joints = {}, lamp = {} } = data.state;
     for (const [name, joint] of Object.entries(joints)) {
@@ -213,15 +418,26 @@ function connect() {
       const goal = typeof joint.goal_deg === 'number' ? ` · goal ${joint.goal_deg.toFixed(1)}°` : '';
       const load = joint.load === undefined ? '' : ` · load ${Math.round(joint.load * 100)}%`;
       row.facts.textContent = `${joint.counts} counts${goal}${load}${temp}`;
+      // The body's own load reading, as it says it (0 to 1); the twin adds no physics of its own.
+      const share = typeof joint.load === 'number' ? Math.max(0, Math.min(1, joint.load)) : 0;
+      row.load.firstElementChild.style.width = `${Math.round(share * 100)}%`;
+      row.load.classList.toggle('high', share >= 0.8);
     }
     const light = lamp.light ?? {};
     const on = light.on === true && TINTS[light.colour];
     const share = on ? Math.min(5, Math.max(1, light.level ?? 3)) / 5 : 0;
     const tint = new THREE.Color(...(on ? TINTS[light.colour] : [0.13, 0.13, 0.13]));
     disc.material.color.copy(on ? tint.clone().multiplyScalar(0.4 + 0.6 * share) : tint);
+    const pixels = Array.isArray(lamp.light?.shows?.pixels) && lamp.light.shows.pixels.length === RING.pixels && lamp.light.shows.pixels.every((hex) => /^#[0-9a-f]{6}$/i.test(hex)) ? lamp.light.shows.pixels : null;
+    // The ring's pixels are capped (120 of 255) as the real ring's are, and a flat dot has no bloom, so
+    // the dots are drawn brighter than the lamp says (display only, like the glow).
+    pixelDots.forEach((dot, i) => { dot.material.color.set(pixels ? pixels[i] : disc.material.color); dot.material.color.multiplyScalar(DOT_GAIN); });
+    // Pixel by pixel, the glow on the floor is the ring's average, not the named colour.
+    if (pixels) { const sum = pixels.reduce((a, hex) => { const c = new THREE.Color(hex); return [a[0] + c.r, a[1] + c.g, a[2] + c.b]; }, [0, 0, 0]); tint.setRGB(sum[0] / pixels.length, sum[1] / pixels.length, sum[2] / pixels.length); }
     glow.color.copy(tint);
     glow.intensity = share * 2;
     document.getElementById('ring').style.background = `#${disc.material.color.getHexString()}`;
+    document.getElementById('speaking').classList.toggle('on', lamp.talking === true);
     document.getElementById('lampline').textContent = `light ${on ? `${light.colour}, ${light.level} of 5` : 'off'}${lamp.talking ? ' · talking' : ''}${lamp.private ? ' · private' : ''}`;
   };
 }

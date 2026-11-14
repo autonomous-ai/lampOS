@@ -179,6 +179,26 @@ pub trait Lamp {
         None
     }
 
+    /// The setup walk's id and its steps ended, from the voice's
+    /// `onboarding/pending` heartbeat (#5979): none without an id.
+    fn onboarding_steps(&self) -> Option<(u64, Vec<lamp_msgs::OnboardingStepEnded>)> {
+        None
+    }
+
+    /// The app's open onboarding page (#6076, `crate::onboarding_page`).
+    fn onboarding_page(&mut self, data: &Value) -> Result<Value, String> {
+        crate::onboarding_page::PAGES
+            .lock()
+            .map_err(|_| "the page cannot be kept".to_owned())?
+            .open(data, crate::onboarding_page::Seen::default(), |_| None)
+    }
+
+    /// The open page's line due now handed to the voice, and the reply's
+    /// `data` when the page is done with it (#6076, #6353).
+    fn onboarding_page_done(&mut self) -> Option<Value> {
+        None
+    }
+
     /// lamp-voice's app-make socket, for a skill typed in the owner's app
     /// (`LAMP_APP_MAKE_SKILL=on` with the skills page, #2813,
     /// `crate::make_skill`).
@@ -232,6 +252,13 @@ pub trait Lamp {
         None
     }
 
+    /// `lamp-services`' admin socket for an uploaded skill's keys
+    /// (`LAMP_SKILL_SECRETS=on`, `crate::skill_secrets`): there only with
+    /// the switch.
+    fn skill_secrets(&self) -> Option<std::path::PathBuf> {
+        None
+    }
+
     /// Whether the app may read the lamp's software update
     /// (`LAMP_APP_UPDATE=on`, #2194, `crate::update`).
     fn update_page(&self) -> bool {
@@ -243,12 +270,52 @@ pub trait Lamp {
         None
     }
 
+    /// The file the app's `update.started` and `update.ended` are kept in
+    /// (#6284, `crate::update_events`): there only with
+    /// `LAMP_APP_UPDATE_EVENTS=on` and a state folder.
+    fn update_events(&self) -> Option<std::path::PathBuf> {
+        None
+    }
+
+    /// `update/status` as those events read it: fresh, and one lamp-update
+    /// could have said.
+    fn update_now(&self) -> Option<lamp_msgs::UpdateStatus> {
+        crate::update_events::read(self.update_status())
+    }
+
     /// Asks `lamp-update serve` for its next round now (`update.check`,
     /// #4153, `crate::update::Checks`), at `now`: at most once a minute, and
     /// only when a running lamp-update reads it. Only with
     /// `LAMP_APP_UPDATE=on`.
-    fn check_update(&mut self, _now: std::time::Instant) -> Result<(), String> {
+    /// With `retry` set to a refused build's sequence (#6266): lamp-update
+    /// drops that refusal before the round.
+    fn check_update(
+        &mut self,
+        _now: std::time::Instant,
+        _retry: Option<u64>,
+    ) -> Result<(), String> {
         Err(not_here("update.check"))
+    }
+
+    /// Whether the app may see and install the lamp's agents
+    /// (`LAMP_APP_ENGINES=on` with `LAMP_APP_UPDATE=on`, #6240,
+    /// `crate::update`).
+    fn engines_page(&self) -> bool {
+        false
+    }
+
+    /// Asks `lamp-update serve` to install `engine` at its next round
+    /// (`engines.install`, #6240, `crate::update::Checks::ask_install`), at
+    /// `now`: at most once a minute, and only when a running lamp-update
+    /// reads it.
+    fn install_engine(&mut self, _engine: &str, _now: std::time::Instant) -> Result<(), String> {
+        Err(not_here("engines.install"))
+    }
+
+    /// lamp-tasks' app socket, where the lamp's default agent is chosen
+    /// and read (`engines.default`, #6492, `crate::engine_default`).
+    fn tasks_app_socket(&self) -> std::path::PathBuf {
+        crate::harness_sign_in::SOCKET.into()
     }
 
     /// Asks setup's change helper to restart the lamp (`system.reboot`, #2193): its
@@ -283,6 +350,12 @@ pub trait Lamp {
     fn control(&self) -> Option<crate::control::Door> {
         None
     }
+
+    /// The owner's dev monitor (`LAMP_APP_MONITOR=on`, #5883,
+    /// `crate::monitor`): there only with the switch.
+    fn monitor(&self) -> Option<crate::monitor::Place> {
+        None
+    }
 }
 
 /// Whether a kind is answered on `lamp` now: its switch, read without
@@ -293,7 +366,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 65] = [
+pub const KINDS: [(&str, Switch); 75] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -331,6 +404,7 @@ pub const KINDS: [(&str, Switch); 65] = [
     (crate::settings::KINDS[2], SETTINGS),
     (crate::settings::KINDS[3], SETTINGS),
     (crate::settings::KINDS[4], SETTINGS),
+    (crate::settings::KINDS[5], SETTINGS),
     (crate::settings::PLACE_KINDS[0], PLACE),
     (crate::settings::PLACE_KINDS[1], PLACE),
     (crate::settings::VOICE_KINDS[0], VOICE),
@@ -350,8 +424,17 @@ pub const KINDS: [(&str, Switch); 65] = [
     (crate::share::KINDS[1], SHARE),
     (crate::share::KINDS[2], SHARE),
     (crate::upload::KIND, |lamp| lamp.upload().is_some()),
+    // An uploaded skill's keys from the app (`LAMP_SKILL_SECRETS`): with
+    // the skills page, while lamp-services' admin socket is there.
+    (crate::skill_secrets::KINDS[0], SKILL_SECRETS),
+    (crate::skill_secrets::KINDS[1], SKILL_SECRETS),
+    (crate::skill_secrets::KINDS[2], SKILL_SECRETS),
     ("update.status", |lamp| lamp.update_page()),
     ("update.check", |lamp| lamp.update_page()),
+    // The lamp's agents (#6240): a missing one installed from the app.
+    ("engines.install", |lamp| lamp.engines_page()),
+    // The lamp's default agent, chosen in the app (#6492).
+    (crate::engine_default::KIND, |lamp| lamp.engines_page()),
     ("system.reboot", |lamp| lamp.restarts()),
     ("system.shutdown", |lamp| lamp.shuts_down()),
     // The person's own services (Queue #4710): `services` says
@@ -373,6 +456,12 @@ pub const KINDS: [(&str, Switch); 65] = [
     (crate::control::KINDS[2], CONTROL),
     (crate::control::KINDS[3], CONTROL),
     (crate::control::KINDS[4], CONTROL),
+    (crate::control::KINDS[5], CONTROL),
+    // The owner's dev monitor (#5883): its switch, and root's helper that
+    // `monitor.set` goes to.
+    (crate::monitor::KINDS[0], MONITOR),
+    (crate::monitor::KINDS[1], MONITOR),
+    (crate::monitor::KINDS[2], MONITOR),
 ];
 
 const CONSENT: Switch = |lamp| lamp.consent().is_some();
@@ -394,6 +483,11 @@ const PLACE: Switch = |lamp| lamp.changes().is_some_and(|c| c.place_on());
 const VOICE: Switch = |lamp| lamp.changes().is_some_and(|c| c.voice_on());
 /// The switch, and lamp-services there to ask.
 const SERVICES: Switch = |lamp| lamp.services().is_some_and(|s| s.here());
+/// The switch, and root's change helper for `monitor.set`.
+const MONITOR: Switch = |lamp| lamp.monitor().is_some() && lamp.changes().is_some();
+/// The switch, the skills page, and lamp-services there to ask.
+const SKILL_SECRETS: Switch =
+    |lamp| lamp.skills().is_some() && lamp.skill_secrets().is_some_and(|socket| socket.exists());
 /// The socket given, and lamp-control there to ask.
 const CONTROL: Switch = |lamp| lamp.control().is_some_and(|door| door.here());
 
@@ -446,6 +540,14 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             if lamp.recovery() {
                 info["recovery"] = json!(true);
             }
+            // `developer` (App Only's C): only while lamp-control's admin socket is
+            // there (developer access on); whether a camera, microphone or speaker
+            // stream is usable, so the app's grants screen can disable that tick.
+            if let Some(door) = lamp.control()
+                && let Some(developer) = crate::control::developer(&door)
+            {
+                info["developer"] = developer;
+            }
             // `reset` (#2937): a lamp that can't tell says none, so the
             // app reads it as before, the 5 s hold.
             if let Some(reset) = lamp.reset() {
@@ -466,10 +568,28 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             // with the switch on (and a state folder); none otherwise.
             if lamp.onboarding_done().is_some() {
                 info["onboarding_done_supported"] = json!(true);
+                // And `onboarding.step` as each walk step ends (#5979),
+                // behind the same switch.
+                info["onboarding_step_supported"] = json!(true);
+                // And `onboarding.page`, its page done pushed (#6076).
+                info["onboarding_page_supported"] = json!(true);
+                // Which page contract (#6366): 2 is per-tap Add and `done`.
+                info["onboarding_page_version"] = json!(crate::onboarding_page::VERSION);
+            }
+            // `update_events_supported` (#6284): this lamp sends
+            // `update.started` and `update.ended`, so the app may show
+            // "Updating". Only with its switch on (and a state folder).
+            if lamp.update_events().is_some() {
+                info["update_events_supported"] = json!(true);
             }
             some(info)
         }
         "system.version" => some(lamp.versions()),
+        // The app's open onboarding page (#6076), with `onboarding.done`'s
+        // switch.
+        crate::onboarding_page::KIND if lamp.onboarding_done().is_some() => {
+            lamp.onboarding_page(data).map(Some)
+        }
         "system.network" => some(lamp.network()),
         "volume.get" => lamp.volume().map(|volume| Some(json!(volume))),
         "volume.set" => {
@@ -641,7 +761,18 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // (#1722), never a core one: the page as it now is.
         "skills.remove" if on(lamp, kind) => {
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
-            crate::skills::remove(&places, data).map(Some)
+            let removed = crate::skills::remove(&places, data)?;
+            // Its keys go with it (`LAMP_SKILL_SECRETS`).
+            if let (Some(socket), Some(skill)) = (lamp.skill_secrets(), data["name"].as_str()) {
+                crate::skill_secrets::dropped(&socket, skill);
+            }
+            some(removed)
+        }
+        // An uploaded skill's keys from the owner's app
+        // (`LAMP_SKILL_SECRETS`): to root's lamp-services, names back.
+        kind if crate::skill_secrets::KINDS.contains(&kind) && on(lamp, kind) => {
+            let socket = lamp.skill_secrets().ok_or_else(|| not_here(kind))?;
+            crate::skill_secrets::answer(&socket, kind, data).map(Some)
         }
         // A skill turned off or on on the person's tap (#2815), kept as
         // their own choice: the page as it now is.
@@ -677,7 +808,15 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 .make_skill()
                 .or_else(|| lamp.write_skill())
                 .ok_or_else(|| not_here(kind))?;
-            crate::make_skill::made(&socket, data)
+            let told = crate::make_skill::made(&socket, data)?;
+            // A made skill that needs a connector not linked: told to the
+            // app once a make (`LAMP_SKILL_LINK_APP`).
+            if lamp.skills().is_some_and(|places| places.link.is_some())
+                && let Some(told) = &told
+            {
+                crate::skills::note_made(told);
+            }
+            Ok(told)
         }
         // A skill written in the app (`LAMP_SKILL_WRITTEN=on`): its text
         // goes to lamp-voice as written, kept there with no model; only a
@@ -723,15 +862,51 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         }
         // The lamp's software update, for the app's Lamp 2 page (#2194):
         // only with `LAMP_APP_UPDATE=on`.
-        "update.status" if on(lamp, kind) => crate::update::status(lamp.update_status()),
+        "update.status" if on(lamp, kind) => {
+            let mut status = crate::update::status(lamp.update_status(), lamp.engines_page())?;
+            // The default agent beside the agents (#6492), when lamp-tasks
+            // says one; never a failure of the status.
+            if let Some(status) = status.as_mut() {
+                crate::engine_default::add_to(status, &lamp.tasks_app_socket());
+            }
+            Ok(status)
+        }
         // The app's Check for update (#4153): `serve`'s next round now, not
         // after its wait. Refused while a round runs and within a minute of
         // the last; the round keeps its own lock and quiet moment.
         "update.check" if on(lamp, kind) => {
-            let status = crate::update::status(lamp.update_status())?.unwrap_or_default();
+            let status = crate::update::status(lamp.update_status(), lamp.engines_page())?
+                .unwrap_or_default();
             crate::update::idle(&status)?;
-            lamp.check_update(std::time::Instant::now())?;
+            // The owner's retry of a refused build (#6266): its sequence, a whole
+            // number, which lamp-update drops the refusal of before the round.
+            let retry = match data.get("retry") {
+                None | Some(Value::Null) => None,
+                Some(value) => Some(
+                    value
+                        .as_u64()
+                        .ok_or("retry must be the refused build's sequence, a whole number")?,
+                ),
+            };
+            lamp.check_update(std::time::Instant::now(), retry)?;
             some(crate::update::started(status))
+        }
+        // The app's install of a missing agent (#6240): only one lamp-update
+        // says is missing or failed, at most once a minute; the install
+        // waits for lamp-update's next round and keeps its own rules.
+        "engines.install" if on(lamp, kind) => {
+            let engine = data["engine"]
+                .as_str()
+                .ok_or("engine must be the agent's name")?;
+            let status = crate::update::status(lamp.update_status(), true)?.unwrap_or_default();
+            crate::update::installable(&status, engine)?;
+            lamp.install_engine(engine, std::time::Instant::now())?;
+            some(crate::update::install_started())
+        }
+        // The lamp's default agent chosen in the app (#6492): the name
+        // checked here, the choice lamp-tasks' own.
+        crate::engine_default::KIND if on(lamp, kind) => {
+            crate::engine_default::choose(&lamp.tasks_app_socket(), data).map(Some)
         }
         // A restart from the app (#2193): asked of setup's change helper,
         // never done here; it answers first and refuses under an update.
@@ -764,6 +939,24 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         kind if crate::control::KINDS.contains(&kind) && lamp.control().is_some() => {
             let door = lamp.control().ok_or_else(|| not_here(kind))?;
             crate::control::answer(&door, kind, data)
+        }
+        // The owner's dev monitor (#5883): on and off through root's
+        // helper, answered `starting` and then its result, as `control.set`;
+        // read where the helper writes it; and a one-time link sealed to the
+        // app's own key.
+        crate::monitor::SET_KIND if on(lamp, kind) => {
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            changes.start(kind, crate::monitor::line(data)?);
+            Ok(None)
+        }
+        kind if crate::monitor::KINDS.contains(&kind) && on(lamp, kind) => {
+            let place = lamp.monitor().ok_or_else(|| not_here(kind))?;
+            if kind == crate::monitor::LINK_KIND {
+                let host = lamp.host()["hostname"].as_str().unwrap_or("").to_owned();
+                crate::monitor::link(&place, &host, data).map(Some)
+            } else {
+                some(crate::monitor::get(&place))
+            }
         }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
@@ -813,6 +1006,9 @@ pub mod tests {
         pub schedule: Option<lamp_actions::schedule::Adapter>,
         pub guard: Option<std::path::PathBuf>,
         pub harness_sign_in: Option<crate::harness_sign_in::Place>,
+        /// lamp-tasks' app socket for the default agent (#6492); none is a
+        /// path where nothing listens.
+        pub tasks_app: Option<std::path::PathBuf>,
         pub make_skill: Option<std::path::PathBuf>,
         pub make_skill_ready: bool,
         pub write_skill: Option<std::path::PathBuf>,
@@ -833,6 +1029,8 @@ pub mod tests {
         pub reset: Option<&'static str>,
         /// The person's own services (Queue #4710), with their switch.
         pub services: Option<std::sync::Arc<crate::services::Services>>,
+        /// lamp-services' admin socket for a skill's keys, with their switch.
+        pub skill_secrets: Option<std::path::PathBuf>,
         /// lamp-control's admin socket (#5299).
         pub control: Option<crate::control::Door>,
         /// The owner's two yeses from the app (#5500), with their switch.
@@ -840,6 +1038,12 @@ pub mod tests {
         /// What `onboarding` says, and the switch's file (#5812).
         pub onboarding: Option<u64>,
         pub onboarding_done: Option<std::path::PathBuf>,
+        /// What `onboarding_steps` says (#5979).
+        pub onboarding_steps: Option<(u64, Vec<lamp_msgs::OnboardingStepEnded>)>,
+        /// The switch's file for the update's events (#6284), and the
+        /// `update/status` they read in place of the bus's.
+        pub update_events: Option<std::path::PathBuf>,
+        pub update_now: Option<lamp_msgs::UpdateStatus>,
     }
 
     impl Lamp for Fake {
@@ -938,6 +1142,9 @@ pub mod tests {
         fn onboarding_done(&self) -> Option<std::path::PathBuf> {
             self.onboarding_done.clone()
         }
+        fn onboarding_steps(&self) -> Option<(u64, Vec<lamp_msgs::OnboardingStepEnded>)> {
+            self.onboarding_steps.clone()
+        }
         fn make_skill(&self) -> Option<std::path::PathBuf> {
             self.make_skill.clone()
         }
@@ -959,11 +1166,22 @@ pub mod tests {
         fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
             self.services.clone()
         }
+        fn skill_secrets(&self) -> Option<std::path::PathBuf> {
+            self.skill_secrets.clone()
+        }
         fn control(&self) -> Option<crate::control::Door> {
             self.control.clone()
         }
         fn consent(&self) -> Option<crate::consent::Place> {
             self.consent.clone()
+        }
+        fn update_events(&self) -> Option<std::path::PathBuf> {
+            self.update_events.clone()
+        }
+        fn update_now(&self) -> Option<lamp_msgs::UpdateStatus> {
+            self.update_now
+                .clone()
+                .or_else(|| crate::update_events::read(self.update_status()))
         }
         fn update_status(&self) -> Option<lamp_bus::Message> {
             self.update_bus
@@ -972,8 +1190,24 @@ pub mod tests {
                 .ok()
                 .flatten()
         }
-        fn check_update(&mut self, now: std::time::Instant) -> Result<(), String> {
-            self.update_checks.ask(self.update_bus.as_ref(), now)
+        fn check_update(
+            &mut self,
+            now: std::time::Instant,
+            retry: Option<u64>,
+        ) -> Result<(), String> {
+            self.update_checks.ask(self.update_bus.as_ref(), now, retry)
+        }
+        fn engines_page(&self) -> bool {
+            self.update_page && self.update_checks.engines()
+        }
+        fn install_engine(&mut self, engine: &str, now: std::time::Instant) -> Result<(), String> {
+            self.update_checks
+                .ask_install(self.update_bus.as_ref(), engine, now)
+        }
+        fn tasks_app_socket(&self) -> std::path::PathBuf {
+            self.tasks_app
+                .clone()
+                .unwrap_or_else(|| "/nowhere/app.sock".into())
         }
         fn restarts(&self) -> bool {
             self.restart
@@ -1170,6 +1404,8 @@ pub mod tests {
         assert_eq!(info["network"]["interface"], "wlan0");
         // `account` only while signed out; a lamp signed in says what it did.
         assert!(info.get("account").is_none(), "{info}");
+        // `developer` only where lamp-control's admin socket is: none here.
+        assert!(info.get("developer").is_none(), "{info}");
         let mut out = Fake {
             account: Some("signed_out"),
             ..Fake::default()
@@ -1209,6 +1445,36 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(told["onboarding_done_supported"], true);
+        // #5979: `onboarding_step_supported` beside it, with the same switch.
+        assert_eq!(told["onboarding_step_supported"], true);
+        assert!(info.get("onboarding_step_supported").is_none(), "{info}");
+        // #6076: `onboarding_page_supported` beside them, with the same
+        // switch, and `onboarding.page` answered only then.
+        assert_eq!(told["onboarding_page_supported"], true);
+        assert!(info.get("onboarding_page_supported").is_none(), "{info}");
+        // #6366: the page contract's version beside it, same switch.
+        assert_eq!(told["onboarding_page_version"], 2);
+        assert!(info.get("onboarding_page_version").is_none(), "{info}");
+        // #6284: `update_events_supported` only with its own switch.
+        assert!(info.get("update_events_supported").is_none(), "{info}");
+        assert!(told.get("update_events_supported").is_none(), "{told}");
+        let mut updating = Fake {
+            update_events: Some("/nonexistent/update-events".into()),
+            ..Fake::default()
+        };
+        let updated = answer(&mut updating, "system.info", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated["update_events_supported"], true);
+        assert!(answer(&mut will, "onboarding.page", &json!({"page": "create"})).is_ok());
+        assert!(
+            answer(
+                &mut Fake::default(),
+                "onboarding.page",
+                &json!({"page": "create"})
+            )
+            .is_err()
+        );
         // #2937: a lamp that can't tell its reset says nothing of it; one
         // that can says hold or none.
         assert!(info.get("reset").is_none(), "{info}");
@@ -1357,6 +1623,75 @@ pub mod tests {
         assert!(off["at"].is_string());
     }
 
+    /// `LAMP_SKILL_SECRETS`: a skill's keys are kinds only with the switch,
+    /// the page and lamp-services there; then each is asked of it inline,
+    /// and a removed skill's keys are dropped there.
+    #[test]
+    fn a_skills_keys_are_kinds_only_with_their_switch_and_the_page() {
+        use std::io::{BufRead, BufReader, Write};
+        let mut lamp = lamp();
+        let can = |lamp: &Fake| {
+            KINDS
+                .iter()
+                .filter(|(_, switch)| switch(lamp))
+                .map(|(kind, _)| *kind)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            answer(&mut lamp, "skills.secrets", &json!({"skill": "tutor"})),
+            Err("not on this lamp: skills.secrets".to_owned())
+        );
+        let places = crate::skills::tests::places("secrets");
+        crate::skills::tests::helper(&places);
+        lamp.skills = Some(places);
+        let dir = tempfile::tempdir().unwrap();
+        let socket = dir.path().join("admin.sock");
+        lamp.skill_secrets = Some(socket.clone());
+        // No lamp-services there: not named.
+        assert!(!can(&lamp).contains(&"skills.secrets"));
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        assert!(
+            crate::skill_secrets::KINDS
+                .iter()
+                .all(|kind| can(&lamp).contains(kind))
+        );
+        let served = std::thread::spawn(move || {
+            let mut lines = Vec::new();
+            for reply in [
+                json!({"ok": true, "result": {"skill": "tutor", "needed": ["GEMINI_API_KEY"], "set": []}}),
+                json!({"ok": true, "result": {"skill": "tutor"}}),
+            ] {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                writeln!(&stream, "{reply}").unwrap();
+                lines.push(serde_json::from_str::<Value>(&line).unwrap());
+            }
+            lines
+        });
+        let listed = answer(&mut lamp, "skills.secrets", &json!({"skill": "tutor"}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            listed,
+            json!({"skill": "tutor", "needed": ["GEMINI_API_KEY"], "set": []})
+        );
+        crate::skills::tests::skill(
+            lamp.skills.as_ref().unwrap(),
+            "tutor",
+            "Desk tutor",
+            "",
+            "[permissions]\nbody = true",
+        );
+        answer(&mut lamp, "skills.remove", &json!({"name": "tutor"})).unwrap();
+        let lines = served.join().unwrap();
+        assert_eq!(lines[0], json!({"op": "skill_secrets", "skill": "tutor"}));
+        assert_eq!(
+            lines[1],
+            json!({"op": "skill_secrets_drop", "skill": "tutor"})
+        );
+    }
+
     /// #1722: the skills page is answered only with its switch, and
     /// without it refused as every kind this lamp lacks.
     #[test]
@@ -1460,6 +1795,7 @@ pub mod tests {
             "device.soft_reset",
             "device.rename",
             "control.set",
+            "control.set_agent",
             "add_channel",
             "skills.install_store",
             "face.enroll",
@@ -1591,6 +1927,7 @@ pub mod tests {
                     "device.rename",
                     "language.set",
                     "control.set",
+                    "control.set_agent",
                     "wifi.set",
                     "wifi.confirm",
                 ],
@@ -1604,6 +1941,7 @@ pub mod tests {
                     "device.rename",
                     "language.set",
                     "control.set",
+                    "control.set_agent",
                     "keys.set",
                     "keys.remove",
                     "keys.get",
@@ -1621,6 +1959,7 @@ pub mod tests {
                     "device.rename",
                     "language.set",
                     "control.set",
+                    "control.set_agent",
                     "owner.place",
                     "owner.place.clear",
                 ],
@@ -1637,6 +1976,7 @@ pub mod tests {
                     "device.rename",
                     "language.set",
                     "control.set",
+                    "control.set_agent",
                     "voice.set",
                     "character.set",
                     "voice.get",
@@ -1736,6 +2076,20 @@ pub mod tests {
                 "update page",
                 |f| f.update_page = true,
                 &["update.status", "update.check"],
+            ),
+            (
+                // The lamp's agents (#6240): with the update page's switch.
+                "engines",
+                |f| {
+                    f.update_page = true;
+                    f.update_checks = crate::update::Checks::with_engines(true);
+                },
+                &[
+                    "update.status",
+                    "update.check",
+                    "engines.install",
+                    "engines.default",
+                ],
             ),
             (
                 "harness sign-in",
@@ -1886,6 +2240,8 @@ pub mod tests {
                 last: None,
                 harness: None,
                 round: None,
+                refused: None,
+                engines: None,
             },
         )
         .unwrap();
@@ -1908,6 +2264,262 @@ pub mod tests {
         );
     }
 
+    /// The owner's retry of a refused build (#6266) is `update.check`'s `retry`:
+    /// a whole number, else refused and nothing is sent.
+    #[test]
+    fn a_retry_is_a_whole_number_or_refused() {
+        let root = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(root.path()).unwrap();
+        let mut lamp = Fake {
+            update_bus: Some(lamp_bus::Bus::new(root.path()).unwrap()),
+            update_page: true,
+            ..lamp()
+        };
+        let mut update = bus
+            .subscribe_typed(
+                lamp_msgs::UpdateCheck::TOPIC,
+                "update",
+                lamp_msgs::UpdateCheck::TYPE,
+            )
+            .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        for bad in [json!("12226"), json!(1.5), json!(-3), json!(true)] {
+            assert_eq!(
+                answer(&mut lamp, "update.check", &json!({"retry": bad})),
+                Err("retry must be the refused build's sequence, a whole number".to_owned()),
+                "{bad}"
+            );
+        }
+        assert!(
+            update
+                .recv(std::time::Duration::from_millis(100))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            answer(&mut lamp, "update.check", &json!({"retry": 12226})).is_ok(),
+            "a whole number is taken"
+        );
+        let heard = update
+            .recv(std::time::Duration::from_secs(1))
+            .unwrap()
+            .expect("the retry is on the bus");
+        assert_eq!(
+            heard.parse::<lamp_msgs::UpdateCheck>().unwrap(),
+            lamp_msgs::UpdateCheck { retry: Some(12226) }
+        );
+    }
+
+    /// #6240: `engines.install` is answered only with both switches, for
+    /// an agent lamp-update says is missing or failed; refused otherwise,
+    /// within a minute of the last, and when no lamp-update reads it.
+    #[test]
+    fn the_app_installs_a_missing_agent_only_when_lamp_update_says_it_is_missing() {
+        let root = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(root.path()).unwrap();
+        let mut lamp = Fake {
+            update_bus: Some(lamp_bus::Bus::new(root.path()).unwrap()),
+            update_page: true,
+            ..lamp()
+        };
+        let hermes = json!({"engine": "hermes"});
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &hermes),
+            Err(not_here("engines.install"))
+        );
+        lamp.update_checks = crate::update::Checks::with_engines(true);
+        // lamp-update has said nothing: no such agent.
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &hermes),
+            Err(crate::update::NO_ENGINE.to_owned())
+        );
+        let mut says = bus
+            .publisher_declared(
+                lamp_msgs::UpdateStatus::TOPIC,
+                &lamp_msgs::UpdateStatus::declaration(),
+                "update",
+            )
+            .unwrap();
+        let with = |state: &str| lamp_msgs::UpdateStatus {
+            running: None,
+            now: "idle".into(),
+            last: None,
+            harness: None,
+            round: None,
+            refused: None,
+            engines: Some(std::collections::BTreeMap::from([(
+                "hermes".to_owned(),
+                lamp_msgs::EngineInstall {
+                    state: state.into(),
+                    version: None,
+                    reason: (state == "failed").then(|| "no_space".into()),
+                    at_unix_ms: Some(3),
+                },
+            )])),
+        };
+        for state in ["off", "waiting", "installing", "frozen"] {
+            says.publish_json(0, &with(state)).unwrap();
+            assert_eq!(
+                answer(&mut lamp, "engines.install", &hermes),
+                Err(crate::update::NOT_MISSING.to_owned()),
+                "{state}"
+            );
+        }
+        says.publish_json(0, &with("not_installed")).unwrap();
+        let status = answer(&mut lamp, "update.status", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(status["engines"]["hermes"]["state"], "not_installed");
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &json!({"engine": "openclaw"})),
+            Err(crate::update::NO_ENGINE.to_owned())
+        );
+        assert!(answer(&mut lamp, "engines.install", &json!({})).is_err());
+        // No lamp-update reads asks: said, and not counted.
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &hermes),
+            Err(crate::update::NOT_LISTENING.to_owned())
+        );
+        let mut update = bus
+            .subscribe_typed(
+                lamp_msgs::EngineInstallAsk::TOPIC,
+                "update",
+                lamp_msgs::EngineInstallAsk::TYPE,
+            )
+            .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &hermes),
+            Ok(Some(json!({"install": "started"})))
+        );
+        let heard = update
+            .recv(std::time::Duration::from_secs(1))
+            .unwrap()
+            .expect("one ask on the bus");
+        assert_eq!(
+            heard.parse::<lamp_msgs::EngineInstallAsk>().unwrap().engine,
+            "hermes"
+        );
+        says.publish_json(0, &with("failed")).unwrap();
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &hermes),
+            Err(crate::update::TOO_SOON.to_owned())
+        );
+        // The update page's switch off: neither is here.
+        lamp.update_page = false;
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &hermes),
+            Err(not_here("engines.install"))
+        );
+    }
+
+    /// #6492: `engines.default` is answered only with both switches; the
+    /// engine goes to lamp-tasks and its answer comes back; an empty one
+    /// is refused before lamp-tasks is asked; lamp-tasks' refusal passes
+    /// through; `update.status` carries the default lamp-tasks says, and
+    /// leaves it out when lamp-tasks is not reached.
+    #[test]
+    fn the_app_chooses_the_default_agent_through_lamp_tasks() {
+        let dir = crate::harness_sign_in::tests::folder("ead");
+        let asked = crate::harness_sign_in::tests::tasks(
+            &dir,
+            vec![
+                r#"{"ok":true,"default":"openclaw","chosen_in_app":true}"#,
+                r#"{"ok":false,"error":"engine_not_installed"}"#,
+                r#"{"ok":true,"default":"openclaw","chosen_in_app":true}"#,
+            ],
+        );
+        let root = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(root.path()).unwrap();
+        let mut lamp = Fake {
+            update_bus: Some(lamp_bus::Bus::new(root.path()).unwrap()),
+            update_page: true,
+            tasks_app: Some(dir.join("app.sock")),
+            ..lamp()
+        };
+        let openclaw = json!({"engine": "openclaw"});
+        // The agents' switch off: not here, nothing asked.
+        assert_eq!(
+            answer(&mut lamp, "engines.default", &openclaw),
+            Err(not_here("engines.default"))
+        );
+        lamp.update_checks = crate::update::Checks::with_engines(true);
+        assert_eq!(
+            answer(&mut lamp, "engines.default", &openclaw),
+            Ok(Some(json!({"default": "openclaw", "chosen_in_app": true})))
+        );
+        assert_eq!(
+            serde_json::from_str::<Value>(&asked.recv().unwrap()).unwrap(),
+            json!({"op": "app_engine_default", "engine": "openclaw"})
+        );
+        assert_eq!(
+            answer(&mut lamp, "engines.default", &json!({"engine": ""})),
+            Err(crate::engine_default::ENGINE_UNKNOWN.to_owned())
+        );
+        assert_eq!(
+            answer(&mut lamp, "engines.default", &json!({"engine": "hermes"})),
+            Err(crate::engine_default::ENGINE_NOT_INSTALLED.to_owned())
+        );
+        assert_eq!(
+            serde_json::from_str::<Value>(&asked.recv().unwrap()).unwrap(),
+            json!({"op": "app_engine_default", "engine": "hermes"}),
+            "the empty name was never forwarded"
+        );
+        // update.status: the default beside the agents.
+        let mut says = bus
+            .publisher_declared(
+                lamp_msgs::UpdateStatus::TOPIC,
+                &lamp_msgs::UpdateStatus::declaration(),
+                "update",
+            )
+            .unwrap();
+        says.publish_json(
+            0,
+            &lamp_msgs::UpdateStatus {
+                running: None,
+                now: "idle".into(),
+                last: None,
+                harness: None,
+                round: None,
+                refused: None,
+                engines: Some(std::collections::BTreeMap::from([(
+                    "hermes".to_owned(),
+                    lamp_msgs::EngineInstall {
+                        state: "installed".into(),
+                        version: Some("1.0.0".into()),
+                        reason: None,
+                        at_unix_ms: Some(3),
+                    },
+                )])),
+            },
+        )
+        .unwrap();
+        let status = answer(&mut lamp, "update.status", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(status["engines"]["default"], "openclaw", "{status}");
+        assert_eq!(status["engines"]["default_chosen_in_app"], true);
+        assert_eq!(status["engines"]["hermes"]["state"], "installed");
+        assert_eq!(
+            serde_json::from_str::<Value>(&asked.recv().unwrap()).unwrap(),
+            json!({"op": "app_engine_default_state"})
+        );
+        // lamp-tasks not reached: the status still answers, no default.
+        lamp.tasks_app = Some(dir.join("none.sock"));
+        let status = answer(&mut lamp, "update.status", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert!(status["engines"].get("default").is_none(), "{status}");
+        assert_eq!(status["engines"]["hermes"]["state"], "installed");
+        // The update page's switch off: not here.
+        lamp.update_page = false;
+        assert_eq!(
+            answer(&mut lamp, "engines.default", &openclaw),
+            Err(not_here("engines.default"))
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// A switch's name, how it is turned on, and the kinds it brings.
     type Switch = (&'static str, fn(&mut Fake), &'static [&'static str]);
 
@@ -1918,6 +2530,7 @@ pub mod tests {
             manage: std::path::PathBuf::from("/nowhere/manage.sock"),
             store,
             addons: false,
+            link: None,
         }
     }
 

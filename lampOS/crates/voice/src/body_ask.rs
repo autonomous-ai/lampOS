@@ -1,6 +1,7 @@
 //! The body's ask, said aloud (#2938). A body that refuses to start for
 //! its pose lets go (or holds a head tipped up) and says on `diagnostics`
-//! what it needs a person to do ([`lamp_body::ask::asks`]). The voice
+//! what it needs a person to do ([`lamp_body::ask::asks`]); a body that runs
+//! but will not stand says so too, on every report of that run (#6834). The voice
 //! says that line once when the body first lets go, and again only when the
 //! lamp's name is heard (`name/heard`, at the called note's score), at most
 //! once in [`AGAIN_AFTER_US`] (two minutes: a lamp named in a meeting
@@ -183,7 +184,7 @@ fn say(asks: &OwnAsks, line: &str) {
             let outcome = loop {
                 match answered.recv() {
                     Ok(Answer::Done(outcome)) => break outcome.line(),
-                    Ok(Answer::Begun(_) | Answer::BegunTurn { .. }) => {}
+                    Ok(Answer::Begun(_) | Answer::BegunTurn { .. } | Answer::Stream(_)) => {}
                     Err(_) => break "the voice has gone".into(),
                 }
             };

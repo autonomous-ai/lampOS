@@ -32,12 +32,21 @@ const EXAMPLE_RUNS = {
   'ci-light.js': [['pass'], null, [['light', { colour: 'green', level: 3, pattern: 'breathe' }]]],
   // Its three poses, eased as the SDK eases them.
   'curious.js': [[], null, ['lease.take', ['move', { frames: posesToFrames([{ pitch: 3 }, { pitch: 2, yaw: -3 }, { pitch: 2, yaw: 3 }], { holdMs: 400 }) }]]],
-  'follow.js': [[], 'arrived', ['lease.take', ['look', { at: 'face' }]], 'not now: refused: not in this release: look at a face or a name'],
+  'follow.js': [[], 'arrived', ['lease.take', ['look', { at: 'face' }]]],
   'follow-hand.js': [[], 'hand', ['lease.take', ['look', { at: 'hand' }]]],
+  'heat-watch.js': [[], 'hot', [['light', { colour: 'orange', level: 2, pattern: 'pulse' }]]],
+  // Stuffy air, a short wait (DESK_STUFFY_AFTER_S below), one line said, then the glow.
+  'desk-health.js': [[], 'stuffy', ['say', ['light', { colour: 'orange', level: 2, pattern: 'breathe' }]]],
   'greet.js': [[], 'arrived', [['gesture', { name: 'greeting' }]]],
+  'notes.js': [[], null, [['notes.get', { key: 'runs' }], ['notes.set', { key: 'runs', value: 1 }], ['light', { colour: 'warm', level: 1 }]]],
+  // A long stretch at the desk (SIT_AFTER_S below): one slow tilt, counted in the day's note.
+  'posture.js': [[], 'arrived', ['lease.take', ['move', { frames: posesToFrames([{ roll: 3, pitch: 1 }, { roll: -2 }], { holdMs: 600 }) }], ['notes.set', { value: 1 }]]],
   'phrase.js': [[], 'phrase', [['light', { colour: 'warm', level: 2, pattern: 'breathe' }], ['gesture', { name: 'nod' }]]],
   'pomodoro.js': [[], null, [['light', { colour: 'warm', level: 2 }]]],
   'push-skill.js': [['../examples/hello-skill'], null, ['skill.push']],
+  // An arrival is counted in the day's note, quietly: no say, no light.
+  'visitors.js': [[], 'arrived', [['notes.get', {}], ['notes.set', { value: 1 }]]],
+  'touch.js': [[], 'tap', [['light', { colour: 'warm', level: 3 }]]],
   // Pixel 0 white, a green pixel walking, the whole ring blue, given back.
   'ring-walk.js': [['50'], null, [
     ['light', { pixels: (px) => Array.isArray(px) && px[0] === '#ffffff' && px.slice(1).every((c) => c === '#000000') }],
@@ -64,10 +73,13 @@ test('every example runs against a fake lamp and sends what it is for', async ()
   assert.deepEqual(readdirSync(examples).filter((f) => f.endsWith('.js') && f !== 'tour.js').sort(), Object.keys(EXAMPLE_RUNS).sort());
   const nudges = {
     air: (fake) => fake.setAir({ pm2_5: 41, co2_ppm: 1350, feel: 'stuffy' }),
+    stuffy: (fake) => fake.setAir({ co2_ppm: 1500, feel: 'stuffy' }),
     arrived: (fake) => fake.emit('person.arrived', { count: 1, near: 0.3 }),
     // In real time, as the lamp tells it: the example looks every 0.2 s.
     hand: (fake) => fake.emitHandTrack(handTrack('wave', { seconds: 1 }), { realtime: true }),
+    hot: (fake) => fake.emit('body.state', { joints: { yaw: { deg: 0, temp_c: 41 }, elbow: { deg: 30, temp_c: 66 } }, lamp: { light: 'off', talking: false, private: false } }),
     phrase: (fake) => fake.emit('phrase.heard', { phrase: 'good night lamp' }),
+    tap: (fake) => fake.emit('touch', { kind: 'tap' }),
   };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await Promise.all(Object.entries(EXAMPLE_RUNS).map(async ([name, [args, nudge, ops, refusal]]) => {
@@ -76,7 +88,7 @@ test('every example runs against a fake lamp and sends what it is for', async ()
       const home = folder();
       await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring: new Keyring(home) });
       // Not execFileSync: the fake answers on this process's event loop.
-      const child = spawn(process.execPath, [new URL(name, examples).pathname, ...args], { cwd: WRITES_FILES.has(name) ? home : sdkJs, env: { ...process.env, LAMPOS_HOME: home } });
+      const child = spawn(process.execPath, [new URL(name, examples).pathname, ...args], { cwd: WRITES_FILES.has(name) ? home : sdkJs, env: { ...process.env, LAMPOS_HOME: home, DESK_STUFFY_AFTER_S: "1", SIT_AFTER_S: "1" } });
       let out = '';
       child.stdout.on('data', (chunk) => { out += chunk; });
       child.stderr.on('data', (chunk) => { out += chunk; });

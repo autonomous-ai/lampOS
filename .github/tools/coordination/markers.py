@@ -131,8 +131,11 @@ def signer(body):
     # 3 Nov 10:1x: "The first builder, 18:5x" signs too (an optional "The"); #4905 sat out with my lifting READ-OK.
     # The author's signature: "<Name>, HH:MM" at the comment's or a line's start, after a sentence, or right after the
     # marker and its commit; never a name quoted in brackets ("(Fourteen, 09:3x: ...)").
-    sig = re.search(r"(?:^|\n|\. |(?:READ-OK|HOLD)\*{0,2} `?[0-9a-f]{7,40}`?[:,]? )\**(?:[Tt]he )?([A-Za-z][A-Za-z-]+(?: builder)?)\**,? \d{1,2}:\d[\dx]", body[:800])
-    if sig:
+    # 14 Nov 00:5x (Heron's and SubDarren's HOLDs on #6979): here only, a name may carry digits after its first letter
+    # ("sim-3, 22:5x"), so the sim builders sign; a priority or check label with a time ("P1, 22:50") never does. The
+    # no-time paths below keep letters only, so "P3: …", "ARM64: green" and "H2: x" opening a line sign no one.
+    sig = re.search(r"(?:^|\n|\. |(?:READ-OK|HOLD)\*{0,2} `?[0-9a-f]{7,40}`?[:,]? )\**(?:[Tt]he )?([A-Za-z][A-Za-z0-9-]+(?: builder)?)\**,? \d{1,2}:\d[\dx]", body[:800])
+    if sig and not re.fullmatch(r"(?i)p\d+s?|h\d+|arm\d+|x86(-\d+)?|ipv\d", sig.group(1)):
         return sig.group(1)
     # 29 Oct 18:1x: the name right after the marker and its commit on the same line, with no time:
     # "HOLD 3559c8ab3a…  Reviewer-lead: one P2" (#4364, #4346 sat out on it as unsigned).

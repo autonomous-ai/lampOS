@@ -312,7 +312,45 @@ fn fail(host: &mut impl Host, previous: Option<&[u8]>, reason: Reason) -> Joined
 
 /// V1's `cloudProbeTimeout`: the name, the connection and the TLS handshake,
 /// all of it, so a dead network still fails fast inside the 60 s join.
+// PARKED (#6386): 5 s for a slow first lookup or a far server from China (#6256);
+// re-enable when China is scheduled and stable's lamp-update carries #6810:
+// pub const REACH_TIMEOUT: Duration = Duration::from_secs(5);
 pub const REACH_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Pinged in turn before the TLS check, each for at most 2 s: AliDNS first,
+/// which answers in China, then Google's, which answers almost everywhere
+/// else (#6256).
+pub const PING_TARGETS: [&str; 2] = ["223.5.5.5", "8.8.8.8"];
+
+/// The TLS check's `host:port` when setup's request names no backend: the
+/// product's own relay (`lamp-cloud`'s `COMPANY_RELAY_HOST`), which answers
+/// from China, unlike Google's Gemini (#6256).
+pub const DEFAULT_REACH: &str = "campaign-api.autonomous.ai:443";
+
+/// The TLS check's `host:port` for setup's `llm_base_url`: the URL's host,
+/// with its own port or 443; [`DEFAULT_REACH`] when it names no host.
+pub fn reach_address(llm_base_url: &str) -> String {
+    let url = llm_base_url.trim();
+    let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let authority = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    if authority.is_empty() {
+        return DEFAULT_REACH.to_owned();
+    }
+    // A port is digits after the last `:`, outside an IPv6 literal's brackets.
+    let has_port = authority.rsplit_once(':').is_some_and(|(host, port)| {
+        !port.is_empty()
+            && port.bytes().all(|byte| byte.is_ascii_digit())
+            && (!host.starts_with('[') || host.ends_with(']'))
+    });
+    if has_port {
+        authority.to_owned()
+    } else {
+        format!("{authority}:443")
+    }
+}
 
 /// Looks up a `host:port` name. Injected for tests.
 pub type Resolve = fn(&str) -> io::Result<Vec<SocketAddr>>;
@@ -641,7 +679,9 @@ pub struct ImageHost {
     pub station_script: std::path::PathBuf,
     pub hotspot_script: std::path::PathBuf,
     pub interface: String,
-    /// The voice's service, reached over TLS when ping is blocked, as V1 does.
+    /// The backend setup was given ([`reach_address`]), reached over TLS
+    /// when ping is blocked, as V1 does with its voice's service. The caller
+    /// sets it from the setup request before the join.
     pub reach: Reach,
     started: std::time::Instant,
     since_unix: u64,
@@ -654,6 +694,8 @@ impl ImageHost {
             station_script: "/usr/local/bin/device-sta-mode".into(),
             hotspot_script: "/usr/local/bin/device-ap-mode".into(),
             interface: "wlan0".into(),
+            // PARKED (#6386): the product's relay, not Gemini (#6256); re-enable when China is scheduled and stable's lamp-update carries #6810:
+            // reach: Reach::new(DEFAULT_REACH, REACH_TIMEOUT),
             reach: Reach::new("generativelanguage.googleapis.com:443", REACH_TIMEOUT),
             started: std::time::Instant::now(),
             since_unix: std::time::SystemTime::now()
@@ -812,6 +854,34 @@ impl Host for ImageHost {
     }
 
     fn internet(&mut self) -> bool {
+        // PARKED (#6386): AliDNS, then Google, then TLS to the backend, each passing
+        // check said (#6256); re-enable when China is scheduled and stable's lamp-update carries #6810:
+        // let began = Instant::now();
+        // let ping = |target: &str| {
+        //     std::process::Command::new("ping")
+        //         .args(["-c", "1", "-W", "2", target])
+        //         .stdout(std::process::Stdio::null())
+        //         .stderr(std::process::Stdio::null())
+        //         .status()
+        //         .is_ok_and(|status| status.success())
+        // };
+        // let passed = PING_TARGETS
+        //     .iter()
+        //     .find(|target| ping(target))
+        //     .map(|target| format!("ping {target}"))
+        //     .or_else(|| {
+        //         self.reach
+        //             .check()
+        //             .then(|| format!("TLS {}", self.reach.address))
+        //     });
+        // // Which check passed and when, for a network that blocks some (#6256).
+        // if let Some(passed) = &passed {
+        //     eprintln!(
+        //         "lamp-setup: the internet answered: {passed} in {} ms",
+        //         began.elapsed().as_millis()
+        //     );
+        // }
+        // passed.is_some()
         let ping = std::process::Command::new("ping")
             .args(["-c", "1", "-W", "2", "8.8.8.8"])
             .stdout(std::process::Stdio::null())

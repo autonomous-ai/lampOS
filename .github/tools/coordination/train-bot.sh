@@ -18,7 +18,7 @@
 #   WORKTREE_NC       the no-crates lane's (default: $LAMP_COORD_STATE/wt-trainbot-nc)
 #   NOCRATES_LANE     on (default): two lanes, crate trains and no-crates trains side by side (#5212 part 3, below);
 #                     off: one lane, as before
-#   PYTHON            the Python for markers.py, reads2.py and qholds.py (default: python3)
+#   PYTHON            the Python for markers.py, reads2.py, rows.py and qholds.py (default: python3)
 #   Markers count only from logins with write access: $LAMP_COORD_STATE/writers.txt (fetched, an hour's cache) plus
 #   $LAMP_COORD_STATE/writers-extra.txt (lib.sh). A PR whose head is in another repository is never carried.
 TOOLS_DIR="${TOOLS_DIR:-${0:A:h}}"
@@ -41,6 +41,9 @@ done
 LOG=$SP/train-bot.log; cd $R || exit 1
 say() { echo "$(date +%T) $*" | tee -a $LOG; }
 told=$SP/train-bot.told; touch $told
+# 12 Nov (#6556 B): "<PR> <head>" lines for PRs a train's red non-cargo check sat out (run_train); eligible() leaves
+# those heads out with no HOLD posted, and a new head brings the PR back.
+sitout=$SP/train-bot.sitout; touch $sitout
 # tell KEY: remember KEY in the told list. 6 Nov (the reviewer's P3 on #5542): it was append-only, a line per PR per
 # head; it keeps its last 5000 lines, kept long so a `stacked` or `conflict` key is not dropped and its PR comment posted twice.
 tell() { print -r -- "$1" >> $told; tail -n 5000 $told > $told.new && mv $told.new $told; }
@@ -57,8 +60,31 @@ queue_post() {
     || say "the Queue (#$COORD_QUEUE_POST) refused the bot's post (full? add the next Queue issue to lib.sh's COORD_QUEUE_ISSUES): $1" >&2
 }
 fine() { grep -qx -- "$1" $said && { grep -vx -- "$1" $said > $said.new; mv $said.new $said; }; return 0; }
+# head_green PR HEAD: 0 when no check on the PR's own head is red (lib.sh, coord_red_checks_jq; one still running is not
+# red); otherwise it says why, once per head, and fails. Checks that can't be read fail it (fail closed). eligible() and
+# build_train() both ask it. 12 Nov (#6556): build_train asks again just before the cherry-pick, as train 836 (#6611)
+# carried #6506, whose ARM64 run on 024930deaa was still running when its round read it and red 6 min before the cut.
+# 12 Nov (#6556, train 841 #6662): a PR the ARM64 run takes (lib.sh, coord_arm_takes) also needs its own head's ARM64
+# run there and all green (coord_arm64_green_jq); absent or still running, it waits, said once per head. #6572's head
+# ec26212c11 had no ARM64 run at the cut (a force-push started none); its release job went red after the train took it.
+head_green() {
+  local own all arm
+  if ! all=$(gh pr view $1 -R $REPO --json statusCheckRollup 2>/dev/null) || ! own=$(jq -r "$coord_red_checks_jq" <<< $all 2>/dev/null) || [[ -z $own ]]; then
+    once run$1 "#$1 left out: the checks on ${2:0:9} can't be read"; return 1
+  fi
+  fine run$1
+  if [[ $own != ok ]]; then
+    grep -qx "$1 red $2" $told || { say "#$1 left out: a check on its own head ${2:0:9} is red (${own#red })" >&2; tell "$1 red $2"; }
+    return 1
+  fi
+  coord_arm_takes $2 || return 0
+  arm=$(jq -r "$coord_arm64_green_jq" <<< $all 2>/dev/null)
+  [[ $arm == ok ]] && return 0
+  grep -qx "$1 arm $2" $told || { say "#$1 left out: its own head ${2:0:9}'s ARM64 run is not all green yet (${arm#waiting }); it waits" >&2; tell "$1 arm $2"; }
+  return 1
+}
 eligible() {
-  local p head ok sha held two own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl
+  local p head ok sha held two rw sw own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl; local -a so
   # 3 Nov 15:4x (the Reviewer-lead's HOLD on #5068): the repo is public, so markers count only from accounts with write
   # access (lib.sh, coord_writers). Every fetch fails closed: without the writers list, or without the Queue (every
   # issue in lib.sh's COORD_QUEUE_ISSUES) and so its HOLDs, no PR is eligible this round; without a PR's head, comments or body, that PR is not.
@@ -66,13 +92,41 @@ eligible() {
   fine writers
   coord_queue $qf || { once queue "the Queue's (#${(j:, #:)COORD_QUEUE_ISSUES}) comments can't be fetched: no PR is eligible"; return; }
   fine queue
+  # 12 Nov 14:4x (#6556 C, the lead): 13–20 min passed between a train's merge and the next cut, inferred to be this
+  # round's reads of ~91 open PRs (a head, comments and reviews, a body and a fetch each). Each round says how long it
+  # took and how many PRs came from the cache below.
+  local t0=$SECONDS npr=0 nhit=0 nout=0 line lhead upd key ck=$SP/elig-cache hit
+  mkdir -p $ck
+  say "eligible: reading the open PRs" >&2
   # A PR whose head is in another repository is never carried (coord_head checks it again).
-  for p in $(gh pr list -R $REPO --base lamp-voice --state open --limit 200 --json number,isDraft,headRefName,isCrossRepository --jq '.[]|select(.isDraft|not)|select(.isCrossRepository|not)|select(.headRefName|startswith("first/train-")|not)|.number'); do
-    head=$(coord_head $p) || { once head$p "#$p left out: its head can't be read, or is in another repository"; continue; }
-    # 4 Nov: with its reviews' bodies (#5212 part 1).
-    coord_pr_comments $p $cf || { once comments$p "#$p left out: its comments can't be fetched"; continue; }
+  # 12 Nov (#6556 C): the list also gives each PR's head and updatedAt, the cache's key.
+  local prl=$SP/elig-open.txt
+  gh pr list -R $REPO --base lamp-voice --state open --limit 200 --json number,isDraft,headRefName,isCrossRepository,headRefOid,updatedAt --jq '.[]|select(.isDraft|not)|select(.isCrossRepository|not)|select(.headRefName|startswith("first/train-")|not)|"\(.number) \(.headRefOid) \(.updatedAt)"' > $prl 2>/dev/null
+  # 12 Nov (the Reviewer-lead's P3 on #6586): a sat-out PR closed or pushed since leaves $sitout (only when the list
+  # carries heads; the test stand-in's bare numbers don't).
+  grep -q ' ' $prl && coord_sitout_trim $sitout $prl
+  for line in ${(f)"$(<$prl)"}; do
+    p=${line%% *}; [[ $p == <-> ]] || continue
+    lhead=${${line#* }%% *}; upd=${line##* }; [[ $lhead == $p || $upd == $lhead ]] && { lhead=""; upd=""; }
+    npr=$((npr+1))
+    # 12 Nov (#6556 C): a PR's head, comments, reviews and body are kept per PR, keyed by its head and updatedAt, which
+    # GitHub moves on every comment, review, push and body edit. With the key unchanged and the copy under COORD_CACHE_MIN
+    # minutes old (default 120; 12 Nov 17:1x: at 10 min no copy ever lived to the next round, which starts 8-14 min
+    # after the last began, so two rounds read 0 of 90 from it), they are read from the copy, with no call; every verdict is still worked out again from them each round, and the
+    # Queue, the writers, the hold files and the checks (below) are read fresh. still-eligible.sh reads everything
+    # fresh again just before a merge, so a stale copy can at worst put a PR in a train its precheck then drops.
+    key="$lhead $upd"; hit=0
+    if [[ -n $lhead && -n $upd && -s $ck/$p.c && $(cat $ck/$p.key 2>/dev/null) == "$key" && -n $(find $ck/$p.key -mmin -${COORD_CACHE_MIN:-120} 2>/dev/null) ]]; then
+      hit=1; nhit=$((nhit+1)); head=$lhead; cp $ck/$p.c $cf
+    else
+      rm -f $ck/$p.key $ck/$p.c $ck/$p.b
+      head=$(coord_head $p) || { once head$p "#$p left out: its head can't be read, or is in another repository"; continue; }
+      # 4 Nov: with its reviews' bodies (#5212 part 1).
+      coord_pr_comments $p $cf || { once comments$p "#$p left out: its comments can't be fetched"; continue; }
+      if [[ -n $lhead && $head == $lhead && -n $upd ]]; then cp $cf $ck/$p.c && print -r -- $key > $ck/$p.key; fi
+    fi
     fine head$p; fine comments$p
-    # 3 Nov 09:4x: a HOLD posted on the Queue (#4710, and from 5 Nov #5385: lib.sh's COORD_QUEUE_ISSUES) whose first
+    # 3 Nov 09:4x: a HOLD posted on the Queue (#4710, from 5 Nov #5385, from 10 Nov #6059: lib.sh's COORD_QUEUE_ISSUES) whose first
     # line is `HOLD <sha>` holds the PR whose head starts with that sha, until the same account posts a READ-OK on the
     # PR, after it, saying the HOLD is lifted or cleared (qholds.py, with markers.py's marker and lifting words). Train
     # 546 took #5013 on Fourteen's READ-OK while Seventh's "HOLD a13408fb8d…: lamp check pending" stood only on the Queue.
@@ -104,7 +158,9 @@ eligible() {
     fi
     [[ $ok == READ-OK* ]] || continue
     sha=${ok#READ-OK }; [[ -n $sha ]] || continue
-    git fetch -q origin "+refs/pull/$p/head:refs/remotes/pr/$p" 2>/dev/null
+    # 12 Nov (#6556 C): no fetch when the PR's ref here is already its head.
+    [[ $(git rev-parse -q --verify "refs/remotes/pr/$p^{commit}" 2>/dev/null) == $head ]] \
+      || git fetch -q origin "+refs/pull/$p/head:refs/remotes/pr/$p" 2>/dev/null
     if [[ $head != $sha* ]]; then
       git cat-file -e "$sha^{commit}" 2>/dev/null || git fetch -q origin $sha 2>/dev/null
       if ! [[ "$(patch_of refs/remotes/pr/$p)" == "$(patch_of $sha)" && -n "$(patch_of $sha)" ]]; then
@@ -116,7 +172,13 @@ eligible() {
     # 31 Oct 03:1x: a PR whose comments ask "TWO READS" (privacy, safety, data loss) waits for READ-OKs on this head
     # from two different readers (reads2.py). #4633 and #4656 went in trains on one READ-OK where two were named.
     # 3 Nov 15:4x: only "none" or "met N" carries it; a fetch or a reads2.py error leaves it out.
-    coord_body $p $bf || { once body$p "#$p left out: its body can't be fetched"; continue; }
+    # 13 Nov (the lead): --always asks two different signed readers of every PR, asked or not, so "none" no longer comes.
+    # 12 Nov (#6556 C): the body is kept under the same key as the comments.
+    if (( hit )) && [[ -s $ck/$p.b ]]; then cp $ck/$p.b $bf
+    else
+      coord_body $p $bf || { once body$p "#$p left out: its body can't be fetched"; continue; }
+      [[ -s $ck/$p.key ]] && cp $bf $ck/$p.b
+    fi
     fine body$p
     # 4 Nov 04:1x: reads on an earlier head with the same patch count too (coord_same_patch), as for one read above.
     # 7 Nov (El's HOLD on #5653): and heads a Queue READ ASK names, so an ask on a head a plain rebase moved past still
@@ -130,31 +192,59 @@ eligible() {
       || { once commits$p "#$p left out: its commits can't be listed"; continue; }
     fine commits$p
     # 7 Nov (the PM, after Twelve's table): a Queue READ ASK naming TWO READS asks too (#5647, #5650 merged on one read).
-    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf --queue $qf --pr $p --pr-commits $SP/pr-commits.txt $heads)
+    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --always --writers $wf --queue $qf --pr $p --pr-commits $SP/pr-commits.txt $heads)
     if [[ $two == short* ]]; then
-      grep -qx "$p short $head" $told || { say "#$p left out: TWO READS asked, $two on ${head:0:9}" >&2; tell "$p short $head"; }
+      grep -qx "$p short $head" $told || { say "#$p left out: two reads needed, $two on ${head:0:9}" >&2; tell "$p short $head"; }
       continue
     fi
     [[ $two == none || $two == met* ]] || { once reads2$p "#$p left out: reads2.py said '${two}'"; continue; }
     fine reads2$p
-    # 4 Nov 23:4x (Thirteen's P3 on #5305); 7 Nov (#5635): a body that names TWO READS but opts out with a ONE READ line
-    # is said once per head, so an opt-out is seen before a train merges it on one read.
-    if [[ $two == none && $($PYTHON -I $TOOLS_DIR/reads2.py --unasked < $bf) == unasked ]]; then
-      grep -qx "$p unasked $head" $told || { say "#$p: its body names TWO READS but opts out with ONE READ, so one READ-OK carries ${head:0:9}" >&2; tell "$p unasked $head"; }
+    # 14 Nov (the lead): a behaviour PR's lamp row comes before its train. A writer's `ROW` line on the PR (or a tester's
+    # "lamp row for #N"), or a reader's "no row needed" in a READ-OK on this head (or a same-patch one), for docs, tests,
+    # or code behind a switch that's off (rows.py). A DEFAULT-ON always needs its row. Any other answer fails closed.
+    # 14 Nov (the readers' P3s on #7034): a ROW line names this PR, a FAIL row is no row, and a PR whose diff turns a
+    # LAMP_ switch on in a product unit (coord_switch_on; an unread diff leaves it out) needs a row: "no row needed"
+    # doesn't carry it (rows.py --switch-on).
+    sw=$(coord_switch_on $head) || { once switch$p "#$p left out: its diff can't be read for a switch turned on"; continue; }
+    fine switch$p
+    so=(); [[ $sw == on ]] && so=(--switch-on)
+    rw=$($PYTHON -I $TOOLS_DIR/rows.py --writers $wf $so --pr $p $heads < $cf)
+    # 14 Nov 15:40 (the lead): a row names the lamp, the build and quotes the journal lines; one that lacks a part is no
+    # row, said once per head with the parts it lacks (rows.py's "row-incomplete lamp,journal").
+    if [[ $rw == row-incomplete\ * ]]; then
+      grep -qx "$p rowpart $head" $told || { say "#$p left out: its ROW doesn't name the lamp, the build and the journal lines (missing: ${${rw#row-incomplete }//,/, })" >&2; tell "$p rowpart $head"; }
+      continue
     fi
+    if [[ $rw == none && $sw == on ]]; then
+      grep -qx "$p norow-on $head" $told || { say "#$p left out: it turns a switch on in the product, and no ROW line names it on head ${head:0:9}" >&2; tell "$p norow-on $head"; }
+      continue
+    fi
+    if [[ $rw == none ]]; then
+      grep -qx "$p norow $head" $told || { say "#$p left out: no ROW line and no reader's \"no row needed\" on head ${head:0:9}" >&2; tell "$p norow $head"; }
+      continue
+    fi
+    [[ $rw == row || $rw == no-row-needed ]] || { once rows$p "#$p left out: rows.py said '${rw}'"; continue; }
+    fine rows$p
+    # 13 Nov: with --always no PR rides on one read, so a ONE READ opt-out (4 Nov, #5305; 7 Nov, #5635) no longer lowers
+    # it, and its once-a-head line is gone with it.
     # 30 Oct 15:0x (the Reviewer-lead's 14:58): a PR whose own ARM64 run on this head is red sits out. #4507's run was red
     # at 14:17 before trains 407 and 408 carried it; both failed in lamp-update, and the bot held #4524 and #4530 instead.
     # 3 Nov 16:4x (Thirteen's P3 on #5068): a run list gh can't fetch holds the PR (fail closed), not skips the check.
-    if ! own=$(gh run list -R $REPO --workflow lampos-arm64.yml --commit $head -L 1 --json conclusion -q '.[0].conclusion' 2>/dev/null); then
-      once run$p "#$p left out: its ARM64 runs on ${head:0:9} can't be read"; continue
-    fi
-    fine run$p
-    if [[ $own == failure ]]; then
-      grep -qx "$p red $head" $told || { say "#$p left out: its own ARM64 run on ${head:0:9} is red" >&2; tell "$p red $head"; }
+    # 12 Nov 14:4x (#6556 B, the lead): any red check on the PR's own head sits it out, not only ARM64's. #6493's
+    # switches census went red on its own head and the bot only saw it as ARM64 at 10:52; an SDK or doc-links check red
+    # on a PR's head would have ridden a train and failed it. Read last, so only PRs that pass everything else cost the
+    # call; never cached, since a check finishing doesn't move the PR's updatedAt.
+    head_green $p $head || continue
+    # 12 Nov 14:4x (#6556 B): a PR a red non-cargo check of a train sat out (run_train, $sitout) stays out on that head,
+    # with no HOLD posted: a push (a new head) brings it back.
+    if grep -qx "$p $head" $sitout 2>/dev/null; then
+      grep -qx "$p sitout $head" $told || { say "#$p left out: a train's non-cargo check failed on files it changes, at ${head:0:9}; a new head brings it back" >&2; tell "$p sitout $head"; }
       continue
     fi
+    nout=$((nout+1))
     echo $p
   done
+  say "eligible: $nout of $npr open PRs eligible in $((SECONDS-t0)) s ($nhit read from the cache)" >&2
 }
 # 25 Oct 04:1x: a PR stacked on another open PR (#3014 and #3391 carry #3064's commit under their own) would merge that
 # PR's commits with its own: every commit over lamp-voice is cherry-picked. Such a PR is left out until the one under it
@@ -236,13 +326,18 @@ build_train() {
     git worktree prune; git worktree add -q -B $br $wt origin/lamp-voice || { say "worktree failed"; return 1; }
   fi
   carried=()
+  # 12 Nov (#6556 B, the Reviewer-lead's P3 on #6586): each carried PR's head as cherry-picked, so a PR a red check
+  # sits out is kept out on the head the train carried; one pushed while the train ran comes back on its new head.
+  : > $SP/train-carried-$lane.txt
   if [[ $lane == nc ]]; then body="No-crates train $tn, onto lamp-voice \`$LV\`, built by the train bot (#$COORD_QUEUE_POST, the Queue). Its PRs change no build input, so no ARM64 run: it merges by rebase once the checks that start on it pass.\n"
   else body="Merge train $n, onto lamp-voice \`$LV\`, built by the train bot (#$COORD_QUEUE_POST, the Queue). One ARM64 run, merged by rebase.\n"; fi
   for p in "$@"; do
+    head_green $p $(git rev-parse refs/remotes/pr/$p 2>/dev/null) || continue
     own=(${(f)"$(git -C $wt rev-list --reverse --cherry-pick --right-only --no-merges HEAD...refs/remotes/pr/$p)"})
     [[ -n ${own[1]} ]] || continue
     if git -C $wt cherry-pick $own >/dev/null 2>&1; then
-      carried+=$p; body+="\n- #$p: $(gh pr view $p -R $REPO --json title -q .title | sed 's/^lampOS: //' | cut -c1-200)"
+      carried+=$p; print -r -- "$p $(git -C $wt rev-parse refs/remotes/pr/$p 2>/dev/null)" >> $SP/train-carried-$lane.txt
+      body+="\n- #$p: $(gh pr view $p -R $REPO --json title -q .title | sed 's/^lampOS: //' | cut -c1-200)"
     else
       git -C $wt cherry-pick --abort
       # 28 Oct 16:4x: told once per PR, not once per lamp-voice head (#4042 got three in an hour): post less.
@@ -268,7 +363,7 @@ build_train() {
 # run_train LANE: wait for the train built last (tn, tp, carried, refs, h) and merge it, or close it and say why. With
 # two lanes it runs in the background, one per lane.
 run_train() {
-  local lane=$1 rc slow slowf=$SP/train-bot.slow-$1 five fivef=$SP/train-bot.5xx-$1 p left added c run fails errfiles heldany hit d deps t names dd NV
+  local lane=$1 rc slow slowf=$SP/train-bot.slow-$1 five fivef=$SP/train-bot.5xx-$1 p left added c run fails errfiles heldany hit d deps t names dd NV w out other jl; local -a red redjobs redwfs
   # 3 Nov 15:4x: the PRs to recheck go as arguments; merge-when-green.sh runs still-eligible.sh on them (no eval).
   # 4 Nov (#5212 part 2): --behind-unrelated, so a green train behind lamp-voice only by files it doesn't touch, and no
   # build input (behind-unrelated.sh), merges as it is instead of being rebuilt. Part 3: a no-crates train passes
@@ -353,10 +448,19 @@ run_train() {
     return
   fi
   # Which crates the failing tests are in; the PRs touching them sit out with the reason, the rest go again now.
-  run=$(gh api "repos/$REPO/actions/workflows/lampos-arm64.yml/runs?head_sha=$h" --jq '.workflow_runs[0].id')
-  fails=$(gh run view $run -R $REPO --log-failed 2>/dev/null | grep -oE 'FAIL \[[^]]*\] *\( *[0-9]+/[0-9]+\) [a-z0-9_-]+' | awk '{print $NF}' | sort -u)
+  # 12 Nov 14:4x (#6556 B, train 833): read each failed job's own log, from every run on the train's head. Since #6513
+  # the ARM64 run tests on three shards, and the bot looked the moment one shard failed: `gh run view --log-failed`
+  # serves nothing while the run's other shards still run, so 833's `FAIL [ 6.202s] ( 543/5515) lamp-body …` on shard 2
+  # was never read and the bot stopped with "no failing test named". A job's log is served once that job has ended.
+  # A job that has just ended can take a few seconds to serve its log: looked at again while any red job's came back
+  # empty, up to 3 looks 20 s apart (coord_red_jobs_wait).
+  jl=$SP/train-jobs-$lane.log
+  red=(${(f)"$(coord_red_jobs_wait $h $jl)"})
+  redjobs=(); redwfs=(); for c in $red; do redjobs+="${c#* }"; redwfs+="${c%% *}"; done
+  fails=$(grep -oE 'FAIL \[[^]]*\] *\( *[0-9]+/[0-9]+\) [a-z0-9_-]+' $jl | awk '{print $NF}' | sort -u)
   # A compile or lint error (clippy, or a test build): the files it names, and the PRs that touch those files.
-  errfiles=$(for r in $(gh api "repos/$REPO/actions/runs?head_sha=$h" --jq '.workflow_runs[]|select(.conclusion=="failure")|.id'); do gh run view $r -R $REPO --log-failed 2>/dev/null; done | grep -oE -- '--> (lampOS/)?crates/[^:]+' | sed -E 's#^--> (lampOS/)?#lampOS/#' | sort -u)
+  errfiles=$(grep -oE -- '--> (lampOS/)?crates/[^:]+' $jl | sed -E 's#^--> (lampOS/)?#lampOS/#' | sort -u)
+  redwfs=(${(u)redwfs})
   if [[ -n $errfiles ]]; then
     say "train $n (#$tp) failed to compile or lint in: ${(f)errfiles}"
     gh pr close $tp -R $REPO -c "Train bot: closed, a compile or lint error in ${(j:, :)${(f)errfiles}}; the PRs touching those files sit out, the rest go again." >/dev/null
@@ -390,7 +494,28 @@ run_train() {
       fi
     done
   fi
-  [[ -z $fails ]] && { say "no failing test named: stopping for the first builder"; queue_post "Train bot, $(date +%H:%M): train $n (#$tp) failed with no failing test named; stopped for the first builder."; halt crates; }
+  if [[ -z $fails ]]; then
+    # 12 Nov 14:4x (#6556 B): a red check that names no test or file, in a workflow other than ARM64 (the SDK's pytest,
+    # the schema copies, doc links, the virtual lamp): the carried PRs whose files that workflow takes sit out on their
+    # current heads ($sitout, no HOLD posted, a new head brings them back), and the rest go again at once. With none
+    # to name, or ARM64 itself red with no test named (a runner died, a step outside the tests), the bot stops for the
+    # first builder as before, and its post now says which check failed.
+    other=(${redwfs:#.github/workflows/lampos-arm64.yml}); out=()
+    if (( ${#other} && ${#other} == ${#redwfs} )); then
+      for w in $other; do out+=(${(f)"$(coord_prs_taken origin/lamp-voice ${w:t} $carried)"}); done
+      out=(${(u)out})
+    fi
+    if (( ${#out} )); then
+      for p in ${(f)"$(coord_sit_out $sitout $SP/train-carried-$lane.txt $told "Train $n (#$tp) failed in ${(j:, :)redjobs}, a check that runs on files this PR changes, with no test or file named." $out)"}; do
+        say "  #$p sits out on the head train $n carried (${(j:, :)redjobs})"
+      done
+      queue_post "Train bot, $(date +%H:%M): train $n (#$tp) failed in ${(j:, :)redjobs}; the PRs that workflow takes sit out on their heads until a new push: #${(j:, #:)out}. The rest go again."
+      return 0
+    fi
+    say "no failing test named (red: ${(j:, :)redjobs:-none found}): stopping for the first builder"
+    queue_post "Train bot, $(date +%H:%M): train $n (#$tp) failed with no failing test named (red: ${(j:, :)redjobs:-no failed job found}); stopped for the first builder."
+    halt crates
+  fi
   return 0
 }
 # lane_round LANE BUSY PR...: what one lane does this round with its PRs: nothing (busy, stopped, rows alone, none),
@@ -414,6 +539,13 @@ lane_round() {
   build_train $lane $l || return 1
   if (( two )); then run_train $lane & job[$lane]=$!; else run_train $lane; fi
   return 0
+}
+# dropped PR KEY WHY: say "#PR left out: WHY" once per head (its ref eligible() fetched), for the PRs train-hold.txt and
+# train-only.txt drop below. 14 Nov: trains 905-907 left out #7016 and #7022 with no line in the log because
+# train-only.txt didn't name them.
+dropped() {
+  local h=$(git rev-parse -q --verify refs/remotes/pr/$1 2>/dev/null)
+  grep -qx -- "$1 $2 $h" $told || { say "#$1 left out: $3" >&2; tell "$1 $2 $h"; }
 }
 while true; do
   # A lane in the background stopped the bot (halt): let the other lane's train finish, then stop.
@@ -443,12 +575,12 @@ while true; do
   # 28 Oct 11:5x (first builder): PRs named in $LAMP_COORD_STATE/train-hold.txt sit out (read, but owing a lamp run the
   # lead's 09:36 merge condition asks of onboarding fixes), so a READ-OK alone doesn't carry them.
   if [[ -s $SP/train-hold.txt && -n ${list[1]} ]]; then
-    kept=(); for p in $list; do grep -qw $p $SP/train-hold.txt || kept+=$p; done; list=($kept)
+    kept=(); for p in $list; do if grep -qw $p $SP/train-hold.txt; then dropped $p hold "named in train-hold.txt"; else kept+=$p; fi; done; list=($kept)
   fi
   # 28 Oct 09:5x (first builder): the lead's 12:00 onboarding deadline. While $LAMP_COORD_STATE/train-only.txt is there, a
   # train carries only the PRs it names (in train-first.txt's order), so a failure elsewhere costs no onboarding rerun.
   if [[ -f $SP/train-only.txt && -n ${list[1]} ]]; then
-    only=(); for p in $list; do grep -qw $p $SP/train-only.txt && only+=$p; done; list=($only)
+    only=(); for p in $list; do if grep -qw $p $SP/train-only.txt; then only+=$p; else dropped $p only "not named in train-only.txt"; fi; done; list=($only)
   fi
   if (( ! two )); then
     # One lane, as before.

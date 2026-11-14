@@ -597,6 +597,152 @@ pub fn heard_instead(model: &str, heard: Option<&str>, on: bool) -> Option<Strin
     Some(kept)
 }
 
+/// The switch for [`near_heard`] on the second route, in the voice
+/// service's environment: `on` only (C37).
+pub const NEAR_ENVIRONMENT: &str = "LAMP_MEMORY_ASK_NEAR_HEARD";
+
+/// Whether [`NEAR_ENVIRONMENT`] is `on`.
+pub fn near_on() -> bool {
+    std::env::var(NEAR_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// At most this many near words are asked about in one keep.
+const NEAR_MOST: usize = 2;
+
+/// The forms `word` may be an English inflection of, its own included:
+/// without -s, -es, -ies (for -y), -ed or -ing, with an e put back
+/// ("liking", "liked": "like") or a doubled last letter undone
+/// ("stopped": "stop"), each at least three letters, and with a British
+/// "our" after two letters or more spelled "or" ("favourite", "colour").
+fn word_forms(word: &str) -> Vec<String> {
+    let word = match word.char_indices().nth(2) {
+        Some((at, _)) => format!("{}{}", &word[..at], word[at..].replace("our", "or")),
+        None => word.to_owned(),
+    };
+    let mut forms = vec![word.clone()];
+    for suffix in ["ies", "ing", "ed", "es", "s"] {
+        let Some(stem) = word.strip_suffix(suffix) else {
+            continue;
+        };
+        if stem.chars().count() < 3 {
+            continue;
+        }
+        if suffix == "ies" {
+            forms.push(format!("{stem}y"));
+            continue;
+        }
+        forms.push(stem.to_owned());
+        if suffix == "ing" || suffix == "ed" {
+            forms.push(format!("{stem}e"));
+            let mut last = stem.chars().rev();
+            if let (Some(a), Some(b)) = (last.next(), last.next())
+                && a == b
+                && stem.chars().count() > 3
+            {
+                forms.push(stem[..stem.len() - a.len_utf8()].to_owned());
+            }
+        }
+    }
+    forms
+}
+
+/// Whether `heard` and `model` are one word written two ways: an English
+/// inflection (-s, -es, -ed, -ing: "like" and "likes", "liking";
+/// "peanut" and "peanuts") or a British and American spelling
+/// ("favourite" and "favorite", "colour" and "color"). The model rewrites
+/// this way all the time, so [`near_heard`] counts them as heard: its
+/// question would only sound like a machine (Reviewer-lead on #6850).
+fn same_word(heard: &str, model: &str) -> bool {
+    let model_forms = word_forms(model);
+    word_forms(heard)
+        .iter()
+        .any(|form| model_forms.contains(form))
+}
+
+/// The model's key words not heard in `heard` when each of them is a near
+/// spelling of a word that was ([`super::doubted::misheard_as`]: the same
+/// first letter, at most half the letters changed), as (heard, model)
+/// pairs without accents; empty otherwise (C37, lamp-06c1, 5 Nov: heard
+/// "renunculus", the model's `remember` said "ranunculus", and
+/// [`heard_instead`] kept the heard line while the lamp said "Kept: …
+/// ranunculus"). Empty when every key word was heard (the model's text is
+/// kept), when one is near no heard word (the heard line is kept, as ever),
+/// when more than [`NEAR_MOST`] are near ones, and for a line that is only
+/// a yes, no or okay. A word heard inflected or spelled the British way
+/// ([`same_word`]: "likes" for "like", "favorite" for "favourite") counts
+/// as heard, never as near.
+pub fn near_heard(model: &str, heard: &str) -> Vec<(String, String)> {
+    let heard: String = heard.trim().nfc().collect();
+    if !heard.chars().any(char::is_alphanumeric) || only_an_answer(&heard) {
+        return Vec::new();
+    }
+    let said: Vec<String> = words(&heard).map(|word| bare(&word)).collect();
+    // Only a heard key word may be the one misheard: never "please" for
+    // "plant", nor a lead-in's "remember".
+    let heard_keys = key_words(without_lead_in(&heard));
+    let mut near: Vec<(String, String)> = Vec::new();
+    for word in key_words(model) {
+        // The same word inflected or spelled the British way is heard
+        // ([`same_word`]): "Likes hiking" for "I like hiking" asks nothing.
+        if said.contains(&word)
+            || said.iter().any(|heard| same_word(heard, &word))
+            || near.iter().any(|(_, kept)| *kept == word)
+        {
+            continue;
+        }
+        let Some(heard) = heard_keys
+            .iter()
+            .find(|heard| super::doubted::misheard_as(heard, &word))
+        else {
+            return Vec::new();
+        };
+        near.push((heard.clone(), word));
+    }
+    if near.len() > NEAR_MOST {
+        return Vec::new();
+    }
+    near
+}
+
+/// Whether the lamp's `answer` asks about a keep held by [`near_heard`]:
+/// an offer to keep ([`super::asks_about_keeping`]), or a question offering
+/// one of the model's near words for the heard one
+/// ([`super::doubted::offered_word`]: "Is that ranunculus?").
+pub fn asks_about_near(answer: &str, model: &str, heard: &str) -> bool {
+    if super::asks_about_keeping(answer) {
+        return true;
+    }
+    let near = near_heard(model, heard);
+    super::doubted::offered_word(answer, heard).is_some_and(|(was, offered)| {
+        near.iter()
+            .any(|(heard, kept)| *heard == bare(&was) && *kept == bare(&offered))
+    })
+}
+
+/// What the model is told of a `remember` held by [`near_heard`]: nothing
+/// kept yet, ask once whether the word is theirs, the longest near word
+/// as the example.
+pub fn near_held_told(near: &[(String, String)]) -> Value {
+    let asked = near
+        .iter()
+        .map(|(heard, kept)| format!("\"{kept}\" where they were heard saying \"{heard}\""))
+        .collect::<Vec<_>>()
+        .join(", and ");
+    // The longest near word for the example: "ranunculus", not the
+    // spelling of "favorite".
+    let example = near
+        .iter()
+        .map(|(_, kept)| kept.as_str())
+        .max_by_key(|kept| kept.chars().count())
+        .unwrap_or_default();
+    json!({
+        "remembered": false,
+        "held": format!(
+            "Not kept yet: you wrote {asked}, and the lamp may have misheard. Do not say it is kept or noted. Ask them once, in a few words, whether that is the word (for example \"Is that {example}?\"), and then stop. Their yes keeps your sentence as you wrote it; do not call remember again for it."
+        ),
+    })
+}
+
 /// For a `remember` the voice runs for heard line `request`: the call with
 /// the heard words in place of the model's, and those words, when
 /// [`heard_instead`] keeps them. `heard` is false for a line not heard at
@@ -1521,5 +1667,113 @@ mod tests {
         thread.lamp(1, "Kept: your bike is blue.", now);
         thread.person("Yes. Please keep that.", true, now);
         assert!(done_already_in(&thread, (2, None, now), bike).is_some());
+    }
+
+    /// C37 (lamp-06c1, 5 Nov): heard "renunculus", the model wrote
+    /// "ranunculus". Its words not heard are each a near spelling of a heard
+    /// one, so the keep is asked about; with the same words heard nothing
+    /// is asked, and a word near nothing heard follows the heard-line rule.
+    #[test]
+    fn a_near_spelling_of_a_heard_word_is_asked_about() {
+        const HEARD: &str = "Please remember that my favourite flower is a renunculus.";
+        let near = near_heard("Their favorite flower is a ranunculus.", HEARD);
+        // "favorite" for "favourite" is heard: only the flower is asked.
+        assert_eq!(near, [("renunculus".to_owned(), "ranunculus".to_owned())]);
+        // Heard exactly: kept as the model wrote it, nothing asked.
+        assert!(near_heard("My favourite flower is a renunculus.", HEARD).is_empty());
+        assert_eq!(
+            heard_instead("My favourite flower is a renunculus.", Some(HEARD), true),
+            None
+        );
+        // A word near nothing heard: the heard line, as ever.
+        let tulip = "Their favourite flower is a tulip.";
+        assert!(near_heard(tulip, HEARD).is_empty());
+        assert_eq!(
+            heard_instead(tulip, Some(HEARD), true).as_deref(),
+            Some("They said: my favourite flower is a renunculus.")
+        );
+        // One near word beside one near nothing: the heard line too.
+        assert_eq!(
+            near_heard("Their favourite plant is a ranunculus.", HEARD),
+            []
+        );
+        // The 20 Oct tea line: "food" is near no heard word.
+        assert!(near_heard(WRONG, TEA).is_empty());
+        // A line that is only a yes is never held against.
+        assert!(near_heard("Ranunculus.", "Yes.").is_empty());
+        // More than two near words: the heard line.
+        assert!(near_heard("Flawer ranunculus pitals.", "flower renunculus petals").is_empty());
+    }
+
+    /// Reviewer-lead on #6850: a word that differs from a heard one only by
+    /// an English inflection or a British spelling is heard, never asked
+    /// about. Each pair asks nothing alone, and beside a real near word
+    /// only that word is asked: the pair counted as heard, not as near
+    /// nothing. "ranunculus" for "renunculus" still asks.
+    #[test]
+    fn an_inflection_or_british_spelling_is_heard_not_near() {
+        let flower = [("renunculus".to_owned(), "ranunculus".to_owned())];
+        for (model, heard) in [
+            ("Likes hiking.", "I like hiking."),
+            ("Liking hiking.", "I like hiking."),
+            ("Liked hiking.", "I like hiking."),
+            ("Works at Google.", "I work at Google."),
+            ("Allergic to peanuts.", "I'm allergic to peanut."),
+            ("Grows tulips.", "I grow tulip."),
+            (
+                "Their favorite color is blue.",
+                "My favourite colour is blue.",
+            ),
+            (
+                "Their favourite colour is blue.",
+                "My favorite color is blue.",
+            ),
+            ("Watches matches.", "I watch match."),
+            ("Stopped smoking.", "I stop smoke."),
+        ] {
+            assert!(near_heard(model, heard).is_empty(), "{model} / {heard}");
+            let model = format!("{} Ranunculus.", model.trim_end_matches('.'));
+            let heard = format!("{} Renunculus.", heard.trim_end_matches('.'));
+            assert_eq!(near_heard(&model, &heard), flower, "{model} / {heard}");
+        }
+        assert_eq!(
+            near_heard("Grows ranunculus.", "I grow renunculus."),
+            flower
+        );
+        // Not one word written two ways: "hose" and "house", "for" and
+        // "four", "fees" and "feed" stay apart.
+        assert!(!same_word("house", "hose"));
+        assert!(!same_word("four", "for"));
+        assert!(!same_word("renunculus", "ranunculus"));
+    }
+
+    #[test]
+    fn a_question_offering_the_near_word_asks_about_the_held_keep() {
+        const HEARD: &str = "Please remember that my favourite flower is a renunculus.";
+        const MODEL: &str = "Their favorite flower is a ranunculus.";
+        for answer in [
+            "Is that ranunculus?",
+            "Got it, a flower. Did you mean ranunculus?",
+            "Want me to keep that for you?",
+        ] {
+            assert!(asks_about_near(answer, MODEL, HEARD), "{answer}");
+        }
+        for answer in [
+            "Kept: your favorite flower is a ranunculus.",
+            "Is that everything?",
+            "Is that a rose?",
+        ] {
+            assert!(!asks_about_near(answer, MODEL, HEARD), "{answer}");
+        }
+        let told = near_held_told(&near_heard(MODEL, HEARD));
+        assert_eq!(told["remembered"], false);
+        // The example asks about the longest near word, the flower.
+        assert!(
+            told["held"]
+                .as_str()
+                .unwrap()
+                .contains("\"Is that ranunculus?\""),
+            "{told}"
+        );
     }
 }

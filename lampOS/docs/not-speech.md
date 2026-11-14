@@ -558,7 +558,11 @@ one is chosen) and kept in the thread as the lamp's:
   audible answer (the yield committed): a yield that resumed sends no
   Start, so it stays silent; a wordless line begun in the clear (no answer
   cut), or one in a busy room (where a wordless yield is the
-  room's, `LAMP_CUT_IN_OVER_BED`) gets nothing. Asked at most once a minute
+  room's, `LAMP_CUT_IN_OVER_BED`) gets nothing, nor one while a skill
+  asked for by voice is still being made or its line is still to be said,
+  for at most 2 minutes after the make's call (lamp-9adf, 11 Nov: the lamp's own echo cut "I'll make it", and the
+  question came in place of the made line; skills.md, "A cut while it is
+  made"). Asked at most once a minute
   (`cut_in_wordless::AGAIN_AFTER`): a second knock that cuts the question
   itself leaves the lamp quiet, never asking again and again. On in the
   product by the memory owner's call (4 Nov), with a known gap accepted
@@ -585,6 +589,28 @@ one is chosen) and kept in the thread as the lamp's:
   said"); any other words get neither line ("… had words on the way: not
   asked if someone spoke"), and the model is not asked words that never came
   final; with nothing on the way (a cough, a knock) the question is asked.
+- **A yes on the way, in the clear** (#6840, lamp-9adf, 13 Nov): the
+  owner's "Yes." to a calendar move's read-back came back from speech to
+  text with no words, opened nothing, and the waiting write was dropped at
+  the next line. For a line begun in the clear whose final is empty, while a
+  read-back awaits its answer (a services write's,
+  `services::answer_awaited`, or a skill's yes,
+  `skill_write_yes::answer_awaited`), the line's words on the way are taken
+  as said when, all together, they are a plain yes or no
+  (`services::plain_yes`, `services::plain_no`;
+  `second_provider::answer_on_the_way`; the journal: "its final words came
+  back empty; its N words on the way answer a waiting read-back: taken as
+  said (#6840)"). Speech to text sends each result's own words, one segment
+  at a time, so the line's words are every result's in order, an interim
+  that only grows the one before standing in its place
+  (`second_provider::add_line_words`), never the last segment alone: "Wait,
+  not that one." then "Okay." is no answer (Heron's P2 on #6992). Any other
+  words on the way, or with no answer awaited, are thrown away as before,
+  and the journal counts all the line's words: "its final words came back
+  empty; its N words on the way are thrown away (#6840)". For a line in the
+  clear, the words on the way are read only with
+  `LAMP_SECOND_UNFINISHED_WAIT` on; without it, nothing changes. The
+  cut-in's stop path over the lamp's voice is unchanged.
 - **Known gaps** (#4938): the lamp's own echo can still cut its answer with
   no words. A playback gap admitted the story's tail in the clear, or a loud
   word of its own made a yield commit (06c1, 3 Nov 02:13 and 02:24); with

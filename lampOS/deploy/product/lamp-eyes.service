@@ -20,6 +20,10 @@ RuntimeDirectory=lampos-eyes
 RuntimeDirectoryMode=0755
 StateDirectory=lampos-eyes
 StateDirectoryMode=0700
+# lamp-control's state folder hidden (#6305): it keeps the owner's yes to a skill's task, which a part
+# running as lampos with no ProtectSystem=strict could otherwise write by hand. "-": the folder is
+# made at lamp-control's first start, and a part started before it is not refused.
+InaccessiblePaths=-/var/lib/lampos-control
 # Looking is never worth a late word.
 Nice=10
 Environment=LAMP_BUS=on
@@ -40,12 +44,31 @@ Environment=LAMP_MEMORY_STABLE_ID=on
 Environment=LAMP_PRESENCE=on
 Environment=LAMP_PRESENCE_VOICE=addressed
 # The head's own moves left out of the speaking read, and a meshed face read from 16 px (#4558): the
-# memory owner's yes (#4710, 4 Nov), after Sixth's lamp-52e6 check. LAMP_FACE_REFOUND stays off.
+# memory owner's yes (#4710, 4 Nov), after Sixth's lamp-52e6 check.
 Environment=LAMP_EYES_SPEAKING_STEADY=on
 # The one known held through a missed check for 4 s (#4493, both arms passed on lamp-52e6, 30 Oct): without it
 # each miss removed the known file with their face still in view, the voice went cold and named nobody, and
 # their line went to the room (#5522: lamp-29e7, 122 cold lines in 1.5 days).
 Environment=LAMP_FACE_KNOWN_HOLD=on
+# A face turned away and back, on a new passing id, recognised at its first look, not up to 2 s later (#4486), and
+# with the hold above a new id beside the held one's said on humans/faces/tracked as following it (#4885, #5081):
+# the memory owner's call (C65). The name moves to the new id only by a print read as theirs (who::Held::printed).
+Environment=LAMP_FACE_REFOUND=on
+# The fast camera stream (#5894, #5956, #6027): a paired computer with the camera grant gets the camera's own frames
+# (about 21 of 25 a second at 640x480, lamp-75c9 10 Nov) at /run/lampos-eyes/frames.sock instead of the eyes' two a
+# second. The socket takes only lamp-control.service, and a stream's end stops its writer at once. Off for any
+# lamp whose unit is not this one.
+Environment=LAMP_EYES_FAST_STREAM=on
+# The camera's private frame link for lamp-seen (#6543, eyes.md, "The camera's frame link for lamp-seen"):
+# --frame-link-boots on the line below names /run/lampos-seen/frame-link.env, which only lamp-seen's unit with
+# LAMP_SEEN_ACTIVITY=on writes (`lamp-seen frame-link`: as lampos, 0600, in its 0700 runtime folder), with the two boots
+# it gives itself too. The eyes read the boots from that file themselves, never from the line or the environment, and
+# serve the link from their next start; no file, no link. The socket's folder is 0700 lampos (lampos.conf), as the link
+# requires. Beside it, eyes-visits.env sets LAMP_EYES_VISITS=--visits on while the switch is on, for lamp-seen's
+# stranger check only: humans/familiar, the level of the one at the lamp with no name, face or picture (LAMP_BUS=on
+# above; the first builder's yes on #6543). "-": no file, no visits.
+Environment=LAMP_EYES_VISITS=
+EnvironmentFile=-/run/lampos-seen/eyes-visits.env
 # How the near face seems, on humans/seems for Mood's LAMP_MOOD_SEEMS (#1671, #2799): Google's
 # Blendshape V2 from Face Mesh V2's points, both placed by install (models.json). FER+ (`--seems`)
 # never runs here: its training pictures are for research only. Nothing is read without the
@@ -60,7 +83,12 @@ Environment=LAMP_FACE_KNOWN_HOLD=on
 # lamp-52e6, 3-1.3.4 on lamp-a63e and lamp-dbda), found at each open; none or two is refused.
 # A camera that stops opening (#2892, lamp-52e6 after a voice restart) is re-authorized by
 # lamp-eyes-camera.socket's root helper, asked after three failed opens, at most once a minute.
-ExecStart=/opt/lampOS/eyes/current/lamp-eyes --lock-directory /run/lampos-locks/camera --usb 01da:5875 --model /opt/lampOS/eyes/models/face_detection_yunet_2023mar.onnx --recogniser /opt/lampOS/eyes/models/face_recognition_sface_2021dec.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock --presence-file /run/lampos-eyes/present --sight-file /run/lampos-eyes/sight.jpg --people /var/lib/lampos-eyes/people.json --who-socket /run/lampos-eyes/who.sock --known-file /run/lampos-eyes/known --mouth-model /opt/lampOS/eyes/models/face_mesh_v2.onnx --seems-blendshapes /opt/lampOS/eyes/models/face_blendshapes.onnx --full-look 1280x960 --full-look-file /run/lampos-eyes/look.jpg --sight-from-look on --camera-helper /run/lampos-eyes-camera/camera.sock
+# A face from the app's photo (#5750, cloud.md and eyes.md, "A face from a photo"): --photo-dir reads the photo
+# lamp-cloud put in /run/lampos-photos (made at boot by lampos.conf) once, removes it, and keeps its one face's print
+# unconfirmed in people.json.from-photos, never named or greeted, until that person says yes at the lamp; no, no
+# answer in that meeting, a forget or 30 days deletes it. LAMP_PHOTO_SPEAKER stays off: the voice's yes carries no
+# face id yet (#2856).
+ExecStart=/opt/lampOS/eyes/current/lamp-eyes --lock-directory /run/lampos-locks/camera --usb 01da:5875 --model /opt/lampOS/eyes/models/face_detection_yunet_2023mar.onnx --recogniser /opt/lampOS/eyes/models/face_recognition_sface_2021dec.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock --presence-file /run/lampos-eyes/present --sight-file /run/lampos-eyes/sight.jpg --people /var/lib/lampos-eyes/people.json --who-socket /run/lampos-eyes/who.sock --known-file /run/lampos-eyes/known --mouth-model /opt/lampOS/eyes/models/face_mesh_v2.onnx --seems-blendshapes /opt/lampOS/eyes/models/face_blendshapes.onnx --full-look 1280x960 --full-look-file /run/lampos-eyes/look.jpg --sight-from-look on --camera-helper /run/lampos-eyes-camera/camera.sock --photo-dir /run/lampos-photos --frame-link /run/lampos-eyes-frames/camera.frames --frame-link-boots /run/lampos-seen/frame-link.env $LAMP_EYES_VISITS
 Restart=on-failure
 RestartSec=5s
 StandardInput=null

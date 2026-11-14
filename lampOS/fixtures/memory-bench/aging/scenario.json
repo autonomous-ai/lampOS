@@ -1,0 +1,288 @@
+{
+  "version": 1,
+  "fictional": true,
+  "owner": "same development persona",
+  "end_day": 120,
+  "memory_text_bytes": 4096,
+  "candidate_order": [
+    "tiers",
+    "tiers_minus_fading"
+  ],
+  "repetitions": 3,
+  "checkpoints": [
+    90,
+    120
+  ],
+  "episodes": [
+    {
+      "id": "age-story-01",
+      "day": 1,
+      "role": "low_importance",
+      "topic_word": "notebook",
+      "heard": [
+        "Sorting the dated notebook drafts let me find the missing outline. It was an ordinary small task, not a milestone.",
+        "The disposable notebook note in position 1 had a ochre corner and the pencilled mark 101; those labels were just for that afternoon. The disposable notebook note in position 2 had a teal corner and the pencilled mark 102; those labels were just for that afternoon. The disposable notebook note in position 3 had a gray corner and the pencilled mark 103; those labels were just for that afternoon. The disposable notebook note in position 4 had a cream corner and the pencilled mark 104; those labels were just for that afternoon. The disposable notebook note in position 5 had a rust corner and the pencilled mark 105; those labels were just for that afternoon. The disposable notebook note in position 6 had a lilac corner and the pencilled mark 106; those labels were just for that afternoon. The disposable notebook note in position 7 had a navy corner and the pencilled mark 107; those labels were just for that afternoon. The disposable notebook note in position 8 had a coral corner and the pencilled mark 108; those labels were just for that afternoon. The useful part was the lesson, not those disposable labels."
+      ],
+      "question": "What helped with my early notebook mishap? Keep the useful gist rather than the disposable labels.",
+      "criterion": "Keeps the useful gist: sorting drafts by date. Does not invent exact transient details."
+    },
+    {
+      "id": "age-story-09",
+      "day": 9,
+      "role": "high_importance_control",
+      "topic_word": "notebook",
+      "heard": [
+        "I want to remember this long-term principle about notebook: check the result before calling the work finished.",
+        "This principle is important to me over the long term, unlike the disposable labels from that afternoon."
+      ],
+      "question": "What lasting principle did I ask you to keep about notebook?",
+      "criterion": "Recalls checking the result before calling the work finished."
+    },
+    {
+      "id": "age-story-02",
+      "day": 2,
+      "role": "low_importance",
+      "topic_word": "tea",
+      "heard": [
+        "A shorter steep made that bitter cup of tea drinkable. It was an ordinary small task, not a milestone.",
+        "The disposable tea note in position 1 had a ochre corner and the pencilled mark 201; those labels were just for that afternoon. The disposable tea note in position 2 had a teal corner and the pencilled mark 202; those labels were just for that afternoon. The disposable tea note in position 3 had a gray corner and the pencilled mark 203; those labels were just for that afternoon. The disposable tea note in position 4 had a cream corner and the pencilled mark 204; those labels were just for that afternoon. The disposable tea note in position 5 had a rust corner and the pencilled mark 205; those labels were just for that afternoon. The disposable tea note in position 6 had a lilac corner and the pencilled mark 206; those labels were just for that afternoon. The disposable tea note in position 7 had a navy corner and the pencilled mark 207; those labels were just for that afternoon. The disposable tea note in position 8 had a coral corner and the pencilled mark 208; those labels were just for that afternoon. The useful part was the lesson, not those disposable labels."
+      ],
+      "question": "What helped with my early tea mishap? Keep the useful gist rather than the disposable labels.",
+      "criterion": "Keeps the useful gist: shortening the tea steep. Does not invent exact transient details."
+    },
+    {
+      "id": "age-story-10",
+      "day": 10,
+      "role": "high_importance_control",
+      "topic_word": "tea",
+      "heard": [
+        "I want to remember this long-term principle about tea: check the result before calling the work finished.",
+        "This principle is important to me over the long term, unlike the disposable labels from that afternoon."
+      ],
+      "question": "What lasting principle did I ask you to keep about tea?",
+      "criterion": "Recalls checking the result before calling the work finished."
+    },
+    {
+      "id": "age-story-03",
+      "day": 3,
+      "role": "low_importance",
+      "topic_word": "walking",
+      "heard": [
+        "Checking the canal map helped me recover after taking the wrong turn. It was an ordinary small task, not a milestone.",
+        "The disposable walking note in position 1 had a ochre corner and the pencilled mark 301; those labels were just for that afternoon. The disposable walking note in position 2 had a teal corner and the pencilled mark 302; those labels were just for that afternoon. The disposable walking note in position 3 had a gray corner and the pencilled mark 303; those labels were just for that afternoon. The disposable walking note in position 4 had a cream corner and the pencilled mark 304; those labels were just for that afternoon. The disposable walking note in position 5 had a rust corner and the pencilled mark 305; those labels were just for that afternoon. The disposable walking note in position 6 had a lilac corner and the pencilled mark 306; those labels were just for that afternoon. The disposable walking note in position 7 had a navy corner and the pencilled mark 307; those labels were just for that afternoon. The disposable walking note in position 8 had a coral corner and the pencilled mark 308; those labels were just for that afternoon. The useful part was the lesson, not those disposable labels."
+      ],
+      "question": "What helped with my early walking mishap? Keep the useful gist rather than the disposable labels.",
+      "criterion": "Keeps the useful gist: checking the route map after a wrong turn. Does not invent exact transient details."
+    },
+    {
+      "id": "age-story-11",
+      "day": 11,
+      "role": "high_importance_control",
+      "topic_word": "walking",
+      "heard": [
+        "I want to remember this long-term principle about walking: check the result before calling the work finished.",
+        "This principle is important to me over the long term, unlike the disposable labels from that afternoon."
+      ],
+      "question": "What lasting principle did I ask you to keep about walking?",
+      "criterion": "Recalls checking the result before calling the work finished."
+    },
+    {
+      "id": "age-story-04",
+      "day": 4,
+      "role": "low_importance",
+      "topic_word": "craft",
+      "heard": [
+        "Balancing the two paper tails made my kite fly straight. It was an ordinary small task, not a milestone.",
+        "The disposable craft note in position 1 had a ochre corner and the pencilled mark 401; those labels were just for that afternoon. The disposable craft note in position 2 had a teal corner and the pencilled mark 402; those labels were just for that afternoon. The disposable craft note in position 3 had a gray corner and the pencilled mark 403; those labels were just for that afternoon. The disposable craft note in position 4 had a cream corner and the pencilled mark 404; those labels were just for that afternoon. The disposable craft note in position 5 had a rust corner and the pencilled mark 405; those labels were just for that afternoon. The disposable craft note in position 6 had a lilac corner and the pencilled mark 406; those labels were just for that afternoon. The disposable craft note in position 7 had a navy corner and the pencilled mark 407; those labels were just for that afternoon. The disposable craft note in position 8 had a coral corner and the pencilled mark 408; those labels were just for that afternoon. The useful part was the lesson, not those disposable labels."
+      ],
+      "question": "What helped with my early craft mishap? Keep the useful gist rather than the disposable labels.",
+      "criterion": "Keeps the useful gist: balancing the kite tails. Does not invent exact transient details."
+    },
+    {
+      "id": "age-story-12",
+      "day": 12,
+      "role": "high_importance_control",
+      "topic_word": "craft",
+      "heard": [
+        "I want to remember this long-term principle about craft: check the result before calling the work finished.",
+        "This principle is important to me over the long term, unlike the disposable labels from that afternoon."
+      ],
+      "question": "What lasting principle did I ask you to keep about craft?",
+      "criterion": "Recalls checking the result before calling the work finished."
+    },
+    {
+      "id": "age-story-05",
+      "day": 5,
+      "role": "low_importance",
+      "topic_word": "lunch",
+      "heard": [
+        "Labeling lunch containers by day stopped me mixing up the batches. It was an ordinary small task, not a milestone.",
+        "The disposable lunch note in position 1 had a ochre corner and the pencilled mark 501; those labels were just for that afternoon. The disposable lunch note in position 2 had a teal corner and the pencilled mark 502; those labels were just for that afternoon. The disposable lunch note in position 3 had a gray corner and the pencilled mark 503; those labels were just for that afternoon. The disposable lunch note in position 4 had a cream corner and the pencilled mark 504; those labels were just for that afternoon. The disposable lunch note in position 5 had a rust corner and the pencilled mark 505; those labels were just for that afternoon. The disposable lunch note in position 6 had a lilac corner and the pencilled mark 506; those labels were just for that afternoon. The disposable lunch note in position 7 had a navy corner and the pencilled mark 507; those labels were just for that afternoon. The disposable lunch note in position 8 had a coral corner and the pencilled mark 508; those labels were just for that afternoon. The useful part was the lesson, not those disposable labels."
+      ],
+      "question": "What helped with my early lunch mishap? Keep the useful gist rather than the disposable labels.",
+      "criterion": "Keeps the useful gist: labeling lunch containers by day. Does not invent exact transient details."
+    },
+    {
+      "id": "age-story-13",
+      "day": 13,
+      "role": "high_importance_control",
+      "topic_word": "lunch",
+      "heard": [
+        "I want to remember this long-term principle about lunch: check the result before calling the work finished.",
+        "This principle is important to me over the long term, unlike the disposable labels from that afternoon."
+      ],
+      "question": "What lasting principle did I ask you to keep about lunch?",
+      "criterion": "Recalls checking the result before calling the work finished."
+    },
+    {
+      "id": "age-story-06",
+      "day": 6,
+      "role": "low_importance",
+      "topic_word": "plant",
+      "heard": [
+        "Checking dry soil before watering helped the desk plant recover. It was an ordinary small task, not a milestone.",
+        "The disposable plant note in position 1 had a ochre corner and the pencilled mark 601; those labels were just for that afternoon. The disposable plant note in position 2 had a teal corner and the pencilled mark 602; those labels were just for that afternoon. The disposable plant note in position 3 had a gray corner and the pencilled mark 603; those labels were just for that afternoon. The disposable plant note in position 4 had a cream corner and the pencilled mark 604; those labels were just for that afternoon. The disposable plant note in position 5 had a rust corner and the pencilled mark 605; those labels were just for that afternoon. The disposable plant note in position 6 had a lilac corner and the pencilled mark 606; those labels were just for that afternoon. The disposable plant note in position 7 had a navy corner and the pencilled mark 607; those labels were just for that afternoon. The disposable plant note in position 8 had a coral corner and the pencilled mark 608; those labels were just for that afternoon. The useful part was the lesson, not those disposable labels."
+      ],
+      "question": "What helped with my early plant mishap? Keep the useful gist rather than the disposable labels.",
+      "criterion": "Keeps the useful gist: checking soil before watering. Does not invent exact transient details."
+    },
+    {
+      "id": "age-story-14",
+      "day": 14,
+      "role": "high_importance_control",
+      "topic_word": "plant",
+      "heard": [
+        "I want to remember this long-term principle about plant: check the result before calling the work finished.",
+        "This principle is important to me over the long term, unlike the disposable labels from that afternoon."
+      ],
+      "question": "What lasting principle did I ask you to keep about plant?",
+      "criterion": "Recalls checking the result before calling the work finished."
+    },
+    {
+      "id": "age-story-07",
+      "day": 7,
+      "role": "low_importance",
+      "topic_word": "music",
+      "heard": [
+        "Quiet piano helped me finish the tangled outline without interruptions. It was an ordinary small task, not a milestone.",
+        "The disposable music note in position 1 had a ochre corner and the pencilled mark 701; those labels were just for that afternoon. The disposable music note in position 2 had a teal corner and the pencilled mark 702; those labels were just for that afternoon. The disposable music note in position 3 had a gray corner and the pencilled mark 703; those labels were just for that afternoon. The disposable music note in position 4 had a cream corner and the pencilled mark 704; those labels were just for that afternoon. The disposable music note in position 5 had a rust corner and the pencilled mark 705; those labels were just for that afternoon. The disposable music note in position 6 had a lilac corner and the pencilled mark 706; those labels were just for that afternoon. The disposable music note in position 7 had a navy corner and the pencilled mark 707; those labels were just for that afternoon. The disposable music note in position 8 had a coral corner and the pencilled mark 708; those labels were just for that afternoon. The useful part was the lesson, not those disposable labels."
+      ],
+      "question": "What helped with my early music mishap? Keep the useful gist rather than the disposable labels.",
+      "criterion": "Keeps the useful gist: using quiet music while working without interruptions. Does not invent exact transient details."
+    },
+    {
+      "id": "age-story-15",
+      "day": 15,
+      "role": "high_importance_control",
+      "topic_word": "music",
+      "heard": [
+        "I want to remember this long-term principle about music: check the result before calling the work finished.",
+        "This principle is important to me over the long term, unlike the disposable labels from that afternoon."
+      ],
+      "question": "What lasting principle did I ask you to keep about music?",
+      "criterion": "Recalls checking the result before calling the work finished."
+    },
+    {
+      "id": "age-story-08",
+      "day": 8,
+      "role": "low_importance",
+      "topic_word": "ink",
+      "heard": [
+        "Trying pen ink on scrap paper kept the final drawing from smudging. It was an ordinary small task, not a milestone.",
+        "The disposable ink note in position 1 had a ochre corner and the pencilled mark 801; those labels were just for that afternoon. The disposable ink note in position 2 had a teal corner and the pencilled mark 802; those labels were just for that afternoon. The disposable ink note in position 3 had a gray corner and the pencilled mark 803; those labels were just for that afternoon. The disposable ink note in position 4 had a cream corner and the pencilled mark 804; those labels were just for that afternoon. The disposable ink note in position 5 had a rust corner and the pencilled mark 805; those labels were just for that afternoon. The disposable ink note in position 6 had a lilac corner and the pencilled mark 806; those labels were just for that afternoon. The disposable ink note in position 7 had a navy corner and the pencilled mark 807; those labels were just for that afternoon. The disposable ink note in position 8 had a coral corner and the pencilled mark 808; those labels were just for that afternoon. The useful part was the lesson, not those disposable labels."
+      ],
+      "question": "What helped with my early ink mishap? Keep the useful gist rather than the disposable labels.",
+      "criterion": "Keeps the useful gist: testing ink on scrap paper before the final drawing. Does not invent exact transient details."
+    },
+    {
+      "id": "age-story-16",
+      "day": 16,
+      "role": "high_importance_control",
+      "topic_word": "ink",
+      "heard": [
+        "I want to remember this long-term principle about ink: check the result before calling the work finished.",
+        "This principle is important to me over the long term, unlike the disposable labels from that afternoon."
+      ],
+      "question": "What lasting principle did I ask you to keep about ink?",
+      "criterion": "Recalls checking the result before calling the work finished."
+    }
+  ],
+  "recent": [
+    {
+      "id": "aging-recent-01",
+      "day": 110,
+      "label": "current notebook cover color",
+      "value": "white",
+      "heard": "My current notebook cover color is now white. That replaces what I used before.",
+      "question": "What is my current current notebook cover color? Answer with just the value."
+    },
+    {
+      "id": "aging-recent-02",
+      "day": 111,
+      "label": "preferred tea",
+      "value": "rooibos tea",
+      "heard": "My preferred tea is now rooibos tea. That replaces what I used before.",
+      "question": "What is my current preferred tea? Answer with just the value."
+    },
+    {
+      "id": "aging-recent-03",
+      "day": 112,
+      "label": "walking route",
+      "value": "willow path",
+      "heard": "My walking route is now willow path. That replaces what I used before.",
+      "question": "What is my current walking route? Answer with just the value."
+    },
+    {
+      "id": "aging-recent-04",
+      "day": 113,
+      "label": "craft project",
+      "value": "a folded lantern",
+      "heard": "My craft project is now a folded lantern. That replaces what I used before.",
+      "question": "What is my current craft project? Answer with just the value."
+    },
+    {
+      "id": "aging-recent-05",
+      "day": 114,
+      "label": "lunch soup",
+      "value": "tomato soup",
+      "heard": "My lunch soup is now tomato soup. That replaces what I used before.",
+      "question": "What is my current lunch soup? Answer with just the value."
+    },
+    {
+      "id": "aging-recent-06",
+      "day": 115,
+      "label": "desk plant",
+      "value": "aloe",
+      "heard": "My desk plant is now aloe. That replaces what I used before.",
+      "question": "What is my current desk plant? Answer with just the value."
+    },
+    {
+      "id": "aging-recent-07",
+      "day": 116,
+      "label": "music for focus",
+      "value": "soft cello",
+      "heard": "My music for focus is now soft cello. That replaces what I used before.",
+      "question": "What is my current music for focus? Answer with just the value."
+    },
+    {
+      "id": "aging-recent-08",
+      "day": 117,
+      "label": "preferred pen ink",
+      "value": "black",
+      "heard": "My preferred pen ink is now black. That replaces what I used before.",
+      "question": "What is my current preferred pen ink? Answer with just the value."
+    }
+  ],
+  "daily_continuation": [
+    "I am at the desk for a brief check-in.",
+    "I am putting my things away after this short visit."
+  ],
+  "reason": "Separate aging comparison registered before any score; unchanged 90-day policy and existing month are retained.",
+  "gates": [
+    "Accepted nonempty derived detail and gist for low-importance episodes below 0.5; high-importance controls at or above 0.5.",
+    "Nightly maintenance strictly after all target episodes pass 90 days; inspect before later probes.",
+    "Report whether eligible old detail competes with recent evidence under the fixed 4096-byte cap; absent competition is unexercised, not no value.",
+    "No delivered-recall protection claim; adapter does not acknowledge delivery.",
+    "Source records and gists survive fading; ordinary recall is the primary comparison, explicit-history access is separately reported."
+  ]
+}

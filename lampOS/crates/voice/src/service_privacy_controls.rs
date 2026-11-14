@@ -648,19 +648,18 @@ impl Waiting {
                         .sequence
                         .checked_add(1)
                         .ok_or_else(|| io::Error::other("privacy observation count exhausted"))?;
+                    // A stale observation only closes the gate, and nothing
+                    // opens until a fresh one follows; it no longer ends the
+                    // wait by itself (#5224: a muted boot's first look read
+                    // one queued since Ready, with fresh ones right behind
+                    // it). Whether anything fresh came is judged once the
+                    // queue is drained, below, still failing closed.
                     self.gate.observe(
                         self.sequence,
                         MonoTime::from_micros(acquired_at_us),
                         MonoTime::from_micros(monotonic_us()),
                         muted,
                     );
-                    if self.gate.state(MonoTime::from_micros(monotonic_us()))
-                        == PrivacyState::Unavailable
-                    {
-                        return Err(unavailable(
-                            "invalid Controls privacy observation while waiting",
-                        ));
-                    }
                 }
                 Some(WorkerEvent::Fault { code }) => return Err(unavailable(code)),
                 Some(_) => {
@@ -1430,6 +1429,66 @@ pub(crate) mod tests {
             cleanup(&mut worker, None, &directory.path).unwrap();
             assert!(peer.join().unwrap().received_stop);
         }
+    }
+
+    /// The wait's look over `events`, queued on a cooperative fixture as
+    /// the privacy worker would have sent them, and its fixture ended.
+    fn first_look_over(events: &[(u64, bool)]) -> Result<Step> {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut worker, mut peer, input) = Worker::cooperative_fixture(&directory.path, "privacy");
+        let mut waiting = Waiting::new(new_boot().unwrap()).unwrap();
+        let now = monotonic_us();
+        for &(age_us, muted) in events {
+            peer.control
+                .send(WorkerEvent::Privacy {
+                    acquired_at_us: now - age_us,
+                    muted,
+                    receipt: None,
+                })
+                .unwrap();
+        }
+        let step = waiting.step(&mut worker, None, &mut |_, _, _| Ok(()), &mut |_| Ok(false));
+        drop(peer);
+        drop(input);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !matches!(worker.try_exit(), Ok(Some(_))) {
+            assert!(Instant::now() < deadline, "the fixture did not end");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        worker.send_stop_until_peer_gone();
+        cleanup(&mut worker, None, &directory.path).unwrap();
+        drop(worker);
+        let _ = fs::remove_dir(&directory.path);
+        step
+    }
+
+    /// lamp-06c1, 12 Nov (#5224): a muted boot's first look read an
+    /// observation queued since Ready, already past 50 ms, and the wait
+    /// ended "invalid Controls privacy observation while waiting" although
+    /// a fresh one was queued right behind it. The stale one only closes
+    /// the gate; the fresh one behind it is read, and the wait goes on.
+    #[test]
+    fn a_stale_first_observation_with_a_fresh_one_behind_it_does_not_end_the_wait() {
+        let step = first_look_over(&[(80_000, true), (0, true)])
+            .expect("a fresh observation behind a stale one keeps the wait");
+        assert_eq!(step.physical, PrivacyState::Muted);
+        assert!(!step.allowed);
+    }
+
+    /// The same first look with nothing fresh behind the stale observation
+    /// still fails closed, by the check after the queue is drained.
+    #[test]
+    fn a_stale_first_observation_alone_still_ends_the_wait_unavailable() {
+        let error = first_look_over(&[(80_000, true)])
+            .err()
+            .expect("no fresh reading");
+        assert!(is_unavailable(&*error), "{error}");
+        assert!(
+            error
+                .to_string()
+                .contains("Controls privacy unavailable while waiting"),
+            "{error}"
+        );
     }
 
     fn stopping_child(

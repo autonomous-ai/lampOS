@@ -31,6 +31,9 @@ const CHAT: &str = "chat: ";
 /// Each skill a chat request reaches through `use_skill`
 /// (`LAMP_USE_SKILL=on` in the product since #2826), by its own name.
 const REACHED: &str = "reached: ";
+/// Each skill whose line `use_skill`'s section names alone or leaves out,
+/// past its bound (`lamp_voice::use_skill::SECTION_MOST_BYTES`).
+const CUT: &str = "cut: ";
 /// What a chat request with those functions is told to say to "I'm
 /// unplugging you" (#4595): `app`, `plug`, or `none` with
 /// `prepare_to_unplug` offered.
@@ -38,20 +41,31 @@ const UNPLUG: &str = "unplug: ";
 
 /// The lamp's own functions a product lamp's chat request offers now, on the
 /// product's route (`LAMP_VOICE_ROUTE=second`, bound
-/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 22 (with
+/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 27 (with
 /// onboarding's two and memory's `forget_everything` since 25 Oct,
 /// reports' `reports_stop` and `reports_state` since #2862, a made
-/// skill's `make_skill` and `put_on_made_skill` since fourteen-P15, and
+/// skill's `make_skill` since fourteen-P15 (its `put_on_made_skill` gone
+/// since #5977: a made skill goes on as soon as it is kept), and
 /// the Harness sign-in's `sign_in_computer` and `sign_in_answer` since
-/// `LAMP_TASKS_SIGN_IN` is on in the product, #5198), the
+/// `LAMP_TASKS_SIGN_IN` is on in the product, #5198, a person's role's
+/// `set_role` and `end_role` since `LAMP_MEMORY_ROLE` is on in the
+/// product, the memory owner's call of 9 Nov, and a face from a photo's
+/// `photo_face_yes` and `photo_face_no` since `LAMP_PHOTO_FACES` is on in
+/// the product, #5750, and Harness's `harness_status` since
+/// `LAMP_TASKS_HARNESS_STATUS` is on in the product, #6061, and the asked
+/// sleep's `go_to_sleep` since `LAMP_SLEEP_ASKED` is on in the product,
+/// #6853: 45 with the route's 3 is the bound of 48 exactly), the
 /// actions part's 17 and the skills' 1: `use_skill`, which reaches every
 /// skill's function (`LAMP_USE_SKILL=on` since #2826; Dance's `dance`,
 /// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,
-/// were 3 before it), before the search and the look. However many skills
+/// were 3 before it; the FAQ's `lamp_help` since #5790, Light show's
+/// `light_show` since #5745, Light scenes' `light_scene` and Point the
+/// light's `point_light` since #5744), before the
+/// search and the look. However many skills
 /// are installed, the skills' stay 1. The test prints this split. A change
 /// to it is a change to what every session is told: say in its pull
 /// request what is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 40;
+const PRODUCT_FUNCTIONS: usize = 45;
 
 /// Every `Environment=` of a voice unit's `[Service]`.
 fn voice_environment(unit: &str) -> Vec<(String, String)> {
@@ -116,6 +130,14 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
             }
         }
     }
+    let skills = lamp_voice::tools::skill_tools(&settings);
+    let cut = lamp_voice::use_skill::cut(
+        lamp_voice::use_skill::offered(&skills),
+        &lamp_voice::tools::core_skills(&settings),
+    );
+    for skill in cut.named_alone.iter().chain(&cut.left_out) {
+        println!("{CUT}{skill}");
+    }
     let told = lamp_voice::without_a_tool::for_declared(&chat, settings.shutdown_from_app);
     let unplug = if told.contains(lamp_voice::without_a_tool::NO_UNPLUG_APP) {
         "app"
@@ -138,6 +160,7 @@ struct Product {
     left_out: Vec<String>,
     chat: Vec<String>,
     reached: Vec<String>,
+    cut: Vec<String>,
     unplug: Vec<String>,
 }
 
@@ -164,10 +187,9 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
     }
     let skills: Vec<lamp_skills::Skill> = install::PRODUCT_SKILLS
         .iter()
+        // The product's skills set LAMP_UNPLUG=on (#5747), so the runtime
+        // catalog keeps prepare-unplug, as this fixture does.
         .map(|name| lamp_skills::load(&installed.path().join(name)).unwrap())
-        // The product leaves LAMP_UNPLUG unset: mirror the runtime catalog
-        // filter even though this fixture loads the installed files directly.
-        .filter(|skill| !skill.prepares_unplug())
         .collect();
     let beside = folder.path().join(lamp_voice::tools::SKILLS_DIR);
     std::fs::create_dir(&beside).unwrap();
@@ -218,6 +240,7 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
         left_out: found(LEFT_OUT),
         chat: found(CHAT),
         reached: found(REACHED),
+        cut: found(CUT),
         unplug: found(UNPLUG),
     }
 }
@@ -287,24 +310,39 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
     }
 }
 
-/// Migrate's #4595, option (b) (the first builder, 22:1x on 30 Oct): a
-/// product lamp offers no `prepare_to_unplug` (`LAMP_UNPLUG` unset). With
-/// `LAMP_SHUTDOWN` on in the product since the button's check on a product
-/// lamp (#3697, 2 Nov; #4867), told "I'm unplugging you" its chat request is
-/// told to turn it off from the app first; with the switch off, that pulling
-/// the plug is the only way for now, and names no app.
+/// Every product skill's whole line is in `use_skill`'s section (#5790):
+/// the model calls a skill from its line, so one cut to its name alone, or
+/// left out, past the section's bound is one it no longer knows when to
+/// call. The FAQ (`lamp_help`) among them, reached through `use_skill`.
 #[test]
-fn a_product_lamp_told_it_is_being_unplugged_says_the_plug_until_the_app_can_turn_it_off() {
-    let Product { chat, unplug, .. } = product_with(&[(lamp_msgs::SHUTDOWN_SWITCH, "off")]);
+fn every_product_skill_s_line_is_whole_in_use_skill_s_section() {
+    let Product { reached, cut, .. } = product_with(&[]);
+    assert!(cut.is_empty(), "cut from use_skill's lines: {cut:?}");
     assert!(
-        !chat
-            .iter()
-            .any(|name| name == lamp_voice::without_a_tool::UNPLUG_TOOL),
+        reached.iter().any(|name| name == "lamp_help"),
+        "{reached:?}"
+    );
+}
+
+/// Migrate's #4595, option (b) (the first builder, 22:1x on 30 Oct): a lamp
+/// with no `prepare_to_unplug` (`LAMP_UNPLUG` unset), told "I'm unplugging
+/// you", says to turn it off from the app first (`LAMP_SHUTDOWN` on, as in
+/// the product since #3697), or with that switch off, that pulling the plug
+/// is the only way for now, naming no app. Since #5747 the product's skills
+/// set `LAMP_UNPLUG=on`, so a product lamp offers the tool and is told
+/// neither: it folds first.
+#[test]
+fn a_product_lamp_told_it_is_being_unplugged_folds_first() {
+    let Product { chat, unplug, .. } = product_with(&[]);
+    assert!(
+        chat.iter().any(|name| name == lamp_voice::use_skill::NAME),
         "{chat:?}"
     );
-    assert_eq!(unplug, ["plug"]);
-    // The product, with the switch on: the app's Turn off first.
-    assert_eq!(product_with(&[]).unplug, ["app"]);
+    assert_eq!(unplug, ["none"]);
+    assert_eq!(
+        product_with(&[(lamp_msgs::SHUTDOWN_SWITCH, "off")]).unplug,
+        ["none"]
+    );
 }
 
 /// A product lamp's chat request (lamp-0c89, 21 Oct: "Lamp. Please dance
@@ -333,7 +371,18 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
             .any(|name| name == lamp_voice::second_provider::net::search::FETCH),
         "{chat:?}"
     );
-    assert_eq!(skill_tools, ["dance", "set_pose"]);
+    assert_eq!(
+        skill_tools,
+        [
+            "dance",
+            "prepare_to_unplug",
+            "lamp_help",
+            "set_pose",
+            "light_show",
+            "light_scene",
+            "point_light"
+        ]
+    );
     assert!(
         chat.iter().any(|name| name == lamp_voice::use_skill::NAME),
         "{chat:?}"
@@ -389,7 +438,18 @@ fn with_reports_on_dance_stays_at_the_bound() {
         reached,
         ..
     } = product_with(&[(lamp_voice::reports_stop::ENVIRONMENT, "on")]);
-    assert_eq!(skill_tools, ["dance", "set_pose"]);
+    assert_eq!(
+        skill_tools,
+        [
+            "dance",
+            "prepare_to_unplug",
+            "lamp_help",
+            "set_pose",
+            "light_show",
+            "light_scene",
+            "point_light"
+        ]
+    );
     assert!(
         chat.len() > lamp_gemini::MAX_TOOLS && chat.len() <= lamp_voice::second_provider::MAX_TOOLS,
         "{chat:?}"

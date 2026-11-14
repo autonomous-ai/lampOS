@@ -25,12 +25,34 @@ User=lampos
 Group=lampos
 Slice=lampos-parts.slice
 Nice=10
+# A skill's task (#6305, #6432, docs/control.md): the owner's yes kept in --state-dir's task-yes.json, and a
+# run's service.read and service.write sent to lamp-services; only on the run socket, with the door on or off ((b)).
+Environment=LAMP_SKILL_TASKS=on
+# The lamp's agent's connectors (#6648, #6664): a skill's linked-service grants kept in the owner's yes and carried
+# by the run's token, so service.read and service.write reach only what the yes named. The same line in
+# lamp-tasks, lamp-skills, lamp-skills-manage@ and lamp-voice. On in the product (owner, 13 Nov).
+Environment=LAMP_AGENT_SERVICES=on
+# A made skill's fixed write through the lamp's agent (#6824): a token minted for its one write grant, for a skill
+# whose only step is a fixed write (task_yes::KeptYes::fixed_write_grant), its call given that write by the run's
+# token (runs::FixedWrite), never the agent's words. The same line in lamp-skills, lamp-tasks and lamp-services.
+# On in the product (owner, 13 Nov).
+Environment=LAMP_SKILL_WRITE_AGENT=on
+# The run socket (/run/lampos-control/control.sock) for lamp-tasks' skill runs as `lampos` (#6071 PR 1,
+# docs/control.md "The control socket, lamp-control's side"). With LAMP_CONTROL off, lamp-control serves only it and
+# admin.sock (no TLS door), once the first builder's (b) of 12 Nov 08:15 lands.
+Environment=LAMP_CONTROL_RUN_SOCKET_USER=lampos
 # Its certificate and paired computers in --state-dir, the owner's side on --admin-socket (0600),
 # the body's mood and lease sockets, the voice's say socket, lamp-actions' call socket (`volume`),
 # root's skills manage helper (skill push) and the ring's light requests on the bus.
 ExecStart=/opt/lampOS/control/current/lamp-control serve --state-dir /var/lib/lampos-control --admin-socket /run/lampos-control/admin.sock --mood-socket /run/lampos-body/mood.sock --lease-socket /run/lampos-body/lease.sock --say-socket /run/lampos-say/say.sock --actions-socket /run/lampos-actions/call.sock --manage-socket /run/lampos-skills-manage/manage.sock --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=5s
+# The local agent's socket file (docs/control.md, "The local agent") is made by lamp-control while the owner's switch is on,
+# in /run/lampos-agent, which is writable here only through the switch's own drop-in (agent.conf). Turning the switch off
+# removes that drop-in, so the next lamp-control cannot remove the old file: it would stay, owned by lampos and listening
+# nowhere. A stop removes it, by root (the `+`: outside this unit's sandbox), and a missing file is no error. A start with
+# the switch on makes it again.
+ExecStopPost=-+/usr/bin/rm -f /run/lampos-agent/agent.sock
 StandardInput=null
 StandardOutput=journal
 StandardError=journal

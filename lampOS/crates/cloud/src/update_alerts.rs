@@ -109,7 +109,8 @@ impl Stage {
 /// does not know, are told as none.
 fn told_as(outcome: &str) -> Option<Stage> {
     match outcome {
-        "switched" => Some(Stage::Done),
+        // Kept with lamp-body held as it was before (#6113): done.
+        "switched" | "held" => Some(Stage::Done),
         "self-switched" => Some(Stage::SelfSwitched),
         "self-confirmed" => Some(Stage::SelfConfirmed),
         "self-put-back" => Some(Stage::SelfPutBack),
@@ -140,6 +141,30 @@ fn not_switched_code(outcome: &str) -> &'static str {
         .unwrap_or("other")
 }
 
+/// The outcomes [`told_as`] tells as a stage, by their own names.
+const STAGED: &[&str] = &[
+    "switched",
+    "held",
+    "self-switched",
+    "self-confirmed",
+    "self-put-back",
+    "refused",
+    "rolled-back",
+    "failed",
+];
+
+/// A round's outcome by its own name, as `update/status` says it, if this
+/// build knows it (a stage's, or one of [`NOT_SWITCHED`]), else `other`:
+/// never text that came in (#6284's `update.ended`).
+pub fn outcome_name(outcome: &str) -> &'static str {
+    STAGED
+        .iter()
+        .chain(NOT_SWITCHED)
+        .copied()
+        .find(|name| *name == outcome)
+        .unwrap_or("other")
+}
+
 /// A build the lamp ran: its sequence and, when it is hex digits, the
 /// first [`SHORT_COMMIT`] characters of its commit, as [`reports::Build`]
 /// takes one.
@@ -151,13 +176,18 @@ pub struct Version(String);
 const SHORT_COMMIT: usize = 7;
 
 impl Version {
-    fn running(build: &lamp_msgs::UpdateBuild) -> Self {
+    pub fn running(build: &lamp_msgs::UpdateBuild) -> Self {
         let commit: String = build.commit.chars().take(SHORT_COMMIT).collect();
         let whole = format!("{}+{}", build.sequence, commit);
         match reports::Build::of(&whole) {
             Some(_) => Self(whole),
             None => Self(build.sequence.to_string()),
         }
+    }
+
+    /// The build as text: digits, hex digits and `+` only.
+    pub fn text(&self) -> &str {
+        &self.0
     }
 
     /// From a file: only what [`reports::Build`] takes.
@@ -625,6 +655,8 @@ mod tests {
             }),
             harness: None,
             round: None,
+            refused: None,
+            engines: None,
         }
     }
 
@@ -637,6 +669,18 @@ mod tests {
 
     fn none() -> Extras {
         Extras::default()
+    }
+
+    /// Every outcome told as a stage has its own name; any other is
+    /// `other` (#6284).
+    #[test]
+    fn an_outcomes_name_is_one_this_build_knows() {
+        for name in STAGED {
+            assert!(told_as(name).is_some(), "{name}");
+            assert_eq!(outcome_name(name), *name);
+        }
+        assert_eq!(outcome_name("up-to-date"), "up-to-date");
+        assert_eq!(outcome_name("/home/someone"), "other");
     }
 
     #[test]
@@ -736,6 +780,7 @@ mod tests {
         );
         for (outcome, want) in [
             ("switched", Some(Stage::Done)),
+            ("held", Some(Stage::Done)),
             ("self-switched", Some(Stage::SelfSwitched)),
             ("self-confirmed", Some(Stage::SelfConfirmed)),
             ("self-put-back", Some(Stage::SelfPutBack)),
@@ -1408,6 +1453,8 @@ mod tests {
             }),
             harness: None,
             round: None,
+            refused: None,
+            engines: None,
         };
         // Reason and start time as lamp-update may one day say them, with
         // the planted text where a name or a number goes.

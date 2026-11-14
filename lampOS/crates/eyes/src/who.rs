@@ -3422,6 +3422,43 @@ mod tests {
         assert!(printed.keeps_unprinted(then, true, Some("f4")));
     }
 
+    /// LAMP_FACE_REFOUND on in the product beside the known hold: a followed
+    /// id always comes after a look with a near face but not the match's id,
+    /// so main.rs's order (`looked`, `follow`, `printed`, `keeps_print`,
+    /// `carry`) has the gap's print decide first (#5546). Someone else on
+    /// the followed id, 0.32 to the held person's kept prints but under
+    /// `SAME_PERSON` to the eyes' own print of them, is let go; the same
+    /// face carries.
+    #[test]
+    fn a_followed_id_after_its_gap_carries_only_a_print_read_as_theirs() {
+        let print = |own: f32| -> Vec<f32> {
+            let rest = (1.0 - own * own).sqrt();
+            (0..PRINT)
+                .map(|n| match n {
+                    0 => own,
+                    1 => rest,
+                    _ => 0.0,
+                })
+                .collect()
+        };
+        let start = Instant::now();
+        let then = start + Duration::from_millis(500);
+        for (own, carries) in [(0.20, false), (0.30, false), (0.50, true)] {
+            let mut held = Held::new(true).following(true);
+            held.matched_print(start, Some("f3".to_owned()), &print(1.0));
+            // A look: their id gone, a near face on a new id beside it.
+            held.looked(|id| id == "f4", true);
+            assert!(held.follow(then, Some("f4"), Some("f3"), 1));
+            held.printed(&print(own), Some("f4"));
+            assert_eq!(
+                held.keeps_print(then, Some(0.32), Some("f4")),
+                carries,
+                "own print {own}"
+            );
+            assert_eq!(held.carry(Some("f4")), carries, "own print {own}");
+        }
+    }
+
     /// The Reviewer-lead's HOLD on #5546: looks every 0.1 s, the known
     /// person's box, nobody for `away_ms` before 1.0 s, then someone else's
     /// box over their last one (overlap above 0.2 within 1.5 s, so it

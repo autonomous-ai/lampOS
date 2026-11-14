@@ -403,7 +403,16 @@ fn record_then_replay_gives_a_subscriber_the_messages_again_at_their_spacing() {
     let at = |n: u64| 1_000_000 + n * 40_000;
     for n in 0..6u64 {
         let outcome = pose.publish_json(at(n), &json!({"yaw": n})).unwrap();
-        assert_eq!(outcome.delivered, 1);
+        // Train 890 (14 Nov, ARM64 3/3) and a loaded x86 host (banana, 1 in
+        // 30) saw a pose delivered to none, with the recorder's sockets there.
+        // The cause isn't known yet: say which send, and what the publisher
+        // knew of its subscribers, so the next failure names it.
+        assert_eq!(
+            outcome.delivered,
+            1,
+            "pose {n} of 6: {outcome:?}, subscribers {:?}",
+            pose.subscribers()
+        );
     }
     let every_byte: Vec<u8> = (0..=255).collect();
     let text_of = json!({"text": "hello"});
@@ -454,11 +463,21 @@ fn record_then_replay_gives_a_subscriber_the_messages_again_at_their_spacing() {
     // so that what follows is the replay and nothing else.
     let mut follow = bus.subscribe("servos", "follow").unwrap();
     assert_eq!(follow.latest().unwrap().unwrap().header.seq, 6);
+    // Each replayed pose lasts 500 ms (and the grace) from when it is sent,
+    // and `recv` passes an expired one over. So they are taken while the
+    // replay runs, not after it exits: a loaded CI runner once spent longer
+    // than that between the first send and the first read, and the first
+    // pose was rightly passed over (seq 2 came first).
     let started = Instant::now();
-    let replayed = run(
+    let replaying = Running::start(
         &root,
         &["replay", pose_file.to_str().unwrap(), "--speed", "2"],
     );
+    let mut got = Vec::new();
+    for _ in 0..6 {
+        got.push(follow.recv(WAIT).unwrap().expect("a replayed message"));
+    }
+    let replayed = replaying.output();
     let took = started.elapsed();
     let said = text(&replayed.stderr);
     assert!(replayed.status.success(), "{said}");
@@ -468,8 +487,7 @@ fn record_then_replay_gives_a_subscriber_the_messages_again_at_their_spacing() {
     );
     // Five spaces of 40 ms at twice the speed.
     assert!(took >= Duration::from_millis(100), "{took:?}");
-    for n in 0..6u64 {
-        let message = follow.recv(WAIT).unwrap().expect("a replayed message");
+    for (n, message) in (0..6u64).zip(got) {
         assert_eq!(message.header.source, "replay");
         assert_eq!(message.header.kind, Kind::Latest);
         assert_eq!((message.header.seq, message.gap), (n + 1, 0));

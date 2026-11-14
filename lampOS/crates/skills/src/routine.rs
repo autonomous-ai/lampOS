@@ -1146,6 +1146,61 @@ pub fn kept_asleep(bus: &Bus) -> Option<&'static str> {
         .then_some("the privacy switch is closed")
 }
 
+/// Why another program's call is not served now (#6128), or `None`: only a
+/// fresh lease that permits capture with the switch read open (or a lamp
+/// with no slide), and the voice neither muted nor put to sleep. Unlike
+/// [`kept_asleep`], a reading that is missing or past its life counts as
+/// private, not open: the voice itself treats it as closed.
+pub fn private_for_others(bus: &Bus) -> Option<&'static str> {
+    let latest = |topic| bus.latest(topic).ok().flatten();
+    let mute = latest(VoiceMute::TOPIC).and_then(|message| message.parse::<VoiceMute>().ok());
+    let lease = latest(MicrophonePrivacy::TOPIC)
+        .and_then(|message| message.parse::<MicrophonePrivacy>().ok());
+    private_reading(
+        mute.as_ref(),
+        lease.as_ref(),
+        lamp_bus::kernel_boot_id(),
+        lamp_bus::monotonic_us(),
+    )
+}
+
+/// The privacy reading not known: none, past its life, or from another clock.
+pub const PRIVACY_NOT_KNOWN: &str = "the privacy reading is not known";
+
+/// [`private_for_others`] on what it read: `clock` is this boot's
+/// (`None` where there is none to read, and then only the lease's own times
+/// are judged), `now_us` its CLOCK_MONOTONIC.
+pub fn private_reading(
+    mute: Option<&VoiceMute>,
+    lease: Option<&MicrophonePrivacy>,
+    clock: Option<&str>,
+    now_us: u64,
+) -> Option<&'static str> {
+    if let Some(mute) = mute.filter(|mute| mute.check().is_ok() && mute.muted) {
+        return Some(if mute.asleep() {
+            "the lamp was put to sleep by hand"
+        } else {
+            "the lamp's microphones are muted for privacy"
+        });
+    }
+    let Some(lease) = lease else {
+        return Some(PRIVACY_NOT_KNOWN);
+    };
+    let fresh = match clock {
+        Some(clock) => lease.fresh_at(clock, now_us),
+        None => {
+            lease.check().is_ok() && lease.stamp.at_us <= now_us && now_us < lease.expires_at_us
+        }
+    };
+    if !fresh {
+        return Some(PRIVACY_NOT_KNOWN);
+    }
+    if !lease.permitted || !(lease.physical_muted == Some(false) || lease.no_slide) {
+        return Some("the privacy switch is closed");
+    }
+    None
+}
+
 /// After Expression ended an admitted rest: whether it may settle again,
 /// said in the journal either way. Only a night sound (the voice listening,
 /// not yet a turn) stirs it; a turn, a hand, privacy, a pause or a reflex
@@ -1221,6 +1276,68 @@ fn cancel(publisher: &mut Publisher, source: &mut Source, now: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn lease(clock: &str, at_us: u64, permitted: bool) -> MicrophonePrivacy {
+        MicrophonePrivacy {
+            stamp: ClockStamp {
+                clock_id: clock.into(),
+                at_us,
+                sequence: 1,
+            },
+            session_id: "0123456789abcdef".into(),
+            controller_boot: "0123456789abcdef0123456789abcdef".into(),
+            microphone_generation: 1,
+            observed_us: at_us,
+            expires_at_us: at_us + lamp_msgs::MICROPHONE_PRIVACY_FRESH_US,
+            permitted,
+            physical_muted: Some(!permitted),
+            no_slide: false,
+        }
+    }
+
+    /// #6128, Thirteen's P2: another program's call is served only on a
+    /// fresh lease that permits capture; none, an expired one, one from
+    /// another clock or a closed one is private, and so is a mute.
+    #[test]
+    fn another_programs_call_needs_a_fresh_open_privacy_reading() {
+        let now = 10_000_000;
+        let open = lease("boot", now - 1_000, true);
+        assert_eq!(private_reading(None, Some(&open), Some("boot"), now), None);
+        assert_eq!(private_reading(None, Some(&open), None, now), None);
+        assert_eq!(
+            private_reading(None, None, Some("boot"), now),
+            Some(PRIVACY_NOT_KNOWN)
+        );
+        let expired = lease("boot", now - 60_000, true);
+        assert_eq!(
+            private_reading(None, Some(&expired), Some("boot"), now),
+            Some(PRIVACY_NOT_KNOWN)
+        );
+        assert_eq!(
+            private_reading(None, Some(&expired), None, now),
+            Some(PRIVACY_NOT_KNOWN)
+        );
+        assert_eq!(
+            private_reading(None, Some(&open), Some("another-boot"), now),
+            Some(PRIVACY_NOT_KNOWN)
+        );
+        let closed = lease("boot", now - 1_000, false);
+        assert_eq!(
+            private_reading(None, Some(&closed), Some("boot"), now),
+            Some("the privacy switch is closed")
+        );
+        let muted = VoiceMute {
+            muted: true,
+            reason: None,
+            muted_by: None,
+            control: false,
+            hears_name: false,
+        };
+        assert_eq!(
+            private_reading(Some(&muted), Some(&open), Some("boot"), now),
+            Some("the lamp's microphones are muted for privacy")
+        );
+    }
     const CLOCK: &str = "routine-host";
     const NIGHT: u64 = 1_767_225_600_000 + 23 * 3_600_000;
     struct Fixture {

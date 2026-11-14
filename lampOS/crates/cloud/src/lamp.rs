@@ -94,7 +94,8 @@ pub struct Real {
     /// (#2194, `crate::update`).
     pub update_page: bool,
     /// The app's checks for an update asked of lamp-update, with the same
-    /// switch (#4153, `crate::update::Checks`).
+    /// switch (#4153, `crate::update::Checks`), and its installs of a
+    /// missing agent with `LAMP_APP_ENGINES=on` too (#6240).
     pub update_checks: crate::update::Checks,
     /// Setup's change helper's socket ([`crate::settings::SOCKET`]), asked
     /// to restart the lamp, with `LAMP_APP_RESTART=on` (#2193,
@@ -133,6 +134,9 @@ pub struct Real {
     /// The owner's face expressions and room sounds yeses from the app,
     /// with `LAMP_APP_CONSENT=on` (#5500, `crate::consent`).
     pub consent: Option<crate::consent::Place>,
+    /// The owner's dev monitor, with `LAMP_APP_MONITOR=on` (#5883,
+    /// `crate::monitor`).
+    pub monitor: Option<crate::monitor::Place>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -477,6 +481,23 @@ impl Real {
         self.bus.as_ref()?.latest(topic).ok().flatten()
     }
 
+    /// `skills/events`' last message: its publisher's boot and seq, and the
+    /// run (#6076).
+    fn skill_run(&self) -> Option<crate::onboarding_page::Run> {
+        let message = self.latest(lamp_msgs::SkillEvent::TOPIC)?;
+        let run = message.parse::<lamp_msgs::SkillEvent>().ok()?;
+        Some(((message.header.boot.clone(), message.header.seq), run))
+    }
+
+    /// `voice/turn`'s last turn said to the lamp: its publisher's boot and
+    /// seq, never its words (#6353).
+    fn answered_turn(&self) -> Option<crate::onboarding_page::Key> {
+        let message = self.latest(lamp_msgs::VoiceTurn::TOPIC)?;
+        let turn = message.parse::<lamp_msgs::VoiceTurn>().ok()?;
+        (turn.verdict == lamp_msgs::TurnVerdict::Answered)
+            .then(|| (message.header.boot.clone(), message.header.seq))
+    }
+
     /// The host's boot, the clock a preview's claim is on (the ring's own).
     fn boot(&self) -> Result<String, String> {
         Some(read(&self.places.proc.join("sys/kernel/random/boot_id")))
@@ -776,6 +797,56 @@ impl Lamp for Real {
         crate::onboarding_done::kept_in()
     }
 
+    fn onboarding_steps(&self) -> Option<(u64, Vec<lamp_msgs::OnboardingStepEnded>)> {
+        let pending = self
+            .latest(lamp_msgs::OnboardingPending::TOPIC)?
+            .parse::<lamp_msgs::OnboardingPending>()
+            .ok()?;
+        Some((pending.walk_id?, pending.steps_ended))
+    }
+
+    fn onboarding_page(&mut self, data: &Value) -> Result<Value, String> {
+        let light = self.light().ok();
+        let run = self.skill_run();
+        let turn = self.answered_turn();
+        // The installed skills, read for an Add page's taps only (#6353).
+        let catalogue = (data["page"] == "add")
+            .then(|| self.skills())
+            .flatten()
+            .and_then(|places| crate::skills::list(&places).ok());
+        let seen = crate::onboarding_page::Seen {
+            light: light.as_ref(),
+            run: run.as_ref(),
+            turn: turn.as_ref(),
+        };
+        crate::onboarding_page::PAGES
+            .lock()
+            .map_err(|_| "the page cannot be kept".to_owned())?
+            .open(data, seen, |id| {
+                crate::onboarding_page::name_in(catalogue.as_ref()?, id)
+            })
+    }
+
+    fn onboarding_page_done(&mut self) -> Option<Value> {
+        // No bus read on a tick with no page open.
+        if !crate::onboarding_page::PAGES.lock().ok()?.is_open() {
+            return None;
+        }
+        let light = self.light().ok();
+        let run = self.skill_run();
+        let turn = self.answered_turn();
+        let seen = crate::onboarding_page::Seen {
+            light: light.as_ref(),
+            run: run.as_ref(),
+            turn: turn.as_ref(),
+        };
+        let (data, line) = crate::onboarding_page::PAGES.lock().ok()?.done(seen)?;
+        if !line.is_empty() {
+            crate::onboarding_page::say(&line, self.language() == "en");
+        }
+        data
+    }
+
     fn make_skill(&self) -> Option<PathBuf> {
         self.make_skill.clone()
     }
@@ -786,6 +857,10 @@ impl Lamp for Real {
 
     fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
         self.services.clone()
+    }
+
+    fn skill_secrets(&self) -> Option<std::path::PathBuf> {
+        crate::skill_secrets::product()
     }
 
     fn write_skill(&self) -> Option<PathBuf> {
@@ -808,12 +883,29 @@ impl Lamp for Real {
         self.consent.clone()
     }
 
+    fn monitor(&self) -> Option<crate::monitor::Place> {
+        self.monitor.clone()
+    }
+
     fn update_status(&self) -> Option<lamp_bus::Message> {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
 
-    fn check_update(&mut self, now: Instant) -> Result<(), String> {
-        self.update_checks.ask(self.bus.as_ref(), now)
+    fn update_events(&self) -> Option<PathBuf> {
+        crate::update_events::kept_in()
+    }
+
+    fn check_update(&mut self, now: Instant, retry: Option<u64>) -> Result<(), String> {
+        self.update_checks.ask(self.bus.as_ref(), now, retry)
+    }
+
+    fn engines_page(&self) -> bool {
+        self.update_page && self.update_checks.engines()
+    }
+
+    fn install_engine(&mut self, engine: &str, now: Instant) -> Result<(), String> {
+        self.update_checks
+            .ask_install(self.bus.as_ref(), engine, now)
     }
 
     fn restart(&mut self) -> Result<Value, String> {
@@ -1038,6 +1130,7 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            monitor: None,
             upload: None,
             shutdown: None,
         };
@@ -1123,6 +1216,7 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            monitor: None,
             upload: None,
             shutdown: None,
         };
@@ -1217,6 +1311,7 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            monitor: None,
             upload: None,
             shutdown: None,
         };
@@ -1324,6 +1419,7 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            monitor: None,
             upload: None,
             shutdown: None,
         };

@@ -31,6 +31,20 @@
 //! any forget of one of them takes it, never told at a session's start, and
 //! found only by a recall. A conversation too short to have a note keeps
 //! none: its exchanges are there to be recalled themselves.
+//!
+//! With `LAMP_HISTORY_AFTER_NOTE` too (#6218), the exchanges a stored note
+//! holds are told in it alone, not again as the thread's lines and the
+//! chat's history: each note has a lineage ([`Note::lineage`]), the same
+//! for every note made from the one before it, and only a job whose note
+//! was kept marks its own exchanges with it
+//! ([`crate::thread::Thread::folded`]), with the version of the note it
+//! was kept into ([`Note::version`]). A turn leaves an exchange out only
+//! while its scope's note of that lineage, of that version or a later one,
+//! is told to it ([`told_with_lineage`]): a batch folded into a newer
+//! version after the turn read its note is in neither the note it tells nor
+//! out of its history, so it stays told. A job dropped, failed, empty or forgotten, a
+//! note gone at its age or its conversation's end, or one too long for the
+//! room, leaves every exchange told in full, as before.
 use std::{
     sync::{
         Arc, Mutex, OnceLock,
@@ -80,11 +94,24 @@ pub struct Summaries {
     notes: Vec<(Option<String>, Note)>,
     /// Bumped at each forget: a job begun before it is never kept.
     forgets: u64,
+    /// The last lineage given to a note begun from nothing ([`Note::lineage`]).
+    lineages: u64,
+    /// The last version given to a kept note ([`Note::version`]).
+    versions: u64,
 }
 
 struct Note {
     text: String,
     at: Instant,
+    /// The same for a note and every note made from it as the previous
+    /// one; new for a note begun from nothing, unique across scopes. The
+    /// exchanges a kept job folded into it carry it
+    /// (`LAMP_HISTORY_AFTER_NOTE`, [`crate::thread::Thread::folded`]).
+    lineage: u64,
+    /// New at each note kept, whatever its scope or lineage, and only ever
+    /// larger: a note of a lineage holds the exchanges folded into its own
+    /// version and every earlier one of that lineage, never a later one's.
+    version: u64,
 }
 
 impl Summaries {
@@ -92,6 +119,8 @@ impl Summaries {
         Self {
             notes: Vec::new(),
             forgets: 0,
+            lineages: 0,
+            versions: 0,
         }
     }
 
@@ -104,18 +133,63 @@ impl Summaries {
     /// The scope's note, while it is under
     /// [`crate::thread::REMEMBERED_FOR`] old.
     pub fn of(&mut self, whose: Option<&str>, now: Instant) -> Option<String> {
+        self.of_lineage(whose, now).map(|(text, _)| text)
+    }
+
+    /// [`Self::of`], with the note's lineage and version ([`Note::lineage`],
+    /// [`Note::version`]).
+    fn of_lineage(
+        &mut self,
+        whose: Option<&str>,
+        now: Instant,
+    ) -> Option<(String, crate::thread::NoteVersion)> {
         self.notes.retain(|(_, note)| {
             now.saturating_duration_since(note.at) <= crate::thread::REMEMBERED_FOR
         });
         self.notes
             .iter()
             .find(|(scope, _)| scope.as_deref() == whose)
-            .map(|(_, note)| note.text.clone())
+            .map(|(_, note)| (note.text.clone(), (note.lineage, note.version)))
     }
 
-    fn keep(&mut self, whose: Option<String>, text: String, at: Instant) {
+    /// A note begun from nothing: a lineage of its own.
+    #[cfg(any(test, lamp_memory_probe))]
+    fn keep(
+        &mut self,
+        whose: Option<String>,
+        text: String,
+        at: Instant,
+    ) -> crate::thread::NoteVersion {
+        self.keep_from(whose, text, at, None)
+    }
+
+    /// The scope's note, made from the note of lineage `from` as its
+    /// previous one (it holds what that one held), or from nothing with
+    /// none; its lineage and its own new version.
+    fn keep_from(
+        &mut self,
+        whose: Option<String>,
+        text: String,
+        at: Instant,
+        from: Option<u64>,
+    ) -> crate::thread::NoteVersion {
+        let lineage = from.unwrap_or_else(|| {
+            self.lineages += 1;
+            self.lineages
+        });
+        self.versions += 1;
+        let version = self.versions;
         self.notes.retain(|(scope, _)| *scope != whose);
-        self.notes.push((whose, Note { text, at }));
+        self.notes.push((
+            whose,
+            Note {
+                text,
+                at,
+                lineage,
+                version,
+            },
+        ));
+        (lineage, version)
     }
 
     /// The notes of scopes still talking are as new as their talk.
@@ -328,18 +402,12 @@ pub(crate) fn put_back(notes: &[(Option<String>, String)], forgets: u64) -> bool
         return false;
     }
     let at = now();
-    summaries.notes = notes
-        .iter()
-        .map(|(scope, text)| {
-            (
-                scope.clone(),
-                Note {
-                    text: text.clone(),
-                    at,
-                },
-            )
-        })
-        .collect();
+    // Each a lineage of its own: no exchange of this thread is held by
+    // them (`LAMP_HISTORY_AFTER_NOTE`).
+    summaries.notes.clear();
+    for (scope, text) in notes {
+        summaries.keep(scope.clone(), text.clone(), at);
+    }
     true
 }
 
@@ -380,10 +448,22 @@ pub fn memory_forgot_from(
     summaries: &Mutex<Summaries>,
     thread: &Mutex<crate::thread::Thread>,
 ) -> usize {
-    let forgotten = forgot.forgotten(now_us);
+    memory_forgotten_from(&forgot.forgotten(now_us), summaries, thread)
+}
+
+fn memory_forgotten_from(
+    forgotten: &[Option<String>],
+    summaries: &Mutex<Summaries>,
+    thread: &Mutex<crate::thread::Thread>,
+) -> usize {
     // A role went with its person's everything (`LAMP_MEMORY_ROLE`).
-    for person in &forgotten {
+    for person in forgotten {
         crate::remember::role::forgot(person.as_deref());
+        // And the service records the voice holds (`LAMP_SERVICE_RECORDS`).
+        crate::service_records::forgot(person.as_deref());
+        // And the mail contacts planned for a waiting write
+        // (`LAMP_SERVICE_CONTACTS`).
+        crate::service_contacts::forgot(person.as_deref());
     }
     let forgets = forgotten
         .iter()
@@ -410,6 +490,40 @@ pub fn memory_forgot(forgot: &mut crate::bus_out::ForgotIn, now_us: u64) -> usiz
     memory_forgot_from(forgot, now_us, &SUMMARIES, &crate::thread::THREAD)
 }
 
+/// Drain memory forgets even with summaries disabled: pending writes still expire.
+pub fn memory_forgot_waiting(forgot: &mut crate::bus_out::ForgotIn, now_us: u64) -> usize {
+    memory_forgotten_waiting(&forgot.forgotten(now_us))
+}
+
+/// Apply an already-drained batch without touching the thread or running notes.
+pub(crate) fn memory_forgotten_waiting(forgotten: &[Option<String>]) -> usize {
+    // The service records the voice holds of each (`LAMP_SERVICE_RECORDS`),
+    // as [`memory_forgot_from`] drops them with the summary on: an app's
+    // forget of a person reaches them here too (Jarvis's P3 on #6073), so
+    // what the records tell (`LAMP_SERVICE_RECORDS_TOLD`) never keeps them.
+    // A role goes with its person's everything (`LAMP_MEMORY_ROLE`), and so
+    // do the mail contacts planned for their waiting write
+    // (`LAMP_SERVICE_CONTACTS`), as with the summary on.
+    for person in forgotten {
+        crate::remember::role::forgot(person.as_deref());
+        crate::service_records::forgot(person.as_deref());
+        crate::service_contacts::forgot(person.as_deref());
+    }
+    let forgets = forgotten
+        .iter()
+        .filter(|person| memory_forgot_talk(person.as_deref()))
+        .count();
+    if forgets > 0 {
+        crate::services::forget_waiting();
+    }
+    forgets
+}
+
+/// Apply an already-drained batch to this process's thread and notes.
+pub(crate) fn memory_forgotten(forgotten: &[Option<String>]) -> usize {
+    memory_forgotten_from(forgotten, &SUMMARIES, &crate::thread::THREAD)
+}
+
 /// The scope's note, while it is under [`crate::thread::REMEMBERED_FOR`]
 /// old. Notes are made only with the switch on and a model given.
 pub fn for_scope(whose: Option<&str>, now: Instant) -> Option<String> {
@@ -429,13 +543,39 @@ pub fn told_from(
     now: Instant,
     room: usize,
 ) -> String {
+    told_with_lineage_from(summaries, whose, now, room).0
+}
+
+/// [`told`], with the lineage and version of the note told
+/// ([`Note::lineage`], [`Note::version`]): none when no note is told, so no
+/// exchange is left out for it (`LAMP_HISTORY_AFTER_NOTE`,
+/// [`crate::thread::Thread::recall_after_note`]). Read before the thread's
+/// lock is taken, never inside it: a forget takes the thread's lock and then
+/// the notes'; the version, not the lock, keeps a batch folded meanwhile told.
+pub fn told_with_lineage(
+    whose: Option<&str>,
+    now: Instant,
+    room: usize,
+) -> (String, Option<crate::thread::NoteVersion>) {
+    told_with_lineage_from(&SUMMARIES, whose, now, room)
+}
+
+/// [`told_with_lineage`] from `summaries`.
+pub fn told_with_lineage_from(
+    summaries: &Mutex<Summaries>,
+    whose: Option<&str>,
+    now: Instant,
+    room: usize,
+) -> (String, Option<crate::thread::NoteVersion>) {
     let note = summaries
         .lock()
         .ok()
-        .and_then(|mut summaries| summaries.of(whose, now));
+        .and_then(|mut summaries| summaries.of_lineage(whose, now));
     match note {
-        Some(note) if HEADING.len() + note.len() < room => format!("{HEADING}{note}\n"),
-        _ => String::new(),
+        Some((note, lineage)) if HEADING.len() + note.len() < room => {
+            (format!("{HEADING}{note}\n"), Some(lineage))
+        }
+        _ => (String::new(), None),
     }
 }
 
@@ -479,7 +619,11 @@ fn run(
 ) {
     for work in jobs {
         match work {
-            Work::Fold(job) => summarize(job, summarizer, summaries, now),
+            Work::Fold(job) => {
+                summarize(job, summarizer, summaries, now, |whose, held, lineage| {
+                    fold_into(thread, whose, held, lineage);
+                })
+            }
             Work::End(ended, forgets) => end(ended, forgets, summarizer, summaries, thread),
             #[cfg(any(test, lamp_memory_probe))]
             Work::Barrier(done) => {
@@ -575,14 +719,33 @@ fn end(
     }
 }
 
+/// A kept note's exchanges marked in `thread` as held by its lineage and
+/// version ([`crate::thread::Thread::folded`]).
+fn fold_into(
+    thread: &Mutex<crate::thread::Thread>,
+    whose: Option<&str>,
+    held: &Exchanges,
+    lineage: crate::thread::NoteVersion,
+) {
+    match thread.lock() {
+        Ok(mut thread) => thread.folded(whose, held, lineage),
+        Err(poisoned) => poisoned.into_inner().folded(whose, held, lineage),
+    }
+}
+
 /// One job: the previous note and the exchanges to the model, and its
 /// answer kept as the scope's note, bounded; a failure keeps the previous.
-/// The journal has counts and sizes only, never the words.
+/// Only once the note is kept, and with the notes' lock let go (a forget
+/// takes the thread's lock and then theirs), `folded` is given the job's
+/// scope, its exchanges and the kept note's lineage and version: a job dropped, failed,
+/// empty or forgotten folds nothing. The journal has counts and sizes
+/// only, never the words.
 fn summarize(
     job: Job,
     summarizer: &(dyn Fn(&str) -> Option<String> + Send + Sync),
     summaries: &Mutex<Summaries>,
     now: impl Fn() -> Instant,
+    folded: impl FnOnce(Option<&str>, &Exchanges, crate::thread::NoteVersion),
 ) {
     const FORGOTTEN: &str =
         "lamp-voice second: conversation summary: a forget came first; nothing kept";
@@ -594,15 +757,19 @@ fn summarize(
             eprintln!("{FORGOTTEN}");
             return;
         }
-        summaries
-            .of(job.whose.as_deref(), now())
-            .unwrap_or_default()
+        summaries.of_lineage(job.whose.as_deref(), now())
+    };
+    // The new note holds what the previous held: the same lineage.
+    let (previous, from) = match previous {
+        Some((text, (lineage, _))) => (text, Some(lineage)),
+        None => (String::new(), None),
     };
     let started = Instant::now();
     let answer = summarizer(&input(&previous, &job.exchanges));
     let asked_ms = started.elapsed().as_millis();
-    let Ok(mut summaries) = summaries.lock() else {
-        return;
+    let mut summaries = match summaries.lock() {
+        Ok(summaries) => summaries,
+        Err(_) => return,
     };
     if summaries.forgets != job.forgets {
         eprintln!("{FORGOTTEN}");
@@ -630,7 +797,9 @@ fn summarize(
                 job.exchanges.len(),
                 text.len()
             );
-            summaries.keep(job.whose, text, now());
+            let lineage = summaries.keep_from(job.whose.clone(), text, now(), from);
+            drop(summaries);
+            folded(job.whose.as_deref(), &job.exchanges, lineage);
         }
     }
 }
@@ -764,7 +933,57 @@ pub(crate) fn summarize_now(
         exchanges,
         forgets,
     };
-    summarize(job, with, summaries, || now);
+    summarize(job, with, summaries, || now, |_, _, _| {});
+}
+
+/// [`summarize_now`], its kept note's exchanges then marked in `thread`
+/// as a running summary's thread marks them: for tests.
+#[cfg(test)]
+pub(crate) fn summarize_now_folding(
+    summaries: &Mutex<Summaries>,
+    thread: &Mutex<crate::thread::Thread>,
+    whose: Option<String>,
+    exchanges: Exchanges,
+    with: &(dyn Fn(&str) -> Option<String> + Send + Sync),
+    now: Instant,
+) {
+    let forgets = match summaries.lock() {
+        Ok(summaries) => summaries.forgets,
+        Err(_) => return,
+    };
+    let job = Job {
+        whose,
+        exchanges,
+        forgets,
+    };
+    summarize(
+        job,
+        with,
+        summaries,
+        || now,
+        |whose, held, lineage| {
+            fold_into(thread, whose, held, lineage);
+        },
+    );
+}
+
+/// [`summarize_now_folding`] on this process's notes and thread: for the
+/// worker's tests.
+#[cfg(test)]
+pub(crate) fn summarize_now_here(
+    whose: Option<String>,
+    exchanges: Exchanges,
+    with: &(dyn Fn(&str) -> Option<String> + Send + Sync),
+    now: Instant,
+) {
+    summarize_now_folding(
+        &SUMMARIES,
+        &crate::thread::THREAD,
+        whose,
+        exchanges,
+        with,
+        now,
+    );
 }
 
 #[cfg(test)]

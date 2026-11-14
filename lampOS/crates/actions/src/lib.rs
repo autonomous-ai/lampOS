@@ -211,7 +211,7 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
             plain("light_off", "Switch your own light off."),
             Function {
                 name: "light_colour",
-                description: "Your light can change colour: set your own light to one of its colours by name: white, warm (a warm white), orange, yellow, red, pink, purple (violet), blue, cyan or green. White and warm are colours here, not brightness: \"make your light white\" is white, and \"make it warm\" is warm. For a step warmer or cooler than it is, use light_warmer or light_cooler.",
+                description: "Your light can change colour: set your own light to one of its colours by name: white, warm (a warm white), orange, yellow, red, pink, purple (violet), blue, cyan or green. White and warm are colours here, not brightness: \"make your light white\" is white, and a bare \"make it warm\" or \"warm light\" is warm. For a step from where it is, \"warmer\", \"cooler\", or a little, a bit, a touch or slightly warm(er) or cool(er), use light_warmer or light_cooler.",
                 parameters: Some(json!({
                     "type": "object",
                     "properties": {"colour": {"type": "string", "enum": names}},
@@ -228,11 +228,11 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
             ),
             plain(
                 "light_warmer",
-                "Make your own light a step warmer in tone (white, then warm, then orange), keeping its brightness, when someone asks for it warmer, cosier or more golden. For a colour by name, warm included, use light_colour.",
+                "Make your own light a step warmer in tone (white, then warm, then orange), keeping its brightness, when someone asks for it warmer, cosier or more golden, or a little, a bit, a touch or slightly warm or warmer (\"make the light a little warm\" is a step). Only a bare \"make it warm\" or \"warm light\", or another colour by name, is light_colour.",
             ),
             plain(
                 "light_cooler",
-                "Make your own light a step cooler in tone (orange, then warm, then white), keeping its brightness, when someone asks for it cooler, whiter, a cooler white, crisper or more like daylight. For a colour by name, white included, use light_colour.",
+                "Make your own light a step cooler in tone (orange, then warm, then white), keeping its brightness, when someone asks for it cooler, whiter, a cooler white, crisper or more like daylight, or a little, a bit, a touch or slightly cool or cooler (\"make the light a little cool\" is a step). Only a bare \"make it white\" or \"white light\", or another colour by name, is light_colour.",
             ),
         ]);
     }
@@ -522,7 +522,38 @@ mod tests {
         assert!(said("light_colour").contains("not brightness"));
         assert!(said("light_brighter").contains("Not for white or whiter"));
         assert!(said("light_cooler").contains("whiter, a cooler white"));
-        assert!(said("light_warmer").contains("warm included, use light_colour"));
+        assert!(said("light_warmer").contains("Only a bare \"make it warm\""));
+    }
+
+    /// lamp-52e6, build 12104 (#6456): "Hold on, hey Lamp, make the light a
+    /// little warmer" was heard as "...a little warm." and no tool was
+    /// called, since light_colour took "make it warm" and light_warmer sent
+    /// every "warm" to light_colour. A little, a bit, a touch or slightly
+    /// warm(er) or cool(er) is a step; only a bare "make it warm" or "warm
+    /// light" is the colour.
+    #[test]
+    fn a_little_warm_is_a_step_not_the_colour() {
+        let all = catalog(true, true);
+        let said = |name: &str| all.iter().find(|f| f.name == name).unwrap().description;
+        for (step, way) in [("light_warmer", "warm"), ("light_cooler", "cool")] {
+            let text = said(step);
+            assert!(
+                text.contains(&format!(
+                    "a little, a bit, a touch or slightly {way} or {way}er"
+                )),
+                "{step}"
+            );
+            assert!(text.contains(&format!("\"make the light a little {way}\" is a step")));
+            assert!(text.contains("Only a bare"), "{step}");
+            assert!(!text.contains("included, use light_colour"), "{step}");
+        }
+        let colour = said("light_colour");
+        assert!(colour.contains("a bare \"make it warm\" or \"warm light\" is warm"));
+        assert!(colour.contains("a little, a bit, a touch or slightly warm(er) or cool(er)"));
+        assert!(colour.contains("use light_warmer or light_cooler"));
+        for function in &all {
+            assert!(function.description.len() <= 1_024, "{}", function.name);
+        }
     }
 
     /// The first builder's light scene on lamp-4ace (18 Oct, #1367): "a

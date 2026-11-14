@@ -1355,6 +1355,7 @@ struct Service {
     tools: std::path::PathBuf,
     clock: std::path::PathBuf,
     stderr: std::path::PathBuf,
+    bus: std::path::PathBuf,
     _runtime: tempfile::TempDir,
 }
 
@@ -1385,6 +1386,20 @@ impl Service {
     }
 
     fn with_limits(root: &Path, switch: &str, limits: bool) -> Self {
+        Self::spawn(root, switch, limits, true)
+    }
+
+    /// Served as to a peer that is not lamp-voice's unit (#6128): no
+    /// `LAMP_SKILLS_ANY_ASKER`, so the test's own process, in no lamp
+    /// unit's cgroup, is another program (lamp-tasks' `skill call`, the
+    /// lamp's Hermes).
+    fn not_the_voice(root: &Path, switch: &str) -> Self {
+        Self::spawn(root, switch, false, false)
+    }
+
+    /// `voice`: the call socket takes any peer as lamp-voice
+    /// (`LAMP_SKILLS_ANY_ASKER=on`, the tests' stand-in for its cgroup).
+    fn spawn(root: &Path, switch: &str, limits: bool, voice: bool) -> Self {
         let plain = root.join("plain-fixture");
         fs::create_dir(&plain).unwrap();
         fs::write(
@@ -1425,6 +1440,7 @@ impl Service {
             .env("LAMP_SKILL_ROUTINES", if limits { "on" } else { "off" })
             .env("LAMP_OUTPUT_CAPS", if limits { "on" } else { "off" })
             .env("LAMP_SKILLS_ASK", "skip")
+            .env(package::ANY_ASKER, if voice { "on" } else { "" })
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(fs::File::create(&stderr).unwrap())
@@ -1435,6 +1451,7 @@ impl Service {
             tools,
             clock,
             stderr,
+            bus,
             _runtime: runtime,
         };
         service.until_catalog(|tools| tools.iter().any(|tool| tool["name"] == "plain_fixture"));
@@ -1682,4 +1699,207 @@ rest = { op = "cancel" }
             .iter()
             .any(|tool| tool["name"] == "play_fixture")
     );
+}
+
+/// A fresh privacy lease that permits capture, renewed every 10 ms as the
+/// voice does, while it is kept (#6128: another program's call is served
+/// only on one). Dropped, the renewing stops.
+struct OpenLease {
+    renewing: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    renewer: Option<std::thread::JoinHandle<()>>,
+}
+
+impl OpenLease {
+    fn keep(bus_root: &std::path::Path) -> Self {
+        let renewing = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let bus = lamp_bus::Bus::new(bus_root).unwrap();
+        let flag = std::sync::Arc::clone(&renewing);
+        let renewer = std::thread::spawn(move || {
+            let mut lease = bus
+                .publisher_declared(
+                    lamp_msgs::MicrophonePrivacy::TOPIC,
+                    &lamp_msgs::MicrophonePrivacy::declaration(),
+                    "voice",
+                )
+                .unwrap();
+            let clock = lamp_bus::kernel_boot_id().unwrap_or("host").to_owned();
+            for sequence in 1u64.. {
+                if !flag.load(std::sync::atomic::Ordering::Relaxed) {
+                    break;
+                }
+                let now = lamp_ipc::monotonic_us();
+                let open = lamp_msgs::MicrophonePrivacy {
+                    stamp: lamp_msgs::ClockStamp {
+                        clock_id: clock.clone(),
+                        at_us: now,
+                        sequence,
+                    },
+                    session_id: "0123456789abcdef".into(),
+                    controller_boot: "0123456789abcdef0123456789abcdef".into(),
+                    microphone_generation: 1,
+                    observed_us: now,
+                    expires_at_us: now + lamp_msgs::MICROPHONE_PRIVACY_FRESH_US,
+                    permitted: true,
+                    physical_muted: Some(false),
+                    no_slide: false,
+                };
+                lease.publish_json(now, &open).unwrap();
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        });
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        Self {
+            renewing,
+            renewer: Some(renewer),
+        }
+    }
+}
+
+impl OpenLease {
+    /// `op` on `service` while the lease is kept: a reply that says the
+    /// reading is not known is asked again (a renewal can come late on a
+    /// loaded host; the lease lives 50 ms), for at most a second.
+    fn call(&self, service: &Service, op: serde_json::Value) -> serde_json::Value {
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(1);
+        loop {
+            let response = service.call(op.clone());
+            let late = response["error"]
+                .as_str()
+                .is_some_and(|error| error.contains("the privacy reading is not known"));
+            if !late || std::time::Instant::now() >= until {
+                return response;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+}
+
+impl Drop for OpenLease {
+    fn drop(&mut self) {
+        self.renewing
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+        if let Some(renewer) = self.renewer.take() {
+            let _ = renewer.join();
+        }
+    }
+}
+
+/// #6128: a peer that is not lamp-voice's unit (the lamp's Hermes through
+/// `lamp-tasks skill call`) is told apart. Its `requested_audio_context` is
+/// dropped, so a requested sound answers as with none, while the voice's
+/// same context is taken; its `audio_authorize` and `audio_finish` are
+/// refused, even with an offer the voice was given. A plain call is served.
+#[test]
+fn only_the_voice_gives_requested_audio_context_and_audio_ops() {
+    let (_dir, path) = fixture();
+    let voice = Service::start(path.parent().unwrap(), "on");
+    let offer = voice.offer(1);
+    drop(voice);
+    let (_other_dir, path) = fixture();
+    let other = Service::not_the_voice(path.parent().unwrap(), "on");
+    let open = OpenLease::keep(&other.bus);
+    assert_eq!(
+        open.call(
+            &other,
+            json!({"op":"call","name":"plain_fixture","args":{}})
+        )["ok"],
+        true
+    );
+    let response = open.call(
+        &other,
+        json!({
+            "op":"call", "name":"play_fixture", "args":{},
+            "requested_audio_context":context(1, lamp_ipc::monotonic_us())
+        }),
+    );
+    // The very answer to a call that gave no context at all.
+    let none = open.call(&other, json!({"op":"call","name":"play_fixture","args":{}}));
+    assert_eq!(response, none);
+    assert_eq!(response["ok"], false, "{response}");
+    assert!(
+        response["error"]
+            .as_str()
+            .unwrap()
+            .contains("no spoken context"),
+        "{response}"
+    );
+    for op in [
+        json!({"op":"audio_authorize","offer":offer,"phase":"start"}),
+        json!({"op":"audio_finish","offer":offer,"outcome":"cancelled"}),
+    ] {
+        let response = open.call(&other, op);
+        assert_eq!(response["ok"], false, "{response}");
+        assert_eq!(
+            response["error"],
+            lamp_skills::watch::NOT_THE_VOICE,
+            "{response}"
+        );
+    }
+    // Refused before its line is parsed as an op: even a malformed one.
+    assert_eq!(
+        open.call(&other, json!({"op":"audio_authorize"}))["error"],
+        lamp_skills::watch::NOT_THE_VOICE
+    );
+}
+
+/// #6128: while the lamp is private (the voice muted for privacy, or the
+/// privacy switch closed), a call from a peer that is not the voice is
+/// refused with why; the voice's own call is still served (it holds its
+/// turns to privacy itself). With no privacy reading the other peer is
+/// refused too; on a fresh open lease, renewed, it is served.
+#[test]
+fn another_programs_call_is_refused_while_the_lamp_is_private() {
+    use lamp_msgs::VoiceMute;
+    let plain = json!({"op":"call","name":"plain_fixture","args":{}});
+    for voice in [false, true] {
+        let (_dir, path) = fixture();
+        let service = if voice {
+            Service::start(path.parent().unwrap(), "on")
+        } else {
+            Service::not_the_voice(path.parent().unwrap(), "on")
+        };
+        let bus = lamp_bus::Bus::new(&service.bus).unwrap();
+        let mut mute = bus
+            .publisher_declared(VoiceMute::TOPIC, &VoiceMute::declaration(), "voice")
+            .unwrap();
+        let said = |muted: bool| VoiceMute {
+            muted,
+            reason: None,
+            muted_by: None,
+            control: false,
+            hears_name: false,
+        };
+        mute.publish_json(lamp_ipc::monotonic_us(), &said(true))
+            .unwrap();
+        let response = service.call(plain.clone());
+        if voice {
+            assert_eq!(response["ok"], true, "{response}");
+        } else {
+            assert_eq!(response["ok"], false, "{response}");
+            let error = response["error"].as_str().unwrap();
+            assert!(
+                error.starts_with(lamp_skills::watch::PRIVATE_FOR_OTHERS),
+                "{response}"
+            );
+            assert!(error.contains("muted for privacy"), "{response}");
+        }
+        mute.publish_json(lamp_ipc::monotonic_us(), &said(false))
+            .unwrap();
+        // Unmuted, but with no privacy reading: the voice is served, another
+        // program is not (Thirteen's P2: a missing reading is not open).
+        let response = service.call(plain.clone());
+        if voice {
+            assert_eq!(response["ok"], true, "{response}");
+        } else {
+            assert_eq!(response["ok"], false, "{response}");
+            let error = response["error"].as_str().unwrap();
+            assert!(error.contains("not known"), "{response}");
+        }
+        // A fresh lease that permits capture, renewed as the voice does:
+        // both are served.
+        let open = OpenLease::keep(&service.bus);
+        let response = open.call(&service, plain.clone());
+        drop(open);
+        assert_eq!(response["ok"], true, "{voice}: {response}");
+    }
 }

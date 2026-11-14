@@ -766,3 +766,49 @@ fn a_restart_before_the_voice_is_up_hands_it_over_once_it_is() {
     assert_eq!(seen.recv().unwrap(), json!({"upload": {"skill_md": CARD}}));
     assert!(heads.try_recv().is_err(), "fetched once");
 }
+
+/// LAMP_UPLOAD_TO_AGENT: off, a bare SKILL.md past 8 KiB is refused for
+/// its length as before, and nothing reaches the voice; on, the same 4 KB
+/// photobooth-like file goes to the voice whole, and its grants come back
+/// for the app. Past 64 KiB it is refused even on.
+#[test]
+fn an_agent_skills_file_is_taken_to_64_kib_only_with_its_switch() {
+    let body = "Take three photos with a countdown, flash the light, then post the strip to \
+                the chat through the bot API at https://api.example.invalid/. "
+        .repeat(80);
+    let card = format!("---\nname: photo-booth\ndescription: Takes a photo strip.\n---\n{body}");
+    assert!(card.len() > MOST_FILE_BYTES && card.len() < MOST_AGENT_BYTES);
+    let run = |name: &str, card: &str, to_agent: bool, answers: Vec<Value>| {
+        let dir = folder(name);
+        let upload_id = id(card.as_bytes());
+        let (base, _) = backend(
+            &format!("{KIND_PREFIX}{upload_id}"),
+            data(card.as_bytes(), "skill_md"),
+        );
+        let (socket, seen) = voice(name, answers);
+        let mut uploads = Uploads::new(
+            &base,
+            "k-secret",
+            "d-42",
+            &dir.join("skills"),
+            &dir.join("pushed"),
+            &dir.join("store-key.pub"),
+            &socket,
+        );
+        uploads.https_only = false;
+        uploads.to_agent = to_agent;
+        (uploads.run(&upload_id).0, seen)
+    };
+    let (off, seen) = run("agent-off", &card, false, vec![]);
+    assert_eq!(off.unwrap_err(), TOO_LONG);
+    assert!(seen.try_recv().is_err());
+    let mut answer = kept();
+    answer["kept"]["grants"] = json!(["light", "speak", "camera", "net"]);
+    let (on, seen) = run("agent-on", &card, true, vec![answer]);
+    let on = on.unwrap();
+    assert_eq!(on["grants"], json!(["light", "speak", "camera", "net"]));
+    assert_eq!(seen.recv().unwrap(), json!({"upload": {"skill_md": card}}));
+    let long = format!("{card}{}", "x".repeat(MOST_AGENT_BYTES));
+    let (past, _) = run("agent-past", &long, true, vec![]);
+    assert_eq!(past.unwrap_err(), AGENT_TOO_LONG);
+}

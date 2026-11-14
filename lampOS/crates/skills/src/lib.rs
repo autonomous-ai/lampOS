@@ -23,12 +23,17 @@ pub mod addon;
 pub mod clock;
 pub mod daily;
 pub mod glow;
+pub mod holds;
+pub mod knowledge;
 pub mod known;
 pub mod limits;
 pub mod package;
+pub mod remind;
 pub mod requested_audio;
 pub mod routine;
 pub mod service_read;
+pub mod service_write;
+pub mod task;
 pub mod unplug;
 pub mod usage;
 pub mod visits;
@@ -223,6 +228,15 @@ struct SkillFile {
     ask: Option<AskFile>,
     /// A function the model may call, which runs the steps.
     tool: Option<String>,
+    /// The phrases that ask for the skill (#6772): a heard line that is one
+    /// of them, said plainly, calls its tool in code on the voice's second
+    /// route (`LAMP_SKILL_NAMED`), as its tool's name said does
+    /// ([`checked_asks`]).
+    #[serde(default)]
+    asks: Vec<String>,
+    /// A file of the skill's folder whose section the choice names is told
+    /// to the tool's call after its note (#5790, [`knowledge`]).
+    knowledge: Option<String>,
     /// The tool's one argument the model picks from named values.
     choice: Option<ChoiceFile>,
     /// The tool's one argument that is yes or no.
@@ -271,6 +285,14 @@ struct SkillFile {
     watch: Option<watch::WatchFile>,
     /// Output ceilings are independent of a presentation's permission.
     limits: Option<routine::LimitsFile>,
+    /// What a `do.task`'s script may reach through lamp-control, each one
+    /// of its grants ([`task::grants_of`], #6305): only beside a `do.task`.
+    grants: Option<Vec<String>>,
+    /// The variables' names its `do.task`'s run needs, their values given
+    /// in the app and kept by lamp-services (`LAMP_SKILL_SECRETS`,
+    /// `lamp_services::skill_secrets`): only beside a `do.task`, never a
+    /// value. lamp-tasks reads them through lamp-services, not here.
+    secrets: Option<Vec<String>>,
     #[serde(rename = "do", default)]
     steps: Vec<StepFile>,
 }
@@ -333,6 +355,8 @@ pub const BUDGET_WAIT_LIVE_US: u64 = 120_000_000;
 struct StopFile {
     tool: String,
     about: String,
+    #[serde(default)]
+    when: Option<String>,
 }
 
 /// `[stop]` as loaded: the function's name and when to call it, as the
@@ -341,6 +365,9 @@ struct StopFile {
 pub struct Stop {
     pub tool: String,
     pub about: String,
+    /// When to call it and when not, in short (#6218): the tools file's
+    /// `when` with [`SUMMARY_ENVIRONMENT`] on.
+    pub when: Option<String>,
 }
 
 /// The one argument of a `[stop]` function, and its values: `snooze` until
@@ -352,6 +379,39 @@ pub const STOP_WAYS: [&str; 3] = ["snooze", "off", "on"];
 pub const STOP_ALL: &str = "all";
 /// The most a `[stop]`'s `about` may say.
 pub const STOP_ABOUT_MOST_BYTES: usize = 512;
+/// The most a `when` may say: `SKILL.md`'s, or a `[stop]`'s (#6218).
+pub const WHEN_MOST_BYTES: usize = 200;
+/// The switch that gives the tools file its `when` lines (#6218): each
+/// tool's short when to call it and when not, which the voice lists in
+/// place of the description. Off unless `on`; off, the file is as before,
+/// byte for byte.
+pub const SUMMARY_ENVIRONMENT: &str = "LAMP_USE_SKILL_SUMMARY";
+/// Whether [`SUMMARY_ENVIRONMENT`]'s value turns the `when` lines on: `on`
+/// only.
+pub fn summary_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// A `when` as kept: some text, at most [`WHEN_MOST_BYTES`], with no
+/// control characters. Any other is left out with a journal line, never a
+/// refusal: the skill loads as it did without one, so a Store skill's
+/// stray `when:` never stops it loading with the switch off (Twelve's P3
+/// on #6521). The repo's own are held to the bound by its tests.
+fn checked_when(when: Option<String>, whose: &str) -> Option<String> {
+    match when {
+        Some(when)
+            if when.trim().is_empty()
+                || when.len() > WHEN_MOST_BYTES
+                || when.chars().any(char::is_control) =>
+        {
+            eprintln!(
+                "lamp-skills: {whose} when is left out: at most {WHEN_MOST_BYTES} bytes, not empty, with no control characters"
+            );
+            None
+        }
+        when => when,
+    }
+}
 /// The file in `--state-dir` that keeps the skills turned off: one line
 /// each, the skill's name, and nothing else.
 pub const OFF_FILE: &str = "off";
@@ -441,6 +501,15 @@ pub fn keep_names(file: &Path, names: &BTreeSet<String>) -> std::io::Result<()> 
 struct QuietFile {
     from: String,
     to: String,
+}
+
+/// A trigger's `days` (#6066): a list of day names, or one name alone
+/// (`days = "weekdays"`).
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum DaysFile {
+    One(String),
+    List(Vec<String>),
 }
 
 /// A trigger's `rearm`: a word, or a line its field must stay past for a
@@ -543,6 +612,39 @@ pub const FOUND_BEFORE_A_LOOK: &str =
 pub const CAMERA_NOT_ALLOWED: &str =
     "The owner hasn't allowed this skill's camera; they can allow it in the app.";
 
+/// What the model is told of a call that turns the reading pose toward a
+/// place while the body has no measured gaze (#5766's P2: a factory lamp's
+/// body runs without `--gaze`, and would not turn, saying nothing).
+pub const CANNOT_TURN: &str = "I can't turn toward it: my turn isn't measured yet. Say so in a few words and ask them to move it in front of you; never search for it.";
+
+/// What the model is told, before why, of a call that would move the body
+/// while the body is down (#6834: a customer lamp's body stopped, every
+/// gesture dropped, and the voice still said it was dancing).
+pub const CANNOT_MOVE: &str = "I can't move right now, so I did nothing. Say so in a few words; never say you are moving or dancing. Why:";
+
+/// Why the body can't move a skill's gesture, move or stand now, if it
+/// can't: the lamp's `health` says its body has stopped, is let go asking
+/// for a hand, has gone quiet or never came up; or the body says on
+/// `body/limits` that it does not stand this run (`stands`), which drops
+/// every gesture. Unknown (no fresh health, no limits) is not down.
+pub fn body_down(health: Option<&lamp_msgs::Health>, stands: Option<bool>) -> Option<String> {
+    use lamp_msgs::Level;
+    if let Some(health) = health {
+        if health.missing.iter().any(|part| part == "body") {
+            return Some("my body has not started.".into());
+        }
+        if let Some(body) = health.items.iter().find(|item| item.name == "body") {
+            match body.level {
+                Level::Error if !body.message.is_empty() => return Some(body.message.clone()),
+                Level::Error => return Some("my body has stopped.".into()),
+                Level::Stale => return Some("my body is not running.".into()),
+                Level::Ok | Level::Warn => {}
+            }
+        }
+    }
+    (stands == Some(false)).then(|| "my arm can't stand this time.".into())
+}
+
 /// The most looks a search may say it takes: a living thing looks at a few
 /// places and lets it go (CLAUDE.md's rule 8).
 pub const SEARCH_LOOKS_AT_MOST: u32 = 8;
@@ -611,6 +713,8 @@ struct TriggerFile {
     present: Option<bool>,
     /// Local hours in which this trigger can hold.
     during: Option<QuietFile>,
+    /// The local days of the week its `during` opens on (#6066).
+    days: Option<DaysFile>,
     /// Consume at most one chance per local window, durably before acting.
     #[serde(default)]
     once_per_day: bool,
@@ -703,6 +807,9 @@ struct TestFile {
     /// `"holds"`: it holds while its topic has said nothing yet (#1677: a
     /// rule's topic on a lamp without the rules); a value that has run out
     /// still does not hold. Left out, a silent topic never holds.
+    /// `"holds_stale"` (#6543): it also holds on a value that has run out,
+    /// as a topic gone quiet (`humans/doing`); a fresh value is judged as
+    /// ever, its `for` counted from that value.
     unknown: Option<String>,
     /// Values of the field its clock is carried through (#1672): during a
     /// spell of one of them it does not hold, so nothing runs then, but its
@@ -756,6 +863,15 @@ struct StepFile {
     /// A read of one of the owner's linked services, said to them alone
     /// ([`service_read`], #5288).
     read: Option<service_read::ReadFile>,
+    /// A fixed write to one of the owner's linked services, sent only as
+    /// the owner said yes to it ([`service_write`], #6066).
+    write: Option<service_write::WriteFile>,
+    /// A timer or reminder set in the schedule, its words the skill's own
+    /// ([`remind`], #6066).
+    remind: Option<remind::RemindFile>,
+    /// A task handed to the lamp's agent, its script in the skill's own
+    /// `scripts/` ([`task`], #6305): alone in its `[[do]]` table.
+    task: Option<task::TaskFile>,
 }
 
 /// `propose = { ... }`: what an add-on suggests, as its folder writes it.
@@ -851,16 +967,33 @@ pub const MOST_WORDS_BYTES: usize = 900;
 pub struct UnplugLines {
     /// Said as written, once the fold and the asleep look are confirmed.
     pub ready: String,
-    /// A note for the voice when the fold isn't confirmed.
+    /// Said as written (#5777) when the fold isn't confirmed.
     pub failed: String,
-    /// A note for the voice when the person says to stay plugged in.
+    /// Said as written (#5777) when the person says to stay plugged in.
     pub stay: String,
-    /// A note for the voice when it gets back up after the wait.
+    /// Said as written (#5777) when it gets back up after the wait.
     pub timeout: String,
-    /// A note for the voice, said once when a preparation that was Ready
+    /// Said as written (#5777), once when a preparation that was Ready
     /// fails before any cancel, or when the body fails one after the cancel
     /// (no stand within 60 s): it can't get up by itself.
     pub check: String,
+    /// Said as written (#5777) when a confirmed fold could not turn the lamp
+    /// off (`unplug::OFF_SOCKET_ENVIRONMENT` set, the helper refused or
+    /// was not reached, #5763): it must not be unplugged yet. A file from
+    /// before it says the built-in words.
+    #[serde(default = "UnplugLines::built_in_not_off")]
+    pub not_off: String,
+    /// Said as written (#5777) at a confirmed fold with a turn-off socket,
+    /// asking whether to turn off: only a spoken yes to it turns the lamp
+    /// off (#5774's P2). A file from before it says the built-in words.
+    #[serde(default = "UnplugLines::built_in_ask_off")]
+    pub ask_off: String,
+    /// Said as written (#5777) when an update holds the turn-off: the lamp
+    /// can't turn off yet, stands up and asks to be told again (#5763's
+    /// call (a), point 5; #5777's P2: an update restarts lamp-skills, so
+    /// nothing waits for it).
+    #[serde(default = "UnplugLines::built_in_updating")]
+    pub updating: String,
 }
 
 impl UnplugLines {
@@ -870,17 +1003,31 @@ impl UnplugLines {
     /// older `skill.toml` past a newer lamp-skills, by an updater from
     /// before the skills bundle, a lamp's own `--dir` (lamp-4ace's), or a
     /// file changed on the lamp, which a round keeps (#1913). The next
-    /// release removes them, and such a file is then refused.
+    /// release removes them, and such a file is then refused. Their English
+    /// is the voice's, which says them in the owner's language (#5777's P3).
     pub fn built_in() -> Self {
         Self {
-            ready: "My arm is folded. You can unplug me now.".into(),
-            failed:
-                "Say briefly: I could not confirm a safe folded position. Please do not unplug yet."
-                    .into(),
-            stay: "Say exactly: Okay, I'll stay.".into(),
-            timeout: "Say exactly: I'm still plugged in, so I'm getting back up.".into(),
-            check: "Say exactly: I can't get up by myself; I need to be checked.".into(),
+            ready: lamp_voice::language::UNPLUG_READY.into(),
+            failed: lamp_voice::language::UNPLUG_FAILED.into(),
+            stay: lamp_voice::language::UNPLUG_STAY.into(),
+            timeout: lamp_voice::language::UNPLUG_TIMEOUT.into(),
+            check: lamp_voice::language::UNPLUG_CHECK.into(),
+            not_off: Self::built_in_not_off(),
+            ask_off: Self::built_in_ask_off(),
+            updating: Self::built_in_updating(),
         }
+    }
+
+    fn built_in_not_off() -> String {
+        lamp_voice::language::UNPLUG_NOT_OFF.into()
+    }
+
+    fn built_in_ask_off() -> String {
+        lamp_voice::language::UNPLUG_ASK_OFF.into()
+    }
+
+    fn built_in_updating() -> String {
+        lamp_voice::language::UNPLUG_UPDATING.into()
     }
 
     /// Each line is words, as a say's own are: 1 to [`MOST_WORDS_BYTES`]
@@ -892,6 +1039,9 @@ impl UnplugLines {
             ("stay", &self.stay),
             ("timeout", &self.timeout),
             ("check", &self.check),
+            ("not_off", &self.not_off),
+            ("ask_off", &self.ask_off),
+            ("updating", &self.updating),
         ] {
             if line.trim().is_empty()
                 || line.len() > MOST_WORDS_BYTES
@@ -1241,8 +1391,8 @@ pub struct Permissions {
     #[serde(default)]
     pub topics: Vec<String>,
     /// The actions part's functions it may call by name, beyond the
-    /// light's own, which `light` gives. No step names one yet: this is
-    /// the list such a step will be held to.
+    /// light's own, which `light` gives: a `remind` step's `set_reminder`
+    /// or `set_timer` ([`remind`], #6066).
     #[serde(default)]
     pub actions: Vec<String>,
     /// It may speak: a note or the voice's own words (`say`), or a sound.
@@ -1307,9 +1457,11 @@ pub struct Permissions {
     /// copy of the skill without the declaration gets nothing of it.
     #[serde(default)]
     pub core: Vec<String>,
-    /// The owner's linked services it may use, each with how: `"read"`,
-    /// the only value (#5288; writes are not ruled yet). A `read` step
-    /// reads only a service listed here ([`service_read`]).
+    /// The owner's linked services it may use, each with how: `"read"`
+    /// (#5288), or `"write"` with `LAMP_SKILL_WRITES=on` (#6066). A `read`
+    /// step reads only a service listed here as a read ([`service_read`]),
+    /// a `write` step writes only to one listed as a write
+    /// ([`service_write`]).
     #[serde(default)]
     pub services: BTreeMap<String, String>,
 }
@@ -1376,6 +1528,19 @@ impl Permissions {
             | Call::RequestedAudio(_) => ("speak", self.speak),
             Call::Look => ("camera", self.sees_picture()),
             Call::Text(_) => ("messages", self.messages),
+            // A write needs its service listed as a write, and the switch.
+            Call::ServiceWrite(write) => {
+                if self.services.get(&write.service).map(String::as_str) != Some("write") {
+                    return Some(format!(
+                        "write to {0} needs services = {{ {0} = \"write\" }} in [permissions], which it does not give",
+                        write.service
+                    ));
+                }
+                if !service_write::on() {
+                    return Some(service_write::OFF.into());
+                }
+                return None;
+            }
             // A read is said aloud: it needs its service listed as a read,
             // and the voice.
             Call::ServiceRead(read) => {
@@ -1395,8 +1560,12 @@ impl Permissions {
                     )
                 });
             }
+            // Its function, which [permissions] actions must list.
+            Call::Remind(remind) => return self.refuses_action(remind.action()),
             Call::PrepareUnplug => unreachable!("handled above"),
-            Call::AfterSay | Call::Ends => return None,
+            // Its reach is its `grants`, held by the owner's yes and
+            // lamp-control's one-run token (#6304), not `[permissions]`.
+            Call::AfterSay | Call::Ends | Call::Task(_) => return None,
         };
         (!given).then(|| {
             format!(
@@ -1535,17 +1704,34 @@ impl Permissions {
 
     /// Each list's entries well formed, once each.
     fn check(&self) -> Result<(), String> {
-        // A service a skill may read, and only read (#5288).
+        // A service a skill may read (#5288), or with the switch write to
+        // (#6066).
         for (service, how) in &self.services {
-            if let Some(why) = lamp_services::spoken::not_readable(service) {
-                return Err(format!(
-                    "[permissions] services: {why}, so a skill can't read it"
-                ));
-            }
-            if how != "read" {
-                return Err(format!(
-                    "[permissions] services: {service} = {how:?}: only \"read\"; a skill never writes to a service"
-                ));
+            match how.as_str() {
+                "read" => {
+                    if let Some(why) = lamp_services::spoken::not_readable(service) {
+                        return Err(format!(
+                            "[permissions] services: {why}, so a skill can't read it"
+                        ));
+                    }
+                }
+                "write" if !service_write::on() => {
+                    return Err(format!(
+                        "[permissions] services: {service} = \"write\": a skill's writes are off on this lamp ({} is not on)",
+                        service_write::ENVIRONMENT
+                    ));
+                }
+                "write" if !lamp_services::skill_writes::writable(service) => {
+                    return Err(format!(
+                        "[permissions] services: {service} = \"write\": a skill can't write to {service}"
+                    ));
+                }
+                "write" => {}
+                _ => {
+                    return Err(format!(
+                        "[permissions] services: {service} = {how:?}: only \"read\" or \"write\""
+                    ));
+                }
             }
         }
         for (what, list, ok) in [
@@ -1682,6 +1868,7 @@ fn addon_file(file: &SkillFile, no_triggers: bool) -> Result<(), String> {
         (file.again.is_some(), "[again]"),
         (file.still.is_some(), "still"),
         (file.history.is_some(), "[history]"),
+        (file.knowledge.is_some(), "knowledge"),
         (file.search.is_some(), "[search]"),
         (file.stop.is_some(), "[stop]"),
         (file.watch.is_some(), "[watch]"),
@@ -1789,6 +1976,9 @@ pub fn version_ok(version: &str) -> bool {
 pub struct Skill {
     pub name: String,
     pub description: String,
+    /// `SKILL.md`'s `when`, if it has one (#6218): when to call its tool and
+    /// when not, in short, at most [`WHEN_MOST_BYTES`].
+    pub when: Option<String>,
     pub enabled: bool,
     pub limits: Option<routine::Limits>,
     pub needs: Vec<String>,
@@ -1808,6 +1998,9 @@ pub struct Skill {
     /// The function the model may call to run the steps, described to it
     /// with the skill's description.
     pub tool: Option<String>,
+    /// `asks = [...]`: the phrases that ask for its tool (#6772,
+    /// [`checked_asks`]); empty without them.
+    pub asks: Vec<String>,
     choice: Option<ChoiceFile>,
     flag: Option<FlagFile>,
     again: Option<Again>,
@@ -1817,6 +2010,9 @@ pub struct Skill {
     /// With `[history]`: how far back a call is told who was at the lamp
     /// (#1685), and in what words (#940).
     pub history: Option<visits::History>,
+    /// With `knowledge`: the product knowledge a call is told, the section
+    /// its choice names (#5790, [`knowledge`]).
+    pub knowledge: Option<knowledge::Knowledge>,
     /// Local minutes of the day, from and to, when it never starts itself.
     quiet: Option<(u16, u16)>,
     /// The most runs it starts itself a local day.
@@ -1842,9 +2038,33 @@ pub struct Skill {
     pub watch: Option<watch::Spec>,
     /// With the `prepare_unplug` grant, what it says ([`UnplugLines`]).
     pub unplug: Option<UnplugLines>,
+    /// `grants = [...]`: what its `do.task`'s script may reach ([`task`],
+    /// #6305); empty without one.
+    pub grants: Vec<String>,
+    /// The lamp's old limits a skill made here was written with and that
+    /// are ignored as it loads ([`shed_made_manners`]), as said; empty for
+    /// every other skill.
+    pub manners_shed: Vec<&'static str>,
 }
 
 impl Skill {
+    /// Its `do.task` step, if it has one ([`task`], #6305): one a skill.
+    pub fn task_step(&self) -> Option<&task::TaskStep> {
+        self.steps.iter().find_map(|(_, step)| match step {
+            Step::Call(Call::Task(task)) => Some(task.as_ref()),
+            _ => None,
+        })
+    }
+
+    /// Its write to a linked service, if it has one ([`service_write`],
+    /// #6066): a skill's only step.
+    pub fn write_step(&self) -> Option<&service_write::WriteStep> {
+        self.steps.iter().find_map(|(_, step)| match step {
+            Step::Call(Call::ServiceWrite(write)) => Some(write.as_ref()),
+            _ => None,
+        })
+    }
+
     pub fn is_routine(&self) -> bool {
         self.limits.is_some()
             || self
@@ -2075,6 +2295,15 @@ impl Skill {
             [(_, Step::Call(Call::ServiceRead(_)))]
         )
     }
+
+    /// Whether its run is a write to a linked service, its only step
+    /// (#6066): nothing else of it is seen or heard.
+    fn writes_a_service(&self) -> bool {
+        matches!(
+            self.steps.as_slice(),
+            [(_, Step::Call(Call::ServiceWrite(_)))]
+        )
+    }
 }
 
 /// The line a trigger's field must stay past for a while before the trigger
@@ -2119,6 +2348,21 @@ enum Test {
 }
 
 impl Test {
+    /// Whether `value` says a level test's field is not known: the field
+    /// there and `null`, as the air part sends a CO2 its sensor does not
+    /// know yet (`crates/air/src/lib.rs`'s `reading`). Such a message says
+    /// nothing of the level, so a trigger passes it over (#6592). A field
+    /// left out is not this: `lamp/health` leaves `quiet_ms` out at 0.
+    fn unknown_in(&self, value: &Value) -> bool {
+        match self {
+            Self::Above(field, _) | Self::Below(field, _) => field
+                .split('.')
+                .try_fold(value, |value, name| value.get(name))
+                .is_some_and(Value::is_null),
+            _ => false,
+        }
+    }
+
     fn holds(&self, value: &Value) -> bool {
         match self {
             Self::NoFaces => serde_json::from_value::<Faces>(value.clone())
@@ -2216,7 +2460,18 @@ fn out_of_window(trigger: &Trigger, moment: Option<&daily::Moment>) -> Option<St
             window.opens(),
             window.closes()
         )),
-        Some(_) => None,
+        // The day its window opened is the one its `days` names (#6066):
+        // an overnight window's hours after midnight are the evening's.
+        Some(moment) => {
+            let days = trigger.days.as_ref()?;
+            let opened = window.occurrence_day(moment.day, moment.minute)?;
+            (!days.contains(opened)).then(|| {
+                format!(
+                    "not one of its days: its window opened on {}",
+                    daily::Weekdays::name(opened)
+                )
+            })
+        }
     }
 }
 
@@ -2242,6 +2497,9 @@ struct Condition {
     for_us: u64,
     /// It holds while its topic has said nothing yet (`unknown = "holds"`).
     unknown_holds: bool,
+    /// It holds too on a value that has run out (`unknown = "holds_stale"`,
+    /// #6543): never said or gone stale, the same.
+    stale_holds: bool,
     /// The values its clock is carried through (`through`, #1672).
     through: Vec<Value>,
     /// The topics that begin its clock again (`broken_by`).
@@ -2302,6 +2560,10 @@ pub struct Trigger {
     /// talk ends. 0: a chance held back is spent.
     pub wait_us: u64,
     pub during: Option<daily::Window>,
+    /// The local days of the week `during` opens on (#6066); None, every
+    /// day. An overnight window's hours after midnight are the day it
+    /// opened's.
+    pub days: Option<daily::Weekdays>,
     pub once_per_day: bool,
     /// No chance once something was heard since `during` opened today; a
     /// daily trigger's day is spent then, said once.
@@ -2524,6 +2786,17 @@ pub enum Call {
     /// A read of one of the owner's linked services, said to them alone
     /// behind its gate ([`service_read`], #5288). Its skill's only step.
     ServiceRead(Box<service_read::ReadStep>),
+    /// A fixed write to one of the owner's linked services, sent as the
+    /// owner said yes to it ([`service_write`], #6066). Its skill's only
+    /// step.
+    ServiceWrite(Box<service_write::WriteStep>),
+    /// A timer or reminder set in the schedule through the actions part's
+    /// `set_timer` or `set_reminder` ([`remind`], #6066).
+    Remind(remind::Remind),
+    /// A task handed to the lamp's agent, its script the skill's own, on
+    /// the owner's yes to its folder and grants ([`task`], #6305): on its
+    /// own beside the run's other steps, which go on at once.
+    Task(Box<task::TaskStep>),
 }
 
 /// A say written as a table: `{ text = "..." }` or `{ note = "..." }`, with
@@ -2761,6 +3034,9 @@ impl Call {
             }
             Self::Ends => ("ends", json!({})),
             Self::ServiceRead(read) => ("read", read.named()),
+            Self::ServiceWrite(write) => ("write", write.named()),
+            Self::Remind(remind) => ("remind", remind.named()),
+            Self::Task(task) => ("task", json!({"task": task.task, "run": task.run})),
         }
     }
 }
@@ -2786,6 +3062,61 @@ pub fn duration_us(text: &str) -> Result<u64, String> {
         .ok_or_else(|| format!("{text:?} is not a duration: a whole number of ms, s, m or h"))
 }
 
+/// The most phrases a skill's `asks` lists (#6772).
+pub const MOST_ASKS: usize = 8;
+/// The fewest and the most words an ask phrase is said in.
+pub const ASK_WORDS: std::ops::RangeInclusive<usize> = 2..=8;
+
+/// `asks` as a skill may give them (#6772, the first builder's ruling on
+/// #6059): only beside a tool that takes no choice and no flag, since the
+/// voice calls it with nothing (`plain_tool`); at most [`MOST_ASKS`], each [`ASK_WORDS`]
+/// words of letters, digits and apostrophes, one space between them, and
+/// none the same as another, whatever its letters' case. Never ordinary
+/// speech (Thirteen's P1 and P2s and the Reviewer-lead's P2 on #6842): a
+/// phrase that is or holds a yes, a no or a consent's words, a negation or
+/// a question, a stop, the lamp's own words for what it does itself or its
+/// first-round rules' phrases, or only words said around an ask, is
+/// refused by the voice's own check, which matches it
+/// (`lamp_voice::skill_named::ask_refused`). One that holds another
+/// skill's name is left out of the tools file ([`tools_file_summary`]).
+fn checked_asks(asks: &[String], plain_tool: bool) -> Result<(), String> {
+    if asks.is_empty() {
+        return Ok(());
+    }
+    if !plain_tool {
+        return Err(
+            "asks are the phrases that call the skill's tool with nothing: a skill with a tool and no choice or flag"
+                .into(),
+        );
+    }
+    if asks.len() > MOST_ASKS {
+        return Err(format!("asks lists at most {MOST_ASKS} phrases"));
+    }
+    let mut seen = BTreeSet::new();
+    for ask in asks {
+        let words: Vec<&str> = ask.split(' ').collect();
+        if !ASK_WORDS.contains(&words.len())
+            || words.iter().any(|word| {
+                word.is_empty()
+                    || !word
+                        .chars()
+                        .all(|letter| letter.is_alphanumeric() || letter == '\'')
+            })
+        {
+            return Err(format!(
+                "ask {ask:?}: 2 to 8 words of letters, digits and apostrophes, one space between them"
+            ));
+        }
+        if !seen.insert(ask.to_lowercase()) {
+            return Err(format!("ask {ask:?} is listed twice"));
+        }
+        if let Some(why) = lamp_voice::skill_named::ask_refused(ask) {
+            return Err(format!("ask {ask:?}: {why}"));
+        }
+    }
+    Ok(())
+}
+
 fn plain_name(name: &str) -> bool {
     (1..=64).contains(&name.len())
         && name.bytes().all(|byte| {
@@ -2793,21 +3124,23 @@ fn plain_name(name: &str) -> bool {
         })
 }
 
-/// `name` and `description` from `SKILL.md`'s front matter (Agent Skills).
-fn front_matter(text: &str) -> Result<(String, String), String> {
+/// `name` and `description` from `SKILL.md`'s front matter (Agent Skills),
+/// and its `when`, if it has one (#6218).
+fn front_matter(text: &str) -> Result<(String, String, Option<String>), String> {
     let body = text
         .strip_prefix("---\n")
         .and_then(|rest| rest.split_once("\n---"))
         .ok_or("SKILL.md begins with front matter between two --- lines")?
         .0;
-    let field = |key: &str| {
+    let optional = |key: &str| {
         body.lines()
             .find_map(|line| line.strip_prefix(key)?.strip_prefix(':'))
             .map(|value| value.trim().to_owned())
             .filter(|value| !value.is_empty())
-            .ok_or(format!("SKILL.md's front matter has no {key}"))
     };
-    Ok((field("name")?, field("description")?))
+    let field = |key: &str| optional(key).ok_or(format!("SKILL.md's front matter has no {key}"));
+    let when = checked_when(optional("when"), "SKILL.md's");
+    Ok((field("name")?, field("description")?, when))
 }
 
 /// A field's path: names joined by dots, none empty (Jarvis on #1920: a
@@ -2954,6 +3287,14 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         .map(|window| daily::Window::parse(&window.from, &window.to))
         .transpose()
         .map_err(|error| format!("during: {error}"))?;
+    let days = match file.days {
+        None => None,
+        Some(_) if during.is_none() => {
+            return Err("days goes with during: the days its window opens on".into());
+        }
+        Some(DaysFile::One(name)) => Some(daily::Weekdays::parse(&[name])?),
+        Some(DaysFile::List(names)) => Some(daily::Weekdays::parse(&names)?),
+    };
     if file.once_per_day && (during.is_none() || file.name.is_none() || file.each.is_some()) {
         return Err("once_per_day needs a named trigger with during, and no each".into());
     }
@@ -3183,6 +3524,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         wait_us,
         rise,
         during,
+        days,
         once_per_day: file.once_per_day,
         unless_heard: file.unless_heard,
         yields_to,
@@ -3238,7 +3580,7 @@ pub fn load_with(dir: &Path, present: bool) -> Result<Skill, String> {
     let read =
         |file: &str| fs::read_to_string(dir.join(file)).map_err(|error| format!("{file}: {error}"));
     let description_text = read("SKILL.md")?;
-    let (name, description) = front_matter(&description_text)?;
+    let (name, description, when) = front_matter(&description_text)?;
     if dir.file_name().and_then(|folder| folder.to_str()) != Some(name.as_str()) {
         return Err(format!(
             "SKILL.md names {name:?}, which is not its folder's name"
@@ -3259,7 +3601,7 @@ pub fn load_with(dir: &Path, present: bool) -> Result<Skill, String> {
     let Some(overlay) = table.remove("present") else {
         let file =
             toml::from_str(&manifest_text).map_err(|error| format!("skill.toml: {error}"))?;
-        return manifest(dir, name, description, texts, file);
+        return manifest(dir, name, description, texts, file).map(|skill| Skill { when, ..skill });
     };
     let toml::Value::Table(overlay) = overlay else {
         return Err("skill.toml: [present] is a table".into());
@@ -3283,7 +3625,10 @@ pub fn load_with(dir: &Path, present: bool) -> Result<Skill, String> {
     let own = manifest(dir, name.clone(), description.clone(), texts, own)?;
     let with =
         manifest(dir, name, description, texts, with).map_err(|why| format!("[present]: {why}"))?;
-    Ok(if present { with } else { own })
+    Ok(Skill {
+        when,
+        ..if present { with } else { own }
+    })
 }
 
 /// A skill's `skill.toml`, as [`load_with`] has it, loaded; `texts` are
@@ -3489,6 +3834,10 @@ fn manifest(
             return Err("a skill with a tool has a description of at most 1,024 bytes".into());
         }
     }
+    checked_asks(
+        &file.asks,
+        file.tool.is_some() && file.choice.is_none() && file.flag.is_none(),
+    )?;
     let argument = |name: &str, about: &str| -> Result<(), String> {
         if file.tool.is_none() {
             return Err("a choice or a flag is an argument of the skill's tool".into());
@@ -3654,18 +4003,28 @@ fn manifest(
                 ));
             }
         };
-        let unknown_holds = match condition.unknown.as_deref() {
-            None => false,
-            Some("holds") if condition.lasting.is_none() && condition.present.is_none() => true,
+        let (unknown_holds, stale_holds) = match condition.unknown.as_deref() {
+            None => (false, false),
+            Some("holds") if condition.lasting.is_none() && condition.present.is_none() => {
+                (true, false)
+            }
             Some("holds") => {
                 return Err(format!(
                     "on {}: unknown = \"holds\" goes with a field's test, without for or present",
                     condition.topic
                 ));
             }
+            // A fresh value's `for` counts from that value (#6543).
+            Some("holds_stale") if condition.present.is_none() => (true, true),
+            Some("holds_stale") => {
+                return Err(format!(
+                    "on {}: unknown = \"holds_stale\" goes with a field's test, without present",
+                    condition.topic
+                ));
+            }
             Some(other) => {
                 return Err(format!(
-                    "on {}: unknown is \"holds\" or left out, not {other:?}",
+                    "on {}: unknown is \"holds\", \"holds_stale\" or left out, not {other:?}",
                     condition.topic
                 ));
             }
@@ -3758,6 +4117,7 @@ fn manifest(
             test,
             for_us: condition.lasting.as_deref().map_or(Ok(0), duration_us)?,
             unknown_holds,
+            stale_holds,
             through,
             broken_by,
         });
@@ -3885,6 +4245,7 @@ fn manifest(
             Some(Stop {
                 tool: stop.tool,
                 about: stop.about,
+                when: checked_when(stop.when, "[stop]"),
             })
         }
     };
@@ -3934,9 +4295,14 @@ fn manifest(
     // A read of a linked service (#5288) is its skill's whole run: its one
     // step, alone in it, started by a trigger and never by the model, and
     // said by this program behind its gate ([`service_read`]).
-    if file.steps.iter().any(|step| step.read.is_some()) {
+    let writes = file.steps.iter().any(|step| step.write.is_some());
+    if writes && !service_write::on() {
+        return Err(service_write::OFF.into());
+    }
+    if writes || file.steps.iter().any(|step| step.read.is_some()) {
         let alone = |step: &StepFile| {
-            step.body.is_none()
+            (step.read.is_none() || step.write.is_none())
+                && step.body.is_none()
                 && step.light.is_none()
                 && step.say.is_none()
                 && step.sound.is_none()
@@ -3947,6 +4313,8 @@ fn manifest(
                 && step.show.is_none()
                 && step.stand.is_none()
                 && step.propose.is_none()
+                && step.remind.is_none()
+                && step.task.is_none()
                 && step.on.is_none()
                 && step.after.is_none()
                 && step.if_choice.is_none()
@@ -3956,15 +4324,81 @@ fn manifest(
             || triggers.is_empty()
             || triggers.iter().any(|trigger| trigger.each.is_some())
         {
-            return Err(
-                "read is its skill's only step, alone in it, in a skill a trigger starts (no each) and with no tool"
-                    .into(),
-            );
+            return Err(format!(
+                "{} is its skill's only step, alone in it, in a skill a trigger starts (no each) and with no tool",
+                if writes { "write" } else { "read" }
+            ));
+        }
+    }
+    // A task handed to the lamp's agent (#6305): one a skill, its grants
+    // beside it and nowhere else, in an installable skill only.
+    let tasks = file.steps.iter().filter(|step| step.task.is_some()).count();
+    if tasks > 1 {
+        return Err("do.task: a skill hands over one task, so it has one do.task step".into());
+    }
+    if tasks == 1 && kind != SkillKind::Installable {
+        return Err(format!(
+            "do.task: only an installable skill hands a task over, never kind = \"{}\"",
+            kind.name()
+        ));
+    }
+    let grants = match (tasks, file.grants.take()) {
+        (0, Some(_)) => {
+            return Err("grants: what a do.task's script may reach, only beside one".into());
+        }
+        (_, grants) => task::grants_of(&grants.unwrap_or_default())?,
+    };
+    if let Some(secrets) = file.secrets.take() {
+        if tasks == 0 {
+            return Err("secrets: what a do.task's run needs, only beside one".into());
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        if secrets.len() > lamp_services::skill_secrets::MOST_NAMES
+            || !secrets.iter().all(|name| {
+                lamp_services::skill_secrets::name_ok(name) && seen.insert(name.as_str())
+            })
+        {
+            return Err(format!(
+                "secrets: at most {} variables' names (A-Z, 0-9 and _, 3 to 64, not the run's own), once each",
+                lamp_services::skill_secrets::MOST_NAMES
+            ));
         }
     }
     for step in file.steps {
         if let Some(read) = step.read {
             steps.push(Step::Call(Call::ServiceRead(Box::new(read.step(quiet)?))));
+            ons.resize(steps.len(), None);
+            continue;
+        }
+        if let Some(task) = step.task {
+            if step.body.is_some()
+                || step.light.is_some()
+                || step.say.is_some()
+                || step.sound.is_some()
+                || step.cue.is_some()
+                || step.rest.is_some()
+                || step.requested_audio.is_some()
+                || step.look.is_some()
+                || step.show.is_some()
+                || step.stand.is_some()
+                || step.propose.is_some()
+                || step.remind.is_some()
+                || step.write.is_some()
+                || step.on.is_some()
+                || step.after.is_some()
+                || step.if_choice.is_some()
+            {
+                return Err(
+                    "do.task is alone in its [[do]] table: the light, a cue or a say are steps of their own"
+                        .into(),
+                );
+            }
+            steps.push(Step::Call(Call::Task(Box::new(task.step(dir)?))));
+            ons.resize(steps.len(), None);
+            continue;
+        }
+        if let Some(write) = step.write {
+            steps.push(Step::Call(Call::ServiceWrite(Box::new(write.step()?))));
             ons.resize(steps.len(), None);
             continue;
         }
@@ -3979,9 +4413,10 @@ fn manifest(
             && step.show.is_none()
             && step.stand.is_none()
             && step.propose.is_none()
+            && step.remind.is_none()
         {
             return Err(
-                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show, stand, propose or read"
+                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show, stand, propose, remind, read or task"
                     .into(),
             );
         }
@@ -4023,6 +4458,7 @@ fn manifest(
                     || step.rest.is_some()
                     || step.requested_audio.is_some()
                     || step.look.is_some()
+                    || step.remind.is_some()
                 {
                     return Err(
                         "a step for some choices only makes body, light, show or stand".into(),
@@ -4304,6 +4740,17 @@ fn manifest(
             }
             steps.push(Step::Call(Call::RequestedAudio(asset)));
         }
+        if let Some(remind) = step.remind {
+            // A person who asks for a reminder asks the voice, which sets it
+            // and says its time back: a skill's is set by its trigger.
+            if file.tool.is_some() {
+                return Err(
+                    "remind, in a skill with a tool: a person asks the voice for a reminder, which sets it and says its time back; a skill's remind is set when its trigger starts it"
+                        .into(),
+                );
+            }
+            steps.push(Step::Call(Call::Remind(remind.step()?)));
+        }
         ons.resize(steps.len(), on);
     }
     let steps: Vec<(Option<Only>, Step)> = ons.into_iter().zip(steps).collect();
@@ -4542,6 +4989,60 @@ fn manifest(
             })
         }
     };
+    // Product knowledge (#5790, the core FAQ): a person asks, so a tool
+    // alone starts it; its choice names the section told, with a default
+    // for a call that names none; its one say is the note the section
+    // follows, the same for every call.
+    let knowledge = match &file.knowledge {
+        None => None,
+        Some(name) => {
+            if file.tool.is_none() || !triggers.is_empty() {
+                return Err(
+                    "knowledge is told to a tool's call: in a skill started by its tool alone"
+                        .into(),
+                );
+            }
+            let Some(choice) = file
+                .choice
+                .as_ref()
+                .filter(|choice| choice.default.is_some())
+            else {
+                return Err(
+                    "knowledge goes with a [choice] with a default: its words name the sections"
+                        .into(),
+                );
+            };
+            // A tool's say is a note (a say table is refused with a tool).
+            let notes: Vec<(bool, &str)> = steps
+                .iter()
+                .filter_map(|(only, step)| match step {
+                    Step::Call(Call::Say(note)) => Some((only.is_none(), note.as_str())),
+                    _ => None,
+                })
+                .collect();
+            let [(true, note)] = notes.as_slice() else {
+                return Err("knowledge goes with one say, a note, in every call".into());
+            };
+            // Nothing in it is anyone's, and the answer is bounded here,
+            // at load, whole: a `[history]` record told beside it is about
+            // people and grows with the visits, so the two together could
+            // pass what the link carries (Reviewer-three on #5822).
+            if history.is_some() {
+                return Err(
+                    "knowledge is the same words for everyone: not with [history], which is told who was here"
+                        .into(),
+                );
+            }
+            let looks = steps
+                .iter()
+                .any(|(_, step)| *step == Step::Call(Call::Look));
+            let loaded = knowledge::read(dir, name, &choice.one_of)?;
+            if let Some(why) = loaded.too_long(note, looks) {
+                return Err(why);
+            }
+            Some(loaded)
+        }
+    };
     // The words the voice says for a `say = { from = ... }` are the skill
     // whose say it is (#940): checked here as the voice checks them, and
     // only in a skill with that say.
@@ -4606,6 +5107,7 @@ fn manifest(
     let skill = Skill {
         name,
         description,
+        when: None,
         pushed_by: None,
         enabled: file.enabled,
         limits: file.limits.map(routine::LimitsFile::checked).transpose()?,
@@ -4617,12 +5119,14 @@ fn manifest(
         conditions,
         policy,
         tool: file.tool,
+        asks: file.asks,
         choice: file.choice,
         flag: file.flag,
         again,
         still,
         search,
         history,
+        knowledge,
         quiet,
         most_a_day: file.most_a_day,
         active,
@@ -4634,6 +5138,8 @@ fn manifest(
         steps,
         watch,
         unplug,
+        grants,
+        manners_shed: Vec::new(),
     };
     // A watch shows a faint mark while it is on, texts the person, and
     // tells a known face from one it does not know: each needs its key.
@@ -5090,7 +5596,13 @@ fn budget_group_in(folder: &Path) -> Option<String> {
 
 /// The computer a pushed skill's [`PUSHED_FROM`] names, read without
 /// following a link and at most 1 KiB; "a computer" when it says none.
-fn pushed_by(folder: &Path) -> String {
+pub(crate) fn pushed_by(folder: &Path) -> String {
+    pushed_computer(folder).unwrap_or_else(|| "a computer".to_owned())
+}
+
+/// The computer a pushed skill's [`PUSHED_FROM`] names, as [`pushed_by`]
+/// reads it; none when the file is missing, unreadable or names nobody.
+pub(crate) fn pushed_computer(folder: &Path) -> Option<String> {
     use std::{io::Read, os::unix::fs::OpenOptionsExt};
     #[derive(Deserialize)]
     struct From {
@@ -5112,7 +5624,6 @@ fn pushed_by(folder: &Path) -> String {
                 .collect::<String>()
         })
         .filter(|name| !name.trim().is_empty())
-        .unwrap_or_else(|| "a computer".to_owned())
 }
 
 /// The topics a pushed skill may read: presence, the protocol's `look`
@@ -5251,6 +5762,74 @@ pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
     load_each_with(root, None)
 }
 
+/// Whether the skill in `folder` was made on this lamp by voice or in the
+/// app and put on by the manage helper (`package::install_made`): an
+/// installable skill under the skills folder, never pushed, whose
+/// `SKILL.md` front matter says `made: here` (the lamp's own line, inside
+/// the package its SHA-256 binds; the model's is dropped, and a shared one
+/// has it taken out, `lamp-cloud`'s `share`) and not `added: file`,
+/// `written: app` nor `limits: asked`, with a [`package::INSTALLED_FROM`]
+/// record not from the Store. A core, Store, add-on, pushed, file-added or
+/// written skill is none, nor one whose request asked for limits
+/// (`made_skill::LIMITS_ASKED`, written on its card as it was made): its
+/// limits, the defaults among them, are the person's own.
+pub fn made_by_ask(skill: &Skill, folder: &Path) -> bool {
+    if skill.kind != SkillKind::Installable || skill.pushed_by.is_some() {
+        return false;
+    }
+    let Ok(card) = fs::read_to_string(folder.join("SKILL.md")) else {
+        return false;
+    };
+    let Some((front, _)) = card
+        .strip_prefix("---\n")
+        .and_then(|rest| rest.split_once("\n---"))
+    else {
+        return false;
+    };
+    let marks: Vec<&str> = front.lines().map(str::trim).collect();
+    marks.contains(&"made: here")
+        && !marks.contains(&lamp_voice::made_skill::ADDED_FROM_FILE)
+        && !marks.contains(&lamp_voice::made_skill::WRITTEN_MARK)
+        && !marks.contains(&lamp_voice::made_skill::LIMITS_ASKED)
+        && package::installed_from(folder).is_some_and(|installed| !installed.from_store)
+}
+
+/// With `LAMP_MADE_SKILL_LOOSE=on` (`lamp_voice::made_skill::loose_on`),
+/// the two limits the switch no longer writes on a new make, ignored as a
+/// skill made before it loads ([`made_by_ask`]), never written to its
+/// folder: its files, the SHA-256 its package and a task's yes are bound
+/// to ([`task::folder_sha256`]), stay as they were put on. Only a value the
+/// lamp wrote by default is ignored: a `[budget]` of the nudges' group
+/// (`made_skill::MANNERS_GROUP`) at `made_skill::MANNERS_PER_HOUR` an hour
+/// with no `gap`, no `give_back_unsaid` and no `[stop]`, and `most_a_day`
+/// at `made_skill::MANNERS_MOST_A_DAY`. Any other value is kept, as the
+/// person's ask; `[rest]`, `[quiet]`, a trigger's `cooldown` and `rearm`
+/// are kept whole. What was ignored is kept on the skill
+/// ([`Skill::manners_shed`]) for the program's one line.
+pub fn shed_made_manners(skill: &mut Skill, folder: &Path) {
+    use lamp_voice::made_skill::{MANNERS_GROUP, MANNERS_MOST_A_DAY, MANNERS_PER_HOUR};
+    let lamp_budget =
+        skill.budget.as_ref().is_some_and(|(group, per_hour)| {
+            group == MANNERS_GROUP && *per_hour == MANNERS_PER_HOUR
+        }) && skill.budget_gap_us == 0
+            && !skill.budget_gives_back
+            && skill.stop.is_none();
+    let lamp_most = skill.most_a_day == Some(MANNERS_MOST_A_DAY);
+    if !(lamp_budget || lamp_most) || !made_by_ask(skill, folder) {
+        return;
+    }
+    if lamp_budget {
+        skill.budget = None;
+        skill
+            .manners_shed
+            .push("[budget] group \"wellbeing\" per_hour = 1");
+    }
+    if lamp_most {
+        skill.most_a_day = None;
+        skill.manners_shed.push("most_a_day = 3");
+    }
+}
+
 /// The skill folders under `root`, sorted, but those whose name begins
 /// with a dot.
 fn folders_in(root: &Path) -> Vec<PathBuf> {
@@ -5278,7 +5857,17 @@ pub fn load_each_with(
     let mut loaded: Vec<(PathBuf, Result<Skill, String>)> = folders_in(root)
         .into_iter()
         .map(|folder| {
-            let skill = load(&folder);
+            let skill = load(&folder).and_then(|skill| match skill.task_step() {
+                // A script only from the Store here (#6305).
+                Some(_) => task::origin_refuses(&folder, false).map_or(Ok(skill), Err),
+                None => Ok(skill),
+            });
+            let skill = skill.map(|mut skill| {
+                if lamp_voice::made_skill::loose_on() {
+                    shed_made_manners(&mut skill, &folder);
+                }
+                skill
+            });
             (folder, skill)
         })
         .collect();
@@ -5301,17 +5890,30 @@ pub fn load_each_with(
             let name = folder
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned());
-            let taken = loaded[..here].iter().any(|(other, _)| {
-                other
-                    .file_name()
-                    .map(|other| other.to_string_lossy().into_owned())
-                    == name
-            });
+            // Anything of that name under `root`, a file or a link too
+            // (`task::lamp_has_skill_named`, the rule lamp-control and
+            // lamp-tasks hold): lamp-control would hash that one at the
+            // mint, never this (SubDarren's P2/P3 on #6608).
+            let taken = folder
+                .file_name()
+                .is_some_and(|name| task::lamp_has_skill_named(root, name))
+                || loaded[..here].iter().any(|(other, _)| {
+                    other
+                        .file_name()
+                        .map(|other| other.to_string_lossy().into_owned())
+                        == name
+                });
             let skill = if taken {
                 Err("a skill of that name is already on the lamp: a pushed skill never takes its place".to_owned())
             } else {
                 load(&folder).and_then(|mut skill| {
                     if let Some(why) = pushed_refuses(&skill) {
+                        return Err(why);
+                    }
+                    // Pushed by the owner's computer, never made here (#6305).
+                    if skill.task_step().is_some()
+                        && let Some(why) = task::origin_refuses(&folder, true)
+                    {
                         return Err(why);
                     }
                     if let Some((group, _)) = skill.budget.as_ref().filter(|(group, _)| groups.contains(group)) {
@@ -5476,6 +6078,11 @@ struct Watch {
     visited_us: Option<u64>,
     /// This time it holds has had its chance.
     spent: bool,
+    /// This time's run was a write that waited for the owner's yes, and
+    /// its cooldown was given back ([`Engine::unwritten`]): `spent` holds
+    /// it, as it holds a trigger that runs once each time, until it holds
+    /// again.
+    unwritten: bool,
     /// Since when this time's chance has waited for the trigger's
     /// `[[while]]` conditions (`wait`).
     waiting_us: Option<u64>,
@@ -5503,6 +6110,36 @@ struct Watch {
     /// Each gate a due chance was said dropped by ([`dropped`], #2602): the
     /// hold it was said in and when. A run clears them.
     said: HashMap<&'static str, (Option<u64>, u64)>,
+    /// Its hold was taken back from before a restart ([`holds`]): the next
+    /// message of its topic must hold, or the hold is dropped, whatever its
+    /// `gap`.
+    restored: bool,
+    /// Since when its topic's messages have not known the trigger's field
+    /// (a sensor's `null`, #6592), which they are passed over for: a run
+    /// held until the trigger ends ends once that lasts as long as a
+    /// silence would end it ([`Engine::tick`]).
+    unknown_us: Option<u64>,
+}
+
+/// Whether a trigger's hold is kept across a short restart ([`holds`]): a
+/// plain `present` trigger with a `for` of at least [`holds::KEPT_FROM_US`],
+/// with none of the state a restart forgets beside its own watch (`each`, a
+/// `rise`, a rearm line, `once_per_day`), in a skill none of whose triggers
+/// works with another (`follows`, `instead_of`, `yields_to`,
+/// `stands_in_for_group`).
+fn kept_hold(skill: &Skill, trigger: &Trigger) -> bool {
+    trigger.when == When::Present
+        && trigger.for_us >= holds::KEPT_FROM_US
+        && trigger.each.is_none()
+        && trigger.rise.is_none()
+        && trigger.rearm_line.is_none()
+        && !trigger.once_per_day
+        && skill.triggers.iter().all(|any| {
+            any.follows.is_none()
+                && any.instead_of.is_none()
+                && any.yields_to.is_none()
+                && !any.stands_in_for_group
+        })
 }
 
 /// A gate's line is not said again for the same trigger within this long,
@@ -5671,10 +6308,15 @@ pub struct Engine {
     /// tool's run) clears it, so its unsaid say gives nothing back (#5207,
     /// Fourteen's and Thirteen's P2 on #5237).
     unsaid_from: HashMap<String, u64>,
+    /// By a skill whose only step is a write (#6066), what its latest
+    /// start spent: given back if the write waits for the owner's yes
+    /// ([`Engine::unwritten`]).
+    unwritten: HashMap<String, Spent>,
     /// Each resting skill's last nudge and how many in a row went unnoticed.
     nudges: HashMap<String, Nudge>,
     /// Until when each snoozed skill starts nothing itself, by skill: in
-    /// memory only, so a restart forgets it (#1685).
+    /// memory, kept through a short restart beside the holds
+    /// ([`holds::Limits`]); a reboot forgets it (#1685).
     snoozed: HashMap<String, u64>,
     /// The skills turned off, by name, until they are asked for again.
     off: BTreeSet<String>,
@@ -5723,11 +6365,36 @@ pub struct Engine {
     /// the same words twice (#3997). Behind a lock as [`Engine::still`]
     /// makes calls from a shared engine; in memory only.
     picked: std::sync::Mutex<HashMap<String, usize>>,
+    /// Where the long holds are kept across a short restart ([`holds`]).
+    holds: Option<holds::Keeper>,
+    /// The holds read at the start, taken back at the first load of skills.
+    restoring: Option<holds::Restored>,
+}
+
+/// What a write skill's start spent, as it was before (#6066): what
+/// [`Engine::unwritten`] gives back.
+#[derive(Clone, Debug)]
+struct Spent {
+    /// When it started: its cooldown's, its group's and its hold's mark.
+    at_us: u64,
+    /// The trigger that started it, and since when that one held.
+    index: usize,
+    since_us: Option<u64>,
+    /// Its trigger's last run, its day's count and its last in its group.
+    ran_us: Option<u64>,
+    day: Option<(i64, u32)>,
+    group_ran: Option<u64>,
+    /// Its group, where it spent a place in the hour.
+    group: Option<String>,
+    /// Its `[rest]` watch before it, once one was begun for it.
+    nudge: Option<Option<Nudge>>,
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
-/// it within its while, and the unnoticed runs in a row before it.
-#[derive(Clone, Copy, Debug, Default)]
+/// it within its while, and the unnoticed runs in a row before it. Kept
+/// across a short restart with the holds ([`holds::Limits`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, serde::Serialize)]
+#[serde(default)]
 struct Nudge {
     at_us: u64,
     within_us: u64,
@@ -5903,6 +6570,7 @@ impl Engine {
             word_windows: HashMap::new(),
             group_ran: HashMap::new(),
             unsaid_from: HashMap::new(),
+            unwritten: HashMap::new(),
             nudges: HashMap::new(),
             snoozed: HashMap::new(),
             off: BTreeSet::new(),
@@ -5920,6 +6588,8 @@ impl Engine {
             rest_through_sounds: false,
             sooner: false,
             picked: std::sync::Mutex::default(),
+            holds: None,
+            restoring: None,
         }
     }
 
@@ -5937,6 +6607,254 @@ impl Engine {
     pub fn sooner(mut self) -> Self {
         self.sooner = true;
         self
+    }
+
+    /// The long holds kept in `file` across a short restart of the program
+    /// ([`holds`], `docs/skills.md`, "A hold kept across a restart"), on the
+    /// boot `boot`: what the file keeps of this boot is read now, and taken
+    /// back at the first load of skills; the nudges' limits kept with them
+    /// ([`holds::Limits`]) are taken back now. From then on
+    /// [`Engine::keep_holds`] writes both. How many holds were read is
+    /// returned.
+    pub fn keep_holds_in(
+        &mut self,
+        file: PathBuf,
+        boot: String,
+        now_us: u64,
+    ) -> Result<usize, String> {
+        let keeper = holds::Keeper::new(file, boot);
+        let read = keeper.read(now_us);
+        self.holds = Some(keeper);
+        let mut read = read.map_err(|error| error.to_string())?;
+        let count = read.as_ref().map_or(0, |read| read.holds.len());
+        if let Some(read) = &mut read {
+            self.restore_limits(std::mem::take(&mut read.limits), now_us);
+        }
+        self.restoring = read;
+        self.restore_holds();
+        Ok(count)
+    }
+
+    /// The long holds and the nudges' limits written where they are kept
+    /// ([`Engine::keep_holds_in`]), when they changed, or every
+    /// [`holds::WRITE_EVERY_US`] while any hold is kept. The program calls
+    /// it at each turn of its loop.
+    pub fn keep_holds(&mut self, now_us: u64) {
+        if self.holds.is_none() {
+            return;
+        }
+        let now = self.holds_now(now_us);
+        let limits = self.limits_now(now_us);
+        if let Some(keeper) = &mut self.holds {
+            keeper.keep(now, limits, now_us);
+        }
+    }
+
+    /// The nudges' limits that live in memory only, as they stand at
+    /// `now_us`, to keep beside the holds: each skill's runs today (for its
+    /// `most_a_day`), its last run in its group, its snooze still to end and
+    /// its `[rest]` (a nudge still being judged, runs nobody noticed, or a
+    /// rest still to end), and each group's runs within the hour and members
+    /// still waiting for it. What no longer holds anything back is left out.
+    fn limits_now(&self, now_us: u64) -> holds::Limits {
+        let day = day_of(self.clock, now_us);
+        let mut limits = holds::Limits::default();
+        for (name, (on, count)) in &self.day_runs {
+            if *on == day {
+                limits.skills.entry(name.clone()).or_default().day = Some((*on, *count));
+            }
+        }
+        for (name, at) in &self.group_ran {
+            limits.skills.entry(name.clone()).or_default().ran_us = Some(*at);
+        }
+        for (name, until) in &self.snoozed {
+            if now_us < *until {
+                limits
+                    .skills
+                    .entry(name.clone())
+                    .or_default()
+                    .snoozed_until_us = Some(*until);
+            }
+        }
+        for (name, nudge) in &self.nudges {
+            if !nudge.judged || nudge.ignored > 0 || now_us < nudge.resting_until_us {
+                limits.skills.entry(name.clone()).or_default().rest = Some(*nudge);
+            }
+        }
+        for (group, began) in &self.group_runs {
+            let began: Vec<u64> = began
+                .iter()
+                .copied()
+                .filter(|at| now_us.saturating_sub(*at) < HOUR_US)
+                .collect();
+            if !began.is_empty() {
+                limits.groups.entry(group.clone()).or_default().began_us = began;
+            }
+        }
+        for (group, waits) in &self.budget_waits {
+            let waits: BTreeMap<String, (u64, u64)> = waits
+                .iter()
+                .filter(|(_, (_, last))| now_us.saturating_sub(*last) < BUDGET_WAIT_LIVE_US)
+                .map(|(name, wait)| (name.clone(), *wait))
+                .collect();
+            if !waits.is_empty() {
+                limits.groups.entry(group.clone()).or_default().waits = waits;
+            }
+        }
+        limits
+    }
+
+    /// The nudges' limits read at the start taken back ([`holds::Limits`]):
+    /// each only adds to what the engine holds already, never takes from it
+    /// (the later snooze or rest, every group run), so a restart never
+    /// brings a nudge sooner. A day's count of another day than today's is
+    /// never counted ([`day_of`]), and is not written again. A member
+    /// waiting for its group's hour waits from when it began to: when it was
+    /// last held back is written on the cadence only, so it is taken as
+    /// `now_us`, and the wait is live until its next message says.
+    fn restore_limits(&mut self, limits: holds::Limits, now_us: u64) {
+        let (skills, groups) = (limits.skills.len(), limits.groups.len());
+        for (name, kept) in limits.skills {
+            if let Some((on, count)) = kept.day {
+                let now = self.day_runs.entry(name.clone()).or_insert((on, 0));
+                if now.0 == on {
+                    now.1 = now.1.max(count);
+                }
+            }
+            if let Some(at) = kept.ran_us {
+                let now = self.group_ran.entry(name.clone()).or_insert(at);
+                *now = (*now).max(at);
+            }
+            if let Some(until) = kept.snoozed_until_us {
+                let now = self.snoozed.entry(name.clone()).or_insert(until);
+                *now = (*now).max(until);
+            }
+            if let Some(rest) = kept.rest {
+                self.nudges.entry(name).or_insert(rest);
+            }
+        }
+        for (group, kept) in limits.groups {
+            if !kept.began_us.is_empty() {
+                let began = self.group_runs.entry(group.clone()).or_default();
+                began.extend(kept.began_us);
+                began.make_contiguous().sort_unstable();
+                let mut seen = std::collections::VecDeque::with_capacity(began.len());
+                for at in began.drain(..) {
+                    if seen.back() != Some(&at) {
+                        seen.push_back(at);
+                    }
+                }
+                *began = seen;
+            }
+            if !kept.waits.is_empty() {
+                let waits = self.budget_waits.entry(group).or_default();
+                for (name, (first, _)) in kept.waits {
+                    waits.entry(name).or_insert((first, now_us));
+                }
+            }
+        }
+        if skills + groups > 0 {
+            eprintln!(
+                "lamp-skills: the nudges' limits taken back from before the restart: {skills} skills, {groups} groups"
+            );
+        }
+    }
+
+    /// The holds to keep at `now_us`: each [`kept_hold`] trigger that holds,
+    /// of a skill nothing a restart forgets holds back now (a word that
+    /// stands in for its group still to come, a read of a service under way
+    /// or made today: [`read_spent`]). Such a hold is not kept, and begins
+    /// again after a restart, as before. A skill its nudges' limits hold
+    /// back (a snooze, a rest or a nudge still being judged, its day's most,
+    /// its group's hour or gap) keeps its hold: the limits are kept with it
+    /// ([`Engine::limits_now`]) and hold it back after the restart as
+    /// before, so a hold taken back never brings a nudge sooner than a lamp
+    /// that never restarted.
+    fn holds_now(&self, now_us: u64) -> Vec<holds::Hold> {
+        let mut kept = Vec::new();
+        for skill in &self.skills {
+            let name = &skill.name;
+            let held_back = self.stood_in_by(name, now_us).is_some()
+                || read_spent(&self.reads, self.clock, name, now_us).is_some();
+            if held_back {
+                continue;
+            }
+            for (index, trigger) in skill.triggers.iter().enumerate() {
+                if !kept_hold(skill, trigger) {
+                    continue;
+                }
+                let Some(watch) = self.watches.get(&(name.clone(), index)) else {
+                    continue;
+                };
+                if let (Some(since_us), Some(last_held_us)) = (watch.since_us, watch.last_held_us) {
+                    kept.push(holds::Hold {
+                        skill: name.clone(),
+                        trigger: index,
+                        fingerprint: holds::fingerprint(trigger),
+                        since_us,
+                        last_held_us,
+                        spent: watch.spent,
+                        ran_us: watch.ran_us,
+                        waiting_us: watch.waiting_us,
+                    });
+                }
+            }
+        }
+        kept
+    }
+
+    /// The holds read at the start taken back, once skills are loaded: each
+    /// of a loaded skill whose trigger at that place is still [`kept_hold`]
+    /// and has the same fingerprint, last seen holding within that trigger's
+    /// `gap` of when the file was read, and not holding here already. The
+    /// next message of its topic must hold, or it is dropped ([`Watch`]'s
+    /// `restored`). The rest are let go.
+    fn restore_holds(&mut self) {
+        if self.skills.is_empty() {
+            return;
+        }
+        let Some(read) = self.restoring.take() else {
+            return;
+        };
+        for hold in read.holds {
+            let Some(skill) = self.skills.iter().find(|skill| skill.name == hold.skill) else {
+                continue;
+            };
+            let Some(trigger) = skill.triggers.get(hold.trigger) else {
+                continue;
+            };
+            let sound = hold.since_us <= hold.last_held_us
+                && hold.last_held_us <= read.written_us
+                && hold.ran_us.is_none_or(|ran| ran <= read.written_us)
+                && hold
+                    .waiting_us
+                    .is_none_or(|waiting| waiting <= read.written_us);
+            if !sound
+                || !kept_hold(skill, trigger)
+                || holds::fingerprint(trigger) != hold.fingerprint
+                || read.read_us.saturating_sub(hold.last_held_us) > trigger.gap_us
+            {
+                continue;
+            }
+            let watch = self
+                .watches
+                .entry((skill.name.clone(), hold.trigger))
+                .or_default();
+            if watch.since_us.is_some() {
+                continue;
+            }
+            watch.since_us = Some(hold.since_us);
+            watch.last_held_us = Some(hold.last_held_us);
+            watch.spent = hold.spent;
+            watch.ran_us = watch.ran_us.max(hold.ran_us);
+            watch.waiting_us = hold.waiting_us;
+            watch.restored = true;
+            eprintln!(
+                "lamp-skills: {}: its hold taken back from before the restart, held {} s",
+                skill.name,
+                read.read_us.saturating_sub(hold.since_us) / 1_000_000
+            );
+        }
     }
 
     /// The lines of due chances dropped since the last take, each
@@ -6023,19 +6941,21 @@ impl Engine {
         let Some(skill) = self.skills.iter().find(|skill| &skill.name == name) else {
             return Yield::No;
         };
-        let Some((index, window)) = skill
+        let Some((index, window, days)) = skill
             .triggers
             .iter()
             .enumerate()
             .find(|(_, other)| other.name.as_ref() == Some(trigger) && other.once_per_day)
-            .and_then(|(index, other)| Some((index, other.during.as_ref()?)))
+            .and_then(|(index, other)| Some((index, other.during.as_ref()?, other.days)))
         else {
             return Yield::No;
         };
+        // Not one of its days (#6066), its greeting does not come today.
         let Some(day) = window
             .contains(moment.minute)
             .then(|| window.occurrence_day(moment.day, moment.minute))
             .flatten()
+            .filter(|day| days.is_none_or(|days| days.contains(*day)))
         else {
             return Yield::No;
         };
@@ -6372,6 +7292,11 @@ impl Engine {
     /// watched for as it is started.
     pub fn made(&mut self, skill: &str, now_us: u64) {
         if let Some(skill) = self.skills.iter().find(|known| known.name == skill) {
+            if skill.rest.is_some()
+                && let Some(spent) = self.unwritten.get_mut(&skill.name)
+            {
+                spent.nudge = Some(self.nudges.get(&skill.name).copied());
+            }
             nudged(&mut self.nudges, &self.latest, skill, now_us);
             if skill.reads_a_service() {
                 read_made(&mut self.reads, self.clock, &skill.name, now_us);
@@ -6427,6 +7352,59 @@ impl Engine {
         Some(group)
     }
 
+    /// `skill`'s run was its write, told "not sent: waiting for the
+    /// owner's yes" ([`service_write::waiting`]): it did nothing, so what
+    /// its start spent is given back (lamp-9adf, 12 Nov: an unapproved mail
+    /// held an approved skill of its group back for the hour). Its place in
+    /// its group's hour and its gap, its cooldown, its day's count for
+    /// `most_a_day` and its `[rest]` watch are as before it started. Only
+    /// this time its trigger holds has had its chance: it comes again the
+    /// next time it holds, never at the trigger's next message. Whether
+    /// anything was given back.
+    pub fn unwritten(&mut self, skill: &str) -> bool {
+        let Some(spent) = self.unwritten.remove(skill) else {
+            return false;
+        };
+        if let Some(watch) = self.watches.get_mut(&(skill.to_owned(), spent.index))
+            && watch.ran_us == Some(spent.at_us)
+        {
+            watch.ran_us = spent.ran_us;
+            if watch.since_us == spent.since_us {
+                watch.spent = true;
+                watch.unwritten = true;
+            }
+        }
+        match spent.day {
+            Some(day) => self.day_runs.insert(skill.to_owned(), day),
+            None => self.day_runs.remove(skill),
+        };
+        if let Some(group) = &spent.group
+            && let Some(began) = self.group_runs.get_mut(group)
+            && let Some(at) = began.iter().position(|at| *at == spent.at_us)
+        {
+            began.remove(at);
+        }
+        if self.group_ran.get(skill) == Some(&spent.at_us) {
+            match spent.group_ran {
+                Some(at) => self.group_ran.insert(skill.to_owned(), at),
+                None => self.group_ran.remove(skill),
+            };
+        }
+        if self.unsaid_from.get(skill) == Some(&spent.at_us) {
+            self.unsaid_from.remove(skill);
+        }
+        match spent.nudge {
+            Some(Some(nudge)) => {
+                self.nudges.insert(skill.to_owned(), nudge);
+            }
+            Some(None) => {
+                self.nudges.remove(skill);
+            }
+            None => {}
+        }
+        true
+    }
+
     /// Until when `skill` rests after runs nobody noticed, if it does.
     pub fn resting_until(&self, skill: &str, now_us: u64) -> Option<u64> {
         self.nudges
@@ -6480,7 +7458,9 @@ impl Engine {
                 let Some((_, at_us, lifespan_us)) = self.latest.get(&trigger.topic) else {
                     continue;
                 };
-                let silent_us = now_us.saturating_sub(*at_us);
+                // Messages that do not know its field, passed over, are no
+                // more than silence (#6592): counted from the first of them.
+                let silent_us = now_us.saturating_sub(watch.unknown_us.unwrap_or(*at_us));
                 let silent = silent_us >= lifespan_us.unwrap_or(SILENT_ENDS_US);
                 let outside = out_of_window(trigger, moment.as_ref());
                 if watch.open && (silent || outside.is_some()) {
@@ -6564,6 +7544,42 @@ impl Engine {
             .into_iter()
             .map(|call| match call {
                 Call::Say(note) => Call::Say(format!("{note}\n\n{record}")),
+                other => other,
+            })
+            .collect()
+    }
+
+    /// A `knowledge` skill's calls (#5790): its note followed by the section
+    /// the call's choice names (or its default), and whether each skill
+    /// that section names is on this lamp now: installed and enabled, and
+    /// not turned off or snoozed. One installed disabled is not among
+    /// the engine's skills, so it is told as not on this lamp.
+    fn told_knowledge(
+        &self,
+        skill: &Skill,
+        calls: Vec<Call>,
+        args: &Value,
+        now_us: u64,
+    ) -> Vec<Call> {
+        let (Some(knowledge), Some(choice)) = (&skill.knowledge, &skill.choice) else {
+            return calls;
+        };
+        let topic = args[&choice.name]
+            .as_str()
+            .or(choice.default.as_deref())
+            .unwrap_or_default();
+        let Some(section) = knowledge.section(topic) else {
+            return calls;
+        };
+        let here = |name: &str| match self.skills.iter().find(|other| other.name == name) {
+            None => knowledge::Here::Missing,
+            Some(_) if self.stopped(name, now_us) => knowledge::Here::Off,
+            Some(_) => knowledge::Here::On,
+        };
+        calls
+            .into_iter()
+            .map(|call| match call {
+                Call::Say(note) => Call::Say(knowledge::told(&note, section, here)),
                 other => other,
             })
             .collect()
@@ -6682,6 +7698,7 @@ impl Engine {
             let before = condition(&old, name, *index);
             before.is_some() && before == condition(new, name, *index)
         });
+        self.restore_holds();
         ends
     }
 
@@ -6768,8 +7785,16 @@ impl Engine {
             ]);
         }
         // A search reads what was heard before its call, to know which
-        // turn asked for it (#2179): the program's own reading too.
-        if self.skills.iter().any(|skill| skill.search.is_some()) {
+        // turn asked for it (#2179): the program's own reading too. So does
+        // a light show, which stops on the same words (#5744): without it,
+        // the asking turn is not known and its own late words stop it.
+        if self.skills.iter().any(|skill| {
+            skill.search.is_some()
+                || skill
+                    .steps
+                    .iter()
+                    .any(|(_, step)| matches!(step, Step::Call(Call::Show { .. })))
+        }) {
             topics.push(Speech::TOPICS[0].to_owned());
         }
         topics.sort();
@@ -6801,6 +7826,10 @@ impl Engine {
     ) -> bool {
         // A topic that has said nothing yet: held only when asked to be.
         if condition.unknown_holds && !latest.contains_key(&condition.topic) {
+            return true;
+        }
+        // One that has run out, too, when asked to (#6543).
+        if condition.stale_holds && Self::fresh(latest, &condition.topic, now_us).is_none() {
             return true;
         }
         Self::fresh(latest, &condition.topic, now_us)
@@ -6994,10 +8023,7 @@ impl Engine {
             if trigger.once_per_day && self.daily_faulted {
                 return false;
             }
-            if trigger.during.as_ref().is_some_and(|window| {
-                self.local_moment(now_us)
-                    .is_none_or(|moment| !window.contains(moment.minute))
-            }) {
+            if out_of_window(trigger, self.local_moment(now_us).as_ref()).is_some() {
                 return false;
             }
             rose(index, trigger)
@@ -7346,6 +8372,16 @@ impl Engine {
                     continue;
                 }
                 let started = *watch.started_us.get_or_insert(now_us);
+                // A level the message does not know (`co2_ppm: null` while
+                // the air sensor does not know it, #6592) is passed over, as
+                // a rise's reading is: it neither ends the spell nor counts
+                // toward its `for` or the rearm line. Taken as not holding,
+                // a minute of them ends the spell past its gap and begins
+                // its 10 minutes again in silence (lamp-52e6, #6592).
+                if trigger.when != When::Changes && trigger.test.unknown_in(&value) {
+                    watch.unknown_us.get_or_insert(now_us);
+                    continue;
+                }
                 // A rise compares the field's readings: a message without
                 // one (the sensor not knowing it yet) is passed over, as if
                 // it never came, and breaks nothing (#1684).
@@ -7355,10 +8391,12 @@ impl Engine {
                         .as_f64()
                         .filter(|got| got.is_finite())
                     else {
+                        watch.unknown_us.get_or_insert(now_us);
                         continue;
                     };
                     rose = watch.readings.rose(reading, now_us, rise);
                 }
+                watch.unknown_us = None;
                 if let Some(line) = &trigger.rearm_line {
                     if !line.test.holds(&value) {
                         watch.past_line_us = None;
@@ -7367,10 +8405,14 @@ impl Engine {
                     }
                 }
                 let holds = trigger.test.holds(&value) && followed;
+                // A hold taken back from before a restart is confirmed by
+                // its topic's next message, or dropped (`holds`).
+                let restored = std::mem::take(&mut watch.restored);
                 if !(rose && holds && chooses(skill, &value)) {
-                    if watch
-                        .last_held_us
-                        .is_none_or(|held| now_us - held >= trigger.gap_us)
+                    if restored
+                        || watch
+                            .last_held_us
+                            .is_none_or(|held| now_us - held >= trigger.gap_us)
                     {
                         if trigger.once_per_day
                             && let Some(since) = watch.since_us
@@ -7422,6 +8464,7 @@ impl Engine {
                     watch.since_us = Some(now_us);
                     watch.away_us = now_us - watch.visited_us.unwrap_or(started);
                     watch.spent = false;
+                    watch.unwritten = false;
                     watch.waiting_us = None;
                     watch.yielded_us = None;
                     watch.stood_in_us = None;
@@ -7445,7 +8488,7 @@ impl Engine {
                 // Once each time it holds: a chance held back now waits for
                 // the next time.
                 let once = trigger.when == When::Appears || trigger.rearm;
-                if once && watch.spent {
+                if (once || watch.unwritten) && watch.spent {
                     continue;
                 }
                 if watch.disarmed {
@@ -7830,6 +8873,24 @@ impl Engine {
                     if waited < trigger.wait_us {
                         watch.spent = false;
                         watch.disarmed = false;
+                        // A chance kept waiting says so, once a hold: a
+                        // matured spell waiting out a talk left no line for
+                        // up to its whole `wait` (#6592).
+                        let (latest, holding) = (&self.latest, &self.holding);
+                        dropped(
+                            &mut self.dropped,
+                            watch,
+                            &skill.name,
+                            "wait",
+                            now_us,
+                            || {
+                                format!(
+                                    "its while did not hold: kept up to {} s for it (held by {})",
+                                    trigger.wait_us / 1_000_000,
+                                    Self::held_back(latest, holding, skill, now_us)
+                                )
+                            },
+                        );
                     } else if once && (trigger.once_per_day || trigger.wait_us > 0) {
                         if trigger.once_per_day
                             && let (Some(name), Some(day)) = (
@@ -8083,6 +9144,27 @@ impl Engine {
                     question["there_s"] = json!(held_us / 1_000_000);
                 }
                 if acts {
+                    // A write's start, as it was before: given back if the
+                    // write waits for the owner's yes (#6066).
+                    if skill.writes_a_service() {
+                        self.unwritten.insert(
+                            skill.name.clone(),
+                            Spent {
+                                at_us: now_us,
+                                index,
+                                since_us: watch.since_us,
+                                ran_us: watch.ran_us,
+                                day: self.day_runs.get(&skill.name).copied(),
+                                group_ran: self.group_ran.get(&skill.name).copied(),
+                                group: skill
+                                    .budget
+                                    .as_ref()
+                                    .filter(|_| nudge)
+                                    .map(|(group, _)| group.clone()),
+                                nudge: None,
+                            },
+                        );
+                    }
                     watch.ran_us = Some(now_us);
                     watch.said.clear();
                     instead = trigger.instead_of.as_ref();
@@ -8134,6 +9216,9 @@ impl Engine {
                     // Asked of the Policy, a run is watched for once it is
                     // made ([`Engine::made`]): a no shows nothing to ignore.
                     if nudge && !(self.ask_policy || asks_anyway(skill, self.skip_ask)) {
+                        if let Some(spent) = self.unwritten.get_mut(&skill.name) {
+                            spent.nudge = Some(self.nudges.get(&skill.name).copied());
+                        }
                         nudged(&mut self.nudges, &self.latest, skill, now_us);
                     }
                     // Its end is told even if the Policy says no: with no
@@ -8306,9 +9391,14 @@ impl Engine {
                 format!("the model called {name} with {args}"),
                 None,
             )],
-            calls: self.told_history(
+            calls: self.told_knowledge(
                 skill,
-                calls(&self.latest, &self.picked, skill, None, now_us, args, None),
+                self.told_history(
+                    skill,
+                    calls(&self.latest, &self.picked, skill, None, now_us, args, None),
+                    now_us,
+                ),
+                args,
                 now_us,
             ),
             ask: None,
@@ -8645,7 +9735,11 @@ fn calls(
 /// not of each tool, which the voice's function declarations refuse.
 /// `core` names the tools of core skills ([`SkillKind::Core`]), when any:
 /// at a session's bound of functions the voice never cuts one of them, and
-/// cuts others first (the owner's rule, on #2614).
+/// cuts others first (the owner's rule, on #2614). A core skill's `[stop]`
+/// function is named too (the wellbeing skills' `wellbeing_nudges`, shared
+/// with an installable skill or not), and `stay_plugged_in` with a core
+/// unplug skill, so `use_skill`'s lines keep every core skill's function
+/// whole past their bound (`lamp_voice::use_skill::section`).
 /// `searches` gives, by tool, a search's note and walk, when any says them
 /// (`[search]`'s `note`, `walk` and `looked`, and its choice's `default`):
 /// the second voice route's note and walk read them (docs/second-voice.md).
@@ -8653,10 +9747,11 @@ fn calls(
 /// Each is in the tools' names' order, whatever order `skills` is in, so
 /// the voice's cut past its bound, the last first, is by name.
 pub fn tools_file(skills: &[Skill]) -> Value {
-    tools_file_with(
+    tools_file_summary(
         skills,
         requested_audio::from_environment(),
         watch::words_v2(std::env::var(watch::WORDS_ENVIRONMENT).ok().as_deref()),
+        summary_on(std::env::var(SUMMARY_ENVIRONMENT).ok().as_deref()),
     )
 }
 
@@ -8675,6 +9770,24 @@ pub fn tools_file_with_requested_audio(skills: &[Skill], enabled: bool) -> Value
 /// `[choice]` `about` (#2827, `LAMP_GUARD_WORDS_V2`); off, every tool is
 /// as its skill says, byte for byte.
 pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) -> Value {
+    tools_file_summary(skills, enabled, guard_words_v2, false)
+}
+
+/// [`tools_file_with`] with the `when` lines too (#6218,
+/// [`SUMMARY_ENVIRONMENT`]): with `summary`, `"when"` maps each tool in the
+/// file that has one to it, a skill's tool to its `SKILL.md`'s, a `[stop]`
+/// function to the `[stop]` `when` of the skill it was taken from (the
+/// first in order, as its `about`), and `stay_plugged_in` to
+/// [`unplug::STAY_WHEN`]. No tool with one, or `summary` off, and there is
+/// no `"when"`: the file is as [`tools_file_with`] made it before.
+pub fn tools_file_summary(
+    skills: &[Skill],
+    enabled: bool,
+    guard_words_v2: bool,
+    summary: bool,
+) -> Value {
+    let mut whens = serde_json::Map::new();
+    let mut asks = serde_json::Map::new();
     let mut tools: Vec<Value> = Vec::new();
     let mut moving: Vec<&str> = Vec::new();
     let mut core: Vec<&str> = Vec::new();
@@ -8732,6 +9845,30 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
             if !properties.is_empty() {
                 tool["parameters"] = json!({"type": "object", "properties": properties});
             }
+            if let Some(when) = &skill.when {
+                whens.insert(name.clone(), json!(when));
+            }
+            // Never one that holds another skill's name, its function's or
+            // its own, core and with a choice included ("dance for me"
+            // beside the lamp's `dance`): the voice drops it too
+            // (`lamp_voice::skill_named`, Thirteen's P2 on #6842).
+            let kept: Vec<&String> = skill
+                .asks
+                .iter()
+                .filter(|ask| {
+                    !skills
+                        .iter()
+                        .filter(|other| other.name != skill.name)
+                        .any(|other| {
+                            std::iter::once(&other.name)
+                                .chain(&other.tool)
+                                .any(|theirs| lamp_voice::skill_named::ask_holds_name(ask, theirs))
+                        })
+                })
+                .collect();
+            if !kept.is_empty() {
+                asks.insert(name.clone(), json!(kept));
+            }
             tools.push(tool);
         }
         // One function a skill to snooze it or turn it off (#1685): counted
@@ -8770,6 +9907,21 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
                     }),
                 );
             }
+            // A core skill's: one of an enabled core skill sharing it (Meal
+            // check, installable, shares the core wellbeing skills').
+            if skills.iter().any(|other| {
+                other.enabled
+                    && other.kind == SkillKind::Core
+                    && other
+                        .stop
+                        .as_ref()
+                        .is_some_and(|theirs| theirs.tool == stop.tool)
+            }) {
+                core.push(&stop.tool);
+            }
+            if let Some(when) = &stop.when {
+                whens.insert(stop.tool.clone(), json!(when));
+            }
             tools.push(json!({
                 "name": stop.tool,
                 "description": stop.about,
@@ -8784,7 +9936,14 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
         && !tools.iter().any(|tool| tool["name"] == unplug::STAY_TOOL)
     {
         tools.push(unplug::stay_tool());
+        whens.insert(unplug::STAY_TOOL.into(), json!(unplug::STAY_WHEN));
         moving.push(unplug::STAY_TOOL);
+        if skills
+            .iter()
+            .any(|skill| skill.prepares_unplug() && skill.kind == SkillKind::Core)
+        {
+            core.push(unplug::STAY_TOOL);
+        }
     }
     // In the tools' names' order, whatever order the skills came in: the
     // product's install and the program's load gave one file two orders
@@ -8801,6 +9960,15 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
     }
     if !searches.is_empty() {
         file["searches"] = Value::Object(searches);
+    }
+    if summary && !whens.is_empty() {
+        // By name, as the tools are.
+        file["when"] = json!(whens.into_iter().collect::<BTreeMap<_, _>>());
+    }
+    // Each tool's ask phrases (#6772), by name: none given, and the file
+    // is as before, byte for byte.
+    if !asks.is_empty() {
+        file["asks"] = json!(asks.into_iter().collect::<BTreeMap<_, _>>());
     }
     file
 }
@@ -9645,5 +10813,764 @@ mod tests {
         let why = package::install(&other, None, &folder).unwrap_err();
         assert!(why.contains(service_read::QUERY_NOT_AN_ORDER), "{why}");
         assert!(!other.join(name).exists());
+    }
+
+    /// A skill folder `name` in `dir` with `toml` as its skill.toml.
+    fn write_skill(dir: &std::path::Path, name: &str, toml: &str) -> std::path::PathBuf {
+        let folder = dir.join(name);
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: Mails my boss when I arrive.\n---\n"),
+        )
+        .unwrap();
+        std::fs::write(folder.join("skill.toml"), toml).unwrap();
+        folder
+    }
+
+    const ARRIVAL_WRITE: &str = "version = \"1.0.0\"\n[trigger]\ntopic = \"room/presence\"\n\
+        field = \"present\"\nequals = true\n[ask]\npolicy = \"nudge\"\n[permissions]\n\
+        topics = [\"room/presence\"]\nservices = { gmail = \"write\" }\n[[do]]\n\
+        write = { service = \"gmail\", action = \"send_mail\", to = [\"boss@work.test\"], \
+        subject = \"In\", text = \"I'm at my desk.\" }\n";
+
+    /// #6066: a write step loads only with `LAMP_SKILL_WRITES` on and its
+    /// service listed as a write, every field fixed and checked as it loads,
+    /// alone in its skill; its content is what lamp-services hashes.
+    #[test]
+    fn a_write_step_loads_only_with_its_switch_and_permission() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = write_skill(dir.path(), "arrive-mail", ARRIVAL_WRITE);
+        service_write::set_on_here(Some(false));
+        let off = load(&folder).unwrap_err();
+        assert!(off.contains("LAMP_SKILL_WRITES"), "{off}");
+        service_write::set_on_here(Some(true));
+        let skill = load(&folder).unwrap();
+        let [(_, Step::Call(Call::ServiceWrite(write)))] = skill.steps.as_slice() else {
+            panic!("{:?}", skill.steps);
+        };
+        assert_eq!(
+            write.content(),
+            &json!({"service":"gmail","action":"send_mail","to":["boss@work.test"],"subject":"In","text":"I'm at my desk."})
+        );
+        assert_eq!(
+            skill
+                .permissions
+                .refuses(&Call::ServiceWrite(write.clone())),
+            None
+        );
+        let refused = |name: &str, toml: String, why: &str| {
+            let folder = write_skill(dir.path(), name, &toml);
+            let refused = load(&folder).unwrap_err();
+            assert!(refused.contains(why), "{name}: {refused}");
+        };
+        // Its permission a read, or none.
+        refused(
+            "as-read",
+            ARRIVAL_WRITE.replace("gmail = \"write\"", "gmail = \"read\""),
+            "needs services = { gmail = \"write\" }",
+        );
+        refused(
+            "no-permission",
+            ARRIVAL_WRITE.replace("services = { gmail = \"write\" }\n", ""),
+            "needs services = { gmail = \"write\" }",
+        );
+        // A service no skill writes to.
+        refused(
+            "drive-write",
+            ARRIVAL_WRITE.replace(
+                "gmail = \"write\"",
+                "gmail = \"write\", google_drive = \"write\"",
+            ),
+            "a skill can't write to google_drive",
+        );
+        // A field filled at run time, a field it doesn't take, a bad one.
+        refused(
+            "filled",
+            ARRIVAL_WRITE.replace("text = \"I'm at my desk.\"", "text = { from = \"voice\" }"),
+            "skill.toml",
+        );
+        refused(
+            "send-id",
+            ARRIVAL_WRITE.replace(" }\n", ", send_id = \"x\" }\n"),
+            "unknown field",
+        );
+        refused(
+            "bad-address",
+            ARRIVAL_WRITE.replace("boss@work.test", "my boss"),
+            "not an email address",
+        );
+        // Not alone: with another step, or started by a tool.
+        refused(
+            "with-light",
+            format!("{ARRIVAL_WRITE}[[do]]\nlight = \"warm\"\n"),
+            "write is its skill's only step",
+        );
+        service_write::set_on_here(Some(false));
+        // Its permission listed with the switch off.
+        assert!(
+            Permissions {
+                services: [("gmail".to_owned(), "write".to_owned())].into(),
+                ..Permissions::default()
+            }
+            .check()
+            .unwrap_err()
+            .contains("LAMP_SKILL_WRITES")
+        );
+        service_write::set_on_here(None);
+    }
+
+    /// Lamp 9adf, 12 Nov: a made skill whose only step is a write still
+    /// waiting for the owner's yes did nothing, so it spends nothing. Its
+    /// group's hour, its cooldown, its day's count and its `[rest]` count
+    /// are given back: it comes again the next time its trigger holds, and
+    /// an approved skill of its group is not held back by it. Asked of the
+    /// Policy or not.
+    #[test]
+    fn a_write_waiting_for_the_owners_yes_spends_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        service_write::set_on_here(Some(true));
+        let waiting = ARRIVAL_WRITE
+            .replace(
+                "version = \"1.0.0\"\n",
+                "version = \"1.0.0\"\nmost_a_day = 1\n",
+            )
+            .replace("equals = true\n", "equals = true\ncooldown = \"1h\"\n")
+            + "[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\
+               [rest]\nafter_ignored = 1\nwithin = \"10s\"\n";
+        let waiting = load(&write_skill(dir.path(), "back-at-desk-email", &waiting)).unwrap();
+        let approved = load(&write_skill(
+            dir.path(),
+            "back-to-desk-hello",
+            "version = \"1.0.0\"\n[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\n\
+             equals = true\n[ask]\npolicy = \"nudge\"\n[permissions]\nspeak = true\n\
+             topics = [\"room/presence\"]\n[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\
+             [[do]]\nsay = { text = \"Welcome back.\" }\n",
+        ))
+        .unwrap();
+        service_write::set_on_here(None);
+        for policy in [false, true] {
+            let mut engine = Engine::new(vec![waiting.clone(), approved.clone()], !policy);
+            if policy {
+                engine = engine.asking_the_policy();
+            }
+            let ran = |engine: &mut Engine, second: u64, presence: &str| -> Vec<String> {
+                let now = second * 1_000_000;
+                let runs = engine.observe("room/presence", now, presence.as_bytes(), None);
+                let mut ran = Vec::new();
+                for run in runs
+                    .into_iter()
+                    .filter(|run| !run.calls.is_empty() || run.ask.is_some())
+                {
+                    // Asked of the Policy, its yes makes it.
+                    if run.ask.is_some() {
+                        engine.made(&run.skill, now);
+                    }
+                    // The write came back "not sent: waiting for the
+                    // owner's yes".
+                    if run.skill == "back-at-desk-email" {
+                        assert!(engine.unwritten(&run.skill), "policy {policy}");
+                    }
+                    ran.push(run.skill);
+                }
+                ran
+            };
+            let here = r#"{"present":true,"someone":false}"#;
+            assert_eq!(ran(&mut engine, 0, here), ["back-at-desk-email"]);
+            // Its trigger still holding: not again until it holds again.
+            assert!(ran(&mut engine, 5, here).is_empty(), "policy {policy}");
+            // Past its [rest]'s while, nobody noticed: not counted.
+            ran(&mut engine, 20, r#"{"present":false,"someone":false}"#);
+            assert_eq!(engine.resting_until("back-at-desk-email", 20_000_000), None);
+            // Back: its cooldown, its day's one and the hour are its own.
+            assert_eq!(
+                ran(&mut engine, 40, here),
+                ["back-at-desk-email"],
+                "policy {policy}"
+            );
+            // The approved skill of its group runs.
+            assert_eq!(
+                ran(&mut engine, 60, r#"{"present":true,"someone":true}"#),
+                ["back-to-desk-hello"],
+                "policy {policy}"
+            );
+        }
+    }
+
+    const PHOTO_BOOTH: &str = "version = \"1.0.0\"\ngrants = [\"camera\", \"light\"]\n\
+        tool = \"photo_booth\"\n[permissions]\nlight = true\nspeak = true\n\
+        [[do]]\nlight = { colour = \"warm\" }\n[[do]]\nsay = \"Say cheese.\"\n\
+        [[do]]\ntask = { task = \"Take a photo and send it to my phone\", run = \"scripts/main.py\" }\n";
+
+    /// A skill folder with a script, `toml` its skill.toml.
+    fn task_skill(dir: &Path, name: &str, toml: &str) -> PathBuf {
+        let folder = write_skill(dir, name, toml);
+        std::fs::create_dir_all(folder.join(task::SCRIPTS)).unwrap();
+        std::fs::write(folder.join("scripts/main.py"), "print('cheese')\n").unwrap();
+        folder
+    }
+
+    /// The `.package.json` a Store install writes into `folder`.
+    fn from_store(folder: &Path, name: &str, store: bool) {
+        let installed = package::Installed {
+            sha256: "ab".repeat(32),
+            manifest: package::Manifest {
+                format: package::FORMAT,
+                name: name.into(),
+                version: "1.0.0".into(),
+                files: Vec::new(),
+            },
+            from_store: store,
+        };
+        std::fs::write(
+            folder.join(package::INSTALLED_FROM),
+            serde_json::to_vec(&installed).unwrap(),
+        )
+        .unwrap();
+    }
+
+    /// A made skill as the lamp wrote it before `LAMP_MADE_SKILL_LOOSE`:
+    /// the nudges' group and day, its rest, an hour's cooldown.
+    const MADE_LIGHT_OFF: &str = "version = \"1.0.0\"\nmost_a_day = 3\n\
+        [permissions]\ntopics = [\"room/presence\"]\nlight = true\n\
+        [trigger]\ntopic = \"room/presence\"\nfield = \"present\"\nequals = false\n\
+        cooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n[[do]]\nlight = { colour = \"warm\" }\n\
+        [quiet]\nfrom = \"22:00\"\nto = \"08:00\"\n\
+        [budget]\ngroup = \"wellbeing\"\nper_hour = 1\n[rest]\nafter_ignored = 2\n";
+
+    /// A skill folder under `root` named `name`, its card's last lines
+    /// `marks`, its `skill.toml` `toml`, put on from a package (`store`, the
+    /// Store's) or from a folder (`None`).
+    fn marked_skill(
+        root: &Path,
+        name: &str,
+        marks: &str,
+        toml: &str,
+        store: Option<bool>,
+    ) -> PathBuf {
+        let folder = write_skill(root, name, toml);
+        std::fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: Lights off when I leave.\n{marks}---\n"),
+        )
+        .unwrap();
+        if let Some(store) = store {
+            from_store(&folder, name, store);
+        }
+        folder
+    }
+
+    /// The owner's 9adf round, 12 Nov 15:06: loosened, a skill made here
+    /// before the switch sheds the lamp's default `[budget]` group and
+    /// `most_a_day` as it loads, its file untouched and its rest, quiet and
+    /// cooldown kept; a value the person asked for, and every core, Store,
+    /// file-added, folder-put or pushed skill, keeps them; off, nothing is
+    /// shed.
+    #[test]
+    fn loosened_a_made_skill_sheds_the_lamps_old_limits_as_it_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let (root, dev) = (dir.path().join("skills"), dir.path().join("dev"));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::create_dir_all(&dev).unwrap();
+        let made = marked_skill(
+            &root,
+            "light-off",
+            "made: here\nmade_by: voice\n",
+            MADE_LIGHT_OFF,
+            Some(false),
+        );
+        // Made before the maker was written on the card: still made here.
+        marked_skill(
+            &root,
+            "glow-off",
+            "made: here\n",
+            MADE_LIGHT_OFF,
+            Some(false),
+        );
+        let asked = MADE_LIGHT_OFF
+            .replace("most_a_day = 3", "most_a_day = 5")
+            .replace("per_hour = 1", "per_hour = 2");
+        marked_skill(
+            &root,
+            "asked",
+            "made: here\nmade_by: app\n",
+            &asked,
+            Some(false),
+        );
+        let gap = MADE_LIGHT_OFF.replace("per_hour = 1\n", "per_hour = 1\ngap = \"30m\"\n");
+        marked_skill(&root, "gapped", "made: here\n", &gap, Some(false));
+        marked_skill(&root, "store", "made: here\n", MADE_LIGHT_OFF, Some(true));
+        marked_skill(
+            &root,
+            "from-file",
+            "made: here\nadded: file\n",
+            MADE_LIGHT_OFF,
+            Some(false),
+        );
+        marked_skill(&root, "by-hand", "made: here\n", MADE_LIGHT_OFF, None);
+        // Made with the switch on, its request asking for limits ("not too
+        // often"): the lamp's defaults, the person's ask, kept.
+        marked_skill(
+            &root,
+            "limits-asked",
+            &format!(
+                "made: here\nmade_by: voice\n{}\n",
+                lamp_voice::made_skill::LIMITS_ASKED
+            ),
+            MADE_LIGHT_OFF,
+            Some(false),
+        );
+        marked_skill(&root, "plain", "", MADE_LIGHT_OFF, Some(false));
+        marked_skill(
+            &root,
+            "core-nudge",
+            "made: here\n",
+            &format!("kind = \"core\"\n{MADE_LIGHT_OFF}"),
+            Some(false),
+        );
+        marked_skill(&dev, "pushed", "made: here\n", MADE_LIGHT_OFF, None);
+        let written = std::fs::read(made.join("skill.toml")).unwrap();
+        let none = BTreeSet::new();
+        let loaded = |on: bool| {
+            lamp_voice::made_skill::set_loose_here(Some(on));
+            let loaded = load_each_with(
+                &root,
+                Some(Pushed {
+                    dir: &dev,
+                    picture_yes: &none,
+                }),
+            );
+            lamp_voice::made_skill::set_loose_here(None);
+            loaded
+                .into_iter()
+                .map(|(folder, skill)| {
+                    let name = folder.file_name().unwrap().to_string_lossy().into_owned();
+                    (name, skill)
+                })
+                .collect::<BTreeMap<_, _>>()
+        };
+        let on = loaded(true);
+        let skill = |name: &str| {
+            on[name]
+                .clone()
+                .unwrap_or_else(|why| panic!("{name}: {why}"))
+        };
+        for name in ["light-off", "glow-off"] {
+            let shed = skill(name);
+            assert_eq!(shed.budget, None, "{name}");
+            assert_eq!(shed.most_a_day, None, "{name}");
+            assert_eq!(
+                shed.manners_shed,
+                [
+                    "[budget] group \"wellbeing\" per_hour = 1",
+                    "most_a_day = 3"
+                ]
+            );
+            // Kept: its rest, its quiet hours and its trigger's cooldown.
+            assert_eq!(shed.rest.map(|rest| rest.after_ignored), Some(2));
+            assert_eq!(shed.quiet, Some((22 * 60, 8 * 60)));
+            assert_eq!(shed.triggers[0].cooldown_us, 3_600_000_000);
+        }
+        assert_eq!(std::fs::read(made.join("skill.toml")).unwrap(), written);
+        // The person's own values, each kept.
+        let asked = skill("asked");
+        assert_eq!(asked.budget, Some(("wellbeing".into(), 2)));
+        assert_eq!(asked.most_a_day, Some(5));
+        assert!(asked.manners_shed.is_empty());
+        // A gap is no default: the group kept, the day shed.
+        let gapped = skill("gapped");
+        assert_eq!(gapped.budget, Some(("wellbeing".into(), 1)));
+        assert_eq!(gapped.most_a_day, None);
+        assert_eq!(gapped.manners_shed, ["most_a_day = 3"]);
+        for name in [
+            "store",
+            "from-file",
+            "by-hand",
+            "plain",
+            "core-nudge",
+            "limits-asked",
+        ] {
+            let kept = skill(name);
+            assert_eq!(kept.budget, Some(("wellbeing".into(), 1)), "{name}");
+            assert_eq!(kept.most_a_day, Some(3), "{name}");
+            assert!(kept.manners_shed.is_empty(), "{name}");
+        }
+        // A pushed skill never joins a lamp skill's group, so it is refused
+        // as before: it is never seen as made here.
+        assert!(on["pushed"].is_err());
+        // Off, every skill keeps what it was written with.
+        let off = loaded(false);
+        for (name, skill) in &off {
+            if let Ok(skill) = skill {
+                assert!(skill.manners_shed.is_empty(), "{name}");
+                assert!(skill.most_a_day.is_some(), "{name}");
+            }
+        }
+        let made_off = off["light-off"].clone().unwrap();
+        assert_eq!(made_off.budget, Some(("wellbeing".into(), 1)));
+        assert_eq!(made_off.most_a_day, Some(3));
+        // The said values are the lamp's own defaults.
+        assert_eq!(lamp_voice::made_skill::MANNERS_GROUP, "wellbeing");
+        assert_eq!(lamp_voice::made_skill::MANNERS_PER_HOUR, 1);
+        assert_eq!(lamp_voice::made_skill::MANNERS_MOST_A_DAY, 3);
+    }
+
+    const MORNING_MAIL: &str = "version = \"1.0.0\"\ngrants = [\"gmail-read\", \"gmail-write\"]\n\
+        tool = \"morning_mail\"\n[permissions]\ntopics = [\"clock/local\"]\n\
+        [[do]]\ntask = { task = \"Sum up this morning's mail and send it to me\", run = \"scripts/main.py\" }\n";
+
+    /// LAMP_AGENT_SERVICES (#6432's grants): a connector skill's `do.task`
+    /// loads with its `<code>-read` / `<code>-write` grants only with the
+    /// switch on; an unknown service or kind is refused, and with the switch
+    /// off it is refused as before.
+    #[test]
+    fn a_connector_skills_task_loads_with_its_service_grants_only_on() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = task_skill(dir.path(), "morning-mail", MORNING_MAIL);
+        task::set_agent_services_here(Some(false));
+        assert!(
+            load(&folder)
+                .unwrap_err()
+                .contains("\"gmail-read\" is not a grant")
+        );
+        task::set_agent_services_here(Some(true));
+        let skill = load(&folder).unwrap();
+        assert_eq!(skill.grants, ["gmail-read", "gmail-write"]);
+        assert!(skill.task_step().is_some());
+        for (name, grant) in [
+            ("unknown-service", "\"myspace-read\""),
+            ("second-code", "\"gmail-app-read\""),
+            ("unknown-kind", "\"gmail-delete\""),
+            ("bare-code", "\"gmail\""),
+        ] {
+            let folder = task_skill(
+                dir.path(),
+                name,
+                &MORNING_MAIL.replace("\"gmail-write\"", grant),
+            );
+            let refused = load(&folder).unwrap_err();
+            assert!(refused.contains("is not a grant"), "{name}: {refused}");
+        }
+        task::set_agent_services_here(None);
+    }
+
+    /// #6305: a `do.task` loads with its grants beside the skill's other
+    /// steps, which stay steps of their own; its grants and its step are
+    /// checked as it loads.
+    #[test]
+    fn a_task_step_and_its_grants_load_checked() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = task_skill(dir.path(), "photo-booth", PHOTO_BOOTH);
+        let skill = load(&folder).unwrap();
+        assert_eq!(skill.grants, ["camera", "light"]);
+        let step = skill.task_step().unwrap();
+        assert_eq!(step.run, "scripts/main.py");
+        assert_eq!(skill.steps.len(), 3, "the light and the cue run beside it");
+        assert_eq!(
+            skill
+                .permissions
+                .refuses(&Call::Task(Box::new(step.clone()))),
+            None
+        );
+        let refused = |name: &str, toml: String, why: &str| {
+            let folder = task_skill(dir.path(), name, &toml);
+            let refused = load(&folder).unwrap_err();
+            assert!(refused.contains(why), "{name}: {refused}");
+        };
+        refused(
+            "unknown-grant",
+            PHOTO_BOOTH.replace("\"light\"]", "\"root\"]"),
+            "is not a grant",
+        );
+        refused(
+            "skills-grant",
+            PHOTO_BOOTH.replace("\"light\"]", "\"skills\"]"),
+            "never a script's",
+        );
+        refused(
+            "grants-alone",
+            "version = \"1.0.0\"\ngrants = [\"light\"]\ntool = \"x_y\"\n[permissions]\nlight = true\n[[do]]\nlight = { colour = \"warm\" }\n".into(),
+            "only beside one",
+        );
+        refused(
+            "two-tasks",
+            format!(
+                "{PHOTO_BOOTH}[[do]]\ntask = {{ task = \"again\", run = \"scripts/main.py\" }}\n"
+            ),
+            "one do.task step",
+        );
+        // A skill's keys' names (`LAMP_SKILL_SECRETS`): beside its task,
+        // plain names, once each, never the run's own.
+        let named = task_skill(
+            dir.path(),
+            "keys-named",
+            &PHOTO_BOOTH.replace(
+                "tool = ",
+                "secrets = [\"GEMINI_API_KEY\", \"TELEGRAM_BOT_TOKEN\"]\ntool = ",
+            ),
+        );
+        assert!(load(&named).is_ok());
+        for (name, secrets) in [
+            ("keys-reserved", "[\"LAMP_CONTROL_TOKEN\"]"),
+            ("keys-twice", "[\"GOOD_KEY\", \"GOOD_KEY\"]"),
+            ("keys-lower", "[\"good_key\"]"),
+        ] {
+            refused(
+                name,
+                PHOTO_BOOTH.replace("tool = ", &format!("secrets = {secrets}\ntool = ")),
+                "secrets: at most 16",
+            );
+        }
+        refused(
+            "keys-alone",
+            "version = \"1.0.0\"\nsecrets = [\"GOOD_KEY\"]\ntool = \"x_y\"\n[permissions]\nlight = true\n[[do]]\nlight = { colour = \"warm\" }\n".into(),
+            "secrets: what a do.task's run needs, only beside one",
+        );
+        refused(
+            "not-alone",
+            PHOTO_BOOTH.replace(
+                "[[do]]\ntask =",
+                "[[do]]\nlight = { colour = \"warm\" }\ntask =",
+            ),
+            "alone in its [[do]] table",
+        );
+        refused(
+            "out-of-scripts",
+            PHOTO_BOOTH.replace("scripts/main.py", "skill.toml"),
+            "inside the skill's own scripts/",
+        );
+        refused(
+            "unknown-key",
+            PHOTO_BOOTH.replace("run = ", "net = true, run = "),
+            "unknown field",
+        );
+        refused(
+            "core-task",
+            format!("kind = \"core\"\n{PHOTO_BOOTH}"),
+            "only an installable skill",
+        );
+    }
+
+    /// #6305: only a skill from the Store, or pushed by the owner's own
+    /// computer, loads with a `do.task`; one put on by hand, marked as not
+    /// from the Store, or made here does not, and says why.
+    #[test]
+    fn a_task_loads_only_from_the_store_or_the_owners_computer() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("skills");
+        let dev = dir.path().join("dev");
+        std::fs::create_dir_all(&dev).unwrap();
+        let store = task_skill(&root, "photo-booth", PHOTO_BOOTH);
+        from_store(&store, "photo-booth", true);
+        task_skill(
+            &root,
+            "by-hand",
+            &PHOTO_BOOTH.replace("photo_booth", "by_hand"),
+        );
+        let not_store = task_skill(
+            &root,
+            "not-store",
+            &PHOTO_BOOTH.replace("photo_booth", "not_store"),
+        );
+        from_store(&not_store, "not-store", false);
+        let made = task_skill(
+            &root,
+            "made-here",
+            &PHOTO_BOOTH.replace("photo_booth", "made_here"),
+        );
+        from_store(&made, "made-here", true);
+        std::fs::write(
+            made.join("SKILL.md"),
+            "---\nname: made-here\ndescription: x\nmade: here\n---\n",
+        )
+        .unwrap();
+        task_skill(
+            &dev,
+            "pushed-booth",
+            &PHOTO_BOOTH.replace("photo_booth", "pushed_booth"),
+        );
+        let none = BTreeSet::new();
+        let loaded = load_each_with(
+            &root,
+            Some(Pushed {
+                dir: &dev,
+                picture_yes: &none,
+            }),
+        );
+        let result = |name: &str| {
+            loaded
+                .iter()
+                .find(|(folder, _)| folder.ends_with(name))
+                .map(|(_, result)| result.clone())
+                .unwrap()
+        };
+        assert!(result("photo-booth").is_ok());
+        let pushed = result("pushed-booth").unwrap();
+        assert!(pushed.pushed_by.is_some() && pushed.task_step().is_some());
+        for (name, why) in [
+            ("by-hand", "Skills Store or pushed"),
+            ("not-store", "Skills Store or pushed"),
+            ("made-here", "made or added on the lamp"),
+        ] {
+            let refused = result(name).unwrap_err();
+            assert!(refused.contains(why), "{name}: {refused}");
+        }
+    }
+
+    /// A pushed skill whose name is on the lamp under `root` as a folder, a
+    /// file or a link is not loaded, so it is never handed over: lamp-control
+    /// would hash `root/<name>` at the mint (SubDarren's P2/P3 on #6608).
+    #[test]
+    fn a_pushed_skill_never_loads_while_its_name_is_under_the_lamps_skills() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("skills");
+        let dev = dir.path().join("dev");
+        std::fs::create_dir_all(&root).unwrap();
+        task_skill(
+            &dev,
+            "pushed-booth",
+            &PHOTO_BOOTH.replace("photo_booth", "pushed_booth"),
+        );
+        let none = BTreeSet::new();
+        let pushed = || {
+            load_each_with(
+                &root,
+                Some(Pushed {
+                    dir: &dev,
+                    picture_yes: &none,
+                }),
+            )
+            .into_iter()
+            .find(|(folder, _)| folder.starts_with(&dev))
+            .map(|(_, result)| result)
+            .unwrap()
+        };
+        assert!(pushed().unwrap().pushed_by.is_some());
+        let own = root.join("pushed-booth");
+        for what in ["a folder", "a file", "a link"] {
+            match what {
+                "a folder" => std::fs::create_dir(&own).unwrap(),
+                "a file" => std::fs::write(&own, "x").unwrap(),
+                _ => std::os::unix::fs::symlink(dir.path().join("nowhere"), &own).unwrap(),
+            }
+            let refused = pushed().unwrap_err();
+            assert!(refused.contains("already on the lamp"), "{what}: {refused}");
+            assert_eq!(
+                task::folder_of(&root, Some(&dev), "pushed-booth", true),
+                None,
+                "{what}"
+            );
+            if std::fs::symlink_metadata(&own).unwrap().is_dir() {
+                std::fs::remove_dir(&own).unwrap();
+            } else {
+                std::fs::remove_file(&own).unwrap();
+            }
+        }
+        assert_eq!(
+            task::folder_of(&root, Some(&dev), "pushed-booth", true),
+            Some(dev.join("pushed-booth"))
+        );
+    }
+
+    /// #6715: a pushed skill's task is said to come from "your computer"
+    /// and its name when its pushed-from file names one, and from "your
+    /// computer" alone when none does, never "your computer a computer":
+    /// a read-back that says it as a person would ("from your computer,
+    /// and") then holds every say-back word, and the first yes is taken.
+    #[test]
+    fn a_pushed_task_with_no_computer_named_comes_from_your_computer_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("skills");
+        let dev = dir.path().join("dev");
+        std::fs::create_dir_all(&root).unwrap();
+        let folder = task_skill(&dev, "pushed-booth", PHOTO_BOOTH);
+        task::set_on_here(Some(true));
+        let from =
+            || package::task_asks(&root, Some(&dev), "pushed-booth").unwrap()["from"].clone();
+        assert_eq!(from(), "your computer");
+        std::fs::write(folder.join(PUSHED_FROM), r#"{"computer":"desk-mac"}"#).unwrap();
+        assert_eq!(from(), "your computer desk-mac");
+        // A pushed-from file naming nobody is as none.
+        std::fs::write(folder.join(PUSHED_FROM), r#"{"computer":"  "}"#).unwrap();
+        assert_eq!(from(), "your computer");
+        // The skill list still says who pushed it, "a computer" for none.
+        assert_eq!(pushed_by(&folder), "a computer");
+        task::set_on_here(None);
+    }
+
+    /// #6305: the manage helper reads a skill's task back for the voice,
+    /// and keeps no yes: whether the owner agreed is lamp-control's, so a
+    /// `task_yes` is no request here, the voice's included, and its answer
+    /// never says `approved`. Off, it reads nothing back.
+    #[test]
+    fn the_helper_reads_a_task_back_and_keeps_no_yes() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("skills");
+        let state = dir.path().join("state");
+        std::fs::create_dir_all(&state).unwrap();
+        let folder = task_skill(&root, "photo-booth", PHOTO_BOOTH);
+        from_store(&folder, "photo-booth", true);
+        task::set_on_here(Some(false));
+        assert!(
+            package::task_asks(&root, None, "photo-booth")
+                .unwrap_err()
+                .contains("LAMP_SKILL_TASKS")
+        );
+        task::set_on_here(Some(true));
+        let asks = package::task_asks(&root, None, "photo-booth").unwrap();
+        assert_eq!(asks["from"], "the Skills Store");
+        assert_eq!(asks["grants"], json!(["camera", "light"]));
+        assert!(asks.get("approved").is_none(), "{asks}");
+        assert_eq!(asks["task"], "Take a photo and send it to my phone");
+        assert_eq!(
+            package::task_asks(&root, None, "no-such").unwrap(),
+            json!({"task": null})
+        );
+        let sha256 = asks["sha256"].as_str().unwrap().to_owned();
+        let wait = std::time::Duration::from_secs(2);
+        let line = json!({"task_yes": {"name": "photo-booth", "sha256": sha256,
+            "grants": ["camera", "light"]}})
+        .to_string();
+        let made = dir.path().join("made");
+        let (push, dev) = (dir.path().join("push"), dir.path().join("dev"));
+        let key = dir.path().join("key");
+        let pushes = |asker| package::Pushes {
+            dev: &dev,
+            push: &push,
+            asker,
+            key_file: &key,
+        };
+        for asker in [
+            package::Asker::Voice,
+            package::Asker::App,
+            package::Asker::Any,
+        ] {
+            let mut out = Vec::new();
+            assert!(
+                !package::asked(
+                    &root,
+                    &made,
+                    &state,
+                    wait,
+                    None,
+                    Some(pushes(asker)),
+                    line.as_bytes(),
+                    &mut out,
+                )
+                .unwrap()
+            );
+            let said = String::from_utf8_lossy(&out);
+            assert!(said.contains("refused"), "{said}");
+        }
+        // Nothing of a yes in lamp-skills' state.
+        assert!(!state.join("task-yes.json").exists());
+        // A changed script reads back with its new SHA-256.
+        std::fs::write(folder.join("scripts/main.py"), "print('changed')\n").unwrap();
+        let again = package::task_asks(&root, None, "photo-booth").unwrap();
+        assert_ne!(again["sha256"], sha256.as_str());
+        // A remove goes on with lamp-control not reached.
+        package::remove(&root, Some(&state), "photo-booth").unwrap();
+        assert!(!folder.exists());
+        task::set_on_here(None);
     }
 }
