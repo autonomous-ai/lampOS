@@ -592,8 +592,8 @@ class BotDryRound(Repo):
         self.assertNothingChanged()
 
     def test_a_row_line_carries_it(self):
-        for row in ("ROW 7 %s on build 12700: the journal line", "**ROW** 7 %s on build 12700",
-                    "Fifth, 09:51 GMT+7: lamp row for #7 on lamp-52e6 at %s"):
+        for row in ("ROW 7 %s on lamp-52e6 build 12700: PASS\n```\nlamp-52e6 lamp-voice[812]: listening_ready\n```", "**ROW** 7 %s on lamp-52e6 build 12700\n```\nlamp-52e6 lamp-voice[812]: listening_ready\n```",
+                    "Fifth, 09:51 GMT+7: lamp row for #7 on lamp-52e6 at %s, build 12700\n```\nlamp-52e6 lamp-voice[812]: listening_ready\n```"):
             shutil.rmtree(self.state, ignore_errors=True)
             r, lines = self.bot(before=lambda: self.no_row(7, row))
             self.assertIn("dry: no-crates lane: would carry 7 onto " + self.base[:9], lines, row)
@@ -606,6 +606,16 @@ class BotDryRound(Repo):
             shutil.rmtree(self.state, ignore_errors=True)
             r, lines = self.bot(before=lambda: self.no_row(7, row))
             self.assertIn("dry: no-crates lane: nothing eligible", lines, row)
+
+    def test_a_row_missing_a_part_sits_out_with_its_line(self):
+        # 14 Nov 15:40 (the lead): a ROW names the lamp, the build and quotes the journal lines.
+        hs = []
+        r, lines = self.bot(before=lambda: hs.append(self.no_row(7, "ROW #7 %s on build 12700: PASS")))
+        self.assertIn("#7 left out: its ROW doesn't name the lamp, the build and the journal lines (missing: lamp, journal)", r.stderr)
+        self.assertIn("dry: no-crates lane: nothing eligible", lines)
+        r, lines = self.bot(again=True)
+        self.assertNotIn("its ROW doesn't name", r.stderr)
+        self.assertNothingChanged()
 
     def test_no_row_needed_in_a_read_ok_on_the_head_carries_it(self):
         r, lines = self.bot(before=lambda: self.no_row(7, "READ-OK %s\n\nSixth, 01:10: docs only, no row needed."))
@@ -625,6 +635,10 @@ class BotDryRound(Repo):
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("#8: no lamp row (rows.py: none)", r.stdout)
         self.no_row(8, "ROW 8 %s on build 12700")
+        r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("#8: no lamp row (rows.py: row-incomplete lamp,journal)", r.stdout)
+        self.no_row(8, "ROW 8 %s on lamp-52e6 build 12700\n```\nlamp-52e6 lamp-voice[812]: listening_ready\n```")
         r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
@@ -651,7 +665,7 @@ class BotDryRound(Repo):
         self.assertIn("dry: crate lane: would carry 9 onto " + self.base[:9], lines)
 
     def test_a_switch_on_with_its_row_is_carried(self):
-        r, lines = self.bot(before=self.switch("on", "ROW #8 %s on build 12700: PASS, the journal line"))
+        r, lines = self.bot(before=self.switch("on", "ROW #8 %s on lamp-52e6 build 12700: PASS\n```\nlamp-52e6 lamp-voice[812]: listening_ready\n```"))
         self.assertIn("dry: crate lane: would carry 8 9 onto " + self.base[:9], lines, r.stderr)
 
     def test_a_switch_off_carries_on_no_row_needed(self):
@@ -666,7 +680,7 @@ class BotDryRound(Repo):
         r = se()
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("#8: no lamp row (rows.py: none)", r.stdout)
-        self.switch("on", "ROW 8 %s on build 12700")()
+        self.switch("on", "ROW 8 %s on lamp-52e6 build 12700\n```\nlamp-52e6 lamp-voice[812]: listening_ready\n```")()
         self.assertEqual(se().returncode, 0)
 
     def switch_on(self, head):

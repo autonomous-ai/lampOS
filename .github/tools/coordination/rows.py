@@ -6,6 +6,8 @@
 #                  rows open ("Fifth, 09:51 GMT+7: lamp row for #6907 on lamp-52e6 …");
 #   no-row-needed  a writer's READ-OK whose first line is the marker, for a commit one of the heads starts with (or a
 #                  prefix of one), saying "no row needed" (docs, tests, or code behind a switch that's off);
+#   row-incomplete MISSING  a row of this PR (and no "no row needed" that carries it) that lacks lamp, build or journal
+#                  (15:40 below), MISSING the parts it lacks, comma-separated ("lamp,journal");
 #   none           neither.
 # A ROW, a "lamp row for" or a "no row needed" on a quoted line ("> …") or inside a fenced code block is someone else's
 # text and never counts (markers.py's quoted). Only comments from writers count (markers.py's --writers /
@@ -19,6 +21,12 @@
 #   PASS (the words, in capitals) doesn't count.
 # - A switch-on needs a real row: with --switch-on (the bot passes it when the PR's diff turns a LAMP_ switch on in a
 #   product unit, lib.sh's coord_switch_on), "no row needed" never carries; only a row does.
+#
+# 14 Nov 15:40 (the lead): "a ROW line names the lamp, the build (seq or commit) and quotes the journal lines that show the
+# behaviour; a ROW missing any of the three doesn't count." A row (a ROW line or a "lamp row for #N") counts only with all
+# three: in its first 400 characters a lamp ("lamp-52e6": lamp- and 4 lowercase letters or digits, a whole word) and a
+# build (a five-digit sequence as a whole word, "12987", or "build <7-40 hex commit>"), and a journal: a fenced code block
+# with a line in it, or a quoted line ("> …") naming a lamp-. Without one, the bot says which part it lacks.
 import json, os, re, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -29,6 +37,9 @@ from markers import parse_marker, quoted, names_commit, writers_from_args, is_wr
 FAILED = re.compile(r"\b(?:FAIL|VOID)(?:ED|S)?\b")
 PASSED = re.compile(r"\bPASS\b")
 NO_ROW = re.compile(r"(?i)\bno row needed\b")
+LAMP = re.compile(r"(?<![\w-])lamp-[a-z0-9]{4}(?![\w-])")
+BUILD = re.compile(r"(?<![#\w])\d{5}(?!\w)|\bbuild[ \t]+`?[0-9a-f]{7,40}\b")
+FENCE_OPEN = re.compile(r" {0,3}(`{3,}|~{3,})")
 
 
 def lamp_row_re(pr):
@@ -51,13 +62,39 @@ def unquoted(rx, body, end=None):
     return any(not quoted(body, m.start()) for m in rx.finditer(body, 0, len(body) if end is None else end))
 
 
+def journal(body):
+    """A fenced code block (``` or ~~~; an unclosed one runs to the end) with a non-empty line, or a quoted line naming
+    a lamp-."""
+    fence = None
+    for line in body.split("\n"):
+        if fence is None:
+            m = FENCE_OPEN.match(line)
+            if m:
+                fence = m.group(1)
+            elif re.match(r"[ \t]*>", line) and "lamp-" in line:
+                return True
+        elif re.fullmatch(r" {0,3}" + re.escape(fence[0]) + "{%d,}[ \t]*\r?" % len(fence), line):
+            fence = None
+        elif line.strip():
+            return True
+    return False
+
+
+def missing(body):
+    """The parts a row lacks (15:40): a list of "lamp", "build", "journal"."""
+    head = body[:400]
+    return [part for part, ok in (("lamp", LAMP.search(head)), ("build", BUILD.search(head)), ("journal", journal(body)))
+            if not ok]
+
+
 def has_row(c, pr):
+    """None when the comment is no row of this PR (or a failed one), else the parts it lacks ([] for a whole row)."""
     body = c["body"].lstrip()
     if not pr:
-        return False
+        return None
     if not ((row_line_re(pr).match(body) and not quoted(body, 0)) or unquoted(lamp_row_re(pr), body, 300)):
-        return False
-    return not failed(body)
+        return None
+    return None if failed(body) else missing(body)
 
 
 def says_no_row(c, heads):
@@ -70,18 +107,21 @@ def says_no_row(c, heads):
 
 def rows(items, heads, writers, pr=None, switch_on=False):
     """items: dicts {login, body} in posting order. heads: the head sha, or a list of it and earlier heads with the same
-    patch. switch_on: the PR turns a switch on, so "no row needed" doesn't carry it. Returns "row", "no-row-needed" or
-    "none"."""
+    patch. switch_on: the PR turns a switch on, so "no row needed" doesn't carry it. Returns "row", "no-row-needed",
+    "row-incomplete <parts>" (the newest incomplete row's) or "none"."""
     heads = [heads] if isinstance(heads, str) else [h for h in heads if h]
-    found = "none"
+    found, short = "none", None
     for c in items:
         if c.get("pr_body") or not is_writer(c, writers):
             continue
-        if has_row(c, pr):
+        lacks = has_row(c, pr)
+        if lacks == []:
             return "row"
+        if lacks:
+            short = lacks
         if not switch_on and says_no_row(c, heads):
             found = "no-row-needed"
-    return found
+    return "row-incomplete " + ",".join(short) if found == "none" and short else found
 
 
 def main():

@@ -209,6 +209,12 @@ eligible() {
     fine switch$p
     so=(); [[ $sw == on ]] && so=(--switch-on)
     rw=$($PYTHON -I $TOOLS_DIR/rows.py --writers $wf $so --pr $p $heads < $cf)
+    # 14 Nov 15:40 (the lead): a row names the lamp, the build and quotes the journal lines; one that lacks a part is no
+    # row, said once per head with the parts it lacks (rows.py's "row-incomplete lamp,journal").
+    if [[ $rw == row-incomplete\ * ]]; then
+      grep -qx "$p rowpart $head" $told || { say "#$p left out: its ROW doesn't name the lamp, the build and the journal lines (missing: ${${rw#row-incomplete }//,/, })" >&2; tell "$p rowpart $head"; }
+      continue
+    fi
     if [[ $rw == none && $sw == on ]]; then
       grep -qx "$p norow-on $head" $told || { say "#$p left out: it turns a switch on in the product, and no ROW line names it on head ${head:0:9}" >&2; tell "$p norow-on $head"; }
       continue
