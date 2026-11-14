@@ -408,6 +408,10 @@ fn run(args: Arguments) -> Result<(), Box<dyn std::error::Error>> {
     if args.offline_face {
         service = service.with_offline_face(&bus);
     }
+    // The character's energy level, under the body's own switch (#6893).
+    if lamp_body::energy_in::enabled_from_environment() {
+        service = service.with_energy(&bus);
+    }
     // The lamp's one breath, where Mood keeps it (#1670); Mood is off unless
     // `LAMP_MOOD=on`, and with no fresh mood the breath is as before.
     service = service.with_mood_breath(&bus);
