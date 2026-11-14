@@ -760,6 +760,12 @@ pub struct Asked {
     /// and is refused with [`crate::moves::PERSON_USING`] over anything
     /// higher. Without it, a gesture asked over one playing is as before.
     pub replace: bool,
+    /// The gesture asked is one only an energy level above 1 starts of
+    /// itself (`"lively": true` on the mood socket, #6893): the voice's fill
+    /// on an answer with no gesture of its own, a `lively` skill's run. It
+    /// is dropped while lamp-control holds the body (`held`); every other
+    /// gesture is taken under the lease as before.
+    pub lively: bool,
     /// The energy level the character keeps (`crate::energy`, #6893), 0 or
     /// 1 for today. Only with `LAMP_BODY_ENERGY=on`; taken only once the
     /// lamp is settled (no gesture, the pose and the arm still).
@@ -804,6 +810,7 @@ impl Asked {
         night_woke: false,
         aim_from_home: false,
         replace: false,
+        lively: false,
         energy: 0,
     };
 
@@ -834,6 +841,7 @@ impl Asked {
         night_woke: false,
         aim_from_home: false,
         replace: false,
+        lively: false,
         energy: 0,
     };
 }
@@ -4266,6 +4274,7 @@ pub(crate) fn run_looking(
         night_woke: false,
         aim_from_home: false,
         replace: false,
+        lively: false,
         energy: 0,
     };
     run_alive(
@@ -6428,6 +6437,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     },
                     None,
                 ))
+            } else if asked_now.lively && asked_now.held {
+                Some(("dropped: lamp-control holds it", None))
             } else if asked_now.replace && (talking || paused.is_some()) {
                 // The person always first: a paired computer's motion never
                 // starts while someone is talking with the lamp (listening,
