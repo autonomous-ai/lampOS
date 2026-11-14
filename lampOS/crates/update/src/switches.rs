@@ -506,8 +506,10 @@ mod tests {
         let tasks = crate::hermes_install::TASKS_SWITCH;
         assert!(crate::models::file_says_on(product, engines));
         assert!(crate::models::file_says_on(product, tasks));
+        // The one run path is off in the product (#7019): the file lamp-update
+        // reads it from doesn't set it.
         let one_path = crate::agent_ns::DEFAULT_AGENT_SWITCH;
-        assert!(crate::models::file_says_on(product, one_path));
+        assert!(!crate::models::file_says_on(product, one_path));
 
         let root = tempfile::tempdir().unwrap();
         // No file, nothing set: off.
@@ -524,6 +526,12 @@ mod tests {
         // The unit lacks the lines: the carried file turns them on.
         assert!(update_switch(root.path(), engines, None));
         assert!(update_switch(root.path(), tasks, None));
+        assert!(!update_switch(root.path(), one_path, None));
+        // A lamp's own file setting it (a test fixture, not the product's)
+        // turns it on, read from the file as the others are.
+        let mut fixture = product.to_vec();
+        fixture.extend_from_slice(b"LAMP_SKILL_DEFAULT_AGENT=on\n");
+        std::fs::write(&at, &fixture).unwrap();
         assert!(update_switch(root.path(), one_path, None));
         // The environment set always wins over the file.
         assert!(!update_switch(
@@ -568,7 +576,7 @@ mod tests {
             UpdateSwitches {
                 engines: true,
                 tasks: true,
-                one_path: true,
+                one_path: false,
                 gateway_runs: false,
             }
         );
@@ -590,7 +598,24 @@ mod tests {
             |name: &str| (name == crate::agent_ns::DEFAULT_AGENT_SWITCH).then(|| "off".into());
         let no_path = update_switches(root.path(), true, one_path_off);
         assert!(no_path.tasks && !no_path.one_path);
-        assert!(restart_for(now, no_path));
+        assert!(!restart_for(now, no_path));
+        // Off in the product's file (#7019); a lamp's own file setting it (a
+        // test fixture) turns it on, on a product lamp only, and the
+        // environment's off still wins.
+        let mut fixture = std::fs::read(&at).unwrap();
+        fixture.extend_from_slice(b"LAMP_SKILL_DEFAULT_AGENT=on\n");
+        std::fs::write(&at, &fixture).unwrap();
+        let with_path = update_switches(root.path(), true, unset);
+        assert!(with_path.tasks && with_path.one_path);
+        assert!(restart_for(now, with_path));
+        assert!(!update_switches(root.path(), false, unset).one_path);
+        assert!(!update_switches(root.path(), true, one_path_off).one_path);
+        assert!(!update_switches(root.path(), true, tasks_off).one_path);
+        std::fs::write(
+            &at,
+            include_bytes!("../../../deploy/product/settings/update.env"),
+        )
+        .unwrap();
         // A gateway default agent's runs (#6882): no product file sets it,
         // so off; set in the environment, on, with tasks on only.
         assert!(!now.gateway_runs);

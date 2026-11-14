@@ -388,9 +388,9 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     vòng của nó chưa chạy): không tạo hay khởi động gì, nên một lần chạy
     không bao giờ bắt đầu mà không có token trên mạng của đèn.
   - **Agent mặc định của đèn, theo một đường chạy duy nhất, với
-    `LAMP_SKILL_DEFAULT_AGENT=on`** (#6685, bật trong sản phẩm từ 13/11:
-    trong unit của lamp-tasks, và trong unit của lamp-update cùng tệp công
-    tắc mà mỗi bản dựng mang theo `/etc/lampOS/update.env`). Một cách chạy kỹ năng cho mọi agent trong
+    `LAMP_SKILL_DEFAULT_AGENT=on`** (#6685, tắt trong sản phẩm: không unit
+    sản phẩm nào và cả `/etc/lampOS/update.env` đều không đặt nó, cho tới khi
+    hàng trên c0a4 đạt và có hai lượt đọc). Một cách chạy kỹ năng cho mọi agent trong
     Harness của đèn: không có code riêng cho từng agent và không có tên
     engine nào trong đường chạy. lamp-tasks đọc engine mặc định của đèn ở
     mỗi lần chạy (`runtime::lamp_default`, lựa chọn trong app trước; trước
