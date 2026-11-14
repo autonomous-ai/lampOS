@@ -126,7 +126,7 @@ connected apps.
 | `LAMP_SKILL_WRITES=on` (#6066; on in the product's four units since 11 Nov) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
 | `LAMP_SKILL_TASKS=on` (#6432; on in the product units) | `lamp-services`, `lamp-control` (and `lamp-tasks`, which runs the task) and `lamp-voice` | A skill's run reaches no service: lamp-control answers `service.read` and `service.write` `off`, `lamp-services` refuses the `lamp-control.service` cgroup on its tools socket and the voice's `run_write_waiting`, and the voice reads no run's write back ("A skill's run on the lamp's Hermes", below) |
-| `LAMP_SERVICE_READ_IDS_KEPT=on` (tracker row C132; off in every product unit) | `lamp-voice`'s second route, with `LAMP_SERVICES=on` | A calendar read keeps nothing: a move or cancel of an event from an earlier conversation reads in each request and is refused by the after-read rule there ("After a read", below) |
+| `LAMP_SERVICE_READ_IDS_KEPT=on` (tracker row C132; on in the product's lamp-voice unit, beside #6410) | `lamp-voice`'s second route, with `LAMP_SERVICES=on` | A calendar read keeps nothing: a move or cancel of an event from an earlier conversation reads in each request and is refused by the after-read rule there ("After a read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
 the line, so `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on` in
@@ -1695,9 +1695,10 @@ it is saved, never sent, whatever words agreed to it.
   the rest of the session; only the thread and what is built from it are
   kept clear of it.
 - **A calendar read's event ids, kept for the next request
-  (`LAMP_SERVICE_READ_IDS_KEPT`, off unless set; off in the product until
-  its lamp check; tracker row C132).** On lamp-06c1 on 12 Nov (row X1) an
-  event made in an earlier conversation could not be cancelled: the model
+  (`LAMP_SERVICE_READ_IDS_KEPT`, off unless set; on in the product since
+  its lamp check, Fourteen's cancel 2/2 on #6410; tracker row C132).** On
+  lamp-06c1 on 12 Nov (row X1) an event made in an earlier conversation
+  could not be cancelled: the model
   had no `event_id`, so it read first; the rule above refused the write in
   that request, and the next request read again and was refused again. With
   the switch on (`crate::service_read_ids`), a Google Calendar `events` read

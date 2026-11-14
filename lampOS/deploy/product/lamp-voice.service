@@ -694,6 +694,11 @@ Environment=LAMP_SERVICE_RECORDS=on
 Environment=LAMP_SERVICE_RECORDS_TOLD=on
 Environment=LAMP_SERVICE_CONTACTS=on
 Environment=LAMP_SERVICE_REDO=on
+# A calendar read's event ids kept for its asker (tracker row C132, #6546), so "cancel it" after a read writes by id
+# in the next request instead of reading again and being refused by the after-read rule (lamp-06c1's 12 Nov loop,
+# row X1). Fourteen's row on 13000 with it and LAMP_CALENDAR_EDITS on, cancel PASS 2/2:
+# https://github.com/autonomous-ai/lampOS/pull/6410#issuecomment-6872017272. Second route only.
+Environment=LAMP_SERVICE_READ_IDS_KEPT=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
