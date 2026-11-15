@@ -2421,13 +2421,27 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      product lamp, read only with `LAMP_OPENCLAW_ON_LAMP` on), as
      `LAMP_HERMES_SKILLS` does for Hermes: on, `openclaw-ns` shows
      `/run/lampos-skills` read-only; off, nothing under `/run`.
-   - **No skill's run on OpenClaw yet** (#6685): its one gateway has no
-     wrapper started per run, so it has no part in the one run path ("One
-     agent namespace for every engine"), and `openclaw-ns` never shows
-     lamp-control's socket or lamp-tasks' runs' token folder. With
-     `LAMP_SKILL_DEFAULT_AGENT=on` and OpenClaw the lamp's default,
-     lamp-tasks refuses a skill's run in words (docs/tasks.md, "The lamp's
-     default agent"); OpenClaw's own fenced path per run is a later step.
+   - **A skill's run on OpenClaw is a gateway agent's** (#6685, the
+     lead's decision): its one gateway has no wrapper started per run
+     (OpenClaw 2026.11.2 can't open its state outside its gateway's PID
+     namespace), so its wrapper never takes the one run path's per-run
+     form. With the one run path on (`LAMP_SKILL_DEFAULT_AGENT=on`, read
+     only with `LAMP_SKILL_TASKS` on, the same switch Hermes's one run
+     path wrapper follows, and nothing else: lamp-update reads no gateway
+     runs switch, `openclaw_install::shown`), OpenClaw's install writes
+     its wrapper with the gateway mark (`GATEWAY_MARK`, `# lampOS: a
+     gateway agent: a skill's run is one turn on its warm gateway (#6685).
+     Written by lamp-update.`) and its data (`GATEWAY_DATA`, `#@<key>
+     <value>` lines) after `#!/bin/sh`, the rest as above, and
+     `openclaw-ns` shows lamp-control's socket alone, read-only, and the
+     pushed skills (`/var/lib/lampOS/skills-dev`) read-only whenever there,
+     for the gateway's every turn. lamp-tasks reads that wrapper and
+     namespace to take a skill's run as one turn on the warm gateway
+     (docs/tasks.md, "A skill's run on a gateway agent"). Off, the wrapper
+     and `openclaw-ns` are as before #6685, byte for byte. lamp-update
+     never writes OpenClaw's shared `openclaw.json` for a skill's run: its
+     one write of that file is the install's own `gateway` block (the
+     gateway's token, above), with any switch.
    - **Records:** `openclaw-install.json` (the record), `openclaw-ask.json`
      (the ask) and `openclaw.lock` (one install at a time), beside
      Hermes's in lamp-update's records.
@@ -2620,7 +2634,8 @@ yet on a lamp.
 - **Hermes and OpenClaw** keep their own wrappers and namespace scripts
   ("Hermes on the lamp", "OpenClaw on the lamp") with the one run path
   off. With it on (below), Hermes's wrapper is the one run path's;
-  OpenClaw's stays its own and takes no skill's run.
+  OpenClaw's is its own with the gateway mark and data ("OpenClaw on the
+  lamp"), never the per-run form.
 - **Written by a round** (`crates/update/src/agent_ns/rounds.rs`), only
   with `LAMP_AGENT_NS=on` exactly in lamp-update's own unit (no product
   unit sets it; any other value or none is off), by a `serve` with

@@ -470,7 +470,7 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     có đường chạy đã rào cho lần chạy kỹ năng, bất kể công tắc của
     lamp-update, và phép kiểm tra không gọi tên engine nào. Một agent có
     wrapper là của một gateway agent (của OpenClaw khi
-    `LAMP_SKILL_DEFAULT_AGENT` và `LAMP_SKILL_GATEWAY_RUNS` của lamp-update bật, xem "Lần chạy kỹ năng trên một gateway agent" bên
+    chỉ riêng `LAMP_SKILL_DEFAULT_AGENT` của lamp-update bật, #6685, xem "Lần chạy kỹ năng trên một gateway agent" bên
     dưới) nhận lần chạy như một lượt trên gateway đang chạy sẵn của nó;
     wrapper của OpenClaw khi công tắc tắt không có dữ liệu gateway, nên bị
     từ chối như vậy. File token được ghi
@@ -1329,8 +1329,10 @@ lamp-update).
   lần chạy của chính lamp-control là còn giữ trước chúng. Vì vậy
   `LAMP_SKILL_GATEWAY_RUNS` (switches.md) vẫn tắt cho tới khi hàng rào
   được kiểm trên đèn hoặc first builder chấp nhận điều này bằng văn bản;
-  khi tắt, lamp-update để wrapper và namespace của OpenClaw như trước
-  đường chạy chung, và lamp-tasks từ chối lần chạy đó bằng lời.
+  khi tắt, lamp-tasks từ chối lần chạy đó bằng lời. lamp-update không còn
+  đọc công tắc này (#6685, lead): nó ghi wrapper gateway của OpenClaw và
+  cho namespace của nó thấy socket của lamp-control và skills-dev chỉ với
+  `LAMP_SKILL_DEFAULT_AGENT=on`, như wrapper đường chạy chung của Hermes.
 - **Exec.** Lần chạy của Hermes được chạy mọi lệnh trong namespace của nó
   (danh sách cấm cứng vẫn giữ, approvals tắt). Công cụ duy nhất của agent
   rào là `exec`, và danh sách cho phép của nó so theo đường dẫn binary đã

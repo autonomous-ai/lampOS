@@ -350,17 +350,18 @@ const RUNS_EDITS: [(&str, &str); 2] = [
     ),
 ];
 
-/// What a round shows OpenClaw (#6882): `skills` (its skills switch) as
-/// read; lamp-control's socket, the pushed skills and the gateway mark
-/// ([`Shown::tasks`] and [`Shown::one_path`]) only with the one run path
-/// (`one_path`: `LAMP_SKILL_DEFAULT_AGENT=on` with `LAMP_SKILL_TASKS` on)
-/// and a gateway default agent's runs (`gateway_runs`:
-/// [`agent_ns::GATEWAY_RUNS_SWITCH`]) both on. Without the second,
-/// lamp-tasks refuses the gateway's runs, so OpenClaw is shown what it was
-/// before #6685: [`ns_text`] and [`wrapper_text_for`] byte for byte as with
-/// the one run path off.
-pub fn shown(skills: bool, one_path: bool, gateway_runs: bool) -> Shown {
-    let runs = one_path && gateway_runs;
+/// What a round shows OpenClaw (#6882, #6685): `skills` (its skills
+/// switch) as read; lamp-control's socket, the pushed skills and the
+/// gateway mark ([`Shown::tasks`] and [`Shown::one_path`]) with the one
+/// run path on (`one_path`: `LAMP_SKILL_DEFAULT_AGENT=on` with
+/// `LAMP_SKILL_TASKS` on), the same switch Hermes's one run path wrapper
+/// follows, and nothing else: lamp-update reads no gateway runs switch of
+/// its own (the lead on #6685: a skill's run on OpenClaw goes through
+/// Harness `new` as on Hermes, lamp-tasks deciding). With it off, OpenClaw
+/// is shown what it was before #6685: [`ns_text`] and [`wrapper_text_for`]
+/// byte for byte as before.
+pub fn shown(skills: bool, one_path: bool) -> Shown {
+    let runs = one_path;
     Shown {
         skills,
         tasks: runs,

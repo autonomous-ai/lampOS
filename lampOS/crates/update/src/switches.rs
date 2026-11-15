@@ -264,9 +264,6 @@ pub struct UpdateSwitches {
     /// crate::agent_ns::DEFAULT_AGENT_SWITCH), read as `tasks` is, and
     /// only with `tasks` on.
     pub one_path: bool,
-    /// `LAMP_SKILL_GATEWAY_RUNS` (crate::agent_ns::GATEWAY_RUNS_SWITCH),
-    /// read as `tasks` is and only with it on (#6882).
-    pub gateway_runs: bool,
 }
 
 /// lamp-update's switches, each by [`update_switch`], `env` giving
@@ -287,17 +284,12 @@ pub fn update_switches(
     let one_path_env = env(one_path);
     let tasks =
         (tasks_env.is_some() || product) && update_switch(root, tasks, tasks_env.as_deref());
-    let runs = crate::agent_ns::GATEWAY_RUNS_SWITCH;
-    let runs_env = env(runs);
     UpdateSwitches {
         engines: update_switch(root, engines, env(engines).as_deref()),
         tasks,
         one_path: tasks
             && (one_path_env.is_some() || product)
             && update_switch(root, one_path, one_path_env.as_deref()),
-        gateway_runs: tasks
-            && (runs_env.is_some() || product)
-            && update_switch(root, runs, runs_env.as_deref()),
     }
 }
 
@@ -577,7 +569,6 @@ mod tests {
                 engines: true,
                 tasks: true,
                 one_path: false,
-                gateway_runs: false,
             }
         );
         assert!(restart_for(started, now));
@@ -616,33 +607,15 @@ mod tests {
             include_bytes!("../../../deploy/product/settings/update.env"),
         )
         .unwrap();
-        // A gateway default agent's runs (#6882): no product file sets it,
-        // so off; set in the environment, on, with tasks on only.
-        assert!(!now.gateway_runs);
-        let runs = |name: &str| (name == crate::agent_ns::GATEWAY_RUNS_SWITCH).then(|| "on".into());
-        assert!(update_switches(root.path(), true, runs).gateway_runs);
-        assert!(!update_switches(root.path(), false, runs).gateway_runs);
-        let both = |name: &str| {
-            [
-                crate::agent_ns::GATEWAY_RUNS_SWITCH,
-                crate::hermes_install::TASKS_SWITCH,
-            ]
-            .contains(&name)
-            .then(|| "on".into())
-        };
-        assert!(update_switches(root.path(), false, both).gateway_runs);
-        let runs_off =
-            |name: &str| (name == crate::agent_ns::GATEWAY_RUNS_SWITCH).then(|| "off".into());
-        let not_exact =
-            |name: &str| (name == crate::agent_ns::GATEWAY_RUNS_SWITCH).then(|| "On".into());
-        assert!(!update_switches(root.path(), true, not_exact).gateway_runs);
-        // From the file on a product lamp, as tasks; on another lamp, not.
+        // lamp-tasks' gateway runs switch (#6882) is no switch of lamp-update's
+        // (#6685): set in the environment or in the file, it changes nothing here.
+        let runs_switch = concat!("LAMP_SKILL_", "GATEWAY_RUNS");
+        let runs = |name: &str| (name == runs_switch).then(|| "on".into());
+        assert_eq!(update_switches(root.path(), true, runs), now);
         let mut file = std::fs::read(&at).unwrap();
-        file.extend_from_slice(b"LAMP_SKILL_GATEWAY_RUNS=on\n");
+        file.extend_from_slice(format!("{runs_switch}=on\n").as_bytes());
         std::fs::write(&at, &file).unwrap();
-        assert!(update_switches(root.path(), true, unset).gateway_runs);
-        assert!(!update_switches(root.path(), false, unset).gateway_runs);
-        assert!(!update_switches(root.path(), true, runs_off).gateway_runs);
+        assert_eq!(update_switches(root.path(), true, unset), now);
         std::fs::write(
             &at,
             include_bytes!("../../../deploy/product/settings/update.env"),
