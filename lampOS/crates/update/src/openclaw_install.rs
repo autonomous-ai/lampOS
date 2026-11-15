@@ -857,11 +857,16 @@ pub fn withhold(records: &Path) -> bool {
 /// the gateway's unit is written (a round may, the one-shot may not) and
 /// systemd reloaded when it changed, and with Hermes's install under way
 /// only the ask is written: the one-shot installs OpenClaw after Hermes.
+/// With the one run path on and agent `main`'s entry recorded, the round
+/// adds it again itself through `run` ([`keep_run_entry`]): a factory
+/// reset wipes OpenClaw's approvals but keeps the record.
+#[allow(clippy::too_many_arguments)]
 pub fn after_round(
     root: &Path,
     records: &Path,
     shown: Shown,
     systemd: &mut dyn Systemd,
+    run: &mut Runner,
     now_unix_ms: u64,
     window: Result<crate::hermes_schedule::Window, String>,
     say: &mut dyn FnMut(&str),
@@ -875,23 +880,37 @@ pub fn after_round(
         Ok(false) => {}
         Err(why) => say(&format!("OpenClaw's gateway unit not written: {why}")),
     }
-    let before = record(records);
+    let mut before = record(records);
     // OpenClaw there, but agent main's allow-list entry not added yet with
     // the one run path on (an earlier build's, or an add that failed), or
     // still recorded with it off, or the launcher not this lamp-tasks'
     // copy: the one-shot is asked (its steps do only that, the gateway
     // running), and asked again each round until done.
     let added = |said: &OpenclawInstall| said.install == "installed" && said.exec_allowlist;
-    let allowlist_due = if shown.one_path {
+    let mut allowlist_due = if shown.one_path {
         !before.as_ref().is_some_and(added)
     } else {
         before.as_ref().is_some_and(added)
     };
-    let due = allowlist_due || launcher_due(root, shown);
     let there = present(root, shown);
     if there {
         gateway_on(root, systemd, say);
     }
+    // #6685: the entry recorded is added again every round with the
+    // gateway up (an add of an entry there writes nothing), as a factory
+    // reset wipes OpenClaw's approvals and keeps the record. One not taken
+    // marks the record and asks the one-shot, which runs every edit.
+    if there
+        && shown.one_path
+        && !allowlist_due
+        && keep_run_entry(run, say) == Some(false)
+        && let Some(mut said) = before.take()
+    {
+        said.exec_allowlist = false;
+        before = Some(write(records, said));
+        allowlist_due = true;
+    }
+    let due = allowlist_due || launcher_due(root, shown);
     if there && !due {
         if before
             .as_ref()
@@ -957,9 +976,14 @@ pub fn after_round(
             )),
         };
     }
+    // The entry's state goes with the ask (#6685): a switch-off's removes
+    // not run yet are still due in the one-shot ([`steps`]).
     write(
         records,
-        OpenclawInstall::new("installing", None, now_unix_ms),
+        OpenclawInstall {
+            exec_allowlist: before.as_ref().is_some_and(|said| said.exec_allowlist),
+            ..OpenclawInstall::new("installing", None, now_unix_ms)
+        },
     );
     match harness_install::start(root, systemd) {
         Ok(()) => {
@@ -1263,6 +1287,9 @@ fn steps(
     kit: &Kit,
     shown: Shown,
 ) -> OpenclawInstall {
+    // What the record says of agent main's entry before this run: kept
+    // when no edit runs (no gateway), so a switch-off's removes stay due.
+    let had = record(records).is_some_and(|said| said.exec_allowlist);
     if present(root, shown) && kit.built() {
         say(&format!(
             "OpenClaw {VERSION} is already at {OPENCLAW}: nothing installed"
@@ -1275,10 +1302,12 @@ fn steps(
         {
             return said.clone();
         }
-        // Never a failure of the install: an add not done is retried.
-        let added = exec_allowlist(run, shown, say);
+        // Never a failure of the install: an add not done is retried. No
+        // gateway running, nothing was run: the record stays as it was, so
+        // a switch-off's removes are retried until they run.
+        let ran = exec_allowlist(run, shown, say);
         let mut said = before.unwrap_or_else(|| OpenclawInstall::installed(now_unix_ms()));
-        said.exec_allowlist = added;
+        said.exec_allowlist = ran.unwrap_or(had);
         return write(records, said);
     }
     write(
@@ -1492,7 +1521,7 @@ fn steps(
     remove_aside(root, say);
     // Through the gateway just (re)started; an add not done is retried by
     // the next round, never a failure of the install.
-    let exec_allowlist = exec_allowlist(run, shown, say);
+    let exec_allowlist = exec_allowlist(run, shown, say).unwrap_or(had);
     let shown = match (shown.skills, shown.tasks) {
         (true, true) => {
             "its own folder, its work folder, the skills, lamp-skills' socket and lamp-control's socket"
@@ -1551,27 +1580,31 @@ pub fn exec_allowlist_args(shown: Shown) -> Vec<[&'static str; 7]> {
 /// the running gateway's namespaces (the form that worked on a lamp; run
 /// in a namespace of its own with no target, `approvals` exits 1 while the
 /// gateway runs). Only with the gateway's unit active: else nothing is
-/// run, said in one line, and the next round asks again. A remove that
-/// fails is said and passed over; an add that fails is said and not done.
-/// Whether agent [`RUN_AGENT`]'s [`SKILL_START`] entry was added: never
-/// with the one run path off. OpenClaw's config and its `tools.exec` are
-/// never touched.
-fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> bool {
-    if run(&["systemctl", "is-active", "--quiet", UNIT].map(str::to_owned)).is_err() {
+/// run, said in one line, none returned, and the next round asks again.
+/// A remove that fails is said and passed over; an add that fails is said
+/// and not done. [`OLD_FENCE_AGENT`]'s remove fails on a lamp once that
+/// agent is gone from OpenClaw's config ("Config unavailable; cannot
+/// validate --agent"): expected, said in one line as harmless, and
+/// nothing depends on it. Whether agent [`RUN_AGENT`]'s [`SKILL_START`]
+/// entry was added: never with the one run path off. OpenClaw's config
+/// and its `tools.exec` are never touched.
+fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> Option<bool> {
+    if !gateway_active(run) {
         say(&format!(
             "OpenClaw's exec allow-list left as it is: {UNIT} is not running; the next round tries again"
         ));
-        return false;
+        return None;
     }
     let mut added = false;
     for args in exec_allowlist_args(shown) {
-        let mut argv = vec![WRAPPER];
-        argv.extend(args);
-        match run(&as_lampos(&argv)) {
+        match run(&allowlist_argv(args)) {
             Ok(_) => added |= args[2] == "add",
             Err(why) if args[2] == "add" => say(&format!(
                 "OpenClaw's exec allow-list does not let agent {} run {} yet: {why}; the next round tries again",
                 args[5], args[6]
+            )),
+            Err(_) if args[5] == OLD_FENCE_AGENT => say(&format!(
+                "OpenClaw's exec allow-list: agent {OLD_FENCE_AGENT}'s old entry, if any, stays (harmless: the CLI cannot remove it once that agent is gone)"
             )),
             Err(why) => say(&format!(
                 "OpenClaw's exec allow-list: {} {} not taken out: {why}",
@@ -1588,7 +1621,46 @@ fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> 
             "OpenClaw's exec allow-list no longer lets agent {RUN_AGENT} run {SKILL_START}"
         ));
     }
-    added
+    Some(added)
+}
+
+/// Whether the gateway's unit is active (`systemctl is-active`).
+fn gateway_active(run: &mut Runner) -> bool {
+    run(&["systemctl", "is-active", "--quiet", UNIT].map(str::to_owned)).is_ok()
+}
+
+/// An [`exec_allowlist_args`] edit as it is run: as `lampos`, through
+/// [`WRAPPER`], into the running gateway.
+fn allowlist_argv(args: [&str; 7]) -> Vec<String> {
+    let mut argv = vec![WRAPPER];
+    argv.extend(args);
+    as_lampos(&argv)
+}
+
+/// A round's check of agent [`RUN_AGENT`]'s [`SKILL_START`] entry with the
+/// one run path on: with the gateway active, the same add the one-shot
+/// runs (as `lampos`, through [`WRAPPER`]), which OpenClaw takes without
+/// writing when the entry is there. None when the gateway is not active
+/// (nothing run, nothing said: the round started it); else whether the
+/// add was taken, a refusal said in one line. The old globs' removes are
+/// the one-shot's alone.
+fn keep_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str)) -> Option<bool> {
+    if !gateway_active(run) {
+        return None;
+    }
+    let add = exec_allowlist_args(Shown {
+        one_path: true,
+        ..Shown::default()
+    })[0];
+    match run(&allowlist_argv(add)) {
+        Ok(_) => Some(true),
+        Err(why) => {
+            say(&format!(
+                "OpenClaw's exec allow-list does not let agent {RUN_AGENT} run {SKILL_START}: {why}; the one-shot is asked to add it"
+            ));
+            Some(false)
+        }
+    }
 }
 
 /// [`SKILL_START`] there as `shown` wants it: with the one run path on, a
