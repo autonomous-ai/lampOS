@@ -156,6 +156,8 @@ fn written_unix_ms(records: &Path) -> Option<u64> {
 /// When that other build is already refused and the link's is not, a cut
 /// came inside [`settle`] after the link went back: the link names the old
 /// build, the put-back is done, and only the file is left to set aside.
+/// The owner's retry leaves `self-refused` as it is while the file is
+/// there ([`forget_refused`]), so that reading holds.
 pub fn known_builds(records: &Path, root: &Path) -> Option<Known> {
     let link = on_root(root, CURRENT);
     let written = fs::metadata(records.join(PENDING)).ok()?.modified().ok()?;
@@ -462,17 +464,38 @@ pub(crate) fn retry(records: &Path, build: &str) -> io::Result<bool> {
     Ok(true)
 }
 
+/// What the owner's retry did with `self-refused` ([`forget_refused`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Forgot {
+    /// Emptied: how many builds it held, which a round switches to again.
+    Builds(usize),
+    /// Left as it is, with how many builds it holds: a switch of
+    /// lamp-update's own is under way.
+    Left(usize),
+}
+
 /// The owner's retry from the app (#6901): every build leaves
 /// `self-refused`, so a round switches to any of them again; how many
 /// there were. `self-retried` is left as it is: put back again, a build
 /// that had its one more try is refused for good at once, until the owner
 /// retries again. The caller holds the records' lock.
-pub fn forget_refused(records: &Path) -> io::Result<usize> {
+///
+/// Not while a switch of lamp-update's own is under way (`self.json` is
+/// there, readable or not): the list is left as it is, for a retry after
+/// the switch is settled. The put-back of a `self.json` that cannot be read
+/// tells a put-back already done from one still to do by the failed build
+/// being in this list ([`known_builds`]). Emptied after its link went back
+/// and before its file was set aside, the next start would take the good
+/// build for the failed one.
+pub fn forget_refused(records: &Path) -> io::Result<Forgot> {
     let builds = refused(records).len();
+    if !matches!(waiting(records), Ok(None)) {
+        return Ok(Forgot::Left(builds));
+    }
     if builds > 0 {
         write_whole(&records.join(REFUSED), b"", 0o600)?;
     }
-    Ok(builds)
+    Ok(Forgot::Builds(builds))
 }
 
 fn link_names(root: &Path, build: &str) -> bool {
@@ -978,14 +1001,31 @@ mod tests {
         put_back_ago(&records, AGAIN_AFTER);
         assert!(refused_for_good(&records, root.path(), A));
         // The owner's retry lets it go, and leaves it tried once more.
-        assert_eq!(forget_refused(&records).unwrap(), 1);
+        assert_eq!(forget_refused(&records).unwrap(), Forgot::Builds(1));
         assert_eq!(how_refused(&records, root.path(), A), Refused::No);
         assert_eq!(retried(&records), [A]);
-        assert_eq!(forget_refused(&records).unwrap(), 0);
+        assert_eq!(forget_refused(&records).unwrap(), Forgot::Builds(0));
         // Put back after it: final again.
         refuse(&records, root.path(), A).unwrap();
         boot("boot-d");
         put_back_ago(&records, AGAIN_AFTER);
         assert!(refused_for_good(&records, root.path(), A));
+    }
+
+    #[test]
+    fn the_owners_retry_leaves_the_builds_put_back_while_a_switch_is_under_way() {
+        let (_root, records) = put_back_on(Some("boot-a"), Some("boot-a"), Some("boot-a"));
+        // Waiting to be confirmed.
+        begin(&records, A, B).unwrap();
+        assert_eq!(forget_refused(&records).unwrap(), Forgot::Left(1));
+        assert_eq!(refused(&records), [A]);
+        // A `self.json` that cannot be read is a switch not settled yet.
+        fs::write(records.join(PENDING), "{\"version\": 1, \"old\": \"").unwrap();
+        assert_eq!(forget_refused(&records).unwrap(), Forgot::Left(1));
+        assert_eq!(refused(&records), [A]);
+        // Settled: the builds are let go.
+        end(&records).unwrap();
+        assert_eq!(forget_refused(&records).unwrap(), Forgot::Builds(1));
+        assert!(refused(&records).is_empty());
     }
 }

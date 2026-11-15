@@ -2032,10 +2032,13 @@ release changed lamp-update.
   on that boot for 24 hours.
 - **Final:** a build put back a second time (it is in `self-retried`), on
   whatever boot and however long ago. So is one with no line of its own in
-  `self-put-back`: its put-back's boot was not known, or its
+  `self-put-back`: its put-back's boot was not known, its
   `lamp-update-back` notes none (7071's, until the settings writer is
-  refreshed). Only the owner's retry, or a release that changes
-  lamp-update, moves these.
+  refreshed), or another binary was put back after it. `self-put-back`
+  holds one line, for the last binary put back: a later put-back of
+  another binary replaces it, and the earlier binary then stays refused
+  until the owner's retry. Only the owner's retry, or a release that
+  changes lamp-update, moves these.
 - **The owner's retry** (#6901): the app's retry of an update
   (`update.check` with `retry`, [cloud.md](cloud.md), "Check for update")
   also empties `self-refused`, whichever build it names and refused or
@@ -2046,7 +2049,15 @@ release changed lamp-update.
   build's lamp-update as one never put back. `self-retried` is left as it
   is: put back again, a binary that had its one more try is refused for
   good at once, until the owner retries again, and one that had not still
-  has it. A plain check, with no `retry`, lets none go.
+  has it. A plain check, with no `retry`, lets none go. While a switch of
+  lamp-update's own is under way (`self.json` is there, readable or not)
+  the retry leaves `self-refused` as it is and isn't kept for later:
+  `serve` says `the owner asked to retry: lamp-update's own switch is
+  under way, so its builds put back before stay refused; a retry after it
+  is settled lets them go`. The put-back of a `self.json` that can't be
+  read tells a put-back already done from one still to do by the failed
+  build being in `self-refused` (below), so the list is never emptied
+  under it.
 - **Old updaters:** the rule is read by the lamp-update that runs, the one
   the lamp was put back to. A lamp whose own updater is older keeps the
   rule it has: 7071's never retries, and a later one from before #6901
@@ -2056,7 +2067,9 @@ release changed lamp-update.
 
 Tests: `tests/round/self_retry.rs` runs each case through rounds and
 `lamp-update-back` (the three reasons and their lines, the second put-back,
-a put-back dated after now, no boot noted, a climb, the owner's retry);
+a put-back dated after now, no boot noted, a climb, the owner's retry, and
+that retry while a switch waits and inside the put-back of an unreadable
+`self.json`);
 `own.rs`'s `a_build_put_back_once_is_tried_once_more_for_the_first_reason_that_holds`
 has the order of the reasons, and `app_check.rs`'s
 `a_retry_lets_lamp_updates_own_builds_put_back_be_tried_again` the retry as

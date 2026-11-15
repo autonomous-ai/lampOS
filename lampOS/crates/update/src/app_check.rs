@@ -243,12 +243,15 @@ impl AppCheck {
 /// names: a build whose lamp-update was put back is refused by every round
 /// ("waiting for a newer updater") with no refusal in the state to drop.
 /// Said in one line, with how many, when there was one. One put back again
-/// is refused again by the round itself.
+/// is refused again by the round itself. While a switch of lamp-update's own
+/// is under way they are left refused, and said so: the put-back of that
+/// switch may read the list, and a retry after it is settled lets them go.
 pub fn drop_refusals(
     records: &crate::records::Records,
     sequences: &[u64],
     say: &mut dyn FnMut(&str),
 ) {
+    use crate::own::Forgot;
     if sequences.is_empty() {
         return;
     }
@@ -277,10 +280,13 @@ pub fn drop_refusals(
         }
     }
     match crate::own::forget_refused(records.folder()) {
-        Ok(0) => {}
-        Ok(builds) => say(&format!(
+        Ok(Forgot::Builds(0) | Forgot::Left(0)) => {}
+        Ok(Forgot::Builds(builds)) => say(&format!(
             "the owner asked to retry: {builds} of lamp-update's own builds put back before may be tried again"
         )),
+        Ok(Forgot::Left(_)) => say(
+            "the owner asked to retry: lamp-update's own switch is under way, so its builds put back before stay refused; a retry after it is settled lets them go",
+        ),
         Err(error) => say(&format!(
             "the owner asked to retry: self-refused cannot be written: {error}"
         )),

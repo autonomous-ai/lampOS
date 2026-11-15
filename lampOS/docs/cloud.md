@@ -711,7 +711,8 @@ be switched or climbed to again (#6901: lamp-update's `self-refused` is
 emptied before the round; [updates.md](updates.md), "A build put back is
 tried once more"), so a lamp whose rounds said only `… waiting for a newer
 updater` can be retried too; put back again, that binary is refused again by
-the round. A `retry` that is not a
+the round. While a switch of lamp-update's own is under way they stay
+refused, and a retry after it is settled lets them go. A `retry` that is not a
 whole number is refused, `retry must be the refused build's sequence, a whole
 number`, and nothing is sent. The same minute and the same refusals apply.
 

@@ -242,6 +242,79 @@ fn the_owners_retry_lets_a_build_refused_for_good_be_tried_again() {
     );
 }
 
+/// What `serve` says when the owner's retry leaves `self-refused` as it is.
+const LEFT: &str = "the owner asked to retry: lamp-update's own switch is under way, so its builds put back before stay refused; a retry after it is settled lets them go";
+
+/// A read of #7167: while a switch of lamp-update's own waits to be
+/// confirmed, the owner's retry leaves `self-refused` as it is, and says
+/// so. Once the switch is settled, a retry lets its builds go as before.
+#[test]
+fn the_owners_retry_leaves_lamp_updates_own_builds_refused_while_its_switch_is_under_way() {
+    let mut lamp = Lamp::installed_switching_itself();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    // A build put back before, then a switch to another.
+    let before = sha(BAD);
+    fs::write(lamp.records().join("self-refused"), format!("{before}\n")).unwrap();
+    assert!(
+        matches!(lamp.round(), Outcome::SelfSwitched { .. }),
+        "{:?}",
+        lamp.said
+    );
+    assert!(lamp.pending().is_some());
+    let told = owner_retries(&lamp, 2);
+    assert_eq!(own::refused(&lamp.records()), vec![before], "{told:?}");
+    assert_eq!(
+        told,
+        [
+            "the owner asked to retry build 2: it is not refused, so a plain check",
+            LEFT,
+        ]
+    );
+    // Confirmed, the switch is settled: a retry lets the build go.
+    assert_eq!(lamp.confirm(&sha("lamp-update 2")), own::Confirm::Confirmed);
+    let told = owner_retries(&lamp, 2);
+    assert!(
+        told.iter().any(|line| line
+            == "the owner asked to retry: 1 of lamp-update's own builds put back before may be tried again"),
+        "{told:?}"
+    );
+    assert!(own::refused(&lamp.records()).is_empty());
+}
+
+/// The same read, and why: the put-back of a `self.json` that cannot be
+/// read tells a put-back already done from one still to do by the failed
+/// build being in `self-refused` (`own::known_builds`). With that list
+/// emptied after the link went back and before the file was set aside, the
+/// next start took the good build for the failed one, refused it, and
+/// pointed the link at the failed one.
+#[test]
+fn the_owners_retry_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    // A cut after the link moved back, before the file was set aside.
+    lamp.spoil_pending(Duration::from_secs(60));
+    fs::write(lamp.records().join("self-refused"), format!("{new}\n")).unwrap();
+    lamp_update::records::replace_link(&lamp.root.join("opt/lampOS/update/current"), &old).unwrap();
+    let told = owner_retries(&lamp, 2);
+    // The fallback finishes that put-back: the good build stays linked and
+    // the failed one refused.
+    let back = lamp.back(update_unit("failed", "failed"), records_now());
+    assert_eq!(lamp.own_build(), old, "{back:?}, after {told:?}");
+    assert_eq!(
+        back,
+        own::Back::Unreadable(own::Unreadable::PutBack {
+            old,
+            new: new.clone()
+        })
+    );
+    assert_eq!(own::refused(&lamp.records()), vec![new]);
+    assert_eq!(lamp.set_aside("self.json").len(), 1);
+    assert!(told.iter().any(|line| line == LEFT), "{told:?}");
+}
+
 /// #6901's lamp: its updater is too old for the build, climbs to the one
 /// the build carries, and that one is put back on the boot of its switch.
 /// Every round then said "waiting for a newer updater", for good. Now it
