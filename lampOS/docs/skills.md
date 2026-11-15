@@ -3501,8 +3501,11 @@ gone ([switches.md](switches.md)). What happens:
      `not_kept`, why "it couldn't be put on: a skill that runs its own code
      goes on only once you agree to it out loud at the lamp, after it says
      what that code may use". While it was said back at the lamp and its
-     spoken yes is awaited (below; `skill_write_yes::code_yes_awaited`:
-     that SHA-256's wait, neither dropped, answered nor past its 120 s),
+     spoken yes is awaited (below; `skill_write_yes::code_yes_awaited_told`:
+     that SHA-256's wait, neither dropped, answered nor past its 120 s, as
+     the second route's worker keeps it in
+     `/run/lampos-voice/code-yes-awaited.json`, 0600, since the status is
+     answered by the outer voice process and the wait lives in the worker),
      the answer also carries `"awaits_yes": true`, so the app shows it as
      waiting for that yes and keeps asking; once the yes puts it on, the
      next answer is `on`. Not said back (someone else present, or not on

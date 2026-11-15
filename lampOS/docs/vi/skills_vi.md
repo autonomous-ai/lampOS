@@ -768,8 +768,11 @@ sau:
      own code goes on only once you agree to it out loud at the lamp, after
      it says what that code may use". Trong lúc nó đã được đọc lại tại đèn
      và lời đồng ý bằng lời đang được chờ (bên dưới;
-     `skill_write_yes::code_yes_awaited`: cơ chế chờ của đúng SHA-256 đó,
-     chưa bị bỏ, chưa được trả lời và chưa quá 120 s), câu trả lời còn mang
+     `skill_write_yes::code_yes_awaited_told`: cơ chế chờ của đúng SHA-256
+     đó, chưa bị bỏ, chưa được trả lời và chưa quá 120 s, như worker của
+     route thứ hai giữ nó trong `/run/lampos-voice/code-yes-awaited.json`,
+     0600, vì trạng thái do process voice bên ngoài trả lời còn cơ chế chờ
+     nằm trong worker), câu trả lời còn mang
      `"awaits_yes": true`, để ứng dụng hiện là đang chờ lời đồng ý đó và
      tiếp tục hỏi; khi lời đồng ý bật nó, câu trả lời kế tiếp là `on`. Không
      được đọc lại (có người khác ở đó, hoặc không ở route thứ hai) thì không
