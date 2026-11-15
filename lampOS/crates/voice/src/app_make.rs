@@ -1781,6 +1781,9 @@ mod tests {
         let id = wait.split('"').nth(1).unwrap().to_owned();
         assert_eq!(wait.trim(), yes::then_wait(&id));
         assert!(yes::waiting_note(5, now).is_none());
+        // The lamp's words of request 5 kept (none kept reads as a
+        // say-back cut before its first word, #7072).
+        yes::lamp_said(5, "The lamp's model wrote its code.");
         let told_next = yes::waiting_note(6, now).unwrap();
         assert!(
             told_next.contains(&format!("approve_id \"{id}\"")),

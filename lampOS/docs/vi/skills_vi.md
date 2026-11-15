@@ -2965,7 +2965,10 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   đúng từng từ trước bất kỳ cái "có" nào nếu người dùng đồng ý hoặc hỏi
   lại, kèm toàn bộ câu nói lại để nói; một lời từ chối hay chờ thì được
   nói là kỹ năng vẫn tắt, không gọi gì, và không làm câu nói lại được nói
-  thêm lần nữa; rồi kết thúc như câu kết thúc và không hỏi gì. Khi đã có một câu trả lời
+  thêm lần nữa; rồi kết thúc như câu kết thúc và không hỏi gì. Một câu nói
+  lại bị cắt trước khi từ đầu tiên được giữ, không có câu trả lời nào được
+  giữ trong chính request của nó (câu nói lại tự nói của một tác vụ bị bỏ
+  khi cái "có" bắt đầu, #7072), cũng được tính là bị cắt như vậy. Khi đã có một câu trả lời
   không bị cắt chứa trọn nó, ghi chú trở lại như thường, có `approve_id`.
   Journal ghi những gì đã giữ: "a made skill's yes not
   taken: its say-back was not heard whole (kept: r6 cut=true 28 words;
