@@ -13,7 +13,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     let command = args
         .next()
-        .ok_or("usage: lamp-tasks serve [--enable ...] | request --socket ABS | skill list | skill call NAME [JSON]")?;
+        .ok_or("usage: lamp-tasks serve [--enable ...] | request --socket ABS | skill list | skill call NAME [JSON] | factory-engine set openclaw|hermes | factory-engine clear")?;
     if command == "request" {
         if args.next().as_deref() != Some("--socket") {
             return Err("request requires --socket ABS".into());
@@ -51,6 +51,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut targets = None;
     let mut boot_id = None;
     let mut bus_root = PathBuf::from(lamp_bus::DEFAULT_ROOT);
+    let mut factory_engine = PathBuf::from(lamp_tasks::factory_engine::FILE);
     let mut run_for = None;
     let mut as_person = false;
     // On unless `--no-watch`: confirmed on lamp-4ace on 2026-10-15
@@ -124,6 +125,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             "--targets" => {
                 targets = Some(PathBuf::from(args.next().ok_or("--targets needs a path")?))
+            }
+            "--factory-engine" => {
+                factory_engine = PathBuf::from(args.next().ok_or("--factory-engine needs a path")?)
             }
             "--bus-root" => bus_root = PathBuf::from(args.next().ok_or("--bus-root needs a path")?),
             "--boot-id" => boot_id = Some(args.next().ok_or("--boot-id needs an identity")?),
@@ -225,7 +229,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 openclaw_switch.as_deref(),
                 lamp_engine.as_deref(),
                 std::env::var_os("HOME").map(PathBuf::from),
-            ),
+            )
+            // The lamp's factory engine (#6685): after the app's choice
+            // and `LAMP_LAMP_ENGINE`, ahead of the build's order.
+            .map(|side| lamp_tasks::runtime::LampSide {
+                factory: lamp_tasks::factory_engine::load(&factory_engine),
+                ..side
+            }),
         }),
         sign_in_by_code,
         app_socket,
@@ -271,6 +281,20 @@ fn main() {
     // `lamp-tasks net-relay ...` (#6306): inside a skill run's own network
     // namespace, started by its namespace script before Hermes; the run's
     // model calls on 127.0.0.1:7741 piped to lamp-tasks' bridge socket.
+    // `lamp-tasks factory-engine set openclaw|hermes | clear` (#6685): the
+    // lamp's factory engine, written at the factory as root.
+    if args.first().map(String::as_str) == Some("factory-engine") {
+        match lamp_tasks::factory_engine::command(&args[1..]) {
+            Ok(said) => {
+                println!("{said}");
+                std::process::exit(0);
+            }
+            Err(error) => {
+                eprintln!("lamp-tasks factory-engine: {error}");
+                std::process::exit(2);
+            }
+        }
+    }
     if args.first().map(String::as_str) == Some("net-relay") {
         if let Err(error) = lamp_tasks::net_bridge::relay_main(&args[1..]) {
             eprintln!("lamp-tasks net-relay: {error}");

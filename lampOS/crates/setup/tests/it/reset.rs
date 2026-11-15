@@ -3528,3 +3528,38 @@ fn the_reset_forgets_the_agents_after_the_plans_wipes() {
     let steps = reset::reset(&lamp(&Root::new()), &mut Fake::default()).unwrap();
     assert!(!steps.contains(&Step::AgentsForgotten));
 }
+
+/// #6685: the lamp's factory engine (`lamp-tasks`' `factory_engine::FILE`)
+/// outlives a reset: no reset plan wipes it, its folder, or a folder
+/// holding it, and the real wipe leaves it as it is.
+#[test]
+fn no_reset_plan_wipes_the_lamps_factory_engine() {
+    let factory = Path::new("/etc/lampOS/tasks/factory-engine.json");
+    let folder = Path::new("/etc/lampOS/tasks");
+    for source in [
+        include_str!("../../fixtures/reset-plan-product.json"),
+        include_str!("../../fixtures/reset-plan-example.json"),
+        include_str!("../../../../deploy/lamp-06c1/reset-plan.json"),
+    ] {
+        let plan: Plan = serde_json::from_str(source).unwrap();
+        plan.check().unwrap();
+        for path in &plan.wipe {
+            assert!(
+                !factory.starts_with(path) && !path.starts_with(folder),
+                "the reset plan wipes {}",
+                path.display()
+            );
+        }
+        let root = Root::new();
+        let kept = root.0.join(factory.strip_prefix("/").unwrap());
+        fs::create_dir_all(kept.parent().unwrap()).unwrap();
+        fs::write(&kept, br#"{"version":1,"engine":"openclaw"}"#).unwrap();
+        for path in &plan.wipe {
+            reset::wipe(&root.0.join(path.strip_prefix("/").unwrap())).unwrap();
+        }
+        assert_eq!(
+            fs::read(&kept).unwrap(),
+            br#"{"version":1,"engine":"openclaw"}"#
+        );
+    }
+}

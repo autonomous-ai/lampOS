@@ -265,6 +265,12 @@ pub struct LampSide {
     /// (#6492): the default after the app's choice, while Harness reports
     /// it on the lamp. None: unset, or a name no engine has.
     pub chosen: Option<EngineKind>,
+    /// The lamp's factory engine (#6685,
+    /// [`crate::factory_engine::FILE`]): the default after
+    /// [`Self::chosen`], ahead of the build's order. A lamp shipped with
+    /// OpenClaw keeps it after a reset, which leaves that file. None: no
+    /// file, or one not read.
+    pub factory: Option<EngineKind>,
     /// The engines Harness's engines look reports installed on the lamp's
     /// own machine (`harness machines engines`, the machine Harness marks
     /// `current`), in Harness's order, of those that take a task here
@@ -296,6 +302,7 @@ impl LampSide {
             bin: PathBuf::from(LAMP_ENGINES_BIN),
             app: Default::default(),
             chosen: None,
+            factory: None,
             reported: Default::default(),
             wrapped: false,
         }
@@ -341,7 +348,8 @@ impl LampSide {
 /// name here: Harness has many, and how each starts stays Harness's.
 ///
 /// The default ([`lamp_default`]): the owner's choice in the app
-/// ([`LampSide::app`]), else [`LAMP_ENGINE`]'s, else the build's
+/// ([`LampSide::app`]), else [`LAMP_ENGINE`]'s, else the lamp's factory
+/// engine ([`LampSide::factory`], #6685), else the build's
 /// ([`lamp_engines`]' first), else the first of them.
 pub fn lamp_order(side: &LampSide) -> Vec<EngineKind> {
     let mut order: Vec<EngineKind> = match side.reported() {
@@ -368,12 +376,14 @@ pub fn lamp_order(side: &LampSide) -> Vec<EngineKind> {
 }
 
 /// The default among `order` (#6492): the app's choice, else
-/// [`LAMP_ENGINE`]'s, else the build's first switched on, else the first.
+/// [`LAMP_ENGINE`]'s, else the factory's (#6685), else the build's first
+/// switched on, else the first.
 fn lamp_default_of(side: &LampSide, order: &[EngineKind]) -> Option<EngineKind> {
     let here = |engine: &EngineKind| order.contains(engine);
     side.app_choice()
         .filter(here)
         .or(side.chosen.filter(here))
+        .or(side.factory.filter(here))
         .or_else(|| side.order.iter().copied().find(here))
         .or_else(|| order.first().copied())
 }
@@ -383,17 +393,18 @@ fn lamp_default_of(side: &LampSide, order: &[EngineKind]) -> Option<EngineKind> 
 /// not back yet, or timed out), the same when the owner chose nothing
 /// (the build's order, Hermes first): the targets file's engine, possibly
 /// left from an app choice since gone, never wins then (#7019). A choice
-/// (the app's, else [`LAMP_ENGINE`]'s) of an engine outside the switched-on
-/// order, such as a third engine Harness reports on the lamp, can't be
-/// checked before a look, so it gives None and the targets file's engine
-/// (which the last look wrote from that choice) is kept (the
-/// Reviewer-lead's P2 on #7036). None also when the lamp has no engine.
+/// (the app's, else [`LAMP_ENGINE`]'s, else the factory's) of an engine
+/// outside the switched-on order, such as a third engine Harness reports
+/// on the lamp, can't be checked before a look, so it gives None and the
+/// targets file's engine (which the last look wrote from that choice) is
+/// kept (the Reviewer-lead's P2 on #7036). None also when the lamp has no engine.
 pub fn lamp_default(side: &LampSide) -> Option<EngineKind> {
     let order = lamp_order(side);
     if side.reported().is_none()
         && side
             .app_choice()
             .or(side.chosen)
+            .or(side.factory)
             .is_some_and(|choice| !order.contains(&choice))
     {
         return None;
@@ -6040,6 +6051,60 @@ mod tests {
         assert!(lamp_side(None, on, None, None).is_none());
         assert_eq!(lamp_side(None, on, None, home()).unwrap().order, [Openclaw]);
         assert_eq!(LampSide::new(PathBuf::new()).order, [Hermes, Openclaw]);
+        // #6685: no factory file, Hermes first as before.
+        assert_eq!(lamp_side(on, on, None, home()).unwrap().factory, None);
+        assert_eq!(
+            lamp_order(&LampSide::new(PathBuf::new())),
+            [Hermes, Openclaw]
+        );
+        // A factory engine of OpenClaw puts it first when nothing above it
+        // chooses; LAMP_LAMP_ENGINE wins over it; a switch off takes it out.
+        let shipped = |chosen, order: Vec<EngineKind>| LampSide {
+            chosen,
+            factory: Some(Openclaw),
+            ..LampSide::with_order(PathBuf::new(), order)
+        };
+        let both = || vec![Hermes, Openclaw];
+        assert_eq!(lamp_order(&shipped(None, both())), [Openclaw, Hermes]);
+        assert_eq!(lamp_default(&shipped(None, both())), Some(Openclaw));
+        assert_eq!(
+            lamp_order(&shipped(Some(Hermes), both())),
+            [Hermes, Openclaw]
+        );
+        assert_eq!(lamp_default(&shipped(Some(Hermes), both())), Some(Hermes));
+        assert_eq!(lamp_order(&shipped(None, vec![Hermes])), [Hermes]);
+    }
+
+    /// #6685: the app's choice of Hermes wins over a factory engine of
+    /// OpenClaw, at once; when the app's file goes (a reset wipes it), the
+    /// factory engine is the default again, not the build's Hermes.
+    #[test]
+    fn the_apps_choice_of_hermes_beats_the_factory_openclaw() {
+        use EngineKind::{Hermes, Openclaw};
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(ENGINE_DEFAULT_FILE);
+        let side = LampSide {
+            factory: Some(Openclaw),
+            ..LampSide::new(PathBuf::new())
+        };
+        let state = Request::AppEngineDefaultState {};
+        assert_eq!(
+            app_engine_default_operation(&state, Some(&side), &file).unwrap(),
+            serde_json::json!({"default":"openclaw","chosen_in_app":false})
+        );
+        let hermes = Request::AppEngineDefault {
+            engine: "hermes".into(),
+        };
+        assert_eq!(
+            app_engine_default_operation(&hermes, Some(&side), &file).unwrap(),
+            serde_json::json!({"default":"hermes","chosen_in_app":true})
+        );
+        assert_eq!(lamp_order(&side), [Hermes, Openclaw]);
+        assert_eq!(lamp_default(&side), Some(Hermes));
+        fs::remove_file(&file).unwrap();
+        assert!(app_choice_dropped(&side, &file));
+        assert_eq!(lamp_order(&side), [Openclaw, Hermes]);
+        assert_eq!(lamp_default(&side), Some(Openclaw));
     }
 
     /// #6226: a Harness too old for OpenClaw (before 0.6.11) leaves it
@@ -6296,6 +6361,26 @@ mod tests {
         );
         assert!(targets["lamp"].validate().is_ok());
         assert_eq!(targets["office"].engine, EngineKind::Claude);
+        // #6685: a lamp whose factory engine is OpenClaw, both installed
+        // and nothing else chosen, gives its own machine OpenClaw.
+        use std::os::unix::fs::PermissionsExt;
+        let bin = tempfile::tempdir().unwrap();
+        for name in ["hermes", "openclaw"] {
+            let program = bin.path().join(name);
+            fs::write(&program, "#!/bin/sh\nexec true\n").unwrap();
+            fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let shipped = LampSide {
+            bin: bin.path().to_owned(),
+            factory: Some(EngineKind::Openclaw),
+            ..LampSide::new(PathBuf::new())
+        };
+        assert_eq!(lamp_engine_here(&shipped), Some(EngineKind::Openclaw));
+        let plain = LampSide {
+            factory: None,
+            ..shipped.clone()
+        };
+        assert_eq!(lamp_engine_here(&plain), Some(EngineKind::Hermes));
     }
 
     /// #7019 (lamp-52e6, 10:35): the first look at the machines timed
@@ -6367,6 +6452,25 @@ mod tests {
         let left = lamp_target_to_default(&targets, &side).unwrap();
         assert!(!left.changed, "{}", left.said);
         assert_eq!(fs::read(&targets).unwrap(), hand);
+        // #6685: a lamp shipped with OpenClaw (its factory file, which a
+        // reset leaves): when the app's choice of Hermes goes, the lamp's
+        // target is rewritten to OpenClaw, not the build's Hermes.
+        let targets = dir.path().join("shipped-targets.json");
+        let shipped = LampSide {
+            factory: Some(Openclaw),
+            ..LampSide::new(dir.path().join("home"))
+        };
+        let hermes = Request::AppEngineDefault {
+            engine: "hermes".into(),
+        };
+        app_engine_default_operation(&hermes, Some(&shipped), &file).unwrap();
+        write_targets_from_machines(&targets, &listed, Claude, &on(Hermes)).unwrap();
+        assert_eq!(read_targets(&targets).unwrap()["lamp"].engine, Hermes);
+        fs::remove_file(&file).unwrap();
+        assert!(app_choice_dropped(&shipped, &file));
+        let written = lamp_target_to_default(&targets, &shipped).unwrap();
+        assert!(written.changed, "{}", written.said);
+        assert_eq!(read_targets(&targets).unwrap()["lamp"].engine, Openclaw);
     }
 
     /// #6226: OpenClaw's settings at the part's start: merged into

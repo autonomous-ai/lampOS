@@ -3,6 +3,7 @@
 //! it only runs Harness's own sign-in, and passes the person's answer on
 //! ([`sign_in`]).
 pub mod engine;
+pub mod factory_engine;
 pub mod follow;
 pub mod gateway;
 pub mod gateway_run;

@@ -2379,11 +2379,15 @@ fn the_lamps_engine_is_hermes_by_default_openclaw_when_chosen_or_the_one_install
     ];
     let only_openclaw = vec![row("openclaw", Some(true), None)];
     let only_hermes = vec![row("hermes", Some(true), None)];
-    for (chosen, rows, want) in [
-        (None, both.clone(), Hermes),
-        (Some("openclaw"), both.clone(), Openclaw),
-        (None, only_openclaw, Openclaw),
-        (Some("openclaw"), only_hermes, Hermes),
+    // #6685: the lamp's factory engine, after LAMP_LAMP_ENGINE.
+    for (chosen, factory, rows, want) in [
+        (None, None, both.clone(), Hermes),
+        (Some("openclaw"), None, both.clone(), Openclaw),
+        (None, None, only_openclaw, Openclaw),
+        (Some("openclaw"), None, only_hermes.clone(), Hermes),
+        (None, Some(Openclaw), both.clone(), Openclaw),
+        (Some("hermes"), Some(Openclaw), both.clone(), Hermes),
+        (None, Some(Openclaw), only_hermes, Hermes),
     ] {
         let rows_names: Vec<String> = rows.iter().map(|row| row.engine.clone()).collect();
         let home = tempfile::tempdir().unwrap();
@@ -2392,6 +2396,7 @@ fn the_lamps_engine_is_hermes_by_default_openclaw_when_chosen_or_the_one_install
             lamp_side(Some("on"), Some("on"), chosen, Some(home.path().to_owned())).map(|side| {
                 LampSide {
                     bin: bin.path().to_owned(),
+                    factory,
                     ..side
                 }
             });
@@ -2429,7 +2434,7 @@ fn the_lamps_engine_is_hermes_by_default_openclaw_when_chosen_or_the_one_install
         };
         assert!(
             guidance.contains(&format!("You are {who}, running on the lamp")),
-            "{chosen:?}: {guidance}"
+            "{chosen:?} {factory:?}: {guidance}"
         );
         let prepared = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
         let id = prepared["id"].clone();
@@ -2439,7 +2444,7 @@ fn the_lamps_engine_is_hermes_by_default_openclaw_when_chosen_or_the_one_install
         assert_eq!(
             *s.counts.launched_on.lock().unwrap(),
             [("a".repeat(32), want)],
-            "{chosen:?}"
+            "{chosen:?} {factory:?}"
         );
     }
 }

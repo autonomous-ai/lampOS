@@ -1448,6 +1448,7 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   trước. Engine mặc định đứng đầu, rồi mọi engine khác theo thứ tự của
   Harness (`lamp_order`): lựa chọn của chủ trong app khi nó nằm trong số
   đó, nếu không thì của `LAMP_LAMP_ENGINE` (tên bất kỳ engine nào), nếu
+  không thì engine xuất xưởng của đèn (#6685, bên dưới), nếu
   không thì của bản build (engine đầu tiên đang bật của `lamp_engines`),
   nếu không thì engine đầu tiên trong số đó. Engine mặc định vẫn như vậy
   trước mọi lần xem (`lamp_default`, #7019): sau khi khởi động, khi lần xem
@@ -1492,7 +1493,7 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   nêu một engine Harness khởi động không kèm việc thì là chưa chọn. Một lựa
   chọn không còn nằm trong các engine của đèn (Harness không còn báo nó,
   hoặc công tắc của nó tắt) bị bỏ qua, không bị xoá. Reset của đèn xoá nó
-  cùng thư mục tasks. Khi lựa chọn của app mất đi (#7019), `engine` của
+  cùng thư mục tasks; engine xuất xưởng (bên dưới) được giữ. Khi lựa chọn của app mất đi (#7019), `engine` của
   target `lamp` trong file targets được ghi ngay thành engine mặc định của
   đèn (`runtime::lamp_target_to_default`), không chờ tới lần xem máy kế
   tiếp: lúc khởi động khi không có lựa chọn nào được lưu (không có file,
@@ -1515,6 +1516,30 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
   `readiness::tests::the_lamps_installed_engines_keep_harness_s_order`,
   `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.
+- **Engine xuất xưởng của đèn (#6685).** Đèn xuất xưởng với OpenClaw giữ
+  OpenClaw làm mặc định sau khi reset. File là
+  `/etc/lampOS/tasks/factory-engine.json`, cùng dạng với file của app:
+  `{"version":1,"engine":"openclaw"}`. Reset để nguyên nó: không reset
+  plan nào xoá dưới `/etc/lampOS/tasks`, như `/etc/lampOS/body/lamp.env`.
+  lamp-update không bao giờ ghi, nhận hay xoá nó: không build nào được mang
+  setting ở đó. Thứ tự là lựa chọn của app, rồi `LAMP_LAMP_ENGINE`, rồi
+  engine xuất xưởng, rồi của bản build (Hermes trước). App vẫn đổi được
+  mặc định. Không có file thì không gì thay đổi. File được đọc khi khởi
+  động (`serve --factory-engine PATH`, mặc định là đường dẫn đó). File
+  không đọc được hoặc không hợp lệ thì không có engine xuất xưởng, kèm một
+  dòng journal: `the factory engine file … not read: <why>`. Không bao giờ
+  từ chối. Đọc được thì báo `the lamp's factory engine: openclaw`. Ghi ở
+  xưởng, bằng root: `lamp-tasks factory-engine set openclaw` (hoặc
+  `hermes`), và xoá bằng `lamp-tasks factory-engine clear` (`--file PATH`
+  cho chỗ khác). Nó ghi 0644, bên cạnh file rồi đổi tên đè. Có trong test:
+  `factory_engine::tests::*`,
+  `runtime::tests::the_apps_choice_of_hermes_beats_the_factory_openclaw`,
+  `runtime::tests::the_lamps_engines_are_hermes_first_unless_openclaw_is_chosen`,
+  `runtime::tests::when_the_apps_choice_goes_the_lamp_targets_engine_is_rewritten_to_the_default`,
+  `the_lamps_engine_is_hermes_by_default_openclaw_when_chosen_or_the_one_installed`
+  (tests/runtime.rs), `no_reset_plan_wipes_the_lamps_factory_engine` của
+  setup và `a_round_leaves_the_factory_engine_file_as_it_is` của
+  lamp-update.
 - **Nêu trong lời nghe được, do code đặt (#6492, V2 của lead):** khi đèn
   có target riêng, voice đọc câu chính người nói trong request đó (câu do
   đèn viết thì không) và tự đặt `where`/`engine`/`who`, để model bỏ sót

@@ -2190,6 +2190,7 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     switched on, as before. The default comes first, then every other in
     Harness's order (`lamp_order`): the owner's choice in the app when it is
     among them, else `LAMP_LAMP_ENGINE`'s (any engine's name), else the
+    lamp's factory engine (#6685, below), else the
     build's (`lamp_engines`' first switched on), else the first of them.
     The default is the same before any look (`lamp_default`, #7019): after
     a start, while the first look is not back (about 30 s) or when it times
@@ -2234,7 +2235,8 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     missing, not valid, or naming an engine Harness starts with no task is
     no choice. A choice no longer among the lamp's engines (Harness no
     longer reports it, or its switch is off) is passed over, not wiped.
-    The lamp's reset wipes it with the tasks folder. When the app's choice
+    The lamp's reset wipes it with the tasks folder; the factory engine
+    (below) is kept. When the app's choice
     goes (#7019), the `lamp` target's `engine` in the targets file is
     written as the lamp's default at once (`runtime::lamp_target_to_default`),
     not left until the next machines' look: at start when no choice is kept
@@ -2258,6 +2260,30 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
     `readiness::tests::the_lamps_installed_engines_keep_harness_s_order`,
     `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.
+  - **The lamp's factory engine (#6685).** A lamp shipped with OpenClaw
+    keeps OpenClaw as its default after a reset. The file is
+    `/etc/lampOS/tasks/factory-engine.json`, the app's shape:
+    `{"version":1,"engine":"openclaw"}`. A reset leaves it: no reset plan
+    wipes under `/etc/lampOS/tasks`, as with `/etc/lampOS/body/lamp.env`.
+    lamp-update never writes, adopts or removes it: no build may carry a
+    setting there. The order is the app's choice, then `LAMP_LAMP_ENGINE`,
+    then the factory engine, then the build's (Hermes first). The app can
+    still change the default. With no file, nothing changes. It is read
+    at start (`serve --factory-engine PATH`, that path by default). A file
+    that can't be read or is not valid is no factory engine, with one
+    journal line: `the factory engine file … not read: <why>`. Never a
+    refusal. Read, it says `the lamp's factory engine: openclaw`. Written
+    at the factory, as root:
+    `lamp-tasks factory-engine set openclaw` (or `hermes`), and removed
+    with `lamp-tasks factory-engine clear` (`--file PATH` for another
+    place). It writes 0644, beside the file and renamed over. Shown in
+    tests: `factory_engine::tests::*`,
+    `runtime::tests::the_apps_choice_of_hermes_beats_the_factory_openclaw`,
+    `runtime::tests::the_lamps_engines_are_hermes_first_unless_openclaw_is_chosen`,
+    `runtime::tests::when_the_apps_choice_goes_the_lamp_targets_engine_is_rewritten_to_the_default`,
+    `the_lamps_engine_is_hermes_by_default_openclaw_when_chosen_or_the_one_installed`
+    (tests/runtime.rs), setup's `no_reset_plan_wipes_the_lamps_factory_engine`
+    and lamp-update's `a_round_leaves_the_factory_engine_file_as_it_is`.
   - **Started** as Harness starts OpenClaw:
     `openclaw tui --session harness-<agentId> --message "<prompt>"`, with
     no permission modes and no model routing (OpenClaw picks its own

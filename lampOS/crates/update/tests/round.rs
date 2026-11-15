@@ -6132,3 +6132,74 @@ fn a_lamp_update_back_from_before_the_plan_writes_the_rest_and_the_round_says_so
         lamp.said
     );
 }
+
+/// #6685: the lamp's factory engine, `/etc/lampOS/tasks/factory-engine.json`
+/// (`lamp_tasks::factory_engine::FILE`), is written once at the factory and
+/// never lamp-update's. A round leaves it as it is: a build that changes
+/// the settings neither adopts, rewrites nor removes it, and a build that
+/// names any file under `/etc/lampOS/tasks/` as a setting (written or
+/// removed) is refused with nothing changed. The image's files never name
+/// one either.
+#[test]
+fn a_round_leaves_the_factory_engine_file_as_it_is() {
+    use std::os::unix::fs::PermissionsExt;
+    const FACTORY: &str = "/etc/lampOS/tasks/factory-engine.json";
+    const BODY: &str = "{\"version\":1,\"engine\":\"openclaw\"}\n";
+    assert!(!manifest::is_setting_path(FACTORY));
+    assert!(!manifest::is_setting_path("/etc/lampOS/tasks/other.json"));
+    assert!(
+        !manifest::IMAGE_FILES
+            .iter()
+            .any(|path| path.starts_with("/etc/lampOS/tasks/"))
+    );
+    let (mut lamp, _) = lamp_with_settings();
+    let at = lamp.root.join(FACTORY.trim_start_matches('/'));
+    fs::create_dir_all(at.parent().unwrap()).unwrap();
+    fs::write(&at, BODY).unwrap();
+    fs::set_permissions(&at, fs::Permissions::from_mode(0o644)).unwrap();
+    let kept = |lamp: &Lamp| {
+        assert_eq!(lamp.read(FACTORY), BODY);
+        assert_eq!(
+            fs::metadata(&at).unwrap().permissions().mode() & 0o7777,
+            0o644
+        );
+        assert!(
+            lamp.state()["settings"].get(FACTORY).is_none(),
+            "{}",
+            lamp.state()["settings"]
+        );
+    };
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![Setting::new(CONTROLS_JSON, "controls 2")],
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 2");
+    kept(&lamp);
+    for (sequence, setting) in [
+        (
+            3,
+            Setting::new(FACTORY, "{\"version\":1,\"engine\":\"hermes\"}"),
+        ),
+        (
+            4,
+            Setting {
+                path: FACTORY.into(),
+                text: None,
+                sha256: None,
+                mode: None,
+                removed: true,
+            },
+        ),
+    ] {
+        publish_settings(&mut lamp, sequence, vec![setting]);
+        let outcome = lamp.round();
+        assert!(
+            matches!(&outcome, Outcome::Refused(why) if why.contains(FACTORY)),
+            "{outcome:?}"
+        );
+        assert_eq!(lamp.state()["installed"]["sequence"], 2);
+        kept(&lamp);
+    }
+}
