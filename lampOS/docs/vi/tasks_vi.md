@@ -607,7 +607,8 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     `a_run_harness_kept_as_a_shell_is_run_failed_and_never_run_again`.
   - **Một dòng nhật ký cho mỗi lần chạy**: `[lamp-tasks] skill task
     <run-id>: ended, Harness says <state>, after <n> s; its agent: started
-    (Hermes)`, hoặc `never started (Harness shows a shell, agent
+    (<agent>)`, trong đó `<agent>` là tên mà `show` của Harness trả về (hay
+    "the lamp's default agent" khi Harness báo stopped), hoặc `never started (Harness shows a shell, agent
     Terminal)`, hoặc `not known (<why>)` (`show` không được trả lời, phiên
     đã mất, hay việc chờ kết thúc ở hạn chót hoặc khi dừng, ghi `Harness
     says none`). Kiểm thử:

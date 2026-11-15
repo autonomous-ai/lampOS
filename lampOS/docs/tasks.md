@@ -3007,7 +3007,9 @@ for each run, and is answered once the run ends
     `a_run_harness_kept_as_a_shell_never_started_and_is_not_said_done`,
     `a_run_harness_kept_as_a_shell_is_run_failed_and_never_run_again`.
   - **One journal line a run**: `[lamp-tasks] skill task <run-id>: ended,
-    Harness says <state>, after <n> s; its agent: started (Hermes)`, or
+    Harness says <state>, after <n> s; its agent: started (<agent>)`, where
+    `<agent>` is the name Harness's `show` gives (or "the lamp's default
+    agent" when Harness says stopped), or
     `never started (Harness shows a shell, agent Terminal)`, or `not known
     (<why>)` (`show` not answered, the session gone, or the wait ended at
     the deadline or the stop, said `Harness says none`). Test:
