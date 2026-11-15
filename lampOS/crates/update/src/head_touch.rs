@@ -567,7 +567,7 @@ pub(crate) fn verify_with(
         return Ok(());
     };
     let text = match steps.iter().find(|step| step.setting.path == path) {
-        Some(step) if step.act == Act::Write => step.setting.text.clone(),
+        Some(step) if matches!(step.act, Act::Write | Act::Merge(_)) => step.setting.text.clone(),
         Some(step) if step.act == Act::Remove => None,
         _ => inputs.text(&root.join(path.trim_start_matches('/')))?,
     };
