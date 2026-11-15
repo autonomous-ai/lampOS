@@ -2303,3 +2303,103 @@ fn the_openclaw_namespace_keeps_the_line_lamp_tasks_reads() {
         assert!(ns.contains("\nQ=/run/lampos-skill-start\n"), "{ns}");
     }
 }
+
+/// #7135 (V2's HOLD, walk4 on a lamp): a one-shot whose gateway unit is an
+/// earlier build's (a binary ahead of its units) waits for the round that
+/// writes it: OpenClaw's wrapper, namespace script and gateway stay as
+/// they are, nothing is stopped, and the record is no failure. Once the
+/// round has written the unit, the same ask installs as before.
+#[test]
+fn an_earlier_builds_gateway_unit_waits_and_never_takes_openclaw_out() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round(&lamp, &mut systemd, true, 10).unwrap();
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 20).unwrap().install, "installed");
+    // An earlier build's unit and wrapper, as a staged binary finds them.
+    fs::write(
+        lamp.unit(),
+        "[Unit]\nDescription=an earlier build's gateway\n",
+    )
+    .unwrap();
+    fs::write(
+        lamp.at(WRAPPER),
+        "#!/bin/sh\n# an earlier build's wrapper\n",
+    )
+    .unwrap();
+    let ns_before = fs::read(lamp.at(NS)).unwrap();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    let said = install(&lamp, &runs, 30).unwrap();
+    assert_ne!(said.install, "failed", "{:#?}", runs.lines());
+    assert_eq!(
+        fs::read_to_string(lamp.at(WRAPPER)).unwrap(),
+        "#!/bin/sh\n# an earlier build's wrapper\n",
+        "left as it is"
+    );
+    assert_eq!(fs::read(lamp.at(NS)).unwrap(), ns_before, "left as it is");
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line.contains("systemctl stop")),
+        "{:#?}",
+        runs.lines()
+    );
+    // The round writes this build's unit and asks again: installed.
+    round(&lamp, &mut systemd, true, 40);
+    assert_eq!(
+        fs::read_to_string(lamp.unit()).unwrap(),
+        unit_text_for(sk(true))
+    );
+    let runs = Runs::new(&lamp);
+    if lamp.asked().is_none() {
+        lamp.ask();
+    }
+    assert_eq!(
+        install(&lamp, &runs, 50).unwrap().install,
+        "installed",
+        "{:#?}",
+        runs.lines()
+    );
+    assert_eq!(
+        fs::read_to_string(lamp.at(WRAPPER)).unwrap(),
+        wrapper_text_for(sk(true))
+    );
+}
+
+/// #7135 (c0a4's first run denied): a gateway just started answers the
+/// allow-list add "Config unavailable" until its config is read. The add
+/// is tried again until it is taken, so the install records the entry and
+/// a skill's first run is not denied; any other refusal is not retried.
+#[test]
+fn the_allowlist_add_is_tried_again_while_the_gateways_config_is_not_ready() {
+    let mut adds = 0;
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        if argv.iter().any(|arg| arg == "add") {
+            adds += 1;
+            if adds < 3 {
+                return Err(format!("{CONFIG_NOT_READY}: cannot validate --agent."));
+            }
+        }
+        Ok(String::new())
+    };
+    let shown = Shown {
+        one_path: true,
+        ..Shown::default()
+    };
+    assert_eq!(exec_allowlist(&mut run, shown, &mut quiet()), Some(true));
+    assert_eq!(adds, 3);
+
+    let mut adds = 0;
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        if argv.iter().any(|arg| arg == "add") {
+            adds += 1;
+            return Err("unknown agent".into());
+        }
+        Ok(String::new())
+    };
+    assert_eq!(exec_allowlist(&mut run, shown, &mut quiet()), Some(false));
+    assert_eq!(adds, 1, "another refusal is not retried");
+}
