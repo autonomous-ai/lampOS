@@ -1165,6 +1165,18 @@ nằm trong thư mục kỹ năng. Bật trong `lamp-tasks.service` của sản 
 
 ## Lần chạy kỹ năng trên một gateway agent (#6685 bước 4, phương án (a), tắt trừ khi `LAMP_SKILL_DEFAULT_AGENT=on` và `LAMP_SKILL_GATEWAY_RUNS=on`)
 
+**Hiện nay (#7133):** lần chạy kỹ năng trên OpenClaw là một lượt OpenClaw
+`new` của Harness (agent `main`, qua gateway `lamp-openclaw-gateway`), lượt
+này exec `start` của thư mục lần chạy theo đường dẫn đầy đủ. Bản cài
+OpenClaw của lamp-update (khi `LAMP_SKILL_DEFAULT_AGENT=on`) cho agent
+`main` một mục trong danh sách cho phép exec của exec approvals của
+OpenClaw, `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`, và
+gỡ mục của agent hàng rào đã rút lại `lamp-skill-run`: với
+`tools.exec.mode: "ask"` mặc định của OpenClaw, nếu không có mục này thì
+exec của một lượt không giao diện bị từ chối (install.md, "OpenClaw on the
+lamp"). Lượt trên gateway ấm, agent hàng rào và hàng rào bên dưới là thiết
+kế đã rút lại (#7101), giữ ở đây đến khi #7133 viết lại phần này.
+
 Một lần ghi cố định của kỹ năng tự tạo (`LAMP_SKILL_WRITE_AGENT`, ở trên)
 không bao giờ là lần chạy của gateway agent: nó không có script cho
 `start` của lần chạy, nên bị từ chối trước khi bắt đầu (`not_started`), và
