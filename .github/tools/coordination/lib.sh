@@ -270,6 +270,35 @@ coord_red_jobs_wait() {
   [[ -n $out ]] && print -r -- $out
   return 0
 }
+# coord_cancelled_jobs_jq: over a run's jobs, "<id> <name>" for each job GitHub ended as cancelled or timed_out. A job
+# cancelled at its own time limit by a hung test ends as cancelled, with no failed step and no failing test to read.
+coord_cancelled_jobs_jq='.jobs[]|select(.conclusion=="cancelled" or .conclusion=="timed_out")|"\(.id) \(.name)"'
+# coord_cancelled_jobs SHA: every cancelled (or timed-out) job of every workflow run on SHA, one "<workflow path> <job
+# name>" a line, as coord_red_jobs prints the failed ones (a timed-out job is in both lists); no log is read.
+# 16 Nov (#7181, train 940): the train bot cuts a train again, once, when these are its only red.
+coord_cancelled_jobs() {
+  local r j
+  for r in ${(f)"$(gh api "repos/$REPO/actions/runs?head_sha=$1&per_page=50" --jq '.workflow_runs[]|"\(.id) \(.path)"' 2>/dev/null)"}; do
+    [[ ${r%% *} == <-> ]] || continue
+    for j in ${(f)"$(gh api "repos/$REPO/actions/runs/${r%% *}/jobs?per_page=100" --paginate --jq $coord_cancelled_jobs_jq 2>/dev/null)"}; do
+      [[ ${j%% *} == <-> ]] && print -r -- "${r#* } ${j#* }"
+    done
+  done
+  return 0
+}
+# coord_first_error LOG: the first compile or lint error line of a failed job's LOG ("error[E0308]: mismatched types",
+# "error: unused variable: 'x'"), without the log's time and colours, its backticks as quotes (so it can sit in a code
+# span) and at most 160 characters; nothing when LOG has none. 16 Nov (#7181): the Queue line for a PR that failed to
+# compile or lint alone quotes it.
+coord_first_error() {
+  sed -E $'s/\x1b\\[[0-9;]*m//g; s/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z ?//' $1 2>/dev/null \
+    | grep -m1 -E '^ *error(\[E[0-9]+\])?: ' | sed -E 's/^ +//' | tr '`' "'" | cut -c1-160
+}
+# coord_drop_pr FILE PR: FILE ("<PR> ..." lines) without PR's lines.
+coord_drop_pr() {
+  [[ -s $1 ]] || return 0
+  awk -v p=$2 '$1 != p' $1 > $1.new && mv $1.new $1
+}
 # coord_prs_taken REF WORKFLOW PR...: the PRs (of those given) with a file WORKFLOW's pull_request paths at REF take,
 # one a line. 12 Nov (#6556 B): a train red only in that workflow sits them out. Nothing when the paths can't be read.
 coord_prs_taken() {

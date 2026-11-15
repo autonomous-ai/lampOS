@@ -11,7 +11,7 @@ Each script keeps its dated comments. They are the history of each rule.
 
 | Tool | What it does |
 |---|---|
-| `train-bot.sh` | Builds merge trains onto `lamp-voice`, back to back, in two lanes (see "Two lanes" below). It picks every eligible PR, cherry-picks its commits, pushes `first/train-N` (a no-crates train: `first/train-nc-N`), opens the train PR, waits for the checks and merges by rebase. `DRY=1` prints each eligible PR's lane and what one round of each lane would carry, and stops. Since 12 Nov (#6556 B, C): a PR whose own head has any red check sits out, read again just before its cherry-pick into a train; a train's failure is read from each failed job's own log (a sharded run's other jobs may still run), looked at again up to 3 times, 20 s apart, while any red job's log comes back empty; a train red only in a non-ARM64 workflow sits out, on their current heads, the carried PRs that workflow takes (`$LAMP_COORD_STATE/train-bot.sitout`, no HOLD; each PR sits out on the head the train carried and is told why once, a new head brings it back, and a closed or pushed PR leaves the file; a workflow's `paths` or `paths-ignore`, block or inline, decide which PRs it takes, and one that takes every PR names nobody) and the rest go again, else the bot stops and its post names the red check; and each PR's head, comments, reviews and body are kept in `$LAMP_COORD_STATE/elig-cache/`, keyed by its head and `updatedAt` and at most 10 minutes old, so an unchanged PR costs no call (each round logs its time and how many came from the cache; `still-eligible.sh` reads fresh before every merge). |
+| `train-bot.sh` | Builds merge trains onto `lamp-voice`, back to back, in two lanes (see "Two lanes" below). It picks every eligible PR, cherry-picks its commits, pushes `first/train-N` (a no-crates train: `first/train-nc-N`), opens the train PR, waits for the checks and merges by rebase. `DRY=1` prints each eligible PR's lane and what one round of each lane would carry, and stops. Since 12 Nov (#6556 B, C): a PR whose own head has any red check sits out, read again just before its cherry-pick into a train; a train's failure is read from each failed job's own log (a sharded run's other jobs may still run), looked at again up to 3 times, 20 s apart, while any red job's log comes back empty; a train red only in a non-ARM64 workflow sits out, on their current heads, the carried PRs that workflow takes (`$LAMP_COORD_STATE/train-bot.sitout`, no HOLD; each PR sits out on the head the train carried and is told why once, a new head brings it back, and a closed or pushed PR leaves the file; a workflow's `paths` or `paths-ignore`, block or inline, decide which PRs it takes, and one that takes every PR names nobody) and the rest go again, else the bot stops and its post names the red check; and each PR's head, comments, reviews and body are kept in `$LAMP_COORD_STATE/elig-cache/`, keyed by its head and `updatedAt` and at most 10 minutes old, so an unchanged PR costs no call (each round logs its time and how many came from the cache; `still-eligible.sh` reads fresh before every merge). Since 16 Nov (#7181): a crate train whose only red is a cancelled job is cut again once, and a train that fails to compile or lint with no PR to name goes again once, then its PRs go alone, one a train (see "A failed train with no PR to name" below). |
 | `merge-when-green.sh PR [--behind-unrelated] [--no-crates] [--precheck PR...]` | Used by the bot. Waits for a PR's checks, then merges it by rebase, pinned to its head, only if it is green and contains `lamp-voice`'s tip. Green: at least two ARM64 build-and-test and clippy checks, every one completed with `SUCCESS`, and every other check that ran (SDK, virtual lamp, doc links; skipped and neutral jobs left out) completed with `SUCCESS` too; any other completed conclusion (a null one too) on any check fails it, and the first one ends the wait at once (#6556 B, 12 Nov). A PR no file of which the ARM64 run takes (read from `lampos-arm64.yml`'s own `pull_request` paths on the PR's head) waits instead for every check that starts on it; one whose files no workflow takes (skipped docs, `lampOS/builders/`) waits for none. `--no-crates` (the no-crates lane) passes `--no-crates` to `behind-unrelated.sh`. `MWG_POLL` sets the seconds between looks (default 30). With `--behind-unrelated` (the bot passes it), a PR behind `lamp-voice` goes on waiting and merges as it is when `behind-unrelated.sh` says so; a merge as is that GitHub refuses exits 3, not 4. A merge GitHub answers with `HTTP 5xx` is looked at (a 5xx can follow a merge that went through), then after `MWG_RETRY_S` (default 30) the tip and the precheck are read again and it is tried again, at most 3 tries. Three 5xx exit 7, so the bot builds the same PRs again, and stops after two such trains in a row (train 662, 5 Nov). A gh timeout or reset names no 5xx, so it stays a refused merge. With `--precheck`, it runs `still-eligible.sh` on those PRs just before merging. `DRY=1`: waits and decides as usual, but skips `lv-quiet.sh` and the merge and prints what it would do; `LV_AT=<sha>` (dry only) stands in for `lamp-voice`'s tip, to replay a past case. Exit codes: 0 merged, 2 failed, 3 behind `lamp-voice`, 4 refused, 5 not done in 45 min, 6 precheck failed. |
 | `behind-unrelated.sh [--no-crates] TRAIN_HEAD [LAMP_VOICE]` | Used by `merge-when-green.sh --behind-unrelated`. Read-only. Prints `merge as is: ...` (exit 0) or `rebuild: <reason>` (exit 1); see "A green train behind lamp-voice" below. |
 | `still-eligible.sh PR...` | Used before a merge. Fails if any carried PR is now held (on the PR or on the Queue), unread, short of two signed readers, without its lamp row (`rows.py`), or can't be fetched. |
@@ -25,6 +25,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | `tests/test_markers.py` | Tests for the three readers. Run `python3 tests/test_markers.py` from this folder. |
 | `tests/test_rows.py` | Tests for `rows.py`. Run with the others. |
 | `tests/test_red_checks.py` | Tests for #6556 B and C: a red check of any kind ends `merge-when-green.sh`'s wait, a failed job's own log is read (`coord_red_jobs`), the PRs a red workflow takes (`coord_prs_taken`), a PR with a red check on its own head sits out (also when it went red between the round's read and the cut), a PR the ARM64 run takes waits for its own head's ARM64 run all green, and the bot's per-PR cache. Run with the others. |
+| `tests/test_failed_trains.py` | Tests for #7181: a train whose only red is a cancelled job is cut again once and the second stops the bot, and a set that fails to compile or lint twice the same way goes alone, one PR a train, with the PR that fails alone left out and named on the Queue. The bot's own loop runs for real (not `DRY=1`) on the temporary repository, with a stand-in `gh` that opens, merges, closes and comments on PRs there only. Run with the others. |
 | `tests/test_behind_unrelated.py`, `tests/test_lanes.py` | Tests for `behind-unrelated.sh`, `merge-when-green.sh`, the lanes and the bot's dry round, on a temporary repository with a stand-in `gh`. Run all: `python3 -I -m pytest -q .github/tools/coordination/tests` from the repo root. |
 | `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710, #5385, #6059, #6809, #6811) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
 | `build-rows-pr.sh` | Regenerates `lampOS/docs/build-rows.md` from the review page. If it changed, it pushes a branch `first/build-rows-MMDD-HHMM` and opens a docs-only PR. |
@@ -67,6 +68,10 @@ State never lives in the repo. It lives in `$LAMP_COORD_STATE`:
 - `train-hold.txt`: PR numbers that sit out.
 - `train-only.txt`: while it exists, a train carries only the PRs it names.
   Each PR either file leaves out is said in the log once per head (`#N left out: named in train-hold.txt`, `#N left out: not named in train-only.txt`; 14 Nov: trains 905-907 left out #7016 and #7022 with no line).
+- `train-bot.cancelled-crates`: 1 after a crate train whose only red was a cancelled job was cut again, else 0 (below).
+- `train-bot.alone`: PRs, each with its head, that go alone, one a train (below).
+- `train-bot.alone-out`: PRs, each with its head, that failed to compile or lint alone and sit out on that head (below).
+  Delete a PR's line to let it ride again on the same head.
 - `holds-lifted.tsv`: HOLDs lifted in words. See `holds-lifted.tsv.example` for the format.
   Its keys hold account logins, so it stays out of the repo. Copy the first builder's file.
 - `private-names.txt`: one regex a line. See `private-names.txt.example`. `build-rows-pr.sh` stops without it.
@@ -106,6 +111,8 @@ echo $! > "$S/train-bot.pid"
 Stop: `kill "$(cat "$S/train-bot.pid")"` (it stops both lanes). Restart: stop, check no train is open, start.
 
 The bot stops by itself (exit 2) when two crate trains in a row time out, or a crate run fails with no failing test named.
+A crate train whose only red is a cancelled job is cut again once first; the second such train in a row stops it ("A failed train with no PR to name" below).
+Once a lane has stopped the bot (the file `train-bot.stop` in the state folder), a round already under way builds no new train.
 It says so on the Queue (#6811, the last issue in lib.sh's `COORD_QUEUE_ISSUES`).
 If the Queue refuses the post (an issue takes at most 2,500 comments), the bot logs it instead.
 The no-crates lane stops alone (the file `train-bot.stop-nc` in the state folder) when two of its trains in a row time out or GitHub refuses its merge; delete the file, or restart the bot, to start it again.
@@ -159,6 +166,37 @@ A failed no-crates train has no failing test to name: alone in it, the PR gets `
 DRY=1 .github/tools/coordination/train-bot.sh   # each PR's lane, then what each lane would carry
 .github/tools/coordination/lane.sh 5286 5289      # the lane of any PR, eligible or not
 ```
+
+## A failed train with no PR to name
+
+A failed crate train names the PRs to leave out: those that change the failing tests' crates, or the files of a compile or lint error.
+Two kinds of failure name no PR. Since 16 Nov (#7181) the bot handles both by itself.
+
+**Its only red is a cancelled job.** Train 940 (15 Nov) went red with no failed job and no failing test: its macOS job was cancelled at the job's 30-minute limit by a hung test.
+The bot said `no failing test named (red: none found): stopping for the first builder` and stopped until it was restarted by hand.
+
+Now a crate train whose checks failed, and whose only red jobs GitHub ended as `cancelled` or `timed_out` (`lib.sh`, `coord_cancelled_jobs`), with no failed job and no test or file named, is closed and the same PRs are cut again, once.
+The log and the Queue say `train N (#P) … its only red was a cancelled job (<job>): cut again once`.
+If the next train is red the same way, the bot goes on as before: it stops (or sits out the PRs a timed-out check takes), and its lines name the job as `<job> (cancelled)`.
+A merge, or a red of any other kind, starts the count again (`train-bot.cancelled-crates` in the state folder).
+A red with a failed job or a failing test is as before, and so is the no-crates lane. A cancelled job's log is not read.
+
+**The same set fails to compile or lint again.** Trains 948, 949 and 950 (16 Nov) each carried the same two PRs and each failed to compile in `lampOS/crates/skills/src/task.rs`.
+Neither PR changed that file on the head carried, so the bot held nobody and cut the pair again, until one PR was held by hand.
+
+A compile or lint error names a PR only when some of the train's PRs change the failing files and others don't: those that do get `HOLD train N` and the rest go again, as before.
+A PR alone in an ordinary train (not one of the trains of one below) that changes the failing file is held at once, as before.
+When none of the train's PRs changes the failing files, or every one of several does, there is no PR to name. Then:
+
+- The first time, the same PRs go again. The bot keeps each PR's head and the failing files in `train-bot.told`, and logs `no carried PR changes them: the same PRs go again once` (or `every carried PR changes them: …`).
+- A PR that rides a second such train, on the same head and with the same failing files, goes alone. `train-bot.alone` lists it, and the crate lane (the one lane, with `NOCRATES_LANE=off`) carries the listed PRs one a train, the first of them in the round's order, ahead of the rest. The log says `… a second time: #A, #B go alone, one a train`.
+- A PR that fails to compile or lint in such a train of one is left out on the head the train carried, with no HOLD, whether it changes the failing files or not. `train-bot.alone-out` lists it; the bot tells the PR once, logs it, and names it once on the Queue with the failing files and the first `error` line of the failed job's log. The log also says `#N left out: alone in a train, it failed to compile or lint at <sha>; a new head brings it back`, once per head. A new head brings it back.
+- A PR that passes alone merges as usual.
+- A PR that had an ordinary train to itself both times, failing in files it doesn't change, is left out the same way after the second.
+
+A listed PR that can't be built into its train (it conflicts, or a check on its own head went red) leaves `train-bot.alone`, so the lane never waits on it.
+Closed and pushed PRs leave both files.
+The bot closes such a failed train's PR last, after everything above is kept and posted: a round may take the lane as free as soon as its train PR is closed.
 
 ## Marker rules
 
