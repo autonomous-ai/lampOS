@@ -1630,8 +1630,10 @@ pub fn lockfile_pinned(lockfile: &str, sha256: &str, version: &str) -> Result<()
 /// `lamp-update harness-install`'s OpenClaw part, after Hermes's: none
 /// when no [`ASK`] is there. Asked to remove, the gateway is stopped and
 /// the entry points taken out, the record with them. Else
-/// [`steps`]; a failure takes the entry points out. An error only when
-/// another install holds [`LOCK`].
+/// [`steps`]; a failure takes the entry points out, unless an OpenClaw
+/// worked before this run: then what it had is put back and its gateway
+/// left running ([`Before`], #7156). An error only when another install
+/// holds [`LOCK`].
 pub fn install_now(
     root: &Path,
     records: &Path,
@@ -1660,6 +1662,7 @@ fn install_with(
         let _ = fs::remove_file(records.join(RECORD));
         None
     } else {
+        let before = Before::of(root, records);
         let said = steps(
             root,
             records,
@@ -1673,7 +1676,9 @@ fn install_with(
                 one_path: asked.one_path,
             },
         );
-        if said.install == "failed" {
+        // A failed reinstall leaves a working OpenClaw as it was (#7156);
+        // the record still says failed, so the round retries as before.
+        if said.install == "failed" && !before.is_some_and(|before| before.put_back(root, say)) {
             remove_entry_points(root, run, say);
         }
         Some(said)
@@ -1700,6 +1705,99 @@ fn remove_entry_points(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str))
     }
     agent_ns::remove_hook_shim(root, &hermes_install::NS_SCRIPTS, say);
     sync_socket_dir(root, &mut |_| Ok(String::new()), Shown::default(), say);
+}
+
+/// An entry point's bytes and mode, as it was.
+type Kept = (Vec<u8>, u32);
+
+/// What a working OpenClaw had before an install ran (its record
+/// `installed`, or the wrapper, the namespace script and the package
+/// there): the entry points' bytes and modes, whether [`ASIDE`] was
+/// there, and [`PLACE`]'s owner. Kept to put back should the reinstall
+/// fail (#7156).
+struct Before {
+    entry_points: Vec<(&'static str, Option<Kept>)>,
+    aside: bool,
+    place_owner: Option<String>,
+}
+
+impl Before {
+    /// None when no OpenClaw worked before: a failure then takes the
+    /// entry points out, as after a first install.
+    fn of(root: &Path, records: &Path) -> Option<Self> {
+        let installed = record(records).is_some_and(|said| said.install == "installed");
+        let there = [WRAPPER, NS, OPENCLAW]
+            .iter()
+            .all(|path| fs::metadata(on(root, path)).is_ok());
+        if !installed && !there {
+            return None;
+        }
+        let entry_points = [WRAPPER, NS, SKILL_START]
+            .into_iter()
+            .map(|path| {
+                let place = on(root, path);
+                let kept = fs::read(&place)
+                    .ok()
+                    .zip(fs::metadata(&place).ok())
+                    .map(|(bytes, meta)| (bytes, meta.mode() & 0o7777));
+                (path, kept)
+            })
+            .collect();
+        Some(Self {
+            entry_points,
+            aside: fs::symlink_metadata(on(root, ASIDE)).is_ok(),
+            place_owner: owner(root, PLACE),
+        })
+    }
+
+    /// After a failed reinstall: the Node and package this run moved to
+    /// [`ASIDE`] put back in [`PLACE`], then, with the package there, the
+    /// entry points as they were and true. False with no package to go
+    /// back to: nothing worked to keep, so the entry points are taken out.
+    fn put_back(&self, root: &Path, say: &mut dyn FnMut(&str)) -> bool {
+        let aside = on(root, ASIDE);
+        // Only parts moved by this run, into a place still the same
+        // owner's (set_aside's own case); a whole folder moved stays aside.
+        if !self.aside && self.place_owner.is_some() && owner(root, PLACE) == self.place_owner {
+            for (path, name) in [(NODE_DIR, "node"), (PREFIX, "npm")] {
+                let from = aside.join(name);
+                if fs::symlink_metadata(&from).is_err() {
+                    continue;
+                }
+                let place = on(root, path);
+                let removed = match fs::symlink_metadata(&place) {
+                    Ok(meta) if meta.is_dir() => fs::remove_dir_all(&place),
+                    Ok(_) => fs::remove_file(&place),
+                    Err(_) => Ok(()),
+                };
+                match removed.and_then(|()| fs::rename(&from, &place)) {
+                    Ok(()) => say(&format!("{path} put back from {ASIDE}")),
+                    Err(error) => say(&format!("{path} not put back from {ASIDE}: {error}")),
+                }
+            }
+            let _ = fs::remove_dir(&aside);
+        }
+        if fs::metadata(on(root, OPENCLAW)).is_err() {
+            return false;
+        }
+        for (path, kept) in &self.entry_points {
+            let place = on(root, path);
+            let done = match kept {
+                Some((bytes, mode)) => write_whole(&place, bytes, *mode),
+                None => match fs::remove_file(&place) {
+                    Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+                    done => done,
+                },
+            };
+            if let Err(error) = done {
+                say(&format!("{path} not put back: {error}"));
+            }
+        }
+        say(
+            "the reinstall failed: the OpenClaw there before is put back, its gateway left running",
+        );
+        true
+    }
 }
 
 /// The install, in order: `lampos` and its ids looked up; `curl`, `tar`
