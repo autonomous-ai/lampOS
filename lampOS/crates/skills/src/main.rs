@@ -5571,6 +5571,18 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             unix_ms(),
             |socket, line| {
                 let answer = hand_over(socket, line)?;
+                // What lamp-tasks' answer carries of its agent's: its length
+                // only, never its words (#7180).
+                let carried = serde_json::from_str::<serde_json::Value>(answer.trim())
+                    .ok()
+                    .and_then(|answer| answer["answer"].as_str().map(str::len));
+                eprintln!(
+                    "lamp-skills: skill:{skill}: do.task: lamp-tasks' answer carries {}",
+                    carried.map_or_else(
+                        || "no agent's answer".to_owned(),
+                        |bytes| format!("{bytes} bytes of its agent's answer")
+                    )
+                );
                 found = lamp_skills::task::told(&answer);
                 lamp_skills::service_write::agent_answered(&answer)
             },

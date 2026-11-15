@@ -4530,7 +4530,10 @@ again before each, someone coming stopping it with "I'll tell you the rest
 later." The sentences are `task::told`'s: markdown's marks left out, each
 at most the say service's 900 bytes, at most 11. The skill needs no
 `speak`: the owner's yes to its read grant covers it. The journal says
-only how many were said (`do.task: what its agent found: told N`). A run
+only how many were said (`do.task: what its agent found: told N`), and
+before it how much of the agent's answer lamp-tasks' answer carried, its
+length only (`do.task: lamp-tasks' answer carries N bytes of its agent's
+answer`, or `no agent's answer`; #7180). A run
 with no read grant (a send, a script's task) tells nothing, as before.
 Tests: `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
 `service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`.

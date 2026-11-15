@@ -2733,7 +2733,16 @@ for each run, and is answered once the run ends
   lamp's agent"). On lamp-9adf, 15 Nov (build 13135), a voice-made
   `morning-unread-mail` ran 19 Gmail reads and ended idle, and nothing was
   said: the answer was read by that `show` and dropped. Any other run's
-  answer is as before; the journal never has the answer. Tests:
+  answer is as before; the journal never has the answer. It has the
+  answer's length at each step, never its words (#7180): the `show` call
+  line's `answer=N` (bytes in Harness's reply), `its answer not read:
+  CODE` when that reply isn't one `parse_show` takes, the run's
+  `its agent's answer: N bytes kept` (or `none in its end's show`, or
+  `not kept, its run didn't end well`), and `its hand-over's answer
+  tells N bytes` (or `nothing`, or `nothing: not a run that tells`).
+  lamp-skills says what lamp-tasks' answer carried (docs/skills.md). On
+  lamp-9adf, 16 Nov, a run's end `show` gave 360 bytes and nothing was
+  said (#7180), which these lines place. Tests:
   `a_service_reads_ended_answer_carries_what_its_agent_found`,
   `a_skill_runs_end_keeps_its_agents_last_answer`.
 - **A one-run token** (the first builder's 12:45 conditions on #6071): for

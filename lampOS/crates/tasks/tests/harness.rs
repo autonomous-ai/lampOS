@@ -5168,7 +5168,7 @@ fn every_harness_call_says_one_line_with_ids_cut_and_no_words() {
     );
     assert!(
         lines[2].starts_with("tasks: harness show: machine=01234567 agent=11111111 exit=0 ms=")
-            && lines[2].ends_with(" state=idle tools=2 id=11111111"),
+            && lines[2].ends_with(" state=idle tools=2 answer=15 id=11111111"),
         "{}",
         lines[2]
     );
