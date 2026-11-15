@@ -7744,6 +7744,73 @@ fn an_openclaw_gateway_default_runs_through_harness_new_like_hermes() {
     assert!(!rig.root.path().join("runs").exists());
 }
 
+/// #7133 (First's gap on the final head): signed out with OpenClaw the
+/// default, a gateway agent whose wrapper takes no skill's run with no
+/// Harness goes through Harness's own lamp target, not refused: a reset
+/// lamp runs its skills. Hermes's one run path wrapper still takes its run
+/// with no Harness, and with no Harness program the gateway default is
+/// still refused in words.
+#[test]
+fn signed_out_a_gateway_default_is_taken_through_harness_not_refused() {
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let wrapper = openclaw_gateway_wrapper(&gateway_ns);
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &wrapper)],
+        Some("#!/bin/sh\n"),
+    );
+    let _ = runner.no_harness.set(NoHarness {
+        here: Box::new(|| HarnessHere::SignedOut),
+        default_engine: Box::new(|| Some(EngineKind::Openclaw)),
+        home: rig.root.path().to_owned(),
+    });
+    let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+    let run = skill_run(Duration::from_secs(20));
+    assert_eq!(runner.run(&run, &|| {}), Ok(0));
+    let calls = rig.calls();
+    let new = calls
+        .iter()
+        .find(|call| call["args"][0] == "new")
+        .expect("a new");
+    assert_eq!(new["args"][1], "openclaw");
+    let claimed = launched.join().unwrap().expect("live before it ended");
+    let grant = lamp_tasks::skill_start::parse_answer(&claimed.answer).unwrap();
+    assert_eq!(grant.token, RUN_SECRET);
+    assert!(!runner.starts.is_live("task-1"), "not live after its end");
+    assert_eq!(openclaw_json_under(rig.root.path()), Vec::<PathBuf>::new());
+    nothing_left(&rig);
+
+    // No Harness program at all: no other way, refused in words.
+    let rig = Rig::new();
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+        Some(&ns_with_runs()),
+    );
+    let _ = runner.no_harness.set(NoHarness {
+        here: Box::new(|| HarnessHere::Absent),
+        default_engine: Box::new(|| Some(EngineKind::Openclaw)),
+        home: rig.root.path().to_owned(),
+    });
+    let said = runner
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert!(
+        said.contains("takes no skill's run without Harness"),
+        "{said}"
+    );
+    assert!(rig.calls().is_empty(), "nothing asked");
+}
+
 /// #7133: a gateway default's run whose launcher never claimed its start
 /// fails in words, never done; one claimed whose fence never said
 /// `started` fails in its own words. Either way its token is ended with
