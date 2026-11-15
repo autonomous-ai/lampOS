@@ -2978,7 +2978,9 @@ const RUN_NOW: &str = "skills.run_now";
 
 /// Why a run now of `skill`, its steps `calls`, would make nothing, in
 /// words the lamp can say, or none: its last run under way (`busy`); a
-/// task with no folder known, or that [`lamp_skills::task::would_refuse`]
+/// task with no folder known, while another hand-over to lamp-tasks is
+/// under way (`handing`, [`HANDING`]: it runs one at a time), or that
+/// [`lamp_skills::task::would_refuse`]
 /// says the hand-over would refuse (its runs in 24 hours spent, every
 /// skill's spent, its last task under way, the switch off); a read with
 /// its switch off or that came due on `read_day` already (once a local
@@ -2989,6 +2991,7 @@ fn run_now_refused(
     skill: &str,
     calls: &[Call],
     busy: bool,
+    handing: bool,
     tasks: &Tasks,
     read_day: Option<i64>,
     now_ms: u64,
@@ -3002,6 +3005,7 @@ fn run_now_refused(
             Call::Task(_) if !tasks.of.contains_key(skill) => {
                 Some("its folder is not known".to_owned())
             }
+            Call::Task(_) if handing => Some(HANDING_BUSY.to_owned()),
             Call::Task(_) => task::would_refuse(skill, tasks.state.as_deref(), now_ms).map(|why| {
                 why.strip_prefix(task::NOT_HANDED)
                     .unwrap_or(&why)
@@ -3079,6 +3083,7 @@ fn run_now_call(
         &skill,
         &run.calls,
         runs.busy.contains(&skill),
+        HANDING.load(std::sync::atomic::Ordering::SeqCst) > 0,
         &runner.tasks.borrow(),
         read_day,
         now_ms,
@@ -5579,12 +5584,40 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
     });
 }
 
+/// lamp-skills' hand-overs to lamp-tasks under way, a task's or a fixed
+/// write's ([`Handing`]). lamp-tasks runs one at a time, so a run now's
+/// task is refused while one is ([`run_now_refused`]): on lamp-9adf, 15
+/// Nov at 21:40, a run now was said to be running while another skill's
+/// write held lamp-tasks, which then refused it as busy.
+static HANDING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// What a run now's refusal says while another hand-over is under way.
+const HANDING_BUSY: &str =
+    "another skill's task is running on the lamp now, and one runs at a time";
+
+/// One hand-over to lamp-tasks counted in [`HANDING`] while it lives.
+struct Handing;
+
+impl Handing {
+    fn begin() -> Self {
+        HANDING.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Self
+    }
+}
+
+impl Drop for Handing {
+    fn drop(&mut self) {
+        HANDING.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 /// One hand-over line to lamp-tasks at `socket`, and its answer line, read
 /// when the run ends, at most [`lamp_skills::task::RUN_MOST`] later. Not
 /// connected, nothing was taken; a line written and no answer read, the
 /// run may have begun.
 fn hand_over(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
     use lamp_skills::service_write::Unrun;
+    let _handing = Handing::begin();
     let stream = UnixStream::connect(socket)
         .map_err(|error| Unrun::NotTaken(format!("lamp-tasks couldn't be reached: {error}")))?;
     let exchange = || -> io::Result<String> {
@@ -7522,8 +7555,9 @@ mod tests {
     /// lamp-9adf, 15 Nov: a made skill run now by its owner is refused,
     /// in words the lamp can say and before anything is made, as its
     /// trigger's run would be where it is made: its last run under way, its
-    /// folder not known, its tasks off or past the day's bounds; a run of
-    /// no task, read or write passes.
+    /// folder not known, another hand-over to lamp-tasks under way, its
+    /// tasks off or past the day's bounds; a run of no task, read or write
+    /// passes.
     #[test]
     fn a_run_now_is_refused_as_its_trigger_s_run_would_be() {
         // The switch is read from this process's environment here.
@@ -7547,16 +7581,26 @@ mod tests {
             }))
         };
         assert_eq!(
-            run_now_refused("dim", &[light("warm")], false, &tasks, None, 1_000),
+            run_now_refused("dim", &[light("warm")], false, false, &tasks, None, 1_000),
             None
         );
         assert_eq!(
-            run_now_refused("dim", &[light("warm")], true, &tasks, None, 1_000).as_deref(),
+            run_now_refused("dim", &[light("warm")], true, false, &tasks, None, 1_000).as_deref(),
             Some("its last run is still under way")
         );
         assert_eq!(
-            run_now_refused("other", &[task()], false, &tasks, None, 1_000).as_deref(),
+            run_now_refused("other", &[task()], false, false, &tasks, None, 1_000).as_deref(),
             Some("its folder is not known")
+        );
+        // Another skill's hand-over under way: lamp-tasks would say busy.
+        assert_eq!(
+            run_now_refused("study", &[task()], false, true, &tasks, None, 1_000).as_deref(),
+            Some(HANDING_BUSY)
+        );
+        // A run of no task isn't held by it.
+        assert_eq!(
+            run_now_refused("dim", &[light("warm")], false, true, &tasks, None, 1_000),
+            None
         );
         let off = lamp_skills::task::OFF
             .strip_prefix(lamp_skills::task::NOT_HANDED)
@@ -7565,6 +7609,7 @@ mod tests {
             run_now_refused(
                 "study",
                 &[light("warm"), task()],
+                false,
                 false,
                 &tasks,
                 None,

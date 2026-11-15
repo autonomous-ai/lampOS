@@ -4371,7 +4371,13 @@ first."). Then, in code (`made_run::asked`):
   (`lamp_skills::Engine::run_now`; a step held until its trigger ends is
   refused, as that end never comes). Before anything is made, it refuses
   in plain words what the run's own gates would (`run_now_refused`): a
-  task whose folder isn't known, or that `task::would_refuse` says the
+  task whose folder isn't known; a task while another of lamp-skills'
+  hand-overs to lamp-tasks is under way ("another skill's task is running
+  on the lamp now, and one runs at a time", `HANDING`, counted around each
+  task's and fixed write's exchange: lamp-tasks runs one at a time, and on
+  lamp-9adf at 21:40 a run now was said to be running while another
+  skill's write held lamp-tasks, which then refused it as busy); or a task
+  that `task::would_refuse` says the
   hand-over would refuse (its `PER_SKILL` = 3 runs in 24 hours spent, every
   skill's `ALL_SKILLS` = 10 spent, its last task still under way, tasks
   off); a read whose switch is off, or that ran on this local day already
