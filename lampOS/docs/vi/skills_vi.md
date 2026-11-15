@@ -1839,9 +1839,46 @@ quiet hours` sau một giờ); trong lúc chờ nó được giữ trong
 `task-telling.json` của thư mục state (tên skill và lúc bắt đầu chờ, không
 bao giờ có lời của nó), nên câu trả lời bị bỏ dở vì lamp-skills khởi động
 lại được ghi ở lần khởi động sau (`what its agent found: dropped unsaid,
-lamp-skills restarted while it waited`, `task::telling_dropped`). Lần chạy
-không có quyền đọc (gửi thư, task của một script) không nói gì, như trước.
-Test:
+lamp-skills restarted while it waited`, `task::telling_dropped`).
+
+Với `LAMP_TOLD_WHEN_ASKED=on` (`lamp-skills` và `lamp-voice`, tắt nếu không
+đặt; #7180, quyết định của first builder): lần chạy chủ đèn nhờ bằng giọng
+nói giữ lời trong giờ yên lặng. Trên lamp-9adf lúc 02:28 ngày 16/11, một
+lần chạy ngay được trả lời "Running … now", rồi câu trả lời của agent chờ
+sau giờ yên lặng, không nói gì, đến khi bị bỏ qua sau một giờ. Chỉ lần chạy
+do chính chủ đèn nhờ bằng lời: lần chạy ngay (`made_run`, chỉ của giọng
+nói trên call socket, đã hỏi câu đó là của ai) của một kỹ năng có tác vụ
+đánh dấu kỹ năng đó
+(`task::asked_by_voice`), lần giao việc của chính lần chạy đó lấy dấu một
+lần (`task::take_asked_by_voice`), nên lần chạy sau đó do trigger, app hay
+lịch vẫn giữ yên lặng như trước. Chỉ khi câu trả lời của agent có trong
+vòng năm phút sau lời nhờ (`told_when_asked::lifted_until`); khi đó giờ yên
+lặng của đèn và `[quiet]` của kỹ năng được bỏ cho nó đến năm phút sau lúc
+câu trả lời có (`told_when_asked::quiet_holds`), nên khi chờ chủ đèn, đèn
+không bao giờ tự nói lúc một giờ sáng. Mọi phần khác của cổng vẫn giữ: chủ
+đèn trong khung hình và một mình, không có giọng nói trong một phút, không
+riêng tư hay tạm dừng, lượt đọc duy nhất của đèn, và âm lượng ban đêm.
+Nhật ký ghi rõ: `what its agent found: told in quiet hours too, its owner
+asked by voice N s before (LAMP_TOLD_WHEN_ASKED)`, hoặc `its quiet holds,
+ready N s after its owner's ask, past five minutes`. Cùng công tắc đó cho
+giọng nói hỏi cái "có" đầu tiên của tác vụ trong giờ yên lặng (ở trên) khi
+chủ đèn vừa nhờ kỹ năng đó bằng giọng nói trong vòng năm phút: kỹ năng mà
+lời nghe được gọi tên (`LAMP_SKILL_NAMED`), nghe chủ đèn nói
+(`services::owner_hears`), được giữ cùng thời điểm trong
+`/run/lampos-voice/spoken-asks.json` (thư mục runtime riêng của giọng nói,
+nên không kỹ năng hay add-on nào giả được lời nhờ; `told_when_asked::keep`).
+Việc xét câu đó là của ai chạy trên một luồng riêng, nên lần gọi theo tên
+không bao giờ phải chờ nó; thay vào đó, lời hỏi của say service, chỉ trong
+giờ yên lặng, chờ nó tối đa 2 giây
+(`told_when_asked::asked_within_waiting`, `ASKED_WAIT`,
+`Here::asked_by_voice`). Test: `told_when_asked::tests` (cả
+`a_spoken_ask_kept_a_little_later_is_waited_for`),
+`skill_task_yes::tests::asked_by_voice_it_is_said_in_quiet_hours`,
+`task::tests::a_run_asked_by_voice_is_taken_once`, và
+`a_line_the_voice_heard_holds_a_reads_gate` trong main của lamp-skills.
+
+Lần chạy không có quyền đọc (gửi thư, task của một
+script) không nói gì, như trước. Test:
 `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
 `service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,
 `service_read::tests::a_wait_for_the_gate_says_why_once`,
@@ -3186,7 +3223,9 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   của say service, giọng nói tự đọc kỹ năng trên đèn qua manage helper và
   lamp-control, rồi dựng đúng câu nói lại như khi được hỏi
   (`skill_task_yes::asked_aloud`). Nó từ chối, không nói gì, trong giờ yên
-  lặng của đèn, ngoài `LAMP_PRIVATE_ROOM` khi không thấy chủ đèn ở một mình,
+  lặng của đèn (với `LAMP_TOLD_WHEN_ASKED=on` thì không, khi chủ đèn vừa
+  nhờ kỹ năng đó bằng giọng nói trong vòng năm phút, xem bên dưới), ngoài
+  `LAMP_PRIVATE_ROOM` khi không thấy chủ đèn ở một mình,
   khi công tắc tắt, hoặc khi đã đồng ý. Nếu không, câu nói đi qua mọi cổng
   của một say của kỹ năng, như lượt riêng của đèn mà không ai nói. Ghi chú
   được giữ cho worker của route thứ hai trong
