@@ -3895,14 +3895,20 @@ Accepted for Monday's ship as #6882 (a) (the first builder, #7133,
 15 Nov 21:31): **any OpenClaw agent in the gateway can read a running
 skill's token and use its grants for that run.** That includes the
 default agent's own other turns, such as a spoken task running at the
-same time, not only an agent the owner adds. Every agent there is the
-gateway namespace's root with `CAP_SYS_PTRACE`, and the fence's own
-namespace (`unshare --user --map-user`, made by the launcher) is a child
-of the gateway's. So an agent can attach to the launcher after its
-`ready` check and read the grant off fd 3 before the fence, or read
-`LAMP_CONTROL_TOKEN` from the script's environment or memory for as
-long as the run lasts. `TracerPid` 0 at `ready` is one moment, not a
-guard. What bounds it is the token's own limits, checked by lamp-control
+same time, not only an agent the owner adds. Agents don't do it through
+the launcher: they run as `lampos` in the wrapper's nested user namespace
+(`unshare --user --map-user` inside the gateway's `--map-root-user`), where
+root is unmapped and they have no capability over the launcher, and the
+launcher stays non-dumpable until the fence's `exec` (its
+`/proc/<pid>/status` owner is checked at `ready`, c0153f5806). The limit is
+the script itself: after that `exec` it is dumpable again, and
+`LAMP_CONTROL_TOKEN` sits in its environment and memory for as long as the
+run lasts. On lamp-c0a4 (15 Nov), reading the script's
+`/proc/<pid>/environ` from inside the gateway was refused or not found,
+because the script's process is not visible there; the ROW on #7133 records
+the exact command and output. That is what the lamp shows, not a guard this
+PR adds, so the limit stays as accepted until #7024. What bounds it is the
+token's own limits, checked by lamp-control
 on every call: one run, that one skill's grants, at most 14 minutes.
 The limit also leans on agent `main`'s exec allow-list: `main` may run
 the launcher and nothing else, so its turns run no other command. Hermes's runs carry
