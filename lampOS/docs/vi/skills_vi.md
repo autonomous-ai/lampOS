@@ -1487,6 +1487,17 @@ là đã làm. Mô hình được hỏi lại một lần, và lần thứ hai v
 lamp test event … It waits for you to agree" với `calls=none`, và không kỹ
 năng nào được tạo. "I made a mistake." và "I made a mistake: …" không phải lời nói đã làm. Kiểm
 thử: `action_claim::tests::a_skill_said_made_is_a_claim_only_a_make_backs`.
+Ngoại lệ duy nhất là ghi chú của chính đèn về một lần tạo đã xong: một lượt do
+đèn viết, không bao giờ là câu trích của add-on, mở đầu bằng
+`made_skill::ALREADY_DONE` (câu của MAKE IT trong ứng dụng, đã tạo hoặc có
+code và đang chờ lời đồng ý, và câu của một lần tạo bằng giọng nói bị cắt,
+đều qua `app_make::say_note`) tính lần tạo đó là lời gọi `make_skill` của
+lượt (`second_provider::made_skill_said`), nên câu "I made …" được nói như
+nó đến. Trên lamp-9adf (15/11, bản 13162, 14:36, 14:38, 14:40) câu của ứng
+dụng bị hỏi lại rồi nói thành "Sorry, I didn't do that." sau khi kỹ năng đã
+được giữ và bật. Mọi lượt khác nói đã tạo mà không có lời gọi vẫn bị giữ
+lại. Kiểm thử:
+`second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`.
 
 **Gỡ bằng giọng nói** (#6960, ba lần thử của Twelve trên lamp-c0a4, 12843:
 "delete the skill called moon fact" đi tới `lamp_help`, mà ghi chú của nó

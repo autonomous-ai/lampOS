@@ -4155,6 +4155,16 @@ Could you ask me again?". On lamp-9adf (11 Nov 21:28) a line begun inside the
 lamp's own answer got "I made lamp test event … It waits for you to agree"
 with `calls=none`, and no skill was made. "I made a mistake." and "I made a mistake: …" are no claims.
 Test: `action_claim::tests::a_skill_said_made_is_a_claim_only_a_make_backs`.
+The lamp's own note of a make already done is the one exception: a turn the
+lamp wrote, never an add-on's quoted line, that opens on
+`made_skill::ALREADY_DONE` (the app's MAKE IT line, made or with code and its
+yes awaited, and a cut voice make's line, all through `app_make::say_note`)
+counts that make as the turn's `make_skill` call
+(`second_provider::made_skill_said`), so its "I made …" is said as it came.
+On lamp-9adf (15 Nov, build 13162, 14:36, 14:38, 14:40) the app's line was
+asked again and said as "Sorry, I didn't do that." after the skill was kept
+and put on. Any other turn claiming a make with no call is still held. Test:
+`second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`.
 
 **Removed by voice** (#6960, Twelve's three tries on lamp-c0a4, 12843:
 "delete the skill called moon fact" went to `lamp_help`, whose notes said
