@@ -1373,20 +1373,6 @@ hoặc bất kỳ mã nào khác chạy dưới `lampos` ở đó. Sau #7133:
 - **Đọc và ghi được `WORK`, như trước.** Không gì của việc bắt đầu một
   lần chạy được ghi ở đó, và không lần chạy nào ghi `openclaw.json`.
 
-**Vì vậy mọi agent OpenClaw trong gateway đều dùng được grant của một
-kỹ năng đang chạy cho lần chạy đó.** Mọi agent ở đó là root của
-namespace của gateway với `CAP_SYS_PTRACE`, và namespace riêng của hàng
-rào (`unshare --user --map-user`, do launcher tạo) là con của namespace
-của gateway. Nên một agent có thể attach vào launcher sau phép kiểm tra
-`ready` và đọc grant từ fd 3 trước hàng rào, hoặc đọc
-`LAMP_CONTROL_TOKEN` từ môi trường hay bộ nhớ của script suốt lần chạy.
-`TracerPid` 0 lúc `ready` chỉ là một thời điểm, không phải một lớp bảo
-vệ. Thứ giới hạn nó là giới hạn riêng của token: một lần chạy, grant của
-đúng kỹ năng đó, nhiều nhất 14 phút.
-
-Phần còn lại, token chỉ qua fd và một uid riêng cho script, là #7024.
-Sự chấp nhận trên #6882 (a) bao đúng giới hạn này và không rộng hơn.
-
 **Nhật ký của nó.** Cùng các dòng như lần chạy của Hermes qua Harness:
 
 ```
@@ -1399,6 +1385,30 @@ Không dòng nào trong số này tự ghi tên engine theo lời của lamp-tas
 `<agent>` là tên mà `show` của Harness đưa ra cho phiên đó, hoặc `the lamp's
 default agent` khi Harness báo stopped, hoặc `not known (harness show: …)`
 khi không đọc được câu trả lời. Hermes và OpenClaw đều như vậy.
+
+### Giới hạn được chấp nhận cho thứ Hai: grant của kỹ năng đang chạy trong gateway
+
+Được chấp nhận cho đợt phát hành thứ Hai theo #6882 (a) (first builder,
+#7133, 15/11 21:31): **mọi agent OpenClaw trong gateway đều đọc được token
+của một kỹ năng đang chạy và dùng grant của nó cho lần chạy đó.** Điều
+này gồm cả các lượt khác của chính agent mặc định, như một tác vụ nói
+đang chạy cùng lúc, không chỉ một agent mà chủ máy thêm vào. Mọi agent ở
+đó là root của namespace của gateway với `CAP_SYS_PTRACE`, và namespace
+riêng của hàng rào (`unshare --user --map-user`, do launcher tạo) là con
+của namespace của gateway. Nên một agent có thể attach vào launcher sau
+phép kiểm tra `ready` và đọc grant từ fd 3 trước hàng rào, hoặc đọc
+`LAMP_CONTROL_TOKEN` từ môi trường hay bộ nhớ của script suốt lần chạy.
+`TracerPid` 0 lúc `ready` chỉ là một thời điểm, không phải một lớp bảo
+vệ. Thứ giới hạn nó là giới hạn riêng của token, được lamp-control kiểm
+tra ở mỗi lần gọi: một lần chạy, grant của đúng kỹ năng đó, nhiều nhất
+14 phút. Giới hạn này còn dựa vào allow-list exec của agent `main`: `main` chỉ
+được chạy launcher, không gì khác, nên các lượt của nó không chạy lệnh
+nào khác. Lần chạy của
+Hermes cũng mang token trong môi trường như vậy.
+
+Bản sửa là #7024 (P1): lamp-tasks tự khởi động script trong hàng rào, bên
+ngoài các namespace của gateway, với token từ lamp-tasks và không bao
+giờ qua launcher, và cũng vậy cho lần chạy của Hermes.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
