@@ -1171,12 +1171,15 @@ một kỹ năng do người dùng tạo đi qua `new` của Harness, như của
   chạy. lamp-tasks nhận một agent mặc định kiểu gateway (xét theo dữ liệu
   wrapper, không theo tên engine) khi wrapper đó có dữ liệu gateway và
   namespace của nó cho thấy socket của lamp-control.
-- **Hai file trong thư mục của lần chạy.** Trước `new` của Harness,
-  lamp-tasks ghi `token` của lần chạy (0600) và một script `start` vào thư
-  mục riêng của lần chạy. `start` đọc token một lần, xóa nó, rồi chạy
+- **Hai file trong thư mục Harness của lần chạy.** Trước `new` của Harness,
+  lamp-tasks ghi `token` của lần chạy (0600) và một script `start` vào
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-<run>/`. Chúng không nằm
+  trong `/run/lampos-tasks/runs`, vì gateway không thấy thư mục đó.
+  `start` đọc token một lần, xóa nó, rồi chạy
   script của kỹ năng với `/var/lib`, `/var/tmp` và `/dev/shm` bị ẩn.
 - **Qua `new` của Harness** trên engine mặc định (`HarnessRunner`). Tác vụ
-  của Harness bảo agent chạy `start`. Công cụ của OpenClaw chạy trong
+  của Harness bảo agent chạy `start` theo đường dẫn tuyệt đối, vì thư mục
+  làm việc của một exec là workspace của agent. Công cụ của OpenClaw chạy trong
   tiến trình gateway của nó, không trong pane của Harness, nên token mà
   pane export sẽ không bao giờ tới được script của kỹ năng. File trong thư
   mục của lần chạy là cách token tới được đó.
@@ -1185,9 +1188,16 @@ một kỹ năng do người dùng tạo đi qua `new` của Harness, như của
   phải là xong.
 - **lamp-tasks không tự gửi lượt nào tới gateway.** Lần chạy kỹ năng không
   gửi lượt nào tới một gateway và không giữ fence agent nào.
+- **Một exec approval, do lamp-update ghi (#7135).** Với cài đặt gốc,
+  exec approvals của OpenClaw từ chối `start` khi không có ai để duyệt.
+  Với `LAMP_SKILL_DEFAULT_AGENT=on`, lamp-update thêm một mục allowlist cho
+  agent `main`, `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`,
+  vào kho approvals của OpenClaw (không phải `openclaw.json`), và xóa mục
+  `lamp-skill-run` cũ. Một exec bị từ chối vẫn kết thúc lượt là `stopped`,
+  nên phép kiểm tra đóng-khi-lỗi ở trên là thứ phân biệt lần chạy bị từ
+  chối với lần chạy đã xong.
 - **Không ghi vào `openclaw.json`.** Lần chạy kỹ năng không bao giờ ghi
-  config dùng chung của OpenClaw hay exec approvals của nó, và không thêm
-  agent `lamp-skill-run`. Vì vậy các tác vụ OpenClaw riêng của Harness,
+  config dùng chung của OpenClaw, và không thêm agent `lamp-skill-run`. Vì vậy các tác vụ OpenClaw riêng của Harness,
   không nêu agent nào, không bị đụng tới.
 - **lamp-update cho lần chạy thấy thứ nó cần.** Chỉ cần
   `LAMP_SKILL_DEFAULT_AGENT=on`, namespace của OpenClaw cho thấy socket

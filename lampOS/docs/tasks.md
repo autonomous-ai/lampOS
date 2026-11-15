@@ -3601,12 +3601,16 @@ wrapper:
   takes a gateway default agent (judged by its wrapper's data, with no
   engine name) when that wrapper carries its gateway data and its
   namespace shows lamp-control's socket.
-- **Two files in the run's folder.** Before Harness's `new`, lamp-tasks
-  writes the run's `token` (0600) and a `start` script into the run's own
-  folder. `start` reads the token once, deletes it, and runs the skill's
+- **Two files in the run's Harness folder.** Before Harness's `new`,
+  lamp-tasks writes the run's `token` (0600) and a `start` script into
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-<run>/`. They don't go
+  in `/run/lampos-tasks/runs`, because the gateway can't see that folder.
+  `start` reads the token once, deletes it, and runs the skill's
   script with `/var/lib`, `/var/tmp` and `/dev/shm` hidden.
 - **Through Harness's `new`** on the default engine (`HarnessRunner`).
-  Harness's task tells the agent to run `start`. OpenClaw's tools run in
+  Harness's task tells the agent to run `start` by its absolute path,
+  because an exec's working folder is the agent's workspace. OpenClaw's
+  tools run in
   its gateway's process, not in Harness's pane, so a token exported by
   the pane would never reach the skill's script. The file in the run's
   folder is how it gets there.
@@ -3616,8 +3620,16 @@ wrapper:
 - **No gateway turn of lamp-tasks' own.** A skill's run sends no turn to
   a gateway and keeps no fence agent.
 - **No write to `openclaw.json`.** A skill's run never writes OpenClaw's
-  shared config or its exec approvals, and adds no `lamp-skill-run` agent.
-  So Harness's own OpenClaw tasks, which name no agent, are untouched.
+  shared config, and adds no `lamp-skill-run` agent. So Harness's own
+  OpenClaw tasks, which name no agent, are untouched.
+- **One exec approval, written by lamp-update (#7135).** On stock settings
+  OpenClaw's exec approvals deny `start` when no one is there to approve
+  it. With `LAMP_SKILL_DEFAULT_AGENT=on`, lamp-update adds one allowlist
+  entry for agent `main`,
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`, in
+  OpenClaw's approvals store (not `openclaw.json`), and removes the old
+  `lamp-skill-run` entry. A denied exec still ends the turn as `stopped`,
+  so the fail-closed check above is what tells a denied run from a done one.
 - **lamp-update shows the run what it needs.** With
   `LAMP_SKILL_DEFAULT_AGENT=on` alone, OpenClaw's namespace shows
   lamp-control's socket and the pushed skills' folder
