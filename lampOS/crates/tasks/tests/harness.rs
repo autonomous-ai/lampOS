@@ -126,6 +126,7 @@ impl Rig {
             journal: None,
             calls: None,
             session_machines: None,
+            daemon_here: Default::default(),
             health_after_start: false,
             openclaw_gateway: false,
             user_runtime_root: root.path().join("run-user"),
@@ -4367,6 +4368,104 @@ fn the_lamps_own_target_dispatches_under_the_id_the_daemon_runs_as() {
     );
 }
 
+/// R5 again on #7133 (lamp-c0a4, 15 Nov, 4732ecb5): a skill's run has a
+/// Cli of its own, made from the same config, which reads no sign-in. It
+/// matches its `new` against the id the spoken tasks' Cli read, with no
+/// second `auth status`.
+#[test]
+fn a_skill_runs_own_cli_matches_the_daemon_id_the_spoken_cli_read() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "auth": step(json!({"loggedIn":false,"computerId":COMPUTER,"machineId":MACHINE})),
+        "new": step(json!({"ok":true,"machineId":MACHINE,"agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes","permissionMode":null,"bypassPermission":false}})),
+        "show": step(json!({"id":AGENT,"state":"idle","ask":"Inspect the authored fixture","answer":"Observed answer","truncated":false,"tools":2})),
+    }));
+    let mut request = launch();
+    request.target = Target {
+        machine_id: COMPUTER.into(),
+        project: "~/harnesses/lamp-tasks/lamp".into(),
+        engine: EngineKind::Hermes,
+    };
+    assert!(rig.cli().signed_in_here().is_ok());
+    let skill_run = rig.cli();
+    assert_eq!(
+        skill_run.launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    let auths = rig
+        .calls()
+        .into_iter()
+        .filter(|call| call["args"][0] == "auth")
+        .count();
+    assert_eq!(auths, 1, "the skill run's Cli read auth status again");
+}
+
+/// The same, before any sign-in read (a skill's first run after a start):
+/// the run's Cli reads `auth status` itself, before its `new`. Never
+/// signed in nor paired is a lamp's plain case (the dev's rule, 15 Nov):
+/// `loggedIn` is never looked at; with no session the id is this
+/// computer's `computerId`; a failed read leaves the `computerId` too, and
+/// the run still goes. The lamp's own target has no machines look and no
+/// `--machine`.
+#[test]
+fn a_skill_run_before_any_sign_in_read_reads_the_daemon_id_itself() {
+    let failed = json!({"stdout":"{}\n","exit":1});
+    for (auth, daemon) in [
+        (
+            step(json!({"loggedIn":false,"computerId":COMPUTER,"machineId":MACHINE})),
+            MACHINE,
+        ),
+        (
+            step(json!({"loggedIn":true,"computerId":COMPUTER,"machineId":MACHINE})),
+            MACHINE,
+        ),
+        (
+            step(json!({"loggedIn":false,"computerId":COMPUTER})),
+            COMPUTER,
+        ),
+        (
+            step(json!({"loggedIn":true,"computerId":COMPUTER})),
+            COMPUTER,
+        ),
+        (failed.clone(), COMPUTER),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "auth": auth.clone(),
+            "new": step(json!({"ok":true,"machineId":daemon,"agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes","permissionMode":null,"bypassPermission":false}})),
+            "show": step(json!({"id":AGENT,"state":"idle","ask":"Inspect the authored fixture","answer":"Observed answer","truncated":false,"tools":2})),
+        }));
+        let mut request = launch();
+        request.target = Target {
+            machine_id: COMPUTER.into(),
+            project: "~/harnesses/lamp-tasks/lamp".into(),
+            engine: EngineKind::Hermes,
+        };
+        assert_eq!(
+            rig.cli().launch(&request),
+            LaunchOutcome::Created {
+                agent_id: AGENT.into()
+            },
+            "{auth}"
+        );
+        let calls = rig.calls();
+        let order: Vec<&str> = calls
+            .iter()
+            .filter_map(|call| call["args"][0].as_str())
+            .filter(|verb| *verb != "show")
+            .collect();
+        assert_eq!(order, ["auth", "new"], "{auth}");
+        assert!(
+            !calls.iter().any(|call| call["args"]
+                .as_array()
+                .is_some_and(|args| args.iter().any(|arg| arg == "--machine"))),
+            "{auth}"
+        );
+    }
+}
+
 /// The daemon's id from `auth status` (R5 on #7133): `machineId` when
 /// present, never decided by `loggedIn`; a missing, empty or malformed one
 /// falls back to `computerId`, not to none.
@@ -4419,6 +4518,7 @@ fn the_lamps_own_target_signed_out_is_asked_with_no_machines_look_and_no_machine
     let rig = Rig::new();
     rig.plan(json!({
         "machines": {"exit": 1, "stdout": "{\"error\":\"NOT_SIGNED_IN\"}\n"},
+        "auth": step(json!({"loggedIn":false,"computerId":COMPUTER})),
         "new": step(json!({"ok":true,"machineId":COMPUTER,"agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes","permissionMode":null,"bypassPermission":false}})),
         "show": step(json!({"id":AGENT,"state":"idle","ask":"Inspect the authored fixture","answer":"Observed answer","truncated":false,"tools":2})),
         "ps": step(json!({"harnesses":[{"id":AGENT,"state":"idle","lastActive":null}]})),
@@ -4449,6 +4549,8 @@ fn the_lamps_own_target_signed_out_is_asked_with_no_machines_look_and_no_machine
     assert_eq!(
         calls,
         [
+            // The daemon's id, read before the first `new` (R5 on #7133).
+            json!(["auth", "status", "--json"]),
             json!([
                 "new",
                 "hermes",
