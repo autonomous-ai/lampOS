@@ -2217,14 +2217,20 @@ pub type SkillHarnessSlot = std::sync::Arc<std::sync::OnceLock<SkillHarness>>;
 ///   its folder ([`finds_runs_by_folder`]) is refused in words.
 /// - **The run's folder** `skill-<run-id>` ([`RUN_FOLDER_PREFIX`]) is made
 ///   0700 in lamp-tasks' Harness project ([`HarnessRunner::project`],
-///   `~/harnesses/lamp-tasks`), and the run's token written to
-///   [`HarnessRunner::runs`]`/<run-id>` ([`RunTokenFile`]), always before
-///   the launch. The agent is started there, the folder `new`'s
-///   positional argument, with routing off ([`SkillHarness::new`]); its
-///   wrapper reads the token file once,
-///   deletes it, and gives the run the token, the socket, the SDK and a
-///   network namespace of its own. The token is never in Harness's
-///   arguments or state.
+///   `~/harnesses/lamp-tasks`), always before the launch. The agent is
+///   started there, the folder `new`'s positional argument, with routing
+///   off ([`SkillHarness::new`]). The run's token reaches it one of two
+///   ways, never in Harness's arguments or state:
+///   - **Hermes (a wrapper's own namespace):** the token is written to
+///     [`HarnessRunner::runs`]`/<run-id>` ([`RunTokenFile`]) before the
+///     launch; the wrapper reads it once, deletes it, and gives the run
+///     the token, the socket, the SDK and a network namespace of its own.
+///   - **A gateway default (OpenClaw):** no token file. The run is made
+///     live in memory ([`crate::gateway::open_start`]), the Harness task
+///     names only the skill-start launcher and the run's id, and the
+///     launcher claims the run's script and token once over lamp-tasks'
+///     socket and becomes the run's fence ([`crate::skill_start`]); the
+///     run is done only when its fence said `started`.
 /// - **Its end:** `harness wait --any` on the one agent, asked again until
 ///   it ends or the run's deadline ([`SkillRun::deadline`]) cancels it.
 ///   At the deadline, `harness close --now` ([`crate::harness::Cli::close_now`]).
