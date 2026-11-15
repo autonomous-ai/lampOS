@@ -485,8 +485,7 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
   4 s with all five joints and their `temp_c`, and none after `unsubscribe`.
 - `air.changed`: `pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`,
   `feel`; at most once every 5 s. Grant `air`. In today's build, lamp run pending.
-- `volume.changed`: `level` (0–100), `muted`. Grant `speak`. In today's build; lamp run on 10824
-  pending.
+- `volume.changed`: `level` (0–100), `muted`. Grant `speak`. In today's build; seen on lamp-75c9 on 11913 (12 Nov 2026, the controller pre-flight: a step down, then this event; see the Volume row in the status table).
 - `lamp.said`: a line the lamp said out loud: `text`, `by` (`lamp`, or `computer` for a line this
   computer had it say, which comes back to it alone), `source` (`reply`, `exact`, `cached`), and
   `cut: true` when it was cut short (talked over, stopped: the text may not have been said in
