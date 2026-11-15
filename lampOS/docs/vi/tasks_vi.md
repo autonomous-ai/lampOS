@@ -1460,14 +1460,20 @@ khi không đọc được câu trả lời. Hermes và OpenClaw đều như v�
 #7133, 15/11 21:31): **mọi agent OpenClaw trong gateway đều đọc được token
 của một kỹ năng đang chạy và dùng grant của nó cho lần chạy đó.** Điều
 này gồm cả các lượt khác của chính agent mặc định, như một tác vụ nói
-đang chạy cùng lúc, không chỉ một agent mà chủ máy thêm vào. Mọi agent ở
-đó là root của namespace của gateway với `CAP_SYS_PTRACE`, và namespace
-riêng của hàng rào (`unshare --user --map-user`, do launcher tạo) là con
-của namespace của gateway. Nên một agent có thể attach vào launcher sau
-phép kiểm tra `ready` và đọc grant từ fd 3 trước hàng rào, hoặc đọc
-`LAMP_CONTROL_TOKEN` từ môi trường hay bộ nhớ của script suốt lần chạy.
-`TracerPid` 0 lúc `ready` chỉ là một thời điểm, không phải một lớp bảo
-vệ. Thứ giới hạn nó là giới hạn riêng của token, được lamp-control kiểm
+đang chạy cùng lúc, không chỉ một agent mà chủ máy thêm vào. Các agent
+không làm được điều đó qua launcher: chúng chạy dưới `lampos` trong user
+namespace lồng của wrapper (`unshare --user --map-user` bên trong
+`--map-root-user` của gateway), nơi root không được map và chúng không có
+capability nào với launcher, và launcher vẫn không dumpable cho tới lệnh
+`exec` của hàng rào (chủ của `/proc/<pid>/status` được kiểm tra lúc
+`ready`, c0153f5806). Giới hạn nằm ở chính script: sau lệnh `exec` đó nó
+dumpable trở lại, và `LAMP_CONTROL_TOKEN` nằm trong môi trường và bộ nhớ
+của nó suốt lần chạy. Trên lamp-c0a4 (15/11), đọc `/proc/<pid>/environ`
+của script từ bên trong gateway bị từ chối hoặc không tìm thấy, vì tiến
+trình của script không thấy được từ đó; ROW trên #7133 ghi lại đúng lệnh
+và kết quả. Đó là điều đèn cho thấy, không phải một lớp bảo vệ mà PR này
+thêm vào, nên giới hạn vẫn được chấp nhận cho tới #7024. Thứ giới hạn nó
+là giới hạn riêng của token, được lamp-control kiểm
 tra ở mỗi lần gọi: một lần chạy, grant của đúng kỹ năng đó, nhiều nhất
 14 phút. Giới hạn này còn dựa vào allow-list exec của agent `main`: `main` chỉ
 được chạy launcher, không gì khác, nên các lượt của nó không chạy lệnh
