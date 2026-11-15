@@ -1241,7 +1241,12 @@ theo agent mặc định của đèn *là gì*, không bao giờ theo tên của
 
 **Hàng rào lamp-tasks ghi** (`openclaw_config::write_skill_run_fence`,
 lúc lamp-tasks khởi động, chỉ khi `LAMP_SKILL_DEFAULT_AGENT=on`, với quyền
-`lampos`, user của OpenClaw; tắt thì không ghi gì), cho OpenClaw 2026.11.2:
+`lampos`, user của OpenClaw; tắt thì không ghi gì; và lúc bàn giao một lần
+chạy trên gateway, trước bước 3, mỗi wrapper một lần cho tới khi một lượt
+lỗi (`GatewayRunner::fence_agent`), vì lamp-tasks có thể đã khởi động trước
+khi lamp-update đặt wrapper có dấu nên lúc khởi động không ghi gì (#7019);
+khi ghi thì có dòng nhật ký "tasks: OpenClaw's fence for a skill's run
+(lamp-skill-run): written at a run's hand-over"), cho OpenClaw 2026.11.2:
 trong `openclaw.json` của OpenClaw, `agents.entries` có agent rào
 `lamp-skill-run` (theo khóa, không có `id` và `default`): workspace riêng
 `/var/lib/lampos-tasks/harnesses/lamp-tasks/gateway-skill-runs` (0700),

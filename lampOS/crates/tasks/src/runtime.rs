@@ -4370,7 +4370,8 @@ pub fn serve<C: Clock>(
         // default agent a gateway agent (its wrapper's own data), the
         // fence a skill's run on its warm gateway is held to. Otherwise
         // (Hermes the default, say) nothing here is written; a default
-        // changed later is fenced at lamp-tasks' next start.
+        // changed later, or a wrapper laid out after this start (#7019),
+        // gets its fence agent at a run's hand-over (`gateway_run`).
         if let Some(line) = skill_run_fence_at_start(
             std::env::var(crate::skill_task::DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on")
                 && crate::skill_task::gateway_runs_on(),

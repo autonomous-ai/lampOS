@@ -446,6 +446,15 @@ pub struct GatewayRunner {
     /// a lamp, #7019); cleared when a turn fails, so the next run checks
     /// it again. Shared per program as [`Self::live`] is.
     pub fenced: Arc<Mutex<Option<String>>>,
+    /// OpenClaw's state folder, where [`Self::write_fence_agent`] makes
+    /// sure of the fence agent at a run's hand-over
+    /// ([`crate::runtime::OPENCLAW_STATE_DIR`] on a lamp); `None` writes
+    /// nothing.
+    pub state_dir: Option<PathBuf>,
+    /// The state folder the fence agent was last made sure of in, so later
+    /// runs skip it; cleared when a turn fails. Shared per program as
+    /// [`Self::live`] is.
+    pub fence_agent: Arc<Mutex<Option<String>>>,
 }
 
 /// [`GatewayRunner::live`] of each program, kept for lamp-tasks' life.
@@ -459,6 +468,13 @@ fn fenced_for(program: &Path) -> Arc<Mutex<Option<String>>> {
     static FENCED: Mutex<BTreeMap<PathBuf, Arc<Mutex<Option<String>>>>> =
         Mutex::new(BTreeMap::new());
     shared(&FENCED, program)
+}
+
+/// [`GatewayRunner::fence_agent`] of each program, kept for lamp-tasks' life.
+fn fence_agent_for(program: &Path) -> Arc<Mutex<Option<String>>> {
+    static FENCE_AGENT: Mutex<BTreeMap<PathBuf, Arc<Mutex<Option<String>>>>> =
+        Mutex::new(BTreeMap::new());
+    shared(&FENCE_AGENT, program)
 }
 
 /// `program`'s slot in `map`, made empty the first time.
@@ -480,6 +496,8 @@ impl GatewayRunner {
         Self {
             live: live_for(&program),
             fenced: fenced_for(&program),
+            fence_agent: fence_agent_for(&program),
+            state_dir: Some(crate::runtime::OPENCLAW_STATE_DIR.into()),
             program,
             project,
             agent,
@@ -743,11 +761,15 @@ impl GatewayRunner {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if fenced.as_deref() == Some(key.as_str()) {
+            eprintln!(
+                "[lamp-tasks] the fence of {} on its gateway: confirmed earlier, no approvals call",
+                self.agent.agent
+            );
             return Ok(());
         }
         let entry = self.agent.entry(start)?;
         let got = self.fence_call(&self.agent.fence_get, None, until)?;
-        if let Some(doc) = set_entry(&got, &self.agent.agent, &entry)? {
+        let was = if let Some(doc) = set_entry(&got, &self.agent.agent, &entry)? {
             self.fence_call(&self.agent.fence_set, Some(&doc), until)?;
             let again = self.fence_call(&self.agent.fence_get, None, until)?;
             if set_entry(&again, &self.agent.agent, &entry)?.is_some() {
@@ -755,9 +777,50 @@ impl GatewayRunner {
                     "the gateway's approvals do not hold the agent's entry once set".into(),
                 );
             }
-        }
+            "set"
+        } else {
+            "checked, already set"
+        };
+        eprintln!(
+            "[lamp-tasks] the fence of {} on its gateway: {was}",
+            self.agent.agent
+        );
         *fenced = Some(key);
         Ok(())
+    }
+
+    /// The fence agent in OpenClaw's config under [`Self::state_dir`]
+    /// ([`crate::openclaw_config::write_skill_run_fence`]), made sure of
+    /// once per program at a run's hand-over: lamp-tasks may have started
+    /// before lamp-update laid out the marked wrapper, when its start wrote
+    /// none (#7019). A failed write is said and the turn goes on: the
+    /// gateway then refuses it in its own words.
+    fn write_fence_agent(&self) {
+        let Some(state_dir) = &self.state_dir else {
+            return;
+        };
+        let key = state_dir.display().to_string();
+        let mut written = self
+            .fence_agent
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if written.as_deref() == Some(key.as_str()) {
+            return;
+        }
+        match crate::openclaw_config::write_skill_run_fence(state_dir, &self.project) {
+            Ok(changed) => {
+                if changed {
+                    eprintln!(
+                        "tasks: OpenClaw's fence for a skill's run ({}): written at a run's hand-over",
+                        crate::openclaw_config::SKILL_RUN_AGENT
+                    );
+                }
+                *written = Some(key);
+            }
+            Err(error) => eprintln!(
+                "tasks: OpenClaw's fence for a skill's run not written at a run's hand-over: {error}"
+            ),
+        }
     }
 
     /// The run, as the module says.
@@ -855,7 +918,10 @@ impl GatewayRunner {
             );
         }
         // The run's fence on the gateway, made sure of now (the gateway may
-        // have come up since lamp-tasks started): no turn without it.
+        // have come up since lamp-tasks started): no turn without it. Its
+        // agent in OpenClaw's config first, which lamp-tasks' start may
+        // not have written (#7019).
+        self.write_fence_agent();
         let starts = self
             .project
             .join(format!("{RUN_FOLDER_PREFIX}*/{START_FILE}"));
@@ -901,10 +967,11 @@ impl GatewayRunner {
         // A failed turn may be the gateway's fence gone (a gateway made
         // anew): the next run checks it again.
         if ran.is_err() {
-            *self
-                .fenced
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+            for cached in [&self.fenced, &self.fence_agent] {
+                *cached
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+            }
         }
         ran
     }
@@ -1054,6 +1121,8 @@ mod tests {
             stopping: None,
             live: Default::default(),
             fenced: Default::default(),
+            state_dir: None,
+            fence_agent: Default::default(),
         }
     }
 
@@ -1374,6 +1443,57 @@ mod tests {
             Ok(0)
         );
         assert_eq!(fence_calls(&rig).len(), 3, "{:?}", fence_calls(&rig));
+    }
+
+    /// #7019, lamp-52e6: lamp-tasks started before lamp-update laid out
+    /// the marked wrapper, so its start wrote no fence agent and the
+    /// gateway refused the turn ("Unknown agent id"). The first run's
+    /// hand-over writes it; a second run does not write again.
+    #[test]
+    fn the_fence_agent_is_written_at_the_first_hand_over_when_the_start_wrote_none() {
+        let rig = rig(r#"{"status":"ok"}"#, false);
+        let (_, end) = ended();
+        let wrappers = rig.dir.path().join("wrappers");
+        std::fs::create_dir(&wrappers).unwrap();
+        let wrapper = wrappers.join("openclaw");
+        let state = rig.dir.path().join("openclaw-state");
+        let config = state.join("openclaw.json");
+        // At start the wrapper is not the marked one yet: nothing written.
+        std::fs::write(&wrapper, "#!/bin/sh\n").unwrap();
+        assert_eq!(
+            crate::runtime::skill_run_fence_at_start(
+                true,
+                Some(crate::harness::EngineKind::Openclaw),
+                &wrappers,
+                &state,
+                rig.dir.path(),
+            ),
+            None
+        );
+        assert!(!config.exists());
+        // lamp-update lays out the marked wrapper; then a run is handed over.
+        std::fs::write(&wrapper, lamp_updates_data()).unwrap();
+        let runner = GatewayRunner {
+            state_dir: Some(state.clone()),
+            ..runner(&rig)
+        };
+        assert_eq!(
+            runner.run(&skill_run(&rig, Duration::from_secs(90)), &end),
+            Ok(0)
+        );
+        let written: Value =
+            serde_json::from_str(&std::fs::read_to_string(&config).unwrap()).unwrap();
+        assert!(
+            written["agents"]["entries"][crate::openclaw_config::SKILL_RUN_AGENT].is_object(),
+            "{written}"
+        );
+        // A second run does not write again, even with the file gone.
+        std::fs::remove_file(&config).unwrap();
+        assert_eq!(
+            runner.run(&skill_run(&rig, Duration::from_secs(90)), &end),
+            Ok(0)
+        );
+        assert!(!config.exists(), "written once per program");
     }
 
     #[test]

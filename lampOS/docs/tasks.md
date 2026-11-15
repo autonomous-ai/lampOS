@@ -3673,7 +3673,12 @@ default agent is, never by its name (`skill_task::AgentRun`):
 
 **The fence lamp-tasks writes** (`openclaw_config::write_skill_run_fence`,
 at lamp-tasks' start with `LAMP_SKILL_DEFAULT_AGENT=on` only, as
-`lampos`, OpenClaw's user; off, nothing), for OpenClaw 2026.11.2: in
+`lampos`, OpenClaw's user; off, nothing; and at a gateway run's hand-over,
+before step 3, once per wrapper until a turn fails
+(`GatewayRunner::fence_agent`), since lamp-tasks may have started before
+lamp-update laid out the marked wrapper and so written none at its start,
+#7019; a write there is journaled "tasks: OpenClaw's fence for a skill's
+run (lamp-skill-run): written at a run's hand-over"), for OpenClaw 2026.11.2: in
 OpenClaw's `openclaw.json`, `agents.entries` gets the fence agent
 `lamp-skill-run` (keyed, with no `id` and no `default`): its own workspace
 `/var/lib/lampos-tasks/harnesses/lamp-tasks/gateway-skill-runs` (0700),
