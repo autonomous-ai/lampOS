@@ -3500,7 +3500,13 @@ gone ([switches.md](switches.md)). What happens:
      (`made_skill::CODE_BY_VOICE`), so the app's `made` answer stays
      `not_kept`, why "it couldn't be put on: a skill that runs its own code
      goes on only once you agree to it out loud at the lamp, after it says
-     what that code may use".
+     what that code may use". While it was said back at the lamp and its
+     spoken yes is awaited (below; `skill_write_yes::code_yes_awaited`:
+     that SHA-256's wait, neither dropped, answered nor past its 120 s),
+     the answer also carries `"awaits_yes": true`, so the app shows it as
+     waiting for that yes and keeps asking; once the yes puts it on, the
+     next answer is `on`. Not said back (someone else present, or not on
+     the second route), the field is absent and the answer is as above.
    - **Made from the app, said back at the lamp.** The app's MAKE IT
      (`app_make::put_on_line`) then keeps it as asked
      (`made_skill::code_asked`, `code_asked_at_unix_ms`) and has the lamp
@@ -4871,7 +4877,11 @@ to say aloud what it made; without either the app socket isn't started
    kept and being put on), `on`, or `not_kept` with `why` in plain words:
    the maker's, "it couldn't be put on: <why>" for a kept skill the helper
    didn't put on (its `not_on`), or "it wasn't put on" for one kept more
-   than 30 minutes ago and never put on (`app_make::why_not`). A new ask
+   than 30 minutes ago and never put on (`app_make::why_not`). A kept
+   skill with code of its own said back at the lamp, its spoken yes
+   awaited now, is `not_kept` with `"awaits_yes": true` beside its `why`
+   (#6307, "Made from the app, said back at the lamp" above); the field is
+   absent otherwise. A new ask
    is never `kept`, `asked` or `left_off`; a skill asked about before
    #5977 and never said yes to still reads `left_off`. Once kept: `name`,
    `description`, `version`, `uses` (`light`, `body`, `topics`, and

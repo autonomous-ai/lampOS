@@ -937,7 +937,10 @@ voice tells it.
 - **`skills.made`** (`{"request_id"}`, or `{}` for the newest): the app's
   own ask only, never a skill made by voice. `state` is `making`, `on` or
   `not_kept`, with `why` in plain words (the maker's, or "it couldn't be
-  put on: …"); `left_off` only for an ask from before #5977. Once kept:
+  put on: …"); `left_off` only for an ask from before #5977. A made skill
+  with code of its own said back at the lamp, whose spoken yes is awaited
+  now (#6307), is `not_kept` with `"awaits_yes": true` too, and turns `on`
+  once that yes puts it on; the field is absent when it wasn't said back. Once kept:
   `name`, `description`, `version`, `sha256` (what the helper put on) and
   `may_use`, the skills page's rows (`skills::may_use`). With no ask,
   `{"state": "none"}`. A skill made here is also told with `needs_link`,

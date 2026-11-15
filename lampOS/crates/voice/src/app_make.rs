@@ -401,8 +401,13 @@ fn why_not(entry: &Value, made: Option<&Value>) -> Value {
 /// What the app is told of its ask `request_id`, or of its newest: its
 /// state ([`state`]), and once on, the skill's name, what it does, its
 /// version, what it may use and its SHA-256; when not kept or not on, why,
-/// in plain words ([`why_not`]). Only the app's own asks: a skill made by
-/// voice is never told here. `{"state": "none"}` with none.
+/// in plain words ([`why_not`]). A kept skill with code of its own said
+/// back at the lamp, whose spoken yes is awaited now
+/// ([`crate::skill_write_yes::code_yes_awaited`], #6307), is also told
+/// `"awaits_yes": true`, so the app keeps asking until the yes puts it
+/// `on`; not said back (someone else present, or not on the second
+/// route), nothing waits and the field is absent. Only the app's own asks:
+/// a skill made by voice is never told here. `{"state": "none"}` with none.
 pub fn status(directory: &Path, request_id: Option<&str>, now_unix_ms: u64) -> Value {
     let entries = asks(directory);
     let entry = match request_id {
@@ -421,6 +426,13 @@ pub fn status(directory: &Path, request_id: Option<&str>, now_unix_ms: u64) -> V
     let made = made_of(directory, entry);
     if state == "not_kept" {
         told["why"] = why_not(entry, made.as_ref());
+        if let Some(made) = &made
+            && made["uses"]["code"] == true
+            && let Some(sha256) = made["sha256"].as_str()
+            && crate::skill_write_yes::code_yes_awaited(sha256, std::time::Instant::now())
+        {
+            told["awaits_yes"] = json!(true);
+        }
     } else if let Some(made) = made {
         for field in ["name", "description", "version", "sha256", "uses"] {
             told[field] = made[field].clone();
@@ -1842,6 +1854,99 @@ mod tests {
         assert_eq!(status(&keeping.directory, Some("r1"), at)["state"], "on");
         // On: said again, nothing more waits.
         assert_eq!(asked_in(10, &note, true), note);
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_scripts_here(None);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// #6307: the app is told `"awaits_yes": true` beside `not_kept` only
+    /// while an app's make with code of its own was said back at the lamp
+    /// and its spoken yes is awaited. Not said back (the owner not seen
+    /// alone), today's answer stands with no such field; a status asked
+    /// after the yes reads `on`, and nothing waits any more.
+    #[test]
+    fn the_app_is_told_a_said_back_make_with_code_awaits_its_yes() {
+        use crate::make_skill_local::tests::{
+            CODE_CARD, CODE_TOML, chat_at, keeping, manage_helper, service, task_asks,
+        };
+        use crate::skill_write_yes as yes;
+        made_skill::set_scripts_here(Some(true));
+        let (root, keeping) = keeping("app-code-awaits");
+        let at = now_unix_ms();
+        let brief = begin(&keeping.directory, "make me a photo booth", "r1", at).unwrap();
+        let answer = format!(
+            "```skill.toml\n{CODE_TOML}```\n\n```SKILL.md\n{CODE_CARD}```\n\n\
+             ```scripts/main.py\nprint('photo')\n```\n"
+        );
+        let (url, served) = service(vec![(200, answer)]);
+        let mut said = Vec::new();
+        make_here(&keeping, &brief, "r1", at, chat_at(url), |line| {
+            said.push(line.to_owned())
+        });
+        assert_eq!(served.join().unwrap(), 1);
+        let [line] = said.as_slice() else {
+            panic!("{said:?}")
+        };
+        let note = say_note(line).unwrap();
+        let dir = &keeping.directory;
+        let sha256 = made_skill::entries(dir)[0]["sha256"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let now = std::time::Instant::now();
+        let asked_in = |request: u64, alone: bool| {
+            crate::make_skill_local::app_code_asked(
+                dir,
+                request,
+                note.clone(),
+                now_unix_ms(),
+                now,
+                || alone,
+            )
+        };
+        let not_kept = json!({
+            "request_id": "r1",
+            "state": "not_kept",
+            "why": format!("it couldn't be put on: {}", made_skill::CODE_BY_VOICE),
+        });
+        // Kept, not said back yet: today's answer, no field.
+        assert_eq!(status(dir, Some("r1"), at), not_kept);
+        // Not said back: another person present; nothing waits, no field.
+        asked_in(4, false);
+        assert_eq!(status(dir, Some("r1"), at), not_kept);
+        // Said back: its yes awaited, and the app told so.
+        let turn = asked_in(5, true);
+        let id = turn.rsplit('"').nth(1).unwrap().to_owned();
+        let mut awaits = not_kept.clone();
+        awaits["awaits_yes"] = json!(true);
+        assert_eq!(status(dir, Some("r1"), at), awaits);
+        // The wait dropped (a yes not the owner's): no field again.
+        assert!(yes::drop_wait(&id));
+        assert_eq!(status(dir, Some("r1"), at), not_kept);
+        // Said back again, and the owner's yes puts it on: the app's next
+        // ask reads `on`, with no `why` and no field.
+        let turn = asked_in(6, true);
+        let id = turn.rsplit('"').nth(1).unwrap().to_owned();
+        assert_eq!(status(dir, Some("r1"), at), awaits);
+        yes::lamp_said(6, line);
+        let asked = manage_helper(&keeping.manage);
+        crate::skill_task_yes::set_on_here(Some(true));
+        let folder = "cd".repeat(32);
+        let agreed = yes::approve(&id, 7, true, true, now, |asks| {
+            crate::make_skill_local::code_approve(
+                &keeping,
+                asks,
+                |name| Ok(Some(task_asks(name, &folder, &sha256, &["camera"]))),
+                |_| Ok(json!({ "approved": 1 })),
+            )
+        });
+        assert_eq!(agreed["approved"], true, "{agreed}");
+        assert_eq!(asked.join().unwrap()["install_made"], sha256.as_str());
+        let told = status(dir, Some("r1"), at);
+        assert_eq!(told["state"], "on", "{told}");
+        assert!(told.get("why").is_none(), "{told}");
+        assert!(told.get("awaits_yes").is_none(), "{told}");
+        assert!(!yes::code_yes_awaited(&sha256, std::time::Instant::now()));
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_scripts_here(None);
         let _ = fs::remove_dir_all(&root);
