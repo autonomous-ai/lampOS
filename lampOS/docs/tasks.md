@@ -3806,6 +3806,43 @@ gives the script its own namespaces, with only `lo` for network.
 lamp-control's check of the run's one-run token holds as for every run,
 and the token ends with the run.
 
+**What a sibling agent can and cannot do.** Every OpenClaw agent runs in
+the one gateway, as `lampos`, in the gateway's namespaces, and shares
+`WORK`. A sibling is any agent other than `main`, or any other code
+running as `lampos` there. After #7133:
+
+- **Cannot run the launcher through exec approvals.** Only `main` has
+  the exact launcher entry. An owner who gives a sibling unrestricted
+  exec gives it the launcher too, and any other program.
+- **Cannot claim a run with any other program.** lamp-tasks answers only
+  the root-owned launcher: the same uid, `/proc/<pid>/exe` that very file
+  (device and inode), no `LD_` variable, only root's unwritable code
+  mapped, nothing tracing it (`TracerPid` 0), and the id line sent by
+  that pid itself (`SCM_CREDENTIALS`), checked again after the read. The
+  launcher is static, makes itself non-dumpable before the grant, and
+  closes every fd above 4 before the fence.
+- **Cannot choose the script, interpreter or grants.** lamp-tasks fixes
+  the grant from the owner's yes, and a run is claimed once.
+- **Can, with the launcher, race `main` for a live run's id.** The id is
+  not secret: it names the run's folder in `WORK` and is in the task's
+  words. The winner gets only that run's approved script, fenced, once,
+  and the real run then fails closed.
+- **Can, with code execution, read the run's token.** The fence puts the
+  token in the script's environment (`LAMP_CONTROL_TOKEN`), and the
+  script runs as `lampos` and is dumpable after its exec. Another
+  `lampos` process can read `/proc/<pid>/environ`: that is a ptrace
+  read check, which Yama's `ptrace_scope=1` does not limit. The token
+  reaches only lamp-control, for this one run, with this skill's grants,
+  and is ended when the run ends (14 minutes at most). Hermes's path
+  carries the token in the environment the same way, so this is not new
+  with #7133.
+- **Can read and write `WORK`, as before.** Nothing of a run's start is
+  written there, and no run writes `openclaw.json`.
+
+What remains, the token on an fd only and a uid of its own for the
+script, is #7024. The acceptance on #6882 (a) covers exactly this limit
+and nothing wider.
+
 **Its journal.** The same lines as Hermes's run through Harness:
 
 ```
