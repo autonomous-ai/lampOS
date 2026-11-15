@@ -513,14 +513,24 @@ lần chạy, và được trả lời khi lần chạy kết thúc
       "${1-}" = --lamp-task ]` và `agent_task "$Q"`, cùng các dòng cho mọi
       agent) với `agent_task` trong phần dữ liệu của agent, trước đường
       chạy (`AGENT_TASK_LINE`). Wrapper không có chúng (lamp-update cũ hơn,
-      hay agent chưa có việc của riêng nó) bị từ chối bằng lời, có ghi
-      nhật ký: "the lamp's default agent (<engine>) isn't set up for a
-      skill's run yet (its wrapper /usr/local/bin/<engine> takes no skill's
-      run without Harness: …), so nothing was started", không tạo hay khởi
-      động gì. Hiện tại phần dữ liệu của Hermes có `agent_task` (`chat -q`
-      với lời của việc, như Harness và một lần make khởi động nó); Claude
-      Code và các agent thường khác chưa có; OpenClaw hoàn toàn chưa có
-      wrapper đường chạy duy nhất, nên bị từ chối như trên.
+      hay agent chưa có việc của riêng nó) không làm dừng lần chạy khi
+      Harness đã được cài và đọc là đã đăng xuất (#7133): lần chạy đi qua
+      target riêng của đèn trong Harness, như khi đã đăng nhập; target này
+      chạy được khi không có tài khoản (#6407: không xem machines, không
+      `--machine`, việc chạy dưới id riêng của máy). Ghi một dòng nhật ký:
+      "skill task <run>: the lamp's default agent (<engine>) isn't set up
+      for a skill's run yet (…); Harness is signed out, so it goes through
+      Harness's own lamp target". Vì vậy một đèn đã reset với OpenClaw là
+      mặc định vẫn chạy skill qua gateway của OpenClaw và launcher
+      skill-start. Khi hoàn toàn không có chương trình Harness thì không
+      còn đường nào khác: bị từ chối bằng lời, có ghi nhật ký, "the lamp's
+      default agent (<engine>) isn't set up for a skill's run yet (its
+      wrapper /usr/local/bin/<engine> takes no skill's run without
+      Harness: …), so nothing was started", không tạo hay khởi động gì.
+      Hiện tại phần dữ liệu của Hermes có `agent_task` (`chat -q` với lời
+      của việc, như Harness và một lần make khởi động nó), nên Hermes giữ
+      lần chạy không qua Harness; Claude Code và các agent thường khác chưa
+      có; OpenClaw chưa có wrapper đường chạy duy nhất của riêng nó.
     - **Cùng thư mục và file token.** `skill-<run-id>` (0700) trong cùng
       project Harness, file token của lần chạy được ghi trước khi khởi động
       (`RunTokenFile`), và lời của việc trong file `task` của thư mục (0600,

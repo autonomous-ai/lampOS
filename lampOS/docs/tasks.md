@@ -2915,14 +2915,24 @@ for each run, and is answered once the run ends
       "${1-}" = --lamp-task ]` and `agent_task "$Q"`, the same lines for
       every agent) with `agent_task` in its agent's data, before the run
       path (`AGENT_TASK_LINE`). A wrapper without them (an older
-      lamp-update, or an agent with no task of its own) is refused in
-      words and journaled: "the lamp's default agent (<engine>) isn't set
-      up for a skill's run yet (its wrapper /usr/local/bin/<engine> takes
-      no skill's run without Harness: …), so nothing was started", with
-      nothing made or started. Today Hermes's data has `agent_task`
-      (`chat -q` with the task's words, as Harness and a make start it);
-      Claude Code's and the other plain agents' have none yet; OpenClaw
-      has no one run path wrapper at all, so it is refused as above.
+      lamp-update, or an agent with no task of its own) does not stop
+      the run when Harness is set up and read signed out (#7133): the
+      run goes through Harness's own lamp target instead, as when signed
+      in, which works with no account (#6407: no machines look, no
+      `--machine`, work under the computer's own id). One line is
+      journaled: "skill task <run>: the lamp's default agent (<engine>)
+      isn't set up for a skill's run yet (…); Harness is signed out, so
+      it goes through Harness's own lamp target". So a reset lamp with
+      OpenClaw its default runs its skills through OpenClaw's gateway and
+      the skill-start launcher. With no Harness program at all there is
+      no other way: it is refused in words and journaled, "the lamp's
+      default agent (<engine>) isn't set up for a skill's run yet (its
+      wrapper /usr/local/bin/<engine> takes no skill's run without
+      Harness: …), so nothing was started", with nothing made or
+      started. Today Hermes's data has `agent_task` (`chat -q` with the
+      task's words, as Harness and a make start it), so Hermes keeps its
+      run with no Harness; Claude Code's and the other plain agents' have
+      none yet; OpenClaw has no one run path wrapper of its own.
     - **The same folder and token file.** `skill-<run-id>` (0700) in the
       same Harness project, the run's token file written before the start
       (`RunTokenFile`), and the task's words in the folder's `task` file
