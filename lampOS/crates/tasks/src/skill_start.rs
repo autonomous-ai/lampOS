@@ -12,24 +12,41 @@
 //!   unit's `RuntimeDirectory` (0755, `lampos`'s,
 //!   `RuntimeDirectoryPreserve=yes`, so kept until reboot), installed by
 //!   lamp-update's one-shot (#7135); OpenClaw's namespace binds it
-//!   read-only. lamp-tasks never makes or removes it. The launcher sends
-//!   `<run-id>\n`. lamp-tasks checks, in order, the peer's uid (`SO_PEERCRED`, its own), the peer's
-//!   program (`/proc/<pid>/exe` names [`LAUNCHER`], is that very file, and
-//!   the file is root's and not group- or world-writable: [`peer_may`]),
-//!   then that the id is a live gateway run of this lamp-tasks not claimed
-//!   yet ([`Starts::claim`]). It answers one JSON line, the run's
-//!   [`Grant`], or `{"error":"<words>"}` with nothing claimed (a second
-//!   claim of a claimed run is refused too).
+//!   read-only, and each run's fence hides it ([`crate::gateway::HIDDEN`]).
+//!   lamp-tasks never makes or removes it. The talk, in order:
+//!   1. The launcher sends `<run-id>\n` with its credentials
+//!      (`SCM_CREDENTIALS`; the socket has `SO_PASSCRED`). lamp-tasks reads
+//!      it, then checks: the uid (`SO_PEERCRED`, its own), that the line came
+//!      from the connecting pid itself (not a child that kept the socket),
+//!      and that pid now ([`peer_may`]): its program is [`LAUNCHER`], that
+//!      very file, root's and not group- or world-writable; no `LD_`
+//!      variable; only root's code mapped; and nothing traces it
+//!      (`TracerPid` 0). It answers [`CHECKED`].
+//!   2. The launcher makes itself non-dumpable (`PR_SET_DUMPABLE` 0: no
+//!      process of its uid can ptrace it from then on, or read its
+//!      `/proc` files, which is why the checks of 1 come first) and sends
+//!      [`READY`], with its credentials again. lamp-tasks checks the line
+//!      came from the same pid, that the pid is non-dumpable (its `/proc`
+//!      folder is root's) and still untraced ([`undumped_may`]).
+//!   3. Only then is the run claimed ([`Starts::claim`]) and its [`Grant`]
+//!      answered, one JSON line, or `{"error":"<words>"}`. Any refusal after
+//!      a live run's id was read ends that run's start for good
+//!      ([`Starts::refuse`]): it is never claimable again.
 //! - **The fence**: the launcher runs `crate::gateway::FENCE_TEXT` as the
 //!   run's `start` did, the token on fd 3 through a pipe (never an argument
 //!   or the environment), the socket kept open as fd 4. Just before the
 //!   script is exec'd, the fence writes [`STARTED`] to fd 4 and closes it;
 //!   lamp-tasks reads it on that connection ([`Live::ran`]).
 //!
-//! A sibling agent could race the launcher for a live run's id: it gets
-//! only that run's own approved script, fenced, once, and the real run then
-//! fails closed. No arbitrary program is run with a run's token, and no
-//! token is ever in a file.
+//! A sibling agent could race the launcher for a live run's id: through
+//! the launcher it gets only that run's own approved script, fenced, once,
+//! and the real run then fails closed. No token is ever in a file.
+//!
+//! Out of reach of these checks: code that already runs as `lampos`
+//! outside the fence in the gateway's namespace, and holds a launcher's
+//! socket fd (shared with it), could still race the grant on that fd. The
+//! exact exec allow-list and a static launcher keep such code out; the
+//! checks here do not.
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::io::{self, Read, Write};
@@ -57,6 +74,10 @@ pub const START_DIR: &str = "/run/lampos-skill-start";
 pub const START_SOCKET: &str = "/run/lampos-skill-start/start.sock";
 /// The line the fence writes to fd 4 just before the script is exec'd.
 pub const STARTED: &str = "started";
+/// lamp-tasks' line after the launcher's id and its image were checked.
+pub const CHECKED: &str = "checked";
+/// The launcher's line once it is non-dumpable: only then is its grant sent.
+pub const READY: &str = "ready";
 /// How long the launcher's id, and lamp-tasks' answer, may take.
 pub const LINE_WITHIN: Duration = Duration::from_secs(5);
 /// How long after a claim the fence may take to say [`STARTED`].
@@ -115,6 +136,8 @@ struct Entry {
     grant: Grant,
     claimed: bool,
     started: bool,
+    /// Why its start was refused, after which it is never claimed.
+    refused: Option<String>,
 }
 
 /// The live gateway runs of this lamp-tasks, by id: each claimed at most
@@ -144,6 +167,7 @@ impl Starts {
                 grant,
                 claimed: false,
                 started: false,
+                refused: None,
             },
         );
         Ok(Live {
@@ -159,11 +183,29 @@ impl Starts {
         let entry = live
             .get_mut(id)
             .ok_or("no live skill run of this lamp has that id")?;
+        if entry.refused.is_some() {
+            return Err("that run's start was refused already".into());
+        }
         if entry.claimed {
             return Err("that run's start was claimed already".into());
         }
         entry.claimed = true;
         Ok(entry.grant.clone())
+    }
+
+    /// Live run `id`'s start refused for `why`: never claimed after, and
+    /// the run fails in these words ([`Live::ran`]). The first why is kept.
+    pub fn refuse(&self, id: &str, why: &str) {
+        if let Some(entry) = self.lock().get_mut(id)
+            && entry.refused.is_none()
+        {
+            entry.refused = Some(why.to_owned());
+        }
+    }
+
+    /// Why live run `id`'s start was refused, if it was.
+    pub fn refused(&self, id: &str) -> Option<String> {
+        self.lock().get(id).and_then(|entry| entry.refused.clone())
     }
 
     /// Run `id`'s fence said [`STARTED`]: only a claimed live run.
@@ -196,9 +238,12 @@ pub struct Live {
 }
 
 impl Live {
-    /// Whether the run's script started: claimed and [`STARTED`] read
-    /// ([`crate::gateway::start_ran`]).
+    /// Whether the run's script started: not refused ([`Starts::refuse`]),
+    /// claimed and [`STARTED`] read ([`crate::gateway::start_ran`]).
     pub fn ran(&self) -> Result<(), String> {
+        if let Some(why) = self.starts.refused(&self.id) {
+            return Err(format!("the skill's start was refused: {why}"));
+        }
         let (claimed, started) = self.starts.state(&self.id);
         crate::gateway::start_ran(claimed, started)
     }
@@ -255,6 +300,14 @@ pub trait Peers: Send + Sync {
     fn environ(&self, pid: u32) -> io::Result<Vec<u8>>;
     /// `/proc/<pid>/maps`.
     fn maps(&self, pid: u32) -> io::Result<String>;
+    /// `/proc/<pid>/status` (readable even when the pid is non-dumpable).
+    fn status(&self, pid: u32) -> io::Result<String>;
+    /// The owner of `/proc/<pid>`: root's once the pid is non-dumpable.
+    fn proc_owner(&self, pid: u32) -> io::Result<u32>;
+    /// One line of at most `most` bytes from `stream`, and the pid that
+    /// sent it: `Some` only when every byte of it came with credentials
+    /// (`SCM_CREDENTIALS`) naming that one pid.
+    fn read_line(&self, stream: &UnixStream, most: usize) -> io::Result<(String, Option<u32>)>;
 }
 
 /// The kernel's view of a peer.
@@ -287,6 +340,163 @@ impl Peers for Kernel {
     fn maps(&self, pid: u32) -> io::Result<String> {
         std::fs::read_to_string(format!("/proc/{pid}/maps"))
     }
+
+    fn status(&self, pid: u32) -> io::Result<String> {
+        std::fs::read_to_string(format!("/proc/{pid}/status"))
+    }
+
+    fn proc_owner(&self, pid: u32) -> io::Result<u32> {
+        std::fs::metadata(format!("/proc/{pid}")).map(|meta| meta.uid())
+    }
+
+    fn read_line(&self, stream: &UnixStream, most: usize) -> io::Result<(String, Option<u32>)> {
+        read_line_sent(stream, most)
+    }
+}
+
+/// [`Peers::read_line`] on a lamp: a byte at a time by `recvmsg`, each
+/// byte's credentials taken (a stream never joins bytes of two senders in
+/// one read).
+#[cfg(target_os = "linux")]
+fn read_line_sent(stream: &UnixStream, most: usize) -> io::Result<(String, Option<u32>)> {
+    use rustix::net::{RecvAncillaryBuffer, RecvAncillaryMessage, RecvFlags};
+    use std::mem::MaybeUninit;
+    let mut line = Vec::new();
+    let mut sender: Option<Option<u32>> = None;
+    loop {
+        let mut byte = [0u8; 1];
+        let mut space = [MaybeUninit::uninit(); rustix::cmsg_space!(ScmCredentials(1))];
+        let mut control = RecvAncillaryBuffer::new(&mut space);
+        let got = rustix::net::recvmsg(
+            stream,
+            &mut [io::IoSliceMut::new(&mut byte)],
+            &mut control,
+            RecvFlags::CMSG_CLOEXEC,
+        )?;
+        if got.bytes == 0 {
+            return Err(io::ErrorKind::UnexpectedEof.into());
+        }
+        let mut pid = None;
+        for message in control.drain() {
+            if let RecvAncillaryMessage::ScmCredentials(creds) = message {
+                pid = u32::try_from(creds.pid.as_raw_pid()).ok();
+            }
+        }
+        sender = match sender {
+            None => Some(pid),
+            Some(seen) if seen == pid => Some(seen),
+            Some(_) => Some(None),
+        };
+        match byte[0] {
+            b'\n' => break,
+            _ if line.len() >= most => return Err(io::ErrorKind::InvalidData.into()),
+            other => line.push(other),
+        }
+    }
+    let line = String::from_utf8(line).map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?;
+    Ok((line, sender.flatten()))
+}
+
+/// Off Linux there are no credentials on a message: no sender, so every
+/// launcher is refused.
+#[cfg(not(target_os = "linux"))]
+fn read_line_sent(stream: &UnixStream, most: usize) -> io::Result<(String, Option<u32>)> {
+    read_line(stream, most).map(|line| (line, None))
+}
+
+/// `stream`'s messages carry their sender's credentials (`SO_PASSCRED`).
+#[cfg(target_os = "linux")]
+fn pass_creds(stream: impl AsFd) -> io::Result<()> {
+    Ok(rustix::net::sockopt::set_socket_passcred(stream, true)?)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn pass_creds(_: impl AsFd) -> io::Result<()> {
+    Ok(())
+}
+
+/// One line sent with this process's own credentials (`SCM_CREDENTIALS`):
+/// the kernel checks they are the sender's, so lamp-tasks knows which pid
+/// sent it.
+#[cfg(target_os = "linux")]
+fn send_line(stream: &UnixStream, line: &str) -> io::Result<()> {
+    use rustix::net::{SendAncillaryBuffer, SendAncillaryMessage, SendFlags, UCred};
+    use std::mem::MaybeUninit;
+    let bytes = format!("{line}\n");
+    let creds = UCred {
+        pid: rustix::process::getpid(),
+        uid: rustix::process::getuid(),
+        gid: rustix::process::getgid(),
+    };
+    let mut space = [MaybeUninit::uninit(); rustix::cmsg_space!(ScmCredentials(1))];
+    let mut control = SendAncillaryBuffer::new(&mut space);
+    if !control.push(SendAncillaryMessage::ScmCredentials(creds)) {
+        return Err(io::Error::other("no room for the launcher's credentials"));
+    }
+    let sent = rustix::net::sendmsg(
+        stream,
+        &[io::IoSlice::new(bytes.as_bytes())],
+        &mut control,
+        SendFlags::NOSIGNAL,
+    )?;
+    if sent != bytes.len() {
+        return Err(io::Error::other("the launcher's line was cut short"));
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn send_line(stream: &UnixStream, line: &str) -> io::Result<()> {
+    write_line(stream, line)
+}
+
+/// This process made non-dumpable (`PR_SET_DUMPABLE` 0): no process of its
+/// uid may ptrace it or read its memory from now on.
+#[cfg(target_os = "linux")]
+fn undumpable() -> io::Result<()> {
+    Ok(rustix::process::set_dumpable_behavior(
+        rustix::process::DumpableBehavior::NotDumpable,
+    )?)
+}
+
+/// Off Linux the launcher never runs: refused.
+#[cfg(not(target_os = "linux"))]
+fn undumpable() -> io::Result<()> {
+    Err(io::Error::other("only on Linux"))
+}
+
+/// The `TracerPid` in `/proc/<pid>/status`' text: 0 when nothing traces it.
+fn tracer(status: &str) -> Option<u32> {
+    status
+        .lines()
+        .find_map(|line| line.strip_prefix("TracerPid:"))
+        .and_then(|value| value.trim().parse().ok())
+}
+
+/// Whether nothing traces `pid`.
+fn untraced(peers: &dyn Peers, pid: u32) -> Result<(), String> {
+    let status = peers
+        .status(pid)
+        .map_err(|_| "the caller's status can't be read")?;
+    match tracer(&status) {
+        Some(0) => Ok(()),
+        Some(_) => Err("the caller is being traced".into()),
+        None => Err("the caller's status can't be read".into()),
+    }
+}
+
+/// After [`READY`]: `pid` is non-dumpable (its `/proc` folder is root's,
+/// so no process of lamp-tasks' uid can attach to it any more, and it has
+/// not exec'd since, which would make it dumpable again) and still
+/// untraced.
+pub fn undumped_may(peers: &dyn Peers, pid: u32) -> Result<(), String> {
+    let owner = peers
+        .proc_owner(pid)
+        .map_err(|_| "the caller's status can't be read")?;
+    if owner != 0 {
+        return Err("the caller can still be traced (it is dumpable)".into());
+    }
+    untraced(peers, pid)
 }
 
 /// Whether an environment (`/proc/<pid>/environ`'s bytes, or the
@@ -347,28 +557,29 @@ pub fn maps_may(maps: &str, file: impl Fn(&Path) -> io::Result<FileSeen>) -> Res
     Ok(())
 }
 
-/// Whether the peer on `stream` may claim a run, in order: its uid is
-/// `own_uid`; its program's link names `launcher`; `launcher` is a plain
-/// file of root's that neither group nor others may write; the peer's
-/// program is that very file (the same device and inode, so a file of the
-/// same name bound over it in another mount namespace is not it); its
-/// environment sets no `LD_` variable; and every executable mapping it has
-/// is root's own code ([`maps_may`]), since a dynamically linked launcher
-/// could have been given code to run before `main`.
-pub fn peer_may(
-    peers: &dyn Peers,
-    stream: &UnixStream,
-    own_uid: u32,
-    launcher: &Path,
-) -> Result<Peer, String> {
+/// The peer on `stream` as the kernel names it at connect
+/// (`SO_PEERCRED`), when its uid is `own_uid`.
+pub fn peer_of(peers: &dyn Peers, stream: &UnixStream, own_uid: u32) -> Result<Peer, String> {
     let peer = peers
         .peer(stream)
         .ok_or("the caller is not known to the kernel")?;
     if peer.uid != own_uid {
         return Err("the caller is not lamp-tasks' own user".into());
     }
+    Ok(peer)
+}
+
+/// Whether process `pid` may claim a run, in order: its program's link
+/// names `launcher`; `launcher` is a plain
+/// file of root's that neither group nor others may write; the peer's
+/// program is that very file (the same device and inode, so a file of the
+/// same name bound over it in another mount namespace is not it); its
+/// environment sets no `LD_` variable; and every executable mapping it has
+/// is root's own code ([`maps_may`]), since a dynamically linked launcher
+/// could have been given code to run before `main`; and nothing traces it.
+pub fn peer_may(peers: &dyn Peers, pid: u32, launcher: &Path) -> Result<(), String> {
     let link = peers
-        .exe_link(peer.pid)
+        .exe_link(pid)
         .map_err(|_| "the caller's program can't be read")?;
     if link != launcher {
         return Err("the caller is not the skill-start launcher".into());
@@ -380,22 +591,22 @@ pub fn peer_may(
         return Err("the skill-start launcher is not root's own, or others may change it".into());
     }
     let exe = peers
-        .exe_file(peer.pid)
+        .exe_file(pid)
         .map_err(|_| "the caller's program can't be read")?;
     if (exe.dev, exe.ino) != (file.dev, file.ino) {
         return Err("the caller's program is not the skill-start launcher itself".into());
     }
     let environ = peers
-        .environ(peer.pid)
+        .environ(pid)
         .map_err(|_| "the caller's environment can't be read")?;
     if sets_ld(environ.split(|byte| *byte == 0)) {
         return Err("the caller has an LD_ variable set".into());
     }
     let maps = peers
-        .maps(peer.pid)
+        .maps(pid)
         .map_err(|_| "the caller's mappings can't be read")?;
     maps_may(&maps, |path| peers.file(path))?;
-    Ok(peer)
+    untraced(peers, pid)
 }
 
 /// lamp-tasks' side of the launcher: [`START_SOCKET`] served.
@@ -439,7 +650,11 @@ impl Server {
     fn serve(self: Arc<Self>, stop: &AtomicBool) {
         let mut said: Option<String> = None;
         while !stop.load(Ordering::Acquire) {
-            match bind(&self.socket, self.own_uid) {
+            // Each bind passes credentials (`SO_PASSCRED`), so every id line
+            // carries its sender's pid, uid and gid (Twelve's race on #7133).
+            let bound = bind(&self.socket, self.own_uid)
+                .and_then(|(listener, bound)| pass_creds(&listener).map(|()| (listener, bound)));
+            match bound {
                 Ok((listener, bound)) => {
                     eprintln!(
                         "tasks: a gateway agent's skill runs are claimed on {}",
@@ -513,47 +728,93 @@ impl Server {
         }
     }
 
-    /// One launcher's connection: the peer checked, its id read and
-    /// claimed, one JSON line answered; then, after a claim, [`STARTED`]
-    /// waited for on the same connection.
+    /// One launcher's connection, in the module's order: its id read and
+    /// its sender and image checked, [`CHECKED`]; its [`READY`] read and it
+    /// checked non-dumpable and untraced; only then the run claimed and its
+    /// grant answered, one JSON line; then [`STARTED`] waited for on the
+    /// same connection. A refused peer gets no answer at all; after a live
+    /// run's id was read, any refusal ends that run's start
+    /// ([`Starts::refuse`]).
     pub fn one(&self, stream: UnixStream) {
         if stream.set_nonblocking(false).is_err()
             || stream.set_read_timeout(Some(LINE_WITHIN)).is_err()
             || stream.set_write_timeout(Some(LINE_WITHIN)).is_err()
+            || pass_creds(&stream).is_err()
         {
             return;
         }
-        let refuse = |why: &str| {
-            eprintln!("[lamp-tasks] skill start: refused: {why}");
-            let _ = write_line(&stream, &serde_json::json!({ "error": why }).to_string());
-        };
-        // A refused peer gets no answer at all, and nothing is claimed.
-        let peer = match peer_may(&*self.peers, &stream, self.own_uid, &self.launcher) {
+        let peers = &*self.peers;
+        let peer = match peer_of(peers, &stream, self.own_uid) {
             Ok(peer) => peer,
             Err(why) => {
                 eprintln!("[lamp-tasks] skill start: refused a caller: {why}");
                 return;
             }
         };
-        let id = match read_line(&stream, MOST_ID_BYTES) {
-            Ok(id) if plain_id(&id) => id,
-            _ => return refuse("no plain run id was sent"),
+        let answer = |line: &str| {
+            let _ = write_line(&stream, line);
         };
+        let Ok((id, sender)) = peers.read_line(&stream, MOST_ID_BYTES) else {
+            return answer(&error_line("no plain run id was sent"));
+        };
+        // From here a live run's id is known: any refusal ends its start.
+        let silent = |why: &str| {
+            eprintln!("[lamp-tasks] skill start: refused a caller: {why}");
+            if plain_id(&id) {
+                self.starts.refuse(&id, why);
+            }
+        };
+        let checked = (sender == Some(peer.pid))
+            .then_some(())
+            .ok_or_else(|| "the run id was not sent by the caller itself".to_owned())
+            .and_then(|()| peer_may(peers, peer.pid, &self.launcher));
+        if let Err(why) = checked {
+            return silent(&why);
+        }
+        if !plain_id(&id) {
+            return answer(&error_line("no plain run id was sent"));
+        }
+        if !self.starts.is_live(&id) {
+            return answer(&error_line("no live skill run of this lamp has that id"));
+        }
+        if let Some(why) = self.starts.refused(&id) {
+            eprintln!("[lamp-tasks] skill start: run {id} was refused already: {why}");
+            return answer(&error_line("that run's start was refused already"));
+        }
+        answer(CHECKED);
+        let ready = match peers.read_line(&stream, READY.len()) {
+            Ok((line, sender)) if line == READY && sender == Some(peer.pid) => {
+                undumped_may(peers, peer.pid)
+            }
+            Ok((line, _)) if line == READY => {
+                Err("the launcher's ready was not sent by the caller itself".into())
+            }
+            _ => Err("the launcher never said it was ready".into()),
+        };
+        if let Err(why) = ready {
+            return silent(&why);
+        }
         let grant = match self.starts.claim(&id) {
             Ok(grant) => grant,
-            Err(why) => return refuse(&why),
+            Err(why) => {
+                self.starts.refuse(&id, &why);
+                eprintln!("[lamp-tasks] skill start: refused: {why}");
+                return answer(&error_line(&why));
+            }
         };
-        let Ok(answer) = serde_json::to_string(&grant) else {
-            return refuse("the run's start could not be written");
+        let Ok(line) = serde_json::to_string(&grant) else {
+            let why = "the run's start could not be written";
+            self.starts.refuse(&id, why);
+            return answer(&error_line(why));
         };
         eprintln!(
             "[lamp-tasks] skill start: run {id} claimed by the launcher (pid {})",
             peer.pid
         );
-        if write_line(&stream, &answer).is_err() {
+        if write_line(&stream, &line).is_err() {
             return;
         }
-        drop(answer);
+        drop(line);
         if stream.set_read_timeout(Some(self.started_within)).is_ok()
             && read_line(&stream, STARTED.len()).is_ok_and(|line| line == STARTED)
         {
@@ -563,6 +824,12 @@ impl Server {
             eprintln!("[lamp-tasks] skill start: run {id}'s fence never said it started");
         }
     }
+}
+
+/// An answer of refusal: `{"error":"<why>"}`.
+fn error_line(why: &str) -> String {
+    eprintln!("[lamp-tasks] skill start: refused: {why}");
+    serde_json::json!({ "error": why }).to_string()
 }
 
 struct Counted(Arc<AtomicUsize>);
@@ -749,8 +1016,9 @@ pub fn parse_answer(line: &str) -> Result<Grant, String> {
 
 /// The launcher: `skill-start <run-id>`. Refused (exit 2) before it
 /// connects anywhere by [`launcher_refusal`]; else asks lamp-tasks for the
-/// run's start over [`START_SOCKET`], then becomes the run's fence. Returns
-/// only with its exit status and why it did not.
+/// run's start over [`START_SOCKET`] ([`ask`]; exit 2 when it can't be made
+/// non-dumpable), then becomes the run's fence. Returns only with its exit
+/// status and why it did not.
 pub fn launcher_main(args: &[OsString]) -> (i32, String) {
     use std::os::unix::ffi::OsStrExt;
     let names: Vec<OsString> = std::env::vars_os().map(|(name, _)| name).collect();
@@ -758,11 +1026,40 @@ pub fn launcher_main(args: &[OsString]) -> (i32, String) {
         Ok(id) => id,
         Err(why) => return (2, why),
     };
-    (1, launch(&id))
+    launch(&id)
+}
+
+/// The launcher's side of the talk on `stream` (the module's order): `id`
+/// sent with its credentials; on [`CHECKED`], made non-dumpable
+/// (`undumpable`), and only then [`READY`] sent and the grant read. Never
+/// ready unless non-dumpable: if that fails, nothing more is sent (exit 2).
+pub fn ask(
+    stream: &UnixStream,
+    id: &str,
+    undumpable: impl FnOnce() -> io::Result<()>,
+) -> Result<Grant, (i32, String)> {
+    let refused = |why: String| (1, format!("the run's start was refused: {why}"));
+    send_line(stream, id).map_err(|_| (1, "lamp-tasks was not asked".to_owned()))?;
+    match read_line(stream, MOST_ANSWER_BYTES) {
+        Ok(line) if line == CHECKED => {}
+        Ok(line) => return Err(refused(parse_answer(&line).err().unwrap_or_default())),
+        Err(_) => return Err(refused("lamp-tasks did not answer".into())),
+    }
+    undumpable().map_err(|error| {
+        (
+            2,
+            format!("refused: the launcher could not be made non-dumpable: {error}"),
+        )
+    })?;
+    send_line(stream, READY).map_err(|_| (1, "lamp-tasks was not told ready".to_owned()))?;
+    read_line(stream, MOST_ANSWER_BYTES)
+        .map_err(|_| "lamp-tasks did not answer".to_owned())
+        .and_then(|line| parse_answer(&line))
+        .map_err(refused)
 }
 
 /// The launcher past its own checks: lamp-tasks asked for run `id`.
-fn launch(id: &str) -> String {
+fn launch(id: &str) -> (i32, String) {
     // Fds 0-2 held, so the fence's fds land at 3 and 4.
     while let Ok(null) = std::fs::File::open("/dev/null") {
         if null.as_raw_fd() > 2 {
@@ -772,27 +1069,28 @@ fn launch(id: &str) -> String {
     }
     let stream = match UnixStream::connect(START_SOCKET) {
         Ok(stream) => stream,
-        Err(error) => return format!("lamp-tasks can't be reached on {START_SOCKET}: {error}"),
+        Err(error) => {
+            return (
+                1,
+                format!("lamp-tasks can't be reached on {START_SOCKET}: {error}"),
+            );
+        }
     };
     if stream.set_read_timeout(Some(LINE_WITHIN)).is_err()
         || stream.set_write_timeout(Some(LINE_WITHIN)).is_err()
-        || write_line(&stream, id).is_err()
     {
-        return "lamp-tasks was not asked".into();
+        return (1, "lamp-tasks was not asked".into());
     }
-    let grant = match read_line(&stream, MOST_ANSWER_BYTES)
-        .map_err(|_| "lamp-tasks did not answer".to_owned())
-        .and_then(|line| parse_answer(&line))
-    {
+    let grant = match ask(&stream, id, undumpable) {
         Ok(grant) => grant,
-        Err(why) => return format!("the run's start was refused: {why}"),
+        Err(refused) => return refused,
     };
     if stream.set_read_timeout(None).is_err() || stream.set_write_timeout(None).is_err() {
-        return "the launcher socket could not be kept".into();
+        return (1, "the launcher socket could not be kept".into());
     }
     match exec_fence(&grant, stream) {
         Ok(never) => match never {},
-        Err(error) => format!("the run's fence was not started: {error}"),
+        Err(error) => (1, format!("the run's fence was not started: {error}")),
     }
 }
 
@@ -870,7 +1168,9 @@ mod tests {
 
     /// A peer as the test says: its uid, its program's link, its program
     /// file's identity, the launcher file's, its environment, its maps and
-    /// the files they name.
+    /// the files they name, its tracer, its `/proc` folder's owner, the pid
+    /// its lines are sent by, and from which line read on (0: the id, 1:
+    /// ready) its program is another's.
     #[derive(Clone)]
     struct Fake {
         uid: u32,
@@ -880,18 +1180,29 @@ mod tests {
         environ: Vec<u8>,
         maps: String,
         files: HashMap<PathBuf, FileSeen>,
+        tracer: u32,
+        owner: u32,
+        sender: Option<u32>,
+        ready_sender: Option<u32>,
+        other_from: usize,
+        lines: Arc<AtomicUsize>,
     }
+
+    const PID: u32 = 4242;
 
     fn launcher_file() -> FileSeen {
         root_file(42)
     }
+
+    /// `b3:02`, as Linux encodes it in `st_dev`.
+    const DEV: u64 = (0xb3 << 8) | 0x02;
 
     fn root_file(ino: u64) -> FileSeen {
         FileSeen {
             file: true,
             uid: 0,
             mode: 0o100755,
-            dev: 1,
+            dev: DEV,
             ino,
         }
     }
@@ -927,6 +1238,12 @@ mod tests {
                 environ: b"PATH=/usr/bin\0HOME=/var/lib/lampos\0".to_vec(),
                 maps: good_maps(),
                 files: [(LIBC.into(), root_file(100)), (LD.into(), root_file(101))].into(),
+                tracer: 0,
+                owner: 0,
+                sender: Some(PID),
+                ready_sender: Some(PID),
+                other_from: usize::MAX,
+                lines: Arc::default(),
             }
         }
 
@@ -944,11 +1261,14 @@ mod tests {
     impl Peers for Fake {
         fn peer(&self, _: &UnixStream) -> Option<Peer> {
             Some(Peer {
-                pid: 4242,
+                pid: PID,
                 uid: self.uid,
             })
         }
         fn exe_link(&self, _: u32) -> io::Result<PathBuf> {
+            if self.lines.load(Ordering::Acquire) > self.other_from {
+                return Ok("/usr/bin/python3".into());
+            }
             Ok(self.link.clone())
         }
         fn exe_file(&self, _: u32) -> io::Result<FileSeen> {
@@ -963,22 +1283,73 @@ mod tests {
         fn maps(&self, _: u32) -> io::Result<String> {
             Ok(self.maps.clone())
         }
+        fn status(&self, _: u32) -> io::Result<String> {
+            Ok(format!(
+                "Name:\tskill-start\nState:\tS (sleeping)\nTracerPid:\t{}\nUid:\t990\n",
+                self.tracer
+            ))
+        }
+        fn proc_owner(&self, _: u32) -> io::Result<u32> {
+            // Dumpable (its uid's) until it said ready.
+            Ok(if self.lines.load(Ordering::Acquire) >= 2 {
+                self.owner
+            } else {
+                OWN
+            })
+        }
+        fn read_line(&self, stream: &UnixStream, most: usize) -> io::Result<(String, Option<u32>)> {
+            let line = read_line(stream, most)?;
+            let read = self.lines.fetch_add(1, Ordering::AcqRel);
+            Ok((
+                line,
+                if read == 0 {
+                    self.sender
+                } else {
+                    self.ready_sender
+                },
+            ))
+        }
     }
 
     /// Why `fake` may not claim, if it may not.
     fn peer_why(fake: &Fake) -> Result<(), String> {
         let (near, _far) = UnixStream::pair().unwrap();
-        peer_may(fake, &near, OWN, Path::new(LAUNCHER_AT)).map(|_| ())
+        let peer = peer_of(fake, &near, OWN)?;
+        peer_may(fake, peer.pid, Path::new(LAUNCHER_AT))
     }
 
-    /// `fake` refused in `words`: no answer at all on its connection, and
-    /// the live run `task-1` still unclaimed.
+    /// `fake` refused in `words`: no answer at all on its connection, the
+    /// live run `task-1` never claimed, and its start ended for good.
     fn refused(fake: Fake, words: &str) {
         assert_eq!(peer_why(&fake), Err(words.to_owned()));
+        refused_in_talk(fake, words);
+    }
+
+    /// `fake` refused in `words` in the talk itself: no grant, nothing
+    /// claimed, the run's start ended (the uid's refusal comes before any
+    /// id is read, so it ends nothing).
+    fn refused_in_talk(fake: Fake, words: &str) {
         let starts = Starts::default();
-        let _live = starts.open("task-1", grant()).unwrap();
-        assert_eq!(claim(&starts, fake, "task-1", None), "", "no answer");
-        assert_eq!(starts.state("task-1"), (false, false), "nothing claimed");
+        let live = starts.open("task-1", grant()).unwrap();
+        let answer = claim(&starts, fake, "task-1", Some(STARTED));
+        assert!(parse_answer(&answer).is_err(), "no grant: {answer}");
+        assert!(!starts.state("task-1").0, "nothing claimed");
+        if words == "the caller is not lamp-tasks' own user" {
+            assert_eq!(answer, "", "no answer");
+            assert_eq!(starts.refused("task-1"), None);
+            return;
+        }
+        assert_eq!(starts.refused("task-1").as_deref(), Some(words));
+        assert_eq!(
+            live.ran(),
+            Err(format!("the skill's start was refused: {words}"))
+        );
+        // Never claimable again, even by the launcher itself.
+        assert_eq!(
+            error_of(&claim(&starts, Fake::good(), "task-1", None)),
+            "that run's start was refused already"
+        );
+        assert!(!starts.state("task-1").0);
     }
 
     #[test]
@@ -1170,15 +1541,20 @@ mod tests {
         }
     }
 
-    /// One launcher's claim of `id` from a peer `fake`: its answer line,
-    /// then `then` sent (`started`, or nothing) and the connection closed;
-    /// returns once lamp-tasks has done with it.
+    /// One launcher's claim of `id` from a peer `fake`, as [`ask`] talks:
+    /// its last answer line (the grant, an error, or nothing), then `then`
+    /// sent (`started`, or nothing) and the connection closed; returns once
+    /// lamp-tasks has done with it.
     fn claim(starts: &Starts, fake: Fake, id: &str, then: Option<&str>) -> String {
         let (near, far) = UnixStream::pair().unwrap();
         let served = server(starts, fake);
         let serving = std::thread::spawn(move || served.one(far));
         write_line(&near, id).unwrap();
-        let answer = read_line(&near, MOST_ANSWER_BYTES).unwrap_or_default();
+        let mut answer = read_line(&near, MOST_ANSWER_BYTES).unwrap_or_default();
+        if answer == CHECKED {
+            let _ = write_line(&near, READY);
+            answer = read_line(&near, MOST_ANSWER_BYTES).unwrap_or_default();
+        }
         if let Some(line) = then {
             // A refused claim's connection may be closed already.
             let _ = write_line(&near, line);
@@ -1189,7 +1565,7 @@ mod tests {
     }
 
     fn error_of(answer: &str) -> String {
-        let value: serde_json::Value = serde_json::from_str(answer).unwrap();
+        let value: serde_json::Value = serde_json::from_str(answer).unwrap_or_default();
         value["error"].as_str().unwrap_or_default().to_owned()
     }
 
@@ -1245,8 +1621,11 @@ mod tests {
             error_of(&claim(&starts, Fake::good(), "task-1", Some(STARTED))),
             "that run's start was claimed already"
         );
-        // A refused second claim says nothing started for the first.
-        assert_eq!(live.ran(), Err(crate::gateway::FENCE_FAILED.into()));
+        // A refused second claim ends the run's start in its words.
+        assert_eq!(
+            live.ran(),
+            Err("the skill's start was refused: that run's start was claimed already".into())
+        );
     }
 
     #[test]
@@ -1407,6 +1786,142 @@ mod tests {
         );
         assert!(words[fence - 1].contains("printf \"started\\n\" >&4"));
         assert!(!words[fence - 1].contains("$SCRIPT_PATH"));
+    }
+
+    /// #7133 (Twelve's HOLD): a process that connected and then exec'd the
+    /// launcher, with a child keeping the socket, is refused: the id's
+    /// sender must be the connecting pid, and its image is checked after
+    /// the id was read, not at the connect.
+    #[test]
+    fn the_id_must_come_from_the_caller_itself_its_image_checked_after_it() {
+        let mut child = Fake::good();
+        child.sender = Some(PID + 1);
+        refused_in_talk(child, "the run id was not sent by the caller itself");
+        let mut no_creds = Fake::good();
+        no_creds.sender = None;
+        refused_in_talk(no_creds, "the run id was not sent by the caller itself");
+        // The launcher's image at the connect, another's once the id came.
+        let mut changed = Fake::good();
+        changed.other_from = 0;
+        refused_in_talk(changed, "the caller is not the skill-start launcher");
+        // And its ready from another pid.
+        let mut ready_child = Fake::good();
+        ready_child.ready_sender = Some(PID + 1);
+        refused_in_talk(
+            ready_child,
+            "the launcher's ready was not sent by the caller itself",
+        );
+    }
+
+    #[test]
+    fn a_traced_caller_or_one_still_dumpable_at_ready_is_refused() {
+        let mut traced = Fake::good();
+        traced.tracer = 77;
+        refused(traced, "the caller is being traced");
+        let mut dumpable = Fake::good();
+        dumpable.owner = OWN;
+        refused_in_talk(dumpable, "the caller can still be traced (it is dumpable)");
+        assert_eq!(tracer("Name:\tx\nTracerPid:\t0\n"), Some(0));
+        assert_eq!(tracer("Name:\tx\nTracerPid:\t812\n"), Some(812));
+        assert_eq!(tracer("Name:\tx\n"), None);
+    }
+
+    /// The grant is never sent before [`READY`]; a peer that never says it
+    /// gets nothing and claims nothing, and the run's start is ended.
+    #[test]
+    fn the_grant_comes_only_after_ready() {
+        let starts = Starts::default();
+        let live = starts.open("task-1", grant()).unwrap();
+        let (near, far) = UnixStream::pair().unwrap();
+        let served = server(&starts, Fake::good());
+        let serving = std::thread::spawn(move || served.one(far));
+        write_line(&near, "task-1").unwrap();
+        assert_eq!(read_line(&near, MOST_ANSWER_BYTES).unwrap(), CHECKED);
+        near.set_read_timeout(Some(Duration::from_millis(300)))
+            .unwrap();
+        let mut byte = [0u8; 1];
+        assert!(
+            (&near).read(&mut byte).is_err(),
+            "nothing more before ready"
+        );
+        assert_eq!(starts.state("task-1"), (false, false));
+        drop(near);
+        serving.join().unwrap();
+        assert_eq!(starts.state("task-1"), (false, false), "nothing claimed");
+        assert_eq!(
+            live.ran(),
+            Err("the skill's start was refused: the launcher never said it was ready".into())
+        );
+        // With ready, the grant.
+        let starts = Starts::default();
+        let _live = starts.open("task-1", grant()).unwrap();
+        let answer = claim(&starts, Fake::good(), "task-1", None);
+        assert_eq!(parse_answer(&answer), Ok(grant()));
+    }
+
+    /// The launcher's side: non-dumpable before it says [`READY`], and
+    /// never ready (exit 2) when it can't be.
+    #[test]
+    fn the_launcher_is_non_dumpable_before_it_says_ready() {
+        let talk = |undumpable_ok: bool| {
+            let (near, far) = UnixStream::pair().unwrap();
+            let undumped = Arc::new(AtomicBool::new(false));
+            let seen = undumped.clone();
+            let lamp = std::thread::spawn(move || {
+                assert_eq!(read_line(&far, MOST_ID_BYTES).unwrap(), "task-1");
+                write_line(&far, CHECKED).unwrap();
+                let ready = read_line(&far, READY.len());
+                let at_ready = seen.load(Ordering::Acquire);
+                if ready.is_ok() {
+                    write_line(&far, &serde_json::to_string(&grant()).unwrap()).unwrap();
+                }
+                (ready.ok(), at_ready)
+            });
+            let asked = ask(&near, "task-1", || {
+                undumped.store(true, Ordering::Release);
+                if undumpable_ok {
+                    Ok(())
+                } else {
+                    Err(io::Error::other("no"))
+                }
+            });
+            drop(near);
+            (asked, lamp.join().unwrap())
+        };
+        let (asked, (ready, undumped_at_ready)) = talk(true);
+        assert_eq!(asked, Ok(grant()));
+        assert_eq!(ready.as_deref(), Some(READY));
+        assert!(undumped_at_ready, "non-dumpable before ready");
+        let (asked, (ready, _)) = talk(false);
+        assert_eq!(
+            asked,
+            Err((
+                2,
+                "refused: the launcher could not be made non-dumpable: no".into()
+            ))
+        );
+        assert_eq!(ready, None, "never ready");
+        // Against lamp-tasks' own side, end to end.
+        let starts = Starts::default();
+        let live = starts.open("task-1", grant()).unwrap();
+        let (near, far) = UnixStream::pair().unwrap();
+        let served = server(&starts, Fake::good());
+        let serving = std::thread::spawn(move || served.one(far));
+        assert_eq!(ask(&near, "task-1", || Ok(())), Ok(grant()));
+        write_line(&near, STARTED).unwrap();
+        drop(near);
+        serving.join().unwrap();
+        assert_eq!(live.ran(), Ok(()));
+    }
+
+    #[test]
+    fn the_fence_hides_the_launchers_socket() {
+        assert!(crate::gateway::HIDDEN.contains(&START_DIR));
+        assert!(
+            crate::gateway::HIDDEN
+                .iter()
+                .any(|hidden| Path::new(START_SOCKET).starts_with(hidden))
+        );
     }
 
     fn mode(path: &Path) -> u32 {
