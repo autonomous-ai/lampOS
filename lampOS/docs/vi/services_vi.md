@@ -2262,7 +2262,9 @@ người nhận hay nội dung:
    giờ công khai thì chờ, như ở trên.
 6. **Giới hạn** (`skill_writes::Ledger`, `skill-writes.json` trong thư mục
    kho): tối đa 50 lần gửi mỗi kỹ năng và 200 lần cho mọi kỹ năng trong bất
-   kỳ 24 giờ nào. Mỗi lần gửi được đếm trước khi gửi, từng lần một, nên hai
+   kỳ 24 giờ nào, và tối đa 5 lần mỗi kỹ năng trong bất kỳ một giờ nào
+   (`PER_SKILL_HOUR`), để một trigger bật tắt liên tục không bao giờ tiêu
+   hết lượt cả ngày của kỹ năng trong vài phút. Mỗi lần gửi được đếm trước khi gửi, từng lần một, nên hai
    lần cùng lúc không bao giờ cùng vượt giới hạn. Lần gửi thất bại sau đó
    vẫn được đếm. Sổ chỉ giữ tên kỹ năng và thời điểm, nên khởi động lại
    không quên các lần gửi trong ngày. Nó đóng khi lỗi: sổ không đọc được,
@@ -2411,7 +2413,7 @@ bởi một lượt chạy của kỹ năng trên Hermes của đèn, không ph�
   nội dung đó (lượt chạy đổi một trường nào bị từ chối "not sent: this write
   is not the one the owner said yes to", không bao giờ bị giữ chờ lời đồng ý
   nói ra), liên kết lúc đồng ý, giới hạn trong ngày (50 mỗi kỹ năng, 200 cho
-  tất cả) và nhật ký đã gửi, và **một lần mỗi lượt chạy**: lần thử thứ hai,
+  tất cả, 5 mỗi kỹ năng một giờ) và nhật ký đã gửi, và **một lần mỗi lượt chạy**: lần thử thứ hai,
   dù gửi gì, cũng bị từ chối ("not sent: a skill's fixed write is sent once
   a run …"). Tác tử được báo "Sent, as the owner said yes to it." Mọi lệnh
   gọi khác của lượt đó bị từ chối, và khi công tắc tắt ở đây thì lệnh gọi
