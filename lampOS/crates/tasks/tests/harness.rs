@@ -6042,6 +6042,30 @@ fn openclaw_is_offered_only_by_a_harness_from_0_6_11() {
     }
 }
 
+/// #7133: the version's three answers. Only a version read says too old;
+/// a failed run or words that are no version say nothing (a Harness not
+/// answering yet at a boot), so lamp-tasks reads it again instead.
+#[test]
+fn the_harness_version_says_runs_too_old_or_nothing() {
+    use lamp_tasks::harness::OpenclawHarness;
+    for (version, want) in [
+        (json!({"stdout":"0.6.11\n"}), OpenclawHarness::Runs),
+        (
+            json!({"stdout":"0.6.10\n"}),
+            OpenclawHarness::TooOld((0, 6, 10)),
+        ),
+        (
+            json!({"stdout":"0.6.12\n","exit":1}),
+            OpenclawHarness::Unread,
+        ),
+        (json!({"stdout":"starting…\n"}), OpenclawHarness::Unread),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"--version": version.clone()}));
+        assert_eq!(rig.cli().openclaw_harness(), want, "{version}");
+    }
+}
+
 /// #6274: a name said nearly right, one word misheard or misspelt, finds
 /// the one closest session when a look at it (`look_session`) finds
 /// nothing by its name, folder or work: one slip in a word of 4 to 7
