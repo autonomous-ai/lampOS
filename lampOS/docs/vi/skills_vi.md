@@ -956,7 +956,8 @@ sau:
    cùng liên kết (chỉ do đường đồng ý của giọng nói, không bao giờ do cài đặt, và không
    bao giờ trong ứng dụng, nơi không có lời đồng ý nào cho nó: "not sent: waiting for the owner's yes"), không đã đăng xuất,
    tối đa 50 lần mỗi kỹ năng và
-   200 lần cho mọi kỹ năng trong bất kỳ 24 giờ nào. Liên kết mất hoặc thuộc
+   200 lần cho mọi kỹ năng trong bất kỳ 24 giờ nào, và 5 lần mỗi kỹ năng
+   trong bất kỳ một giờ nào. Liên kết mất hoặc thuộc
    tài khoản khác thì dừng các lần ghi của kỹ năng cho đến khi `lamp-skills`
    khởi động lại. **Một lần ghi đang chờ lời đồng ý không tiêu gì**
    (lamp-9adf, 12/11: một thư chưa được đồng ý của nhóm `wellbeing` đã
@@ -2180,7 +2181,7 @@ thêm từ tệp, viết trong ứng dụng, từ Store hay đã cài giữ nguy
 
 Không đổi khi bật: lời đọc lại của một lần ghi và lời đồng ý nói ra cho
 SHA-256 nội dung của nó; việc gửi, tối đa 50 mỗi kỹ năng và 200 cho mọi kỹ năng
-một ngày (`lamp-services`, không đọc công tắc này); các từ chối vì riêng tư;
+một ngày, 5 mỗi kỹ năng một giờ (`lamp-services`, không đọc công tắc này); các từ chối vì riêng tư;
 quyền mã và lời đồng ý của #6071.
 
 Test: `made_skill::tests::loosened_*` (bốn thay đổi, bật và tắt,
