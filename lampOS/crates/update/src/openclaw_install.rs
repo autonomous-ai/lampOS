@@ -1710,7 +1710,11 @@ fn allowlist_argv(args: [&str; 7]) -> Vec<String> {
 /// writing when the entry is there. None when the gateway is not active
 /// (nothing run, nothing said: the round started it); else whether the
 /// add was taken, a refusal said in one line. The old globs' removes are
-/// the one-shot's alone.
+/// the one-shot's alone. A gateway active but not ready yet (at a boot,
+/// [`gateway_not_ready`]) is asked again as the one-shot's add is; still
+/// not ready, it is None: unknown, not refused, so the entry is never
+/// marked gone and OpenClaw never reinstalled for it (#7135, c0a4's
+/// reboot at 22:59:00), and the next round checks again.
 fn keep_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str)) -> Option<bool> {
     if !gateway_active(run) {
         return None;
@@ -1719,8 +1723,24 @@ fn keep_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str)) -> Option<bool> {
         one_path: true,
         ..Shown::default()
     })[0];
-    match run(&allowlist_argv(add)) {
+    let mut ran = run(&allowlist_argv(add));
+    for _ in 1..ADD_TRIES {
+        match &ran {
+            Err(why) if gateway_not_ready(why) => {
+                std::thread::sleep(ADD_AGAIN);
+                ran = run(&allowlist_argv(add));
+            }
+            _ => break,
+        }
+    }
+    match ran {
         Ok(_) => Some(true),
+        Err(why) if gateway_not_ready(&why) => {
+            say(&format!(
+                "OpenClaw's gateway is not ready yet, so agent {RUN_AGENT}'s allow-list entry is not known: {why}; the next round checks again"
+            ));
+            None
+        }
         Err(why) => {
             say(&format!(
                 "OpenClaw's exec allow-list does not let agent {RUN_AGENT} run {SKILL_START}: {why}; the one-shot is asked to add it"
