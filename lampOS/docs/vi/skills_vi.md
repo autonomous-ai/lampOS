@@ -1815,13 +1815,19 @@ nhiêu câu trả lời của agent, chỉ độ dài (`do.task: lamp-tasks' ans
 carries N bytes of its agent's answer`, hoặc `no agent's answer`; #7180).
 Khi bắt đầu chờ mà cổng đang đóng, dù là một lần đọc hay một câu trả lời cần
 nói, nhật ký ghi một lần kèm lý do (`skill:<name>: waits for its gate: quiet
-hours`, `Room::waits`), để câu trả lời bị giữ trong giờ yên lặng, hoặc mất
-khi lamp-skills khởi động lại trong lúc chờ, vẫn để lại một dòng (#7180).
-Lần chạy không có quyền đọc (gửi thư, task của một
-script) không nói gì, như trước. Test:
+hours`, `Room::waits`), để câu trả lời bị giữ trong giờ yên lặng vẫn để lại
+một dòng (#7180). Kết thúc vẫn được ghi như trước (`told N`, hoặc `skipped:
+quiet hours` sau một giờ); trong lúc chờ nó được giữ trong
+`task-telling.json` của thư mục state (tên skill và lúc bắt đầu chờ, không
+bao giờ có lời của nó), nên câu trả lời bị bỏ dở vì lamp-skills khởi động
+lại được ghi ở lần khởi động sau (`what its agent found: dropped unsaid,
+lamp-skills restarted while it waited`, `task::telling_dropped`). Lần chạy
+không có quyền đọc (gửi thư, task của một script) không nói gì, như trước.
+Test:
 `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
 `service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,
-`service_read::tests::a_wait_for_the_gate_says_why_once`.
+`service_read::tests::a_wait_for_the_gate_says_why_once`,
+`task::tests::a_told_answer_a_restart_dropped_is_found_at_the_next_start`.
 
 ### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, bật trong sản phẩm, đề xuất trên #6059)
 

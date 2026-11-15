@@ -142,6 +142,11 @@ pub const DAY_MS: u64 = 86_400_000;
 pub const RUN_MOST: Duration = Duration::from_secs(15 * 60);
 /// In `--state-dir`: when each skill's task was handed over, for the bounds.
 pub const RUNS_FILE: &str = "task-runs.json";
+/// In `--state-dir`: the told answers waiting for the read gate, each its
+/// skill and when it began to wait, kept so one a restart of lamp-skills
+/// drops unsaid is journalled at the next start ([`telling_dropped`],
+/// #7180). Never a word of the answer.
+pub const TELLING_FILE: &str = "task-telling.json";
 /// What a task with no yes for its skill is told; the lamp then asks for
 /// the yes itself ([`ask_yes`]).
 pub const WAITING: &str =
@@ -958,6 +963,60 @@ fn uncount(skill: &str, state: &Path, at_ms: u64) -> Result<(), String> {
         .map_err(|error| format!("its runs' ledger: {error}"))
 }
 
+/// `skill`'s told answer begins to wait at `at_ms`: kept in `state`'s
+/// [`TELLING_FILE`] until [`telling_ends`].
+pub fn telling_begins(state: &Path, skill: &str, at_ms: u64) -> Result<(), String> {
+    telling_change(state, |waiting| waiting.push((skill.to_owned(), at_ms)))
+}
+
+/// `skill`'s told answer that began to wait at `at_ms` ended, said or
+/// skipped: taken off `state`'s [`TELLING_FILE`].
+pub fn telling_ends(state: &Path, skill: &str, at_ms: u64) -> Result<(), String> {
+    telling_change(state, |waiting| {
+        if let Some(at) = waiting
+            .iter()
+            .position(|(name, at)| name == skill && *at == at_ms)
+        {
+            waiting.remove(at);
+        }
+    })
+}
+
+/// At lamp-skills' start: the told answers still kept as waiting, which a
+/// restart dropped unsaid, each its skill and when it began to wait; then
+/// none are kept.
+pub fn telling_dropped(state: &Path) -> Result<Vec<(String, u64)>, String> {
+    let mut dropped = Vec::new();
+    telling_change(state, |waiting| dropped = std::mem::take(waiting))?;
+    Ok(dropped)
+}
+
+/// The told answers waiting, read from `state`'s [`TELLING_FILE`], changed
+/// by `change` and written back whole, under one lock so no other wait's
+/// entry is lost between the read and the write.
+fn telling_change(
+    state: &Path,
+    change: impl FnOnce(&mut Vec<(String, u64)>),
+) -> Result<(), String> {
+    static TELLING: Mutex<()> = Mutex::new(());
+    let _held = TELLING.lock().unwrap_or_else(|poison| poison.into_inner());
+    let path = state.join(TELLING_FILE);
+    let mut waiting: Vec<(String, u64)> = match read_small(&path, 64 * 1024) {
+        Ok(Some(bytes)) => serde_json::from_slice(&bytes)
+            .map_err(|_| "its told answers' list can't be read".to_owned())?,
+        Ok(None) => Vec::new(),
+        Err(_) => return Err("its told answers' list can't be read".into()),
+    };
+    let before = waiting.clone();
+    change(&mut waiting);
+    if waiting == before {
+        return Ok(());
+    }
+    let json = serde_json::to_vec(&waiting).map_err(|error| error.to_string())?;
+    lamp_update::records::write_whole(&path, &json, 0o644)
+        .map_err(|error| format!("its told answers' list: {error}"))
+}
+
 /// lamp-tasks' answer to a hand-over line, as the journal says it: its
 /// task's number, or its refusal's code and words.
 pub fn answered(answer: &str) -> Result<String, String> {
@@ -1246,6 +1305,25 @@ mod tests {
     /// A run lamp-tasks refused before its agent began (busy with another
     /// skill's, 9adf on 15 Nov) spends none of the day's runs; one it may
     /// have begun stays counted.
+    #[test]
+    fn a_told_answer_a_restart_dropped_is_found_at_the_next_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path();
+        assert_eq!(telling_dropped(state), Ok(Vec::new()));
+        telling_begins(state, "read-mail", 10).unwrap();
+        telling_begins(state, "read-calendar", 20).unwrap();
+        // One said or skipped: its wait ended, so it is not dropped.
+        telling_ends(state, "read-calendar", 20).unwrap();
+        assert_eq!(
+            telling_dropped(state),
+            Ok(vec![("read-mail".to_owned(), 10)])
+        );
+        // Found once: the start after says nothing more.
+        assert_eq!(telling_dropped(state), Ok(Vec::new()));
+        // An end with nothing kept is no error.
+        telling_ends(state, "read-mail", 10).unwrap();
+    }
+
     #[test]
     fn a_run_lamp_tasks_did_not_take_is_not_counted() {
         let dir = tempfile::tempdir().unwrap();
