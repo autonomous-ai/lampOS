@@ -339,25 +339,26 @@ pub const HIDDEN: [&str; 3] = ["/var/lib", "/var/tmp", "/dev/shm"];
 /// script with an environment of [`SCRIPT_PATH`], `HOME` the run's folder,
 /// the socket, the SDK and the token only. The token goes through a pipe,
 /// never an argument. Any step that fails ends the start before the script
-/// runs.
+/// runs. Each mount is `mount -n`: the gateway's `/run` is read-only, where
+/// writing `/run/mount/utab` failed with EROFS on lamp-c0a4 (#7101, Thirteen 13:06).
 const FENCE_TEXT: &str = r#"u=$1 g=$2 p=$3 r=$4 k=$5 so=$6 py=$7 i=$8 s=$9
 shift 9
 no() { echo "the run's fence was not made ($1): the script was not run" >&2; exit 1; }
 for w in "$p" "$@"; do
   case "$w/" in "$k"/* | "$r"/*) no "$w is in a folder shown again" ;; esac
 done
-mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp || no /tmp
+mount -n -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp || no /tmp
 t1=$(mktemp -d /tmp/lampos-run.XXXXXX) && t2=$(mktemp -d /tmp/lampos-skill.XXXXXX) || no staging
-mount --bind "$r" "$t1" || no "the run's folder"
-mount --bind "$k" "$t2" || no "the skill's folder"
-mount -t tmpfs -o mode=0700 tmpfs "$p" || no "the project"
+mount -n --bind "$r" "$t1" || no "the run's folder"
+mount -n --bind "$k" "$t2" || no "the skill's folder"
+mount -n -t tmpfs -o mode=0700 tmpfs "$p" || no "the project"
 for h in "$@"; do
   [ -e "$h" ] || continue
-  mount -t tmpfs -o mode=0700 tmpfs "$h" || no "$h"
+  mount -n -t tmpfs -o mode=0700 tmpfs "$h" || no "$h"
 done
 mkdir -p "$k" "$r" || no "the folders"
-mount --move "$t2" "$k" || no "the skill's folder back"
-mount --move "$t1" "$r" || no "the run's folder back"
+mount -n --move "$t2" "$k" || no "the skill's folder back"
+mount -n --move "$t1" "$r" || no "the run's folder back"
 rmdir "$t1" "$t2" || no "the staging"
 cd "$r" || no "the run's folder"
 exec 3<&0
@@ -1735,13 +1736,13 @@ mod tests {
             "rm -f -- \"$F\"",
             "export LAMP_CONTROL_TOKEN",
             "\"$w is in a folder shown again\"",
-            "mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp || no /tmp",
-            "mount --bind \"$r\" \"$t1\" || no",
-            "mount --bind \"$k\" \"$t2\" || no",
-            "mount -t tmpfs -o mode=0700 tmpfs \"$p\" || no",
-            "mount -t tmpfs -o mode=0700 tmpfs \"$h\" || no",
-            "mount --move \"$t2\" \"$k\" || no",
-            "mount --move \"$t1\" \"$r\" || no",
+            "mount -n -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp || no /tmp",
+            "mount -n --bind \"$r\" \"$t1\" || no",
+            "mount -n --bind \"$k\" \"$t2\" || no",
+            "mount -n -t tmpfs -o mode=0700 tmpfs \"$p\" || no",
+            "mount -n -t tmpfs -o mode=0700 tmpfs \"$h\" || no",
+            "mount -n --move \"$t2\" \"$k\" || no",
+            "mount -n --move \"$t1\" \"$r\" || no",
             "cd \"$r\" || no",
             "exec unshare --user --map-user=\"$u\" --map-group=\"$g\" -- env -i PATH=/usr/local/bin:/usr/bin:/bin \
              HOME=\"$r\" LAMP_CONTROL_SOCKET=\"$so\" PYTHONPATH=\"$py\" /bin/sh",
@@ -1767,6 +1768,17 @@ mod tests {
             {
                 assert!(line.contains("|| no "), "{line}");
             }
+        }
+        // Every mount leaves utab alone (`-n`): the gateway's /run is
+        // read-only, where writing /run/mount/utab fails with EROFS.
+        let mounts: Vec<&str> = FENCE_TEXT
+            .lines()
+            .map(str::trim)
+            .filter(|line| line.split_whitespace().next() == Some("mount"))
+            .collect();
+        assert_eq!(mounts.len(), 7, "{mounts:?}");
+        for line in mounts {
+            assert!(line.starts_with("mount -n "), "{line}");
         }
         assert_eq!(text.matches("exec unshare").count(), 2, "{text}");
         assert!(!text.contains("exec python3") && !text.contains("exec \"$i\""));
@@ -1869,24 +1881,24 @@ mod tests {
         );
         assert_eq!(
             lines[1],
-            "mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp"
+            "mount -n -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp"
         );
         assert!(lines[2].starts_with(&format!(
-            "mount --bind {d}/project/skill-task-1 /tmp/lampos-run."
+            "mount -n --bind {d}/project/skill-task-1 /tmp/lampos-run."
         )));
-        assert!(lines[3].starts_with(&format!("mount --bind {d}/skills/s /tmp/lampos-skill.")));
+        assert!(lines[3].starts_with(&format!("mount -n --bind {d}/skills/s /tmp/lampos-skill.")));
         assert_eq!(
             lines[4],
-            format!("mount -t tmpfs -o mode=0700 tmpfs {d}/project")
+            format!("mount -n -t tmpfs -o mode=0700 tmpfs {d}/project")
         );
         assert_eq!(
             lines[5],
-            format!("mount -t tmpfs -o mode=0700 tmpfs {d}/state"),
+            format!("mount -n -t tmpfs -o mode=0700 tmpfs {d}/state"),
             "the absent one skipped"
         );
-        assert!(lines[6].starts_with("mount --move /tmp/lampos-skill."));
+        assert!(lines[6].starts_with("mount -n --move /tmp/lampos-skill."));
         assert!(lines[6].ends_with(&format!(" {d}/skills/s")));
-        assert!(lines[7].starts_with("mount --move /tmp/lampos-run."));
+        assert!(lines[7].starts_with("mount -n --move /tmp/lampos-run."));
         assert!(lines[7].ends_with(&format!(" {d}/project/skill-task-1")));
         assert!(lines[8].starts_with("unshare --user --map-user="), "{log}");
         assert!(

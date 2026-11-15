@@ -1320,7 +1320,8 @@ lamp-update).
   bị che. `/proc` riêng của nó chỉ liệt kê tiến trình của script, nên
   không đọc được môi trường của gateway ở đó. Script chạy bằng chính id
   của người gọi trong một user namespace lồng, nơi không mount nào trong
-  số này gỡ được.
+  số này gỡ được. Các mount này dùng `mount -n`: `/run` của gateway chỉ
+  đọc, nơi util-linux không ghi được utab của nó.
 - **Môi trường.** Script chỉ nhận token của nó, socket của lamp-control,
   `PYTHONPATH`, một `PATH` cố định và `HOME` (thư mục lần chạy): `env -i`,
   không gì của gateway (không có token forwarder `LAMP_HERMES_TOKEN` hay

@@ -3752,7 +3752,8 @@ before each run's turn (step 3 above): `agents.lamp-skill-run` gets
   hidden. Its own `/proc` lists only the script's processes, so the
   gateway's environment cannot be read there. The script runs as the
   caller's own ids in a nested user namespace, where none of these mounts
-  can be undone.
+  can be undone. These mounts are `mount -n`: the gateway's `/run` is
+  read-only, where util-linux cannot write its utab.
 - **Environment.** The script gets only its token, lamp-control's socket,
   `PYTHONPATH`, a fixed `PATH` and `HOME` (the run's folder): `env -i`,
   nothing of the gateway's (not its forwarder token `LAMP_HERMES_TOKEN`
