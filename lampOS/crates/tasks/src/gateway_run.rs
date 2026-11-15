@@ -241,9 +241,23 @@ impl GatewayAgent {
     }
 }
 
+/// `entry` as compared with what the gateway keeps: the `id` it gives
+/// each allow-list item left out (lamp-52e6, 15 Nov 07:44, #7019: a set
+/// entry read back with `allowlist[].id` never matched its own).
+fn without_ids(entry: &Value) -> Value {
+    let mut entry = entry.clone();
+    if let Some(items) = entry.get_mut("allowlist").and_then(Value::as_array_mut) {
+        for item in items.iter_mut().filter_map(Value::as_object_mut) {
+            item.remove("id");
+        }
+    }
+    entry
+}
+
 /// The exec approvals `got` (the gateway's `fence-get` answer: the
 /// document itself, or it under `file` beside its hash) with `agents.<agent>`
-/// set to `entry`, every other key kept: `None` when it is so already,
+/// set to `entry`, every other key kept: `None` when it is so already
+/// (the gateway's own allow-list `id`s aside, [`without_ids`]),
 /// else the document to set (`fence-set`'s stdin). Any other shape is
 /// refused, never guessed at.
 pub fn set_entry(got: &str, agent: &str, entry: &Value) -> Result<Option<String>, String> {
@@ -269,7 +283,7 @@ pub fn set_entry(got: &str, agent: &str, entry: &Value) -> Result<Option<String>
     let agents = agents
         .as_object_mut()
         .ok_or("the gateway's approvals' `agents` is not an object")?;
-    if agents.get(agent) == Some(entry) {
+    if agents.get(agent).map(without_ids) == Some(without_ids(entry)) {
         return Ok(None);
     }
     agents.insert(agent.to_owned(), entry.clone());

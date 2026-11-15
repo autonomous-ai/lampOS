@@ -631,6 +631,23 @@ mod tests {
         }
     }
 
+    /// lamp-52e6, 15 Nov 07:44 (#7019, kit-7019-sg8): the gateway keeps
+    /// the set entry with an `id` on each allow-list item, so the confirming
+    /// get never matched ("do not hold the agent's entry once set"). The
+    /// entry as the gateway keeps it is the entry; another pattern is not.
+    #[test]
+    fn the_gateways_ids_on_the_allow_list_still_read_as_set() {
+        let start = "/p/skill-*/start";
+        let mut kept = skill_run_approvals(start);
+        kept["allowlist"][0]["id"] = json!("a1b2");
+        let got = json!({"version": 1, "agents": {SKILL_RUN_AGENT: kept}}).to_string();
+        assert_eq!(merge_skill_run_approvals(&got, start).unwrap(), None);
+        let mut other = skill_run_approvals("/q/skill-*/start");
+        other["allowlist"][0]["id"] = json!("a1b2");
+        let got = json!({"version": 1, "agents": {SKILL_RUN_AGENT: other}}).to_string();
+        assert!(merge_skill_run_approvals(&got, start).unwrap().is_some());
+    }
+
     #[test]
     fn the_fence_is_written_once_and_writes_no_approvals_file() {
         let dir = tempfile::tempdir().unwrap();
