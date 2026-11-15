@@ -3753,7 +3753,11 @@ running as `lampos` there. After #7133:
   mapped, nothing tracing it (`TracerPid` 0), and the id line sent by
   that pid itself (`SCM_CREDENTIALS`), checked again after the read. The
   launcher is static, makes itself non-dumpable before the grant, and
-  closes every fd above 4 before the fence.
+  closes every fd above 4 before the fence. lamp-tasks answers
+  `checked <nonce>` (16 lowercase hex from `getrandom`, new per connection)
+  and grants only on `ready <that nonce>` from the same pid; bytes already
+  queued after the id line are refused, so a ready written before the
+  launcher was exec'd can never pass, and either refusal ends the run's start.
 - **Cannot choose the script, interpreter or grants.** lamp-tasks fixes
   the grant from the owner's yes, and a run is claimed once.
 - **Can, with the launcher, race `main` for a live run's id.** The id is
