@@ -1625,12 +1625,14 @@ fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> 
     let mut added = false;
     for args in exec_allowlist_args(shown) {
         let mut ran = run(&allowlist_argv(args));
-        // A gateway just (re)started answers "Config unavailable" until its
-        // config is read (#7135, c0a4: the first run's exec was denied):
-        // the add is tried again, ADD_TRIES times at most, ADD_AGAIN apart.
+        // A gateway just (re)started is not ready for the add at first: its
+        // namespace does not show Node yet, then it answers "Config
+        // unavailable" until its config is read (#7135, c0a4: the first
+        // run's exec was denied). The add is tried again, ADD_TRIES times
+        // at most, ADD_AGAIN apart.
         for _ in 1..ADD_TRIES {
             match &ran {
-                Err(why) if args[2] == "add" && why.contains(CONFIG_NOT_READY) => {
+                Err(why) if args[2] == "add" && gateway_not_ready(why) => {
                     std::thread::sleep(ADD_AGAIN);
                     ran = run(&allowlist_argv(args));
                 }
@@ -1667,7 +1669,19 @@ fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> 
 /// What OpenClaw's CLI says while a gateway just started has not read its
 /// config yet (`approvals allowlist add --gateway`).
 pub const CONFIG_NOT_READY: &str = "Config unavailable";
-/// How many times an allow-list add is run while [`CONFIG_NOT_READY`].
+/// What the wrapper says when it joins a gateway just (re)started whose
+/// namespace does not show Node yet (c0a4, 21:22:21: `/usr/bin/env:
+/// 'node': No such file or directory`), before [`CONFIG_NOT_READY`].
+pub const NODE_NOT_READY: &str = "'node': No such file or directory";
+
+/// Whether an allow-list add was refused only because the gateway just
+/// (re)started is not ready yet ([`NODE_NOT_READY`], [`CONFIG_NOT_READY`]).
+fn gateway_not_ready(why: &str) -> bool {
+    why.contains(NODE_NOT_READY) || why.contains(CONFIG_NOT_READY)
+}
+
+/// How many times an allow-list add is run while the gateway is not ready
+/// ([`gateway_not_ready`]).
 pub const ADD_TRIES: u32 = 20;
 /// The wait between those adds: 20 × 3 s, a minute at most.
 pub const ADD_AGAIN: Duration = if cfg!(test) {
