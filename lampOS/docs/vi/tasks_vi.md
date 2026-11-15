@@ -1334,7 +1334,12 @@ hoặc bất kỳ mã nào khác chạy dưới `lampos` ở đó. Sau #7133:
   được được map, không có gì trace nó (`TracerPid` 0), và dòng id do
   chính pid đó gửi (`SCM_CREDENTIALS`), kiểm tra lại sau khi đọc.
   Launcher là bản static, tự đặt non-dumpable trước khi nhận grant, và
-  đóng mọi fd trên 4 trước hàng rào.
+  đóng mọi fd trên 4 trước hàng rào. lamp-tasks trả lời
+  `checked <nonce>` (16 ký tự hex thường từ `getrandom`, mới cho mỗi kết
+  nối) và chỉ cấp grant khi nhận `ready <đúng nonce đó>` từ cùng pid; byte
+  đã xếp hàng sau dòng id bị từ chối, nên một dòng ready ghi trước khi exec
+  launcher không bao giờ qua được, và cả hai lần từ chối đều chấm dứt lần
+  khởi động của lần chạy đó.
 - **Không chọn được script, trình thông dịch hay grant.** lamp-tasks cố
   định grant theo cái gật đầu của chủ máy, và một lần chạy chỉ được nhận
   một lần.
