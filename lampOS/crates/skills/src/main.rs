@@ -7640,6 +7640,7 @@ mod tests {
             Call::Task(Box::new(lamp_skills::task::TaskStep {
                 task: "Read my unread mail.".into(),
                 run: "scripts/mail.sh".into(),
+                quiet: None,
             }))
         };
         assert_eq!(
