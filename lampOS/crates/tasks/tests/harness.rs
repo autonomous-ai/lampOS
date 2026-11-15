@@ -4,8 +4,8 @@ use lamp_tasks::harness::{
     AccountMachine, CLOSE_BUDGET, CLOSE_READ_TIMEOUT, Cli, CliConfig, Closed, Ended, EngineKind,
     EngineRow, JoinedOn, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED,
     PS_STDOUT_LIMIT, PsSession, SessionMachines, SignIn, Target, WATCH_LINE_LIMIT, WatchEnd,
-    WatchEvent, WatchLine, iso_unix_ms, parse_auth_here, parse_auth_status, parse_engines,
-    parse_machines, parse_ps, parse_wait, parse_watch_line, this_computer,
+    WatchEvent, WatchLine, iso_unix_ms, parse_auth_here, parse_auth_status, parse_daemon_here,
+    parse_engines, parse_machines, parse_ps, parse_wait, parse_watch_line, this_computer,
 };
 use lamp_tasks::runtime::{
     HarnessSwitches, NEW_FOLDER_FILE, SESSION_INDEX_FILE, targets_from_machines,
@@ -4289,6 +4289,124 @@ fn signed_out_the_computers_own_id_is_read_with_the_sign_in() {
     assert!(this_computer(COMPUTER));
     assert!(!this_computer(MACHINE));
     assert!(!this_computer("lamp"));
+}
+
+/// R5 on #7133 (lamp-c0a4, 15 Nov): Harness's daemon starts work under
+/// the session's `machineId` when one is on disk, whatever `loggedIn` says,
+/// else under `computerId` (openharness `wantedDaemonIdentity`). The lamp's
+/// own target keeps the `computerId` (no machines look, no `--machine`),
+/// and its `new` reply is matched against the daemon's id: no session,
+/// `computerId`; a session read signed out, or signed in, `machineId`.
+#[test]
+fn the_lamps_own_target_dispatches_under_the_id_the_daemon_runs_as() {
+    for (auth, daemon) in [
+        (json!({"loggedIn":false,"computerId":COMPUTER}), COMPUTER),
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER,"machineId":MACHINE}),
+            MACHINE,
+        ),
+        (
+            json!({"loggedIn":true,"computerId":COMPUTER,"machineId":MACHINE}),
+            MACHINE,
+        ),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "auth": step(auth.clone()),
+            "new": step(json!({"ok":true,"machineId":daemon,"agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes","permissionMode":null,"bypassPermission":false}})),
+            "show": step(json!({"id":AGENT,"state":"idle","ask":"Inspect the authored fixture","answer":"Observed answer","truncated":false,"tools":2})),
+        }));
+        let mut request = launch();
+        request.target = Target {
+            machine_id: COMPUTER.into(),
+            project: "~/harnesses/lamp-tasks/lamp".into(),
+            engine: EngineKind::Hermes,
+        };
+        let cli = rig.cli();
+        assert!(cli.signed_in_here().is_ok(), "{auth}");
+        assert_eq!(
+            cli.launch(&request),
+            LaunchOutcome::Created {
+                agent_id: AGENT.into()
+            },
+            "{auth}"
+        );
+        let new = rig
+            .calls()
+            .into_iter()
+            .find(|call| call["args"][0] == "new")
+            .expect("a new");
+        assert!(
+            !new["args"]
+                .as_array()
+                .expect("args")
+                .iter()
+                .any(|arg| arg == "--machine"),
+            "{auth}"
+        );
+    }
+    // Another id than the daemon's is still not this work.
+    let rig = Rig::new();
+    rig.plan(json!({
+        "auth": step(json!({"loggedIn":false,"computerId":COMPUTER,"machineId":MACHINE})),
+        "new": step(json!({"ok":true,"machineId":COMPUTER,"agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes","permissionMode":null,"bypassPermission":false}})),
+    }));
+    let mut request = launch();
+    request.target = Target {
+        machine_id: COMPUTER.into(),
+        project: "~/harnesses/lamp-tasks/lamp".into(),
+        engine: EngineKind::Hermes,
+    };
+    let cli = rig.cli();
+    assert!(cli.signed_in_here().is_ok());
+    assert_eq!(
+        cli.launch(&request),
+        LaunchOutcome::Uncertain {
+            code: "machine_mismatch".into()
+        }
+    );
+}
+
+/// The daemon's id from `auth status` (R5 on #7133): `machineId` when
+/// present, never decided by `loggedIn`; a missing, empty or malformed one
+/// falls back to `computerId`, not to none.
+#[test]
+fn the_daemons_id_is_the_sessions_machine_else_this_computers_own() {
+    for (reply, daemon) in [
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER}),
+            Some(COMPUTER),
+        ),
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER,"machineId":MACHINE}),
+            Some(MACHINE),
+        ),
+        (
+            json!({"loggedIn":true,"computerId":COMPUTER,"machineId":MACHINE}),
+            Some(MACHINE),
+        ),
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER,"machineId":""}),
+            Some(COMPUTER),
+        ),
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER,"machineId":null}),
+            Some(COMPUTER),
+        ),
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER,"machineId":"lamp"}),
+            Some(COMPUTER),
+        ),
+        (json!({"loggedIn":false,"computerId":"c"}), None),
+        (json!({"loggedIn":false}), None),
+    ] {
+        assert_eq!(
+            parse_daemon_here(reply.to_string().as_bytes()).as_deref(),
+            daemon,
+            "{reply}"
+        );
+    }
+    assert_eq!(parse_daemon_here(b"not json"), None);
 }
 
 /// #6407, a product lamp never signed in: Harness 0.6 refuses `machines`

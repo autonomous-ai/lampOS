@@ -1853,7 +1853,10 @@ lệnh đó chỉ chạy khi đã đăng nhập. Harness 0.6 khi chưa đăng nh
 `machines` và mọi `--machine`, còn `start` và `new` không có `--machine` vẫn
 chạy trên chính máy này, dưới id riêng của nó (`computerId`, một UUID, mà
 `auth status --json` vẫn trả khi chưa đăng nhập; id máy của tài khoản là 32 chữ
-số hex). Vì vậy, khi bật `LAMP_OPENCLAW_ON_LAMP` hoặc `LAMP_HERMES_ON_LAMP`
+số hex). Target giữ id đó; reply của `new` được so với id mà daemon của
+Harness đang chạy dưới: `machineId` của `auth status` nếu có (còn session trên
+đĩa, kể cả khi đọc là chưa đăng nhập), nếu không thì `computerId` (R5 trên
+#7133). Vì vậy, khi bật `LAMP_OPENCLAW_ON_LAMP` hoặc `LAMP_HERMES_ON_LAMP`
 và có `--targets-from-machines`:
 
 - **Target lấy từ chính đèn.** Mỗi lần đọc sign-in thấy chưa đăng nhập và có id
