@@ -1291,6 +1291,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     &records,
                     shown,
                     &mut systemd,
+                    &mut lamp_update::install::output_of,
                     now_unix_ms,
                     window,
                     &mut say,

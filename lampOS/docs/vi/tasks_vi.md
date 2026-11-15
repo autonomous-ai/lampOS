@@ -1176,6 +1176,9 @@ OpenClaw cho thấy ở chế độ chỉ đọc. Danh sách cho phép exec củ
 approvals của OpenClaw chỉ ghi đúng một đường dẫn đó, không có gì trong
 thư mục làm việc (mọi agent OpenClaw đều ghi được vào đó); mẫu glob trước
 đây bị gỡ khỏi `main` và khỏi agent hàng rào đã rút lại `lamp-skill-run`.
+Mỗi vòng có gateway đang chạy, lamp-update thêm lại mục của `main` (mục đã
+có thì không bị ghi lại), nên một lần khôi phục cài đặt gốc xoá exec
+approvals của OpenClaw sẽ có lại mục này.
 Với `tools.exec.mode: "ask"` mặc định của OpenClaw, nếu không có mục này
 thì exec của một lượt không giao diện bị từ chối (install.md, "OpenClaw on
 the lamp"). Lượt trên gateway ấm, agent hàng rào và hàng rào bên dưới là thiết
