@@ -4194,9 +4194,11 @@ is removed through `make_skill` itself, its `remove` alone: the name as
 heard (`made_remove::REMOVE`). It is a parameter of the function the voice
 has, never a function of its own, as the voice is at its 48
 (`lamp_gemini::MAX_TOOLS`). Whether a line asks to remove a skill is the
-model's judgment, told in the function's description ("Call it with
-remove alone to delete or remove a skill, or made alone when asked which
-skills they made, saying nothing first."), never a list of words (the owner's ruling, 13 Nov). Then, in
+model's judgment, told in the function's description ("To delete or
+remove a skill, call it with remove alone; to run one they made now,
+run alone; to list those they made, made alone; say nothing first.", the
+run's and the list's in the same sentence, below), never a list of words
+(the owner's ruling, 13 Nov). Then, in
 code (`made_remove::asked`):
 - **Only the person's own.** The name is matched to the skills they made,
   the made skills' index (`made.json`) alone (`made_remove::found`): its
@@ -4323,6 +4325,78 @@ one.", and the read-back's sentence is shorter. Then, in code
 Test: `made_list::tests::the_skills_they_made_are_told_from_the_lamp_newest_first`,
 and `make_skill_local::tests::a_made_script_is_offered_to_the_voice_with_its_switch_alone`
 (named with every switch on, within the bounds).
+
+**Run now by voice** (lamp-9adf, 15 Nov at 15:49 and 15:52: "Run my unread
+mail skill now, please." and "Run my read newest email when sitting skill
+now." each went to a read-back, and the lamp said only "unread mail
+doesn't send or write anything": a made skill has a trigger and no tool,
+so `use_skill` can't run it, and nothing else could). A skill the person
+made is run once now through `make_skill` itself, its `run` alone: the
+name as heard (`made_run::RUN`), a parameter of the function the voice
+has, as a remove is. Whether a line asks to run a skill now or to hear
+what it sends is the model's judgment, told in the remove's sentence of
+the description above and in the parameter's ("Only when the person asks
+to run, start or do a skill they made, now … Never to hear what it sends
+or uses."), never a list of words (the owner's ruling, 13 Nov). The
+description's "Call it only when the person asks for a skill to be made."
+is now "Make one only when the person asks for it.", so with every switch
+on it stays within 1,024 bytes (1,018, with the list beside it and the
+read-back's sentence cut to "Call it with read_back alone to hear what a
+skill they made sends or what a skill on the lamp uses, saying nothing
+first."). Then, in code (`made_run::asked`):
+- **The owner's alone, heard.** A turn nobody spoke runs nothing ("a skill
+  is run by voice only when the person asks out loud"); a line not the
+  owner's, as a read-back or a remove holds it (`services::owner_hears`,
+  asked first), runs nothing and names no skill ("only the lamp's owner can
+  run a skill they made by voice").
+- **Only the person's own, by its name.** Matched as a remove's is
+  (`made_remove::found`): one they didn't make is "NAME isn't a skill they
+  made, so I can't run it this way"; several as near are asked which; none
+  near is said so, naming theirs that are on (at most 3).
+- **Exactly a trigger's bounds.** One made and not on is "it isn't on the
+  lamp now". One whose writes are not approved for the package on the
+  lamp (`services::skill_writes_approved`, as a read-back asks it) is "it
+  waits for their yes to what it sends" (or "it changed on the lamp since
+  it was made"); one whose task has no yes from lamp-control
+  (`skill_task_yes::asks_by`, with `LAMP_SKILL_TASKS` on) is "it waits for
+  their yes to what it uses"; neither yes can be told, "I can't tell now
+  whether …". Nothing runs, and no wait starts: the yes is given as before,
+  by asking what it sends or uses. Otherwise lamp-skills is asked on its
+  call socket, one line, at most 1.5 s (`{"op":"run","skill":NAME}`,
+  `made_run::OP`; any peer but the voice's unit is refused,
+  `made_run::NOT_THE_VOICE`, and a `call` can't name the run's internal
+  name). lamp-skills runs only a skill made here (`made: here`, never a
+  core one), loaded, not off or snoozed, with its last run not under way,
+  its steps as its one trigger would make them
+  (`lamp_skills::Engine::run_now`; a step held until its trigger ends is
+  refused, as that end never comes). Before anything is made, it refuses
+  in plain words what the run's own gates would (`run_now_refused`): a
+  task whose folder isn't known, or that `task::would_refuse` says the
+  hand-over would refuse (its `PER_SKILL` = 3 runs in 24 hours spent, every
+  skill's `ALL_SKILLS` = 10 spent, its last task still under way, tasks
+  off); a read whose switch is off, or that ran on this local day already
+  (a read is once a day, as `read_service` holds it); a write whose switch
+  is off or whose writes are stopped. What passes starts as a trigger's
+  run does (`start`): the task's hand-over checks the owner's yes and
+  counts the run in `task-runs.json`, the read waits for its room, and the
+  services use their own tokens. As for a tool's run, the Policy is not
+  asked and its trigger's `[[while]]`, quiet hours, cooldown, day's most
+  and group's hour are neither asked nor spent: a person asked. The
+  journal says "run now, as its owner asked by voice", or why not.
+- **Said plainly.** Run, the model says only that NAME is running now,
+  never what it found, sent or did, nor that it is done; what a read or a
+  task's agent finds is said as a trigger's run says it. Refused, "NAME
+  didn't run now, and why: …", never that it is running. lamp-skills not
+  answering is "my skills didn't answer, so it may not have started".
+
+Tests: `made_run::tests::the_owners_two_lines_each_run_that_made_skill`,
+`a_run_refused_is_said_plainly_with_why`,
+`only_the_owners_heard_line_runs_a_skill`,
+`a_name_that_matches_none_runs_nothing`,
+`make_skill_is_offered_for_a_run_within_the_bounds`;
+`lamp_skills::tests::a_made_skill_runs_now_as_its_trigger_would_and_not_when_off`;
+`task::tests::a_run_now_past_its_own_three_a_day_is_refused_plainly`; and
+lamp-skills' `tests::a_run_now_is_refused_as_its_trigger_s_run_would_be`.
 
 Tests:
 - `make_skill_local::tests`: `a_good_answer_is_kept_and_put_on_with_no_yes`

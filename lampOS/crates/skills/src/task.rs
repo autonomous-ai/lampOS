@@ -695,6 +695,54 @@ fn bounded(runs: &[(String, u64)], skill: &str, now_ms: u64) -> Result<(), Strin
     Ok(())
 }
 
+/// What a skill's task is told while its last is still under way.
+const STILL_UNDER_WAY: &str = "do.task: not handed over: its last task is still under way";
+/// What a skill's task is told with no `--state-dir` to count it in.
+const NO_STATE: &str = "do.task: not handed over: no --state-dir, so its runs aren't counted";
+/// The words before why in each of [`hand`]'s refusals.
+pub const NOT_HANDED: &str = "do.task: not handed over: ";
+
+/// The runs counted, as `state`'s [`RUNS_FILE`] keeps them (or, without
+/// one, this program's own count); one that can't be read, why.
+fn ledger(state: Option<&Path>) -> Result<Vec<(String, u64)>, String> {
+    const UNREAD: &str = "do.task: not handed over: its runs' ledger can't be read";
+    match state {
+        Some(state) => match read_small(&state.join(RUNS_FILE), 64 * 1024) {
+            Ok(None) => Ok(Vec::new()),
+            Ok(Some(bytes)) => serde_json::from_slice(&bytes).map_err(|_| UNREAD.to_owned()),
+            Err(_) => Err(UNREAD.into()),
+        },
+        None => Ok(RUNS_HERE
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .clone()),
+    }
+}
+
+/// Why [`hand`] would refuse `skill`'s task at `now_ms` whatever the
+/// owner's yes: the switch off, no `state` (`--state-dir`), its last still
+/// under way, or past the bounds of [`begin`]'s ledger (one unreadable is
+/// full). Read only: nothing is counted or written, and a run that passes
+/// here is still held to [`hand`] and [`begin`], the real gate.
+pub fn would_refuse(skill: &str, state: Option<&Path>, now_ms: u64) -> Option<String> {
+    if !on() {
+        return Some(OFF.into());
+    }
+    let Some(state) = state else {
+        return Some(NO_STATE.into());
+    };
+    if UNDER_WAY
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .contains(skill)
+    {
+        return Some(STILL_UNDER_WAY.into());
+    }
+    ledger(Some(state))
+        .and_then(|runs| bounded(&runs, skill, now_ms))
+        .err()
+}
+
 /// `skill`'s task begun at `now_ms`, if it may be: none of its own under
 /// way, and within the bounds kept in `state`'s [`RUNS_FILE`] (or, without
 /// one, this program's own count); an unreadable ledger counts as full.
@@ -704,23 +752,9 @@ pub fn begin(skill: &str, state: Option<&Path>, now_ms: u64) -> Result<Runs, Str
         .lock()
         .unwrap_or_else(|poison| poison.into_inner());
     if under_way.contains(skill) {
-        return Err("do.task: not handed over: its last task is still under way".into());
+        return Err(STILL_UNDER_WAY.into());
     }
-    let mut runs: Vec<(String, u64)> = match state {
-        Some(state) => match read_small(&state.join(RUNS_FILE), 64 * 1024) {
-            Ok(None) => Vec::new(),
-            Ok(Some(bytes)) => serde_json::from_slice(&bytes).map_err(|_| {
-                "do.task: not handed over: its runs' ledger can't be read".to_owned()
-            })?,
-            Err(_) => {
-                return Err("do.task: not handed over: its runs' ledger can't be read".into());
-            }
-        },
-        None => RUNS_HERE
-            .lock()
-            .unwrap_or_else(|poison| poison.into_inner())
-            .clone(),
-    };
+    let mut runs = ledger(state)?;
     bounded(&runs, skill, now_ms)?;
     runs.retain(|(_, at)| now_ms.saturating_sub(*at) < DAY_MS);
     runs.push((skill.to_owned(), now_ms));
@@ -853,7 +887,7 @@ pub fn hand(
         return OFF.into();
     }
     let Some(state) = place.state else {
-        return "do.task: not handed over: no --state-dir, so its runs aren't counted".into();
+        return NO_STATE.into();
     };
     let sha256 = match folder_sha256(folder) {
         Ok(sha256) => sha256,
@@ -1596,6 +1630,54 @@ mod tests {
         );
     }
 
+    /// The check before a run says what [`hand`] would: off, no state, its
+    /// last under way, the bounds spent or the ledger unreadable; and it
+    /// never counts a run or writes the ledger.
+    #[test]
+    fn a_task_refused_is_known_before_it_is_handed_over() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path();
+        set_on_here(Some(false));
+        assert_eq!(
+            would_refuse("check-skill", Some(state), 1_000).as_deref(),
+            Some(OFF)
+        );
+        set_on_here(Some(true));
+        assert_eq!(
+            would_refuse("check-skill", None, 1_000).as_deref(),
+            Some(NO_STATE)
+        );
+        // Fine, and nothing written.
+        assert_eq!(would_refuse("check-skill", Some(state), 1_000), None);
+        assert!(!state.join(RUNS_FILE).exists());
+        let first = begin("check-skill", Some(state), 1_000).unwrap();
+        assert_eq!(
+            would_refuse("check-skill", Some(state), 1_001).as_deref(),
+            Some(STILL_UNDER_WAY)
+        );
+        drop(first);
+        let before = fs::read(state.join(RUNS_FILE)).unwrap();
+        assert_eq!(would_refuse("check-skill", Some(state), 1_002), None);
+        assert_eq!(fs::read(state.join(RUNS_FILE)).unwrap(), before);
+        // Every skill's ten spent: refused as `begin` would.
+        let runs: Vec<(String, u64)> = (0..ALL_SKILLS)
+            .map(|at| (format!("s{at}"), at as u64))
+            .collect();
+        fs::write(state.join(RUNS_FILE), serde_json::to_vec(&runs).unwrap()).unwrap();
+        let spent = would_refuse("check-skill", Some(state), 100).unwrap();
+        assert!(spent.contains("10 runs in 24 hours are spent"), "{spent}");
+        assert_eq!(begin("check-skill", Some(state), 100).unwrap_err(), spent);
+        // A day on, it may again.
+        assert_eq!(would_refuse("check-skill", Some(state), DAY_MS + 10), None);
+        fs::write(state.join(RUNS_FILE), "not json").unwrap();
+        assert!(
+            would_refuse("check-skill", Some(state), 9_000)
+                .unwrap()
+                .contains("can't be read")
+        );
+        set_on_here(None);
+    }
+
     /// Off: nothing is handed over, and the journal says why. On: with no
     /// yes from lamp-control it waits; with it the line names the folder's
     /// SHA-256 and grants; a changed script asks again.
@@ -2000,5 +2082,29 @@ mod tests {
         let back = now - 6 * ASK_RETRY_MS;
         let other = ask_yes("fresh", &sha(999), state, back, || SPOKEN.to_owned());
         assert_eq!(other, format!("asked aloud: {SPOKEN}"));
+    }
+
+    /// A made skill run now by its owner (lamp-9adf, 15 Nov) is held to
+    /// its own day's bound as a trigger's run is: its three runs in 24
+    /// hours spent, it is refused in words that say so, and another skill
+    /// still runs; nothing is written by the check.
+    #[test]
+    fn a_run_now_past_its_own_three_a_day_is_refused_plainly() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path();
+        set_on_here(Some(true));
+        let runs: Vec<(String, u64)> = (0..PER_SKILL)
+            .map(|at| ("unread-mail".to_owned(), at as u64))
+            .collect();
+        fs::write(state.join(RUNS_FILE), serde_json::to_vec(&runs).unwrap()).unwrap();
+        let before = fs::read(state.join(RUNS_FILE)).unwrap();
+        let spent = would_refuse("unread-mail", Some(state), 100).unwrap();
+        assert_eq!(
+            spent.strip_prefix(NOT_HANDED),
+            Some("its 3 runs in 24 hours are spent")
+        );
+        assert_eq!(would_refuse("evening-dim", Some(state), 100), None);
+        assert_eq!(fs::read(state.join(RUNS_FILE)).unwrap(), before);
+        set_on_here(None);
     }
 }
