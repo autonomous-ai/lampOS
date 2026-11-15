@@ -955,8 +955,8 @@ sau:
    nơi chỉ gửi nếu chủ đèn đã đồng ý đúng nội dung đó cho kỹ năng đó như đã cài (gói của nó: kỹ năng được cập nhật hay bị gỡ thì chờ lời đồng ý mới) dưới
    cùng liên kết (chỉ do đường đồng ý của giọng nói, không bao giờ do cài đặt, và không
    bao giờ trong ứng dụng, nơi không có lời đồng ý nào cho nó: "not sent: waiting for the owner's yes"), không đã đăng xuất,
-   tối đa 10 lần mỗi kỹ năng và
-   30 lần cho mọi kỹ năng trong bất kỳ 24 giờ nào. Liên kết mất hoặc thuộc
+   tối đa 50 lần mỗi kỹ năng và
+   200 lần cho mọi kỹ năng trong bất kỳ 24 giờ nào. Liên kết mất hoặc thuộc
    tài khoản khác thì dừng các lần ghi của kỹ năng cho đến khi `lamp-skills`
    khởi động lại. **Một lần ghi đang chờ lời đồng ý không tiêu gì**
    (lamp-9adf, 12/11: một thư chưa được đồng ý của nhóm `wellbeing` đã
@@ -2165,7 +2165,7 @@ thêm từ tệp, viết trong ứng dụng, từ Store hay đã cài giữ nguy
    (lamp-voice).
 
 Không đổi khi bật: lời đọc lại của một lần ghi và lời đồng ý nói ra cho
-SHA-256 nội dung của nó; việc gửi, tối đa 10 mỗi kỹ năng và 30 cho mọi kỹ năng
+SHA-256 nội dung của nó; việc gửi, tối đa 50 mỗi kỹ năng và 200 cho mọi kỹ năng
 một ngày (`lamp-services`, không đọc công tắc này); các từ chối vì riêng tư;
 quyền mã và lời đồng ý của #6071.
 
@@ -3131,7 +3131,7 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   lamp-control; không có "có" thì chờ, "có" cho byte hay grant khác thì hỏi
   lại (cả hai trường hợp đèn tự hỏi thành tiếng, xem dưới), không hỏi được
   lamp-control thì không giao gì và không hỏi gì; một tác vụ một lúc mỗi
-  kỹ năng, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng trong 24 giờ. Một lần
+  kỹ năng, tối đa 20 mỗi kỹ năng và 100 cho mọi kỹ năng trong 24 giờ. Một lần
   chạy được đếm khi giao đi, và được gỡ khỏi sổ khi lamp-tasks từ chối nó
   trước khi agent bắt đầu (`NOT_TAKEN` của lần ghi cố định: `busy` vì đang
   chạy tác vụ của kỹ năng khác, `not_started`, tắt, dòng sai hay thiếu
