@@ -1201,6 +1201,12 @@ camera, so I can't take photos…" with `calls=none`.
   light on", "light scene", "reading light", "light up the room", "light
   my face", "light this up" and "point at the door" are the model's, as
   before: a room, a place or a face is never the thing. English only.
+  Each spoken request that plainly asks for a skill says so once in its
+  journal (#7069): `request N: the plain ask forces use_skill point_light
+  in round 1`, or `request N: the line plainly asks for point_light, but
+  point_light isn't offered`, when point-light is not installed or is
+  turned off; any other line says nothing
+  (`tools::skill_asked::journal_line`).
 - **Which lines** (`skill_named::named`): the function's name said as words
   in a row, loosely (`photo_booth` as "photo booth" or "photobooth", a
   number as a word or a digit), with nothing else but a greeting, the

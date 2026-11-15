@@ -1480,6 +1480,10 @@ pub type NamedAsk = Arc<dyn Fn(&str) -> Vec<&'static str> + Send + Sync>;
 /// The skill a heard line asks what it uses, by name, or none
 /// (`crate::make_skill_local::read_back_heard`, V2 on #6413).
 pub type ReadBackAsked = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
+/// What a heard line's plain ask for a skill comes to with
+/// `LAMP_SKILL_ASKED` (`crate::tools::skill_asked::asked`): forced, not
+/// offered, or none (#7069).
+pub type SkillAsked = Arc<dyn Fn(&str) -> Option<crate::tools::skill_asked::Asked> + Send + Sync>;
 /// The call a heard line plainly asks for by an installed skill's name, as
 /// its name and arguments, or none (`crate::skill_named::heard`, #6772).
 pub type SkillNamed = Arc<dyn Fn(&str) -> Option<(String, Value)> + Send + Sync>;
@@ -1835,6 +1839,9 @@ struct Shared {
     /// The skill a heard line plainly asks for by its name: called in code
     /// as round 1 ([`Engine::calling_skills_named`]).
     skill_named: Option<SkillNamed>,
+    /// With `LAMP_SKILL_ASKED`: what a heard line's plain ask for a skill
+    /// comes to, said once in its journal ([`Engine::journaling_skill_asks`]).
+    skill_asked: Option<SkillAsked>,
     /// With the tasks part: the agent a spoken line's words name for the
     /// work, whose round 1 answered in words alone is asked again once
     /// ([`Engine::catching_named_agents`], #6547 (1b)).
@@ -4606,6 +4613,7 @@ impl Engine {
                 named_ask: None,
                 read_back_asked: None,
                 skill_named: None,
+                skill_asked: None,
                 named_agent: None,
                 named_asked_again: crate::agent_tasks::AskedAgain::default(),
                 #[cfg(test)]
@@ -6308,6 +6316,18 @@ impl Engine {
     pub fn calling_skills_named(mut self, named: SkillNamed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.skill_named = Some(named);
+        }
+        self
+    }
+
+    /// With `LAMP_SKILL_ASKED` (#7069): each spoken request whose heard
+    /// words plainly ask for a skill says in its journal, once, whether its
+    /// round 1 is forced to call it or the skill is not offered
+    /// (`crate::tools::skill_asked::journal_line`); any other line says
+    /// nothing. Before any turn only.
+    pub fn journaling_skill_asks(mut self, asked: SkillAsked) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.skill_asked = Some(asked);
         }
         self
     }
@@ -15302,6 +15322,19 @@ async fn answer(
                 .and_then(|named| named(&said))
         })
         .flatten();
+    // What the heard words' plain ask for a skill comes to
+    // (`LAMP_SKILL_ASKED`), said once: forced, or not offered (#7069). A
+    // round 1 made in code asks no chat, so it says nothing.
+    if heard
+        && skill_named.is_none()
+        && read_back_named.is_none()
+        && let Some(asked) = shared.skill_asked.as_ref().and_then(|asked| asked(&said))
+    {
+        eprintln!(
+            "{}",
+            crate::tools::skill_asked::journal_line(request, asked)
+        );
+    }
     // Whom the line's own words ask by name (`LAMP_TASKS_NAMED_ASK`): told
     // once, after round 1 answers.
     let mut named_ask = shared

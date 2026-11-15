@@ -2531,7 +2531,12 @@ camera, so I can't take photos…" với `calls=none`.
   "light scene", "reading light", "light up the room", "light my face",
   "light this up" và "point at the door" vẫn là của model như trước: một
   căn phòng, một nơi chốn hay một khuôn mặt không bao giờ là vật được
-  chiếu. Chỉ tiếng Anh.
+  chiếu. Chỉ tiếng Anh. Mỗi request nói mà xin rõ một skill ghi một dòng
+  journal duy nhất (#7069): `request N: the plain ask forces use_skill
+  point_light in round 1`, hoặc `request N: the line plainly asks for
+  point_light, but point_light isn't offered` khi point-light chưa cài hay
+  đang tắt; câu khác không ghi gì
+  (`tools::skill_asked::journal_line`).
 - **Câu nào** (`skill_named::named`): tên hàm nói thành các từ liền nhau,
   khớp lỏng (`photo_booth` là "photo booth" hay "photobooth", số nói bằng
   chữ hay chữ số), ngoài ra chỉ có lời chào, tên đèn, "please" hay

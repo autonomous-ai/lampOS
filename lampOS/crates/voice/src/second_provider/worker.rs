@@ -3243,6 +3243,16 @@ pub fn serve(
         );
         tools.clone()
     });
+    // Each spoken request's plain ask for a skill says once what it came
+    // to: forced, or not offered (`LAMP_SKILL_ASKED`, #7069), as the force
+    // reads it.
+    let skill_asks = crate::tools::skill_asked::on().then(|| {
+        let offered: Option<crate::tools::skill_asked::Offered> = tools
+            .use_skill
+            .then(|| Arc::new(crate::tools::skill_asked::offered_now(tools.clone())) as _);
+        Arc::new(move |heard: &str| crate::tools::skill_asked::asked(heard, offered.as_ref()))
+            as crate::second_provider::SkillAsked
+    });
     // A plain ask for news, a score, a price, hours or the weather starts
     // its search from the words heard, while the model's first round runs
     // (#1712).
@@ -3973,6 +3983,9 @@ pub fn serve(
     if let Some(settings) = skills_named {
         let named = crate::skill_named::Heard::new(settings);
         engine = engine.calling_skills_named(Arc::new(move |heard: &str| named.heard(heard)));
+    }
+    if let Some(asks) = skill_asks {
+        engine = engine.journaling_skill_asks(asks);
     }
     if let Some(place) = named_ask {
         engine = engine.asking_by_name(Arc::new(move |words: &str| {

@@ -446,33 +446,79 @@ fn plainly(
 /// Whether `use_skill` offers a skill now ([`offered_now`]).
 pub type Offered = std::sync::Arc<dyn Fn(&str) -> bool + Send + Sync>;
 
+/// What a heard line's plain ask for a skill comes to ([`asked`]), for
+/// the force and for the turn's journal line ([`journal_line`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Asked {
+    /// The skill's function is forced in round 1: `use_skill` pinned to it,
+    /// or, without `use_skill`, its own function.
+    Forced(&'static str),
+    /// The line plainly asks for it, but `use_skill` does not offer it now
+    /// (not installed, turned off, or cut from `use_skill`): nothing is
+    /// forced, and the pick is the model's.
+    NotOffered(&'static str),
+}
+
+/// What `said` comes to with the switch on: [`Asked::Forced`] when it
+/// plainly asks for a scene, a show, a question about the lamp or a point
+/// of the light and the skill is offered (or `offered` is `None`, no
+/// `use_skill`), [`Asked::NotOffered`] when it asks but the skill is not
+/// offered, and nothing for any other line.
+pub fn asked(said: &str, offered: Option<&Offered>) -> Option<Asked> {
+    let skill = asks_for(said)
+        .or_else(|| asks_about(said))
+        .or_else(|| asks_to_point(said))?;
+    Some(match offered {
+        Some(offered) if !offered(skill) => Asked::NotOffered(skill),
+        _ => Asked::Forced(skill),
+    })
+}
+
+/// The turn's journal line for what its heard words came to ([`asked`]),
+/// said once per spoken request that plainly asks for a skill; a line that
+/// asks for none says nothing. On lamp-52e6 on 15 Nov (Seventh's row P on
+/// #7069) request 10 called `take_a_look` and the journal could not say
+/// whether its words matched or point-light was not offered.
+pub fn journal_line(request: u64, asked: Asked) -> String {
+    match asked {
+        Asked::Forced(skill) => format!(
+            "lamp-voice second: request {request}: the plain ask forces use_skill {skill} in round 1 ({ENVIRONMENT})"
+        ),
+        Asked::NotOffered(skill) => format!(
+            "lamp-voice second: request {request}: the line plainly asks for {skill}, but {skill} isn't offered: nothing is forced, the pick is the model's ({ENVIRONMENT})"
+        ),
+    }
+}
+
 /// The force the second route's chat is given with the switch on
 /// (`second_provider::net::Chat::forcing`): a request whose last message is
 /// a person's line that plainly asks for a scene or a show, plainly asks a
 /// question about the lamp itself, or plainly asks to point the light at a
-/// thing, must call its skill. `offered`
+/// thing, must call its skill ([`asked`]). `offered`
 /// says, at each request, whether `use_skill` offers a skill: then
 /// `use_skill` is forced with its `skill` pinned to it, and nothing when it
 /// is not offered (a skill turned off is never forced); without `use_skill`
 /// (`None`), the skill's own function, which the chat forces only when it
-/// is declared.
+/// is declared. The force itself says nothing: a request may be measured
+/// or sent twice; the turn's journal line is the engine's, once
+/// ([`journal_line`]).
 pub fn force(offered: Option<Offered>) -> Force {
     std::sync::Arc::new(move |messages: &[Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
         let said = last.words()?;
-        let skill = asks_for(said)
-            .or_else(|| asks_about(said))
-            .or_else(|| asks_to_point(said))?;
-        match &offered {
-            Some(offered) => offered(skill).then_some(Forced {
-                name: crate::use_skill::NAME,
-                only: Some(("skill", skill)),
-                fields: None,
-            }),
-            None => Some(Forced {
-                name: skill,
-                only: None,
-                fields: None,
+        match asked(said, offered.as_ref())? {
+            Asked::NotOffered(_) => None,
+            Asked::Forced(skill) => Some(match offered {
+                Some(_) => Forced {
+                    name: crate::use_skill::NAME,
+                    only: Some(("skill", skill)),
+                    fields: None,
+                },
+                None => Forced {
+                    name: skill,
+                    only: None,
+                    fields: None,
+                },
             }),
         }
     })
@@ -873,5 +919,59 @@ mod tests {
         assert_eq!(wrapped(&after), None);
         assert_eq!(wrapped(&[Message::user("Lamp, look at my book.")]), None);
         assert_eq!(wrapped(&[Message::user("What do you see?")]), None);
+    }
+
+    /// Seventh's row P on #7069 (lamp-52e6, 15 Nov): the kit's "Hey Lamp"
+    /// lines, as speech-to-text may write them, are point-light's.
+    #[test]
+    fn the_rows_hey_lamp_pointing_lines_are_point_lights() {
+        for said in [
+            "Hey Lamp, point the light at my book.",
+            "Hey, Lamp. Point the light at my book.",
+            "Hey lamp point the light at my book",
+            "Hey Lamp. Point the light at my book.",
+            "Hey Lamp, point the light at the book.",
+            "Hey Lamp, point the light on the book.",
+            "Hey Lamp, point a light at the book.",
+            "Hey Lamp, point your light at my book please.",
+            "Hey Lamp, point the light at my books.",
+            "Hey, lamp, light the book on the desk.",
+            "Hey Lamp, can you light the book?",
+            "Hey Lamp, light the book, please.",
+            "Hey Lamp, please light the book here.",
+        ] {
+            assert_eq!(asks_to_point(said), Some(POINT), "{said}");
+        }
+    }
+
+    /// #7069: each spoken plain ask says once what it came to, forced or
+    /// not offered, and an ordinary line comes to nothing, so it says
+    /// nothing.
+    #[test]
+    fn a_plain_ask_comes_to_forced_or_not_offered_and_its_journal_line_says_which() {
+        let book = "Hey Lamp, point the light at my book.";
+        let every: Offered = Arc::new(|_| true);
+        let without_point: Offered = Arc::new(|skill| skill != POINT);
+        assert_eq!(asked(book, Some(&every)), Some(Asked::Forced(POINT)));
+        assert_eq!(
+            asked(book, Some(&without_point)),
+            Some(Asked::NotOffered(POINT))
+        );
+        assert_eq!(asked(book, None), Some(Asked::Forced(POINT)));
+        assert_eq!(
+            asked("Lamp, movie light.", Some(&without_point)),
+            Some(Asked::Forced(SCENE))
+        );
+        for said in ["Lamp, look at my book.", "What do you see?", "Hello", ""] {
+            assert_eq!(asked(said, Some(&every)), None, "{said}");
+        }
+        assert_eq!(
+            journal_line(10, Asked::Forced(POINT)),
+            "lamp-voice second: request 10: the plain ask forces use_skill point_light in round 1 (LAMP_SKILL_ASKED)"
+        );
+        assert_eq!(
+            journal_line(10, Asked::NotOffered(POINT)),
+            "lamp-voice second: request 10: the line plainly asks for point_light, but point_light isn't offered: nothing is forced, the pick is the model's (LAMP_SKILL_ASKED)"
+        );
     }
 }
