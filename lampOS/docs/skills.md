@@ -4486,7 +4486,10 @@ of a skill that reads or writes a linked service (Gmail, Calendar, GitHub,
 ...) is made as one `do.task` for the lamp's agent (Hermes, with the
 connectors MCP `lamp-services`: `services_connected`, `service_read`,
 `service_write`; a send goes back to the voice for the owner's spoken
-yes), never as a `do.read` or `do.write` step. The making model is told
+yes, and one whose read-back can't fit the voice's one note is refused
+before it is held, with its room in characters, so the agent shortens it
+and calls again, [services.md](services.md), "A skill's run on the lamp's
+Hermes"), never as a `do.read` or `do.write` step. The making model is told
 (`make_skill_local::agent_services`, with a whole example for "every
 morning at eight, read me my new mail"): `[permissions]` only its
 trigger's topics, no `services`; `grants` exactly the services it uses,
