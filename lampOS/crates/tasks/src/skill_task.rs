@@ -771,6 +771,15 @@ pub struct SkillRun {
     /// is refused [`NOT_STARTED`], so lamp-skills may send it itself, and
     /// never after (the first builder's ruling on #6823).
     pub started: std::sync::atomic::AtomicBool,
+    /// A skill's fixed write's run (#6879), set by [`run_on_token`]: a
+    /// launch Harness didn't make is asked once more ([`HarnessRunner`],
+    /// #7092).
+    pub write: bool,
+    /// Set by the runner when a fixed write's run was never made: Harness
+    /// didn't make its launch, asked twice, or didn't answer to be asked
+    /// again (#7092). Refused [`NOT_MADE`], so lamp-skills tells the owner
+    /// its send didn't go.
+    pub not_made: std::sync::atomic::AtomicBool,
     /// The folder the run starts in, when not the runner's own work
     /// folder: a make's folder (`crate::skill_make`). None for a skill's.
     pub start_in: Option<PathBuf>,
@@ -792,6 +801,12 @@ pub const TELL_LINE: &str = "Your last answer is said aloud to the owner by the 
 /// The code of a fixed write's run refused before its agent began
 /// ([`SkillRun::started`]): nothing of it can have been sent.
 pub const NOT_STARTED: &str = "not_started";
+
+/// The code of a fixed write's run Harness never made, though asked
+/// ([`SkillRun::not_made`], #7092): not sent straight, as its first launch
+/// may have reached Harness, and never tried again; lamp-skills tells the
+/// owner its send didn't go.
+pub const NOT_MADE: &str = "not_made";
 
 impl std::fmt::Debug for SkillRun {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -853,6 +868,8 @@ impl SkillRun {
             ],
             deadline: RUN_LIFETIME,
             started: std::sync::atomic::AtomicBool::new(false),
+            write: false,
+            not_made: std::sync::atomic::AtomicBool::new(false),
             start_in: None,
             env_file: None,
             answer: std::sync::OnceLock::new(),
@@ -1322,7 +1339,8 @@ pub fn answer_for(
 /// starts in, removed when it ends; or the refusal) and waited for, the
 /// token ended however it ends; the answer, or the refusal. A fixed
 /// write's (`write`) that fails before its agent began is [`NOT_STARTED`],
-/// else `run_failed` as a task's. A run that `tells` ([`tells_answer`])
+/// one Harness never made though asked is [`NOT_MADE`] (#7092), else
+/// `run_failed` as a task's. A run that `tells` ([`tells_answer`])
 /// and ended well with an answer has it in its answer ([`told_answer`]).
 fn run_on_token(
     skill: &str,
@@ -1354,10 +1372,11 @@ fn run_on_token(
              the owner says yes again in the app",
         );
     }
-    let (run, fresh) = match made(&run_id, &minted.token) {
+    let (mut run, fresh) = match made(&run_id, &minted.token) {
         Ok(made) => made,
         Err(refused) => return refused,
     };
+    run.write = write;
     let ran = runner.run(&run, &|| ending.end());
     let began = run.started.load(Ordering::Acquire);
     let found = run
@@ -1378,6 +1397,7 @@ fn run_on_token(
             }
         );
     }
+    let not_made = run.not_made.load(Ordering::Acquire);
     // Its keys' file, whatever the runner did with it, then its folder.
     if let Some(file) = &run.env_file {
         let _ = std::fs::remove_file(file);
@@ -1392,6 +1412,7 @@ fn run_on_token(
             None => json!({"ok": true, "id": id}),
         },
         Err(why) if write && !began => refusal(NOT_STARTED, &why),
+        Err(why) if write && not_made => refusal(NOT_MADE, &why),
         Err(why) => refusal("run_failed", &why),
     }
 }
@@ -1627,6 +1648,11 @@ pub const WAIT_RETRY: Duration = Duration::from_secs(1);
 /// looked past, for the live one in the run's folder, before the run ends
 /// as lost (#6432); and how often in that time it is looked for.
 pub const LOST_START_LOOK: Duration = Duration::from_secs(5);
+/// How long a fixed write's launch Harness didn't make waits for Harness
+/// to answer before it is asked once more (#7092): its daemon, started
+/// again with lamp-tasks, answered within seconds on lamp-9adf. Within the
+/// run's own deadline, under lamp-skills' wait for the answer.
+pub const ANSWER_WAIT: Duration = Duration::from_secs(60);
 const LOST_START_EVERY: Duration = Duration::from_millis(500);
 
 /// The Harness a skill's run is started through, as lamp-tasks has set it
@@ -2319,6 +2345,9 @@ pub struct HarnessRunner {
     /// How long a `stopped` with no session bound is looked past
     /// ([`LOST_START_LOOK`] on a lamp, #6432).
     pub lost_look: Duration,
+    /// How long a fixed write's unmade launch waits for Harness to answer
+    /// before it is asked once more ([`ANSWER_WAIT`] on a lamp, #7092).
+    pub answer_wait: Duration,
     /// [`DEFAULT_AGENT_SWITCH`] on: a run goes to the lamp's default agent
     /// by the one run path, or is refused ([`default_agent_takes_runs`]).
     pub default_agent: bool,
@@ -2360,6 +2389,7 @@ impl HarnessRunner {
             held_by: Some(PathBuf::from(HERMES)),
             retry: WAIT_RETRY,
             lost_look: LOST_START_LOOK,
+            answer_wait: ANSWER_WAIT,
             default_agent: std::env::var(DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on"),
             wrappers: Some(PathBuf::from(AGENT_WRAPPERS)),
             agent_ns: Some(PathBuf::from(AGENT_NS)),
@@ -2676,6 +2706,43 @@ fn after_stop(
     }
 }
 
+/// Whether Harness didn't make a launch it was asked for: `new` refused
+/// or failed (`new_failed`, #7092).
+fn unmade(outcome: &crate::harness::LaunchOutcome) -> bool {
+    matches!(outcome, crate::harness::LaunchOutcome::Uncertain { code } if code == "new_failed")
+}
+
+impl HarnessRunner {
+    /// #7092: `ps` of `machine` asked every [`Self::retry`] until Harness
+    /// answers, `until` or lamp-tasks' stop: whether nothing is live in
+    /// `folder` then, or `None` when it never answered.
+    fn answers_empty(
+        &self,
+        cli: &crate::harness::Cli,
+        machine: &str,
+        folder: &str,
+        until: std::time::Instant,
+    ) -> Option<bool> {
+        let stopped = || {
+            self.stopping
+                .get()
+                .is_some_and(|stop| stop.load(Ordering::Acquire))
+        };
+        loop {
+            if let Ok(live) = cli.live_in(machine, folder) {
+                return Some(live.is_empty());
+            }
+            let next = std::time::Instant::now() + self.retry;
+            if next >= until || stopped() {
+                return None;
+            }
+            while std::time::Instant::now() < next && !stopped() {
+                std::thread::sleep(RUN_TICK.min(self.retry));
+            }
+        }
+    }
+}
+
 impl Runner for HarnessRunner {
     fn stop_on(&self, stop: std::sync::Arc<std::sync::atomic::AtomicBool>) {
         let _ = self.stopping.set(stop);
@@ -2863,11 +2930,46 @@ impl Runner for HarnessRunner {
             },
             session: None,
         };
-        let outcome = cli.launch(&launch);
+        let mut outcome = cli.launch(&launch);
         // Asked of Harness: from here the agent may have begun, unless
         // Harness never sent the creation.
         if !matches!(outcome, LaunchOutcome::NotSent { .. }) {
             run.started.store(true, Ordering::Release);
+        }
+        // #7092: a fixed write's launch Harness didn't make (`new_failed`:
+        // its daemon not up yet, as just after a lamp-tasks restart) is
+        // asked once more, the same run in the same folder on the same
+        // token, once Harness answers with nothing in the run's folder.
+        // lamp-services sends a run's write once, so even a first launch
+        // Harness made after all sends nothing twice. Never a task's run,
+        // never a third launch, and never once something is in the folder.
+        if run.write && unmade(&outcome) {
+            let until = std::time::Instant::now() + self.answer_wait;
+            let until = until.min(began + run.deadline);
+            match self.answers_empty(&cli, &lamp.machine_id, &launch.target.project, until) {
+                Some(true) => {
+                    eprintln!(
+                        "[lamp-tasks] skill task {}: Harness didn't make the fixed write's run (new_failed); it answers now with nothing in the run's folder, so it is asked once more",
+                        run.run
+                    );
+                    outcome = cli.launch(&launch);
+                    if unmade(&outcome) || matches!(outcome, LaunchOutcome::NotSent { .. }) {
+                        run.not_made.store(true, Ordering::Release);
+                    }
+                }
+                Some(false) => eprintln!(
+                    "[lamp-tasks] skill task {}: Harness didn't make the fixed write's run (new_failed), but an agent is in the run's folder, so it isn't asked again: it may have begun",
+                    run.run
+                ),
+                None => {
+                    eprintln!(
+                        "[lamp-tasks] skill task {}: Harness didn't make the fixed write's run (new_failed) and didn't answer within {} s, so it isn't asked again",
+                        run.run,
+                        self.answer_wait.as_secs()
+                    );
+                    run.not_made.store(true, Ordering::Release);
+                }
+            }
         }
         let launched = match outcome {
             LaunchOutcome::Created { agent_id } => agent_id,
@@ -3680,12 +3782,17 @@ mod tests {
         seen: RefCell<Vec<Seen>>,
         /// Whether its agent begins before its result ([`SkillRun::started`]).
         starts: bool,
+        /// Whether a fixed write's run is never made ([`SkillRun::not_made`]).
+        not_made: bool,
     }
 
     impl Runner for FakeRunner<'_> {
         fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
             if self.starts {
                 run.started.store(true, Ordering::Release);
+            }
+            if self.not_made && run.write {
+                run.not_made.store(true, Ordering::Release);
             }
             let token = run
                 .env
@@ -3768,6 +3875,7 @@ mod tests {
             result,
             seen: RefCell::default(),
             starts: true,
+            not_made: false,
         }
     }
 
@@ -3942,6 +4050,24 @@ mod tests {
             assert_eq!(refused, refusal(code, harness), "{refused}");
             assert_eq!(fresh.ended.borrow().len(), 1, "its token ended");
         }
+        // #7092: one Harness never made, asked twice, is `not_made`, so
+        // lamp-skills tells the owner; never sent straight.
+        let fresh = FakeTokens {
+            yes: Some(vec!["gmail-write".into()]),
+            ..FakeTokens::default()
+        };
+        let unmade = "Harness didn't start the run (new_failed)";
+        let mut failing = super::tests::runner(&fresh, Err(unmade.into()));
+        failing.not_made = true;
+        let refused = answer_with(&write_line(|_| {}), true, true, skills(), &fresh, &failing);
+        assert_eq!(refused, refusal(NOT_MADE, unmade), "{refused}");
+        assert_eq!(fresh.ended.borrow().len(), 1, "its token ended");
+        // A task's run is never a fixed write's: `run_failed`, as before.
+        let fresh = FakeTokens::default();
+        let mut failing = super::tests::runner(&fresh, Err(unmade.into()));
+        failing.not_made = true;
+        let task = answer_with(&line(|_| {}), true, true, skills(), &fresh, &failing);
+        assert_eq!(task["error"], "run_failed");
         // A task's run failing before it began is still `run_failed`.
         let fresh = FakeTokens::default();
         let mut failing = super::tests::runner(&fresh, Err(harness.into()));
@@ -5661,6 +5787,7 @@ mod tests {
             held_by: None,
             retry: Duration::from_millis(20),
             lost_look: LOST_START_LOOK,
+            answer_wait: Duration::from_millis(200),
             default_agent,
             wrappers: Some(bin),
             agent_ns: Some(ns),
