@@ -3592,19 +3592,29 @@ program, a missing name said, a `skill.toml` naming `secrets` seen),
 ## A skill's run on OpenClaw (#6685, the lead's decision, 15 Nov)
 
 With `LAMP_SKILL_DEFAULT_AGENT=on` and OpenClaw the lamp's default, a
-user-made skill's job goes the one run path, as Hermes's does
-(c6891872763, c6891910754):
+user-made skill's job goes through Harness's `new`, as Hermes's does
+(c6891872763, c6891910754). It does not go through the one run path's
+wrapper:
 
 - **Accepted by its wrapper.** lamp-update keeps OpenClaw's gateway
   wrapper, because OpenClaw can't run in a per-run namespace. lamp-tasks
-  takes an OpenClaw default when that wrapper carries its gateway data
-  and its namespace shows lamp-control's socket.
-- **Through Harness's `new`** on the default engine (`HarnessRunner`), in
-  the run's own folder, with the run's token file, as Hermes's ("The
-  lamp's default agent, by the one run path", above).
-- **No gateway runner.** `gateway_run::GatewayRunner` is not used by a
-  skill's run. lamp-tasks sends no turn to a gateway of its own and keeps
-  no fence agent.
+  takes a gateway default agent (judged by its wrapper's data, with no
+  engine name) when that wrapper carries its gateway data and its
+  namespace shows lamp-control's socket.
+- **Two files in the run's folder.** Before Harness's `new`, lamp-tasks
+  writes the run's `token` (0600) and a `start` script into the run's own
+  folder. `start` reads the token once, deletes it, and runs the skill's
+  script with `/var/lib`, `/var/tmp` and `/dev/shm` hidden.
+- **Through Harness's `new`** on the default engine (`HarnessRunner`).
+  Harness's task tells the agent to run `start`. OpenClaw's tools run in
+  its gateway's process, not in Harness's pane, so a token exported by
+  the pane would never reach the skill's script. The file in the run's
+  folder is how it gets there.
+- **Fails closed.** If `start` never ran (the token file is still there
+  when Harness says idle or stopped), the run ends failed, in words, not
+  as done.
+- **No gateway turn of lamp-tasks' own.** A skill's run sends no turn to
+  a gateway and keeps no fence agent.
 - **No write to `openclaw.json`.** A skill's run never writes OpenClaw's
   shared config or its exec approvals, and adds no `lamp-skill-run` agent.
   So Harness's own OpenClaw tasks, which name no agent, are untouched.
@@ -3616,21 +3626,22 @@ user-made skill's job goes the one run path, as Hermes's does
 **The one real difference from Hermes.** OpenClaw won't open its state
 from a namespace other than its gateway's (`GatewayLockNamespaceError`,
 the top of `crates/update/src/openclaw_install.rs`). So a skill's turn
-runs in OpenClaw's one gateway, under OpenClaw's own exec approvals, like
-every Harness OpenClaw task. There is no per-run network fence as Hermes
-has (`--net`, only `lo` and the model bridge). lamp-control's check of the
-run's one-run token holds as for every run, and the token ends with the
-run.
+runs in OpenClaw's one gateway, and its tools (`start` among them) run
+under OpenClaw's own exec approvals, like every Harness OpenClaw task.
+The pane sees the gateway's mount view, not a per-run one. There is no
+per-run network fence as Hermes has (`--net`, only `lo` and the model
+bridge). lamp-control's check of the run's one-run token holds as for
+every run, and the token ends with the run.
 
 **Its journal.** The same lines as Hermes's run through Harness:
 
 ```
 tasks: harness new: machine=<machine> exit=0 ms=<ms> out=<n> state=ok id=<id>
 tasks: skill-task-<run>: dispatch accepted (exit 0, <s> s)
-[lamp-tasks] skill task <run>: ended, Harness says idle, after <N> s; its agent: started (<Engine>)
+[lamp-tasks] skill task <run>: ended, Harness says idle, after <N> s; its agent: started (<agent>)
 ```
 
-`TODO(S3)`: OpenClaw's exact words in the last line.
+Harness may say `stopped` instead of `idle`. `<agent>` is the agent Harness's `show` gives; lamp-tasks adds no engine word.
 
 ## Devin (#1854)
 

@@ -1163,19 +1163,28 @@ nằm trong thư mục kỹ năng. Bật trong `lamp-tasks.service` của sản 
 ## Lần chạy kỹ năng trên OpenClaw (#6685, quyết định của lead, 15/11)
 
 Với `LAMP_SKILL_DEFAULT_AGENT=on` và OpenClaw là mặc định của đèn, việc của
-một kỹ năng do người dùng tạo đi theo đường chạy duy nhất, như của Hermes
-(c6891872763, c6891910754):
+một kỹ năng do người dùng tạo đi qua `new` của Harness, như của Hermes
+(c6891872763, c6891910754). Nó không đi qua wrapper của đường chạy duy nhất:
 
 - **Được nhận theo wrapper của nó.** lamp-update giữ gateway wrapper của
   OpenClaw, vì OpenClaw không chạy được trong namespace theo từng lần
-  chạy. lamp-tasks nhận OpenClaw mặc định khi wrapper đó có dữ liệu
-  gateway và namespace của nó cho thấy socket của lamp-control.
-- **Qua `new` của Harness** trên engine mặc định (`HarnessRunner`), trong
-  thư mục riêng của lần chạy, với file token của lần chạy, như của Hermes
-  ("Agent mặc định của đèn, theo một đường chạy duy nhất", ở trên).
-- **Không có gateway runner.** Lần chạy kỹ năng không dùng
-  `gateway_run::GatewayRunner`. lamp-tasks không gửi lượt nào tới một
-  gateway riêng và không giữ fence agent nào.
+  chạy. lamp-tasks nhận một agent mặc định kiểu gateway (xét theo dữ liệu
+  wrapper, không theo tên engine) khi wrapper đó có dữ liệu gateway và
+  namespace của nó cho thấy socket của lamp-control.
+- **Hai file trong thư mục của lần chạy.** Trước `new` của Harness,
+  lamp-tasks ghi `token` của lần chạy (0600) và một script `start` vào thư
+  mục riêng của lần chạy. `start` đọc token một lần, xóa nó, rồi chạy
+  script của kỹ năng với `/var/lib`, `/var/tmp` và `/dev/shm` bị ẩn.
+- **Qua `new` của Harness** trên engine mặc định (`HarnessRunner`). Tác vụ
+  của Harness bảo agent chạy `start`. Công cụ của OpenClaw chạy trong
+  tiến trình gateway của nó, không trong pane của Harness, nên token mà
+  pane export sẽ không bao giờ tới được script của kỹ năng. File trong thư
+  mục của lần chạy là cách token tới được đó.
+- **Đóng khi lỗi.** Nếu `start` không chạy (file token vẫn còn khi Harness
+  báo idle hay stopped), lần chạy kết thúc là thất bại, nói bằng lời, không
+  phải là xong.
+- **lamp-tasks không tự gửi lượt nào tới gateway.** Lần chạy kỹ năng không
+  gửi lượt nào tới một gateway và không giữ fence agent nào.
 - **Không ghi vào `openclaw.json`.** Lần chạy kỹ năng không bao giờ ghi
   config dùng chung của OpenClaw hay exec approvals của nó, và không thêm
   agent `lamp-skill-run`. Vì vậy các tác vụ OpenClaw riêng của Harness,
@@ -1188,21 +1197,22 @@ một kỹ năng do người dùng tạo đi theo đường chạy duy nhất, n
 **Khác biệt thật duy nhất so với Hermes.** OpenClaw không mở state của nó
 từ một namespace khác namespace của gateway (`GatewayLockNamespaceError`,
 đầu file `crates/update/src/openclaw_install.rs`). Vì vậy lượt của kỹ năng
-chạy trong gateway duy nhất của OpenClaw, dưới exec approvals riêng của
-OpenClaw, như mọi tác vụ OpenClaw của Harness. Không có rào mạng theo từng
-lần chạy như Hermes có (`--net`, chỉ `lo` và cầu nối model). Phép kiểm tra
-token một lần chạy của lamp-control vẫn giữ như với mọi lần chạy, và token
-hết hạn cùng lần chạy.
+chạy trong gateway duy nhất của OpenClaw, và công cụ của nó (cả `start`)
+chạy dưới exec approvals riêng của OpenClaw, như mọi tác vụ OpenClaw của
+Harness. Pane thấy cách mount của gateway, không phải của riêng lần chạy.
+Không có rào mạng theo từng lần chạy như Hermes có (`--net`, chỉ `lo` và
+cầu nối model). Phép kiểm tra token một lần chạy của lamp-control vẫn giữ
+như với mọi lần chạy, và token hết hạn cùng lần chạy.
 
 **Nhật ký của nó.** Cùng các dòng như lần chạy của Hermes qua Harness:
 
 ```
 tasks: harness new: machine=<machine> exit=0 ms=<ms> out=<n> state=ok id=<id>
 tasks: skill-task-<run>: dispatch accepted (exit 0, <s> s)
-[lamp-tasks] skill task <run>: ended, Harness says idle, after <N> s; its agent: started (<Engine>)
+[lamp-tasks] skill task <run>: ended, Harness says idle, after <N> s; its agent: started (<agent>)
 ```
 
-`TODO(S3)`: câu chữ chính xác của OpenClaw ở dòng cuối.
+Harness có thể báo `stopped` thay cho `idle`. `<agent>` là tên agent mà `show` của Harness trả về; lamp-tasks không thêm tên engine.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
