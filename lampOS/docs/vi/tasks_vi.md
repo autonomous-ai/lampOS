@@ -388,17 +388,14 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     setup giữ nó lại; mọi việc giao đi bị từ chối là `no_harness`, health
     của nó vẫn ok, và Harness cài sau được dùng khi lệnh cài của lamp-update
     khởi động lại phần này (test
-    `the_product_unit_starts_the_part_with_no_harness_program`). Khi không có đích của đèn, hay Harness không khởi động lần
-    chạy (`harness new` không gửi được hoặc không chắc), lamp-tasks đọc
-    trạng thái đăng nhập của Harness một lần (`harness auth status
-    --json`); nếu chưa đăng nhập, lời từ chối nói lý do bằng lời cho người
-    dùng (`skill_task::SIGNED_OUT`, theo yêu cầu 10:44 ngày 13/11 của
-    builder đầu tiên, cho tới khi PR 3 của #6685 chạy được mà không cần
-    Harness): "This skill's task can't run yet: Harness isn't signed in on
-    this lamp. Sign in to Harness from the app to let it run." Lời này được
-    trả về lamp-skills với mã `run_failed`, và dòng nhật ký của lamp-skills
-    cho `do.task` của kỹ năng mang nó; giọng nói và app chưa nói nó. Khi đã
-    đăng nhập, offline hay không đọc được trạng thái, lời vẫn như trước.
+    `the_product_unit_starts_the_part_with_no_harness_program`). Một lần
+    chạy bị từ chối, khi không có đích của đèn hay Harness không khởi động
+    lần chạy (`harness new` không gửi được hoặc không chắc), giữ lý do của
+    chính nó. Nó không bao giờ yêu cầu đăng nhập Harness, vì Harness của
+    chính đèn chạy được khi chưa đăng nhập (#6407; lead, #7019). Lời này
+    được trả về lamp-skills với mã `run_failed`, và dòng nhật ký của
+    lamp-skills cho `do.task` của kỹ năng mang nó; giọng nói và app chưa
+    nói nó.
     Một `/usr/local/bin/hermes` thiếu các dòng nhận lần chạy
     (`WRAPPER_RUN_LINES`) hay các dòng mạng (`WRAPPER_NET_LINES`) bị từ
     chối `NOT_FOUND_BY_FOLDER` (`LAMP_SKILL_TASKS` của lamp-update tắt hoặc
