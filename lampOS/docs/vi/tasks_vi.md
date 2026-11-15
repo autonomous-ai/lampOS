@@ -1407,6 +1407,17 @@ hoặc bất kỳ mã nào khác chạy dưới `lampos` ở đó. Sau #7133:
   đã xếp hàng sau dòng id bị từ chối, nên một dòng ready ghi trước khi exec
   launcher không bao giờ qua được, và cả hai lần từ chối đều chấm dứt lần
   khởi động của lần chạy đó.
+  **Bên trong namespace của gateway OpenClaw, non-dumpable không bảo vệ
+  được gì** (#7133, c0a4). Gateway chạy dưới `unshare --map-root-user`,
+  nên mọi tiến trình ở đó, kể cả agent, đều là root của namespace đó với
+  `CAP_SYS_PTRACE` trên nó, và kernel giao `/proc/<pid>` của một tác vụ
+  non-dumpable cho root đó (bên ngoài là `lampos`), y như của một tác vụ
+  dumpable. Vì vậy khi thấy caller ở một user namespace khác, lamp-tasks
+  đòi `/proc/<pid>` thuộc root của namespace đó (dòng `0 <outer>` trong
+  `uid_map`) thay vì uid 0, và chủ sở hữu không cho biết thêm gì. Ở đó
+  lần chạy chỉ được bảo vệ bởi launcher không bị trace lúc `ready`
+  (`TracerPid` 0), nonce, các phép kiểm tra ở trên, và giới hạn riêng của
+  token lần chạy ở dưới.
 - **Không chọn được script, trình thông dịch hay grant.** lamp-tasks cố
   định grant theo cái gật đầu của chủ máy, và một lần chạy chỉ được nhận
   một lần.

@@ -317,6 +317,13 @@ pub trait Peers: Send + Sync {
     fn status(&self, pid: u32) -> io::Result<String>;
     /// The owner of `/proc/<pid>`: root's once the pid is non-dumpable.
     fn proc_owner(&self, pid: u32) -> io::Result<u32>;
+    /// `None` when `pid` is in lamp-tasks' own user namespace; else the
+    /// uid that namespace's root is outside it (`/proc/<pid>/uid_map`'s
+    /// `0 <outer> …` line), as in OpenClaw's gateway (`unshare
+    /// --map-root-user`, #7133). Not readable: taken as the same namespace.
+    fn user_ns_root(&self, _pid: u32) -> io::Result<Option<u32>> {
+        Ok(None)
+    }
     /// One line of at most `most` bytes from `stream`, and the pid that
     /// sent it: `Some` only when every byte of it came with credentials
     /// (`SCM_CREDENTIALS`) naming that one pid.
@@ -360,6 +367,15 @@ impl Peers for Kernel {
 
     fn proc_owner(&self, pid: u32) -> io::Result<u32> {
         std::fs::metadata(format!("/proc/{pid}")).map(|meta| meta.uid())
+    }
+
+    fn user_ns_root(&self, pid: u32) -> io::Result<Option<u32>> {
+        let theirs = std::fs::read_link(format!("/proc/{pid}/ns/user"))?;
+        if theirs == std::fs::read_link("/proc/self/ns/user")? {
+            return Ok(None);
+        }
+        let map = std::fs::read_to_string(format!("/proc/{pid}/uid_map"))?;
+        Ok(ns_root_outside(&map))
     }
 
     fn read_line(&self, stream: &UnixStream, most: usize) -> io::Result<(String, Option<u32>)> {
@@ -502,14 +518,42 @@ fn untraced(peers: &dyn Peers, pid: u32) -> Result<(), String> {
 /// so no process of lamp-tasks' uid can attach to it any more, and it has
 /// not exec'd since, which would make it dumpable again) and still
 /// untraced.
+///
+/// In another user namespace (OpenClaw's gateway runs in one, `unshare
+/// --map-root-user`, #7133) the kernel gives a non-dumpable task's `/proc`
+/// to that namespace's root, the uid outside that made it, as it gives a
+/// dumpable one's: there the owner must be that uid, and it tells no more.
+/// That namespace's root holds `CAP_SYS_PTRACE` over it, so non-dumpable
+/// keeps out no process in it: there only an untraced launcher at
+/// [`READY`] and the run token's own limits (that run, that skill's
+/// grants, its life) guard the run.
 pub fn undumped_may(peers: &dyn Peers, pid: u32) -> Result<(), String> {
     let owner = peers
         .proc_owner(pid)
         .map_err(|_| "the caller's status can't be read")?;
-    if owner != 0 {
+    let wanted = match peers.user_ns_root(pid) {
+        Ok(Some(root)) => root,
+        Ok(None) | Err(_) => 0,
+    };
+    if owner != wanted {
         return Err("the caller can still be traced (it is dumpable)".into());
     }
     untraced(peers, pid)
+}
+
+/// The uid outside a user namespace its root (uid 0 inside) is, by its
+/// `uid_map` text (`<inside> <outside> <count>` lines); `None` when root
+/// is not mapped.
+pub fn ns_root_outside(map: &str) -> Option<u32> {
+    map.lines().find_map(|line| {
+        let mut fields = line.split_whitespace().map(str::parse::<u32>);
+        match (fields.next(), fields.next(), fields.next()) {
+            (Some(Ok(inside)), Some(Ok(outside)), Some(Ok(count))) if inside == 0 && count >= 1 => {
+                Some(outside)
+            }
+            _ => None,
+        }
+    })
 }
 
 /// Whether an environment (`/proc/<pid>/environ`'s bytes, or the
@@ -1279,6 +1323,7 @@ mod tests {
         files: HashMap<PathBuf, FileSeen>,
         tracer: u32,
         owner: u32,
+        ns_root: Option<u32>,
         sender: Option<u32>,
         ready_sender: Option<u32>,
         other_from: usize,
@@ -1337,6 +1382,7 @@ mod tests {
                 files: [(LIBC.into(), root_file(100)), (LD.into(), root_file(101))].into(),
                 tracer: 0,
                 owner: 0,
+                ns_root: None,
                 sender: Some(PID),
                 ready_sender: Some(PID),
                 other_from: usize::MAX,
@@ -1385,6 +1431,9 @@ mod tests {
                 "Name:\tskill-start\nState:\tS (sleeping)\nTracerPid:\t{}\nUid:\t990\n",
                 self.tracer
             ))
+        }
+        fn user_ns_root(&self, _: u32) -> io::Result<Option<u32>> {
+            Ok(self.ns_root)
         }
         fn proc_owner(&self, _: u32) -> io::Result<u32> {
             // Dumpable (its uid's) until it said ready.
@@ -1927,6 +1976,49 @@ mod tests {
             ready_child,
             "the launcher's ready was not sent by the caller itself",
         );
+    }
+
+    /// #7133 (c0a4's first OpenClaw run): the launcher started in
+    /// OpenClaw's gateway (a user namespace whose root is lampos outside)
+    /// is non-dumpable at ready with its `/proc` lampos's, as the kernel
+    /// gives it there: taken, still untraced. Another owner there, or a
+    /// traced one, is refused; in lamp-tasks' own namespace only root's.
+    #[test]
+    fn in_the_gateways_user_namespace_its_root_owns_the_undumped_launcher() {
+        const LAMPOS: u32 = 1001;
+        let mut gateway = Fake::good();
+        gateway.ns_root = Some(LAMPOS);
+        gateway.owner = LAMPOS;
+        gateway.lines.store(2, Ordering::Release);
+        assert_eq!(undumped_may(&gateway, PID), Ok(()));
+        let mut other = Fake::good();
+        other.ns_root = Some(LAMPOS);
+        other.owner = 4242;
+        other.lines.store(2, Ordering::Release);
+        assert!(undumped_may(&other, PID).is_err());
+        let mut traced = Fake::good();
+        traced.ns_root = Some(LAMPOS);
+        traced.owner = LAMPOS;
+        traced.tracer = 77;
+        traced.lines.store(2, Ordering::Release);
+        assert_eq!(
+            undumped_may(&traced, PID),
+            Err("the caller is being traced".into())
+        );
+        let mut own = Fake::good();
+        own.owner = LAMPOS;
+        own.lines.store(2, Ordering::Release);
+        assert!(
+            undumped_may(&own, PID).is_err(),
+            "lamp-tasks' namespace: root's only"
+        );
+        assert_eq!(
+            ns_root_outside("         0       1001          1\n"),
+            Some(1001)
+        );
+        assert_eq!(ns_root_outside("0 0 4294967295\n"), Some(0));
+        assert_eq!(ns_root_outside("1 1001 1\n"), None);
+        assert_eq!(ns_root_outside(""), None);
     }
 
     #[test]
