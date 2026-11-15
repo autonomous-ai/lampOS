@@ -2697,15 +2697,22 @@ impl Runner for HarnessRunner {
                 .wrappers
                 .as_ref()
                 .and_then(|wrappers| read(&wrappers.join(engine.argument())));
+            // A gateway agent, by its wrapper's own data (no engine's name):
+            // its tools run in its gateway, so its run's token goes through
+            // the run's start (#7133).
+            let gateway_agent = self.wrappers.as_ref().and_then(|_| {
+                wrapper
+                    .as_deref()
+                    .and_then(crate::gateway::GatewayAgent::of)
+                    .and_then(Result::ok)
+            });
             let checked = match &self.wrappers {
                 Some(wrappers) => {
                     // The namespace the agent runs in, by its own data: a
                     // gateway agent's gateway's, else the agent namespace.
-                    let ns = wrapper
-                        .as_deref()
-                        .and_then(crate::gateway::GatewayAgent::of)
-                        .and_then(Result::ok)
-                        .map(|gateway| gateway.ns)
+                    let ns = gateway_agent
+                        .as_ref()
+                        .map(|gateway| gateway.ns.clone())
                         .or_else(|| self.agent_ns.clone());
                     default_agent_takes_runs(
                         engine,
@@ -2729,7 +2736,7 @@ impl Runner for HarnessRunner {
                 None => Ok(()),
             };
             match checked {
-                Ok(()) => Some(engine),
+                Ok(()) => Some((engine, gateway_agent.is_some())),
                 // The lamp's Hermes the default, its wrapper not yet
                 // rewritten (an older updater's round, #6898): the run goes
                 // the switch-off way below, as before (#6914).
@@ -2748,8 +2755,8 @@ impl Runner for HarnessRunner {
         } else {
             None
         };
-        let (engine, agent) = match one_path {
-            Some(engine) => (engine, "the lamp's default agent"),
+        let (engine, agent, by_start) = match one_path {
+            Some((engine, by_start)) => (engine, "the lamp's default agent", by_start),
             None => {
                 if let Some(wrapper) = &self.held_by
                     && !std::fs::read_to_string(wrapper)
@@ -2757,7 +2764,7 @@ impl Runner for HarnessRunner {
                 {
                     return Err(NOT_FOUND_BY_FOLDER.into());
                 }
-                (EngineKind::Hermes, "the lamp's Hermes")
+                (EngineKind::Hermes, "the lamp's Hermes", false)
             }
         };
         let token = run
@@ -2790,16 +2797,24 @@ impl Runner for HarnessRunner {
             folder,
             token: None,
         };
-        // Always before the launch: the agent's wrapper reads it at its start.
-        started.token = Some(crate::run_token_file::RunTokenFile::write(
-            &self.runs, &run.run, &token,
-        )?);
+        // Always before the launch. A per-run agent's wrapper reads it at
+        // its start; a gateway agent's tools never see that wrapper, so its
+        // token is in the run's folder for the run's start, and the task
+        // asks the agent to run that start (#7133).
+        let prompt = if by_start {
+            crate::gateway::write_start(&started.folder, run, token.secret())?
+        } else {
+            started.token = Some(crate::run_token_file::RunTokenFile::write(
+                &self.runs, &run.run, &token,
+            )?);
+            run.prompt.clone()
+        };
         let Some(project) = started.folder.to_str().map(str::to_owned) else {
             return Err("the run's folder is not a plain path".into());
         };
         let launch = Launch {
             name: format!("{RUN_FOLDER_PREFIX}{}", run.run),
-            prompt: run.prompt.clone(),
+            prompt,
             target: Target {
                 machine_id: lamp.machine_id.clone(),
                 project,
@@ -2981,6 +2996,16 @@ impl Runner for HarnessRunner {
                     });
                 }
                 let ended = ended_as(&state, agent);
+                // Failing closed: a gateway agent's run whose start never
+                // took its token never ran the skill's script.
+                let ended = if by_start && ended.is_ok() {
+                    let token_left =
+                        std::fs::symlink_metadata(started.folder.join(crate::gateway::TOKEN_FILE))
+                            .is_ok();
+                    crate::gateway::start_ran(token_left).and(ended)
+                } else {
+                    ended
+                };
                 let answer = answer.filter(|answer| !answer.trim().is_empty());
                 // What of its agent's answer is kept: its length only, never
                 // its words (#7180).
