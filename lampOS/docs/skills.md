@@ -1728,7 +1728,10 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   it must be said again, word for word, before any yes if they agree or
   ask for it, with the whole say-back to say; that a decline or a wait
   is told it stays off, with nothing called, and doesn't bring the
-  say-back back; then to end as it ends and ask nothing. Once an uncut
+  say-back back; then to end as it ends and ask nothing. A say-back cut
+  off before its first word was kept, with no answer kept in its own
+  request (a task's unasked say-back dropped as the "yes" began, #7072),
+  counts as cut the same way. Once an uncut
   answer has held it whole, the note is the usual one again, with the
   `approve_id`. The journal says what
   was kept: "a made skill's yes not taken: its say-back was not heard

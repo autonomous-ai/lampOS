@@ -611,13 +611,20 @@ fn said_whole_before(waiting: &Waiting, request: u64) -> bool {
 
 /// Whether one of the lamp's answers toward `waiting` before `request` was
 /// cut and none before it held the whole say-back uncut (#6715): a cut
-/// say-back still to be said again.
+/// say-back still to be said again. A later line with no answer kept in
+/// the wait's own request counts as cut too: the say-back was cut off
+/// before its first word was kept (#7072, c0a4 14 Nov: a task's unasked
+/// say-back, request 4, dropped as the "yes" of request 5 began 0.7 s
+/// later, "kept: none"), so the yes over it found no cut and the note gave
+/// the approve_id.
 fn cut_unsaid(waiting: &Waiting, request: u64) -> bool {
     !said_whole_before(waiting, request)
-        && waiting
+        && (waiting
             .said
             .iter()
             .any(|(id, _, cut)| *id < request && *cut)
+            || (request > waiting.request
+                && !waiting.said.iter().any(|(id, ..)| *id == waiting.request)))
 }
 
 /// Where `said` first falls short of `say_back`, as
@@ -1166,6 +1173,9 @@ mod tests {
             ..asks("desk-watch", &[])
         };
         wait_for_yes(task, 9, now);
+        // Its say-back said in its own request (none kept reads as cut
+        // before its first word, #7072).
+        lamp_said(9, "It may use the camera.");
         assert!(
             waiting_note(10, now)
                 .unwrap()
@@ -1178,6 +1188,7 @@ mod tests {
             ..asks("desk-watch", &[])
         };
         wait_for_yes(code, 11, now);
+        lamp_said(11, "It runs code of its own.");
         assert!(
             waiting_note(12, now)
                 .unwrap()
