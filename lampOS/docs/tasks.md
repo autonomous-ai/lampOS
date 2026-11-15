@@ -3696,13 +3696,22 @@ process or session tools), nothing elevated, and its exec on the gateway's
 host by an allow-list with no safe binaries (`host: gateway`,
 `mode: allowlist`, `safeBins: []`; never `mode` with the legacy
 `security`/`ask`, which OpenClaw's schema refuses). With a second agent,
-`agents.ownership: explicit` and `agents.defaults.systemAgent.agentId:
-main` are set, each only when not set already, so the person's spoken
-tasks keep their agent. Once `agents.entries` exists OpenClaw takes no
+`agents.defaults.systemAgent.agentId: main` is set when not set already,
+so the person's spoken tasks keep their agent, and no `agents.ownership`
+is stamped: an `explicit` fleet has no default, and on lamp-52e6 (walk3,
+15 Nov) every agent-less Harness OpenClaw task after the first skill run
+stopped before its ask ("dispatch uncertain stopped_before_message"). The
+system agent's entry instead gets `default: true` when no entry has one,
+so a task naming no agent still lands on `main`; the fence agent never
+gets it. This fence's own earlier `explicit` stamp (beside its entry) is
+taken back; a person's own `explicit` ownership, or another entry
+already the default, is refused, "Refused: ...", and the file left as it
+is. Once `agents.entries` exists OpenClaw takes no
 agent as implicit, so the system agent must be listed there (lamp-52e6,
 15 Nov: with only `lamp-skill-run` listed, OpenClaw exited 78/CONFIG,
 "Unknown agent id \"main\" (not in agents.entries)"): when `main` isn't,
-it is listed as `entries.main: {workspace: <agents.defaults.workspace>}`,
+it is listed as `entries.main: {workspace: <agents.defaults.workspace>,
+default: true}`,
 and a person's entries are never changed. When the system agent can't be
 kept listed (no `agents.defaults.workspace` for `main`, or a person's own
 system agent missing from `entries`), the merge is refused, "Refused: ...

@@ -1264,14 +1264,22 @@ trình duyệt, process hay phiên), không nâng quyền, và exec chạy trên
 của gateway theo danh sách cho phép, không có safe binary nào
 (`host: gateway`, `mode: allowlist`, `safeBins: []`; không bao giờ để
 `mode` cùng `security`/`ask` cũ, schema của OpenClaw từ chối). Khi có agent
-thứ hai, `agents.ownership: explicit` và
-`agents.defaults.systemAgent.agentId: main` được đặt, mỗi khóa chỉ khi
-chưa có, để việc nói của người dùng giữ agent của chúng. Khi đã có
+thứ hai, `agents.defaults.systemAgent.agentId: main` được đặt khi chưa có,
+để việc nói của người dùng giữ agent của chúng, và không đóng dấu
+`agents.ownership`: nhóm agent `explicit` không có agent mặc định, và trên
+lamp-52e6 (walk3, 15/11) mọi task OpenClaw không nêu agent của Harness sau
+lần chạy skill đầu tiên đều dừng trước câu hỏi ("dispatch uncertain
+stopped_before_message"). Thay vào đó entry của system agent được đặt
+`default: true` khi chưa entry nào có, nên task không nêu agent vẫn về
+`main`; agent rào không bao giờ có khóa này. Dấu `explicit` mà rào này
+từng ghi (cạnh entry của nó) được gỡ lại; `explicit` do người dùng tự đặt,
+hoặc một entry khác đã là mặc định, thì bị từ chối, "Refused: ...", và
+file giữ nguyên. Khi đã có
 `agents.entries`, OpenClaw không coi agent nào là ngầm định, nên system
 agent phải có trong đó (lamp-52e6, 15/11: chỉ có `lamp-skill-run`, OpenClaw
 thoát 78/CONFIG, "Unknown agent id \"main\" (not in agents.entries)"): khi
 `main` chưa có, nó được thêm là `entries.main: {workspace:
-<agents.defaults.workspace>}`, và entry của người dùng không bao giờ bị
+<agents.defaults.workspace>, default: true}`, và entry của người dùng không bao giờ bị
 sửa. Khi không giữ được system agent trong danh sách (không có
 `agents.defaults.workspace` cho `main`, hoặc system agent riêng của người
 dùng không có trong `entries`), việc gộp bị từ chối, "Refused: ... the

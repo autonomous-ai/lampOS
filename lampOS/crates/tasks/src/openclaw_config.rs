@@ -255,10 +255,12 @@ fn skill_run_agent(workspace: &str) -> Value {
 
 /// `openclaw.json`'s text with the fence agent ([`SKILL_RUN_AGENT`]) set
 /// in `agents.entries`, its workspace `workspace`; with it a second agent,
-/// `agents.ownership` `explicit` and the system agent [`MAIN_AGENT`], each
-/// only when not set already, and [`MAIN_AGENT`] listed in
-/// `agents.entries` with `agents.defaults.workspace` when it isn't; a
-/// system agent it can't keep listed is refused. A legacy `agents.list`
+/// the system agent [`MAIN_AGENT`] when none is set, [`MAIN_AGENT`] listed
+/// in `agents.entries` with `agents.defaults.workspace` when it isn't, and
+/// the system agent's entry `default: true` when no entry is, so tasks
+/// naming no agent still resolve to it. No `agents.ownership` is stamped;
+/// a system agent it can't keep listed or the default, or a person's
+/// `explicit` ownership, is refused. A legacy `agents.list`
 /// (invalid on OpenClaw 2026.11.2) is refused, never rewritten. Unchanged
 /// text when nothing changes.
 pub fn merge_skill_run_agent(text: &str, workspace: &Path) -> Result<String, Refused> {
@@ -282,11 +284,24 @@ pub fn merge_skill_run_agent(text: &str, workspace: &Path) -> Result<String, Ref
                 .into(),
         ));
     }
+    // `explicit` ownership leaves a fleet with no default, so Harness's
+    // agent-less OpenClaw tasks stop before their ask (lamp-52e6 walk3,
+    // 15 Nov). This fence's own earlier stamp (beside its entry) is taken
+    // back; a person's own `explicit` is refused, never overridden.
+    if agents.get("ownership").and_then(Value::as_str) == Some("explicit") {
+        let ours = agents
+            .get("entries")
+            .is_some_and(|entries| entries.get(SKILL_RUN_AGENT).is_some());
+        if !ours {
+            return Err(Refused(
+                "its `agents.ownership` is explicit, so tasks naming no agent would have none; left as it is"
+                    .into(),
+            ));
+        }
+        agents.remove("ownership");
+    }
     object(agents, "entries", "agents.entries")?
         .insert(SKILL_RUN_AGENT.into(), skill_run_agent(workspace));
-    if agents.get("ownership").is_none_or(Value::is_null) {
-        agents.insert("ownership".into(), json!("explicit"));
-    }
     let defaults = object(agents, "defaults", "agents.defaults")?;
     let home = defaults
         .get("workspace")
@@ -319,6 +334,25 @@ pub fn merge_skill_run_agent(text: &str, workspace: &Path) -> Result<String, Ref
             "the system agent is still not in `agents.entries`; left as it is".into(),
         ));
     }
+    // The system agent is the default, so a task naming no agent still
+    // resolves to it once a second agent is listed.
+    let id = value["agents"]["defaults"]["systemAgent"]["agentId"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    let entries = &mut value["agents"]["entries"];
+    let any_default = entries
+        .as_object()
+        .is_some_and(|all| all.values().any(|entry| entry["default"] == true));
+    if !any_default && let Some(entry) = entries[&id].as_object_mut() {
+        entry.insert("default".into(), json!(true));
+    }
+    if !agentless_resolves_to_system(&value) {
+        return Err(Refused(
+            "another agent is the default, so tasks naming no agent would leave the system agent; left as it is"
+                .into(),
+        ));
+    }
     if value == was {
         return Ok(text.to_owned());
     }
@@ -333,6 +367,21 @@ fn system_agent_listed(value: &Value) -> bool {
     value["agents"]["defaults"]["systemAgent"]["agentId"]
         .as_str()
         .is_some_and(|id| value["agents"]["entries"].get(id).is_some())
+}
+
+/// Whether a task naming no agent resolves to the system agent: no
+/// `explicit` ownership and exactly one entry `default: true`, the system
+/// agent's.
+fn agentless_resolves_to_system(value: &Value) -> bool {
+    let agents = &value["agents"];
+    let Some(entries) = agents["entries"].as_object() else {
+        return false;
+    };
+    let mut defaults = entries.iter().filter(|(_, entry)| entry["default"] == true);
+    agents["ownership"] != "explicit"
+        && defaults.next().map(|(id, _)| id.as_str())
+            == agents["defaults"]["systemAgent"]["agentId"].as_str()
+        && defaults.next().is_none()
 }
 
 /// The fence agent's exec approvals: an allow-list of `start` alone (each
@@ -628,7 +677,7 @@ mod tests {
         let value: Value = serde_json::from_str(&once).unwrap();
         assert_eq!(
             value["agents"]["entries"][MAIN_AGENT],
-            json!({"workspace": "/var/lib/lampos-openclaw/state/workspace"})
+            json!({"workspace": "/var/lib/lampos-openclaw/state/workspace", "default": true})
         );
         assert!(value["agents"]["entries"][SKILL_RUN_AGENT].is_object());
         assert_eq!(
@@ -646,6 +695,43 @@ mod tests {
         assert!(merge_skill_run_agent(theirs, ws).is_err());
     }
 
+    /// lamp-52e6 walk3, 15 Nov: with `ownership: explicit` and no default
+    /// agent, Harness's agent-less OpenClaw tasks stopped before their ask
+    /// ("dispatch uncertain stopped_before_message"). `main` is the
+    /// default, no ownership is stamped.
+    #[test]
+    fn the_skill_run_fence_keeps_main_the_default_for_agentless_tasks() {
+        let ws = Path::new("/var/lib/lampos-tasks/harnesses/lamp-tasks/gateway-skill-runs");
+        let once = merge_skill_run_agent(LAMP, ws).unwrap();
+        let value: Value = serde_json::from_str(&once).unwrap();
+        assert_eq!(value["agents"].get("ownership"), None);
+        assert_eq!(value["agents"]["entries"][MAIN_AGENT]["default"], true);
+        assert_eq!(
+            value["agents"]["entries"][SKILL_RUN_AGENT].get("default"),
+            None
+        );
+        assert_eq!(
+            value["agents"]["defaults"]["systemAgent"]["agentId"],
+            MAIN_AGENT
+        );
+        assert!(agentless_resolves_to_system(&value));
+        assert_eq!(merge_skill_run_agent(&once, ws).unwrap(), once);
+        // A person's explicit ownership leaves agent-less tasks nowhere.
+        let explicit = r#"{"agents":{"ownership":"explicit","defaults":{"workspace":"/w"}}}"#;
+        let refused = merge_skill_run_agent(explicit, ws).unwrap_err();
+        assert!(refused.0.contains("explicit"), "{}", refused.0);
+        // The stamp this fence wrote before (52e6 walk3) is taken back.
+        let mut stamped = value.clone();
+        stamped["agents"]["ownership"] = json!("explicit");
+        let stamped = serde_json::to_string(&stamped).unwrap();
+        let healed: Value =
+            serde_json::from_str(&merge_skill_run_agent(&stamped, ws).unwrap()).unwrap();
+        assert_eq!(healed, value);
+        // Another entry already the default, not the system agent: refused.
+        let other = r#"{"agents":{"defaults":{"workspace":"/w"},"entries":{"main":{"workspace":"/w"},"x":{"workspace":"/x","default":true}}}}"#;
+        assert!(merge_skill_run_agent(other, ws).is_err());
+    }
+
     #[test]
     fn the_skill_run_fence_keeps_the_main_agent_and_is_idle_twice() {
         let ws = Path::new("/var/lib/lampos-tasks/harnesses/lamp-tasks/gateway-skill-runs");
@@ -659,7 +745,7 @@ mod tests {
             ours["tools"]["exec"],
             json!({"host": "gateway", "mode": "allowlist", "safeBins": []})
         );
-        assert_eq!(value["agents"]["ownership"], "explicit");
+        assert_eq!(value["agents"].get("ownership"), None);
         assert_eq!(
             value["agents"]["defaults"]["systemAgent"]["agentId"],
             MAIN_AGENT
@@ -674,6 +760,7 @@ mod tests {
         let own = r#"{"agents":{"ownership":"shared","defaults":{"systemAgent":{"agentId":"work","x":1}},"entries":{"work":{"workspace":"/w"}}}}"#;
         let merged: Value = serde_json::from_str(&merge_skill_run_agent(own, ws).unwrap()).unwrap();
         assert_eq!(merged["agents"]["entries"]["work"]["workspace"], "/w");
+        assert_eq!(merged["agents"]["entries"]["work"]["default"], true);
         assert_eq!(merged["agents"]["ownership"], "shared");
         assert_eq!(
             merged["agents"]["defaults"]["systemAgent"],
