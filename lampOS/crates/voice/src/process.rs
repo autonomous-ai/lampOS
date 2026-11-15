@@ -1185,6 +1185,10 @@ fn worker_command(
             role,
             var(crate::skill_named::ENVIRONMENT).as_deref(),
         ))
+        .envs(told_when_asked_worker_environment(
+            role,
+            var(crate::told_when_asked::ENVIRONMENT).as_deref(),
+        ))
         .envs(make_skill_asked_worker_environment(
             role,
             var(crate::tools::make_skill_asked::ENVIRONMENT).as_deref(),
@@ -2022,6 +2026,18 @@ fn skill_named_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::skill_named::ENVIRONMENT, "on"))
+}
+
+// A skill the heard words named, its owner heard saying it, is kept as
+// their spoken ask, so its task's first yes may be asked in quiet hours
+// (`told_when_asked`, #7180): the exact `on`, to the second route, whose
+// named call it is.
+fn told_when_asked_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::told_when_asked::ENVIRONMENT, "on"))
 }
 
 // A plain ask to make a skill calls make_skill (`tools::make_skill_asked`,
@@ -3190,6 +3206,13 @@ mod tests {
                         "LAMP_SKILL_NAMED",
                         ["second"].as_slice(),
                     ),
+                    // Its owner's spoken ask of a named skill kept: the
+                    // second route alone (#7180).
+                    (
+                        told_when_asked_worker_environment,
+                        "LAMP_TOLD_WHEN_ASKED",
+                        ["second"].as_slice(),
+                    ),
                     // A plain ask to make a skill calls make_skill: the
                     // second route alone (#6835).
                     (
@@ -3502,6 +3525,7 @@ mod tests {
                     crate::tools::reminders_asked::ENVIRONMENT,
                     crate::tools::skill_asked::ENVIRONMENT,
                     crate::skill_named::ENVIRONMENT,
+                    crate::told_when_asked::ENVIRONMENT,
                     crate::tools::make_skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
@@ -3920,6 +3944,7 @@ mod tests {
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
+                    "LAMP_TOLD_WHEN_ASKED=on",
                     "LAMP_TURNED_FACE_SPEAKS=on",
                     "LAMP_TURNED_SPEAKING=on",
                     "LAMP_TWO_FACES_HELD=on",

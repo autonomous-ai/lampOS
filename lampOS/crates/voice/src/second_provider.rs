@@ -15958,6 +15958,34 @@ async fn answer(
                 &crate::skill_named::spoken(function),
             )));
         }
+        // The owner's own spoken ask of the skill, kept so its task's first
+        // yes may be asked in the lamp's quiet hours (#7180,
+        // `LAMP_TOLD_WHEN_ASKED`): only the owner heard saying it, judged
+        // on a thread of its own and never waited for here, so the named
+        // call runs as soon as it would without the switch; the say
+        // service's ask waits a little for it instead
+        // (`told_when_asked::ASKED_WAIT`).
+        if crate::told_when_asked::on()
+            && let Some(call) = &named_call
+        {
+            let skill = crate::skill_named::function_of(&call.name, &call.args).to_owned();
+            let lease = scope.clone();
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_millis() as u64);
+            drop(tokio::task::spawn_blocking(move || {
+                if !crate::services::owner_hears(request, heard, lease.as_ref()) {
+                    return;
+                }
+                if let Err(error) = crate::told_when_asked::keep(
+                    std::path::Path::new(crate::told_when_asked::SPOKEN_ASKS_FILE),
+                    &skill,
+                    now_ms,
+                ) {
+                    eprintln!("lamp-voice second: request {request}: {error}");
+                }
+            }));
+        }
         // Their yes did not count (#2377): told once, beside the request.
         if let Some(told) = unseen_yes {
             messages.push(Message::system(told));
