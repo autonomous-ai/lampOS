@@ -315,7 +315,11 @@ pub trait Peers: Send + Sync {
     fn maps(&self, pid: u32) -> io::Result<String>;
     /// `/proc/<pid>/status` (readable even when the pid is non-dumpable).
     fn status(&self, pid: u32) -> io::Result<String>;
-    /// The owner of `/proc/<pid>`: root's once the pid is non-dumpable.
+    /// The owner of `/proc/<pid>/status`: the root of the pid's user
+    /// namespace outside it once the pid is non-dumpable, or 0 when that
+    /// root is not mapped (as in OpenClaw's gateway, #7133); else its euid.
+    /// Not the `/proc/<pid>` folder, which the kernel leaves at the euid
+    /// whatever the dumpable flag.
     fn proc_owner(&self, pid: u32) -> io::Result<u32>;
     /// `None` when `pid` is in lamp-tasks' own user namespace; else the
     /// uid that namespace's root is outside it (`/proc/<pid>/uid_map`'s
@@ -366,7 +370,7 @@ impl Peers for Kernel {
     }
 
     fn proc_owner(&self, pid: u32) -> io::Result<u32> {
-        std::fs::metadata(format!("/proc/{pid}")).map(|meta| meta.uid())
+        std::fs::metadata(format!("/proc/{pid}/status")).map(|meta| meta.uid())
     }
 
     fn user_ns_root(&self, pid: u32) -> io::Result<Option<u32>> {
@@ -514,19 +518,20 @@ fn untraced(peers: &dyn Peers, pid: u32) -> Result<(), String> {
     }
 }
 
-/// After [`READY`]: `pid` is non-dumpable (its `/proc` folder is root's,
-/// so no process of lamp-tasks' uid can attach to it any more, and it has
-/// not exec'd since, which would make it dumpable again) and still
+/// After [`READY`]: `pid` is non-dumpable (its `/proc/<pid>/status` is
+/// root's, so no process of lamp-tasks' uid can attach to it any more, and
+/// it has not exec'd since, which would make it dumpable again) and still
 /// untraced.
 ///
-/// In another user namespace (OpenClaw's gateway runs in one, `unshare
-/// --map-root-user`, #7133) the kernel gives a non-dumpable task's `/proc`
-/// to that namespace's root, the uid outside that made it, as it gives a
-/// dumpable one's: there the owner must be that uid, and it tells no more.
-/// That namespace's root holds `CAP_SYS_PTRACE` over it, so non-dumpable
-/// keeps out no process in it: there only an untraced launcher at
-/// [`READY`] and the run token's own limits (that run, that skill's
-/// grants, its life) guard the run.
+/// The kernel gives a non-dumpable task's `/proc` files to the root of the
+/// task's user namespace, or to uid 0 when that root is not mapped
+/// (`task_dump_owner`); the `/proc/<pid>` folder stays at its euid. OpenClaw
+/// runs its agents in a user namespace whose root is not mapped (the
+/// wrapper's `unshare --user --map-user` inside the gateway's `unshare
+/// --map-root-user`, #7133, c0a4): there a non-dumpable launcher's status
+/// is 0's and a dumpable one's `lampos`'s, so the check is real. In a
+/// namespace whose root is mapped, the owner must be that root outside,
+/// as for a dumpable task whose euid it is, and it tells no more.
 pub fn undumped_may(peers: &dyn Peers, pid: u32) -> Result<(), String> {
     let owner = peers
         .proc_owner(pid)
