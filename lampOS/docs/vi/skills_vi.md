@@ -1510,9 +1510,10 @@ người dùng tạo được gỡ qua chính `make_skill`, chỉ với `remove`
 nghe (`made_remove::REMOVE`). Đó là một tham số của hàm giọng nói đã có,
 không bao giờ là một hàm riêng, vì giọng nói đã ở mức 48 hàm
 (`lamp_gemini::MAX_TOOLS`). Một câu có xin gỡ kỹ năng hay không là do mô
-hình phán đoán, theo mô tả của hàm ("Call it with remove alone to delete
-or remove a skill, or made alone when asked which skills they made, saying
-nothing first."), không bao giờ là
+hình phán đoán, theo mô tả của hàm ("To delete or remove a skill, call
+it with remove alone; to run one they made now, run alone; to list those
+they made, made alone; say nothing first.", câu của việc chạy và việc liệt
+kê nằm chung câu, xem dưới), không bao giờ là
 một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong code
 (`made_remove::asked`):
 - **Chỉ của chính người dùng.** Tên được so với các kỹ năng họ đã tạo, chỉ
@@ -1639,6 +1640,81 @@ và câu của read-back ngắn hơn. Sau đó, trong code (`made_list::listed`)
 Kiểm thử: `made_list::tests::the_skills_they_made_are_told_from_the_lamp_newest_first`,
 và `make_skill_local::tests::a_made_script_is_offered_to_the_voice_with_its_switch_alone`
 (được nói tới khi mọi công tắc bật, trong giới hạn).
+
+**Chạy ngay bằng giọng nói** (lamp-9adf, 15/11 lúc 15:49 và 15:52: "Run my
+unread mail skill now, please." và "Run my read newest email when sitting
+skill now." đều đi tới read-back, và đèn chỉ nói "unread mail doesn't send
+or write anything": kỹ năng tự tạo có trigger mà không có tool, nên
+`use_skill` không chạy được nó, và không gì khác chạy được). Kỹ năng do
+người dùng tạo được chạy một lần ngay qua chính `make_skill`, chỉ với
+`run`: tên như đã nghe (`made_run::RUN`), một tham số của hàm giọng nói đã
+có, như việc gỡ. Một câu xin chạy kỹ năng ngay hay xin nghe nó gửi gì là
+do mô hình phán đoán, theo câu của việc gỡ trong mô tả hàm ở trên và mô tả
+của tham số ("Only when the person asks to run, start or do a skill they
+made, now … Never to hear what it sends or uses."), không bao giờ là một
+danh sách từ (phán quyết của chủ đèn, 13/11). Câu "Call it only when the
+person asks for a skill to be made." của mô tả giờ là "Make one only when
+the person asks for it.", để khi mọi công tắc bật, mô tả vẫn trong 1.024
+byte (1.018, có việc liệt kê bên cạnh và câu của read-back rút lại thành
+"Call it with read_back alone to hear what a skill they made sends or what
+a skill on the lamp uses, saying nothing first."). Sau đó, trong code
+(`made_run::asked`):
+- **Chỉ của chủ đèn, nói thành lời.** Lượt không ai nói thì không chạy gì
+  ("a skill is run by voice only when the person asks out loud"); câu không
+  phải của chủ đèn, theo cách read-back hay việc gỡ xét
+  (`services::owner_hears`, hỏi đầu tiên), không chạy gì và không kể tên
+  kỹ năng nào ("only the lamp's owner can run a skill they made by voice").
+- **Chỉ của chính người dùng, theo tên.** So khớp như việc gỡ
+  (`made_remove::found`): cái họ không tạo là "NAME isn't a skill they
+  made, so I can't run it this way"; nhiều cái gần như nhau thì hỏi là cái
+  nào; không cái nào gần thì nói vậy, kể tên các kỹ năng của họ đang bật
+  (tối đa 3).
+- **Đúng các giới hạn của một lần trigger.** Cái đã tạo mà không bật là
+  "it isn't on the lamp now". Cái có write chưa được duyệt cho gói trên đèn
+  (`services::skill_writes_approved`, như read-back hỏi) là "it waits for
+  their yes to what it sends" (hoặc "it changed on the lamp since it was
+  made"); cái có task chưa có "có" của lamp-control
+  (`skill_task_yes::asks_by`, khi `LAMP_SKILL_TASKS` bật) là "it waits for
+  their yes to what it uses"; không biết được cái "có" nào thì "I can't
+  tell now whether …". Không gì chạy, và không việc chờ nào bắt đầu: cái
+  "có" vẫn được cho như trước, bằng cách hỏi nó gửi gì hay dùng gì. Nếu
+  không, lamp-skills được hỏi trên socket call của nó, một dòng, tối đa
+  1,5 s (`{"op":"run","skill":NAME}`, `made_run::OP`; mọi peer không phải
+  unit của giọng nói bị từ chối, `made_run::NOT_THE_VOICE`, và một `call`
+  không gọi được tên nội bộ của việc chạy). lamp-skills chỉ chạy kỹ năng
+  tạo trên đèn này (`made: here`, không bao giờ kỹ năng lõi), đã nạp,
+  không tắt hay tạm hoãn, lần chạy trước không còn đang chạy, các bước của
+  nó như trigger duy nhất của nó sẽ tạo (`lamp_skills::Engine::run_now`;
+  một bước giữ tới khi trigger kết thúc bị từ chối, vì kết thúc đó không
+  bao giờ tới). Trước khi tạo gì, nó từ chối bằng lời dễ hiểu những gì các
+  cổng của chính lần chạy sẽ từ chối (`run_now_refused`): task không biết
+  thư mục, hay `task::would_refuse` nói việc giao sẽ từ chối (hết
+  `PER_SKILL` = 3 lần chạy trong 24 giờ của nó, hết `ALL_SKILLS` = 10 của
+  mọi kỹ năng, task trước của nó vẫn đang chạy, task tắt); read có công
+  tắc tắt, hay đã chạy trong ngày địa phương này (read mỗi ngày một lần,
+  như `read_service` giữ); write có công tắc tắt hay đã bị dừng. Cái qua
+  được thì bắt đầu như một lần trigger (`start`): việc giao task kiểm tra
+  cái "có" của chủ đèn và đếm lần chạy trong `task-runs.json`, read chờ
+  phòng của nó, và các dịch vụ dùng token riêng của chúng. Như lần chạy
+  của một tool, Policy không được hỏi và `[[while]]`, giờ yên tĩnh,
+  cooldown, số lần tối đa mỗi ngày và giờ của nhóm của trigger không được
+  hỏi cũng không bị tiêu: người dùng đã xin. Journal ghi "run now, as its
+  owner asked by voice", hoặc lý do không chạy.
+- **Nói rõ ràng.** Đã chạy, mô hình chỉ nói NAME đang chạy, không bao giờ
+  nói nó tìm thấy, gửi hay làm gì, hay nó đã xong; những gì read hay agent
+  của task tìm thấy được nói như một lần trigger nói. Bị từ chối, "NAME
+  didn't run now, and why: …", không bao giờ nói nó đang chạy. lamp-skills
+  không trả lời thì là "my skills didn't answer, so it may not have
+  started".
+
+Kiểm thử: `made_run::tests::the_owners_two_lines_each_run_that_made_skill`,
+`a_run_refused_is_said_plainly_with_why`,
+`only_the_owners_heard_line_runs_a_skill`,
+`a_name_that_matches_none_runs_nothing`,
+`make_skill_is_offered_for_a_run_within_the_bounds`;
+`lamp_skills::tests::a_made_skill_runs_now_as_its_trigger_would_and_not_when_off`;
+`task::tests::a_run_now_past_its_own_three_a_day_is_refused_plainly`; và
+`tests::a_run_now_is_refused_as_its_trigger_s_run_would_be` của lamp-skills.
 
 Kiểm thử: `make_skill_local::tests` (kể cả
 `a_good_answer_is_kept_and_put_on_with_no_yes`,
