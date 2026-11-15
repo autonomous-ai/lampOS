@@ -387,7 +387,11 @@ const RUNS_EDITS: [(&str, &str); 6] = [
     ),
     (
         " P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\n",
-        " P=/var/lib/lampOS/skills-dev Q=/run/lampos-skill-start S=/tmp/.lampos-ns\n",
+        // Q= on a line of its own after the folders' line, so that line
+        // stays byte for byte the one lamp-tasks reads as the namespace
+        // showing lamp-control's socket (`lamp_tasks::skill_task::
+        // AGENT_NS_TASKS_LINE`; c0a4's #7133 dry run, 15 Nov).
+        " P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\nQ=/run/lampos-skill-start\n",
     ),
     (
         "|| fail \"no $P\"; else P=; fi\n",
