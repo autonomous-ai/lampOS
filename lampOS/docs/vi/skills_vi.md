@@ -2027,8 +2027,8 @@ cả hai người viết.
   `/opt` hiện trong namespace của lần tạo, và gói được ghi vào `/tmp` riêng
   của lần chạy), sửa theo lời của kiểm tra tối đa hai lần, rồi ghi
   `answer.md` như luật nói. Mỗi câu trả lời có 90 giây
-  (`make_skill_agent::GUIDED_WRITE_WITHIN`) thay vì 45 giây, trong 120 giây
-  của agent. Giọng nói vẫn cho câu trả lời qua toàn bộ kiểm tra của nó; câu
+  (`make_skill_agent::GUIDED_WRITE_WITHIN`), bằng khi không có hướng dẫn
+  (`WRITE_WITHIN`), trong 120 giây của agent. Giọng nói vẫn cho câu trả lời qua toàn bộ kiểm tra của nó; câu
   bị từ chối được gửi lại kèm lời của kiểm tra (`REPAIR_MARK`) tối đa thêm
   2 lần (`GUIDED_MOST_REPAIRS`), mỗi lần chỉ bắt đầu khi thêm một câu trả
   lời vẫn vừa 120 giây, và câu vẫn bị từ chối được nói là không tạo được,
