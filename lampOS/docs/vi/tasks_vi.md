@@ -1311,6 +1311,43 @@ rào cho script các namespace riêng, mạng chỉ có `lo`. Phép kiểm tra t
 một lần chạy của lamp-control vẫn giữ như với mọi lần chạy, và token hết
 hạn cùng lần chạy.
 
+**Agent anh em làm được gì và không làm được gì.** Mọi agent OpenClaw
+chạy trong gateway duy nhất, với user `lampos`, trong các namespace của
+gateway, và dùng chung `WORK`. Agent anh em là mọi agent khác `main`,
+hoặc bất kỳ mã nào khác chạy dưới `lampos` ở đó. Sau #7133:
+
+- **Không chạy được launcher qua exec approvals.** Chỉ `main` có mục
+  đúng đường dẫn launcher. Chủ máy cho một agent anh em exec không giới
+  hạn là cho nó cả launcher, và mọi chương trình khác.
+- **Không nhận được lần chạy bằng chương trình khác.** lamp-tasks chỉ
+  trả lời launcher do root sở hữu: cùng uid, `/proc/<pid>/exe` đúng file
+  đó (cùng device và inode), không biến `LD_`, chỉ mã của root không ghi
+  được được map, không có gì trace nó (`TracerPid` 0), và dòng id do
+  chính pid đó gửi (`SCM_CREDENTIALS`), kiểm tra lại sau khi đọc.
+  Launcher là bản static, tự đặt non-dumpable trước khi nhận grant, và
+  đóng mọi fd trên 4 trước hàng rào.
+- **Không chọn được script, trình thông dịch hay grant.** lamp-tasks cố
+  định grant theo cái gật đầu của chủ máy, và một lần chạy chỉ được nhận
+  một lần.
+- **Có thể, khi có launcher, tranh id của một lần chạy đang sống với
+  `main`.** Id không bí mật: nó là tên thư mục của lần chạy trong `WORK`
+  và có trong lời của tác vụ. Bên thắng chỉ được script đã duyệt của lần
+  chạy đó, trong hàng rào, một lần, và lần chạy thật khi đó đóng khi lỗi.
+- **Có thể, khi chạy được mã, đọc token của lần chạy.** Hàng rào đặt
+  token vào môi trường của script (`LAMP_CONTROL_TOKEN`), và script chạy
+  dưới `lampos`, dumpable sau exec. Một tiến trình `lampos` khác đọc được
+  `/proc/<pid>/environ`: đó là phép kiểm tra đọc của ptrace, mà
+  `ptrace_scope=1` của Yama không giới hạn. Token chỉ tới được
+  lamp-control, cho đúng lần chạy này, với grant của kỹ năng này, và bị
+  kết thúc khi lần chạy kết thúc (nhiều nhất 14 phút). Đường của Hermes
+  cũng mang token trong môi trường như vậy, nên điều này không mới với
+  #7133.
+- **Đọc và ghi được `WORK`, như trước.** Không gì của việc bắt đầu một
+  lần chạy được ghi ở đó, và không lần chạy nào ghi `openclaw.json`.
+
+Phần còn lại, token chỉ qua fd và một uid riêng cho script, là #7024.
+Sự chấp nhận trên #6882 (a) bao đúng giới hạn này và không rộng hơn.
+
 **Nhật ký của nó.** Cùng các dòng như lần chạy của Hermes qua Harness:
 
 ```
