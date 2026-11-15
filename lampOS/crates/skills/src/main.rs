@@ -2602,6 +2602,17 @@ fn start(
         );
         return made_rx;
     }
+    // A run that is only tasks the lamp would not hand over now makes
+    // nothing, and says so, rather than "goes on on its own".
+    if let Some(why) = tasks_refused(&skill, &calls, &runner.tasks.borrow()) {
+        let _ = runner.finished.send(SkillEvent {
+            skill,
+            stage: SkillStage::Done,
+            why: format!("not made: {why}"),
+            allowed: None,
+        });
+        return made_rx;
+    }
     // Counted once it is under way, for the opt-in health report's skill
     // runs (`lamp_skills::usage`): one atomic add, nothing waited on.
     if let Some(runs) = runner.runs.borrow().get(&skill) {
@@ -3339,6 +3350,28 @@ fn tool_call(
     let under_way = !nothing && busy.contains(&run.skill);
     if under_way && made.len() == run.calls.len() {
         return refuse("I'm still doing that.");
+    }
+    // A run that is only tasks the lamp would not hand over now: the model
+    // is told nothing runs, and why, never "Done." (lamp-9adf, 15 Nov).
+    if let Some(why) = tasks_refused(&run.skill, &made, &runner.tasks.borrow()) {
+        eprintln!("lamp-skills: {name} with {args} not run: {why}");
+        if !admission.commit() {
+            return;
+        }
+        let _ = reply.send(json!({ "error": format!("{} {why}", lamp_skills::TASK_NOT_RUN) }));
+        for event in run.events {
+            publish(out, event);
+        }
+        publish(
+            out,
+            SkillEvent {
+                skill: run.skill,
+                stage: SkillStage::Done,
+                why: format!("not made: {why}"),
+                allowed: None,
+            },
+        );
+        return;
     }
     // The caller told it timed out: nothing is done.
     if !admission.commit() {
@@ -5528,6 +5561,27 @@ fn lamp_room(
     }
 }
 
+/// Why a run of `calls`, every one a `do.task`, makes nothing now, in the
+/// words after "not made: ": its folder not known, or what
+/// [`lamp_skills::task::would_refuse`] says [`lamp_skills::task::hand`]
+/// would refuse. `None` for a run with any other call, which is made as
+/// it is; the hand-over still holds each task to the real gate.
+fn tasks_refused(skill: &str, calls: &[Call], tasks: &Tasks) -> Option<String> {
+    use lamp_skills::task;
+    if calls.is_empty() || !calls.iter().all(|call| matches!(call, Call::Task(_))) {
+        return None;
+    }
+    if !tasks.of.contains_key(skill) {
+        return Some("its folder is not known".into());
+    }
+    let why = task::would_refuse(skill, tasks.state.as_deref(), unix_ms())?;
+    Some(
+        why.strip_prefix(task::NOT_HANDED)
+            .unwrap_or(&why)
+            .to_owned(),
+    )
+}
+
 /// A skill's `do.task` that came due (#6305, [`lamp_skills::task`]),
 /// handed over on a thread of its own ([`lamp_skills::task::hand`]): only
 /// with the switch on and the owner's yes for its folder as it is now and
@@ -7619,6 +7673,96 @@ mod tests {
             Some(off)
         );
         // Nothing is counted by the check.
+        assert!(!root.path().join(lamp_skills::task::RUNS_FILE).exists());
+    }
+
+    /// A run that is only a `do.task` the lamp would not hand over makes
+    /// nothing and says "not made:", never "goes on on its own"; a run with
+    /// another call is made as it is, its task held to the hand-over.
+    #[test]
+    fn a_run_of_only_a_task_refused_says_it_is_not_made() {
+        // The switch is read from this process's environment here.
+        if lamp_skills::task::on() {
+            return;
+        }
+        let root = tempfile::Builder::new()
+            .prefix("task-refused-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(root.path().join("bus")).unwrap();
+        let mut out = bus
+            .publisher_declared(SkillEvent::TOPIC, &SkillEvent::declaration(), "skills")
+            .unwrap();
+        let (_woken, waker) = wake_pipe().unwrap();
+        let (finished, done) = waking(&Arc::new(waker));
+        let tasks = Tasks {
+            of: HashMap::from([("study".to_owned(), (root.path().join("study"), Vec::new()))]),
+            state: Some(root.path().to_owned()),
+            socket: None,
+            say: root.path().join("say.sock"),
+        };
+        let task = || {
+            Call::Task(Box::new(lamp_skills::task::TaskStep {
+                task: "Start a study block.".into(),
+                run: "scripts/study.sh".into(),
+            }))
+        };
+        assert_eq!(
+            tasks_refused("study", &[task(), light("warm")], &tasks),
+            None
+        );
+        assert_eq!(tasks_refused("study", &[], &tasks), None);
+        assert_eq!(
+            tasks_refused("other", &[task()], &tasks).as_deref(),
+            Some("its folder is not known")
+        );
+        let runner = Runner {
+            sockets: nowhere(root.path(), Permissions::default()),
+            finished,
+            bus,
+            glows: None,
+            body_requests: false,
+            ends: RefCell::default(),
+            unplug: RefCell::default(),
+            made: RefCell::default(),
+            tasks: RefCell::new(tasks),
+            local_time: None,
+            trust_clock: false,
+            clock_waiting: Cell::new(false),
+            rest_client: None,
+            runs: RefCell::default(),
+            permissions: RefCell::default(),
+            looks: RefCell::default(),
+            watching: RefCell::new(Watching {
+                watches: Watches::default(),
+                marks: HashMap::new(),
+                texts: None,
+                known_file: None,
+                signs: None,
+                retaken: HashMap::new(),
+            }),
+            proposals: None,
+        };
+        let told = start(
+            "study".into(),
+            vec![task()],
+            &mut HashSet::new(),
+            &mut out,
+            &runner,
+        );
+        let event = done.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(event.stage, SkillStage::Done);
+        assert_eq!(
+            event.why,
+            format!(
+                "not made: {}",
+                lamp_skills::task::OFF
+                    .strip_prefix(lamp_skills::task::NOT_HANDED)
+                    .unwrap()
+            )
+        );
+        // Nothing was made, so nothing tells it began.
+        assert!(told.recv().is_err());
         assert!(!root.path().join(lamp_skills::task::RUNS_FILE).exists());
     }
 
