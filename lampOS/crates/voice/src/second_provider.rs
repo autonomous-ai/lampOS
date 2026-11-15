@@ -15135,6 +15135,17 @@ fn held_for_a_claim(held: &mut Option<String>, piece: String) -> String {
     }
 }
 
+/// Whether the turn is the lamp's own note of a skill made already, with
+/// no call of its own: one it wrote ([`Asker::Written`], never an add-on's
+/// quoted line) that opens on [`crate::made_skill::ALREADY_DONE`], as the
+/// app's make line and a cut voice make's line are told
+/// (`app_make::say_note`). `LAMP_ACTION_CLAIM_CHECKED` counts that make as
+/// the turn's call, so its "I made …" is never said as not done.
+fn made_skill_said(asked: &Asker, said: &str) -> bool {
+    matches!(asked, Asker::Written { quoted: false, .. })
+        && said.starts_with(crate::made_skill::ALREADY_DONE)
+}
+
 /// A turn whose reply claimed an action again with no call of its kind,
 /// after one ask again (`LAMP_ACTION_CLAIM_CHECKED`, #5215): what an earlier
 /// round held is said, then [`crate::action_claim::NOT_DONE_LINE`], and the
@@ -15184,6 +15195,7 @@ async fn answer(
     let looking = matches!(asked, Asker::Written { looking: true, .. });
     let searching = matches!(asked, Asker::Written { search: true, .. });
     let quoted = matches!(asked, Asker::Written { quoted: true, .. });
+    let made_said = made_skill_said(&asked, &said);
     let heard_at = Instant::now();
     // The request's own words, for a forget it calls (#3113): never the
     // next line, which may be someone else's.
@@ -16011,6 +16023,14 @@ async fn answer(
                 crate::made_skill::MAKE.to_owned(),
                 serde_json::json!({ crate::make_skill_local::READ_BACK: name }),
             ));
+        }
+        // So is the make the lamp's own note says is done
+        // ([`made_skill_said`]: an app's make, a voice make's line after its
+        // turn was cut): the skill was made outside the turn, so its line
+        // stands (lamp-9adf, 15 Nov, build 13162: "I made …" said as "Sorry,
+        // I didn't do that." after the app's MAKE IT, three of three).
+        if made_said {
+            turn_called.push((crate::made_skill::MAKE.to_owned(), Value::Null));
         }
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
