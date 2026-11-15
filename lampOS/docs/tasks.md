@@ -3809,20 +3809,6 @@ running as `lampos` there. After #7133:
 - **Can read and write `WORK`, as before.** Nothing of a run's start is
   written there, and no run writes `openclaw.json`.
 
-**So any OpenClaw agent in the gateway can use a running skill's grants
-for that run.** Every agent there is the gateway namespace's root with
-`CAP_SYS_PTRACE`, and the fence's own namespace (`unshare --user
---map-user`, made by the launcher) is a child of the gateway's. So an
-agent can attach to the launcher after its `ready` check and read the
-grant off fd 3 before the fence, or read `LAMP_CONTROL_TOKEN` from the
-script's environment or memory for as long as the run lasts. `TracerPid`
-0 at `ready` is one moment, not a guard. What bounds it is the token's
-own limits: one run, that one skill's grants, at most 14 minutes.
-
-What remains, the token on an fd only and a uid of its own for the
-script, is #7024. The acceptance on #6882 (a) covers exactly this limit
-and nothing wider.
-
 **Its journal.** The same lines as Hermes's run through Harness:
 
 ```
@@ -3835,6 +3821,29 @@ None of these lines names the engine in lamp-tasks' own words: `<agent>`
 is the name Harness's `show` gives for the session, or `the lamp's default
 agent` when Harness says stopped, or `not known (harness show: …)` when its
 reply can't be read. The same holds for Hermes and OpenClaw.
+
+### The limit accepted for Monday: a running skill's grants inside the gateway
+
+Accepted for Monday's ship as #6882 (a) (the first builder, #7133,
+15 Nov 21:31): **any OpenClaw agent in the gateway can read a running
+skill's token and use its grants for that run.** That includes the
+default agent's own other turns, such as a spoken task running at the
+same time, not only an agent the owner adds. Every agent there is the
+gateway namespace's root with `CAP_SYS_PTRACE`, and the fence's own
+namespace (`unshare --user --map-user`, made by the launcher) is a child
+of the gateway's. So an agent can attach to the launcher after its
+`ready` check and read the grant off fd 3 before the fence, or read
+`LAMP_CONTROL_TOKEN` from the script's environment or memory for as
+long as the run lasts. `TracerPid` 0 at `ready` is one moment, not a
+guard. What bounds it is the token's own limits, checked by lamp-control
+on every call: one run, that one skill's grants, at most 14 minutes.
+The limit also leans on agent `main`'s exec allow-list: `main` may run
+the launcher and nothing else, so its turns run no other command. Hermes's runs carry
+the token in the environment the same way.
+
+The fix is #7024 (P1): lamp-tasks starts the fenced script itself,
+outside the gateway's namespaces, with the token from lamp-tasks and
+never through the launcher, and the same for Hermes's runs.
 
 ## Devin (#1854)
 
