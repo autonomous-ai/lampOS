@@ -1813,10 +1813,15 @@ vụ nói, tối đa 11 câu. Skill không cần `speak`: lời đồng ý của
 agent found: told N`), và trước đó câu trả lời của lamp-tasks mang theo bao
 nhiêu câu trả lời của agent, chỉ độ dài (`do.task: lamp-tasks' answer
 carries N bytes of its agent's answer`, hoặc `no agent's answer`; #7180).
+Khi bắt đầu chờ mà cổng đang đóng, dù là một lần đọc hay một câu trả lời cần
+nói, nhật ký ghi một lần kèm lý do (`skill:<name>: waits for its gate: quiet
+hours`, `Room::waits`), để câu trả lời bị giữ trong giờ yên lặng, hoặc mất
+khi lamp-skills khởi động lại trong lúc chờ, vẫn để lại một dòng (#7180).
 Lần chạy không có quyền đọc (gửi thư, task của một
 script) không nói gì, như trước. Test:
 `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
-`service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`.
+`service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,
+`service_read::tests::a_wait_for_the_gate_says_why_once`.
 
 ### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, bật trong sản phẩm, đề xuất trên #6059)
 

@@ -4541,10 +4541,15 @@ at most the say service's 900 bytes, at most 11. The skill needs no
 only how many were said (`do.task: what its agent found: told N`), and
 before it how much of the agent's answer lamp-tasks' answer carried, its
 length only (`do.task: lamp-tasks' answer carries N bytes of its agent's
-answer`, or `no agent's answer`; #7180). A run
+answer`, or `no agent's answer`; #7180). A gate found shut as the wait
+begins, a read's or a told answer's, is said once with its reason
+(`skill:<name>: waits for its gate: quiet hours`, `Room::waits`), so an
+answer held in quiet hours, or lost with a restart of lamp-skills while it
+waits, leaves a line (#7180). A run
 with no read grant (a send, a script's task) tells nothing, as before.
 Tests: `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
-`service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`.
+`service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,
+`service_read::tests::a_wait_for_the_gate_says_why_once`.
 With the same switch in `lamp-skills`, its manage helper, `lamp-voice` and
 `lamp-control` (which reads a skill's grants through lamp-skills at each
 token's mint), a `do.task`'s `grants` may name a linked service's grant
