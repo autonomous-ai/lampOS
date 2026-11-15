@@ -3643,6 +3643,9 @@ file:
   it exits 2 before it connects anywhere (`usage: skill-start <run-id>`,
   `the run id is not one lamp-tasks makes`, `refused: an LD_ variable is
   set`).
+  lamp-tasks is built static (`+crt-static`, no ELF interpreter;
+  `deploy/build-lamp-tasks-static.sh`, checked in both arm64 CI jobs), so
+  the launcher runs no `ld.so` and no preloaded code before `main()`.
 - **The socket.** The launcher sends the run id to
   `/run/lampos-skill-start/start.sock` (0600). lamp-update owns the folder
   `/run/lampos-skill-start` (0755, `lampos`'s): the OpenClaw gateway's
