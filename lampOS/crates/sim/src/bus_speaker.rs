@@ -261,13 +261,73 @@ impl Runs {
     }
 }
 
-/// Whether to start the player again: it has ended, no run is going on (so no answer is cut
-/// by the start's wait), and the last start was at least [`QUIET`] ago (a player that ends at
-/// once is not started over and over). With the voice's clock on, its zero blocks come every
+/// A player that ended within this of its start ended at once (a sound server that drops the
+/// stream): the next start waits longer.
+const QUICK: Duration = Duration::from_secs(5);
+/// The longest wait between starts of a player that keeps ending at once.
+const MOST_WAIT: Duration = Duration::from_secs(60);
+
+/// When the player is started again. With the voice's clock on, its zero blocks come every
 /// 10 ms between answers, so a player that died there is noticed and started again before the
-/// next answer, which is then played, not lost.
-fn restart_due(gone: bool, in_run: bool, started: Instant, now: Instant) -> bool {
-    gone && !in_run && now.duration_since(started) >= QUIET
+/// next answer, which is then played, not lost. Never during a run (the start's wait, about
+/// 150 ms, would cut the answer). A start can still fall just before an answer's first block:
+/// the blocks then wait on the bus and come at once, and the cap ([`AHEAD`]) makes a short hole
+/// at the answer's start; the run's line says how many were dropped.
+#[derive(Debug)]
+struct Restarts {
+    /// When the player now in use was started.
+    started: Instant,
+    /// When it was first seen ended, if it has.
+    ended: Option<Instant>,
+    /// How many players in a row ended at once: each doubles the wait before the next start.
+    quick: u32,
+}
+
+impl Restarts {
+    fn new(now: Instant) -> Self {
+        Self {
+            started: now,
+            ended: None,
+            quick: 0,
+        }
+    }
+
+    /// The wait after a start before the next: [`QUIET`], doubled for each player in a row that
+    /// ended at once, [`MOST_WAIT`] at most.
+    fn wait(&self) -> Duration {
+        if self.quick == 0 {
+            return QUIET;
+        }
+        QUIET.saturating_mul(1 << self.quick.min(6)).min(MOST_WAIT)
+    }
+
+    /// Whether to start the player again now; `gone` is whether it has ended.
+    fn due(&mut self, gone: bool, in_run: bool, now: Instant) -> bool {
+        if !gone {
+            return false;
+        }
+        self.ended.get_or_insert(now);
+        !in_run && now.duration_since(self.started) >= self.wait()
+    }
+
+    /// The player was started again at `now`: the line to say, if any. One line for a player that
+    /// ended after it had played a while, one when they start ending at once, then none.
+    fn started_again(&mut self, now: Instant) -> Option<String> {
+        let lived = self
+            .ended
+            .map_or(Duration::MAX, |ended| ended.duration_since(self.started));
+        self.quick = if lived < QUICK { self.quick + 1 } else { 0 };
+        self.started = now;
+        self.ended = None;
+        match self.quick {
+            0 => Some("the voice's speaker's player ended; starting it again".to_owned()),
+            1 => Some(format!(
+                "the voice's speaker's player ended at once; starting it again less and less often (every {} s at most)",
+                MOST_WAIT.as_secs()
+            )),
+            _ => None,
+        }
+    }
 }
 
 /// How long `bytes` of 24 kHz mono S16LE play.
@@ -288,7 +348,7 @@ pub fn run(bus: &Bus) {
 /// [`run`] with a player queue of `queued` blocks and `ahead` of sound ahead of the clock at most.
 pub fn run_with(bus: &Bus, queued: usize, ahead: Duration) {
     let mut player = Player::start(queued, ahead);
-    let mut started = Instant::now();
+    let mut restarts = Restarts::new(Instant::now());
     if player.child.is_none() {
         eprintln!(
             "lamp-sim: the voice's speaker is counted, not played (LAMP_SIM_SPEAKER=silent, or no paplay, aplay or ffplay)"
@@ -319,10 +379,11 @@ pub fn run_with(bus: &Bus, queued: usize, ahead: Duration) {
             if let Some(run) = runs.ended(now) {
                 eprintln!("lamp-sim: {}", run_line(&run));
             }
-            if restart_due(player.gone(), runs.in_run(), started, now) {
-                eprintln!("lamp-sim: the voice's speaker's player ended; starting it again");
+            if restarts.due(player.gone(), runs.in_run(), now) {
                 player = Player::start(queued, ahead);
-                started = Instant::now();
+                if let Some(line) = restarts.started_again(Instant::now()) {
+                    eprintln!("lamp-sim: {line}");
+                }
             }
         }
     }
@@ -553,25 +614,16 @@ mod tests {
     fn a_dead_player_is_started_again_between_answers_only() {
         let start = Instant::now();
         let at = |ms: u64| start + Duration::from_millis(ms);
-        // Dead, between answers, last started long ago: start it again.
-        assert!(restart_due(true, false, start, at(5_000)));
+        // Dead, between answers, started long ago: start it again.
+        assert!(Restarts::new(start).due(true, false, at(5_000)));
         // Alive: never.
-        assert!(!restart_due(false, false, start, at(5_000)));
+        assert!(!Restarts::new(start).due(false, false, at(5_000)));
         // During an answer: not now (the start's wait would cut it); after the run.
-        assert!(!restart_due(true, true, start, at(5_000)));
+        assert!(!Restarts::new(start).due(true, true, at(5_000)));
         // Started less than QUIET ago and dead again: wait.
-        assert!(!restart_due(
-            true,
-            false,
-            start,
-            at(QUIET.as_millis() as u64 - 1)
-        ));
-        assert!(restart_due(
-            true,
-            false,
-            start,
-            at(QUIET.as_millis() as u64)
-        ));
+        let quiet = QUIET.as_millis() as u64;
+        assert!(!Restarts::new(start).due(true, false, at(quiet - 1)));
+        assert!(Restarts::new(start).due(true, false, at(quiet)));
         // Runs says whether an answer is going on: sound starts it, QUIET after the last sound ends it.
         let mut runs = Runs::default();
         let mut player = Player {
@@ -587,6 +639,45 @@ mod tests {
         assert!(runs.in_run());
         assert!(runs.ended(at(10 + QUIET.as_millis() as u64)).is_some());
         assert!(!runs.in_run());
+    }
+
+    /// A player that keeps ending at once is started again less and less often (QUIET, doubled each
+    /// time, MOST_WAIT at most) with one line when that begins, not a line a second for ever; one that
+    /// played a while before it ended is started again after QUIET, as at first.
+    #[test]
+    fn a_player_that_ends_at_once_is_started_again_less_often() {
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let mut restarts = Restarts::new(start);
+        let mut now = 0;
+        let mut waits = Vec::new();
+        let mut lines = Vec::new();
+        for _ in 0..9 {
+            // Each player is seen ended 100 ms after its start.
+            assert!(!restarts.due(true, false, at(now + 100)));
+            let mut t = now + 100;
+            while !restarts.due(true, false, at(t)) {
+                t += 100;
+            }
+            waits.push(t - now);
+            lines.push(restarts.started_again(at(t)));
+            now = t;
+        }
+        let secs: Vec<u64> = waits.iter().map(|ms| ms / 1000).collect();
+        assert_eq!(secs, [1, 2, 4, 8, 16, 32, 60, 60, 60], "{waits:?}");
+        assert!(lines[0].as_deref().unwrap().contains("less and less often"));
+        assert!(lines[1..].iter().all(Option::is_none), "{lines:?}");
+        // A player that plays a while (past QUICK) before it ends: started again after QUIET, said once.
+        let ended = now + 10_000;
+        assert!(!restarts.due(true, true, at(ended)), "not during a run");
+        assert!(restarts.due(true, false, at(ended + 61_000)));
+        assert!(
+            restarts
+                .started_again(at(ended + 61_000))
+                .unwrap()
+                .contains("starting it again")
+        );
+        assert_eq!(restarts.wait(), QUIET);
     }
 
     /// A burst (a held-up receive catching up) is played only up to AHEAD past the clock; the rest is dropped,
