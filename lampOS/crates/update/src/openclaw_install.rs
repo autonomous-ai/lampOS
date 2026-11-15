@@ -175,17 +175,38 @@ pub const SKILLS: &str = hermes_install::SKILLS;
 pub const SKILLS_SOCKET: &str = hermes_install::SKILLS_SOCKET;
 /// All [`NS`] shows OpenClaw of what it hides, as Hermes's does.
 pub const ALLOWED: [&str; 3] = [PLACE, WORK, SKILLS];
-/// A skill's run's `start` in Harness's project (#6685): what agent `main`
-/// execs by absolute path in a skill's run on OpenClaw (a Harness `new`
-/// turn through the gateway), allowed by its exec allow-list with the one
-/// run path on ([`exec_allowlist`]). Without the entry, OpenClaw's stock
-/// `ask` denies it: a headless turn cannot wait for an approval.
-pub const RUN_START: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start";
-/// The agent [`RUN_START`] is allowed for.
+/// The one file agent `main`'s exec allow-list names with the one run path
+/// on (#6685, [`exec_allowlist`]): a skill's run on OpenClaw is a Harness
+/// `new` OpenClaw turn (agent `main`), which execs this launcher by its
+/// absolute path, never a file in [`WORK`] (which every gateway agent can
+/// write, so nothing there is allowed). A byte copy of the installed
+/// lamp-tasks ([`TASKS_BINARY`]), root's, 0755, beside lamp-update's own
+/// fixed files ([`sync_launcher`]); it reaches lamp-tasks through
+/// [`START_SOCKET_DIR`]. Taken out with the one run path off.
+pub const SKILL_START: &str = "/usr/local/lib/lampos/skill-start";
+/// The installed lamp-tasks [`SKILL_START`] is a copy of: lamp-tasks.service's
+/// own `ExecStart` program (`hermes_install::RELAY`), its release's
+/// `current` link followed.
+pub const TASKS_BINARY: &str = hermes_install::RELAY;
+/// The folder of lamp-tasks' socket for [`SKILL_START`] (`start.sock`,
+/// which lamp-tasks makes in it). lamp-update's, never lamp-tasks' runtime
+/// folder (which a lamp-tasks restart wipes, leaving the gateway's bind of
+/// it stale): with the one run path on, the gateway's unit makes it at
+/// every start and keeps it past a stop ([`unit_text_for`]: `lampos`'s,
+/// 0755, until a reboot), Harness's one-shot makes it at once
+/// ([`sync_socket_dir`]), and [`NS`] shows it read-only (a unix socket
+/// still connects on a read-only mount), skipped when it is not there
+/// ([`RUNS_EDITS`]). Off, taken out.
+pub const START_SOCKET_DIR: &str = "/run/lampos-skill-start";
+/// The agent [`SKILL_START`] is allowed for.
 pub const RUN_AGENT: &str = "main";
-/// The fence agent of a withdrawn design (#7101): its [`RUN_START`] entry
-/// is taken out of OpenClaw's exec approvals.
+/// The fence agent of a withdrawn design (#7101): its [`OLD_RUN_START`]
+/// entry is taken out of OpenClaw's exec approvals.
 pub const OLD_FENCE_AGENT: &str = "lamp-skill-run";
+/// The glob an earlier build of #6685 allowed (a run's `start` in
+/// [`WORK`], which every gateway agent can write): taken out of agent
+/// [`RUN_AGENT`]'s and [`OLD_FENCE_AGENT`]'s allow-lists, never added.
+pub const OLD_RUN_START: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start";
 /// Free space `/var/lib` must hold before an install: the package unpacks
 /// to 275 MB, its dependencies and npm's cache come on top, and Node is
 /// about 190 MB. Not measured on a lamp yet: 2 GiB with room to spare.
@@ -345,19 +366,42 @@ fi
 /// on (the gateway mark's, [`wrapper_text_for`]), after [`ENGINE_EDITS`],
 /// each found exactly once (a test holds it): the pushed skills' folder
 /// (`hermes_install::PUSHED`) is shown read-only whenever it is there, not
-/// only with `LAMP_NS_NET=run`, which the gateway's unit never sets: the
-/// fence agent's `start` runs a pushed skill's script from it inside the
-/// gateway's namespace. Nothing else of `LAMP_NS_NET`'s (no network
-/// namespace, no `model.sock`, no relay) comes with it.
-const RUNS_EDITS: [(&str, &str); 2] = [
+/// only with `LAMP_NS_NET=run`, which the gateway's unit never sets: a
+/// skill's run, one turn on the gateway, runs a pushed skill's script from
+/// it. And [`START_SOCKET_DIR`], [`SKILL_START`]'s way to lamp-tasks:
+/// staged with the rest before `/run` is hidden, moved back and remounted
+/// read-only, and its staging folder removed; skipped when it is not
+/// there, as the pushed skills are. Nothing else of
+/// `LAMP_NS_NET`'s (no network namespace, no `model.sock`, no relay)
+/// comes with it.
+const RUNS_EDITS: [(&str, &str); 6] = [
     (
         "# It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there.\n",
         "# It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there, for the\n\
-         # gateway's every turn (#6685: a skill's run is one turn on it, its script under that folder).\n",
+         # gateway's every turn (#6685: a skill's run is one turn on it, its script under that folder), and\n\
+         # /run/lampos-skill-start, read-only, when there: /usr/local/lib/lampos/skill-start's way to lamp-tasks.\n",
     ),
     (
         "if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]; then mkdir -m 0700",
         "if [ -d \"$P\" ]; then mkdir -m 0700",
+    ),
+    (
+        " P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\n",
+        " P=/var/lib/lampOS/skills-dev Q=/run/lampos-skill-start S=/tmp/.lampos-ns\n",
+    ),
+    (
+        "|| fail \"no $P\"; else P=; fi\n",
+        "|| fail \"no $P\"; else P=; fi\n\
+         if [ -d \"$Q\" ]; then mkdir -m 0700 \"$S/q\" && mount --bind \"$Q\" \"$S/q\" || fail \"no $Q\"; else Q=; fi\n",
+    ),
+    (
+        "&& ro \"$P\" || fail \"$P not shown\"; fi\n",
+        "&& ro \"$P\" || fail \"$P not shown\"; fi\n\
+         if [ -n \"$Q\" ]; then mkdir -p \"$Q\" && mount --move \"$S/q\" \"$Q\" && ro \"$Q\" || fail \"$Q not shown\"; fi\n",
+    ),
+    (
+        "{ [ -z \"$P\" ] || rmdir \"$S/p\"; } &&",
+        "{ [ -z \"$P\" ] || rmdir \"$S/p\"; } && { [ -z \"$Q\" ] || rmdir \"$S/q\"; } &&",
     ),
 ];
 
@@ -427,8 +471,8 @@ pub const GATEWAY_MARK: &str = "# lampOS: a gateway agent: a skill's run is one 
 /// comments, each `#@<key> <value>`, which lamp-tasks reads
 /// (`lamp_tasks::gateway::GatewayAgent`) and no shell runs. A skill's run
 /// on OpenClaw is a Harness `new` OpenClaw turn (agent `main`), which
-/// execs the run folder's `start` by absolute path, allowed by agent
-/// `main`'s exec allow-list entry ([`RUN_START`], [`exec_allowlist`]).
+/// execs [`SKILL_START`] by absolute path, the one file agent `main`'s
+/// exec allow-list names ([`exec_allowlist`]).
 /// The `#@agent`, `#@turn`, `#@stop`, `#@end` and `#@fence-*` keys are
 /// from the withdrawn fence-turn design (#7101): nothing uses them after
 /// #7133, but `GatewayAgent`'s parse still needs every key, and they stay
@@ -506,6 +550,30 @@ NoNewPrivileges=yes
 WantedBy=multi-user.target
 ";
 
+/// The lines [`unit_text_for`] adds after [`UNIT_TEXT`]'s
+/// `WorkingDirectory=` with the one run path on: [`START_SOCKET_DIR`] made
+/// by systemd at each start, `lampos`'s, 0755, and kept past a stop or
+/// restart (until a reboot), so lamp-tasks' socket in it outlives a
+/// gateway restart and the folder is there before [`NS`] shows it.
+pub const START_DIR_LINES: &str = "\
+# LAMP_SKILL_DEFAULT_AGENT=on (#6685): the folder of lamp-tasks' socket for /usr/local/lib/lampos/skill-start, which
+# openclaw-ns shows read-only; kept past a stop, so lamp-tasks' socket in it outlives a gateway restart.
+RuntimeDirectory=lampos-skill-start
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+";
+
+/// [`UNIT`]'s text for `shown`: with [`Shown::one_path`], [`UNIT_TEXT`]
+/// with [`START_DIR_LINES`] after its `WorkingDirectory=`; else
+/// [`UNIT_TEXT`], byte for byte.
+pub fn unit_text_for(shown: Shown) -> String {
+    let anchor = "WorkingDirectory=/var/lib/lampos-openclaw/state\n";
+    if !shown.one_path {
+        return UNIT_TEXT.to_owned();
+    }
+    UNIT_TEXT.replacen(anchor, &format!("{anchor}{START_DIR_LINES}"), 1)
+}
+
 /// What `systemctl enable` makes of [`UNIT_TEXT`]'s `WantedBy`: a link in
 /// `multi-user.target.wants` to the unit. The round makes and removes it.
 pub const WANTS: &str = "/etc/systemd/system/multi-user.target.wants/lamp-openclaw-gateway.service";
@@ -529,9 +597,10 @@ pub struct OpenclawInstall {
     pub node: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
-    /// With `installed`: agent `main`'s [`RUN_START`] allow-list entry was
-    /// put in OpenClaw's exec approvals ([`exec_allowlist`]) by this
-    /// build's install, with the one run path on.
+    /// With `installed`: agent `main`'s [`SKILL_START`] allow-list entry
+    /// was added to OpenClaw's exec approvals ([`exec_allowlist`]) by this
+    /// build, with the one run path on. False until an add succeeded, so a
+    /// round asks again.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub exec_allowlist: bool,
 }
@@ -745,7 +814,7 @@ pub fn present(root: &Path, shown: Shown) -> bool {
         && holds(root, WRAPPER, &wrapper_text_for(shown))
         && holds(root, NS, &ns_text(shown))
         && agent_ns::hook_shim_there(root)
-        && fs::read(unit_path(root)).is_ok_and(|bytes| bytes == UNIT_TEXT.as_bytes())
+        && fs::read(unit_path(root)).is_ok_and(|bytes| bytes == unit_text_for(shown).as_bytes())
 }
 
 /// When `serve` starts, as Hermes's: off, an earlier record and ask are
@@ -797,7 +866,7 @@ pub fn after_round(
     window: Result<crate::hermes_schedule::Window, String>,
     say: &mut dyn FnMut(&str),
 ) -> Option<OpenclawInstall> {
-    match crate::writer_unit::write_unit(root, UNIT, UNIT_TEXT) {
+    match crate::writer_unit::write_unit(root, UNIT, &unit_text_for(shown)) {
         Ok(true) => {
             if let Err(why) = systemd.reload() {
                 say(&format!("{UNIT} written, but systemd not reloaded: {why}"));
@@ -807,14 +876,23 @@ pub fn after_round(
         Err(why) => say(&format!("OpenClaw's gateway unit not written: {why}")),
     }
     let before = record(records);
-    // An OpenClaw installed before the allow-list entry was made is
-    // installed again (its steps then add it) once the one run path is on.
-    let allowlist_due = shown.one_path
-        && !before
-            .as_ref()
-            .is_some_and(|said| said.install == "installed" && said.exec_allowlist);
-    if present(root, shown) && !allowlist_due {
+    // OpenClaw there, but agent main's allow-list entry not added yet with
+    // the one run path on (an earlier build's, or an add that failed), or
+    // still recorded with it off, or the launcher not this lamp-tasks'
+    // copy: the one-shot is asked (its steps do only that, the gateway
+    // running), and asked again each round until done.
+    let added = |said: &OpenclawInstall| said.install == "installed" && said.exec_allowlist;
+    let allowlist_due = if shown.one_path {
+        !before.as_ref().is_some_and(added)
+    } else {
+        before.as_ref().is_some_and(added)
+    };
+    let due = allowlist_due || launcher_due(root, shown);
+    let there = present(root, shown);
+    if there {
         gateway_on(root, systemd, say);
+    }
+    if there && !due {
         if before
             .as_ref()
             .is_some_and(|said| said.install == "installed")
@@ -1137,16 +1215,16 @@ fn install_with(
     Ok(said)
 }
 
-/// The gateway stopped, then the wrapper and the namespace
-/// script taken out, the wrapper first. OpenClaw's folder (its state among
-/// it) and the unit file (the round's) stay.
+/// The gateway stopped, then the wrapper, the namespace script and
+/// [`SKILL_START`] taken out, the wrapper first. OpenClaw's folder (its
+/// state among it) and the unit file (the round's) stay.
 fn remove_entry_points(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
     if fs::symlink_metadata(unit_path(root)).is_ok()
         && let Err(why) = run(&["systemctl", "stop", UNIT].map(str::to_owned))
     {
         say(&format!("{UNIT} not stopped: {why}"));
     }
-    for path in [WRAPPER, NS] {
+    for path in [WRAPPER, NS, SKILL_START] {
         match fs::remove_file(on(root, path)) {
             Ok(()) => say(&format!("{path} taken out")),
             Err(error) if error.kind() == ErrorKind::NotFound => {}
@@ -1154,6 +1232,7 @@ fn remove_entry_points(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str))
         }
     }
     agent_ns::remove_hook_shim(root, &hermes_install::NS_SCRIPTS, say);
+    sync_socket_dir(root, &mut |_| Ok(String::new()), Shown::default(), say);
 }
 
 /// The install, in order: `lampos` and its ids looked up; `curl`, `tar`
@@ -1169,8 +1248,12 @@ fn remove_entry_points(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str))
 /// gateway's token made once, OpenClaw's config given its `gateway` block,
 /// `openclaw --version` run in the namespace (OpenClaw's first run, which
 /// finishes its package step), the namespace script and the wrapper
-/// written, the gateway (re)started (the round enables it), [`ASIDE`]
-/// removed, and after a new install lamp-tasks started again if it runs.
+/// written, [`SKILL_START`] made as the one run path wants it
+/// ([`sync_launcher`]), after a new install lamp-tasks started again if it
+/// runs, the gateway (re)started (the round enables it), [`ASIDE`]
+/// removed, and agent `main`'s exec allow-list edited through the running
+/// gateway ([`exec_allowlist`]). OpenClaw there already: only the
+/// launcher and the allow-list, when not done yet.
 fn steps(
     root: &Path,
     records: &Path,
@@ -1184,20 +1267,18 @@ fn steps(
         say(&format!(
             "OpenClaw {VERSION} is already at {OPENCLAW}: nothing installed"
         ));
+        sync_launcher(root, shown, say);
+        sync_socket_dir(root, run, shown, say);
         let before = record(records).filter(|said| said.install == "installed");
         if let Some(said) = &before
             && said.exec_allowlist == shown.one_path
         {
             return said.clone();
         }
-        let ids = install::uid_of(run, USER).and_then(|uid| Ok((uid, gid_of(run, USER)?)));
-        let applied = ids.and_then(|(uid, gid)| exec_allowlist(run, &uid, &gid, shown, say));
-        if let Err(why) = applied {
-            say(&format!("OpenClaw is not installed: {why}"));
-            return write(records, failed(now_unix_ms(), "config"));
-        }
+        // Never a failure of the install: an add not done is retried.
+        let added = exec_allowlist(run, shown, say);
         let mut said = before.unwrap_or_else(|| OpenclawInstall::installed(now_unix_ms()));
-        said.exec_allowlist = shown.one_path;
+        said.exec_allowlist = added;
         return write(records, said);
     }
     write(
@@ -1381,18 +1462,27 @@ fn steps(
             );
         }
     }
-    if let Err(why) = exec_allowlist(run, &uid, &gid, shown, say) {
-        return fail("config", why, say);
-    }
     if let Err(why) = write_entry_points(root, shown) {
         return fail("entry", why, say);
     }
-    if !fs::read(unit_path(root)).is_ok_and(|bytes| bytes == UNIT_TEXT.as_bytes()) {
+    sync_launcher(root, shown, say);
+    sync_socket_dir(root, run, shown, say);
+    if !fs::read(unit_path(root)).is_ok_and(|bytes| bytes == unit_text_for(shown).as_bytes()) {
         return fail(
             "gateway",
             format!("{UNIT} is not this build's: a round writes it"),
             say,
         );
+    }
+    // lamp-tasks merges OpenClaw's models and skills at its start. Before
+    // the gateway's (re)start: lamp-tasks' runtime folder is made again
+    // with it, and the gateway's namespace shows START_SOCKET_DIR as it is
+    // when the gateway starts.
+    if !pinned_there
+        && let Err(why) =
+            run(&["systemctl", "try-restart", "lamp-tasks.service"].map(str::to_owned))
+    {
+        say(&format!("lamp-tasks.service not started again: {why}"));
     }
     // Always on (the owner on #6226): started now, or restarted so one
     // running an older OpenClaw runs the new one. The round enables it.
@@ -1400,14 +1490,9 @@ fn steps(
         return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
     }
     remove_aside(root, say);
-    if !pinned_there
-        && let Err(why) =
-            run(&["systemctl", "try-restart", "lamp-tasks.service"].map(str::to_owned))
-    {
-        // lamp-tasks merges OpenClaw's models and skills at its start.
-        say(&format!("lamp-tasks.service not started again: {why}"));
-    }
-    let exec_allowlist = shown.one_path;
+    // Through the gateway just (re)started; an add not done is retried by
+    // the next round, never a failure of the install.
+    let exec_allowlist = exec_allowlist(run, shown, say);
     let shown = match (shown.skills, shown.tasks) {
         (true, true) => {
             "its own folder, its work folder, the skills, lamp-skills' socket and lamp-control's socket"
@@ -1429,46 +1514,163 @@ fn steps(
     )
 }
 
-/// The `openclaw approvals` commands [`exec_allowlist`] runs for `shown`,
-/// each OpenClaw's own allow-list edit of its local approvals (no target
-/// flag: the approvals row in [`STATE`]'s database, through the gateway
-/// when it runs, offline when not), never a whole document set. With the
-/// one run path on, agent [`RUN_AGENT`] given [`RUN_START`] and
-/// [`OLD_FENCE_AGENT`]'s entry taken out; off, [`RUN_AGENT`]'s entry
-/// taken out. OpenClaw adds a pattern there already, or removes one not
-/// there, without writing, so each runs every time.
-pub fn exec_allowlist_args(shown: Shown) -> Vec<[&'static str; 6]> {
-    let edit = |op, agent| ["approvals", "allowlist", op, "--agent", agent, RUN_START];
+/// The `openclaw approvals` edits [`exec_allowlist`] runs for `shown`,
+/// each OpenClaw's own allow-list edit of the running gateway's exec
+/// approvals (`--gateway`), never a whole document set. With the one run
+/// path on, agent [`RUN_AGENT`] given [`SKILL_START`] exactly (no glob, no
+/// argument pattern), then [`OLD_RUN_START`] taken out of [`RUN_AGENT`]'s
+/// and [`OLD_FENCE_AGENT`]'s entries; off, [`RUN_AGENT`]'s [`SKILL_START`]
+/// and [`OLD_RUN_START`] taken out.
+pub fn exec_allowlist_args(shown: Shown) -> Vec<[&'static str; 7]> {
+    let edit = |op, agent, path| {
+        [
+            "approvals",
+            "allowlist",
+            op,
+            "--gateway",
+            "--agent",
+            agent,
+            path,
+        ]
+    };
     if shown.one_path {
-        vec![edit("add", RUN_AGENT), edit("remove", OLD_FENCE_AGENT)]
+        vec![
+            edit("add", RUN_AGENT, SKILL_START),
+            edit("remove", RUN_AGENT, OLD_RUN_START),
+            edit("remove", OLD_FENCE_AGENT, OLD_RUN_START),
+        ]
     } else {
-        vec![edit("remove", RUN_AGENT)]
+        vec![
+            edit("remove", RUN_AGENT, SKILL_START),
+            edit("remove", RUN_AGENT, OLD_RUN_START),
+        ]
     }
 }
 
-/// [`exec_allowlist_args`] run in OpenClaw's namespace as `lampos`, as
-/// `openclaw --version` is ([`in_namespace`]), not through [`WRAPPER`]
-/// (which needs the gateway running). OpenClaw's config and its
-/// `tools.exec` are never touched.
-fn exec_allowlist(
-    run: &mut Runner,
-    uid: &str,
-    gid: &str,
-    shown: Shown,
-    say: &mut dyn FnMut(&str),
-) -> Result<(), String> {
-    for args in exec_allowlist_args(shown) {
-        run(&in_namespace(uid, gid, false, &args))
-            .map_err(|why| format!("openclaw {}: {why}", args.join(" ")))?;
+/// [`exec_allowlist_args`] run as `lampos` through [`WRAPPER`], which joins
+/// the running gateway's namespaces (the form that worked on a lamp; run
+/// in a namespace of its own with no target, `approvals` exits 1 while the
+/// gateway runs). Only with the gateway's unit active: else nothing is
+/// run, said in one line, and the next round asks again. A remove that
+/// fails is said and passed over; an add that fails is said and not done.
+/// Whether agent [`RUN_AGENT`]'s [`SKILL_START`] entry was added: never
+/// with the one run path off. OpenClaw's config and its `tools.exec` are
+/// never touched.
+fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> bool {
+    if run(&["systemctl", "is-active", "--quiet", UNIT].map(str::to_owned)).is_err() {
+        say(&format!(
+            "OpenClaw's exec allow-list left as it is: {UNIT} is not running; the next round tries again"
+        ));
+        return false;
     }
-    say(&if shown.one_path {
-        format!(
-            "OpenClaw's exec allow-list lets agent {RUN_AGENT} run {RUN_START}; {OLD_FENCE_AGENT}'s entry taken out"
-        )
-    } else {
-        format!("OpenClaw's exec allow-list no longer lets agent {RUN_AGENT} run {RUN_START}")
-    });
-    Ok(())
+    let mut added = false;
+    for args in exec_allowlist_args(shown) {
+        let mut argv = vec![WRAPPER];
+        argv.extend(args);
+        match run(&as_lampos(&argv)) {
+            Ok(_) => added |= args[2] == "add",
+            Err(why) if args[2] == "add" => say(&format!(
+                "OpenClaw's exec allow-list does not let agent {} run {} yet: {why}; the next round tries again",
+                args[5], args[6]
+            )),
+            Err(why) => say(&format!(
+                "OpenClaw's exec allow-list: {} {} not taken out: {why}",
+                args[5], args[6]
+            )),
+        }
+    }
+    if added {
+        say(&format!(
+            "OpenClaw's exec allow-list lets agent {RUN_AGENT} run {SKILL_START} alone"
+        ));
+    } else if !shown.one_path {
+        say(&format!(
+            "OpenClaw's exec allow-list no longer lets agent {RUN_AGENT} run {SKILL_START}"
+        ));
+    }
+    added
+}
+
+/// [`SKILL_START`] there as `shown` wants it: with the one run path on, a
+/// regular file, 0755, holding [`TASKS_BINARY`]'s bytes; off, not there.
+/// Nothing is due when lamp-tasks is not installed.
+fn launcher_due(root: &Path, shown: Shown) -> bool {
+    let place = on(root, SKILL_START);
+    if !shown.one_path {
+        return fs::symlink_metadata(&place).is_ok();
+    }
+    match fs::read(on(root, TASKS_BINARY)) {
+        Ok(source) => !launcher_holds(&place, &source),
+        Err(_) => false,
+    }
+}
+
+fn launcher_holds(place: &Path, source: &[u8]) -> bool {
+    fs::symlink_metadata(place).is_ok_and(|meta| meta.is_file() && meta.mode() & 0o7777 == 0o755)
+        && fs::read(place).is_ok_and(|bytes| bytes == source)
+}
+
+/// [`START_SOCKET_DIR`] made at once with the one run path on (`lampos`'s,
+/// 0755; the gateway's unit makes it at each start too), taken out off.
+/// Never a failure of the install: what is not done is said.
+fn sync_socket_dir(root: &Path, run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) {
+    if shown.one_path {
+        let made = [
+            "install",
+            "-d",
+            "-o",
+            USER,
+            "-g",
+            USER,
+            "-m",
+            "0755",
+            START_SOCKET_DIR,
+        ];
+        if let Err(why) = run(&made.map(str::to_owned)) {
+            say(&format!("{START_SOCKET_DIR} not made: {why}"));
+        }
+        return;
+    }
+    match fs::remove_dir_all(on(root, START_SOCKET_DIR)) {
+        Ok(()) => say(&format!(
+            "{START_SOCKET_DIR} taken out: the one run path is off"
+        )),
+        Err(error) if error.kind() == ErrorKind::NotFound => {}
+        Err(error) => say(&format!("{START_SOCKET_DIR} not taken out: {error}")),
+    }
+}
+
+/// [`SKILL_START`] made what `shown` wants ([`launcher_due`]): with the
+/// one run path on, a byte copy of [`TASKS_BINARY`] (never a link) written
+/// whole beside and renamed in, root's, 0755, when it is missing or not
+/// those bytes; off, taken out. Never a failure of the install: what is
+/// not done is said, and the next round asks again.
+fn sync_launcher(root: &Path, shown: Shown, say: &mut dyn FnMut(&str)) {
+    let place = on(root, SKILL_START);
+    if !shown.one_path {
+        match fs::remove_file(&place) {
+            Ok(()) => say(&format!("{SKILL_START} taken out: the one run path is off")),
+            Err(error) if error.kind() == ErrorKind::NotFound => {}
+            Err(error) => say(&format!("{SKILL_START} not taken out: {error}")),
+        }
+        return;
+    }
+    let source = match fs::read(on(root, TASKS_BINARY)) {
+        Ok(source) => source,
+        Err(error) => {
+            say(&format!(
+                "{SKILL_START} not written: no {TASKS_BINARY}: {error}"
+            ));
+            return;
+        }
+    };
+    if launcher_holds(&place, &source) {
+        return;
+    }
+    match write_whole(&place, &source, 0o755) {
+        Ok(()) => say(&format!("{SKILL_START} written: a copy of {TASKS_BINARY}")),
+        Err(error) => say(&format!("{SKILL_START} not written: {error}")),
+    }
 }
 
 /// The error for a long step that failed: `timeout` past its bound, else
