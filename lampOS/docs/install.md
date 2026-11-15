@@ -2413,7 +2413,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the wrapper as `lampos`, on loopback `ws://127.0.0.1:18789`, with the
      token in `/var/lib/lampos-openclaw/gateway-token` (0600 `lampos`),
      made once by lamp-update at the install. One Gateway serves every
-     pane. Its unit is written by a round only, never by the one-shot:
+     pane. Its CPU: `Nice=10` and `CPUWeight=20` once the lamp is up, below
+     the voice, but `StartupCPUWeight=100` while the lamp boots, and
+     `CPUQuota=300%` (three of the eight cores) for its main thread and its
+     11 workers. At `CPUQuota=100%` they shared one core, and lamp-c0a4's
+     reboot on 15 Nov took 194 s to the gateway's "startup outcomes"
+     (#7135). Its unit is written by a round only, never by the one-shot:
      a one-shot that finds an earlier build's unit (a lamp-update ahead
      of its units) changes nothing and takes nothing out, journals
      "OpenClaw's install waits: lamp-openclaw-gateway.service is not
