@@ -1187,7 +1187,7 @@ ROW on lamp-52e6 is to come (#7301).
 
 ### How lively it moves: the energy level (`LAMP_BODY_ENERGY=on`, #6893)
 
-With `LAMP_BODY_ENERGY=on` (off unless exactly `on`, set in no unit) the body reads the character's
+With `LAMP_BODY_ENERGY=on` (off unless exactly `on`; on in the product, set on Body, Expression, Skills and Voice together: lamp-52e6, row-6893h, 15 Nov, level 5 PASS, #6893) the body reads the character's
 energy level, 1 to 5, from `character/energy` (`{"level": 1..5, "chosen": bool}`) at most once a second
 (`energy_in.rs`). A level outside 1 to 5 or a message that does not read is not taken; a publisher gone
 keeps the last level, not 1. Off, the body never reads it and runs at level 1. Level 1 is today exactly:
@@ -2084,7 +2084,7 @@ more for a lamp that stands.
 
 ### Energy: gestures under the servo's speed, an S-curve follower (`LAMP_BODY_ENERGY=on`, #6893)
 
-Off unless exactly `on`, set in no unit; off, nothing here changes. Not yet run on a lamp. On (`Limits::energy`):
+Off unless exactly `on`; on in the product (row-6893h on lamp-52e6, 15 Nov, level 5 PASS, #6893); off, nothing here changes. On (`Limits::energy`):
 
 - **A gesture's step never outruns the servo.** Each step from one frame to the next whose
   biggest joint move would go faster than `--servo-speed` counts a second (the servo's own goal
