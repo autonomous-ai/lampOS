@@ -1537,14 +1537,14 @@ mod tests {
             .unwrap()
             .to_owned();
         assert_eq!(told, format!("{note} {}", then_wait(&id)));
-        // Its id is told to the next heard line (#6558).
-        assert!(skill_write_yes::waiting_note(6, now).unwrap().contains(&id));
         assert!(skill_write_yes::waiting_note(5, now).is_none());
         // A yes before it was said whole is not taken.
         let early = skill_write_yes::approve(&id, 6, true, true, now, |_| panic!("approved"));
         assert_eq!(early["error"], skill_write_yes::NOT_SAID_WHOLE);
         // In its own turn, nobody spoke: never a yes.
         skill_write_yes::lamp_said(5, &line(&booth(false)));
+        // Its id is told to the next heard line once it was said (#6558).
+        assert!(skill_write_yes::waiting_note(6, now).unwrap().contains(&id));
         // The owner's yes: not refused, and it approves exactly this.
         assert!(crate::make_skill_local::not_owners_yes_refused(&id, || true).is_none());
         let mut approved = None;
@@ -1559,6 +1559,42 @@ mod tests {
         assert_eq!(approved.grants, Some(vec!["camera".into(), "light".into()]));
         assert!(approved.writes.is_empty() && !approved.code);
         assert!(!skill_write_yes::awaited(now));
+    }
+
+    /// A task's unasked say-back cut off before its first word (#7072, c0a4
+    /// 14 Nov: request 4's say dropped as the "yes" of request 5 began
+    /// 0.7 s later, "kept: none"): the yes over it finds it cut, as a
+    /// say-back cut part way is (#6715). The note hands it whole to say
+    /// again and gives no approve_id, so no round is lost on a refused
+    /// yes; said whole, the next yes is taken.
+    #[test]
+    fn an_unasked_say_back_cut_before_its_first_word_is_said_again_before_a_yes() {
+        let now = Instant::now();
+        let (note, kept) = asked_unasked(alone(), booth(false));
+        let note = note.unwrap();
+        let told = asked_in(4, note, || kept, now, 2_000);
+        let id = told
+            .split("approve_id \"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())
+            .unwrap()
+            .to_owned();
+        // Nothing of request 4 was kept: the line of request 5 cut it.
+        let cut = skill_write_yes::waiting_note(5, now).unwrap();
+        assert!(cut.contains("was not heard whole"), "{cut}");
+        assert!(cut.contains("say it again, word for word"), "{cut}");
+        assert!(cut.contains(&said(&booth(false))), "{cut}");
+        assert!(!cut.contains(&id), "{cut}");
+        assert!(!skill_write_yes::approve_forced_now(now));
+        let refused = skill_write_yes::approve(&id, 5, true, true, now, |_| panic!("approved"));
+        assert_eq!(refused["error"], skill_write_yes::NOT_SAID_WHOLE);
+        // Said whole in request 5: request 6's note gives the id, and its
+        // yes is taken.
+        skill_write_yes::lamp_said(5, &line(&booth(false)));
+        assert!(skill_write_yes::waiting_note(6, now).unwrap().contains(&id));
+        let told =
+            skill_write_yes::approve(&id, 6, true, true, now, |_| Ok(json!({"approved": 1})));
+        assert_eq!(told["approved"], true, "{told}");
     }
 
     /// Not said whole here, nothing is said and nothing kept, so the next
