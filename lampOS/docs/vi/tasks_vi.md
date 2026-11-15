@@ -306,7 +306,16 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   `morning-unread-mail` làm bằng giọng nói đã đọc Gmail 19 lần và kết thúc
   idle, mà không nói gì: câu trả lời được `show` đó đọc rồi bỏ đi. Câu trả
   lời của mọi lần chạy khác vẫn như trước; nhật ký không bao giờ ghi câu
-  trả lời. Test:
+  trả lời. Nhật ký ghi độ dài của câu trả lời ở mỗi bước, không bao giờ ghi
+  lời của nó (#7180): `answer=N` trên dòng gọi `show` (số byte trong câu
+  đáp của Harness), `its answer not read: CODE` khi `parse_show` không nhận
+  câu đáp đó, `its agent's answer: N bytes kept` của lần chạy (hoặc `none
+  in its end's show`, hoặc `not kept, its run didn't end well`), và
+  `its hand-over's answer tells N bytes` (hoặc `nothing`, hoặc `nothing:
+  not a run that tells`). lamp-skills ghi câu trả lời của lamp-tasks mang
+  theo gì (docs/vi/skills_vi.md). Trên lamp-9adf, 16/11, `show` lúc kết
+  thúc một lần chạy cho 360 byte mà không nói gì (#7180); các dòng này chỉ
+  ra nó mất ở đâu. Test:
   `a_service_reads_ended_answer_carries_what_its_agent_found`,
   `a_skill_runs_end_keeps_its_agents_last_answer`.
 - **Token một lần chạy** (điều kiện 12:45 của người xây dựng đầu tiên trên
