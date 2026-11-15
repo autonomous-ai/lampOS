@@ -1282,6 +1282,15 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   trả lời, không gì được gửi ("tasks: the OpenClaw Gateway did not answer
   on 127.0.0.1:18789 within 60 s; the hand-over is not sent"), và lỗi của
   lần chạy là `Harness didn't start the run (openclaw_gateway_not_ready)`.
+- **Khoảng trống sau khi khởi động (đã biết, chưa sửa).** OpenClaw chạy
+  một kỹ năng khi gateway của nó đã khởi động xong. Trên lamp-c0a4 việc đó
+  mất khoảng 176 s sau khi khởi động (lần khởi động lại #4, 15/11: từ lúc
+  unit của gateway active tới dòng "startup outcomes" của nó). Cổng đã trả
+  lời trước lúc đó, nên lần chờ ở trên không che được: một lần chạy được
+  giao trong khoảng đó không bao giờ khởi chạy script của nó, và kết thúc
+  với "the default agent never started the skill's script". #7170 theo dõi
+  việc giữ lần giao cho tới khi gateway báo sẵn sàng; #7174 theo dõi việc
+  khởi động nhanh hơn.
 - **Ghi cố định bị từ chối.** Task không có script (một ghi cố định) bị
   từ chối trước khi bất cứ gì được đặt sống: "a fixed write is not taken
   by a gateway agent, so nothing was started".

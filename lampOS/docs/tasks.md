@@ -3722,6 +3722,14 @@ file:
   answer on 127.0.0.1:18789 within 60 s; the hand-over is not sent"), and
   the run's error is `Harness didn't start the run
   (openclaw_gateway_not_ready)`.
+- **The window after a boot (known, not fixed yet).** OpenClaw runs a
+  skill once its gateway has finished starting. On lamp-c0a4 that is
+  about 176 s after a boot (reboot #4, 15 Nov: from the gateway's unit
+  going active to its "startup outcomes" line). The port answers before
+  then, so the wait above doesn't cover it: a run handed over inside that
+  window never starts its script, and ends with "the default agent never
+  started the skill's script". #7170 tracks holding the hand-over until
+  the gateway says it is ready; #7174 tracks a faster start.
 - **A fixed write is refused.** A task with no script (a fixed write) is
   refused before anything is made live: "a fixed write is not taken by a
   gateway agent, so nothing was started".
