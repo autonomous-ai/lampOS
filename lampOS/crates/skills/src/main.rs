@@ -5947,6 +5947,13 @@ impl lamp_skills::service_read::Room for LampRoom {
     fn turns(&self) -> Option<&'static lamp_skills::service_read::Turns> {
         Some(&lamp_skills::service_read::TURNS)
     }
+
+    fn waits(&mut self, why: &str) {
+        eprintln!(
+            "lamp-skills: skill:{}: waits for its gate: {why}",
+            self.skill
+        );
+    }
 }
 
 /// Makes one call and says how it went. A gesture or a move says it is
