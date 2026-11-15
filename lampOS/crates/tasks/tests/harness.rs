@@ -7437,6 +7437,124 @@ fn a_skill_run_goes_to_the_default_agent_by_the_one_path() {
     assert_eq!(engine_of(off, &rig), "hermes");
 }
 
+/// lamp-update's OpenClaw wrapper with its gateway data (a gateway agent),
+/// as its own source has them, its gateway's namespace script `ns`.
+fn openclaw_gateway_wrapper(ns: &std::path::Path) -> String {
+    let openclaw_rs = include_str!("../../update/src/openclaw_install.rs");
+    let between = |from: &str| {
+        openclaw_rs
+            .split_once(from)
+            .and_then(|(_, rest)| rest.split_once("\"#;"))
+            .unwrap()
+            .0
+            .to_owned()
+    };
+    let own = between("pub const WRAPPER_TEXT: &str = r#\"");
+    let data = between("pub const GATEWAY_DATA: &str = r#\"");
+    let at = data
+        .lines()
+        .find_map(|line| line.strip_prefix("#@ns "))
+        .unwrap()
+        .to_owned();
+    format!(
+        "#!/bin/sh\n{}{}{}",
+        lamp_tasks::gateway::GATEWAY_MARK,
+        data.replacen(&format!("#@ns {at}"), &format!("#@ns {}", ns.display()), 1),
+        own.strip_prefix("#!/bin/sh\n").unwrap()
+    )
+}
+
+/// Every file named `openclaw.json` under `dir`.
+fn openclaw_json_under(dir: &std::path::Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let mut todo = vec![dir.to_owned()];
+    while let Some(at) = todo.pop() {
+        for entry in fs::read_dir(&at).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.is_dir() && !path.is_symlink() {
+                todo.push(path);
+            } else if entry.file_name() == "openclaw.json" {
+                found.push(path);
+            }
+        }
+    }
+    found
+}
+
+/// #6685 (the lead's decision): with the switch on and OpenClaw the
+/// lamp's default, a gateway agent by its wrapper's data whose gateway's
+/// namespace shows lamp-control's socket, a skill's run is `harness new
+/// openclaw` in its own folder, exactly as Hermes's is: the token file
+/// written before the launch and in no argument, nothing left after, and
+/// no `openclaw.json` written anywhere.
+#[test]
+fn an_openclaw_gateway_default_runs_through_harness_new_like_hermes() {
+    for state in ["stopped", "idle"] {
+        let rig = Rig::new();
+        skill_ok_plan(&rig, state);
+        let gateway_ns = rig.root.path().join("openclaw-ns");
+        fs::write(
+            &gateway_ns,
+            format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+        )
+        .unwrap();
+        let wrapper = openclaw_gateway_wrapper(&gateway_ns);
+        assert!(lamp_tasks::gateway::GatewayAgent::of(&wrapper).is_some_and(|data| data.is_ok()));
+        // The agent namespace shows nothing: the gateway's own is what counts.
+        let runner = one_path_runner(
+            &rig,
+            EngineKind::Openclaw,
+            &[("openclaw", &wrapper)],
+            Some("#!/bin/sh\n"),
+        );
+        let run = skill_run(Duration::from_secs(20));
+        assert_eq!(runner.run(&run, &|| {}), Ok(0));
+        assert!(run.started.load(std::sync::atomic::Ordering::Acquire));
+        let calls = rig.calls();
+        for call in &calls {
+            assert!(!call.to_string().contains(RUN_SECRET), "{call}");
+        }
+        let verbs: Vec<&str> = calls
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap())
+            .collect();
+        // OpenClaw's own launch looks at its new agent once (`show`).
+        assert_eq!(verbs, ["machines", "new", "show", "wait", "show", "close"]);
+        let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+        assert_eq!(new["args"][1], "openclaw");
+        assert!(
+            new.to_string().contains("skill-task-1"),
+            "the run's own folder: {new}"
+        );
+        assert_eq!(openclaw_json_under(rig.root.path()), Vec::<PathBuf>::new());
+        nothing_left(&rig);
+    }
+
+    // Its gateway's namespace without lamp-control's socket: refused in
+    // words, nothing asked of Harness.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(&gateway_ns, "#!/bin/sh\n").unwrap();
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+        Some(&ns_with_runs()),
+    );
+    let said = runner
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert!(
+        said.starts_with(
+            "the lamp's default agent (openclaw) isn't set up for a skill's run yet ("
+        ) && said.contains("doesn't show lamp-control's socket"),
+        "{said}"
+    );
+    assert!(rig.calls().is_empty(), "nothing asked");
+    assert!(!rig.root.path().join("runs").exists());
+}
+
 /// #6685 PR 3: with the switch on and Harness read signed in (or offline,
 /// or not read yet), a skill's run still goes through Harness, `harness
 /// new <default>`, even though the default agent's wrapper takes a run
