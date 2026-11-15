@@ -3637,7 +3637,16 @@ default agent is, never by its name (`skill_task::AgentRun`):
    goes to `fence-set` on stdin, and `fence-get` again must show it. Each
    call is bounded to 30 s (`FENCE_WITHIN`: each is a cold OpenClaw CLI
    through nsenter, which took more than 10 s on lamp-52e6, #7019) and
-   read to 256 KiB. Once confirmed for the agent and the run path, later
+   read to 256 KiB. When the run had to wait for the gateway's port (a
+   gateway just restarted, as after set-up or an update), a call that
+   fails (a status, or past its bound) within 30 s of the port first
+   answering (`GATEWAY_FRESH`) is tried once more after 5 s
+   (`FENCE_RETRY_AFTER`), when the run's deadline leaves more than that,
+   with the log line "[lamp-tasks] the gateway's approvals call failed N s
+   after the gateway came up: tried again in 5 s": on lamp-52e6 the
+   approvals call 2 s after a restarted gateway listened ended with
+   status 1 (#7019). A gateway already answering at the run's first look
+   is taken as long up: no retry. Once confirmed for the agent and the run path, later
    runs of the same wrapper skip the fence (`GatewayRunner::fenced`, kept
    for lamp-tasks' life) until a turn fails, when the next run checks it
    again. Any

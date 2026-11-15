@@ -30,7 +30,8 @@
 //! gateway must answer on its loopback port first; then its fence is
 //! made sure of ([`GatewayRunner::ensure_fence`]: the approvals got, the
 //! agent's entry set when it is not there, got again to confirm it, each
-//! call bounded by [`FENCE_WITHIN`]; once confirmed, skipped until a turn
+//! call bounded by [`FENCE_WITHIN`] and tried once more when it fails on a
+//! gateway just come up, [`GATEWAY_FRESH`]; once confirmed, skipped until a turn
 //! fails), or the run is refused in words with
 //! no turn sent; then the turn is sent through the agent's wrapper (the
 //! program), held to the run's deadline.
@@ -87,6 +88,27 @@ pub const AFTER_WITHIN: Duration = Duration::from_secs(10);
 /// lamp-52e6 took more than 10 s (07:24 15 Nov, #7019). Calibration:
 /// lower it once the CLI is warm.
 pub const FENCE_WITHIN: Duration = Duration::from_secs(30);
+/// How long after the gateway first answered its port it is taken as
+/// freshly up: a fence call that fails within it is tried once more
+/// ([`FENCE_RETRY_AFTER`]). Known only when the run had to wait for the
+/// port; a gateway already answering is taken as long up. lamp-52e6 (08:20
+/// 15 Nov, #7019): the approvals call failed 2 s after the gateway's
+/// "http server listening". Calibration: how long a restarted gateway
+/// takes to answer approvals calls. In tests 8 s: a stand-in call takes
+/// about 3 s under the suite's load.
+pub const GATEWAY_FRESH: Duration = if cfg!(test) {
+    Duration::from_secs(8)
+} else {
+    Duration::from_secs(30)
+};
+/// How long a fence call that failed on a fresh gateway ([`GATEWAY_FRESH`])
+/// waits before its one more try, when the run's deadline leaves room.
+/// Calibration: lamp-52e6's failure (#7019) came 2 s after the listen.
+pub const FENCE_RETRY_AFTER: Duration = if cfg!(test) {
+    Duration::from_millis(200)
+} else {
+    Duration::from_secs(5)
+};
 /// The least the turn's stop and end have together past the run's
 /// deadline, so cleanup still happens: a run's only overrun.
 pub const AFTER_FLOOR: Duration = Duration::from_secs(3);
@@ -723,29 +745,56 @@ fn answered(said: &str, token_left: bool) -> Result<u64, String> {
 
 impl GatewayRunner {
     /// One fence call, bounded by [`FENCE_WITHIN`] and by `until` (the
-    /// run's deadline): what it printed, when it ended with status 0.
+    /// run's deadline): what it printed, when it ended with status 0. One
+    /// that failed (a status, or past its bound) within [`GATEWAY_FRESH`]
+    /// of `came_up` (when the run, having waited, saw the gateway first
+    /// answer) is tried once more after [`FENCE_RETRY_AFTER`], when the
+    /// deadline leaves room (#7019).
     fn fence_call(
         &self,
         template: &[String],
         input: Option<&str>,
         until: Instant,
+        came_up: Option<Instant>,
     ) -> Result<String, String> {
-        let within = until
-            .saturating_duration_since(Instant::now())
-            .min(FENCE_WITHIN);
-        if within.is_zero() {
-            return Err("the run's deadline passed".into());
-        }
-        let args = self.agent.fill(template, "", "", within);
-        match call(self, &args, within, None, input)? {
-            Turn::Done { code: 0, said } => Ok(said),
-            Turn::Done { code, .. } => Err(format!(
-                "the gateway's approvals call ended with status {code}"
-            )),
-            Turn::Cut => Err(format!(
-                "the gateway's approvals call ran past {} ms",
-                within.as_millis()
-            )),
+        // Ok(Err(why)) is a failed call, which may be tried again.
+        let once = || -> Result<Result<String, String>, String> {
+            let within = until
+                .saturating_duration_since(Instant::now())
+                .min(FENCE_WITHIN);
+            if within.is_zero() {
+                return Err("the run's deadline passed".into());
+            }
+            let args = self.agent.fill(template, "", "", within);
+            Ok(match call(self, &args, within, None, input)? {
+                Turn::Done { code: 0, said } => Ok(said),
+                Turn::Done { code, .. } => Err(format!(
+                    "the gateway's approvals call ended with status {code}"
+                )),
+                Turn::Cut => Err(format!(
+                    "the gateway's approvals call ran past {} ms",
+                    within.as_millis()
+                )),
+            })
+        };
+        let failed = match once()? {
+            Ok(said) => return Ok(said),
+            Err(why) => why,
+        };
+        match came_up.map(|up| up.elapsed()) {
+            Some(since)
+                if since < GATEWAY_FRESH
+                    && until.saturating_duration_since(Instant::now()) > FENCE_RETRY_AFTER =>
+            {
+                eprintln!(
+                    "[lamp-tasks] the gateway's approvals call failed {} s after the gateway came up: tried again in {} s",
+                    since.as_secs(),
+                    FENCE_RETRY_AFTER.as_secs()
+                );
+                std::thread::sleep(FENCE_RETRY_AFTER);
+                once()?
+            }
+            _ => Err(failed),
         }
     }
 
@@ -754,7 +803,14 @@ impl GatewayRunner {
     /// got again to confirm it is; each call by `until` at the latest.
     /// Once confirmed for this agent and `start`, later runs skip it
     /// ([`Self::fenced`]) until a turn fails.
-    pub fn ensure_fence(&self, start: &str, until: Instant) -> Result<(), String> {
+    /// `came_up` is when the run, having waited, saw the gateway first
+    /// answer ([`Self::fence_call`] tries a failed call once more then).
+    pub fn ensure_fence(
+        &self,
+        start: &str,
+        until: Instant,
+        came_up: Option<Instant>,
+    ) -> Result<(), String> {
         let key = format!("{}\n{start}", self.agent.agent);
         let mut fenced = self
             .fenced
@@ -768,10 +824,10 @@ impl GatewayRunner {
             return Ok(());
         }
         let entry = self.agent.entry(start)?;
-        let got = self.fence_call(&self.agent.fence_get, None, until)?;
+        let got = self.fence_call(&self.agent.fence_get, None, until, came_up)?;
         let was = if let Some(doc) = set_entry(&got, &self.agent.agent, &entry)? {
-            self.fence_call(&self.agent.fence_set, Some(&doc), until)?;
-            let again = self.fence_call(&self.agent.fence_get, None, until)?;
+            self.fence_call(&self.agent.fence_set, Some(&doc), until, came_up)?;
+            let again = self.fence_call(&self.agent.fence_get, None, until, came_up)?;
             if set_entry(&again, &self.agent.agent, &entry)?.is_some() {
                 return Err(
                     "the gateway's approvals do not hold the agent's entry once set".into(),
@@ -903,7 +959,11 @@ impl GatewayRunner {
         // The gateway is the lamp's own, warm: it answers on loopback, or
         // the run is given up in words before any turn is sent.
         let ready_until = (began + self.ready_within).min(until);
+        // Waited for, the gateway is freshly up: a failed fence call is
+        // then tried once more (GATEWAY_FRESH).
+        let mut waited = false;
         while !(self.ready)(self.agent.port) {
+            waited = true;
             if Instant::now() >= ready_until {
                 return Err(format!(
                     "the default agent's gateway did not answer on 127.0.0.1:{} within {} s, so nothing was started",
@@ -917,6 +977,7 @@ impl GatewayRunner {
                     .min(self.ready_within),
             );
         }
+        let came_up = waited.then(Instant::now);
         // The run's fence on the gateway, made sure of now (the gateway may
         // have come up since lamp-tasks started): no turn without it. Its
         // agent in OpenClaw's config first, which lamp-tasks' start may
@@ -928,6 +989,7 @@ impl GatewayRunner {
         self.ensure_fence(
             starts.to_str().ok_or("the project is not a plain path")?,
             until,
+            came_up,
         )
             .map_err(|why| {
                 format!("the default agent's fence for a skill's run is not set ({why}), so nothing was started")
@@ -1071,7 +1133,8 @@ mod tests {
             format!(
                 "#!/bin/sh\nprintf '%s\\n' \"$*\" >> {log}\n\
                  case $1.$2 in\n\
-                 approvals.get) cat {fence} 2>/dev/null || printf '%s\\n' '{{\"version\":1,\"agents\":{{\"main\":{{}}}}}}'; exit 0;;\n\
+                 approvals.get) [ -e {failonce} ] && {{ sleep \"$(cat {failonce})\"; rm {failonce}; exit 1; }}\n\
+                 cat {fence} 2>/dev/null || printf '%s\\n' '{{\"version\":1,\"agents\":{{\"main\":{{}}}}}}'; exit 0;;\n\
                  approvals.set) [ -e {refuse} ] && exit 1; cat > {fence}; exit 0;;\n\
                  esac\n\
                  case $3 in chat.abort) [ -e {stopslow} ] && sleep 30; [ -e {stopfail} ] && exit 1;; esac\n\
@@ -1079,6 +1142,7 @@ mod tests {
                 log = log.display(),
                 fence = dir.path().join("fence").display(),
                 refuse = dir.path().join("refuse").display(),
+                failonce = dir.path().join("failonce").display(),
                 stopslow = dir.path().join("stopslow").display(),
                 stopfail = dir.path().join("stopfail").display(),
             ),
@@ -1528,6 +1592,65 @@ mod tests {
             assert!(call.contains(&ms), "{call}");
         }
         assert!(FENCE_WITHIN > AFTER_WITHIN);
+    }
+
+    /// A runner whose gateway answers its port only at the second look, as
+    /// a gateway just restarted does.
+    fn runner_waiting_for_the_gateway(rig: &Rig) -> GatewayRunner {
+        let looked = std::sync::atomic::AtomicU32::new(0);
+        GatewayRunner {
+            ready: Box::new(move |_| looked.fetch_add(1, Ordering::AcqRel) > 0),
+            ..runner(rig)
+        }
+    }
+
+    /// #7019, lamp-52e6 08:20 15 Nov: OpenClaw's gateway restarted, the run
+    /// waited for its port, and the approvals call 2 s after it answered
+    /// ended with status 1. Tried once more, the run goes through.
+    #[test]
+    fn a_fence_call_failing_right_after_the_gateway_came_up_is_tried_once_more() {
+        let rig = rig(r#"{"status":"ok"}"#, false);
+        std::fs::write(rig.dir.path().join("failonce"), "0").unwrap();
+        let (_, end) = ended();
+        assert_eq!(
+            runner_waiting_for_the_gateway(&rig)
+                .run(&skill_run(&rig, Duration::from_secs(90)), &end),
+            Ok(0)
+        );
+        let fence = fence_calls(&rig);
+        assert_eq!(fence.len(), 4, "get failed, got again, set, get: {fence:?}");
+        assert!(fence[0].starts_with("approvals get"), "{fence:?}");
+        assert!(fence[1].starts_with("approvals get"), "{fence:?}");
+    }
+
+    /// The same failure on a gateway up longer than GATEWAY_FRESH (or
+    /// already answering when the run began) is not tried again: refused
+    /// as before.
+    #[test]
+    fn a_fence_call_failing_on_a_gateway_long_up_is_refused_with_no_retry() {
+        // Waited for, but the failing call ends past GATEWAY_FRESH.
+        let rig = rig(r#"{"status":"ok"}"#, false);
+        let late = GATEWAY_FRESH + Duration::from_millis(500);
+        std::fs::write(
+            rig.dir.path().join("failonce"),
+            format!("{}", late.as_secs_f64()),
+        )
+        .unwrap();
+        let (_, end) = ended();
+        let said = runner_waiting_for_the_gateway(&rig)
+            .run(&skill_run(&rig, Duration::from_secs(90)), &end)
+            .unwrap_err();
+        assert!(said.contains("ended with status 1"), "{said}");
+        assert_eq!(fence_calls(&rig).len(), 1, "{:?}", fence_calls(&rig));
+        assert!(calls(&rig).is_empty(), "no turn");
+        // Answering at the first look: not known fresh, not tried again.
+        let up = self::rig(r#"{"status":"ok"}"#, false);
+        std::fs::write(up.dir.path().join("failonce"), "0").unwrap();
+        let said = runner(&up)
+            .run(&skill_run(&up, Duration::from_secs(90)), &end)
+            .unwrap_err();
+        assert!(said.contains("ended with status 1"), "{said}");
+        assert_eq!(fence_calls(&up).len(), 1, "{:?}", fence_calls(&up));
     }
 
     #[test]

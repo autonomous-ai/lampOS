@@ -1205,7 +1205,16 @@ theo agent mặc định của đèn *là gì*, không bao giờ theo tên của
    mọi khóa khác) được đưa vào `fence-set` qua stdin, và `fence-get` lần
    nữa phải thấy nó. Mỗi lệnh tối đa 30 s (`FENCE_WITHIN`: mỗi lệnh là một
    CLI OpenClaw nguội qua nsenter, trên lamp-52e6 mất hơn 10 s, #7019) và
-   đọc tối đa 256 KiB. Khi đã xác nhận cho agent và đường chạy, các lần
+   đọc tối đa 256 KiB. Khi lần chạy phải chờ cổng của gateway (gateway vừa
+   khởi động lại, như sau cài đặt hay cập nhật), một lệnh thất bại (mã
+   trạng thái khác 0, hoặc quá giới hạn) trong vòng 30 s kể từ lúc cổng
+   trả lời lần đầu (`GATEWAY_FRESH`) được thử lại một lần sau 5 s
+   (`FENCE_RETRY_AFTER`), nếu hạn của lần chạy còn hơn thế, kèm dòng nhật
+   ký "[lamp-tasks] the gateway's approvals call failed N s after the
+   gateway came up: tried again in 5 s": trên lamp-52e6 lệnh approvals 2 s
+   sau khi gateway khởi động lại bắt đầu lắng nghe kết thúc với mã 1
+   (#7019). Gateway đã trả lời ngay lần nhìn đầu tiên được coi là đã chạy
+   lâu: không thử lại. Khi đã xác nhận cho agent và đường chạy, các lần
    chạy sau của cùng wrapper bỏ qua hàng rào (`GatewayRunner::fenced`, giữ
    suốt đời lamp-tasks) cho tới khi một lượt thất bại, lúc đó lần chạy kế
    kiểm lại. Lỗi bất kỳ là `run_failed` "the default agent's fence for a
