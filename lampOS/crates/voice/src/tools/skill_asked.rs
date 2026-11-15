@@ -238,13 +238,32 @@ pub fn asks_about(said: &str) -> Option<&'static str> {
 const POINTS: &[&str] = &["point", "aim", "shine"];
 
 /// The light a pointing verb points, whole.
+/// "Lights" too: on #7069's replay of row PL1 through Nova-3 with the
+/// product's settings, "point the light at my book" played softly in a
+/// room came back as "Point the lights at my book." two times of three.
 const LIGHT_POINTED: &[&[&str]] = &[
     &["the", "light"],
     &["your", "light"],
     &["a", "light"],
     &["some", "light"],
     &["light"],
+    &["the", "lights"],
+    &["your", "lights"],
+    &["some", "lights"],
+    &["lights"],
 ];
+
+/// Words speech to text writes for the lamp's name that the product's own
+/// call reading does not list (`attention::written_for_the_name` does the
+/// rest: "lamb", "lam", "lynn", "louvre", ...): "Hey, lab." came back for
+/// "Hey Lamp" on #7069's replay of rows PL1 and LOFF.
+const NAME_ALSO_HEARD_AS: &[&str] = &["lab"];
+
+/// Whether `word`, before a pointing ask, is the lamp's name as speech to
+/// text may write it ([`NAME_ALSO_HEARD_AS`]).
+fn the_name_as_heard(word: &str) -> bool {
+    crate::attention::written_for_the_name(word) || NAME_ALSO_HEARD_AS.contains(&word)
+}
 
 /// The words that say at what the light is pointed.
 const AT: &[&str] = &["at", "on", "onto", "over", "to", "toward", "towards"];
@@ -315,6 +334,29 @@ const NOT_A_THING: &[&str] = &[
     "hair",
     "room",
     "rooms",
+    // What speech to text writes for "the room" (#7069's replay of row RM
+    // through Nova-3: "Light up the roof." two times of three), and a
+    // room's own parts: never a thing on the desk.
+    "roof",
+    "roofs",
+    "rum",
+    "rome",
+    "broom",
+    "groom",
+    "ceiling",
+    "ceilings",
+    "wall",
+    "walls",
+    "floor",
+    "floors",
+    "world",
+    "sky",
+    "mood",
+    "party",
+    "stage",
+    "building",
+    "garden",
+    "yard",
     "place",
     "house",
     "home",
@@ -339,8 +381,8 @@ const NOT_A_THING: &[&str] = &[
 const MOST_THING_WORDS: usize = 5;
 
 /// [`POINT`] when the line plainly asks to point or shine the light at a
-/// thing: past a greeting, the lamp's name or a request ([`AROUND`],
-/// [`REQUESTS`]), "point/aim/shine the light at/on X" or "light (up) my/the
+/// thing: past a greeting, the lamp's name as speech to text writes it, or
+/// none ([`the_name_as_heard`]), or a request ([`AROUND`], [`REQUESTS`]), "point/aim/shine the light at/on X" or "light (up) my/the
 /// X (up)", and after the thing only a "please" or a "thanks"; never a room,
 /// a place or a face ([`NOT_A_THING`]). English only, as
 /// the other asks here bar the help questions: a line in any other language
@@ -350,8 +392,14 @@ const MOST_THING_WORDS: usize = 5;
 pub fn asks_to_point(said: &str) -> Option<&'static str> {
     let words = lower_words(said);
     let mut at = 0;
-    while let Some(taken) =
-        phrase_at(&words, at, AROUND).or_else(|| phrase_at(&words, at, REQUESTS))
+    while let Some(taken) = phrase_at(&words, at, AROUND)
+        .or_else(|| phrase_at(&words, at, REQUESTS))
+        .or_else(|| {
+            words
+                .get(at)
+                .filter(|word| the_name_as_heard(word))
+                .map(|_| 1)
+        })
     {
         at += taken;
     }
@@ -457,6 +505,15 @@ pub enum Asked {
     /// (not installed, turned off, or cut from `use_skill`): nothing is
     /// forced, and the pick is the model's.
     NotOffered(&'static str),
+    /// The line plainly asks for it and it is offered, but a force before
+    /// this one in round 1's chain (`second_provider::worker`'s
+    /// `first_force`s: a skill's task's yes, a named ask, a face, a make,
+    /// a keep, a timer or the reminders) names `first` for the same line,
+    /// and only one function is forced: `first` is (Heron's P3 on #7069).
+    ForcedFirst {
+        skill: &'static str,
+        first: &'static str,
+    },
 }
 
 /// What `said` comes to with the switch on: [`Asked::Forced`] when it
@@ -474,6 +531,30 @@ pub fn asked(said: &str, offered: Option<&Offered>) -> Option<Asked> {
     })
 }
 
+/// [`asked`], told what round 1 forces before the skill (`earlier`, the
+/// chain's forces ahead of [`force`], none when there are none): when one
+/// of those names a function for the line, [`Asked::ForcedFirst`], so the
+/// journal never says the skill is forced when another call is. `earlier`
+/// is asked as the chat asks it, the line as the last message.
+pub fn asked_after(
+    said: &str,
+    offered: Option<&Offered>,
+    earlier: Option<&Force>,
+) -> Option<Asked> {
+    match asked(said, offered)? {
+        Asked::Forced(skill) => Some(
+            match earlier.and_then(|earlier| earlier(&[Message::user(said)])) {
+                Some(first) => Asked::ForcedFirst {
+                    skill,
+                    first: first.name,
+                },
+                None => Asked::Forced(skill),
+            },
+        ),
+        other => Some(other),
+    }
+}
+
 /// The turn's journal line for what its heard words came to ([`asked`]),
 /// said once per spoken request that plainly asks for a skill; a line that
 /// asks for none says nothing. On lamp-52e6 on 15 Nov (Seventh's row P on
@@ -486,6 +567,9 @@ pub fn journal_line(request: u64, asked: Asked) -> String {
         ),
         Asked::NotOffered(skill) => format!(
             "lamp-voice second: request {request}: the line plainly asks for {skill}, but {skill} isn't offered: nothing is forced, the pick is the model's ({ENVIRONMENT})"
+        ),
+        Asked::ForcedFirst { skill, first } => format!(
+            "lamp-voice second: request {request}: the line plainly asks for {skill}, which would be forced, but {first} is forced first in round 1 ({ENVIRONMENT})"
         ),
     }
 }
@@ -507,7 +591,7 @@ pub fn force(offered: Option<Offered>) -> Force {
         let last = messages.last().filter(|message| message.role == "user")?;
         let said = last.words()?;
         match asked(said, offered.as_ref())? {
-            Asked::NotOffered(_) => None,
+            Asked::NotOffered(_) | Asked::ForcedFirst { .. } => None,
             Asked::Forced(skill) => Some(match offered {
                 Some(_) => Forced {
                     name: crate::use_skill::NAME,
@@ -972,6 +1056,118 @@ mod tests {
         assert_eq!(
             journal_line(10, Asked::NotOffered(POINT)),
             "lamp-voice second: request 10: the line plainly asks for point_light, but point_light isn't offered: nothing is forced, the pick is the model's (LAMP_SKILL_ASKED)"
+        );
+    }
+
+    /// #7069's c0a4 row, replayed through Nova-3 with the product's
+    /// settings (`net::stt`'s query): PL1 came back as "Hey, Lamp. Point
+    /// the light at my book." clean, and played softly in a room as "Hey,
+    /// lab. Point the light at my book." and "Hey, Lamp. Point the lights at
+    /// my book.". Each is point-light's, with the name as speech to text
+    /// writes it, or none: the rule is about the ask, not the name.
+    #[test]
+    fn the_rows_pointing_line_as_heard_is_point_lights() {
+        for said in [
+            "Hey, Lamp. Point the light at my book.",
+            "Hey, lab. Point the light at my book.",
+            "Hey, Lamp. Point the lights at my book.",
+            "Hey, Lamb. Point the light at my book.",
+            "Hey, Lam. Point the light at my book.",
+            "Hey Lynn, point the light at my book.",
+            "Lamb, point the light at my book.",
+            "Point the light at my book.",
+            "Hey. Point the light at my book.",
+            "Hey, Lamp. Hey, Lamp. Point the light at my book.",
+            "Hey, Lamp. Light my notebook, please.",
+            "Light my notebook.",
+        ] {
+            assert_eq!(asks_to_point(said), Some(POINT), "{said}");
+        }
+    }
+
+    /// #7069's c0a4 row RM: "Hey Lamp, light up the room." was forced to
+    /// point_light. Replayed softly in a room it came back as "Hey, Lamp.
+    /// Light up the roof." two times of three: a room's word as speech to
+    /// text writes it, or a room's part, is never the thing. Row PL2's
+    /// "light my notebook" came back as "Like my notebook, please.", which
+    /// is no ask to light anything and stays the model's.
+    #[test]
+    fn the_rows_room_line_as_heard_is_never_point_lights() {
+        for said in [
+            "Hey, Lamp. Light up the room.",
+            "Hey, Lamp. Light up the roof.",
+            "Hey, lab. Light up the roof.",
+            "Hey Lamb, light up the rum.",
+            "Light up the ceiling.",
+            "Light the walls up.",
+            "Shine the light on the floor.",
+            "Hey, Lamp. Like my notebook, please.",
+            "Like my notebook, please.",
+            "Hey, lab.",
+            "Hey, Lamp. Lab, point at the door.",
+        ] {
+            assert_eq!(asks_to_point(said), None, "{said}");
+        }
+    }
+
+    /// Heron's P3 on #7069: a force ahead of the skill's in round 1's chain
+    /// wins, and the journal says so rather than that the skill is forced.
+    #[test]
+    fn an_earlier_force_wins_and_the_journal_says_the_skill_is_not_forced() {
+        let book = "Hey Lamp, point the light at my book.";
+        let every: Offered = Arc::new(|_| true);
+        let make: Force = Arc::new(|messages: &[Message]| {
+            messages.last().filter(|message| message.role == "user")?;
+            Some(Forced {
+                name: "make_skill",
+                only: None,
+                fields: None,
+            })
+        });
+        let quiet: Force = Arc::new(|_: &[Message]| None);
+        assert_eq!(
+            asked_after(book, Some(&every), Some(&make)),
+            Some(Asked::ForcedFirst {
+                skill: POINT,
+                first: "make_skill"
+            })
+        );
+        assert_eq!(
+            asked_after(book, Some(&every), Some(&quiet)),
+            Some(Asked::Forced(POINT))
+        );
+        assert_eq!(
+            asked_after(book, Some(&every), None),
+            Some(Asked::Forced(POINT))
+        );
+        let without_point: Offered = Arc::new(|skill| skill != POINT);
+        assert_eq!(
+            asked_after(book, Some(&without_point), Some(&make)),
+            Some(Asked::NotOffered(POINT))
+        );
+        assert_eq!(
+            asked_after("What do you see?", Some(&every), Some(&make)),
+            None
+        );
+        assert_eq!(
+            journal_line(
+                4,
+                Asked::ForcedFirst {
+                    skill: POINT,
+                    first: "make_skill"
+                }
+            ),
+            "lamp-voice second: request 4: the line plainly asks for point_light, which would be forced, but make_skill is forced first in round 1 (LAMP_SKILL_ASKED)"
+        );
+        assert!(
+            !journal_line(
+                4,
+                Asked::ForcedFirst {
+                    skill: POINT,
+                    first: "make_skill"
+                }
+            )
+            .contains("forces use_skill")
         );
     }
 }

@@ -1200,12 +1200,24 @@ camera, so I can't take photos…" with `calls=none`.
   model's pick there. "Look at my book", "what do you see", "turn the
   light on", "light scene", "reading light", "light up the room", "light
   my face", "light this up" and "point at the door" are the model's, as
-  before: a room, a place or a face is never the thing. English only.
+  before: a room, a place or a face is never the thing, nor what speech
+  to text writes for a room or its parts ("the roof", "the ceiling", "the
+  walls", "the floor": #7069's row RM, "light up the room", came back as
+  "Light up the roof."). The rule is about the ask, not the name: the
+  name may be missing, or written as speech to text writes it ("Lamb",
+  "Lam", "Lynn", "lab", `attention::written_for_the_name`), and "the
+  lights" points as "the light" does (#7069's row PL1 came back as "Hey,
+  lab. Point the light at my book." and "Point the lights at my book.").
+  "Like my notebook" is no ask to light. English only.
   Each spoken request that plainly asks for a skill says so once in its
   journal (#7069): `request N: the plain ask forces use_skill point_light
   in round 1`, or `request N: the line plainly asks for point_light, but
   point_light isn't offered`, when point-light is not installed or is
-  turned off; any other line says nothing
+  turned off, or `request N: the line plainly asks for point_light, which
+  would be forced, but <function> is forced first in round 1`, when a
+  force ahead of it in round 1's chain (a skill's task's yes, a named
+  ask, a face, a make, a keep, a timer or the reminders) wins
+  (`tools::skill_asked::asked_after`); any other line says nothing
   (`tools::skill_asked::journal_line`).
 - **Which lines** (`skill_named::named`): the function's name said as words
   in a row, loosely (`photo_booth` as "photo booth" or "photobooth", a

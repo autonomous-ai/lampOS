@@ -2664,6 +2664,8 @@ pub fn serve(
             .then(|| Arc::new(crate::tools::skill_asked::offered_now(tools.clone())) as _);
         crate::tools::skill_asked::force(offered)
     });
+    // The schedule's and the reminders' forces, ahead of the skill's.
+    let set_only = set.clone();
     let set = first_force(set, skill);
     // A line that plainly asks the lamp to make a skill must call
     // make_skill, so a script skill is never refused in the model's own
@@ -2689,6 +2691,21 @@ pub fn serve(
         );
         crate::skill_write_yes::approve_force()
     });
+    // Every force ahead of the skill's in the chain below, for the skill
+    // ask's journal line (`LAMP_SKILL_ASKED`, Heron's P3 on #7069): it says
+    // "forces" only when none of these wins round 1. The task's yes is
+    // read without its own line (`approve_check`), so the check says
+    // nothing the chat's own ask does not.
+    let skill_earlier = first_force(
+        tools.make_skill.then(crate::skill_write_yes::approve_check),
+        first_force(
+            named.clone(),
+            first_force(
+                remember.clone(),
+                first_force(make.clone(), first_force(keep.clone(), set_only)),
+            ),
+        ),
+    );
     let net = match first_force(
         task_yes,
         first_force(
@@ -3250,8 +3267,9 @@ pub fn serve(
         let offered: Option<crate::tools::skill_asked::Offered> = tools
             .use_skill
             .then(|| Arc::new(crate::tools::skill_asked::offered_now(tools.clone())) as _);
-        Arc::new(move |heard: &str| crate::tools::skill_asked::asked(heard, offered.as_ref()))
-            as crate::second_provider::SkillAsked
+        Arc::new(move |heard: &str| {
+            crate::tools::skill_asked::asked_after(heard, offered.as_ref(), skill_earlier.as_ref())
+        }) as crate::second_provider::SkillAsked
     });
     // A plain ask for news, a score, a price, hours or the weather starts
     // its search from the words heard, while the model's first round runs

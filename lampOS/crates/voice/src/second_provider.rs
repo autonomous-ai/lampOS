@@ -1481,8 +1481,8 @@ pub type NamedAsk = Arc<dyn Fn(&str) -> Vec<&'static str> + Send + Sync>;
 /// (`crate::make_skill_local::read_back_heard`, V2 on #6413).
 pub type ReadBackAsked = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 /// What a heard line's plain ask for a skill comes to with
-/// `LAMP_SKILL_ASKED` (`crate::tools::skill_asked::asked`): forced, not
-/// offered, or none (#7069).
+/// `LAMP_SKILL_ASKED` (`crate::tools::skill_asked::asked_after`): forced,
+/// not offered, beaten by a force ahead of it in round 1, or none (#7069).
 pub type SkillAsked = Arc<dyn Fn(&str) -> Option<crate::tools::skill_asked::Asked> + Send + Sync>;
 /// The call a heard line plainly asks for by an installed skill's name, as
 /// its name and arguments, or none (`crate::skill_named::heard`, #6772).

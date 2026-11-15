@@ -384,16 +384,24 @@ pub const ANSWERS: [&str; 3] = ["yes", "no", "unclear"];
 /// answered "Yes." with "Want me to go ahead with that?" and called
 /// nothing, so no yes was kept.
 pub fn approve_force() -> crate::second_provider::net::Force {
-    std::sync::Arc::new(|messages: &[crate::second_provider::net::Message]| {
-        messages.last().filter(|message| message.role == "user")?;
-        if !approve_forced_now(Instant::now()) {
-            return None;
-        }
+    let check = approve_check();
+    std::sync::Arc::new(move |messages: &[crate::second_provider::net::Message]| {
+        let forced = check(messages)?;
         eprintln!(
             "lamp-voice second: the line after a skill's task said back whole: its first round must call {}",
             crate::made_skill::MAKE
         );
-        Some(crate::second_provider::net::Forced {
+        Some(forced)
+    })
+}
+
+/// [`approve_force`] without its journal line: what it forces for
+/// `messages` now, for a check that only reads it (the skill ask's journal
+/// line, `LAMP_SKILL_ASKED`, Heron's P3 on #7069).
+pub fn approve_check() -> crate::second_provider::net::Force {
+    std::sync::Arc::new(|messages: &[crate::second_provider::net::Message]| {
+        messages.last().filter(|message| message.role == "user")?;
+        approve_forced_now(Instant::now()).then_some(crate::second_provider::net::Forced {
             name: crate::made_skill::MAKE,
             only: None,
             fields: Some(&APPROVE_FIELDS),
