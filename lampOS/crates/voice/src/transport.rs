@@ -206,13 +206,22 @@ impl Channel {
             // lamp-cb94 a bare "Connection refused (os error 111)" ended the
             // voice and could not say whose peer had gone (#1178): a send
             // to a peer that has closed its socket is refused.
-            io::Error::new(error.kind(), format!("{}: {error}", self.name))
+            self.named(error)
         })?;
         self.send_sequence = sequence;
         #[cfg(test)]
         self.probe
             .record(probe::Direction::Send, self.sender, sequence);
         Ok(())
+    }
+
+    /// `error` said with this socket's name, as a refused send is: a bare "Connection reset by peer
+    /// (os error 54)" cannot say whose peer has gone (#1178), and `peer_stop` takes the reference
+    /// link's closed peer by the `ref.c.` / `ref.d.` it starts with. On macOS the one ECONNRESET of
+    /// a closed peer comes on whichever operation is first, a receive as well as a send; on Linux a
+    /// receive from a closed peer is only `WouldBlock`, and this changes no kind, only the text.
+    fn named(&self, error: io::Error) -> io::Error {
+        io::Error::new(error.kind(), format!("{}: {error}", self.name))
     }
 
     pub fn receive<T: DeserializeOwned>(&mut self) -> io::Result<Option<T>> {
@@ -286,7 +295,7 @@ impl Channel {
         let count = match self.endpoint.try_recv(&mut data) {
             Ok(count) => count,
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => return Ok(None),
-            Err(error) => return Err(error),
+            Err(error) => return Err(self.named(error)),
         };
         let behind: Envelope<T> = decode(&data[..count])?;
         Ok((behind.boot == stale.boot
@@ -320,7 +329,7 @@ impl Channel {
                 self.held_up_us = 0;
                 return Ok(None);
             }
-            Err(error) => return Err(error),
+            Err(error) => return Err(self.named(error)),
         };
         let mut packet: Envelope<T> = decode(&data[..count])?;
         // Read the clock after the receive: a message sent since `looked`
@@ -365,7 +374,7 @@ impl Channel {
                     Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                         return Ok(None);
                     }
-                    Err(error) => return Err(error),
+                    Err(error) => return Err(self.named(error)),
                 };
                 packet = decode(&data[..count])?;
                 // Again after this receive, as above.
@@ -1536,6 +1545,21 @@ mod tests {
             .expect("the queue fills");
         assert_eq!(full.kind(), io::ErrorKind::WouldBlock);
         assert!(!full.to_string().starts_with("s: "), "{full}");
+    }
+
+    /// macOS answers the FIRST operation on a closed peer with ECONNRESET, a receive as well as a
+    /// send (Heron's read of #7137, on a Mac): the receive's error is said with the socket's name
+    /// too, so `peer_stop` knows the reference link's peer has gone. (On Linux that receive is
+    /// only `WouldBlock`.)
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn a_receive_from_a_peer_that_has_gone_is_named_with_the_sockets_name() {
+        let dir = SessionDirectory::create().unwrap();
+        let (mut sender, receiver) = pair(&dir.path);
+        drop(receiver);
+        let error = sender.receive::<u32>().unwrap_err();
+        assert_ne!(error.kind(), io::ErrorKind::WouldBlock);
+        assert!(error.to_string().starts_with("s: "), "{error}");
     }
 
     /// #1178: on Linux a send refused because its peer has gone also drops

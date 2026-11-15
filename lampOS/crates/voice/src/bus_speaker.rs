@@ -113,6 +113,12 @@ pub fn open(boot: BootId) -> lamp_audio::Result<Speaker> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A short root: a Unix socket's address holds about 103 bytes, and macOS's temp directory
+    /// alone is some 50.
+    fn short_root() -> std::path::PathBuf {
+        std::path::PathBuf::from("/tmp")
+    }
     use lamp_audio::pcm::PlaybackPcm;
     use std::time::Instant;
 
@@ -200,7 +206,7 @@ mod tests {
     /// reads, in order, typed as `lamp_msgs/Audio`.
     #[test]
     fn what_the_queue_takes_is_what_a_subscriber_of_the_play_topic_reads() {
-        let dir = std::env::temp_dir().join(format!("lamp-bus-speaker-{}", std::process::id()));
+        let dir = short_root().join(format!("lbs-{}", std::process::id()));
         let bus = Bus::new(&dir).unwrap();
         let mut hearing = bus
             .subscribe_typed(Audio::PLAY_TOPIC, "sim", Audio::TYPE)
