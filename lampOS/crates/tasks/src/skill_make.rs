@@ -176,6 +176,8 @@ pub fn make_run(folder: &Path, within: Duration) -> SkillRun {
         env: home_env(folder).to_vec(),
         deadline: within,
         started: Default::default(),
+        write: false,
+        not_made: Default::default(),
         start_in: Some(folder.to_path_buf()),
         env_file: None,
         answer: Default::default(),
