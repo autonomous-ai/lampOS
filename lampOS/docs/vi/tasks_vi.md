@@ -1266,7 +1266,16 @@ của gateway theo danh sách cho phép, không có safe binary nào
 `mode` cùng `security`/`ask` cũ, schema của OpenClaw từ chối). Khi có agent
 thứ hai, `agents.ownership: explicit` và
 `agents.defaults.systemAgent.agentId: main` được đặt, mỗi khóa chỉ khi
-chưa có, để việc nói của người dùng giữ agent của chúng. `agents.list` cũ
+chưa có, để việc nói của người dùng giữ agent của chúng. Khi đã có
+`agents.entries`, OpenClaw không coi agent nào là ngầm định, nên system
+agent phải có trong đó (lamp-52e6, 15/11: chỉ có `lamp-skill-run`, OpenClaw
+thoát 78/CONFIG, "Unknown agent id \"main\" (not in agents.entries)"): khi
+`main` chưa có, nó được thêm là `entries.main: {workspace:
+<agents.defaults.workspace>}`, và entry của người dùng không bao giờ bị
+sửa. Khi không giữ được system agent trong danh sách (không có
+`agents.defaults.workspace` cho `main`, hoặc system agent riêng của người
+dùng không có trong `entries`), việc gộp bị từ chối, "Refused: ... the
+system agent ...", và file giữ nguyên. `agents.list` cũ
 (không hợp lệ trên 2026.11.2) bị từ chối, "Refused: ... legacy
 `agents.list` ...", và file giữ nguyên. Mọi khóa khác được giữ; file đã
 đúng thì không ghi lại.

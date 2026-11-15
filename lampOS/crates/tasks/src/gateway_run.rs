@@ -1537,6 +1537,9 @@ mod tests {
         assert!(!config.exists());
         // lamp-update lays out the marked wrapper; then a run is handed over.
         std::fs::write(&wrapper, lamp_updates_data()).unwrap();
+        // OpenClaw's settings, written at the start, give `main` its workspace.
+        std::fs::create_dir_all(&state).unwrap();
+        std::fs::write(&config, r#"{"agents":{"defaults":{"workspace":"/w"}}}"#).unwrap();
         let runner = GatewayRunner {
             state_dir: Some(state.clone()),
             ..runner(&rig)

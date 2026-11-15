@@ -5070,6 +5070,10 @@ mod tests {
             assert_eq!(at(on, engine), None, "{on} {engine:?}");
             assert!(!config.exists(), "{on} {engine:?}");
         }
+        // OpenClaw's settings, written first at the start, give `main` its
+        // workspace.
+        std::fs::create_dir_all(&state).unwrap();
+        std::fs::write(&config, r#"{"agents":{"defaults":{"workspace":"/w"}}}"#).unwrap();
         let said = at(true, Some(EngineKind::Openclaw)).unwrap();
         assert!(said.contains("written"), "{said}");
         let text = std::fs::read_to_string(&config).unwrap();

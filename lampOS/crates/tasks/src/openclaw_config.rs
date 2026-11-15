@@ -256,9 +256,11 @@ fn skill_run_agent(workspace: &str) -> Value {
 /// `openclaw.json`'s text with the fence agent ([`SKILL_RUN_AGENT`]) set
 /// in `agents.entries`, its workspace `workspace`; with it a second agent,
 /// `agents.ownership` `explicit` and the system agent [`MAIN_AGENT`], each
-/// only when not set already. A legacy `agents.list` (invalid on OpenClaw
-/// 2026.11.2) is refused, never rewritten. Unchanged text when nothing
-/// changes.
+/// only when not set already, and [`MAIN_AGENT`] listed in
+/// `agents.entries` with `agents.defaults.workspace` when it isn't; a
+/// system agent it can't keep listed is refused. A legacy `agents.list`
+/// (invalid on OpenClaw 2026.11.2) is refused, never rewritten. Unchanged
+/// text when nothing changes.
 pub fn merge_skill_run_agent(text: &str, workspace: &Path) -> Result<String, Refused> {
     let workspace = workspace
         .to_str()
@@ -286,9 +288,36 @@ pub fn merge_skill_run_agent(text: &str, workspace: &Path) -> Result<String, Ref
         agents.insert("ownership".into(), json!("explicit"));
     }
     let defaults = object(agents, "defaults", "agents.defaults")?;
+    let home = defaults
+        .get("workspace")
+        .and_then(Value::as_str)
+        .map(str::to_owned);
     let system = object(defaults, "systemAgent", "agents.defaults.systemAgent")?;
     if system.get("agentId").is_none_or(Value::is_null) {
         system.insert("agentId".into(), json!(MAIN_AGENT));
+    }
+    // Once `agents.entries` exists nothing is implicit: OpenClaw 2026.11.2
+    // exits 78/CONFIG (lamp-52e6) when the system agent is not listed.
+    // `main` is listed with the defaults' workspace; a person's own system
+    // agent, or `main` with no workspace to give it, is never guessed.
+    if !system_agent_listed(&value) {
+        let id = &value["agents"]["defaults"]["systemAgent"]["agentId"];
+        if id != MAIN_AGENT {
+            return Err(Refused(format!(
+                "the system agent {id} is not in `agents.entries`; left as it is"
+            )));
+        }
+        let home = home.ok_or_else(|| {
+            Refused(
+                "the system agent `main` has no workspace to be listed with; left as it is".into(),
+            )
+        })?;
+        value["agents"]["entries"][MAIN_AGENT] = json!({ "workspace": home });
+    }
+    if !system_agent_listed(&value) {
+        return Err(Refused(
+            "the system agent is still not in `agents.entries`; left as it is".into(),
+        ));
     }
     if value == was {
         return Ok(text.to_owned());
@@ -296,6 +325,14 @@ pub fn merge_skill_run_agent(text: &str, workspace: &Path) -> Result<String, Ref
     let mut out = serde_json::to_string_pretty(&value).expect("a JSON value");
     out.push('\n');
     Ok(out)
+}
+
+/// Whether `agents.defaults.systemAgent.agentId` names an entry in
+/// `agents.entries`, as OpenClaw 2026.11.2 requires once entries exist.
+fn system_agent_listed(value: &Value) -> bool {
+    value["agents"]["defaults"]["systemAgent"]["agentId"]
+        .as_str()
+        .is_some_and(|id| value["agents"]["entries"].get(id).is_some())
 }
 
 /// The fence agent's exec approvals: an allow-list of `start` alone (each
@@ -568,10 +605,51 @@ mod tests {
         );
     }
 
+    /// lamp-52e6's file before the fence (15 Nov): lamp-update's Gateway
+    /// block and [`merge_config`]'s defaults, with no `agents.entries`.
+    const LAMP: &str = r#"{
+  "agents": {"defaults": {"model": "x", "workspace": "/var/lib/lampos-openclaw/state/workspace"}},
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback",
+    "port": 18789,
+    "auth": {"mode": "token", "token": "kept-gateway-token"}
+  }
+}
+"#;
+
+    /// lamp-52e6, 15 Nov: entries with `lamp-skill-run` alone and the
+    /// system agent `main` made OpenClaw 2026.11.2 exit 78/CONFIG
+    /// ("Unknown agent id \"main\" (not in agents.entries)").
+    #[test]
+    fn the_skill_run_fence_lists_main_with_the_defaults_workspace() {
+        let ws = Path::new("/var/lib/lampos-tasks/harnesses/lamp-tasks/gateway-skill-runs");
+        let once = merge_skill_run_agent(LAMP, ws).unwrap();
+        let value: Value = serde_json::from_str(&once).unwrap();
+        assert_eq!(
+            value["agents"]["entries"][MAIN_AGENT],
+            json!({"workspace": "/var/lib/lampos-openclaw/state/workspace"})
+        );
+        assert!(value["agents"]["entries"][SKILL_RUN_AGENT].is_object());
+        assert_eq!(
+            value["agents"]["defaults"]["systemAgent"]["agentId"],
+            MAIN_AGENT
+        );
+        assert!(system_agent_listed(&value));
+        assert_eq!(merge_skill_run_agent(&once, ws).unwrap(), once);
+        // No defaults' workspace to list `main` with: refused, not guessed.
+        let refused = merge_skill_run_agent(INSTALLED, ws).unwrap_err();
+        assert!(refused.0.contains("no workspace"), "{}", refused.0);
+        // A person's own system agent missing from entries: refused.
+        let theirs =
+            r#"{"agents":{"defaults":{"workspace":"/w","systemAgent":{"agentId":"work"}}}}"#;
+        assert!(merge_skill_run_agent(theirs, ws).is_err());
+    }
+
     #[test]
     fn the_skill_run_fence_keeps_the_main_agent_and_is_idle_twice() {
         let ws = Path::new("/var/lib/lampos-tasks/harnesses/lamp-tasks/gateway-skill-runs");
-        let once = merge_skill_run_agent(INSTALLED, ws).unwrap();
+        let once = merge_skill_run_agent(LAMP, ws).unwrap();
         let value: Value = serde_json::from_str(&once).unwrap();
         let ours = &value["agents"]["entries"][SKILL_RUN_AGENT];
         assert_eq!(ours.get("id"), None);
@@ -653,6 +731,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let state = dir.path().join("state");
         let project = dir.path().join("project");
+        fs::create_dir_all(&state).unwrap();
+        fs::write(state.join(CONFIG_FILE), LAMP).unwrap();
         assert!(write_skill_run_fence(&state, &project).unwrap());
         assert!(!write_skill_run_fence(&state, &project).unwrap());
         assert!(project.join(SKILL_RUN_WORKSPACE).is_dir());

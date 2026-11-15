@@ -3698,7 +3698,15 @@ host by an allow-list with no safe binaries (`host: gateway`,
 `security`/`ask`, which OpenClaw's schema refuses). With a second agent,
 `agents.ownership: explicit` and `agents.defaults.systemAgent.agentId:
 main` are set, each only when not set already, so the person's spoken
-tasks keep their agent. A legacy `agents.list` (invalid on 2026.11.2) is
+tasks keep their agent. Once `agents.entries` exists OpenClaw takes no
+agent as implicit, so the system agent must be listed there (lamp-52e6,
+15 Nov: with only `lamp-skill-run` listed, OpenClaw exited 78/CONFIG,
+"Unknown agent id \"main\" (not in agents.entries)"): when `main` isn't,
+it is listed as `entries.main: {workspace: <agents.defaults.workspace>}`,
+and a person's entries are never changed. When the system agent can't be
+kept listed (no `agents.defaults.workspace` for `main`, or a person's own
+system agent missing from `entries`), the merge is refused, "Refused: ...
+the system agent ...", and the file left as it is. A legacy `agents.list` (invalid on 2026.11.2) is
 refused, "Refused: ... legacy `agents.list` ...", and the file left as it
 is. Every other key is kept; a file already right is not written.
 
