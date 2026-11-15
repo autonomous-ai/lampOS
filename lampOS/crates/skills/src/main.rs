@@ -1148,6 +1148,21 @@ fn serve(
         waiting: HashMap::new(),
         last: 0,
     };
+    // A told answer a restart dropped while it waited for the read gate:
+    // said once, at this start (#7180).
+    if let Some(state) = &options.state {
+        match lamp_skills::task::telling_dropped(state) {
+            Ok(dropped) => {
+                for (skill, began) in dropped {
+                    eprintln!(
+                        "lamp-skills: skill:{skill}: do.task: what its agent found: dropped unsaid, lamp-skills restarted while it waited (it began to wait {} s before this start)",
+                        unix_ms().saturating_sub(began) / 1000
+                    );
+                }
+            }
+            Err(error) => eprintln!("lamp-skills: the told answers waiting not read: {error}"),
+        }
+    }
     let runner = Runner {
         sockets: sockets.clone(),
         finished,
@@ -5644,8 +5659,21 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
         );
         eprintln!("lamp-skills: skill:{skill}: {said}");
         if let Some(lines) = found {
+            // Kept as waiting till its end, so a restart that drops it
+            // unsaid leaves a line at the next start (#7180).
+            let began = unix_ms();
+            if let Some(state) = &state
+                && let Err(error) = lamp_skills::task::telling_begins(state, &skill, began)
+            {
+                eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {error}");
+            }
             let told = lamp_skills::service_read::tell(&lines, &mut room);
             eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {told}");
+            if let Some(state) = &state
+                && let Err(error) = lamp_skills::task::telling_ends(state, &skill, began)
+            {
+                eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {error}");
+            }
         }
     });
 }
