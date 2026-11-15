@@ -25,7 +25,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | `tests/test_markers.py` | Tests for the three readers. Run `python3 tests/test_markers.py` from this folder. |
 | `tests/test_rows.py` | Tests for `rows.py`. Run with the others. |
 | `tests/test_red_checks.py` | Tests for #6556 B and C: a red check of any kind ends `merge-when-green.sh`'s wait, a failed job's own log is read (`coord_red_jobs`), the PRs a red workflow takes (`coord_prs_taken`), a PR with a red check on its own head sits out (also when it went red between the round's read and the cut), a PR the ARM64 run takes waits for its own head's ARM64 run all green, and the bot's per-PR cache. Run with the others. |
-| `tests/test_failed_trains.py` | Tests for #7181: a train whose only red is a cancelled job is cut again once and the second stops the bot, and a set that fails to compile or lint twice the same way goes alone, one PR a train, with the PR that fails alone left out and named on the Queue. The bot's own loop runs for real (not `DRY=1`) on the temporary repository, with a stand-in `gh` that opens, merges, closes and comments on PRs there only. Run with the others. |
+| `tests/test_failed_trains.py` | Tests for #7181: a train whose only red is a cancelled job is cut again once and the second stops the bot, and a set that fails to compile or lint twice the same way goes alone, one PR a train, with the PR that fails alone left out and named on the Queue; and, from the first read of #7186, a PR that fails alone while lamp-voice's own head is red is not left out and the bot stops. The bot's own loop runs for real (not `DRY=1`) on the temporary repository, with a stand-in `gh` that opens, merges, closes and comments on PRs there only. Run with the others. |
 | `tests/test_behind_unrelated.py`, `tests/test_lanes.py` | Tests for `behind-unrelated.sh`, `merge-when-green.sh`, the lanes and the bot's dry round, on a temporary repository with a stand-in `gh`. Run all: `python3 -I -m pytest -q .github/tools/coordination/tests` from the repo root. |
 | `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710, #5385, #6059, #6809, #6811) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
 | `build-rows-pr.sh` | Regenerates `lampOS/docs/build-rows.md` from the review page. If it changed, it pushes a branch `first/build-rows-MMDD-HHMM` and opens a docs-only PR. |
@@ -112,6 +112,7 @@ Stop: `kill "$(cat "$S/train-bot.pid")"` (it stops both lanes). Restart: stop, c
 
 The bot stops by itself (exit 2) when two crate trains in a row time out, or a crate run fails with no failing test named.
 A crate train whose only red is a cancelled job is cut again once first; the second such train in a row stops it ("A failed train with no PR to name" below).
+It also stops when a PR fails to compile or lint alone while lamp-voice's own head is red (the same section).
 Once a lane has stopped the bot (the file `train-bot.stop` in the state folder), a round already under way builds no new train.
 It says so on the Queue (#6811, the last issue in lib.sh's `COORD_QUEUE_ISSUES`).
 If the Queue refuses the post (an issue takes at most 2,500 comments), the bot logs it instead.
@@ -197,6 +198,17 @@ When none of the train's PRs changes the failing files, or every one of several 
 A listed PR that can't be built into its train (it conflicts, or a check on its own head went red) leaves `train-bot.alone`, so the lane never waits on it.
 Closed and pushed PRs leave both files.
 The bot closes such a failed train's PR last, after everything above is kept and posted: a round may take the lane as free as soon as its train PR is closed.
+
+**Not while lamp-voice itself is red.** With lamp-voice itself broken (a toolchain or a runner change, not a PR), every PR would fail alone and be left out on its head, and a fix to lamp-voice would bring none of them back until each author pushed (the first read of #7186).
+So before a PR is left out for failing alone, the bot fetches lamp-voice and reads its own head (`lib.sh`, `coord_lv_state`): the latest push run of `lampos-clippy.yml` and of `lampos-arm64.yml` on that commit.
+
+- A job a train waits for (build and test, clippy) failed in one of them, also while that run's other jobs still run: no PR is blamed. The PR is not left out, nothing is kept or posted on it, and the bot stops for the first builder. Its log and its one Queue post say `lamp-voice itself is red at <sha> in <workflow> (<job>)`; the post goes on `so no PR is blamed; stopped for the first builder`. A PR listed in `train-bot.alone` stays listed, so it goes alone again after the restart.
+- Both runs are there and ended as success, or as failure in other jobs only: the PR is left out as above. A failed publish or cache job is not lamp-voice failing to build or lint (lamp-voice's head `051928e2be` on 16 Nov: its ARM64 run red in the publish job alone, its clippy run green).
+- A run is missing, still running, ended some other way (cancelled, timed out) or can't be read: the PR is left out as above, and the log says `lamp-voice's own run at <sha> was not there to check (<what>): the failure is taken as #N's`.
+
+The guard sees only a run on lamp-voice's head itself. A commit merged just before has no finished run yet, and a toolchain that changed after the head's run went green shows nowhere until the next push to lamp-voice: in both cases the PR is still left out.
+On a lamp-voice push the ARM64 run can reuse the train's tested build and skip its build and test jobs (`reuse` in `lampos-arm64.yml`); the clippy run, when the push starts one, lints the head itself.
+The older sit-outs (`train-bot.sitout`, a train red only in a workflow outside the ARM64 run) are not guarded: what would clear a PR there is lamp-voice's own run of that workflow, which this does not read.
 
 ## Marker rules
 
