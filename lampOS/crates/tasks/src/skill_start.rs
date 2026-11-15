@@ -1267,7 +1267,9 @@ mod tests {
         let token = dir.path().join("token");
         let said = dir.path().join("said");
         std::fs::write(&token, "secret-7133\n").unwrap();
-        let script = r#"printf 'token=%s\n' "$LAMP_CONTROL_TOKEN"; printf 'said=%s\n' "$(cat "$0")"; { : <&3; } 2>/dev/null && echo fd3; { : >&4; } 2>/dev/null && echo fd4; true"#;
+        // Each fd probe runs in a subshell: in dash (the lamps' /bin/sh) a
+        // failed redirection on the special builtin `:` exits the whole shell.
+        let script = r#"printf 'token=%s\n' "$LAMP_CONTROL_TOKEN"; printf 'said=%s\n' "$(cat "$0")"; ( : <&3 ) 2>/dev/null && echo fd3; ( : >&4 ) 2>/dev/null && echo fd4; true"#;
         let out = std::process::Command::new("/bin/sh")
             .args([
                 "-c",
