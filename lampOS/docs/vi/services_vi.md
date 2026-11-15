@@ -2522,7 +2522,25 @@ lẫn lượt chạy đều không giữ token nào.
   (chương trình này cũng vậy). Một lần ghi của lượt chạy trong khi một lần
   ghi khác đang chờ lời đồng ý bị từ chối ("another write waits for the
   person's yes"), nên nó không bao giờ làm rơi lần ghi của chính người
-  dùng. Lần ghi chỉ được gửi bằng đường gửi hiện có, lời đồng ý nói ra qua
+  dùng. **Một lần ghi của lượt chạy có lời đọc lại không vừa một ghi chú
+  của giọng nói bị từ chối trước khi được giữ**
+  (`serve::run_read_back_room`): chỗ trống là `serve::RUN_NOTE_ROOM` (591
+  byte: 1.024 byte của ghi chú, `lamp_gemini::wire::MAX_NOTE_BYTES`, trừ
+  các chữ cố định, send id và thời gian còn lại của nó) trừ hai lần tên kỹ
+  năng và mã của dịch vụ, đếm như ghi chú viết nó, số byte của một chuỗi
+  JSON (một dòng mới hay một dấu ngoặc kép là hai, một chữ có dấu là hai
+  hoặc ba; `serve::run_read_back_bytes`). Vượt quá thì không gì được giữ,
+  và lượt chạy được báo chỗ trống tính bằng ký tự, độ dài của lời đọc lại
+  và cần rút ngắn ít nhất bao nhiêu ("nothing was prepared: the lamp reads
+  a write back to the owner in one go, and this read-back is 600
+  characters, over the 546 it can read out ... Shorten the text by at
+  least 54 characters and call service_write again", `serve::run_too_long`),
+  để tác tử rút ngắn nó và gọi lại. Công cụ `service_write` của nó nói
+  trước điều này, nêu 448 ký tự, chỗ trống cho tên kỹ năng và mã dịch vụ
+  dài nhất (`mcp_server::write_short`). Trước đây (lamp-9adf, bản dựng
+  13135), một thư liệt kê 10 tiêu đề thư chưa đọc đã được giữ, rồi chỉ bị
+  nói là quá dài, và lượt chạy kết thúc mà không gửi gì. Lần ghi chỉ được
+  gửi bằng đường gửi hiện có, lời đồng ý nói ra qua
   cổng của giọng nói, và khi đó tính vào giới hạn của kỹ năng như lần ghi
   của kỹ năng tự tạo (10 lần một ngày mỗi kỹ năng, 30 lần cho mọi kỹ năng,
   `skill_writes::Ledger`): vượt quá thì "not sent".
@@ -2554,7 +2572,10 @@ lẫn lượt chạy đều không giữ token nào.
   giữ trong bộ nhớ: khởi động lại không bao giờ kể lại.
   Một lời đọc lại quá dài cho một ghi chú (1 024 byte) không bao giờ bị cắt:
   đèn chỉ nói rằng kỹ năng muốn gửi một thứ quá dài để đọc ra, không gì chờ,
-  và việc giữ tự hết hạn.
+  và việc giữ tự hết hạn. Đây chỉ là lớp chặn cuối: chương trình này từ
+  chối lần ghi như vậy trước khi giữ (ở trên), và bài kiểm thử của giọng
+  nói giữ `serve::run_read_back_room` khớp đúng ghi chú của nó
+  (`lamp_services_room_for_a_read_back_is_one_note_exactly`).
 - **Lời đồng ý.** Worker của giọng nói đọc lại chính xác ghi chú đó và giữ
   lần ghi chờ được gửi như một lần ghi do chính mô hình của nó chuẩn bị
   (`services::wait_for_run_yes`), request của ghi chú là request đọc lại,
