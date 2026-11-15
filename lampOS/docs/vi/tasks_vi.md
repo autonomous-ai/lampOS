@@ -1298,7 +1298,10 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   của nó. Không gì trong thư mục làm việc được cho phép, vì mọi agent
   OpenClaw đều ghi được vào đó; mẫu glob của một bản build trước
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`) bị gỡ khỏi
-  `main` và khỏi agent hàng rào đã rút lại `lamp-skill-run` (#7101). Với
+  `main` và khỏi agent hàng rào đã rút lại `lamp-skill-run` (#7101). Mỗi
+  vòng có gateway đang chạy, lamp-update thêm lại mục của `main` (mục đã
+  có thì không bị ghi lại), nên một lần khôi phục cài đặt gốc xoá exec
+  approvals của OpenClaw sẽ có lại mục này. Với
   `tools.exec.mode: "ask"` mặc định của OpenClaw, nếu không có mục này
   thì exec của một lượt không giao diện bị từ chối. Một
   exec bị từ chối vẫn kết thúc lượt là `stopped`, nên phép kiểm tra đóng
