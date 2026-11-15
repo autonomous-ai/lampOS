@@ -1713,7 +1713,7 @@ Kiểm thử: `made_run::tests::the_owners_two_lines_each_run_that_made_skill`,
 `a_name_that_matches_none_runs_nothing`,
 `make_skill_is_offered_for_a_run_within_the_bounds`;
 `lamp_skills::tests::a_made_skill_runs_now_as_its_trigger_would_and_not_when_off`;
-`task::tests::a_run_now_past_its_own_three_a_day_is_refused_plainly`; và
+`task::tests::a_run_now_past_its_own_days_runs_is_refused_plainly`; và
 `tests::a_run_now_is_refused_as_its_trigger_s_run_would_be` của lamp-skills.
 
 Kiểm thử: `make_skill_local::tests` (kể cả
