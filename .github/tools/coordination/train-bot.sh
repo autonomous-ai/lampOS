@@ -377,7 +377,7 @@ build_train() {
 # two lanes it runs in the background, one per lane.
 run_train() {
   local lane=$1 rc slow slowf=$SP/train-bot.slow-$1 five fivef=$SP/train-bot.5xx-$1 p left added c run fails errfiles heldany hit d deps t names dd NV w out other jl; local -a red redjobs redwfs
-  local cancf=$SP/train-bot.cancelled-$1 ef ch err why note; local -a canc failed cj hitp solo
+  local cancf=$SP/train-bot.cancelled-$1 ef ch err why note lvh lvs; local -a canc failed cj hitp solo
   # 3 Nov 15:4x: the PRs to recheck go as arguments; merge-when-green.sh runs still-eligible.sh on them (no eval).
   # 4 Nov (#5212 part 2): --behind-unrelated, so a green train behind lamp-voice only by files it doesn't touch, and no
   # build input (behind-unrelated.sh), merges as it is instead of being rebuilt. Part 3: a no-crates train passes
@@ -517,6 +517,20 @@ run_train() {
     ch=$(awk -v p=$p '$1 == p { print $2; exit }' $SP/train-carried-$lane.txt 2>/dev/null)
     if (( ${#carried} == 1 )) && [[ -n $ch ]] && { grep -qx -- "$p $ch" $alonef 2>/dev/null || grep -qxF -- "$p again $ch $ef" $told; }; then
       err=$(coord_first_error $jl)
+      # 16 Nov (the first read of #7186): with lamp-voice itself broken (a toolchain or a runner change, not a PR),
+      # every PR would fail alone and be left out on its head, and a fix to lamp-voice would bring none of them back
+      # until each author pushed. So lamp-voice's own head is read first (lib.sh, coord_lv_state: its latest push run of
+      # the ARM64 and of the clippy workflow). A job a train waits for failed there: no PR is blamed, nothing is kept
+      # or posted on the PR, and the bot stops for the first builder, saying so in its one Queue post. A run missing or
+      # still going can't say: the PR is left out as below, and the log says there was no run to check.
+      git fetch -q origin lamp-voice 2>/dev/null; lvh=$(git rev-parse -q --verify origin/lamp-voice 2>/dev/null); lvs=$(coord_lv_state $lvh)
+      if [[ $lvs == red\ * ]]; then
+        say "  lamp-voice itself is red at ${lvh:0:9} in ${lvs#red }: #$p is not left out; stopping for the first builder"
+        queue_post "Train bot, $(date +%H:%M): train $n (#$tp) carried #$p alone and failed to compile or lint in ${ef//,/, }, but lamp-voice itself is red at \`${lvh:0:9}\` in ${lvs#red }, so no PR is blamed; stopped for the first builder."
+        gh pr close $tp -R $REPO -c "Train bot: closed, a compile or lint error in ${(j:, :)${(f)errfiles}}; lamp-voice itself is red at ${lvh:0:9} in ${lvs#red }, so no PR is blamed." >/dev/null
+        halt crates
+      fi
+      [[ $lvs == ok ]] || say "  lamp-voice's own run at ${${lvh:0:9}:-its head} was not there to check (${lvs#none }): the failure is taken as #$p's"
       coord_drop_pr $alonef $p
       for p in ${(f)"$(coord_sit_out $aloneout $SP/train-carried-$lane.txt $told "Train $n (#$tp) carried this PR alone and failed to compile or lint in ${ef//,/, }${err:+ ($err)}." $p)"}; do
         say "  #$p, alone in the train, is left out on the head it carried until a new push${err:+ ($err)}"

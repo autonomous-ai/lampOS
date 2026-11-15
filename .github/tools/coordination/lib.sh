@@ -294,6 +294,36 @@ coord_first_error() {
   sed -E $'s/\x1b\\[[0-9;]*m//g; s/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z ?//' $1 2>/dev/null \
     | grep -m1 -E '^ *error(\[E[0-9]+\])?: ' | sed -E 's/^ +//' | tr '`' "'" | cut -c1-160
 }
+# coord_lv_runs_jq: over the push runs on a commit (actions/runs?event=push&head_sha=...), "<id> <how it ended>
+# <workflow path>" for the latest run of the ARM64 workflow and of the clippy workflow, the two a train waits for:
+# its conclusion (success, failure, cancelled, ...) once completed, else "running". A promotion (workflow_dispatch) on
+# the same commit is not lamp-voice's own push run.
+coord_lv_runs_jq='[.workflow_runs[]|select(.event=="push" and (.path|test("/lampos-(arm64|clippy)\\.yml$")))]|group_by(.path)|map(max_by(.run_number))|.[]|"\(.id) \(if .status=="completed" then (.conclusion // "unknown") else "running" end) \(.path)"'
+# coord_lv_failed_jq: over a run's jobs, the name of each failed job a train waits for (build and test, clippy, as
+# merge-when-green.sh names them). A failed publish or cache job is not lamp-voice failing to build or lint.
+coord_lv_failed_jq='.jobs[]|select(.conclusion=="failure" and (.name|test("build and test|clippy")))|.name'
+# coord_lv_state SHA: is lamp-voice's own head SHA green for the checks a train needs? Reads the latest push run of
+# lampos-arm64.yml and of lampos-clippy.yml on SHA, as coord_red_jobs reads a train's runs, and prints one line:
+# "red <workflow> (<job>)" when a job a train waits for failed in one (also while that run's other jobs still run);
+# "ok" when both runs are there and ended as success, or as failure in other jobs only (a publish that failed); else
+# "none <what>", naming each run that is missing, still running or ended some other way (cancelled, timed out). Runs
+# that can't be read are missing. 16 Nov (the first read of #7186): with lamp-voice itself broken (a toolchain or a
+# runner change, not a PR), every PR would fail alone and be left out on its head, and a fix to lamp-voice would bring
+# none of them back. The train bot asks this before it leaves a PR out for failing alone.
+coord_lv_state() {
+  local r wf j st; local -a seen lack
+  [[ -n $1 ]] || { print -r -- "none lamp-voice's head can't be read"; return 0; }
+  for r in ${(f)"$(gh api "repos/$REPO/actions/runs?event=push&head_sha=$1&per_page=50" --jq $coord_lv_runs_jq 2>/dev/null)"}; do
+    [[ ${r%% *} == <-> ]] || continue
+    wf=${${r##* }:t}; st=${${r#* }%% *}
+    j=$(gh api "repos/$REPO/actions/runs/${r%% *}/jobs?per_page=100" --paginate --jq $coord_lv_failed_jq 2>/dev/null)
+    [[ -n $j ]] && { print -r -- "red $wf (${j%%$'\n'*})"; return 0; }
+    seen+=$wf
+    if [[ $st == running ]]; then lack+="$wf still running"; elif [[ $st != (success|failure) ]]; then lack+="$wf $st"; fi
+  done
+  for wf in lampos-clippy.yml lampos-arm64.yml; do (( ${seen[(Ie)$wf]} )) || lack+="no push run of $wf"; done
+  if (( ${#lack} )); then print -r -- "none ${(j:, :)lack}"; else print -r -- ok; fi
+}
 # coord_drop_pr FILE PR: FILE ("<PR> ..." lines) without PR's lines.
 coord_drop_pr() {
   [[ -s $1 ]] || return 0
