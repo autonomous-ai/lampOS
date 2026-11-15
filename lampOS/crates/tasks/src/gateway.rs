@@ -480,7 +480,10 @@ pub fn prompt(start: &Path, run: &SkillRun) -> String {
 mod tests {
     use super::*;
     use crate::harness::Target;
+    use crate::skill_task::RUN_PATH;
     use std::net::TcpListener;
+    use std::os::unix::fs::PermissionsExt;
+    use std::process::{Command, Stdio};
     use std::sync::{Arc, Mutex};
 
     /// How many times it was looked at, and from which look on it answers.
@@ -655,5 +658,365 @@ mod tests {
         }
         let twice = good.replacen("#@port 18789\n", "#@port 18789\n#@port 18789\n", 1);
         assert!(GatewayAgent::of(&twice).unwrap().is_err());
+    }
+
+    fn fixed_write_run(folder: &Path) -> SkillRun {
+        SkillRun {
+            run: "task-1".into(),
+            skill: "s".into(),
+            prompt: "p".into(),
+            folder: folder.into(),
+            script: PathBuf::new(),
+            task: String::new(),
+            env: vec![(TOKEN_ENV, "run-secret".into())],
+            deadline: Duration::from_secs(90),
+            started: AtomicBool::new(false),
+            start_in: None,
+            env_file: None,
+            answer: std::sync::OnceLock::new(),
+        }
+    }
+
+    /// A fixed write has no script: it is refused before anything is
+    /// written, so no token and no start are left in the run's folder.
+    #[test]
+    fn a_fixed_write_is_refused_before_anything_is_written() {
+        let dir = tempfile::tempdir().unwrap();
+        let run = fixed_write_run(dir.path());
+        let said = write_start(dir.path(), &run, "run-secret").unwrap_err();
+        assert!(said.contains("fixed write is not taken"), "{said}");
+        assert!(said.contains("nothing was started"), "{said}");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+        assert!(!run.started.load(std::sync::atomic::Ordering::Acquire));
+    }
+
+    #[test]
+    fn the_start_reads_the_token_once_and_names_no_secret() {
+        let hidden: Vec<&Path> = HIDDEN.iter().map(Path::new).collect();
+        let text = start_text(
+            Path::new("/p/skill-task-1"),
+            INTERPRETER,
+            Path::new("/var/lib/lampOS/skills/s/scripts/main.py"),
+            Path::new("/var/lib/lampOS/skills/s"),
+            "/run/lampos-control/control.sock",
+            "/usr/local/lib/lampos/sdk-python",
+            &hidden,
+        );
+        assert!(text.contains("F='/p/skill-task-1/token'\n"), "{text}");
+        assert!(text.contains("rm -f -- \"$F\"\n"));
+        assert!(text.contains("it was started already"));
+        let fenced = text.lines().last().unwrap();
+        assert!(
+            fenced.starts_with(
+                "exec unshare --user --map-root-user --net --mount --pid --fork --kill-child --mount-proc "
+            ),
+            "{fenced}"
+        );
+        // The skill's folder is the skill's own (not its script's), and
+        // each hidden path is an argument.
+        assert!(fenced.ends_with(
+            " fence \"$U\" \"$G\" '/p' '/p/skill-task-1' '/var/lib/lampOS/skills/s' \
+             '/run/lampos-control/control.sock' '/usr/local/lib/lampos/sdk-python' 'python3' \
+             '/var/lib/lampOS/skills/s/scripts/main.py' '/var/lib' '/var/tmp' '/dev/shm'"
+        ));
+        // Every path the gateway's namespace shows that holds another's
+        // state is under one hidden: OpenClaw's config and token, the
+        // project, the other skills.
+        for shown in [
+            "/var/lib/lampos-openclaw/state/openclaw.json",
+            "/var/lib/lampos-openclaw/gateway-token",
+            "/var/lib/lampos-tasks/harnesses/lamp-tasks",
+            "/var/lib/lampOS/skills",
+            "/var/lib/lampOS/skills-dev",
+        ] {
+            assert!(
+                HIDDEN.iter().any(|h| Path::new(shown).starts_with(h)),
+                "{shown}"
+            );
+        }
+        // The steps, in order: the token read and deleted before anything;
+        // then, in the namespaces: a check, a fresh /tmp, the folders bound
+        // aside, the project and each hidden path covered, the folders
+        // moved back, then the script with an environment of its own.
+        let steps = [
+            "rm -f -- \"$F\"",
+            "export LAMP_CONTROL_TOKEN",
+            "\"$w is in a folder shown again\"",
+            "mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp || no /tmp",
+            "mount --bind \"$r\" \"$t1\" || no",
+            "mount --bind \"$k\" \"$t2\" || no",
+            "mount -t tmpfs -o mode=0700 tmpfs \"$p\" || no",
+            "mount -t tmpfs -o mode=0700 tmpfs \"$h\" || no",
+            "mount --move \"$t2\" \"$k\" || no",
+            "mount --move \"$t1\" \"$r\" || no",
+            "cd \"$r\" || no",
+            "exec unshare --user --map-user=\"$u\" --map-group=\"$g\" -- env -i PATH=/usr/local/bin:/usr/bin:/bin \
+             HOME=\"$r\" LAMP_CONTROL_SOCKET=\"$so\" PYTHONPATH=\"$py\" /bin/sh",
+            // The fence is given as a word to the namespaces' shell, which
+            // runs it in them.
+            "exec unshare --user --map-root-user --net",
+        ];
+        let mut at = 0;
+        for step in steps {
+            let found = text[at..]
+                .find(step)
+                .unwrap_or_else(|| panic!("{step} after {at}: {text}"));
+            at += found + step.len();
+        }
+        // Fail closed: every step of the fence ends it when it fails, and
+        // nothing runs the script unfenced.
+        for line in FENCE_TEXT.lines() {
+            let line = line.trim();
+            if line.starts_with("mount ")
+                || line.starts_with("mkdir ")
+                || line.starts_with("rmdir ")
+                || line.starts_with("cd ")
+            {
+                assert!(line.contains("|| no "), "{line}");
+            }
+        }
+        assert_eq!(text.matches("exec unshare").count(), 2, "{text}");
+        assert!(!text.contains("exec python3") && !text.contains("exec \"$i\""));
+        for name in [TOKEN_ENV, SOCKET_ENV, PYTHONPATH_ENV] {
+            assert!(FENCE_TEXT.contains(name), "{name}");
+        }
+        // A path is one quoted word, whatever is in it.
+        let odd = start_text(
+            Path::new("/p q/skill-it's"),
+            INTERPRETER,
+            Path::new("/s/main.py"),
+            Path::new("/s"),
+            "",
+            "",
+            &[],
+        );
+        assert!(odd.contains(r"F='/p q/skill-it'\''s/token'"), "{odd}");
+    }
+
+    /// Stand-ins for `unshare` (logs its arguments, then runs its program)
+    /// and `mount` (logs its arguments; fails when its last one is the path
+    /// in `<dir>/fail`) in `<dir>/bin`, each logging to `log`.
+    fn stubs(dir: &Path, log: &Path) {
+        let bin = dir.join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let log = log.display();
+        let fail = dir.join("fail");
+        for (name, text) in [
+            (
+                "unshare",
+                format!(
+                    "#!/bin/sh\nprintf 'unshare %s' \"$*\" | tr '\\n' '~' >> {log}; echo >> {log}\n\
+                     while [ $# -gt 0 ]; do case $1 in --) shift; break;; -*) shift;; *) break;; esac; done\n\
+                     exec \"$@\"\n"
+                ),
+            ),
+            (
+                "mount",
+                format!(
+                    "#!/bin/sh\nprintf 'mount %s\\n' \"$*\" >> {log}\n\
+                     eval \"l=\\${{$#}}\"\n\
+                     [ -e {fail} ] && [ \"$(cat {fail})\" = \"$l\" ] && exit 1\nexit 0\n",
+                    fail = fail.display()
+                ),
+            ),
+        ] {
+            std::fs::write(bin.join(name), text).unwrap();
+            std::fs::set_permissions(bin.join(name), std::fs::Permissions::from_mode(0o755))
+                .unwrap();
+        }
+    }
+
+    /// The start, run for real with `unshare`, `mount` and the interpreter
+    /// stood in for: what each was given, in order, and the script's
+    /// environment.
+    struct Started {
+        dir: tempfile::TempDir,
+        folder: PathBuf,
+        start: PathBuf,
+        log: PathBuf,
+    }
+
+    /// One real start at a time: each forks a dozen processes, and three at
+    /// once slow a loaded host past the 2 s deadline of skill_task's
+    /// `a_run_with_no_harness_is_ended_at_its_deadline_or_the_stop_and_its_status_said`.
+    static ONE_START: Mutex<()> = Mutex::new(());
+
+    fn started() -> Started {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("log");
+        stubs(dir.path(), &log);
+        let project = dir.path().join("project");
+        let folder = project.join("skill-task-1");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::create_dir_all(project.join("skill-task-2")).unwrap();
+        std::fs::create_dir_all(dir.path().join("state")).unwrap();
+        std::fs::create_dir_all(dir.path().join("skills/s")).unwrap();
+        std::fs::write(folder.join(TOKEN_FILE), "run-secret").unwrap();
+        let python = dir.path().join("bin/python3");
+        std::fs::write(
+            &python,
+            format!(
+                "#!/bin/sh\nprintf 'python3 %s|%s|%s|%s|%s|%s|%s|%s\\n' \"$*\" \"$LAMP_CONTROL_TOKEN\" \
+                 \"$LAMP_CONTROL_SOCKET\" \"$PYTHONPATH\" \"$HOME\" \"$PATH\" \"${{LAMP_HERMES_TOKEN-none}}\" \"$(pwd)\" >> {}\n",
+                log.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&python, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let state = dir.path().join("state");
+        let absent = dir.path().join("absent");
+        let start = folder.join(START_FILE);
+        std::fs::write(
+            &start,
+            start_text(
+                &folder,
+                python.to_str().unwrap(),
+                &dir.path().join("skills/s/main.py"),
+                &dir.path().join("skills/s"),
+                "/run/lampos-control/control.sock",
+                "/sdk",
+                &[&state, &absent],
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&start, std::fs::Permissions::from_mode(0o700)).unwrap();
+        Started {
+            dir,
+            folder,
+            start,
+            log,
+        }
+    }
+
+    fn start_it(at: &Started) -> std::process::Output {
+        Command::new(&at.start)
+            .env_clear()
+            .env(
+                "PATH",
+                format!("{}:{RUN_PATH}", at.dir.path().join("bin").display()),
+            )
+            .env("LAMP_HERMES_TOKEN", "gateway-secret")
+            .stdin(Stdio::null())
+            .output()
+            .unwrap()
+    }
+
+    #[test]
+    fn the_start_runs_the_script_fenced_with_its_own_environment_only() {
+        let _one = ONE_START.lock().unwrap_or_else(|held| held.into_inner());
+        let at = started();
+        let d = at.dir.path().display().to_string();
+        let out = start_it(&at);
+        assert!(out.status.success(), "{out:?}");
+        assert!(!at.folder.join(TOKEN_FILE).exists(), "the token deleted");
+        // The fence was up, so the run is done.
+        assert_eq!(start_ran(at.folder.join(TOKEN_FILE).exists()), Ok(()));
+        let log = std::fs::read_to_string(&at.log).unwrap();
+        let lines: Vec<&str> = log.lines().collect();
+        assert_eq!(lines.len(), 10, "{log}");
+        assert!(
+            lines[0].starts_with("unshare --user --map-root-user --net --mount --pid --fork "),
+            "{log}"
+        );
+        assert_eq!(
+            lines[1],
+            "mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp"
+        );
+        assert!(lines[2].starts_with(&format!(
+            "mount --bind {d}/project/skill-task-1 /tmp/lampos-run."
+        )));
+        assert!(lines[3].starts_with(&format!("mount --bind {d}/skills/s /tmp/lampos-skill.")));
+        assert_eq!(
+            lines[4],
+            format!("mount -t tmpfs -o mode=0700 tmpfs {d}/project")
+        );
+        assert_eq!(
+            lines[5],
+            format!("mount -t tmpfs -o mode=0700 tmpfs {d}/state"),
+            "the absent one skipped"
+        );
+        assert!(lines[6].starts_with("mount --move /tmp/lampos-skill."));
+        assert!(lines[6].ends_with(&format!(" {d}/skills/s")));
+        assert!(lines[7].starts_with("mount --move /tmp/lampos-run."));
+        assert!(lines[7].ends_with(&format!(" {d}/project/skill-task-1")));
+        assert!(lines[8].starts_with("unshare --user --map-user="), "{log}");
+        assert!(
+            lines[8].contains(" -- env -i PATH=/usr/local/bin:/usr/bin:/bin "),
+            "{log}"
+        );
+        assert!(!lines[8].contains("run-secret"), "the token in no argument");
+        assert!(
+            lines[9].ends_with("/project/skill-task-1"),
+            "the run's folder: {log}"
+        );
+        assert_eq!(
+            lines[9].rsplit_once('|').unwrap().0,
+            format!(
+                "python3 {d}/skills/s/main.py|run-secret|/run/lampos-control/control.sock|/sdk|\
+                 {d}/project/skill-task-1|/usr/local/bin:/usr/bin:/bin|none"
+            ),
+            "{log}"
+        );
+        // A second start has no token, and nothing is run.
+        let again = start_it(&at);
+        assert_eq!(again.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&again.stderr).contains("it was started already"));
+        assert_eq!(std::fs::read_to_string(&at.log).unwrap(), log);
+    }
+
+    #[test]
+    fn a_failed_mount_ends_the_start_before_the_script() {
+        let _one = ONE_START.lock().unwrap_or_else(|held| held.into_inner());
+        let at = started();
+        // The hidden path's mount fails, after the folders were bound.
+        let state = at.dir.path().join("state");
+        std::fs::write(at.dir.path().join("fail"), state.to_str().unwrap()).unwrap();
+        let out = start_it(&at);
+        assert!(!out.status.success(), "{out:?}");
+        let said = String::from_utf8_lossy(&out.stderr);
+        assert!(said.contains("the script was not run"), "{said}");
+        let log = std::fs::read_to_string(&at.log).unwrap();
+        assert!(
+            !log.lines().any(|line| line.starts_with("python3 ")
+                || line.starts_with("unshare --user --map-user")),
+            "{log}"
+        );
+        assert!(!at.folder.join(TOKEN_FILE).exists());
+        // The token is gone all the same: a second start has none.
+        let again = start_it(&at);
+        assert_eq!(again.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&again.stderr).contains("it was started already"));
+    }
+
+    #[test]
+    fn a_hidden_path_in_a_folder_shown_again_ends_the_start_before_any_mount() {
+        let _one = ONE_START.lock().unwrap_or_else(|held| held.into_inner());
+        let at = started();
+        let d = at.dir.path();
+        // The start again, with the skill's own folder among the hidden.
+        std::fs::write(at.folder.join(TOKEN_FILE), "run-secret").unwrap();
+        std::fs::write(
+            &at.start,
+            start_text(
+                &at.folder,
+                d.join("bin/python3").to_str().unwrap(),
+                &d.join("skills/s/main.py"),
+                &d.join("skills"),
+                "/run/lampos-control/control.sock",
+                "/sdk",
+                &[&d.join("skills/s")],
+            ),
+        )
+        .unwrap();
+        let out = start_it(&at);
+        assert_eq!(out.status.code(), Some(1), "{out:?}");
+        let said = String::from_utf8_lossy(&out.stderr);
+        assert!(said.contains("is in a folder shown again"), "{said}");
+        let log = std::fs::read_to_string(&at.log).unwrap();
+        assert!(
+            !log.lines()
+                .any(|line| line.starts_with("mount ") || line.starts_with("python3 ")),
+            "{log}"
+        );
     }
 }
