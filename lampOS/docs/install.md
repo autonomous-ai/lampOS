@@ -2395,7 +2395,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    - **Tried again** by the first reached round 24 h after a failure
      (`RETRY_AFTER`), or after `installing` for over 70 min; `serve`,
      `not_started`, `privacy_lost` and `interrupted` at the next round
-     whose window is open (`RETRY_IN_NEXT_WINDOW`), that is the next
+     whose window is open (`RETRY_IN_NEXT_WINDOW`; for OpenClaw also
+     `gateway`, a failure at its gateway's (re)start, #7156), that is the next
      round reached outside the setup walk. Every retry waits for its
      window. A failed install takes out the
      wrapper and the namespace script, but keeps its partial

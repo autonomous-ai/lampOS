@@ -3597,6 +3597,26 @@ fn kept_as_it_was(
     );
 }
 
+/// #7156: an install that failed at the gateway's (re)start is tried
+/// again at the next round whose window is open, not a day later; another
+/// recent failure still waits its day.
+#[test]
+fn a_gateway_failure_is_tried_again_in_the_next_window() {
+    const HOUR_MS: u64 = 60 * 60 * 1000;
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    write(&lamp.records(), failed(100, GATEWAY_FAILED));
+    let mut systemd = Fake::default();
+    let said = round(&lamp, &mut systemd, false, 100 + HOUR_MS);
+    assert_eq!(said.map(|said| said.install).as_deref(), Some("installing"));
+
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    write(&lamp.records(), failed(100, "installer"));
+    let mut systemd = Fake::default();
+    assert_eq!(round(&lamp, &mut systemd, false, 100 + HOUR_MS), None);
+}
+
 /// #7156: a reinstall over a working OpenClaw (an earlier build's
 /// wrapper, a new lamp-tasks) that fails at its first run or at the
 /// gateway's restart puts the wrapper, the namespace script and the

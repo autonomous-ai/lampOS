@@ -1062,7 +1062,7 @@ pub fn after_round_with(
         // failure does not hold it, as for Hermes.
         if said.install == "failed"
             && !matches!(window, Ok(crate::hermes_schedule::Window::Asked))
-            && !matches!(said.error.as_deref(), Some(error) if RETRY_IN_NEXT_WINDOW.contains(&error))
+            && !matches!(said.error.as_deref(), Some(error) if RETRY_IN_NEXT_WINDOW.contains(&error) || error == GATEWAY_FAILED)
             && since(said) < RETRY_AFTER.as_millis() as u64
         {
             return None;
@@ -2207,6 +2207,12 @@ fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> 
     }
     Some(added)
 }
+
+/// A failure at the gateway's (re)start (`gateway`), tried again at the
+/// next round whose window is open, as [`RETRY_IN_NEXT_WINDOW`]'s, not a
+/// day later (#7156): on a lamp whose default agent is OpenClaw, a day
+/// without its gateway is a day without an agent.
+pub const GATEWAY_FAILED: &str = "gateway";
 
 /// What OpenClaw's CLI says while a gateway just started has not read its
 /// config yet (`approvals allowlist add --gateway`).
