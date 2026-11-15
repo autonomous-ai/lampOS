@@ -2205,12 +2205,16 @@ mod tests {
     #[test]
     fn fds_above_4_are_closed_at_the_fences_exec() {
         let file = tempfile::tempfile().unwrap();
-        let open = rustix::io::dup(&file).unwrap();
+        // Above 4 whatever the test runner left free (fds 3 and 4 may be),
+        // and inheritable, as a caller's stray fd is.
+        let open = rustix::io::fcntl_dupfd_cloexec(&file, 10).unwrap();
+        rustix::io::fcntl_setfd(&open, rustix::io::FdFlags::empty()).unwrap();
         let fd = open.as_raw_fd();
         assert!(fd > 4);
         let sees = || {
             std::process::Command::new("/bin/sh")
-                .args(["-c", &format!("( : <&{fd} ) 2>/dev/null")])
+                // By /dev/fd, not `<&N`: dash reads one digit there.
+                .args(["-c", &format!("[ -e /dev/fd/{fd} ]")])
                 .status()
                 .unwrap()
                 .success()
