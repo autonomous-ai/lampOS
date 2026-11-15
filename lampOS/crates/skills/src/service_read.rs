@@ -558,6 +558,11 @@ pub trait Room {
     fn turns(&self) -> Option<&'static Turns> {
         None
     }
+    /// The gate found shut as a read or a told answer begins to wait for
+    /// it: once a wait, with the gate's words, for the journal (#7180: a
+    /// told answer in quiet hours waited unsaid with no line). The
+    /// default keeps nothing.
+    fn waits(&mut self, _why: &str) {}
 }
 
 /// Runs a read that came due, and says how it went for the journal:
@@ -621,6 +626,7 @@ fn wait_for_gate<R: Room>(room: &mut R) -> Result<Option<Taken<'static>>, String
     let turns = room.turns();
     let mut steady: Option<u64> = None;
     let mut last = Closed::Nobody;
+    let mut said_why = false;
     let taken = loop {
         let now = room.now_ms();
         // Another read's turn closes the gate as the room does, under the
@@ -635,6 +641,10 @@ fn wait_for_gate<R: Room>(room: &mut R) -> Result<Option<Taken<'static>>, String
             Err(why) => {
                 steady = None;
                 last = why;
+                if !said_why {
+                    said_why = true;
+                    room.waits(why.words());
+                }
             }
             Ok(()) => {
                 let since = *steady.get_or_insert(now);
@@ -826,6 +836,8 @@ mod tests {
         other_ends_at: Option<u64>,
         /// When each line was said, by the clock.
         said_at: Vec<u64>,
+        /// [`Room::waits`]'s words, in turn.
+        waits: Vec<String>,
     }
 
     impl Lamp {
@@ -844,6 +856,7 @@ mod tests {
                 turns: None,
                 other_ends_at: None,
                 said_at: Vec::new(),
+                waits: Vec::new(),
             }
         }
     }
@@ -904,6 +917,9 @@ mod tests {
         }
         fn turns(&self) -> Option<&'static Turns> {
             self.turns
+        }
+        fn waits(&mut self, why: &str) {
+            self.waits.push(why.to_owned());
         }
     }
 
@@ -1410,6 +1426,29 @@ mod tests {
             "skipped: the owner not in view"
         );
         assert!(lamp.said.is_empty());
+    }
+
+    /// A gate found shut says why, once, as the wait begins (#7180): a told
+    /// answer in quiet hours waits and is skipped unsaid, its reason
+    /// journalled; a voice heard, then the owner alone, says it and is
+    /// told after; a gate open at once says nothing of a wait.
+    #[test]
+    fn a_wait_for_the_gate_says_why_once() {
+        let lines = vec!["None urgent.".to_owned()];
+        let mut quiet = alone();
+        quiet.quiet = true;
+        let mut lamp = Lamp::new(vec![quiet], json!({}));
+        assert_eq!(tell(&lines, &mut lamp), "skipped: quiet hours");
+        assert_eq!(lamp.waits, ["quiet hours"]);
+        assert!(lamp.said.is_empty());
+        let mut heard = alone();
+        heard.heard_ago = Some(Duration::from_secs(1));
+        let mut lamp = Lamp::new(vec![heard.clone(), heard, alone()], json!({}));
+        assert_eq!(tell(&lines, &mut lamp), "told 1");
+        assert_eq!(lamp.waits, ["a voice heard"]);
+        let mut lamp = Lamp::new(vec![alone()], json!({}));
+        assert_eq!(tell(&lines, &mut lamp), "told 1");
+        assert!(lamp.waits.is_empty());
     }
 
     /// "Quiet hours: nothing", and no owner's face enrolled: skipped at
