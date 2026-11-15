@@ -175,6 +175,17 @@ pub const SKILLS: &str = hermes_install::SKILLS;
 pub const SKILLS_SOCKET: &str = hermes_install::SKILLS_SOCKET;
 /// All [`NS`] shows OpenClaw of what it hides, as Hermes's does.
 pub const ALLOWED: [&str; 3] = [PLACE, WORK, SKILLS];
+/// A skill's run's `start` in Harness's project (#6685): what agent `main`
+/// execs by absolute path in a skill's run on OpenClaw (a Harness `new`
+/// turn through the gateway), allowed by its exec allow-list with the one
+/// run path on ([`exec_allowlist`]). Without the entry, OpenClaw's stock
+/// `ask` denies it: a headless turn cannot wait for an approval.
+pub const RUN_START: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start";
+/// The agent [`RUN_START`] is allowed for.
+pub const RUN_AGENT: &str = "main";
+/// The fence agent of a withdrawn design (#7101): its [`RUN_START`] entry
+/// is taken out of OpenClaw's exec approvals.
+pub const OLD_FENCE_AGENT: &str = "lamp-skill-run";
 /// Free space `/var/lib` must hold before an install: the package unpacks
 /// to 275 MB, its dependencies and npm's cache come on top, and Node is
 /// about 190 MB. Not measured on a lamp yet: 2 GiB with room to spare.
@@ -408,26 +419,20 @@ pub fn wrapper_text() -> String {
 /// The line after `#!/bin/sh` of OpenClaw's wrapper with the one run path
 /// on ([`Shown::one_path`], #6685 step 4): the same for every gateway
 /// agent, naming none, what lamp-tasks looks for
-/// (`lamp_tasks::gateway_run::GATEWAY_MARK`) before a skill's run goes to
+/// (`lamp_tasks::gateway::GATEWAY_MARK`) before a skill's run goes to
 /// the lamp's default agent as one turn on its warm gateway.
 pub const GATEWAY_MARK: &str = "# lampOS: a gateway agent: a skill's run is one turn on its warm gateway (#6685). Written by lamp-update.\n";
 
 /// OpenClaw's data as a gateway agent, after [`GATEWAY_MARK`]: shell
 /// comments, each `#@<key> <value>`, which lamp-tasks reads
-/// (`lamp_tasks::gateway_run::GatewayAgent::of`) and no shell runs. The
-/// gateway's loopback [`PORT`]; the namespace it runs in ([`NS`], which
-/// shows lamp-control's socket with the one run path on); the agent a
-/// skill's run is one turn of (its fence, lamp-tasks'
-/// `openclaw_config::SKILL_RUN_AGENT`); and the arguments, after the
-/// wrapper, of a turn (`gateway call agent`, the gateway's own RPC, never
-/// `--local`, so no turn runs outside the warm gateway), of its stop
-/// (`chat.abort`) and of its end (`sessions.delete`), as templates; and
-/// the run's fence in the gateway's exec approvals, which live in its own
-/// store, never a file: `approvals get --gateway --json` (`fence-get`),
-/// `approvals set --gateway --stdin` (`fence-set`, which needs
-/// `operator.admin`), and the fence agent's entry (`fence-entry`, its
-/// allow-list the runs' start `{start}` alone, no prompt, a prompt's
-/// fallback denied), which lamp-tasks makes sure of before each run's turn.
+/// (`lamp_tasks::gateway::GatewayAgent`) and no shell runs. A skill's run
+/// on OpenClaw is a Harness `new` OpenClaw turn (agent `main`), which
+/// execs the run folder's `start` by absolute path, allowed by agent
+/// `main`'s exec allow-list entry ([`RUN_START`], [`exec_allowlist`]).
+/// The `#@agent`, `#@turn`, `#@stop`, `#@end` and `#@fence-*` keys are
+/// from the withdrawn fence-turn design (#7101): nothing uses them after
+/// #7133, but `GatewayAgent`'s parse still needs every key, and they stay
+/// for the wrapper's byte identity. Never change these bytes.
 pub const GATEWAY_DATA: &str = r#"#@port 18789
 #@ns /usr/local/lib/lampos/openclaw-ns
 #@agent lamp-skill-run
@@ -524,6 +529,11 @@ pub struct OpenclawInstall {
     pub node: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// With `installed`: agent `main`'s [`RUN_START`] allow-list entry was
+    /// put in OpenClaw's exec approvals ([`exec_allowlist`]) by this
+    /// build's install, with the one run path on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub exec_allowlist: bool,
 }
 
 impl OpenclawInstall {
@@ -563,6 +573,7 @@ impl OpenclawInstall {
             version: None,
             node: None,
             error: error.map(str::to_owned),
+            exec_allowlist: false,
         }
     }
 
@@ -796,7 +807,13 @@ pub fn after_round(
         Err(why) => say(&format!("OpenClaw's gateway unit not written: {why}")),
     }
     let before = record(records);
-    if present(root, shown) {
+    // An OpenClaw installed before the allow-list entry was made is
+    // installed again (its steps then add it) once the one run path is on.
+    let allowlist_due = shown.one_path
+        && !before
+            .as_ref()
+            .is_some_and(|said| said.install == "installed" && said.exec_allowlist);
+    if present(root, shown) && !allowlist_due {
         gateway_on(root, systemd, say);
         if before
             .as_ref()
@@ -1167,12 +1184,21 @@ fn steps(
         say(&format!(
             "OpenClaw {VERSION} is already at {OPENCLAW}: nothing installed"
         ));
-        if let Some(said) = record(records)
-            && said.install == "installed"
+        let before = record(records).filter(|said| said.install == "installed");
+        if let Some(said) = &before
+            && said.exec_allowlist == shown.one_path
         {
-            return said;
+            return said.clone();
         }
-        return write(records, OpenclawInstall::installed(now_unix_ms()));
+        let ids = install::uid_of(run, USER).and_then(|uid| Ok((uid, gid_of(run, USER)?)));
+        let applied = ids.and_then(|(uid, gid)| exec_allowlist(run, &uid, &gid, shown, say));
+        if let Err(why) = applied {
+            say(&format!("OpenClaw is not installed: {why}"));
+            return write(records, failed(now_unix_ms(), "config"));
+        }
+        let mut said = before.unwrap_or_else(|| OpenclawInstall::installed(now_unix_ms()));
+        said.exec_allowlist = shown.one_path;
+        return write(records, said);
     }
     write(
         records,
@@ -1355,6 +1381,9 @@ fn steps(
             );
         }
     }
+    if let Err(why) = exec_allowlist(run, &uid, &gid, shown, say) {
+        return fail("config", why, say);
+    }
     if let Err(why) = write_entry_points(root, shown) {
         return fail("entry", why, say);
     }
@@ -1378,6 +1407,7 @@ fn steps(
         // lamp-tasks merges OpenClaw's models and skills at its start.
         say(&format!("lamp-tasks.service not started again: {why}"));
     }
+    let exec_allowlist = shown.one_path;
     let shown = match (shown.skills, shown.tasks) {
         (true, true) => {
             "its own folder, its work folder, the skills, lamp-skills' socket and lamp-control's socket"
@@ -1390,7 +1420,55 @@ fn steps(
         "OpenClaw {} on Node {} installed for {USER} at {OPENCLAW}; Harness runs it through {WRAPPER}, its gateway {UNIT} (127.0.0.1:{PORT}) always on, in a namespace that shows it only {shown}",
         kit.version, kit.node_version
     ));
-    write(records, OpenclawInstall::installed(now_unix_ms()))
+    write(
+        records,
+        OpenclawInstall {
+            exec_allowlist,
+            ..OpenclawInstall::installed(now_unix_ms())
+        },
+    )
+}
+
+/// The `openclaw approvals` commands [`exec_allowlist`] runs for `shown`,
+/// each OpenClaw's own allow-list edit of its local approvals (no target
+/// flag: the approvals row in [`STATE`]'s database, through the gateway
+/// when it runs, offline when not), never a whole document set. With the
+/// one run path on, agent [`RUN_AGENT`] given [`RUN_START`] and
+/// [`OLD_FENCE_AGENT`]'s entry taken out; off, [`RUN_AGENT`]'s entry
+/// taken out. OpenClaw adds a pattern there already, or removes one not
+/// there, without writing, so each runs every time.
+pub fn exec_allowlist_args(shown: Shown) -> Vec<[&'static str; 6]> {
+    let edit = |op, agent| ["approvals", "allowlist", op, "--agent", agent, RUN_START];
+    if shown.one_path {
+        vec![edit("add", RUN_AGENT), edit("remove", OLD_FENCE_AGENT)]
+    } else {
+        vec![edit("remove", RUN_AGENT)]
+    }
+}
+
+/// [`exec_allowlist_args`] run in OpenClaw's namespace as `lampos`, as
+/// `openclaw --version` is ([`in_namespace`]), not through [`WRAPPER`]
+/// (which needs the gateway running). OpenClaw's config and its
+/// `tools.exec` are never touched.
+fn exec_allowlist(
+    run: &mut Runner,
+    uid: &str,
+    gid: &str,
+    shown: Shown,
+    say: &mut dyn FnMut(&str),
+) -> Result<(), String> {
+    for args in exec_allowlist_args(shown) {
+        run(&in_namespace(uid, gid, false, &args))
+            .map_err(|why| format!("openclaw {}: {why}", args.join(" ")))?;
+    }
+    say(&if shown.one_path {
+        format!(
+            "OpenClaw's exec allow-list lets agent {RUN_AGENT} run {RUN_START}; {OLD_FENCE_AGENT}'s entry taken out"
+        )
+    } else {
+        format!("OpenClaw's exec allow-list no longer lets agent {RUN_AGENT} run {RUN_START}")
+    });
+    Ok(())
 }
 
 /// The error for a long step that failed: `timeout` past its bound, else

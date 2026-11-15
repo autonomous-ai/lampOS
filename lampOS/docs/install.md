@@ -2435,11 +2435,25 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      <value>` lines) after `#!/bin/sh`, the rest as above, and
      `openclaw-ns` shows lamp-control's socket alone, read-only, and the
      pushed skills (`/var/lib/lampOS/skills-dev`) read-only whenever there,
-     for the gateway's every turn. lamp-tasks reads that wrapper and
-     namespace to take a skill's run as one turn on the warm gateway
-     (docs/tasks.md, "A skill's run on a gateway agent"). Off, the wrapper
-     and `openclaw-ns` are as before #6685, byte for byte. lamp-update
-     never writes OpenClaw's shared `openclaw.json` for a skill's run: its
+     for every turn the gateway runs. A skill's run on OpenClaw is then a
+     Harness `new` OpenClaw turn (agent `main`), which execs the run
+     folder's `start` by absolute path (docs/tasks.md). That exec is
+     allowed by one entry the install puts in agent `main`'s exec
+     allow-list, `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`
+     (`RUN_START`), in OpenClaw's exec approvals (its state database,
+     `state/openclaw.sqlite`, not `openclaw.json`): with OpenClaw's stock
+     `tools.exec.mode: "ask"`, a headless turn's exec is denied otherwise,
+     since nobody can answer the approval. The install runs `openclaw
+     approvals allowlist add --agent main <pattern>` and `... remove
+     --agent lamp-skill-run <pattern>` (the withdrawn fence agent of #7101)
+     as `lampos` in `openclaw-ns`, with no target flag (the local approvals
+     row; OpenClaw adds or removes nothing already so); with the switch
+     off it removes `main`'s entry, other entries untouched. A failure
+     fails the install as `config` does. An OpenClaw installed by an
+     earlier build gets the entry at the next round (its record's
+     `exec_allowlist`). Off, the wrapper and `openclaw-ns` are as before
+     #6685, byte for byte. lamp-update never writes OpenClaw's shared
+     `openclaw.json` for a skill's run and never changes `tools.exec`: its
      one write of that file is the install's own `gateway` block (the
      gateway's token, above), with any switch.
    - **Records:** `openclaw-install.json` (the record), `openclaw-ask.json`
