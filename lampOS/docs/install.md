@@ -2485,7 +2485,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      --gateway --agent lamp-skill-run <glob>`; with the switch off,
      `remove` of `main`'s launcher entry and of the glob. Only with
      `lamp-openclaw-gateway.service` active (else one journal line, and
-     the next round asks again). A remove that fails is journaled and
+     the next round asks again). An add refused only because the
+     gateway just (re)started is not ready yet (its namespace does not
+     show Node, `'node': No such file or directory`, then `Config
+     unavailable`) is tried again in the same run, 40 times 3 s apart (two
+     minutes) at most (#7135). A remove that fails is journaled and
      passed over; an add that fails is journaled and not done: the
      install is still `installed`, nothing is taken down, and the record's
      `exec_allowlist` stays false, so the next round asks the one-shot
