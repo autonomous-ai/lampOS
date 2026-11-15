@@ -2836,9 +2836,17 @@ impl Cli {
         }
         let agent =
             shown_agent(&reply.stdout, agent_id).ok_or_else(|| "show_invalid_reply".to_owned())?;
-        let answer = parse_show(&reply.stdout, agent_id)
-            .ok()
-            .map(|(observation, _)| observation.answer);
+        let answer = match parse_show(&reply.stdout, agent_id) {
+            Ok((observation, _)) => Some(observation.answer),
+            // Its code only (#7180): the agent named, its answer not read.
+            Err(code) => {
+                eprintln!(
+                    "tasks: harness show: agent={}: its answer not read: {code}",
+                    short_id(agent_id)
+                );
+                None
+            }
+        };
         Ok((agent, answer))
     }
 
@@ -4579,6 +4587,12 @@ fn said_of_stdout(verb: &str, bytes: &[u8], exited_ok: bool) -> String {
     }
     if let Some(tools) = reply["tools"].as_u64() {
         said.push_str(&format!(" tools={tools}"));
+    }
+    // A `show`'s answer: its length in bytes only, never its words (#7180).
+    if verb == "show"
+        && let Some(answer) = reply["answer"].as_str()
+    {
+        said.push_str(&format!(" answer={}", answer.len()));
     }
     if let Some(rows) = reply["harnesses"].as_array() {
         let mut states: BTreeMap<&str, usize> = BTreeMap::new();

@@ -1810,7 +1810,10 @@ mỗi dòng, có người đến thì dừng với "I'll tell you the rest later
 là của `task::told`: bỏ ký hiệu markdown, mỗi câu tối đa 900 byte của dịch
 vụ nói, tối đa 11 câu. Skill không cần `speak`: lời đồng ý của chủ cho quyền
 đọc đã bao gồm việc này. Nhật ký chỉ ghi số câu đã nói (`do.task: what its
-agent found: told N`). Lần chạy không có quyền đọc (gửi thư, task của một
+agent found: told N`), và trước đó câu trả lời của lamp-tasks mang theo bao
+nhiêu câu trả lời của agent, chỉ độ dài (`do.task: lamp-tasks' answer
+carries N bytes of its agent's answer`, hoặc `no agent's answer`; #7180).
+Lần chạy không có quyền đọc (gửi thư, task của một
 script) không nói gì, như trước. Test:
 `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
 `service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`.
