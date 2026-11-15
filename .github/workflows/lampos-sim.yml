@@ -121,10 +121,12 @@ jobs:
   # builds, is clippy-clean under macOS's cfg, and its tests pass there; lamp-body's too; and the whole lamp
   # runs, the real lamp-body on lamp-sim's pty (no SDK tour here yet).
   # Free on this public repository.
+  # 45 minutes, not 30 (#7193): with lamp-voice's clippy and tests in it the job takes 22 to 25, and a
+  # runner half as slow again ran train 953 into the limit with every finished step green.
   sim-macos:
     name: lampOS virtual lamp — lamp-sim builds and tests on macOS arm64
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Rust 1.96.0
