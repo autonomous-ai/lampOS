@@ -239,18 +239,19 @@ pub fn ran_by(folder: &Path, name: &str) -> Result<(), String> {
 /// folder (`LAMP_MAKE_SKILL`), the owner's hearing as a read-back's
 /// (`services::owner_hears`), the writes' approval of `lamp-services`, the
 /// task's yes of lamp-control through the manage helper (with a skill's
-/// tasks on, `LAMP_SKILL_TASKS`), and lamp-skills' own folder
-/// (`LAMP_SKILLS_DIR`).
+/// tasks on, `LAMP_SKILL_TASKS`), and lamp-skills' own folder `skills`, the
+/// tools' (`--skills-dir`). Not `LAMP_SKILLS_DIR`: the second route's
+/// worker is started without it, and on lamp-9adf (15 Nov, 17:42) "Run my
+/// read newest email when sitting skill now" was answered "that part of me
+/// isn't running".
 pub fn asked_here(
     name: &str,
     request: u64,
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
+    skills: Option<&Path>,
 ) -> Value {
-    let (Some(keeping), Some(skills)) = (
-        Keeping::when(true),
-        std::env::var_os(crate::tools::SKILLS_ENVIRONMENT),
-    ) else {
+    let (Some(keeping), Some(skills)) = (Keeping::when(true), skills) else {
         return crate::tools::unavailable();
     };
     made_skill::drop_gone(&keeping);
@@ -275,7 +276,7 @@ pub fn asked_here(
             .map(|asks| asks.map(|asks| asks.approved))
         },
         |asks| crate::services::skill_writes_approved(Path::new(crate::services::FOLDER), asks),
-        |skill| ran_by(Path::new(&skills), skill),
+        |skill| ran_by(skills, skill),
     )
 }
 
@@ -329,6 +330,26 @@ mod tests {
     /// name it heard to `make_skill`'s `run`: each runs that made skill
     /// once, by its name as written, and the model says it is running,
     /// never what it found.
+    /// On lamp-9adf (15 Nov, 17:42) the second route's worker, started
+    /// without `LAMP_SKILLS_DIR`, answered a run "that part of me isn't
+    /// running": `make_skill` now carries the tools' own lamp-skills folder
+    /// (`--skills-dir`), and with none a run is unavailable, as before.
+    #[test]
+    fn make_skill_carries_the_tools_skills_folder_for_a_run() {
+        use crate::tools::{Route, Settings, route};
+        let folder = PathBuf::from("/run/lampos-skills");
+        let on = Settings {
+            make_skill: true,
+            skills: Some(folder.clone()),
+            ..Settings::default()
+        };
+        assert_eq!(route(&on, made_skill::MAKE), Route::MakeLocal(Some(folder)));
+        assert_eq!(
+            asked_here("unread mail", 3, true, None, None),
+            crate::tools::unavailable()
+        );
+    }
+
     #[test]
     fn the_owners_two_lines_each_run_that_made_skill() {
         let (root, keeping) = nines_lamp("run-two-lines");

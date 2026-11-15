@@ -2701,6 +2701,7 @@ pub fn answer(
     request: u64,
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
+    skills: Option<&std::path::Path>,
 ) -> Value {
     // The person's choice on a made skill that clashes with one on the
     // lamp (#6593): only the owner's own later line, as for a yes.
@@ -2782,7 +2783,7 @@ pub fn answer(
     // "Run my unread mail skill now" was read back, and nothing ran): the
     // owner's alone, held to its trigger's bounds ([`crate::made_run`]).
     if let Some(name) = call.args[crate::made_run::RUN].as_str() {
-        return crate::made_run::asked_here(name, request, heard, lease);
+        return crate::made_run::asked_here(name, request, heard, lease, skills);
     }
     // A made skill read back by voice (`LAMP_SKILL_WRITES`): what it
     // sends, and its yes awaited again when it waits for one. Or a skill on
@@ -3051,7 +3052,7 @@ pub(crate) mod tests {
             args: serde_json::json!({"request": "Glow green when I come back to my desk."}),
         };
         assert_eq!(
-            answer(&call, 1, false, None),
+            answer(&call, 1, false, None, None),
             serde_json::json!({"error": NOT_ASKED_ALOUD})
         );
     }
@@ -3071,7 +3072,7 @@ pub(crate) mod tests {
                 name: crate::made_skill::MAKE.to_owned(),
                 args,
             };
-            let told = answer(&call, 2, true, None);
+            let told = answer(&call, 2, true, None, None);
             assert_eq!(told["error"], NO_REQUEST, "{told}");
             assert!(told["next"].is_string(), "{told}");
         }
@@ -4902,7 +4903,7 @@ light = { dim = 1 }
             ..Settings::default()
         };
         assert!(settings.tasks.is_none());
-        assert_eq!(route(&settings, made_skill::MAKE), Route::MakeLocal);
+        assert_eq!(route(&settings, made_skill::MAKE), Route::MakeLocal(None));
         assert_eq!(route(&settings, "put_on_made_skill"), Route::Nobody);
         let (root, keeping) = keeping("no-tasks");
         let (url, served) = service(vec![(200, good())]);
@@ -6087,7 +6088,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 tasks,
                 ..Settings::default()
             };
-            assert_eq!(route(&on, made_skill::MAKE), Route::MakeLocal);
+            assert_eq!(route(&on, made_skill::MAKE), Route::MakeLocal(None));
             assert_eq!(
                 declared(&on)
                     .iter()

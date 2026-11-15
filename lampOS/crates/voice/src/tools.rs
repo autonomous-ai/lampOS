@@ -1053,8 +1053,10 @@ pub enum Route {
     /// Work for an agent elsewhere, through the tasks part.
     Tasks(crate::agent_tasks::Place),
     /// A skill made, or put on, by the lamp's own model
-    /// ([`crate::make_skill_local`]).
-    MakeLocal,
+    /// ([`crate::make_skill_local`]), with lamp-skills' folder when given
+    /// (`--skills-dir`): a made skill run now asks it there
+    /// ([`crate::made_run`]).
+    MakeLocal(Option<PathBuf>),
     /// Remember or forget a face, or say yes or no to being named, through
     /// the eyes on this socket, as switched; with the onboarding file, if
     /// any, which a face saved tells (#3740).
@@ -1163,7 +1165,7 @@ pub fn route(settings: &Settings, name: &str) -> Route {
         );
     }
     if settings.make_skill && name == crate::made_skill::MAKE {
-        return Route::MakeLocal;
+        return Route::MakeLocal(settings.skills.clone());
     }
     if crate::agent_tasks::is_tool(name) {
         return settings.tasks.clone().map_or(Route::Nobody, Route::Tasks);
@@ -2275,10 +2277,10 @@ fn run_call_with_scope(
                 crate::agent_tasks::DEADLINE,
             ),
         ),
-        Route::MakeLocal => (
+        Route::MakeLocal(skills) => (
             "the lamp's own model",
             (
-                crate::make_skill_local::answer(call, request, heard, lease),
+                crate::make_skill_local::answer(call, request, heard, lease, skills.as_deref()),
                 true,
             ),
         ),
