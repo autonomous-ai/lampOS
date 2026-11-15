@@ -2503,7 +2503,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      OpenClaw takes an entry already there without writing), so a factory
      reset that wipes OpenClaw's approvals gets it back on the next
      round; an add refused sets `exec_allowlist` false and asks the
-     one-shot, and the removes stay the one-shot's. With the switch off
+     one-shot, and the removes stay the one-shot's. A gateway active but
+     not ready yet (Node not there yet, or `Config unavailable`, as after
+     a boot) is asked again the same way, 40 times 3 s apart; still not
+     ready, the entry is unknown, not refused: nothing is marked or asked,
+     and the next round checks again (#7135, lamp-c0a4's reboot at
+     22:59:00, where it had started a reinstall). With the switch off
      and the gateway not active, nothing is run and `exec_allowlist`
      stays true (carried through the `installing` record too), so each
      round asks the one-shot again until `main`'s removes have run with
