@@ -2296,6 +2296,9 @@ pub struct HarnessRunner {
     /// With [`DEFAULT_AGENT_SWITCH`] on, what a run with no Harness needs
     /// ([`NoHarness`], #6685 PR 3); empty, every run goes through Harness.
     pub no_harness: NoHarnessSlot,
+    /// A gateway agent's runs live for the launcher
+    /// ([`crate::skill_start::Server`] serves the same, #7133).
+    pub starts: crate::skill_start::Starts,
 }
 
 impl HarnessRunner {
@@ -2319,6 +2322,7 @@ impl HarnessRunner {
             login: Some(LoginLookup::lamp(home)),
             stopping: std::sync::OnceLock::new(),
             no_harness: NoHarnessSlot::default(),
+            starts: Default::default(),
         }
     }
 
@@ -2519,6 +2523,9 @@ struct Started<'a> {
     agent: Option<String>,
     folder: PathBuf,
     token: Option<crate::run_token_file::RunTokenFile>,
+    /// A gateway agent's run live for its launcher (#7133): no longer live
+    /// once its token is ended, so a later claim is refused.
+    live: Option<crate::skill_start::Live>,
 }
 
 impl Started<'_> {
@@ -2527,6 +2534,7 @@ impl Started<'_> {
     /// there was no session to close.
     fn close(&mut self) -> Option<Result<crate::harness::Closed, String>> {
         (self.end_token)();
+        drop(self.live.take());
         let agent = self.agent.take()?;
         let closed = self
             .cli
@@ -2678,7 +2686,7 @@ impl Runner for HarnessRunner {
                 .and_then(|wrappers| read(&wrappers.join(engine.argument())));
             // A gateway agent, by its wrapper's own data (no engine's name):
             // its tools run in its gateway, so its run's token goes through
-            // the run's start (#7133).
+            // the skill-start launcher, never a file (#7133).
             let gateway_agent = self.wrappers.as_ref().and_then(|_| {
                 wrapper
                     .as_deref()
@@ -2775,13 +2783,19 @@ impl Runner for HarnessRunner {
             agent: None,
             folder,
             token: None,
+            live: None,
         };
         // Always before the launch. A per-run agent's wrapper reads it at
-        // its start; a gateway agent's tools never see that wrapper, so its
-        // token is in the run's folder for the run's start, and the task
-        // asks the agent to run that start (#7133).
+        // its start; a gateway agent's tools never see that wrapper, and
+        // its run's folder is in `WORK`, which every agent of the gateway
+        // reads and writes: so nothing is written there, the run is made
+        // live for the launcher to claim once, and the task asks the agent
+        // to run the launcher with the run's id (#7133).
         let prompt = if by_start {
-            crate::gateway::write_start(&started.folder, run, token.secret())?
+            let (live, prompt) =
+                crate::gateway::open_start(&self.starts, &started.folder, run, token.secret())?;
+            started.live = Some(live);
+            prompt
         } else {
             started.token = Some(crate::run_token_file::RunTokenFile::write(
                 &self.runs, &run.run, &token,
@@ -2972,13 +2986,18 @@ impl Runner for HarnessRunner {
                     });
                 }
                 let ended = ended_as(&state, agent);
-                // Failing closed: a gateway agent's run whose start never
-                // took its token never ran the skill's script.
+                // Failing closed: a gateway agent's run whose launcher never
+                // claimed its start, or whose fence never said it started
+                // the script, never ran the skill's script.
                 let ended = if by_start && ended.is_ok() {
-                    let token_left =
-                        std::fs::symlink_metadata(started.folder.join(crate::gateway::TOKEN_FILE))
-                            .is_ok();
-                    crate::gateway::start_ran(token_left).and(ended)
+                    started
+                        .live
+                        .as_ref()
+                        .map_or_else(
+                            || crate::gateway::start_ran(false, false),
+                            crate::skill_start::Live::ran,
+                        )
+                        .and(ended)
                 } else {
                     ended
                 };
@@ -3134,7 +3153,14 @@ impl HandOvers {
     /// `net` through the make's runner instead
     /// ([`crate::skill_make::lamp_runner`], with [`NET_SWITCH`] on), and
     /// lamp-skills alone as caller.
-    pub fn lamp(home: &Path, harness: SkillHarnessSlot, no_harness: NoHarnessSlot) -> Self {
+    /// A gateway agent's runs are made live in `starts`, which
+    /// lamp-tasks' launcher socket serves (#7133).
+    pub fn lamp(
+        home: &Path,
+        harness: SkillHarnessSlot,
+        no_harness: NoHarnessSlot,
+        starts: crate::skill_start::Starts,
+    ) -> Self {
         let net = net_on(std::env::var(NET_SWITCH).ok().as_deref());
         eprintln!(
             "[lamp-tasks] skill task: the net grant is {}",
@@ -3146,6 +3172,7 @@ impl HandOvers {
         );
         let mut runner = HarnessRunner::lamp(home, harness);
         runner.no_harness = no_harness;
+        runner.starts = starts;
         let keys = crate::skill_keys::on(std::env::var(crate::skill_keys::SWITCH).ok().as_deref());
         if keys {
             eprintln!(
@@ -5618,6 +5645,7 @@ mod tests {
             login: None,
             stopping: std::sync::OnceLock::new(),
             no_harness,
+            starts: Default::default(),
         }
     }
 
@@ -6091,7 +6119,12 @@ mod tests {
             let runner = crate::skill_make::lamp_runner(home, held);
             assert_eq!(runner.hermes.folder, Path::new(MAKE_WORK));
         }
-        let lamp = HandOvers::lamp(home, std::sync::Arc::default(), std::sync::Arc::default());
+        let lamp = HandOvers::lamp(
+            home,
+            std::sync::Arc::default(),
+            std::sync::Arc::default(),
+            Default::default(),
+        );
         assert_eq!(lamp.work.as_deref(), Some(Path::new(MAKE_WORK)));
         assert!(lamp.held.is_some());
     }

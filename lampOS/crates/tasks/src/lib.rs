@@ -21,5 +21,6 @@ pub mod sign_in;
 pub mod skill_call;
 pub mod skill_keys;
 pub mod skill_make;
+pub mod skill_start;
 pub mod skill_task;
 pub mod store;
