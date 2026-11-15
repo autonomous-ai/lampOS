@@ -4286,14 +4286,12 @@ pub fn serve<C: Clock>(
             // its own socket (#7133): served with the same switch. One not
             // bound leaves such a run failing closed, the rest as it is.
             let starts = crate::skill_start::Starts::default();
-            match crate::skill_start::Server::lamp(starts.clone()).start(stop.clone()) {
-                Ok(_) => eprintln!(
-                    "tasks: a gateway agent's skill runs are claimed on {}",
-                    crate::skill_start::START_SOCKET
-                ),
-                Err(error) => {
-                    eprintln!("tasks: the skill-start launcher's socket is not there: {error}")
-                }
+            // Bound once its folder is there and again when it comes back
+            // (the Reviewer-lead's boot-order P2): the serving thread says
+            // each change.
+            if let Err(error) = crate::skill_start::Server::lamp(starts.clone()).start(stop.clone())
+            {
+                eprintln!("tasks: the skill-start launcher's socket is not served: {error}")
             }
             match crate::skill_task::HandOvers::lamp(
                 &home,
