@@ -7,8 +7,8 @@ use crate::{
     follow::{CliWatch, Follows, WatchLane},
     harness::{
         AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, EngineRow, Launch,
-        LaunchOutcome, Listed, MOST_WAITED, Observation, SessionMachines, SessionSeen, SignIn,
-        Target, this_computer,
+        LaunchOutcome, Listed, MOST_WAITED, Observation, OpenclawHarness, SessionMachines,
+        SessionSeen, SignIn, Target, this_computer,
     },
     now::Now as TasksNow,
     progress::{Reads, Tracker},
@@ -326,6 +326,74 @@ impl LampSide {
     pub fn app_choice(&self) -> Option<EngineKind> {
         self.app.lock().ok().and_then(|app| *app)
     }
+}
+
+/// The waits before Harness's version is read again while it was not read
+/// at lamp-tasks' start (#7133: at a boot Harness may not answer yet), about
+/// 31 minutes in all; after them OpenClaw stays as chosen.
+pub const OPENCLAW_VERSION_AGAIN: [Duration; 9] = [
+    Duration::from_secs(5),
+    Duration::from_secs(10),
+    Duration::from_secs(20),
+    Duration::from_secs(40),
+    Duration::from_secs(60),
+    Duration::from_secs(120),
+    Duration::from_secs(300),
+    Duration::from_secs(600),
+    Duration::from_secs(720),
+];
+
+/// One `harness --version` reading taken (#6226, #7133): a version read
+/// and older than 0.6.11 takes OpenClaw out of the lamp's engines
+/// (`gateway.refused`); a version read and new enough puts it back; none
+/// read changes nothing, so a Harness that does not answer yet at a boot
+/// never takes away the owner's OpenClaw. Journaled; the reading back.
+pub fn settle_openclaw_harness(
+    shared: &crate::gateway::Shared,
+    read: OpenclawHarness,
+) -> OpenclawHarness {
+    match read {
+        OpenclawHarness::Runs => {
+            if shared.refused.swap(false, Ordering::AcqRel) {
+                eprintln!(
+                    "tasks: the Harness here now runs OpenClaw: it is the lamp's engine again"
+                );
+            }
+        }
+        OpenclawHarness::TooOld((major, minor, patch)) => {
+            shared.refused.store(true, Ordering::Release);
+            eprintln!(
+                "tasks: the Harness here is {major}.{minor}.{patch}, older than 0.6.11; OpenClaw is not the lamp's engine"
+            );
+        }
+        OpenclawHarness::Unread => eprintln!(
+            "tasks: Harness's version not read (it may not answer yet); OpenClaw stays the lamp's engine, the version read again later"
+        ),
+    }
+    read
+}
+
+/// Harness's version read again after each of `waits` until one is read
+/// ([`settle_openclaw_harness`]), quietly: only a version read is
+/// journaled, and the end of the waits with none. The last reading back.
+pub fn read_openclaw_harness_again(
+    shared: &crate::gateway::Shared,
+    mut read: impl FnMut() -> OpenclawHarness,
+    mut wait: impl FnMut(Duration),
+    waits: &[Duration],
+) -> OpenclawHarness {
+    for pause in waits {
+        wait(*pause);
+        let now = read();
+        if now != OpenclawHarness::Unread {
+            return settle_openclaw_harness(shared, now);
+        }
+    }
+    eprintln!(
+        "tasks: Harness's version still not read after {} tries; OpenClaw stays the lamp's engine",
+        waits.len()
+    );
+    OpenclawHarness::Unread
 }
 
 /// The lamp's engines in the order its target is chosen from now (#6226,
@@ -4448,16 +4516,40 @@ pub fn serve<C: Clock>(
                 }
             }
         }
+        let probe = openclaw_on.then(|| cli.clone());
         let cli = Cli::new(cli, session.into())?;
         // A Harness before 0.6.11 has no OpenClaw (#6226): the lamp's
-        // target is never OpenClaw with it.
-        if let Some(side) = lamp_side.as_ref().filter(|_| openclaw_on)
-            && !cli.runs_openclaw()
-        {
-            side.gateway.refused.store(true, Ordering::Release);
-            eprintln!(
-                "tasks: the Harness here is older than 0.6.11 or its version not read; OpenClaw is not the lamp's engine"
-            );
+        // target is never OpenClaw with it. Only a version READ says so: at
+        // a boot Harness may not answer yet, and a version not read is
+        // read again later, never taken as old (#7133, lamp-c0a4).
+        if let Some(side) = lamp_side.as_ref().filter(|_| openclaw_on) {
+            let shared = side.gateway.clone();
+            let first = cli.openclaw_harness();
+            if let OpenclawHarness::Unread = settle_openclaw_harness(&shared, first) {
+                match probe.map(|config| Cli::new(config, session.into())) {
+                    Some(Ok(probe)) => {
+                        let spawned = thread::Builder::new()
+                            .name("openclaw-version".into())
+                            .spawn(move || {
+                                read_openclaw_harness_again(
+                                    &shared,
+                                    || probe.openclaw_harness(),
+                                    thread::sleep,
+                                    &OPENCLAW_VERSION_AGAIN,
+                                );
+                            });
+                        if let Err(error) = spawned {
+                            eprintln!(
+                                "tasks: Harness's version not read again: {error}; OpenClaw stays the lamp's engine"
+                            );
+                        }
+                    }
+                    Some(Err(error)) => eprintln!(
+                        "tasks: Harness's version not read again: {error}; OpenClaw stays the lamp's engine"
+                    ),
+                    None => {}
+                }
+            }
         }
         Ok(Production::Cli(Box::new(cli)))
     });
@@ -5952,6 +6044,80 @@ mod tests {
         let only = LampSide::with_order(PathBuf::new(), vec![Openclaw]);
         only.gateway.refused.store(true, Ordering::Release);
         assert!(lamp_order(&only).is_empty());
+    }
+
+    /// #7133 (lamp-c0a4, after a reboot): Harness not answering its
+    /// version at lamp-tasks' start never takes OpenClaw away; a version
+    /// read later that runs it keeps it, read again with the waits given.
+    #[test]
+    fn a_version_not_read_at_the_start_keeps_openclaw_and_is_read_again() {
+        use EngineKind::{Hermes, Openclaw};
+        let side = LampSide::new(PathBuf::new());
+        let first = settle_openclaw_harness(&side.gateway, OpenclawHarness::Unread);
+        assert_eq!(first, OpenclawHarness::Unread);
+        assert_eq!(lamp_order(&side), [Hermes, Openclaw], "not latched");
+        let mut reads = vec![
+            OpenclawHarness::Runs,
+            OpenclawHarness::Unread,
+            OpenclawHarness::Unread,
+        ];
+        let mut waited = Vec::new();
+        let last = read_openclaw_harness_again(
+            &side.gateway,
+            || reads.pop().unwrap(),
+            |pause| waited.push(pause),
+            &OPENCLAW_VERSION_AGAIN,
+        );
+        assert_eq!(last, OpenclawHarness::Runs);
+        assert_eq!(
+            waited,
+            OPENCLAW_VERSION_AGAIN[..3],
+            "read again until read, then no more"
+        );
+        assert_eq!(lamp_order(&side), [Hermes, Openclaw]);
+    }
+
+    /// #6226 kept: a version READ and older than 0.6.11 takes OpenClaw
+    /// out, at the start or when read again later.
+    #[test]
+    fn a_version_read_older_than_0_6_11_leaves_openclaw_out() {
+        use EngineKind::Hermes;
+        let side = LampSide::new(PathBuf::new());
+        settle_openclaw_harness(&side.gateway, OpenclawHarness::TooOld((0, 6, 10)));
+        assert_eq!(lamp_order(&side), [Hermes]);
+        let later = LampSide::new(PathBuf::new());
+        settle_openclaw_harness(&later.gateway, OpenclawHarness::Unread);
+        let mut reads = vec![OpenclawHarness::TooOld((0, 6, 2)), OpenclawHarness::Unread];
+        read_openclaw_harness_again(
+            &later.gateway,
+            || reads.pop().unwrap(),
+            |_| {},
+            &OPENCLAW_VERSION_AGAIN,
+        );
+        assert_eq!(lamp_order(&later), [Hermes]);
+    }
+
+    /// #7133: a read error, every time, is never latched: after all the
+    /// waits OpenClaw is still the lamp's, and nothing is read past them.
+    #[test]
+    fn a_version_never_read_is_never_latched() {
+        use EngineKind::{Hermes, Openclaw};
+        let side = LampSide::new(PathBuf::new());
+        settle_openclaw_harness(&side.gateway, OpenclawHarness::Unread);
+        let mut tries = 0;
+        let last = read_openclaw_harness_again(
+            &side.gateway,
+            || {
+                tries += 1;
+                OpenclawHarness::Unread
+            },
+            |_| {},
+            &OPENCLAW_VERSION_AGAIN,
+        );
+        assert_eq!(last, OpenclawHarness::Unread);
+        assert_eq!(tries, OPENCLAW_VERSION_AGAIN.len());
+        assert!(!side.gateway.refused.load(Ordering::Acquire));
+        assert_eq!(lamp_order(&side), [Hermes, Openclaw]);
     }
 
     /// #6492: the app's choice of the lamp's default engine is refused

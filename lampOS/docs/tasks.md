@@ -2165,7 +2165,12 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
   installed; Hermes is the default again (#6498, the lead's decision,
   back from #6226's OpenClaw).
   `lamp_order` (`crates/tasks/src/runtime.rs`) leaves OpenClaw out only
-  while the Harness on the lamp is older than 0.6.11.
+  while the Harness on the lamp is older than 0.6.11, a version READ by
+  `harness --version` (`settle_openclaw_harness`). A version not read (a
+  failed or timed-out run: at a boot Harness may not answer yet, #7133 on
+  lamp-c0a4) changes nothing: OpenClaw stays the lamp's engine, and the
+  version is read again after 5 s, 10 s, 20 s, 40 s, 1, 2, 5, 10 and 12 min
+  (`OPENCLAW_VERSION_AGAIN`), journaled once when read or when the waits end.
   - **Which engine:** `LAMP_LAMP_ENGINE` is `openclaw` or `hermes`, unset
     `hermes`, the default (#6498; #6226 had `openclaw`). The lamp's target is still `lamp`, with that engine; when
     the one chosen is not installed but the other is, the other.
