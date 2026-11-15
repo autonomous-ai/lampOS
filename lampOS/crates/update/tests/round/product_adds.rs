@@ -711,3 +711,47 @@ fn a_build_put_back_takes_away_a_unit_of_lamp_updates_own_and_leaves_its_folder(
         "update 1"
     );
 }
+
+/// A round on a managed updater writes the exit note `install` writes for
+/// each listed unit on the lamp that has none: lamp-tasks.service, which a
+/// round once added without it (#7135), and a unit added by this round. A
+/// note the lamp already has is its own and is kept byte for byte, and
+/// systemd is reloaded after the notes are written.
+#[test]
+fn a_listed_unit_without_its_exit_note_gets_installs_and_one_the_lamp_has_is_kept() {
+    use lamp_update::install::EXIT_NOTE;
+    let mut lamp = product_lamp();
+    fs::write(
+        lamp.root.join("etc/systemd/system/lamp-tasks.service"),
+        "[Service]\nExecStart=/opt/lampOS/tasks/current/lamp-tasks\n",
+    )
+    .unwrap();
+    let own = "[Service]\nExecStopPost=/bin/true\n";
+    fs::create_dir_all(lamp.root.join("etc/systemd/system/lamp-eyes.service.d")).unwrap();
+    fs::write(
+        lamp.root
+            .join("etc/systemd/system/lamp-eyes.service.d/exit-note.conf"),
+        own,
+    )
+    .unwrap();
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    for unit in ["lamp-tasks.service", MOOD, "lamp-update.service"] {
+        let path = format!("/etc/systemd/system/{unit}.d/exit-note.conf");
+        assert_eq!(lamp.read(&path), EXIT_NOTE, "{unit}");
+        assert!(
+            lamp.said
+                .iter()
+                .any(|line| line.starts_with(&format!("wrote {path}: "))),
+            "{:?}",
+            lamp.said
+        );
+    }
+    assert_eq!(
+        lamp.read("/etc/systemd/system/lamp-eyes.service.d/exit-note.conf"),
+        own
+    );
+    // A unit the lamp lacks gets no note.
+    assert!(!lamp.exists("/etc/systemd/system/lamp-voice.service.d"));
+    assert_eq!(lamp.calls().first().map(String::as_str), Some("reload"));
+}
