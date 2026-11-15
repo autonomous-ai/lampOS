@@ -1694,7 +1694,10 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     Harness 0.6 signed out refuses `machines` and every `--machine`, while
     `start` and `new` with none work on this computer, under its own id
     (`computerId`, a UUID, which `auth status --json` names signed out too;
-    an account machine's id is 32 hex digits). So, with a lamp engine's
+    an account machine's id is 32 hex digits). The target keeps that id;
+    its `new` reply is matched against the id Harness's daemon runs as,
+    `auth status`'s `machineId` when one is there (a session on disk, even
+    read signed out), else `computerId` (R5 on #7133). So, with a lamp engine's
     switch on (`LAMP_OPENCLAW_ON_LAMP` or `LAMP_HERMES_ON_LAMP`) and
     `--targets-from-machines`:
     - **The target from the lamp itself.** At each sign-in read that says
