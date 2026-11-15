@@ -2435,24 +2435,55 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      <value>` lines) after `#!/bin/sh`, the rest as above, and
      `openclaw-ns` shows lamp-control's socket alone, read-only, and the
      pushed skills (`/var/lib/lampOS/skills-dev`) read-only whenever there,
-     for every turn the gateway runs. A skill's run on OpenClaw is then a
-     Harness `new` OpenClaw turn (agent `main`), which execs the run
-     folder's `start` by absolute path (docs/tasks.md). That exec is
-     allowed by one entry the install puts in agent `main`'s exec
-     allow-list, `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`
-     (`RUN_START`), in OpenClaw's exec approvals (its state database,
-     `state/openclaw.sqlite`, not `openclaw.json`): with OpenClaw's stock
+     for every turn the gateway runs, and the start socket folder
+     `/run/lampos-skill-start` read-only (lamp-tasks makes its
+     `start.sock` there; a socket still connects on a read-only mount;
+     skipped when the folder is not there, as the pushed skills are). The
+     folder is lamp-update's, not under lamp-tasks' runtime folder (which
+     a lamp-tasks restart wipes, leaving the gateway's bind stale): with
+     the switch on, the gateway's unit gets `RuntimeDirectory=lampos-skill-start`,
+     `RuntimeDirectoryMode=0755` and `RuntimeDirectoryPreserve=yes`, so
+     systemd makes it `lampos`'s, 0755, before every gateway start and keeps
+     it past a stop or restart until a reboot; Harness's one-shot also
+     makes it at once (`install -d -o lampos -g lampos -m 0755`). Not a
+     tmpfiles.d line: neither the round's sandbox nor the one-shot's can
+     write `/etc/tmpfiles.d`. Off, the unit is as before byte for byte,
+     and the one-shot takes the folder out (and with OpenClaw off). A skill's run on OpenClaw is
+     then a Harness `new` OpenClaw turn (agent `main`), which execs the
+     launcher `/usr/local/lib/lampos/skill-start` by absolute path
+     (docs/tasks.md). The launcher is a byte copy (never a link) of the
+     installed lamp-tasks, `/opt/lampOS/tasks/current/lamp-tasks`,
+     root's, 0755, written whole beside and renamed in by Harness's
+     one-shot (the round's sandbox cannot write `/usr/local/lib/lampos`):
+     a round compares its bytes and mode with the installed lamp-tasks
+     and asks the one-shot when they differ; with the switch off it is
+     taken out, and with OpenClaw off it goes with the entry points. That
+     exec is allowed by exactly one entry in agent `main`'s exec
+     allow-list, `/usr/local/lib/lampos/skill-start` (`SKILL_START`: no
+     glob, no argument pattern), in OpenClaw's exec approvals (its state
+     database, not `openclaw.json`): with OpenClaw's stock
      `tools.exec.mode: "ask"`, a headless turn's exec is denied otherwise,
-     since nobody can answer the approval. The install runs `openclaw
-     approvals allowlist add --agent main <pattern>` and `... remove
-     --agent lamp-skill-run <pattern>` (the withdrawn fence agent of #7101)
-     as `lampos` in `openclaw-ns`, with no target flag (the local approvals
-     row; OpenClaw adds or removes nothing already so); with the switch
-     off it removes `main`'s entry, other entries untouched. A failure
-     fails the install as `config` does. An OpenClaw installed by an
-     earlier build gets the entry at the next round (its record's
-     `exec_allowlist`). Off, the wrapper and `openclaw-ns` are as before
-     #6685, byte for byte. lamp-update never writes OpenClaw's shared
+     since nobody can answer the approval. The work folder
+     (`/var/lib/lampos-tasks/harnesses/lamp-tasks`) stays writable to the
+     gateway and every OpenClaw agent, so nothing in it is allowlisted;
+     an earlier build's glob there
+     (`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`) is
+     taken out of `main` and of the withdrawn fence agent
+     `lamp-skill-run` (#7101). The install runs, as `lampos` through the
+     wrapper (which joins the running gateway), after the gateway's
+     (re)start: `/usr/local/bin/openclaw approvals allowlist add
+     --gateway --agent main /usr/local/lib/lampos/skill-start`, then
+     `... remove --gateway --agent main <glob>` and `... remove
+     --gateway --agent lamp-skill-run <glob>`; with the switch off,
+     `remove` of `main`'s launcher entry and of the glob. Only with
+     `lamp-openclaw-gateway.service` active (else one journal line, and
+     the next round asks again). A remove that fails is journaled and
+     passed over; an add that fails is journaled and not done: the
+     install is still `installed`, nothing is taken down, and the record's
+     `exec_allowlist` stays false, so the next round asks the one-shot
+     again, which then only writes the launcher and edits the allow-list.
+     Off, the wrapper and `openclaw-ns` are as before #6685, byte for
+     byte. lamp-update never writes OpenClaw's shared
      `openclaw.json` for a skill's run and never changes `tools.exec`: its
      one write of that file is the install's own `gateway` block (the
      gateway's token, above), with any switch.

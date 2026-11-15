@@ -1167,14 +1167,18 @@ nằm trong thư mục kỹ năng. Bật trong `lamp-tasks.service` của sản 
 
 **Hiện nay (#7133):** lần chạy kỹ năng trên OpenClaw là một lượt OpenClaw
 `new` của Harness (agent `main`, qua gateway `lamp-openclaw-gateway`), lượt
-này exec `start` của thư mục lần chạy theo đường dẫn đầy đủ. Bản cài
-OpenClaw của lamp-update (khi `LAMP_SKILL_DEFAULT_AGENT=on`) cho agent
-`main` một mục trong danh sách cho phép exec của exec approvals của
-OpenClaw, `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`, và
-gỡ mục của agent hàng rào đã rút lại `lamp-skill-run`: với
-`tools.exec.mode: "ask"` mặc định của OpenClaw, nếu không có mục này thì
-exec của một lượt không giao diện bị từ chối (install.md, "OpenClaw on the
-lamp"). Lượt trên gateway ấm, agent hàng rào và hàng rào bên dưới là thiết
+này exec trình khởi chạy `/usr/local/lib/lampos/skill-start` theo đường
+dẫn đầy đủ: một bản sao từng byte của lamp-tasks đã cài, thuộc root, do
+lamp-update giữ (khi `LAMP_SKILL_DEFAULT_AGENT=on`), nối tới lamp-tasks qua
+`/run/lampos-skill-start` (thư mục của lamp-update, do unit của gateway
+giữ; lamp-tasks tạo `start.sock` trong đó), thư mục mà namespace của
+OpenClaw cho thấy ở chế độ chỉ đọc. Danh sách cho phép exec của agent `main` trong exec
+approvals của OpenClaw chỉ ghi đúng một đường dẫn đó, không có gì trong
+thư mục làm việc (mọi agent OpenClaw đều ghi được vào đó); mẫu glob trước
+đây bị gỡ khỏi `main` và khỏi agent hàng rào đã rút lại `lamp-skill-run`.
+Với `tools.exec.mode: "ask"` mặc định của OpenClaw, nếu không có mục này
+thì exec của một lượt không giao diện bị từ chối (install.md, "OpenClaw on
+the lamp"). Lượt trên gateway ấm, agent hàng rào và hàng rào bên dưới là thiết
 kế đã rút lại (#7101), giữ ở đây đến khi #7133 viết lại phần này.
 
 Một lần ghi cố định của kỹ năng tự tạo (`LAMP_SKILL_WRITE_AGENT`, ở trên)
