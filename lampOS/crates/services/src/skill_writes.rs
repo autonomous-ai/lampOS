@@ -100,10 +100,13 @@ pub const APPROVED_FILE: &str = "skill-writes-approved.json";
 pub const LEDGER_FILE: &str = "skill-writes.json";
 /// In the store folder: the owner's sent-log.
 pub const SENT_FILE: &str = "skill-writes-sent.json";
-/// The most sends a skill makes in any 24 hours.
-pub const PER_SKILL: usize = 10;
-/// The most sends every skill together makes in any 24 hours.
-pub const ALL_SKILLS: usize = 30;
+/// The most sends a skill makes in any 24 hours: 10 until the owner's ask
+/// of 15 Nov raised it with the skills' runs (`lamp-skills`' `task.rs`).
+/// The read-back and the spoken yes on each write's SHA-256 stay the safety.
+pub const PER_SKILL: usize = 50;
+/// The most sends every skill together makes in any 24 hours: 30 until
+/// 15 Nov, raised with [`PER_SKILL`].
+pub const ALL_SKILLS: usize = 200;
 /// The window the bounds count in, seconds.
 pub const DAY_S: i64 = 86_400;
 /// The most writes approved on the lamp, every skill's together.
