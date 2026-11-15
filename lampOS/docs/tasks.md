@@ -3467,6 +3467,26 @@ lamp-tasks, the hand-over socket also takes a made skill's fixed write
   is `run_failed` either way, as before. Tests:
   `a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
   `a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`.
+- **Not made** (#7092): a fixed write's launch Harness didn't make
+  (`harness new` failed, `new_failed`: its daemon not up yet, as just after
+  a lamp-tasks restart) is asked once more, the same run in the same folder
+  on the same token file, once Harness answers: `harness ps` of the lamp's
+  machine every `HarnessRunner::retry` (1 s) for at most
+  `skill_task::ANSWER_WAIT` (60 s) within the run's deadline, and only with
+  nothing live in the run's folder. The journal says `Harness didn't make
+  the fixed write's run (new_failed); it answers now with nothing in the
+  run's folder, so it is asked once more`. lamp-services sends a run's
+  write once, so even a first launch Harness made after all sends nothing
+  twice. An agent in the run's folder is never asked again (it may have
+  begun: `run_failed`). A second launch Harness didn't make or never sent,
+  or a Harness that never answered within the wait, is refused `not_made`
+  (`skill_task::NOT_MADE`, `SkillRun::not_made`): lamp-skills sends
+  nothing, neither straight nor again, and the lamp tells the owner once.
+  A run that started and then failed, and a task's run, are never asked
+  twice. Tests:
+  `issue_7092_a_fixed_writes_unmade_launch_is_asked_once_more_once_harness_answers`,
+  `issue_7092_a_fixed_write_that_may_have_begun_is_never_asked_again`,
+  `issue_7092_a_fixed_write_unmade_twice_or_unanswered_is_not_made`.
 
 ### An agent skill's run and the `net` grant (`LAMP_UPLOAD_TO_AGENT` on, `LAMP_TASK_NET` off)
 

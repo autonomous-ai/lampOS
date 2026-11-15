@@ -1076,6 +1076,26 @@ năng tự tạo (`do.write`, docs/skills.md) như một lượt chạy
   một task vẫn là `run_failed` trong cả hai trường hợp, như trước. Test:
   `a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
   `a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`.
+- **Không được tạo** (#7092): lần launch của một lệnh ghi cố định mà Harness
+  không tạo (`harness new` thất bại, `new_failed`: daemon của nó chưa lên,
+  như ngay sau khi lamp-tasks khởi động lại) được nhờ thêm một lần, cùng
+  lượt chạy, cùng thư mục, cùng file token, khi Harness trả lời: `harness
+  ps` của máy của đèn mỗi `HarnessRunner::retry` (1 s), tối đa
+  `skill_task::ANSWER_WAIT` (60 s) trong hạn của lượt chạy, và chỉ khi không
+  có gì đang chạy trong thư mục của lượt chạy. Journal ghi `Harness didn't
+  make the fixed write's run (new_failed); it answers now with nothing in
+  the run's folder, so it is asked once more`. lamp-services gửi lệnh ghi
+  của một lượt chạy một lần, nên kể cả khi lần launch đầu rốt cuộc được
+  Harness tạo thì cũng không gửi hai lần. Có tác tử trong thư mục của lượt
+  chạy thì không bao giờ nhờ lại (nó có thể đã bắt đầu: `run_failed`). Lần
+  launch thứ hai Harness cũng không tạo hoặc không gửi, hoặc Harness không
+  trả lời trong thời gian chờ, bị từ chối `not_made` (`skill_task::NOT_MADE`,
+  `SkillRun::not_made`): lamp-skills không gửi gì, không gửi thẳng cũng không
+  gửi lại, và đèn báo cho chủ một lần. Lượt chạy đã bắt đầu rồi thất bại, và
+  lượt chạy của một task, không bao giờ được nhờ hai lần. Test:
+  `issue_7092_a_fixed_writes_unmade_launch_is_asked_once_more_once_harness_answers`,
+  `issue_7092_a_fixed_write_that_may_have_begun_is_never_asked_again`,
+  `issue_7092_a_fixed_write_unmade_twice_or_unanswered_is_not_made`.
 
 ### Lần chạy của kỹ năng agent và quyền `net` (`LAMP_UPLOAD_TO_AGENT` bật, `LAMP_TASK_NET` tắt)
 

@@ -998,7 +998,17 @@ sau:
    xuất hay không có Hermes: `service_write::NOT_TAKEN`), nó được gửi thẳng
    như trên, kèm một dòng journal nói lý do (quyết định của first builder
    trên #6823); một khi lượt chạy có thể đã bắt đầu thì không bao giờ
-   (`service_write::hand`: không bao giờ gửi hai lần). Một lệnh ghi gửi qua
+   (`service_write::hand`: không bao giờ gửi hai lần). Lượt chạy Harness
+   không tạo được lamp-tasks nhờ thêm một lần khi Harness trả lời (#7092,
+   [tasks_vi.md](tasks_vi.md), "Không được tạo"); cả hai lần đều không tạo
+   thì nó trở về `not_made` (`service_write::Unrun::NotMade`): không gửi gì,
+   không gửi thẳng cũng không gửi lại, và đèn nói một lần, đúng lời, "A
+   skill's send didn't go: the lamp's agent couldn't start it, so nothing
+   was sent." (`service_write::NOT_SENT_LINE`, qua socket say với mức ưu
+   tiên say của kỹ năng; đó là câu của chính đèn, nên kỹ năng không cần
+   `say`), journal ghi `the lamp's agent's run was never made, asked once
+   more, so nothing was sent and the owner is told`. Test:
+   `a_write_whose_run_was_never_made_tells_the_owner_once`. Một lệnh ghi gửi qua
    tác tử mà đang chờ lời đồng ý chỉ được báo cho tác tử, nên phần đã tiêu
    khi bắt đầu không được trả lại. Tắt thì nó đi như trên. Journal chỉ giữ kết
    quả, không bao giờ có người nhận hay nội dung
