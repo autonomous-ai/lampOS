@@ -6762,6 +6762,48 @@ pub fn forget_named_checked(directory: &Path, name: &str) -> Result<(), String> 
     forget_others(directory, name, "").map_err(|error| error.to_string())
 }
 
+/// What the folder `name` in the skills folder went on as: the SHA-256 of
+/// its package (`.package.json`, written by the manage helper's install);
+/// `Ok(None)` when no such folder is there, `Err` when it is there but says
+/// no package.
+pub(crate) fn went_on_as(keeping: &Keeping, name: &str) -> Result<Option<String>, ()> {
+    let folder = keeping.installed.join(name);
+    if !folder.is_dir() {
+        return Ok(None);
+    }
+    fs::read(folder.join(".package.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .and_then(|record| record["sha256"].as_str().map(str::to_owned))
+        .map(Some)
+        .ok_or(())
+}
+
+/// The kept skills marked on whose folder is no longer on the lamp
+/// ([`went_on_as`]), dropped from the index with their packages
+/// ([`forget_named_checked`]): `lamp-skills remove` takes a made skill off
+/// and says nothing here, so its name was taken for good and it was still
+/// told as on (#7100). One whose folder holds another package is left: its
+/// read-back says it changed ([`crate::make_skill_local::changed_since_made`]).
+pub fn drop_gone(keeping: &Keeping) {
+    for entry in index(&keeping.directory) {
+        let Some(name) = entry["name"].as_str().filter(|_| entry["on"] == true) else {
+            continue;
+        };
+        if went_on_as(keeping, name) != Ok(None) {
+            continue;
+        }
+        match forget_named_checked(&keeping.directory, name) {
+            Ok(()) => eprintln!(
+                "lamp-voice: a made skill is no longer on the lamp: dropped from the made skills: {name}"
+            ),
+            Err(error) => eprintln!(
+                "lamp-voice: a made skill no longer on the lamp is still listed among the made skills: {error}"
+            ),
+        }
+    }
+}
+
 /// The made skill `sha256`, kept and not on, dropped from the index, its
 /// package with it unless another entry names it (`crate::made_clash`'s
 /// cancel, or a clash never answered): never told as made and off.
@@ -7509,6 +7551,7 @@ fn free_name(
     toml: &str,
     most: usize,
 ) -> Result<String, Refused> {
+    drop_gone(keeping);
     if !name_taken(keeping, installed, name) {
         return Ok(name.to_owned());
     }
@@ -13320,10 +13363,17 @@ light = { colour = "green", level = 3, for = "20s" }
         fs::create_dir_all(&keeping.directory).unwrap();
         let sha = hex(&Sha256::digest(other.as_bytes()));
         let entries = vec![
-            json!({"name": "bedtime", "on": true, "toml_sha256": sha}),
+            json!({"name": "bedtime", "sha256": "c".repeat(64), "on": true, "toml_sha256": sha}),
             json!({"name": "unused", "on": false, "toml_sha256": sha}),
         ];
         write_index(&keeping.directory, &entries).unwrap();
+        // On the lamp as it went on (#7100), a folder with no card.
+        fs::create_dir_all(installed.join("bedtime")).unwrap();
+        fs::write(
+            installed.join("bedtime").join(".package.json"),
+            json!({"sha256": "c".repeat(64)}).to_string(),
+        )
+        .unwrap();
         let Err(Refused(why, None)) = free_name(&keeping, installed, "bedtime", &other, 64) else {
             panic!("already had");
         };
@@ -13336,6 +13386,49 @@ light = { colour = "green", level = 3, for = "20s" }
             free_name(&keeping, installed, "unused", TOML, 64).unwrap(),
             "unused"
         );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #7100: `lamp-skills remove` takes a made skill's folder off the
+    /// lamp and says nothing to the index. A new make of its name keeps
+    /// the name, and read-back no longer names it; one still in its folder
+    /// as it went on stays on, its name taken.
+    #[test]
+    fn a_made_skill_removed_by_lamp_skills_frees_its_name_and_is_not_read_back() {
+        let dir = scratch("made-name-removed");
+        let keeping = name_keeping(&dir);
+        let installed = &keeping.installed;
+        let went_on = |name: &str, sha256: &str| {
+            fs::create_dir_all(installed.join(name)).unwrap();
+            fs::write(
+                installed.join(name).join(".package.json"),
+                json!({"sha256": sha256}).to_string(),
+            )
+            .unwrap();
+        };
+        let (dim, out) = ("a".repeat(64), "b".repeat(64));
+        fs::create_dir_all(&keeping.directory).unwrap();
+        let entries = vec![
+            json!({"name": "evening-dim", "sha256": dim, "on": true}),
+            json!({"name": "light-out", "sha256": out, "on": true}),
+        ];
+        write_index(&keeping.directory, &entries).unwrap();
+        went_on("evening-dim", &dim);
+        went_on("light-out", &out);
+        let free = |name: &str| free_name(&keeping, installed, name, TOML, 64).unwrap();
+        assert_eq!(free("evening-dim"), "evening-dim-2");
+        // `lamp-skills remove evening-dim`.
+        fs::remove_dir_all(installed.join("evening-dim")).unwrap();
+        assert_eq!(free("evening-dim"), "evening-dim");
+        assert_eq!(free("light-out"), "light-out-2");
+        assert_eq!(kept_on_names(&keeping.directory), ["light-out"]);
+        // Read-back, the index as it was before any make.
+        write_index(&keeping.directory, &entries).unwrap();
+        assert_eq!(
+            crate::make_skill_local::read_back_names(&keeping),
+            ["light-out"]
+        );
+        assert_eq!(names(&keeping.directory), ["light-out"]);
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -13826,6 +13919,14 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         );
         let asked: Value = serde_json::from_str(&asked.join().unwrap()).unwrap();
         assert_eq!(asked["install_made"], made.sha256.as_str());
+        // Installed as the helper installs it (#7100: one whose folder is
+        // gone is no longer on).
+        fs::create_dir_all(keeping.installed.join("photo-booth")).unwrap();
+        fs::write(
+            keeping.installed.join("photo-booth").join(".package.json"),
+            json!({"sha256": made.sha256}).to_string(),
+        )
+        .unwrap();
         // A changed script is another package, not on, asked again.
         let changed = keep(
             &code_answer(CODE_TOML, &[("scripts/main.py", "print('other')\n")]),

@@ -1227,9 +1227,16 @@ sau:
      đang giữ và đã bật với SHA-256 của nó, `toml_sha256` trong
      `made.json`), không tạo bản sao: "You already have that skill: <tên>.
      It's on." (`made_skill::ALREADY_HAVE`). Kỹ năng đang giữ mà chưa bật
-     vẫn nhường cho cái mới cùng tên. Test:
+     vẫn nhường cho cái mới cùng tên. Kỹ năng đang giữ và đã bật mà thư mục
+     của nó không còn trong thư mục kỹ năng (`lamp-skills remove` gỡ nó và
+     không báo gì cho giọng nói, #7100) bị bỏ khỏi `made.json` cùng gói của
+     nó trước (`made_skill::drop_gone`), nên tên của nó trống lại; phần đọc
+     lại cũng bỏ nó như vậy trước khi kể các kỹ năng đang bật
+     (`make_skill_local::read_back_names`). Kỹ năng có thư mục chứa gói
+     khác thì giữ nguyên, phần đọc lại nói nó đã đổi. Test:
      `a_built_in_skills_name_gets_the_first_free_one`,
      `the_persons_own_same_skill_is_already_had_and_another_gets_a_number`,
+     `a_made_skill_removed_by_lamp_skills_frees_its_name_and_is_not_read_back`,
      và trong `tests/it/made.rs`
      `a_made_skill_named_as_the_lamps_own_gets_a_free_name_and_goes_on`.
      Khi một phần của yêu cầu không làm được ("dim slowly over a
