@@ -1888,6 +1888,14 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   stays counted. On lamp-9adf on 15 Nov, a presence skill refused `busy`
   spent the day's last run, and the skill that came due 4 s later found
   none.
+  A run that is only `do.task`s is checked first, read only
+  (its folder known, then `task::would_refuse`: the switch, `--state-dir`,
+  its last under way, the bounds): refused, nothing is handed over, the run's `Done` says "not
+  made: " and why (say "not made: the skills' 10 runs in 24 hours are
+  spent"), and a model's call is answered with an error that nothing is
+  running and why (`TASK_NOT_RUN`), never "Done." (lamp-9adf, 15 Nov). A
+  run with other steps makes them at once, its task still refused on its
+  thread.
 - **The hand-over** (#6306's to build): one line on lamp-tasks' socket
   (`--tasks-socket`, or `LAMP_SKILLS_TASKS_SOCKET`, which the product's
   lamp-skills unit passes, `/run/lampos-tasks/skill-task.sock`; with

@@ -3142,6 +3142,14 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   Lần chạy có thể đã bắt đầu (`run_failed`, không có trả lời) vẫn được đếm.
   Trên lamp-9adf ngày 15/11, một kỹ năng hiện diện bị từ chối `busy` đã tiêu
   lần chạy cuối của ngày, và kỹ năng đến lượt 4 giây sau không còn lần nào.
+  Lần chạy chỉ gồm `do.task` được kiểm tra trước, chỉ đọc
+  (biết thư mục của nó, rồi `task::would_refuse`: công tắc, `--state-dir`,
+  lần trước còn chạy, giới hạn): bị từ chối thì không giao gì, `Done` của lần chạy ghi "not made: "
+  kèm lý do (ví dụ "not made: the skills' 10 runs in 24 hours are spent"),
+  và lời gọi của model được trả lỗi rằng không có gì đang chạy và vì sao
+  (`TASK_NOT_RUN`), không bao giờ "Done." (lamp-9adf, 15/11). Lần chạy có
+  bước khác vẫn làm các bước đó ngay, tác vụ vẫn bị từ chối trên luồng của
+  nó.
 - **Tự hỏi thành tiếng khi tác vụ đến lượt** (V2 của #6071): lần chạy bị từ
   chối vì thiếu cái "có" thì lamp-skills nhờ say service của giọng nói
   (`{"skill": NAME, "task_yes": true, "priority": 5, "expires_in_ms":

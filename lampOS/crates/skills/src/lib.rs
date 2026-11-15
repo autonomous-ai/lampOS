@@ -622,6 +622,11 @@ pub const CANNOT_TURN: &str = "I can't turn toward it: my turn isn't measured ye
 /// gesture dropped, and the voice still said it was dancing).
 pub const CANNOT_MOVE: &str = "I can't move right now, so I did nothing. Say so in a few words; never say you are moving or dancing. Why:";
 
+/// What the model is told, before why, of a call whose whole run is a
+/// `do.task` the lamp would not hand over now (lamp-9adf, 15 Nov: "Your
+/// study block is running." with the day's runs spent): nothing ran.
+pub const TASK_NOT_RUN: &str = "I didn't start it, so nothing is running. Say so in a few words, and why; never say it is running or done. Why:";
+
 /// Why the body can't move a skill's gesture, move or stand now, if it
 /// can't: the lamp's `health` says its body has stopped, is let go asking
 /// for a hand, has gone quiet or never came up; or the body says on
