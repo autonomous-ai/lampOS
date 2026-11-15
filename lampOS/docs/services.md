@@ -2169,7 +2169,7 @@ and no text:
    (`writes::scope_missing`), is refused as for the voice. A GitHub
    repository approved as private and public now waits, as above.
 6. **The bounds** (`skill_writes::Ledger`, `skill-writes.json` in the store
-   folder): at most 10 sends a skill and 30 across every skill in any 24
+   folder): at most 50 sends a skill and 200 across every skill in any 24
    hours. Each send is counted before it goes, one at a time, so two at
    once never pass a bound together. A send that then fails still counts.
    The ledger keeps a skill's name and a time, nothing else, so a restart
@@ -2309,7 +2309,7 @@ is sent by a skill's run on the lamp's Hermes, not by `lamp-skills`:
   the owner's kept yes matched on that exact content (a run that changes a
   field is refused "not sent: this write is not the one the owner said yes
   to", never held for a spoken yes), the link it was said under, the day's
-  bounds (10 a skill, 30 in all) and the sent-log, and **once a run**: a
+  bounds (50 a skill, 200 in all) and the sent-log, and **once a run**: a
   second try, whatever it sends, is refused ("not sent: a skill's fixed
   write is sent once a run …"). The agent is told "Sent, as the owner said
   yes to it." Any other call of that run is refused, and with the switch
@@ -2431,8 +2431,8 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   mail of 10 unread subjects was held, then only said too long, and the
   run ended with nothing sent. The write is sent only by the
   existing send, the spoken yes through the voice's gate, and then counts
-  against the skills' bounds as a made skill's write does (10 a day a skill,
-  30 across every skill, `skill_writes::Ledger`): over them it is "not sent".
+  against the skills' bounds as a made skill's write does (50 a day a skill,
+  200 across every skill, `skill_writes::Ledger`): over them it is "not sent".
 - **The voice reads it back** (`crates/voice/src/run_write_yes.rs`, with
   `LAMP_SKILL_TASKS=on` in `lamp-voice` too). The coordinator asks this
   program for the run's held write, the voice's own call on the tools
@@ -2571,7 +2571,7 @@ never through an open socket.
   owner's yes: nothing is sent". The voice reads the held write back
   (`run_write_yes`, "Your <skill> skill wants to send: …") and waits for the
   owner's plain spoken yes (#6558's wait); only then does this program send
-  it, counted in the skills' bounds (3 a day a skill, 10 across them). A
+  it, counted in the skills' bounds (20 a day a skill, 100 across them). A
   made skill's fixed write run through the agent (`LAMP_SKILL_WRITE_AGENT`,
   on in the product) is the one write sent on a run's call, and only as the
   owner's kept yes has it, once ("A made skill's write", "Through the
