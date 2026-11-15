@@ -403,7 +403,8 @@ fn why_not(entry: &Value, made: Option<&Value>) -> Value {
 /// version, what it may use and its SHA-256; when not kept or not on, why,
 /// in plain words ([`why_not`]). A kept skill with code of its own said
 /// back at the lamp, whose spoken yes is awaited now
-/// ([`crate::skill_write_yes::code_yes_awaited`], #6307), is also told
+/// ([`crate::skill_write_yes::code_yes_awaited_told`], #6307, as the
+/// second route's worker keeps it), is also told
 /// `"awaits_yes": true`, so the app keeps asking until the yes puts it
 /// `on`; not said back (someone else present, or not on the second
 /// route), nothing waits and the field is absent. Only the app's own asks:
@@ -429,7 +430,7 @@ pub fn status(directory: &Path, request_id: Option<&str>, now_unix_ms: u64) -> V
         if let Some(made) = &made
             && made["uses"]["code"] == true
             && let Some(sha256) = made["sha256"].as_str()
-            && crate::skill_write_yes::code_yes_awaited(sha256, std::time::Instant::now())
+            && crate::skill_write_yes::code_yes_awaited_told(sha256, now_unix_ms)
         {
             told["awaits_yes"] = json!(true);
         }
@@ -1875,6 +1876,10 @@ mod tests {
         use crate::skill_write_yes as yes;
         made_skill::set_scripts_here(Some(true));
         let (root, keeping) = keeping("app-code-awaits");
+        // The wait kept as the second route's worker keeps it, in a file
+        // the status reads (sim-2's HOLD: two processes on a lamp).
+        let awaited = root.join("code-yes-awaited.json");
+        yes::set_code_awaited_file_here(Some(awaited.clone()));
         let at = now_unix_ms();
         let brief = begin(&keeping.directory, "make me a photo booth", "r1", at).unwrap();
         let answer = format!(
@@ -1923,6 +1928,21 @@ mod tests {
         let mut awaits = not_kept.clone();
         awaits["awaits_yes"] = json!(true);
         assert_eq!(status(dir, Some("r1"), at), awaits);
+        // Read where the wait isn't held, as the outer voice process
+        // reads it: from the file alone, and past its window no more.
+        let read_apart = |when: u64| {
+            let (awaited, sha256) = (awaited.clone(), sha256.clone());
+            std::thread::spawn(move || {
+                yes::set_code_awaited_file_here(Some(awaited));
+                yes::code_yes_awaited_told(&sha256, when)
+            })
+            .join()
+            .unwrap()
+        };
+        assert!(read_apart(at));
+        assert!(!read_apart(
+            now_unix_ms() + yes::YES_WITHIN.as_millis() as u64 + 1_000
+        ));
         // The wait dropped (a yes not the owner's): no field again.
         assert!(yes::drop_wait(&id));
         assert_eq!(status(dir, Some("r1"), at), not_kept);
@@ -1950,6 +1970,8 @@ mod tests {
         assert!(told.get("why").is_none(), "{told}");
         assert!(told.get("awaits_yes").is_none(), "{told}");
         assert!(!yes::code_yes_awaited(&sha256, std::time::Instant::now()));
+        assert!(!awaited.exists(), "the file goes once none waits");
+        yes::set_code_awaited_file_here(None);
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_scripts_here(None);
         let _ = fs::remove_dir_all(&root);
