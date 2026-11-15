@@ -508,6 +508,24 @@ fn refresh_lamp_reported(side: &LampSide, known: &Known, listed: &[AccountMachin
     }
 }
 
+/// #7019: after a factory reset and the owner's sign-in, the `lamp` target
+/// needs Harness's machines to mark one `current` ([`Known::lamp_engine`]).
+/// While signed in with the lamp side on, a look that lists none says so
+/// in the journal, once a sign-in (`said` kept by the loop, cleared at the
+/// next one). Log-only: nothing else changes.
+pub fn lamp_not_among_machines(
+    lamp_side: bool,
+    signed_in: bool,
+    listed: &[AccountMachine],
+    said: &mut bool,
+) -> Option<&'static str> {
+    if !lamp_side || !signed_in || *said || listed.iter().any(|machine| machine.current) {
+        return None;
+    }
+    *said = true;
+    Some("tasks: Harness is signed in, but this lamp is not among its machines yet")
+}
+
 /// Whether the app's choice went while the part runs (#7019): the side
 /// holds one, and its file ([`ENGINE_DEFAULT_FILE`]) is no longer there.
 /// The choice is then dropped from the side, with one journal line, and
@@ -1547,8 +1565,9 @@ enum Job {
     Close(CloseJob),
     SignIn,
     Machines,
-    /// `harness start` after a sign-in by code (openharness#1463).
-    StartDaemon,
+    /// `harness start` at a part's start (#5379, #6407), or `harness start
+    /// --restart` after a sign-in by code (`true`, #7019).
+    StartDaemon(bool),
     /// `harness start --restart` once, its env file changed (#5978).
     RestartDaemon,
 }
@@ -1559,7 +1578,7 @@ enum Outcome {
     Close(CloseJob, Result<Closed, String>),
     SignIn(Result<(SignIn, Option<String>), String>),
     Machines(Result<Vec<AccountMachine>, String>),
-    StartDaemon(Result<(), String>),
+    StartDaemon(bool, Result<(), String>),
     RestartDaemon(Result<(), String>),
 }
 pub(crate) struct Binding {
@@ -1906,6 +1925,13 @@ fn owner<C: Clock>(
     // hand-over waits while a try is due.
     let mut start_daemon_due: Option<Instant> = None;
     let mut daemon_tries: u32 = 0;
+    // After a sign-in the daemon is started again, not started (#7019): one
+    // started signed out at this start keeps running under `harness start`
+    // and never connects to Harness's cloud, so the lamp never becomes its
+    // own machine. Kept with the due time, through its tries.
+    let mut daemon_restart = false;
+    // The lamp not among Harness's machines said this sign-in (#7019).
+    let mut not_among_said = false;
     // The last sign-in's id. Counted from the clock, so a sign-in after a
     // restart isn't taken for one before it (the reviewer's P3 on #2174).
     // This run's id for the app (#5198): views are ordered by `revision`
@@ -1937,9 +1963,13 @@ fn owner<C: Clock>(
                 // Harness's own sign-in stops its daemon, and its user
                 // service doesn't start it again, so every hand-over after
                 // it says "Harness is not running here" (lamp-75c9, 20 Oct;
-                // openharness#1463): started here.
+                // openharness#1463): started here. Started again, not
+                // started (#7019): a daemon started signed out at this
+                // start still runs, and `harness start` would leave it so.
                 start_daemon_due = Some(Instant::now());
                 daemon_tries = 0;
+                daemon_restart = true;
+                not_among_said = false;
             }
         }
         if looked_aside.elapsed() >= LOOK_ASIDE_EVERY {
@@ -2069,6 +2099,17 @@ fn owner<C: Clock>(
                                 } else {
                                     BTreeMap::new()
                                 };
+                                let signed_in = set_up
+                                    .as_ref()
+                                    .is_some_and(|found| found.sign_in == Some(SignIn::In));
+                                if let Some(line) = lamp_not_among_machines(
+                                    later.lamp.is_some(),
+                                    signed_in,
+                                    &listed,
+                                    &mut not_among_said,
+                                ) {
+                                    eprintln!("{line}");
+                                }
                                 let said = machines_written(
                                     &later.targets,
                                     &listed,
@@ -2126,9 +2167,12 @@ fn owner<C: Clock>(
                     }
                     Ok(())
                 }
-                Outcome::StartDaemon(started) => {
+                Outcome::StartDaemon(restart, started) => {
                     daemon_tries += 1;
                     match started {
+                        Ok(()) if restart => eprintln!(
+                            "tasks: Harness's daemon started again after the sign-in (#7019)"
+                        ),
                         Ok(()) => eprintln!(
                             "tasks: Harness's daemon started (openharness#1463)"
                         ),
@@ -2208,6 +2252,12 @@ fn owner<C: Clock>(
                                     );
                                     start_daemon_due = Some(Instant::now());
                                     daemon_tries = 0;
+                                    daemon_restart = false;
+                                }
+                                // Signed in anew: the lamp not among the
+                                // machines may be said again (#7019).
+                                if sign_in == SignIn::In && found.sign_in != Some(SignIn::In) {
+                                    not_among_said = false;
                                 }
                                 found.sign_in_read(sign_in);
                             }
@@ -2482,7 +2532,7 @@ fn owner<C: Clock>(
             let daemon = match start_daemon_due {
                 Some(due) if due <= Instant::now() => {
                     start_daemon_due = None;
-                    Some(Job::StartDaemon)
+                    Some(Job::StartDaemon(daemon_restart))
                 }
                 _ => None,
             };
@@ -4737,7 +4787,12 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                             }
                             Job::SignIn => Outcome::SignIn(adapter.signed_in_here()),
                             Job::Machines => Outcome::Machines(adapter.machines()),
-                            Job::StartDaemon => Outcome::StartDaemon(adapter.start_daemon()),
+                            Job::StartDaemon(false) => {
+                                Outcome::StartDaemon(false, adapter.start_daemon())
+                            }
+                            Job::StartDaemon(true) => {
+                                Outcome::StartDaemon(true, adapter.restart_daemon())
+                            }
                             Job::RestartDaemon => Outcome::RestartDaemon(adapter.restart_daemon()),
                         };
                         if outcomes_tx.try_send(result).is_err() {
@@ -5813,6 +5868,26 @@ mod tests {
             current,
             status: None,
         }
+    }
+
+    /// #7019: signed in with the lamp side on, a look marking no machine
+    /// `current` is said once a sign-in; not with one `current`, nor
+    /// signed out, nor with the lamp side off.
+    #[test]
+    fn the_lamp_not_among_harnesss_machines_is_said_once_while_signed_in() {
+        let none = [machine('b', "office", false)];
+        let here = [machine('a', "lamp", true), machine('b', "office", false)];
+        let mut said = false;
+        assert_eq!(
+            lamp_not_among_machines(true, true, &none, &mut said),
+            Some("tasks: Harness is signed in, but this lamp is not among its machines yet")
+        );
+        assert_eq!(lamp_not_among_machines(true, true, &none, &mut said), None);
+        let mut said = false;
+        assert_eq!(lamp_not_among_machines(true, true, &here, &mut said), None);
+        assert_eq!(lamp_not_among_machines(true, false, &none, &mut said), None);
+        assert_eq!(lamp_not_among_machines(false, true, &none, &mut said), None);
+        assert!(!said);
     }
 
     /// #1676: the lamp itself is left out; the first is `office`, the

@@ -1977,7 +1977,15 @@ và có `--targets-from-machines`:
 - **Daemon lúc khởi động.** Lần đọc sign-in đầu tiên thấy chưa đăng nhập cũng
   khởi động daemon của Harness, khi bật target của đèn.
 - **Đăng nhập lại** thì danh sách máy ghi target như trước, và target của đèn
-  mang id máy của tài khoản. Việc đã bắt đầu dưới id máy của tài khoản chỉ đọc
+  mang id máy của tài khoản. Daemon khởi động lúc chưa đăng nhập không bao
+  giờ kết nối tới cloud của Harness, nên sau khi đăng nhập thành công phần
+  tasks khởi động lại nó (`harness start --restart`, `Cli::restart_daemon`),
+  không phải `harness start` vốn để nguyên daemon đang chạy (#7019); journal
+  ghi `Harness's daemon started again after the sign-in (#7019)`. Lần khởi
+  động của chính phần tasks vẫn là `harness start`. Khi đã đăng nhập mà danh
+  sách máy không đánh dấu máy nào là `current`, journal ghi một lần mỗi lần
+  đăng nhập `Harness is signed in, but this lamp is not among its machines
+  yet`. Việc đã bắt đầu dưới id máy của tài khoản chỉ đọc
   được khi đã đăng nhập; các máy tính vẫn cần đăng nhập.
 - **Lời nói.** Dòng health nói `computers_need_sign_in` ("Harness is not signed
   in: tasks go to the lamp's own agent; sign in to hand tasks to your
