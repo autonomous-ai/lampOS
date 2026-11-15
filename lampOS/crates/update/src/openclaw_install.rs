@@ -362,6 +362,26 @@ if [ \"$M\" = on ]; then
 fi
 ";
 
+/// Where OpenClaw's Node compile cache is kept across starts (#7135):
+/// `lampos`'s, 0700, in OpenClaw's own folder.
+pub const COMPILE_CACHE: &str = "/var/lib/lampos-openclaw/.node-compile-cache";
+
+/// [`NS`]'s lines before OpenClaw runs (#7135): OpenClaw keeps its Node
+/// compile cache in `/tmp/node-compile-cache` (its own
+/// `module.enableCompileCache`), but this script gives it a new tmpfs
+/// `/tmp` at each start, so every gateway start compiled cold (lamp-c0a4,
+/// 15 Nov: 20 MB again after each boot, 26.5 s to its first import). The
+/// folder [`COMPILE_CACHE`] is bound there instead, made `lampos`'s and
+/// 0700 by the namespace's root (`lampos` mapped). It helps from the
+/// second start on, the first fills it. Not kept, OpenClaw runs as before.
+const COMPILE_CACHE_LINES: &str = "# (#7135) OpenClaw's Node compile cache kept across starts, in its own folder: this /tmp is new at each start.
+N=/var/lib/lampos-openclaw/.node-compile-cache
+if { [ -d \"$N\" ] && [ ! -L \"$N\" ] || mkdir -m 0700 \"$N\"; } && mkdir -p /tmp/node-compile-cache && mount -n --bind \"$N\" /tmp/node-compile-cache; then :; else
+  echo \"openclaw-ns: OpenClaw's compile cache not kept across starts ($N)\" >&2
+fi
+unset N
+";
+
 /// What [`ns_text`] changes with [`Shown::one_path`] and [`Shown::tasks`]
 /// on (the gateway mark's, [`wrapper_text_for`]), after [`ENGINE_EDITS`],
 /// each found exactly once (a test holds it): the pushed skills' folder
@@ -452,7 +472,11 @@ pub fn ns_text(shown: Shown) -> String {
             text = text.replacen(from, to, 1);
         }
     }
-    text.replacen(RUN_LINE, &format!("{NPM_CI_MODE}{RUN_LINE}"), 1)
+    text.replacen(
+        RUN_LINE,
+        &format!("{NPM_CI_MODE}{COMPILE_CACHE_LINES}{RUN_LINE}"),
+        1,
+    )
 }
 
 /// [`WRAPPER`]'s text: [`WRAPPER_TEXT`] with the shared namespace piece's
