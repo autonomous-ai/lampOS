@@ -2413,7 +2413,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the wrapper as `lampos`, on loopback `ws://127.0.0.1:18789`, with the
      token in `/var/lib/lampos-openclaw/gateway-token` (0600 `lampos`),
      made once by lamp-update at the install. One Gateway serves every
-     pane.
+     pane. Its unit is written by a round only, never by the one-shot:
+     a one-shot that finds an earlier build's unit (a lamp-update ahead
+     of its units) changes nothing and takes nothing out, journals
+     "OpenClaw's install waits: lamp-openclaw-gateway.service is not
+     this build's yet; …", and leaves a working OpenClaw and its gateway
+     as they are; the next round writes the unit and asks again (#7135).
    - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
      lamp-cloud's `/var/lib/lampos-cloud/hermes-token`, as Hermes's does,
      for the `lampos` provider's `apiKey` (`${LAMP_HERMES_TOKEN}`).
