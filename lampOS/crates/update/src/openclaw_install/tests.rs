@@ -283,11 +283,13 @@ fn install(lamp: &Lamp, runs: &Runs, at: u64) -> Option<OpenclawInstall> {
 }
 
 fn round(lamp: &Lamp, systemd: &mut Fake, skills: bool, at: u64) -> Option<OpenclawInstall> {
+    let runs = Runs::new(lamp);
     after_round(
         lamp.root(),
         &lamp.records(),
         sk(skills),
         systemd,
+        &mut runs.runner(),
         at,
         Ok(crate::hermes_schedule::Window::Reached),
         &mut quiet(),
@@ -1243,6 +1245,7 @@ fn an_ask_from_the_app_tries_a_recent_openclaw_failure_again() {
             &lamp.records(),
             sk(false),
             systemd,
+            &mut Runs::new(&lamp).runner(),
             at,
             Ok(crate::hermes_schedule::Window::Asked),
             &mut quiet(),
@@ -1717,11 +1720,22 @@ fn install_built(lamp: &Lamp, runs: &Runs, at: u64) -> Option<OpenclawInstall> {
 }
 
 fn round_shown(lamp: &Lamp, systemd: &mut Fake, shown: Shown) -> Option<OpenclawInstall> {
+    round_with(lamp, systemd, shown, &Runs::new(lamp))
+}
+
+/// A round whose commands `runs` answers and logs.
+fn round_with(
+    lamp: &Lamp,
+    systemd: &mut Fake,
+    shown: Shown,
+    runs: &Runs,
+) -> Option<OpenclawInstall> {
     after_round(
         lamp.root(),
         &lamp.records(),
         shown,
         systemd,
+        &mut runs.runner(),
         10,
         Ok(crate::hermes_schedule::Window::Reached),
         &mut quiet(),
@@ -1965,6 +1979,111 @@ fn the_one_path_off_takes_the_launcher_and_the_entries_out() {
         ]
     );
     assert!(!launcher_due(lamp.root(), sk(true)));
+    round_shown(&lamp, &mut systemd, sk(true));
+    assert_eq!(lamp.asked(), None, "nothing left to do");
+}
+
+/// #6685: a factory reset wipes OpenClaw's approvals and keeps the
+/// record (`exec_allowlist` true): every round with the gateway up runs
+/// agent `main`'s add again (only it: no remove, no install, no one-shot).
+/// An add refused marks the record and asks the one-shot; with the
+/// gateway down the round runs nothing and keeps the record.
+#[test]
+fn every_round_adds_agent_mains_entry_again_with_the_gateway_up() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+    assert!(lamp.said().unwrap().exec_allowlist);
+
+    for _ in 0..2 {
+        let runs = Runs::new(&lamp);
+        assert_eq!(round_with(&lamp, &mut systemd, one_path(), &runs), None);
+        assert_eq!(
+            approvals(&runs),
+            [approvals_line("add", "main", SKILL_START)]
+        );
+        assert!(
+            runs.position(&format!("systemctl is-active --quiet {UNIT}"))
+                < runs.position(" approvals ")
+        );
+        assert_eq!(lamp.asked(), None, "no one-shot");
+        assert!(lamp.said().unwrap().exec_allowlist);
+    }
+
+    let down = Runs {
+        fail_on: Some(" is-active "),
+        ..Runs::new(&lamp)
+    };
+    round_with(&lamp, &mut systemd, one_path(), &down);
+    assert_eq!(approvals(&down), Vec::<String>::new());
+    assert!(lamp.said().unwrap().exec_allowlist && lamp.asked().is_none());
+
+    let refused = Runs {
+        fail_on: Some(" approvals allowlist add "),
+        ..Runs::new(&lamp)
+    };
+    round_with(&lamp, &mut systemd, one_path(), &refused);
+    assert!(!lamp.said().unwrap().exec_allowlist);
+    assert!(lamp.asked().unwrap().one_path, "the one-shot is asked");
+    let runs = Runs::new(&lamp);
+    assert!(install_built(&lamp, &runs, 40).unwrap().exec_allowlist);
+    assert_eq!(approvals(&runs), on_lines());
+
+    // With the one run path off, a round adds nothing.
+    let off = Runs::new(&lamp);
+    round_with(&lamp, &mut systemd, sk(true), &off);
+    assert!(!approvals(&off).iter().any(|line| line.contains(" add ")));
+}
+
+/// The one run path switched off with the gateway down: nothing is run,
+/// and the record keeps the entry, so the next round asks again; with
+/// the gateway up, the removes run and the record drops it.
+#[test]
+fn a_switch_off_with_the_gateway_down_is_retried_until_the_removes_run() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+
+    round_shown(&lamp, &mut systemd, sk(true));
+    assert!(!lamp.asked().unwrap().one_path);
+    let down = Runs {
+        fail_on: Some(" is-active "),
+        ..Runs::new(&lamp)
+    };
+    let said = install_built(&lamp, &down, 30).unwrap();
+    assert!(said.install == "installed" && said.exec_allowlist);
+    assert_eq!(approvals(&down), Vec::<String>::new());
+
+    // Again with the gateway down, OpenClaw now there as off wants it
+    // (nothing installed): still kept.
+    round_shown(&lamp, &mut systemd, sk(true));
+    assert!(present(lamp.root(), sk(true)) && !lamp.asked().unwrap().one_path);
+    let down = Runs {
+        fail_on: Some(" is-active "),
+        ..Runs::new(&lamp)
+    };
+    let said = install_built(&lamp, &down, 35).unwrap();
+    assert!(said.install == "installed" && said.exec_allowlist);
+    assert!(!down.lines().iter().any(|line| line.contains(NPM_CI_ENV)));
+
+    round_shown(&lamp, &mut systemd, sk(true));
+    assert!(!lamp.asked().unwrap().one_path, "asked again");
+    let up = Runs::new(&lamp);
+    let said = install_built(&lamp, &up, 40).unwrap();
+    assert!(said.install == "installed" && !said.exec_allowlist);
+    assert_eq!(
+        approvals(&up),
+        [
+            approvals_line("remove", "main", SKILL_START),
+            approvals_line("remove", "main", OLD_RUN_START)
+        ]
+    );
     round_shown(&lamp, &mut systemd, sk(true));
     assert_eq!(lamp.asked(), None, "nothing left to do");
 }

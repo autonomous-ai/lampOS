@@ -3597,7 +3597,10 @@ shows read-only.
 Agent `main`'s exec allow-list in OpenClaw's exec approvals names that
 one path exactly, nothing in the work folder (every OpenClaw agent can
 write there); the earlier glob is taken out of `main` and of the
-withdrawn fence agent `lamp-skill-run`. With OpenClaw's stock
+withdrawn fence agent `lamp-skill-run`. Every round with the gateway
+active, lamp-update adds `main`'s entry again (an entry there is not
+written twice), so a factory reset that wipes OpenClaw's approvals gets
+it back. With OpenClaw's stock
 `tools.exec.mode: "ask"`, a headless turn's exec is denied otherwise
 (install.md, "OpenClaw on the lamp"). The warm-gateway turn, its fence
 agent and the fence below are the withdrawn design (#7101), kept here
