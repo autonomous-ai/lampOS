@@ -2581,7 +2581,8 @@ credential of its own.
   factory reset and a sign-in from the app (#7019). The part's own start
   below stays `harness start`.
   It's the next job on the lane, ahead of a hand-over already waiting,
-  which would otherwise go to the stopped daemon. It's given 75 s
+  which would otherwise go to the stopped daemon, once no task is busy
+  (watched), as the env-file restart (#5978) waits. It's given 75 s
   (`DAEMON_START_TIMEOUT`), past Harness's own 60 s wait for the daemon,
   and the part journals `Harness's daemon started again after the sign-in
   (#7019)` or why not. A sign-in that fails or is cancelled starts nothing.
