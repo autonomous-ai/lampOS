@@ -47,6 +47,9 @@ mod setup_walk;
 #[path = "round/head_touch.rs"]
 mod head_touch;
 
+#[path = "round/install_settings.rs"]
+mod install_settings;
+
 #[path = "round/models_file.rs"]
 mod models_file;
 

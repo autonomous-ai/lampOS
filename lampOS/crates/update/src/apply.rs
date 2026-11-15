@@ -142,6 +142,10 @@ pub enum Act {
     Remove,
     /// Already the build's now: only recorded.
     Record,
+    /// The lamp's own, merged by key ([`merge_own`]): written with the
+    /// build's keys it lacked, named here, and never recorded, so it stays
+    /// the lamp's own.
+    Merge(String),
     /// The lamp's own: kept, with why.
     Keep(String),
 }
@@ -258,6 +262,77 @@ pub fn plan(
     Ok(steps)
 }
 
+/// The settings a lamp's own copy of is merged by key, not kept whole
+/// (#5984): Controls' two files, which the factory step, a V1 move
+/// (lamp-keeper) and install itself (`install::own_pins_follow_build`)
+/// write the lamp's own values into. Every other setting the lamp changed
+/// is kept whole and said.
+pub const MERGED: &[&str] = &[
+    "/etc/lampOS/controls/controls.json",
+    "/etc/lampOS/controls/controls-pins.json",
+];
+
+/// Each [`MERGED`] setting kept as the lamp's own, merged by key: the
+/// lamp's JSON object with every top-level key of the build's it lacks
+/// added, its own values kept. One with nothing to add, or either side not
+/// a JSON object, stays kept. Run on [`plan`]'s steps by the round and by
+/// `lamp-update-apply` alike, so both write the same bytes.
+pub fn merge_own(root: &Path, steps: &mut [Step]) -> io::Result<()> {
+    for step in steps.iter_mut() {
+        if !MERGED.contains(&step.setting.path.as_str())
+            || step.act != Act::Keep("this lamp's own".into())
+            || step.setting.removed
+        {
+            continue;
+        }
+        let Some(Ok(serde_json::Value::Object(build))) = step
+            .setting
+            .text
+            .as_deref()
+            .map(serde_json::from_str::<serde_json::Value>)
+        else {
+            continue;
+        };
+        let at = on_root(root, &step.setting.path);
+        let text = match fs::read_to_string(&at) {
+            Ok(text) => text,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(io::Error::new(
+                    error.kind(),
+                    format!("{}: {error}", step.setting.path),
+                ));
+            }
+        };
+        let Ok(serde_json::Value::Object(mut own)) = serde_json::from_str(&text) else {
+            continue;
+        };
+        let mut added = Vec::new();
+        for (key, value) in build {
+            if !own.contains_key(&key) {
+                own.insert(key.clone(), value);
+                added.push(key);
+            }
+        }
+        if added.is_empty() {
+            continue;
+        }
+        // Written as install writes a lamp's own object (`write_object`).
+        let mut merged = serde_json::to_string_pretty(&serde_json::Value::Object(own))
+            .map_err(io::Error::other)?;
+        merged.push('\n');
+        step.setting.sha256 = Some(manifest::sha256_hex(merged.as_bytes()));
+        step.setting.text = Some(merged);
+        step.act = Act::Merge(added.join(", "));
+    }
+    Ok(())
+}
+
+/// The journal line of a merged setting.
+pub fn merged_line(path: &str, added: &str) -> String {
+    format!("merged {path}: added the build's {added}; this lamp's own values are kept")
+}
+
 /// What the build's reset plan needs on this lamp (#806): none where the
 /// lamp has no plan; recorded where it is the build's already; written over
 /// any other, the lamp's own or a past build's alike, never kept.
@@ -326,7 +401,7 @@ pub fn keep_reset_plan(
 pub fn writes(steps: &[Step]) -> Vec<String> {
     steps
         .iter()
-        .filter(|step| matches!(step.act, Act::Write | Act::Remove))
+        .filter(|step| matches!(step.act, Act::Write | Act::Merge(_) | Act::Remove))
         .map(|step| step.setting.path.clone())
         .collect()
 }
@@ -611,6 +686,7 @@ fn apply(
         &signed.settings,
         &mut steps,
     )?;
+    merge_own(root, &mut steps).map_err(|error| error.to_string())?;
     crate::head_touch::verify(
         root,
         &root.join("etc/systemd/system"),
@@ -689,7 +765,7 @@ fn apply(
     let mut files = Vec::new();
     for step in &steps {
         let wrote = match step.act {
-            Act::Write => step.setting.sha256.clone(),
+            Act::Write | Act::Merge(_) => step.setting.sha256.clone(),
             Act::Remove => None,
             _ => continue,
         };
@@ -747,6 +823,12 @@ fn apply(
                 remove(&on_root(root, path)).map_err(|error| failed_at(path, error))?;
                 say(&format!("removed {path}"));
                 records_now.insert(path.clone(), None);
+            }
+            // Its record stays as it was: the lamp's own still.
+            Act::Merge(added) => {
+                let text = step.setting.text.as_deref().unwrap_or_default();
+                put(root, path, text.as_bytes(), step.setting.mode_bits())?;
+                say(&merged_line(path, added));
             }
             Act::Record => {
                 records_now.insert(path.clone(), step.setting.sha256.clone());

@@ -314,7 +314,7 @@ fn reconciles_pins(signed: &Setting, initial: Option<&Act>, effective: &Step) ->
         return false;
     }
     match initial {
-        Some(act @ (Act::Keep(_) | Act::Remove)) => {
+        Some(act @ (Act::Keep(_) | Act::Merge(_) | Act::Remove)) => {
             effective.setting == *signed && effective.act == *act
         }
         Some(Act::Write | Act::Record) | None => {

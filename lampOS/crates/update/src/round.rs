@@ -1541,6 +1541,11 @@ impl Run<'_, '_> {
                 )
                 .map_err(Outcome::Refused)?;
             }
+            if settings {
+                apply::merge_own(&self.config.root, &mut steps).map_err(|error| {
+                    Outcome::Failed(format!("the settings cannot be read: {error}"))
+                })?;
+            }
             crate::head_touch::verify(
                 &self.config.root,
                 &self.config.on(&self.config.units),
@@ -1664,11 +1669,15 @@ impl Run<'_, '_> {
 
     fn say_kept(&mut self, steps: &[apply::Step]) {
         for step in steps {
-            if let apply::Act::Keep(why) = &step.act {
-                self.say(&format!(
+            match &step.act {
+                apply::Act::Keep(why) => self.say(&format!(
                     "kept {}: {why}; the build's is not written",
                     step.setting.path
-                ));
+                )),
+                apply::Act::Merge(added) => {
+                    self.say(&apply::merged_line(&step.setting.path, added))
+                }
+                _ => {}
             }
         }
     }

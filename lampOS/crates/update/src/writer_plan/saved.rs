@@ -224,6 +224,9 @@ fn action(out: &mut Writer, value: Option<&Act>) -> Result<(), Refused> {
             out.u8(4)?;
             out.blob(reason.as_bytes(), 64)
         }
+        // This preparation never merges a lamp's own file (#5984): it has
+        // no tag, so a row that holds one is refused.
+        Some(Act::Merge(_)) => Err(Refused),
     }
 }
 
