@@ -7512,6 +7512,34 @@ impl lamp_tasks::skill_start::Peers for LauncherPeer {
             "aaaa1000-aaab0000 r-xp 00001000 b3:02 2 {TEST_LAUNCHER}\n"
         ))
     }
+    fn status(&self, _: u32) -> std::io::Result<String> {
+        Ok("Name:\tskill-start\nTracerPid:\t0\n".into())
+    }
+    fn proc_owner(&self, _: u32) -> std::io::Result<u32> {
+        Ok(0)
+    }
+    /// Every line from the launcher's own pid.
+    fn read_line(
+        &self,
+        stream: &std::os::unix::net::UnixStream,
+        most: usize,
+    ) -> std::io::Result<(String, Option<u32>)> {
+        use std::io::Read as _;
+        let mut line = String::new();
+        let mut byte = [0u8; 1];
+        loop {
+            if (&*stream).read(&mut byte)? == 0 {
+                return Err(std::io::ErrorKind::UnexpectedEof.into());
+            }
+            if byte[0] == b'\n' {
+                return Ok((line, Some(7133)));
+            }
+            if line.len() >= most {
+                return Err(std::io::ErrorKind::InvalidData.into());
+            }
+            line.push(byte[0] as char);
+        }
+    }
 }
 
 fn launcher_seen() -> lamp_tasks::skill_start::FileSeen {
@@ -7519,7 +7547,8 @@ fn launcher_seen() -> lamp_tasks::skill_start::FileSeen {
         file: true,
         uid: 0,
         mode: 0o100755,
-        dev: 1,
+        // `b3:02`, as Linux encodes it.
+        dev: (0xb3 << 8) | 0x02,
         ino: 2,
     }
 }
@@ -7572,11 +7601,21 @@ fn launch_start(
                     started_within: Duration::from_secs(5),
                 };
                 let served = thread::spawn(move || server.one(far));
+                let read_answer = || {
+                    let mut answer = String::new();
+                    let mut byte = [0u8; 1];
+                    while (&near).read(&mut byte).unwrap_or(0) == 1 && byte[0] != b'\n' {
+                        answer.push(byte[0] as char);
+                    }
+                    answer
+                };
                 (&near).write_all(b"task-1\n").unwrap();
-                let mut answer = String::new();
-                let mut byte = [0u8; 1];
-                while (&near).read(&mut byte).unwrap() == 1 && byte[0] != b'\n' {
-                    answer.push(byte[0] as char);
+                let mut answer = read_answer();
+                if answer == lamp_tasks::skill_start::CHECKED {
+                    (&near)
+                        .write_all(format!("{}\n", lamp_tasks::skill_start::READY).as_bytes())
+                        .unwrap();
+                    answer = read_answer();
                 }
                 if let Some(line) = then {
                     (&near).write_all(format!("{line}\n").as_bytes()).unwrap();
