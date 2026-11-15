@@ -192,7 +192,7 @@ impl Player {
                     Fed::Queued
                 }
                 Err(mpsc::TrySendError::Full(_)) => Fed::Full,
-                // The player ended: not played from now on, and started again after the run.
+                // The player ended: not played from now on; started again in the silence before the next run.
                 Err(mpsc::TrySendError::Disconnected(_)) => {
                     self.feed = None;
                     Fed::Ended
@@ -245,6 +245,11 @@ impl Runs {
         }
     }
 
+    /// Whether a run is going on: sound came less than [`QUIET`] ago.
+    fn in_run(&self) -> bool {
+        self.last.is_some()
+    }
+
     /// The run that ended by `now`, once.
     fn ended(&mut self, now: Instant) -> Option<Played> {
         let last = self.last?;
@@ -254,6 +259,15 @@ impl Runs {
         self.last = None;
         Some(self.counter.end_run())
     }
+}
+
+/// Whether to start the player again: it has ended, no run is going on (so no answer is cut
+/// by the start's wait), and the last start was at least [`QUIET`] ago (a player that ends at
+/// once is not started over and over). With the voice's clock on, its zero blocks come every
+/// 10 ms between answers, so a player that died there is noticed and started again before the
+/// next answer, which is then played, not lost.
+fn restart_due(gone: bool, in_run: bool, started: Instant, now: Instant) -> bool {
+    gone && !in_run && now.duration_since(started) >= QUIET
 }
 
 /// How long `bytes` of 24 kHz mono S16LE play.
@@ -274,6 +288,7 @@ pub fn run(bus: &Bus) {
 /// [`run`] with a player queue of `queued` blocks and `ahead` of sound ahead of the clock at most.
 pub fn run_with(bus: &Bus, queued: usize, ahead: Duration) {
     let mut player = Player::start(queued, ahead);
+    let mut started = Instant::now();
     if player.child.is_none() {
         eprintln!(
             "lamp-sim: the voice's speaker is counted, not played (LAMP_SIM_SPEAKER=silent, or no paplay, aplay or ffplay)"
@@ -300,11 +315,14 @@ pub fn run_with(bus: &Bus, queued: usize, ahead: Duration) {
                     break;
                 }
             }
-            if let Some(run) = runs.ended(Instant::now()) {
+            let now = Instant::now();
+            if let Some(run) = runs.ended(now) {
                 eprintln!("lamp-sim: {}", run_line(&run));
-                if player.gone() {
-                    player = Player::start(queued, ahead);
-                }
+            }
+            if restart_due(player.gone(), runs.in_run(), started, now) {
+                eprintln!("lamp-sim: the voice's speaker's player ended; starting it again");
+                player = Player::start(queued, ahead);
+                started = Instant::now();
             }
         }
     }
@@ -527,6 +545,48 @@ mod tests {
         // The last sound was at 2490 ms: the run ends at 3490 ms, QUIET later.
         assert_eq!(tick * 10, 2490 + QUIET.as_millis() as u64);
         assert_eq!((run.blocks, run.ms(), run.gaps), (50, 500, 0));
+    }
+
+    /// A player that ended is started again in the silence between answers, never during a run,
+    /// and not more than once a QUIET.
+    #[test]
+    fn a_dead_player_is_started_again_between_answers_only() {
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        // Dead, between answers, last started long ago: start it again.
+        assert!(restart_due(true, false, start, at(5_000)));
+        // Alive: never.
+        assert!(!restart_due(false, false, start, at(5_000)));
+        // During an answer: not now (the start's wait would cut it); after the run.
+        assert!(!restart_due(true, true, start, at(5_000)));
+        // Started less than QUIET ago and dead again: wait.
+        assert!(!restart_due(
+            true,
+            false,
+            start,
+            at(QUIET.as_millis() as u64 - 1)
+        ));
+        assert!(restart_due(
+            true,
+            false,
+            start,
+            at(QUIET.as_millis() as u64)
+        ));
+        // Runs says whether an answer is going on: sound starts it, QUIET after the last sound ends it.
+        let mut runs = Runs::default();
+        let mut player = Player {
+            child: None,
+            feed: None,
+            writer: None,
+            plays_until: None,
+            ahead: AHEAD,
+        };
+        runs.block(&silence(0), &mut player, at(0));
+        assert!(!runs.in_run());
+        runs.block(&block(24_000, 1, 1, 480), &mut player, at(10));
+        assert!(runs.in_run());
+        assert!(runs.ended(at(10 + QUIET.as_millis() as u64)).is_some());
+        assert!(!runs.in_run());
     }
 
     /// A burst (a held-up receive catching up) is played only up to AHEAD past the clock; the rest is dropped,
