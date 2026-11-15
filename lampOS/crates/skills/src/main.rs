@@ -1615,7 +1615,11 @@ fn serve(
                     );
                 }
             }
-            tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner, &audio);
+            if call.0 == RUN_NOW {
+                run_now_call(call, &mut engine, &mut runs, &mut out, &runner);
+            } else {
+                tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner, &audio);
+            }
         }
         if let Some((_, answers)) = &mut asking.gate {
             answer_asks(
@@ -2968,6 +2972,132 @@ type ToolAsk = (
     Admission,
 );
 
+/// The name a made skill's run now is asked by on the main loop, from the
+/// call socket's `run` op alone ([`listen`]): no tool's call can name it.
+const RUN_NOW: &str = "skills.run_now";
+
+/// Why a run now of `skill`, its steps `calls`, would make nothing, in
+/// words the lamp can say, or none: its last run under way (`busy`); a
+/// task with no folder known, or that [`lamp_skills::task::would_refuse`]
+/// says the hand-over would refuse (its runs in 24 hours spent, every
+/// skill's spent, its last task under way, the switch off); a read with
+/// its switch off or that came due on `read_day` already (once a local
+/// day, as `read_service` holds it); a write with its switch off or
+/// stopped. Read only: what passes is still held to the real gates where
+/// it is made (`hand_task`, `read_service`, `write_service`).
+fn run_now_refused(
+    skill: &str,
+    calls: &[Call],
+    busy: bool,
+    tasks: &Tasks,
+    read_day: Option<i64>,
+    now_ms: u64,
+) -> Option<String> {
+    use lamp_skills::{service_read, service_write, task};
+    if busy {
+        return Some("its last run is still under way".into());
+    }
+    for call in calls {
+        let why = match call {
+            Call::Task(_) if !tasks.of.contains_key(skill) => {
+                Some("its folder is not known".to_owned())
+            }
+            Call::Task(_) => task::would_refuse(skill, tasks.state.as_deref(), now_ms).map(|why| {
+                why.strip_prefix(task::NOT_HANDED)
+                    .unwrap_or(&why)
+                    .to_owned()
+            }),
+            Call::ServiceRead(_) if !service_read::on() => Some(format!(
+                "a skill's reads are off on this lamp ({} is not on)",
+                service_read::ENVIRONMENT
+            )),
+            Call::ServiceRead(_)
+                if read_day.is_some()
+                    && READ_DAYS
+                        .lock()
+                        .unwrap_or_else(|poison| poison.into_inner())
+                        .get(skill)
+                        == read_day.as_ref() =>
+            {
+                Some("its read runs once a day, and it ran today already".to_owned())
+            }
+            Call::ServiceWrite(_) if !service_write::on() => Some(format!(
+                "a skill's writes are off on this lamp ({} is not on)",
+                service_write::ENVIRONMENT
+            )),
+            Call::ServiceWrite(_) if service_write::stopped(skill) => {
+                Some("its writes are stopped: its link changed or is gone".to_owned())
+            }
+            _ => None,
+        };
+        if why.is_some() {
+            return why;
+        }
+    }
+    None
+}
+
+/// A skill made on this lamp run once now, as its owner asked by voice
+/// (the call socket's `run` op, the voice's alone, which asked whose line
+/// it was: `lamp_voice::made_run`). Only a made skill's (`made: here`),
+/// loaded, on, not under way, its steps as its trigger would make them
+/// ([`lamp_skills::Engine::run_now`]) and nothing [`run_now_refused`]
+/// refuses; then started as a trigger's run is ([`start`]), so every bound
+/// of its steps holds where it is made, and the voice is told it began,
+/// never what it found. Refused, the voice is told why and nothing is
+/// made, counted or said.
+fn run_now_call(
+    (_, args, _, reply, admission): ToolAsk,
+    engine: &mut Engine,
+    runs: &mut Runs,
+    out: &mut Publisher,
+    runner: &Runner,
+) {
+    let refuse = |why: &str| {
+        if admission.commit() {
+            let _ = reply.send(json!({ "error": why }));
+        }
+    };
+    let Some(skill) = args["skill"].as_str().map(str::to_owned) else {
+        return refuse("no skill was named");
+    };
+    if !runner.made.borrow().contains(&skill) {
+        eprintln!("lamp-skills: a run now refused: no skill made here is loaded by that name");
+        return refuse("it isn't a skill made on this lamp, or it isn't on the lamp now");
+    }
+    let now_us = clock::now_us();
+    let run = match engine.run_now(&skill, now_us) {
+        Ok(run) => run,
+        Err(why) => {
+            eprintln!("lamp-skills: skill:{skill}: not run now: {why}");
+            return refuse(&why);
+        }
+    };
+    let now_ms = unix_ms();
+    let read_day = runner.local_time.as_ref().map(|local| local.day(now_ms));
+    if let Some(why) = run_now_refused(
+        &skill,
+        &run.calls,
+        runs.busy.contains(&skill),
+        &runner.tasks.borrow(),
+        read_day,
+        now_ms,
+    ) {
+        eprintln!("lamp-skills: skill:{skill}: not run now: {why}");
+        return refuse(&why);
+    }
+    if !admission.commit() {
+        return;
+    }
+    engine.ran_now(&skill, now_us);
+    eprintln!("lamp-skills: skill:{skill}: run now, as its owner asked by voice");
+    let _ = reply.send(json!({ "ran": skill }));
+    for event in run.events {
+        publish(out, event);
+    }
+    let _ = start(run.skill, run.calls, &mut runs.busy, out, runner);
+}
+
 /// The model called a skill's tool: its steps run, and the voice is told
 /// what the model is to say: at once, or, with a look, once the body and
 /// the light are made (#1146). The say is the model's and the look the
@@ -3550,9 +3680,28 @@ fn listen(
                             return writeln!(&stream, "{}", json!({"ok": false, "error": why}));
                         }
                     },
+                    // A made skill run now, as its owner asked by voice
+                    // (`lamp_voice::made_run`): only the voice's, which
+                    // asked whose line it was.
+                    Some(lamp_voice::made_run::OP) => {
+                        if !voice {
+                            eprintln!(
+                                "lamp-skills: a run asked by a peer that is not the voice refused"
+                            );
+                            return writeln!(
+                                &stream,
+                                "{}",
+                                json!({"ok": false, "error": lamp_voice::made_run::NOT_THE_VOICE})
+                            );
+                        }
+                        args = json!({ "skill": call["skill"] });
+                        Some(RUN_NOW.to_owned())
+                    }
                     Some("call") => call["name"]
                         .as_str()
-                        .filter(|name| *name != watch::APP_ON && *name != watch::APP_OFF)
+                        .filter(|name| {
+                            *name != watch::APP_ON && *name != watch::APP_OFF && *name != RUN_NOW
+                        })
                         .map(str::to_owned),
                     _ => None,
                 };
@@ -7368,6 +7517,64 @@ mod tests {
                 assert_eq!(say.accept().unwrap_err().kind(), io::ErrorKind::WouldBlock);
             }
         }
+    }
+
+    /// lamp-9adf, 15 Nov: a made skill run now by its owner is refused,
+    /// in words the lamp can say and before anything is made, as its
+    /// trigger's run would be where it is made: its last run under way, its
+    /// folder not known, its tasks off or past the day's bounds; a run of
+    /// no task, read or write passes.
+    #[test]
+    fn a_run_now_is_refused_as_its_trigger_s_run_would_be() {
+        // The switch is read from this process's environment here.
+        if lamp_skills::task::on() {
+            return;
+        }
+        let root = tempfile::Builder::new()
+            .prefix("run-now-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let tasks = Tasks {
+            of: HashMap::from([("study".to_owned(), (root.path().join("study"), Vec::new()))]),
+            state: Some(root.path().to_owned()),
+            socket: None,
+            say: root.path().join("say.sock"),
+        };
+        let task = || {
+            Call::Task(Box::new(lamp_skills::task::TaskStep {
+                task: "Read my unread mail.".into(),
+                run: "scripts/mail.sh".into(),
+            }))
+        };
+        assert_eq!(
+            run_now_refused("dim", &[light("warm")], false, &tasks, None, 1_000),
+            None
+        );
+        assert_eq!(
+            run_now_refused("dim", &[light("warm")], true, &tasks, None, 1_000).as_deref(),
+            Some("its last run is still under way")
+        );
+        assert_eq!(
+            run_now_refused("other", &[task()], false, &tasks, None, 1_000).as_deref(),
+            Some("its folder is not known")
+        );
+        let off = lamp_skills::task::OFF
+            .strip_prefix(lamp_skills::task::NOT_HANDED)
+            .unwrap();
+        assert_eq!(
+            run_now_refused(
+                "study",
+                &[light("warm"), task()],
+                false,
+                &tasks,
+                None,
+                1_000
+            )
+            .as_deref(),
+            Some(off)
+        );
+        // Nothing is counted by the check.
+        assert!(!root.path().join(lamp_skills::task::RUNS_FILE).exists());
     }
 
     /// A run's sockets carry its own skill's permissions, as of the last

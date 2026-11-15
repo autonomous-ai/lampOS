@@ -264,7 +264,7 @@ pub fn question(spoken: &str) -> String {
 }
 
 /// The spoken names `names` as said in a line: "a", "a or b", "a, b or c".
-fn said_or(names: &[String]) -> String {
+pub(crate) fn said_or(names: &[String]) -> String {
     let spoken: Vec<String> = names
         .iter()
         .map(|name| made_skill::spoken_name(name))
@@ -524,7 +524,7 @@ pub fn removed_here(asks: &Asks) -> Result<Value, String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::make_skill_local::tests::keeping;
     use crate::skill_write_yes as yes;
@@ -535,7 +535,7 @@ mod tests {
     /// The person's made skills kept in `keeping`'s index, each by its name
     /// and whether it is on (an on one has its folder in the skills folder,
     /// as the manage helper put it there).
-    fn made_here(keeping: &crate::made_skill::Keeping, made: &[(&str, bool)]) {
+    pub(crate) fn made_here(keeping: &crate::made_skill::Keeping, made: &[(&str, bool)]) {
         std::fs::create_dir_all(&keeping.directory).unwrap();
         let entries: Vec<Value> = made
             .iter()
