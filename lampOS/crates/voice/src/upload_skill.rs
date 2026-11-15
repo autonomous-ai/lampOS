@@ -185,6 +185,12 @@ pub fn take(
     {
         return Err(Refused("its name isn't a skill's name".into(), None));
     }
+    // A made or added skill removed since (by the app or `lamp-skills
+    // remove`) is dropped from the kept ones first, as a voice make's name
+    // is (`made_skill::free_name`): on lamp-9adf, 15 Nov 16:14, a file
+    // added again 3 minutes after the app removed its skill was refused as
+    // "already on this lamp" until the record was dropped at 16:23.
+    made_skill::drop_gone(keeping);
     if let Some(why) = taken(&name, &place.skills, &place.pushed, &keeping.directory) {
         return Err(Refused(why, None));
     }
@@ -458,6 +464,31 @@ mod tests {
         // Kept here once: a second upload by that name is refused too.
         let why = take(&place, &keeping, None, CARD, NOW + 1).unwrap_err().0;
         assert!(why.contains("already on this lamp"), "{why}");
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// One added, put on and then removed from the lamp is free to add
+    /// again at once: its record is dropped before the name is checked
+    /// (lamp-9adf, 15 Nov 16:14). While its folder is on the lamp, it is
+    /// still refused.
+    #[test]
+    fn one_removed_since_can_be_added_again() {
+        use crate::make_skill_local::tests::manage_helper;
+        let (root, keeping) = keeping("upload-again");
+        let place = place(&root);
+        let made = take(&place, &keeping, None, CARD, NOW).unwrap();
+        let asked = manage_helper(&keeping.manage);
+        made_skill::put_on(&keeping, &made).unwrap();
+        asked.join().unwrap();
+        let folder = keeping.installed.join("tea-tip");
+        std::fs::create_dir_all(&folder).unwrap();
+        let why = take(&place, &keeping, None, CARD, NOW + 1).unwrap_err().0;
+        assert!(why.contains("already on this lamp"), "{why}");
+        // Removed: the folder gone, the same file is taken again.
+        std::fs::remove_dir_all(&folder).unwrap();
+        let again = take(&place, &keeping, None, CARD, NOW + 2).unwrap();
+        assert_eq!(again.name, "tea-tip");
         assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
         let _ = std::fs::remove_dir_all(&root);
     }
