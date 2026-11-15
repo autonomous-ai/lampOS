@@ -2884,7 +2884,7 @@ for each run, and is answered once the run ends
     fenced run path for a skill's run yet, whatever lamp-update's switch,
     with no engine named in the check. An agent whose wrapper is a
     gateway agent's (OpenClaw's with lamp-update's `LAMP_SKILL_DEFAULT_AGENT`
-    and `LAMP_SKILL_GATEWAY_RUNS` on, below,
+    on alone, #6685, below,
     "A skill's run on a gateway agent") takes the run as one turn on its
     warm gateway instead; OpenClaw's wrapper with the switch off has no
     gateway data either, so it is refused this way. The token file is written before the launch, as for
@@ -3767,8 +3767,10 @@ before each run's turn (step 3 above): `agents.lamp-skill-run` gets
   lamp-control's own checks of the run's token hold against them. So
   `LAMP_SKILL_GATEWAY_RUNS` (switches.md) stays off until the fence is
   checked on a lamp or the first builder accepts this in writing; off,
-  lamp-update leaves OpenClaw's wrapper and namespace as before the one
-  run path, and lamp-tasks refuses such a run in words.
+  lamp-tasks refuses such a run in words. lamp-update no longer reads it
+  (#6685, the lead): it writes OpenClaw's gateway wrapper and shows its
+  namespace lamp-control's socket and skills-dev with
+  `LAMP_SKILL_DEFAULT_AGENT=on` alone, as Hermes's one run path wrapper.
 - **Exec.** Hermes's run may run any command in its namespace (its
   hardline list holds, approvals are off). The fence agent's only tool is
   `exec`, and its allow-list matches resolved binary paths: only a run's

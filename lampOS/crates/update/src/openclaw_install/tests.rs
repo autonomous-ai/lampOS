@@ -1341,37 +1341,120 @@ fn the_one_path_makes_openclaw_a_gateway_agent_and_off_changes_nothing() {
     assert!(!ns_text(sk(true)).contains("L=/run/lampos-control/control.sock"));
 }
 
-/// #6882: with the one run path on but LAMP_SKILL_GATEWAY_RUNS off,
-/// lamp-tasks refuses a gateway default agent's runs, so OpenClaw is shown
-/// exactly what it is with the one run path off: its namespace text and
-/// its wrapper byte for byte, no control socket, no pushed skills shown
-/// for every turn, no gateway mark. With both on, all three.
+/// #6685 (the lead): the one run path alone (`LAMP_SKILL_DEFAULT_AGENT`
+/// on, as Hermes's one run path wrapper) shows OpenClaw lamp-control's
+/// socket, the pushed skills and the gateway mark: no second switch. Its
+/// wrapper and namespace are byte for byte what both switches on wrote
+/// before (#6882's `one_path && gateway_runs`, built here the old way), so
+/// lamp-tasks' acceptance of that text holds. Off, as before #6685.
 #[test]
-fn gateway_runs_off_shows_openclaw_what_the_one_path_off_does() {
+fn the_one_path_alone_shows_openclaw_what_both_switches_did() {
     for skills in [false, true] {
-        let before = sk(skills);
-        let off = shown(skills, true, false);
-        assert_eq!(off, before);
-        assert_eq!(ns_text(off), ns_text(before));
-        assert_eq!(wrapper_text_for(off), wrapper_text_for(before));
-        assert_eq!(wrapper_text_for(off), wrapper_text());
-        // Without the one run path the runs switch alone changes nothing.
-        assert_eq!(shown(skills, false, true), before);
-        assert_eq!(shown(skills, false, false), before);
-        let ns = ns_text(off);
-        assert!(!ns.contains("/run/lampos-control/control.sock"), "{ns}");
-        assert!(!wrapper_text_for(off).contains(GATEWAY_MARK));
-
-        let on = shown(skills, true, true);
+        let on = shown(skills, true);
         assert!(on.tasks && on.one_path && on.skills == skills);
+        // Today's `one_path && gateway_runs` text, built the old way.
+        let old = Shown {
+            skills,
+            tasks: true,
+            one_path: true,
+        };
+        let old_wrapper = format!(
+            "#!/bin/sh\n{GATEWAY_MARK}{GATEWAY_DATA}{}",
+            wrapper_text().strip_prefix("#!/bin/sh\n").unwrap()
+        );
+        assert_eq!(wrapper_text_for(on).as_bytes(), old_wrapper.as_bytes());
+        assert_eq!(wrapper_text_for(on), wrapper_text_for(old));
+        assert_eq!(ns_text(on).as_bytes(), ns_text(old).as_bytes());
         let ns = ns_text(on);
-        assert!(ns.contains("L=/run/lampos-control/control.sock"), "{ns}");
+        assert!(ns.contains(
+            " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\n"
+        ), "{ns}");
         assert!(ns.contains("/var/lib/lampOS/skills-dev, read-only, when there, for the\n"));
         assert!(ns.contains("if [ -d \"$P\" ]; then mkdir -m 0700"));
         assert!(!ns.contains("if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]"));
+        // The gateway form, never the per-run one: OpenClaw can't open its
+        // state outside its gateway's PID namespace.
         let wrapper = wrapper_text_for(on);
-        assert!(wrapper.starts_with(&format!("#!/bin/sh\n{GATEWAY_MARK}{GATEWAY_DATA}")));
+        assert!(wrapper.starts_with(&format!("#!/bin/sh\n{GATEWAY_MARK}")));
+        assert!(!wrapper.contains(agent_ns::wrapper::ONE_PATH_MARK));
+        assert!(wrapper[..512].contains(agent_ns::wrapper::MARK));
+
+        // Off: byte for byte as before #6685.
+        let before = sk(skills);
+        let off = shown(skills, false);
+        assert_eq!(off, before);
+        assert_eq!(ns_text(off), ns_text(before));
+        assert_eq!(wrapper_text_for(off), wrapper_text());
+        assert!(!ns_text(off).contains("/run/lampos-control/control.sock"));
+        assert!(!wrapper_text_for(off).contains(GATEWAY_MARK));
     }
+}
+
+/// #6685 (the lead): lamp-update reads no gateway runs switch of its own,
+/// in any of the files that decide what OpenClaw is shown.
+#[test]
+fn lamp_update_reads_no_gateway_runs_switch() {
+    let switch = concat!("LAMP_SKILL_", "GATEWAY_RUNS");
+    for (name, source) in [
+        (
+            "openclaw_install.rs",
+            include_str!("../openclaw_install.rs"),
+        ),
+        ("switches.rs", include_str!("../switches.rs")),
+        ("agent_ns.rs", include_str!("../agent_ns.rs")),
+        ("main.rs", include_str!("../main.rs")),
+        ("hermes_install.rs", include_str!("../hermes_install.rs")),
+    ] {
+        assert!(!source.contains(switch), "{name} reads {switch}");
+        assert!(!source.contains("GATEWAY_RUNS_SWITCH"), "{name}");
+        assert!(!source.contains("gateway_runs"), "{name}");
+    }
+}
+
+/// #6685 (the lead): nothing the one run path changes writes OpenClaw's
+/// shared config ([`CONFIG`]). The one write of it in lamp-update is the
+/// install's own `gateway` block ([`gateway_config`], the gateway's token,
+/// as before #6685), which takes no [`Shown`]: the switches never reach it.
+/// The written wrapper and namespace never name it.
+#[test]
+fn the_one_path_writes_nothing_to_openclaws_shared_config() {
+    let source = include_str!("../openclaw_install.rs");
+    let code = source.split("\n#[cfg(test)]").next().unwrap();
+    assert_eq!(code.matches("on(root, CONFIG)").count(), 1);
+    let writer = code
+        .split_once("fn gateway_config(")
+        .unwrap()
+        .1
+        .split_once("\n}\n")
+        .unwrap()
+        .0;
+    assert!(writer.contains("on(root, CONFIG)"));
+    assert!(!writer.contains("Shown"));
+    assert!(
+        !code.contains("CONFIG, "),
+        "CONFIG handed to another writer"
+    );
+    for skills in [false, true] {
+        for one_path in [false, true] {
+            let shown = shown(skills, one_path);
+            assert!(!wrapper_text_for(shown).contains("openclaw.json"));
+            assert!(!ns_text(shown).contains("openclaw.json"));
+        }
+    }
+    // And the files `shown` reaches are the wrapper and the namespace
+    // script alone, never the config.
+    let entry_points = code
+        .split_once("fn write_entry_points(root: &Path, shown: Shown)")
+        .unwrap()
+        .1
+        .split_once("\n}\n")
+        .unwrap()
+        .0;
+    assert!(entry_points.contains("write_root_file(root, NS, &ns_text(shown), 0o755)"));
+    assert!(
+        entry_points.contains("write_root_file(root, WRAPPER, &wrapper_text_for(shown), 0o755)")
+    );
+    assert!(!entry_points.contains("CONFIG"));
 }
 
 /// The one run path is carried through the one-shot's ask, so its
