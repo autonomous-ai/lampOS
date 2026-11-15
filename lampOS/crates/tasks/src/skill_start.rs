@@ -8,10 +8,12 @@
 //!   allow-list holds. Invoked as [`NAME`] (its file name, or `lamp-tasks
 //!   skill-start`), it is [`launcher_main`]: `skill-start <run-id>`.
 //! - **The socket** ([`START_SOCKET`], 0600, in [`START_DIR`]): lamp-tasks'
-//!   [`Server`]. lamp-update owns the folder (0755, `lampos`'s, made by
-//!   tmpfiles.d and its round, gone with the switch off) and OpenClaw's
-//!   namespace binds it read-only; lamp-tasks never makes or removes it. The launcher sends `<run-id>\n`. lamp-tasks
-//!   checks, in order, the peer's uid (`SO_PEERCRED`, its own), the peer's
+//!   [`Server`]. The folder is made by systemd as the OpenClaw gateway
+//!   unit's `RuntimeDirectory` (0755, `lampos`'s,
+//!   `RuntimeDirectoryPreserve=yes`, so kept until reboot), installed by
+//!   lamp-update's one-shot (#7135); OpenClaw's namespace binds it
+//!   read-only. lamp-tasks never makes or removes it. The launcher sends
+//!   `<run-id>\n`. lamp-tasks checks, in order, the peer's uid (`SO_PEERCRED`, its own), the peer's
 //!   program (`/proc/<pid>/exe` names [`LAUNCHER`], is that very file, and
 //!   the file is root's and not group- or world-writable: [`peer_may`]),
 //!   then that the id is a live gateway run of this lamp-tasks not claimed
@@ -47,7 +49,8 @@ pub const LAUNCHER: &str = "/usr/local/lib/lampos/skill-start";
 /// The name lamp-tasks acts as the launcher by: its file's name, or its
 /// first argument.
 pub const NAME: &str = "skill-start";
-/// The launcher socket's folder: lamp-update's (0755, `lampos`'s), outside
+/// The launcher socket's folder: the OpenClaw gateway unit's
+/// `RuntimeDirectory` (0755, `lampos`'s, kept until reboot), outside
 /// lamp-tasks' own runtime folder, which systemd wipes at each stop.
 pub const START_DIR: &str = "/run/lampos-skill-start";
 /// The launcher socket, 0600, in [`START_DIR`].
