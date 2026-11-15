@@ -8647,11 +8647,22 @@ pub const ALREADY_DONE: &str = "This has happened already and nothing is left to
 /// `line` ([`not_made_line`]) in the language of the conversation, the
 /// reason and what to try whole.
 pub fn not_made_in_their_language(line: &str) -> String {
-    format!(
-        "{ALREADY_DONE}Tell the person this, in the language of the conversation, every part \
-         of it, leaving nothing out: that the skill wasn't made, why, and what to try. Add \
-         nothing else: \"{line}\""
-    )
+    format!("{ALREADY_DONE}{NOT_MADE_TOLD}\"{line}\"")
+}
+
+/// What [`not_made_in_their_language`] tells the model after
+/// [`ALREADY_DONE`], before the quoted line.
+const NOT_MADE_TOLD: &str = "Tell the person this, in the language of the conversation, every \
+                             part of it, leaving nothing out: that the skill wasn't made, why, \
+                             and what to try. Add nothing else: ";
+
+/// Whether `note` is the lamp's note of a skill made: it opens on
+/// [`ALREADY_DONE`] and isn't [`not_made_in_their_language`]'s note of
+/// one not made. `LAMP_ACTION_CLAIM_CHECKED` counts only these as the
+/// turn's make (#7128).
+pub fn tells_made(note: &str) -> bool {
+    note.strip_prefix(ALREADY_DONE)
+        .is_some_and(|told| !told.starts_with(NOT_MADE_TOLD))
 }
 
 /// What the lamp says when a kept skill couldn't be put on: why, in the
@@ -11168,6 +11179,9 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(note.starts_with(ALREADY_DONE), "{note}");
         assert!(note.contains("call no tool"), "{note}");
         assert!(in_their_language("I made x, and it's on.").starts_with(ALREADY_DONE));
+        assert!(!tells_made(&note), "{note}");
+        assert!(tells_made(&in_their_language("I made x, and it's on.")));
+        assert!(!tells_made("I made x, and it's on."));
     }
 
     /// With reads on, a read refused as unsaid goes back with lines that
