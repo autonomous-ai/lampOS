@@ -766,7 +766,14 @@ sau:
      do (`made_skill::CODE_BY_VOICE`), nên câu trả lời `made` của ứng dụng
      vẫn là `not_kept`, lý do "it couldn't be put on: a skill that runs its
      own code goes on only once you agree to it out loud at the lamp, after
-     it says what that code may use".
+     it says what that code may use". Trong lúc nó đã được đọc lại tại đèn
+     và lời đồng ý bằng lời đang được chờ (bên dưới;
+     `skill_write_yes::code_yes_awaited`: cơ chế chờ của đúng SHA-256 đó,
+     chưa bị bỏ, chưa được trả lời và chưa quá 120 s), câu trả lời còn mang
+     `"awaits_yes": true`, để ứng dụng hiện là đang chờ lời đồng ý đó và
+     tiếp tục hỏi; khi lời đồng ý bật nó, câu trả lời kế tiếp là `on`. Không
+     được đọc lại (có người khác ở đó, hoặc không ở route thứ hai) thì không
+     có trường này và câu trả lời như trên.
    - **Tạo từ ứng dụng, đọc lại tại đèn.** MAKE IT của ứng dụng
      (`app_make::put_on_line`) sau đó giữ nó là đã hỏi
      (`made_skill::code_asked`, `code_asked_at_unix_ms`) và để đèn nói đúng
@@ -2104,7 +2111,10 @@ từ chối ngay như mọi câu nói, và kỹ năng vẫn bật.
 - `{"made": {"request_id"}}`: trạng thái của lời nhờ từ ứng dụng: `making`
   (đang tạo, hoặc đã giữ và đang bật), `on`, hoặc `not_kept` kèm `why` (lời
   rõ ràng của người tạo, "it couldn't be put on: …" khi helper không bật,
-  hoặc "it wasn't put on" khi giữ hơn 30 phút mà chưa bật). Lời nhờ mới
+  hoặc "it wasn't put on" khi giữ hơn 30 phút mà chưa bật). Kỹ năng đã giữ
+  có mã riêng, đã được đọc lại tại đèn và đang chờ lời đồng ý bằng lời, là
+  `not_kept` kèm `"awaits_yes": true` bên cạnh `why` (#6307, "Tạo từ ứng
+  dụng, đọc lại tại đèn" ở trên); ngoài ra không có trường này. Lời nhờ mới
   không bao giờ là `kept`, `asked` hay `left_off`; chỉ lời nhờ trước #5977
   chưa được đồng ý mới còn là `left_off`.
 

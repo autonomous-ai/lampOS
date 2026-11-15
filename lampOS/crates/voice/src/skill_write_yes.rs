@@ -341,6 +341,21 @@ pub fn drop_wait(id: &str) -> bool {
     })
 }
 
+/// Whether the person's yes to the made skill with code of its own whose
+/// SHA-256 is `sha256` is awaited at `now` (#6307): its say-back was given
+/// to the lamp to say, and its wait is neither dropped, answered nor past
+/// [`YES_WITHIN`]. The app is told so (`app_make::status`, `awaits_yes`).
+pub fn code_yes_awaited(sha256: &str, now: Instant) -> bool {
+    kept::waiting(|waiting| {
+        waiting.as_ref().is_some_and(|waiting| {
+            waiting.asks.code
+                && !waiting.asks.remove
+                && waiting.asks.sha256 == sha256
+                && now.saturating_duration_since(waiting.at) <= YES_WITHIN
+        })
+    })
+}
+
 /// Whether a made skill's writes wait for the yes at `now`: the echo hold
 /// is on ([`crate::second_provider`]).
 pub fn awaited(now: Instant) -> bool {
