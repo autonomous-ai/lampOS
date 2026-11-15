@@ -1777,7 +1777,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   same say-back ("Photo booth hands one task to the lamp's agent: … It
   runs only once you agree.", `skill_task_yes::asked_aloud`). It refuses,
   and nothing is said, in the lamp's quiet hours
-  (`lamp_local_time::quiet_hours`), outside `LAMP_PRIVATE_ROOM` unless the
+  (`lamp_local_time::quiet_hours`; with `LAMP_TOLD_WHEN_ASKED=on`, not when
+  the owner asked for that skill by voice within five minutes, below),
+  outside `LAMP_PRIVATE_ROOM` unless the
   owner is seen alone (as a run's write is read back,
   `run_write_yes::read_back_allowed_now`), with the switch off, or once
   agreed. Otherwise the say goes through every gate a skill's say has
@@ -4566,7 +4568,43 @@ answer held in quiet hours leaves a line (#7180). Its end is said as before
 kept in the state folder's `task-telling.json` (its skill and when it
 began, never a word of it), so one a restart of lamp-skills drops unsaid is
 said at the next start (`what its agent found: dropped unsaid, lamp-skills
-restarted while it waited`, `task::telling_dropped`). A run
+restarted while it waited`, `task::telling_dropped`).
+
+With `LAMP_TOLD_WHEN_ASKED=on` (`lamp-skills` and `lamp-voice`, off unless
+set; #7180, the first builder's ruling): a run the owner asked for by voice
+keeps its word in quiet hours. On lamp-9adf at 02:28 on 16 Nov a run now
+was answered "Running … now", and its agent's answer then waited behind
+the lamp's quiet hours, with nothing said, until it was skipped an hour
+later. Only a run started by the owner's own spoken ask: a run now
+(`made_run`, the voice's alone on the call socket, which asked whose line
+it was) of a skill with a task marks it (`task::asked_by_voice`), taken once by that run's
+hand-over (`task::take_asked_by_voice`), so a trigger's run, the app's or a
+schedule's after it keeps the quiet as before. Only if the agent's answer
+is ready within five minutes of the ask
+(`told_when_asked::lifted_until`); then the lamp's quiet hours and the
+skill's own `[quiet]` are lifted for it until five minutes after it was
+ready (`told_when_asked::quiet_holds`), so a wait for the owner never
+speaks at one in the morning unasked. Every other part of the gate stays:
+the owner in view and alone, no voice for a minute, not private or
+paused, the lamp's one read turn, and the night's volume. The journal says
+which: `what its agent found: told in quiet hours too, its owner asked by
+voice N s before (LAMP_TOLD_WHEN_ASKED)`, or `its quiet holds, ready N s
+after its owner's ask, past five minutes`. The same switch lets the voice
+ask a task's first yes in quiet hours (above) when the owner asked for that
+skill by voice within five minutes: a skill the heard words named
+(`LAMP_SKILL_NAMED`), the owner heard saying it (`services::owner_hears`),
+is kept with its time in `/run/lampos-voice/spoken-asks.json` (the voice's
+own runtime folder, so no skill or add-on can stand for an ask;
+`told_when_asked::keep`). Whose line it was is judged on a thread of its
+own, so the named call never waits for it; the say service's ask, in
+quiet hours only, waits up to 2 s for it instead
+(`told_when_asked::asked_within_waiting`, `ASKED_WAIT`,
+`Here::asked_by_voice`). Tests:
+`told_when_asked::tests` (with `a_spoken_ask_kept_a_little_later_is_waited_for`), `skill_task_yes::tests::asked_by_voice_it_is_said_in_quiet_hours`,
+`task::tests::a_run_asked_by_voice_is_taken_once`, and
+`a_line_the_voice_heard_holds_a_reads_gate` in lamp-skills' main.
+
+A run
 with no read grant (a send, a script's task) tells nothing, as before.
 Tests: `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
 `service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,

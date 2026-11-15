@@ -3121,6 +3121,14 @@ fn run_now_call(
         return;
     }
     engine.ran_now(&skill, now_us);
+    // Its told answer may lift the quiet (#7180): a run now is the
+    // owner's own spoken ask, the voice's alone ([`listen`]); marked only
+    // for a run with a task, whose own hand-over takes it.
+    if lamp_voice::told_when_asked::on()
+        && run.calls.iter().any(|call| matches!(call, Call::Task(_)))
+    {
+        lamp_skills::task::asked_by_voice(&skill, now_ms);
+    }
     eprintln!("lamp-skills: skill:{skill}: run now, as its owner asked by voice");
     let _ = reply.send(json!({ "ran": skill }));
     for event in run.events {
@@ -5573,6 +5581,7 @@ fn lamp_room(
         owner,
         local_time,
         quiet,
+        quiet_lifted: None,
     }
 }
 
@@ -5609,6 +5618,8 @@ fn tasks_refused(skill: &str, calls: &[Call], tasks: &Tasks) -> Option<String> {
 /// read's gate ([`lamp_skills::service_read::tell`]); the journal says only
 /// how many sentences.
 fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut room: LampRoom) {
+    // This run's own: a run now asked by voice, never a trigger's after it.
+    let asked = lamp_skills::task::take_asked_by_voice(skill);
     let Some((folder, grants)) = tasks.of.get(skill).cloned() else {
         eprintln!("lamp-skills: skill:{skill}: do.task: not handed over: its folder is not known");
         return;
@@ -5666,6 +5677,24 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
                 && let Err(error) = lamp_skills::task::telling_begins(state, &skill, began)
             {
                 eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {error}");
+            }
+            // Asked by the owner's voice and ready within five minutes: the
+            // quiet lifted for it, for five minutes more (#7180).
+            if let Some(asked) = asked {
+                let ready = unix_ms();
+                let after = ready.saturating_sub(asked) / 1000;
+                match lamp_voice::told_when_asked::lifted_until(asked, ready) {
+                    Some(until) => {
+                        room.quiet_lifted = Some(until);
+                        eprintln!(
+                            "lamp-skills: skill:{skill}: do.task: what its agent found: told in quiet hours too, its owner asked by voice {after} s before ({})",
+                            lamp_voice::told_when_asked::ENVIRONMENT
+                        );
+                    }
+                    None => eprintln!(
+                        "lamp-skills: skill:{skill}: do.task: what its agent found: its quiet holds, ready {after} s after its owner's ask, past five minutes"
+                    ),
+                }
             }
             let told = lamp_skills::service_read::tell(&lines, &mut room);
             eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {told}");
@@ -5821,6 +5850,10 @@ struct LampRoom {
     local_time: Option<Arc<lamp_local_time::LocalTime>>,
     /// The skill's own `[quiet]`.
     quiet: Option<(u16, u16)>,
+    /// Until when (unix ms) the lamp's quiet hours and the skill's own are
+    /// lifted for a told answer its owner asked for by voice (#7180,
+    /// `lamp_voice::told_when_asked`); none, they hold.
+    quiet_lifted: Option<u64>,
 }
 
 impl lamp_skills::service_read::Room for LampRoom {
@@ -5868,6 +5901,7 @@ impl lamp_skills::service_read::Room for LampRoom {
                     lamp_local_time::QuietWindow { from, to }.contains(minute)
                 })
         });
+        let quiet = lamp_voice::told_when_asked::quiet_holds(quiet, self.quiet_lifted, now_ms);
         lamp_skills::service_read::Seen {
             owner_known: self.owner.is_some() && self.known_file.is_some(),
             faces,
@@ -6330,7 +6364,16 @@ mod tests {
             owner: None,
             local_time: None,
             quiet: None,
+            quiet_lifted: None,
         };
+        // No local time is quiet; a told answer its owner asked for by voice
+        // lifts it until its lift's end, and no longer (#7180).
+        assert!(room.seen().quiet);
+        room.quiet_lifted = Some(unix_ms() + 60_000);
+        assert!(!room.seen().quiet);
+        room.quiet_lifted = Some(unix_ms() - 1);
+        assert!(room.seen().quiet);
+        room.quiet_lifted = None;
         let heard_ago = |room: &mut LampRoom| room.seen().heard_ago;
         assert_eq!(heard_ago(&mut room), None);
         hear_voices(&bus);

@@ -35,6 +35,7 @@ fn said_back_unasked(said: Option<&str>) -> String {
         task_yes::Here {
             quiet_hours: false,
             owner_sees_alone: true,
+            asked_by_voice: false,
         },
         |_| Ok(Some(booth())),
         |file| {

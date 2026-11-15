@@ -64,7 +64,7 @@ use lamp_voice::skill_task_yes::Agreement;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     io::Read,
     os::unix::fs::OpenOptionsExt,
@@ -660,6 +660,29 @@ pub fn ask_yes(
 static UNDER_WAY: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
 /// Without `--state-dir`, when each run was handed over, for the bounds.
 static RUNS_HERE: Mutex<Vec<(String, u64)>> = Mutex::new(Vec::new());
+/// The skills run now as their owner asked by voice, each with when, for
+/// that run's told answer ([`take_asked_by_voice`], #7180).
+static ASKED_BY_VOICE: Mutex<BTreeMap<String, u64>> = Mutex::new(BTreeMap::new());
+
+/// `skill` run now at `at_ms` as its owner asked by voice (a run now, the
+/// voice's alone, `lamp_voice::made_run`), with
+/// `lamp_voice::told_when_asked::ENVIRONMENT` on: its told answer may lift
+/// the quiet (`lamp_voice::told_when_asked::lifted_until`).
+pub fn asked_by_voice(skill: &str, at_ms: u64) {
+    ASKED_BY_VOICE
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .insert(skill.to_owned(), at_ms);
+}
+
+/// When `skill` was last run now as its owner asked by voice, taken once:
+/// by that run's hand-over, so no later trigger's run counts as asked.
+pub fn take_asked_by_voice(skill: &str) -> Option<u64> {
+    ASKED_BY_VOICE
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .remove(skill)
+}
 
 /// A skill's task under way: the skill is free for its next when it ends
 /// ([`Drop`]).
@@ -1331,6 +1354,16 @@ mod tests {
             telling_dropped(state),
             Ok(vec![("read-mail".to_owned(), 30)])
         );
+    }
+
+    /// A run now asked by voice is found once, by its own hand-over; none
+    /// for another skill, nor for the run after it.
+    #[test]
+    fn a_run_asked_by_voice_is_taken_once() {
+        asked_by_voice("asked-once", 1_000);
+        assert_eq!(take_asked_by_voice("asked-other"), None);
+        assert_eq!(take_asked_by_voice("asked-once"), Some(1_000));
+        assert_eq!(take_asked_by_voice("asked-once"), None);
     }
 
     /// A run lamp-tasks refused before its agent began (busy with another
