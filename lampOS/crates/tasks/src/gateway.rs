@@ -11,9 +11,12 @@
 //! [`NOT_READY`], and the person is told it failed.
 use std::io::{Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
+use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::thread;
 use std::time::{Duration, Instant};
+
+use serde_json::Value;
 
 use crate::harness::{EngineKind, Launch, LaunchOutcome};
 
@@ -138,6 +141,144 @@ pub fn answers(port: u16) -> bool {
     );
     let mut first = [0u8; 1];
     asked.is_ok() && matches!(stream.read(&mut first), Ok(1))
+}
+
+// A gateway agent's data (#6685), read only to accept the lamp's default
+// agent for a skill's run (`crate::skill_task::default_agent_takes_runs`):
+// an accepted run is `harness new <engine>` like any other, whose pane
+// joins the gateway's namespaces.
+
+/// The line after `#!/bin/sh` of a gateway agent's wrapper
+/// (`lamp_update::openclaw_install::GATEWAY_MARK`): the same for every
+/// gateway agent, naming none.
+pub const GATEWAY_MARK: &str = "# lampOS: a gateway agent: a skill's run is one turn on its warm gateway (#6685). Written by lamp-update.\n";
+/// Each of the gateway's data lines starts with this, then its key and a
+/// space.
+pub const DATA_PREFIX: &str = "#@";
+/// The keys of the gateway's data, each once.
+pub const KEYS: [&str; 9] = [
+    "port",
+    "ns",
+    "agent",
+    "turn",
+    "stop",
+    "end",
+    "fence-get",
+    "fence-set",
+    "fence-entry",
+];
+
+/// A gateway agent's data, as lamp-update wrote it in its wrapper: every
+/// key there and plain, though only [`Self::ns`] is read here.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GatewayAgent {
+    /// The gateway's port, on loopback only.
+    pub port: u16,
+    /// The namespace script the gateway runs in: it must show
+    /// lamp-control's socket.
+    pub ns: PathBuf,
+    /// The agent a skill's run is one turn of (its fence).
+    pub agent: String,
+    /// The turn's arguments, a template.
+    pub turn: Vec<String>,
+    /// The arguments that stop a turn still going, a template.
+    pub stop: Vec<String>,
+    /// The arguments that remove the run's session, a template.
+    pub end: Vec<String>,
+    /// The arguments that print the gateway's exec approvals as JSON, a
+    /// template.
+    pub fence_get: Vec<String>,
+    /// The arguments that set the gateway's exec approvals from stdin, a
+    /// template.
+    pub fence_set: Vec<String>,
+    /// The agent's own entry in the approvals, JSON text with `{start}`
+    /// for the runs' start pattern.
+    pub fence_entry: String,
+}
+
+/// A plain word of data: letters, digits, `-`, `_`, `.`.
+fn plain_word(word: &str) -> bool {
+    !word.is_empty()
+        && word
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+}
+
+impl GatewayAgent {
+    /// The data of `wrapper` (a wrapper's text) when it is a gateway
+    /// agent's ([`GATEWAY_MARK`] its second line): `None` when it is not
+    /// one; `Some(Err)` in words when it is one whose data is not whole or
+    /// not plain.
+    pub fn of(wrapper: &str) -> Option<Result<Self, String>> {
+        let rest = wrapper.strip_prefix("#!/bin/sh\n")?;
+        let data = rest.strip_prefix(GATEWAY_MARK)?;
+        Some(Self::parse(data))
+    }
+
+    fn parse(data: &str) -> Result<Self, String> {
+        let mut found: std::collections::BTreeMap<&str, &str> = Default::default();
+        for line in data.lines() {
+            let Some(line) = line.strip_prefix(DATA_PREFIX) else {
+                break;
+            };
+            let (key, value) = line
+                .split_once(' ')
+                .ok_or("a gateway data line has no value")?;
+            if !KEYS.contains(&key) {
+                return Err(format!("the gateway's data has an unknown key {key:?}"));
+            }
+            if found.insert(key, value).is_some() {
+                return Err(format!("the gateway's data has {key} twice"));
+            }
+        }
+        let get = |key: &str| {
+            found
+                .get(key)
+                .copied()
+                .ok_or_else(|| format!("the gateway's data has no {key}"))
+        };
+        let port = get("port")?
+            .parse::<u16>()
+            .ok()
+            .filter(|port| *port > 0)
+            .ok_or("the gateway's port is not a port")?;
+        let ns = PathBuf::from(get("ns")?);
+        if !ns.is_absolute() || !get("ns")?.bytes().all(|b| b.is_ascii_graphic()) {
+            return Err("the gateway's namespace script is not a plain full path".into());
+        }
+        let agent = get("agent")?.to_owned();
+        if !plain_word(&agent) {
+            return Err("the gateway's agent is not a plain name".into());
+        }
+        let args = |key: &str| -> Result<Vec<String>, String> {
+            let words: Vec<String> = get(key)?.split(' ').map(str::to_owned).collect();
+            if words.iter().any(String::is_empty) {
+                return Err(format!("the gateway's {key} has an empty word"));
+            }
+            Ok(words)
+        };
+        let turn = args("turn")?;
+        if !turn.iter().any(|word| word.contains("{message}")) {
+            return Err("the gateway's turn never gives the run's words".into());
+        }
+        let fence_entry = get("fence-entry")?.to_owned();
+        if !fence_entry.contains("{start}")
+            || !serde_json::from_str::<Value>(&fence_entry).is_ok_and(|entry| entry.is_object())
+        {
+            return Err("the gateway's fence-entry is not a JSON object with {start}".into());
+        }
+        Ok(Self {
+            port,
+            ns,
+            agent,
+            turn,
+            stop: args("stop")?,
+            end: args("end")?,
+            fence_get: args("fence-get")?,
+            fence_set: args("fence-set")?,
+            fence_entry,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -279,5 +420,45 @@ mod tests {
                 "{name} runs a unit manager"
             );
         }
+    }
+
+    /// lamp-update's own gateway agent data (OpenClaw's wrapper with the
+    /// one run path on), read from its source.
+    fn lamp_updates_data() -> String {
+        let source = include_str!("../../update/src/openclaw_install.rs");
+        let block = source
+            .split_once("pub const GATEWAY_DATA: &str = r#\"")
+            .and_then(|(_, rest)| rest.split_once("\"#;"))
+            .unwrap()
+            .0;
+        format!("#!/bin/sh\n{GATEWAY_MARK}{block}# the rest\n")
+    }
+
+    #[test]
+    fn the_mark_and_the_data_are_lamp_updates() {
+        let source = include_str!("../../update/src/openclaw_install.rs");
+        assert!(source.contains(&GATEWAY_MARK.replace('\n', "\\n")));
+        let agent = GatewayAgent::of(&lamp_updates_data()).unwrap().unwrap();
+        assert_eq!(agent.port, crate::gateway::PORT);
+        assert!(agent.turn.iter().any(|word| word.contains("{message}")));
+    }
+
+    #[test]
+    fn a_wrapper_with_no_mark_is_no_gateway_agent_and_bad_data_is_said() {
+        assert!(
+            GatewayAgent::of("#!/bin/sh\n# lampOS: something. Written by lamp-update.\n").is_none()
+        );
+        let good = lamp_updates_data();
+        for (from, to) in [
+            ("#@port 18789", "#@port nope"),
+            ("#@agent ", "#@agent a/b"),
+            ("#@ns /", "#@ns rel/"),
+        ] {
+            let bad = good.replacen(from, to, 1);
+            assert_ne!(bad, good, "{from}");
+            assert!(GatewayAgent::of(&bad).unwrap().is_err(), "{from}");
+        }
+        let twice = good.replacen("#@port 18789\n", "#@port 18789\n#@port 18789\n", 1);
+        assert!(GatewayAgent::of(&twice).unwrap().is_err());
     }
 }
