@@ -3867,6 +3867,16 @@ running as `lampos` there. After #7133:
 - **Can read and write `WORK`, as before.** Nothing of a run's start is
   written there, and no run writes `openclaw.json`.
 
+**So any OpenClaw agent in the gateway can use a running skill's grants
+for that run.** Every agent there is the gateway namespace's root with
+`CAP_SYS_PTRACE`, and the fence's own namespace (`unshare --user
+--map-user`, made by the launcher) is a child of the gateway's. So an
+agent can attach to the launcher after its `ready` check and read the
+grant off fd 3 before the fence, or read `LAMP_CONTROL_TOKEN` from the
+script's environment or memory for as long as the run lasts. `TracerPid`
+0 at `ready` is one moment, not a guard. What bounds it is the token's
+own limits: one run, that one skill's grants, at most 14 minutes.
+
 What remains, the token on an fd only and a uid of its own for the
 script, is #7024. The acceptance on #6882 (a) covers exactly this limit
 and nothing wider.

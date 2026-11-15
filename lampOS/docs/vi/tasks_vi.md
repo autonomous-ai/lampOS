@@ -1437,6 +1437,17 @@ hoặc bất kỳ mã nào khác chạy dưới `lampos` ở đó. Sau #7133:
 - **Đọc và ghi được `WORK`, như trước.** Không gì của việc bắt đầu một
   lần chạy được ghi ở đó, và không lần chạy nào ghi `openclaw.json`.
 
+**Vì vậy mọi agent OpenClaw trong gateway đều dùng được grant của một
+kỹ năng đang chạy cho lần chạy đó.** Mọi agent ở đó là root của
+namespace của gateway với `CAP_SYS_PTRACE`, và namespace riêng của hàng
+rào (`unshare --user --map-user`, do launcher tạo) là con của namespace
+của gateway. Nên một agent có thể attach vào launcher sau phép kiểm tra
+`ready` và đọc grant từ fd 3 trước hàng rào, hoặc đọc
+`LAMP_CONTROL_TOKEN` từ môi trường hay bộ nhớ của script suốt lần chạy.
+`TracerPid` 0 lúc `ready` chỉ là một thời điểm, không phải một lớp bảo
+vệ. Thứ giới hạn nó là giới hạn riêng của token: một lần chạy, grant của
+đúng kỹ năng đó, nhiều nhất 14 phút.
+
 Phần còn lại, token chỉ qua fd và một uid riêng cho script, là #7024.
 Sự chấp nhận trên #6882 (a) bao đúng giới hạn này và không rộng hơn.
 
