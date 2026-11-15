@@ -21,12 +21,16 @@
 //!      and that pid now ([`peer_may`]): its program is [`LAUNCHER`], that
 //!      very file, root's and not group- or world-writable; no `LD_`
 //!      variable; only root's code mapped; and nothing traces it
-//!      (`TracerPid` 0). It answers [`CHECKED`].
+//!      (`TracerPid` 0). It refuses if any byte is queued after the id
+//!      line already, then answers [`CHECKED`] with a fresh random nonce:
+//!      `checked <16 lowercase hex>`.
 //!   2. The launcher makes itself non-dumpable (`PR_SET_DUMPABLE` 0: no
 //!      process of its uid can ptrace it from then on, or read its
 //!      `/proc` files, which is why the checks of 1 come first) and sends
-//!      [`READY`], with its credentials again. lamp-tasks checks the line
-//!      came from the same pid, that the pid is non-dumpable (its `/proc`
+//!      `ready <nonce>` ([`READY`]), with its credentials again. lamp-tasks
+//!      checks the nonce is exactly the one it gave (bytes queued before the
+//!      launcher was exec'd cannot hold it), that the line came from the
+//!      same pid, that the pid is non-dumpable (its `/proc`
 //!      folder is root's) and still untraced ([`undumped_may`]).
 //!   3. Only then is the run claimed ([`Starts::claim`]) and its [`Grant`]
 //!      answered, one JSON line, or `{"error":"<words>"}`. Any refusal after
@@ -74,10 +78,19 @@ pub const START_DIR: &str = "/run/lampos-skill-start";
 pub const START_SOCKET: &str = "/run/lampos-skill-start/start.sock";
 /// The line the fence writes to fd 4 just before the script is exec'd.
 pub const STARTED: &str = "started";
-/// lamp-tasks' line after the launcher's id and its image were checked.
+/// lamp-tasks' line after the launcher's id and its image were checked,
+/// sent as `checked <nonce>`: [`NONCE_HEX`] lowercase hex of fresh random
+/// bytes, new for each connection.
 pub const CHECKED: &str = "checked";
-/// The launcher's line once it is non-dumpable: only then is its grant sent.
+/// The launcher's line once it is non-dumpable, sent as `ready <nonce>`
+/// with the nonce its [`CHECKED`] gave: only then is its grant sent.
 pub const READY: &str = "ready";
+/// The nonce's length in lowercase hex (8 random bytes).
+pub const NONCE_HEX: usize = 16;
+/// [`CHECKED`] and the space before its nonce.
+const CHECKED_SPACE: &str = "checked ";
+/// The refusal of bytes already queued after the run id, before [`CHECKED`].
+const QUEUED: &str = "bytes were queued after the run id before it was checked";
 /// How long the launcher's id, and lamp-tasks' answer, may take.
 pub const LINE_WITHIN: Duration = Duration::from_secs(5);
 /// How long after a claim the fence may take to say [`STARTED`].
@@ -798,12 +811,21 @@ impl Server {
             eprintln!("[lamp-tasks] skill start: run {id} was refused already: {why}");
             return answer(&error_line("that run's start was refused already"));
         }
-        answer(CHECKED);
-        let ready = match peers.read_line(&stream, READY.len()) {
-            Ok((line, sender)) if line == READY && sender == Some(peer.pid) => {
+        // Nothing may be queued after the id yet: a ready sent before
+        // CHECKED was not the checked launcher's.
+        if !matches!(queued(&stream), Ok(false)) {
+            return silent(QUEUED);
+        }
+        let Ok(nonce) = nonce() else {
+            return silent("no nonce could be made");
+        };
+        answer(&format!("{CHECKED_SPACE}{nonce}"));
+        let want = format!("{READY} {nonce}");
+        let ready = match peers.read_line(&stream, want.len()) {
+            Ok((line, sender)) if line == want && sender == Some(peer.pid) => {
                 undumped_may(peers, peer.pid)
             }
-            Ok((line, _)) if line == READY => {
+            Ok((line, _)) if line == want => {
                 Err("the launcher's ready was not sent by the caller itself".into())
             }
             _ => Err("the launcher never said it was ready".into()),
@@ -841,6 +863,25 @@ impl Server {
             eprintln!("[lamp-tasks] skill start: run {id}'s fence never said it started");
         }
     }
+}
+
+/// Whether any byte is queued on `stream` already (peeked, not waited
+/// for).
+fn queued(stream: &UnixStream) -> io::Result<bool> {
+    use rustix::net::RecvFlags;
+    let mut byte = [0u8; 1];
+    match rustix::net::recv(stream, &mut byte[..], RecvFlags::PEEK | RecvFlags::DONTWAIT) {
+        Ok((got, _)) => Ok(got > 0),
+        Err(rustix::io::Errno::AGAIN) => Ok(false),
+        Err(error) => Err(error.into()),
+    }
+}
+
+/// A fresh nonce: [`NONCE_HEX`] lowercase hex of random bytes.
+fn nonce() -> io::Result<String> {
+    let mut bytes = [0u8; NONCE_HEX / 2];
+    getrandom::fill(&mut bytes).map_err(|_| io::Error::other("no random bytes"))?;
+    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
 }
 
 /// An answer of refusal: `{"error":"<why>"}`.
@@ -1047,8 +1088,9 @@ pub fn launcher_main(args: &[OsString]) -> (i32, String) {
 }
 
 /// The launcher's side of the talk on `stream` (the module's order): `id`
-/// sent with its credentials; on [`CHECKED`], made non-dumpable
-/// (`undumpable`), and only then [`READY`] sent and the grant read. Never
+/// sent with its credentials; on [`CHECKED`] and its nonce, made
+/// non-dumpable (`undumpable`), and only then [`READY`] with that nonce
+/// sent and the grant read. Never
 /// ready unless non-dumpable: if that fails, nothing more is sent (exit 2).
 pub fn ask(
     stream: &UnixStream,
@@ -1057,18 +1099,21 @@ pub fn ask(
 ) -> Result<Grant, (i32, String)> {
     let refused = |why: String| (1, format!("the run's start was refused: {why}"));
     send_line(stream, id).map_err(|_| (1, "lamp-tasks was not asked".to_owned()))?;
-    match read_line(stream, MOST_ANSWER_BYTES) {
-        Ok(line) if line == CHECKED => {}
-        Ok(line) => return Err(refused(parse_answer(&line).err().unwrap_or_default())),
+    let nonce = match read_line(stream, MOST_ANSWER_BYTES) {
+        Ok(line) => match line.strip_prefix(CHECKED_SPACE) {
+            Some(nonce) if !nonce.is_empty() => nonce.to_owned(),
+            _ => return Err(refused(parse_answer(&line).err().unwrap_or_default())),
+        },
         Err(_) => return Err(refused("lamp-tasks did not answer".into())),
-    }
+    };
     undumpable().map_err(|error| {
         (
             2,
             format!("refused: the launcher could not be made non-dumpable: {error}"),
         )
     })?;
-    send_line(stream, READY).map_err(|_| (1, "lamp-tasks was not told ready".to_owned()))?;
+    send_line(stream, &format!("{READY} {nonce}"))
+        .map_err(|_| (1, "lamp-tasks was not told ready".to_owned()))?;
     read_line(stream, MOST_ANSWER_BYTES)
         .map_err(|_| "lamp-tasks did not answer".to_owned())
         .and_then(|line| parse_answer(&line))
@@ -1622,8 +1667,8 @@ mod tests {
         let serving = std::thread::spawn(move || served.one(far));
         write_line(&near, id).unwrap();
         let mut answer = read_line(&near, MOST_ANSWER_BYTES).unwrap_or_default();
-        if answer == CHECKED {
-            let _ = write_line(&near, READY);
+        if let Some(nonce) = answer.strip_prefix(CHECKED_SPACE).map(str::to_owned) {
+            let _ = write_line(&near, &format!("{READY} {nonce}"));
             answer = read_line(&near, MOST_ANSWER_BYTES).unwrap_or_default();
         }
         if let Some(line) = then {
@@ -1907,7 +1952,11 @@ mod tests {
         let served = server(&starts, Fake::good());
         let serving = std::thread::spawn(move || served.one(far));
         write_line(&near, "task-1").unwrap();
-        assert_eq!(read_line(&near, MOST_ANSWER_BYTES).unwrap(), CHECKED);
+        assert!(
+            read_line(&near, MOST_ANSWER_BYTES)
+                .unwrap()
+                .starts_with(CHECKED_SPACE)
+        );
         near.set_read_timeout(Some(Duration::from_millis(300)))
             .unwrap();
         let mut byte = [0u8; 1];
@@ -1930,6 +1979,65 @@ mod tests {
         assert_eq!(parse_answer(&answer), Ok(grant()));
     }
 
+    /// A ready queued with the id, before [`CHECKED`] (a process that
+    /// queued it and then exec'd the launcher), is refused outright: no
+    /// grant, nothing claimed, the run's start ended.
+    #[test]
+    fn a_ready_queued_before_checked_is_refused() {
+        let starts = Starts::default();
+        let live = starts.open("task-1", grant()).unwrap();
+        let (near, far) = UnixStream::pair().unwrap();
+        let served = server(&starts, Fake::good());
+        let serving = std::thread::spawn(move || served.one(far));
+        write_line(&near, "task-1\nready").unwrap();
+        let mut answer = read_line(&near, MOST_ANSWER_BYTES).unwrap_or_default();
+        if answer.starts_with(CHECKED) {
+            // Nothing more sent: only the queued ready.
+            answer = read_line(&near, MOST_ANSWER_BYTES).unwrap_or_default();
+        }
+        drop(near);
+        serving.join().unwrap();
+        assert!(parse_answer(&answer).is_err(), "no grant: {answer}");
+        assert_eq!(starts.state("task-1"), (false, false), "nothing claimed");
+        assert_eq!(
+            live.ran(),
+            Err(format!("the skill's start was refused: {QUEUED}"))
+        );
+    }
+
+    /// A ready whose nonce is not the one [`CHECKED`] gave, or has none,
+    /// is refused and ends the run's start.
+    #[test]
+    fn a_ready_with_a_wrong_or_no_nonce_is_refused() {
+        for ready in [format!("{READY} 0000000000000000"), READY.to_owned()] {
+            let starts = Starts::default();
+            let live = starts.open("task-1", grant()).unwrap();
+            let (near, far) = UnixStream::pair().unwrap();
+            let served = server(&starts, Fake::good());
+            let serving = std::thread::spawn(move || served.one(far));
+            write_line(&near, "task-1").unwrap();
+            let answer = read_line(&near, MOST_ANSWER_BYTES).unwrap();
+            let nonce = answer.strip_prefix(CHECKED_SPACE).unwrap();
+            assert_eq!(nonce.len(), 16);
+            assert!(
+                nonce
+                    .bytes()
+                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+            );
+            assert_ne!(ready, format!("{READY} {nonce}"));
+            write_line(&near, &ready).unwrap();
+            let answer = read_line(&near, MOST_ANSWER_BYTES).unwrap_or_default();
+            drop(near);
+            serving.join().unwrap();
+            assert!(parse_answer(&answer).is_err(), "no grant: {answer}");
+            assert_eq!(starts.state("task-1"), (false, false), "nothing claimed");
+            assert_eq!(
+                live.ran(),
+                Err("the skill's start was refused: the launcher never said it was ready".into())
+            );
+        }
+    }
+
     /// The launcher's side: non-dumpable before it says [`READY`], and
     /// never ready (exit 2) when it can't be.
     #[test]
@@ -1940,8 +2048,8 @@ mod tests {
             let seen = undumped.clone();
             let lamp = std::thread::spawn(move || {
                 assert_eq!(read_line(&far, MOST_ID_BYTES).unwrap(), "task-1");
-                write_line(&far, CHECKED).unwrap();
-                let ready = read_line(&far, READY.len());
+                write_line(&far, "checked 0123456789abcdef").unwrap();
+                let ready = read_line(&far, READY.len() + 1 + NONCE_HEX);
                 let at_ready = seen.load(Ordering::Acquire);
                 if ready.is_ok() {
                     write_line(&far, &serde_json::to_string(&grant()).unwrap()).unwrap();
@@ -1961,7 +2069,7 @@ mod tests {
         };
         let (asked, (ready, undumped_at_ready)) = talk(true);
         assert_eq!(asked, Ok(grant()));
-        assert_eq!(ready.as_deref(), Some(READY));
+        assert_eq!(ready.as_deref(), Some("ready 0123456789abcdef"));
         assert!(undumped_at_ready, "non-dumpable before ready");
         let (asked, (ready, _)) = talk(false);
         assert_eq!(
