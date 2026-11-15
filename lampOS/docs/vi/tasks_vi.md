@@ -1980,7 +1980,8 @@ và có `--targets-from-machines`:
   mang id máy của tài khoản. Daemon khởi động lúc chưa đăng nhập không bao
   giờ kết nối tới cloud của Harness, nên sau khi đăng nhập thành công phần
   tasks khởi động lại nó (`harness start --restart`, `Cli::restart_daemon`),
-  không phải `harness start` vốn để nguyên daemon đang chạy (#7019); journal
+  không phải `harness start` vốn để nguyên daemon đang chạy (#7019), sau khi
+  không còn việc nào bận (đang được theo dõi), như lần khởi động lại #5978; journal
   ghi `Harness's daemon started again after the sign-in (#7019)`. Lần khởi
   động của chính phần tasks vẫn là `harness start`. Khi đã đăng nhập mà danh
   sách máy không đánh dấu máy nào là `current`, journal ghi một lần mỗi lần

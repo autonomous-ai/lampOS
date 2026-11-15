@@ -3019,6 +3019,53 @@ fn a_changed_env_file_restarts_harnesss_daemon_once_and_never_while_a_task_is_bu
     assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 0);
 }
 
+/// #7019 on #7141: the restart after a sign-in waits, as #5978's does,
+/// until no task is busy (watched): a task the daemon runs since before
+/// the sign-in finishes first, and then the daemon is started again once.
+#[test]
+fn the_restart_after_a_sign_in_waits_until_no_task_is_busy() {
+    use lamp_tasks::sign_in::{Done, Event};
+    let mut s = Running::unstarted(false, false, true, false);
+    s.config.sign_in_by_code = true;
+    s.start();
+    // A task busy: accepted and watched. The injected clock stands, so the
+    // watch doesn't look yet.
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    s.wait(&prepared["id"], |v| {
+        v["task"]["dispatch"]["state"] == "accepted"
+    });
+    // A sign-in succeeds while it is busy: no restart.
+    assert_eq!(s.trusted(json!({"op":"sign_in_start"}))["ok"], true);
+    s.counts
+        .sign_in_lines
+        .lock()
+        .unwrap()
+        .push_back(Ok(Event::Result(Done::Success { email: None })));
+    let start = Instant::now();
+    while s.trusted(json!({"op":"sign_in_state"}))["sign_in"] != "done" {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "sign-in never done"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    thread::sleep(Duration::from_millis(300));
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 0);
+    // The watch's first look finds it asking the person: settled, no
+    // longer busy, and the daemon is started again once.
+    s.clock.0.lock().unwrap().monotonic_ms = WATCH_EARLY_MS;
+    s.wait(&prepared["id"], |v| v["task"]["observations"] == json!(1));
+    let start = Instant::now();
+    while s.counts.daemon_restarts.load(Ordering::SeqCst) == 0 {
+        assert!(start.elapsed() < Duration::from_secs(5), "never restarted");
+        thread::sleep(Duration::from_millis(5));
+    }
+    thread::sleep(Duration::from_millis(200));
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 1);
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 0);
+}
+
 /// openharness#1463, the reviewer-lead's P2 on #2309: a hand-over waiting
 /// when a sign-in by code succeeds goes to Harness only after its daemon
 /// was started again, and a sign-in that fails starts nothing (the
@@ -3029,6 +3076,9 @@ fn after_a_sign_in_the_daemon_is_started_before_a_waiting_hand_over() {
     let mut s = Running::new(false);
     s.stop();
     s.config.sign_in_by_code = true;
+    // The watch on: the first task settles at its first look, so the
+    // restart, which waits until no task is busy (#7019), can go.
+    s.config.watch = true;
     s.start();
     let state = |s: &Running, want: &str| {
         let start = Instant::now();
@@ -3087,6 +3137,14 @@ fn after_a_sign_in_the_daemon_is_started_before_a_waiting_hand_over() {
     assert_eq!(s.trusted(s.confirmation(&second))["ok"], true);
     thread::sleep(Duration::from_millis(100));
     s.counts.hold_launch.store(false, Ordering::SeqCst);
+    // The first is busy until the watch's first look finds it asking the
+    // person: the restart, and the second with it, wait until then.
+    s.wait(&first["id"], |v| {
+        v["task"]["dispatch"]["state"] == "accepted"
+    });
+    thread::sleep(Duration::from_millis(100));
+    assert_eq!(*s.counts.order.lock().unwrap(), ["launch"]);
+    s.clock.0.lock().unwrap().monotonic_ms = WATCH_EARLY_MS;
     let start = Instant::now();
     while s.counts.launches.load(Ordering::SeqCst) < 2 {
         assert!(
@@ -3121,6 +3179,10 @@ fn a_failed_daemon_start_is_tried_again_before_a_waiting_hand_over() {
     let mut s = Running::new(false);
     s.stop();
     s.config.sign_in_by_code = true;
+    // The watch on: the first task settles at its first look, so the
+    // second sign-in's restart, which waits until no task is busy (#7019),
+    // can go.
+    s.config.watch = true;
     s.start();
     let signed_in = |s: &Running| {
         assert_eq!(s.trusted(json!({"op":"sign_in_start"}))["ok"], true);
@@ -3159,6 +3221,8 @@ fn a_failed_daemon_start_is_tried_again_before_a_waiting_hand_over() {
     );
     // Every try fails: four in all, and then the hand-over goes as before.
     s.counts.order.lock().unwrap().clear();
+    s.clock.0.lock().unwrap().monotonic_ms = WATCH_EARLY_MS;
+    s.wait(&first["id"], |v| v["task"]["observations"] == json!(1));
     s.counts.daemon_fails.store(10, Ordering::SeqCst);
     signed_in(&s);
     let start = Instant::now();
