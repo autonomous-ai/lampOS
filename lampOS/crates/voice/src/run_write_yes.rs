@@ -20,10 +20,13 @@
 //!   send: …. Shall I send it?" A read-back too long for one note
 //!   (`lamp_gemini::wire::MAX_NOTE_BYTES`) is never cut: the lamp says only
 //!   that the skill wanted to send something too long to read out, and
-//!   nothing is sent ([`too_long`]). The line is one JSON string after the
-//!   header, so nothing the run wrote can close it or fake a header. A
-//!   write whose hold ends untold is told once later ([`lapsed_note`]), in
-//!   memory only.
+//!   nothing is sent ([`too_long`]). `lamp-services` refuses such a write
+//!   before it is held, naming the room for the run's agent to shorten it
+//!   and call again (`lamp_services::serve::run_read_back_room`, held to
+//!   this note exactly), so this is only the backstop. The line is one
+//!   JSON string after the header, so nothing the run wrote can close it
+//!   or fake a header. A write whose hold ends untold is told once later
+//!   ([`lapsed_note`]), in memory only.
 //! - **`LAMP_PRIVATE_ROOM`**, as a write the person prepares: on, as above;
 //!   off, read back only to the owner seen alone ([`read_back_allowed`]),
 //!   and sent only on the owner's yes (`services::gate`, else
@@ -536,6 +539,45 @@ mod tests {
         };
         assert_eq!(long.note(), too_long("dinner-note"));
         assert!(parse(&long.note()).is_none());
+    }
+
+    /// lamp-services' room for a run's read-back
+    /// (`lamp_services::serve::run_read_back_room`, which refuses a longer
+    /// one before it is held) is this note's exactly: at the room, with the
+    /// longest send id and time left, the note is one note to the byte; a
+    /// byte more is only said too long.
+    #[test]
+    fn lamp_services_room_for_a_read_back_is_one_note_exactly() {
+        for (service, skill) in [
+            ("gmail", "dinner-note"),
+            ("google_calendar", "unread-mail-subjects"),
+        ] {
+            let run = RunWrite {
+                service: service.into(),
+                skill: skill.into(),
+                left: lamp_services::writes::HOLD,
+                ..run()
+            };
+            let room = lamp_services::serve::run_read_back_room(skill, service);
+            // A line break is two bytes in the note, as lamp-services counts it.
+            let fits = format!("x\n{}", "x".repeat(room - 3));
+            assert_eq!(lamp_services::serve::run_read_back_bytes(&fits), room);
+            let at = RunWrite {
+                read_back: fits.clone(),
+                ..run.clone()
+            };
+            assert_eq!(
+                at.note().len(),
+                lamp_gemini::wire::MAX_NOTE_BYTES,
+                "{skill}"
+            );
+            assert_eq!(parse(&at.note()).unwrap().read_back, fits);
+            let over = RunWrite {
+                read_back: format!("{fits}x"),
+                ..run
+            };
+            assert_eq!(over.note(), too_long(skill), "{skill}");
+        }
     }
 
     /// SubDarren's P2 on #6440: what the run wrote can't close the line or
