@@ -1641,6 +1641,11 @@ pub struct SkillHarness {
     /// at each run (#6685); `None` before Harness has said, then the lamp
     /// target's own engine counts.
     pub default_engine: Box<dyn Fn() -> Option<crate::harness::EngineKind> + Send + Sync>,
+    /// The wait before a launch spoken tasks have (#6226), made at each
+    /// run: by default the config's own ([`crate::harness::Cli::openclaw_gateway`]).
+    /// [`crate::gateway::launch_with`] decides by the launch's engine
+    /// whether it is waited for.
+    pub gateway: Box<dyn Fn() -> Option<crate::gateway::Gateway> + Send + Sync>,
 }
 
 impl SkillHarness {
@@ -1666,12 +1671,25 @@ impl SkillHarness {
         config.restart_daemon = false;
         config.health_after_start = false;
         config.session_machines = None;
+        let waits = config.openclaw_gateway;
         Self {
             config,
             session,
             lamp,
             default_engine: Box::new(|| None),
+            gateway: Box::new(move || {
+                waits.then(|| crate::gateway::Gateway::new(Box::new(crate::gateway::Loopback)))
+            }),
         }
+    }
+
+    /// With the wait before a launch made by `gateway` (tests).
+    pub fn with_gateway(
+        mut self,
+        gateway: Box<dyn Fn() -> Option<crate::gateway::Gateway> + Send + Sync>,
+    ) -> Self {
+        self.gateway = gateway;
+        self
     }
 
     /// With the lamp's default engine read by `default_engine` (#6685).
@@ -2789,7 +2807,11 @@ impl Runner for HarnessRunner {
             },
             session: None,
         };
-        let outcome = cli.launch(&launch);
+        // As a spoken task's launch (#6226): an engine whose Gateway must
+        // answer first is waited for, at most the same bound, else not sent.
+        let mut gateway = (harness.gateway)();
+        let outcome =
+            crate::gateway::launch_with(gateway.as_mut(), &launch, || cli.launch(&launch));
         // Asked of Harness: from here the agent may have begun, unless
         // Harness never sent the creation.
         if !matches!(outcome, LaunchOutcome::NotSent { .. }) {
