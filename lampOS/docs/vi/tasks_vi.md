@@ -1852,7 +1852,9 @@ chạy trên chính máy này, dưới id riêng của nó (`computerId`, một 
 số hex). Target giữ id đó; reply của `new` được so với id mà daemon của
 Harness đang chạy dưới: `machineId` của `auth status` nếu có (còn session trên
 đĩa, kể cả khi đọc là chưa đăng nhập), nếu không thì `computerId` (R5 trên
-#7133). Vì vậy, khi bật `LAMP_OPENCLAW_ON_LAMP` hoặc `LAMP_HERMES_ON_LAMP`
+#7133). Id đó được dùng chung cho mọi Cli tạo từ cùng config, kể cả Cli riêng
+của một lần chạy skill; khi chưa đọc được id nào, Cli tự đọc `auth status`
+trước `new` đó, và đọc lỗi thì giữ `computerId` (lamp-c0a4, 15/11). Vì vậy, khi bật `LAMP_OPENCLAW_ON_LAMP` hoặc `LAMP_HERMES_ON_LAMP`
 và có `--targets-from-machines`:
 
 - **Target lấy từ chính đèn.** Mỗi lần đọc sign-in thấy chưa đăng nhập và có id
