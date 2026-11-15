@@ -373,10 +373,37 @@ fn tap_prints_each_message_published_while_it_listens_and_ends_at_its_count() {
 
 #[test]
 fn record_then_replay_gives_a_subscriber_the_messages_again_at_their_spacing() {
+    let started = Instant::now();
+    // How long the recorder listens, counted from when every topic is bound.
+    // All is sent as soon as both sockets are seen: room enough (#1128) on a
+    // host that holds nothing up.
+    let mut listens = Duration::from_millis(750);
+    // A run in which this process was held up while it sent says nothing of
+    // the bus (`held_up` below), and is begun again with a recorder that
+    // listens twice as long: beside another build's file work each pose took
+    // a sixth of a second and more to write to the topic's file, and six fit
+    // in no 0.75 s.
+    while !recorded_then_replayed(listens) {
+        assert!(
+            started.elapsed() < WAIT,
+            "held up while sending in every run, the last with a recorder listening {listens:?}"
+        );
+        listens *= 2;
+    }
+}
+
+/// One run of the test above, with a recorder that listens for `listens`.
+/// False, before anything of the bus is judged, if this process was held up
+/// while it sent.
+fn recorded_then_replayed(listens: Duration) -> bool {
     let root = Root::new();
     let kept = Root::new();
     let bus = root.bus();
     let directory = kept.0.to_str().unwrap();
+    let seconds = listens.as_secs_f64().to_string();
+    // The recorder's time cannot have begun before it was started, nor
+    // before a look that did not find both its sockets.
+    let mut began_after = Instant::now();
     let recorder = Running::start(
         &root,
         &[
@@ -385,14 +412,34 @@ fn record_then_replay_gives_a_subscriber_the_messages_again_at_their_spacing() {
             "servos",
             "gemini/transcript",
             "--seconds",
-            // Counted from when every topic is bound, and all is sent as soon
-            // as both sockets are seen: room enough (#1128).
-            "0.75",
+            &seconds,
         ],
     );
     until("the recorder's sockets", || {
-        root.sockets("servos").len() == 1 && root.sockets("gemini/transcript").len() == 1
+        let looked = Instant::now();
+        let bound =
+            root.sockets("servos").len() == 1 && root.sockets("gemini/transcript").len() == 1;
+        if !bound {
+            began_after = looked;
+        }
+        bound
     });
+    // When its time is up the recorder unsubscribes, whatever is still to be
+    // sent. So a send counts only if it was over half a second before the
+    // recorder's time can first have been up, which leaves the recorder that
+    // long to take it. After one that was not, the run is given up, and says
+    // so.
+    let held_up = || {
+        let since = began_after.elapsed();
+        let late = since + Duration::from_millis(500) >= listens;
+        if late {
+            eprintln!(
+                "record_then_replay: held up while sending, {since:?} into a recorder's \
+                 {listens:?}: this run is given up"
+            );
+        }
+        late
+    };
     let mut pose = bus.publisher("servos", Kind::Latest, "body").unwrap();
     pose.expires_after(Some(Duration::from_millis(500)));
     let mut words = bus
@@ -403,10 +450,21 @@ fn record_then_replay_gives_a_subscriber_the_messages_again_at_their_spacing() {
     let at = |n: u64| 1_000_000 + n * 40_000;
     for n in 0..6u64 {
         let outcome = pose.publish_json(at(n), &json!({"yaw": n})).unwrap();
-        // Train 890 (14 Nov, ARM64 3/3) and a loaded x86 host (banana, 1 in
-        // 30) saw a pose delivered to none, with the recorder's sockets there.
-        // The cause isn't known yet: say which send, and what the publisher
-        // knew of its subscribers, so the next failure names it.
+        if held_up() {
+            return false;
+        }
+        // Trains 890 and 941 (14 and 15 Nov, ARM64 3/3) and a loaded x86 host
+        // (banana, 1 in 30) saw a pose delivered to none; 941 said pose 4 of
+        // 6, to a publisher that knew of no subscriber. The cause: this
+        // process was held up between two sends for longer than the recorder
+        // had left (each pose is also written to the topic's file, and a busy
+        // file system makes that wait), so the recorder had unsubscribed and
+        // the publisher's next look found nobody. A sleep of 0.75 s before
+        // pose 4 gives that message every time, and so did 39 runs of 40
+        // beside another build's file work, at pose 1 or 2. Such a run has
+        // been given up just above, so a pose undelivered here was sent in
+        // time: say which send, and what the publisher knew of its
+        // subscribers.
         assert_eq!(
             outcome.delivered,
             1,
@@ -416,15 +474,20 @@ fn record_then_replay_gives_a_subscriber_the_messages_again_at_their_spacing() {
     }
     let every_byte: Vec<u8> = (0..=255).collect();
     let text_of = json!({"text": "hello"});
-    assert_eq!(words.publish_json(5, &text_of).unwrap().delivered, 1);
+    let sent = [
+        words.publish_json(5, &text_of).unwrap(),
+        words.publish_bytes(6, "x-test", &every_byte).unwrap(),
+        words.publish_bytes(7, "none", b"").unwrap(),
+    ];
+    if held_up() {
+        return false;
+    }
     assert_eq!(
-        words
-            .publish_bytes(6, "x-test", &every_byte)
-            .unwrap()
-            .delivered,
-        1
+        sent.map(|outcome| outcome.delivered),
+        [1, 1, 1],
+        "words: {sent:?}, subscribers {:?}",
+        words.subscribers()
     );
-    assert_eq!(words.publish_bytes(7, "none", b"").unwrap().delivered, 1);
     let output = recorder.output();
     let said = text(&output.stderr);
     assert!(output.status.success(), "{said}");
@@ -531,6 +594,7 @@ fn record_then_replay_gives_a_subscriber_the_messages_again_at_their_spacing() {
         &["replay", kept.0.join("none.jsonl").to_str().unwrap()],
     );
     assert_eq!(missing.status.code(), Some(1));
+    true
 }
 
 #[test]
