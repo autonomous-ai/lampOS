@@ -606,8 +606,8 @@ pub fn tool() -> lamp_gemini::Tool {
     let writes = made_skill::writes_on();
     let mut description = "Make a new skill for the lamp: something the lamp then does by itself, \
              whatever the lamp can do (its light, its head, a few exact words it says, its hum, a read of a linked service), at a time each day, when someone comes or goes, a face comes \
-             into view, someone gets up, pats its head, the air gets stuffy, or when it is resting (\"make me a skill that dims the light at 10 pm\"). Call it only when the \
-             person asks for a skill to be made. In the same breath, before you call it, say in a \
+             into view, someone gets up, pats its head, the air gets stuffy, or when it is resting (\"make me a skill that dims the light at 10 pm\"). Make one only when \
+             the person asks for one. In the same breath, before you call it, say in a \
              few words that you'll make it now. The skill is made, checked, kept and put on the \
              lamp at once: then say exactly the line you are told, nothing more."
         .to_owned();
@@ -629,8 +629,9 @@ pub fn tool() -> lamp_gemini::Tool {
     if code {
         description.push_str(CODE_TOLD);
     }
-    // A made skill removed by voice (#6960): the same function, its
-    // `remove` alone; whether a line asks it is the model's judgment.
+    // A made skill removed by voice (#6960), and those made listed: the
+    // same function, its `remove` or `made` alone; whether a line asks
+    // either is the model's judgment.
     description.push_str(REMOVE_TOLD);
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
@@ -658,9 +659,12 @@ const CODE_REQUEST_TOLD: &str = " A made skill's own script may check what the l
 
 /// What [`tool`]'s description adds for a remove (#6960): on lamp-c0a4
 /// "delete the skill called moon fact" went to `lamp_help` and "remove the
-/// moon fact skill" to a read-back, since nothing here named a remove.
-pub const REMOVE_TOLD: &str = " When asked to delete or remove a skill, call it with remove \
-     alone, saying nothing first.";
+/// moon fact skill" to a read-back, since nothing here named a remove. And
+/// for the skills made, listed (`crate::made_list`): on lamp-9adf, 15 Nov,
+/// "which skills have you made for me?" was answered from the thread with
+/// no call, and once by a read-back of one skill.
+pub const REMOVE_TOLD: &str = " Call it with remove alone to delete or remove a skill, or made \
+     alone when asked which skills they made, saying nothing first.";
 
 /// What [`tool`]'s description adds with a made skill's writes on.
 pub const READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
@@ -673,9 +677,9 @@ pub const TASKS_READ_BACK_TOLD: &str = " Call it with read_back alone too when t
 /// What [`tool`]'s description adds with a made skill's writes and a
 /// skill's tasks both on: [`READ_BACK_TOLD`] and [`TASKS_READ_BACK_TOLD`]
 /// in one sentence.
-pub const BOTH_READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
-     what a skill they made sends or what a skill on the lamp uses, or to hear one read back, \
-     saying nothing first.";
+pub const BOTH_READ_BACK_TOLD: &str = " Call it with read_back alone when asked what a skill \
+     they made sends, what a skill on the lamp uses, or to hear one read back, saying nothing \
+     first.";
 
 /// The function's parameters: the request, and with a made skill's writes
 /// (#6066) or code (#6307) on, the yes to one that waits for it,
@@ -709,6 +713,12 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     parameters["properties"][crate::made_remove::REMOVE] = json!({
         "type": "string",
         "description": "Only when the person asks to delete or remove a skill: its name as they said it, given alone with no request."
+    });
+    // The skills the person made, listed by voice ([`crate::made_list`]):
+    // how many, and the newest by name to the owner.
+    parameters["properties"][crate::made_list::LIST] = json!({
+        "type": "boolean",
+        "description": "Only when the person asks which skills they made, or you made for them, or how many: true, given alone with no request. Never answer that from the conversation."
     });
     parameters["properties"][crate::made_clash::CHOICE] = json!({
         "type": "string",
@@ -2750,6 +2760,11 @@ pub fn answer(
     // to their own made skills, asked once by its name, removed on the yes.
     if let Some(name) = call.args[crate::made_remove::REMOVE].as_str() {
         return crate::made_remove::asked_here(name, request, heard, lease);
+    }
+    // The skills the person made, listed by voice: how many, and the
+    // newest by name to the owner alone.
+    if call.args[crate::made_list::LIST] == true {
+        return crate::made_list::listed_here(request, heard, lease);
     }
     // A made skill read back by voice (`LAMP_SKILL_WRITES`): what it
     // sends, and its yes awaited again when it waits for one. Or a skill on
@@ -6253,7 +6268,20 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let all = tool();
         assert!(all.description.len() <= 1_024, "{}", all.description.len());
         assert!(!all.description.contains("yes"), "{}", all.description);
-        assert!(all.parameters.unwrap().to_string().len() <= 4_096);
+        // The skills made, listed (lamp-9adf, 15 Nov): named with every
+        // switch on, its parameter beside remove.
+        assert!(
+            all.description
+                .contains("made alone when asked which skills they made"),
+            "{}",
+            all.description
+        );
+        let parameters = all.parameters.unwrap();
+        assert_eq!(
+            parameters["properties"][crate::made_list::LIST]["type"],
+            "boolean"
+        );
+        assert!(parameters.to_string().len() <= 4_096);
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_writes_here(None);
         made_skill::set_scripts_here(None);

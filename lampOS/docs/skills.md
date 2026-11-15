@@ -4187,9 +4187,9 @@ is removed through `make_skill` itself, its `remove` alone: the name as
 heard (`made_remove::REMOVE`). It is a parameter of the function the voice
 has, never a function of its own, as the voice is at its 48
 (`lamp_gemini::MAX_TOOLS`). Whether a line asks to remove a skill is the
-model's judgment, told in the function's description ("When asked to
-delete or remove a skill, call it with remove alone, saying nothing
-first."), never a list of words (the owner's ruling, 13 Nov). Then, in
+model's judgment, told in the function's description ("Call it with
+remove alone to delete or remove a skill, or made alone when asked which
+skills they made, saying nothing first."), never a list of words (the owner's ruling, 13 Nov). Then, in
 code (`made_remove::asked`):
 - **Only the person's own.** The name is matched to the skills they made,
   the made skills' index (`made.json`) alone (`made_remove::found`): its
@@ -4287,6 +4287,35 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `a_yes_after_remove_moon_fact_is_forced_and_removes_it`,
 `a_no_after_remove_moon_fact_keeps_it`,
 `no_force_before_the_question_is_said_whole`.
+
+**Listed by voice** (lamp-9adf, 15 Nov, build 13162: "which skills have you
+made for me?" called nothing and was answered from the last few turns, two
+skills of the 26 made there; heard as "skills have you made for me?" it
+called a read-back of one, told "glow green on return doesn't send or write
+anything", since `make_skill` named no list). The skills the person made are
+told through `make_skill` itself, its `made` alone, `true`
+(`made_list::LIST`): a parameter of the function the voice has, as a remove
+is. Whether a line asks it is the model's judgment, told in the function's
+description (above) and the parameter's ("Never answer that from the
+conversation."), never a list of words. The function's description stays
+within 1,024 bytes with every switch on: its "Call it only when the person
+asks for a skill to be made." is "Make one only when the person asks for
+one.", and the read-back's sentence is shorter. Then, in code
+(`made_list::listed`):
+- **From the lamp, never the thread.** The made skills' index
+  (`made.json`), those marked on whose folder is still on the lamp
+  (`made_skill::drop_gone` first, #7100), newest first: made here (by voice
+  or in the app) apart from those added from a file.
+- **How many, and the newest named to the owner.** The model is told
+  `made_count` and `added_from_a_file_count`; only when the owner hears
+  (`services::owner_hears`, asked only when there is a name to say, as a
+  read-back's and a remove's names are) also the newest three of each by
+  name (`made_list::NAMED_MOST`), never all 26 read out. None made is said
+  so; a turn nobody spoke is told nothing. The journal holds the counts
+  alone.
+Test: `made_list::tests::the_skills_they_made_are_told_from_the_lamp_newest_first`,
+and `make_skill_local::tests::a_made_script_is_offered_to_the_voice_with_its_switch_alone`
+(named with every switch on, within the bounds).
 
 Tests:
 - `make_skill_local::tests`: `a_good_answer_is_kept_and_put_on_with_no_yes`
