@@ -564,6 +564,59 @@ pub trait Room {
 /// `read N`, `skipped: <why>`, `stopped: <why>, N of M read` or
 /// `not read: <why>`. Counts and the gate's words only.
 pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
+    let taken = match wait_for_gate(room) {
+        Ok(taken) => taken,
+        Err(skipped) => return skipped,
+    };
+    let outcome = speak(step, room);
+    if let Some(taken) = taken {
+        taken.end(room.now_ms());
+    }
+    outcome
+}
+
+/// What a skill's task's agent found (`crate::task::told`'s lines, its
+/// run granted a linked service's read): said to the owner as a read's
+/// lines are, behind the same gate, turn and wait, as exact words, the
+/// gate judged again before each line. The journal's words: how many
+/// lines were said, never one.
+pub fn tell(lines: &[String], room: &mut impl Room) -> String {
+    if lines.is_empty() {
+        return "nothing to tell".into();
+    }
+    let taken = match wait_for_gate(room) {
+        Ok(taken) => taken,
+        Err(skipped) => return skipped,
+    };
+    let all = lines.len();
+    let mut outcome = format!("told {all}");
+    for (at, line) in lines.iter().enumerate() {
+        if let Err(why) = judge_through_blinks(room) {
+            outcome = if at == 0 {
+                format!("stopped: {} before a word", why.words())
+            } else if why.someone_came() {
+                let _ = room.say(STOP_LINE);
+                format!("stopped: someone came, {at} of {all} told")
+            } else {
+                format!("stopped: {}, {at} of {all} told", why.words())
+            };
+            break;
+        }
+        if let Err(why) = room.say(line) {
+            outcome = format!("stopped: a line was not said ({why}), {at} of {all} told");
+            break;
+        }
+    }
+    if let Some(taken) = taken {
+        taken.end(room.now_ms());
+    }
+    outcome
+}
+
+/// Waits up to [`WAIT`] for the gate to stay open [`STEADY`] and the
+/// lamp's turn: the turn taken (none with no [`Room::turns`]), or why it
+/// was skipped, for the journal.
+fn wait_for_gate<R: Room>(room: &mut R) -> Result<Option<Taken<'static>>, String> {
     let began = room.now_ms();
     let turns = room.turns();
     let mut steady: Option<u64> = None;
@@ -578,7 +631,7 @@ pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
         });
         match judged {
             // Nobody to wait for: never on a lamp with no owner's face.
-            Err(Closed::NoOwner) => return format!("skipped: {}", Closed::NoOwner.words()),
+            Err(Closed::NoOwner) => return Err(format!("skipped: {}", Closed::NoOwner.words())),
             Err(why) => {
                 steady = None;
                 last = why;
@@ -599,15 +652,11 @@ pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
             }
         }
         if now.saturating_sub(began) >= WAIT.as_millis() as u64 {
-            return format!("skipped: {}", last.words());
+            return Err(format!("skipped: {}", last.words()));
         }
         room.wait(POLL);
     };
-    let outcome = speak(step, room);
-    if let Some(taken) = taken {
-        taken.end(room.now_ms());
-    }
-    outcome
+    Ok(taken)
 }
 
 /// A read whose gate opened, with the lamp's turn: the read itself and
@@ -861,6 +910,51 @@ mod tests {
     /// A turn of its own for a test, as the lamp's one [`TURNS`] is.
     fn turns() -> &'static Turns {
         Box::leak(Box::new(Turns::new()))
+    }
+
+    /// What a skill's task's agent found is said behind a read's gate: the
+    /// owner alone and steady, then each line as exact words, in order, and
+    /// the turn given back; with another face in view, or no owner's face
+    /// enrolled, nothing is said.
+    #[test]
+    fn a_tasks_answer_is_told_behind_the_reads_gate() {
+        let lines = vec![
+            "You have 12 unread messages.".to_owned(),
+            "None urgent.".to_owned(),
+        ];
+        let turns = turns();
+        let mut lamp = Lamp::new(vec![alone()], json!({}));
+        lamp.turns = Some(turns);
+        assert_eq!(tell(&lines, &mut lamp), "told 2");
+        assert_eq!(lamp.said, lines);
+        assert!(lamp.said_at[0] >= 1_000 + STEADY.as_millis() as u64);
+        assert!(lamp.reads.is_empty(), "nothing is read");
+        assert!(!turns.free(lamp.now), "the turn is given back as it ended");
+        let mut two = Lamp::new(
+            vec![Seen {
+                faces: Some(2),
+                ..alone()
+            }],
+            json!({}),
+        );
+        assert_eq!(tell(&lines, &mut two), "skipped: not alone");
+        assert!(two.said.is_empty());
+        let mut unknown = Lamp::new(
+            vec![Seen {
+                owner_known: false,
+                ..alone()
+            }],
+            json!({}),
+        );
+        assert_eq!(
+            tell(&lines, &mut unknown),
+            "skipped: no owner's face enrolled"
+        );
+        assert!(unknown.said.is_empty());
+        assert_eq!(
+            tell(&[], &mut Lamp::new(vec![alone()], json!({}))),
+            "nothing to tell"
+        );
     }
 
     /// Another skill's read holds the lamp's turn (Morning agenda's, as

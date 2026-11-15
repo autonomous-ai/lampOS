@@ -2799,6 +2799,18 @@ impl Cli {
     /// then reads it idle (OpenHarness, #6835 gap 1). `Err` is a show that
     /// wasn't answered or names another id or no agent.
     pub fn shown_agent(&self, machine: &str, agent_id: &str) -> Result<String, String> {
+        self.shown_end(machine, agent_id).map(|(agent, _)| agent)
+    }
+
+    /// [`Cli::shown_agent`], and the agent's last answer that same `show`
+    /// gives, as [`Cli::observe`] reads it (`--chars 4000`): none when the
+    /// reply isn't one `observe` takes. Read once, after a skill's run ends,
+    /// so its answer can be told (`skill_task::SkillRun::answer`).
+    pub fn shown_end(
+        &self,
+        machine: &str,
+        agent_id: &str,
+    ) -> Result<(String, Option<String>), String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
@@ -2812,6 +2824,8 @@ impl Cli {
                     "--machine".into(),
                     machine.into(),
                     agent_id.into(),
+                    "--chars".into(),
+                    "4000".into(),
                     "--json".into(),
                 ],
                 self.config.read_timeout,
@@ -2820,7 +2834,12 @@ impl Cli {
         if !reply.success {
             return Err("show_failed".into());
         }
-        shown_agent(&reply.stdout, agent_id).ok_or_else(|| "show_invalid_reply".into())
+        let agent =
+            shown_agent(&reply.stdout, agent_id).ok_or_else(|| "show_invalid_reply".to_owned())?;
+        let answer = parse_show(&reply.stdout, agent_id)
+            .ok()
+            .map(|(observation, _)| observation.answer);
+        Ok((agent, answer))
     }
 
     /// `harness close`, with `--now` only when asked ([`Cli::close_now`]).

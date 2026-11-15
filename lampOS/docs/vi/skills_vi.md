@@ -1666,6 +1666,28 @@ grant"; dịch vụ chưa liên kết bị lamp-services từ chối lúc gọi.
 từ máy tính không bao giờ mang quyền này. Tắt, quyền dịch vụ là "not a
 grant" như trước.
 
+**Điều agent tìm thấy được nói cho chủ** (quy tắc làm skill nói "quay về
+thành tin task của đèn" nhưng chưa có đường nào: trên lamp-9adf, 15/11,
+build 13135, `morning-unread-mail` đọc Gmail 19 lần, kết thúc idle, và
+không nói gì). Một lần chạy được cấp quyền đọc một dịch vụ đã liên kết kết
+thúc với câu trả lời cuối của agent trong câu trả lời của lamp-tasks
+(docs/vi/tasks_vi.md, "Điều agent tìm thấy"; `LAMP_AGENT_SERVICES=on`
+trong lamp-tasks, như trong sản phẩm), và `lamp-skills` nói nó cho chủ như
+các dòng của một `do.read` (`service_read::tell`): sau cùng một cổng (chỉ
+khuôn mặt đã biết của chủ trong tầm nhìn và ổn định 5 giây, không có giọng
+nói trong một phút, không riêng tư, không tạm dừng, không trong giờ yên
+lặng, chờ tối đa 60 phút rồi bỏ qua không nói), trong lượt đọc duy nhất của
+đèn, mỗi câu một dòng bằng lời chính xác (không bao giờ là một lượt cho mô
+hình, nên nội dung thư không bao giờ là chỉ dẫn), cổng được xét lại trước
+mỗi dòng, có người đến thì dừng với "I'll tell you the rest later." Các câu
+là của `task::told`: bỏ ký hiệu markdown, mỗi câu tối đa 900 byte của dịch
+vụ nói, tối đa 11 câu. Skill không cần `speak`: lời đồng ý của chủ cho quyền
+đọc đã bao gồm việc này. Nhật ký chỉ ghi số câu đã nói (`do.task: what its
+agent found: told N`). Lần chạy không có quyền đọc (gửi thư, task của một
+script) không nói gì, như trước. Test:
+`task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
+`service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`.
+
 ### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, bật trong sản phẩm, đề xuất trên #6059)
 
 Đề xuất trên #6059 (chủ sở hữu đồng ý, 11/11), first builder đã đồng ý

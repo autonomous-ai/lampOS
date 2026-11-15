@@ -292,6 +292,23 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   `bad_request`, `too_long` (quá 8192 byte), `no_token` (lamp-control không
   cấp token một lần chạy), `run_failed`, hoặc `busy` (việc của
   một kỹ năng khác đang chạy: mỗi lúc chỉ chạy một việc).
+- **Điều agent tìm thấy** (`tells_answer`): khi `LAMP_AGENT_SERVICES=on` ở
+  đây, một lần chạy được cấp quyền đọc một dịch vụ đã liên kết
+  (`gmail-read`) mà kết thúc tốt sẽ trả lời
+  `{"ok":true,"id":N,"answer":"..."}`, là câu trả lời cuối của agent theo
+  lệnh `show` lúc kết thúc lần chạy (`--chars 4000`, `Cli::shown_end`; với
+  kết thúc `stopped`, là `show` đã thấy phiên được gắn), mỗi dãy khoảng
+  trắng hoặc ký tự điều khiển thành một dấu cách, tối đa 3.000 byte
+  (`told_answer`, `MOST_TOLD_BYTES`). Lời giao việc kết thúc bằng
+  `TELL_LINE`, để agent kết thúc bằng vài câu đơn giản cho chủ.
+  lamp-skills nói chúng cho chủ (docs/vi/skills_vi.md, "Dịch vụ đã liên kết
+  thành task cho agent của đèn"). Trên lamp-9adf, 15/11 (build 13135), một
+  `morning-unread-mail` làm bằng giọng nói đã đọc Gmail 19 lần và kết thúc
+  idle, mà không nói gì: câu trả lời được `show` đó đọc rồi bỏ đi. Câu trả
+  lời của mọi lần chạy khác vẫn như trước; nhật ký không bao giờ ghi câu
+  trả lời. Test:
+  `a_service_reads_ended_answer_carries_what_its_agent_found`,
+  `a_skill_runs_end_keeps_its_agents_last_answer`.
 - **Token một lần chạy** (điều kiện 12:45 của người xây dựng đầu tiên trên
   #6071): với mỗi lần chạy, lamp-tasks xin lamp-control (#6304, PR #6408)
   một token trên socket quản trị `/run/lampos-control/admin.sock`
