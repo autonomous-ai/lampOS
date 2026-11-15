@@ -45,6 +45,10 @@ Environment=LAMP_BODY_STRAIN_GUARD=on
 # "I'm unplugging you" folds the arm first (#1674, unplug.md): set on Body, Expression, Skills and Voice together
 # (#5747); lamp-52e6 20 Oct, #1699 row 1: ask, fold 6.7 s, head and base home, ready, Expression asleep.
 Environment=LAMP_UNPLUG=on
+# The character's energy level, 1 to 5, sets how lively the lamp moves: pace, roll, lean, nods, gestures (#6893,
+# body.md "How lively it moves"); set on Body, Expression, Skills and Voice together. lamp-52e6 15 Nov, row-6893h:
+# level 5 PASS (https://github.com/autonomous-ai/lampOS/issues/6893#issuecomment-6885667954).
+Environment=LAMP_BODY_ENERGY=on
 EnvironmentFile=/etc/lampOS/body/lamp.env
 # --speed 300, Tuning::SPEED_CAP (24 Oct; energy level 1, Tuning::ENERGY_SPEED_CAP is 800 for LAMP_BODY_ENERGY levels): Expression's offsets, the mood poses and gaze moves reach the head at this
 # rate, with the software acceleration six times it (720 -> 1800 counts/s^2); leans keep their 1.5 s and the arm's stand

@@ -3173,6 +3173,31 @@ fn the_product_folds_for_an_unplug_in_every_part_that_reads_it() {
     );
 }
 
+/// The energy level is on in the product (#6893, row-6893h on lamp-52e6,
+/// 15 Nov, level 5 PASS): Body, Expression, Skills and Voice each read
+/// `LAMP_BODY_ENERGY` (`lamp_body::energy_in`), so every one of their units
+/// sets it, or a level would move the body while its nods and gestures
+/// stayed at level 1.
+#[test]
+fn the_energy_level_is_on_in_every_product_part_that_reads_it() {
+    for name in [
+        "lamp-body.service",
+        "lamp-expression.service",
+        "lamp-skills.service",
+        "lamp-voice.service",
+    ] {
+        let unit = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1;
+        assert!(
+            section(unit, "Service").contains(&"Environment=LAMP_BODY_ENERGY=on"),
+            "{name} lacks LAMP_BODY_ENERGY=on"
+        );
+    }
+}
+
 /// A lone known face's line is told and read as theirs, and a carried line
 /// recalls and keeps as its person's, never forgets (the memory owner's call,
 /// switched on 10 Nov after lamp-3e83 answered its known person from the
