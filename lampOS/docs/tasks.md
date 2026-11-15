@@ -1724,7 +1724,12 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
       out starts Harness's daemon too, while a lamp engine's switch is on
       (below).
     - **Signed in again**, the machines write the targets, as above, and the
-      lamp's target names the account's machine. Work started under the
+      lamp's target names the account's machine. The daemon started signed
+      out at boot never connects to Harness's cloud, so after the sign-in
+      it is restarted, not started (#7019, below). While signed in, a
+      machines look that marks no machine `current` journals once a
+      sign-in `Harness is signed in, but this lamp is not among its
+      machines yet`. Work started under the
       account's machine id stays readable only signed in (its calls name
       it with `--machine`); the computers keep needing the sign-in.
     - **What is said.** The health line says `computers_need_sign_in`
@@ -2557,13 +2562,18 @@ credential of its own.
   doesn't start it again (openharness#1463). So every hand-over after a
   sign-in failed in under 3 s, `new_failed`, with Harness saying "Harness is
   not running here" (lamp-75c9, 20 October, two voice hand-overs to Devin
-  Cloud). Once a sign-in by code succeeds, the part runs `harness start`
-  (`Cli::start_daemon`, through systemd where the service is installed).
+  Cloud). Once a sign-in by code succeeds, the part runs `harness start
+  --restart` (`Cli::restart_daemon`, through systemd where the service is
+  installed), not `harness start`, which leaves a running daemon as it is:
+  a daemon started signed out at the part's start (#6407) never connects
+  to Harness's cloud, so the lamp never became its own machine after a
+  factory reset and a sign-in from the app (#7019). The part's own start
+  below stays `harness start`.
   It's the next job on the lane, ahead of a hand-over already waiting,
   which would otherwise go to the stopped daemon. It's given 75 s
   (`DAEMON_START_TIMEOUT`), past Harness's own 60 s wait for the daemon,
-  and the part journals `Harness's daemon started` or why
-  not. A sign-in that fails or is cancelled starts nothing.
+  and the part journals `Harness's daemon started again after the sign-in
+  (#7019)` or why not. A sign-in that fails or is cancelled starts nothing.
 - **Started at the part's own start, when already signed in (#5379).**
   Harness put on by the onboarding install (`harness-install`, install.md)
   has no daemon at boot: no linger and no `harness service install`. So
