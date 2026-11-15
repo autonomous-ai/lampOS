@@ -63,8 +63,9 @@ COMPILE_LOG = ("2026-11-15T17:38:39.9000000Z    Compiling lamp-y v0.1.0\n"
                "2026-11-15T17:38:40.1000001Z    --> crates/y/src/task.rs:412:15\n"
                "2026-11-15T17:38:41.0000000Z error: could not compile `lamp-y` (lib) due to 1 previous error\n"
                "2026-11-15T17:38:41.2000000Z ##[error]Process completed with exit code 101.\n" % ERROR)
-# The longest a loop may take here before the test gives up on it. With two lanes the bot looks at a lane's train 10 s
-# after it is cut and then a minute apart, so a slow machine can take minutes over a few trains.
+# The longest a loop may take here before the test gives up on it. With two lanes the bot looks at a lane's train every
+# 10 s (#7188; before, 10 s after it was cut and then a minute apart), so a slow machine can take minutes over a few
+# trains.
 DEADLINE = 600
 
 
