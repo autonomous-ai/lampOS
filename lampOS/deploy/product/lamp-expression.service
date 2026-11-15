@@ -21,6 +21,10 @@ Environment=LAMP_REST_REQUESTS=on
 # "I'm unplugging you" folds the arm first (#1674, unplug.md): set on Body, Expression, Skills and Voice together
 # (#5747); lamp-52e6 20 Oct, #1699 row 1: ask, fold 6.7 s, head and base home, ready, Expression asleep.
 Environment=LAMP_UNPLUG=on
+# The character's energy level, 1 to 5, sets how lively the lamp moves: pace, roll, lean, nods, gestures (#6893,
+# body.md "How lively it moves"); set on Body, Expression, Skills and Voice together. lamp-52e6 15 Nov, row-6893h:
+# level 5 PASS (https://github.com/autonomous-ai/lampOS/issues/6893#issuecomment-6885667954).
+Environment=LAMP_BODY_ENERGY=on
 # --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), across summer time.
 # --head-touch: the head leans into a hand, sleeps on a hold, wakes on a tap (#711), with the voice's head touch.
 ExecStart=/opt/lampOS/expression/current/lamp-expression serve --enable --bus-root /run/lampos-bus --catalogue /etc/lampOS/expression/expression.json --zone system --kernel-clock --head-touch
