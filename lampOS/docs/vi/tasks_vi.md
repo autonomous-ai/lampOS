@@ -1199,10 +1199,13 @@ hết hạn cùng lần chạy.
 ```
 tasks: harness new: machine=<machine> exit=0 ms=<ms> out=<n> state=ok id=<id>
 tasks: skill-task-<run>: dispatch accepted (exit 0, <s> s)
-[lamp-tasks] skill task <run>: ended, Harness says idle, after <N> s; its agent: started (<Engine>)
+[lamp-tasks] skill task <run>: ended, Harness says idle, after <N> s; its agent: started (<agent>)
 ```
 
-`TODO(S3)`: câu chữ chính xác của OpenClaw ở dòng cuối.
+Không dòng nào trong số này tự ghi tên engine theo lời của lamp-tasks:
+`<agent>` là tên mà `show` của Harness đưa ra cho phiên đó, hoặc `the lamp's
+default agent` khi Harness báo stopped, hoặc `not known (harness show: …)`
+khi không đọc được câu trả lời. Hermes và OpenClaw đều như vậy.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
