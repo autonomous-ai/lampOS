@@ -993,7 +993,9 @@ pub fn telling_dropped(state: &Path) -> Result<Vec<(String, u64)>, String> {
 
 /// The told answers waiting, read from `state`'s [`TELLING_FILE`], changed
 /// by `change` and written back whole, under one lock so no other wait's
-/// entry is lost between the read and the write.
+/// entry is lost between the read and the write. A list that can't be
+/// parsed starts again empty, so it heals: only a restart's line for what
+/// it held is lost, never an answer.
 fn telling_change(
     state: &Path,
     change: impl FnOnce(&mut Vec<(String, u64)>),
@@ -1001,15 +1003,15 @@ fn telling_change(
     static TELLING: Mutex<()> = Mutex::new(());
     let _held = TELLING.lock().unwrap_or_else(|poison| poison.into_inner());
     let path = state.join(TELLING_FILE);
-    let mut waiting: Vec<(String, u64)> = match read_small(&path, 64 * 1024) {
+    let (mut waiting, unparsed): (Vec<(String, u64)>, bool) = match read_small(&path, 64 * 1024) {
         Ok(Some(bytes)) => serde_json::from_slice(&bytes)
-            .map_err(|_| "its told answers' list can't be read".to_owned())?,
-        Ok(None) => Vec::new(),
+            .map_or_else(|_| (Vec::new(), true), |waiting| (waiting, false)),
+        Ok(None) => (Vec::new(), false),
         Err(_) => return Err("its told answers' list can't be read".into()),
     };
     let before = waiting.clone();
     change(&mut waiting);
-    if waiting == before {
+    if waiting == before && !unparsed {
         return Ok(());
     }
     let json = serde_json::to_vec(&waiting).map_err(|error| error.to_string())?;
@@ -1302,9 +1304,9 @@ mod tests {
         set_on_here(None);
     }
 
-    /// A run lamp-tasks refused before its agent began (busy with another
-    /// skill's, 9adf on 15 Nov) spends none of the day's runs; one it may
-    /// have begun stays counted.
+    /// A told answer still waiting when lamp-skills stops is found once at
+    /// the next start (#7180); one whose wait ended is not; a list that
+    /// can't be read is started again empty, so it heals.
     #[test]
     fn a_told_answer_a_restart_dropped_is_found_at_the_next_start() {
         let dir = tempfile::tempdir().unwrap();
@@ -1322,8 +1324,18 @@ mod tests {
         assert_eq!(telling_dropped(state), Ok(Vec::new()));
         // An end with nothing kept is no error.
         telling_ends(state, "read-mail", 10).unwrap();
+        // A list that can't be read starts again empty.
+        fs::write(state.join(TELLING_FILE), b"not json").unwrap();
+        telling_begins(state, "read-mail", 30).unwrap();
+        assert_eq!(
+            telling_dropped(state),
+            Ok(vec![("read-mail".to_owned(), 30)])
+        );
     }
 
+    /// A run lamp-tasks refused before its agent began (busy with another
+    /// skill's, 9adf on 15 Nov) spends none of the day's runs; one it may
+    /// have begun stays counted.
     #[test]
     fn a_run_lamp_tasks_did_not_take_is_not_counted() {
         let dir = tempfile::tempdir().unwrap();
