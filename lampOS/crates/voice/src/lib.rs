@@ -139,7 +139,7 @@ pub mod others_answer;
 pub(crate) mod peer_stop;
 #[cfg(target_os = "linux")]
 pub mod physical_privacy;
-#[cfg(any(target_os = "linux", test))]
+#[cfg(unix)]
 mod playback;
 pub mod policy_holds;
 pub mod privacy;
@@ -232,9 +232,9 @@ pub mod wire;
 pub mod without_a_tool;
 pub mod worker_scheduling;
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 pub mod audio_workers;
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 pub mod bus_speaker;
 pub mod coordinator;
 

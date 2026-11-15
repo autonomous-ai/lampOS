@@ -20,6 +20,7 @@ on:
       - 'lampOS/crates/control/**'
       - 'lampOS/crates/skills/**'
       - 'lampOS/crates/audio/**'
+      - 'lampOS/crates/voice/**'
       - 'lampOS/sdk/**'
       - 'lampOS/docs/control*'
       - 'lampOS/docs/lamp.model.json'
@@ -34,6 +35,7 @@ on:
       - 'lampOS/crates/control/**'
       - 'lampOS/crates/skills/**'
       - 'lampOS/crates/audio/**'
+      - 'lampOS/crates/voice/**'
       - 'lampOS/sdk/**'
       - 'lampOS/docs/control*'
       - 'lampOS/docs/lamp.model.json'
@@ -160,6 +162,19 @@ jobs:
       - name: lamp-audio's lib tests
         working-directory: lampOS
         run: cargo test --locked -p lamp-audio --lib
+      # lamp-voice under macOS's cfg (step 3, C2: the capture and speaker workers, with `bus:` devices, build off
+      # Linux; the ALSA arms are cfg(linux)): clippy, and the lib tests of the two modules C2 made portable.
+      - name: clippy for lamp-voice under macOS's cfg
+        working-directory: lampOS
+        run: cargo clippy --locked -p lamp-voice --all-targets -- -D warnings
+      - name: lamp-voice's bus speaker and worker tests
+        working-directory: lampOS
+        run: |
+          cargo test --locked -p lamp-voice --lib bus_speaker::
+          cargo test --locked -p lamp-voice --lib bus_capture::
+          cargo test --locked -p lamp-voice --lib audio_workers::
+          cargo test --locked -p lamp-voice --lib peer_stop::
+          cargo test --locked -p lamp-voice --lib transport::tests::a_receive_from_a_peer_that_has_gone
       - name: lamp-sim's tests
         working-directory: lampOS
         run: |

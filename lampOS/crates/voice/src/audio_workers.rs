@@ -1,9 +1,12 @@
-//! Dedicated Linux audio loops with actual accepted PCM and a direct reference link.
+//! Dedicated audio loops with actual accepted PCM and a direct reference link. On Linux they open ALSA
+//! cards; on any unix they run over the bus devices (`bus:mic1`, `bus:speaker1`).
+#[cfg(target_os = "linux")]
+use crate::open_at_start::{SPEAKER_BUSY_AT_START, open_waiting_out_busy};
 use crate::{
     activity::SpeechProbability,
     diagnostic_control::{DiagnosticFinished, DiagnosticStarted},
     diagnostics::{self, EndReason, Recorder, ResetMeta, ResetReason, StreamKind},
-    open_at_start::{BUSY_AT_START, OpenAtStart, SPEAKER_BUSY_AT_START, open_waiting_out_busy},
+    open_at_start::{BUSY_AT_START, OpenAtStart},
     options::{
         AudioWorkerOptions, NoiseSuppression, ReferenceClock, ReferenceRecovery, SoftwareProcessing,
     },
@@ -22,13 +25,15 @@ use crate::{
         RenderReference, SpeakerChunk, WorkerEvent,
     },
 };
+#[cfg(target_os = "linux")]
+use lamp_audio::device::AlsaCapture;
 use lamp_audio::{
     EchoProcessor, RENDER_SAMPLES,
     capture::{
         CaptureConfig, CaptureError, Discontinuity, ErrorKind as CaptureErrorKind, MicrophoneOn,
         StartReport,
     },
-    device::{AlsaCapture, CaptureDevice},
+    device::CaptureDevice,
     pcm::{Speaker, Underrun, Written},
 };
 use lamp_ipc::monotonic_us;
@@ -42,6 +47,12 @@ use std::{
     time::{Duration, Instant},
 };
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+/// The capture device of the board's own entry points. Off Linux there is no sound card: it is the
+/// bus microphone, which refuses any device name but `bus:mic1`.
+#[cfg(target_os = "linux")]
+type BoardCapture = AlsaCapture;
+#[cfg(not(target_os = "linux"))]
+type BoardCapture = crate::bus_capture::BusCapture;
 const TICK: Duration = Duration::from_millis(2);
 /// With `LAMP_CAPTURE_WAIT=on` (`quiet_pace::CAPTURE_WAIT_ENVIRONMENT`, #705,
 /// the lamp's heat) the loop waits in `poll` on the microphone and its
@@ -348,7 +359,7 @@ pub fn capture_with_noise_suppression(
             capture_wait_from_environment(),
         );
     }
-    capture_on::<AlsaCapture>(
+    capture_on::<BoardCapture>(
         channels,
         controller,
         worker,
@@ -390,7 +401,7 @@ pub fn capture_with_options(
             capture_wait_from_environment(),
         );
     }
-    capture_on::<AlsaCapture>(
+    capture_on::<BoardCapture>(
         channels,
         controller,
         worker,
@@ -1293,6 +1304,27 @@ fn open_speaker(
     if crate::bus_speaker::is_bus_device(device) {
         return crate::bus_speaker::open(controller);
     }
+    open_alsa_speaker(channels, device, controller)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn open_alsa_speaker(
+    _channels: &mut WorkerChannels,
+    device: &str,
+    _controller: BootId,
+) -> Result<Speaker> {
+    Err(io::Error::other(format!(
+        "this build has no sound card: the speaker device {device} is not available, only bus:speaker1 is"
+    ))
+    .into())
+}
+
+#[cfg(target_os = "linux")]
+fn open_alsa_speaker(
+    channels: &mut WorkerChannels,
+    device: &str,
+    controller: BootId,
+) -> Result<Speaker> {
     let (speaker, waited) = open_waiting_out_busy(
         || Speaker::open_clock(device, controller),
         lamp_audio::pcm::open_fault,
@@ -2690,12 +2722,25 @@ mod peer_stop_speaker_tests {
                 observed_at_us: monotonic_us(),
             })
             .expect_err("a send to a closed capture side is refused");
-        assert_eq!(
-            refused.kind(),
-            io::ErrorKind::ConnectionRefused,
-            "{refused}"
-        );
+        // What the OS says of a send to a closed peer: refused on Linux, reset on macOS (ECONNRESET).
+        // Nothing here branches on which; only that the send is an error.
+        #[cfg(target_os = "linux")]
+        let closed_peer = io::ErrorKind::ConnectionRefused;
+        #[cfg(not(target_os = "linux"))]
+        let closed_peer = io::ErrorKind::ConnectionReset;
+        assert_eq!(refused.kind(), closed_peer, "{refused}");
+        #[cfg(target_os = "linux")]
         let speaker = Speaker::open_clock("null", parent_boot).unwrap();
+        // Off Linux there is no ALSA "null" device: the same clock speaker over a software queue
+        // that drops what it plays.
+        #[cfg(not(target_os = "linux"))]
+        let speaker = Speaker::with_pcm(
+            Box::new(lamp_audio::soft_pcm::SoftPcm::real_time(|_| {})),
+            lamp_audio::soft_pcm::FORMAT,
+            parent_boot,
+            true,
+        )
+        .unwrap();
         let owner: TurnOwner = serde_json::from_value(serde_json::json!({
             "boot": serde_json::to_value(parent_boot).unwrap(),
             "turn": 1,

@@ -320,9 +320,19 @@ instead of ALSA:
   worker, as an absolute path only.
 - Cutting a say (`discard`) loses at most the 40 ms already published; the
   subscriber's own queue is not told.
+- Between answers the speaker's clock writes one zero block every 10 ms tick
+  (`audio_workers.rs`), so `speaker1/play` carries silence at the voice's pace
+  while nothing is said, not only during speech.
 - The device is off unless the flag is given: the lamp's units do not pass it
-  and nothing changes on a lamp. Linux only for now (`bus_speaker` sits behind
-  the same gate as `audio_workers`).
+  and nothing changes on a lamp. `audio_workers` and `bus_speaker` build on
+  any unix (macOS included): the ALSA arms (`AlsaCapture`, the speaker's
+  `open_alsa_speaker`, the busy-device wait) are Linux only, and off Linux the
+  capture worker takes only `bus:` devices (`BusCapture`) and the speaker only
+  `bus:speaker1`; a card name there is refused with "this build has no sound
+  card". The `sim-macos` job runs clippy for `lamp-voice` and the lib tests of
+  `bus_speaker`, `bus_capture`, `audio_workers` and `peer_stop`, and one `transport` test of the
+  receive side. The workflow's `lampOS/crates/voice/**` path also runs the Linux `sim` job on
+  every voice change.
 
 Latency: the first block is published in the call that wrote it, with no
 thread, wait or copy beyond the one into the message. The sound the
