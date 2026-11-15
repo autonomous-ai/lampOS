@@ -3838,6 +3838,17 @@ running as `lampos` there. After #7133:
   and grants only on `ready <that nonce>` from the same pid; bytes already
   queued after the id line are refused, so a ready written before the
   launcher was exec'd can never pass, and either refusal ends the run's start.
+  **Inside OpenClaw's gateway namespace non-dumpable protects nothing**
+  (#7133, c0a4). The gateway runs under `unshare --map-root-user`, so
+  every process there, the agent's included, is that namespace's root
+  with `CAP_SYS_PTRACE` over it, and the kernel gives a non-dumpable
+  task's `/proc/<pid>` to that root (`lampos` outside), as a dumpable
+  one's. So lamp-tasks, seeing the caller in another user namespace,
+  wants `/proc/<pid>` owned by that namespace's root (`uid_map`'s
+  `0 <outer>` line) instead of uid 0, and the owner tells it no more.
+  There the run is guarded only by an untraced launcher at `ready`
+  (`TracerPid` 0), the nonce, the checks above, and the run token's own
+  limits below.
 - **Cannot choose the script, interpreter or grants.** lamp-tasks fixes
   the grant from the owner's yes, and a run is claimed once.
 - **Can, with the launcher, race `main` for a live run's id.** The id is
