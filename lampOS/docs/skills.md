@@ -4544,12 +4544,17 @@ length only (`do.task: lamp-tasks' answer carries N bytes of its agent's
 answer`, or `no agent's answer`; #7180). A gate found shut as the wait
 begins, a read's or a told answer's, is said once with its reason
 (`skill:<name>: waits for its gate: quiet hours`, `Room::waits`), so an
-answer held in quiet hours, or lost with a restart of lamp-skills while it
-waits, leaves a line (#7180). A run
+answer held in quiet hours leaves a line (#7180). Its end is said as before
+(`told N`, or `skipped: quiet hours` after the hour); while it waits it is
+kept in the state folder's `task-telling.json` (its skill and when it
+began, never a word of it), so one a restart of lamp-skills drops unsaid is
+said at the next start (`what its agent found: dropped unsaid, lamp-skills
+restarted while it waited`, `task::telling_dropped`). A run
 with no read grant (a send, a script's task) tells nothing, as before.
 Tests: `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
 `service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,
-`service_read::tests::a_wait_for_the_gate_says_why_once`.
+`service_read::tests::a_wait_for_the_gate_says_why_once`,
+`task::tests::a_told_answer_a_restart_dropped_is_found_at_the_next_start`.
 With the same switch in `lamp-skills`, its manage helper, `lamp-voice` and
 `lamp-control` (which reads a skill's grants through lamp-skills at each
 token's mint), a `do.task`'s `grants` may name a linked service's grant
