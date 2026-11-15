@@ -310,7 +310,11 @@ fn an_updater_refused_for_good_does_not_block_a_newer_updater() {
     let old = lamp.own_build();
     product_build_with_updater(&mut lamp, 2, BAD);
     switched_and_put_back(&mut lamp, "boot-a", "boot-a");
-    assert!(own::refused_for_good(&lamp.records(), &sha(BAD)));
+    assert!(own::refused_for_good(
+        &lamp.records(),
+        &lamp.root,
+        &sha(BAD)
+    ));
     product_build_with_updater(&mut lamp, 3, "lamp-update 3");
     assert_eq!(
         lamp.round(),
@@ -338,7 +342,11 @@ fn an_updater_refused_for_good_does_not_block_a_newer_updater() {
     );
     let back = lamp.back(update_unit("failed", "failed"), records_now());
     assert!(matches!(back, own::Back::PutBack(_)), "{back:?}");
-    assert!(own::refused_for_good(&lamp.records(), &sha(BAD)));
+    assert!(own::refused_for_good(
+        &lamp.records(),
+        &lamp.root,
+        &sha(BAD)
+    ));
     assert!(
         matches!(lamp.round(), Outcome::Refused(_)),
         "{:?}",

@@ -135,9 +135,10 @@ impl AppCheck {
 
     /// A wait ended by the app's check: the owner's retries it carried
     /// ([`Self::take_retries`]) drop their refusals before the round, with
-    /// either wait. The wait with the first update after setup on
-    /// ([`Self::wait_or`]) once dropped them, so a refused build was never
-    /// retried on a product lamp (#6800).
+    /// either wait, and let lamp-update's own builds put back before be
+    /// tried again (#6901, [`drop_refusals`]). The wait with the first
+    /// update after setup on ([`Self::wait_or`]) once dropped them, so a
+    /// refused build was never retried on a product lamp (#6800).
     pub fn retry_asked(&mut self, records: &crate::records::Records, say: &mut dyn FnMut(&str)) {
         let retries = self.take_retries();
         drop_refusals(records, &retries, say);
@@ -236,6 +237,13 @@ impl AppCheck {
 /// ignored, and the round is a plain check. A build that is really unwell is
 /// refused again by the round itself, so a retry never loops. Said, one line
 /// each.
+///
+/// A retry also lets every build of lamp-update's own that was put back be
+/// tried again (#6901, [`crate::own::forget_refused`]), whichever build it
+/// names: a build whose lamp-update was put back is refused by every round
+/// ("waiting for a newer updater") with no refusal in the state to drop.
+/// Said in one line, with how many, when there was one. One put back again
+/// is refused again by the round itself.
 pub fn drop_refusals(
     records: &crate::records::Records,
     sequences: &[u64],
@@ -250,24 +258,32 @@ pub fn drop_refusals(
         say("a retry of a refused build: another lamp-update is at work, so it is a plain check");
         return;
     };
-    let Ok(mut state) = records.state(say) else {
-        return;
-    };
-    let mut dropped = false;
-    for sequence in sequences {
-        if state.forget_refusal(*sequence) {
-            say(&format!(
-                "the owner asked to retry build {sequence}: its refusal is dropped"
-            ));
-            dropped = true;
-        } else {
-            say(&format!(
-                "the owner asked to retry build {sequence}: it is not refused, so a plain check"
-            ));
+    if let Ok(mut state) = records.state(say) {
+        let mut dropped = false;
+        for sequence in sequences {
+            if state.forget_refusal(*sequence) {
+                say(&format!(
+                    "the owner asked to retry build {sequence}: its refusal is dropped"
+                ));
+                dropped = true;
+            } else {
+                say(&format!(
+                    "the owner asked to retry build {sequence}: it is not refused, so a plain check"
+                ));
+            }
+        }
+        if dropped && let Err(error) = records.save_state(&state) {
+            say(&format!("the refusals could not be saved: {error}"));
         }
     }
-    if dropped && let Err(error) = records.save_state(&state) {
-        say(&format!("the refusals could not be saved: {error}"));
+    match crate::own::forget_refused(records.folder()) {
+        Ok(0) => {}
+        Ok(builds) => say(&format!(
+            "the owner asked to retry: {builds} of lamp-update's own builds put back before may be tried again"
+        )),
+        Err(error) => say(&format!(
+            "the owner asked to retry: self-refused cannot be written: {error}"
+        )),
     }
 }
 

@@ -1450,7 +1450,7 @@ only a self-switch or a climb goes to the journal's form, before its `exec`.
 |---|---|---|
 | `up to date: build N` | `up-to-date` | nothing to do |
 | `nothing changed: …` | `unreachable`, `nothing-published` | the channel couldn't be read, or has no build |
-| `refused, nothing switched: …` | `refused` | the build isn't taken. `…: build N needs updater M or newer, and this is updater K; …` (`TooOld::why`) means **no climb**: `LAMP_UPDATE_SELF` off, the build not newer, its updater put back before, or its updater not this channel's (each ends `…; waiting for a newer updater`); or the build carries none (`…; it carries no lamp-update, so waiting for a build that does`) |
+| `refused, nothing switched: …` | `refused` | the build isn't taken. `…: build N needs updater M or newer, and this is updater K; …` (`TooOld::why`) means **no climb**: `LAMP_UPDATE_SELF` off, the build not newer, its updater put back before and still refused ("A build put back is tried once more", below), or its updater not this channel's (each ends `…; waiting for a newer updater`); or the build carries none (`…; it carries no lamp-update, so waiting for a build that does`) |
 | `not switched: …` | `not-quiet` | tried again next round: `no quiet moment in S s: …`, `the setup walk is under way: held, round R of 8`, `a reset of the lamp may be under way …`, `the lamp booted N s ago: no switch in its first 180 s …`, or `another lamp-update is at work` |
 | `switched to build N; every part is well` | `switched` | the parts switched and the watch passed |
 | `switched to build N and kept; held: <unit> held, nothing moves: <why>` | `held` | the parts switched and the watch passed, one unit held as it was before the switch (#6113, step 9): the build is kept, the hold needs a person (unplug.md); the cloud alert tells it as `done` |
@@ -1553,7 +1553,9 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | **lamp-update's own build** (`climb`, `own`, `own_switch`) | |
 | `lamp-update's own build is not switched: …` | a self-switch or climb couldn't be set up: the parts' outcome stands |
 | `lamp-update's own switch waits: the settings writer was refreshed and has not proved itself yet` | a writer not yet proved is a switch's only way back, so the switch waits for it |
-| `lamp-update's build … was put back after a reboot came in its minutes: it is tried once more, and a second put-back is final` | #2810 |
+| `lamp-update's build … was put back after a reboot came in its minutes: it is tried once more, and a second put-back is final` | a lamp-update put back once is switched to once more: its switch began on one boot and it was put back on another (#2810, "A build put back is tried once more") |
+| `lamp-update's build … was put back and the lamp is on a later boot now: it is tried once more, and a second put-back is final` | the same, for one put back on the boot its switch began on: the lamp has started again since that put-back (#6901) |
+| `lamp-update's build … was put back 24 hours ago or more: it is tried once more, and a second put-back is final` | the same, still on the boot of that put-back: 24 hours or more after it, by `self-put-back`'s own time (#6901) |
 | `lamp-update switches to its build …; it must confirm itself within 10 min` | before a self-switch's or a climb's end |
 | **The folders kept** (`prune`, after the end) | |
 | `build folders are kept because the installed units cannot be read: …` | nothing is removed |
@@ -1689,7 +1691,8 @@ build could carry it units or settings.
 
 1. **Phase 1.** Once a round's parts run build N (the round switched to it,
    or found it up to date), and N's `lamp-update` is not the one
-   `update/current` names, nor one refused before, the round installs it
+   `update/current` names, nor one put back before and still refused ("A
+   build put back is tried once more", below), the round installs it
    beside in `update/<sha256>/` (checked like any part's, with room for it
    and `--keep-free-mb` to spare), writes `self.json`, then moves
    `update/current`. The outcome is `SelfSwitched`, and `serve` (or `once`)
@@ -1740,7 +1743,8 @@ build could carry it units or settings.
    `self.json` is there and lamp-update is not `active`/`running`, or 10 min
    (`own::DEADLINE`) have passed since the link moved, it points
    `update/current` at the old build again, adds the new binary's SHA-256 to
-   `self-refused` (never switched to again), removes `self.json`, logs a
+   `self-refused` (not switched to again, but for its one more try and the
+   owner's retry, both below), removes `self.json`, logs a
    round's end, `self-put-back`, and runs `systemctl reset-failed` and
    `restart --no-block lamp-update`. Otherwise it ends, having changed
    nothing. So the old updater's `update/status` says `self-put-back` as the
@@ -1978,41 +1982,92 @@ on purpose (the first builder's rule on #1680: if the channel can't be
 reached, wait for it and don't confirm; the deadline then puts the old one
 back): an updater that has not shown it can fetch and check a signed
 manifest is not trusted to be the one that updates the lamp. The parts'
-own rounds go on with the old lamp-update. What recovers it is the next
-release whose `lamp-update` binary differs (a new SHA-256 is not refused):
-the lamp switches to that one as to any other. A later build with a
-byte-for-byte identical `lamp-update` stays refused, so a lamp seen with
-`self-refused` after an outage is waiting for a release that changes
-lamp-update, not broken.
+own rounds go on with the old lamp-update. The lamp tries that binary once
+more by itself, on a later boot or 24 hours after the put-back, and again
+whenever the owner retries from the app (both below). Put back a second
+time it stays refused, and what recovers it then is the owner's retry or
+the next release whose `lamp-update` binary differs (a new SHA-256 is not
+refused): the lamp switches to that one as to any other. A later build
+with a byte-for-byte identical `lamp-update` stays refused, so a lamp seen
+with a binary in both `self-refused` and `self-retried` after an outage is
+waiting for the owner's retry or a release that changes lamp-update, not
+broken.
 
-**A build put back across a reboot is tried once more** (#2810). When a
-switch begins, the round notes the build and this boot's kernel id
+**A build put back is tried once more** (#2810, #6901). When a switch
+begins, the round notes the build and this boot's kernel id
 (`/proc/sys/kernel/random/boot_id`) in `self-began`. When `lamp-update-back`
 puts a build back, it notes the build and the boot it does so on in
-`self-put-back`. A power cut or a reboot
-in the switch's 10 minutes reads to `lamp-update-back` the same as a build
-that can't run. On a lamp with no clock of its own, the clock's jump at the
-next boot can also pass the deadline before the confirming round runs.
-- **Tried once more:** a refused build whose switch began on one boot and
-  was put back on another. An ordinary reboot later doesn't count: only the
-  boot of the put-back does. The round moves it from `self-refused` to `self-retried`
-  (retried first, so a cut between the two leaves it refused for good), and
-  says so.
-- **Final:** a build put back on the boot it began on (it failed, or hung
-  past the deadline) stays refused, as before. So does one put back a second
-  time, one whose boot is not known, or one put back by a
-  `lamp-update-back` that notes no boot (7071's, until the settings writer
-  is refreshed).
-- **Not covered:** a stop by hand without a reboot.
-- **Old updaters:** the rule is read by the lamp-update that runs. A lamp
-  whose own updater is older (7071's) never retries, and still waits for a
+`self-put-back`, a file written anew each time, so its own time is when.
+A power cut or a reboot in the switch's 10 minutes reads to
+`lamp-update-back` the same as a build that can't run, and so does a Wi-Fi
+drop or a refused download. On a lamp with no clock of its own, the
+clock's jump at the next boot can also pass the deadline before the
+confirming round runs. Until #6901 only a put-back across a reboot was
+tried again: a build put back on the boot its switch began on was refused
+for good, and a shipped lamp whose climb met a Wi-Fi drop said `… waiting
+for a newer updater` every round, and "Refused" in the app, until a
+release changed lamp-update.
+- **Tried once more:** a build in `self-refused` and not in
+  `self-retried`, with a line of its own in `self-put-back`, as soon as one
+  of these holds (`own::how_refused`; the first that holds is the reason
+  said):
+  1. its switch began on one boot and it was put back on another: a reboot
+     came in its minutes (#2810);
+  2. the lamp is on a later boot than the one noted in `self-put-back`:
+     this boot's id is not that one;
+  3. 24 hours or more (`own::AGAIN_AFTER`) have passed since the put-back,
+     by `self-put-back`'s modification time on the wall clock. The file's
+     own time is read so that a `lamp-update-back` already on a lamp needs
+     no new record. A time after now (the clock went back since) is not
+     24 hours.
+
+  The round moves it from `self-refused` to `self-retried` (retried first,
+  so a cut between the two leaves it refused for good), and says which:
+  `lamp-update's build … was put back after a reboot came in its minutes:
+  it is tried once more, and a second put-back is final`, `… was put back
+  and the lamp is on a later boot now: …`, or `… was put back 24 hours ago
+  or more: …`. A binary has this one try once, ever.
+- **Refused until then:** a build put back on the boot its switch began on
+  (it failed, hung past the deadline, or lost the channel) stays refused
+  on that boot for 24 hours.
+- **Final:** a build put back a second time (it is in `self-retried`), on
+  whatever boot and however long ago. So is one with no line of its own in
+  `self-put-back`: its put-back's boot was not known, or its
+  `lamp-update-back` notes none (7071's, until the settings writer is
+  refreshed). Only the owner's retry, or a release that changes
+  lamp-update, moves these.
+- **The owner's retry** (#6901): the app's retry of an update
+  (`update.check` with `retry`, [cloud.md](cloud.md), "Check for update")
+  also empties `self-refused`, whichever build it names and refused or
+  not, under the same lock and before the round it starts
+  (`app_check::drop_refusals`, `own::forget_refused`). `serve` says `the
+  owner asked to retry: N of lamp-update's own builds put back before may
+  be tried again`, and nothing of them when none was. That round takes the
+  build's lamp-update as one never put back. `self-retried` is left as it
+  is: put back again, a binary that had its one more try is refused for
+  good at once, until the owner retries again, and one that had not still
+  has it. A plain check, with no `retry`, lets none go.
+- **Old updaters:** the rule is read by the lamp-update that runs, the one
+  the lamp was put back to. A lamp whose own updater is older keeps the
+  rule it has: 7071's never retries, and a later one from before #6901
+  retries at most a put-back across a reboot (#2810) and leaves
+  `self-refused` alone at the owner's retry. Such a lamp still waits for a
   release that changes lamp-update.
+
+Tests: `tests/round/self_retry.rs` runs each case through rounds and
+`lamp-update-back` (the three reasons and their lines, the second put-back,
+a put-back dated after now, no boot noted, a climb, the owner's retry);
+`own.rs`'s `a_build_put_back_once_is_tried_once_more_for_the_first_reason_that_holds`
+has the order of the reasons, and `app_check.rs`'s
+`a_retry_lets_lamp_updates_own_builds_put_back_be_tried_again` the retry as
+`serve` takes it.
 
 **An updater too old for a build** (#1680). When a signed build's
 `min_updater` is above this updater's `UPDATER`, the build names a
 `lamp-update` (read leniently, before the schema check), and the build is
 of the channel followed, newer than the one the lamp runs, and its updater
-hasn't been refused before, phase 1 runs for that binary alone. No part's
+isn't one put back before and still refused (`own::refused_for_good`),
+phase 1 runs for that binary alone. No part's
 file, unit or link is fetched or changed. The outcome is `Climbs` ("build N
 needs updater M; lamp-update switches from its build ... to ..., which the
 build carries, and takes nothing else of it until that one has confirmed
@@ -2290,7 +2345,9 @@ update; the self-switch every build already makes moves from after the
 parts to before them. A lamp that put a carried lamp-update back for good
 (`own::refused_for_good`) now takes nothing from a build carrying that same
 lamp-update, where before its own updater still switched the parts; that ends
-at the next build whose lamp-update differs (Tests' P3 on #4582). A
+at the next build whose lamp-update differs (Tests' P3 on #4582), or sooner
+at that lamp-update's one more try or the owner's retry (#6901, "A build put
+back is tried once more"). A
 development lamp on `deploy/units/lamp-update.service`, pinned with no
 `LAMP_UPDATE_SELF`, refuses every product build from here ("needs updater 9
 or newer") until it is installed again. The test:
