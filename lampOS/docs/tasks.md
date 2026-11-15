@@ -3717,7 +3717,10 @@ file:
   agent can write there; an earlier build's glob
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`) is taken
   out of `main` and of the withdrawn fence agent `lamp-skill-run`
-  (#7101). With OpenClaw's stock `tools.exec.mode: "ask"`, a headless
+  (#7101). Every round with the gateway active, lamp-update adds
+  `main`'s entry again (an entry there is not written twice), so a
+  factory reset that wipes OpenClaw's approvals gets it back. With
+  OpenClaw's stock `tools.exec.mode: "ask"`, a headless
   turn's exec is denied without this entry. A denied exec still ends the turn as
   `stopped`, so the fail-closed check above tells a denied run from a
   done one.
