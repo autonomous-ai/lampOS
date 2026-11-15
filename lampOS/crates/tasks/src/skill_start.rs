@@ -513,7 +513,7 @@ const UNTRUSTED: [&str; 5] = ["/var", "/tmp", "/run", "/home", "/dev/shm"];
 /// Whether every executable mapping in `maps` (`/proc/<pid>/maps`' text)
 /// is the kernel's own (`[vdso]`, `[vsyscall]`) or a regular file of
 /// root's that neither group nor others may write (`file`: `lstat`), the
-/// same inode the map names, and outside [`UNTRUSTED`]. An anonymous one,
+/// same device and inode the map names, and outside [`UNTRUSTED`]. An anonymous one,
 /// a deleted file, a memfd or anything else is refused in words.
 pub fn maps_may(maps: &str, file: impl Fn(&Path) -> io::Result<FileSeen>) -> Result<(), String> {
     for line in maps.lines() {
@@ -525,7 +525,7 @@ pub fn maps_may(maps: &str, file: impl Fn(&Path) -> io::Result<FileSeen>) -> Res
             *field = &rest[..end];
             rest = &rest[end..];
         }
-        let [_, perms, _, _, inode] = fields;
+        let [_, perms, _, device, inode] = fields;
         if perms.as_bytes().get(2) != Some(&b'x') {
             continue;
         }
@@ -548,6 +548,7 @@ pub fn maps_may(maps: &str, file: impl Fn(&Path) -> io::Result<FileSeen>) -> Res
             || seen.uid != 0
             || seen.mode & 0o022 != 0
             || inode.parse::<u64>().ok() != Some(seen.ino)
+            || map_device(device) != Some(dev_parts(seen.dev))
         {
             return Err(format!(
                 "the caller's code {path:?} is not root's own, or others may change it"
@@ -555,6 +556,22 @@ pub fn maps_may(maps: &str, file: impl Fn(&Path) -> io::Result<FileSeen>) -> Res
         }
     }
     Ok(())
+}
+
+/// A maps line's device (`major:minor`, in hex).
+fn map_device(device: &str) -> Option<(u64, u64)> {
+    let (major, minor) = device.split_once(':')?;
+    Some((
+        u64::from_str_radix(major, 16).ok()?,
+        u64::from_str_radix(minor, 16).ok()?,
+    ))
+}
+
+/// `st_dev`'s major and minor, as Linux encodes them.
+fn dev_parts(dev: u64) -> (u64, u64) {
+    let major = ((dev >> 8) & 0xfff) | ((dev >> 32) & 0xffff_f000);
+    let minor = (dev & 0xff) | ((dev >> 12) & 0xffff_ff00);
+    (major, minor)
 }
 
 /// The peer on `stream` as the kernel names it at connect
@@ -1094,6 +1111,40 @@ fn launch(id: &str) -> (i32, String) {
     }
 }
 
+/// Every fd of this process above 4 made close-on-exec, so the fence gets
+/// fds 0-4 only, whatever its caller left open: the fds named in
+/// `/proc/self/fd` (`/dev/fd` off Linux) as read once.
+pub fn above_4_closed_at_exec() -> io::Result<()> {
+    let dir = if cfg!(target_os = "linux") {
+        "/proc/self/fd"
+    } else {
+        "/dev/fd"
+    };
+    let fds: Vec<i32> = std::fs::read_dir(dir)?
+        .filter_map(|entry| entry.ok()?.file_name().to_str()?.parse().ok())
+        .filter(|fd| *fd > 4)
+        .collect();
+    for fd in fds {
+        // The listing's own fd is closed by now: that one is skipped.
+        let _ = cloexec(fd);
+    }
+    Ok(())
+}
+
+/// Raw `fd` marked close-on-exec, if it is open.
+#[allow(unsafe_code)]
+fn cloexec(fd: i32) -> io::Result<()> {
+    // SAFETY: the fd is only borrowed for the two fcntl calls and never
+    // closed here; the launcher is one thread, so it is not closed and
+    // reused meanwhile, and on a closed fd fcntl only fails (EBADF).
+    let fd = unsafe { std::os::fd::BorrowedFd::borrow_raw(fd) };
+    let flags = rustix::io::fcntl_getfd(fd)?;
+    Ok(rustix::io::fcntl_setfd(
+        fd,
+        flags | rustix::io::FdFlags::CLOEXEC,
+    )?)
+}
+
 /// `fd` duplicated at exactly `at` (3 or 4, both free: every fd this
 /// process opened is above, close-on-exec), inherited by the fence.
 fn place(fd: impl AsFd, at: i32) -> io::Result<OwnedFd> {
@@ -1123,6 +1174,7 @@ fn exec_fence(grant: &Grant, stream: UnixStream) -> io::Result<std::convert::Inf
     let (reader, stream) = (high_reader, high_stream);
     let token_fd = place(&reader, 3)?;
     let socket_fd = place(&stream, 4)?;
+    above_4_closed_at_exec()?;
     let hidden: Vec<&Path> = crate::gateway::HIDDEN.iter().map(Path::new).collect();
     let error = std::process::Command::new("unshare")
         .args(crate::gateway::fence_args(
@@ -1437,6 +1489,25 @@ mod tests {
         assert!(maps_may(&loose_line, |path| loose.file_at(path)).is_err());
         let swapped = with(&format!("eeee0000-eeee1000 r-xp 00000000 b3:02 9 {LIBC}"));
         assert!(maps_may(&swapped, file).is_err());
+        // The same inode on another device, or a device not read.
+        for device in ["b3:03", "b4:02", "00:00", "b3", "zz:02"] {
+            let moved = with(&format!(
+                "eeee0000-eeee1000 r-xp 00000000 {device} 100 {LIBC}"
+            ));
+            assert_eq!(
+                maps_may(&moved, file),
+                Err(format!(
+                    "the caller's code {LIBC:?} is not root's own, or others may change it"
+                )),
+                "{device}"
+            );
+        }
+        // A big device number as Linux encodes it.
+        assert_eq!(
+            dev_parts((0x12000_u64 << 32) | (0x345 << 8) | 0x67),
+            (0x12345, 0x67)
+        );
+        assert_eq!(map_device("103:0a"), Some((0x103, 0x0a)));
         for (line, words) in [
             (
                 "eeee0000-eeee1000 r-xp 00000000 00:00 0 ",
@@ -1921,6 +1992,31 @@ mod tests {
             crate::gateway::HIDDEN
                 .iter()
                 .any(|hidden| Path::new(START_SOCKET).starts_with(hidden))
+        );
+    }
+
+    /// An fd the launcher's caller left open (not close-on-exec) never
+    /// reaches the fence's programs.
+    #[test]
+    fn fds_above_4_are_closed_at_the_fences_exec() {
+        let file = tempfile::tempfile().unwrap();
+        let open = rustix::io::dup(&file).unwrap();
+        let fd = open.as_raw_fd();
+        assert!(fd > 4);
+        let sees = || {
+            std::process::Command::new("/bin/sh")
+                .args(["-c", &format!("( : <&{fd} ) 2>/dev/null")])
+                .status()
+                .unwrap()
+                .success()
+        };
+        assert!(sees(), "inherited before");
+        above_4_closed_at_exec().unwrap();
+        assert!(!sees(), "closed at exec after");
+        assert!(
+            rustix::io::fcntl_getfd(&open)
+                .unwrap()
+                .contains(rustix::io::FdFlags::CLOEXEC)
         );
     }
 
