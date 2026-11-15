@@ -1499,6 +1499,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `switching to build N` | the parts' switch begins |
 | `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
 | `lamp-body's restart was refused (…); tried once more after 3 s, its let-go` | lamp-body's restart in the switch was refused; it is tried once more after 3 s (#7067, "lamp-body's one retry") |
+| `lamp-body's start count is not reset: …` | before its one retry, lamp-body's start count (`systemctl reset-failed`) could not be reset; the retry is still made, and may then meet systemd's start limit (#7067) |
 | `lamp-body's restart tried once more: it stands` | that one retry stood; the switch goes on to the watch |
 | `lamp-body's restart tried once more: refused again (…)` | the retry was refused too; the build is put back |
 | `setup is complete; its phone grace period is not restarted` | a completed setup's unit changed, and isn't restarted |
