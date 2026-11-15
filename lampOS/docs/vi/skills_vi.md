@@ -1507,8 +1507,9 @@ người dùng tạo được gỡ qua chính `make_skill`, chỉ với `remove`
 nghe (`made_remove::REMOVE`). Đó là một tham số của hàm giọng nói đã có,
 không bao giờ là một hàm riêng, vì giọng nói đã ở mức 48 hàm
 (`lamp_gemini::MAX_TOOLS`). Một câu có xin gỡ kỹ năng hay không là do mô
-hình phán đoán, theo mô tả của hàm ("When asked to delete or remove a
-skill, call it with remove alone, saying nothing first."), không bao giờ là
+hình phán đoán, theo mô tả của hàm ("Call it with remove alone to delete
+or remove a skill, or made alone when asked which skills they made, saying
+nothing first."), không bao giờ là
 một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong code
 (`made_remove::asked`):
 - **Chỉ của chính người dùng.** Tên được so với các kỹ năng họ đã tạo, chỉ
@@ -1607,6 +1608,34 @@ Kiểm thử: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact
 `a_yes_after_remove_moon_fact_is_forced_and_removes_it`,
 `a_no_after_remove_moon_fact_keeps_it`,
 `no_force_before_the_question_is_said_whole`.
+
+**Liệt kê bằng giọng nói** (lamp-9adf, 15/11, bản 13162: "which skills have
+you made for me?" không gọi hàm nào và được trả lời từ vài lượt gần nhất,
+hai trong 26 kỹ năng đã tạo ở đó; nghe thành "skills have you made for me?"
+thì gọi read-back của một kỹ năng, được bảo "glow green on return doesn't
+send or write anything", vì `make_skill` không có gì nói tới việc liệt kê).
+Các kỹ năng người dùng đã tạo được kể qua chính `make_skill`, chỉ với
+`made`, `true` (`made_list::LIST`): một tham số của hàm giọng nói đã có,
+như việc gỡ. Một câu có hỏi điều đó hay không là do mô hình phán đoán, theo
+mô tả của hàm (ở trên) và của tham số ("Never answer that from the
+conversation."), không bao giờ là một danh sách từ. Mô tả của hàm vẫn trong
+1.024 byte khi mọi công tắc bật: câu "Call it only when the person asks for
+a skill to be made." thành "Make one only when the person asks for one.",
+và câu của read-back ngắn hơn. Sau đó, trong code (`made_list::listed`):
+- **Từ đèn, không bao giờ từ cuộc trò chuyện.** Chỉ mục kỹ năng đã tạo
+  (`made.json`), những kỹ năng được đánh dấu bật mà thư mục vẫn còn trên đèn
+  (`made_skill::drop_gone` trước, #7100), mới nhất trước: tạo ở đây (bằng
+  giọng nói hoặc trong ứng dụng), tách riêng những kỹ năng thêm từ tệp.
+- **Bao nhiêu, và tên mới nhất chỉ cho chủ đèn.** Mô hình được cho
+  `made_count` và `added_from_a_file_count`; chỉ khi chủ đèn nghe
+  (`services::owner_hears`, chỉ hỏi khi có tên để nói, như tên của read-back
+  và của việc gỡ) mới thêm ba tên mới nhất của mỗi loại
+  (`made_list::NAMED_MOST`), không bao giờ đọc hết 26. Chưa tạo kỹ năng nào
+  thì nói vậy; lượt không ai nói thì không được kể gì. Nhật ký chỉ ghi số
+  đếm.
+Kiểm thử: `made_list::tests::the_skills_they_made_are_told_from_the_lamp_newest_first`,
+và `make_skill_local::tests::a_made_script_is_offered_to_the_voice_with_its_switch_alone`
+(được nói tới khi mọi công tắc bật, trong giới hạn).
 
 Kiểm thử: `make_skill_local::tests` (kể cả
 `a_good_answer_is_kept_and_put_on_with_no_yes`,
