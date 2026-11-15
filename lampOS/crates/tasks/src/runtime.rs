@@ -4214,10 +4214,24 @@ pub fn serve<C: Clock>(
     let skill_stop = stop.clone();
     match std::env::var_os("HOME").map(PathBuf::from) {
         Some(home) if skill_tasks => {
+            // A gateway agent's skill run is claimed by the launcher on
+            // its own socket (#7133): served with the same switch. One not
+            // bound leaves such a run failing closed, the rest as it is.
+            let starts = crate::skill_start::Starts::default();
+            match crate::skill_start::Server::lamp(starts.clone()).start(stop.clone()) {
+                Ok(_) => eprintln!(
+                    "tasks: a gateway agent's skill runs are claimed on {}",
+                    crate::skill_start::START_SOCKET
+                ),
+                Err(error) => {
+                    eprintln!("tasks: the skill-start launcher's socket is not there: {error}")
+                }
+            }
             match crate::skill_task::HandOvers::lamp(
                 &home,
                 skill_harness.clone(),
                 no_harness.clone(),
+                starts,
             )
             .start(true, stop.clone())
             {
