@@ -15137,13 +15137,13 @@ fn held_for_a_claim(held: &mut Option<String>, piece: String) -> String {
 
 /// Whether the turn is the lamp's own note of a skill made already, with
 /// no call of its own: one it wrote ([`Asker::Written`], never an add-on's
-/// quoted line) that opens on [`crate::made_skill::ALREADY_DONE`], as the
-/// app's make line and a cut voice make's line are told
-/// (`app_make::say_note`). `LAMP_ACTION_CLAIM_CHECKED` counts that make as
-/// the turn's call, so its "I made …" is never said as not done.
+/// quoted line) that tells of a make ([`crate::made_skill::tells_made`]),
+/// as the app's make line and a cut voice make's line are told
+/// (`app_make::say_note`); never the note of a skill not made.
+/// `LAMP_ACTION_CLAIM_CHECKED` counts that make as the turn's call, so its
+/// "I made …" is never said as not done.
 fn made_skill_said(asked: &Asker, said: &str) -> bool {
-    matches!(asked, Asker::Written { quoted: false, .. })
-        && said.starts_with(crate::made_skill::ALREADY_DONE)
+    matches!(asked, Asker::Written { quoted: false, .. }) && crate::made_skill::tells_made(said)
 }
 
 /// A turn whose reply claimed an action again with no call of its kind,
