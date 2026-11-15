@@ -1173,20 +1173,32 @@ một kỹ năng do người dùng tạo đi qua `new` của Harness, như của
   wrapper, không theo tên engine) khi wrapper đó có dữ liệu gateway và
   namespace của nó cho thấy socket của lamp-control.
 - **Hai file trong thư mục Harness của lần chạy.** Trước `new` của Harness,
-  lamp-tasks ghi `token` của lần chạy (0600) và một script `start` vào
-  `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-<run>/`. Chúng không nằm
-  trong `/run/lampos-tasks/runs`, vì gateway không thấy thư mục đó.
+  lamp-tasks ghi `token` của lần chạy (0600) và một script `start` (0700)
+  vào `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-<run>/`, mỗi file
+  được tạo mới, không bao giờ qua liên kết. Chúng không nằm trong
+  `/run/lampos-tasks/runs`, vì gateway không thấy thư mục đó, và lần chạy
+  qua gateway không có file token ở đó.
   `start` đọc token một lần, xóa nó, rồi chạy
   script của kỹ năng với `/var/lib`, `/var/tmp` và `/dev/shm` bị ẩn.
 - **Qua `new` của Harness** trên engine mặc định (`HarnessRunner`). Tác vụ
-  của Harness bảo agent chạy `start` theo đường dẫn tuyệt đối, vì thư mục
-  làm việc của một exec là workspace của agent. Công cụ của OpenClaw chạy trong
+  của Harness ghi "Run `<absolute path>/start` once, exactly as written,
+  …", vì thư mục làm việc của một exec là workspace của agent. Công cụ của OpenClaw chạy trong
   tiến trình gateway của nó, không trong pane của Harness, nên token mà
   pane export sẽ không bao giờ tới được script của kỹ năng. File trong thư
   mục của lần chạy là cách token tới được đó.
 - **Đóng khi lỗi.** Nếu `start` không chạy (file token vẫn còn khi Harness
-  báo idle hay stopped), lần chạy kết thúc là thất bại, nói bằng lời, không
-  phải là xong.
+  báo idle hay stopped), lần chạy kết thúc là thất bại: "the default agent
+  never started the skill's script".
+- **Dọn dẹp khi xong.** Token của lần chạy được kết thúc với lamp-control
+  trước, rồi phiên Harness được đóng và thư mục của lần chạy bị xóa.
+- **Gateway phải trả lời trước.** Trước khi giao việc, lamp-tasks chờ tối
+  đa 60 s cho gateway của OpenClaw ở `127.0.0.1:18789`. Nếu nó không trả
+  lời thì không gửi gì ("tasks: the OpenClaw Gateway did not answer on
+  127.0.0.1:18789 within 60 s; the hand-over is not sent"), và lỗi của lần
+  chạy là `Harness didn't start the run (openclaw_gateway_not_ready)`.
+- **Việc ghi cố định bị từ chối.** Một việc không có script (ghi cố định)
+  không được agent kiểu gateway nhận: "a fixed write is not taken by a
+  gateway agent, so nothing was started".
 - **lamp-tasks không tự gửi lượt nào tới gateway.** Lần chạy kỹ năng không
   gửi lượt nào tới một gateway và không giữ fence agent nào.
 - **Một exec approval, do lamp-update ghi (#7135).** Với cài đặt gốc,

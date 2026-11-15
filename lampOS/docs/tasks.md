@@ -3604,21 +3604,34 @@ wrapper:
   engine name) when that wrapper carries its gateway data and its
   namespace shows lamp-control's socket.
 - **Two files in the run's Harness folder.** Before Harness's `new`,
-  lamp-tasks writes the run's `token` (0600) and a `start` script into
-  `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-<run>/`. They don't go
-  in `/run/lampos-tasks/runs`, because the gateway can't see that folder.
+  lamp-tasks writes the run's `token` (0600) and a `start` script (0700)
+  into `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-<run>/`, each made
+  new, never through a link. They don't go in `/run/lampos-tasks/runs`,
+  because the gateway can't see that folder, and a gateway run gets no
+  token file there.
   `start` reads the token once, deletes it, and runs the skill's
   script with `/var/lib`, `/var/tmp` and `/dev/shm` hidden.
 - **Through Harness's `new`** on the default engine (`HarnessRunner`).
-  Harness's task tells the agent to run `start` by its absolute path,
-  because an exec's working folder is the agent's workspace. OpenClaw's
+  Harness's task says "Run `<absolute path>/start` once, exactly as
+  written, …", because an exec's working folder is the agent's workspace. OpenClaw's
   tools run in
   its gateway's process, not in Harness's pane, so a token exported by
   the pane would never reach the skill's script. The file in the run's
   folder is how it gets there.
 - **Fails closed.** If `start` never ran (the token file is still there
-  when Harness says idle or stopped), the run ends failed, in words, not
-  as done.
+  when Harness says idle or stopped), the run ends failed: "the default
+  agent never started the skill's script".
+- **Cleaned up at the end.** The run's token is ended with lamp-control
+  first, then Harness's session is closed and the run's folder removed.
+- **The gateway must answer first.** Before the hand-over, lamp-tasks
+  waits up to 60 s for OpenClaw's gateway on `127.0.0.1:18789`. If it
+  doesn't answer, nothing is sent ("tasks: the OpenClaw Gateway did not
+  answer on 127.0.0.1:18789 within 60 s; the hand-over is not sent"), and
+  the run's error is `Harness didn't start the run
+  (openclaw_gateway_not_ready)`.
+- **A fixed write is refused.** A task with no script (a fixed write)
+  isn't taken by a gateway agent: "a fixed write is not taken by a gateway
+  agent, so nothing was started".
 - **No gateway turn of lamp-tasks' own.** A skill's run sends no turn to
   a gateway and keeps no fence agent.
 - **No write to `openclaw.json`.** A skill's run never writes OpenClaw's
