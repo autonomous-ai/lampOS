@@ -2700,27 +2700,31 @@ fn the_product_keeps_a_cut_answer_as_heard() {
     }
 }
 
-/// A stop said over the lamp's answer is heard (#5032, #5905): everything
-/// heard while the lamp speaks is listened for (`LAMP_STOP_WORDS=heard-always`),
-/// so a short "Stop." stops the answer as the hand does, whether or not it
-/// made the lamp pause; a stop that commits a turn gets the stop line, never
-/// the model (`LAMP_SPOKEN_STOP_ENDS`). Without stop words, 9 of 9 spoken
-/// stops over the answer were lost on lamp-06c1; with `heard`, a 0.5 s
-/// "Stop." that made no pause was lost on lamp-52e6 on 11 November.
+/// A stop that commits a turn gets the stop line, never the model
+/// (`LAMP_SPOKEN_STOP_ENDS`). The stop words heard while the lamp speaks
+/// (`LAMP_STOP_WORDS=heard-always`, #5032, #5905) stay off in the product:
+/// turning them on waits for the stop keyword spotted by lamp-name's on-mic
+/// model (the first builder's ruling on #5905, 15 November). The unit keeps
+/// the line parked, commented out.
 #[test]
-fn the_product_answers_a_stop_said_over_its_answer() {
+fn the_product_answers_a_stop_and_leaves_its_stop_words_off() {
     let voice = install::PRODUCT
         .iter()
         .find(|(unit, _)| *unit == "lamp-voice.service")
         .unwrap()
         .1;
     let service = section(voice, "Service");
-    for line in [
-        "Environment=LAMP_STOP_WORDS=heard-always",
-        "Environment=LAMP_SPOKEN_STOP_ENDS=on",
-    ] {
-        assert!(service.contains(&line), "the voice lacks {line}");
-    }
+    assert!(
+        service.contains(&"Environment=LAMP_SPOKEN_STOP_ENDS=on"),
+        "the voice lacks LAMP_SPOKEN_STOP_ENDS"
+    );
+    assert!(
+        !service
+            .iter()
+            .any(|line| line.starts_with("Environment=LAMP_STOP_WORDS=")),
+        "the product sets LAMP_STOP_WORDS (#5905: off until the stop keyword)"
+    );
+    assert!(voice.contains("PARKED (#5905)"), "the parked line is gone");
 }
 
 /// A person's turn is also told the room's lines of the same conversation
