@@ -2172,6 +2172,14 @@ pub fn starts_without_harness(default_agent: bool, here: HarnessHere, harness_se
         }
 }
 
+/// Read as `here`, a run whose default agent takes no skill's run with no
+/// Harness goes through Harness instead of being refused (#7133): signed
+/// out, Harness's own lamp target works with no account (#6407). With no
+/// Harness program there is no other way, so it is refused in words.
+pub fn signed_out_through_harness(here: HarnessHere) -> bool {
+    here == HarnessHere::SignedOut
+}
+
 /// What a skill's run started with no Harness needs (#6685 PR 3), set by
 /// `runtime::serve` before a run can begin.
 pub struct NoHarness {
@@ -2318,6 +2326,23 @@ impl HarnessRunner {
             no_harness: NoHarnessSlot::default(),
             starts: Default::default(),
         }
+    }
+
+    /// Whether the lamp's default agent takes a skill's run with no
+    /// Harness ([`default_agent_takes_tasks`]), as [`Self::run_without_harness`]
+    /// checks it, read now; nothing is started.
+    fn takes_without_harness(&self, local: &NoHarness) -> Result<(), String> {
+        let engine = (local.default_engine)().ok_or("the lamp has no default agent yet")?;
+        let wrappers = self
+            .wrappers
+            .as_ref()
+            .ok_or("the agents' wrappers aren't known here")?;
+        let read = |path: &Path| std::fs::read_to_string(path).ok();
+        default_agent_takes_tasks(
+            engine,
+            read(&wrappers.join(engine.argument())).as_deref(),
+            self.agent_ns.as_deref().and_then(read).as_deref(),
+        )
     }
 
     /// A skill's run on the lamp's default agent with no Harness (#6685
@@ -2644,14 +2669,23 @@ impl Runner for HarnessRunner {
         // With the switch on and no Harness account (or no Harness), the
         // lamp's own agent with no Harness (#6685 PR 3), read as last
         // known: nothing is asked here.
-        if let Some(local) = self.no_harness.get()
-            && starts_without_harness(
-                self.default_agent,
-                (local.here)(),
-                self.harness.get().is_some(),
-            )
-        {
-            return self.run_without_harness(local, run, end_token);
+        if let Some(local) = self.no_harness.get() {
+            let here = (local.here)();
+            if starts_without_harness(self.default_agent, here, self.harness.get().is_some()) {
+                match self.takes_without_harness(local) {
+                    // Signed out with Harness set up, a default agent whose
+                    // wrapper takes no skill's run with no Harness (a
+                    // gateway agent's, OpenClaw's) goes through Harness's
+                    // own lamp target below, which works signed out
+                    // (#6407): a reset lamp with OpenClaw its default runs
+                    // its skills (#7133). Hermes's wrapper keeps the run.
+                    Err(why) if signed_out_through_harness(here) => eprintln!(
+                        "[lamp-tasks] skill task {}: {why}; Harness is signed out, so it goes through Harness's own lamp target",
+                        run.run
+                    ),
+                    _ => return self.run_without_harness(local, run, end_token),
+                }
+            }
         }
         let Some(harness) = self.harness.get() else {
             return Err(
