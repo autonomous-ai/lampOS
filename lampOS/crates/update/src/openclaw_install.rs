@@ -1493,6 +1493,15 @@ fn steps(
             return fail("version", why, say);
         }
     }
+    // The package pinned already, its namespace script gone (a failed
+    // install took it out, 52e6; #6405 wrote it only before npm): written
+    // again, as `--version` and the gateway run inside it (#7135).
+    if pinned_there
+        && !holds(root, NS, &ns_text(shown))
+        && let Err(why) = write_root_file(root, NS, &ns_text(shown), 0o755)
+    {
+        return fail("entry", why, say);
+    }
     if let Err(why) = gateway_config(root, run, say) {
         return fail("config", why, say);
     }
