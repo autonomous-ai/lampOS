@@ -2408,6 +2408,32 @@ fn the_allowlist_add_is_tried_again_while_the_gateways_config_is_not_ready() {
     assert_eq!(adds, 1, "another refusal is not retried");
 }
 
+/// #7135 (c0a4, 21:22:21, an update's one-shot): the add joined a gateway
+/// just restarted whose namespace did not show Node yet, then answered
+/// "Config unavailable". Both are tried again in the same one-shot, so the
+/// entry lands and a skill's first run after an update is not denied.
+#[test]
+fn the_allowlist_add_is_tried_again_while_the_gateways_node_is_not_there_yet() {
+    let mut adds = 0;
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        if argv.iter().any(|arg| arg == "add") {
+            adds += 1;
+            match adds {
+                1 | 2 => return Err(format!("/usr/bin/env: {NODE_NOT_READY}")),
+                3 => return Err(format!("{CONFIG_NOT_READY}: cannot validate --agent.")),
+                _ => {}
+            }
+        }
+        Ok(String::new())
+    };
+    let shown = Shown {
+        one_path: true,
+        ..Shown::default()
+    };
+    assert_eq!(exec_allowlist(&mut run, shown, &mut quiet()), Some(true));
+    assert_eq!(adds, 4);
+}
+
 /// #7135 (V2, 52e6 stuck): the package pinned already, the namespace
 /// script gone (a failed install took it out), the one-shot writes it
 /// again before `--version` runs in it, and installs; never `installer`
