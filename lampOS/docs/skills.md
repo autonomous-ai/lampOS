@@ -3878,9 +3878,16 @@ gone ([switches.md](switches.md)). What happens:
      file, or kept and on with its SHA-256, `toml_sha256` in `made.json`),
      no twin is made: "You already have that skill: <name>. It's on."
      (`made_skill::ALREADY_HAVE`). One kept and not on still gives way to
-     the newer one of its name. Tests:
+     the newer one of its name. One kept and on whose folder is no
+     longer in the skills folder (`lamp-skills remove` takes it off and
+     tells the voice nothing, #7100) is dropped from `made.json` with its
+     package first (`made_skill::drop_gone`), so its name is free again;
+     the read-back drops it the same way before it names the skills on
+     (`make_skill_local::read_back_names`). One whose folder holds another
+     package is left, its read-back saying it changed. Tests:
      `a_built_in_skills_name_gets_the_first_free_one`,
      `the_persons_own_same_skill_is_already_had_and_another_gets_a_number`,
+     `a_made_skill_removed_by_lamp_skills_frees_its_name_and_is_not_read_back`,
      and in `tests/it/made.rs`
      `a_made_skill_named_as_the_lamps_own_gets_a_free_name_and_goes_on`.
      When part

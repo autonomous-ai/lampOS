@@ -1993,11 +1993,19 @@ pub fn read_back_heard(heard: &str) -> Option<String> {
         return None;
     }
     let keeping = Keeping::when(true)?;
+    read_back_asked(heard, &read_back_names(&keeping))
+}
+
+/// The skills [`read_back_heard`] reads back, from `keeping`: the made
+/// skills kept on the lamp, those no longer on it dropped first
+/// ([`made_skill::drop_gone`], #7100), and the pushed ones.
+pub(crate) fn read_back_names(keeping: &Keeping) -> Vec<String> {
+    made_skill::drop_gone(keeping);
     let mut names = made_skill::kept_on_names(&keeping.directory);
     names.extend(crate::skill_task_yes::pushed_names(&made_skill::pushed(
         &keeping.installed,
     )));
-    read_back_asked(heard, &names)
+    names
 }
 
 /// Whether a model's call `name` with `args` is the skill `asked` run or
@@ -2756,6 +2764,7 @@ pub fn answer(
         let Some(keeping) = Keeping::when(true) else {
             return crate::tools::unavailable();
         };
+        made_skill::drop_gone(&keeping);
         let asking = Asking {
             request,
             heard,
@@ -3703,7 +3712,16 @@ light = { dim = 1 }
         );
         assert_eq!(first["made"], "green-on-return", "{first}");
         let _ = take_said_line();
-        helper.join().unwrap();
+        let asked = helper.join().unwrap();
+        // Installed as the helper installs it (#7100: one whose folder is
+        // gone is no longer on).
+        let folder = keeping.installed.join("green-on-return");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join(".package.json"),
+            json!({"sha256": asked["install_made"]}).to_string(),
+        )
+        .unwrap();
         std::fs::remove_file(&keeping.manage).unwrap();
         let helper = manage_helper(&keeping.manage);
         let second = make_with(
