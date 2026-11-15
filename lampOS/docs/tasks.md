@@ -3627,10 +3627,13 @@ run.
 ```
 tasks: harness new: machine=<machine> exit=0 ms=<ms> out=<n> state=ok id=<id>
 tasks: skill-task-<run>: dispatch accepted (exit 0, <s> s)
-[lamp-tasks] skill task <run>: ended, Harness says idle, after <N> s; its agent: started (<Engine>)
+[lamp-tasks] skill task <run>: ended, Harness says idle, after <N> s; its agent: started (<agent>)
 ```
 
-`TODO(S3)`: OpenClaw's exact words in the last line.
+None of these lines names the engine in lamp-tasks' own words: `<agent>`
+is the name Harness's `show` gives for the session, or `the lamp's default
+agent` when Harness says stopped, or `not known (harness show: …)` when its
+reply can't be read. The same holds for Hermes and OpenClaw.
 
 ## Devin (#1854)
 
