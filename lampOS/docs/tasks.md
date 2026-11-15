@@ -3647,9 +3647,15 @@ file:
   a lamp-tasks restart wipes. lamp-tasks only takes it
   when it is a real folder of its own user that no one else may write. It
   removes a stale socket of its own there, and never makes or removes the
-  folder. With the folder missing, nothing is served ("tasks: the
-  skill-start launcher's socket is not there: …") and a gateway run fails
-  closed.
+  folder. With the folder missing, nothing is served yet ("tasks: the
+  skill-start launcher's socket is not served yet: …; tried again every
+  2 s", said once) and a gateway run fails closed. The bind is tried
+  again every 2 s (`BIND_AGAIN`), so lamp-tasks started before the
+  gateway's unit makes the folder (after a boot, or with the switch
+  turned on while it runs) serves the launcher within 2 s of the
+  folder appearing. A socket gone while served (the folder taken out and
+  made again) is bound again the same way ("tasks: … is gone; bound
+  again once its folder is there").
 - **The peer checks, in order, before any reply** (`skill_start::peer_may`):
   the same uid as lamp-tasks (`SO_PEERCRED`); `/proc/<pid>/exe` names the
   launcher; the launcher file is root's and not group- or world-writable;
