@@ -1044,6 +1044,7 @@ mod tests {
             started: Default::default(),
             start_in: None,
             env_file: None,
+            answer: Default::default(),
         }
     }
 

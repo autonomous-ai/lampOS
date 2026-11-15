@@ -48,9 +48,15 @@
 //!   a skill and [`ALL_SKILLS`] across every skill in any 24 hours
 //!   ([`Runs`]).
 //! - **The hand-over** ([`HandOver::line`]): one line to lamp-tasks
-//!   (`--tasks-socket`, #6306), answered when the run ends; its result
-//!   comes back as Task news through lamp-tasks. The other steps of the
-//!   skill (light, cue, say) run at once beside it.
+//!   (`--tasks-socket`, #6306), answered when the run ends. The other steps
+//!   of the skill (light, cue, say) run at once beside it.
+//! - **What its agent found** ([`told`]): a run granted a linked service's
+//!   read ends with the agent's last answer in lamp-tasks' answer
+//!   (`lamp_tasks::skill_task::tells_answer`, `LAMP_AGENT_SERVICES` on
+//!   there), which is said to the owner sentence by sentence as exact
+//!   words, behind a read's gate and turn
+//!   (`crate::service_read::tell`). Nothing else of a run is told; the
+//!   journal says only how many sentences were said.
 //! - **Off**, a `do.task` loads and hands nothing over, and the journal
 //!   says why ([`OFF`]); the skill's other steps still run.
 use crate::package;
@@ -897,9 +903,107 @@ pub fn answered(answer: &str) -> Result<String, String> {
     }
 }
 
+/// The most sentences of an agent's answer said ([`told`]): as many as a
+/// read's lines, its count and [`crate::service_read::MOST_ITEMS`] items.
+pub const MOST_TOLD_LINES: usize = 11;
+
+/// The sentences to say of lamp-tasks' answer to a hand-over (`answer`),
+/// when the run ended well and its agent's answer is in it
+/// (`lamp_tasks::skill_task::told_answer`): markdown's marks left out, one
+/// sentence a line, a sentence longer than the say service takes
+/// (`lamp_voice::say::MOST_WORDS_BYTES`) cut at its words, at most
+/// [`MOST_TOLD_LINES`]. None for any other answer, or one with no words.
+pub fn told(answer: &str) -> Option<Vec<String>> {
+    let answer: serde_json::Value = serde_json::from_str(answer.trim()).ok()?;
+    if answer.get("ok").and_then(serde_json::Value::as_bool) != Some(true) {
+        return None;
+    }
+    let text: String = answer
+        .get("answer")?
+        .as_str()?
+        .chars()
+        .map(|c| match c {
+            '*' | '#' | '`' | '|' | '>' => ' ',
+            c if c.is_control() => ' ',
+            c => c,
+        })
+        .collect();
+    let most = lamp_voice::say::MOST_WORDS_BYTES;
+    let mut lines: Vec<String> = Vec::new();
+    let mut line = String::new();
+    for word in text.split_whitespace() {
+        // A bullet's dash alone is no word to say.
+        if word.chars().all(|c| c == '-') {
+            continue;
+        }
+        let word: String = if word.len() > most {
+            let mut end = most;
+            while !word.is_char_boundary(end) {
+                end -= 1;
+            }
+            word[..end].to_owned()
+        } else {
+            word.to_owned()
+        };
+        if !line.is_empty() && line.len() + 1 + word.len() > most {
+            lines.push(std::mem::take(&mut line));
+        }
+        if !line.is_empty() {
+            line.push(' ');
+        }
+        line.push_str(&word);
+        if word.ends_with(['.', '!', '?']) {
+            lines.push(std::mem::take(&mut line));
+        }
+    }
+    if !line.is_empty() {
+        lines.push(line);
+    }
+    lines.truncate(MOST_TOLD_LINES);
+    (!lines.is_empty()).then_some(lines)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// What the agent found comes back in lamp-tasks' answer, and is said
+    /// a sentence a line, its markdown left out; an answer without it, a
+    /// refusal or one of no words says nothing.
+    #[test]
+    fn an_ended_runs_answer_is_told_a_sentence_a_line() {
+        assert_eq!(
+            told(
+                r#"{"ok":true,"id":0,"answer":"**You have 12 unread messages.** - Two are from Ana. Nothing urgent"}"#
+            ),
+            Some(vec![
+                "You have 12 unread messages.".to_owned(),
+                "Two are from Ana.".to_owned(),
+                "Nothing urgent".to_owned(),
+            ])
+        );
+        for none in [
+            r#"{"ok":true,"id":0}"#,
+            r#"{"ok":true,"id":0,"answer":" ** - "}"#,
+            r#"{"ok":false,"error":"run_failed","message":"x","answer":"Hi."}"#,
+            "not json",
+        ] {
+            assert_eq!(told(none), None, "{none}");
+        }
+        let long = format!(
+            r#"{{"ok":true,"id":0,"answer":"{} end"}}"#,
+            "word ".repeat(400)
+        );
+        let lines = told(&long).unwrap();
+        assert!(lines.len() > 1, "{lines:?}");
+        assert!(
+            lines
+                .iter()
+                .all(|line| line.len() <= lamp_voice::say::MOST_WORDS_BYTES)
+        );
+        let many = format!(r#"{{"ok":true,"id":0,"answer":"{}"}}"#, "One. ".repeat(30));
+        assert_eq!(told(&many).unwrap().len(), MOST_TOLD_LINES);
+    }
 
     fn folder(dir: &Path) -> std::path::PathBuf {
         let folder = dir.join("photo-booth");
