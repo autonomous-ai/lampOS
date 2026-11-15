@@ -217,6 +217,7 @@ pub mod task_news;
 mod termination;
 pub mod thread;
 pub mod tiers_night;
+pub mod told_when_asked;
 pub mod tool_turns;
 pub mod tools;
 pub mod transport;
