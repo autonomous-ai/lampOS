@@ -8220,14 +8220,20 @@ fn a_skill_run_is_refused_with_no_harness_or_an_old_wrapper() {
     refused(old, &rig, skill_task::NOT_FOUND_BY_FOLDER);
 }
 
-/// The first builder's 10:44 on the Queue: with Harness signed out, a run
-/// with no lamp target, or one Harness didn't start, says why in the
-/// person's words ([`skill_task::SIGNED_OUT`]), after one `auth status`;
-/// nothing is left. Signed in, its own words stay.
+/// #7019 (the lead): the lamp's own Harness works signed out (#6407), so a
+/// skill's run refused with Harness signed out keeps its own reason, with no
+/// lamp target or one Harness didn't start, and never asks for a sign-in;
+/// nothing is left.
 #[test]
-fn a_skill_run_refused_with_harness_signed_out_says_so() {
+fn a_skill_run_refused_with_harness_signed_out_keeps_its_own_reason() {
     let signed_out = step(json!({"loggedIn":false,"computerId":"c"}));
-    for engine in [None, Some(EngineKind::Hermes)] {
+    for (engine, said) in [
+        (None, "the lamp has no Harness target of its own yet"),
+        (
+            Some(EngineKind::Hermes),
+            "Harness didn't start the run (new_failed)",
+        ),
+    ] {
         let rig = Rig::new();
         rig.plan(json!({
             "auth":signed_out.clone(),
@@ -8237,25 +8243,16 @@ fn a_skill_run_refused_with_harness_signed_out_says_so() {
         let why = skill_runner(&rig, engine)
             .run(&skill_run(Duration::from_secs(20)), &|| {})
             .unwrap_err();
-        assert_eq!(why, skill_task::SIGNED_OUT, "{engine:?}");
-        let calls = rig.calls();
-        assert_eq!(
-            calls.last().unwrap()["args"],
-            json!(["auth", "status", "--json"])
+        assert!(why.starts_with(said), "{engine:?}: {why}");
+        let lower = why.to_lowercase();
+        assert!(
+            !lower.contains("sign in") && !lower.contains("signed in"),
+            "{engine:?}: {why}"
         );
+        let calls = rig.calls();
         assert!(calls.iter().all(|call| call["args"][0] != "close"));
         nothing_left(&rig);
     }
-    let rig = Rig::new();
-    rig.plan(json!({
-        "auth":step(json!({"loggedIn":true,"computerId":"c","machineId":MACHINE})),
-        "machines":{"default":true},
-        "new":{"exit":1},
-    }));
-    let why = skill_runner(&rig, Some(EngineKind::Hermes))
-        .run(&skill_run(Duration::from_secs(20)), &|| {})
-        .unwrap_err();
-    assert_eq!(why, "Harness didn't start the run (new_failed)");
 }
 
 /// #6691: lamp-tasks' start reads each session's id and name from one `ps`
