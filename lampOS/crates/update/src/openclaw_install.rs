@@ -1314,6 +1314,20 @@ fn steps(
         said.exec_allowlist = ran.unwrap_or(had);
         return write(records, said);
     }
+    // The gateway's unit is the round's to write (the one-shot may not):
+    // an earlier build's unit waits for that round, nothing changed and
+    // nothing taken out. A working OpenClaw stays as it is, its gateway
+    // running (#7135, V2's HOLD: a binary ahead of its units took it out).
+    if fs::read(unit_path(root)).is_ok_and(|bytes| bytes != unit_text_for(shown).as_bytes()) {
+        say(&format!(
+            "OpenClaw's install waits: {UNIT} is not this build's yet; the next round writes it, and OpenClaw stays as it is until then"
+        ));
+        return record(records)
+            .filter(|said| said.install != "installing")
+            .unwrap_or_else(|| {
+                write(records, OpenclawInstall::new("absent", None, now_unix_ms()))
+            });
+    }
     write(
         records,
         OpenclawInstall::new("installing", None, now_unix_ms()),
@@ -1601,7 +1615,20 @@ fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> 
     }
     let mut added = false;
     for args in exec_allowlist_args(shown) {
-        match run(&allowlist_argv(args)) {
+        let mut ran = run(&allowlist_argv(args));
+        // A gateway just (re)started answers "Config unavailable" until its
+        // config is read (#7135, c0a4: the first run's exec was denied):
+        // the add is tried again, ADD_TRIES times at most, ADD_AGAIN apart.
+        for _ in 1..ADD_TRIES {
+            match &ran {
+                Err(why) if args[2] == "add" && why.contains(CONFIG_NOT_READY) => {
+                    std::thread::sleep(ADD_AGAIN);
+                    ran = run(&allowlist_argv(args));
+                }
+                _ => break,
+            }
+        }
+        match ran {
             Ok(_) => added |= args[2] == "add",
             Err(why) if args[2] == "add" => say(&format!(
                 "OpenClaw's exec allow-list does not let agent {} run {} yet: {why}; the next round tries again",
@@ -1627,6 +1654,18 @@ fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> 
     }
     Some(added)
 }
+
+/// What OpenClaw's CLI says while a gateway just started has not read its
+/// config yet (`approvals allowlist add --gateway`).
+pub const CONFIG_NOT_READY: &str = "Config unavailable";
+/// How many times an allow-list add is run while [`CONFIG_NOT_READY`].
+pub const ADD_TRIES: u32 = 20;
+/// The wait between those adds: 20 × 3 s, a minute at most.
+pub const ADD_AGAIN: Duration = if cfg!(test) {
+    Duration::from_millis(1)
+} else {
+    Duration::from_secs(3)
+};
 
 /// Whether the gateway's unit is active (`systemctl is-active`).
 fn gateway_active(run: &mut Runner) -> bool {
