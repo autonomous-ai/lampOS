@@ -7611,9 +7611,15 @@ fn launch_start(
                 };
                 (&near).write_all(b"task-1\n").unwrap();
                 let mut answer = read_answer();
-                if answer == lamp_tasks::skill_start::CHECKED {
+                // `checked <nonce>`: the launcher's `ready` echoes it (#7133).
+                if let Some(nonce) = answer
+                    .strip_prefix(lamp_tasks::skill_start::CHECKED)
+                    .and_then(|rest| rest.strip_prefix(' '))
+                {
                     (&near)
-                        .write_all(format!("{}\n", lamp_tasks::skill_start::READY).as_bytes())
+                        .write_all(
+                            format!("{} {nonce}\n", lamp_tasks::skill_start::READY).as_bytes(),
+                        )
                         .unwrap();
                     answer = read_answer();
                 }
