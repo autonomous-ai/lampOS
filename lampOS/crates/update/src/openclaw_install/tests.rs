@@ -602,6 +602,60 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     }
 }
 
+/// #7135: OpenClaw's compile cache is kept across starts. Its folder in
+/// OpenClaw's own, `lampos`'s and 0700, is bound over the new `/tmp`'s
+/// `node-compile-cache` right before OpenClaw runs (after the npm mode,
+/// which never runs OpenClaw); a symlink there is never followed and a
+/// failure only says so. Run in a scratch root, the lines make the folder
+/// 0700 and leave a symlink alone.
+#[test]
+fn openclaws_compile_cache_is_kept_in_its_own_folder_across_starts() {
+    use std::os::unix::fs::PermissionsExt;
+    assert_eq!(
+        COMPILE_CACHE,
+        "/var/lib/lampos-openclaw/.node-compile-cache"
+    );
+    assert!(COMPILE_CACHE.starts_with(PLACE));
+    for shown in [sk(false), sk(true), one_path()] {
+        let text = ns_text(shown);
+        assert_eq!(text.matches(COMPILE_CACHE_LINES).count(), 1);
+        assert!(text.ends_with(&format!("{COMPILE_CACHE_LINES}{RUN_LINE}")));
+    }
+    assert!(COMPILE_CACHE_LINES.contains(&format!("N={COMPILE_CACHE}\n")));
+    assert!(COMPILE_CACHE_LINES.contains("mount -n --bind \"$N\" /tmp/node-compile-cache"));
+    assert!(COMPILE_CACHE_LINES.contains("[ ! -L \"$N\" ]"));
+    assert!(COMPILE_CACHE_LINES.contains("mkdir -m 0700 \"$N\""));
+    assert!(!COMPILE_CACHE_LINES.contains("fail "), "never fatal");
+    // The folder test, with the mount taken out (no namespace here).
+    let scratch = tempfile::tempdir().unwrap();
+    let dir = scratch.path().join("cache");
+    let script = COMPILE_CACHE_LINES
+        .replace(COMPILE_CACHE, dir.to_str().unwrap())
+        .replace(" && mkdir -p /tmp/node-compile-cache && mount -n --bind \"$N\" /tmp/node-compile-cache", "");
+    let ran = std::process::Command::new("/bin/sh")
+        .args(["-c", &script])
+        .output()
+        .unwrap();
+    assert!(ran.status.success() && ran.stderr.is_empty(), "{ran:?}");
+    assert_eq!(
+        fs::metadata(&dir).unwrap().permissions().mode() & 0o7777,
+        0o700
+    );
+    let link = scratch.path().join("link");
+    symlink(scratch.path(), &link).unwrap();
+    let script = COMPILE_CACHE_LINES
+        .replace(COMPILE_CACHE, link.to_str().unwrap())
+        .replace(" && mkdir -p /tmp/node-compile-cache && mount -n --bind \"$N\" /tmp/node-compile-cache", "");
+    let ran = std::process::Command::new("/bin/sh")
+        .args(["-c", &script])
+        .output()
+        .unwrap();
+    assert!(
+        String::from_utf8_lossy(&ran.stderr).contains("compile cache not kept"),
+        "{ran:?}"
+    );
+}
+
 /// The namespace script is Hermes's, line for line, but for OpenClaw's
 /// folder, command and names: the same allow-list and the same steps, with
 /// the skills' socket only with the switch on. No Hermes is left in it.
@@ -616,13 +670,15 @@ fn the_namespace_script_is_hermess_for_openclaw() {
     for skills in [false, true] {
         let with_mode = ns_text(sk(skills));
         assert_eq!(with_mode.matches(NPM_CI_MODE).count(), 1);
-        assert!(with_mode.ends_with(&format!("{NPM_CI_MODE}{RUN_LINE}")));
+        assert!(with_mode.ends_with(&format!("{NPM_CI_MODE}{COMPILE_CACHE_LINES}{RUN_LINE}")));
         let checked = std::process::Command::new("/bin/sh")
             .args(["-n", "-c", &with_mode])
             .output()
             .unwrap();
         assert!(checked.status.success(), "{checked:?}");
-        let ours = with_mode.replacen(NPM_CI_MODE, "", 1);
+        let ours = with_mode
+            .replacen(NPM_CI_MODE, "", 1)
+            .replacen(COMPILE_CACHE_LINES, "", 1);
         let hermes = hermes_install::ns_text(skills, false);
         assert!(!ours.to_ascii_lowercase().contains("hermes"), "{ours}");
         assert!(!ours.contains("#5978") && !ours.contains("#6128"));
@@ -1519,7 +1575,11 @@ fn the_one_path_shows_the_pushed_skills_without_ns_net_and_off_changes_nothing()
             for (from, to) in ENGINE_EDITS {
                 before = before.replace(from, to);
             }
-            let before = before.replacen(RUN_LINE, &format!("{NPM_CI_MODE}{RUN_LINE}"), 1);
+            let before = before.replacen(
+                RUN_LINE,
+                &format!("{NPM_CI_MODE}{COMPILE_CACHE_LINES}{RUN_LINE}"),
+                1,
+            );
             let off = Shown {
                 skills,
                 tasks,

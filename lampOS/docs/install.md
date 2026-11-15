@@ -2418,7 +2418,14 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `CPUQuota=300%` (three of the eight cores) for its main thread and its
      11 workers. At `CPUQuota=100%` they shared one core, and lamp-c0a4's
      reboot on 15 Nov took 194 s to the gateway's "startup outcomes"
-     (#7135). Its unit is written by a round only, never by the one-shot:
+     (#7135). OpenClaw keeps its Node compile cache in `/tmp/node-compile-cache`,
+     but `openclaw-ns` gives it a new tmpfs `/tmp` at each start, so every
+     start compiled cold (20 MB again, 26.5 s to its first import). So
+     `openclaw-ns` binds `/var/lib/lampos-openclaw/.node-compile-cache`
+     (`COMPILE_CACHE`: `lampos`'s, 0700, made there if missing, a symlink
+     never followed) over it right before OpenClaw runs. It helps from the
+     second start on, since the first fills it. If it can't be bound, one
+     line says so and OpenClaw runs as before. Its unit is written by a round only, never by the one-shot:
      a one-shot that finds an earlier build's unit (a lamp-update ahead
      of its units) changes nothing and takes nothing out, journals
      "OpenClaw's install waits: lamp-openclaw-gateway.service is not
