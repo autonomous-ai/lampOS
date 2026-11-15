@@ -69,6 +69,10 @@ const MOST_ANSWER_BYTES: usize = 64 * 1024;
 const MOST_CONNECTIONS: usize = 4;
 /// How often the socket is looked at while no one connects.
 const ACCEPT_TICK: Duration = Duration::from_millis(20);
+/// How often [`START_SOCKET`] is bound again while its folder is not
+/// there, and looked at while served (the Reviewer-lead's boot-order P2 on
+/// #7133): a skill run waits at most this long after the folder is made.
+pub const BIND_AGAIN: Duration = Duration::from_secs(2);
 
 /// What a claimed run's launcher is given, one JSON line: its script and
 /// interpreter, its skill's folder, its run's folder, lamp-control's
@@ -418,25 +422,72 @@ impl Server {
         }
     }
 
-    /// The socket bound ([`bind`]) and served on a thread of its own until
-    /// `stop`, removed then.
+    /// Served on a thread of its own until `stop`: the socket bound
+    /// ([`bind`]) as soon as its folder is there, tried again every
+    /// [`BIND_AGAIN`] until then (the Reviewer-lead's boot-order P2 on
+    /// #7133: lamp-tasks may start before the gateway's unit makes the
+    /// folder, at a boot or when the switch is turned on while it runs),
+    /// and bound again when the socket is gone (the folder taken out and
+    /// made again). One journal line a change, never one a try. Removed at
+    /// `stop`.
     pub fn start(self, stop: Arc<AtomicBool>) -> io::Result<std::thread::JoinHandle<()>> {
-        let (listener, bound) = bind(&self.socket, self.own_uid)?;
         std::thread::Builder::new()
             .name("tasks-skill-start".into())
-            .spawn(move || {
-                let _bound = bound;
-                self.accept(&listener, &stop);
-            })
+            .spawn(move || Arc::new(self).serve(&stop))
     }
 
-    fn accept(self, listener: &UnixListener, stop: &AtomicBool) {
-        let this = Arc::new(self);
+    fn serve(self: Arc<Self>, stop: &AtomicBool) {
+        let mut said: Option<String> = None;
+        while !stop.load(Ordering::Acquire) {
+            match bind(&self.socket, self.own_uid) {
+                Ok((listener, bound)) => {
+                    eprintln!(
+                        "tasks: a gateway agent's skill runs are claimed on {}",
+                        self.socket.display()
+                    );
+                    said = None;
+                    self.accept(&listener, &bound, stop);
+                    if !stop.load(Ordering::Acquire) {
+                        eprintln!(
+                            "tasks: {} is gone; bound again once its folder is there",
+                            self.socket.display()
+                        );
+                    }
+                }
+                Err(error) => {
+                    let why = error.to_string();
+                    if said.as_deref() != Some(why.as_str()) {
+                        eprintln!(
+                            "tasks: the skill-start launcher's socket is not served yet: {why}; tried again every {} s",
+                            BIND_AGAIN.as_secs()
+                        );
+                        said = Some(why);
+                    }
+                    let until = std::time::Instant::now() + BIND_AGAIN;
+                    while std::time::Instant::now() < until && !stop.load(Ordering::Acquire) {
+                        std::thread::sleep(ACCEPT_TICK);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Connections taken until `stop`, or until the socket bound is no
+    /// longer at its path (looked at every [`BIND_AGAIN`]).
+    fn accept(self: &Arc<Self>, listener: &UnixListener, bound: &Bound, stop: &AtomicBool) {
+        let this = self.clone();
         let open = Arc::new(AtomicUsize::new(0));
+        let mut looked = std::time::Instant::now();
         while !stop.load(Ordering::Acquire) {
             let stream = match listener.accept() {
                 Ok((stream, _)) => stream,
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    if looked.elapsed() >= BIND_AGAIN {
+                        looked = std::time::Instant::now();
+                        if !bound.there() {
+                            return;
+                        }
+                    }
                     std::thread::sleep(ACCEPT_TICK);
                     continue;
                 }
@@ -548,11 +599,18 @@ pub struct Bound {
     ino: u64,
 }
 
+impl Bound {
+    /// Whether the socket bound is still at its path: the same socket,
+    /// not gone with its folder or replaced.
+    fn there(&self) -> bool {
+        std::fs::symlink_metadata(&self.path)
+            .is_ok_and(|m| m.file_type().is_socket() && m.dev() == self.dev && m.ino() == self.ino)
+    }
+}
+
 impl Drop for Bound {
     fn drop(&mut self) {
-        if std::fs::symlink_metadata(&self.path)
-            .is_ok_and(|m| m.file_type().is_socket() && m.dev() == self.dev && m.ino() == self.ino)
-        {
+        if self.there() {
             let _ = std::fs::remove_file(&self.path);
         }
     }
@@ -1400,5 +1458,60 @@ mod tests {
         std::fs::write(other.join("start.sock"), "x").unwrap();
         assert!(bind(&other.join("start.sock"), own).is_err());
         assert!(other.join("start.sock").is_file());
+    }
+
+    /// The Reviewer-lead's boot-order P2 on #7133: lamp-tasks started
+    /// before the folder is made (a boot with the gateway later, or the
+    /// switch turned on while it runs) still serves the launcher once the
+    /// folder is there, and again after the folder is taken out and made
+    /// again; the socket is removed at the stop.
+    #[test]
+    fn the_socket_is_bound_once_its_folder_is_there_and_again_when_it_comes_back() {
+        use std::os::unix::fs::DirBuilderExt;
+        let root = tempfile::Builder::new()
+            .prefix("ss")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let dir = root.path().join("start");
+        let socket = dir.join("start.sock");
+        let served = Server {
+            socket: socket.clone(),
+            own_uid: rustix::process::geteuid().as_raw(),
+            ..server(&Starts::default(), Fake::good())
+        };
+        let stop = Arc::new(AtomicBool::new(false));
+        let serving = served
+            .start(stop.clone())
+            .expect("served without its folder");
+        let connects = |within: Duration| {
+            let until = std::time::Instant::now() + within;
+            while std::time::Instant::now() < until {
+                if UnixStream::connect(&socket).is_ok() {
+                    return true;
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            false
+        };
+        let make = || {
+            std::fs::DirBuilder::new().mode(0o755).create(&dir).unwrap();
+            std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+        };
+        assert!(
+            !connects(Duration::from_millis(100)),
+            "no folder, nothing served"
+        );
+        assert!(!dir.exists(), "never made here");
+        make();
+        assert!(connects(BIND_AGAIN * 2), "bound once the folder is there");
+        std::fs::remove_dir_all(&dir).unwrap();
+        make();
+        assert!(
+            connects(BIND_AGAIN * 3),
+            "bound again after the folder came back"
+        );
+        stop.store(true, Ordering::Release);
+        serving.join().unwrap();
+        assert!(!socket.exists(), "removed at the stop");
     }
 }

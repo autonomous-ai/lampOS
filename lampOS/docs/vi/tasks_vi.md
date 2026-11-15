@@ -1201,9 +1201,15 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   (0600). lamp-update sở hữu thư mục `/run/lampos-skill-start` (0755, của
   `lampos`). lamp-tasks chỉ dùng nó khi đó là thư mục thật của chính user
   của nó mà không ai khác ghi được. Nó xóa socket cũ của chính nó ở đó,
-  và không bao giờ tạo hay xóa thư mục. Khi thiếu thư mục, không có gì
-  được phục vụ ("tasks: the skill-start launcher's socket is not there:
-  …") và lần chạy qua gateway đóng khi lỗi.
+  và không bao giờ tạo hay xóa thư mục. Khi thiếu thư mục, chưa có gì
+  được phục vụ ("tasks: the skill-start launcher's socket is not served
+  yet: …; tried again every 2 s", nói một lần) và lần chạy qua gateway
+  đóng khi lỗi. Việc bind được thử lại mỗi 2 giây (`BIND_AGAIN`), nên
+  lamp-tasks khởi động trước khi unit của gateway tạo thư mục (sau một
+  lần khởi động máy, hoặc khi bật công tắc lúc nó đang chạy) sẽ phục vụ
+  launcher trong vòng 2 giây sau khi thư mục xuất hiện. Socket mất đi
+  khi đang phục vụ (thư mục bị xóa rồi tạo lại) cũng được bind lại như
+  vậy ("tasks: … is gone; bound again once its folder is there").
 - **Kiểm tra peer, theo thứ tự, trước mọi câu trả lời**
   (`skill_start::peer_may`): cùng uid với lamp-tasks (`SO_PEERCRED`);
   `/proc/<pid>/exe` chỉ tới launcher; file launcher thuộc root và group
