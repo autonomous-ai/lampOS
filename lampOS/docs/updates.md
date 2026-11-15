@@ -2320,6 +2320,14 @@ for at least level 8 (9 since second-P1, above), so an updater of level 7 climbs
   `/etc/passwd`, so one that runs as a user or a group the lamp lacks is not
   added, and that is said. `lamp-update install` makes them.
 
+A round that switches on a managed updater also writes the exit note
+`install` writes (`UNIT.d/exit-note.conf`, 0644, [install.md](install.md))
+for each of Cloud's fixed services whose unit is on the lamp or written by
+the round and which has none, says `wrote …` for each, and reloads systemd
+with the units; a note already there is the lamp's and never rewritten,
+and a build put back removes the notes it wrote (#7135: before this, a unit a round added, such as `lamp-tasks.service`, had
+none).
+
 A service of a part already installed here is added beside it, through the
 same link. A unit of lamp-update's own that starts through `update/current`
 (the region's, `lamp-region.service`, #6386) is added beside the folder
