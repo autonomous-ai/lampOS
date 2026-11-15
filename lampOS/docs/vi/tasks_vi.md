@@ -1459,7 +1459,12 @@ phẩm, #6226, mọi đèn đều có 6 GB): nó làm target riêng của đèn,
 của Hermes (`tasks.md`, "The lamp itself, with Hermes"), khi được chọn hoặc
 khi Hermes chưa cài; Hermes lại là mặc định (#6498, quyết định của lead, thay
 cho OpenClaw của #6226). `lamp_order` (`crates/tasks/src/runtime.rs`) chỉ bỏ
-OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
+OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11, theo một phiên bản ĐỌC ĐƯỢC
+từ `harness --version` (`settle_openclaw_harness`). Không đọc được phiên bản
+(lệnh lỗi hoặc quá giờ: lúc khởi động Harness có thể chưa trả lời, #7133 trên
+lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và phiên bản được
+đọc lại sau 5 s, 10 s, 20 s, 40 s, 1, 2, 5, 10 và 12 phút
+(`OPENCLAW_VERSION_AGAIN`), ghi journal một lần khi đọc được hoặc khi hết lượt.
 
 - **Engine nào:** `LAMP_LAMP_ENGINE` là `openclaw` hoặc `hermes`, không đặt
   thì `hermes`, mặc định (#6498; #6226 từng là `openclaw`). Target
