@@ -138,7 +138,8 @@ struct Counts {
     sign_in_methods: Mutex<Vec<lamp_tasks::sign_in::Method>>,
     /// How many times Harness's daemon was started (openharness#1463).
     daemon_starts: AtomicUsize,
-    /// How many daemon starts still fail, `start_failed` (lamp-75c9, 21 Oct).
+    /// How many daemon starts or restarts still fail, `start_failed` or
+    /// `restart_failed` (lamp-75c9, 21 Oct).
     daemon_fails: AtomicUsize,
     /// Whether the adapter says its daemon is to be started again (its env
     /// file changed while it ran, #5978), and how many times it was.
@@ -396,6 +397,15 @@ impl Adapter for Script {
     fn restart_daemon(&self) -> Result<(), String> {
         self.counts.daemon_restarts.fetch_add(1, Ordering::SeqCst);
         self.counts.order.lock().unwrap().push("restart");
+        // After a sign-in it is a restart (#7019): its failures as a
+        // start's.
+        let fails = &self.counts.daemon_fails;
+        if fails
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+            .is_ok()
+        {
+            return Err("restart_failed".into());
+        }
         Ok(())
     }
     fn sign_in_starter(&self) -> Option<lamp_tasks::sign_in::Starter> {
@@ -2486,8 +2496,10 @@ fn a_lamp_never_signed_in_hands_work_to_its_own_engine() {
     }
     assert_eq!(told_targets(&s), 0);
     assert!(!path.exists());
-    // The daemon at boot, signed out too, once.
+    // The daemon at boot, signed out too, once: started, not restarted
+    // (#7019).
     assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 1);
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 0);
     let install = |name: &str| {
         let program = bin.path().join(name);
         fs::write(&program, WRAPPER).unwrap();
@@ -2904,20 +2916,23 @@ fn the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end() {
             email: Some("someone@example.com".into()),
         })));
     // Not before the sign-in has succeeded.
-    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 0);
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 0);
     assert_eq!(until("done")["result"], "success");
-    // Harness's own sign-in stops its daemon (openharness#1463): started
-    // once after it, and not again.
+    // Harness's own sign-in may stop its daemon (openharness#1463), or
+    // leave one started signed out running, which never connects (#7019):
+    // started again once after it, `harness start --restart`, never a
+    // plain `harness start`, and not again.
     let start = Instant::now();
-    while s.counts.daemon_starts.load(Ordering::SeqCst) == 0 {
+    while s.counts.daemon_restarts.load(Ordering::SeqCst) == 0 {
         assert!(
             start.elapsed() < Duration::from_secs(5),
-            "the daemon was never started"
+            "the daemon was never started again"
         );
         thread::sleep(Duration::from_millis(10));
     }
     thread::sleep(Duration::from_millis(200));
-    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 1);
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 1);
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 0);
     // Done: kept for the voice, and a start begins anew.
     assert_eq!(
         s.trusted(json!({"op":"sign_in_state"}))["result"],
@@ -2955,6 +2970,8 @@ fn a_part_started_signed_in_starts_harnesss_daemon_once() {
             thread::sleep(Duration::from_millis(10));
         }
         thread::sleep(Duration::from_millis(200));
+        // Started, never restarted, at a part's start (#7019).
+        assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 0);
         s.counts.daemon_starts.load(Ordering::SeqCst)
     };
     assert_eq!(started(true, false), 1, "signed in at the start");
@@ -3048,6 +3065,7 @@ fn after_a_sign_in_the_daemon_is_started_before_a_waiting_hand_over() {
     }
     thread::sleep(Duration::from_millis(200));
     assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 0);
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 0);
     // A first hand-over holds the job lane while the sign-in succeeds and
     // a second is confirmed.
     s.counts.hold_launch.store(true, Ordering::SeqCst);
@@ -3080,7 +3098,7 @@ fn after_a_sign_in_the_daemon_is_started_before_a_waiting_hand_over() {
     }
     assert_eq!(
         *s.counts.order.lock().unwrap(),
-        ["launch", "daemon", "launch"]
+        ["launch", "restart", "launch"]
     );
     // Each launch's end kept before the service is stopped: the store syncs
     // with `fullfsync`, and on a Mac under the whole binary's load a write
@@ -3128,7 +3146,7 @@ fn a_failed_daemon_start_is_tried_again_before_a_waiting_hand_over() {
     s.counts.daemon_fails.store(2, Ordering::SeqCst);
     signed_in(&s);
     let start = Instant::now();
-    while s.counts.daemon_starts.load(Ordering::SeqCst) == 0 {
+    while s.counts.daemon_restarts.load(Ordering::SeqCst) == 0 {
         assert!(start.elapsed() < Duration::from_secs(5), "never started");
         thread::sleep(Duration::from_millis(2));
     }
@@ -3137,14 +3155,14 @@ fn a_failed_daemon_start_is_tried_again_before_a_waiting_hand_over() {
     launched(&s, 1);
     assert_eq!(
         *s.counts.order.lock().unwrap(),
-        ["daemon", "daemon", "daemon", "launch"]
+        ["restart", "restart", "restart", "launch"]
     );
     // Every try fails: four in all, and then the hand-over goes as before.
     s.counts.order.lock().unwrap().clear();
     s.counts.daemon_fails.store(10, Ordering::SeqCst);
     signed_in(&s);
     let start = Instant::now();
-    while s.counts.daemon_starts.load(Ordering::SeqCst) < 4 {
+    while s.counts.daemon_restarts.load(Ordering::SeqCst) < 7 {
         assert!(start.elapsed() < Duration::from_secs(5), "not tried again");
         thread::sleep(Duration::from_millis(2));
     }
@@ -3154,7 +3172,7 @@ fn a_failed_daemon_start_is_tried_again_before_a_waiting_hand_over() {
     thread::sleep(Duration::from_millis(500));
     assert_eq!(
         *s.counts.order.lock().unwrap(),
-        ["daemon", "daemon", "daemon", "daemon", "launch"]
+        ["restart", "restart", "restart", "restart", "launch"]
     );
     // Each launch's end kept before the service is stopped: the store syncs
     // with `fullfsync`, and on a Mac under the whole binary's load a write
