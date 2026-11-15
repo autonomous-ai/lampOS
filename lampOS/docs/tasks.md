@@ -3600,6 +3600,18 @@ program, a missing name said, a `skill.toml` naming `secrets` seen),
 
 ## A skill's run on a gateway agent (#6685 step 4, option (a), off unless `LAMP_SKILL_DEFAULT_AGENT=on` and `LAMP_SKILL_GATEWAY_RUNS=on`)
 
+**Now (#7133):** a skill's run on OpenClaw is a Harness `new` OpenClaw
+turn (agent `main`, through the gateway `lamp-openclaw-gateway`), which
+execs the run folder's `start` by absolute path. lamp-update's OpenClaw
+install (with `LAMP_SKILL_DEFAULT_AGENT=on`) gives agent `main` one exec
+allow-list entry in OpenClaw's exec approvals,
+`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`, and takes the
+withdrawn fence agent `lamp-skill-run`'s entry out: with OpenClaw's stock
+`tools.exec.mode: "ask"`, a headless turn's exec is denied otherwise
+(install.md, "OpenClaw on the lamp"). The warm-gateway turn, its fence
+agent and the fence below are the withdrawn design (#7101), kept here
+until #7133 rewrites this section.
+
 A made skill's fixed write (`LAMP_SKILL_WRITE_AGENT`, above) is never a
 gateway agent's run: it has no script for the run's `start`, so it is
 refused before anything began (`not_started`), and lamp-skills sends it

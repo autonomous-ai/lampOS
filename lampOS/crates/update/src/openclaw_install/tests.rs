@@ -1363,7 +1363,6 @@ fn the_one_path_alone_shows_openclaw_what_both_switches_did() {
             wrapper_text().strip_prefix("#!/bin/sh\n").unwrap()
         );
         assert_eq!(wrapper_text_for(on).as_bytes(), old_wrapper.as_bytes());
-        assert_eq!(wrapper_text_for(on), wrapper_text_for(old));
         assert_eq!(ns_text(on).as_bytes(), ns_text(old).as_bytes());
         let ns = ns_text(on);
         assert!(ns.contains(
@@ -1649,4 +1648,169 @@ fn the_gateways_namespace_shows_the_pushed_skills_read_only_with_the_one_path() 
         assert!(!lines.iter().any(|line| line.contains("model.sock")));
         assert!(!lines.iter().any(|line| line.contains("net-relay")));
     }
+}
+
+/// The one run path's exec allow-list entry: its pattern is a skill's
+/// run's `start` in Harness's project.
+#[test]
+fn the_run_start_pattern_is_a_skill_run_s_start_in_harness_s_project() {
+    assert_eq!(RUN_START, format!("{WORK}/skill-*/start"));
+    assert_eq!(
+        RUN_START,
+        "/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start"
+    );
+}
+
+fn one_path() -> Shown {
+    shown(true, true)
+}
+
+/// The approvals lines of `runs`, each as `in_namespace` runs them.
+fn approvals(runs: &Runs) -> Vec<String> {
+    runs.lines()
+        .into_iter()
+        .filter(|line| line.contains(" approvals "))
+        .collect()
+}
+
+fn approvals_line(edit: &str, agent: &str) -> String {
+    let (uid, gid) = own_ids();
+    format!(
+        "{AS_LAMPOS}LAMP_NS_UID={uid} LAMP_NS_GID={gid} /usr/bin/unshare --map-root-user --mount --pid --fork --kill-child --mount-proc --propagation private {NS} approvals allowlist {edit} --agent {agent} {RUN_START}"
+    )
+}
+
+/// An install with this build's own pins, as the one-shot runs it over
+/// an OpenClaw already there.
+fn install_built(lamp: &Lamp, runs: &Runs, at: u64) -> Option<OpenclawInstall> {
+    let mut run = runs.runner();
+    install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut run,
+        &mut || at,
+        &mut quiet(),
+        &Kit::BUILT,
+    )
+    .unwrap()
+}
+
+fn round_shown(lamp: &Lamp, systemd: &mut Fake, shown: Shown) -> Option<OpenclawInstall> {
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        shown,
+        systemd,
+        10,
+        Ok(crate::hermes_schedule::Window::Reached),
+        &mut quiet(),
+    )
+}
+
+/// #6685: with the one run path on, the install gives agent `main` the
+/// run's `start` in OpenClaw's exec approvals and takes the withdrawn
+/// fence agent's entry out, before the gateway is restarted; never
+/// through OpenClaw's config.
+#[test]
+fn the_one_path_lets_agent_main_run_a_skill_run_s_start() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    assert!(lamp.asked().unwrap().one_path);
+    let runs = Runs::new(&lamp);
+    let said = install(&lamp, &runs, 20).unwrap();
+    assert_eq!(said.install, "installed", "{:#?}", runs.lines());
+    assert!(said.exec_allowlist);
+    assert_eq!(
+        approvals(&runs),
+        [
+            approvals_line("add", "main"),
+            approvals_line("remove", "lamp-skill-run")
+        ]
+    );
+    assert!(
+        runs.position(" --version") < runs.position(" approvals allowlist add ")
+            && runs.position(" approvals allowlist remove ")
+                < runs.position(&format!("systemctl restart {UNIT}"))
+    );
+    assert!(
+        !approvals(&runs)
+            .iter()
+            .any(|line| line.contains("openclaw.json")
+                || line.contains("--gateway")
+                || line.contains("approvals set")
+                || line.contains(WRAPPER))
+    );
+    let config: serde_json::Value =
+        serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap();
+    assert_eq!(
+        config.as_object().unwrap().keys().collect::<Vec<_>>(),
+        ["gateway"]
+    );
+
+    // Installed with the entry: a round asks nothing, and an install
+    // asked again runs no approvals command.
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    assert_eq!(lamp.asked(), None);
+    ask(&lamp.records(), false, one_path()).unwrap();
+    let again = Runs::new(&lamp);
+    assert!(install_built(&lamp, &again, 30).unwrap().exec_allowlist);
+    assert_eq!(approvals(&again), Vec::<String>::new());
+}
+
+/// An OpenClaw installed by an earlier build, entry points already the
+/// one run path's: the round asks the one-shot, which adds the entry
+/// without installing anything again.
+#[test]
+fn an_openclaw_installed_before_the_entry_gets_it() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+    let mut old = lamp.said().unwrap();
+    old.exec_allowlist = false;
+    write(&lamp.records(), old);
+
+    round_shown(&lamp, &mut systemd, one_path());
+    assert!(lamp.asked().unwrap().one_path, "asked again");
+    let runs = Runs::new(&lamp);
+    let said = install_built(&lamp, &runs, 40).unwrap();
+    assert!(said.install == "installed" && said.exec_allowlist);
+    assert_eq!(
+        approvals(&runs),
+        [
+            approvals_line("add", "main"),
+            approvals_line("remove", "lamp-skill-run")
+        ]
+    );
+    assert!(!runs.lines().iter().any(|line| line.contains(NPM_CI_ENV)));
+}
+
+/// With the one run path off, the install takes agent `main`'s entry
+/// out, nothing else; with the approvals command failing, the install
+/// fails as for its config.
+#[test]
+fn the_one_path_off_takes_the_entry_out_and_a_failure_is_config() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, sk(true));
+    let runs = Runs::new(&lamp);
+    let said = install(&lamp, &runs, 20).unwrap();
+    assert!(said.install == "installed" && !said.exec_allowlist);
+    assert_eq!(approvals(&runs), [approvals_line("remove", "main")]);
+
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    round_shown(&lamp, &mut systemd, one_path());
+    let mut runs = Runs::new(&lamp);
+    runs.fail_on = Some(" approvals allowlist add ");
+    let said = install(&lamp, &runs, 20).unwrap();
+    assert_eq!(
+        (said.install.as_str(), said.error.as_deref()),
+        ("failed", Some("config"))
+    );
 }
