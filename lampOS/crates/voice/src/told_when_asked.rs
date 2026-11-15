@@ -62,8 +62,11 @@ pub fn quiet_holds(quiet: bool, lifted: Option<u64>, now_ms: u64) -> bool {
 
 /// The owner's spoken ask of `skill` at `at_ms` kept in `path`, beside
 /// those within [`WITHIN_MS`] (older ones let go). Written whole, for the
-/// voice only.
+/// voice only, under one lock, so two named calls kept at once lose
+/// neither.
 pub fn keep(path: &Path, skill: &str, at_ms: u64) -> Result<(), String> {
+    static KEEPING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _held = KEEPING.lock().unwrap_or_else(|poison| poison.into_inner());
     let mut asks = read(path);
     asks.retain(|_, at| {
         at.as_u64()
@@ -173,6 +176,26 @@ mod tests {
         assert!(!asked_within(&path, "desk-check", 10_000 + WITHIN_MS));
         keep(&path, "photo-booth", 20_000).unwrap();
         assert!(asked_within(&path, "photo-booth", 20_000));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Two asks kept at once, from two threads, are both kept.
+    #[test]
+    fn two_asks_kept_at_once_are_both_kept() {
+        let dir = std::env::temp_dir().join(format!("lamp-voice-told-both-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("spoken-asks.json");
+        for round in 0..20u64 {
+            let _ = std::fs::remove_file(&path);
+            let (a, b) = (path.clone(), path.clone());
+            let one = std::thread::spawn(move || keep(&a, "photo-booth", 1_000 + round).unwrap());
+            let two = std::thread::spawn(move || keep(&b, "desk-check", 1_000 + round).unwrap());
+            one.join().unwrap();
+            two.join().unwrap();
+            assert!(asked_within(&path, "photo-booth", 1_000 + round));
+            assert!(asked_within(&path, "desk-check", 1_000 + round));
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 
