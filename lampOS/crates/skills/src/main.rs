@@ -5418,7 +5418,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             |socket, line| {
                 let answer = hand_over(socket, line)?;
                 found = lamp_skills::task::told(&answer);
-                lamp_skills::task::answered(&answer)
+                lamp_skills::service_write::agent_answered(&answer)
             },
             say_yes,
         );
@@ -5431,18 +5431,22 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
 }
 
 /// One hand-over line to lamp-tasks at `socket`, and its answer line, read
-/// when the run ends, at most [`lamp_skills::task::RUN_MOST`] later.
-fn hand_over(socket: &Path, line: &str) -> Result<String, String> {
+/// when the run ends, at most [`lamp_skills::task::RUN_MOST`] later. Not
+/// connected, nothing was taken; a line written and no answer read, the
+/// run may have begun.
+fn hand_over(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
+    use lamp_skills::service_write::Unrun;
+    let stream = UnixStream::connect(socket)
+        .map_err(|error| Unrun::NotTaken(format!("lamp-tasks couldn't be reached: {error}")))?;
     let exchange = || -> io::Result<String> {
-        let mut stream = UnixStream::connect(socket)?;
         stream.set_write_timeout(Some(Duration::from_secs(5)))?;
         stream.set_read_timeout(Some(lamp_skills::task::RUN_MOST))?;
-        stream.write_all(format!("{line}\n").as_bytes())?;
+        (&stream).write_all(format!("{line}\n").as_bytes())?;
         let mut answer = String::new();
-        BufReader::new(stream.take(8_192)).read_line(&mut answer)?;
+        BufReader::new((&stream).take(8_192)).read_line(&mut answer)?;
         Ok(answer)
     };
-    exchange().map_err(|error| format!("lamp-tasks couldn't be reached: {error}"))
+    exchange().map_err(|error| Unrun::Unknown(format!("lamp-tasks' answer never came: {error}")))
 }
 
 /// A skill's write to a linked service that came due (#6066,
@@ -5494,20 +5498,7 @@ fn write_service(
 /// connected, nothing was taken; a line written and no answer read, the
 /// run may have begun.
 fn hand_write_over(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
-    use lamp_skills::service_write::Unrun;
-    let stream = UnixStream::connect(socket)
-        .map_err(|error| Unrun::NotTaken(format!("lamp-tasks couldn't be reached: {error}")))?;
-    let exchange = || -> io::Result<String> {
-        stream.set_write_timeout(Some(Duration::from_secs(5)))?;
-        stream.set_read_timeout(Some(lamp_skills::task::RUN_MOST))?;
-        (&stream).write_all(format!("{line}\n").as_bytes())?;
-        let mut answer = String::new();
-        BufReader::new((&stream).take(8_192)).read_line(&mut answer)?;
-        Ok(answer)
-    };
-    let answer = exchange()
-        .map_err(|error| Unrun::Unknown(format!("lamp-tasks' answer never came: {error}")))?;
-    lamp_skills::service_write::agent_answered(&answer)
+    lamp_skills::service_write::agent_answered(&hand_over(socket, line)?)
 }
 
 /// `skill`'s fixed write sent straight on `lamp-services`' tools socket

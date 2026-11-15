@@ -833,7 +833,11 @@ pub fn lamp_has_skill_named(root: &Path, name: impl AsRef<Path>) -> bool {
 /// asked aloud through `say_yes` ([`ask_yes`]): the run waits for its next
 /// trigger once agreed, never for this one; past the bounds or
 /// with its last still under way, nothing. The run is counted once it is
-/// handed over, and the skill holds its one place until `send` returns.
+/// handed over, and the skill holds its one place until `send` returns. A
+/// run lamp-tasks refused before its agent began
+/// ([`crate::service_write::Unrun::NotTaken`]: busy with another skill's,
+/// its agent not started, or not reached) is taken back off the ledger
+/// ([`uncount`]): nothing of it ran, so it spends none of the day's runs.
 #[allow(clippy::too_many_arguments)] // the run's two ways out, lamp-tasks and the voice, each its own
 pub fn hand(
     skill: &str,
@@ -842,7 +846,7 @@ pub fn hand(
     grants: &[String],
     place: Place<'_>,
     now_ms: u64,
-    send: impl FnOnce(&Path, &str) -> Result<String, String>,
+    send: impl FnOnce(&Path, &str) -> Result<String, crate::service_write::Unrun>,
     say_yes: impl FnOnce() -> String,
 ) -> String {
     if !on() {
@@ -880,8 +884,44 @@ pub fn hand(
     .line();
     match send(socket, &line) {
         Ok(said) => format!("do.task: handed to lamp-tasks: {said}"),
-        Err(why) => format!("do.task: lamp-tasks did not take it: {why}"),
+        Err(crate::service_write::Unrun::NotTaken(why)) => match uncount(skill, state, now_ms) {
+            Ok(()) => format!("do.task: lamp-tasks did not take it: {why}; not counted"),
+            Err(error) => {
+                format!("do.task: lamp-tasks did not take it: {why}; still counted: {error}")
+            }
+        },
+        Err(crate::service_write::Unrun::Unknown(why)) => {
+            format!("do.task: lamp-tasks did not take it: {why}")
+        }
     }
+}
+
+/// `skill`'s run counted at `at_ms` by [`begin`] taken back off `state`'s
+/// [`RUNS_FILE`], once lamp-tasks refused it before its agent began: one
+/// entry, that run's own, and none if it is gone.
+fn uncount(skill: &str, state: &Path, at_ms: u64) -> Result<(), String> {
+    // Held as `begin` holds it, so no other run's count is lost between
+    // the read and the write.
+    let _under_way = UNDER_WAY
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner());
+    let path = state.join(RUNS_FILE);
+    let mut runs: Vec<(String, u64)> = match read_small(&path, 64 * 1024) {
+        Ok(Some(bytes)) => serde_json::from_slice(&bytes)
+            .map_err(|_| "its runs' ledger can't be read".to_owned())?,
+        Ok(None) => return Ok(()),
+        Err(_) => return Err("its runs' ledger can't be read".into()),
+    };
+    let Some(at) = runs
+        .iter()
+        .position(|(name, at)| name == skill && *at == at_ms)
+    else {
+        return Ok(());
+    };
+    runs.remove(at);
+    let json = serde_json::to_vec(&runs).map_err(|error| error.to_string())?;
+    lamp_update::records::write_whole(&path, &json, 0o644)
+        .map_err(|error| format!("its runs' ledger: {error}"))
 }
 
 /// lamp-tasks' answer to a hand-over line, as the journal says it: its
@@ -1150,7 +1190,7 @@ mod tests {
             1,
             |_, line| {
                 sent = Some(line.to_owned());
-                answered("{\"ok\":true,\"id\":9}")
+                crate::service_write::agent_answered("{\"ok\":true,\"id\":9}")
             },
             || -> String { panic!("asked aloud") },
         );
@@ -1166,6 +1206,90 @@ mod tests {
             serde_json::json!(["gmail-read", "gmail-write"])
         );
         set_agent_services_here(None);
+        set_on_here(None);
+    }
+
+    /// A run lamp-tasks refused before its agent began (busy with another
+    /// skill's, 9adf on 15 Nov) spends none of the day's runs; one it may
+    /// have begun stays counted.
+    #[test]
+    fn a_run_lamp_tasks_did_not_take_is_not_counted() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let folder = folder(dir.path());
+        let step = step(&folder, "scripts/main.py").unwrap();
+        let grants = vec!["light".to_owned()];
+        let socket = dir.path().join("tasks.sock");
+        let control_socket = dir.path().join("control.sock");
+        let place = Place {
+            state: Some(&state),
+            control: &control_socket,
+            socket: Some(&socket),
+        };
+        let agreed = serde_json::json!({"agreed": true});
+        let lamp_control = control(
+            &control_socket,
+            vec![agreed.clone(), agreed.clone(), agreed],
+        );
+        set_on_here(Some(true));
+        let ledger = || -> Vec<(String, u64)> {
+            fs::read(state.join(RUNS_FILE))
+                .map(|bytes| serde_json::from_slice(&bytes).unwrap())
+                .unwrap_or_default()
+        };
+        let unasked = || -> String { panic!("asked aloud") };
+        let busy = hand(
+            "read-mail",
+            &step,
+            &folder,
+            &grants,
+            place,
+            1,
+            |_, _| {
+                crate::service_write::agent_answered(
+                    "{\"ok\":false,\"error\":\"busy\",\"message\":\"a skill's task is already running on this lamp; one runs at a time\"}",
+                )
+            },
+            unasked,
+        );
+        assert!(busy.ends_with("; not counted"), "{busy}");
+        assert!(busy.contains("did not take it: busy"), "{busy}");
+        assert_eq!(ledger(), Vec::<(String, u64)>::new());
+        let unreached = hand(
+            "read-mail",
+            &step,
+            &folder,
+            &grants,
+            place,
+            2,
+            |_, _| {
+                Err(crate::service_write::Unrun::NotTaken(
+                    "lamp-tasks couldn't be reached: connection refused".into(),
+                ))
+            },
+            unasked,
+        );
+        assert!(unreached.ends_with("; not counted"), "{unreached}");
+        assert_eq!(ledger(), Vec::<(String, u64)>::new());
+        let failed = hand(
+            "read-mail",
+            &step,
+            &folder,
+            &grants,
+            place,
+            3,
+            |_, _| {
+                crate::service_write::agent_answered(
+                    "{\"ok\":false,\"error\":\"run_failed\",\"message\":\"no\"}",
+                )
+            },
+            unasked,
+        );
+        assert!(failed.contains("did not take it: run_failed"), "{failed}");
+        assert!(!failed.contains("not counted"), "{failed}");
+        assert_eq!(ledger(), vec![("read-mail".to_owned(), 3)]);
+        lamp_control.join().unwrap();
         set_on_here(None);
     }
 
@@ -1500,7 +1624,9 @@ mod tests {
                 agreed.clone(),
             ],
         );
-        let never = |_: &Path, _: &str| -> Result<String, String> { panic!("handed over") };
+        let never = |_: &Path, _: &str| -> Result<String, crate::service_write::Unrun> {
+            panic!("handed over")
+        };
         let unasked = || -> String { panic!("asked aloud") };
         let spoken = || SPOKEN.to_owned();
         set_on_here(Some(false));
@@ -1543,7 +1669,7 @@ mod tests {
             |at, line| {
                 assert_eq!(at, socket.as_path());
                 sent = Some(line.to_owned());
-                answered("{\"ok\":true,\"id\":7}")
+                crate::service_write::agent_answered("{\"ok\":true,\"id\":7}")
             },
             unasked,
         );
@@ -1576,7 +1702,11 @@ mod tests {
             &grants,
             place,
             4,
-            |_, _| answered("{\"ok\":false,\"error\":\"unknown_op\",\"message\":\"no\"}"),
+            |_, _| {
+                crate::service_write::agent_answered(
+                    "{\"ok\":false,\"error\":\"unknown_op\",\"message\":\"no\"}",
+                )
+            },
             unasked,
         );
         assert!(refused.contains("did not take it: unknown_op"), "{refused}");
@@ -1679,7 +1809,7 @@ mod tests {
             1,
             |_, line| {
                 sent = Some(line.to_owned());
-                answered("{\"ok\":true,\"id\":3}")
+                crate::service_write::agent_answered("{\"ok\":true,\"id\":3}")
             },
             || -> String { panic!("asked aloud") },
         );
@@ -1688,7 +1818,9 @@ mod tests {
         assert_eq!(line["folder"], pushed.to_string_lossy().as_ref());
         assert_eq!(line["sha256"], unpushed.as_str());
         fs::write(pushed.join(SCRIPTS).join("main.py"), "print('changed')\n").unwrap();
-        let never = |_: &Path, _: &str| -> Result<String, String> { panic!("handed over") };
+        let never = |_: &Path, _: &str| -> Result<String, crate::service_write::Unrun> {
+            panic!("handed over")
+        };
         let changed = hand(
             "pushed-booth",
             &step,
@@ -1729,7 +1861,9 @@ mod tests {
         let waiting = serde_json::json!({"agreed": false, "why": "waiting"});
         let changed = serde_json::json!({"agreed": false, "why": "changed"});
         let lamp_control = control(&control_socket, vec![waiting.clone(), waiting, changed]);
-        let never = |_: &Path, _: &str| -> Result<String, String> { panic!("handed over") };
+        let never = |_: &Path, _: &str| -> Result<String, crate::service_write::Unrun> {
+            panic!("handed over")
+        };
         set_on_here(Some(true));
         let mut asked = 0;
         let said = hand(

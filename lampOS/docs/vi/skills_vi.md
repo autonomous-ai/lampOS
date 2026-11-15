@@ -3043,7 +3043,14 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   lamp-control; không có "có" thì chờ, "có" cho byte hay grant khác thì hỏi
   lại (cả hai trường hợp đèn tự hỏi thành tiếng, xem dưới), không hỏi được
   lamp-control thì không giao gì và không hỏi gì; một tác vụ một lúc mỗi
-  kỹ năng, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng trong 24 giờ.
+  kỹ năng, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng trong 24 giờ. Một lần
+  chạy được đếm khi giao đi, và được gỡ khỏi sổ khi lamp-tasks từ chối nó
+  trước khi agent bắt đầu (`NOT_TAKEN` của lần ghi cố định: `busy` vì đang
+  chạy tác vụ của kỹ năng khác, `not_started`, tắt, dòng sai hay thiếu
+  token, hoặc không tới được lamp-tasks): journal ghi thêm "; not counted".
+  Lần chạy có thể đã bắt đầu (`run_failed`, không có trả lời) vẫn được đếm.
+  Trên lamp-9adf ngày 15/11, một kỹ năng hiện diện bị từ chối `busy` đã tiêu
+  lần chạy cuối của ngày, và kỹ năng đến lượt 4 giây sau không còn lần nào.
 - **Tự hỏi thành tiếng khi tác vụ đến lượt** (V2 của #6071): lần chạy bị từ
   chối vì thiếu cái "có" thì lamp-skills nhờ say service của giọng nói
   (`{"skill": NAME, "task_yes": true, "priority": 5, "expires_in_ms":
