@@ -407,7 +407,7 @@ Every refusal is `{"code": "…", "why": "…"}`, with `retry_ms` on `rate` (and
 | `refused` | The part's own check said no, in its words in `why` (out of reach, under a pattern's least level, not routed on this lamp yet). Change the request: the same one is refused again. |
 | `quiet_hours` | It's the lamp's quiet hours (`limits.quiet_hours`, off unless this lamp sets them): `say`, `sound` and `turn.start` wait until they end. A light is still fine. |
 | `private` | The person set the lamp private: it neither sees nor hears for computers. Wait for `lamp.changed` with `private` false. (Today the camera ops, and the microphone and speaker streams, answer it.) |
-| `paused` | The person paused the lamp. Wait for `lamp.changed` with `paused` false. |
+| `paused` | The lamp is paused (said on `lamp/pause`, which only the keeper does; a product lamp has no keeper today, so this does not happen there: see `lamp.changed`). Wait for `lamp.changed` with `paused` false. |
 | `asleep` | The lamp is asleep. Wait for `lamp.changed` with `asleep` false. |
 | `rate` | Too many of one kind too fast: wait `retry_ms` and send it again. With the rates off (the default), only refused actions and phrase changes are bounded. |
 | `bad_request` | The request doesn't fit the protocol; `why` names the field. Check it against the schema (control.schema.json). |
@@ -478,7 +478,7 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
   sends it yet.
 - `time`: the client's own schedule. No grant. Planned: nothing sends it yet.
 - `lamp.changed`: `lamp_state` (`talking`, `paused`, `private`, `asleep`; a lease change comes as a `lease` event, not here). No grant.
-  Works today for `talking` (13 Nov 2026, lamp-75c9 on stable 12728, 20:06): a turn started with a prompt (`start_turn("Hello, this is a quiet test.")`) sent `lamp.changed` with `talking` true 0.1 s after the start and `talking` false at 5.1 s, when the turn ended by itself (the program's own `end_turn`, at about 14 s, was answered "busy: not this computer's turn"); `get("lamp")` polled every 0.4 s said true at 0.4 s and false at 5.3 s. Each event carried exactly `asleep`, `paused`, `private` and `talking`. `talking` is the voice leaving "resting": a turn started with no prompt did not make it true within 6 s (20:02 run), and a computer's own `say` never does. **Not shown:** a change of `private`, `paused` or `asleep`.
+  Works today for `talking` (13 Nov 2026, lamp-75c9 on stable 12728, 20:06): a turn started with a prompt (`start_turn("Hello, this is a quiet test.")`) sent `lamp.changed` with `talking` true 0.1 s after the start and `talking` false at 5.1 s, when the turn ended by itself (the program's own `end_turn`, at about 14 s, was answered "busy: not this computer's turn"); `get("lamp")` polled every 0.4 s said true at 0.4 s and false at 5.3 s. Each event carried exactly `asleep`, `paused`, `private` and `talking`. `talking` is the voice leaving "resting": a turn started with no prompt did not make it true within 6 s (20:02 run), and a computer's own `say` never does. **Not shown:** a change of `private` or `asleep`. **`paused` does not happen on a product lamp today:** nothing publishes `lamp/pause` there. Its only publisher is `lamp-keeper` (`crates/keeper/src/main.rs`, `publish_pause`, line 185), and the keeper is not shipped (`deploy/product/README.md` line 65, "Not here yet: the keeper's unit"; `docs/shutdown.md` line 39, "A product lamp has no keeper"; `crates/setup/src/shutdown.rs` line 182, "no keeper on this lamp"). The app and lamp-cloud have no pause either. So `lamp.changed`'s `paused` stays false and a lease is never lost with `why` `paused` there (read at lamp-voice `4ac70d0a24`, not run on a lamp: lamp-control's side is `crates/control/src/watch.rs` line 555, which only a keeper's message would reach).
 - `body.state`: `joints` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, each `deg`, `counts`,
   `goal_deg`, `load`, `moving`, `temp_c`) and `lamp` (`light`, `talking`, `private`); about
   12.5 a second. Grant `body`. Works today (9 Nov 2026, the customer build 11048): 50 in
@@ -656,7 +656,7 @@ with a `lease` event: `{"ev":"lease","lease":"l_81","state":"suspended","why":"c
   its clock runs), and when the talk ends it is `held` again, with a new `lease`
   event. Shown on a test lamp on the customer build, 9 Nov.
 - **Lost**, with `why`: `hand` (a hand on the lamp), `stop_heard`, `private`
-  (the privacy switch), `paused`, `asleep`, `expired`, `taken_by_owner_app`
+  (the privacy switch), `paused` (the keeper's pause: none on a product lamp today, see `lamp.changed`), `asleep`, `expired`, `taken_by_owner_app`
   (the owner took it back in the app), `revoked`, `released` (by the program,
   or its last connection closed), `slumped` (the body gave way under load). An
   act on a lost lease is refused with how it ended. Take a new lease later.
