@@ -6803,6 +6803,7 @@ fn skill_run(deadline: Duration) -> SkillRun {
         started: Default::default(),
         start_in: None,
         env_file: None,
+        answer: Default::default(),
     }
 }
 
@@ -7065,6 +7066,78 @@ fn a_run_harness_kept_as_a_shell_never_started_and_is_not_said_done() {
             "{show}"
         );
         nothing_left(&rig);
+    }
+}
+
+/// What the run's agent found is kept for the hand-over's answer from the
+/// one `show` that ends the run: idle, from the end's own `show` (`--chars
+/// 4000`, as an observation reads it); stopped, from the `show` that found
+/// its session bound. A shell's or an unread `show` keeps none.
+#[test]
+fn a_skill_runs_end_keeps_its_agents_last_answer() {
+    let shown = |agent: &str, answer: &str| {
+        json!({"name":"skill-task-1","id":AGENT,"agent":agent,"machine":"lamp","state":"idle",
+            "startedBy":"you","folder":null,"ask":null,"answer":answer,"truncated":false,
+            "tools":3,"next":[]})
+        .to_string()
+    };
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":shown("Hermes", "You have 12 unread messages.")},
+        "close":{"exit":0},
+    }));
+    let run = skill_run(Duration::from_secs(20));
+    assert_eq!(
+        skill_runner(&rig, Some(EngineKind::Hermes)).run(&run, &|| {}),
+        Ok(0)
+    );
+    assert_eq!(
+        run.answer.get().map(String::as_str),
+        Some("You have 12 unread messages.")
+    );
+    let calls = rig.calls();
+    assert_eq!(
+        calls[3]["args"],
+        json!([
+            "show",
+            "--machine",
+            MACHINE,
+            AGENT,
+            "--chars",
+            "4000",
+            "--json"
+        ])
+    );
+    // Stopped with its session bound: the fixture's own `show`.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let run = skill_run(Duration::from_secs(20));
+    assert_eq!(
+        skill_runner(&rig, Some(EngineKind::Hermes)).run(&run, &|| {}),
+        Ok(0)
+    );
+    assert_eq!(
+        run.answer.get().map(String::as_str),
+        Some("Observed answer")
+    );
+    for plan in [json!({"stdout":shown("Hermes", "  ")}), json!({"exit":1})] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":{"default":true},
+            "wait":{"stdout":waited("idle", AGENT)},
+            "show":plan,
+            "close":{"exit":0},
+        }));
+        let run = skill_run(Duration::from_secs(20));
+        assert_eq!(
+            skill_runner(&rig, Some(EngineKind::Hermes)).run(&run, &|| {}),
+            Ok(0)
+        );
+        assert_eq!(run.answer.get(), None, "{plan}");
     }
 }
 

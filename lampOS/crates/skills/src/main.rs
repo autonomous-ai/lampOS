@@ -2613,7 +2613,16 @@ fn start(
     let handed = !tasks.is_empty();
     for call in tasks {
         let Call::Task(step) = call else { continue };
-        hand_task(&skill, *step, &runner.tasks.borrow());
+        // Where what its agent found is told, if it finds any.
+        let room = lamp_room(
+            &skill,
+            &runner.sockets_for(&skill),
+            runner.bus.clone(),
+            runner.watching.borrow().known_file.clone(),
+            runner.local_time.clone(),
+            None,
+        );
+        hand_task(&skill, *step, &runner.tasks.borrow(), room);
     }
     if handed && calls.is_empty() {
         let _ = made.send(());
@@ -5332,13 +5341,28 @@ fn read_service(
             days.insert(skill.to_owned(), day);
         }
     }
+    let mut room = lamp_room(skill, sockets, bus, known_file, local_time, read.quiet);
+    service_read::run(read, &mut room)
+}
+
+/// The room a skill's read is said in, and what a skill's task's agent
+/// found ([`hand_task`]): its gate's eyes, ears and clock, and the say
+/// service; `quiet`, the skill's own `[quiet]`.
+fn lamp_room(
+    skill: &str,
+    sockets: &Sockets,
+    bus: Bus,
+    known_file: Option<PathBuf>,
+    local_time: Option<Arc<lamp_local_time::LocalTime>>,
+    quiet: Option<(u16, u16)>,
+) -> LampRoom {
     let owner = std::env::var_os(OWNER_FILE_ENVIRONMENT)
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
         .and_then(|path| lamp_voice::person::read(&path).ok().flatten());
     let services = std::env::var_os(SERVICES_SOCKET_ENVIRONMENT)
         .map_or_else(|| PathBuf::from(SERVICES_SOCKET), PathBuf::from);
-    let mut room = LampRoom {
+    LampRoom {
         skill: skill.to_owned(),
         say: sockets.say.clone(),
         services,
@@ -5346,9 +5370,8 @@ fn read_service(
         known_file,
         owner,
         local_time,
-        quiet: read.quiet,
-    };
-    service_read::run(read, &mut room)
+        quiet,
+    }
 }
 
 /// A skill's `do.task` that came due (#6305, [`lamp_skills::task`]),
@@ -5357,8 +5380,12 @@ fn read_service(
 /// its grants, one at a time a skill, within the day's bounds; with no yes,
 /// the voice is asked to say the read-back and ask for it (`task_yes`,
 /// [`lamp_skills::task::ask_yes`]). The journal says what became of it,
-/// never the task's words.
-fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
+/// never the task's words. What its agent found, when lamp-tasks' answer
+/// carries it (a run granted a linked service's read,
+/// [`lamp_skills::task::told`]), is said to the owner in `room`, behind a
+/// read's gate ([`lamp_skills::service_read::tell`]); the journal says only
+/// how many sentences.
+fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut room: LampRoom) {
     let Some((folder, grants)) = tasks.of.get(skill).cloned() else {
         eprintln!("lamp-skills: skill:{skill}: do.task: not handed over: its folder is not known");
         return;
@@ -5380,6 +5407,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
             "expires_in_ms": lamp_skills::task::ASK_EXPIRES_MS,
         });
         let say_yes = || say(&say_socket, "say", &skill, ask, &[], || {});
+        let mut found = None;
         let said = lamp_skills::task::hand(
             &skill,
             &step,
@@ -5387,15 +5415,23 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
             &grants,
             place,
             unix_ms(),
-            hand_over,
+            |socket, line| {
+                let answer = hand_over(socket, line)?;
+                found = lamp_skills::task::told(&answer);
+                lamp_skills::task::answered(&answer)
+            },
             say_yes,
         );
         eprintln!("lamp-skills: skill:{skill}: {said}");
+        if let Some(lines) = found {
+            let told = lamp_skills::service_read::tell(&lines, &mut room);
+            eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {told}");
+        }
     });
 }
 
-/// One hand-over line to lamp-tasks at `socket`, and its answer, read when
-/// the run ends, at most [`lamp_skills::task::RUN_MOST`] later.
+/// One hand-over line to lamp-tasks at `socket`, and its answer line, read
+/// when the run ends, at most [`lamp_skills::task::RUN_MOST`] later.
 fn hand_over(socket: &Path, line: &str) -> Result<String, String> {
     let exchange = || -> io::Result<String> {
         let mut stream = UnixStream::connect(socket)?;
@@ -5406,8 +5442,7 @@ fn hand_over(socket: &Path, line: &str) -> Result<String, String> {
         BufReader::new(stream.take(8_192)).read_line(&mut answer)?;
         Ok(answer)
     };
-    let answer = exchange().map_err(|error| format!("lamp-tasks couldn't be reached: {error}"))?;
-    lamp_skills::task::answered(&answer)
+    exchange().map_err(|error| format!("lamp-tasks couldn't be reached: {error}"))
 }
 
 /// A skill's write to a linked service that came due (#6066,

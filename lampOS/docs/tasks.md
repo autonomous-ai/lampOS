@@ -2721,6 +2721,21 @@ for each run, and is answered once the run ends
   `bad_request`, `too_long` (over 8192 bytes), `no_token` (lamp-control gave
   no one-run token), `run_failed`, or `busy` (another skill's task is
   running: one runs at a time).
+- **What its agent found** (`tells_answer`): with `LAMP_AGENT_SERVICES=on`
+  here, a run granted a linked service's read (`gmail-read`) that ended
+  well answers `{"ok":true,"id":N,"answer":"..."}`, the agent's last
+  answer as the run's end `show` gave it (`--chars 4000`, `Cli::shown_end`;
+  for a `stopped` end, the `show` that found its session bound), every run
+  of whitespace or control characters one space, at most 3,000 bytes
+  (`told_answer`, `MOST_TOLD_BYTES`). Its words end with `TELL_LINE`, so
+  the agent ends with a few plain sentences for the owner. lamp-skills says
+  them to the owner (docs/skills.md, "A linked service as a task for the
+  lamp's agent"). On lamp-9adf, 15 Nov (build 13135), a voice-made
+  `morning-unread-mail` ran 19 Gmail reads and ended idle, and nothing was
+  said: the answer was read by that `show` and dropped. Any other run's
+  answer is as before; the journal never has the answer. Tests:
+  `a_service_reads_ended_answer_carries_what_its_agent_found`,
+  `a_skill_runs_end_keeps_its_agents_last_answer`.
 - **A one-run token** (the first builder's 12:45 conditions on #6071): for
   each run lamp-tasks asks lamp-control (#6304, PR #6408) for a token on
   its admin socket, `/run/lampos-control/admin.sock` (`ControlTokens`, the
