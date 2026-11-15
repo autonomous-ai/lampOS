@@ -4597,8 +4597,8 @@ the same code for both writers.
   is shown in the make's namespace, and the package goes to the run's own
   `/tmp`), fix it by the check's words at most twice, then write
   `answer.md` as the rules say. Each answer is given 90 s
-  (`make_skill_agent::GUIDED_WRITE_WITHIN`) in place of 45 s, within the
-  agent's 120 s. The voice still puts the answer through its whole check;
+  (`make_skill_agent::GUIDED_WRITE_WITHIN`), the same as without the guide
+  (`WRITE_WITHIN`), within the agent's 120 s. The voice still puts the answer through its whole check;
   one it refuses goes back with the check's words (`REPAIR_MARK`) at most
   2 more times (`GUIDED_MOST_REPAIRS`), each begun only while one more
   answer fits the 120 s, and one still refused is said as not made, as
