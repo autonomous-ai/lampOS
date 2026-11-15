@@ -613,8 +613,21 @@ pub fn bind(socket: &Path, own_uid: u32) -> io::Result<(UnixListener, Bound)> {
 /// Whether this process's own program is the launcher ([`LAUNCHER`]), by
 /// `/proc/self/exe` resolved: then it is the launcher whatever its
 /// arguments, never lamp-tasks' own commands.
+///
+/// On Linux it fails closed: a program whose own file can't be read is
+/// taken as the launcher (which then refuses or asks for one run only), so
+/// the launcher's copy never falls back to lamp-tasks' commands.
 pub fn exe_is_launcher() -> bool {
-    std::fs::canonicalize("/proc/self/exe").is_ok_and(|exe| exe == Path::new(LAUNCHER))
+    is_launcher_exe(std::fs::canonicalize("/proc/self/exe").ok().as_deref())
+}
+
+/// [`exe_is_launcher`] for the program's own file as read (`None`: not
+/// read).
+pub fn is_launcher_exe(exe: Option<&Path>) -> bool {
+    match exe {
+        Some(exe) => exe == Path::new(LAUNCHER),
+        None => cfg!(target_os = "linux"),
+    }
 }
 
 /// The launcher's arguments when this process is the launcher: always
@@ -780,6 +793,15 @@ mod tests {
             pythonpath: "/opt/lampOS/sdk".into(),
             token: "secret-7133".into(),
         }
+    }
+
+    #[test]
+    fn the_launchers_own_file_unread_is_taken_as_the_launcher_on_linux() {
+        assert!(is_launcher_exe(Some(Path::new(LAUNCHER))));
+        assert!(!is_launcher_exe(Some(Path::new(
+            "/opt/lampOS/tasks/current/lamp-tasks"
+        ))));
+        assert_eq!(is_launcher_exe(None), cfg!(target_os = "linux"));
     }
 
     const LAUNCHER_AT: &str = "/test/skill-start";
