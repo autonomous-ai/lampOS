@@ -1270,9 +1270,11 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   nối tới đâu (`usage: skill-start <run-id>`, `the run id is not one
   lamp-tasks makes`, `refused: an LD_ variable is set`).
   lamp-tasks được build static (`+crt-static`, không có ELF interpreter;
-  `deploy/build-lamp-tasks-static.sh`, được kiểm tra trong cả hai job arm64
-  của CI), nên launcher không chạy `ld.so` và không chạy code preload nào
-  trước `main()`.
+  `deploy/build-lamp-tasks-static.sh`). Script thất bại khi `readelf` thấy
+  header `INTERP` hoặc không đọc được file. Trong các job arm64 (build
+  native), script còn chạy bản static một lần như `skill-start` không có
+  run id, và nó phải thoát với mã 2. Nên launcher không chạy `ld.so` và
+  không chạy code preload nào trước `main()`.
 - **Socket.** Launcher gửi run id tới `/run/lampos-skill-start/start.sock`
   (0600). lamp-update sở hữu thư mục `/run/lampos-skill-start` (0755, của
   `lampos`): unit của gateway OpenClaw tạo nó làm `RuntimeDirectory` ở mỗi
