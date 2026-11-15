@@ -3807,7 +3807,7 @@ before each run's turn (step 3 above): `agents.lamp-skill-run` gets
 - **Concurrency.** Hermes's run is a process of its own, killed with its
   group. A gateway turn shares the one gateway with the person's spoken
   OpenClaw tasks: a long turn takes the gateway's CPU and memory from them
-  (`MemoryMax=2500M` for all of them together), and OpenClaw queues turns
+  (`MemoryMax=2500M` and `CPUQuota=300%` for all of them together), and OpenClaw queues turns
   per session and globally, so a skill's run may wait behind a spoken
   task. The kill at the deadline ends lamp-tasks' call and asks the
   gateway to abort the turn (`chat.abort`), and the turn's own `timeout`

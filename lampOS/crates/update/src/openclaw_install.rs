@@ -541,8 +541,12 @@ pub fn wrapper_text_for(shown: Shown) -> String {
 /// with the switch off. Its memory (#6226: RAM floor): no `MemoryHigh`
 /// (at 700M on lamp-c0a4 it throttled the gateway into 18 s stalls and no
 /// turn finished), only `MemoryMax=2500M` as a guard, and Node's own heap
-/// limit left as it is. Its CPU caps are sane values, not measured yet:
-/// below the lamp's services (`Nice`, `CPUWeight`, `CPUQuota`), started
+/// limit left as it is. Its CPU: below the lamp's services once the lamp
+/// is up (`Nice`, `CPUWeight=20`), but `StartupCPUWeight=100` while the
+/// lamp boots, and `CPUQuota=300%`, three of the A733's eight cores: at
+/// 100% its main thread and its 11 workers shared one core, and on
+/// lamp-c0a4's reboot (15 Nov, 22:57) it took 194 s to its "startup
+/// outcomes", with main-thread stalls of 12 s and 18 s (#7135). Started
 /// again on failure, given up on after five starts in ten minutes.
 pub const UNIT_TEXT: &str = "\
 # lamp-openclaw-gateway: OpenClaw's gateway on the lamp, which Harness's OpenClaw panes talk to (lampOS/docs/install.md,
@@ -569,7 +573,11 @@ StandardInput=null
 SyslogIdentifier=lamp-openclaw-gateway
 Nice=10
 CPUWeight=20
-CPUQuota=100%
+# (#7135) a fair share while the lamp boots only: at 20 it waited behind the boot for most of its 194 s startup on
+# lamp-c0a4; once the lamp is up, CPUWeight=20 holds, below the voice.
+StartupCPUWeight=100
+# (#7135) three of the eight cores for its main thread and 11 workers: at 100% they shared one.
+CPUQuota=300%
 # (#6226: RAM floor) on lamp-c0a4 a memory throttle stalled the gateway (about 780k throttles, 18 s stalls, no turn
 # finished), so none is set: only a hard guard, and Node's own heap limit left as it is.
 MemoryMax=2500M

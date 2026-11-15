@@ -867,7 +867,9 @@ fn the_gateway_unit_runs_through_the_wrapper_as_lampos_with_caps() {
         "WorkingDirectory=/var/lib/lampos-openclaw/state",
         "Restart=on-failure",
         "Nice=10",
-        "CPUQuota=100%",
+        "CPUWeight=20",
+        "StartupCPUWeight=100",
+        "CPUQuota=300%",
         "Environment=HOME=/var/lib/lampos-openclaw OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state LAMP_OPENCLAW_GATEWAY=on",
         "MemoryMax=2500M",
         "[Install]",
@@ -880,6 +882,22 @@ fn the_gateway_unit_runs_through_the_wrapper_as_lampos_with_caps() {
     assert!(!UNIT_TEXT.contains("NODE_OPTIONS") && UNIT_TEXT.contains("(#6226: RAM floor)"));
     // (the owner on #6226) always on: no memory throttle, only the guard.
     assert!(!UNIT_TEXT.contains("MemoryHigh"));
+    // (#7135) one CPU line each: below the voice once up, a fair share at
+    // boot, three cores, never the whole lamp (8 cores, 800%).
+    for key in ["CPUWeight=", "StartupCPUWeight=", "CPUQuota="] {
+        assert_eq!(
+            lines.iter().filter(|line| line.starts_with(key)).count(),
+            1,
+            "{key}"
+        );
+    }
+    let quota: u32 = lines
+        .iter()
+        .find_map(|line| line.strip_prefix("CPUQuota="))
+        .and_then(|value| value.strip_suffix('%'))
+        .and_then(|value| value.parse().ok())
+        .expect("CPUQuota in percent");
+    assert!((200..800).contains(&quota), "{quota}");
     assert_eq!(
         WANTS,
         format!("/etc/systemd/system/multi-user.target.wants/{UNIT}")

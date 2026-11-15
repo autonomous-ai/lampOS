@@ -1379,7 +1379,7 @@ lamp-update).
 - **Chạy đồng thời.** Lần chạy của Hermes là một tiến trình riêng, bị kill
   cùng group. Một lượt trên gateway dùng chung gateway duy nhất với các
   việc nói cho OpenClaw của người dùng: một lượt dài lấy CPU và bộ nhớ
-  của gateway từ chúng (`MemoryMax=2500M` cho tất cả), và OpenClaw xếp
+  của gateway từ chúng (`MemoryMax=2500M` và `CPUQuota=300%` cho tất cả), và OpenClaw xếp
   hàng các lượt theo phiên và toàn cục, nên lần chạy kỹ năng có thể phải
   chờ sau một việc nói. Kill lúc tới hạn kết thúc lời gọi của lamp-tasks
   và xin gateway hủy lượt (`chat.abort`), và `timeout` của chính lượt kết
