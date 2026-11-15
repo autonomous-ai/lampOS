@@ -1803,16 +1803,25 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   `make_skill` is declared, before every other force: with the switch off
   it forces only a made skill's remove's answer, "Removed by voice"),
   whose `approve_id` form also takes `answer`: `yes`, `no` or `unclear`
-  (left out: `yes` for a made skill's writes or
-  code, as before; `unclear` for a skill's task, so a forced call with no
-  answer never keeps a yes). Code decides when; the model decides what (#6835 gap
+  (left out: `yes` for a voice make's writes or
+  code, as before; `unclear` for a skill's task or an app's make with
+  code, so a forced call with no answer never keeps a yes). Code decides when; the model decides what (#6835 gap
   2, the first builder's option (b) on #6811; on lamp-52e6 on 13 Nov the
   model, after a `use_skill` it started itself, answered the owner's
   "Yes." with "Want me to go ahead with that?" and called nothing). The
-  force holds only while a task's wait or a made skill's remove (never a
-  make's writes or code) is
+  force holds only while a task's wait, a made skill's remove, or an
+  app's make with code (`noted`, `skill_write_yes::wait_for_yes_noted`;
+  never a voice make's writes or code, whose yes answers the model's own
+  call) is
   within `YES_WITHIN` and the lamp's newest answer kept toward it held the
-  whole say-back uncut: so for that one round, never after a cut or
+  whole say-back uncut, an answer of a later request cut before any of its
+  words were kept counting as none (`skill_write_yes::stands_between`; the
+  say-back's own request cut before its first word still counts as cut,
+  #7072). On lamp-9adf on 15 Nov 17:24 an app's make was said back, the
+  owner's "Hey Lamp" was answered as a call and cut before a word played
+  by their "Yes.", and the two were asked as "Lamp. Yes.": told the
+  `approve_id`, the model greeted them and called nothing, so the yes was
+  never taken. The force so holds for that one round, never after a cut or
   partial read-back, never in the say-back's own turn, never with nothing
   waiting. `yes` goes through the approval with every guard above; `no`
   keeps nothing, ends the wait and the lamp says it stays off
@@ -3537,8 +3546,10 @@ gone ([switches.md](switches.md)). What happens:
      from that request on, the turn ending as a voice make's does
      (`skill_write_yes::then_wait`); as the history keeps no call's
      answer, each later heard line is told its `approve_id` in a note
-     (`skill_write_yes::waiting_note`). The yes is then taken exactly as
-     a voice make's, below. Said only on the Live route, or never said,
+     (`skill_write_yes::waiting_note`). The yes is then taken as a voice
+     make's, below, except that the person's next line is forced to answer
+     the wait (`skill_write_yes::approve_force`, as a skill's task's is),
+     as no call of the model's is there for the yes to answer. Said only on the Live route, or never said,
      nothing waits and it stays off. It follows `LAMP_PRIVATE_ROOM` as a
      skill run's write does: off, it is said back only to the owner seen
      alone (`services::owner_sees_alone`: the eyes' known face an owner

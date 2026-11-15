@@ -792,8 +792,11 @@ sau:
      như của lần tạo bằng giọng nói (`skill_write_yes::then_wait`); vì
      lịch sử không giữ câu trả lời của lời gọi nào, mỗi dòng nghe được sau
      đó được báo `approve_id` của nó trong một ghi chú
-     (`skill_write_yes::waiting_note`). Lời đồng ý sau đó được nhận đúng
-     như của lần tạo bằng giọng nói, bên dưới. Chỉ được nói trên route
+     (`skill_write_yes::waiting_note`). Lời đồng ý sau đó được nhận như
+     của lần tạo bằng giọng nói, bên dưới, trừ việc câu tiếp theo của người
+     dùng bị buộc trả lời việc chờ (`skill_write_yes::approve_force`, như
+     câu trả lời cho task của kỹ năng), vì không có lời gọi nào của mô hình
+     để cái "có" trả lời. Chỉ được nói trên route
      Live, hoặc không bao giờ được nói, thì không có gì chờ và nó vẫn tắt.
      Nó theo `LAMP_PRIVATE_ROOM` như lần ghi của một lần chạy kỹ năng: khi
      tắt, nó chỉ được đọc lại cho chủ nhân được thấy một mình
@@ -3043,16 +3046,25 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   chỉ buộc câu trả lời cho việc gỡ một kỹ năng đã tạo, "Gỡ bằng giọng
   nói"), mà
   form `approve_id` của nó nhận thêm `answer`: `yes`, `no` hoặc `unclear` (bỏ trống: `yes` với
-  thao tác ghi hay code của kỹ năng tự tạo, như trước; `unclear` với task
-  của kỹ năng, để một lời gọi bị ép mà không có câu trả lời không bao giờ
+  thao tác ghi hay code của lần tạo bằng giọng nói, như trước; `unclear` với task
+  của kỹ năng hay lần tạo có code từ ứng dụng, để một lời gọi bị ép mà không có câu trả lời không bao giờ
   giữ một lời đồng ý). Code quyết định khi nào; mô hình quyết định cái gì
   (#6835 khoảng trống 2, phương án (b) của first builder trên #6811; trên
   lamp-52e6 ngày 13/11, sau một `use_skill` mô hình tự bắt đầu, mô hình trả
   lời câu "Yes." của chủ đèn bằng "Want me to go ahead with that?" và không
-  gọi gì). Lực buộc chỉ giữ khi việc chờ của một tác vụ hay việc gỡ một kỹ năng đã tạo (không bao giờ là
-  write hay code của kỹ năng tự tạo) còn trong `YES_WITHIN` và câu trả lời
-  mới nhất của đèn được giữ cho nó chứa trọn câu đọc lại, không bị cắt: nên
-  chỉ cho đúng một vòng đó, không bao giờ sau câu đọc lại bị cắt hay thiếu,
+  gọi gì). Lực buộc chỉ giữ khi việc chờ của một tác vụ, việc gỡ một kỹ năng đã tạo, hay
+  lần tạo có code từ ứng dụng (`noted`, `skill_write_yes::wait_for_yes_noted`;
+  không bao giờ là write hay code của lần tạo bằng giọng nói, vì cái "có" của nó
+  trả lời chính lời gọi của mô hình) còn trong `YES_WITHIN` và câu trả lời
+  mới nhất của đèn được giữ cho nó chứa trọn câu đọc lại, không bị cắt; câu
+  trả lời của một request sau bị cắt trước khi giữ được chữ nào thì không
+  tính (`skill_write_yes::stands_between`; chính request của câu đọc lại bị
+  cắt trước chữ đầu tiên vẫn tính là bị cắt, #7072). Trên lamp-9adf lúc
+  17:24 ngày 15/11, một lần tạo từ ứng dụng được đọc lại, câu "Hey Lamp" của
+  chủ đèn được trả lời như một lời gọi và bị câu "Yes." của họ cắt trước khi
+  phát chữ nào, rồi hai câu được hỏi chung thành "Lamp. Yes.": được báo
+  `approve_id`, mô hình chào lại và không gọi gì, nên cái "có" không được
+  nhận. Vì vậy lực buộc chỉ cho đúng một vòng đó, không bao giờ sau câu đọc lại bị cắt hay thiếu,
   không trong chính lượt đọc lại, không khi không có gì chờ. `yes` đi qua
   việc duyệt với mọi cổng ở trên; `no` không giữ gì, kết thúc việc chờ và
   đèn nói nó vẫn tắt (`skill_write_yes::DECLINED_NEXT`); `unclear` không
