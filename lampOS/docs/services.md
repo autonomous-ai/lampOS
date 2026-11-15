@@ -2413,7 +2413,24 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   the run, and lamp-control refuses a `send_id` or `said` before it reaches
   here (and so does this program). A run's write while another write waits
   for its yes is refused ("another write waits for the person's yes"),
-  so it never drops the person's own. The write is sent only by the
+  so it never drops the person's own. **A run's write whose read-back
+  can't fit the voice's one note is refused before it is held**
+  (`serve::run_read_back_room`): the room is `serve::RUN_NOTE_ROOM` (591
+  bytes: the note's 1,024, `lamp_gemini::wire::MAX_NOTE_BYTES`, less its
+  fixed words, send id and time left) less twice the skill's name and the
+  service's code, counted as the note writes it, a JSON string's bytes (a
+  line break or a quote mark two, an accented letter two or three;
+  `serve::run_read_back_bytes`). Over it, nothing is held and the run is
+  told the room in characters, the read-back's length and at least how
+  much to shorten it by ("nothing was prepared: the lamp reads a write back
+  to the owner in one go, and this read-back is 600 characters, over the
+  546 it can read out ... Shorten the text by at least 54 characters and
+  call service_write again", `serve::run_too_long`), so the agent shortens
+  it and calls again. Its `service_write` tool says so beforehand, naming
+  448 characters, the room for the longest skill name and service code
+  (`mcp_server::write_short`). Before this (lamp-9adf, build 13135), a
+  mail of 10 unread subjects was held, then only said too long, and the
+  run ended with nothing sent. The write is sent only by the
   existing send, the spoken yes through the voice's gate, and then counts
   against the skills' bounds as a made skill's write does (50 a day a skill,
   200 across every skill, `skill_writes::Ledger`): over them it is "not sent".
@@ -2446,6 +2463,9 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   tells it. A read-back too long for one note
   (1 024 bytes) is never cut: the lamp says only that the skill wanted to
   send something too long to read out, nothing waits, and the hold lapses.
+  This is only the backstop: this program refuses such a write before it
+  is held (above), and the voice's test holds `serve::run_read_back_room`
+  to its note exactly (`lamp_services_room_for_a_read_back_is_one_note_exactly`).
 - **The yes.** The voice's worker reads the note back exactly and keeps the
   write waiting for its send as a write its own model prepared
   (`services::wait_for_run_yes`), the note's request as its read-back's,

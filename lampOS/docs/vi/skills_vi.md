@@ -1768,7 +1768,10 @@ lamp-control,
 (Gmail, Calendar, GitHub, ...) được làm thành một `do.task` cho agent của
 đèn (Hermes, với MCP connectors `lamp-services`: `services_connected`,
 `service_read`, `service_write`; thư gửi đi quay về giọng nói để chủ nói
-đồng ý), không còn là bước `do.read` hay `do.write`: `[permissions]` chỉ
+đồng ý, và một thư có lời đọc lại không vừa một ghi chú của giọng nói bị
+từ chối trước khi được giữ, kèm chỗ trống tính bằng ký tự, để agent rút
+ngắn nó và gọi lại, [services_vi.md](services_vi.md), "Lượt chạy của một
+kỹ năng trên Hermes của đèn"), không còn là bước `do.read` hay `do.write`: `[permissions]` chỉ
 có topic của trigger, không `services`; `grants` đúng các dịch vụ nó dùng,
 `<code>-read` để đọc và `<code>-write` để gửi (phán quyết trên #6432; chỉ
 gửi thì chỉ `-write`), chỉ được giữ khi bật công tắc; đúng một bước

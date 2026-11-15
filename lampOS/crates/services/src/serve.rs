@@ -83,6 +83,39 @@ pub fn read_back_sha256(read_back: &str) -> String {
         .map(|byte| format!("{byte:02x}"))
         .collect()
 }
+/// The room a skill run's read-back has in the voice's note, in bytes as
+/// the note writes it ([`run_read_back_bytes`]), before the skill's name
+/// (said twice there) and the service's code ([`run_read_back_room`]):
+/// `lamp_gemini::wire::MAX_NOTE_BYTES` (1,024) less the note's fixed words,
+/// its 32-character send id and three digits of time left (lamp-voice's
+/// `run_write_yes::RunWrite::note`, whose test holds it to this exactly).
+/// The voice never cuts a longer one, only says it was too long and sends
+/// nothing, so a run's write over it is refused here, held nowhere, with
+/// the room named for the run's agent to shorten it and call again.
+pub const RUN_NOTE_ROOM: usize = 591;
+
+/// The most bytes `read_back` of `skill`'s run's write to `service` (the
+/// code it is held for) may take in the voice's note.
+pub fn run_read_back_room(skill: &str, service: &str) -> usize {
+    RUN_NOTE_ROOM.saturating_sub(2 * skill.len() + service.len())
+}
+
+/// The bytes `read_back` takes in the voice's note: as a JSON string's,
+/// without its quotes (a line break or a quote mark two, an accented
+/// letter two or three).
+pub fn run_read_back_bytes(read_back: &str) -> usize {
+    serde_json::to_string(read_back).map_or(usize::MAX, |json| json.len().saturating_sub(2))
+}
+
+/// What a skill run's write too long to read back is told: the room, its
+/// own length and at least how much to shorten it by.
+pub fn run_too_long(room: usize, bytes: usize) -> String {
+    format!(
+        "nothing was prepared: the lamp reads a write back to the owner in one go, and this read-back is {bytes} characters, over the {room} it can read out (a line break, a quote mark or an accented letter counts as two or more). Shorten the text by at least {} characters and call service_write again.",
+        bytes.saturating_sub(room)
+    )
+}
+
 /// The fixed-write runs kept, one send each ([`Services::run_fixed_write`]):
 /// one run at a time on the lamp, so more than enough.
 pub const FIXED_RUNS_KEPT: usize = 32;
@@ -614,7 +647,7 @@ impl<H: Http, M: Mail> Services<H, M> {
                 Err(RUN_PREPARES_ONLY.into())
             }
             tools::WRITE if self.desk.waiting_at(Instant::now()) => Err(RUN_WRITE_WAITS.into()),
-            tools::WRITE => match self.write(&args).await {
+            tools::WRITE => match self.write_for(&args, Some(&skill)).await {
                 Ok(mut held) => {
                     if let Some(send_id) = held
                         .as_object_mut()
@@ -1946,6 +1979,13 @@ impl<H: Http, M: Mail> Services<H, M> {
     }
 
     async fn write(&self, args: &Value) -> Result<Value, String> {
+        self.write_for(args, None).await
+    }
+
+    /// [`Self::write`], for the skill `run` names when a skill's run
+    /// prepares it: a read-back too long for the voice's one note
+    /// ([`run_read_back_room`]) is refused before it is held.
+    async fn write_for(&self, args: &Value, run: Option<&str>) -> Result<Value, String> {
         if !self.write_on {
             return Err("writing to services is off on this lamp".into());
         }
@@ -2016,6 +2056,13 @@ impl<H: Http, M: Mail> Services<H, M> {
             } else {
                 "Nothing is sent yet. Read read_back to the person in full; send only if they agree, in any words."
             };
+            if let Some(skill) = run {
+                let room = run_read_back_room(skill, pending.service);
+                let bytes = run_read_back_bytes(&read_back);
+                if bytes > room {
+                    return Err(run_too_long(room, bytes));
+                }
+            }
             let send_id = self.desk.hold(pending, Instant::now());
             return Ok(json!({
                 "read_back": read_back,
@@ -3171,6 +3218,54 @@ mod tests {
             "{refused}"
         );
         assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
+    }
+
+    /// A skill run's write whose read-back can't fit the voice's one note
+    /// is refused with the room it has, by how much to shorten it, and
+    /// nothing held (the voice would only say it was too long and send
+    /// nothing); one at the room is held as any.
+    #[test]
+    fn a_skill_runs_write_too_long_to_read_back_is_refused_with_its_room() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = services(dir.path(), "[]", true).with_skill_tasks(true);
+        run(services.admin(&set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+        )));
+        let draft = |text: &str| {
+            json!({"service":"gmail","action":"send_mail","to":["me@home.test"],
+                "subject":"Unread","text":text})
+        };
+        let room = run_read_back_room("mail-count", "gmail");
+        assert_eq!(room, RUN_NOTE_ROOM - 2 * "mail-count".len() - "gmail".len());
+        // The read-back's own words around one character of text.
+        let probe = run(services.run_tool(&run_line(tools::WRITE, draft("x"))));
+        let words = run_read_back_bytes(probe["result"]["read_back"].as_str().unwrap()) - 1;
+        services.desk.forget(None);
+        *services.run_held.lock().unwrap() = None;
+        let fits = "x".repeat(room - words);
+        // One byte over (a line break is two in the note): refused, held
+        // nowhere, the room and the shortening named.
+        let over = format!("x\n{}", &fits[2..]);
+        let refused = run(services.run_tool(&run_line(tools::WRITE, draft(&over))));
+        assert_eq!(refused["ok"], false, "{refused}");
+        assert_eq!(refused["error"], run_too_long(room, room + 1), "{refused}");
+        let error = refused["error"].as_str().unwrap();
+        assert!(
+            error.contains(&format!("over the {room}")) && error.contains("at least 1 character"),
+            "{error}"
+        );
+        assert!(!services.desk.waiting());
+        assert!(services.run_held.lock().unwrap().is_none());
+        // At the room: held for the yes.
+        let held = run(services.run_tool(&run_line(tools::WRITE, draft(&fits))));
+        assert_eq!(held["ok"], true, "{held}");
+        assert_eq!(
+            run_read_back_bytes(held["result"]["read_back"].as_str().unwrap()),
+            room
+        );
+        assert!(services.desk.waiting());
+        assert!(services.mail.sent.lock().unwrap().is_empty());
     }
 
     /// #6432: the voice asks for a run's held write (its own call, with
