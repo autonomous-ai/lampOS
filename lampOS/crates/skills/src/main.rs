@@ -5670,6 +5670,13 @@ fn write_service(
             hand_write_over,
             || send_write(skill, write),
             |line| eprintln!("lamp-skills: skill:{skill}: {line}"),
+            // The lamp's own line about its send (#7092), exact words: not
+            // the skill's say, so its permissions don't hold it back.
+            || {
+                let asking = json!({"text": service_write::NOT_SENT_LINE, "exact": true,
+                                    "priority": lamp_skills::SAY_PRIORITY});
+                say(&sockets.say, "say", skill, asking, &[], || {})
+            },
         );
     }
     send_write(skill, write)

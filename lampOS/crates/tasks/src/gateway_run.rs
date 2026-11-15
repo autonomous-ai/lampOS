@@ -1042,6 +1042,8 @@ mod tests {
             ],
             deadline,
             started: Default::default(),
+            write: false,
+            not_made: Default::default(),
             start_in: None,
             env_file: None,
             answer: Default::default(),
