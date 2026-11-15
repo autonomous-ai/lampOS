@@ -1993,10 +1993,12 @@ cả hai người viết.
   P2 của Heron trên #6788): một lần tạo từ ứng dụng mà DeepSeek làm đúng
   sau một lần sửa không bao giờ bị nói là không tạo được chỉ vì agent không
   nhận. Lần tạo bằng giọng nói giữ thứ tự của nó: ở đó một câu trả lời của
-  DeepSeek giữ nguyên. Chưa có hiệu lực khi gộp: từ #7014 unit lamp-voice
-  của sản phẩm không đặt `LAMP_MAKE_SKILL_AGENT` (có đặt `LAMP_TASKS_DIR`),
-  nên MAKE IT chỉ giao các lần tạo của nó khi công tắc đó bật lại; cho đến
-  lúc đó các lần tạo của ứng dụng vẫn do DeepSeek, với các lần sửa của nó. Thời gian vừa: `skills.make` của lamp-cloud chờ tối đa 2 giây
+  DeepSeek giữ nguyên. Có hiệu lực khi gộp: unit lamp-voice của sản phẩm
+  lại đặt `LAMP_MAKE_SKILL_AGENT=on` (15/11, sau khi #7014 đã tắt nó; một
+  lần tạo có code bởi agent qua 3/3 trên lamp-9adf), nên từ PR này mọi đèn
+  sản phẩm giao cho agent lần tạo MAKE IT mà DeepSeek không giữ được. Khi
+  agent không nhận, journal ghi "DeepSeek is asked, with its repairs, as
+  without the agent". Thời gian vừa: `skills.make` của lamp-cloud chờ tối đa 2 giây
   (`make_skill::WAIT`), và giọng nói trả lời `{"making": true}` trước khi
   bắt đầu tạo, trên một luồng riêng; sau đó `skills.made` đọc `making` tới
   30 phút (`app_make::MAKING_LONGEST_MS`, mà `makingLongest` của ứng dụng

@@ -4715,11 +4715,12 @@ the same code for both writers.
   (`Agent::repairs_if_untaken`, set by `for_app` alone; Heron's P2 on
   #6788): an app make DeepSeek gets right on a repair is never said as not
   made because the agent couldn't take it. A voice make keeps its order:
-  there DeepSeek's one answer stands. Not live at merge: since #7014 the
-  product's lamp-voice unit sets no `LAMP_MAKE_SKILL_AGENT` (it sets
-  `LAMP_TASKS_DIR`), so MAKE IT hands its makes over only once that switch
-  is on again; until then the app's makes stay DeepSeek's, with their
-  repairs. The
+  there DeepSeek's one answer stands. Live at merge: the product's
+  lamp-voice unit sets `LAMP_MAKE_SKILL_AGENT=on` again (15 Nov, after
+  #7014 had it off; a code make by the agent passed 3 of 3 on lamp-9adf),
+  so from this PR on every product lamp's MAKE IT hands a make DeepSeek
+  can't keep to the agent. When the agent didn't take it, the journal says
+  "DeepSeek is asked, with its repairs, as without the agent". The
   time fits: lamp-cloud's `skills.make` waits at most 2 s
   (`make_skill::WAIT`), and the voice answers `{"making": true}` before the
   make begins, on a thread of its own; `skills.made` then reads `making`
