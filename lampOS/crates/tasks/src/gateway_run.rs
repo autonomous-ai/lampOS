@@ -30,7 +30,8 @@
 //! gateway must answer on its loopback port first; then its fence is
 //! made sure of ([`GatewayRunner::ensure_fence`]: the approvals got, the
 //! agent's entry set when it is not there, got again to confirm it, each
-//! call bounded by [`AFTER_WITHIN`]), or the run is refused in words with
+//! call bounded by [`FENCE_WITHIN`]; once confirmed, skipped until a turn
+//! fails), or the run is refused in words with
 //! no turn sent; then the turn is sent through the agent's wrapper (the
 //! program), held to the run's deadline.
 //! However it ends, the token is ended with lamp-control first, then the
@@ -78,9 +79,14 @@ pub const START_FILE: &str = "start";
 /// The interpreter the skill's script is run with (`HandOver`'s scripts
 /// are Python's).
 pub const INTERPRETER: &str = "python3";
-/// How long the turn's stop and its end, and each fence call, have at
-/// most (less when the run's deadline is nearer).
+/// How long the turn's stop and its end have at most (less when the
+/// run's deadline is nearer).
 pub const AFTER_WITHIN: Duration = Duration::from_secs(10);
+/// How long each fence call has at most (less when the run's deadline is
+/// nearer): each is a cold OpenClaw CLI through nsenter, which on
+/// lamp-52e6 took more than 10 s (07:24 15 Nov, #7019). Calibration:
+/// lower it once the CLI is warm.
+pub const FENCE_WITHIN: Duration = Duration::from_secs(30);
 /// The least the turn's stop and end have together past the run's
 /// deadline, so cleanup still happens: a run's only overrun.
 pub const AFTER_FLOOR: Duration = Duration::from_secs(3);
@@ -421,12 +427,32 @@ pub struct GatewayRunner {
     /// succeeds. Shared by every runner of the same program
     /// ([`Self::lamp`]), since the runner is made per run.
     pub live: Arc<Mutex<Option<String>>>,
+    /// The fence [`Self::ensure_fence`] last confirmed (its agent and
+    /// start), so later runs skip its approvals calls (each a cold CLI on
+    /// a lamp, #7019); cleared when a turn fails, so the next run checks
+    /// it again. Shared per program as [`Self::live`] is.
+    pub fenced: Arc<Mutex<Option<String>>>,
 }
 
 /// [`GatewayRunner::live`] of each program, kept for lamp-tasks' life.
 fn live_for(program: &Path) -> Arc<Mutex<Option<String>>> {
     static LIVE: Mutex<BTreeMap<PathBuf, Arc<Mutex<Option<String>>>>> = Mutex::new(BTreeMap::new());
-    LIVE.lock()
+    shared(&LIVE, program)
+}
+
+/// [`GatewayRunner::fenced`] of each program, kept for lamp-tasks' life.
+fn fenced_for(program: &Path) -> Arc<Mutex<Option<String>>> {
+    static FENCED: Mutex<BTreeMap<PathBuf, Arc<Mutex<Option<String>>>>> =
+        Mutex::new(BTreeMap::new());
+    shared(&FENCED, program)
+}
+
+/// `program`'s slot in `map`, made empty the first time.
+fn shared(
+    map: &Mutex<BTreeMap<PathBuf, Arc<Mutex<Option<String>>>>>,
+    program: &Path,
+) -> Arc<Mutex<Option<String>>> {
+    map.lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .entry(program.to_owned())
         .or_default()
@@ -439,6 +465,7 @@ impl GatewayRunner {
     pub fn lamp(program: PathBuf, project: PathBuf, agent: GatewayAgent) -> Self {
         Self {
             live: live_for(&program),
+            fenced: fenced_for(&program),
             program,
             project,
             agent,
@@ -663,7 +690,7 @@ fn answered(said: &str, token_left: bool) -> Result<u64, String> {
 }
 
 impl GatewayRunner {
-    /// One fence call, bounded by [`AFTER_WITHIN`] and by `until` (the
+    /// One fence call, bounded by [`FENCE_WITHIN`] and by `until` (the
     /// run's deadline): what it printed, when it ended with status 0.
     fn fence_call(
         &self,
@@ -673,7 +700,7 @@ impl GatewayRunner {
     ) -> Result<String, String> {
         let within = until
             .saturating_duration_since(Instant::now())
-            .min(AFTER_WITHIN);
+            .min(FENCE_WITHIN);
         if within.is_zero() {
             return Err("the run's deadline passed".into());
         }
@@ -693,18 +720,30 @@ impl GatewayRunner {
     /// The agent's entry ([`GatewayAgent::entry`] for `start`) in the
     /// gateway's exec approvals: got, set only when it is not there, and
     /// got again to confirm it is; each call by `until` at the latest.
+    /// Once confirmed for this agent and `start`, later runs skip it
+    /// ([`Self::fenced`]) until a turn fails.
     pub fn ensure_fence(&self, start: &str, until: Instant) -> Result<(), String> {
+        let key = format!("{}\n{start}", self.agent.agent);
+        let mut fenced = self
+            .fenced
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if fenced.as_deref() == Some(key.as_str()) {
+            return Ok(());
+        }
         let entry = self.agent.entry(start)?;
         let got = self.fence_call(&self.agent.fence_get, None, until)?;
-        let Some(doc) = set_entry(&got, &self.agent.agent, &entry)? else {
-            return Ok(());
-        };
-        self.fence_call(&self.agent.fence_set, Some(&doc), until)?;
-        let again = self.fence_call(&self.agent.fence_get, None, until)?;
-        match set_entry(&again, &self.agent.agent, &entry)? {
-            None => Ok(()),
-            Some(_) => Err("the gateway's approvals do not hold the agent's entry once set".into()),
+        if let Some(doc) = set_entry(&got, &self.agent.agent, &entry)? {
+            self.fence_call(&self.agent.fence_set, Some(&doc), until)?;
+            let again = self.fence_call(&self.agent.fence_get, None, until)?;
+            if set_entry(&again, &self.agent.agent, &entry)?.is_some() {
+                return Err(
+                    "the gateway's approvals do not hold the agent's entry once set".into(),
+                );
+            }
         }
+        *fenced = Some(key);
+        Ok(())
     }
 
     /// The run, as the module says.
@@ -823,8 +862,8 @@ impl GatewayRunner {
             "[lamp-tasks] skill task {}: one turn on the default agent's warm gateway (127.0.0.1:{})",
             run.run, self.agent.port
         );
-        let turn = call(self, &args, left, self.stopping.as_deref(), None)?;
-        match turn {
+        let turn = call(self, &args, left, self.stopping.as_deref(), None);
+        let ran = turn.and_then(|turn| match turn {
             Turn::Done { code: 0, said } => answered(
                 &said,
                 std::fs::symlink_metadata(folder.join(TOKEN_FILE)).is_ok(),
@@ -844,7 +883,16 @@ impl GatewayRunner {
                     Err("the run was ended as lamp-tasks stops".into())
                 }
             }
+        });
+        // A failed turn may be the gateway's fence gone (a gateway made
+        // anew): the next run checks it again.
+        if ran.is_err() {
+            *self
+                .fenced
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
         }
+        ran
     }
 }
 
@@ -991,6 +1039,7 @@ mod tests {
             hidden: vec![rig.dir.path().join("state")],
             stopping: None,
             live: Default::default(),
+            fenced: Default::default(),
         }
     }
 
@@ -1273,9 +1322,9 @@ mod tests {
     fn the_fence_is_set_before_the_turn_and_only_once() {
         let rig = rig(r#"{"status":"ok"}"#, false);
         let (_, end) = ended();
-        let runner = runner(&rig);
+        let first = runner(&rig);
         assert_eq!(
-            runner.run(&skill_run(&rig, Duration::from_secs(90)), &end),
+            first.run(&skill_run(&rig, Duration::from_secs(90)), &end),
             Ok(0)
         );
         let fence = fence_calls(&rig);
@@ -1294,12 +1343,57 @@ mod tests {
             )),
             "lamp-update's fence-entry is lamp-tasks' fence"
         );
-        // A second run finds it set: one get, no set.
+        // A second run trusts the fence it confirmed: no approvals call at
+        // all (each one is a cold CLI on a lamp, #7019).
         assert_eq!(
-            runner.run(&skill_run(&rig, Duration::from_secs(90)), &end),
+            first.run(&skill_run(&rig, Duration::from_secs(90)), &end),
             Ok(0)
         );
-        assert_eq!(fence_calls(&rig).len(), 4);
+        assert_eq!(fence_calls(&rig).len(), 3, "{:?}", fence_calls(&rig));
+        // Nor does a runner made anew for the same program (one per run).
+        let again = GatewayRunner {
+            fenced: first.fenced.clone(),
+            ..runner(&rig)
+        };
+        assert_eq!(
+            again.run(&skill_run(&rig, Duration::from_secs(90)), &end),
+            Ok(0)
+        );
+        assert_eq!(fence_calls(&rig).len(), 3, "{:?}", fence_calls(&rig));
+    }
+
+    #[test]
+    fn a_failed_turn_makes_the_next_run_check_its_fence_again() {
+        let rig = rig(r#"{"status":"error"}"#, false);
+        let (_, end) = ended();
+        let runner = runner(&rig);
+        assert!(
+            runner
+                .run(&skill_run(&rig, Duration::from_secs(90)), &end)
+                .is_err()
+        );
+        assert_eq!(fence_calls(&rig).len(), 3);
+        assert!(
+            runner
+                .run(&skill_run(&rig, Duration::from_secs(90)), &end)
+                .is_err()
+        );
+        assert_eq!(fence_calls(&rig).len(), 4, "got again, found set");
+    }
+
+    #[test]
+    fn each_fence_call_has_fence_within_not_after_within() {
+        let rig = rig(r#"{"status":"ok"}"#, false);
+        let (_, end) = ended();
+        assert_eq!(
+            runner(&rig).run(&skill_run(&rig, Duration::from_secs(90)), &end),
+            Ok(0)
+        );
+        let ms = format!("--timeout {}", FENCE_WITHIN.as_millis());
+        for call in fence_calls(&rig) {
+            assert!(call.contains(&ms), "{call}");
+        }
+        assert!(FENCE_WITHIN > AFTER_WITHIN);
     }
 
     #[test]

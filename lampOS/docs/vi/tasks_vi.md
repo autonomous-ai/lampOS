@@ -1203,8 +1203,12 @@ theo agent mặc định của đèn *là gì*, không bao giờ theo tên của
    không bao giờ đoán (`gateway_run::set_entry`). Khi
    `agents.lamp-skill-run` chưa đúng là mục của hàng rào, cả tài liệu (giữ
    mọi khóa khác) được đưa vào `fence-set` qua stdin, và `fence-get` lần
-   nữa phải thấy nó. Mỗi lệnh tối đa 10 s (`AFTER_WITHIN`) và đọc tối đa
-   256 KiB. Lỗi bất kỳ là `run_failed` "the default agent's fence for a
+   nữa phải thấy nó. Mỗi lệnh tối đa 30 s (`FENCE_WITHIN`: mỗi lệnh là một
+   CLI OpenClaw nguội qua nsenter, trên lamp-52e6 mất hơn 10 s, #7019) và
+   đọc tối đa 256 KiB. Khi đã xác nhận cho agent và đường chạy, các lần
+   chạy sau của cùng wrapper bỏ qua hàng rào (`GatewayRunner::fenced`, giữ
+   suốt đời lamp-tasks) cho tới khi một lượt thất bại, lúc đó lần chạy kế
+   kiểm lại. Lỗi bất kỳ là `run_failed` "the default agent's fence for a
    skill's run is not set (...), so nothing was started": không gửi lượt
    nào và script không bao giờ chạy. Việc ghi hàng rào
    (`exec.approvals.get`/`set`, như `sessions.delete` ở bước 5) cần quyền

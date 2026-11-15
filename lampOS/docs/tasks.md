@@ -3635,7 +3635,12 @@ default agent is, never by its name (`skill_task::AgentRun`):
    (`gateway_run::set_entry`). When `agents.lamp-skill-run` is not
    already the fence's entry, the whole document, every other key kept,
    goes to `fence-set` on stdin, and `fence-get` again must show it. Each
-   call is bounded to 10 s (`AFTER_WITHIN`) and read to 256 KiB. Any
+   call is bounded to 30 s (`FENCE_WITHIN`: each is a cold OpenClaw CLI
+   through nsenter, which took more than 10 s on lamp-52e6, #7019) and
+   read to 256 KiB. Once confirmed for the agent and the run path, later
+   runs of the same wrapper skip the fence (`GatewayRunner::fenced`, kept
+   for lamp-tasks' life) until a turn fails, when the next run checks it
+   again. Any
    failure is `run_failed` "the default agent's fence for a skill's run
    is not set (...), so nothing was started": no turn is sent and the
    script never runs. The fence's write (`exec.approvals.get`/`set`, as
