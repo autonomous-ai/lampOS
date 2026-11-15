@@ -3702,8 +3702,11 @@ file:
   `the run id is not one lamp-tasks makes`, `refused: an LD_ variable is
   set`).
   lamp-tasks is built static (`+crt-static`, no ELF interpreter;
-  `deploy/build-lamp-tasks-static.sh`, checked in both arm64 CI jobs), so
-  the launcher runs no `ld.so` and no preloaded code before `main()`.
+  `deploy/build-lamp-tasks-static.sh`). The script fails when `readelf`
+  shows an `INTERP` header or can't read the file. In the arm64 jobs, which
+  build natively, it also runs the static copy once as `skill-start` with
+  no run id, which must exit 2. So the launcher runs no `ld.so` and no
+  preloaded code before `main()`.
 - **The socket.** The launcher sends the run id to
   `/run/lampos-skill-start/start.sock` (0600). lamp-update owns the folder
   `/run/lampos-skill-start` (0755, `lampos`'s): the OpenClaw gateway's
