@@ -515,6 +515,9 @@ jobs:
         working-directory: lampOS
         # Keep Cargo's current-target records outside the restored target cache.
         run: cargo build --locked --release --workspace --bins --examples --message-format=json-render-diagnostics > arm64-build.jsonl
+      - name: lamp-tasks static, no ELF interpreter (its byte copy is the skill-start launcher, #7133)
+        working-directory: lampOS
+        run: bash deploy/build-lamp-tasks-static.sh target/release
       - name: every built lamp-* binary is classified for the lamp-os package
         working-directory: lampOS
         run: bash tools/package-binaries-test.sh && bash tools/package-binaries.sh deploy/package-binaries.json target/release
@@ -723,6 +726,9 @@ jobs:
       - name: build (release, the lamps' binaries)
         working-directory: lampOS
         run: cargo build --locked --release --workspace --bins --examples
+      - name: lamp-tasks static, no ELF interpreter (its byte copy is the skill-start launcher, #7133)
+        working-directory: lampOS
+        run: bash deploy/build-lamp-tasks-static.sh target/release
       - name: build the test binaries (listed, not run)
         working-directory: lampOS
         # The two own-harness tests cannot be listed; the ARM64 job leaves them out the same way.
