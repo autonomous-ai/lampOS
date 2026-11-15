@@ -208,7 +208,9 @@ Environment=LAMP_STOP_WORDS_KEYTERM=on
 # stops the answer as the hand does, whether or not the lamp paused: on lamp-52e6 on 11 Nov a 0.5 s "Stop." made no
 # pause, so `heard` (a pause's audio only) never heard it (the lead's call on #5905). Its words only judge a stop and are
 # never kept (the first builder's condition on #5032). Its cost: the whole answer's audio streamed (stop-word.md).
-Environment=LAMP_STOP_WORDS=heard-always
+# PARKED (#5905): off in the product; turning it on waits for the stop keyword spotted by lamp-name's on-mic
+# model (the first builder's ruling on #5905, 15 Nov). To turn it on, uncomment the next line.
+#Environment=LAMP_STOP_WORDS=heard-always
 # An answer cut by a line or a stop is kept as the words that were played, so "go on" picks up from the cut
 # (#3997): probe-cut-in on lamp-06c1 on 30 Oct, resume 19/20 to 20/20 with LAMP_CUT_IN_TOLD; two played demos, 2 of 2.
 Environment=LAMP_SAID_AS_HEARD=on

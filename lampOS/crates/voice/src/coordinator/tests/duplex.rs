@@ -2039,7 +2039,7 @@ fn a_stop_word_heard_in_a_yield_commits_it_and_other_words_resume_it() {
     assert_eq!((at, committed), (110, false));
 }
 
-/// The product's voice unit, for what its stop words hear.
+/// The product's voice unit, for what it sets of the stop words.
 const PRODUCT_UNIT: &str = include_str!("../../../../../deploy/product/lamp-voice.service");
 
 /// "Stop. Please stop talking.", 16 kHz mono s16le (`activity`'s fixture).
@@ -2077,8 +2077,8 @@ impl crate::stop_words::Ears for KeptEars {
     fn rest(&mut self) {}
 }
 
-/// What one line said over a reply led to, with the product unit's stop
-/// words.
+/// What one line said over a reply led to, with
+/// `LAMP_STOP_WORDS=heard-always`.
 struct OverTheReply {
     h: Harness,
     old: TurnOwner,
@@ -2091,10 +2091,9 @@ struct OverTheReply {
 
 /// #5032 (b): the recording said over a reply as on lamp-06c1, Over the
 /// lamp but not plainly, then quiet (`duplex.rs`: Unknown, so neither Clear
-/// nor plain blocks), with the stop words the product unit sets up, its
-/// words heard as `words`.
-fn said_over_a_reply_in_the_product(words: &'static str) -> OverTheReply {
-    over_a_reply_in_the_product(words, |h| {
+/// nor plain blocks), with `heard-always`, its words heard as `words`.
+fn said_over_a_reply_heard_always(words: &'static str) -> OverTheReply {
+    over_a_reply_heard_always(words, |h| {
         h.blocks(ONSET + 2, 0.9, Some(evidence(0, OVER)));
         for quiet in 1..=29 {
             h.block(0.1, Some(evidence(quiet, None)));
@@ -2103,21 +2102,13 @@ fn said_over_a_reply_in_the_product(words: &'static str) -> OverTheReply {
 }
 
 /// The recording said over a reply in the shape `line` gives its blocks,
-/// with the product unit's stop words, its words heard as `words`, then
-/// still for 1.5 s, the lamp silent.
-fn over_a_reply_in_the_product(
-    words: &'static str,
-    line: impl FnOnce(&mut Harness),
-) -> OverTheReply {
+/// with `heard-always`, its words heard as `words`, then still for 1.5 s,
+/// the lamp silent.
+fn over_a_reply_heard_always(words: &'static str, line: impl FnOnce(&mut Harness)) -> OverTheReply {
     let handed = std::sync::Arc::default();
-    let value = PRODUCT_UNIT
-        .lines()
-        .find_map(|line| line.trim().strip_prefix("Environment=LAMP_STOP_WORDS="));
-    let listen = crate::stop_words::listen_for(value);
     assert_eq!(
-        listen,
-        crate::stop_words::Listen::Always,
-        "the product hears its stop words always (#5905)"
+        crate::stop_words::listen_for(Some("heard-always")),
+        crate::stop_words::Listen::Always
     );
     let mut h = Harness::new(TurnTaking::Duplex, 400);
     h.stop_words = Some(crate::stop_words::StopWords::always_counted(
@@ -2155,14 +2146,14 @@ fn heard_the_line(over: &OverTheReply) -> bool {
     over.handed.contains(&first)
 }
 
-/// #5032 (b): with the product unit, a short "Stop." said over the lamp's
+/// #5032 (b): with `heard-always`, a short "Stop." said over the lamp's
 /// answer, which yields and resumes on sound alone, stops it as the hand
 /// does (`heard-always`: the words of everything heard while the lamp
 /// speaks). With `heard` it was a yield's words; 9 of 9 spoken stops over
 /// the answer were lost on lamp-06c1 without either.
 #[test]
-fn the_product_hears_a_stop_said_over_its_answer() {
-    let over = said_over_a_reply_in_the_product("Stop.");
+fn heard_always_hears_a_stop_said_over_its_answer() {
+    let over = said_over_a_reply_heard_always("Stop.");
     assert_eq!(over.h.events("duplex_yield").len(), 1);
     assert!(heard_the_line(&over));
     assert!(over.stopped, "the stop words did not stop the reply");
@@ -2177,11 +2168,11 @@ fn the_product_hears_a_stop_said_over_its_answer() {
 /// #5905, lamp-52e6 at 17:22 on 11 November: a 0.5 s "Stop." the render
 /// explained as the lamp's own voice (heard under it or as its own, never
 /// over it) made no yield, so `heard`, which listens only in a yield, never
-/// heard it and the story went on. With the product unit it is heard while
+/// heard it and the story went on. With `heard-always` it is heard while
 /// the lamp speaks and stops the reply.
 #[test]
-fn the_product_hears_a_stop_that_makes_no_yield() {
-    let over = over_a_reply_in_the_product("Stop.", |h| {
+fn heard_always_hears_a_stop_that_makes_no_yield() {
+    let over = over_a_reply_heard_always("Stop.", |h| {
         h.blocks(50, 0.9, Some(evidence(0, OWN)));
         h.blocks(30, 0.1, Some(evidence(0, OWN)));
     });
@@ -2193,11 +2184,11 @@ fn the_product_hears_a_stop_that_makes_no_yield() {
 /// #5111, lamp-9adf: "Stop, Lamp" over a story, the yield coming late on
 /// "Lamp" and the rest heard in the lamp's own dying tail, over the lamp but
 /// never plainly, then quiet. Sound alone resumed it and dropped its
-/// candidate as `policy` some 0.74 s on; with the product unit its words are
+/// candidate as `policy` some 0.74 s on; with `heard-always` its words are
 /// heard and stop the reply.
 #[test]
-fn the_product_hears_a_stop_in_a_late_yield_over_its_own_tail() {
-    let over = over_a_reply_in_the_product("Stop, Lamp.", |h| {
+fn heard_always_hears_a_stop_in_a_late_yield_over_its_own_tail() {
+    let over = over_a_reply_heard_always("Stop, Lamp.", |h| {
         h.blocks(ONSET + 5, 0.9, Some(evidence(0, OVER)));
         assert_eq!(h.events("duplex_yield").len(), 1);
         for quiet in 1..=25 {
@@ -2219,9 +2210,9 @@ fn the_product_hears_a_stop_in_a_late_yield_over_its_own_tail() {
 /// anywhere (`LAMP_STOP_WORDS_AUDIO`, `LAMP_STOP_WORDS_COUNTS`,
 /// `LAMP_BACKCHANNEL_DEBUG` unset).
 #[test]
-fn the_product_uses_a_yields_words_only_to_judge_a_stop() {
+fn heard_always_uses_a_lines_words_only_to_judge_a_stop() {
     // A made-up line with a secret in it.
-    let over = said_over_a_reply_in_the_product("Remember my code is 4321.");
+    let over = said_over_a_reply_heard_always("Remember my code is 4321.");
     let h = &over.h;
     assert!(heard_the_line(&over));
     assert!(!over.stopped);
@@ -2245,6 +2236,22 @@ fn the_product_uses_a_yields_words_only_to_judge_a_stop() {
     ] {
         assert!(!PRODUCT_UNIT.contains(kept), "the product sets {kept}");
     }
+}
+
+/// #5905: the product leaves its stop words off, so none of the tests above
+/// is the product's; turning `heard-always` on waits for the stop keyword
+/// spotted by lamp-name's on-mic model (the first builder's ruling on
+/// #5905, 15 November).
+#[test]
+fn the_product_leaves_its_stop_words_off() {
+    let value = PRODUCT_UNIT
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("Environment=LAMP_STOP_WORDS="));
+    assert_eq!(
+        crate::stop_words::listen_for(value),
+        crate::stop_words::Listen::Off,
+        "the product sets LAMP_STOP_WORDS={value:?}"
+    );
 }
 
 /// #2939, `LAMP_BACKCHANNEL_HOLDS=on`: a backchannel that would commit
