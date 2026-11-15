@@ -166,17 +166,22 @@ pub struct TaskFile {
     run: String,
 }
 
-/// A `do.task` step as loaded: its words, and its script's path in the
-/// skill's folder.
+/// A `do.task` step as loaded: its words, its script's path in the
+/// skill's folder, and the skill's own `[quiet]`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TaskStep {
     pub task: String,
     pub run: String,
+    /// The skill's own `[quiet]`, local minutes: what its agent found
+    /// ([`told`]) is held to it beside the lamp's quiet hours, as a
+    /// `do.read`'s is ([`crate::service_read::ReadStep::quiet`]).
+    pub quiet: Option<(u16, u16)>,
 }
 
 impl TaskFile {
-    /// The step of the skill in `dir`, or why the folder's words are not one.
-    pub fn step(self, dir: &Path) -> Result<TaskStep, String> {
+    /// The step of the skill in `dir`, with the skill's `[quiet]`, or why
+    /// the folder's words are not one.
+    pub fn step(self, dir: &Path, quiet: Option<(u16, u16)>) -> Result<TaskStep, String> {
         let task = self.task.trim();
         if task.is_empty() || task.len() > MOST_TASK_BYTES || task.chars().any(char::is_control) {
             return Err(format!(
@@ -187,6 +192,7 @@ impl TaskFile {
         Ok(TaskStep {
             task: task.to_owned(),
             run: self.run,
+            quiet,
         })
     }
 }
@@ -1102,7 +1108,7 @@ mod tests {
             task: "Take a photo".into(),
             run: run.into(),
         }
-        .step(dir)
+        .step(dir, None)
     }
 
     #[test]
@@ -1137,7 +1143,7 @@ mod tests {
                 task: task.into(),
                 run: "scripts/main.py".into(),
             }
-            .step(&folder)
+            .step(&folder, None)
             .unwrap_err();
             assert!(refused.contains("task is 1 to"), "{refused}");
         }

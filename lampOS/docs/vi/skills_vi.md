@@ -1801,7 +1801,8 @@ trong lamp-tasks, như trong sản phẩm), và `lamp-skills` nói nó cho chủ
 các dòng của một `do.read` (`service_read::tell`): sau cùng một cổng (chỉ
 khuôn mặt đã biết của chủ trong tầm nhìn và ổn định 5 giây, không có giọng
 nói trong một phút, không riêng tư, không tạm dừng, không trong giờ yên
-lặng, chờ tối đa 60 phút rồi bỏ qua không nói), trong lượt đọc duy nhất của
+lặng của đèn hay `[quiet]` riêng của skill, như một `do.read`, chờ tối đa
+60 phút rồi bỏ qua không nói), trong lượt đọc duy nhất của
 đèn, mỗi câu một dòng bằng lời chính xác (không bao giờ là một lượt cho mô
 hình, nên nội dung thư không bao giờ là chỉ dẫn), cổng được xét lại trước
 mỗi dòng, có người đến thì dừng với "I'll tell you the rest later." Các câu
@@ -1811,7 +1812,9 @@ vụ nói, tối đa 11 câu. Skill không cần `speak`: lời đồng ý của
 agent found: told N`). Lần chạy không có quyền đọc (gửi thư, task của một
 script) không nói gì, như trước. Test:
 `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
-`service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`.
+`service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,
+`tests::a_task_step_loads_with_its_skills_own_quiet`, và
+`a_tasks_told_answer_is_held_to_its_skills_own_quiet` của lamp-skills.
 
 ### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, bật trong sản phẩm, đề xuất trên #6059)
 

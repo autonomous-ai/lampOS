@@ -2617,15 +2617,7 @@ fn start(
     let handed = !tasks.is_empty();
     for call in tasks {
         let Call::Task(step) = call else { continue };
-        // Where what its agent found is told, if it finds any.
-        let room = lamp_room(
-            &skill,
-            &runner.sockets_for(&skill),
-            runner.bus.clone(),
-            runner.watching.borrow().known_file.clone(),
-            runner.local_time.clone(),
-            None,
-        );
+        let room = task_room(&skill, &step, runner);
         hand_task(&skill, *step, &runner.tasks.borrow(), room);
     }
     if handed && calls.is_empty() {
@@ -5528,6 +5520,21 @@ fn lamp_room(
     }
 }
 
+/// Where what a skill's task's agent found is told, if it finds any
+/// ([`hand_task`]): a read's room, held to the skill's own `[quiet]` as a
+/// `do.read`'s is ([`read_service`]), so a run that ends (or a wait that
+/// runs on) into it says nothing.
+fn task_room(skill: &str, step: &lamp_skills::task::TaskStep, runner: &Runner) -> LampRoom {
+    lamp_room(
+        skill,
+        &runner.sockets_for(skill),
+        runner.bus.clone(),
+        runner.watching.borrow().known_file.clone(),
+        runner.local_time.clone(),
+        step.quiet,
+    )
+}
+
 /// A skill's `do.task` that came due (#6305, [`lamp_skills::task`]),
 /// handed over on a thread of its own ([`lamp_skills::task::hand`]): only
 /// with the switch on and the owner's yes for its folder as it is now and
@@ -6204,6 +6211,61 @@ mod tests {
             );
         }
         assert_eq!(exact("Say briefly: Wait.", 5)["text"], "Wait.");
+    }
+
+    /// #7104 (P3): what a skill's task's agent found is told in a room held
+    /// to the skill's own `[quiet]`, as a `do.read`'s is: a run that ends
+    /// in that window says nothing; a skill with none, the lamp's quiet
+    /// hours alone.
+    #[test]
+    fn a_tasks_told_answer_is_held_to_its_skills_own_quiet() {
+        use lamp_skills::service_read::Room;
+        let dir = tempfile::Builder::new()
+            .prefix("tq")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let (_woken, waker) = wake_pipe().unwrap();
+        let (finished, _done) = waking(&Arc::new(waker));
+        let local = Arc::new(lamp_local_time::LocalTime::Offset(0));
+        let runner = Runner {
+            sockets: nowhere(dir.path(), Permissions::default()),
+            finished,
+            bus: Bus::new(dir.path().join("bus")).unwrap(),
+            glows: None,
+            body_requests: false,
+            ends: RefCell::default(),
+            looks: RefCell::default(),
+            unplug: RefCell::default(),
+            made: RefCell::default(),
+            tasks: RefCell::default(),
+            local_time: Some(local.clone()),
+            trust_clock: false,
+            clock_waiting: Cell::new(false),
+            rest_client: None,
+            runs: RefCell::default(),
+            permissions: RefCell::default(),
+            watching: RefCell::new(Watching {
+                watches: Watches::default(),
+                marks: HashMap::new(),
+                texts: None,
+                known_file: None,
+                signs: None,
+                retaken: HashMap::new(),
+            }),
+            proposals: None,
+        };
+        // A window from this minute, two long: a minute's turn stays in it.
+        let minute = local.minute_of_day(unix_ms());
+        let window = (minute, (minute + 2) % (24 * 60));
+        let step = |quiet| lamp_skills::task::TaskStep {
+            task: "Sum up this morning's mail".into(),
+            run: "scripts/main.py".into(),
+            quiet,
+        };
+        let mut room = task_room("morning-mail", &step(Some(window)), &runner);
+        assert_eq!(room.quiet, Some(window));
+        assert!(room.seen().quiet, "the skill's own [quiet] holds the tell");
+        assert_eq!(task_room("morning-mail", &step(None), &runner).quiet, None);
     }
 
     /// #5288's gate: a line on `voice/heard`, an event the bus keeps no
