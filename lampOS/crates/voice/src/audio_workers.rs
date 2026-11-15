@@ -2715,19 +2715,30 @@ mod peer_stop_speaker_tests {
             ReferenceChannels::bind(&directory.path, "speaker", worker_boot, capture_boot).unwrap();
         assert!(link.connect_step().unwrap());
         drop(capture);
-        let refused = link
-            .control
-            .send(ReferenceControl::Stopped {
-                playback_epoch: 1,
-                observed_at_us: monotonic_us(),
-            })
-            .expect_err("a send to a closed capture side is refused");
         // What the OS says of a send to a closed peer: refused on Linux, reset on macOS (ECONNRESET).
-        // Nothing here branches on which; only that the send is an error.
         #[cfg(target_os = "linux")]
         let closed_peer = io::ErrorKind::ConnectionRefused;
         #[cfg(not(target_os = "linux"))]
         let closed_peer = io::ErrorKind::ConnectionReset;
+        // Sent until it is refused, for at most 5 s: a child another test forks just as the peer
+        // drops holds a copy of its socket until its exec (on macOS, std sets close-on-exec only
+        // after `socket()`, so a fork in that gap keeps it for good), and a send to it is then
+        // accepted (`process::Worker::send_stop_until_peer_gone`, #1569; Heron's pairs run on #7137).
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let refused = loop {
+            let sent = link.control.send(ReferenceControl::Stopped {
+                playback_epoch: 1,
+                observed_at_us: monotonic_us(),
+            });
+            match sent {
+                Err(error) if error.kind() == closed_peer => break error,
+                other => assert!(
+                    std::time::Instant::now() < until,
+                    "a send to a closed capture side was still not refused after 5 s: {other:?}"
+                ),
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        };
         assert_eq!(refused.kind(), closed_peer, "{refused}");
         #[cfg(target_os = "linux")]
         let speaker = Speaker::open_clock("null", parent_boot).unwrap();

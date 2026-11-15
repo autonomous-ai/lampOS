@@ -1533,7 +1533,19 @@ mod tests {
         let (mut sender, receiver) = pair(&dir.path);
         sender.send(1u32).unwrap();
         drop(receiver);
-        let error = sender.send(2u32).unwrap_err();
+        // Sent until it is refused, for at most 5 s: a child another test forks just as the peer
+        // drops holds a copy of its socket until its exec, and a send to it is then accepted.
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let error = loop {
+            match sender.send(2u32) {
+                Err(error) if error.kind() != io::ErrorKind::WouldBlock => break error,
+                other => assert!(
+                    std::time::Instant::now() < until,
+                    "a send to a gone peer was still not refused after 5 s: {other:?}"
+                ),
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        };
         assert_ne!(error.kind(), io::ErrorKind::WouldBlock);
         assert!(error.to_string().starts_with("s: "), "{error}");
         #[cfg(target_os = "linux")]
@@ -1557,7 +1569,20 @@ mod tests {
         let dir = SessionDirectory::create().unwrap();
         let (mut sender, receiver) = pair(&dir.path);
         drop(receiver);
-        let error = sender.receive::<u32>().unwrap_err();
+        // Received until it errs, for at most 5 s: a child another test forks just as the peer
+        // drops holds a copy of its socket until its exec (macOS: for good, close-on-exec is set
+        // after `socket()`), and the receive is then only `WouldBlock`.
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let error = loop {
+            match sender.receive::<u32>() {
+                Err(error) => break error,
+                other => assert!(
+                    std::time::Instant::now() < until,
+                    "a receive from a gone peer still did not fail after 5 s: {other:?}"
+                ),
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        };
         assert_ne!(error.kind(), io::ErrorKind::WouldBlock);
         assert!(error.to_string().starts_with("s: "), "{error}");
     }
