@@ -987,14 +987,26 @@ impl Cli {
     /// [`OPENCLAW_HARNESS`] or later (#6226: the lamp's pinned 0.6.2 has no
     /// OpenClaw). A version not read is no.
     pub fn runs_openclaw(&self) -> bool {
+        self.openclaw_harness() == OpenclawHarness::Runs
+    }
+
+    /// What `harness --version` says of OpenClaw now: a version read and
+    /// [`OPENCLAW_HARNESS`] or later, one read and older, or none read (a
+    /// failed or timed-out run, or words that are no version: at a boot
+    /// Harness may not answer yet, #7133).
+    pub fn openclaw_harness(&self) -> OpenclawHarness {
         let mut seen = Seen::default();
         let version = self.run(&["--version".into()], self.config.read_timeout);
         seen.took(&version);
-        version
+        match version
             .ok()
             .filter(|reply| reply.success)
             .and_then(|reply| harness_version(&reply.stdout))
-            .is_some_and(|version| version >= OPENCLAW_HARNESS)
+        {
+            Some(version) if version >= OPENCLAW_HARNESS => OpenclawHarness::Runs,
+            Some(version) => OpenclawHarness::TooOld(version),
+            None => OpenclawHarness::Unread,
+        }
     }
 
     /// The environment each Harness child gets: the checked one, with the
@@ -5366,6 +5378,17 @@ fn lists_resume(bytes: &[u8]) -> bool {
 
 /// The first Harness CLI that runs OpenClaw (#6226).
 pub const OPENCLAW_HARNESS: (u32, u32, u32) = (0, 6, 11);
+
+/// What `harness --version` says of OpenClaw ([`Cli::openclaw_harness`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OpenclawHarness {
+    /// [`OPENCLAW_HARNESS`] or later.
+    Runs,
+    /// A version read, older than [`OPENCLAW_HARNESS`]: no OpenClaw.
+    TooOld((u32, u32, u32)),
+    /// No version read: it says nothing either way.
+    Unread,
+}
 
 /// The first `major.minor.patch` in `harness --version`'s first line
 /// (`0.6.12_cli`, `harness 0.6.12`).
