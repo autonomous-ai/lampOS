@@ -216,6 +216,10 @@ impl Runs {
                 put_package(&self.root, self.package);
                 Ok(String::new())
             } else if line.ends_with(" --version") {
+                // It runs in the namespace script: none there, it fails.
+                if fs::metadata(on(&self.root, NS)).is_err() {
+                    return Err(format!("{NS}: No such file or directory"));
+                }
                 Ok("OpenClaw 2026.11.2\n".into())
             } else {
                 Ok(String::new())
@@ -2402,4 +2406,33 @@ fn the_allowlist_add_is_tried_again_while_the_gateways_config_is_not_ready() {
     };
     assert_eq!(exec_allowlist(&mut run, shown, &mut quiet()), Some(false));
     assert_eq!(adds, 1, "another refusal is not retried");
+}
+
+/// #7135 (V2, 52e6 stuck): the package pinned already, the namespace
+/// script gone (a failed install took it out), the one-shot writes it
+/// again before `--version` runs in it, and installs; never `installer`
+/// on every try.
+#[test]
+fn a_pinned_package_with_its_namespace_script_gone_installs_again() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round(&lamp, &mut systemd, true, 10).unwrap();
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 20).unwrap().install, "installed");
+    fs::remove_file(lamp.at(NS)).unwrap();
+    fs::remove_file(lamp.at(WRAPPER)).unwrap();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    let said = install(&lamp, &runs, 30).unwrap();
+    assert_eq!(said.install, "installed", "{:#?}", runs.lines());
+    // The ask as written here: every switch off.
+    assert_eq!(
+        fs::read_to_string(lamp.at(NS)).unwrap(),
+        ns_text(Shown::default())
+    );
+    assert!(
+        !runs.lines().iter().any(|line| line.contains(NPM_CI_ENV)),
+        "pinned: no npm ci again"
+    );
 }
