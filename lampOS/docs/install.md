@@ -2548,6 +2548,14 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      check still failing is found again by the next round. There is no
      switch of its own: it only makes systemd run lamp-update's own unit
      as its text says.
+     A reinstall that fails over a working OpenClaw (its record
+     `installed`, or the wrapper, `openclaw-ns` and the package there)
+     puts the Node and package it moved to `/var/lib/lampos-openclaw.old`
+     back, then the wrapper, `openclaw-ns` and `skill-start` as they were,
+     and never stops the gateway; the record still says `failed`, so it is
+     retried as before. Only a failure with nothing working before (or no
+     package to go back to) stops the gateway and takes the entry points
+     out (#7156).
    - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
      lamp-cloud's `/var/lib/lampos-cloud/hermes-token`, as Hermes's does,
      for the `lampos` provider's `apiKey` (`${LAMP_HERMES_TOKEN}`).
