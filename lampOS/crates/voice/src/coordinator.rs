@@ -58,9 +58,11 @@ use std::{
     io::{self, Write},
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
-    process::Command,
     time::{Duration, Instant},
 };
+// The legacy-owner guard (Linux) runs systemctl; the tests spawn this binary.
+#[cfg(any(target_os = "linux", test))]
+use std::process::Command;
 mod camera;
 pub mod motor;
 use motor::{OptionalMotor, PreparedMotor};
@@ -3669,6 +3671,14 @@ fn flush_cues(trace: &mut SessionState, cues: &mut Option<CueSink>) {
     trace.flush(cues, monotonic_us());
 }
 
+/// Off Linux there is no systemd, and so none of the lamp's units to coexist with: nothing
+/// to refuse. (macOS has no `/usr/bin/systemctl`; the guard's first call would fail the start.)
+#[cfg(not(target_os = "linux"))]
+fn refuse_legacy_owners() -> io::Result<()> {
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
 fn refuse_legacy_owners() -> io::Result<()> {
     // This is a coexistence guard for the test board, not a legacy runtime
     // dependency. An absent unit is fine; a running writer forbids this run.
