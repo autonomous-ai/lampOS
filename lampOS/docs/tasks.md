@@ -3588,11 +3588,16 @@ program, a missing name said, a `skill.toml` naming `secrets` seen),
 
 **Now (#7133):** a skill's run on OpenClaw is a Harness `new` OpenClaw
 turn (agent `main`, through the gateway `lamp-openclaw-gateway`), which
-execs the run folder's `start` by absolute path. lamp-update's OpenClaw
-install (with `LAMP_SKILL_DEFAULT_AGENT=on`) gives agent `main` one exec
-allow-list entry in OpenClaw's exec approvals,
-`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`, and takes the
-withdrawn fence agent `lamp-skill-run`'s entry out: with OpenClaw's stock
+execs the launcher `/usr/local/lib/lampos/skill-start` by absolute path:
+a root-owned byte copy of the installed lamp-tasks that lamp-update keeps
+(with `LAMP_SKILL_DEFAULT_AGENT=on`), reaching lamp-tasks through
+`/run/lampos-skill-start` (lamp-update's folder, kept by the gateway's
+unit; lamp-tasks makes `start.sock` in it), which OpenClaw's namespace
+shows read-only.
+Agent `main`'s exec allow-list in OpenClaw's exec approvals names that
+one path exactly, nothing in the work folder (every OpenClaw agent can
+write there); the earlier glob is taken out of `main` and of the
+withdrawn fence agent `lamp-skill-run`. With OpenClaw's stock
 `tools.exec.mode: "ask"`, a headless turn's exec is denied otherwise
 (install.md, "OpenClaw on the lamp"). The warm-gateway turn, its fence
 agent and the fence below are the withdrawn design (#7101), kept here
