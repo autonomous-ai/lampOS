@@ -304,6 +304,11 @@ pub struct Journal {
     /// before.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skills: Vec<SkillBack>,
+    /// The exit notes the switch writes for units without one (#7135), as
+    /// lamp paths: removed with the rest put back. Absent from a journal
+    /// written before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exit_notes: Vec<String>,
     /// Why the build was being put back, when a put-back for a fault of the
     /// build (a part not well, a failed watch) could not put every file back
     /// and left the journal (#6266). Its recovery refuses the build for this
@@ -884,6 +889,7 @@ mod tests {
             }],
             models: Vec::new(),
             settings: false,
+            exit_notes: vec!["/etc/systemd/system/lamp-tasks.service.d/exit-note.conf".into()],
             refusing: None,
         };
         records.save_journal(&journal).unwrap();
@@ -1042,6 +1048,7 @@ mod tests {
                 wrote: "9".repeat(64),
                 made: Vec::new(),
             }],
+            exit_notes: Vec::new(),
             refusing: None,
         };
         (state, journal)
