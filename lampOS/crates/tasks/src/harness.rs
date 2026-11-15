@@ -833,6 +833,13 @@ pub struct CliConfig {
     /// lamp's own target looks among ([`SessionMachines`]). `None`: only
     /// the launch's own machine, as before.
     pub session_machines: Option<Arc<Mutex<SessionMachines>>>,
+    /// The id Harness's daemon here starts work under, from the last
+    /// `auth status` read ([`parse_daemon_here`], R5 on #7133), shared by
+    /// every [`Cli`] made from this config or its clones: a skill's run has
+    /// a Cli of its own ([`crate::skill_task::SkillHarness`]), which reads
+    /// no sign-in, and needs the id the spoken tasks' Cli read (lamp-c0a4,
+    /// 15 Nov: every signed-out skill run was `machine_mismatch`).
+    pub daemon_here: Arc<Mutex<Option<String>>>,
     /// After each `harness start` that succeeded, Harness's `/api/health`
     /// is asked, with no credential, in a thread of its own, and one line
     /// journaled ([`crate::hold::watch_health`], #5229). Set with the update
@@ -909,6 +916,7 @@ impl CliConfig {
             journal: None,
             calls: None,
             session_machines: None,
+            daemon_here: Arc::default(),
             health_after_start: false,
             openclaw_gateway: false,
         }
@@ -925,10 +933,6 @@ pub struct Cli {
     operation: Mutex<()>,
     poisoned: AtomicBool,
     executable: ExecutableIdentity,
-    /// The id Harness's daemon here starts work under, from the last
-    /// `auth status` read ([`parse_daemon_here`], R5 on #7133): what a `new`
-    /// for the lamp's own target replies as its `machineId`.
-    daemon: Mutex<Option<String>>,
     /// Each computer's answer for each engine (`serve --engines-ready`).
     ready: Mutex<Kept>,
     /// Each computer's home folder, by machine id, as its own `new` reply
@@ -1095,7 +1099,6 @@ impl Cli {
             operation: Mutex::new(()),
             poisoned: AtomicBool::new(false),
             executable,
-            daemon: Mutex::new(None),
             ready: Mutex::new(BTreeMap::new()),
             homes: Mutex::new(BTreeMap::new()),
             folders,
@@ -1279,6 +1282,9 @@ impl Cli {
                 "tasks: {}: the folder for '{name}' is new to this lamp on that computer, so Harness is asked to make it",
                 launch.name
             );
+        }
+        if this_computer(&launch.target.machine_id) && self.daemon_here().is_none() {
+            self.read_daemon_here(until.saturating_duration_since(Instant::now()));
         }
         let asked = Instant::now();
         let mut reply = self.run(&args, until.saturating_duration_since(Instant::now()));
@@ -3002,7 +3008,28 @@ impl Cli {
     /// The id the daemon here starts work under, as the last `auth status`
     /// read said ([`parse_daemon_here`]); none before one.
     fn daemon_here(&self) -> Option<String> {
-        self.daemon.lock().ok().and_then(|daemon| daemon.clone())
+        self.config
+            .daemon_here
+            .lock()
+            .ok()
+            .and_then(|daemon| daemon.clone())
+    }
+
+    /// The daemon's id read here, before a `new` for the lamp's own target,
+    /// when no `auth status` read has said it yet (a skill's first run after
+    /// a start may come before the spoken tasks' first sign-in read). In
+    /// the launch's bound; a failed read leaves none, and the reply is then
+    /// matched against the target's own id, as before.
+    fn read_daemon_here(&self, bound: Duration) {
+        let Ok(reply) = self.run(&["auth".into(), "status".into(), "--json".into()], bound) else {
+            return;
+        };
+        if !reply.success {
+            return;
+        }
+        if let Ok(mut daemon) = self.config.daemon_here.lock() {
+            *daemon = parse_daemon_here(&reply.stdout);
+        }
     }
 
     pub fn signed_in(&self) -> Result<SignIn, String> {
@@ -3023,7 +3050,7 @@ impl Cli {
             return Err("auth_status_failed".into());
         }
         let read = parse_auth_here(&reply.stdout).map_err(str::to_string)?;
-        if let Ok(mut daemon) = self.daemon.lock() {
+        if let Ok(mut daemon) = self.config.daemon_here.lock() {
             *daemon = parse_daemon_here(&reply.stdout);
         }
         if read.0 == SignIn::Out {
