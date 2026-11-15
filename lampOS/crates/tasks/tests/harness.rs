@@ -6782,6 +6782,7 @@ fn skill_runner_with(
         wrappers: None,
         agent_ns: None,
         login: None,
+        starts: Default::default(),
     }
 }
 
@@ -7457,42 +7458,108 @@ fn openclaw_json_under(dir: &std::path::Path) -> Vec<PathBuf> {
     found
 }
 
-/// What a gateway agent's run left in its folder before Harness was
-/// asked ([`watch_start`]).
-struct StartSeen {
-    start: String,
-    start_mode: u32,
-    token: String,
-    token_mode: u32,
+/// The skill-start launcher as the kernel would name it (#7133): its
+/// own uid, its program the launcher file itself.
+struct LauncherPeer;
+
+const TEST_LAUNCHER: &str = "/test/skill-start";
+
+impl lamp_tasks::skill_start::Peers for LauncherPeer {
+    fn peer(&self, _: &std::os::unix::net::UnixStream) -> Option<lamp_tasks::skill_start::Peer> {
+        Some(lamp_tasks::skill_start::Peer {
+            pid: 7133,
+            uid: 990,
+        })
+    }
+    fn exe_link(&self, _: u32) -> std::io::Result<PathBuf> {
+        Ok(TEST_LAUNCHER.into())
+    }
+    fn exe_file(&self, _: u32) -> std::io::Result<lamp_tasks::skill_start::FileSeen> {
+        Ok(launcher_seen())
+    }
+    fn file(&self, _: &std::path::Path) -> std::io::Result<lamp_tasks::skill_start::FileSeen> {
+        Ok(launcher_seen())
+    }
+    fn environ(&self, _: u32) -> std::io::Result<Vec<u8>> {
+        Ok(b"PATH=/usr/bin\0".to_vec())
+    }
+    fn maps(&self, _: u32) -> std::io::Result<String> {
+        Ok(format!(
+            "aaaa1000-aaab0000 r-xp 00001000 b3:02 2 {TEST_LAUNCHER}\n"
+        ))
+    }
 }
 
-/// Watches run `task-1`'s folder for its `start` and `token` (#7133): once
-/// both are whole, reads them and, with `consume`, deletes the token as
-/// the run's start does when the agent runs it. `None` when none came.
-fn watch_start(rig: &Rig, consume: bool) -> thread::JoinHandle<Option<StartSeen>> {
+fn launcher_seen() -> lamp_tasks::skill_start::FileSeen {
+    lamp_tasks::skill_start::FileSeen {
+        file: true,
+        uid: 0,
+        mode: 0o100755,
+        dev: 1,
+        ino: 2,
+    }
+}
+
+/// What the launcher saw of run `task-1` (#7133): its folder's entries
+/// when it was live, lamp-tasks' answer to its claim.
+struct Claimed {
+    entries: Vec<String>,
+    answer: String,
+}
+
+/// The launcher for run `task-1`: once it is live, claims it on lamp-tasks'
+/// launcher side (a socket pair, as the launcher's connection), then says
+/// `then` (`started`, or nothing, as a fence that failed). With `claim`
+/// off, only waits to see it live. `None` when it never was live.
+fn launch_start(
+    rig: &Rig,
+    starts: &lamp_tasks::skill_start::Starts,
+    claim: bool,
+    then: Option<&'static str>,
+) -> thread::JoinHandle<Option<Claimed>> {
+    use std::io::{Read as _, Write as _};
     let folder = rig.root.path().join("project/skill-task-1");
+    let starts = starts.clone();
     thread::spawn(move || {
         let until = Instant::now() + Duration::from_secs(20);
-        let start_at = folder.join(lamp_tasks::gateway::START_FILE);
-        let token_at = folder.join(lamp_tasks::gateway::TOKEN_FILE);
         while Instant::now() < until {
-            if let Ok(start) = fs::read_to_string(&start_at)
-                && start.ends_with('\n')
-                && start.contains("exec unshare --user --map-root-user")
-            {
-                let token = fs::read_to_string(&token_at).unwrap();
-                let mode =
-                    |path: &PathBuf| fs::metadata(path).unwrap().permissions().mode() & 0o777;
-                let seen = StartSeen {
-                    start,
-                    start_mode: mode(&start_at),
-                    token,
-                    token_mode: mode(&token_at),
-                };
-                if consume {
-                    fs::remove_file(&token_at).unwrap();
+            if starts.is_live("task-1") {
+                let mut entries: Vec<String> = fs::read_dir(&folder)
+                    .map(|read| {
+                        read.flatten()
+                            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                entries.sort();
+                if !claim {
+                    return Some(Claimed {
+                        entries,
+                        answer: String::new(),
+                    });
                 }
-                return Some(seen);
+                let (near, far) = std::os::unix::net::UnixStream::pair().unwrap();
+                let server = lamp_tasks::skill_start::Server {
+                    socket: PathBuf::from("/unused"),
+                    starts: starts.clone(),
+                    peers: Arc::new(LauncherPeer),
+                    own_uid: 990,
+                    launcher: TEST_LAUNCHER.into(),
+                    started_within: Duration::from_secs(5),
+                };
+                let served = thread::spawn(move || server.one(far));
+                (&near).write_all(b"task-1\n").unwrap();
+                let mut answer = String::new();
+                let mut byte = [0u8; 1];
+                while (&near).read(&mut byte).unwrap() == 1 && byte[0] != b'\n' {
+                    answer.push(byte[0] as char);
+                }
+                if let Some(line) = then {
+                    (&near).write_all(format!("{line}\n").as_bytes()).unwrap();
+                }
+                drop(near);
+                served.join().unwrap();
+                return Some(Claimed { entries, answer });
             }
             thread::sleep(Duration::from_millis(1));
         }
@@ -7505,16 +7572,18 @@ fn watch_start(rig: &Rig, consume: bool) -> thread::JoinHandle<Option<StartSeen>
 /// namespace shows lamp-control's socket, a skill's run is `harness new
 /// openclaw` in its own folder, as Hermes's is, and no `openclaw.json` is
 /// written anywhere. Its tools run in the gateway, which no wrapper's
-/// environment reaches (#7133): before `new` the run's folder holds the
-/// token (0600) and the run's `start` (0700), the Harness task names that
-/// `start` and never the token, and once `start` has taken the token the
-/// run ends well, with nothing left.
+/// environment reaches, and its folder is in `WORK`, which every agent
+/// of the gateway reads and writes (#7133): before `new` the run is live
+/// for the skill-start launcher and its folder holds nothing (no `token`,
+/// no `start`); the Harness task names the launcher and the run's id and
+/// never the token; the launcher's claim gets the run's grant; once its
+/// fence says `started` the run ends well, with nothing left, and the
+/// run is no longer live.
 #[test]
 fn an_openclaw_gateway_default_runs_through_harness_new_like_hermes() {
     for state in ["stopped", "idle"] {
         let rig = Rig::new();
         skill_ok_plan(&rig, state);
-        let watched = watch_start(&rig, true);
         let gateway_ns = rig.root.path().join("openclaw-ns");
         fs::write(
             &gateway_ns,
@@ -7530,6 +7599,7 @@ fn an_openclaw_gateway_default_runs_through_harness_new_like_hermes() {
             &[("openclaw", &wrapper)],
             Some("#!/bin/sh\n"),
         );
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
         let run = skill_run(Duration::from_secs(20));
         assert_eq!(runner.run(&run, &|| {}), Ok(0));
         assert!(run.started.load(std::sync::atomic::Ordering::Acquire));
@@ -7549,20 +7619,33 @@ fn an_openclaw_gateway_default_runs_through_harness_new_like_hermes() {
             new.to_string().contains("skill-task-1"),
             "the run's own folder: {new}"
         );
-        let seen = watched.join().unwrap().expect("start and token before new");
-        assert_eq!(seen.token, RUN_SECRET);
-        assert_eq!((seen.token_mode, seen.start_mode), (0o600, 0o700));
-        assert!(
-            !seen.start.contains(RUN_SECRET),
-            "the start names no secret"
+        let claimed = launched.join().unwrap().expect("live before it ended");
+        assert_eq!(
+            claimed.entries,
+            Vec::<String>::new(),
+            "no token or start in WORK"
         );
-        let start = rig.root.path().join("project/skill-task-1/start");
-        assert!(seen.start.contains("python3") && seen.start.contains("main.py"));
+        let grant = lamp_tasks::skill_start::parse_answer(&claimed.answer).unwrap();
+        assert_eq!(grant.token, RUN_SECRET);
+        assert_eq!(grant.interpreter, "python3");
+        assert_eq!(
+            grant.script,
+            PathBuf::from("/var/lib/lampOS/skills/photo-booth/scripts/main.py")
+        );
+        assert_eq!(
+            grant.skill,
+            PathBuf::from("/var/lib/lampOS/skills/photo-booth")
+        );
+        assert_eq!(grant.run, rig.root.path().join("project/skill-task-1"));
+        assert_eq!(grant.socket, skill_task::CONTROL_SOCKET);
         let task = new.to_string();
         assert!(
-            task.contains(&format!("Run `{}` once", start.display())),
-            "the task names the run's start: {task}"
+            task.contains("Run `/usr/local/lib/lampos/skill-start task-1` once"),
+            "the task names the launcher and the run: {task}"
         );
+        assert!(!task.contains("/start`"), "{task}");
+        assert!(!runner.starts.is_live("task-1"), "not live after its end");
+        assert!(runner.starts.claim("task-1").is_err());
         assert_eq!(openclaw_json_under(rig.root.path()), Vec::<PathBuf>::new());
         nothing_left(&rig);
     }
@@ -7592,13 +7675,30 @@ fn an_openclaw_gateway_default_runs_through_harness_new_like_hermes() {
     assert!(!rig.root.path().join("runs").exists());
 }
 
-/// #7133: a gateway default's run whose `start` never ran (its token still
-/// in the run's folder when Harness says the agent ended) fails in words,
-/// never done, its token ended with lamp-control before the folder goes.
+/// #7133: a gateway default's run whose launcher never claimed its start
+/// fails in words, never done; one claimed whose fence never said
+/// `started` fails in its own words. Either way its token is ended with
+/// lamp-control while the run is still live, then it is live no more.
 /// Hermes's run is asked with the run's own words, as before.
 #[test]
 fn a_gateway_default_whose_start_never_ran_fails_and_hermes_is_as_before() {
-    for state in ["stopped", "idle"] {
+    for (state, claim, said_is) in [
+        (
+            "stopped",
+            false,
+            "the default agent never started the skill's script",
+        ),
+        (
+            "idle",
+            false,
+            "the default agent never started the skill's script",
+        ),
+        (
+            "idle",
+            true,
+            "the skill's start was claimed but its script never started (its fence failed)",
+        ),
+    ] {
         let rig = Rig::new();
         skill_ok_plan(&rig, state);
         let gateway_ns = rig.root.path().join("openclaw-ns");
@@ -7613,26 +7713,25 @@ fn a_gateway_default_whose_start_never_ran_fails_and_hermes_is_as_before() {
             &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
             Some("#!/bin/sh\n"),
         );
-        let watched = watch_start(&rig, false);
-        let folder = rig.root.path().join("project/skill-task-1");
-        let token_at_end = std::cell::Cell::new(None);
+        let launched = launch_start(&rig, &runner.starts, claim, None);
+        let starts = runner.starts.clone();
+        let live_at_end = std::cell::Cell::new(None);
         let said = runner
             .run(&skill_run(Duration::from_secs(20)), &|| {
-                if token_at_end.get().is_none() {
-                    token_at_end.set(Some(folder.join("token").exists()));
+                if live_at_end.get().is_none() {
+                    live_at_end.set(Some(starts.is_live("task-1")));
                 }
             })
             .unwrap_err();
-        assert_eq!(said, "the default agent never started the skill's script");
-        assert!(
-            watched.join().unwrap().is_some(),
-            "start and token were there"
-        );
+        assert_eq!(said, said_is);
+        let launched = launched.join().unwrap().expect("it was live");
+        assert_eq!(launched.entries, Vec::<String>::new());
         assert_eq!(
-            token_at_end.get(),
+            live_at_end.get(),
             Some(true),
-            "token ended before the folder went"
+            "token ended while the run was still live"
         );
+        assert!(!starts.is_live("task-1"));
         nothing_left(&rig);
     }
 
@@ -7657,7 +7756,8 @@ fn a_gateway_default_whose_start_never_ran_fails_and_hermes_is_as_before() {
             .any(|arg| arg == &json!(run.prompt)),
         "Hermes's task is the run's own words: {new}"
     );
-    assert!(!new.to_string().contains("/start"), "{new}");
+    assert!(!new.to_string().contains("skill-start"), "{new}");
+    assert!(!runner.starts.is_live("task-1"));
     nothing_left(&rig);
 }
 
@@ -7760,8 +7860,8 @@ fn an_openclaw_default_skill_run_waits_for_the_gateway_before_new() {
         Some(4),
         Duration::from_secs(10),
     );
-    // The agent runs the run's start, which takes its token (#7133).
-    let watched = watch_start(&rig, true);
+    // The agent runs the launcher, whose fence starts the script (#7133).
+    let watched = launch_start(&rig, &runner.starts, true, Some("started"));
     assert_eq!(
         runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
         Ok(0)
