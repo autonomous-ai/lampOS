@@ -925,6 +925,10 @@ pub struct Cli {
     operation: Mutex<()>,
     poisoned: AtomicBool,
     executable: ExecutableIdentity,
+    /// The id Harness's daemon here starts work under, from the last
+    /// `auth status` read ([`parse_daemon_here`], R5 on #7133): what a `new`
+    /// for the lamp's own target replies as its `machineId`.
+    daemon: Mutex<Option<String>>,
     /// Each computer's answer for each engine (`serve --engines-ready`).
     ready: Mutex<Kept>,
     /// Each computer's home folder, by machine id, as its own `new` reply
@@ -1079,6 +1083,7 @@ impl Cli {
             operation: Mutex::new(()),
             poisoned: AtomicBool::new(false),
             executable,
+            daemon: Mutex::new(None),
             ready: Mutex::new(BTreeMap::new()),
             homes: Mutex::new(BTreeMap::new()),
             folders,
@@ -1340,7 +1345,7 @@ impl Cli {
         }
         match reply {
             Ok(reply) if reply.success && launch.target.engine.typed_after() => {
-                let outcome = parse_launch(&reply.stdout, launch);
+                let outcome = parse_launch(&reply.stdout, launch, self.daemon_here().as_deref());
                 self.first_message(launch, outcome, until, seen)
             }
             // OpenClaw's first prompt is its TUI's `--message` (#6226). On
@@ -1351,10 +1356,12 @@ impl Cli {
             // (#6499). A truly lost prompt ("initial message not sent") is
             // Harness's to type in: fixed in Harness 0.6.23 (openharness#4172).
             Ok(reply) if reply.success && launch.target.engine == EngineKind::Openclaw => {
-                let outcome = parse_launch(&reply.stdout, launch);
+                let outcome = parse_launch(&reply.stdout, launch, self.daemon_here().as_deref());
                 self.openclaw_first_prompt(launch, outcome, until, seen)
             }
-            Ok(reply) if reply.success => parse_launch(&reply.stdout, launch),
+            Ok(reply) if reply.success => {
+                parse_launch(&reply.stdout, launch, self.daemon_here().as_deref())
+            }
             Ok(reply) if self.config.folder_missing && folder_missing(&reply.stdout) => {
                 not_sent("folder_missing")
             }
@@ -2972,6 +2979,12 @@ impl Cli {
     /// Whether Harness is signed in to the person's account (`harness auth
     /// status --json`, `serve --set-up-later`). A read only: it signs
     /// nothing in or out.
+    /// The id the daemon here starts work under, as the last `auth status`
+    /// read said ([`parse_daemon_here`]); none before one.
+    fn daemon_here(&self) -> Option<String> {
+        self.daemon.lock().ok().and_then(|daemon| daemon.clone())
+    }
+
     pub fn signed_in(&self) -> Result<SignIn, String> {
         self.signed_in_here().map(|(sign_in, _)| sign_in)
     }
@@ -2990,6 +3003,9 @@ impl Cli {
             return Err("auth_status_failed".into());
         }
         let read = parse_auth_here(&reply.stdout).map_err(str::to_string)?;
+        if let Ok(mut daemon) = self.daemon.lock() {
+            *daemon = parse_daemon_here(&reply.stdout);
+        }
         if read.0 == SignIn::Out {
             self.index_signed_out();
         }
@@ -5422,7 +5438,13 @@ fn reply_refusal(bytes: &[u8]) -> &'static str {
     }
 }
 
-fn parse_launch(bytes: &[u8], launch: &Launch) -> LaunchOutcome {
+/// `daemon`: the id Harness's daemon here starts work under
+/// ([`parse_daemon_here`]). A `new` for the lamp's own target is sent with
+/// no `--machine`, so it is always started here, and its reply names the
+/// daemon's id: with a session on disk, signed out or not, the account
+/// machine's `machineId`, not the `computerId` the target is named by
+/// (R5 on #7133). Any other target's reply names that target's machine.
+fn parse_launch(bytes: &[u8], launch: &Launch, daemon: Option<&str>) -> LaunchOutcome {
     let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
     let Ok(reply) = serde_json::from_slice::<NewReply>(bytes) else {
         return uncertain("invalid_reply");
@@ -5433,7 +5455,11 @@ fn parse_launch(bytes: &[u8], launch: &Launch) -> LaunchOutcome {
     if reply.error.is_some() {
         return uncertain("invalid_reply");
     }
-    if reply.machine_id.as_deref() != Some(&launch.target.machine_id) {
+    let expected = match daemon {
+        Some(daemon) if this_computer(&launch.target.machine_id) => daemon,
+        _ => launch.target.machine_id.as_str(),
+    };
+    if reply.machine_id.as_deref() != Some(expected) {
         return uncertain("machine_mismatch");
     }
     if reply.existing == Some(true) {
@@ -5728,6 +5754,26 @@ pub fn parse_auth_here(bytes: &[u8]) -> Result<(SignIn, Option<String>), &'stati
         .filter(|id| this_computer(id))
         .map(str::to_owned);
     Ok((sign_in, computer))
+}
+
+/// The id Harness's daemon on this computer starts work under, from
+/// `harness auth status --json` (openharness `cli.ts`
+/// `wantedDaemonIdentity`: the session's `machineId`, else `computerId`;
+/// R5 on #7133): `machineId` when present and a machine's id, whatever
+/// `loggedIn` says (a session on disk may read signed out and still run
+/// under it), else `computerId` when it is this computer's own id
+/// ([`this_computer`]). None when neither is.
+pub fn parse_daemon_here(bytes: &[u8]) -> Option<String> {
+    let status = serde_json::from_slice::<Value>(bytes).ok()?;
+    let named = |field: &str| {
+        status[field]
+            .as_str()
+            .filter(|id| !id.is_empty())
+            .map(str::to_owned)
+    };
+    named("machineId")
+        .filter(|id| machine_id(id))
+        .or_else(|| named("computerId").filter(|id| this_computer(id)))
 }
 
 /// What `harness ps --json` says (Harness 0.4.2): an object whose
