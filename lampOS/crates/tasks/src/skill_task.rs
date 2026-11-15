@@ -1366,6 +1366,18 @@ fn run_on_token(
         .filter(|_| tells)
         .map(|answer| told_answer(answer))
         .filter(|answer| !answer.is_empty());
+    // What its answer to lamp-skills tells: its length only (#7180).
+    if tells || run.answer.get().is_some() {
+        eprintln!(
+            "[lamp-tasks] skill task {}: its hand-over's answer tells {}",
+            run.run,
+            match (&found, tells) {
+                (Some(found), _) => format!("{} bytes", found.len()),
+                (None, false) => "nothing: not a run that tells".to_owned(),
+                (None, true) => "nothing".to_owned(),
+            }
+        );
+    }
     // Its keys' file, whatever the runner did with it, then its folder.
     if let Some(file) = &run.env_file {
         let _ = std::fs::remove_file(file);
@@ -3021,10 +3033,22 @@ impl Runner for HarnessRunner {
                     });
                 }
                 let ended = ended_as(&state, agent);
+                let answer = answer.filter(|answer| !answer.trim().is_empty());
+                // What of its agent's answer is kept: its length only, never
+                // its words (#7180).
+                eprintln!(
+                    "[lamp-tasks] skill task {}: its agent's answer: {}",
+                    run.run,
+                    match (&answer, ended.is_ok()) {
+                        (Some(answer), true) => format!("{} bytes kept", answer.len()),
+                        (Some(_), false) => "not kept, its run didn't end well".to_owned(),
+                        (None, _) => "none in its end's show".to_owned(),
+                    }
+                );
                 // Kept for the hand-over's answer; told only by a run that
                 // tells it ([`tells_answer`]).
                 if ended.is_ok()
-                    && let Some(answer) = answer.filter(|answer| !answer.trim().is_empty())
+                    && let Some(answer) = answer
                 {
                     let _ = run.answer.set(answer);
                 }
