@@ -1871,7 +1871,14 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   owner's yes, can't be asked"). Then one at a time a skill, and at most 3 a skill
   and 10 across every skill in any 24 hours (`task-runs.json` in
   `--state-dir`; an unreadable ledger or one with a run after now counts as
-  full).
+  full). A run is counted as it is handed over, and taken back off the
+  ledger when lamp-tasks refused it before its agent began (the fixed
+  write's `NOT_TAKEN`: `busy` with another skill's run, `not_started`, off,
+  a bad line or no token, or lamp-tasks not reached): the journal adds
+  "; not counted". A run that may have begun (`run_failed`, no answer)
+  stays counted. On lamp-9adf on 15 Nov, a presence skill refused `busy`
+  spent the day's last run, and the skill that came due 4 s later found
+  none.
 - **The hand-over** (#6306's to build): one line on lamp-tasks' socket
   (`--tasks-socket`, or `LAMP_SKILLS_TASKS_SOCKET`, which the product's
   lamp-skills unit passes, `/run/lampos-tasks/skill-task.sock`; with
