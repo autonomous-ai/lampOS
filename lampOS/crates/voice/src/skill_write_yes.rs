@@ -123,9 +123,10 @@ mod kept {
     static WAITING: Mutex<Option<Waiting>> = Mutex::new(None);
     static AGREED: Mutex<Option<Agreed>> = Mutex::new(None);
     pub fn waiting<R>(f: impl FnOnce(&mut Option<Waiting>) -> R) -> R {
-        f(&mut WAITING
+        let mut waiting = WAITING
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner()))
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        super::mirrored(&mut waiting, f)
     }
     pub fn agreed<R>(f: impl FnOnce(&mut Option<Agreed>) -> R) -> R {
         f(&mut AGREED
@@ -144,7 +145,7 @@ mod kept {
         static AGREED: RefCell<Option<Agreed>> = const { RefCell::new(None) };
     }
     pub fn waiting<R>(f: impl FnOnce(&mut Option<Waiting>) -> R) -> R {
-        WAITING.with(|cell| f(&mut cell.borrow_mut()))
+        WAITING.with(|cell| super::mirrored(&mut cell.borrow_mut(), f))
     }
     pub fn agreed<R>(f: impl FnOnce(&mut Option<Agreed>) -> R) -> R {
         AGREED.with(|cell| f(&mut cell.borrow_mut()))
@@ -339,6 +340,97 @@ pub fn drop_wait(id: &str) -> bool {
         }
         waits
     })
+}
+
+/// Where the second route's worker keeps the made skill with code whose
+/// spoken yes it awaits ([`code_yes_awaited_told`]): the app's make status
+/// is answered by the outer voice process (`app_make::status`, its socket
+/// for lamp-cloud), and the wait lives in the worker's own memory, so on a
+/// lamp the status never saw it (sim-2's HOLD on #7130). A file in the
+/// voice's own runtime folder (`RuntimeDirectory=lampos-voice`, 0700),
+/// 0600, as [`crate::skill_task_yes::ASKED_FILE`] crosses the same two.
+pub const CODE_AWAITED_FILE: &str = "/run/lampos-voice/code-yes-awaited.json";
+
+#[cfg(not(test))]
+fn code_awaited_file() -> Option<std::path::PathBuf> {
+    Some(CODE_AWAITED_FILE.into())
+}
+
+#[cfg(test)]
+thread_local! {
+    static CODE_AWAITED_HERE: std::cell::RefCell<Option<std::path::PathBuf>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Tests: where this thread's wait is mirrored; none, nowhere.
+#[cfg(test)]
+pub fn set_code_awaited_file_here(path: Option<std::path::PathBuf>) {
+    CODE_AWAITED_HERE.with(|here| *here.borrow_mut() = path);
+}
+
+#[cfg(test)]
+fn code_awaited_file() -> Option<std::path::PathBuf> {
+    CODE_AWAITED_HERE.with(|here| here.borrow().clone())
+}
+
+/// The code wait `waiting` holds, as it is mirrored: its SHA-256 and when
+/// its wait began; none for a wait with no code of its own, or a remove's.
+fn code_wait(waiting: &Option<Waiting>) -> Option<(String, Instant)> {
+    waiting
+        .as_ref()
+        .filter(|waiting| waiting.asks.code && !waiting.asks.remove)
+        .map(|waiting| (waiting.asks.sha256.clone(), waiting.at))
+}
+
+/// `f` run on the wait, and a change of its code wait ([`code_wait`])
+/// written to [`CODE_AWAITED_FILE`]: the SHA-256 and the wall-clock time
+/// its [`YES_WITHIN`] ends, or the file removed once none waits. Written
+/// whole (`thread::write_file`); one not written leaves the app told
+/// today's `not_kept`, never a yes awaited that isn't.
+fn mirrored<R>(waiting: &mut Option<Waiting>, f: impl FnOnce(&mut Option<Waiting>) -> R) -> R {
+    let before = code_wait(waiting);
+    let result = f(waiting);
+    let after = code_wait(waiting);
+    if before != after
+        && let Some(path) = code_awaited_file()
+    {
+        match after {
+            Some((sha256, at)) => {
+                let left = YES_WITHIN.saturating_sub(at.elapsed());
+                let until = crate::app_make::now_unix_ms() + left.as_millis() as u64;
+                let told = json!({"sha256": sha256, "until_unix_ms": until});
+                if let Err(error) = crate::thread::write_file(&path, &told.to_string()) {
+                    eprintln!(
+                        "lamp-voice: a made skill's awaited yes isn't kept for the app: {error}"
+                    );
+                }
+            }
+            None => {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    }
+    result
+}
+
+/// Whether the yes to the made skill with code whose SHA-256 is `sha256`
+/// is awaited at `now_unix_ms`, as the second route's worker keeps it
+/// ([`CODE_AWAITED_FILE`]), read from any of the voice's processes: the
+/// app's make status (`app_make::status`, `awaits_yes`). One past its
+/// [`YES_WITHIN`], unreadable or of another skill, none.
+pub fn code_yes_awaited_told(sha256: &str, now_unix_ms: u64) -> bool {
+    let Some(path) = code_awaited_file() else {
+        return false;
+    };
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+        .is_some_and(|told| {
+            told["sha256"] == sha256
+                && told["until_unix_ms"]
+                    .as_u64()
+                    .is_some_and(|until| now_unix_ms <= until)
+        })
 }
 
 /// Whether the person's yes to the made skill with code of its own whose
