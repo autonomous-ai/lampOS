@@ -40,9 +40,10 @@
 //!   đi"…), so nothing the run wrote can steer the model into a send, and
 //!   names the SHA-256 of the read-back the lamp said, which
 //!   `lamp-services` holds to the write it keeps (`serve::RUN_NOT_SAID`).
-//! - **Sent by `lamp-services`**, counted against the skills' bounds (3 a
-//!   day a skill, 10 across them); the model is told "sent" only from its
-//!   answer (`services::answered`). A no, a wait, another request answered
+//! - **Sent by `lamp-services`**, counted against the skills' write bounds
+//!   (`lamp_services::skill_writes::PER_SKILL`, `PER_SKILL_HOUR` and
+//!   `ALL_SKILLS`); the model is told "sent" only from its answer
+//!   (`services::answered`). A no, a wait, another request answered
 //!   or the two minutes over: nothing is sent.
 use serde_json::Value;
 use std::{
