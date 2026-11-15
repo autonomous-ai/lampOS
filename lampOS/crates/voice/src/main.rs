@@ -707,7 +707,7 @@ fn run() -> Result<()> {
             let options = lamp_voice::options::SessionOptions::parse(flags)?;
             lamp_voice::coordinator::run_directed_session(Path::new(config), seconds.parse()?, Path::new(output), options)?;
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(unix)]
         [command, role, dir, parent, worker, device, flags @ ..]
             if command == "worker" && matches!(role.as_str(), "capture" | "speaker") => {
             let options = lamp_voice::options::AudioWorkerOptions::parse(flags, role == "capture")?;

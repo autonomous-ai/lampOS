@@ -153,6 +153,12 @@ impl CaptureDevice for BusCapture {
 mod tests {
     use super::*;
 
+    /// A short root: a Unix socket's address holds about 103 bytes, and macOS's temp directory
+    /// alone is some 50.
+    fn short_root() -> std::path::PathBuf {
+        std::path::PathBuf::from("/tmp")
+    }
+
     fn block(first: i16) -> Vec<u8> {
         let samples: Vec<u8> = (0..320i16)
             .flat_map(|k| (first + k).to_le_bytes())
@@ -178,7 +184,7 @@ mod tests {
 
     #[test]
     fn a_20_ms_block_is_read_as_two_10_ms_blocks_in_order_then_nothing_is_ready() {
-        let dir = std::env::temp_dir().join(format!("lamp-bus-capture-{}", std::process::id()));
+        let dir = short_root().join(format!("lbc-{}", std::process::id()));
         let bus = Bus::new(&dir).unwrap();
         let mut publisher = bus
             .publisher_declared(TOPIC, &Audio::declaration(), "ears")
@@ -271,7 +277,7 @@ mod tests {
 
     #[test]
     fn a_block_that_is_not_mono_16_khz_is_dropped_and_said_once() {
-        let dir = std::env::temp_dir().join(format!("lamp-bus-capture-bad-{}", std::process::id()));
+        let dir = short_root().join(format!("lbc-bad-{}", std::process::id()));
         let bus = Bus::new(&dir).unwrap();
         let mut publisher = bus
             .publisher_declared(TOPIC, &Audio::declaration(), "ears")
