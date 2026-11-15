@@ -1339,7 +1339,7 @@ fn the_one_path_makes_openclaw_a_gateway_agent_and_off_changes_nothing() {
     assert!(!GATEWAY_DATA.contains("--local"));
     let ns = ns_text(on);
     assert!(ns.contains(
-        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev Q=/run/lampos-skill-start S=/tmp/.lampos-ns\n"
+        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\nQ=/run/lampos-skill-start\n"
     ));
     assert!(!ns_text(sk(true)).contains("L=/run/lampos-control/control.sock"));
 }
@@ -1369,7 +1369,7 @@ fn the_one_path_alone_shows_openclaw_what_both_switches_did() {
         assert_eq!(ns_text(on).as_bytes(), ns_text(old).as_bytes());
         let ns = ns_text(on);
         assert!(ns.contains(
-            " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev Q=/run/lampos-skill-start S=/tmp/.lampos-ns\n"
+            " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\nQ=/run/lampos-skill-start\n"
         ), "{ns}");
         assert!(ns.contains("/var/lib/lampOS/skills-dev, read-only, when there, for the\n"));
         assert!(ns.contains("if [ -d \"$P\" ]; then mkdir -m 0700"));
@@ -2192,7 +2192,7 @@ fn the_gateways_namespace_shows_the_start_socket_folder_read_only() {
     }
     let on = ns_text(one_path());
     for line in [
-        " Q=/run/lampos-skill-start ",
+        "\nQ=/run/lampos-skill-start\n",
         "if [ -d \"$Q\" ]; then mkdir -m 0700 \"$S/q\" && mount --bind \"$Q\" \"$S/q\" || fail \"no $Q\"; else Q=; fi\n",
         "if [ -n \"$Q\" ]; then mkdir -p \"$Q\" && mount --move \"$S/q\" \"$Q\" && ro \"$Q\" || fail \"$Q not shown\"; fi\n",
     ] {
@@ -2286,4 +2286,20 @@ fn run_ns_stubbed(
         .map(str::to_owned)
         .collect();
     (lines, (at("/tmp/.lampos-ns"), at(START_SOCKET_DIR)))
+}
+
+/// The namespace lamp-update writes for OpenClaw with the one run path
+/// holds, byte for byte, the line lamp-tasks reads as it showing
+/// lamp-control's socket (`lamp_tasks::skill_task::AGENT_NS_TASKS_LINE`,
+/// the contract between the two): without it, lamp-tasks refuses every
+/// skill's run on OpenClaw as "doesn't show lamp-control's socket"
+/// (c0a4's #7133 dry run, 15 Nov, when `Q=` went inside that line).
+#[test]
+fn the_openclaw_namespace_keeps_the_line_lamp_tasks_reads() {
+    const AGENT_NS_TASKS_LINE: &str = " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\n";
+    for skills in [false, true] {
+        let ns = ns_text(shown(skills, true));
+        assert_eq!(ns.matches(AGENT_NS_TASKS_LINE).count(), 1, "{ns}");
+        assert!(ns.contains("\nQ=/run/lampos-skill-start\n"), "{ns}");
+    }
 }
