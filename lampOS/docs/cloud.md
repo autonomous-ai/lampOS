@@ -1594,7 +1594,12 @@ is Backend3's.
    code), and so is one with any file but `skill.toml` and `SKILL.md`, or
    either longer than 8 KiB. A skill by its name on the lamp
    (`/var/lib/lampOS/skills`, core, from the Store or made) or pushed
-   (`/var/lib/lampOS/skills-dev`) is refused, never replaced.
+   (`/var/lib/lampOS/skills-dev`) is refused, never replaced. A made or
+   added skill removed since (by the app or `lamp-skills remove`) is
+   dropped from the kept ones first (`made_skill::drop_gone`, as a voice
+   make's name is), so the same file can be added again at once (lamp-9adf,
+   15 Nov 16:14: refused as "already on this lamp" 3 minutes after the app
+   removed it, until its record was dropped at 16:23).
 5. **Handed to the voice** on `/run/lampos-app-make/make.sock`:
    `{"upload": {"skill_md", "skill_toml"?}}`, waited for at most 25 s.
    `lamp-voice` holds it to a made skill's checks and its own, keeps it,
