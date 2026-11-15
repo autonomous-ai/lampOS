@@ -354,9 +354,17 @@ pub const SCRIPT_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
 /// naming no engine: all of `/var/lib` (the
 /// agents' state and config, such as OpenClaw's `openclaw.json` and its
 /// gateway token, lamp-tasks' Harness project with every other run, the
-/// other skills), and the gateway's own `/var/tmp` and `/dev/shm`. Only
-/// the run's folder and its skill's folder are shown again.
-pub const HIDDEN: [&str; 3] = ["/var/lib", "/var/tmp", "/dev/shm"];
+/// other skills), the gateway's own `/var/tmp` and `/dev/shm`, and the
+/// skill-start launcher's socket folder
+/// ([`crate::skill_start::START_DIR`]), so a run's own script can't ask
+/// for another run's start. Only the run's folder and its skill's folder
+/// are shown again.
+pub const HIDDEN: [&str; 4] = [
+    "/var/lib",
+    "/var/tmp",
+    "/dev/shm",
+    crate::skill_start::START_DIR,
+];
 
 /// What the launcher runs in the run's own namespaces (`sh -c`, its
 /// arguments: the caller's uid and gid, the project, the run's folder, the
