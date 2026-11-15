@@ -476,7 +476,7 @@ pub fn answer_awaited(request: u64, now: Instant) -> bool {
                 && waiting
                     .said
                     .iter()
-                    .filter(|(id, ..)| *id < request)
+                    .filter(|kept| kept.0 < request && stands_between(waiting, kept))
                     .max_by_key(|(id, ..)| *id)
                     .is_some_and(|(_, said, cut)| {
                         !cut && crate::services::read_back_said(&waiting.asks.say_back, said)
@@ -498,9 +498,10 @@ pub const ANSWERS: [&str; 3] = ["yes", "no", "unclear"];
 /// gap 2, the first builder's option (b) on #6811): the round 1 of the
 /// person's line right after a skill's task said back is made to call
 /// `make_skill`, the call that takes its `approve_id` and the person's
-/// [`ANSWER`]. Only while a task's wait, or a made skill's remove (#6960;
-/// never a make's writes or code) holds, within [`YES_WITHIN`], and the lamp's newest answer kept toward it
-/// held the whole say-back uncut: so one round only (the round's own answer
+/// [`ANSWER`]. Only while a task's wait, a made skill's remove (#6960), or
+/// an app's make with code (never a voice make's writes or code,
+/// [`answer_forced`]) holds, within [`YES_WITHIN`], and the lamp's newest
+/// answer kept toward it ([`stands_between`]) held the whole say-back uncut: so one round only (the round's own answer
 /// is newer, and is no say-back), never after a cut or partial read-back,
 /// never with nothing waiting, and never in the say-back's own written turn
 /// (no answer kept yet). On lamp-52e6 (13 Nov, row-photo2) the model,
@@ -531,11 +532,33 @@ pub fn approve_force() -> crate::second_provider::net::Force {
 /// make or edit beside them.
 pub const APPROVE_FIELDS: [&str; 2] = [APPROVE_ID, ANSWER];
 
-/// Whether `waiting` is a skill's task's wait, or a made skill's remove
-/// (#6960): the ones [`approve_force`] forces, whose call always says what
-/// the person answered (never a made skill's writes or code).
+/// Whether `waiting` is a skill's task's wait, a made skill's remove
+/// (#6960), or an app's make with code of its own (`noted`, #6307): the
+/// ones [`approve_force`] forces, whose call always says what the person
+/// answered (never a voice make's writes or code, whose yes answers the
+/// model's own call). An app's make has no call of the model's that the yes
+/// answers, only the note: on lamp-9adf (15 Nov 17:24) the owner's "Hey
+/// Lamp", then "Yes.", after an app's make said back, was asked as "Lamp.
+/// Yes.", told the approve_id, and answered with a greeting, calling
+/// nothing, so the yes was never taken.
 fn answer_forced(waiting: &Waiting) -> bool {
-    waiting.asks.remove || (waiting.asks.grants.is_some() && !waiting.asks.code)
+    waiting.asks.remove
+        || (waiting.asks.grants.is_some() && !waiting.asks.code)
+        || (waiting.noted && waiting.asks.code)
+}
+
+/// Whether the lamp's answer `kept` toward `waiting` stands between its
+/// say-back and a later line, for [`answer_awaited`] and
+/// [`approve_forced_now`]: all do but a later request's answer cut before
+/// any of its words were kept, which said nothing. On lamp-9adf (15 Nov
+/// 17:24) the owner's "Hey Lamp" after an app's make said back was answered
+/// as a call, cut before a word played by their "Yes.", and that empty cut
+/// answer was the newest, so the yes was never forced. The wait's own
+/// request cut with nothing kept still stands: a say-back cut off before its
+/// first word (#7072).
+fn stands_between(waiting: &Waiting, kept: &(u64, String, bool)) -> bool {
+    let (id, said, cut) = kept;
+    !(*id > waiting.request && *cut && said.is_empty())
 }
 
 /// Whether [`approve_force`] forces a request at `now`.
@@ -547,6 +570,7 @@ pub fn approve_forced_now(now: Instant) -> bool {
                 && waiting
                     .said
                     .iter()
+                    .filter(|kept| stands_between(waiting, kept))
                     .max_by_key(|(id, ..)| *id)
                     .is_some_and(|(id, said, cut)| {
                         *id >= waiting.request
@@ -598,9 +622,10 @@ pub fn answered(id: &str, request: u64, answer: Option<&str>) -> Option<Value> {
     kept::waiting(|kept| {
         let waiting = kept.as_mut().filter(|waiting| waiting.id == id)?;
         // Left out: a yes for a made skill's writes or code, as before;
-        // for a skill's task, whose approval call code forces whatever the
-        // person said ([`approve_force`]), unclear, so a forced call with
-        // no answer never keeps a yes nobody gave.
+        // for a skill's task or an app's make with code, whose approval
+        // call code forces whatever the person said ([`approve_force`]),
+        // unclear, so a forced call with no answer never keeps a yes nobody
+        // gave.
         let answer = match answer {
             Some(answer) => answer,
             None if answer_forced(waiting) => "unclear",
@@ -1186,8 +1211,13 @@ mod tests {
         );
         lamp_said(6, SAY_BACK);
         assert!(answer_awaited(7, now), "said again whole");
+        // An answer cut before any of its words were kept said nothing
+        // (9adf, 15 Nov 17:24): the say-back still holds.
         lamp_cut(7);
-        assert!(!answer_awaited(8, now), "said again and cut");
+        assert!(answer_awaited(8, now), "cut before a word");
+        lamp_said(8, &SAY_BACK[..SAY_BACK.len() / 2]);
+        lamp_cut(8);
+        assert!(!answer_awaited(9, now), "said again and cut");
         assert!(waits(&id));
     }
 
@@ -1301,6 +1331,56 @@ mod tests {
                 .unwrap()
                 .contains("before it runs any code")
         );
+    }
+
+    /// On lamp-9adf (15 Nov 17:24) an app's make with code was said back,
+    /// the owner's "Hey Lamp" was answered as a call and cut before a word
+    /// played, then came their "Yes.": that empty cut answer stands between
+    /// nothing, so the yes is still awaited and, for an app's make (noted),
+    /// forced to answer its wait. A cut answer that played words still
+    /// stands between, the say-back's own request cut before its first word
+    /// still counts as cut (#7072), and a voice make's code is not forced.
+    #[test]
+    fn an_app_makes_yes_past_a_cut_call_is_forced_to_answer_its_wait() {
+        let now = Instant::now();
+        let code = Asks {
+            code: true,
+            writes: Vec::new(),
+            ..asks("noon-photo", &[])
+        };
+        let id = wait_for_yes_noted(code.clone(), 17, now);
+        lamp_said(17, SAY_BACK);
+        assert!(answer_awaited(18, now));
+        assert!(approve_forced_now(now));
+        lamp_cut(18);
+        assert!(answer_awaited(19, now), "the cut call said nothing");
+        assert!(approve_forced_now(now));
+        let note = waiting_note(19, now).unwrap();
+        assert!(note.contains(&id), "{note}");
+        assert!(note.contains("always give answer"), "{note}");
+        // The forced call's no ends the wait: it stays off.
+        let no = answered(&id, 19, Some("no")).unwrap();
+        assert_eq!(no["next"], DECLINED_NEXT, "{no}");
+        assert!(!awaited(now));
+        // A cut answer that played words stands between.
+        wait_for_yes_noted(code.clone(), 20, now);
+        lamp_said(20, SAY_BACK);
+        lamp_said(21, "Hey, what do");
+        lamp_cut(21);
+        assert!(!answer_awaited(22, now));
+        assert!(!approve_forced_now(now));
+        // The say-back's own request cut with nothing kept (#7072).
+        wait_for_yes_noted(code.clone(), 23, now);
+        lamp_cut(23);
+        assert!(!answer_awaited(24, now));
+        assert!(!approve_forced_now(now));
+        // A voice make's code: awaited, never forced.
+        wait_for_yes(code, 25, now);
+        lamp_said(25, SAY_BACK);
+        assert!(answer_awaited(26, now));
+        assert!(!approve_forced_now(now));
+        let note = waiting_note(26, now).unwrap();
+        assert!(!note.contains("always give answer"), "{note}");
     }
 
     /// App Only's P1 on #6142: a say-back cut, summed up or missing a
