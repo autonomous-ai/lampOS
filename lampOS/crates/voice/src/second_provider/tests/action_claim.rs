@@ -530,6 +530,35 @@ fn a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held() {
     }
 }
 
+/// A make that didn't happen: the lamp's note of a skill not made
+/// ([`crate::made_skill::not_made_in_their_language`]) opens on
+/// [`crate::made_skill::ALREADY_DONE`] too, but counts as no make, so a
+/// reply of "I made …" to it is asked again and then said as
+/// [`crate::action_claim::NOT_DONE_LINE`] (#7128's second read).
+#[test]
+fn a_not_made_notes_made_claim_is_held() {
+    let reply = "I made evening dim, and it's on: it dims the light at ten.";
+    let note = crate::made_skill::not_made_in_their_language(&crate::made_skill::not_made_line(
+        "A skill can't hear words.",
+    ));
+    let got = went(
+        true,
+        false,
+        true,
+        &note,
+        true,
+        saying(reply),
+        vec![saying(reply)],
+    );
+    assert_eq!(
+        got.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{got:?}"
+    );
+    assert_eq!(got.asked, 2, "{got:?}");
+    assert!(told_claim(&got), "{got:?}");
+}
+
 /// An answer that claims nothing is untouched, byte for byte.
 #[test]
 fn an_answer_that_claims_nothing_is_untouched() {

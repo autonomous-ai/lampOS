@@ -4208,11 +4208,18 @@ lamp wrote, never an add-on's quoted line, that opens on
 `made_skill::ALREADY_DONE` (the app's MAKE IT line, made or with code and its
 yes awaited, and a cut voice make's line, all through `app_make::say_note`)
 counts that make as the turn's `make_skill` call
-(`second_provider::made_skill_said`), so its "I made …" is said as it came.
+(`second_provider::made_skill_said`, `made_skill::tells_made`), so its "I
+made …" is said as it came. Only a made note counts: the note of a skill not
+made (`made_skill::not_made_in_their_language`) opens on `ALREADY_DONE` too,
+counts as no make, and an "I made …" to it is still held. The make counted
+isn't tied to a skill's name, so on that one turn "I made" of another skill
+would stand too, and the say socket doesn't check which skill wrote a note;
+both are bounded to that turn.
 On lamp-9adf (15 Nov, build 13162, 14:36, 14:38, 14:40) the app's line was
 asked again and said as "Sorry, I didn't do that." after the skill was kept
 and put on. Any other turn claiming a make with no call is still held. Test:
-`second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`.
+`second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`,
+`a_not_made_notes_made_claim_is_held`.
 
 **Removed by voice** (#6960, Twelve's three tries on lamp-c0a4, 12843:
 "delete the skill called moon fact" went to `lamp_help`, whose notes said

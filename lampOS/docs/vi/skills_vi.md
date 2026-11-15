@@ -1505,12 +1505,19 @@ Ngoại lệ duy nhất là ghi chú của chính đèn về một lần tạo �
 `made_skill::ALREADY_DONE` (câu của MAKE IT trong ứng dụng, đã tạo hoặc có
 code và đang chờ lời đồng ý, và câu của một lần tạo bằng giọng nói bị cắt,
 đều qua `app_make::say_note`) tính lần tạo đó là lời gọi `make_skill` của
-lượt (`second_provider::made_skill_said`), nên câu "I made …" được nói như
-nó đến. Trên lamp-9adf (15/11, bản 13162, 14:36, 14:38, 14:40) câu của ứng
+lượt (`second_provider::made_skill_said`, `made_skill::tells_made`), nên
+câu "I made …" được nói như nó đến. Chỉ ghi chú đã tạo mới được tính: ghi chú
+của một kỹ năng không tạo được (`made_skill::not_made_in_their_language`)
+cũng mở đầu bằng `ALREADY_DONE`, nhưng không tính là lần tạo nào, và câu "I
+made …" đáp lại nó vẫn bị giữ. Lần tạo được tính không gắn với tên kỹ năng,
+nên trong đúng lượt đó câu "I made" về một kỹ năng khác cũng được nói, và
+socket say không kiểm tra kỹ năng nào viết ghi chú; cả hai chỉ giới hạn trong
+lượt đó. Trên lamp-9adf (15/11, bản 13162, 14:36, 14:38, 14:40) câu của ứng
 dụng bị hỏi lại rồi nói thành "Sorry, I didn't do that." sau khi kỹ năng đã
 được giữ và bật. Mọi lượt khác nói đã tạo mà không có lời gọi vẫn bị giữ
 lại. Kiểm thử:
-`second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`.
+`second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`,
+`a_not_made_notes_made_claim_is_held`.
 
 **Gỡ bằng giọng nói** (#6960, ba lần thử của Twelve trên lamp-c0a4, 12843:
 "delete the skill called moon fact" đi tới `lamp_help`, mà ghi chú của nó
