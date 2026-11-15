@@ -2515,8 +2515,8 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   (`manifest::UPDATE_ENV`, `deploy/product/settings/update.env`,
   `install::UPDATE_SETTING`) is carried by every build with settings from
   updater 12 (`manifest::UPDATE_ENV_UPDATER`, #6607): `LAMP_APP_ENGINES=on`,
-  `LAMP_SKILL_TASKS=on` and, since 13 Nov, `LAMP_SKILL_DEFAULT_AGENT=on`
-  (the one run path, #6685, read only with `LAMP_SKILL_TASKS` on). No round rewrites lamp-update's own unit, so
+  `LAMP_SKILL_TASKS=on` and `LAMP_SKILL_DEFAULT_AGENT=on` (the one run
+  path, #6685, read only with `LAMP_SKILL_TASKS` on). No round rewrites lamp-update's own unit, so
   these lines in `lamp-update.service` never reached a lamp already in a
   home. lamp-update reads each switch at its start
   (`switches::update_switches`): set in its environment, `on` exactly, and
