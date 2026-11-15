@@ -2042,6 +2042,85 @@ fn every_round_adds_agent_mains_entry_again_with_the_gateway_up() {
     assert!(!approvals(&off).iter().any(|line| line.contains(" add ")));
 }
 
+/// #7135 (c0a4's reboot #3, 22:59:00): a round right after a boot found
+/// the gateway active but not ready ("Config unavailable"), read it as the
+/// entry gone, and asked the one-shot, which reinstalled OpenClaw. Not
+/// ready is unknown: the add is asked again until taken; never taken, the
+/// record keeps the entry and nothing is asked. Another refusal still
+/// marks the record and asks the one-shot, once.
+#[test]
+fn a_round_reads_a_gateway_not_ready_as_unknown_never_as_the_entry_gone() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+    assert!(lamp.said().unwrap().exec_allowlist && lamp.asked().is_none());
+
+    let round = |systemd: &mut Fake, run: &mut Runner| {
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            one_path(),
+            systemd,
+            run,
+            30,
+            Ok(crate::hermes_schedule::Window::Reached),
+            &mut quiet(),
+        )
+    };
+    let not_ready = [
+        format!("{CONFIG_NOT_READY}; cannot validate --agent."),
+        format!("/usr/bin/env: {NODE_NOT_READY}"),
+    ];
+    for why in &not_ready {
+        // Not ready twice, then taken: one round, the entry kept.
+        let mut adds = 0;
+        let mut run = |argv: &[String]| -> Result<String, String> {
+            if argv.iter().any(|arg| arg == "add") {
+                adds += 1;
+                if adds < 3 {
+                    return Err(why.clone());
+                }
+            }
+            Ok(String::new())
+        };
+        round(&mut systemd, &mut run);
+        assert_eq!(adds, 3, "{why}");
+        assert!(lamp.said().unwrap().exec_allowlist, "{why}");
+        assert_eq!(lamp.asked(), None, "{why}");
+
+        // Never ready in the round: unknown, nothing marked or asked.
+        let mut adds = 0;
+        let mut run = |argv: &[String]| -> Result<String, String> {
+            if argv.iter().any(|arg| arg == "add") {
+                adds += 1;
+                return Err(why.clone());
+            }
+            Ok(String::new())
+        };
+        round(&mut systemd, &mut run);
+        assert_eq!(adds, ADD_TRIES, "{why}");
+        assert!(lamp.said().unwrap().exec_allowlist, "{why}");
+        assert_eq!(lamp.asked(), None, "no reinstall: {why}");
+    }
+
+    // Another refusal: marked and asked, not tried again.
+    let mut adds = 0;
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        if argv.iter().any(|arg| arg == "add") {
+            adds += 1;
+            return Err("unknown agent".into());
+        }
+        Ok(String::new())
+    };
+    round(&mut systemd, &mut run);
+    assert_eq!(adds, 1);
+    assert!(!lamp.said().unwrap().exec_allowlist);
+    assert!(lamp.asked().unwrap().one_path, "the one-shot is asked");
+}
+
 /// The one run path switched off with the gateway down: nothing is run,
 /// and the record keeps the entry, so the next round asks again; with
 /// the gateway up, the removes run and the record drops it.
