@@ -3622,7 +3622,14 @@ default agent is, never by its name (`skill_task::AgentRun`):
   its full path. OpenClaw is the one gateway agent today: lamp-update
   writes its wrapper this way only with `LAMP_SKILL_DEFAULT_AGENT=on`
   (with `LAMP_SKILL_TASKS` on); off, its wrapper and namespace are byte
-  for byte as before.
+  for byte as before. lamp-update also writes OpenClaw's fence gateway,
+  `lamp-openclaw-fence.service` (#7101, option (b); install.md, "OpenClaw
+  on the lamp"): state `/var/lib/lampos-openclaw/fence`, loopback port
+  18790, its own token `/var/lib/lampos-openclaw/fence/gateway-token`,
+  never enabled, started on demand once `openclaw.json` is in that
+  folder, which lamp-tasks, not lamp-update, writes. The gateway's data
+  above still names the main gateway (18789, `lamp-skill-run`) until
+  lamp-tasks' runs go to the fence.
 
 **A run on a gateway agent** (`gateway_run::GatewayRunner`):
 

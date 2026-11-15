@@ -2414,6 +2414,28 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      token in `/var/lib/lampos-openclaw/gateway-token` (0600 `lampos`),
      made once by lamp-update at the install. One Gateway serves every
      pane.
+   - **The skill run's fence gateway** (#7101, option (b)): a second
+     OpenClaw gateway, `lamp-openclaw-fence.service`, so a skill run's
+     fence agent and its exec approvals never sit in the person's
+     `openclaw.json`. A round writes it with `lamp-openclaw-gateway.service`
+     and takes it out with it; Harness's one-shot stops both before it
+     takes the wrapper out. Same wrapper (`/usr/local/bin/openclaw gateway
+     run`), user (`lampos`), namespaces and caps, but
+     `OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/fence` and
+     `OPENCLAW_GATEWAY_PORT=18790` (loopback). The wrapper keeps that
+     state folder only when the caller names it exactly (any other value
+     is `/var/lib/lampos-openclaw/state`), and a call naming it joins the
+     fence gateway's namespaces (its unit's `MainPID`), not the main
+     one's. The install makes `/var/lib/lampos-openclaw/fence` (`lampos`,
+     0700) and its own token there, `gateway-token` (0600 `lampos`, made
+     once, never the main gateway's), and never writes its `openclaw.json`:
+     lamp-tasks writes that one (one agent, `main`, the fence). The unit
+     has no `[Install]`, so it is never enabled: it starts on demand only,
+     and only once that config is there (`ConditionPathExists`); an
+     install restarts it only if it runs (`try-restart`). It has no idle
+     stop of its own. A lamp missing the fence's unit or token is not
+     "there" for lamp-update, so the next round asks for the install
+     again.
    - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
      lamp-cloud's `/var/lib/lampos-cloud/hermes-token`, as Hermes's does,
      for the `lampos` provider's `apiKey` (`${LAMP_HERMES_TOKEN}`).

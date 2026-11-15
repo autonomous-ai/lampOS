@@ -40,6 +40,8 @@ impl Systemd for Fake {
     fn stop(&mut self, unit: &str) -> Result<(), String> {
         if unit == UNIT {
             self.asked.push("stop-gateway");
+        } else if unit == FENCE_UNIT {
+            self.asked.push("stop-fence");
         } else {
             assert_eq!(unit, harness_install::UNIT);
             self.asked.push("stop");
@@ -136,6 +138,9 @@ impl Lamp {
     }
     fn unit(&self) -> PathBuf {
         unit_path(self.root())
+    }
+    fn fence_unit(&self) -> PathBuf {
+        fence_unit_path(self.root())
     }
 }
 
@@ -345,6 +350,10 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
     assert_eq!(systemd.asked, ["reload", "reload", "show", "start"]);
     assert_eq!(fs::read_to_string(lamp.unit()).unwrap(), UNIT_TEXT);
     assert_eq!(
+        fs::read_to_string(lamp.fence_unit()).unwrap(),
+        FENCE_UNIT_TEXT
+    );
+    assert_eq!(
         lamp.asked(),
         Some(Ask {
             version: 1,
@@ -390,7 +399,10 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
         format!("install -d -o lampos -g lampos -m 0700 {STATE}"),
         format!("chown -h lampos:lampos {GATEWAY_TOKEN}"),
         format!("chown -h lampos:lampos {CONFIG}"),
+        format!("install -d -o lampos -g lampos -m 0700 {FENCE_STATE}"),
+        format!("chown -h lampos:lampos {FENCE_TOKEN}"),
         format!("systemctl restart {UNIT}"),
+        format!("systemctl try-restart {FENCE_UNIT}"),
         "systemctl try-restart lamp-tasks.service".to_owned(),
     ] {
         runs.position(&wanted);
@@ -490,7 +502,7 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     assert!(WRAPPER_TEXT.starts_with("#!/bin/sh\n"));
     assert!(WRAPPER_TEXT.contains(&format!("$(cat {TOKEN} 2>/dev/null)")));
     assert!(WRAPPER_TEXT.contains(&format!(
-        "export {TOKEN_ENV}=\"$T\" {STATE_ENV}={STATE} OPENCLAW_NO_AUTO_UPDATE=1 PATH=\"{NODE_BIN}:$PATH\" "
+        "export {TOKEN_ENV}=\"$T\" {STATE_ENV}=\"$S\" OPENCLAW_NO_AUTO_UPDATE=1 PATH=\"{NODE_BIN}:$PATH\" "
     )));
     assert_eq!(
         NS_FLAGS.join(" "),
@@ -505,14 +517,16 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     assert!(UNIT_TEXT.contains(&format!(" {GATEWAY_ENV}=on\n")));
     // Every other call: the gateway's namespaces by systemd's MainPID, its
     // PID namespace the one its children are in, then the caller's ids.
+    assert!(WRAPPER_TEXT.contains(
+        "P=$(/usr/bin/systemctl show -p MainPID --value \"$U.service\" 2>/dev/null) || P=\n"
+    ));
     assert!(WRAPPER_TEXT.contains(&format!(
-        "P=$(/usr/bin/systemctl show -p MainPID --value {UNIT} 2>/dev/null) || P=\n"
+        "  *) S={STATE} U={} ;;\n",
+        UNIT.trim_end_matches(".service")
     )));
     // A pid reused after the gateway stopped is not taken: it must still be
     // in the unit's cgroup.
-    assert!(
-        WRAPPER_TEXT.contains("! grep -q '/lamp-openclaw-gateway\\.service$' \"/proc/$P/cgroup\"")
-    );
+    assert!(WRAPPER_TEXT.contains("! grep -q \"/$U\\\\.service\\$\" \"/proc/$P/cgroup\""));
     assert!(WRAPPER_TEXT.ends_with(&format!(
         "exec /usr/bin/nsenter --user=\"/proc/$P/ns/user\" --mount=\"/proc/$P/ns/mnt\" --pid=\"/proc/$P/ns/pid_for_children\" --preserve-credentials --wd=\"$PWD\" -- /usr/bin/unshare --user --map-user=\"$LAMP_NS_UID\" --map-group=\"$LAMP_NS_GID\" {OPENCLAW} \"$@\"\n"
     )));
@@ -781,6 +795,7 @@ fn a_failed_install_takes_the_entry_points_out_and_stops_the_gateway() {
     ] {
         let lamp = Lamp::new();
         fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+        fs::write(lamp.fence_unit(), FENCE_UNIT_TEXT).unwrap();
         fs::write(lamp.at(WRAPPER), "old").unwrap();
         fs::write(lamp.at(NS), "old").unwrap();
         lamp.ask();
@@ -795,6 +810,7 @@ fn a_failed_install_takes_the_entry_points_out_and_stops_the_gateway() {
             "{fail_on}"
         );
         runs.position(&format!("systemctl stop {UNIT}"));
+        runs.position(&format!("systemctl stop {FENCE_UNIT}"));
     }
     // A Node or package not at the pin after its step: version.
     for (node, package) in [("24.22.1", VERSION), (NODE_VERSION, "2026.11.1")] {
@@ -819,6 +835,7 @@ fn the_switch_off_stops_the_gateway_and_takes_everything_out() {
     let lamp = Lamp::new();
     lamp.harness_there();
     fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    fs::write(lamp.fence_unit(), FENCE_UNIT_TEXT).unwrap();
     fs::write(lamp.at(WRAPPER), wrapper_text()).unwrap();
     fs::write(lamp.at(NS), ns_text(sk(true))).unwrap();
     let mut systemd = Fake::default();
@@ -832,12 +849,16 @@ fn the_switch_off_stops_the_gateway_and_takes_everything_out() {
     let runs = Runs::new(&lamp);
     assert_eq!(install(&lamp, &runs, 9), None);
     assert_eq!(
-        runs.lines()[0],
-        format!("systemctl stop {UNIT}"),
-        "the gateway stopped first"
+        runs.lines()[..2],
+        [
+            format!("systemctl stop {UNIT}"),
+            format!("systemctl stop {FENCE_UNIT}")
+        ],
+        "both gateways stopped first"
     );
     assert!(!lamp.at(WRAPPER).exists() && !lamp.at(NS).exists());
     assert!(lamp.unit().exists(), "the round's to take out");
+    assert!(lamp.fence_unit().exists(), "the round's to take out");
     let mut systemd = Fake::default();
     assert!(!after_round_off(
         lamp.root(),
@@ -846,7 +867,8 @@ fn the_switch_off_stops_the_gateway_and_takes_everything_out() {
         &mut quiet()
     ));
     assert!(!lamp.unit().exists());
-    assert_eq!(systemd.asked, ["stop-gateway", "reload"]);
+    assert!(!lamp.fence_unit().exists(), "taken out with the main one");
+    assert_eq!(systemd.asked, ["stop-gateway", "stop-fence", "reload"]);
 }
 
 /// The gateway's unit: through the wrapper as `lampos`, from OpenClaw's
@@ -894,6 +916,7 @@ fn npm_ci_runs_with_output_and_a_long_step_past_its_bound_is_timeout() {
     assert!(NPM_CI_MODE.contains(&format!("cd {PREFIX} ")));
     let lamp = Lamp::new();
     fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    fs::write(lamp.fence_unit(), FENCE_UNIT_TEXT).unwrap();
     lamp.ask();
     let runs = Runs::new(&lamp);
     assert_eq!(install(&lamp, &runs, 1).unwrap().install, "installed");
@@ -964,12 +987,14 @@ fn a_node_below_what_openclaw_runs_on_is_old_node() {
 fn the_wrapper_puts_the_lamps_node_first_and_ends_in_exec() {
     assert!(WRAPPER_TEXT.contains(&format!("PATH=\"{NODE_BIN}:$PATH\"")));
     assert_eq!(NODE_BIN, "/var/lib/lampos-openclaw/node/bin");
-    assert!(WRAPPER_TEXT.contains(&format!("{STATE_ENV}={STATE}")));
+    assert!(WRAPPER_TEXT.contains(&format!("{STATE_ENV}=\"$S\"")));
+    assert!(WRAPPER_TEXT.contains(&format!("  *) S={STATE} U=")));
     assert!(WRAPPER_TEXT.contains(&format!("{TOKEN_ENV}=\"$T\"")));
     let last = WRAPPER_TEXT.lines().last().unwrap();
     assert!(last.starts_with("exec "), "{last}");
     let lamp = Lamp::new();
     fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    fs::write(lamp.fence_unit(), FENCE_UNIT_TEXT).unwrap();
     lamp.ask();
     let runs = Runs::new(&lamp);
     install(&lamp, &runs, 4).unwrap();
@@ -1566,4 +1591,273 @@ fn the_gateways_namespace_shows_the_pushed_skills_read_only_with_the_one_path() 
         assert!(!lines.iter().any(|line| line.contains("model.sock")));
         assert!(!lines.iter().any(|line| line.contains("net-relay")));
     }
+}
+
+/// #7101 (option (b)): the fence gateway's unit is the main one's, line
+/// for line, but for its own state folder, port, name and comment; never
+/// enabled (no `[Install]`, no `WantedBy`), and started only once
+/// lamp-tasks wrote its config.
+#[test]
+fn the_fence_unit_is_the_gateways_with_its_own_state_and_port_on_demand() {
+    let lines: Vec<&str> = FENCE_UNIT_TEXT.lines().collect();
+    for wanted in [
+        "User=lampos",
+        "Group=lampos",
+        "ExecStart=/usr/local/bin/openclaw gateway run",
+        "WorkingDirectory=/var/lib/lampos-openclaw/fence",
+        "Environment=HOME=/var/lib/lampos-openclaw OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/fence OPENCLAW_GATEWAY_PORT=18790 LAMP_OPENCLAW_GATEWAY=on",
+        "ConditionPathExists=/var/lib/lampos-openclaw/fence/openclaw.json",
+        "SyslogIdentifier=lamp-openclaw-fence",
+        "Restart=on-failure",
+        "NoNewPrivileges=yes",
+    ] {
+        assert!(lines.contains(&wanted), "{wanted} missing");
+    }
+    assert!(FENCE_UNIT_TEXT.contains(&format!(" {STATE_ENV}={FENCE_STATE} ")));
+    assert!(FENCE_UNIT_TEXT.contains(&format!(" {PORT_ENV}={FENCE_PORT} ")));
+    assert!(FENCE_UNIT_TEXT.contains(&format!(" {GATEWAY_ENV}=on\n")));
+    assert!(FENCE_UNIT_TEXT.contains(&format!("ConditionPathExists={FENCE_CONFIG}\n")));
+    assert!(FENCE_UNIT_TEXT.contains(&format!("port {FENCE_PORT}")));
+    assert_eq!(FENCE_PORT, 18790);
+    assert_ne!(FENCE_PORT, PORT);
+    assert_eq!(FENCE_UNIT, "lamp-openclaw-fence.service");
+    assert_eq!(FENCE_CONFIG, format!("{FENCE_STATE}/openclaw.json"));
+    assert_eq!(FENCE_TOKEN, format!("{FENCE_STATE}/gateway-token"));
+    // On demand: nothing for `systemctl enable` to link.
+    assert!(!FENCE_UNIT_TEXT.contains("[Install]"));
+    assert!(!FENCE_UNIT_TEXT.contains("WantedBy"));
+    // The rest of [Unit] and [Service] is the main gateway's, line for line.
+    let own = |line: &str| {
+        line.starts_with('#')
+            || line.starts_with("Description=")
+            || line.starts_with("Environment=")
+            || line.starts_with("WorkingDirectory=")
+            || line.starts_with("SyslogIdentifier=")
+            || line.starts_with("ConditionPathExists=")
+    };
+    let body = |text: &'static str| -> Vec<&'static str> {
+        text.split("\n[Install]")
+            .next()
+            .unwrap()
+            .lines()
+            .filter(|line| !own(line))
+            .collect()
+    };
+    assert_eq!(body(FENCE_UNIT_TEXT), body(UNIT_TEXT));
+}
+
+/// #7101: the fence gateway never runs on the person's state. Its unit
+/// names only its own folder, and the wrapper it runs through keeps that
+/// folder (and joins the fence's own namespaces for a call to it); any
+/// other folder a caller names is the main one's.
+#[test]
+fn the_fence_never_runs_on_the_shared_state() {
+    assert_ne!(FENCE_STATE, STATE);
+    assert!(!FENCE_STATE.starts_with(&format!("{STATE}/")));
+    assert!(
+        !FENCE_UNIT_TEXT.contains(STATE),
+        "the fence's unit names the shared state folder"
+    );
+    assert!(!FENCE_UNIT_TEXT.contains(&format!("{PORT_ENV}={PORT}")));
+    let folder = tempfile::tempdir().unwrap();
+    let printer = folder.path().join("unshare");
+    fs::write(
+        &printer,
+        "#!/bin/sh\necho \"state=$OPENCLAW_STATE_DIR port=${OPENCLAW_GATEWAY_PORT-unset}\"\necho \"args: $*\"\n",
+    )
+    .unwrap();
+    fs::set_permissions(&printer, fs::Permissions::from_mode(0o755)).unwrap();
+    // systemctl keeps which unit it was asked for and answers MainPID 0:
+    // the call then fails closed naming that unit.
+    let systemctl = folder.path().join("systemctl");
+    let asked = folder.path().join("asked");
+    fs::write(
+        &systemctl,
+        format!(
+            "#!/bin/sh\necho \"$*\" > {}\necho 0\n",
+            asked.to_string_lossy()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&systemctl, fs::Permissions::from_mode(0o755)).unwrap();
+    let token = folder.path().join("hermes-token");
+    fs::write(&token, "tok_0123456789abcdef\n").unwrap();
+    let wrapper = folder.path().join("openclaw");
+    fs::write(
+        &wrapper,
+        WRAPPER_TEXT
+            .replace(TOKEN, &token.to_string_lossy())
+            .replace("/usr/bin/unshare", &printer.to_string_lossy())
+            .replace("/usr/bin/systemctl", &systemctl.to_string_lossy()),
+    )
+    .unwrap();
+    let ran = |state: Option<&str>, gateway: bool| {
+        let mut command = std::process::Command::new("/bin/sh");
+        command
+            .arg(&wrapper)
+            .args(["gateway", "run"])
+            .env("PATH", "/usr/bin:/bin")
+            .env_remove(GATEWAY_ENV)
+            .env_remove(STATE_ENV)
+            .env_remove(PORT_ENV);
+        if let Some(state) = state {
+            command.env(STATE_ENV, state);
+        }
+        if gateway {
+            command.env(GATEWAY_ENV, "on").env(PORT_ENV, "18790");
+        }
+        command.output().unwrap()
+    };
+    // The fence's unit: its own folder and port reach OpenClaw.
+    let fence = ran(Some(FENCE_STATE), true);
+    assert!(fence.status.success(), "{fence:?}");
+    assert!(
+        String::from_utf8_lossy(&fence.stdout)
+            .contains(&format!("state={FENCE_STATE} port={FENCE_PORT}\n")),
+        "{fence:?}"
+    );
+    // The main gateway's unit, or any other folder named: the main state.
+    for state in [
+        None,
+        Some(STATE),
+        Some("/var/lib/lampos-openclaw/fence/"),
+        Some("/tmp/x"),
+    ] {
+        let main = ran(state, true);
+        assert!(
+            String::from_utf8_lossy(&main.stdout).contains(&format!("state={STATE} ")),
+            "{state:?}: {main:?}"
+        );
+    }
+    // A call: the fence's namespaces for the fence's folder, else the main
+    // gateway's; neither running here, so each fails closed naming it.
+    for (state, unit) in [(Some(FENCE_STATE), FENCE_UNIT), (None, UNIT)] {
+        let call = ran(state, false);
+        assert!(!call.status.success());
+        let err = String::from_utf8_lossy(&call.stderr);
+        assert!(
+            err.contains(&format!("its gateway ({unit}) is not running")),
+            "{state:?}: {err}"
+        );
+        assert_eq!(
+            fs::read_to_string(&asked).unwrap(),
+            format!("show -p MainPID --value {unit}\n"),
+            "{state:?}"
+        );
+    }
+}
+
+/// #7101: an install makes the fence's folder (`lampos`'s, 0700) and its
+/// own token once (0600, not the main gateway's), and never writes its
+/// config: lamp-tasks' alone. Without the fence's unit or token, OpenClaw
+/// is not there as this build puts it, so a round asks for the install
+/// again (a reset's wipe or an older install gets them back).
+#[test]
+fn the_install_makes_the_fence_folder_and_token_but_never_its_config() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round(&lamp, &mut systemd, true, 1);
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 2).unwrap().install, "installed");
+    assert!(lamp.at(FENCE_STATE).is_dir());
+    let token = fs::read_to_string(lamp.at(FENCE_TOKEN)).unwrap();
+    let token = token.trim().to_owned();
+    assert_eq!(token.len(), 64);
+    assert!(token.bytes().all(|b| b.is_ascii_hexdigit()));
+    assert_eq!(mode(&lamp.at(FENCE_TOKEN)), 0o600);
+    assert_ne!(
+        token,
+        fs::read_to_string(lamp.at(GATEWAY_TOKEN)).unwrap().trim(),
+        "its own token"
+    );
+    assert!(!lamp.at(FENCE_CONFIG).exists(), "lamp-tasks' to write");
+    assert!(
+        runs.position(&format!(
+            "install -d -o lampos -g lampos -m 0700 {FENCE_STATE}"
+        )) < runs.position(&format!("chown -h lampos:lampos {FENCE_TOKEN}"))
+    );
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line.contains("start lamp-openclaw-fence")
+                && !line.contains("try-restart")),
+        "never started by the install: on demand"
+    );
+    assert!(present(lamp.root(), sk(true)));
+
+    // Again: the token is kept.
+    fs::remove_file(lamp.at(NS)).unwrap();
+    lamp.ask();
+    assert_eq!(
+        install(&lamp, &Runs::new(&lamp), 3).unwrap().install,
+        "installed"
+    );
+    assert_eq!(
+        fs::read_to_string(lamp.at(FENCE_TOKEN)).unwrap().trim(),
+        token
+    );
+
+    // The fence's token or unit gone: not there as this build puts it.
+    fs::remove_file(lamp.at(FENCE_TOKEN)).unwrap();
+    assert!(!present(lamp.root(), sk(true)));
+    lamp.ask();
+    assert_eq!(
+        install(&lamp, &Runs::new(&lamp), 4).unwrap().install,
+        "installed"
+    );
+    assert!(lamp.at(FENCE_TOKEN).is_file());
+    fs::remove_file(lamp.fence_unit()).unwrap();
+    assert!(!present(lamp.root(), sk(true)));
+    // The install refuses a fence unit not this build's: a round writes it.
+    lamp.ask();
+    assert_eq!(
+        install(&lamp, &Runs::new(&lamp), 5)
+            .unwrap()
+            .error
+            .as_deref(),
+        Some("gateway")
+    );
+}
+
+/// #7101: a round writes the fence's unit with the main one's, never
+/// enables or starts it, and the switch off stops both.
+#[test]
+fn a_round_writes_both_units_and_enables_only_the_main_one() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round(&lamp, &mut systemd, true, 1);
+    assert_eq!(fs::read_to_string(lamp.unit()).unwrap(), UNIT_TEXT);
+    assert_eq!(
+        fs::read_to_string(lamp.fence_unit()).unwrap(),
+        FENCE_UNIT_TEXT
+    );
+    assert_eq!(
+        systemd
+            .asked
+            .iter()
+            .filter(|asked| **asked == "reload")
+            .count(),
+        2,
+        "one reload for both units, as for the main one alone before"
+    );
+    install(&lamp, &Runs::new(&lamp), 2);
+    let mut systemd = Fake::default();
+    round(&lamp, &mut systemd, true, 3);
+    assert_eq!(systemd.asked, ["reload", "start-gateway"]);
+    let wants = lamp.at(WANTS);
+    let linked: Vec<_> = fs::read_dir(wants.parent().unwrap())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(
+        linked,
+        [std::ffi::OsString::from(UNIT)],
+        "only the main one"
+    );
+    let mut systemd = Fake::default();
+    after_round_off(lamp.root(), &lamp.records(), &mut systemd, &mut quiet());
+    assert_eq!(systemd.asked[..3], ["reload", "stop-gateway", "stop-fence"]);
 }

@@ -17,6 +17,12 @@
 //! switch off disables and stops it. The install leaves the gateway's token ([`GATEWAY_TOKEN`])
 //! in OpenClaw's first config ([`CONFIG`], its `gateway` block only:
 //! lamp-tasks merges its models, agents and skills keys in at its start).
+//! Beside it, the round writes (and takes out) the skill run's fence
+//! gateway's unit, [`FENCE_UNIT`] (#7101, option (b)): the same wrapper,
+//! user and namespaces, with its own state folder [`FENCE_STATE`] and port
+//! [`FENCE_PORT`], never enabled, started on demand once lamp-tasks wrote
+//! its config there; the install makes that folder and its own token
+//! ([`FENCE_TOKEN`]), never its config.
 //!
 //! **As `lampos`, in a namespace, as Hermes.** [`WRAPPER`] and [`NS`] are
 //! Hermes's ([`crate::hermes_install::WRAPPER_TEXT`],
@@ -130,6 +136,25 @@ pub const CONFIG: &str = "/var/lib/lampos-openclaw/state/openclaw.json";
 pub const GATEWAY_TOKEN: &str = "/var/lib/lampos-openclaw/gateway-token";
 /// The gateway's loopback port.
 pub const PORT: u16 = 18789;
+/// The skill run's fence gateway (#7101, option (b)): a second OpenClaw
+/// gateway, [`FENCE_UNIT`], with its own state folder, so its one agent
+/// (`main`, the fence) and its exec approvals are never in the person's
+/// [`STATE`]. Its folder: `lampos`'s, 0700, made by the install as
+/// [`STATE`] is. Its `openclaw.json` ([`FENCE_CONFIG`]) is lamp-tasks'
+/// alone (`write_fence`): lamp-update never writes it.
+pub const FENCE_STATE: &str = "/var/lib/lampos-openclaw/fence";
+/// The fence gateway's config, lamp-tasks' to write; its unit starts only
+/// once it is there.
+pub const FENCE_CONFIG: &str = "/var/lib/lampos-openclaw/fence/openclaw.json";
+/// The fence gateway's token, made once at the install as
+/// [`GATEWAY_TOKEN`] is (`lampos`'s, 0600), in its own state folder; never
+/// the main gateway's.
+pub const FENCE_TOKEN: &str = "/var/lib/lampos-openclaw/fence/gateway-token";
+/// The fence gateway's loopback port, given in its unit as
+/// [`PORT_ENV`].
+pub const FENCE_PORT: u16 = 18790;
+/// The variable OpenClaw reads its gateway's port from.
+pub const PORT_ENV: &str = "OPENCLAW_GATEWAY_PORT";
 /// The pinned Node runtime, unpacked whole.
 pub const NODE_DIR: &str = "/var/lib/lampos-openclaw/node";
 /// Its `bin`, first on the `PATH` OpenClaw runs with.
@@ -162,6 +187,9 @@ pub const NS: &str = "/usr/local/lib/lampos/openclaw-ns";
 /// ([`WANTS`]) and started by it once OpenClaw is there, restarted by an
 /// install; disabled and stopped by the round with the switch off.
 pub const UNIT: &str = "lamp-openclaw-gateway.service";
+/// The fence gateway's unit ([`FENCE_UNIT_TEXT`]): written and taken out
+/// by the round with [`UNIT`], never enabled; started on demand only.
+pub const FENCE_UNIT: &str = "lamp-openclaw-fence.service";
 /// lamp-cloud's forwarder token, the one Hermes is given.
 pub const TOKEN: &str = hermes_install::TOKEN;
 /// The variable the forwarder's key is given in: the same as Hermes's, so
@@ -253,7 +281,10 @@ const DOWNLOADS: &str = "lamp-update-openclaw-";
 /// [`NS`] in a new user, mount and PID namespace ([`NS_FLAGS`]); run by
 /// anyone else (a Harness pane), it joins the running gateway's
 /// namespaces, found by the unit's `MainPID`, and runs OpenClaw there as
-/// the caller's ids, or fails closed with no gateway running.
+/// the caller's ids, or fails closed with no gateway running. Its state
+/// folder is [`STATE`] and its gateway [`UNIT`], unless the caller's
+/// [`STATE_ENV`] is [`FENCE_STATE`] exactly (the fence gateway's unit, or
+/// a call to it, #7101): then that folder and [`FENCE_UNIT`].
 pub const WRAPPER_TEXT: &str = r#"#!/bin/sh
 # lampOS: OpenClaw on the lamp (#6226; lampOS/docs/install.md, "OpenClaw on the lamp"). Written by lamp-update.
 # OpenClaw (its gateway and each Harness pane) runs as its caller (lampos), in a user and mount namespace where it sees
@@ -267,8 +298,14 @@ T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
   exit 1
 }
 LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
-export LAMP_HERMES_TOKEN="$T" OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state OPENCLAW_NO_AUTO_UPDATE=1 PATH="/var/lib/lampos-openclaw/node/bin:$PATH" LAMP_NS_UID LAMP_NS_GID
-unset T
+# The state folder: the main gateway's, or the skill run's fence gateway's (#7101) when the caller names that one exactly
+# (its unit does); any other value is the main one's. U is the gateway's unit whose namespaces a call joins.
+case ${OPENCLAW_STATE_DIR-} in
+  /var/lib/lampos-openclaw/fence) S=/var/lib/lampos-openclaw/fence U=lamp-openclaw-fence ;;
+  *) S=/var/lib/lampos-openclaw/state U=lamp-openclaw-gateway ;;
+esac
+export LAMP_HERMES_TOKEN="$T" OPENCLAW_STATE_DIR="$S" OPENCLAW_NO_AUTO_UPDATE=1 PATH="/var/lib/lampos-openclaw/node/bin:$PATH" LAMP_NS_UID LAMP_NS_GID
+unset T S
 A=${LAMP_OPENCLAW_GATEWAY-}
 unset LAMP_OPENCLAW_GATEWAY
 if [ "$A" = on ]; then
@@ -277,11 +314,11 @@ fi
 # The gateway's namespaces, by its unit's main process (that unshare, as lampos, in a user namespace of its own, still in
 # the unit's cgroup, so a pid reused after the gateway stopped is never taken for it). LAMP_OPENCLAW_GATEWAY=on from any
 # other caller only gives that caller namespaces of its own, never a way into the lamp's.
-P=$(/usr/bin/systemctl show -p MainPID --value lamp-openclaw-gateway.service 2>/dev/null) || P=
+P=$(/usr/bin/systemctl show -p MainPID --value "$U.service" 2>/dev/null) || P=
 case $P in '' | 0 | *[!0-9]*) P= ;; esac
-if [ -n "$P" ] && { [ "$(stat -c %u "/proc/$P" 2>/dev/null)" != "$LAMP_NS_UID" ] || [ "$(readlink "/proc/$P/ns/user")" = "$(readlink /proc/self/ns/user)" ] || ! grep -q '/lamp-openclaw-gateway\.service$' "/proc/$P/cgroup" 2>/dev/null; }; then P=; fi
+if [ -n "$P" ] && { [ "$(stat -c %u "/proc/$P" 2>/dev/null)" != "$LAMP_NS_UID" ] || [ "$(readlink "/proc/$P/ns/user")" = "$(readlink /proc/self/ns/user)" ] || ! grep -q "/$U\\.service\$" "/proc/$P/cgroup" 2>/dev/null; }; then P=; fi
 [ -n "$P" ] || {
-  echo "openclaw: its gateway (lamp-openclaw-gateway.service) is not running in its own namespaces; nothing runs without it" >&2
+  echo "openclaw: its gateway ($U.service) is not running in its own namespaces; nothing runs without it" >&2
   exit 1
 }
 export HOME=/var/lib/lampos-openclaw
@@ -498,6 +535,50 @@ NoNewPrivileges=yes
 
 [Install]
 WantedBy=multi-user.target
+";
+
+/// [`FENCE_UNIT`], the skill run's fence gateway (#7101, option (b)),
+/// written and taken out by a round with [`UNIT`] and only then. The same
+/// wrapper, user, namespaces and caps as [`UNIT_TEXT`], but its own state
+/// folder ([`FENCE_STATE`], which the wrapper takes from its
+/// [`STATE_ENV`], and whose namespaces a call naming it joins) and port
+/// ([`FENCE_PORT`], as [`PORT_ENV`]). No `[Install]`: never enabled,
+/// started on demand only, and only once lamp-tasks wrote its
+/// [`FENCE_CONFIG`] (`ConditionPathExists`), so OpenClaw never starts on
+/// a folder with no config of lamp-tasks'. No idle stop of its own: plain
+/// systemd has none for a service that is not socket-activated.
+pub const FENCE_UNIT_TEXT: &str = "\
+# lamp-openclaw-fence: the skill run's fence, a second OpenClaw gateway on the lamp (#7101, option (b); lampOS/docs/install.md,
+# \"OpenClaw on the lamp\"). Its own state folder /var/lib/lampos-openclaw/fence, whose openclaw.json lamp-tasks writes (one
+# agent, main: the fence), and its own token there, on loopback port 18790; the person's state and the gateway on 18789
+# untouched. Written and taken out by a round of lamp-update with lamp-openclaw-gateway, never enabled: started on demand
+# only, once lamp-tasks wrote its config. It runs only through /usr/local/bin/openclaw, in the namespaces that wrapper
+# makes for it (LAMP_OPENCLAW_GATEWAY=on: its own PID namespace, which a call naming its state folder joins), as lampos.
+[Unit]
+Description=lampOS OpenClaw fence gateway for a skill's run (lamp-openclaw-fence)
+After=network-online.target lamp-cloud.service
+ConditionPathExists=/var/lib/lampos-openclaw/fence/openclaw.json
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Environment=HOME=/var/lib/lampos-openclaw OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/fence OPENCLAW_GATEWAY_PORT=18790 LAMP_OPENCLAW_GATEWAY=on
+WorkingDirectory=/var/lib/lampos-openclaw/fence
+ExecStart=/usr/local/bin/openclaw gateway run
+Restart=on-failure
+RestartSec=10
+StandardInput=null
+SyslogIdentifier=lamp-openclaw-fence
+Nice=10
+CPUWeight=20
+CPUQuota=100%
+# As lamp-openclaw-gateway's (#6226: RAM floor): no memory throttle, only a hard guard. Not measured for the fence yet.
+MemoryMax=2500M
+TasksMax=256
+NoNewPrivileges=yes
 ";
 
 /// What `systemctl enable` makes of [`UNIT_TEXT`]'s `WantedBy`: a link in
@@ -720,6 +801,11 @@ fn unit_path(root: &Path) -> PathBuf {
     root.join(crate::writer_unit::FOLDER).join(UNIT)
 }
 
+/// The fence gateway's unit's path under `root`.
+fn fence_unit_path(root: &Path) -> PathBuf {
+    root.join(crate::writer_unit::FOLDER).join(FENCE_UNIT)
+}
+
 /// OpenClaw there as this build puts it, under `root`: the package at
 /// [`VERSION`] with its command, installed from this build's
 /// [`LOCKFILE`], the Node at [`NODE_VERSION`], the wrapper
@@ -734,6 +820,8 @@ pub fn present(root: &Path, shown: Shown) -> bool {
         && holds(root, NS, &ns_text(shown))
         && agent_ns::hook_shim_there(root)
         && fs::read(unit_path(root)).is_ok_and(|bytes| bytes == UNIT_TEXT.as_bytes())
+        && fs::read(fence_unit_path(root)).is_ok_and(|bytes| bytes == FENCE_UNIT_TEXT.as_bytes())
+        && fs::symlink_metadata(on(root, FENCE_TOKEN)).is_ok_and(|meta| meta.is_file())
 }
 
 /// When `serve` starts, as Hermes's: off, an earlier record and ask are
@@ -785,14 +873,25 @@ pub fn after_round(
     window: Result<crate::hermes_schedule::Window, String>,
     say: &mut dyn FnMut(&str),
 ) -> Option<OpenclawInstall> {
-    match crate::writer_unit::write_unit(root, UNIT, UNIT_TEXT) {
+    // The fence gateway's unit (#7101) only with the main one's, and
+    // systemd reloaded once when either changed.
+    let written = crate::writer_unit::write_unit(root, UNIT, UNIT_TEXT)
+        .map_err(|why| format!("OpenClaw's gateway unit not written: {why}"))
+        .and_then(|main| {
+            crate::writer_unit::write_unit(root, FENCE_UNIT, FENCE_UNIT_TEXT)
+                .map(|fence| main || fence)
+                .map_err(|why| format!("OpenClaw's fence gateway unit not written: {why}"))
+        });
+    match written {
         Ok(true) => {
             if let Err(why) = systemd.reload() {
-                say(&format!("{UNIT} written, but systemd not reloaded: {why}"));
+                say(&format!(
+                    "{UNIT} and {FENCE_UNIT} written, but systemd not reloaded: {why}"
+                ));
             }
         }
         Ok(false) => {}
-        Err(why) => say(&format!("OpenClaw's gateway unit not written: {why}")),
+        Err(why) => say(&why),
     }
     let before = record(records);
     if present(root, shown) {
@@ -933,6 +1032,11 @@ fn gateway_off(root: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)
     {
         say(&format!("{UNIT} not stopped: {why}"));
     }
+    if fs::symlink_metadata(fence_unit_path(root)).is_ok()
+        && let Err(why) = systemd.stop(FENCE_UNIT)
+    {
+        say(&format!("{FENCE_UNIT} not stopped: {why}"));
+    }
 }
 
 /// After a round that reached the channel, with the switch off: the
@@ -952,16 +1056,21 @@ pub fn after_round_off(
         .into_iter()
         .any(|path| fs::symlink_metadata(on(root, path)).is_ok());
     if !there {
-        if fs::symlink_metadata(unit_path(root)).is_ok() {
-            match fs::remove_file(unit_path(root)) {
-                Ok(()) => {
-                    say(&format!("OpenClaw on the lamp is off: {UNIT} taken out"));
-                    if let Err(why) = systemd.reload() {
-                        say(&format!("systemd not reloaded: {why}"));
+        // The fence gateway's unit (#7101) goes with the main one's.
+        let mut removed = false;
+        for (unit, path) in [(UNIT, unit_path(root)), (FENCE_UNIT, fence_unit_path(root))] {
+            if fs::symlink_metadata(&path).is_ok() {
+                match fs::remove_file(&path) {
+                    Ok(()) => {
+                        say(&format!("OpenClaw on the lamp is off: {unit} taken out"));
+                        removed = true;
                     }
+                    Err(error) => say(&format!("{unit} not taken out: {error}")),
                 }
-                Err(error) => say(&format!("{UNIT} not taken out: {error}")),
             }
+        }
+        if removed && let Err(why) = systemd.reload() {
+            say(&format!("systemd not reloaded: {why}"));
         }
         return false;
     }
@@ -1119,14 +1228,16 @@ fn install_with(
     Ok(said)
 }
 
-/// The gateway stopped, then the wrapper and the namespace
-/// script taken out, the wrapper first. OpenClaw's folder (its state among
-/// it) and the unit file (the round's) stay.
+/// The gateway and the fence gateway stopped, then the wrapper and the
+/// namespace script taken out, the wrapper first. OpenClaw's folder (its
+/// states among it) and the unit files (the round's) stay.
 fn remove_entry_points(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
-    if fs::symlink_metadata(unit_path(root)).is_ok()
-        && let Err(why) = run(&["systemctl", "stop", UNIT].map(str::to_owned))
-    {
-        say(&format!("{UNIT} not stopped: {why}"));
+    for (unit, path) in [(UNIT, unit_path(root)), (FENCE_UNIT, fence_unit_path(root))] {
+        if fs::symlink_metadata(&path).is_ok()
+            && let Err(why) = run(&["systemctl", "stop", unit].map(str::to_owned))
+        {
+            say(&format!("{unit} not stopped: {why}"));
+        }
     }
     for path in [WRAPPER, NS] {
         match fs::remove_file(on(root, path)) {
@@ -1341,6 +1452,9 @@ fn steps(
     if let Err(why) = gateway_config(root, run, say) {
         return fail("config", why, say);
     }
+    if let Err(why) = fence_state(root, run) {
+        return fail("config", why, say);
+    }
     match run(&in_namespace(&uid, &gid, false, &["--version"])) {
         Ok(said) => say(&format!(
             "OpenClaw runs: {}",
@@ -1357,17 +1471,28 @@ fn steps(
     if let Err(why) = write_entry_points(root, shown) {
         return fail("entry", why, say);
     }
-    if !fs::read(unit_path(root)).is_ok_and(|bytes| bytes == UNIT_TEXT.as_bytes()) {
-        return fail(
-            "gateway",
-            format!("{UNIT} is not this build's: a round writes it"),
-            say,
-        );
+    for (unit, path, text) in [
+        (UNIT, unit_path(root), UNIT_TEXT),
+        (FENCE_UNIT, fence_unit_path(root), FENCE_UNIT_TEXT),
+    ] {
+        if !fs::read(path).is_ok_and(|bytes| bytes == text.as_bytes()) {
+            return fail(
+                "gateway",
+                format!("{unit} is not this build's: a round writes it"),
+                say,
+            );
+        }
     }
     // Always on (the owner on #6226): started now, or restarted so one
     // running an older OpenClaw runs the new one. The round enables it.
     if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
         return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
+    }
+    // The fence gateway is on demand (#7101): restarted only if it runs,
+    // so a running one runs the new OpenClaw; never started here. A
+    // failure is said, not the install's: lamp-tasks starts it per run.
+    if let Err(why) = run(&["systemctl", "try-restart", FENCE_UNIT].map(str::to_owned)) {
+        say(&format!("{FENCE_UNIT} not started again: {why}"));
     }
     remove_aside(root, say);
     if !pinned_there
@@ -1465,26 +1590,7 @@ pub fn runs_long_step(argv: &[String]) -> bool {
 /// it or the token was just made. A config lamp-update cannot read as a
 /// JSON object is left as it is, and said.
 fn gateway_config(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) -> Result<(), String> {
-    let token_path = on(root, GATEWAY_TOKEN);
-    let kept = fs::symlink_metadata(&token_path)
-        .ok()
-        .filter(|meta| meta.is_file())
-        .and_then(|_| fs::read_to_string(&token_path).ok())
-        .map(|text| text.trim().to_owned())
-        .filter(|text| !text.is_empty());
-    let (token, made) = match kept {
-        Some(token) => (token, false),
-        None => {
-            let mut bytes = [0u8; 32];
-            ring::rand::SecureRandom::fill(&ring::rand::SystemRandom::new(), &mut bytes)
-                .map_err(|_| "no random bytes for the gateway's token".to_owned())?;
-            let token = crate::manifest::hex(&bytes);
-            write_whole(&token_path, format!("{token}\n").as_bytes(), 0o600)
-                .map_err(|error| format!("{GATEWAY_TOKEN}: {error}"))?;
-            give_to_lampos(run, GATEWAY_TOKEN)?;
-            (token, true)
-        }
-    };
+    let (token, made) = token_once(root, run, GATEWAY_TOKEN)?;
     let gateway = serde_json::json!({
         "mode": "local",
         "bind": "loopback",
@@ -1512,6 +1618,50 @@ fn gateway_config(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) -> R
     let text = serde_json::to_vec_pretty(&config).map_err(|error| error.to_string())?;
     write_whole(&config_path, &text, 0o600).map_err(|error| format!("{CONFIG}: {error}"))?;
     give_to_lampos(run, CONFIG)
+}
+
+/// The token at `path` (a gateway's), or one made there when there is
+/// none (32 random bytes, hex; `lampos`'s, 0600); whether it was made.
+fn token_once(root: &Path, run: &mut Runner, path: &str) -> Result<(String, bool), String> {
+    let token_path = on(root, path);
+    let kept = fs::symlink_metadata(&token_path)
+        .ok()
+        .filter(|meta| meta.is_file())
+        .and_then(|_| fs::read_to_string(&token_path).ok())
+        .map(|text| text.trim().to_owned())
+        .filter(|text| !text.is_empty());
+    if let Some(token) = kept {
+        return Ok((token, false));
+    }
+    let mut bytes = [0u8; 32];
+    ring::rand::SecureRandom::fill(&ring::rand::SystemRandom::new(), &mut bytes)
+        .map_err(|_| "no random bytes for the gateway's token".to_owned())?;
+    let token = crate::manifest::hex(&bytes);
+    write_whole(&token_path, format!("{token}\n").as_bytes(), 0o600)
+        .map_err(|error| format!("{path}: {error}"))?;
+    give_to_lampos(run, path)?;
+    Ok((token, true))
+}
+
+/// The fence gateway's state folder (#7101) made `lampos`'s, 0700, as
+/// [`STATE`] is (at every install: one already pinned makes no folder
+/// otherwise), and its own token made once there. Its `openclaw.json` is
+/// lamp-tasks', never written here.
+fn fence_state(root: &Path, run: &mut Runner) -> Result<(), String> {
+    run(&[
+        "install",
+        "-d",
+        "-o",
+        USER,
+        "-g",
+        USER,
+        "-m",
+        "0700",
+        FENCE_STATE,
+    ]
+    .map(str::to_owned))
+    .map_err(|why| format!("{FENCE_STATE} not made {USER}'s: {why}"))?;
+    token_once(root, run, FENCE_TOKEN).map(drop)
 }
 
 /// `path` made `lampos`'s (a link as a link).

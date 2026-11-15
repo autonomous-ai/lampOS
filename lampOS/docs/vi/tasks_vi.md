@@ -1195,7 +1195,15 @@ theo agent mặc định của đèn *là gì*, không bao giờ theo tên của
   theo đường dẫn đầy đủ. Hiện OpenClaw là gateway agent duy nhất:
   lamp-update chỉ ghi wrapper của nó như vậy khi `LAMP_SKILL_DEFAULT_AGENT=on`
   (cùng `LAMP_SKILL_TASKS` bật); khi tắt, wrapper và namespace của nó giữ
-  nguyên từng byte như trước.
+  nguyên từng byte như trước. lamp-update cũng ghi gateway rào của
+  OpenClaw, `lamp-openclaw-fence.service` (#7101, phương án (b);
+  install.md, "OpenClaw on the lamp"): state
+  `/var/lib/lampos-openclaw/fence`, cổng loopback 18790, token riêng
+  `/var/lib/lampos-openclaw/fence/gateway-token`, không bao giờ được
+  enable, chỉ khởi động khi cần và chỉ khi `openclaw.json` đã có trong thư
+  mục đó, file do lamp-tasks ghi, không phải lamp-update. Dữ liệu gateway
+  ở trên vẫn nêu gateway chính (18789, `lamp-skill-run`) cho đến khi các
+  lần chạy của lamp-tasks chuyển sang gateway rào.
 
 **Một lần chạy trên gateway agent** (`gateway_run::GatewayRunner`):
 
