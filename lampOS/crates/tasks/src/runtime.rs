@@ -2529,8 +2529,15 @@ fn owner<C: Clock>(
             // reviewer-lead's P2 on #2309).
             // A start that failed is tried again later, and until then no
             // hand-over goes either: it would fail on the stopped daemon.
+            // The restart after a sign-in (#7019) waits, as #5978's does,
+            // until no task is busy (watched): a task the lamp's own daemon
+            // runs since before the sign-in finishes first. New hand-overs
+            // wait for it too, as for any start due.
             let daemon = match start_daemon_due {
-                Some(due) if due <= Instant::now() => {
+                Some(due)
+                    if due <= Instant::now()
+                        && (!daemon_restart || engine.watched(&now).is_empty()) =>
+                {
                     start_daemon_due = None;
                     Some(Job::StartDaemon(daemon_restart))
                 }
