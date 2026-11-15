@@ -2669,6 +2669,47 @@ carrier default leaves a build's settings unwritten. The round says which
 set`). The rest of the build is taken as today. Users and groups aren't
 carried: a later step, when a build needs a new one.
 
+### Install's settings in a round (#5984)
+
+Every settings file install writes (`install::SETTINGS`, `STORE_SETTINGS`,
+`SETUP_SETTINGS`) has one rule for a round, by who writes it besides
+install. A round brings a file to its build's by that rule; "kept" means
+the round writes nothing there and says `kept PATH: this lamp's own; the
+build's is not written`.
+
+| File | Who writes it | Rule in a round |
+|---|---|---|
+| `/etc/lampOS/expression/expression.json` | install and a build's settings only; no part or the app writes it | **Replace** while it is still the one install or a build wrote (its record in `state.json`'s `settings`); changed on the lamp, **kept and said** |
+| `/etc/lampOS/records.json` | install and a build's settings only | **Replace**, or kept and said, as `expression.json` |
+| `/etc/lampOS/controls/controls-pins.json` | install, the factory step (`discover-head`: `head_pads`, `head_rest`), a V1 move (lamp-keeper's `provision/`), and install's `own_pins_follow_build` | **Replace** while it is install's or a build's; the lamp's own is **merged by key** (below) |
+| `/etc/lampOS/controls/controls.json` | install, a V1 move, and install's `own_pins_follow_build` (its `head_pads` names) | as `controls-pins.json` |
+| `/etc/tmpfiles.d/lampos.conf` | install and a build's settings | **Replace**, or kept and said (`apply::TMPFILES_SHIPPED` counts as install's) |
+| `/etc/lampOS/skills/store.env` | install and a build's settings; a change on the lamp is the lamp's | **Replace**, or kept and said |
+| `store.conf` (`lamp-skills-manage@.service.d/`) | install only | **Install's alone**: not a path a build may write (`manifest::is_setting_path`), so a round leaves it; a change to it needs `lamp-update install` |
+| `/etc/lampOS/setup/serve.json` | `install --setup on` and setup | **Setup's**: never a build's setting; a round leaves it |
+| product skills' files (`/var/lib/lampOS/skills/`) | not settings files | the folder install copies whole is placed by the round from `lamp-product-skills` ("The product's skills", above): a core skill's files put back, one turned on kept on |
+
+**Merged by key** (`apply::MERGED`, `apply::merge_own`): where Controls'
+file is the lamp's own and both it and the build's are JSON objects, each
+top-level key of the build's the lamp's lacks is added and every key the
+lamp has keeps its value, a lamp's head pins and their rest among them, as
+install keeps them. The file is written as install writes a lamp's own
+object (pretty JSON, a newline at the end) and said: `merged PATH: added
+the build's KEYS; this lamp's own values are kept`. Its record is not
+changed, so it stays the lamp's own and the next build's file never
+replaces it whole. With nothing to add, or either side not an object, it is
+kept and said. The round and `lamp-update-apply` both merge, so the round
+restarts Controls for it; a put-back restores the file byte for byte, as
+for any setting. A `lamp-update-back` from before this keeps the file whole,
+as before, until a round refreshes it ("The settings writer refreshed").
+Install's own key moves (the privacy section, the old guessed head pads,
+`legacy_head`) stay install's.
+
+Tests (`crates/update/tests/round/install_settings.rs`):
+`a_round_over_an_older_installed_expression_gives_the_builds`,
+`a_lamps_own_pins_survive_a_round_and_gain_the_builds_new_keys`,
+`an_expression_changed_on_the_lamp_is_kept_whole_and_said`.
+
 ### Setup's reset plan (#806)
 
 The reset plan, `/etc/lampOS/setup/reset-plan.json`, is what the 5 s reset
