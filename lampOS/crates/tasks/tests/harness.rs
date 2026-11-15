@@ -7531,6 +7531,172 @@ fn an_openclaw_gateway_default_runs_through_harness_new_like_hermes() {
     assert!(!rig.root.path().join("runs").exists());
 }
 
+/// A Gateway probe for a skill's run: ready from look `ready_from` (never
+/// with none); each look notes whether Harness was already asked `new`.
+struct SkillProbe {
+    calls: PathBuf,
+    ready_from: Option<usize>,
+    looks: Arc<Mutex<Vec<bool>>>,
+}
+impl lamp_tasks::gateway::Probe for SkillProbe {
+    fn ready(&mut self) -> bool {
+        let asked_new = fs::read_to_string(&self.calls).is_ok_and(|text| {
+            text.lines()
+                .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+                .any(|call| call["args"][0] == "new")
+        });
+        let mut looks = self.looks.lock().unwrap();
+        looks.push(asked_new);
+        self.ready_from.is_some_and(|from| looks.len() >= from)
+    }
+}
+
+/// `runner` with the wait spoken tasks have before a launch, its probe
+/// [`SkillProbe`], bounded by `within`.
+fn with_gateway(
+    rig: &Rig,
+    mut runner: HarnessRunner,
+    default: EngineKind,
+    ready_from: Option<usize>,
+    within: Duration,
+) -> (HarnessRunner, Arc<Mutex<Vec<bool>>>) {
+    let looks = Arc::new(Mutex::new(Vec::new()));
+    let calls = rig.root.path().join("calls.jsonl");
+    let seen = looks.clone();
+    let lamp = Target {
+        machine_id: MACHINE.into(),
+        project: "~/harnesses/lamp-tasks/lamp".into(),
+        engine: EngineKind::Hermes,
+    };
+    runner.harness = Arc::default();
+    let _ = runner.harness.set(
+        SkillHarness::new(
+            rig.config.clone(),
+            "stable-session_123".into(),
+            Box::new(move || Some(lamp.clone())),
+        )
+        .with_default_engine(Box::new(move || Some(default)))
+        .with_gateway(Box::new(move || {
+            Some(lamp_tasks::gateway::Gateway::with_bounds(
+                Box::new(SkillProbe {
+                    calls: calls.clone(),
+                    ready_from,
+                    looks: seen.clone(),
+                }),
+                within,
+                Duration::from_millis(20),
+            ))
+        })),
+    );
+    (runner, looks)
+}
+
+/// #6226 for a skill's run (#6685): with OpenClaw the lamp's default, a
+/// skill's run's `harness new openclaw` waits for the Gateway as a spoken
+/// task's launch does (`gateway::launch_with`): one coming up is waited
+/// for and `new` is asked only once it answers; one that never answers
+/// within the bound is not asked `new` at all, the run refused with
+/// spoken tasks' code and nothing left. Hermes's run never waits.
+#[test]
+fn an_openclaw_default_skill_run_waits_for_the_gateway_before_new() {
+    let openclaw_runner = |rig: &Rig| {
+        let gateway_ns = rig.root.path().join("openclaw-ns");
+        fs::write(
+            &gateway_ns,
+            format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+        )
+        .unwrap();
+        one_path_runner(
+            rig,
+            EngineKind::Openclaw,
+            &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+            Some("#!/bin/sh\n"),
+        )
+    };
+    let verbs = |rig: &Rig| -> Vec<String> {
+        rig.calls()
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap().to_owned())
+            .collect()
+    };
+
+    // Coming up: looked at until it answers, and only then `new`.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let (runner, looks) = with_gateway(
+        &rig,
+        openclaw_runner(&rig),
+        EngineKind::Openclaw,
+        Some(4),
+        Duration::from_secs(10),
+    );
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    assert_eq!(
+        *looks.lock().unwrap(),
+        [false; 4],
+        "no `new` before it answered"
+    );
+    assert!(verbs(&rig).contains(&"new".to_owned()));
+    nothing_left(&rig);
+
+    // Never answering: no `new` within the bound, refused, nothing left.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let within = Duration::from_millis(300);
+    let (runner, looks) = with_gateway(
+        &rig,
+        openclaw_runner(&rig),
+        EngineKind::Openclaw,
+        None,
+        within,
+    );
+    let run = skill_run(Duration::from_secs(20));
+    let began = Instant::now();
+    let said = runner.run(&run, &|| {}).unwrap_err();
+    assert!(began.elapsed() >= within, "waited the bound");
+    assert!(
+        said.contains(lamp_tasks::gateway::NOT_READY),
+        "refused with spoken tasks' code: {said}"
+    );
+    assert!(looks.lock().unwrap().len() >= 2, "looked at again");
+    assert!(
+        !verbs(&rig).contains(&"new".to_owned()),
+        "{:?}",
+        verbs(&rig)
+    );
+    assert!(!run.started.load(Ordering::Acquire));
+    nothing_left(&rig);
+
+    // Hermes the default: never waited for, whatever the Gateway.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let hermes = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_runs()),
+    );
+    let (runner, looks) = with_gateway(
+        &rig,
+        hermes,
+        EngineKind::Hermes,
+        None,
+        Duration::from_secs(10),
+    );
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    assert!(looks.lock().unwrap().is_empty(), "Hermes never waits");
+    let calls = rig.calls();
+    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+    assert_eq!(new["args"][1], "hermes");
+    nothing_left(&rig);
+}
+
 /// #6685 PR 3: with the switch on and Harness read signed in (or offline,
 /// or not read yet), a skill's run still goes through Harness, `harness
 /// new <default>`, even though the default agent's wrapper takes a run
