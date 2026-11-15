@@ -1058,10 +1058,24 @@ pub fn after_round(
     );
     match harness_install::start(root, systemd) {
         Ok(()) => {
-            say(&format!(
-                "OpenClaw {VERSION} is not set up at {OPENCLAW}: {} started to put it there",
-                harness_install::UNIT
-            ));
+            // OpenClaw there with only agent main's entry or the launcher
+            // due (a new lamp-tasks, c0a4's reboot #4) is not "not set up".
+            if there {
+                say(&format!(
+                    "OpenClaw {VERSION} is at {OPENCLAW}, but {} is due: {} started to set it",
+                    if allowlist_due {
+                        "agent main's exec allow-list entry"
+                    } else {
+                        "the skill launcher"
+                    },
+                    harness_install::UNIT
+                ));
+            } else {
+                say(&format!(
+                    "OpenClaw {VERSION} is not set up at {OPENCLAW}: {} started to put it there",
+                    harness_install::UNIT
+                ));
+            }
             record(records)
         }
         Err(why) => {
@@ -1778,10 +1792,11 @@ fn allowlist_argv(args: [&str; 7]) -> Vec<String> {
 /// (nothing run, nothing said: the round started it); else whether the
 /// add was taken, a refusal said in one line. The old globs' removes are
 /// the one-shot's alone. A gateway active but not ready yet (at a boot,
-/// [`gateway_not_ready`]) is asked again as the one-shot's add is; still
-/// not ready, it is None: unknown, not refused, so the entry is never
-/// marked gone and OpenClaw never reinstalled for it (#7135, c0a4's
-/// reboot at 22:59:00), and the next round checks again.
+/// [`gateway_not_ready`]) is None after the one try: unknown, not
+/// refused, so the entry is never marked gone and OpenClaw never
+/// reinstalled for it (#7135, c0a4's reboot at 22:59:00), and the next
+/// round checks again. The round does not retry, as the one-shot does:
+/// each try starts Node beside the gateway's own startup.
 fn keep_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str)) -> Option<bool> {
     if !gateway_active(run) {
         return None;
@@ -1790,17 +1805,11 @@ fn keep_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str)) -> Option<bool> {
         one_path: true,
         ..Shown::default()
     })[0];
-    let mut ran = run(&allowlist_argv(add));
-    for _ in 1..ADD_TRIES {
-        match &ran {
-            Err(why) if gateway_not_ready(why) => {
-                std::thread::sleep(ADD_AGAIN);
-                ran = run(&allowlist_argv(add));
-            }
-            _ => break,
-        }
-    }
-    match ran {
+    // Tried once per round, not ADD_TRIES times: on c0a4's reboot #4 (15
+    // Nov) the round's retries started OpenClaw's CLI 9 times in 208 s,
+    // each Node start competing with the gateway's own startup. A gateway
+    // not ready is unknown, and the next round checks again.
+    match run(&allowlist_argv(add)) {
         Ok(_) => Some(true),
         Err(why) if gateway_not_ready(&why) => {
             say(&format!(

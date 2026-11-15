@@ -2153,23 +2153,9 @@ fn a_round_reads_a_gateway_not_ready_as_unknown_never_as_the_entry_gone() {
         format!("/usr/bin/env: {NODE_NOT_READY}"),
     ];
     for why in &not_ready {
-        // Not ready twice, then taken: one round, the entry kept.
-        let mut adds = 0;
-        let mut run = |argv: &[String]| -> Result<String, String> {
-            if argv.iter().any(|arg| arg == "add") {
-                adds += 1;
-                if adds < 3 {
-                    return Err(why.clone());
-                }
-            }
-            Ok(String::new())
-        };
-        round(&mut systemd, &mut run);
-        assert_eq!(adds, 3, "{why}");
-        assert!(lamp.said().unwrap().exec_allowlist, "{why}");
-        assert_eq!(lamp.asked(), None, "{why}");
-
-        // Never ready in the round: unknown, nothing marked or asked.
+        // Not ready: tried once in the round, not again (c0a4's reboot #4,
+        // 15 Nov: 9 CLI starts in 208 s beside the gateway's startup);
+        // unknown, nothing marked or asked.
         let mut adds = 0;
         let mut run = |argv: &[String]| -> Result<String, String> {
             if argv.iter().any(|arg| arg == "add") {
@@ -2179,9 +2165,22 @@ fn a_round_reads_a_gateway_not_ready_as_unknown_never_as_the_entry_gone() {
             Ok(String::new())
         };
         round(&mut systemd, &mut run);
-        assert_eq!(adds, ADD_TRIES, "{why}");
+        assert_eq!(adds, 1, "{why}");
         assert!(lamp.said().unwrap().exec_allowlist, "{why}");
         assert_eq!(lamp.asked(), None, "no reinstall: {why}");
+
+        // Ready at the next round: taken, the entry kept.
+        let mut adds = 0;
+        let mut run = |argv: &[String]| -> Result<String, String> {
+            if argv.iter().any(|arg| arg == "add") {
+                adds += 1;
+            }
+            Ok(String::new())
+        };
+        round(&mut systemd, &mut run);
+        assert_eq!(adds, 1, "{why}");
+        assert!(lamp.said().unwrap().exec_allowlist, "{why}");
+        assert_eq!(lamp.asked(), None, "{why}");
     }
 
     // Another refusal: marked and asked, not tried again.
