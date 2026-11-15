@@ -100,6 +100,7 @@ pub mod made_clash;
 pub mod made_counts;
 pub mod made_list;
 pub mod made_remove;
+pub mod made_run;
 pub mod made_skill;
 pub mod make_skill_agent;
 pub mod make_skill_local;

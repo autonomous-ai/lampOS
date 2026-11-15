@@ -9406,6 +9406,77 @@ impl Engine {
             from: None,
         })
     }
+
+    /// The skill `name` run once now, as its owner asked by voice
+    /// (`lamp_voice::made_run`; lamp-9adf, 15 Nov at 15:49 and 15:52: "Run
+    /// my unread mail skill now, please." was read back, since a made skill
+    /// has a trigger and no tool, and nothing ran): its steps as its one
+    /// trigger would make them (all its steps but another trigger's), with
+    /// none of a trigger's own: a person asked, so, as for a tool, the
+    /// Policy is not asked and its `[[while]]`, quiet hours, cooldown, day's
+    /// most and group's hour are neither asked nor spent. What its steps do
+    /// is held to every bound a trigger's run is, where it is made (a
+    /// task's runs a day, one at a time, its owner's yes; a read's once a
+    /// day and its room; a write's yes). Off or snoozed, not loaded, or a
+    /// step held until its trigger ends (which never comes here) is `Err`,
+    /// in words the lamp can say. Nothing is marked: once the run is made,
+    /// [`Engine::ran_now`].
+    pub fn run_now(&mut self, name: &str, now_us: u64) -> Result<Run, String> {
+        let skill = self
+            .skills
+            .iter()
+            .find(|skill| skill.name == name)
+            .ok_or("it isn't on the lamp now")?;
+        if self.stopped(name, now_us) {
+            return Err("it is turned off or snoozed".into());
+        }
+        let trigger = match skill.triggers.as_slice() {
+            [one] => Some(one),
+            _ => None,
+        };
+        let calls = calls(
+            &self.latest,
+            &self.picked,
+            skill,
+            trigger,
+            now_us,
+            &Value::Null,
+            None,
+        );
+        if calls.is_empty() {
+            return Err("it has nothing to do but at its own moment".into());
+        }
+        if calls.iter().any(Call::held_until_ends) {
+            return Err("it lasts only while its moment holds, so it runs only then".into());
+        }
+        let run = Run {
+            generation: skill.scheduled_run(None).then(|| self.generation.clone()),
+            skill: skill.name.clone(),
+            events: vec![event(
+                &skill.name,
+                SkillStage::Triggered,
+                "its owner asked by voice to run it now".into(),
+                None,
+            )],
+            calls,
+            ask: None,
+            queue: false,
+            from: None,
+        };
+        Ok(run)
+    }
+
+    /// [`Engine::run_now`]'s run of `name` made at `now_us`: a read is
+    /// under way from here, as a trigger's is once made.
+    pub fn ran_now(&mut self, name: &str, now_us: u64) {
+        if self
+            .skills
+            .iter()
+            .any(|skill| skill.name == name && skill.reads_a_service())
+        {
+            read_made(&mut self.reads, self.clock, name, now_us);
+        }
+    }
 }
 
 /// What was heard of the newest thing said, joined from its pieces on
@@ -10761,6 +10832,59 @@ mod tests {
     /// modifiedTime desc"`, which the new lamp-skills refused at load. On
     /// the lamp it loads, its read with no query, the latest; made, packed
     /// or installed anew it is refused as before.
+    /// lamp-9adf, 15 Nov at 15:49: a made skill with a trigger and no tool,
+    /// run now as its owner asked: its trigger's steps, the Policy not
+    /// asked, nothing of its trigger spent; turned off, or not loaded, it
+    /// is refused in words the lamp can say.
+    #[test]
+    fn a_made_skill_runs_now_as_its_trigger_would_and_not_when_off() {
+        let dir = tempfile::tempdir().unwrap();
+        let name = "unread-mail";
+        let folder = dir.path().join(name);
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: Reads my unread mail.\nmade: here\n---\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            folder.join("skill.toml"),
+            "version = \"1.0.0\"\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\n\
+             equals = \"resting\"\ncooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n[permissions]\n\
+             topics = [\"voice/state\"]\nspeak = true\nservices = { gmail = \"read\" }\n\
+             [[do]]\nread = { service = \"gmail\", what = \"recent\", count = 3 }\n",
+        )
+        .unwrap();
+        let skill = load(&folder).unwrap();
+        let mut engine = Engine::new(vec![skill], false);
+        let run = engine.run_now(name, 1_000_000).unwrap();
+        assert_eq!(run.skill, name);
+        assert!(run.ask.is_none());
+        assert!(
+            matches!(run.calls.as_slice(), [Call::ServiceRead(_)]),
+            "{:?}",
+            run.calls
+        );
+        assert_eq!(run.events[0].stage, SkillStage::Triggered);
+        // Nothing of its trigger is spent: no cooldown begins.
+        assert!(engine.watches.values().all(|watch| watch.ran_us.is_none()));
+        // Its read is under way only once made.
+        assert!(!engine.reads.contains_key(name));
+        engine.ran_now(name, 1_000_000);
+        assert!(engine.reads[name].under_way);
+        assert_eq!(
+            engine.run_now("evening-dim", 1_000_000).unwrap_err(),
+            "it isn't on the lamp now"
+        );
+        let state = tempfile::tempdir().unwrap();
+        std::fs::write(state.path().join(OFF_FILE), format!("{name}\n")).unwrap();
+        engine.keep_off_in(state.path()).unwrap();
+        assert_eq!(
+            engine.run_now(name, 2_000_000).unwrap_err(),
+            "it is turned off or snoozed"
+        );
+    }
+
     #[test]
     fn a_skill_on_the_lamp_whose_read_asks_an_order_loads_and_a_new_one_is_refused() {
         let dir = tempfile::tempdir().unwrap();

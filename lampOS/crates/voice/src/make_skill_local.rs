@@ -606,8 +606,8 @@ pub fn tool() -> lamp_gemini::Tool {
     let writes = made_skill::writes_on();
     let mut description = "Make a new skill for the lamp: something the lamp then does by itself, \
              whatever the lamp can do (its light, its head, a few exact words it says, its hum, a read of a linked service), at a time each day, when someone comes or goes, a face comes \
-             into view, someone gets up, pats its head, the air gets stuffy, or when it is resting (\"make me a skill that dims the light at 10 pm\"). Make one only when \
-             the person asks for one. In the same breath, before you call it, say in a \
+             into view, someone gets up, pats its head, the air gets stuffy, or when it is resting (\"make me a skill that dims the light at 10 pm\"). Make one only when the \
+             person asks for it. In the same breath, before you call it, say in a \
              few words that you'll make it now. The skill is made, checked, kept and put on the \
              lamp at once: then say exactly the line you are told, nothing more."
         .to_owned();
@@ -629,9 +629,10 @@ pub fn tool() -> lamp_gemini::Tool {
     if code {
         description.push_str(CODE_TOLD);
     }
-    // A made skill removed by voice (#6960), and those made listed: the
-    // same function, its `remove` or `made` alone; whether a line asks
-    // either is the model's judgment.
+    // A made skill removed by voice (#6960), run now (lamp-9adf, 15 Nov),
+    // and those made listed: the same function, its `remove`, `run` or
+    // `made` alone; whether a line asks any, or a read-back, is the
+    // model's judgment.
     description.push_str(REMOVE_TOLD);
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
@@ -659,12 +660,15 @@ const CODE_REQUEST_TOLD: &str = " A made skill's own script may check what the l
 
 /// What [`tool`]'s description adds for a remove (#6960): on lamp-c0a4
 /// "delete the skill called moon fact" went to `lamp_help` and "remove the
-/// moon fact skill" to a read-back, since nothing here named a remove. And
-/// for the skills made, listed (`crate::made_list`): on lamp-9adf, 15 Nov,
-/// "which skills have you made for me?" was answered from the thread with
-/// no call, and once by a read-back of one skill.
-pub const REMOVE_TOLD: &str = " Call it with remove alone to delete or remove a skill, or made \
-     alone when asked which skills they made, saying nothing first.";
+/// moon fact skill" to a read-back, since nothing here named a remove.
+/// And for a run now (lamp-9adf, 15 Nov at 15:49 and 15:52: "Run my
+/// unread mail skill now, please." went to a read-back, since nothing here
+/// named a run, and nothing ran), and for the skills made, listed
+/// (`crate::made_list`: "which skills have you made for me?" was answered
+/// from the thread with no call), in the same sentence, so every switch on
+/// still fits the link's 1,024 bytes.
+pub const REMOVE_TOLD: &str = " To delete or remove a skill, call it with remove alone; to run \
+     one they made now, run alone; to list those they made, made alone; say nothing first.";
 
 /// What [`tool`]'s description adds with a made skill's writes on.
 pub const READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
@@ -677,9 +681,8 @@ pub const TASKS_READ_BACK_TOLD: &str = " Call it with read_back alone too when t
 /// What [`tool`]'s description adds with a made skill's writes and a
 /// skill's tasks both on: [`READ_BACK_TOLD`] and [`TASKS_READ_BACK_TOLD`]
 /// in one sentence.
-pub const BOTH_READ_BACK_TOLD: &str = " Call it with read_back alone when asked what a skill \
-     they made sends, what a skill on the lamp uses, or to hear one read back, saying nothing \
-     first.";
+pub const BOTH_READ_BACK_TOLD: &str = " Call it with read_back alone to hear what a skill they \
+     made sends or what a skill on the lamp uses, saying nothing first.";
 
 /// The function's parameters: the request, and with a made skill's writes
 /// (#6066) or code (#6307) on, the yes to one that waits for it,
@@ -719,6 +722,12 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     parameters["properties"][crate::made_list::LIST] = json!({
         "type": "boolean",
         "description": "Only when the person asks which skills they made, or you made for them, or how many: true, given alone with no request. Never answer that from the conversation."
+    });
+    // A made skill run now by voice ([`crate::made_run`]): the name as
+    // heard, matched in code to the person's own made skills, as a remove's.
+    parameters["properties"][crate::made_run::RUN] = json!({
+        "type": "string",
+        "description": "Only when the person asks to run, start or do a skill they made, now: its name as they said it, given alone with no request. Never to hear what it sends or uses."
     });
     parameters["properties"][crate::made_clash::CHOICE] = json!({
         "type": "string",
@@ -1266,7 +1275,10 @@ fn already_made(name: &str, told: &Value) -> Value {
 /// package, and what must be heard whole before the yes, each write's
 /// plain words as the say-back has them. None for a skill that writes
 /// nothing.
-fn asks_of(directory: &std::path::Path, made: &Made) -> Option<crate::skill_write_yes::Asks> {
+pub(crate) fn asks_of(
+    directory: &std::path::Path,
+    made: &Made,
+) -> Option<crate::skill_write_yes::Asks> {
     let writes = made_skill::writes_of(directory, &made.sha256);
     if writes.is_empty() {
         return None;
@@ -2765,6 +2777,12 @@ pub fn answer(
     // newest by name to the owner alone.
     if call.args[crate::made_list::LIST] == true {
         return crate::made_list::listed_here(request, heard, lease);
+    }
+    // A skill the person made, run once now by voice (lamp-9adf, 15 Nov:
+    // "Run my unread mail skill now" was read back, and nothing ran): the
+    // owner's alone, held to its trigger's bounds ([`crate::made_run`]).
+    if let Some(name) = call.args[crate::made_run::RUN].as_str() {
+        return crate::made_run::asked_here(name, request, heard, lease);
     }
     // A made skill read back by voice (`LAMP_SKILL_WRITES`): what it
     // sends, and its yes awaited again when it waits for one. Or a skill on
@@ -6272,7 +6290,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         // switch on, its parameter beside remove.
         assert!(
             all.description
-                .contains("made alone when asked which skills they made"),
+                .contains("to list those they made, made alone"),
             "{}",
             all.description
         );
