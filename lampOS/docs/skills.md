@@ -4371,7 +4371,8 @@ answer in lamp-tasks' answer (docs/tasks.md, "What its agent found";
 `lamp-skills` says it to the owner as a `do.read`'s lines are said
 (`service_read::tell`): behind the same gate (the owner's known face alone
 in view and steady 5 s, no voice for a minute, not private, paused or in
-quiet hours, waited for up to 60 minutes, then skipped unsaid), in the
+the lamp's quiet hours or the skill's own `[quiet]`, as a `do.read`'s,
+waited for up to 60 minutes, then skipped unsaid), in the
 lamp's one read turn, one sentence a line as exact words (never a turn for
 the model, so what a mail says is never an instruction), the gate judged
 again before each, someone coming stopping it with "I'll tell you the rest
@@ -4381,7 +4382,9 @@ at most the say service's 900 bytes, at most 11. The skill needs no
 only how many were said (`do.task: what its agent found: told N`). A run
 with no read grant (a send, a script's task) tells nothing, as before.
 Tests: `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
-`service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`.
+`service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,
+`tests::a_task_step_loads_with_its_skills_own_quiet`, and lamp-skills'
+`a_tasks_told_answer_is_held_to_its_skills_own_quiet`.
 With the same switch in `lamp-skills`, its manage helper, `lamp-voice` and
 `lamp-control` (which reads a skill's grants through lamp-skills at each
 token's mint), a `do.task`'s `grants` may name a linked service's grant
