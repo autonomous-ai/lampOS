@@ -2459,7 +2459,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      one-shot (the round's sandbox cannot write `/usr/local/lib/lampos`):
      a round compares its bytes and mode with the installed lamp-tasks
      and asks the one-shot when they differ; with the switch off it is
-     taken out, and with OpenClaw off it goes with the entry points. That
+     taken out, and with OpenClaw off it goes with the entry points. The
+     launcher's safety depends on lamp-tasks choosing launcher mode first
+     in `main()`, by `/proc/self/exe`, and then taking exactly one run id
+     (#7133). That
      exec is allowed by exactly one entry in agent `main`'s exec
      allow-list, `/usr/local/lib/lampos/skill-start` (`SKILL_START`: no
      glob, no argument pattern), in OpenClaw's exec approvals (its state
@@ -2471,7 +2474,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      an earlier build's glob there
      (`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`) is
      taken out of `main` and of the withdrawn fence agent
-     `lamp-skill-run` (#7101). The install runs, as `lampos` through the
+     `lamp-skill-run` (#7101; an old `lamp-skill-run` entry, harmless,
+     cannot be removed by the CLI once that agent is gone from
+     `openclaw.json`, so that remove's failure is expected, journaled
+     once per try, and nothing depends on it). The install runs, as `lampos` through the
      wrapper (which joins the running gateway), after the gateway's
      (re)start: `/usr/local/bin/openclaw approvals allowlist add
      --gateway --agent main /usr/local/lib/lampos/skill-start`, then
@@ -2484,6 +2490,17 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      install is still `installed`, nothing is taken down, and the record's
      `exec_allowlist` stays false, so the next round asks the one-shot
      again, which then only writes the launcher and edits the allow-list.
+     The entry is re-checked every round: with the switch on, the record
+     saying it was added and the gateway active, the round itself runs
+     the same `approvals allowlist add` (as `lampos`, through the wrapper;
+     OpenClaw takes an entry already there without writing), so a factory
+     reset that wipes OpenClaw's approvals gets it back on the next
+     round; an add refused sets `exec_allowlist` false and asks the
+     one-shot, and the removes stay the one-shot's. With the switch off
+     and the gateway not active, nothing is run and `exec_allowlist`
+     stays true (carried through the `installing` record too), so each
+     round asks the one-shot again until `main`'s removes have run with
+     the gateway active; only then does it go false.
      Off, the wrapper and `openclaw-ns` are as before #6685, byte for
      byte. lamp-update never writes OpenClaw's shared
      `openclaw.json` for a skill's run and never changes `tools.exec`: its
