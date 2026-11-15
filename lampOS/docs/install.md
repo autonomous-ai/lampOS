@@ -2491,8 +2491,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the next round asks again). An add refused only because the
      gateway just (re)started is not ready yet (its namespace does not
      show Node, `'node': No such file or directory`, then `Config
-     unavailable`) is tried again in the same run, 20 times 3 s apart at
-     most (#7135). A remove that fails is journaled and
+     unavailable`) is tried again in the same run, 40 times 3 s apart (two
+     minutes) at most (#7135). A remove that fails is journaled and
      passed over; an add that fails is journaled and not done: the
      install is still `installed`, nothing is taken down, and the record's
      `exec_allowlist` stays false, so the next round asks the one-shot

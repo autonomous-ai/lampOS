@@ -1682,8 +1682,9 @@ fn gateway_not_ready(why: &str) -> bool {
 
 /// How many times an allow-list add is run while the gateway is not ready
 /// ([`gateway_not_ready`]).
-pub const ADD_TRIES: u32 = 20;
-/// The wait between those adds: 20 × 3 s, a minute at most.
+pub const ADD_TRIES: u32 = 40;
+/// The wait between those adds: 40 × 3 s, two minutes at most (c0a4 was
+/// not ready for about 40 s; a slower card takes longer).
 pub const ADD_AGAIN: Duration = if cfg!(test) {
     Duration::from_millis(1)
 } else {
