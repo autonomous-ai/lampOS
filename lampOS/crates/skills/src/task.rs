@@ -1659,13 +1659,16 @@ mod tests {
         let before = fs::read(state.join(RUNS_FILE)).unwrap();
         assert_eq!(would_refuse("check-skill", Some(state), 1_002), None);
         assert_eq!(fs::read(state.join(RUNS_FILE)).unwrap(), before);
-        // Every skill's ten spent: refused as `begin` would.
+        // Every skill's runs spent: refused as `begin` would.
         let runs: Vec<(String, u64)> = (0..ALL_SKILLS)
             .map(|at| (format!("s{at}"), at as u64))
             .collect();
         fs::write(state.join(RUNS_FILE), serde_json::to_vec(&runs).unwrap()).unwrap();
         let spent = would_refuse("check-skill", Some(state), 100).unwrap();
-        assert!(spent.contains("10 runs in 24 hours are spent"), "{spent}");
+        assert!(
+            spent.contains(&format!("{ALL_SKILLS} runs in 24 hours are spent")),
+            "{spent}"
+        );
         assert_eq!(begin("check-skill", Some(state), 100).unwrap_err(), spent);
         // A day on, it may again.
         assert_eq!(would_refuse("check-skill", Some(state), DAY_MS + 10), None);
@@ -2085,11 +2088,11 @@ mod tests {
     }
 
     /// A made skill run now by its owner (lamp-9adf, 15 Nov) is held to
-    /// its own day's bound as a trigger's run is: its three runs in 24
-    /// hours spent, it is refused in words that say so, and another skill
+    /// its own day's bound as a trigger's run is: its [`PER_SKILL`] runs
+    /// in 24 hours spent, it is refused in words that say so, and another skill
     /// still runs; nothing is written by the check.
     #[test]
-    fn a_run_now_past_its_own_three_a_day_is_refused_plainly() {
+    fn a_run_now_past_its_own_days_runs_is_refused_plainly() {
         let dir = tempfile::tempdir().unwrap();
         let state = dir.path();
         set_on_here(Some(true));
@@ -2101,7 +2104,7 @@ mod tests {
         let spent = would_refuse("unread-mail", Some(state), 100).unwrap();
         assert_eq!(
             spent.strip_prefix(NOT_HANDED),
-            Some("its 3 runs in 24 hours are spent")
+            Some(format!("its {PER_SKILL} runs in 24 hours are spent").as_str())
         );
         assert_eq!(would_refuse("evening-dim", Some(state), 100), None);
         assert_eq!(fs::read(state.join(RUNS_FILE)).unwrap(), before);
