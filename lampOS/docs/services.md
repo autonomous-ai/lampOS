@@ -2170,7 +2170,8 @@ and no text:
    repository approved as private and public now waits, as above.
 6. **The bounds** (`skill_writes::Ledger`, `skill-writes.json` in the store
    folder): at most 50 sends a skill and 200 across every skill in any 24
-   hours. Each send is counted before it goes, one at a time, so two at
+   hours, and at most 5 a skill in any hour (`PER_SKILL_HOUR`), so a
+   trigger that flaps never spends a skill's day in minutes. Each send is counted before it goes, one at a time, so two at
    once never pass a bound together. A send that then fails still counts.
    The ledger keeps a skill's name and a time, nothing else, so a restart
    doesn't forget the day's sends. It fails closed: a ledger that can't
@@ -2309,7 +2310,7 @@ is sent by a skill's run on the lamp's Hermes, not by `lamp-skills`:
   the owner's kept yes matched on that exact content (a run that changes a
   field is refused "not sent: this write is not the one the owner said yes
   to", never held for a spoken yes), the link it was said under, the day's
-  bounds (50 a skill, 200 in all) and the sent-log, and **once a run**: a
+  bounds (50 a skill, 200 in all, 5 a skill an hour) and the sent-log, and **once a run**: a
   second try, whatever it sends, is refused ("not sent: a skill's fixed
   write is sent once a run …"). The agent is told "Sent, as the owner said
   yes to it." Any other call of that run is refused, and with the switch

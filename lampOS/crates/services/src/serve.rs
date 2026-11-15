@@ -3204,17 +3204,17 @@ mod tests {
         assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
         // The skill's day's sends used up: the next is not sent.
         let ledger = skill_writes::Ledger::new(&services.store.0);
-        for _ in 1..skill_writes::PER_SKILL {
+        for _ in 1..skill_writes::PER_SKILL_HOUR {
             ledger.take("mail-count", crate::now_secs()).unwrap();
         }
         run(services.run_tool(&run_line(tools::WRITE, draft)));
         let id = services.run_held.lock().unwrap().clone().unwrap();
         let refused = run(services.tool(&send(&id.0)));
         assert!(
-            refused["error"]
-                .as_str()
-                .unwrap()
-                .contains(&format!("at most {} times a day", skill_writes::PER_SKILL)),
+            refused["error"].as_str().unwrap().contains(&format!(
+                "at most {} times an hour",
+                skill_writes::PER_SKILL_HOUR
+            )),
             "{refused}"
         );
         assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
@@ -4368,8 +4368,8 @@ mod tests {
             skill_writes::WAITING
         );
         assert_eq!(on.mail.sent.lock().unwrap().len(), 1);
-        // Over its bound: PER_SKILL a day, then refused.
-        for _ in 1..skill_writes::PER_SKILL {
+        // Over its bound: PER_SKILL_HOUR within the hour, then refused.
+        for _ in 1..skill_writes::PER_SKILL_HOUR {
             assert_eq!(run(on.skill_tool(&line))["result"]["sent"], true);
         }
         let over = run(on.skill_tool(&line));
@@ -4377,10 +4377,13 @@ mod tests {
             over["error"]
                 .as_str()
                 .unwrap()
-                .contains(&format!("at most {} times", skill_writes::PER_SKILL)),
+                .contains(&format!("at most {} times", skill_writes::PER_SKILL_HOUR)),
             "{over}"
         );
-        assert_eq!(on.mail.sent.lock().unwrap().len(), skill_writes::PER_SKILL);
+        assert_eq!(
+            on.mail.sent.lock().unwrap().len(),
+            skill_writes::PER_SKILL_HOUR
+        );
         let store = dir.path().join("s");
         for file in [skill_writes::LEDGER_FILE, skill_writes::APPROVED_FILE] {
             let kept = std::fs::read_to_string(store.join(file)).unwrap();
@@ -4389,7 +4392,7 @@ mod tests {
         // The owner's sent-log: who, never what.
         let log = run(on.tool(r#"{"op":"call","name":"skill_writes_sent"}"#));
         let sent = log["result"]["sent"].as_array().unwrap();
-        assert_eq!(sent.len(), skill_writes::PER_SKILL, "{log}");
+        assert_eq!(sent.len(), skill_writes::PER_SKILL_HOUR, "{log}");
         assert_eq!(sent[0]["skill"], "arrive-mail");
         assert_eq!(sent[0]["to"], "boss");
         assert!(!log.to_string().contains("desk"));
@@ -4447,26 +4450,29 @@ mod tests {
         ));
         assert_eq!(read["ok"], false, "{read}");
         assert_eq!(on.mail.sent.lock().unwrap().len(), 1);
-        // The skill's day's bound: the send past it is refused.
-        for n in 1..skill_writes::PER_SKILL {
+        // The skill's hour's bound: the send past it is refused.
+        for n in 1..skill_writes::PER_SKILL_HOUR {
             let id = format!("task-1-1-{}", 3 + n);
             let sent = run(on.run_tool(&fixed_write_line(&id, &arrival_mail())));
             assert_eq!(sent["result"]["sent"], true, "{sent}");
         }
-        let over_id = format!("task-1-1-{}", 3 + skill_writes::PER_SKILL);
+        let over_id = format!("task-1-1-{}", 3 + skill_writes::PER_SKILL_HOUR);
         let over = run(on.run_tool(&fixed_write_line(&over_id, &arrival_mail())));
         assert!(
             over["error"]
                 .as_str()
                 .unwrap()
-                .contains(&format!("at most {}", skill_writes::PER_SKILL)),
+                .contains(&format!("at most {}", skill_writes::PER_SKILL_HOUR)),
             "{over}"
         );
-        assert_eq!(on.mail.sent.lock().unwrap().len(), skill_writes::PER_SKILL);
+        assert_eq!(
+            on.mail.sent.lock().unwrap().len(),
+            skill_writes::PER_SKILL_HOUR
+        );
         let log = run(on.tool(r#"{"op":"call","name":"skill_writes_sent"}"#));
         assert_eq!(
             log["result"]["sent"].as_array().unwrap().len(),
-            skill_writes::PER_SKILL,
+            skill_writes::PER_SKILL_HOUR,
             "{log}"
         );
         // The switch off here: nothing is sent.
