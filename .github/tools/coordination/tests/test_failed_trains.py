@@ -7,6 +7,10 @@
 #      them changed, so the bot held nobody and cut the pair again. Now a set that failed twice the same way is not cut
 #      a third time: each of its PRs goes alone, one a train; one that fails alone is left out on that head and named on
 #      the Queue with the file and the first error line, until its head changes; one that passes merges as usual.
+#   3. The first read of #7186: with lamp-voice itself broken, every PR would fail alone and be left out on its head,
+#      and a fix to lamp-voice would bring none of them back. Before a PR is left out for failing alone, the bot reads
+#      lamp-voice's own push runs at its head: red there, no PR is left out and the bot stops, saying so on the Queue;
+#      green, missing or still running, the PR is left out as in 2 (and the log says when there was no run to check).
 # The bot's own loop runs here for real (not DRY=1), on test_lanes.py's temporary repository and a stand-in gh that
 # opens, merges, closes and comments on PRs in that repository only. Needs git, zsh and jq.
 # Run from the repo root: python3 -I -m pytest -q .github/tools/coordination/tests
@@ -20,9 +24,11 @@ from test_red_checks import CRATE, check
 # The stand-in gh for a real round, ahead of test_red_checks.py's cases: `pr create` opens a train PR (numbered from
 # 101, its head at refs/pull/N/head, its branch on the list of open trains the bot reads to see a lane busy), `pr merge`
 # moves lamp-voice to the train's head, `pr close` takes a PR off the open list (and a train off the open trains, as a
-# merge does), `pr comment` adds the comment to the PR's comments (so a HOLD the bot posts holds), and a run's
-# cancelled jobs are listed apart from its failed ones (the two calls differ only in their --jq).
-LOOP = r"""  "pr create "*) n=$(cat "$FAKE_DIR/created" 2>/dev/null || echo 100); n=$((n+1)); echo $n > "$FAKE_DIR/created"
+# merge does), `pr comment` adds the comment to the PR's comments (so a HOLD the bot posts holds), a run's cancelled
+# jobs are listed apart from its failed ones (the two calls differ only in their --jq), and lamp-voice's own push runs
+# on a commit (lv-runs.txt) are apart from a train's runs (runs.txt): that call asks for event=push.
+LOOP = r"""  *"actions/runs?event=push&head_sha="*) cat "$FAKE_DIR/lv-runs.txt" 2>/dev/null; exit 0 ;;
+  "pr create "*) n=$(cat "$FAKE_DIR/created" 2>/dev/null || echo 100); n=$((n+1)); echo $n > "$FAKE_DIR/created"
                  br=$(echo "$*" | sed -E 's/.*--head ([^ ]+).*/\1/'); h=$(git ls-remote origin "refs/heads/$br" | cut -c1-40)
                  git push -q origin "$h:refs/pull/$n/head"; echo "$h" > "$FAKE_DIR/head-$n.txt"
                  echo "$br" > "$FAKE_DIR/branch-$n.txt"; echo "$br" >> "$FAKE_DIR/open.txt"
@@ -46,6 +52,8 @@ OTHER = "lampOS/crates/x/src/other.rs"
 # The macOS job of train 940, and a train's checks with it cancelled and nothing else red.
 SIM = "lampOS virtual lamp — lamp-sim builds and tests on macOS arm64"
 CANCELLED = ARM_CHECKS + [check(SIM, conclusion="CANCELLED")]
+# The clippy workflow's one job, as lamp-voice's own push run names it.
+CLIPPY = "lampOS — clippy, every crate and target (x86 Linux)"
 # A train that failed to compile: its checks, and its failed job's log as GitHub serves it (a time on each line).
 RED = [check("build and test", conclusion="FAILURE"), check("clippy")]
 TASK = "lampOS/crates/y/src/task.rs"
@@ -309,6 +317,65 @@ class TheSameFailingSet(Loop):
         self.assertEqual(self.trains(out), ["train 24 (#101): 7", "train 25 (#102): 7"], out)
         self.left_out(7, "train 25 (#102)")
         self.assertNotIn("HOLD train", self.calls())
+        # lamp-voice's head has no push run here at all: the log says there was none to check.
+        self.assertIn("lamp-voice's own run at %s was not there to check (no push run of lampos-clippy.yml, no push run of lampos-arm64.yml)"
+                      ": the failure is taken as #7's" % self.rev("origin/lamp-voice")[:9], out)
+
+    # The first read of #7186: lamp-voice itself broken would leave every PR out, one by one, each on its head.
+    def lamp_voice(self, runs, failed=None):
+        """lamp-voice's own push runs on its head, as the bot reads them: (run, how it ended or "running", workflow)
+        each, and by run the failed jobs a train waits for."""
+        self.fakefile("lv-runs.txt", "".join("%d %s .github/workflows/%s\n" % r for r in runs))
+        for run_id, jobs in (failed or {}).items():
+            self.fakefile("jobs-%d.txt" % run_id, "".join(j + "\n" for j in jobs))
+
+    def alone_twice(self):
+        """#7 alone, failing twice to compile in a file it does not change: the second time it would be left out."""
+        self.ready(7)
+        self.changes(7, CRATE)
+        self.train(1, RED)
+        self.train(2, RED)
+        rc, out = self.loop(until=lambda o: then("#7 left out: ", "open PRs eligible")(o) or len(self.trains(o)) > 2, lanes="off")
+        self.assertEqual(self.trains(out), ["train 24 (#101): 7", "train 25 (#102): 7"], out)
+        return rc, out
+
+    def test_a_pr_failing_alone_while_lamp_voice_itself_is_red_is_not_left_out_and_the_bot_stops(self):
+        self.lamp_voice([(701, "failure", "lampos-clippy.yml"), (702, "success", "lampos-arm64.yml")], failed={701: [CLIPPY]})
+        rc, out = self.alone_twice()
+        lv = self.rev("origin/lamp-voice")[:9]
+        # The bot stops, and says why in its log and in its one post on the Queue.
+        self.assertEqual(rc, 2, out)
+        self.assertTrue(os.path.exists(os.path.join(self.state, "train-bot.stop")))
+        self.assertIn("lamp-voice itself is red at %s in lampos-clippy.yml (%s): #7 is not left out; stopping for the first builder" % (lv, CLIPPY), out)
+        self.assertEqual(len(self.queue()), 1, self.queue())
+        for part in ("train 25 (#102) carried #7 alone", TASK,
+                     "lamp-voice itself is red at `%s` in lampos-clippy.yml (%s), so no PR is blamed; stopped for the first builder" % (lv, CLIPPY)):
+            self.assertIn(part, self.queue()[0])
+        # No PR is blamed: #7 is not left out, told nothing and not held.
+        self.assertNotIn("left out", self.queue()[0])
+        self.assertNotIn("#7 left out", out)
+        self.assertEqual(self.comments(7), [])
+        with open(os.path.join(self.state, "train-bot.alone-out")) as fh:
+            self.assertEqual(fh.read(), "")
+
+    def test_a_pr_failing_alone_while_lamp_voice_is_green_is_left_out(self):
+        self.lamp_voice([(701, "success", "lampos-clippy.yml"), (702, "success", "lampos-arm64.yml")])
+        rc, out = self.alone_twice()
+        self.assertEqual(rc, None, out)
+        self.left_out(7, "train 25 (#102)")
+        self.assertIn("#7 left out: alone in a train, it failed to compile or lint at", out)
+        self.assertNotIn("lamp-voice itself is red", out)
+        self.assertNotIn("not there to check", out)
+
+    def test_with_lamp_voices_own_run_missing_or_still_running_the_pr_is_left_out_and_the_log_says_so(self):
+        # Its clippy run still going, and no ARM64 run on that head.
+        self.lamp_voice([(701, "running", "lampos-clippy.yml")])
+        rc, out = self.alone_twice()
+        self.assertEqual(rc, None, out)
+        self.left_out(7, "train 25 (#102)")
+        self.assertIn("lamp-voice's own run at %s was not there to check (lampos-clippy.yml still running, no push run of lampos-arm64.yml)"
+                      ": the failure is taken as #7's" % self.rev("origin/lamp-voice")[:9], out)
+        self.assertNotIn("lamp-voice itself is red", out)
 
     def test_a_pr_that_changes_the_failing_file_is_held_and_the_rest_go_again_as_before(self):
         self.changes(7, CRATE, TASK)
@@ -382,6 +449,62 @@ class Helpers(StandIn):
         # A long line is cut, and a log with no error line gives nothing.
         self.assertEqual(self.first_error("error: " + "x" * 400 + "\n"), "error: " + "x" * 153 + "\n")
         self.assertEqual(self.first_error("warning: unused\n##[error]Process completed with exit code 101.\n"), "")
+
+    # The first read of #7186: lamp-voice's own head, read before a PR is left out for failing alone.
+    def test_lamp_voices_own_head_reads_red_ok_or_not_there(self):
+        state = lambda sha="abc": self.lib('coord_lv_state "$1"', sha).stdout
+        clippy, arm = ".github/workflows/lampos-clippy.yml", ".github/workflows/lampos-arm64.yml"
+        # No push run on that commit (or none that could be read): not there, each named.
+        self.assertEqual(state(), "none no push run of lampos-clippy.yml, no push run of lampos-arm64.yml\n")
+        self.assertIn("actions/runs?event=push&head_sha=abc", self.calls())
+        # One still going.
+        self.fakefile("lv-runs.txt", "702 running %s\n701 success %s\n" % (arm, clippy))
+        self.assertEqual(state(), "none lampos-arm64.yml still running\n")
+        # One ended with no answer.
+        self.fakefile("lv-runs.txt", "702 success %s\n701 cancelled %s\n" % (arm, clippy))
+        self.assertEqual(state(), "none lampos-clippy.yml cancelled\n")
+        # Both there and done, no job a train waits for failed: green. Also when the ARM64 run failed in another job
+        # only: lamp-voice's head 051928e2be on 16 Nov, its build reused from the train and its publish failed.
+        self.fakefile("lv-runs.txt", "702 success %s\n701 success %s\n" % (arm, clippy))
+        self.assertEqual(state(), "ok\n")
+        self.fakefile("lv-runs.txt", "702 failure %s\n701 success %s\n" % (arm, clippy))
+        self.assertEqual(state(), "ok\n")
+        # A failed job a train waits for: red, with the workflow and the job. Also while the run's other jobs still run.
+        self.fakefile("lv-runs.txt", "702 success %s\n701 failure %s\n" % (arm, clippy))
+        self.fakefile("jobs-701.txt", CLIPPY + "\n")
+        self.assertEqual(state(), "red lampos-clippy.yml (%s)\n" % CLIPPY)
+        self.fakefile("jobs-702.txt", "%s\n%s\n" % (ARM % "2/3", ARM % "3/3"))
+        self.fakefile("lv-runs.txt", "702 running %s\n" % arm)
+        self.assertEqual(state(), "red lampos-arm64.yml (%s)\n" % (ARM % "2/3"))
+        # No commit to ask about: nothing is asked.
+        open(os.path.join(self.fake, "calls.log"), "w").close()
+        self.assertEqual(state(""), "none lamp-voice's head can't be read\n")
+        self.assertEqual(self.calls(), "")
+
+    def test_the_runs_and_jobs_read_for_lamp_voices_own_head(self):
+        # The filters themselves, on jq. Runs: the latest push run of the clippy and of the ARM64 workflow; a promotion
+        # (workflow_dispatch), a pull request's run and other workflows are not lamp-voice's own push runs.
+        wf = ".github/workflows/lampos-%s.yml"
+        runs = {"workflow_runs": [
+            {"id": 1, "event": "push", "path": wf % "clippy", "status": "completed", "conclusion": "success", "run_number": 10},
+            {"id": 2, "event": "push", "path": wf % "clippy", "status": "in_progress", "conclusion": None, "run_number": 11},
+            {"id": 3, "event": "workflow_dispatch", "path": wf % "arm64", "status": "completed", "conclusion": "success", "run_number": 50},
+            {"id": 4, "event": "push", "path": wf % "arm64", "status": "completed", "conclusion": "failure", "run_number": 49},
+            {"id": 5, "event": "push", "path": wf % "sim", "status": "completed", "conclusion": "failure", "run_number": 7},
+            {"id": 6, "event": "pull_request", "path": wf % "clippy", "status": "completed", "conclusion": "failure", "run_number": 12}]}
+        r = self.lib('jq -r "$coord_lv_runs_jq" <<< "$1"', json.dumps(runs))
+        self.assertEqual(r.stdout.splitlines(), ["4 failure " + wf % "arm64", "2 running " + wf % "clippy"])
+        for run in runs["workflow_runs"]:
+            run.update(status="completed", conclusion="cancelled" if run["id"] == 2 else None)
+        r = self.lib('jq -r "$coord_lv_runs_jq" <<< "$1"', json.dumps(runs))
+        self.assertEqual(r.stdout.splitlines(), ["4 unknown " + wf % "arm64", "2 cancelled " + wf % "clippy"])
+        # Jobs: the failed ones a train waits for. A failed publish is not lamp-voice failing to build or lint.
+        jobs = {"jobs": [{"name": ARM % "build", "conclusion": "success"}, {"name": ARM % "2/3", "conclusion": "failure"},
+                         {"name": "lampOS — sign and publish the tested lamp-voice artifact", "conclusion": "failure"},
+                         {"name": CLIPPY, "conclusion": "failure"}, {"name": ARM % "release", "conclusion": "cancelled"},
+                         {"name": ARM % "1/3", "conclusion": None}]}
+        r = self.lib('jq -r "$coord_lv_failed_jq" <<< "$1"', json.dumps(jobs))
+        self.assertEqual(r.stdout.splitlines(), [ARM % "2/3", CLIPPY])
 
 
 if __name__ == "__main__":
