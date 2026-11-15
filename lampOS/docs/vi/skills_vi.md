@@ -1688,7 +1688,13 @@ a skill on the lamp uses, saying nothing first."). Sau đó, trong code
   một bước giữ tới khi trigger kết thúc bị từ chối, vì kết thúc đó không
   bao giờ tới). Trước khi tạo gì, nó từ chối bằng lời dễ hiểu những gì các
   cổng của chính lần chạy sẽ từ chối (`run_now_refused`): task không biết
-  thư mục, hay `task::would_refuse` nói việc giao sẽ từ chối (hết
+  thư mục; task trong lúc một lần giao khác của lamp-skills sang
+  lamp-tasks đang diễn ra ("another skill's task is running on the lamp
+  now, and one runs at a time", `HANDING`, đếm quanh mỗi lần trao đổi của
+  task và write cố định: lamp-tasks chạy từng việc một, và trên lamp-9adf
+  lúc 21:40 một lần chạy ngay được nói là đang chạy trong khi write của
+  kỹ năng khác giữ lamp-tasks, rồi lamp-tasks từ chối nó vì bận); hay task
+  mà `task::would_refuse` nói việc giao sẽ từ chối (hết
   `PER_SKILL` = 3 lần chạy trong 24 giờ của nó, hết `ALL_SKILLS` = 10 của
   mọi kỹ năng, task trước của nó vẫn đang chạy, task tắt); read có công
   tắc tắt, hay đã chạy trong ngày địa phương này (read mỗi ngày một lần,
