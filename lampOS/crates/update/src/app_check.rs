@@ -549,4 +549,52 @@ mod tests {
             "{told:?}"
         );
     }
+
+    /// #6901: the owner's retry also lets lamp-update's own builds that were
+    /// put back be tried again. A lamp whose updater could not climb said
+    /// "waiting for a newer updater" every round, with no refusal in the
+    /// state for the retry to drop. `self-refused` is emptied and said;
+    /// `self-retried` is left, so a build tried once more before is refused
+    /// for good again when it is put back again. A plain check lets none go.
+    #[test]
+    fn a_retry_lets_lamp_updates_own_builds_put_back_be_tried_again() {
+        let once = "a".repeat(64);
+        let twice = "b".repeat(64);
+        let root = tempfile::tempdir().unwrap();
+        let folder = tempfile::tempdir().unwrap();
+        let records = crate::records::Records::new(folder.path().to_path_buf());
+        let refused = folder.path().join("self-refused");
+        std::fs::write(&refused, format!("{once}\n{twice}\n")).unwrap();
+        std::fs::write(folder.path().join("self-retried"), format!("{twice}\n")).unwrap();
+        let mut check = AppCheck::new(root.path(), &mut |_| {}).looking_every(LOOK);
+        let mut cloud = cloud(&Bus::new(root.path()).unwrap());
+        let mut ears = Waits::default();
+        // Build 12728 is not refused in the state: its updater was.
+        cloud
+            .publish_json(0, &UpdateCheck { retry: Some(12728) })
+            .unwrap();
+        let mut due = |_: &mut dyn FnMut(&str)| false;
+        let woken = check.wait_or(&mut ears, Duration::from_secs(2), &mut |_| {}, &mut due);
+        assert!(matches!(woken, Woken::Asked));
+        let mut told = Vec::new();
+        check.retry_asked(&records, &mut |line| told.push(line.to_owned()));
+        assert_eq!(
+            told,
+            [
+                "the owner asked to retry build 12728: it is not refused, so a plain check",
+                "the owner asked to retry: 2 of lamp-update's own builds put back before may be tried again",
+            ]
+        );
+        assert!(crate::own::refused(folder.path()).is_empty());
+        assert_eq!(crate::own::retried(folder.path()), [twice.as_str()]);
+
+        // A plain check carries no retry: a build put back stays refused.
+        std::fs::write(&refused, format!("{twice}\n")).unwrap();
+        cloud.publish_json(0, &UpdateCheck::default()).unwrap();
+        assert!(check.asked(Instant::now() + UpdateCheck::AGAIN_AFTER));
+        told.clear();
+        check.retry_asked(&records, &mut |line| told.push(line.to_owned()));
+        assert!(told.is_empty(), "{told:?}");
+        assert_eq!(crate::own::refused(folder.path()), [twice]);
+    }
 }
