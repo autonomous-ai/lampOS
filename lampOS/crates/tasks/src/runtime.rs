@@ -1950,6 +1950,11 @@ fn owner<C: Clock>(
     // and never connects to Harness's cloud, so the lamp never becomes its
     // own machine. Kept with the due time, through its tries.
     let mut daemon_restart = false;
+    // The start due was made due by a hand-over Harness answered not
+    // running here: it gets one try, and a failed one is not tried again,
+    // so the task waiting on it goes at once to its final `new` and the
+    // person is told (the first builder's P2 on #7282).
+    let mut daemon_one_try = false;
     // The tasks handed over once more after Harness answered not running
     // here (`harness_not_running`): at most once a task.
     let mut relaunched = DaemonOnce::default();
@@ -2000,6 +2005,7 @@ fn owner<C: Clock>(
                 start_daemon_due = Some(Instant::now());
                 daemon_tries = 0;
                 daemon_restart = true;
+                daemon_one_try = false;
                 not_among_said = false;
             }
         }
@@ -2105,6 +2111,7 @@ fn owner<C: Clock>(
                         start_daemon_due = Some(Instant::now());
                         daemon_tries = 0;
                         daemon_restart = false;
+                        daemon_one_try = true;
                     }
                     engine.launch_again(id, &now)
                 }
@@ -2220,12 +2227,17 @@ fn owner<C: Clock>(
                 Outcome::StartDaemon(restart, started) => {
                     gate.in_flight = false;
                     daemon_tries += 1;
+                    let one_try = std::mem::take(&mut daemon_one_try);
                     match started {
                         Ok(()) if restart => eprintln!(
                             "tasks: Harness's daemon started again after the sign-in (#7019)"
                         ),
                         Ok(()) => eprintln!(
                             "tasks: Harness's daemon started (openharness#1463)"
+                        ),
+                        Err(code) if one_try => eprintln!(
+                            "tasks: Harness's daemon not started: {code}; \
+                             one try, as a hand-over waits on it"
                         ),
                         Err(code) if daemon_tries < DAEMON_START_TRIES => {
                             let after = daemon_retry_after * (1 << (daemon_tries - 1));
@@ -2329,6 +2341,7 @@ fn owner<C: Clock>(
                                     start_daemon_due = Some(Instant::now());
                                     daemon_tries = 0;
                                     daemon_restart = false;
+                                    daemon_one_try = false;
                                 }
                                 // Signed in anew: the lamp not among the
                                 // machines may be said again (#7019).

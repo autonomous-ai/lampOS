@@ -4230,14 +4230,19 @@ impl DaemonGate {
     }
 }
 
-/// Whether a failed `new` says no Harness daemon runs on this computer:
-/// "Harness is not running here. Start it with `harness start`." on stderr
-/// (Harness CLI's `NOT_RUNNING`), or the same words on stdout.
-pub fn not_running_here(stdout: &[u8], stderr: &[u8]) -> bool {
-    const SAID: &[u8] = b"is not running here";
-    [stdout, stderr]
-        .iter()
-        .any(|bytes| bytes.windows(SAID.len()).any(|window| window == SAID))
+/// Harness CLI's fixed answer when no daemon runs on this computer
+/// (`NOT_RUNNING`), a whole stderr line.
+pub const NOT_RUNNING_SAID: &str = "Harness is not running here. Start it with `harness start`.";
+
+/// Whether a failed `new` says no Harness daemon runs on this computer: a
+/// stderr line that, trimmed, is [`NOT_RUNNING_SAID`] itself. A line that
+/// only holds those words (a person's ask echoed back, "why the printer is
+/// not running here") is not it, nor is stdout (the first builder's and the
+/// reviewer-lead's reads of #7282).
+pub fn not_running_here(_stdout: &[u8], stderr: &[u8]) -> bool {
+    String::from_utf8_lossy(stderr)
+        .lines()
+        .any(|line| line.trim() == NOT_RUNNING_SAID)
 }
 
 /// Whether a failed `new` says the target's folder isn't on the computer
@@ -4367,10 +4372,9 @@ fn dispatch_line(launch: &Launch, outcome: &LaunchOutcome, seen: &Seen, took: Du
         took.as_secs_f64()
     );
     // Harness's own words that no daemon runs here are said whole, so the
-    // lamp's journal shows them as Harness gave them: only stderr's lines
-    // that are that fixed answer, never another line, which may hold the
-    // person's words. Any other stderr (and a not-running answer said on
-    // stdout only) goes through `said_of_stderr`'s cut.
+    // lamp's journal shows them as Harness gave them: the fixed answer's
+    // constant, never stderr's own line, which may hold the person's
+    // words. Any other stderr goes through `said_of_stderr`'s cut.
     let whole = matches!(outcome, LaunchOutcome::NotSent { code } if code == HARNESS_NOT_RUNNING)
         .then(|| not_running_lines(&seen.stderr))
         .flatten();
@@ -4383,18 +4387,11 @@ fn dispatch_line(launch: &Launch, outcome: &LaunchOutcome, seen: &Seen, took: Du
     line
 }
 
-/// Stderr's lines that say Harness is not running here ([`not_running_here`]),
-/// each trimmed, joined with a space on one line. Nothing when no line says
-/// it: the rest of stderr is never said whole.
+/// [`NOT_RUNNING_SAID`] when stderr says it ([`not_running_here`]): the
+/// constant, never stderr's own line. Nothing when no line is it: the rest
+/// of stderr is never said whole.
 fn not_running_lines(stderr: &[u8]) -> Option<String> {
-    let text = String::from_utf8_lossy(stderr);
-    let joined = text
-        .lines()
-        .map(str::trim)
-        .filter(|line| not_running_here(&[], line.as_bytes()))
-        .collect::<Vec<_>>()
-        .join(" ");
-    (!joined.is_empty()).then_some(joined)
+    not_running_here(&[], stderr).then(|| NOT_RUNNING_SAID.to_owned())
 }
 
 /// Stderr's last line that has words, with only what can't be the person's
