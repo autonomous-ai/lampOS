@@ -1091,7 +1091,7 @@ reached it by moving all five joints together over five seconds.
 
 Without it a lamp folds 90 s after the last talk and then only breathes,
 which reads as switched off with a person still at the desk. With
-`LAMP_BODY_PRESENCE=on` (off unless exactly `on`; on in the product unit)
+`LAMP_BODY_PRESENCE=on` (off unless exactly `on`; off in the product until its lamp-52e6 row)
 the body reads `room/presence` ([presence.md](presence.md)) at most once a
 second (`presence_in.rs`):
 
