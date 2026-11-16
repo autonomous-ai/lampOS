@@ -475,15 +475,17 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             })
         }
         // The journal says only how long the words are, never them.
-        // The energy is kept with the words: the app's pick, chosen, else
-        // 1, derived, which lamp-cloud's model rating replaces when it is on
-        // (#7314). It never restarts the voice, which the words alone shape.
+        // The energy is worked out once, here, and kept: it never restarts
+        // the voice, which the words alone shape (#6893). A derived level is
+        // the keyword table's; with LAMP_ENERGY_FROM_MODEL=on lamp-cloud says
+        // the model's in its place (#7314).
         Change::Character(text, chosen) => {
             let path = beside_language(config, "character");
             let changed = keep_line(&path, text.as_deref())?;
-            let level = text
-                .as_deref()
-                .map(|_| (chosen.unwrap_or(1), chosen.is_some()));
+            let level = text.as_deref().map(|words| {
+                let level = chosen.unwrap_or_else(|| lamp_msgs::chosen_voice::energy_of(words));
+                (level, chosen.is_some())
+            });
             keep_line(
                 &beside_language(config, "energy"),
                 level
