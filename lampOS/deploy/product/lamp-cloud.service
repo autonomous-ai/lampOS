@@ -46,7 +46,8 @@ Environment=LAMP_CLOUD_KNOWN_FILE=/run/lampos-eyes/known
 Environment=LAMP_SETTINGS_CHANGE=on
 Environment=LAMP_SKILLS_PAGE=on
 # Wellbeing nudges at a present spacing and Comfort break (#5207): the skills page and report list the skills with
-# their [present] values, as lamp-skills runs them (Comfort break on). The same line in lamp-skills.service and lamp-skills-manage@.service.
+# their [present] values, as lamp-skills runs them (Comfort break on). The same line in lamp-skills.service,
+# lamp-skills-manage@.service and lamp-voice.service.
 Environment=LAMP_NUDGES_PRESENT=on
 # So the skills page loads skills as lamp-skills does: its list loads each skill in this process
 # (lamp_skills::load_each), and these four of lamp-skills' switches change what loads. A connector's
