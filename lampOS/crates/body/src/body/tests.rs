@@ -6567,9 +6567,12 @@ fn at_level_five_someone_there_sees_a_shift_every_ten_to_thirty_seconds() {
 }
 
 /// Held by lamp-control's lease, no shift at rest, even with nothing
-/// else asked of it (usage: "While held, no shift at rest").
+/// else asked of it (usage: "While held, no shift at rest"). Run with
+/// `LAMP_BODY_PRESENCE` off (`run_at_rest`'s `Limits` leave `presence`
+/// false): the held guard in the quiet check is the one part of #7301 not
+/// behind the switch, so the off path pins it (switches.md, "Off:").
 #[test]
-fn held_by_a_lease_it_does_not_shift() {
+fn held_by_a_lease_it_does_not_shift_with_presence_off() {
     let (report, shifts) = shifts_at_rest(
         true,
         10,
@@ -6582,6 +6585,9 @@ fn held_by_a_lease_it_does_not_shift() {
         }),
     );
     assert_eq!((report.idles, shifts.len()), (0, 0), "{shifts:?}");
+    // The same run not held shifts, so the zero above is the hold's.
+    let (report, _) = shifts_at_rest(true, 10, Mood::Resting, 100, None, None);
+    assert!(report.idles > 0);
 }
 
 /// Expression's rest stream, renewed every step under `--rest-glance`
