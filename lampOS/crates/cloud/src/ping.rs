@@ -97,6 +97,33 @@ pub struct Reply {
     /// TCP has failed [`crate::wss::FAILURES`] times.
     #[serde(default, deserialize_with = "text")]
     pub mqtt_ws_url: String,
+    /// The burst period the cloud asks of lamp-seen (#7401), kept whole as
+    /// [`SEEN_CLIP_FILE`] for lamp-seen to read, as `region` is. Anything not
+    /// whole seconds of exactly `every_s` and `until_unix_s` reads as none,
+    /// so a strange value never loses the rest of the reply. lamp-seen holds
+    /// it to its own range and the switch (`lamp_seen::clip`).
+    #[serde(default, deserialize_with = "seen_clip")]
+    pub seen_clip: Option<SeenClip>,
+}
+
+/// The ping reply's `seen_clip`: `{"every_s": N, "until_unix_s": T}`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SeenClip {
+    pub every_s: u64,
+    pub until_unix_s: u64,
+}
+
+/// Where `seen_clip` is kept: lamp-cloud's state folder's `seen-clip.json`,
+/// `/var/lib/lampos-cloud/seen-clip.json` on the product.
+pub const SEEN_CLIP_FILE: &str = "seen-clip.json";
+
+fn seen_clip<'de, D: serde::Deserializer<'de>>(from: D) -> Result<Option<SeenClip>, D::Error> {
+    let value = serde_json::Value::deserialize(from)?;
+    Ok(value
+        .is_object()
+        .then(|| serde_json::from_value(value).ok())
+        .flatten())
 }
 
 fn text<'de, D: serde::Deserializer<'de>>(from: D) -> Result<String, D::Error> {
@@ -146,7 +173,57 @@ impl Region {
     }
 }
 
+/// The `seen_clip` a ping's reply last said, kept whole in
+/// [`SEEN_CLIP_FILE`] (0644, a new file renamed over it, only on a change)
+/// and removed when a reply leaves it out, so lamp-seen goes back to a
+/// minute. Kept across boots, as [`Region`]. The journal says only a new
+/// `every_s` or its end (`main.rs`), not each new `until_unix_s`.
+pub struct SeenClipKept {
+    path: PathBuf,
+    kept: Option<SeenClip>,
+}
+
+impl SeenClipKept {
+    pub fn at(path: PathBuf) -> Self {
+        let kept = std::fs::read(&path)
+            .ok()
+            .and_then(|text| serde_json::from_slice(&text).ok());
+        Self { path, kept }
+    }
+
+    /// The `seen_clip` kept now.
+    pub fn kept(&self) -> Option<SeenClip> {
+        self.kept
+    }
+
+    /// Takes a reply's `seen_clip`: `None` when it is the one kept, else
+    /// what writing or removing it came to. The cloud moves `until_unix_s`
+    /// on, so a clip in force is written again on most pings while the
+    /// cloud sends it.
+    pub fn take(&mut self, clip: Option<SeenClip>) -> Option<std::io::Result<()>> {
+        if clip == self.kept && (clip.is_some() || !self.path.exists()) {
+            return None;
+        }
+        self.kept = clip;
+        Some(match clip {
+            Some(clip) => write_whole(&self.path, &format!("{}\n", json_of(&clip))),
+            None => match std::fs::remove_file(&self.path) {
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                done => done,
+            },
+        })
+    }
+}
+
+fn json_of(clip: &SeenClip) -> String {
+    serde_json::to_string(clip).unwrap_or_default()
+}
+
 fn write_region(path: &Path, region: &str) -> std::io::Result<()> {
+    write_whole(path, &format!("{region}\n"))
+}
+
+fn write_whole(path: &Path, text: &str) -> std::io::Result<()> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
     let beside = path.with_extension("new");
@@ -156,7 +233,7 @@ fn write_region(path: &Path, region: &str) -> std::io::Result<()> {
         .truncate(true)
         .mode(0o644)
         .open(&beside)?;
-    file.write_all(format!("{region}\n").as_bytes())?;
+    file.write_all(text.as_bytes())?;
     file.sync_all()?;
     std::fs::rename(&beside, path)
 }
@@ -365,6 +442,77 @@ mod tests {
         assert!(again.take("CN").is_none());
         assert!(again.take("").unwrap().is_ok());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "\n");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #7401: a reply's `seen_clip`, missing or strange, never loses the
+    /// reply.
+    #[test]
+    fn a_reply_reads_with_its_seen_clip_without_one_or_with_a_strange_one() {
+        let with =
+            reply(br#"{"status":"ok","seen_clip":{"every_s":30,"until_unix_s":1800000300}}"#)
+                .unwrap();
+        assert_eq!(
+            with.seen_clip,
+            Some(SeenClip {
+                every_s: 30,
+                until_unix_s: 1_800_000_300
+            })
+        );
+        assert_eq!(reply(br#"{"status":"ok"}"#).unwrap().seen_clip, None);
+        for strange in [
+            "null",
+            "30",
+            r#"{"every_s":30}"#,
+            r#"{"every_s":30.5,"until_unix_s":1}"#,
+            r#"{"every_s":-1,"until_unix_s":1}"#,
+            r#"{"every_s":"30","until_unix_s":1}"#,
+            r#"{"every_s":30,"until_unix_s":1,"x":1}"#,
+            "[30,1]",
+        ] {
+            let body = format!(r#"{{"status":"ok","device_id":"d-9","seen_clip":{strange}}}"#);
+            let read = reply(body.as_bytes()).unwrap();
+            assert_eq!(
+                (read.seen_clip, read.device_id.as_str()),
+                (None, "d-9"),
+                "{strange}"
+            );
+        }
+    }
+
+    /// #7401: kept whole on a change, removed when left out, read back at
+    /// start.
+    #[test]
+    fn the_seen_clip_is_kept_on_a_change_and_removed_when_left_out() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("lamp-cloud-seen-clip-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(SEEN_CLIP_FILE);
+        let clip = SeenClip {
+            every_s: 30,
+            until_unix_s: 1_800_000_300,
+        };
+        let mut kept = SeenClipKept::at(path.clone());
+        assert!(kept.take(None).is_none(), "none kept, none said");
+        assert!(kept.take(Some(clip)).unwrap().is_ok());
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "{\"every_s\":30,\"until_unix_s\":1800000300}\n"
+        );
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode & 0o044, 0o044, "readable by others: {mode:o}");
+        assert!(kept.take(Some(clip)).is_none(), "unchanged: not written");
+        let mut again = SeenClipKept::at(path.clone());
+        assert!(again.take(Some(clip)).is_none(), "read back at start");
+        let later = SeenClip {
+            until_unix_s: 1_800_000_315,
+            ..clip
+        };
+        assert!(again.take(Some(later)).unwrap().is_ok());
+        assert!(again.take(None).unwrap().is_ok());
+        assert!(!path.exists(), "left out: removed");
+        assert!(again.take(None).is_none());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

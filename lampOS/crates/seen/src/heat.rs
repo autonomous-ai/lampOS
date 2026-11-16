@@ -8,8 +8,10 @@
 //!   and with no subscriber name. Off: ok, always, and the pace is today's.
 //! - **A value past its life** (`BoardHeat::LASTS`), from the future, past
 //!   its own life on the bus or not valid is ok: full speed.
-//! - **The pace** ([`Pace::at`]): at warm the next burst is spaced
-//!   [`crate::activity::EVERY_US`]×2, at hot ×4; posture's frame every
+//! - **The pace** ([`Pace::at_every`]): at warm the next burst is spaced
+//!   ×2 the rate in force ([`crate::activity::EVERY_US`], or
+//!   [`crate::activity::FAST_EVERY_US`] with `LAMP_SEEN_BURST_15S=on`), at
+//!   hot ×4; posture's frame every
 //!   30 s at ok and warm, one a minute at hot (never paused).
 //! - **Unchanged at every level:** the frames' spacing within a burst
 //!   ([`crate::activity::SPACING_US`]), a burst under way (it finishes),
@@ -67,17 +69,29 @@ impl Pace {
 
     /// The pace at `level`; with the switch off, [`Pace::FULL`] always.
     pub fn at(level: HeatLevel, on: bool) -> Pace {
+        Self::at_every(level, on, crate::activity::EVERY_US)
+    }
+
+    /// The same from a burst every `burst_every_us` at ok: a minute, or
+    /// 15 s with `LAMP_SEEN_BURST_15S=on` ([`crate::activity::every_us`],
+    /// #7401). Warm and hot multiply whichever rate is in force; with the
+    /// switch off, that rate always.
+    pub fn at_every(level: HeatLevel, on: bool, burst_every_us: u64) -> Pace {
+        let full = Pace {
+            burst_every_us,
+            ..Self::FULL
+        };
         if !on {
-            return Self::FULL;
+            return full;
         }
         match level {
-            HeatLevel::Ok => Self::FULL,
+            HeatLevel::Ok => full,
             HeatLevel::Warm => Pace {
-                burst_every_us: crate::activity::EVERY_US * 2,
+                burst_every_us: burst_every_us * 2,
                 posture_every_us: crate::pose::EVERY_US,
             },
             HeatLevel::Hot => Pace {
-                burst_every_us: crate::activity::EVERY_US * 4,
+                burst_every_us: burst_every_us * 4,
                 posture_every_us: crate::pose::EVERY_US * 2,
             },
         }

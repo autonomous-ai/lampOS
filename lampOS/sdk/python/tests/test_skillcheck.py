@@ -452,3 +452,15 @@ def test_a_task_skill_packs_and_the_fake_lamp_takes_the_push(tmp_path):
                 return await lamp.push_skill(folder)
 
     assert asyncio.run(go()).get("name") == "blue-task"
+
+
+STOP = '[stop]\ntool = "quiet_please"\ngroup = "quiet-ones"\nabout = "Stop it."\nwhen = "When asked to stop."\n'
+
+
+def test_a_stop_group_is_taken_with_no_budget_and_refused_beside_one(tmp_path):
+    assert check(skill(tmp_path / "shared", rules='version = "1.0.0"\n' + STOP)).errors == []
+    beside = check(skill(tmp_path / "budgeted", rules='version = "1.0.0"\n[budget]\ngroup = "quiet"\n' + STOP))
+    assert "skill.toml: [stop] group is for a skill in no [budget] group: its group shares it already" in beside.errors
+    bad = check(skill(tmp_path / "underscore", rules='version = "1.0.0"\n' + STOP.replace("quiet-ones", "quiet_ones")))
+    assert any(line.startswith("skill.toml: stop.group:") for line in bad.errors), bad.errors
+

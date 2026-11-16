@@ -467,8 +467,8 @@ fn a_skill_from_a_package_is_listed_with_its_sha256_and_version() {
 /// #6543: the owner's seen_more yes copies the camera's. With
 /// `LAMP_SEEN_MORE_DOINGS` off in lamp-cloud's unit the page is as before:
 /// no row carries `seen_more_allowed`, `can` doesn't name
-/// `skills.seen_more` and it is not answered. On, only a row that names
-/// `humans/doing_more` carries it, false until the owner says yes through
+/// `skills.seen_more` and it is not answered. On, only the rows that name
+/// `humans/doing_more` carry it, false until the owner says yes through
 /// the manage helper, and the reply says what was kept; the rows are
 /// otherwise the same bytes as with the switch off.
 #[test]
@@ -569,14 +569,42 @@ fn the_seen_more_yes_is_on_the_page_only_with_its_switch_and_set_as_the_camera()
     );
     let page = sent(&mut on);
     assert_eq!(allowed(&page), Some(json!(false)));
-    assert_eq!(
-        rows(&page)
-            .iter()
-            .filter(|row| row.get("seen_more_allowed").is_some())
-            .count(),
-        1,
-        "no shipped skill carries it"
-    );
+    // The rows that carry it are those whose `[permissions] topics` name
+    // `humans/doing_more`: tired-glow and the shipped skills that do (the
+    // seen reactions, #7401), read from the folder the page lists, each
+    // false with no yes given.
+    let mut naming: Vec<String> = fs::read_dir(&folder)
+        .unwrap()
+        .flatten()
+        .filter(|entry| {
+            let Ok(text) = fs::read_to_string(entry.path().join("skill.toml")) else {
+                return false;
+            };
+            let table: toml::Table = text.parse().unwrap();
+            table
+                .get("permissions")
+                .and_then(|permissions| permissions.get("topics"))
+                .and_then(|topics| topics.as_array())
+                .is_some_and(|topics| {
+                    topics
+                        .iter()
+                        .any(|topic| topic.as_str() == Some("humans/doing_more"))
+                })
+        })
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    naming.sort();
+    assert!(naming.iter().any(|name| name == "tired-glow"), "{naming:?}");
+    let mut carrying: Vec<String> = rows(&page)
+        .iter()
+        .filter(|row| row.get("seen_more_allowed").is_some())
+        .map(|row| {
+            assert_eq!(row["seen_more_allowed"], json!(false), "{row}");
+            row["name"].as_str().unwrap().to_string()
+        })
+        .collect();
+    carrying.sort();
+    assert_eq!(carrying, naming, "only the rows that name the topic");
     assert_eq!(without_field(&page), without_field(&listed));
 
     // The yes given and taken back, as the camera's.

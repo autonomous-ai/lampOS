@@ -34,12 +34,20 @@
 //!   sureness rule. They never set `last` or `humans/doing_seen`, and V1's
 //!   `emotional` (laughing, crying, singing) is never said. The same topic
 //!   says how many drinks and how much eating were newly seen this sitting,
-//!   the sightings `humans/doing_seen` says: a count only of what was seen.
+//!   the sightings `humans/doing_seen` says, and how often tiredness and
+//!   celebrating were: a count only of what was seen. A kind seen in two
+//!   bursts that answered in a row is one sighting, counted once, and a
+//!   burst that did not answer is no burst between them ([`Sitting::took`]).
 //!   And `desk_s`, this sitting's desk-work time: the time between two
 //!   bursts in a row that both saw desk work, each gap up to
-//!   [`DESK_GAP_US`] (the burst period); a burst without desk work ends the
+//!   [`DESK_GAP_US`] (the default burst period, a minute, at either
+//!   rate); a burst without desk work ends the
 //!   run. A number only, wiped with the sitting.
-use crate::wire::{ActionAnswer, group};
+use crate::{
+    activity::Finished,
+    burst::Outcome,
+    wire::{ActionAnswer, group},
+};
 use lamp_msgs::{DeskWork, Doing, DoingSeen, HumanDoing, HumanDoingMore};
 
 /// The switch for tiredness, desk work and celebrating on
@@ -209,7 +217,11 @@ pub struct Sitting {
     /// This sitting's desk-work time so far ([`DESK_GAP_US`] per gap at
     /// most).
     desk_total_us: u64,
-    celebrate_us: Option<u64>,
+    /// How many times celebrating was newly seen this sitting, counted as
+    /// `tired_seen` is.
+    celebrate_seen: u32,
+    /// Whether the last burst that answered saw celebrating.
+    celebrate_last_burst: bool,
 }
 
 /// The most one gap between two desk-work bursts adds to `desk_s`: the
@@ -257,7 +269,8 @@ impl Sitting {
             desk_work: DeskWork::Nothing,
             desk_run_us: None,
             desk_total_us: 0,
-            celebrate_us: None,
+            celebrate_seen: 0,
+            celebrate_last_burst: false,
         }
     }
 
@@ -297,9 +310,10 @@ impl Sitting {
         } else {
             self.desk_run_us = None;
         }
-        if more.celebrate {
-            self.celebrate_us = Some(now_us);
+        if more.celebrate && !self.celebrate_last_burst {
+            self.celebrate_seen = self.celebrate_seen.saturating_add(1);
         }
+        self.celebrate_last_burst = more.celebrate;
         more.any()
     }
 
@@ -316,7 +330,8 @@ impl Sitting {
         self.desk_work = DeskWork::Nothing;
         self.desk_run_us = None;
         self.desk_total_us = 0;
-        self.celebrate_us = None;
+        self.celebrate_seen = 0;
+        self.celebrate_last_burst = false;
         // Said on `humans/doing_more` too, so forgotten with it.
         self.drank_seen = 0;
         self.ate_seen = 0;
@@ -381,6 +396,35 @@ impl Sitting {
         newly
     }
 
+    /// Take a burst that ended at `now_us`: what it saw ([`Sitting::saw`],
+    /// returned), and with `more_said` its tiredness, desk work and
+    /// celebrating ([`Sitting::saw_more`]). Only a burst that answered is
+    /// taken: one busy or failed saw nothing, so it is no burst between two
+    /// that saw the same sip, bite, yawn or cheer, and that one move, caught
+    /// either side of it, counts once (the owner's call on #7401, 19 Nov).
+    pub fn took(&mut self, finished: &Finished, more_said: bool, now_us: u64) -> Vec<DoingSeen> {
+        if finished.outcome != Outcome::Answered {
+            return Vec::new();
+        }
+        let newly = self.saw(&finished.seen, now_us);
+        if more_said {
+            self.saw_more(&finished.more, now_us);
+        }
+        newly
+    }
+
+    /// This sitting's counts of moves newly seen, `drank_seen`, `ate_seen`,
+    /// `tired_seen` and `celebrate_seen`: `main` says both topics at once
+    /// when a burst raised one (#7401).
+    pub fn counts(&self) -> [u32; 4] {
+        [
+            self.drank_seen,
+            self.ate_seen,
+            self.tired_seen,
+            self.celebrate_seen,
+        ]
+    }
+
     /// The timers at `now_us`: each from its last sighting, else from the
     /// arrival.
     pub fn doing(&self, now_us: u64) -> HumanDoing {
@@ -407,7 +451,7 @@ impl Sitting {
             desk_work_s_ago: since(self.desk_work_us),
             desk_work: self.desk_work,
             desk_s: u32::try_from(self.desk_total_us / 1_000_000).unwrap_or(u32::MAX),
-            celebrate_s_ago: since(self.celebrate_us),
+            celebrate_seen: self.celebrate_seen,
         })
     }
 }
@@ -546,7 +590,8 @@ mod tests {
                 desk_work: DeskWork::Nothing,
                 desk_run_us: None,
                 desk_total_us: 0,
-                celebrate_us: None,
+                celebrate_seen: 0,
+                celebrate_last_burst: false,
             }
         );
     }
@@ -768,7 +813,89 @@ mod tests {
         assert!(sitting.saw_more(&seen, 210 * S));
         let more_now = sitting.doing_more(220 * S).unwrap();
         assert_eq!((more_now.tired_s_ago, more_now.tired_seen), (10, 1));
+        assert_eq!(more_now.celebrate_seen, 1);
         assert_eq!(more_now.desk_work, DeskWork::Phone);
+    }
+
+    /// One sip, bite, yawn or cheer caught by two clips is one sighting,
+    /// though a burst between them was busy or failed: that burst saw
+    /// nothing, so it does not end the sighting (the owner's call on #7401,
+    /// 19 Nov: one move is one reaction).
+    #[test]
+    fn one_move_caught_either_side_of_a_burst_that_did_not_answer_counts_once() {
+        let drink = DoingSeen {
+            what: Doing::Drinking,
+            confidence: 0.7,
+        };
+        let all = More {
+            tired: true,
+            celebrate: true,
+            ..More::default()
+        };
+        let answered = Finished {
+            outcome: Outcome::Answered,
+            seen: vec![drink],
+            more: all,
+        };
+        for between in [
+            Outcome::Busy,
+            Outcome::Failed(crate::burst::Failure::Connect),
+        ] {
+            let mut sitting = Sitting::with_more(0, true);
+            assert_eq!(sitting.took(&answered, true, 100 * S), [drink]);
+            let missed = Finished {
+                outcome: between,
+                seen: Vec::new(),
+                more: More::default(),
+            };
+            assert!(sitting.took(&missed, true, 115 * S).is_empty());
+            assert!(
+                sitting.took(&answered, true, 130 * S).is_empty(),
+                "{between:?}: the same drink"
+            );
+            let more = sitting.doing_more(130 * S).unwrap();
+            assert_eq!(
+                (more.drank_seen, more.tired_seen, more.celebrate_seen),
+                (1, 1, 1),
+                "{between:?}"
+            );
+            // A burst that answered and saw none of them ends it: the next
+            // is a move of its own.
+            let none = Finished {
+                outcome: Outcome::Answered,
+                seen: Vec::new(),
+                more: More::default(),
+            };
+            sitting.took(&none, true, 145 * S);
+            assert_eq!(sitting.took(&answered, true, 160 * S), [drink]);
+            let more = sitting.doing_more(160 * S).unwrap();
+            assert_eq!(
+                (more.drank_seen, more.tired_seen, more.celebrate_seen),
+                (2, 2, 2)
+            );
+        }
+        // Each count raised is seen in `counts` at the answer, once.
+        let mut sitting = Sitting::with_more(0, true);
+        let cheer = Finished {
+            outcome: Outcome::Answered,
+            seen: Vec::new(),
+            more: More {
+                celebrate: true,
+                ..More::default()
+            },
+        };
+        sitting.took(&cheer, true, 100 * S);
+        assert_eq!(sitting.counts(), [0, 0, 0, 1]);
+        sitting.took(&cheer, true, 115 * S);
+        assert_eq!(sitting.counts(), [0, 0, 0, 1], "the same cheer");
+        // Without `more_said`, only what `humans/doing` says is taken.
+        let mut sitting = Sitting::with_more(0, true);
+        sitting.took(&answered, false, 100 * S);
+        let more = sitting.doing_more(100 * S).unwrap();
+        assert_eq!(
+            (more.drank_seen, more.tired_seen, more.celebrate_seen),
+            (1, 0, 0)
+        );
     }
 
     #[test]
@@ -801,7 +928,7 @@ mod tests {
                 desk_work_s_ago: 300,
                 desk_work: DeskWork::Nothing,
                 desk_s: 0,
-                celebrate_s_ago: 300,
+                celebrate_seen: 0,
             })
         );
         // Desk work: its timer and kind, and never `last` or a sighting.
@@ -844,15 +971,16 @@ mod tests {
         let more_now = sitting.doing_more(710 * S).unwrap();
         assert_eq!((more_now.tired_s_ago, more_now.tired_seen), (10, 2));
         assert_eq!(more_now.desk_work, DeskWork::Computer, "kept");
-        // Celebrating.
-        sitting.saw_more(
-            &More {
-                celebrate: true,
-                ..More::default()
-            },
-            720 * S,
-        );
-        assert_eq!(sitting.doing_more(725 * S).unwrap().celebrate_s_ago, 5);
+        // Celebrating: counted once across bursts in a row, again after a
+        // burst without, as tiredness is.
+        let cheer = More {
+            celebrate: true,
+            ..More::default()
+        };
+        for (at, seen) in [(720, &cheer), (735, &cheer), (750, &none), (765, &cheer)] {
+            sitting.saw_more(seen, at * S);
+        }
+        assert_eq!(sitting.doing_more(770 * S).unwrap().celebrate_seen, 2);
         // A stand-up begins the sitting again (`main`: a new `Sitting`):
         // nothing carried.
         let again = Sitting::with_more(800 * S, true);
@@ -866,7 +994,7 @@ mod tests {
                 desk_work_s_ago: 60,
                 desk_work: DeskWork::Nothing,
                 desk_s: 0,
-                celebrate_s_ago: 60,
+                celebrate_seen: 0,
             })
         );
     }

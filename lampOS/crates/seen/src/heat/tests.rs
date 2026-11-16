@@ -132,3 +132,24 @@ fn a_held_sitting_keeps_posture_at_todays_pace_at_hot() {
         assert_eq!(pace.holding(true), pace, "{level:?}");
     }
 }
+
+/// #7401: warm and hot multiply whichever burst rate is in force, a
+/// minute or 15 s with `LAMP_SEEN_BURST_15S=on`.
+#[test]
+fn the_heat_multiplies_the_burst_rate_in_force() {
+    for base in [crate::activity::EVERY_US, crate::activity::FAST_EVERY_US] {
+        let at = |level| Pace::at_every(level, true, base).burst_every_us;
+        assert_eq!(
+            (at(HeatLevel::Ok), at(HeatLevel::Warm), at(HeatLevel::Hot)),
+            (base, 2 * base, 4 * base)
+        );
+        assert_eq!(
+            Pace::at_every(HeatLevel::Hot, false, base).burst_every_us,
+            base
+        );
+    }
+    assert_eq!(
+        Pace::at(HeatLevel::Hot, true),
+        Pace::at_every(HeatLevel::Hot, true, crate::activity::EVERY_US)
+    );
+}

@@ -19,7 +19,7 @@
 //!   [`frames::Sink`], the one place a frame would go to the server:
 //!   [`activity::Activity`] when an account is given, else
 //!   [`frames::Discard`].
-//! - [`activity`]: one 8-frame burst a minute, each on its own socket
+//! - [`activity`]: one 8-frame burst a minute (the cloud's [`clip`] with its switch), each on its own socket
 //!   ([`burst`]) to [`endpoint`], closed after; busy and failures retreat.
 //! - [`scale`]: the camera's frame scaled down to 320×240 and encoded
 //!   again before it is sent, whatever size the camera serves.
@@ -56,6 +56,7 @@
 pub mod activity;
 pub mod backoff;
 pub mod burst;
+pub mod clip;
 pub mod crypto;
 pub mod endpoint;
 pub mod frames;

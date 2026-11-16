@@ -318,7 +318,22 @@ and behind the gate, so a frame reaches it only while the gate is clear
 that one too, aborts a burst under way.
 
 - **One burst a minute** (`activity::EVERY_US`), of **8 frames**
-  (`activity::FRAMES`, the server's clip). The sink wants a frame
+  (`activity::FRAMES`, the server's clip). With `LAMP_SEEN_BURST_15S=on`
+  (exactly; dark, no unit sets it), the cloud may ask for one as often as
+  every 15 s (`activity::FAST_EVERY_US`, the owner's call on #7401, 19 Nov,
+  for the seen reactions) through the `/ping` reply's `seen_clip`
+  (`clip.rs`): lamp-cloud keeps it as
+  `/var/lib/lampos-cloud/seen-clip.json`, `{"every_s": N, "until_unix_s":
+  T}` in whole seconds (cloud.md), and lamp-seen reads it again every 2 s
+  (`opt_in::READ_EVERY`). It is a minute whenever lamp-seen hasn't heard:
+  no file, one that can't be read or is over 4096 bytes, not exactly those
+  two whole numbers, `every_s` outside 15–60 s, or `until_unix_s` reached.
+  With the switch off it is a minute whatever the cloud says; the heat
+  pace multiplies the period in force ("The board's heat"). At 15 s,
+  against a minute, a seated lamp then sends the
+  perception server four times the bursts and spends about four times the
+  encode and TLS work. At either rate a burst under way holds the next back
+  until it ends, so two never overlap and none is queued. The sink wants a frame
   (`Sink::ready`) only while a burst is due or under way with frames left,
   so between bursts no frame is asked for and the ring is not asked for its
   mark (`Marked` asks the sink inside first). The taker asks for the
@@ -440,12 +455,16 @@ that one too, aborts a burst under way.
   - `humans/doing` (`HumanDoing`): `drank_s_ago`, `ate_s_ago`,
     `break_s_ago` (always present), `last` and `confidence`, every 30 s
     while a sitting lasts (not while it is kept through a short
-    closing), and at once after a burst that saw something.
+    closing), and at once, with `humans/doing_more`, in the tick of a
+    burst's answer that saw a kind of it or raised any count
+    (`drank_seen`, `ate_seen`, `tired_seen`, `celebrate_seen`; #7401: a
+    count up is a seen reaction right away, not up to 30 s later); the
+    30 s beat goes on from that saying.
     It goes out whether or not frames do (the opt-in off, the server busy,
     the slide shut, no account given), so a skill's `[[while]] above` on a
     timer runs on the clock as it would without this part;
   - `humans/doing_seen` (`DoingSeen`): once for each kind newly seen, not
-    seen in the burst before;
+    seen in the burst before that answered;
   - with `LAMP_SEEN_MORE_DOINGS=on` only, `humans/doing_more`
     (`HumanDoingMore`), with `humans/doing` and as often: `tired_s_ago`
     and `tired_seen` (V1's `tired` group, a yawn, and a stretch of an arm
@@ -456,15 +475,21 @@ that one too, aborts a burst under way.
     "writing" and "drawing" `writing`; the kind of the surest such label)
     and `desk_s`, this sitting's desk-work time in seconds: the time
     between two bursts in a row that both saw desk work, each gap counted
-    up to the burst period (60 s), so a missed burst (busy, failed,
+    up to a minute (the default burst period, at either rate), so a missed burst (busy, failed,
     paused) never counts the long gap it leaves, and a burst without desk
     work ends the run (0 before two such bursts; a number only, no
     picture or label kept),
-    and `celebrate_s_ago` (V1's `celebrate` group), and `drank_seen` and
+    and `celebrate_seen` (V1's `celebrate` group), how often celebrating
+    was newly seen this sitting, counted as `tired_seen` is (#7401: each
+    one seen is one count, for the seen reactions), and `drank_seen` and
     `ate_seen`, how many drinks and how much eating were newly seen this
     sitting: exactly the sightings `humans/doing_seen` says, so a count is
     only of what was seen (the first builder's fourth change on #6543),
-    for A comfort break's "after 2 drinks". Every field always
+    for A comfort break's "after 2 drinks". Each count is of a move newly
+    seen: one seen in two bursts in a row that answered is one, and a burst
+    that did not answer (busy, failed) is no burst between them, so one
+    sip, bite, yawn or cheer caught either side of it counts once
+    (`Sitting::took`, the owner's call on #7401). Every field always
     there, each timer counting from the desk arrival; the same sureness
     rule, the same bursts, no more pictures, wiped with the sitting. They
     never set `last` or say `humans/doing_seen`: desk work shows in almost
@@ -919,7 +944,7 @@ the future or not valid is ok: full speed.
 With activity on, `lamp-seen`'s journal says each burst and each posture
 sample, and what the server answered: diagnostics only, never a picture, an
 id or a name. A burst a minute and a sample each 30 s keep it to a few
-lines a minute.
+lines a minute (about fourteen at the cloud's fastest `seen_clip`, 15 s, with `LAMP_SEEN_BURST_15S=on`).
 
 By default the lines say only counts and outcomes: no label, confidence,
 score, risk, bad or good flag, region or bad share. The journal is kept on
