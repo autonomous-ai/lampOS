@@ -527,9 +527,10 @@ lần chạy, và được trả lời khi lần chạy kết thúc
       target riêng của đèn trong Harness, như khi đã đăng nhập; target này
       chạy được khi không có tài khoản (#6407: không xem machines, không
       `--machine`, việc chạy dưới id riêng của máy). Ghi một dòng nhật ký:
-      "skill task <run>: the lamp's default agent (<engine>) isn't set up
-      for a skill's run yet (…); Harness is signed out, so it goes through
-      Harness's own lamp target". Vì vậy một đèn đã reset với OpenClaw là
+      "skill task <run>: direct execution is unavailable; Harness is signed
+      out, so trying Harness's own lamp target". Dòng này mô tả một lần thử,
+      không phải từ chối cuối cùng hay khẳng định thành công.
+      Vì vậy một đèn đã reset với OpenClaw là
       mặc định vẫn chạy skill qua gateway của OpenClaw và launcher
       skill-start. Khi hoàn toàn không có chương trình Harness thì không
       còn đường nào khác: bị từ chối bằng lời, có ghi nhật ký, "the lamp's
@@ -1286,11 +1287,31 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
 - **Dọn dẹp khi kết thúc.** Token của lần chạy được kết thúc với
   lamp-control trước, và lần chạy thôi sống, nên lần nhận sau bị từ chối.
   Sau đó phiên của Harness được đóng và thư mục của lần chạy bị xóa.
-- **Gateway phải trả lời trước.** Trước khi giao việc, lamp-tasks chờ tối
-  đa 60 s cho gateway của OpenClaw trên `127.0.0.1:18789`. Nếu nó không
-  trả lời, không gì được gửi ("tasks: the OpenClaw Gateway did not answer
-  on 127.0.0.1:18789 within 60 s; the hand-over is not sent"), và lỗi của
-  lần chạy là `Harness didn't start the run (openclaw_gateway_not_ready)`.
+- **Gateway phải phục vụ được trước (#7170).** Sau khi khởi động hay
+  khởi động lại, gateway của OpenClaw trả lời trên `127.0.0.1:18789` từ
+  rất lâu trước khi khởi động xong (lamp-c0a4: cổng lúc 23:00:33, khởi
+  động đến 23:01:58); một lần chạy giao trong khoảng đó được nhận nhưng
+  không bao giờ chạy launcher. Vì vậy trước khi giao việc, lamp-tasks chờ
+  tối đa 240 s (`gateway::SERVING_WITHIN`, trong 14 phút của lần chạy)
+  cho đến khi cổng trả lời và rồi lệnh đọc approvals của chính gateway
+  thành công (`openclaw approvals get --gateway --json`, `#@fence-get` của
+  lamp-update, `gateway::Serving`), chạy nhiều nhất mỗi 3 s, mỗi lần giới
+  hạn 20 s. Nếu không, không gì được gửi ("tasks: the OpenClaw Gateway
+  answered on 127.0.0.1:18789 but did not serve its approvals read
+  (exec.approvals.get) before the readiness or run deadline; the hand-over is not sent", hoặc
+  "did not answer on 127.0.0.1:18789" khi cổng không bao giờ trả lời), và
+  lỗi của lần chạy là `Harness didn't start the run
+  (openclaw_gateway_not_ready)`. Mỗi lần đọc khởi động CLI của OpenClaw,
+  khoảng 10 s trên lamp-c0a4 kể cả khi gateway đã ấm (C7170, 15/11), nên
+  chỉ đọc một lần cho mỗi lần gateway khởi động: lần đọc thành công được
+  giữ theo inode của socket đang lắng nghe trên 18789 (`/proc/net/tcp`,
+  `gateway::listener_inode`), và các lần chạy sau chỉ chờ cổng cho tới khi
+  một lần khởi động lại mở socket mới. Không tìm thấy socket lắng nghe thì
+  lần chạy nào cũng đọc. Nếu listener đổi trong lúc đọc thì kết quả bị bỏ.
+  Thời gian chờ còn bị giới hạn bởi deadline còn lại của lần chạy; khi
+  shutdown, subprocess đọc approvals và nhóm tiến trình của nó bị hủy.
+  Không giao việc sau khi đã hủy hoặc hết hạn. Tác vụ nói vẫn chỉ chờ
+  cổng, tối đa 60 s.
 - **Ghi cố định bị từ chối.** Task không có script (một ghi cố định) bị
   từ chối trước khi bất cứ gì được đặt sống: "a fixed write is not taken
   by a gateway agent, so nothing was started".

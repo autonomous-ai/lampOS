@@ -2940,9 +2940,10 @@ for each run, and is answered once the run ends
       run goes through Harness's own lamp target instead, as when signed
       in, which works with no account (#6407: no machines look, no
       `--machine`, work under the computer's own id). One line is
-      journaled: "skill task <run>: the lamp's default agent (<engine>)
-      isn't set up for a skill's run yet (…); Harness is signed out, so
-      it goes through Harness's own lamp target". So a reset lamp with
+      journaled: "skill task <run>: direct execution is unavailable;
+      Harness is signed out, so trying Harness's own lamp target". This
+      describes an attempt, not a final refusal or a claim of success.
+      So a reset lamp with
       OpenClaw its default runs its skills through OpenClaw's gateway and
       the skill-start launcher. With no Harness program at all there is
       no other way: it is refused in words and journaled, "the lamp's
@@ -3725,12 +3726,31 @@ file:
 - **Cleaned up at the end.** The run's token is ended with lamp-control
   first, and the run stops being live, so a later claim is refused. Then
   Harness's session is closed and the run's folder removed.
-- **The gateway must answer first.** Before the hand-over, lamp-tasks
-  waits up to 60 s for OpenClaw's gateway on `127.0.0.1:18789`. If it
-  doesn't answer, nothing is sent ("tasks: the OpenClaw Gateway did not
-  answer on 127.0.0.1:18789 within 60 s; the hand-over is not sent"), and
-  the run's error is `Harness didn't start the run
-  (openclaw_gateway_not_ready)`.
+- **The gateway must serve first (#7170).** After a boot or a restart,
+  OpenClaw's gateway answers on `127.0.0.1:18789` long before it has
+  finished starting (lamp-c0a4: port at 23:00:33, startup until 23:01:58);
+  a run handed over in that window was taken but never ran its launcher.
+  So before the hand-over, lamp-tasks waits up to 240 s
+  (`gateway::SERVING_WITHIN`, of the run's 14 minutes) until the port
+  answers and then the gateway's own approvals read succeeds
+  (`openclaw approvals get --gateway --json`, lamp-update's `#@fence-get`,
+  `gateway::Serving`), run at most every 3 s, each bounded at 20 s. If
+  it doesn't, nothing is sent ("tasks: the OpenClaw Gateway answered on
+  127.0.0.1:18789 but did not serve its approvals read
+  (exec.approvals.get) before the readiness or run deadline; the hand-over is not sent", or "did
+  not answer on 127.0.0.1:18789" when the port never answered), and the
+  run's error is `Harness didn't start the run
+  (openclaw_gateway_not_ready)`. Each read starts OpenClaw's CLI, about
+  10 s on lamp-c0a4 even on a warm gateway (C7170, 15 Nov), so it is made
+  once per gateway start: a read that succeeded is kept against the inode
+  of the socket listening on 18789 (`/proc/net/tcp`,
+  `gateway::listener_inode`), and later runs wait for the port alone until
+  a restart opens a new socket. With no listening socket found, every run
+  reads. A listener replacement during the read invalidates that result.
+  The wait is also bounded by the remaining run deadline; shutdown cancels
+  an active approvals subprocess and its process group. No hand-over is
+  sent after cancellation or expiry. A spoken task still waits only for
+  the port, up to 60 s.
 - **A fixed write is refused.** A task with no script (a fixed write) is
   refused before anything is made live: "a fixed write is not taken by a
   gateway agent, so nothing was started".
