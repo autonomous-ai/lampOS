@@ -36,25 +36,19 @@ body's movement only: the voice and what it says do not change with it.
 **Level 1 is how the lamp always moved, and the default**: no level kept,
 one that does not read, or no `lamp-cloud` is level 1.
 
-The owner may pick it (`"energy"` in `character.set`, kept as `chosen`).
-Otherwise root's helper works it out from the words once, when they are
-kept (`lamp_msgs::chosen_voice::energy_of`, kept as `derived`), from a fixed
-table, no model asked: start at 1, add each word's weight found as a whole
-word or phrase (lowercase), hold to 1 to 5.
-
-| Weight | English | Vietnamese |
-|---|---|---|
-| +2 (lively) | energetic, lively, excited, hyper, bubbly, playful | năng động, sôi nổi, hào hứng, hiếu động, nghịch ngợm |
-| +1 (cheerful) | cheerful, upbeat, fun, curious, friendly | vui vẻ, vui tươi, vui tính, tò mò, thân thiện |
-| −2 (calm) | calm, gentle, quiet, sleepy, serene, shy | điềm tĩnh, nhẹ nhàng, trầm lặng, buồn ngủ, thanh thản, nhút nhát |
-
-The Vietnamese words are kept pending the first builder's answer on #6893
-(English-only keyword table?): a separate list (`VI_WORDS`) dropped in one
-line if the table is English only.
-
-So "energetic, playful and excited" is 5, "cheerful and curious" 3, "calm
-and quiet" or "a wise old owl" 1, and "playful but gentle" 1. "funny" is not
-"fun": whole words only.
+The owner may pick it (`"energy"` in `character.set`, kept as `chosen`), and a
+pick always wins. Otherwise root's helper keeps `1` and `derived`: no word list
+reads the words (#7314). With `LAMP_ENERGY_FROM_MODEL=on` in `lamp-cloud`
+(off unless set), `lamp-cloud` asks the model once per saved words
+(`crate::energy_rate`): the voice's DeepSeek on the company relay with the
+voice's key, the same relay, model and key as `crate::hermes_llm`, one short
+English prompt ("Rate this character's energy from 1 (calm) to 5 (very lively).
+Answer with one digit only.", the words quoted after it), within 10 s with one
+retry. An answer that is not one digit from 1 to 5, or any failure, is level 1.
+The level said on `character/energy` is then the model's; the words already
+rated are not asked again, though a restart of `lamp-cloud` asks once more.
+`voice.get` still answers the kept file's level (1 for derived words). No word
+is logged.
 
 It is kept in `/etc/lampOS/setup/energy` (644 root): the level on the first
 line, `chosen` or `derived` on the second; removed when the words are

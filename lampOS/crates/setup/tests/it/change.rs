@@ -39,8 +39,8 @@ fn the_persons_name_is_written_as_setup_writes_it_and_an_empty_one_removes_it() 
     assert_eq!(reply, json!({"done": {"name": ""}}));
 }
 
-/// #6893: the energy is kept beside the words, worked out from them once
-/// when none is chosen, and a change of the energy alone restarts nothing;
+/// #6893: the energy is kept beside the words, level 1 derived when none
+/// is chosen (no word list reads the words, #7314: lamp-cloud's model does), and a change of the energy alone restarts nothing;
 /// clearing the words removes it; 0 and 6 are refused with nothing written.
 #[test]
 fn the_energy_is_kept_with_the_words_and_restarts_nothing() {
@@ -52,10 +52,10 @@ fn the_energy_is_kept_with_the_words_and_restarts_nothing() {
     let (reply, done) = answer(r#"{"character": "energetic and playful"}"#, &config, true);
     assert_eq!(
         reply,
-        json!({"done": {"text": "energetic and playful", "energy": 5}})
+        json!({"done": {"text": "energetic and playful", "energy": 1}})
     );
     assert!(done.unwrap().restart_voice);
-    assert_eq!(fs::read_to_string(&energy).unwrap(), "5\nderived\n");
+    assert_eq!(fs::read_to_string(&energy).unwrap(), "1\nderived\n");
     assert_eq!(mode(&energy), 0o644);
 
     let (reply, done) = answer(
@@ -93,7 +93,7 @@ fn the_energy_is_kept_with_the_words_and_restarts_nothing() {
         }
     );
 
-    // The old string form, as an older lamp-cloud sends it: worked out.
+    // The old string form, as an older lamp-cloud sends it: derived.
     let (reply, _) = answer(r#"{"character": "calm and quiet"}"#, &config, true);
     assert_eq!(reply["done"]["energy"], 1);
     assert_eq!(
