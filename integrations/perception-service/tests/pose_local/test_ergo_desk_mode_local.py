@@ -7,7 +7,7 @@ import pytest
 from pydantic import TypeAdapter
 
 from core.enums.pose import ErgoAssessorEnum, GraphEnum
-from core.models.pose import RawPose2DDetection
+from core.models.pose import RawPose2DDetection, RawPose3DDetection
 from core.perception.pose.session import PosePerceptionSession
 from core.perception.pose.utils import ErgoAssessorFactory
 from dlserver.models.pose import PoseConfigRequest, PoseRequest, PoseResponse
@@ -30,6 +30,23 @@ class _Fake2DBatcher:
     async def submit(self, inputs):
         fut = asyncio.get_running_loop().create_future()
         fut.set_result(self._raw)
+        return [fut]
+
+
+class _Fake3DPredictor:
+    GRAPH_TYPE: GraphEnum = GraphEnum.H36M
+    n_frames: int = 1
+
+
+class _Fake3DBatcher:
+    """Stands in for the 3D lifter: returns zeros for the last frame."""
+
+    def __init__(self) -> None:
+        self.predictor = _Fake3DPredictor()
+
+    async def submit(self, inputs):
+        fut = asyncio.get_running_loop().create_future()
+        fut.set_result(RawPose3DDetection(joints_3d=np.zeros((1, 17, 3), dtype=np.float32)))
         return [fut]
 
 
@@ -160,6 +177,102 @@ class TestSessionOptIn:
         assert _answer(a)["ergo"]["partial"] is True
         assert "ergo" not in _answer(b)
 
+
+
+def _coco_side_view_one_ear(lean: float = 0.0, ear_score: float = 0.1) -> tuple[np.ndarray, np.ndarray]:
+    """Side view facing +x, hips hidden, only the near (right) ear confident.
+
+    *lean* moves the head forward (+x) relative to the shoulders.
+    """
+    kps = np.zeros((17, 2), dtype=np.float32)
+    kps[5] = [158, 150]  # L shoulder (far)
+    kps[6] = [162, 150]  # R shoulder (near)
+    kps[3] = [150 + lean, 92]  # L ear (far, weak)
+    kps[4] = [162 + lean, 90]  # R ear (near)
+    kps[0] = [180 + lean, 97]  # nose in front of the ears
+    kps[1] = [174 + lean, 88]
+    kps[2] = [176 + lean, 88]
+    kps[7] = [160, 200]
+    kps[8] = [162, 200]
+    kps[9] = [190, 210]
+    kps[10] = [192, 210]
+    scores = np.full(17, 0.9, dtype=np.float32)
+    scores[3] = ear_score
+    scores[11:] = 0.1
+    return kps, scores
+
+
+class TestOneEar:
+    def test_desk_one_ear_upright_is_partial_neutral_neck(self):
+        s = _session(*_coco_side_view_one_ear())
+        s.update_config(ergo_mode="desk")
+        ans = _answer(s)
+        assert ans["ergo"]["partial"] is True
+        assert ans["ergo"]["left"]["body_scores"]["neck"] == 1
+        assert ans["ergo"]["right"]["body_scores"]["neck"] == 1
+
+    def test_desk_one_ear_head_forward_is_flexion(self):
+        s = _session(*_coco_side_view_one_ear(lean=30.0))
+        s.update_config(ergo_mode="desk")
+        ans = _answer(s)
+        assert ans["ergo"]["partial"] is True
+        body = ans["ergo"]["left"]["body_scores"]
+        assert body["neck_angle"] > 20
+        assert body["neck"] >= 3
+
+    def test_desk_one_ear_head_back_is_not_flexion(self):
+        s = _session(*_coco_side_view_one_ear(lean=-30.0))
+        s.update_config(ergo_mode="desk")
+        ans = _answer(s)
+        assert ans["ergo"]["left"]["body_scores"]["neck_angle"] < 0
+
+    def test_desk_no_ear_has_no_ergo(self):
+        kps, scores = _coco_side_view_one_ear()
+        scores[3] = scores[4] = 0.1
+        s = _session(kps, scores)
+        s.update_config(ergo_mode="desk")
+        assert "ergo" not in _answer(s)
+
+    def test_desk_one_ear_with_3d_lift_is_partial(self):
+        """Production runs the 3D lift; RULA then gets the lifter's H36M input."""
+        s = _session(*_coco_side_view_one_ear())
+        s._pose3d_batcher = _Fake3DBatcher()  # type: ignore[assignment]
+        s.update_config(ergo_mode="desk")
+        ans = _answer(s)
+        assert "pose_3d" in ans
+        assert ans["ergo"]["partial"] is True
+        assert ans["ergo"]["left"]["body_scores"]["neck"] == 1
+
+    def test_default_one_ear_with_3d_lift_unchanged(self):
+        s = _session(*_coco_side_view_one_ear())
+        s._pose3d_batcher = _Fake3DBatcher()  # type: ignore[assignment]
+        assert "ergo" not in _answer(s)
+
+    def test_default_one_ear_unchanged(self):
+        assert "ergo" not in _answer(_session(*_coco_side_view_one_ear()))
+
+    def test_desk_both_ears_keeps_midpoint(self):
+        from core.perception.pose.graph.convert import coco_to_h36m, head_from_one_ear
+
+        kps, scores = _coco_side_view_one_ear(ear_score=0.9)
+        h_kps, h_scores = coco_to_h36m(kps[None], scores[None])
+        out_kps, out_scores = head_from_one_ear(h_kps, h_scores, kps[None], scores[None], 0.3)
+        assert np.array_equal(out_kps, h_kps) and np.array_equal(out_scores, h_scores)
+
+    def test_head_is_the_confident_ear(self):
+        from core.perception.pose.graph.convert import coco_to_h36m, head_from_one_ear
+        from core.perception.pose.graph.h36m import H36MJoint
+
+        kps, scores = _coco_side_view_one_ear()
+        h_kps, h_scores = coco_to_h36m(kps[None], scores[None])
+        out_kps, out_scores = head_from_one_ear(h_kps, h_scores, kps[None], scores[None], 0.3)
+        assert np.array_equal(out_kps[0, H36MJoint.HEAD], kps[4])
+        assert out_scores[0, H36MJoint.HEAD] == scores[4]
+        # Only HEAD changes, and the inputs are not modified.
+        mask = np.ones(17, dtype=bool)
+        mask[H36MJoint.HEAD] = False
+        assert np.array_equal(out_kps[0, mask], h_kps[0, mask])
+        assert h_scores[0, H36MJoint.HEAD] == np.float32(0.1)
 
 class TestConfigMessage:
     _adapter: TypeAdapter = TypeAdapter(PoseRequest)

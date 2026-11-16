@@ -77,6 +77,35 @@ def coco_to_h36m(
     return h36m_kps, h36m_scores
 
 
+
+def head_from_one_ear(
+    h36m_kps: npt.NDArray[np.float32],
+    h36m_scores: npt.NDArray[np.float32],
+    coco_kps: npt.NDArray[np.float32],
+    coco_scores: npt.NDArray[np.float32],
+    threshold: float,
+) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
+    """Desk RULA only: use the one confident ear as HEAD when the other ear is weak.
+
+    coco_to_h36m takes HEAD as the ear midpoint with the lower ear score, so a side
+    view whose far ear is weak loses HEAD. When exactly one ear reaches *threshold*,
+    HEAD becomes that ear (position and score). Frames with both ears or neither
+    ear confident are returned unchanged. Inputs are (N, 17, D) and (N, 17); the
+    returned arrays are copies.
+    """
+    kps: npt.NDArray[np.float32] = h36m_kps.copy()
+    scores: npt.NDArray[np.float32] = h36m_scores.copy()
+    left: npt.NDArray[np.float32] = coco_scores[:, COCOJoint.L_EAR]
+    right: npt.NDArray[np.float32] = coco_scores[:, COCOJoint.R_EAR]
+    use_left = (left >= threshold) & (right < threshold)
+    use_right = (right >= threshold) & (left < threshold)
+    dims: int = min(kps.shape[-1], coco_kps.shape[-1])
+    kps[use_left, H36MJoint.HEAD, :dims] = coco_kps[use_left, COCOJoint.L_EAR, :dims]
+    scores[use_left, H36MJoint.HEAD] = left[use_left]
+    kps[use_right, H36MJoint.HEAD, :dims] = coco_kps[use_right, COCOJoint.R_EAR, :dims]
+    scores[use_right, H36MJoint.HEAD] = right[use_right]
+    return kps, scores
+
 CONVERTER_REGISTRY: dict[tuple[GraphEnum, GraphEnum], GraphConverter] = {
     (GraphEnum.COCO, GraphEnum.H36M): coco_to_h36m,
 }

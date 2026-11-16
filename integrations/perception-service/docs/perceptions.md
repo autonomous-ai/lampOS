@@ -99,9 +99,10 @@ A 3-stage pipeline: 2D keypoints → optional 3D lift → optional RULA ergonomi
   the facing side (nose x offset from the ear midpoint): towards the face is
   flexion (neck 1–3), behind the trunk by 5° or more is extension (neck 4). A
   frontal view gives an unsigned angle (`rula/utils.py` `signed_flexion_angle`,
-  `facing_direction_2d`). See [known-issues.md](known-issues.md#pose-estimation-rtmpose--rula).
+  `facing_direction_2d`). With only one confident ear, desk sessions use that ear
+  instead of the ear midpoint (`graph/convert.py` `head_from_one_ear`). See [known-issues.md](known-issues.md#pose-estimation-rtmpose--rula).
 - RULA needs the hips (H36M `SPINE`) to define the trunk. In desk mode, hidden hips with confident
-  shoulders, nose and ears give an upper-body score instead of no `ergo`: the
+  shoulders, nose and at least one ear give an upper-body score instead of no `ergo`: the
   shoulder line stands in for the trunk, trunk and legs score 1, and
   `ErgoAssessment.partial` is `true` (`false` on full desk answers, `None` and
   left off the wire outside desk mode).

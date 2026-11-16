@@ -67,7 +67,8 @@ ear midpoint line, signed by the side the face points to (the nose's x offset fr
 ear midpoint), so an upright or forward head scores neck 1–3 and only a head carried
 back 5° or more scores 4 (the original rule reads every 2D neck as 4); a frontal view
 gives an unsigned angle. Desk mode also scores a frame with hidden hips but visible
-shoulders, nose and ears on the upper body (trunk and legs assumed neutral), with
+shoulders, nose and at least one ear on the upper body (trunk and legs assumed
+neutral; with one ear, that ear replaces the ear midpoint for the neck), with
 `partial: true` in `ergo`; full desk answers have `partial: false`, and default answers
 have no `partial` key. `POSE__ERGO_DESK_MODE=false` (default true) is a kill switch
 that ignores the opt-in.

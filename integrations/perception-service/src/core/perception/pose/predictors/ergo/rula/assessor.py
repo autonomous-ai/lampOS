@@ -55,7 +55,7 @@ class RULAAssessor(ErgoAssessor):
     - 2D input: the neck is thorax -> ear midpoint, signed by the facing side of
       the face (the original rule always reads 2D as extension, neck 4).
     - A frame whose hips are hidden (spine below the threshold) but whose
-      shoulders, nose and ears are confident is still scored: the shoulder line
+      shoulders, nose and HEAD are confident is still scored: the shoulder line
       stands in for the trunk, trunk and legs are assumed neutral (score 1) and
       the result carries ``partial=True`` (``False`` on a full-body desk answer).
     """
@@ -85,6 +85,10 @@ class RULAAssessor(ErgoAssessor):
         self._force_load_score: int = get_or_default(
             force_load_score, self.DEFAULT_FORCE_LOAD_SCORE
         )
+
+    @property
+    def confidence_threshold(self) -> float:
+        return self._confidence_threshold
 
     def _assess_side(
         self,
@@ -220,7 +224,11 @@ class RULAAssessor(ErgoAssessor):
         )
 
     def _upper_body_visible(self, scores: npt.NDArray[np.float32]) -> bool:
-        """Shoulders, nose and ear midpoint all confident: enough for an upper-body score."""
+        """Shoulders, nose and HEAD all confident: enough for an upper-body score.
+
+        HEAD is the ear midpoint, or the one confident ear for a desk session
+        (see ``head_from_one_ear``); the neck sign then uses that ear.
+        """
         needed: tuple[str, ...] = ("THORAX", "L_SHOULDER", "R_SHOULDER", "NECK", "HEAD")
         return all(scores[_H36M.joint(name)] >= self._confidence_threshold for name in needed)
 

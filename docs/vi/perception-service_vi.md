@@ -69,7 +69,8 @@ tới trung điểm hai tai, lấy dấu theo phía khuôn mặt hướng tới 
 trung điểm hai tai), nên đầu thẳng hoặc cúi về trước được điểm cổ 1–3 và chỉ khi đầu ngả
 ra sau từ 5° trở lên mới được 4 (quy tắc gốc đọc mọi góc cổ 2D thành 4); góc nhìn chính
 diện cho góc không dấu. Chế độ desk còn chấm điểm phần thân trên cho khung hình bị che
-hông nhưng thấy rõ vai, mũi và hai tai (thân và chân coi như trung tính), với
+hông nhưng thấy rõ vai, mũi và ít nhất một tai (thân và chân coi như trung tính; khi chỉ
+thấy một tai thì tai đó thay cho trung điểm hai tai khi tính góc cổ), với
 `partial: true` trong `ergo`; câu trả lời desk đủ thân có `partial: false`, câu trả lời
 mặc định không có key `partial`. `POSE__ERGO_DESK_MODE=false` (mặc định true) là công tắc
 tắt khẩn cấp, bỏ qua opt-in.

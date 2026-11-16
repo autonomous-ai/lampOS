@@ -45,7 +45,9 @@ Tracked model accuracy and architecture limitations that affect production quali
   close-up framing), the assessor returns None and no ergo score is produced
   for that frame. This is common in seated desk setups where the camera is
   at monitor height. For a session that sends `ergo_mode: "desk"`, a
-  frame whose only gap is the hips (shoulders, nose and both ears confident) is
+  frame whose only gap is the hips (shoulders, nose and at least one ear
+  confident; a side view's far ear is often weak, and the one confident ear then
+  stands in for the ear midpoint as HEAD) is
   scored on the upper body instead: the trunk reference is the perpendicular of
   the shoulder line (image vertical when the shoulders overlap in a side view),
   trunk and legs are assumed neutral, and `ergo.partial` is `true`.

@@ -22,7 +22,7 @@ from core.models.pose import (
 )
 from core.perception.base import PerceptionSessionBase
 from core.perception.base.batching import InputBatcher
-from core.perception.pose.graph.convert import convert_graph
+from core.perception.pose.graph.convert import convert_graph, head_from_one_ear
 from core.perception.pose.predictors.ergo.base import ErgoAssessor, ErgoInput
 from core.perception.pose.predictors.pose2d.base import PoseEstimator2D
 from core.perception.pose.predictors.pose3d.base import Pose3DInput, PoseEstimator3DLifting
@@ -181,6 +181,22 @@ class PosePerceptionSession(
                     raw_2d.scores,
                     src_graph,
                     ergo_graph,
+                )
+
+            desk_threshold: float | None = getattr(ergo_assessor, "confidence_threshold", None)
+            if (
+                ergo_batcher is self._desk_ergo_batcher
+                and src_graph == GraphEnum.COCO
+                and ergo_graph == GraphEnum.H36M
+                and desk_threshold is not None
+            ):
+                # Desk only: a side view's far ear is often weak; one ear is enough.
+                ergo_kps, ergo_scores = head_from_one_ear(
+                    ergo_kps,
+                    ergo_scores,
+                    raw_2d.keypoints,
+                    raw_2d.scores,
+                    desk_threshold,
                 )
 
             ergo_input: ErgoInput = (ergo_kps[0], ergo_scores[0])
