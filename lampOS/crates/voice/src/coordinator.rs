@@ -7893,14 +7893,13 @@ fn conversation_with_gate_inner(
             crate::sleep_asked::switched_on(),
             controls.as_ref(),
             onboarding.as_ref(),
-        ) && let Some(current) = reply.as_ref()
-            && onboarding_marked != Some(current.owner.turn())
-        {
-            onboarding_marked = Some(current.owner.turn());
-            provider_queue.push_back(ProviderInput::Onboarding {
-                request: current.owner.turn(),
-                privacy_generation: snapshot.microphone_generation(),
-            });
+        ) {
+            mark_onboarding(
+                &mut provider_queue,
+                &mut onboarding_marked,
+                reply.as_ref(),
+                snapshot.microphone_generation(),
+            );
         }
         // A sleep asked aloud whose turn is gone without being heard whole
         // (cut by the person, or failed), or whose cap has passed: at the
@@ -16881,6 +16880,24 @@ fn after_start(
     marks
 }
 
+/// The turn in hand marked as begun while the walk is under way, once,
+/// if [`after_start`] did not mark it as it began.
+fn mark_onboarding(
+    queue: &mut VecDeque<ProviderInput>,
+    marked: &mut Option<u64>,
+    reply: Option<&Reply>,
+    privacy_generation: u64,
+) {
+    let Some(current) = reply.filter(|current| *marked != Some(current.owner.turn())) else {
+        return;
+    };
+    *marked = Some(current.owner.turn());
+    queue.push_back(ProviderInput::Onboarding {
+        request: current.owner.turn(),
+        privacy_generation,
+    });
+}
+
 /// Whether the provider worker is told the walk's state `now` (its turn in
 /// hand, under way or not), having been told `told` last: each turn while
 /// the walk is under way, so a worker started since learns it, and once
@@ -20764,6 +20781,71 @@ mod tests {
         assert!(speaker.data.receive::<SpeakerChunk>().unwrap().is_none());
         assert_eq!(reply.as_ref().unwrap().pcm.len(), 480);
         assert!(!reply.as_ref().unwrap().cloud.started);
+    }
+
+    /// #7219: with `LAMP_SLEEP_ASKED=on`, the walk's own written line (its
+    /// start and end at once) was marked as begun in the walk after it was
+    /// sent. The mark could never be sent, and once the line had played and
+    /// its reply settled, the next flush found input with no owner and the
+    /// voice exited ("provider input lost its owner").
+    #[test]
+    fn a_written_line_in_the_walk_takes_no_onboarding_mark_it_could_never_send() {
+        let (_owner, mut reply) = current_input();
+        reply.as_mut().unwrap().local_input_ended = true;
+        let request = reply.as_ref().unwrap().owner.turn();
+        let mut cloud = CloudAvailability::default();
+        cloud.observe(ready_link(1, 1), monotonic_us()).unwrap();
+        let mut queue = VecDeque::from([ProviderInput::Written {
+            request,
+            session: 1,
+            privacy_generation: 1,
+            text: "Say only this: Hi.".into(),
+            look: false,
+            search: false,
+            quoted: false,
+        }]);
+        flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        assert!(queue.is_empty());
+        let mut marked = None;
+        mark_onboarding(&mut queue, &mut marked, reply.as_ref(), 1);
+        flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        // The line played and settled: its reply ends.
+        reply = None;
+        flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        assert!(queue.is_empty());
+    }
+
+    /// The same for a turn that never went out (a local-only turn, #830,
+    /// heard while the lamp is offline in its walk): its input is closed to
+    /// the provider from the start, though its sound is still coming in.
+    #[test]
+    fn a_local_only_line_in_the_walk_takes_no_onboarding_mark() {
+        let (_owner, mut reply) = current_input();
+        reply.as_mut().unwrap().cloud = CloudRequest::local_only();
+        let mut cloud = CloudAvailability::default();
+        cloud.observe(ready_link(1, 1), monotonic_us()).unwrap();
+        let mut queue = VecDeque::new();
+        let mut marked = None;
+        mark_onboarding(&mut queue, &mut marked, reply.as_ref(), 1);
+        flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        reply = None;
+        flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        assert!(queue.is_empty());
+    }
+
+    /// A heard line still open is marked once, and the mark is sent.
+    #[test]
+    fn an_open_heard_line_in_the_walk_is_marked_once() {
+        let (_owner, mut reply) = current_input();
+        let mut cloud = CloudAvailability::default();
+        cloud.observe(ready_link(1, 1), monotonic_us()).unwrap();
+        let mut queue = VecDeque::from([start_command(&reply)]);
+        let mut marked = None;
+        mark_onboarding(&mut queue, &mut marked, reply.as_ref(), 1);
+        mark_onboarding(&mut queue, &mut marked, reply.as_ref(), 1);
+        assert_eq!(queue.len(), 2);
+        flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        assert!(queue.is_empty());
     }
 
     #[test]
