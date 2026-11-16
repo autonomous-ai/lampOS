@@ -1359,7 +1359,8 @@ và giữ trong tuần đó. Chương không bao giờ đọc một lượt trao
 mục nó dựa vào (`crates/memory/src/chapters.rs`, `nightly.rs` của voice).
 
 - **Khi nào:** `LAMP_MEMORY_WEEKLY_CHAPTERS=on` của voice, cùng với
-  `LAMP_MEMORY_NIGHTLY=on` (tắt nếu không đặt). Mỗi người đã biết được nghe
+  `LAMP_MEMORY_NIGHTLY=on` (tắt nếu không đặt; bật trong unit sản phẩm từ lời
+  đồng ý của chủ sở hữu ngày 16/11). Mỗi người đã biết được nghe
   trong một tuần được xếp hàng cho tuần đó (chỉ trong bộ nhớ, như các ngày);
   sau khi các ngày của đêm đó xong, một tuần đã qua được một lần gọi, trong
   cùng giờ, yên lặng, công tắc riêng tư và ngân sách đêm như một ngày. Tuần

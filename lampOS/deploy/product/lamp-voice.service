@@ -587,6 +587,11 @@ Environment=LAMP_MEMORY_PROFILE=on
 Environment=LAMP_MEMORY_NIGHTLY=on
 Environment=LAMP_MEMORY_NIGHTLY_PATTERNS=on
 Environment=LAMP_MEMORY_NIGHTLY_FEELINGS=on
+# Weekly chapters (B2, C109, docs/memory-days.md): the first night after a week ends, one short chapter of each known
+# person's week from the items the nightly pass kept, grounded in them; told only to that person's own recall of a
+# day or span, never in the session note. The owner's yes on 16 Nov; a row on lamp-06c1 comes before it trains. Needs
+# LAMP_MEMORY_NIGHTLY above and lamp-memory's weekly ops from the same build, which a product install ships.
+Environment=LAMP_MEMORY_WEEKLY_CHAPTERS=on
 # A role a seen person gives the lamp ("you are Harry Potter") lasts with them until they end it (the memory owner's
 # design of 6 Nov, #5545; switched on by their call on 9 Nov). Only a short name is kept, per known face, read once with
 # their session's open; a turn not placed as theirs is told only the role names of the known faces in view, never

@@ -1729,6 +1729,39 @@ fn the_product_sorts_a_day_into_memory_overnight() {
     );
 }
 
+/// Weekly chapters are on in the product (`LAMP_MEMORY_WEEKLY_CHAPTERS`, B2,
+/// C109): the owner's yes on 16 Nov. A chapter is written only in the
+/// nightly pass's thread, from its kept items, so the unit sets the nightly
+/// pass too, and lamp-memory runs Days for the weekly ops.
+#[test]
+fn the_product_writes_a_weekly_chapter() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    let service = section(unit("lamp-voice.service"), "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_WEEKLY_CHAPTERS=on",
+        "Environment=LAMP_MEMORY_NIGHTLY=on",
+    ] {
+        assert_eq!(
+            service.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice lacks {line}"
+        );
+    }
+    let memory = section(unit("lamp-memory.service"), "Service");
+    assert!(
+        memory
+            .iter()
+            .any(|line| line.starts_with("ExecStart=") && line.contains(" --memory-days")),
+        "the memory runs without --memory-days"
+    );
+}
+
 /// What a caller said before their face was known becomes theirs once it is
 /// (`LAMP_MEMORY_FOLLOWS_FACE`, #2176): the memory owner's call on 4 Nov. It
 /// moves nothing without the Days memory, the second route and the eyes'

@@ -1625,7 +1625,8 @@ week. A chapter never reads an exchange; it cites the items it rests on
 (`crates/memory/src/chapters.rs`, the voice's `nightly.rs`).
 
 - **When:** the voice's `LAMP_MEMORY_WEEKLY_CHAPTERS=on`, beside
-  `LAMP_MEMORY_NIGHTLY=on` (off unless set). Each known person heard in a
+  `LAMP_MEMORY_NIGHTLY=on` (off unless set; on in the product unit since the
+  owner's yes on 16 Nov). Each known person heard in a
   week is queued for it (held in memory only, like the days); after that
   night's days are done, a week that is over gets one call, in the same
   hours, quiet, slide and night budget as a day. A week is let go after its
