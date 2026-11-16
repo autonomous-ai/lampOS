@@ -1,5 +1,12 @@
 //! Actual child/channel startup with fake peers: no device or provider access.
+//!
+//! The tests that start a fake ring child are Linux only: they test
+//! `spawn_optional_ring_with_tick`, which off Linux starts nothing (every ring
+//! entry of the binary is Linux only), so on a Mac there is no child to see.
+//! The tests that run everywhere are the two on the off-Linux answer and the
+//! ones through the `spawn_optional_ring_reading` seam.
 use super::*;
+#[cfg(target_os = "linux")]
 use std::os::unix::net::UnixDatagram;
 
 pub(crate) struct ChildFixture {
@@ -115,6 +122,7 @@ pub(crate) fn await_exit(worker: &mut Worker) -> ExitStatus {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn failed_handshake_retains_owned_child_and_cleans_only_its_socket_namespace() {
     let fixture = ChildFixture::new();
@@ -157,6 +165,7 @@ fn failed_handshake_retains_owned_child_and_cleans_only_its_socket_namespace() {
     drop(peer);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn ready_ring_keeps_private_handshake_and_control_contract() {
     let fixture = ChildFixture::new();
@@ -213,6 +222,7 @@ fn the_startup_wait_reads_the_hosts_clock_unless_this_thread_moves_it() {
     assert!(read <= Instant::now() + Duration::from_secs(60));
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn missing_socket_deadline_is_unchanged_and_does_not_lose_the_child() {
     let fixture = ChildFixture::new();
@@ -245,6 +255,7 @@ fn missing_socket_deadline_is_unchanged_and_does_not_lose_the_child() {
     assert!(!fixture.directory.path.join("ring").exists());
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn mandatory_interrupt_during_ring_startup_preserves_kind_and_reaps() {
     let fixture = ChildFixture::new();
@@ -272,6 +283,7 @@ fn mandatory_interrupt_during_ring_startup_preserves_kind_and_reaps() {
     assert!(!fixture.directory.path.join("ring").exists());
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn instant_optional_exec_failure_cannot_mask_new_mandatory_fault() {
     let directory = SessionDirectory::create().unwrap();
@@ -300,6 +312,7 @@ fn instant_optional_exec_failure_cannot_mask_new_mandatory_fault() {
     assert!(!directory.path.join("ring").exists());
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn cleanup_refuses_replaced_peer_inode_and_retains_failure() {
     let fixture = ChildFixture::new();
@@ -351,6 +364,7 @@ fn cleanup_refuses_replaced_peer_inode_and_retains_failure() {
     fixture.assert_reaped();
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn cleanup_refuses_unexpected_file_without_erasing_it() {
     let fixture = ChildFixture::new();
@@ -382,6 +396,7 @@ fn cleanup_refuses_unexpected_file_without_erasing_it() {
     fixture.assert_reaped();
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn permanently_nonprivate_peers_timeout_without_connecting_or_chmod() {
     let fixture = ChildFixture::new();
@@ -434,6 +449,7 @@ fn permanently_nonprivate_peers_timeout_without_connecting_or_chmod() {
     assert!(!fixture.directory.path.join("ring").exists());
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn connected_but_unready_ring_times_out_and_remains_owned() {
     let fixture = ChildFixture::new();
@@ -466,6 +482,7 @@ fn connected_but_unready_ring_times_out_and_remains_owned() {
     assert!(!fixture.directory.path.join("ring").exists());
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn child_exit_before_ready_is_optional_but_abnormal_exit_is_retained() {
     let fixture = ChildFixture::new();
@@ -557,4 +574,51 @@ fn the_ring_is_started_with_the_unplug_switch_and_only_when_it_is_on() {
             "{value:?}: a voice variable leaked"
         );
     }
+}
+
+/// Where no ring worker exists the startup is the answer for a ring that left
+/// no child: unavailable with no worker, which the muted wait takes as "no
+/// light" and the coordinator as a ring that never started (no retry).
+/// A mandatory fault met while it waits is returned before that answer.
+#[test]
+fn a_ring_where_none_runs_is_unavailable_with_no_child() {
+    let mut waited = 0;
+    let startup = Worker::ring_not_on_this_os(|| {
+        waited += 1;
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(waited, 1, "the mandatory supervision runs once");
+    let (worker, error) = unavailable(startup);
+    assert!(worker.is_none(), "no child may exist");
+    assert_eq!(error.kind(), io::ErrorKind::Unsupported);
+
+    let fault = Worker::ring_not_on_this_os(|| Err(io::Error::other("privacy worker gone")));
+    assert_eq!(
+        fault.err().map(|error| error.to_string()).as_deref(),
+        Some("privacy worker gone")
+    );
+}
+
+/// Off Linux the entry point makes no child, directory or socket at all;
+/// on Linux it still starts the ring (the tests above).
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn off_linux_the_ring_entry_makes_nothing() {
+    let fixture = ChildFixture::new();
+    let parent = new_boot().unwrap();
+    let startup = Worker::spawn_optional_ring_with_tick(
+        &fixture.executable,
+        &fixture.directory.path,
+        parent,
+        &[],
+        || Ok(()),
+    )
+    .unwrap();
+    let (worker, _) = unavailable(startup);
+    assert!(worker.is_none());
+    assert!(
+        !fixture.directory.path.join("ring").exists(),
+        "no ring directory may be made"
+    );
 }
