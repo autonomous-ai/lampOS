@@ -2297,23 +2297,40 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `readiness::tests::the_lamps_installed_engines_keep_harness_s_order`,
     `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.
   - **Started** as Harness starts OpenClaw:
-    `openclaw tui --session harness-<agentId> --message "<prompt>"`, with
-    no permission modes and no model routing (OpenClaw picks its own
-    model, from its settings below).
-  - **Idle with no ask counts as handed over** (#6499): after a `new`
-    that answered, lamp-tasks reads `show` until the harness is asked or
-    idle, within the same `launch_timeout`. Either way the task is
-    `Created`, as Harness answered it: on the lamp OpenClaw's `show` can
-    read idle with no `ask` seconds after a `new` whose `--message` it did
-    take. Idle with no ask writes one journal line and nothing else:
-    nothing is closed, `new` is not asked again, and nothing is typed in
-    with `harness reply`. A `show` that fails is uncertain, with its code.
-    The real loss, OpenClaw dropping `--message` while the TUI pairs with
-    a cold Gateway, is fixed in Harness 0.6.23
-    (autonomous-ai/openharness#4172: it starts OpenClaw without
-    `--message` and types the task once the pane is ready); a lamp gets it
-    with the Harness pin move (#5957). (#6504's close-and-start-again
-    stopgap is gone.)
+    `openclaw tui --session harness-<agentId>`, with no permission modes
+    and no model routing (OpenClaw picks its own model, from its settings
+    below). Harness 0.6.52 starts it with no `--message` and types the
+    task in once the pane is ready, waiting up to 30 s for the Gateway to
+    write it as the user's message (`sessionInput.ts`); before that it was
+    `--message "<prompt>"`.
+  - **Counted only with proof it was taken** (#7277, replacing #6499's
+    "idle with no ask counts as handed over"): after a `new` that
+    answered, lamp-tasks reads `show` until it proves OpenClaw took the
+    task: an `ask`, a tool used, an answer, or `working`. Idle with no ask
+    is no proof: on c0a4 (build 13373, Harness 0.6.52) such a read was
+    the TUI before its first send, which logged a 17.5 s startup, and on
+    other runs the send never came. The bound is `OPENCLAW_PROOF_WITHIN`,
+    45 s from `new`'s answer (never more than one `launch_timeout`): the
+    30 s Harness waits for the Gateway, the slow first send and the
+    preparation after it. Proven, the task is `Created` as before, so a
+    run that reads idle with no ask and then uses a tool (#6499's case)
+    still counts. No proof: that harness is closed and `new` asked once
+    more (`harness reply` is off on product lamps), proved the same way.
+    Still none: the second harness is closed too and the task is
+    `not_sent`, `openclaw_not_taken`, so the voice tells the person it did
+    not reach the agent, never that it started. A harness that can't be
+    closed ends the launch `uncertain` (`openclaw_not_closed` for the
+    first, `openclaw_not_taken` for the second) with nothing more started:
+    one left running could still take its task beside another. A second
+    `new` that fails is `openclaw_new_again_failed`; a stopped harness is
+    `stopped_before_message`, and a `show` that fails is uncertain with its
+    code. Nothing is started a third time. Tested by
+    `openclaw_idle_with_no_ask_then_a_tool_within_the_bound_is_created`,
+    `openclaw_idle_with_no_ask_throughout_is_closed_started_once_more_and_not_sent`,
+    `openclaw_not_taken_then_taken_on_the_second_new_is_created_on_it`,
+    `openclaw_not_taken_and_not_closed_is_uncertain_with_nothing_more_started`
+    and `openclaw_asked_after_new_is_created_with_nothing_more_called`
+    (`tests/harness.rs`).
   - **Never begun, told and closed** (#6577): the lamp's own OpenClaw
     task, handed over in this boot, still read idle with nothing asked,
     no answer and no tool used `OPENCLAW_BEGIN_WITHIN_MS` (130 s: the
