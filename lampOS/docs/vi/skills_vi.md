@@ -1538,7 +1538,11 @@ của task của một kỹ năng):
   chưa bật và giờ không lời đồng ý nào bật được nó, nên người dùng có thể nhờ
   tạo lại (trong 120 s nó đã được báo kỹ năng đang chờ, cùng `approve_id`,
   như trước);
-- câu trả lời của mỗi vòng được giữ đến cuối vòng. Bên cạnh một lời gọi
+- chỉ ở hai lượt nghe được đầu tiên sau 120 s của nó
+  (`made_not_on::LATE_TURNS_GUARDED`, `skill_write_yes::late_guarded`), câu
+  trả lời của mỗi vòng được giữ đến cuối vòng; một lượt trong 120 s, hay lượt
+  muộn thứ ba, được phát trực tiếp như trước, chỉ ghi chú báo cho mô hình
+  (P2 về độ trễ của Heron trên #7284). Bên cạnh một lời gọi
   `make_skill` có `approve_id` nó không được nói (vòng sau nói từ câu trả lời
   của lời gọi đó). Nếu không, chính mô hình chat của route, được hỏi không kèm
   hàm nào trong một lời gọi ngắn giới hạn 1,5 s (`made_not_on::JUDGE_WITHIN`,
