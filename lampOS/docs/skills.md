@@ -4559,6 +4559,31 @@ no network:
   nobody spoke are as below (nothing is added to that turn's answer). An
   answer that isn't an object is kept under `result`. Off, or any other
   schedule call, the answer is the schedule's, byte for byte.
+- **A skill asked about may not be one they made.** On lamp-9adf (#7335's
+  row) "Lamp, do I have a skill that reads my calendar when I sit down?
+  Did it last run?" called `make_skill` for the list of the skills they
+  made, and the lamp said it saw no such skill, while
+  read-calendar-when-sitting, added from a file, was on. With the switch,
+  a `make_skill` answer that tells the person about their skills without
+  making or asking anything (`skill_about::tells_their_skills`) carries
+  `skills_on_the_lamp` and `skills_note` the same way, through
+  `make_skill`'s route (`tools::run_call_with_scope`): the list of those
+  they made (`made`), whatever it says, and a run, a remove or a read-back
+  (`run`, `remove`, `read_back`) answered with an `error` (none found by
+  that name, more than one, not theirs, not here) and no `approve_id`
+  awaited. The note: "A skill they ask about may be any skill on the lamp,
+  not only one they made: each is listed in skills_on_the_lamp with its
+  state from the lamp's records, whether made here, added from a file,
+  from the Store or the lamp's own. When one fits what they asked, answer
+  from its line too, in a few words, though the words above name only
+  those they made; never say they have none like it, or that it is off,
+  unless its line says so. Only answer: offer to change, turn on or turn
+  off nothing." With a record unreadable: "The lamp can't check its other
+  skills right now: if they may mean a skill they didn't make, say you
+  can't check that right now, and guess nothing." A make, a clash's
+  choice, a yes, a read-back or remove that waits for a yes, and a turn
+  nobody spoke are untouched; off, every `make_skill` answer is as before,
+  byte for byte.
 - **Never a guess.** A record there and unreadable (the skills folder, the
   `off` file, `holds.json`, a skill's `SKILL.md` or `skill.toml`) tells the
   model only that the lamp can't check its skills right now. A missing
@@ -4582,7 +4607,8 @@ call naming no skill. Tests: `skill_about::tests` (on, off, snoozed, resting,
 that can't be read, the owner's names, the bounds, `use_skill`'s parameters with the switch and without),
 `tools::tests::a_question_about_a_skill_adds_no_function`,
 `tools::tests::a_question_about_a_skill_is_answered_through_use_skill`,
-`tools::tests::a_reminders_answer_carries_the_skills_only_with_the_switch`, and
+`tools::tests::a_reminders_answer_carries_the_skills_only_with_the_switch`,
+`tools::tests::a_made_skills_list_carries_the_skills_only_with_the_switch`, and
 `process::tests::the_memory_switches_alone_reach_the_started_routes`.
 
 **Run now by voice** (lamp-9adf, 15 Nov at 15:49 and 15:52: "Run my unread
