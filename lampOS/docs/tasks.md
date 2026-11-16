@@ -1253,7 +1253,7 @@ started once its answer is told:
 | CLI capture | 64 KiB stdout, 16 KiB stderr; individual poll waits capped at 10 ms |
 | Progress (`--progress`) | One `ps` per machine per watch period, 10 s each; 256 KiB stdout; 256 harnesses a reply; a progress line cut to 2 KiB; memory only, at most 16 tasks |
 | Tasks now (`tasks_now`, with `--progress`) | Memory only; at most 8 tasks, newest first; the reply under 2 KiB (body at most 1,900 bytes); a last step at most 160 characters, cut at a whole character, control characters removed; a settled task kept 30 min after it was told and at most 2 h after it settled; no Harness call of its own |
-| Follow (`--push-watch`) | One `watch` per watched task, at most 4 at once (`MOST_FOLLOWED`), each on its own thread and its own adapter beside the CLI worker, 600 s each (killed at 630 s) and started again at once; 64 KiB a line, each line dropped once read; killed on `done`/`failed`, when its task leaves the watch, and when the part stops (the owner joins every one before it ends); a failed one started again after 3, then 10 s, given up for its task after 3 in a row; a task settled by it not followed again for 3 s |
+| Follow (`--push-watch`) | One `watch` per watched task, at most 4 at once (`MOST_FOLLOWED`), each on its own thread and its own adapter beside the CLI worker, 600 s each (killed at 630 s) and started again at once; 64 KiB a line, each line dropped once read; killed on `done`/`failed`, when its task leaves the watch, and when the part stops (the owner joins every one before it ends); a failed one started again after 3, then 10 s, given up for its task after 3 in a row (a line from it does not end the row; one held 60 s, `FOLLOW_KEPT`, or one heard from that ended on `done`/`failed`/`stopped` does, #7248); a task settled by it not followed again for 3 s |
 | Push (`--push-wait`) | One `wait` held per machine with watched tasks, on at most 64 agents, 600 s each (killed at 630 s), beside the CLI worker; the next on a machine no sooner than 3 s after one came back with an end, 30 s after one failed; a pushed task left out until the watch reads it again; 64 KiB stdout |
 | Private persistence | 8 MiB snapshot, 32 MiB database, 40 MiB journal; 4,096-byte pages |
 | SQLite | DELETE journal, FULL sync, fullfsync requested, 2 MiB cache, 50 ms busy wait, no mmap/WAL |
@@ -4585,7 +4585,11 @@ used only to say it.
   again is safe, its first line being how the harness stands then. Exit 1
   (`GONE`, `DISCONNECTED`, `MACHINE_UNAVAILABLE` …; only the code is
   journaled) starts it again after 3, then 10 s, and after three failures
-  in a row the task is given up to the fallback. Exit 2, a usage error, is
+  in a row the task is given up to the fallback. A line from the watch
+  does not end the row, so one that says `working` and then exits 1 is
+  given up too, not started again every 3 s (#7248); a watch held 60 s
+  (`FOLLOW_KEPT`), or one heard from that ended on the agent settling or
+  stopping, does. Exit 2, a usage error, is
   taken for a Harness without `watch`: no watch is started again while the
   part runs. A task settled by its watch is not followed again for 3 s,
   and not while its latest read was a push (`Engine::pushed`), so a watch
