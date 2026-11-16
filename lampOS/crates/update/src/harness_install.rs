@@ -391,6 +391,22 @@ pub fn after_round(
     )
 }
 
+/// The ask a round hands the one-shot for an install, `pin` or none, in
+/// [`ASK`] (0600). The image's pre-install (crate::preinstall) writes the
+/// same one.
+pub fn ask_install(records: &Path, pin: Option<Pin>) -> Result<(), String> {
+    let ask = Ask {
+        version: 1,
+        pin,
+        upgrade_from: None,
+    };
+    serde_json::to_vec(&ask)
+        .map_err(|error| error.to_string())
+        .and_then(|text| {
+            write_whole(&records.join(ASK), &text, 0o600).map_err(|error| error.to_string())
+        })
+}
+
 /// After a round that reached the channel, with the switch on: Harness
 /// already there is recorded `installed` (put there before, or by hand),
 /// unless a pinned install recorded it `version`, and nothing runs; missing, with no try under way, `installing` is
@@ -478,16 +494,7 @@ pub fn after_round_when(
         }
     };
     let pinned = Some(pin.is_some());
-    let ask = Ask {
-        version: 1,
-        pin,
-        upgrade_from: None,
-    };
-    let asked = serde_json::to_vec(&ask)
-        .map_err(|error| error.to_string())
-        .and_then(|text| {
-            write_whole(&records.join(ASK), &text, 0o600).map_err(|error| error.to_string())
-        });
+    let asked = ask_install(records, pin);
     let started = asked.and_then(|()| {
         write(
             records,
@@ -502,7 +509,7 @@ pub fn after_round_when(
         Ok(()) => {
             say(&format!(
                 "Harness is not at {HARNESS}: {UNIT} started to put it there ({})",
-                if ask.pin.is_some() {
+                if pinned == Some(true) {
                     "pinned"
                 } else {
                     "Harness's own manifest, not pinned"
