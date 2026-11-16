@@ -836,12 +836,15 @@ fn the_stream_reports_denied_sessions_and_recovers_without_words_or_paths() {
     };
     let started = Instant::now();
     let mut stream = EventStream::open(&rig);
+    // Turns falls back to the bus (#7208): no bus turn yet, an empty state,
+    // never the permission error. Overview still marks its summary.
     let sections = stream.until(|sections| {
-        sections["turns"].contains(PERMISSION) && sections["overview"].contains(PERMISSION)
+        sections["turns"].contains("No turn heard yet.")
+            && sections["overview"].contains(PERMISSION)
     });
     let first = started.elapsed();
     safe(&sections);
-    assert!(!sections["turns"].contains("No turn"));
+    assert!(!sections["turns"].contains(PERMISSION));
     assert!(!sections["turns"].contains(STALE));
     assert!(!sections["turns"].contains("117 ms"));
 
@@ -891,6 +894,47 @@ fn the_stream_reports_denied_sessions_and_recovers_without_words_or_paths() {
         eprintln!("peek_read_status {boundary}_us={}", elapsed.as_micros());
         assert!(elapsed < Duration::from_secs(2), "{boundary}: {elapsed:?}");
     }
+}
+
+/// #7208: on a product lamp the voice's sessions are `root:root 0700` and
+/// peek runs as `lampos`, so the records are never readable. Turns is then
+/// built from the bus's turns, as cards, never the permission error; with
+/// no bus turn either, an empty state. No word shows outside monitor mode.
+#[test]
+fn with_the_voices_sessions_private_turns_shows_the_bus_turns() {
+    const PERMISSION: &str = "Can't read the voice's sessions: permission.";
+    let rig = Rig::new("turns-bus", Some(TOKEN));
+    let sessions = rig.root.join("sessions");
+    fs::create_dir_all(sessions.join("s1/metadata")).unwrap();
+    let _hold = Unreadable::new(&sessions);
+    assert_eq!(
+        fs::read_dir(&sessions).unwrap_err().kind(),
+        std::io::ErrorKind::PermissionDenied,
+        "the permission fixture must run as an ordinary user"
+    );
+    let mut stream = EventStream::open(&rig);
+    let sections = stream.until(|sections| sections["turns"].contains("No turn heard yet."));
+    let turns = &sections["turns"];
+    assert!(!turns.contains(PERMISSION), "{turns}");
+    assert!(!turns.contains("turn card"), "{turns}");
+
+    let mut heard = rig.publisher(Speech::TOPICS[0], &Speech::declaration(), "voice");
+    let mut said = rig.publisher(Speech::TOPICS[1], &Speech::declaration(), "voice");
+    let speech = |text: &str| Speech {
+        text: text.into(),
+        finished: true,
+        locale: None,
+        request: Some(12),
+    };
+    heard.publish_json(1, &speech("Ossifrage heard")).unwrap();
+    thread::sleep(Duration::from_millis(60));
+    said.publish_json(2, &speech("Ossifrage said")).unwrap();
+    let sections = stream.until(|sections| sections["turns"].contains("request 12"));
+    let turns = &sections["turns"];
+    assert!(turns.contains("class=\"turn card\""), "{turns}");
+    assert!(turns.contains("from the bus"), "{turns}");
+    assert!(!turns.contains(PERMISSION), "{turns}");
+    assert!(!turns.contains("Ossifrage"), "{turns}");
 }
 
 /// #2141's second step (the lead on #1711, 20 Oct): the one page's stream
