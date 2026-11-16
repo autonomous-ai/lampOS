@@ -2291,7 +2291,7 @@ cả hai người viết.
   không bao giờ `admin.sock`. Terminal và công cụ của nó chỉ chạy trong
   namespace đó, và không token nào được tạo.
 - **Cả trên OpenClaw, qua đường chạy chung
-  (`LAMP_MAKE_AGENT_ONE_PATH=on`, tắt trừ khi đặt, không unit nào đặt;
+  (`LAMP_MAKE_AGENT_ONE_PATH=on`, bật trong unit lamp-voice của sản phẩm;
   #7245).** Khi bật, lần tạo được giao cho agent của đèn mỗi khi lamp-tasks
   báo agent đó nhận lần chạy, Hermes hay OpenClaw
   (`make_skill_agent::ONE_PATH_ENGINES`), và dòng của nó mang
