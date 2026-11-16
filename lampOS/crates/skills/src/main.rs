@@ -5743,7 +5743,11 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             );
             found.set(lamp_skills::task::told(&answer));
             refused.set(lamp_skills::task::refusal_said(&answer));
-            not_ready.set(lamp_skills::task::not_ready_line(&answer, asked.is_some()));
+            not_ready.set(lamp_skills::task::not_ready_line(
+                &answer,
+                asked.is_some(),
+                lamp_voice::skill_words::since_boot_ms(),
+            ));
             lamp_skills::service_write::agent_answered(&answer)
         };
         // Each try afresh: one that returns before `send` keeps nothing of

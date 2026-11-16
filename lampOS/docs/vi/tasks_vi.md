@@ -1653,8 +1653,11 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   cổng, tối đa 60 s. Một lần chạy người dùng nhờ bằng giọng nói mà bị từ
   chối như vậy (`openclaw_gateway_not_ready`), hoặc vì `harness_not_running`
   (#7282), được nói một lần đúng nguyên văn "I'm still getting ready. Give me
-  a minute and ask me again." (`task::not_ready_line` của lamp-skills); lần
-  chạy do trigger thì không nói gì. Lời từ chối vì đèn chưa có target riêng
+  a minute and ask me again." (`task::not_ready_line` của lamp-skills), chỉ
+  trong 180 s sau khi đèn khởi động (`/proc/uptime`,
+  `skill_words::NOT_READY_WITHIN_MS`); quá mức đó, hoặc không đọc được thời
+  gian, lỗi của lần chạy được nói như trước. Lần chạy do trigger thì không
+  nói gì. Lời từ chối vì đèn chưa có target riêng
   thì không được nói như vậy, vì nó cũng có nghĩa là Hermes trên đèn đang
   tắt. Test:
   `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`.
@@ -2173,7 +2176,14 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   `openclaw_gateway_not_ready` (Gateway của OpenClaw không trả lời trong
   60 s) hoặc `harness_not_running` (#7282) được Task news kể bằng lời
   `failed_not_ready`, "I'm still getting ready. Give me a minute and ask me
-  again.", không phải là việc "did not reach" agent. Với
+  again.", không phải là việc "did not reach" agent. Chỉ trong 180 s sau khi
+  đèn khởi động (`skill_words::NOT_READY_WITHIN_MS`, bằng `STARTING_AT_MOST`
+  của lamp-tasks), tính theo `dispatch.finished.monotonic_ms` của lời từ
+  chối trên đồng hồ boot của lamp-tasks: quá mức đó, Gateway hoặc Harness
+  vẫn chưa lên là đang hỏng chứ không phải đang khởi động, và lỗi thường
+  được kể như trước, để một đèn hỏng không nói "give me a minute" mãi (P2
+  của El trên #7351). Test:
+  `a_not_ready_refusal_past_the_start_window_is_told_as_a_plain_failure`. Với
   `serve --set-up-later`, từ lúc khởi động hoặc đăng nhập đến khi lần xem
   targets đầu tiên ổn định (đã đọc file targets và có trả lời đăng nhập;
   đã đăng nhập thì các máy cũng đã trả lời; tối đa 180 s,
