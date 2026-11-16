@@ -248,7 +248,10 @@ pub fn overview(glance: &Glance) -> String {
         .collect();
     rows.push((
         "first audio".into(),
-        if glance.turns.status == ReadStatus::Current {
+        if from_bus(glance.turns.status) {
+            // The bus has no timing peek joins to a turn (#7208).
+            "<span class=\"small\">not known from the bus</span>".to_owned()
+        } else if glance.turns.status == ReadStatus::Current {
             format!(
                 "newest {}, median of the last {} {}",
                 ms(first),
@@ -389,10 +392,7 @@ fn type_icon(spoken: bool) -> &'static str {
 /// bus's turns instead, as the timeline's cards (#7208), words only with
 /// `words`.
 pub fn turns(snapshot: &Snapshot, entries: &[Entry], words: bool) -> String {
-    if matches!(
-        snapshot.status,
-        ReadStatus::Unavailable(ReadFailure::Permission | ReadFailure::Missing)
-    ) {
+    if from_bus(snapshot.status) {
         return format!(
             "<p class=\"small\">Turns from the bus.</p>{}",
             timeline(entries, snapshot, words)
@@ -874,6 +874,17 @@ fn clock(unix_ms: u64) -> String {
         seconds / 3600,
         seconds / 60 % 60,
         seconds % 60
+    )
+}
+
+/// Whether the voice's records are not there for peek, and never were this
+/// read: a product lamp keeps them `root:root 0700` and peek runs as
+/// `lampos` (#7208). What they would say then comes from the bus, or is
+/// not known, never the permission error.
+fn from_bus(status: ReadStatus) -> bool {
+    matches!(
+        status,
+        ReadStatus::Unavailable(ReadFailure::Permission | ReadFailure::Missing)
     )
 }
 
