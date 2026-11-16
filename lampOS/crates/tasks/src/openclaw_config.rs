@@ -315,6 +315,25 @@ pub fn write(
     skills: bool,
     v1: bool,
 ) -> io::Result<bool> {
+    write_checked(
+        state_dir,
+        port,
+        workspace,
+        skills,
+        v1,
+        Path::new("/usr/local/bin/openclaw"),
+    )
+}
+
+/// [`write`], with `validator` as OpenClaw's command.
+pub fn write_checked(
+    state_dir: &Path,
+    port: u16,
+    workspace: &Path,
+    skills: bool,
+    v1: bool,
+    _validator: &Path,
+) -> io::Result<bool> {
     let path = state_dir.join(CONFIG_FILE);
     let text = read_or_empty(&path)?;
     let merged = merge_config(&text, port, workspace, skills, v1).map_err(|refused| {
@@ -671,5 +690,57 @@ mod tests {
             fs::read_to_string(folder.path().join("AGENTS.md")).unwrap(),
             text
         );
+    }
+
+    /// #7108: the new text is checked by OpenClaw's own `config validate`,
+    /// through its wrapper, on a file beside `openclaw.json`, never the
+    /// live one: refused, `write` fails with OpenClaw's words and the old
+    /// file stays byte for byte with nothing left beside it; taken, the new
+    /// text is in place. With no wrapper there it is written as before.
+    #[test]
+    fn a_text_openclaws_own_validate_refuses_never_lands() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        fs::write(&path, INSTALLED).unwrap();
+        // A stand-in wrapper: its `config validate` keeps a copy of the
+        // file it was pointed at and answers with the verdict file's
+        // status.
+        let verdict = dir.path().join("verdict");
+        let checked = dir.path().join("checked");
+        let wrapper = dir.path().join("openclaw");
+        fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\n[ \"$*\" = \"config validate --json\" ] && [ \"$LAMP_OPENCLAW_GATEWAY\" = on ] && [ \"$OPENCLAW_CONFIG_PATH\" != {live} ] || exit 2\ncp \"$OPENCLAW_CONFIG_PATH\" {checked}\necho 'models.providers.lampos: Unrecognized key'\nexit \"$(cat {verdict})\"\n",
+                live = path.display(),
+                checked = checked.display(),
+                verdict = verdict.display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        let write = |validator: &Path| {
+            write_checked(&state, 7741, Path::new(WORKSPACE), true, true, validator)
+        };
+
+        fs::write(&verdict, "1").unwrap();
+        let error = write(&wrapper).unwrap_err().to_string();
+        assert!(error.contains("Unrecognized key"), "{error}");
+        assert!(error.contains("status 1"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+        let given = fs::read_to_string(&checked).unwrap();
+        assert!(given.contains("kept-gateway-token") && given != INSTALLED);
+
+        fs::write(&verdict, "0").unwrap();
+        assert!(write(&wrapper).unwrap());
+        assert_eq!(fs::read_to_string(&path).unwrap(), given);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+
+        fs::write(&path, INSTALLED).unwrap();
+        assert!(write(&dir.path().join("none")).unwrap());
+        assert_eq!(fs::read_to_string(&path).unwrap(), given);
     }
 }
