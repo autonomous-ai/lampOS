@@ -48,6 +48,14 @@
 //! cleared environment, so without them the guide's check would refuse a
 //! `write` step or a `do.task`'s service grant the voice's own check
 //! accepts, and Hermes would take the asked-for step out.
+//!
+//! With [`ONE_PATH_ENVIRONMENT`] `on` too (`LAMP_MAKE_AGENT_ONE_PATH`, off
+//! unless set; #7245), a make goes to the lamp's agent when it is one the
+//! one run path takes ([`ONE_PATH_ENGINES`]: Hermes or OpenClaw), and its
+//! line carries `"one_path":true` so lamp-tasks' make socket picks its
+//! runner by `default_agent_takes_runs` (#7133's `HarnessRunner` for a
+//! gateway agent). Off, the line and the hand-over are today's, byte for
+//! byte. A `cannot:` answer is passed on verbatim, as before (#7234).
 use crate::agent_tasks;
 use serde_json::{Value, json};
 use std::{
@@ -105,6 +113,12 @@ const NOT_HELD_OFF_CODES: [&str; 3] = ["off", "not_held_off", "no_namespace"];
 /// The one engine a make is handed to: only Hermes has a namespace runner
 /// for a make today (lamp-tasks' `MakeHermes`, #6643's 19:14 ruling).
 pub const MAKE_ENGINE: &str = "Hermes";
+/// The one run path's switch for a make (#7245): `on`, and nothing else;
+/// off unless set.
+pub const ONE_PATH_ENVIRONMENT: &str = "LAMP_MAKE_AGENT_ONE_PATH";
+/// With [`ONE_PATH_ENVIRONMENT`] on, the engines a make is handed to:
+/// lamp-tasks takes each through the one run path (#7133).
+pub const ONE_PATH_ENGINES: [&str; 2] = [MAKE_ENGINE, "OpenClaw"];
 
 /// Whether the switch is on.
 pub fn on() -> bool {
@@ -191,6 +205,11 @@ pub fn guide_on() -> bool {
     on_with(std::env::var(GUIDE_ENVIRONMENT).ok().as_deref())
 }
 
+/// Whether the one run path's switch is on ([`ONE_PATH_ENVIRONMENT`]).
+pub fn one_path_on() -> bool {
+    on_with(std::env::var(ONE_PATH_ENVIRONMENT).ok().as_deref())
+}
+
 /// The switches `lamp-skills pack` reads as it loads a skill, so that change
 /// what it refuses: a `do.task`'s linked service grants and a `write` step
 /// or permission (`lamp_tasks::skill_make::CHECK_SWITCHES`, the only names
@@ -244,6 +263,9 @@ pub struct Agent {
     /// Whether each make asks for the lamp's skill-creator guide
     /// ([`GUIDE_ENVIRONMENT`]).
     pub guide: bool,
+    /// Whether a make goes to the lamp's agent on the one run path, its
+    /// line carrying `"one_path":true` ([`ONE_PATH_ENVIRONMENT`]).
+    pub one_path: bool,
 }
 
 /// Why the agent gave no answer to take.
@@ -291,6 +313,7 @@ impl Agent {
             },
             make_within: MAKE_WITHIN,
             guide,
+            one_path: one_path_on(),
         })
     }
 
@@ -319,10 +342,17 @@ impl Agent {
     /// The lamp's agent when it is Hermes, the one engine a make is handed
     /// to ([`MAKE_ENGINE`]); any other (OpenClaw has no namespace runner for
     /// a make) is journaled with its name and not handed over, so
-    /// DeepSeek's answer stands.
+    /// DeepSeek's answer stands. With [`Agent::one_path`], the lamp's agent
+    /// when the one run path takes it ([`ONE_PATH_ENGINES`]).
     pub fn hermes(&self) -> Option<&'static str> {
         let engine = self.engine()?;
         if engine == MAKE_ENGINE {
+            return Some(engine);
+        }
+        if self.one_path && ONE_PATH_ENGINES.contains(&engine) {
+            eprintln!(
+                "lamp-voice: a skill made here: the lamp's agent is {engine}: handed over on the one run path"
+            );
             return Some(engine);
         }
         eprintln!(
@@ -368,6 +398,11 @@ impl Agent {
         if self.guide {
             line["guide"] = json!(true);
             line["switches"] = check_switches();
+        }
+        // The one run path asked for only with its switch: off, the line
+        // is as above, byte for byte.
+        if self.one_path {
+            line["one_path"] = json!(true);
         }
         stream
             .set_write_timeout(Some(SEND_WITHIN))
@@ -558,6 +593,7 @@ pub(crate) mod tests {
                 within: Duration::from_millis(1_500),
                 make_within: Duration::from_secs(10),
                 guide: false,
+                one_path: false,
             }
         }
 
@@ -912,6 +948,68 @@ pub(crate) mod tests {
                 ("LAMP_SKILL_WRITES", "on".to_owned())
             ]
         );
+    }
+
+    /// #7245, lamp-c0a4 (13333, OpenClaw, 11:46): with
+    /// `LAMP_MAKE_AGENT_ONE_PATH` on, a make on an OpenClaw lamp is handed
+    /// to OpenClaw, never "DeepSeek makes it alone", and its line asks
+    /// lamp-tasks for the one run path.
+    #[test]
+    fn with_the_one_path_on_a_make_on_openclaw_is_handed_over_on_it() {
+        let tasks = stub(Some("openclaw"), Arc::new(|_: &str| Some("x".to_owned())));
+        let agent = Agent {
+            one_path: true,
+            ..tasks.agent()
+        };
+        assert_eq!(agent.hermes(), Some("OpenClaw"));
+        assert_eq!(agent.write("S", "B", false).unwrap(), "x");
+        let sent = tasks.sent.lock().unwrap().clone();
+        let make = sent.iter().find(|line| line["op"] == "skill_make").unwrap();
+        assert_eq!(make["one_path"], json!(true));
+        let mut keys = make.as_object().unwrap().keys().collect::<Vec<_>>();
+        keys.sort();
+        assert_eq!(keys, ["one_path", "op", "rules", "within_ms"]);
+    }
+
+    /// #7245: the switch off, an OpenClaw lamp is as today: not handed
+    /// over, and a line sent anyway has no `one_path`.
+    #[test]
+    fn with_the_one_path_off_a_make_on_openclaw_is_as_today() {
+        let tasks = stub(Some("openclaw"), Arc::new(|_: &str| Some("x".to_owned())));
+        let agent = tasks.agent();
+        assert!(!agent.one_path);
+        assert_eq!(agent.engine(), Some("OpenClaw"));
+        assert_eq!(agent.hermes(), None);
+        assert_eq!(tasks.hand_overs(), 0);
+        assert_eq!(agent.write("S", "B", false).unwrap(), "x");
+        let sent = tasks.sent.lock().unwrap().clone();
+        let make = sent.iter().find(|line| line["op"] == "skill_make").unwrap();
+        assert_eq!(
+            make.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["op", "rules", "within_ms"]
+        );
+    }
+
+    /// #7245: with the switch on, a Hermes lamp's make is handed over as
+    /// before, its line carrying `one_path` too.
+    #[test]
+    fn with_the_one_path_on_a_make_on_hermes_carries_it() {
+        let tasks = stub(Some("hermes"), Arc::new(|_: &str| Some("x".to_owned())));
+        let agent = Agent {
+            one_path: true,
+            ..tasks.agent()
+        };
+        assert_eq!(agent.hermes(), Some("Hermes"));
+        assert_eq!(agent.write("S", "B", false).unwrap(), "x");
+        let sent = tasks.sent.lock().unwrap().clone();
+        let make = sent.iter().find(|line| line["op"] == "skill_make").unwrap();
+        assert_eq!(make["one_path"], json!(true));
+    }
+
+    #[test]
+    fn the_one_path_switch_is_on_only_when_set_on() {
+        assert_eq!(ONE_PATH_ENVIRONMENT, "LAMP_MAKE_AGENT_ONE_PATH");
+        assert_eq!(ONE_PATH_ENGINES, ["Hermes", "OpenClaw"]);
     }
 
     #[test]
