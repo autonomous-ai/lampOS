@@ -71,6 +71,7 @@ pub mod probe;
 mod second_try;
 mod services;
 pub mod speech_tags;
+mod usage_limit;
 pub mod wordless_call;
 pub mod worker;
 
@@ -8313,7 +8314,7 @@ pub fn fault(error: &net::Error) -> Fault {
         net::Error::Timeout(_) => Fault::ResponseTimeout,
         net::Error::Status(401 | 403) => Fault::Authentication,
         net::Error::Status(402) => Fault::QuotaExceeded,
-        net::Error::Status(429) => Fault::RateLimited,
+        net::Error::Status(429) | net::Error::UsageLimit(_) => Fault::RateLimited,
         net::Error::Status(500..) => Fault::ServerUnavailable,
         net::Error::Status(_) => Fault::ServerRejected,
         net::Error::Protocol(_) => Fault::Protocol,
