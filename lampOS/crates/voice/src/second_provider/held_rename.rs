@@ -366,13 +366,20 @@ pub(super) fn take(
         .unwrap_or_default()
         .to_owned();
     let said = said_window(shared);
+    // With `LAMP_NAME_LEARN_FIX`, a name heard as its letter is the same
+    // name for the yes (`known_faces::as_said`, #7331).
+    let (yes_name, said) = if shared.name_learn_fix {
+        crate::known_faces::as_said(&name, &said)
+    } else {
+        (name.clone(), said)
+    };
     let seen = sight
         .as_ref()
         .filter(|(seen, _, _)| *seen == request)
         .map(|(_, speakers, known)| (speakers.as_slice(), known.clone()));
     let one_face = scope.and_then(crate::memory_scope::ScopeLease::kept_by_one_face);
     let turn = YesTurn {
-        name: &name,
+        name: &yes_name,
         said: &said,
         asker: &held.asker,
         session: scope.map(|scope| scope.key().session),

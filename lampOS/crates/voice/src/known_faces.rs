@@ -1158,6 +1158,74 @@ fn spelled_whole(name: &[String], spelled: &[String]) -> bool {
     name.len() > 1 && spelled.iter().any(|letters| *letters == name.concat())
 }
 
+/// How a letter is said as a word ("J" is "Jay", "B" is "Bee", "L" is
+/// "El"): what speech to text may write as the letter alone for a name
+/// that sounds like it ([`as_said`], #7331).
+fn letter_said(letter: char) -> Option<String> {
+    match letter {
+        'b' | 'c' | 'd' | 'g' | 'p' | 't' | 'v' | 'z' => Some(format!("{letter}ee")),
+        'j' | 'k' => Some(format!("{letter}ay")),
+        'f' | 'l' | 'm' | 'n' | 's' | 'x' => Some(format!("e{letter}")),
+        _ => None,
+    }
+}
+
+/// `name` and `said` with a name heard as its letter made one
+/// (`LAMP_NAME_LEARN_FIX`, #7331, V2 on lamp-74ff): a name that is a lone
+/// letter is judged as the word it is said as ([`letter_said`]), and a lone
+/// letter in what was said, not in a run of letters spelled, as that word
+/// when it is one of the name's. So "J", "Jay" and "J a y" are one name
+/// for a rename's checks. Only the checks read it: the eyes get the
+/// model's name.
+pub(crate) fn as_said(name: &str, said: &Said) -> (String, Said) {
+    let lone = |token: &str| match folded_words(token).as_slice() {
+        [word] if word.chars().count() == 1 => word.chars().next(),
+        _ => None,
+    };
+    let name = lone(name)
+        .and_then(letter_said)
+        .unwrap_or_else(|| name.to_owned());
+    let name_words = folded_words(&name);
+    let swap = |text: &str| -> String {
+        let tokens: Vec<&str> = text.split_whitespace().collect();
+        tokens
+            .iter()
+            .enumerate()
+            .map(|(at, token)| {
+                let in_run = (at > 0 && lone(tokens[at - 1]).is_some())
+                    || tokens.get(at + 1).is_some_and(|next| lone(next).is_some());
+                match lone(token)
+                    .filter(|_| !in_run)
+                    .and_then(letter_said)
+                    .filter(|word| name_words.contains(word))
+                {
+                    Some(word) => token
+                        .chars()
+                        .map(|c| {
+                            if c.is_alphabetic() {
+                                word.clone()
+                            } else {
+                                c.to_string()
+                            }
+                        })
+                        .collect(),
+                    None => (*token).to_owned(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    let said = Said {
+        this: swap(&said.this),
+        before: said
+            .before
+            .iter()
+            .map(|(person, lamp)| (swap(person), swap(lamp)))
+            .collect(),
+    };
+    (name, said)
+}
+
 /// The runs of single letters in `theirs`, each put together as a word
 /// ([`said_by_them`]'s rules).
 fn spelled_runs(theirs: &[String]) -> Vec<String> {
@@ -2548,11 +2616,18 @@ fn run_switched(
     // With `LAMP_NAME_LEARN_FIX`, so is a rename's (#7331): on lamp-52e6 a
     // rename spelled after the lamp asked for it was NOT_HEARD.
     let spelled;
-    let heard = if checked && switches.rename_yes && replacing {
-        heard_for_rename(name, said)
+    // With `LAMP_NAME_LEARN_FIX`, a name heard as its letter is the same
+    // name for the checks ([`as_said`], #7331); off, as said.
+    let (heard_name, heard_said) = if checked && switches.name_learn_fix {
+        as_said(name, said)
     } else {
-        name_heard(name, said)
-    } || (setup && said_back_and_agreed(name, said));
+        (name.to_owned(), said.clone())
+    };
+    let heard = if checked && switches.rename_yes && replacing {
+        heard_for_rename(&heard_name, &heard_said)
+    } else {
+        name_heard(&heard_name, &heard_said)
+    } || (setup && said_back_and_agreed(&heard_name, &heard_said));
     let name = if checked && call.name == REMEMBER && !heard {
         // Only after the lamp asked them to spell, and as many spelled runs
         // as the model's name has words: "L O R E N, and I'm at I B M" is
@@ -2595,9 +2670,9 @@ fn run_switched(
     // spelling is how a person fixes a misheard name (#7331).
     let agreed = (spelled_rename && spelled_by_them(name, &said.this))
         || if switches.rename_yes {
-            rename_agreed(name, said)
+            rename_agreed(&heard_name, &heard_said)
         } else {
-            agreed_to(name, said)
+            agreed_to(&heard_name, &heard_said)
         };
     if checked && call.name == REMEMBER && replace && !agreed {
         return (json!({"error": NOT_AGREED}), true);
@@ -5981,6 +6056,69 @@ mod tests {
         assert_eq!(
             sent.join().unwrap(),
             vec![json!({"remember": "Ada", "one_face": true, "replace": false}); 3]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// #7331 (V2 on lamp-74ff, 16 Nov): a name that sounds like a letter
+    /// is written by speech to text as the letter, so a rename heard as the
+    /// letter, said as the word or spelled was judged three names. With
+    /// `LAMP_NAME_LEARN_FIX` they are one name for the rename's checks:
+    /// heard "J", "Jay" and spelled "J a y" (made up). Off, refused as
+    /// before.
+    #[test]
+    fn a_name_heard_as_its_letter_is_the_same_name() {
+        let switches = |name_learn_fix: bool| FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix,
+            ..FaceSwitches::default()
+        };
+        let rename = |name: &str| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": name, "replace": true}),
+        };
+        let said = |person: &str, lamp: &str, this: &str| Said {
+            this: this.into(),
+            before: vec![(person.into(), lamp.into())],
+        };
+        let cases = [
+            // Heard as the letter, read back as the word, then a yes.
+            ("Jay", said("Call me J.", "Shall I call you Jay instead?", "Yes.")),
+            // The model kept the letter; the yes spells the word.
+            ("J", said("Call me Jay.", "Shall I call you J instead?", "Yes, J a y.")),
+        ];
+        let (socket, sent) = eyes(
+            cases
+                .iter()
+                .map(|(name, _)| json!({"remembered": name, "replaced": ["Tove"]}))
+                .collect(),
+        );
+        for (name, said) in &cases {
+            let (off, _) =
+                run_switched(&socket, &rename(name), switches(false), said, None, &mut None);
+            assert!(refused_here(&off), "off, {name}, {said:?}: {off}");
+            let (on, _) =
+                run_switched(&socket, &rename(name), switches(true), said, None, &mut None);
+            assert_eq!(on["ok"], true, "on, {name}, {said:?}: {on}");
+        }
+        // Another letter, or a name not said, stays refused.
+        for (name, said) in [
+            ("Jay", said("Call me K.", "Shall I call you Jay instead?", "Yes.")),
+            ("Jay", said("Call me Jay.", "Shall I call you Jay instead?", "Yes, K a y.")),
+        ] {
+            let (on, _) =
+                run_switched(&socket, &rename(name), switches(true), &said, None, &mut None);
+            assert!(refused_here(&on), "{said:?}: {on}");
+        }
+        // The eyes keep the name as the model gave it.
+        assert_eq!(
+            sent.join().unwrap(),
+            cases
+                .iter()
+                .map(|(name, _)| json!({"remember": name, "one_face": true, "replace": true}))
+                .collect::<Vec<_>>()
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }

@@ -1611,7 +1611,16 @@ With the switch:
     and its yes, two letters joined as a word ("A d a", "A, d, a" and
     "A l" send `{"remember":"Ada","replace":true}` and "Al"); on lamp-52e6
     such a rename was refused as not heard or not agreed
-    (`known_faces::tests::a_spelled_short_name_is_heard_on_a_rename`). Letters that disagree with a count
+    (`known_faces::tests::a_spelled_short_name_is_heard_on_a_rename`).
+    With the same switch, a name that sounds like a letter is one name
+    however it was heard (`known_faces::as_said`, V2 on lamp-74ff): speech
+    to text writes such a name as the letter, so for the name checks and a
+    rename's yes (here and in the held rename) a lone letter not in a
+    spelled run is read as the word it is said as when that is the name's
+    ("J" is "Jay", "B" "Bee", "L" "El"), and a name that is a lone letter
+    is judged as that word. Heard "J", said "Jay" and spelled "J a y" agree;
+    the eyes still get the model's name, and an alias the eyes keep is left
+    as it is (`a_name_heard_as_its_letter_is_the_same_name`). Letters that disagree with a count
     they gave ("four letters", five spelled) are refused, as above.
 
   Past setup, and on the speaker's own line (`LAMP_REMEMBER_SPEAKER`), the
