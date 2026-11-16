@@ -735,6 +735,153 @@ pub fn start_ran(claimed: bool, started: bool) -> Result<(), String> {
     }
 }
 
+/// Why a skill run is not typed into the one session while agent `main`'s
+/// exec allow-list lacks the launcher ([`SkillStartAllowed`]).
+pub const SKILL_START_NOT_ALLOWED: &str = "skill-start is not on agent main's exec allow-list yet (lamp-update re-adds it after a gateway start)";
+/// Its refusal code, for a run that is not a fixed write's.
+pub const SKILL_START_NOT_ALLOWED_CODE: &str = "skill_start_not_allowed";
+
+/// Whether an approvals read's JSON ([`APPROVALS_READ`]: `{"file":
+/// {"agents": {...}}}`) lets agent `main` exec the skill-start launcher:
+/// an entry whose `pattern` is [`crate::skill_start::LAUNCHER`] in
+/// `main`'s or the wildcard `*`'s allow-list (OpenClaw joins both). None
+/// when the text is not such a read.
+pub fn allows_skill_start(json: &str) -> Option<bool> {
+    let read: Value = serde_json::from_str(json).ok()?;
+    let agents = read.get("file")?.as_object()?.get("agents");
+    let Some(agents) = agents.and_then(Value::as_object) else {
+        return Some(false);
+    };
+    Some(["main", "*"].iter().any(|agent| {
+        agents
+            .get(*agent)
+            .and_then(|agent| agent.get("allowlist"))
+            .and_then(Value::as_array)
+            .is_some_and(|entries| {
+                entries.iter().any(|entry| {
+                    entry.get("pattern").and_then(Value::as_str).map(str::trim)
+                        == Some(crate::skill_start::LAUNCHER)
+                })
+            })
+    }))
+}
+
+/// Agent `main`'s exec allow-list checked for the skill-start launcher
+/// before a skill run is typed into the one session (#7246): right after
+/// a Gateway start the entry is missing until lamp-update's round re-adds
+/// it, and the agent's `exec` of the launcher is denied headless, so the
+/// run would end as [`NEVER_STARTED`]. A read takes about 10 s, so a
+/// positive one is kept per Gateway start (its listening socket's inode,
+/// as [`Serving`]); a read that fails or can't be parsed never blocks.
+pub struct SkillStartAllowed {
+    read: Box<dyn Fn() -> Result<String, String> + Send + Sync>,
+    listener: Box<dyn Fn() -> Option<u64> + Send + Sync>,
+    allowed_at: std::sync::Mutex<Option<u64>>,
+}
+
+impl SkillStartAllowed {
+    /// The lamp's: [`APPROVALS_READ`]'s output, kept per [`PORT`]'s
+    /// listening socket.
+    pub fn lamp() -> Self {
+        Self::new(Box::new(approvals_json), Box::new(listener_here))
+    }
+
+    pub fn new(
+        read: Box<dyn Fn() -> Result<String, String> + Send + Sync>,
+        listener: Box<dyn Fn() -> Option<u64> + Send + Sync>,
+    ) -> Self {
+        Self {
+            read,
+            listener,
+            allowed_at: std::sync::Mutex::new(None),
+        }
+    }
+
+    /// [`SKILL_START_NOT_ALLOWED`] only when a read was answered and has
+    /// no entry; else fine.
+    pub fn check(&self) -> Result<(), &'static str> {
+        let listener = (self.listener)();
+        let kept = self.allowed_at.lock().map(|at| *at).unwrap_or(None);
+        if listener.is_some() && listener == kept {
+            return Ok(());
+        }
+        let read = match (self.read)() {
+            Ok(read) => read,
+            Err(why) => {
+                eprintln!("tasks: agent main's exec allow-list not read ({why}); the run is typed");
+                return Ok(());
+            }
+        };
+        match allows_skill_start(&read) {
+            Some(false) => Err(SKILL_START_NOT_ALLOWED),
+            Some(true) => {
+                if listener.is_some()
+                    && listener == (self.listener)()
+                    && let Ok(mut at) = self.allowed_at.lock()
+                {
+                    *at = listener;
+                }
+                Ok(())
+            }
+            None => {
+                eprintln!("tasks: agent main's exec allow-list read is not JSON; the run is typed");
+                Ok(())
+            }
+        }
+    }
+}
+
+/// [`APPROVALS_READ`]'s output, run as [`ApprovalsRead`] runs it, killed
+/// with its process group past [`READ_WITHIN`].
+fn approvals_json() -> Result<String, String> {
+    use rustix::process::{Pid, Signal, WaitId, WaitIdOptions, kill_process_group, waitid};
+    use std::os::unix::process::CommandExt;
+    use std::process::{Command, Stdio};
+    let ms = READ_RPC_MS.to_string();
+    let mut words = APPROVALS_READ.iter().map(|word| word.replace("{ms}", &ms));
+    let program = words.next().ok_or("no program")?;
+    let mut child = Command::new(program)
+        .args(words)
+        .envs(APPROVALS_ENV)
+        .current_dir("/")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .process_group(0)
+        .spawn()
+        .map_err(|error| format!("openclaw not started: {error}"))?;
+    let pid = Pid::from_child(&child);
+    let mut out = child.stdout.take().ok_or("no output")?;
+    let reader = thread::spawn(move || {
+        let mut text = String::new();
+        out.read_to_string(&mut text).map(|_| text)
+    });
+    let until = Instant::now() + READ_WITHIN;
+    let code = loop {
+        // NOWAIT keeps the pid, so the group signal below never reaches
+        // another process given it.
+        match waitid(
+            WaitId::Pid(pid),
+            WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
+        ) {
+            Ok(Some(status)) => break Some(status.exit_status()),
+            Ok(None) if Instant::now() < until => thread::sleep(Duration::from_millis(50)),
+            Ok(None) => break None,
+            Err(error) if error == rustix::io::Errno::INTR => {}
+            Err(_) => break None,
+        }
+    };
+    let _ = kill_process_group(pid, Signal::KILL);
+    let _ = child.kill();
+    let _ = child.wait();
+    let text = reader.join().map_err(|_| "its output not read")?;
+    match code {
+        Some(Some(0)) => text.map_err(|error| error.to_string()),
+        Some(code) => Err(format!("openclaw ended {code:?}")),
+        None => Err("openclaw gave no answer in time".into()),
+    }
+}
+
 /// The `PATH` the skill's script is run with ([`FENCE_TEXT`]), and the
 /// launcher's fence: nothing of the gateway's.
 pub const SCRIPT_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
@@ -858,6 +1005,72 @@ pub fn prompt(launcher: &Path, run: &SkillRun) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #7246: the approvals read's JSON allows the launcher only with an
+    /// exact `pattern` in main's or `*`'s allow-list.
+    #[test]
+    fn skill_start_is_allowed_only_with_its_entry() {
+        let with = |agent: &str, pattern: &str| {
+            serde_json::json!({"file": {"agents": {agent: {"allowlist": [{"pattern": pattern}]}}}})
+                .to_string()
+        };
+        let launcher = crate::skill_start::LAUNCHER;
+        assert_eq!(allows_skill_start(&with("main", launcher)), Some(true));
+        assert_eq!(allows_skill_start(&with("*", launcher)), Some(true));
+        assert_eq!(allows_skill_start(&with("other", launcher)), Some(false));
+        assert_eq!(
+            allows_skill_start(&with("main", "/usr/bin/true")),
+            Some(false)
+        );
+        assert_eq!(
+            allows_skill_start(&with("main", "/usr/local/lib/lampos/skill-start*")),
+            Some(false)
+        );
+        assert_eq!(
+            allows_skill_start(r#"{"file": {"version": 1}}"#),
+            Some(false)
+        );
+        assert_eq!(allows_skill_start("not json"), None);
+        assert_eq!(allows_skill_start(r#"{"path": "/x"}"#), None);
+    }
+
+    /// Missing: refused, read again each time. Present: kept per listener,
+    /// read again after a new one. A failed read never refuses.
+    #[test]
+    fn skill_start_allowed_is_kept_per_gateway_start() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+        let reads = Arc::new(AtomicUsize::new(0));
+        let present = Arc::new(AtomicBool::new(false));
+        let listener = Arc::new(AtomicU64::new(1));
+        let (r, p, l) = (reads.clone(), present.clone(), listener.clone());
+        let allowed = SkillStartAllowed::new(
+            Box::new(move || {
+                r.fetch_add(1, Ordering::SeqCst);
+                let pattern = if p.load(Ordering::SeqCst) {
+                    crate::skill_start::LAUNCHER
+                } else {
+                    "/usr/bin/true"
+                };
+                Ok(serde_json::json!({"file": {"agents": {"main": {"allowlist": [{"pattern": pattern}]}}}}).to_string())
+            }),
+            Box::new(move || Some(l.load(Ordering::SeqCst))),
+        );
+        assert_eq!(allowed.check(), Err(SKILL_START_NOT_ALLOWED));
+        assert_eq!(allowed.check(), Err(SKILL_START_NOT_ALLOWED));
+        assert_eq!(reads.load(Ordering::SeqCst), 2);
+        present.store(true, Ordering::SeqCst);
+        assert_eq!(allowed.check(), Ok(()));
+        assert_eq!(allowed.check(), Ok(()));
+        assert_eq!(reads.load(Ordering::SeqCst), 3, "kept for the same Gateway");
+        // A restarted Gateway: read again, and now missing.
+        present.store(false, Ordering::SeqCst);
+        listener.store(2, Ordering::SeqCst);
+        assert_eq!(allowed.check(), Err(SKILL_START_NOT_ALLOWED));
+        assert_eq!(reads.load(Ordering::SeqCst), 4);
+        let failed = SkillStartAllowed::new(Box::new(|| Err("no".into())), Box::new(|| Some(1)));
+        assert_eq!(failed.check(), Ok(()));
+    }
     use crate::harness::Target;
     use crate::skill_task::RUN_PATH;
     use std::net::TcpListener;
@@ -1005,7 +1218,9 @@ mod tests {
     }
 
     fn runs(at: &Path) -> u32 {
-        std::fs::read_to_string(at).map_or(0, |text| text.trim().parse().unwrap())
+        // Read while a run's `echo $n > runs` has emptied the file but not
+        // yet written it: that run is not counted yet.
+        std::fs::read_to_string(at).map_or(0, |text| text.trim().parse().unwrap_or(0))
     }
 
     fn serving(argv: Vec<String>, port: &Fake, within: Duration) -> Gateway {
