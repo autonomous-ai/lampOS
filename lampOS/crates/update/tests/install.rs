@@ -1842,6 +1842,32 @@ fn the_product_takes_back_a_doubted_keep() {
     );
 }
 
+/// A keep with a near spelling of a heard word is asked about and kept on
+/// the person's yes (`LAMP_MEMORY_ASK_NEAR_HEARD`, C37): the owner's yes on
+/// 16 Nov. It replaces `LAMP_MEMORY_KEEP_HEARD`'s silent keep of the heard
+/// line and needs the eyes' speaking faces, so the unit sets both.
+#[test]
+fn the_product_asks_about_a_near_heard_word() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_ASK_NEAR_HEARD=on",
+        "Environment=LAMP_MEMORY_KEEP_HEARD=on",
+        "Environment=LAMP_EYES_SPEAKING=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+    ] {
+        assert_eq!(
+            service.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice lacks {line}"
+        );
+    }
+}
+
 /// "Forget that" right after a keep forgets that keep in the product
 /// (C88, #5022): the memory owner's call on 5 Nov, after lamp-06c1 answered
 /// a bare "forget that" after the umbrella keep in words two days running.

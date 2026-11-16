@@ -272,7 +272,7 @@ giữ chính câu nghe được, dạng "They said: …" (tối đa 300 byte). M
 [memory.md](../memory.md), "What is kept is what was said".
 
 Với `LAMP_MEMORY_ASK_NEAR_HEARD=on` (C37, lamp-06c1, 5/11; tắt nếu không đặt,
-chỉ đường thứ hai), trên câu có yêu cầu ghi nhớ, khi mọi từ khóa trong câu `remember` của mô hình mà không
+bật trong unit sản phẩm từ lời đồng ý của chủ sở hữu ngày 16/11, chỉ đường thứ hai), trên câu có yêu cầu ghi nhớ, khi mọi từ khóa trong câu `remember` của mô hình mà không
 nghe thấy đều là cách viết gần với một từ đã nghe (cùng chữ cái đầu, đổi tối đa
 một nửa số chữ, tối đa hai từ như vậy: "ranunculus" thay cho "renunculus" nghe
 được), lamp không giữ ngay. Lệnh được giữ lại chờ lời "có" của cùng người đã

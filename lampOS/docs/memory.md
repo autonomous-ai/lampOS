@@ -1839,7 +1839,8 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     spelling such as "favorite") also keeps what was heard: never less than
     was said.
   - **With `LAMP_MEMORY_ASK_NEAR_HEARD`: a near spelling is asked about**
-    (C37, lamp-06c1, 5 Nov; off unless set, the second route only). Speech
+    (C37, lamp-06c1, 5 Nov; off unless set, on in the product unit since the
+    owner's yes on 16 Nov, the second route only). Speech
     to text heard "renunculus"; the model's `remember` wrote "ranunculus",
     so the rule above kept "They said: my favorite flower is a renunculus."
     while the lamp said "Kept: your favorite flower is a ranunculus.", and
