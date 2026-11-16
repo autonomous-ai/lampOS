@@ -4332,7 +4332,7 @@ after a take-over, but now for every turn:
   it's lovely." and "Not for me to answer, but I think it's lovely.", each
   held to the word that decides it.
 - **Inside a live back-and-forth the doubt goes to the person, with
-  `LAMP_BUSY_FOLLOW_UP_RENEWS=on`** (off unless set, #7332; Sixth's trace
+  `LAMP_BUSY_FOLLOW_UP_RENEWS=on`** (on in the product, off unless set elsewhere, #7332; Sixth's trace
   and design, with the first builder's 19:54 conditions). On the owner's
   lamp-74ff on 16 Nov (13500), in a busy room, the owner spoke three times
   in 26 s and got no answer: r43 called the lamp, r44 followed it up, the
