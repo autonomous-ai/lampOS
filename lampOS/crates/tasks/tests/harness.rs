@@ -9016,3 +9016,31 @@ fn a_make_without_one_path_or_on_hermes_goes_to_the_lamps_hermes() {
     assert!(rig.calls().is_empty());
     assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
 }
+
+/// #7245: Hermes lamps unchanged. With `one_path`, the lamp's Hermes the
+/// default and Harness not set up (no slot, so no default known), the make
+/// goes to the lamp's Hermes exactly as without the field: not refused,
+/// and Harness never asked.
+#[test]
+fn a_one_path_make_with_no_harness_set_up_goes_to_the_lamps_hermes() {
+    let rig = Rig::new();
+    let work = make_work(&rig);
+    let mut runner = one_path_runner(&rig, EngineKind::Hermes, &[], None);
+    runner.harness = SkillHarnessSlot::default();
+    runner.default_agent = false;
+    runner.makes = true;
+    let gateway = lamp_tasks::skill_make::MakeGateway::of(Arc::new(runner));
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered, json!({"ok": true, "answer": "HERMES"}));
+    assert_eq!(hermes.0.load(Ordering::Acquire), 1);
+    assert!(rig.calls().is_empty(), "Harness never asked");
+    assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+}
