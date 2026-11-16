@@ -3445,7 +3445,7 @@ pub const BRIEFS_OWN_REFUSALS: &[&str] = &[
     "adding a calendar event while my clock isn't set",
     "You can ask me for it yourself any time",
     SENDS_ON_ITS_OWN,
-    "Not possible yet: a skill can't",
+    BRIEFS_SKILL_CANT,
     "deleting or changing what is in your services",
 ];
 
@@ -3470,6 +3470,16 @@ pub fn briefs_send_refusal(why: &str) -> bool {
 /// as the prompt says it ("hearing what is said" for "hear what is said").
 pub fn briefs_own_refusal(why: &str) -> bool {
     briefs_own_refusal_in(why, BRIEFS_OWN_REFUSALS)
+}
+
+/// The brief's own refusal of what a plain skill can't do yet (#7245): with
+/// the one run path on, the lamp's agent makes it instead.
+pub const BRIEFS_SKILL_CANT: &str = "Not possible yet: a skill can't";
+
+/// Whether the model's `cannot:` reason `why` is [`BRIEFS_SKILL_CANT`], as
+/// [`briefs_own_refusal`] reads it.
+pub fn briefs_skill_cant(why: &str) -> bool {
+    briefs_own_refusal_in(why, &[BRIEFS_SKILL_CANT])
 }
 
 /// [`briefs_own_refusal`], against `refusals`.
