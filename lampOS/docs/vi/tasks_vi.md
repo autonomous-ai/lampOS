@@ -295,7 +295,16 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   `{"ok":false,"error","message"}`: `off` (công tắc không phải `on`),
   `bad_request`, `too_long` (quá 8192 byte), `no_token` (lamp-control không
   cấp token một lần chạy), `run_failed`, hoặc `busy` (việc của
-  một kỹ năng khác đang chạy: mỗi lúc chỉ chạy một việc).
+  một kỹ năng khác đang chạy: mỗi lúc chỉ chạy một việc). Với
+  `LAMP_SKILL_TASK_SURE=on` ở lamp-skills (tắt nếu không đặt, không unit
+  sản phẩm nào đặt; docs/skills.md, "A skill's task"), lamp-skills nói lời
+  từ chối hay lần chạy thất bại với chủ đèn bằng một câu cố định sau cổng
+  của câu trả lời cần nói, không bao giờ là lời của tác vụ hay message
+  này, và lần chạy bị từ chối `busy` chờ đến lượt trong hàng duy nhất của
+  lamp-skills (tối đa 4 cái trong hàng, tính cả cái đang được giao, vào
+  trước ra trước, mỗi cái tối đa 15 phút từ lúc bắt đầu chờ) rồi được giao lại khi lần chạy đang diễn ra kết thúc, nên hai kỹ
+  năng đến hạn cùng một phút đều chạy, lần lượt. Ở đây không có gì thay đổi
+  vì nó.
 - **Điều agent tìm thấy** (`tells_answer`): khi `LAMP_AGENT_SERVICES=on` ở
   đây, một lần chạy được cấp quyền đọc một dịch vụ đã liên kết
   (`gmail-read`) mà kết thúc tốt sẽ trả lời
