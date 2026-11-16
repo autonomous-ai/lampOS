@@ -986,6 +986,15 @@ elbow holds 3 short at 24 and is left as it is.
 - An ease is one journal line: `elbow_pitch held short of its stand: goal
   2600 eased to 2560, held at 2555, load 190`. A start begins from the
   measured stand again.
+- An ease is kept only if the load comes under 150 (`STAND_EASE_LOAD`).
+  Still over it for another 60 s at the eased goal, the joint goes back to
+  its measured stand and is not eased again that run, said once: `elbow_pitch
+  eased stand did not lower its load: goal 2565, held at 2525, load 172
+  (over 150); back to its stand goal 2600, not eased again this run`.
+  lamp-74ff on 13508 (19:57 to 20:05) eased 2,562 to 2,527 to 2,494 and
+  drooped ~40 under each at the same load of 164 to 172: an ease that
+  doesn't lower the load only lowers the lamp. The strain guard and the
+  cool-down seat bound the heat instead.
 - The strain guard, the load bound and the heat bound below judge every
   step as before: a real strain still sits it down.
 
@@ -993,7 +1002,9 @@ The numbers are from two lamps (`ponytail:` in the code); retune them from
 more arms' journals. Shown by tests only
 (`a_standing_elbow_held_45_short_at_load_190_has_its_stand_goal_eased`,
 `a_standing_elbow_3_short_at_load_24_keeps_its_stand_goal`,
-`a_standing_elbow_pushed_120_down_by_a_hand_is_not_eased`); not yet on a lamp.
+`a_standing_elbow_pushed_120_down_by_a_hand_is_not_eased`,
+`a_standing_elbow_still_loaded_after_its_ease_goes_back_to_its_stand_and_eases_no_more`,
+`a_standing_elbow_whose_load_drops_after_its_ease_keeps_it`); not yet on a lamp.
 
 ### The strain guard (`LAMP_BODY_STRAIN_GUARD=on`, #4390, #4501)
 
