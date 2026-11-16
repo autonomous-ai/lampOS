@@ -24,10 +24,14 @@
 //!   servers ([`servers_in`], `/etc/resolv.conf`), but a single-label name
 //!   and a reverse lookup in a closed range are refused ([`refusal`]).
 //! - **Closed** ([`class`]): the lamp's own networks (every interface's
-//!   address and prefix, every route's gateway and destination, read again
-//!   at each connect, [`own_networks`]), the fixed IPv4 and IPv6 ranges,
-//!   and an IPv4 address inside an IPv6 one (mapped, NAT64, 6to4) checked
-//!   as IPv4.
+//!   address and prefix, every IPv4 and IPv6 route's gateway and
+//!   destination, the default routes' gateways among them, read again at
+//!   each connect, [`own_networks`]), the fixed IPv4 and IPv6 ranges (the
+//!   local-use NAT64 `64:ff9b:1::/48` whole), and an IPv4 address inside an
+//!   IPv6 one (mapped, NAT64 `64:ff9b::/96`, 6to4) checked as IPv4. Not
+//!   closed, as nothing on the lamp names it: the home router's public
+//!   (WAN) address, nor an IPv6 network of the home that no route of the
+//!   lamp's names.
 //!
 //! Bounded as [`crate::net_bridge`]'s pipes are: at most [`MOST_PIPES`]
 //! at once, [`CONNECT_WITHIN`] to reach the other side, [`IDLE_WITHIN`]
@@ -150,7 +154,9 @@ impl Net {
 }
 
 /// `ip`, or the IPv4 address inside it: v4-mapped (`::ffff:0:0/96`),
-/// NAT64 (`64:ff9b::/96`, `64:ff9b:1::/48`) and 6to4 (`2002::/16`).
+/// NAT64 (`64:ff9b::/96`) and 6to4 (`2002::/16`). The local-use NAT64
+/// `64:ff9b:1::/48` has no one place for it, so it is closed whole
+/// ([`V6_CLOSED`]).
 pub fn as_v4(ip: IpAddr) -> IpAddr {
     let IpAddr::V6(v6) = ip else { return ip };
     if let Some(v4) = v6.to_ipv4_mapped() {
@@ -159,7 +165,7 @@ pub fn as_v4(ip: IpAddr) -> IpAddr {
     let s = v6.segments();
     let low = |a: u16, b: u16| IpAddr::V4(Ipv4Addr::from((u32::from(a) << 16) | u32::from(b)));
     match s {
-        [0x64, 0xff9b, 0, 0, 0, 0, a, b] | [0x64, 0xff9b, 1, _, _, _, a, b] => low(a, b),
+        [0x64, 0xff9b, 0, 0, 0, 0, a, b] => low(a, b),
         [0x2002, a, b, ..] => low(a, b),
         _ => ip,
     }
@@ -185,7 +191,7 @@ const V4_CLOSED: [(Ipv4Addr, u8, &str); 14] = [
 
 /// The fixed IPv6 ranges a run never reaches, with their class: `::` and
 /// `::1` inside the IPv4-compatible `::/96`.
-const V6_CLOSED: [(Ipv6Addr, u8, &str); 8] = [
+const V6_CLOSED: [(Ipv6Addr, u8, &str); 9] = [
     (Ipv6Addr::UNSPECIFIED, 128, "unspecified"),
     (Ipv6Addr::LOCALHOST, 128, "loopback"),
     (Ipv6Addr::UNSPECIFIED, 96, "reserved"),
@@ -197,6 +203,11 @@ const V6_CLOSED: [(Ipv6Addr, u8, &str); 8] = [
     (Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 0), 10, "link-local"),
     (Ipv6Addr::new(0xfec0, 0, 0, 0, 0, 0, 0, 0), 10, "site-local"),
     (Ipv6Addr::new(0xff00, 0, 0, 0, 0, 0, 0, 0), 8, "multicast"),
+    (
+        Ipv6Addr::new(0x64, 0xff9b, 1, 0, 0, 0, 0, 0),
+        48,
+        "local-translation",
+    ),
     (
         Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 0),
         32,
@@ -252,9 +263,57 @@ pub fn route_networks(text: &str) -> Vec<Net> {
     nets
 }
 
+/// The networks in `/proc/net/ipv6_route`'s text: each route's next hop,
+/// and each destination but the default route's (`::/0`), as
+/// [`route_networks`] does for IPv4.
+pub fn route6_networks(text: &str) -> Vec<Net> {
+    let addr = |field: &str| {
+        (field.len() == 32)
+            .then(|| u128::from_str_radix(field, 16).ok())
+            .flatten()
+            .map(|raw| IpAddr::V6(Ipv6Addr::from(raw)))
+    };
+    let mut nets = Vec::new();
+    for line in text.lines() {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        let (Some(dest), Some(prefix), Some(hop)) = (
+            fields.first().and_then(|f| addr(f)),
+            fields.get(1).and_then(|f| u8::from_str_radix(f, 16).ok()),
+            fields.get(4).and_then(|f| addr(f)),
+        ) else {
+            continue;
+        };
+        if !hop.is_unspecified() {
+            nets.push(Net::new(hop, 128));
+        }
+        if prefix != 0 {
+            nets.push(Net::new(dest, prefix));
+        }
+    }
+    nets
+}
+
+/// The lamp's own networks from what was read: `nets` (the interfaces'),
+/// and the IPv4 and IPv6 route tables' texts. `/proc/net/route` unread:
+/// an error, so nothing passes. `/proc/net/ipv6_route` unread (a kernel
+/// with no IPv6 has none): every IPv6 address is closed, and IPv4 is
+/// checked still.
+pub fn networks_from(
+    mut nets: Vec<Net>,
+    route: io::Result<String>,
+    route6: io::Result<String>,
+) -> io::Result<Vec<Net>> {
+    nets.extend(route_networks(&route?));
+    match route6 {
+        Ok(text) => nets.extend(route6_networks(&text)),
+        Err(_) => nets.push(Net::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)),
+    }
+    Ok(nets)
+}
+
 /// The lamp's own networks now: every interface's address (and its
-/// point-to-point peer) alone and with its prefix, and
-/// [`route_networks`]. An error: they are not known, so nothing passes.
+/// point-to-point peer) alone and with its prefix, and the routes'
+/// ([`networks_from`]). An error: they are not known, so nothing passes.
 pub fn own_networks() -> io::Result<Vec<Net>> {
     let ip_of = |addr: &nix::sys::socket::SockaddrStorage| {
         addr.as_sockaddr_in()
@@ -278,10 +337,11 @@ pub fn own_networks() -> io::Result<Vec<Net>> {
             nets.push(Net::new(peer, full));
         }
     }
-    nets.extend(route_networks(
-        &std::fs::read_to_string("/proc/net/route").unwrap_or_default(),
-    ));
-    Ok(nets)
+    networks_from(
+        nets,
+        std::fs::read_to_string("/proc/net/route"),
+        std::fs::read_to_string("/proc/net/ipv6_route"),
+    )
 }
 
 /// The lamp's check: [`class`] against [`own_networks`] read now; they
