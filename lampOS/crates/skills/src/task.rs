@@ -955,6 +955,12 @@ pub fn hand(
         Err(crate::service_write::Unrun::Unknown(why)) => {
             format!("do.task: lamp-tasks did not take it: {why}")
         }
+        // Harness never made its run, though lamp-tasks asked once more
+        // (#7092): nothing ran, but its first launch may have reached
+        // Harness, so it stays counted, as an unknown end does.
+        Err(crate::service_write::Unrun::NotMade(why)) => {
+            format!("do.task: its run was never made, though lamp-tasks asked once more: {why}")
+        }
     }
 }
 
@@ -1387,7 +1393,7 @@ mod tests {
         let agreed = serde_json::json!({"agreed": true});
         let lamp_control = control(
             &control_socket,
-            vec![agreed.clone(), agreed.clone(), agreed],
+            vec![agreed.clone(), agreed.clone(), agreed.clone(), agreed],
         );
         set_on_here(Some(true));
         let ledger = || -> Vec<(String, u64)> {
@@ -1446,6 +1452,29 @@ mod tests {
         assert!(failed.contains("did not take it: run_failed"), "{failed}");
         assert!(!failed.contains("not counted"), "{failed}");
         assert_eq!(ledger(), vec![("read-mail".to_owned(), 3)]);
+        // A run Harness never made (#7092): said so, and still counted.
+        let never_made = hand(
+            "read-mail",
+            &step,
+            &folder,
+            &grants,
+            place,
+            4,
+            |_, _| {
+                crate::service_write::agent_answered(
+                    "{\"ok\":false,\"error\":\"not_made\",\"message\":\"no\"}",
+                )
+            },
+            unasked,
+        );
+        assert!(
+            never_made.contains("its run was never made"),
+            "{never_made}"
+        );
+        assert_eq!(
+            ledger(),
+            vec![("read-mail".to_owned(), 3), ("read-mail".to_owned(), 4)]
+        );
         lamp_control.join().unwrap();
         set_on_here(None);
     }

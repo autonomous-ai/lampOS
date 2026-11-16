@@ -7432,6 +7432,7 @@ fn skill_runner_with(
         held_by: None,
         retry: Duration::from_millis(20),
         lost_look: Duration::from_millis(600),
+        answer_wait: Duration::from_millis(600),
         stopping: std::sync::OnceLock::new(),
         default_agent: false,
         no_harness: Default::default(),
@@ -7459,10 +7460,19 @@ fn skill_run(deadline: Duration) -> SkillRun {
         ],
         deadline,
         started: Default::default(),
+        write: false,
+        not_made: Default::default(),
         start_in: None,
         env_file: None,
         answer: Default::default(),
     }
+}
+
+/// [`skill_run`] as a skill's fixed write's (#6879).
+fn write_run(deadline: Duration) -> SkillRun {
+    let mut run = skill_run(deadline);
+    run.write = true;
+    run
 }
 
 /// Nothing of the run is left: no `skill-*` folder, no token file.
@@ -9098,6 +9108,149 @@ fn a_skill_run_that_fails_leaves_nothing() {
             .unwrap_err();
         assert!(why.contains(said), "{state}: {why}");
         assert!(rig.calls().iter().any(|call| call["args"][0] == "close"));
+        nothing_left(&rig);
+    }
+}
+
+/// #7092: a fixed write's launch Harness didn't make (`new_failed`, its
+/// daemon not up yet just after a lamp-tasks restart) is asked once more,
+/// the same run in the same folder on the same token file, once Harness
+/// answers with nothing in the run's folder: one run, one send. A task's
+/// run is never asked twice.
+#[test]
+fn issue_7092_a_fixed_writes_unmade_launch_is_asked_once_more_once_harness_answers() {
+    use std::sync::atomic::Ordering;
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"each":[{"exit":1},{"default":true}]},
+        // Harness's daemon unreachable at first, then up with nothing there.
+        "ps":{"each":[{"exit":1},step(json!({"ok":true,"harnesses":[]}))]},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let run = write_run(Duration::from_secs(20));
+    assert_eq!(
+        skill_runner(&rig, Some(EngineKind::Hermes)).run(&run, &|| {}),
+        Ok(0)
+    );
+    assert!(!run.not_made.load(Ordering::Acquire));
+    let calls = rig.calls();
+    let news: Vec<&Value> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "new")
+        .collect();
+    assert_eq!(news.len(), 2, "asked once more, never a third time");
+    assert_eq!(
+        news[0]["args"], news[1]["args"],
+        "the same run, the same folder"
+    );
+    let first_ps = calls.iter().position(|call| call["args"][0] == "ps");
+    let second_new = calls
+        .iter()
+        .rposition(|call| call["args"][0] == "new")
+        .unwrap();
+    assert!(
+        first_ps.is_some_and(|ps| ps < second_new),
+        "asked after Harness answers"
+    );
+    assert_eq!(
+        calls.iter().filter(|call| call["args"][0] == "ps").count(),
+        2,
+        "until it answers"
+    );
+    nothing_left(&rig);
+    // A task's run is asked once, as before.
+    let rig = Rig::new();
+    rig.plan(json!({"machines":{"default":true},"new":{"each":[{"exit":1},{"default":true}]}}));
+    let run = skill_run(Duration::from_secs(20));
+    let why = skill_runner(&rig, Some(EngineKind::Hermes))
+        .run(&run, &|| {})
+        .unwrap_err();
+    assert_eq!(why, "Harness didn't start the run (new_failed)");
+    assert!(!run.not_made.load(Ordering::Acquire));
+    let calls = rig.calls();
+    assert_eq!(
+        calls.iter().filter(|call| call["args"][0] == "new").count(),
+        1
+    );
+    assert!(calls.iter().all(|call| call["args"][0] != "ps"));
+    nothing_left(&rig);
+}
+
+/// #7092: a fixed write's run that started and then failed is never asked
+/// again; nor is one whose unmade launch left an agent in the run's
+/// folder (Harness may have made it after all). Neither is `not_made`:
+/// it may have sent.
+#[test]
+fn issue_7092_a_fixed_write_that_may_have_begun_is_never_asked_again() {
+    use std::sync::atomic::Ordering;
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "failed");
+    let run = write_run(Duration::from_secs(20));
+    let why = skill_runner(&rig, Some(EngineKind::Hermes))
+        .run(&run, &|| {})
+        .unwrap_err();
+    assert!(why.contains("failed"), "{why}");
+    assert!(!run.not_made.load(Ordering::Acquire));
+    let calls = rig.calls();
+    assert_eq!(
+        calls.iter().filter(|call| call["args"][0] == "new").count(),
+        1
+    );
+    nothing_left(&rig);
+    let rig = Rig::new();
+    let folder = rig.root.path().join("project/skill-task-1");
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"each":[{"exit":1},{"default":true}]},
+        "ps":step(json!({"ok":true,"harnesses":[
+            {"id":AGENT,"state":"working","folder":folder.to_str().unwrap()},
+        ]})),
+        "close":{"exit":0},
+    }));
+    let run = write_run(Duration::from_secs(20));
+    let why = skill_runner(&rig, Some(EngineKind::Hermes))
+        .run(&run, &|| {})
+        .unwrap_err();
+    assert_eq!(why, "Harness didn't start the run (new_failed)");
+    assert!(!run.not_made.load(Ordering::Acquire));
+    assert!(run.started.load(Ordering::Acquire));
+    let calls = rig.calls();
+    assert_eq!(
+        calls.iter().filter(|call| call["args"][0] == "new").count(),
+        1
+    );
+    nothing_left(&rig);
+}
+
+/// #7092: a fixed write whose second launch Harness didn't make either, or
+/// whose Harness never answered within its wait, is `not_made`: nothing
+/// was made, so lamp-skills tells the owner its send didn't go. Never a
+/// third launch.
+#[test]
+fn issue_7092_a_fixed_write_unmade_twice_or_unanswered_is_not_made() {
+    use std::sync::atomic::Ordering;
+    for (ps, news) in [
+        (step(json!({"ok":true,"harnesses":[]})), 2),
+        (json!({"exit":1}), 1),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"machines":{"default":true},"new":{"exit":1},"ps":ps}));
+        let run = write_run(Duration::from_secs(20));
+        let why = skill_runner(&rig, Some(EngineKind::Hermes))
+            .run(&run, &|| {})
+            .unwrap_err();
+        assert!(why.starts_with("Harness didn't start the run"), "{why}");
+        assert!(run.not_made.load(Ordering::Acquire), "{why}");
+        let calls = rig.calls();
+        assert_eq!(
+            calls.iter().filter(|call| call["args"][0] == "new").count(),
+            news,
+            "{why}"
+        );
+        assert!(calls.iter().all(|call| call["args"][0] != "close"));
         nothing_left(&rig);
     }
 }

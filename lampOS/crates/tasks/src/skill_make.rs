@@ -393,6 +393,8 @@ pub fn make_run_with(
         env: home_env(folder).into_iter().chain(switches.env()).collect(),
         deadline: within,
         started: Default::default(),
+        write: false,
+        not_made: Default::default(),
         start_in: Some(folder.to_path_buf()),
         env_file: None,
         answer: Default::default(),
