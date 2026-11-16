@@ -1108,6 +1108,8 @@ where
                             }
                             sound.sent(&bytes, (samples_sent + bytes.len() / 2) as f64 / 16_000.0);
                             samples_sent += bytes.len() / 2;
+                            // Counted for the day, with LAMP_VOICE_DAY_TALLY=on (#7347).
+                            crate::day_tally::heard(bytes.len() / 2);
                             write
                                 .send(Message::binary(bytes))
                                 .await

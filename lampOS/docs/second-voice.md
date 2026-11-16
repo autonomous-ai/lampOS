@@ -824,13 +824,16 @@ order is kept. A written turn is the same from the chat on.
   minutes (#7254), and nothing on the lamp said what the day had cost.
   With the switch on, each chat answer that ends is counted by its model:
   answers, prompt tokens, those the cache held, completion tokens, and
-  answers whose service gave no count; and each turn the model declined as
-  not said to the lamp. The day is a UTC day, as the allowance is counted.
-  Numbers only: no word, name or request is kept.
+  answers whose service gave no count; each turn the model declined as
+  not said to the lamp; the sound sent to be heard, in milliseconds; and
+  the lines sent to be spoken, with their characters. The day is a UTC
+  day, as the allowance is counted. Numbers only: no word, name or request
+  is kept.
   - **Where it is kept:** `/var/lib/lampOS/voice/day-tally/tally.json`,
     root's: `{"today": {"day", "models": {NAME: {"answers", "uncounted",
-    "prompt_tokens", "cached_tokens", "completion_tokens"}}, "declined"},
-    "yesterday": …}`. `day` is days since 1970. At the first write of a
+    "prompt_tokens", "cached_tokens", "completion_tokens"}}, "declined",
+    "heard_ms", "spoken_lines", "spoken_chars"}, "yesterday": …}`. `day`
+    is days since 1970. At the first write of a
     new UTC day the day before becomes `yesterday`, whole, so a morning's
     read shows what a day cost; a day older than that is let go. Only a
     later day turns it over: a clock that has gone back, by a correction
@@ -839,23 +842,32 @@ order is kept. A written turn is the same from the chat on.
     tally is begun again, with one journal line saying so. At most eight
     models are kept apart, the rest as `other`.
   - **A turn never waits on it.** An answer is counted in memory where it
-    ends, under a short lock. A thread of its own adds the counts to the
+    ends, and a line where it is sent to be spoken (`Tts::speak_in`,
+    `speak_fresh`, the Gemini speech's `speak`), under a short lock. Sound
+    is counted where each block goes onto the speech-to-text socket, a
+    hundred times a second, so that takes no lock: one flag read and one
+    add. A thread of its own adds the counts to the
     file at most once a minute, under a file lock, written whole beside
     it and moved over it. The voice and its second-route worker are two
     processes and each adds its own.
   - **The journal** has one line in each hour in which the process counted
     something: `thinking today (UTC): N chat answers, P prompt tokens (H
-    from the cache), C completion tokens; D turns declined`, and by model
-    when there is more than one.
-  - **Not counted, and it is more than half of a day:** speech in either
-    direction. By the relay's own count of that lamp's day (Backend on
-    #7347, 16 Nov), thinking was about 38% of what the day cost, listening
-    30%, speaking 27% and the second model 4%. So this tally says what a
-    day's thinking cost and how many turns were declined, not what the
-    day cost; listening and speaking are counted next (#7347). The
-    relay also counts a token its cache held as far less than a fresh
-    one, which the two token counts here keep apart.
-  - **Also not counted:** an answer cut before it ends (the service still
+    from the cache), C completion tokens; D turns declined; S s of sound
+    sent to be heard; L lines sent to be spoken (K characters)`, and by
+    model when there is more than one.
+  - **Why sound and lines are counted too:** by the relay's own count of
+    that lamp's day (Backend on #7347, 16 Nov), thinking was about 38% of
+    what the day cost, listening 30%, speaking 27% and the second model
+    4%. A lamp in a busy room spends its day on hearing, even when it
+    says little. The relay counts a token its cache held as far less than
+    a fresh one, which the two token counts here keep apart.
+  - **These are the lamp's own counts, not the bill.** Seconds of sound
+    and characters of speech are what the lamp sent. What each costs is
+    the relay's to say, and the relay's count of the day stays the true
+    figure. A line taken from the cache of fixed lines is not sent, so it
+    is not counted; a piece asked again after it failed to start is
+    counted again.
+  - **Not counted:** an answer cut before it ends (the service still
     counts its prompt). Counts made in the last minute before 00:00 UTC
     may be written into the new day, and those of the last minute before
     the voice or its worker stops are lost.
@@ -865,8 +877,9 @@ order is kept. A written turn is the same from the chat on.
   - Tests: `day_tally::tests` (an answer's usage is read in both services'
     forms, nothing is counted until counting begins, two writers add up
     by model, a new UTC day keeps the day before and begins again, a clock
-    gone back keeps today's counts, a bad file begins again and many
-    models are bounded, names are bounded and
+    gone back keeps today's counts, sound and spoken lines add up and are
+    told, a bad file begins again and many models are bounded, names are
+    bounded and
     an answer without usage is still counted), and the workers' census
     (`process::switch_census_tests`), which fails if the switch does not
     reach the second worker.

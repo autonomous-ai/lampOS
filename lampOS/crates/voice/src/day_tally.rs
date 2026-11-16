@@ -1,19 +1,25 @@
-//! What the lamp's thinking costs in a day (#7347).
+//! What the lamp's thinking, listening and speaking cost in a day (#7347).
 //!
 //! On 16 November 2026 a lamp at home used up its day's allowance before
 //! six in the evening and answered nothing for over an hour. The lamp kept
 //! no count of its own, so it could not tell how near it was, and nobody
 //! could say afterwards what the day had gone on. Here each chat answer's
 //! tokens are counted, by model, as the service's own `usage` gives them,
-//! with the turns the model declined as not said to the lamp, for the day
-//! the allowance is counted in: a UTC day.
+//! with the turns the model declined as not said to the lamp, the sound
+//! sent to be heard and the lines sent to be spoken, for the day the
+//! allowance is counted in: a UTC day. By the relay's count of that lamp's
+//! day, thinking was about 38% of what it cost, listening 30% and speaking
+//! 27%.
 //!
 //! Numbers only: no word, name or request is kept. Off unless [`SWITCH`]
 //! is `on`.
 //!
-//! - An answer is counted where it ends ([`answered`]) and a declined turn
-//!   where it is declined ([`declined`]): a short lock on counts held in
-//!   memory, never a file. A turn never waits on a file (as `made_counts`).
+//! - An answer is counted where it ends ([`answered`]), a declined turn
+//!   where it is declined ([`declined`]) and a line where it is sent to be
+//!   spoken ([`spoken`]): a short lock on counts held in memory, never a
+//!   file. Sound is counted where it goes to be heard ([`heard`]), a
+//!   hundred times a second, so that takes no lock at all: one flag read
+//!   and one add. A turn never waits on a file (as `made_counts`).
 //! - The counts are added to [`FILE`] at most every [`FLUSH_EVERY`] by a
 //!   thread of its own. The voice and its second-route worker are two
 //!   processes; each adds its own under [`LOCK`], so neither undoes the
@@ -35,7 +41,10 @@ use std::{
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
-    sync::{Mutex, OnceLock},
+    sync::{
+        Mutex, OnceLock,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -95,6 +104,12 @@ pub struct Day {
     pub models: BTreeMap<String, Model>,
     /// Turns the model declined as not said to the lamp.
     pub declined: u64,
+    /// Sound sent to be heard, in milliseconds.
+    pub heard_ms: u64,
+    /// Lines sent to be spoken; one asked again is counted again.
+    pub spoken_lines: u64,
+    /// Their characters.
+    pub spoken_chars: u64,
 }
 
 impl Day {
@@ -108,10 +123,17 @@ impl Day {
             self.models.entry(name.to_owned()).or_default().add(model);
         }
         self.declined = self.declined.saturating_add(more.declined);
+        self.heard_ms = self.heard_ms.saturating_add(more.heard_ms);
+        self.spoken_lines = self.spoken_lines.saturating_add(more.spoken_lines);
+        self.spoken_chars = self.spoken_chars.saturating_add(more.spoken_chars);
     }
 
     fn is_empty(&self) -> bool {
-        self.models.is_empty() && self.declined == 0
+        self.models.is_empty()
+            && self.declined == 0
+            && self.heard_ms == 0
+            && self.spoken_lines == 0
+            && self.spoken_chars == 0
     }
 
     /// Every model's counts together.
@@ -142,6 +164,13 @@ struct Pending {
 }
 
 static PENDING: OnceLock<Mutex<Pending>> = OnceLock::new();
+/// Whether counting has begun, for [`heard`]: read where sound is sent to
+/// be heard, so that path takes no lock.
+static COUNTING: AtomicBool = AtomicBool::new(false);
+/// Samples of sound sent to be heard and not yet in [`Pending`].
+static HEARD_SAMPLES: AtomicU64 = AtomicU64::new(0);
+/// The sound sent to be heard is 16 kHz: this many samples a millisecond.
+const SAMPLES_A_MS: u64 = 16;
 
 fn pending() -> std::sync::MutexGuard<'static, Pending> {
     PENDING
@@ -167,6 +196,7 @@ pub fn start(directory: &Path) {
         }
         pending.directory = Some(directory.to_path_buf());
     }
+    COUNTING.store(true, Ordering::Relaxed);
     let directory = directory.to_path_buf();
     let spawned = std::thread::Builder::new()
         .name("lamp-voice-day-tally".into())
@@ -187,10 +217,11 @@ pub fn start(directory: &Path) {
         });
     match spawned {
         Ok(_) => eprintln!(
-            "lamp-voice: the day's thinking is counted, numbers only ({SWITCH}), in {DIRECTORY}/{FILE}"
+            "lamp-voice: the day's thinking, listening and speaking are counted, numbers only ({SWITCH}), in {DIRECTORY}/{FILE}"
         ),
         Err(error) => {
             eprintln!("lamp-voice: the day's tally not begun: {error}");
+            COUNTING.store(false, Ordering::Relaxed);
             pending().directory = None;
         }
     }
@@ -239,6 +270,32 @@ pub fn declined() {
     }
 }
 
+/// `samples` of 16 kHz sound have gone to be heard. One flag read and one
+/// add: it is called for every block sent. Nothing unless counting has begun.
+pub fn heard(samples: usize) {
+    if COUNTING.load(Ordering::Relaxed) {
+        HEARD_SAMPLES.fetch_add(samples as u64, Ordering::Relaxed);
+    }
+}
+
+/// One line has gone to be spoken: counted with its characters, never
+/// kept. Nothing unless counting has begun.
+pub fn spoken(text: &str) {
+    let mut pending = pending();
+    if pending.directory.is_some() {
+        pending.counts.spoken_lines = pending.counts.spoken_lines.saturating_add(1);
+        pending.counts.spoken_chars = pending
+            .counts
+            .spoken_chars
+            .saturating_add(text.chars().count() as u64);
+    }
+}
+
+/// `samples` as whole milliseconds of sound, and the samples left over.
+fn ms_of(samples: u64) -> (u64, u64) {
+    (samples / SAMPLES_A_MS, samples % SAMPLES_A_MS)
+}
+
 /// A model's name as it is kept: its printable ASCII, [`MOST_NAME`] at
 /// most, or [`OTHER`] if none is left. A model's name is the service's
 /// own, never a person's word.
@@ -267,7 +324,15 @@ fn unix_s() -> u64 {
 /// process had nothing to add and the day had not changed: nothing is
 /// written. Counts that could not be written are kept for the next time.
 fn flush(directory: &Path, now_s: u64) -> io::Result<Option<Tally>> {
-    let counts = std::mem::take(&mut pending().counts);
+    // The sound counted since the last time, as whole milliseconds; what is
+    // left of a millisecond waits for the next.
+    let (heard_ms, left) = ms_of(HEARD_SAMPLES.swap(0, Ordering::Relaxed));
+    HEARD_SAMPLES.fetch_add(left, Ordering::Relaxed);
+    let counts = {
+        let mut pending = pending();
+        pending.counts.heard_ms = pending.counts.heard_ms.saturating_add(heard_ms);
+        std::mem::take(&mut pending.counts)
+    };
     let written = add(directory, now_s, &counts);
     if written.is_err() {
         pending().counts.add(&counts);
@@ -330,8 +395,15 @@ pub fn read(directory: &Path) -> Option<Tally> {
 pub fn told(day: &Day) -> String {
     let all = day.all();
     let mut told = format!(
-        "{} chat answers, {} prompt tokens ({} from the cache), {} completion tokens; {} turns declined",
-        all.answers, all.prompt_tokens, all.cached_tokens, all.completion_tokens, day.declined
+        "{} chat answers, {} prompt tokens ({} from the cache), {} completion tokens; {} turns declined; {} s of sound sent to be heard; {} lines sent to be spoken ({} characters)",
+        all.answers,
+        all.prompt_tokens,
+        all.cached_tokens,
+        all.completion_tokens,
+        day.declined,
+        day.heard_ms / 1_000,
+        day.spoken_lines,
+        day.spoken_chars
     );
     if all.uncounted > 0 {
         told.push_str(&format!("; {} answers gave no count", all.uncounted));
@@ -425,9 +497,53 @@ mod tests {
             Some(&json!({"prompt_tokens": 5, "completion_tokens": 1})),
         );
         declined();
+        heard(1_600);
+        spoken("Hello there.");
+        assert_eq!(HEARD_SAMPLES.load(Ordering::Relaxed), 0);
         let pending = pending();
         assert!(pending.directory.is_none());
         assert!(pending.counts.is_empty());
+    }
+
+    /// Sound is kept as whole milliseconds, with what is left of one waiting
+    /// for the next write; it and the spoken lines add up in the file and
+    /// are said in the journal's line.
+    #[test]
+    fn sound_and_spoken_lines_add_up_and_are_told() {
+        assert_eq!(ms_of(16_000), (1_000, 0));
+        assert_eq!(ms_of(16_015), (1_000, 15));
+        assert_eq!(ms_of(15), (0, 15));
+        let dir = folder("speech");
+        let noon = 20_000 * DAY_S + 12 * 3_600;
+        let first = Day {
+            heard_ms: 61_500,
+            spoken_lines: 2,
+            spoken_chars: 80,
+            ..Day::default()
+        };
+        let second = Day {
+            heard_ms: 13_500,
+            spoken_lines: 1,
+            spoken_chars: 40,
+            ..Day::default()
+        };
+        assert!(!first.is_empty());
+        add(&dir, noon, &first).unwrap().unwrap();
+        let tally = add(&dir, noon + 60, &second).unwrap().unwrap();
+        assert_eq!(tally.today.heard_ms, 75_000);
+        assert_eq!(tally.today.spoken_lines, 3);
+        assert_eq!(tally.today.spoken_chars, 120);
+        assert_eq!(
+            told(&tally.today),
+            "0 chat answers, 0 prompt tokens (0 from the cache), 0 completion tokens; 0 turns \
+             declined; 75 s of sound sent to be heard; 3 lines sent to be spoken (120 characters)"
+        );
+        // A file written before these counts reads with them at nothing.
+        let old: Tally =
+            serde_json::from_str(r#"{"today":{"day":20000,"models":{},"declined":4}}"#).unwrap();
+        assert_eq!(old.today.heard_ms, 0);
+        assert_eq!(old.today.declined, 4);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// Two processes' counts add up in one file, by model, and a write with
@@ -463,7 +579,8 @@ mod tests {
         assert_eq!(
             told(&tally.today),
             "2 chat answers, 11600 prompt tokens (9000 from the cache), 45 completion tokens; \
-             2 turns declined; by model: deepseek-chat 1 answers, 11040 tokens, small-model 1 \
+             2 turns declined; 0 s of sound sent to be heard; 0 lines sent to be spoken (0 \
+             characters); by model: deepseek-chat 1 answers, 11040 tokens, small-model 1 \
              answers, 605 tokens"
         );
         let _ = fs::remove_dir_all(&dir);
@@ -556,7 +673,8 @@ mod tests {
         assert_eq!(
             told(&day),
             "1 chat answers, 0 prompt tokens (0 from the cache), 0 completion tokens; 0 turns \
-             declined; 1 answers gave no count"
+             declined; 0 s of sound sent to be heard; 0 lines sent to be spoken (0 characters); \
+             1 answers gave no count"
         );
     }
 }
