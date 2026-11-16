@@ -24,6 +24,7 @@ use crate::{
 use lamp_ipc::monotonic_us;
 use lamp_turn_owner::{BootId, BoundaryGuard, MonoTime, Snapshot};
 use std::{
+    cell::Cell,
     io,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -68,6 +69,9 @@ struct Gate {
     rides_stall: bool,
     /// Since when it holds closed, the last authority's install.
     held_since: Option<u64>,
+    /// The last retired request whose dropped input was journalled
+    /// ([`Gate::admits`]): one line per request, not one per audio frame.
+    retired_logged: Cell<u64>,
 }
 
 enum Drain {
@@ -87,6 +91,7 @@ impl Gate {
             skipped_expired: 0,
             rides_stall: false,
             held_since: None,
+            retired_logged: Cell::new(0),
         }
     }
 
@@ -289,16 +294,28 @@ impl Gate {
             .guard
             .state()
             .ok_or_else(|| invalid("second route has no authority"))?;
-        if request == 0
-            || !state.listening_ready(MonoTime::from_micros(now_us))
+        if request == 0 {
+            return Err(invalid(
+                "second route input lost privacy or retention authority",
+            ));
+        }
+        // Input of a retired turn is dropped unread before any authority
+        // check (#7224): after a stall of the whole board the gap snapshot
+        // that retired it can come before a line queued for it, and that
+        // line must not end the route. A live request keeps every check.
+        if request <= self.retired_through {
+            if self.retired_logged.get() != request {
+                self.retired_logged.set(request);
+                eprintln!("lamp-voice second: input of retired turn {request} dropped unread");
+            }
+            return Ok(false);
+        }
+        if !state.listening_ready(MonoTime::from_micros(now_us))
             || privacy != state.microphone_generation()
         {
             return Err(invalid(
                 "second route input lost privacy or retention authority",
             ));
-        }
-        if request <= self.retired_through {
-            return Ok(false);
         }
         if state.owner().map(|owner| owner.turn()) != Some(request) {
             return Err(invalid("second route input has no matching admitted owner"));
@@ -22341,6 +22358,136 @@ mod tests {
             assert!(error.contains("heartbeat expired"), "on {on}: {error}");
             assert!(!gate.holds(monotonic_us(), &mut engine), "on {on}");
         }
+    }
+
+    /// #7224, lamp-c0a4 16 Nov 12:59:12: "second worker exited abnormally"
+    /// after a stall under memory pressure. A 600 ms silence of the
+    /// controller during an active second-route turn, with a line queued for
+    /// it before the stall and its output pending: with the switch on the
+    /// route is held (the queued line dropped unread), and the coordinator's
+    /// gap snapshot (the turn revoked by its lapse, capture held) lets it go
+    /// on. The loop's own order: drain, holds, fresh, input, output.
+    #[tokio::test]
+    async fn a_600_ms_controller_stall_in_a_second_route_turn_is_held_and_goes_on() {
+        let (mut gate, mut owner, mut engine, mut parent, mut worker, _directory, turn) =
+            stalled_controller(600_000, true);
+        let generation = gate.guard.state().unwrap().microphone_generation();
+        parent.data.send(line_start(turn, generation)).unwrap();
+        // A tick in the silence: held, the queued line dropped unread.
+        assert!(matches!(
+            gate.drain(&mut worker.control, &mut engine),
+            Ok(Drain::Empty)
+        ));
+        assert!(gate.holds(monotonic_us(), &mut engine));
+        for _ in 0..INPUT_SLICE {
+            if worker.data.receive::<ProviderInput>().unwrap().is_none() {
+                break;
+            }
+        }
+        // The coordinator wakes: its gap snapshot, capture held.
+        let at = MonoTime::from_micros(monotonic_us());
+        owner.set_capture(at, CaptureState::Unavailable).unwrap();
+        let snapshot = owner.snapshot(at).unwrap();
+        assert!(snapshot.owner().is_none());
+        parent
+            .control
+            .send(Control::Authority { snapshot })
+            .unwrap();
+        assert!(matches!(
+            gate.drain(&mut worker.control, &mut engine),
+            Ok(Drain::Empty)
+        ));
+        assert!(!gate.holds(monotonic_us(), &mut engine));
+        gate.fresh(monotonic_us()).unwrap();
+        assert!(worker.data.receive::<ProviderInput>().unwrap().is_none());
+        // The stalled turn's output is retired, dropped unsent.
+        assert!(turn <= gate.retired_through);
+    }
+
+    /// The same 600 ms stall of the whole board (#7224): the second worker
+    /// stalled with the controller, so when it wakes the coordinator's gap
+    /// snapshot is already queued and the line sent just before the stall
+    /// is still unread. The route must drop the line, not end.
+    #[tokio::test]
+    async fn a_600_ms_board_stall_in_a_second_route_turn_drops_the_retired_line_unread() {
+        let (mut gate, mut owner, mut engine, mut parent, mut worker, _directory, turn) =
+            stalled_controller(600_000, true);
+        let generation = gate.guard.state().unwrap().microphone_generation();
+        parent.data.send(line_start(turn, generation)).unwrap();
+        let at = MonoTime::from_micros(monotonic_us());
+        owner.set_capture(at, CaptureState::Unavailable).unwrap();
+        let snapshot = owner.snapshot(at).unwrap();
+        parent
+            .control
+            .send(Control::Authority { snapshot })
+            .unwrap();
+        // The worker's first tick after waking, as `run` does it.
+        assert!(matches!(
+            gate.drain(&mut worker.control, &mut engine),
+            Ok(Drain::Empty)
+        ));
+        assert!(!gate.holds(monotonic_us(), &mut engine));
+        gate.fresh(monotonic_us()).unwrap();
+        let retained = worker.data.receive::<ProviderInput>().unwrap().unwrap();
+        assert!(matches!(
+            gate.drain(&mut worker.control, &mut engine),
+            Ok(Drain::Empty)
+        ));
+        assert!(!gate.holds(monotonic_us(), &mut engine));
+        let admitted = gate.admits(monotonic_us(), &retained);
+        assert!(
+            matches!(admitted, Ok(false)),
+            "the queued line ended the route: {admitted:?}"
+        );
+    }
+
+    /// The same whole-board stall with `LAMP_PRIVACY_RIDES_STALL` off
+    /// (#7224): the retired turn's queued line is dropped unread and the
+    /// route goes on (it ended the worker before), while a live request's
+    /// input without listening still ends it as before.
+    #[tokio::test]
+    async fn off_a_retired_turns_queued_line_is_dropped_unread_and_a_live_one_still_errs() {
+        let (mut gate, mut owner, mut engine, mut parent, mut worker, _directory, turn) =
+            stalled_controller(600_000, false);
+        let generation = gate.guard.state().unwrap().microphone_generation();
+        parent.data.send(line_start(turn, generation)).unwrap();
+        let at = MonoTime::from_micros(monotonic_us());
+        owner.set_capture(at, CaptureState::Unavailable).unwrap();
+        let snapshot = owner.snapshot(at).unwrap();
+        parent
+            .control
+            .send(Control::Authority { snapshot })
+            .unwrap();
+        assert!(matches!(
+            gate.drain(&mut worker.control, &mut engine),
+            Ok(Drain::Empty)
+        ));
+        assert!(!gate.holds(monotonic_us(), &mut engine));
+        gate.fresh(monotonic_us()).unwrap();
+        assert!(turn <= gate.retired_through);
+        let retained = worker.data.receive::<ProviderInput>().unwrap().unwrap();
+        let now_us = monotonic_us();
+        assert!(
+            !gate
+                .guard
+                .state()
+                .unwrap()
+                .listening_ready(MonoTime::from_micros(now_us))
+        );
+        assert!(matches!(gate.admits(now_us, &retained), Ok(false)));
+        // Again for the same request: still dropped, journalled once.
+        assert!(matches!(gate.admits(now_us, &retained), Ok(false)));
+        assert_eq!(gate.retired_logged.get(), turn);
+        // Request 0 is never a turn.
+        assert!(gate.admits(now_us, &line_start(0, generation)).is_err());
+        // A live (not retired) request without listening errs as before.
+        let live = gate.retired_through + 1;
+        assert_eq!(
+            gate.admits(now_us, &line_start(live, generation))
+                .unwrap_err()
+                .to_string(),
+            "second route input lost privacy or retention authority"
+        );
     }
 
     /// #2305's review: a camera close and a mute, as the worker installs
