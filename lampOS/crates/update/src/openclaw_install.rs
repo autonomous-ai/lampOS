@@ -870,6 +870,12 @@ pub fn at_start(root: &Path, records: &Path, switch: bool, shown: Shown, now_uni
     }
 }
 
+/// An install's ask for `shown`, as a round writes it: the image's
+/// pre-install (crate::preinstall) writes the same one.
+pub fn ask_install(records: &Path, shown: Shown) -> io::Result<()> {
+    ask(records, false, shown)
+}
+
 fn ask(records: &Path, remove: bool, shown: Shown) -> io::Result<()> {
     let text = serde_json::to_vec(&Ask {
         version: 1,
