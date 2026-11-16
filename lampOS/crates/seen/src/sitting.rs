@@ -15,8 +15,10 @@
 //!   `humans/doing` (`lamp_msgs::HumanDoing`): every timer always present,
 //!   counting from the desk arrival when nothing has been seen, so a
 //!   skill's `[[while]] above` runs on the clock as it did without this
-//!   part. It begins again on `room/stood_up`, and on the gate closing for
-//!   nobody or a stranger: no history is kept.
+//!   part. It begins again on `room/stood_up`, a forget or a stranger, and
+//!   when nobody remembered has been at the desk for more than
+//!   [`crate::keep::KEEP_US`] (120 s; kept unsaid until then,
+//!   [`crate::keep`]): no history is kept.
 use crate::wire::{ActionAnswer, group};
 use lamp_msgs::{Doing, DoingSeen, HumanDoing};
 

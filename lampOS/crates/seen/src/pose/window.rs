@@ -14,7 +14,8 @@
 //!
 //! Nothing of the frame or the answer is kept: a sample is its time, one
 //! flag and four bits, and the window lives in memory only for one sitting
-//! (reset when they leave, a stranger comes, or the opt-in goes off).
+//! (reset when they stand up or stay away past [`crate::keep::KEEP_US`], a
+//! stranger comes, the privacy or sleep, or the opt-in goes off).
 use crate::wire::Ergo;
 use lamp_msgs::{HumanPosture, PostureRegion};
 use std::collections::VecDeque;
@@ -80,6 +81,24 @@ pub fn judge(ergo: &Ergo) -> (bool, u8) {
     }
     let bad = ergo.risk_level >= BAD_RISK_LEVEL || high != 0 || high_on(WRIST);
     (bad, high)
+}
+
+/// The first of [`REGIONS`] in `high` ([`judge`]'s bits), as
+/// `humans/posture` writes it, or `none`: for the journal.
+pub fn region_name(high: u8) -> &'static str {
+    REGIONS
+        .iter()
+        .enumerate()
+        .find(|(bit, _)| high & (1 << bit) != 0)
+        .map_or("none", |(_, (name, _))| name)
+}
+
+/// `region` as `humans/posture` writes it: for the journal.
+pub fn region_word(region: PostureRegion) -> &'static str {
+    REGIONS
+        .iter()
+        .find(|(_, r)| *r == region)
+        .map_or("none", |(name, _)| name)
 }
 
 impl Window {

@@ -31,6 +31,11 @@
 //! - **The familiar yes is never carried to a new id** (#6602's P2): a new
 //!   id wipes, and the gate's own rule ([`crate::watch`]) wants a level
 //!   said after the new face came.
+//! - **After a pause** wiped because the face went out of view or a gate
+//!   reading lapsed ([`Pause::lost`]), `serve` may still keep the sitting
+//!   for up to 120 s, unsaid, as for any other short closing
+//!   ([`crate::keep`]); a pause's own wipes (5 s, a new id, a box jump) and
+//!   the privacy, sleep, the opt-in or a second face still wipe at once.
 //! - **The journal** gets counts only ([`Counts`]): no id, no box.
 //!
 //! The eyes' tracker follows a face by its box alone (`lamp-eyes`'
@@ -96,6 +101,9 @@ pub struct Pause {
     open_on: Option<Track>,
     paused: Option<Paused>,
     counts: Counts,
+    /// This step's wipe was the face lost or a reading not known, not the
+    /// pause's own rules ([`Pause::lost`]).
+    lost: bool,
 }
 
 fn centre(edges: &[f32; 4]) -> (f32, f32) {
@@ -153,16 +161,30 @@ impl Pause {
     pub fn end(&mut self) {
         self.paused = None;
         self.open_on = None;
+        self.lost = false;
+    }
+
+    /// Whether the last step's wipe came from the face going out of view
+    /// (no face, two, or the faces not known) or a rule of the gate no
+    /// longer holding (a reading gone stale, the privacy, sleep, the
+    /// opt-in), rather than the pause's own rules (5 s, a new id, a box
+    /// jump, a resume far from where it paused). `serve` keeps the sitting
+    /// through the first kind for a while unless the closing is one that
+    /// wipes at once ([`crate::keep`]); the second kind always wipes.
+    pub fn lost(&self) -> bool {
+        self.lost
     }
 
     /// One step at `now_us` with the gate's inputs and the one face in view.
     pub fn step(&mut self, now_us: u64, inputs: &Inputs, seen: &OnTrack) -> Verdict {
+        self.lost = false;
         let open = gate::may_request(inputs).is_ok();
         let Some(mut paused) = self.paused.take() else {
             return self.step_unpaused(now_us, open, inputs, seen);
         };
         let Some(track) = seen.track.as_ref() else {
             // No face, a second face, or the faces not known.
+            self.lost = true;
             return WIPE;
         };
         if track.id != paused.id
@@ -181,6 +203,7 @@ impl Pause {
             };
         }
         if !all_but_familiar(inputs) {
+            self.lost = true;
             return WIPE;
         }
         if seen.stranger && seen.reading_at != paused.reading_at {
