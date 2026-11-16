@@ -1108,8 +1108,12 @@ second (`presence_in.rs`):
     person still there, and stands again when spoken to or called;
   - by heat: not once the shoulder or the elbow reads 55 (`bus_out::WARM`),
     so it folds before the strain guard's hot sit-down at 62;
-  - never in its night rest (`Asked::night`), and never while seated
-    (#4501).
+  - never in its night rest (`Asked::night`);
+  - never through a fold of its own: a lamp resting after a load, heat or
+    tracking retreat, unplugged, unable to lift or seated (#4501) is not
+    kept up, and the window presence last gave it ends then, so it does not
+    stand again when that rest is over (Sixth's P1 on #7313). A window from
+    talk, a call or a gesture is kept as without the switch.
 
   Someone who leaves: folded about 120 s + 90 s after the last face or
   voice.
@@ -1138,8 +1142,8 @@ At the product's level 1, after a talk:
 At level 5 the waits are 10 to 30 s and the sag 1.2 times. The settle
 moves the head about 15 to 20 mm (estimated from lamp-4ace's link lengths,
 not measured on lamp-52e6): about 1 degree of view at 1 m, against the
-breath's 3 mm. It moves at most about 35 counts a second, against the
-pose's 300, to stay quiet.
+breath's 3 mm. It moves at most about 35 counts a second at level 1
+(about 39 at level 5's 1.2 times), against the pose's 300, to stay quiet.
 
 Rule 8: posture, as a breath let out. The base never turns and nothing
 sweeps; the timing is irregular and the same move seldom comes twice.
@@ -2010,8 +2014,10 @@ while it is folded, rising or folding, while a mood other than rest is
 heard (someone talking to it, a call taken as listening), while a call or
 another gesture plays or waits, while the head or the base has given way to
 a hand or is in one, while stillness is asked (Expression's `hold` for
-someone working under the light, or a pause), or while lamp-control's
-lease holds the body (`Asked::held`, #7301); any of these lets a shift
+someone working under the light, or a pause), or under
+`LAMP_BODY_PRESENCE` while lamp-control's lease holds the body
+(`Asked::held`, #7301; with the switch off a held lamp shifts as before);
+any of these lets a shift
 under way go and starts the wait again, so no shift comes right after it.
 
 A shift and Expression's rest layer under `--rest-glance` (its breath and

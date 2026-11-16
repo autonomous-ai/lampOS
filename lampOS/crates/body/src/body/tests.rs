@@ -6311,11 +6311,19 @@ fn at_rest_with(
     minutes: u64,
     asked: fn(Duration) -> Asked,
     heat: Option<(Duration, usize, u8)>,
-) -> (BodyReport, Vec<Shift>, Option<Duration>, [(u16, u16); 2]) {
+    strain: Option<(Duration, Duration, usize, u16)>,
+) -> (
+    BodyReport,
+    Vec<Shift>,
+    Option<Duration>,
+    [(u16, u16); 2],
+    Option<Duration>,
+) {
     let (mut lamp, mut clock) = folded(Duration::from_secs(minutes * 60));
     lamp.arm_moves = true;
     lamp.overload_clears = 1;
     lamp.heats.extend(heat);
+    lamp.strains.extend(strain);
     let limits = Limits {
         presence,
         energy,
@@ -6334,6 +6342,8 @@ fn at_rest_with(
     let mut playing: Option<(Duration, &'static str)> = None;
     let mut stood = false;
     let mut folding: Option<Duration> = None;
+    let mut down = false;
+    let mut rose_again: Option<Duration> = None;
     let mut arm = [(u16::MAX, 0u16); 2];
     let report = run_alive(
         &mut lamp,
@@ -6360,6 +6370,11 @@ fn at_rest_with(
             {
                 folding = Some(watched.get());
             }
+            // Folded all the way after standing, then rising again.
+            down |= folding.is_some() && glimpse.stand <= 0.0;
+            if down && glimpse.stand > 0.0 && rose_again.is_none() {
+                rose_again = Some(watched.get());
+            }
             let shift = glimpse
                 .gesture
                 .filter(|name| idle::MOVES.iter().any(|shift| shift.name == *name));
@@ -6380,7 +6395,7 @@ fn at_rest_with(
         },
     );
     assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
-    (report, shifts, folding, arm)
+    (report, shifts, folding, arm, rose_again)
 }
 
 fn someone_there(_: Duration) -> Asked {
@@ -6405,7 +6420,7 @@ fn waits_in(shifts: &[Shift], from: Duration, to: Duration) -> Vec<Duration> {
 /// it folds 90 s after the talk, as today.
 #[test]
 fn someone_there_keeps_it_standing_for_fifteen_quiet_minutes() {
-    let (report, _, folding, _) = at_rest_with(true, false, 20, someone_there, None);
+    let (report, _, folding, _, _) = at_rest_with(true, false, 20, someone_there, None, None);
     let folding = folding.expect("it never folded");
     assert!(
         folding >= Duration::from_secs(2) + QUIET_STAND,
@@ -6419,7 +6434,7 @@ fn someone_there_keeps_it_standing_for_fifteen_quiet_minutes() {
         (false, someone_there as fn(Duration) -> Asked),
         (true, |_| Asked::default()),
     ] {
-        let (_, _, folding, _) = at_rest_with(presence, false, 3, asked, None);
+        let (_, _, folding, _, _) = at_rest_with(presence, false, 3, asked, None, None);
         let folding = folding.expect("it never folded");
         assert!(
             (Duration::from_secs(91)..=Duration::from_secs(93)).contains(&folding),
@@ -6432,7 +6447,7 @@ fn someone_there_keeps_it_standing_for_fifteen_quiet_minutes() {
 /// (the eyes' own two minutes of grace come before, `presence_in`).
 #[test]
 fn someone_who_leaves_is_folded_for_ninety_seconds_later() {
-    let (_, _, folding, _) = at_rest_with(
+    let (_, _, folding, _, _) = at_rest_with(
         true,
         false,
         8,
@@ -6440,6 +6455,7 @@ fn someone_who_leaves_is_folded_for_ninety_seconds_later() {
             present: at < Duration::from_secs(4 * 60),
             ..Asked::default()
         },
+        None,
         None,
     );
     let folding = folding.expect("it never folded");
@@ -6453,12 +6469,13 @@ fn someone_who_leaves_is_folded_for_ninety_seconds_later() {
 /// calmly at the end of its window, before the strain guard's hot sit-down.
 #[test]
 fn a_warm_arm_is_not_kept_standing_for_someone() {
-    let (_, _, folding, _) = at_rest_with(
+    let (_, _, folding, _, _) = at_rest_with(
         true,
         false,
         8,
         someone_there,
         Some((Duration::from_secs(3 * 60), 1, crate::bus_out::WARM)),
+        None,
     );
     let folding = folding.expect("it never folded");
     assert!(
@@ -6467,12 +6484,33 @@ fn a_warm_arm_is_not_kept_standing_for_someone() {
     );
 }
 
+/// Sixth's P1 on #7313: presence never stands a lamp folded for its load.
+/// Spoken to, then the shoulder loaded at 990 at 60 s, so its tired rest
+/// outlasts the talk's 90 s: it folds and stays folded, someone there or not.
+#[test]
+fn someone_there_does_not_stand_a_lamp_folded_for_its_load() {
+    for presence in [false, true] {
+        let (report, _, folding, _, rose_again) = at_rest_with(
+            presence,
+            false,
+            4,
+            someone_there,
+            None,
+            Some((Duration::from_secs(60), Duration::from_secs(61), 1, 990)),
+        );
+        let folding = folding.expect("it never folded");
+        assert!(folding < Duration::from_secs(62), "{presence}: {folding:?}");
+        assert!(!report.retreats.is_empty(), "{presence}: {report:?}");
+        assert_eq!(rose_again, None, "{presence}: {report:?}");
+    }
+}
+
 /// Presence never keeps a lamp up in its night rest: Expression saying
 /// asleep from 30 s, a standing lamp is kept up no longer and folds at the
 /// end of the window it had then, 90 s later.
 #[test]
 fn at_night_someone_there_does_not_keep_it_standing() {
-    let (_, _, folding, _) = at_rest_with(
+    let (_, _, folding, _, _) = at_rest_with(
         true,
         false,
         4,
@@ -6481,6 +6519,7 @@ fn at_night_someone_there_does_not_keep_it_standing() {
             night: at >= Duration::from_secs(30),
             ..Asked::default()
         },
+        None,
         None,
     );
     let folding = folding.expect("it never folded");
@@ -6496,7 +6535,8 @@ fn at_night_someone_there_does_not_keep_it_standing() {
 /// toward the fold and never past it, by enough to be seen at 1 m.
 #[test]
 fn someone_there_sees_a_shift_every_twenty_to_sixty_seconds() {
-    let (report, shifts, folding, arm) = at_rest_with(true, false, 10, someone_there, None);
+    let (report, shifts, folding, arm, _) =
+        at_rest_with(true, false, 10, someone_there, None, None);
     assert_eq!(folding, None);
     assert_eq!(report.idles as usize, shifts.len());
     assert!(shifts.len() >= 10, "{shifts:?}");
@@ -6544,7 +6584,7 @@ fn someone_there_sees_a_shift_every_twenty_to_sixty_seconds() {
 /// At energy level 5, waits of 10 s to 30 s.
 #[test]
 fn at_level_five_someone_there_sees_a_shift_every_ten_to_thirty_seconds() {
-    let (_, shifts, folding, _) = at_rest_with(
+    let (_, shifts, folding, _, _) = at_rest_with(
         true,
         true,
         8,
@@ -6553,6 +6593,7 @@ fn at_level_five_someone_there_sees_a_shift_every_ten_to_thirty_seconds() {
             energy: 5,
             ..Asked::default()
         },
+        None,
         None,
     );
     assert_eq!(folding, None);
@@ -6566,28 +6607,42 @@ fn at_level_five_someone_there_sees_a_shift_every_ten_to_thirty_seconds() {
     );
 }
 
-/// Held by lamp-control's lease, no shift at rest, even with nothing
-/// else asked of it (usage: "While held, no shift at rest"). Run with
-/// `LAMP_BODY_PRESENCE` off (`run_at_rest`'s `Limits` leave `presence`
-/// false): the held guard in the quiet check is the one part of #7301 not
-/// behind the switch, so the off path pins it (switches.md, "Off:").
+/// Held by lamp-control's lease: under `LAMP_BODY_PRESENCE` no shift at
+/// rest, even with nothing else asked of it (usage: "While held, no shift
+/// at rest"). With the switch off (`run_at_rest`'s `Limits` leave
+/// `presence` false) it shifts while held as before #7301, exactly as an
+/// unheld run does (switches.md, "Off:").
 #[test]
-fn held_by_a_lease_it_does_not_shift_with_presence_off() {
-    let (report, shifts) = shifts_at_rest(
+fn held_by_a_lease_it_does_not_shift_only_with_presence_on() {
+    let held = |_| Asked {
+        held: true,
+        ..Asked::default()
+    };
+    let (held_off, held_shifts) = shifts_at_rest(true, 10, Mood::Resting, 100, None, Some(held));
+    let (unheld, unheld_shifts) = shifts_at_rest(
         true,
         10,
         Mood::Resting,
         100,
         None,
-        Some(|_| Asked {
+        Some(|_| Asked::default()),
+    );
+    assert!(held_off.idles > 0, "{held_off:?}");
+    assert_eq!(held_shifts, unheld_shifts);
+    assert_eq!(held_off.idles, unheld.idles);
+    let (report, shifts, _, _, _) = at_rest_with(
+        true,
+        false,
+        10,
+        |_| Asked {
             held: true,
+            present: true,
             ..Asked::default()
-        }),
+        },
+        None,
+        None,
     );
     assert_eq!((report.idles, shifts.len()), (0, 0), "{shifts:?}");
-    // The same run not held shifts, so the zero above is the hold's.
-    let (report, _) = shifts_at_rest(true, 10, Mood::Resting, 100, None, None);
-    assert!(report.idles > 0);
 }
 
 /// Expression's rest stream, renewed every step under `--rest-glance`
