@@ -4535,8 +4535,30 @@ no network:
   through the manage helper once, for the first such skill, with
   `LAMP_SKILL_TASKS` on); and to answer from these alone, never guess, say
   what isn't given isn't kept, and say no skill on the lamp is that one when
-  none is (a reminder they set is not a skill). Which skill they mean is the
-  model's. The answer is about 3 to 5 KB with 65 skills on the lamp.
+  none is (a reminder they set is not a skill), and only to answer:
+  "offer to change, turn on or turn off nothing" (on lamp-9adf "is my plant
+  watering skill on?" was answered none, then "say so and I'll turn it
+  off"). Which skill they mean is the model's. The answer is about 3 to 5
+  KB with 65 skills on the lamp.
+- **A reminder may be a skill.** On lamp-9adf (#7335's row) "Lamp, is my
+  water reminder on or off?" called `list_reminders`, not `use_skill`, and
+  with no reminder set the lamp said "No water reminder is set", while Sip
+  of water and Drink water reminder were on. With the switch, every
+  `list_reminders` answer through the schedule (`tools::run_call_with_scope`,
+  which both routes' calls reach; `skill_about::with_reminders`) carries,
+  beside the schedule's own words, `skills_on_the_lamp`: every skill's line
+  as above, and `skills_note`: "A reminder they ask about may be one of the
+  lamp's own skills, each listed in skills_on_the_lamp with its state from
+  the lamp's records. When one fits what they asked, answer from its line
+  too, in a few words; never say a skill is off or missing unless its line
+  says so. Only answer: offer to change, turn on or turn off nothing."
+  Whether a skill fits is the model's; nothing in code reads the words. A
+  record there and unreadable gives only `skills_note`: "The lamp can't
+  check its skills right now: if they may mean one of the lamp's skills, say
+  you can't check that right now, and guess nothing."; the names and a turn
+  nobody spoke are as below (nothing is added to that turn's answer). An
+  answer that isn't an object is kept under `result`. Off, or any other
+  schedule call, the answer is the schedule's, byte for byte.
 - **Never a guess.** A record there and unreadable (the skills folder, the
   `off` file, `holds.json`, a skill's `SKILL.md` or `skill.toml`) tells the
   model only that the lamp can't check its skills right now. A missing
@@ -4559,7 +4581,8 @@ call naming no skill. Tests: `skill_about::tests` (on, off, snoozed, resting,
 `[present]`, a skill named by what it does, one not on the lamp, records
 that can't be read, the owner's names, the bounds, `use_skill`'s parameters with the switch and without),
 `tools::tests::a_question_about_a_skill_adds_no_function`,
-`tools::tests::a_question_about_a_skill_is_answered_through_use_skill`, and
+`tools::tests::a_question_about_a_skill_is_answered_through_use_skill`,
+`tools::tests::a_reminders_answer_carries_the_skills_only_with_the_switch`, and
 `process::tests::the_memory_switches_alone_reach_the_started_routes`.
 
 **Run now by voice** (lamp-9adf, 15 Nov at 15:49 and 15:52: "Run my unread

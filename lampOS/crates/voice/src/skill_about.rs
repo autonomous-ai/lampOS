@@ -31,8 +31,13 @@
 //! - **Names to the owner.** A skill the person made here is named only
 //!   when the owner hears (`services::owner_hears`), as a list's names
 //!   are; a turn nobody spoke is told nothing.
+//! - **A reminder may be a skill.** A [`LIST_REMINDERS`] answer carries
+//!   every skill's line too ([`with_reminders`]): "is my water reminder on
+//!   or off?" may call the schedule, not `use_skill` (#7335's row on
+//!   lamp-9adf), and the model judges whether a skill fits.
 //!
-//! Off unless set, and then `use_skill` is exactly as before.
+//! Off unless set, and then `use_skill` and `list_reminders`' answer are
+//! exactly as before.
 use crate::made_skill;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -483,7 +488,22 @@ fn ago(ran_us: u64, now_us: u64) -> String {
 }
 
 /// What the model is told after the facts.
-pub const NEXT: &str = "These are the lamp's own records: every skill on it with its state, and those whose words come nearest to what they asked in full. Answer what they asked from these alone, in a few words: on, off, snoozed or resting, what it does and what starts it, when it last ran, whether it waits for their yes. Never guess: what is not given here the lamp doesn't keep, so say so. If none is the skill they mean, say no skill on the lamp is that one (a reminder they set themselves is not a skill). Don't call use_skill again for it.";
+pub const NEXT: &str = "These are the lamp's own records: every skill on it with its state, and those whose words come nearest to what they asked in full. Answer what they asked from these alone, in a few words: on, off, snoozed or resting, what it does and what starts it, when it last ran, whether it waits for their yes. Never guess: what is not given here the lamp doesn't keep, so say so. If none is the skill they mean, say no skill on the lamp is that one (a reminder they set themselves is not a skill). Only answer: offer to change, turn on or turn off nothing. Don't call use_skill again for it.";
+
+/// The schedule's function whose answer carries the skills' lines too
+/// ([`with_reminders`]): the owner, 16 Nov, "is my water reminder on or
+/// off?" called it on lamp-9adf (#7335's row), and with no reminder set it
+/// said nothing was on, while Sip of water was.
+pub const LIST_REMINDERS: &str = "list_reminders";
+/// The key of the skills' lines added to its answer.
+pub const SKILLS_ON_THE_LAMP: &str = "skills_on_the_lamp";
+/// The key of what the model is told of them.
+pub const SKILLS_NOTE: &str = "skills_note";
+/// What the model is told beside the skills' lines in a reminders answer.
+pub const REMINDERS_NOTE: &str = "A reminder they ask about may be one of the lamp's own skills, each listed in skills_on_the_lamp with its state from the lamp's records. When one fits what they asked, answer from its line too, in a few words; never say a skill is off or missing unless its line says so. Only answer: offer to change, turn on or turn off nothing.";
+/// What the model is told in a reminders answer when the skills' records
+/// can't be read.
+pub const REMINDERS_CANT_CHECK: &str = "The lamp can't check its skills right now: if they may mean one of the lamp's skills, say you can't check that right now, and guess nothing.";
 
 /// The answer to a question `asked` about a skill on the lamp at `places`
 /// at `now_us` (the monotonic clock) with `present`, in the voice's request
@@ -506,19 +526,13 @@ pub fn told(
         eprintln!("lamp-voice: request {request}: a skill's state not told: no one asked aloud");
         return json!({ "error": NOT_ASKED_ALOUD });
     }
-    let mut skills = match skills(places, now_us, present) {
-        Ok(skills) => skills,
+    let (skills, not_named) = match heard_skills(places, now_us, present, owner_hears) {
+        Ok(found) => found,
         Err(why) => {
             eprintln!("lamp-voice: request {request}: skills' state not told: {why}");
             return json!({ "error": CANT_CHECK });
         }
     };
-    let made = skills.iter().filter(|skill| skill.made_here).count();
-    let mut not_named = 0;
-    if made > 0 && !owner_hears() {
-        skills.retain(|skill| !skill.made_here);
-        not_named = made;
-    }
     let nearest = nearest(asked, &skills);
     // Counts only: the journal holds no skill's name and no words.
     eprintln!(
@@ -553,7 +567,40 @@ pub fn told(
             facts
         })
         .collect();
-    let listed: Vec<String> = skills
+    let mut told = json!({
+        "asked": asked,
+        "nearest": full,
+        "skills": lines(&skills),
+        "next": NEXT,
+    });
+    if not_named > 0 {
+        told["made_here_not_named"] = json!(not_named);
+    }
+    told
+}
+
+/// Every skill on the lamp ([`skills`]), but those made here when the
+/// owner doesn't hear (`owner_hears`, asked only when there is one), and
+/// how many were left out so.
+fn heard_skills(
+    places: &Places,
+    now_us: u64,
+    present: bool,
+    owner_hears: impl FnOnce() -> bool,
+) -> Result<(Vec<Skill>, usize), String> {
+    let mut skills = skills(places, now_us, present)?;
+    let made = skills.iter().filter(|skill| skill.made_here).count();
+    let mut not_named = 0;
+    if made > 0 && !owner_hears() {
+        skills.retain(|skill| !skill.made_here);
+        not_named = made;
+    }
+    Ok((skills, not_named))
+}
+
+/// Each skill's line: its spoken name and its state in a word.
+fn lines(skills: &[Skill]) -> Vec<String> {
+    skills
         .iter()
         .map(|skill| {
             format!(
@@ -562,17 +609,74 @@ pub fn told(
                 skill.state.short()
             )
         })
-        .collect();
-    let mut told = json!({
-        "asked": asked,
-        "nearest": full,
-        "skills": listed,
-        "next": NEXT,
-    });
-    if not_named > 0 {
-        told["made_here_not_named"] = json!(not_named);
+        .collect()
+}
+
+/// A [`LIST_REMINDERS`] answer `told`, in the voice's request `request`
+/// (`heard`: someone spoke it), given the skills' lines at `places` too,
+/// as a question with `about` gives them, with [`REMINDERS_NOTE`]: a
+/// reminder the person asks about may be a skill, and which one, if any,
+/// is the model's to judge. Names of skills made here only when
+/// `owner_hears`; nothing added for a turn nobody spoke; with a record
+/// there unreadable, [`REMINDERS_CANT_CHECK`] alone. An answer that is not
+/// an object is kept under `result`.
+pub fn with_reminders(
+    told: &mut Value,
+    places: &Places,
+    now_us: u64,
+    present: bool,
+    request: u64,
+    heard: bool,
+    owner_hears: impl FnOnce() -> bool,
+) {
+    if !heard {
+        return;
     }
-    told
+    if !told.is_object() {
+        *told = json!({ "result": told.take() });
+    }
+    match heard_skills(places, now_us, present, owner_hears) {
+        Ok((skills, not_named)) => {
+            eprintln!(
+                "lamp-voice: request {request}: reminders told with {} skills' lines",
+                skills.len()
+            );
+            told[SKILLS_ON_THE_LAMP] = json!(lines(&skills));
+            told[SKILLS_NOTE] = json!(REMINDERS_NOTE);
+            if not_named > 0 {
+                told["made_here_not_named"] = json!(not_named);
+            }
+        }
+        Err(why) => {
+            eprintln!("lamp-voice: request {request}: reminders told without skills: {why}");
+            told[SKILLS_NOTE] = json!(REMINDERS_CANT_CHECK);
+        }
+    }
+}
+
+/// [`with_reminders`] on the lamp, for the call `name` with the switch on
+/// (only [`LIST_REMINDERS`]): the product's places, the owner's hearing as
+/// [`told_here`]'s. Off, or another call, `told` is untouched.
+pub fn with_reminders_here(
+    name: &str,
+    told: &mut Value,
+    request: u64,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) {
+    if !on() || name != LIST_REMINDERS {
+        return;
+    }
+    let present = std::env::var(PRESENT_ENVIRONMENT).ok().as_deref() == Some("on");
+    with_reminders(
+        told,
+        &Places::product(None),
+        lamp_ipc::monotonic_us(),
+        present,
+        request,
+        heard,
+        || crate::services::owner_hears(request, heard, lease),
+    );
 }
 
 /// [`told`] on the lamp, by `use_skill`'s call: the product's places,
@@ -1032,6 +1136,86 @@ mod tests {
             "{told}"
         );
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7335's row on lamp-9adf: "is my water reminder on or off?" called
+    /// `list_reminders`, and with none set the lamp said nothing was on.
+    /// Its answer carries the skills' lines and the note, the schedule's
+    /// own words kept; a turn nobody spoke gets nothing added; a record
+    /// that can't be read gets the can't-check note alone; a made skill's
+    /// name only to the owner.
+    #[test]
+    fn a_reminders_answer_carries_the_skills_lines() {
+        let (root, places) = product_lamp("reminders");
+        let folder = places.installed.join("drink-water-reminder");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join("SKILL.md"),
+            "---\nname: drink-water-reminder\ndescription: Every hour, a reminder to drink water.\nmade: here\n---\n",
+        )
+        .unwrap();
+        std::fs::write(folder.join("skill.toml"), "kind = \"installable\"\n").unwrap();
+        let schedule = json!({"reminders": []});
+        let mut told = schedule.clone();
+        with_reminders(&mut told, &places, MINUTE, true, 1, true, || true);
+        assert_eq!(told["reminders"], json!([]), "{told}");
+        let lines = told[SKILLS_ON_THE_LAMP].as_array().unwrap();
+        assert!(lines.contains(&json!("sip of water: on")), "{told}");
+        assert!(lines.contains(&json!("drink water reminder: on")), "{told}");
+        assert!(lines.contains(&json!("dance: off")), "{told}");
+        assert_eq!(told[SKILLS_NOTE], REMINDERS_NOTE);
+        // Not the owner: a skill made here is left out and counted.
+        let mut guest = schedule.clone();
+        with_reminders(&mut guest, &places, MINUTE, true, 2, true, || false);
+        assert!(
+            !guest.to_string().contains("drink water reminder"),
+            "{guest}"
+        );
+        assert_eq!(guest["made_here_not_named"], 1);
+        // A turn nobody spoke: the schedule's answer as it was.
+        let mut unheard = schedule.clone();
+        with_reminders(&mut unheard, &places, MINUTE, true, 3, false, || {
+            panic!("owner asked")
+        });
+        assert_eq!(unheard, schedule);
+        // An answer that is not an object is kept whole.
+        let mut text = json!("You have no reminders.");
+        with_reminders(&mut text, &places, MINUTE, true, 4, true, || true);
+        assert_eq!(text["result"], "You have no reminders.");
+        assert!(text[SKILLS_ON_THE_LAMP].is_array());
+        // A record that can't be read: never a guess.
+        std::fs::write(places.tools.join(HOLDS_FILE), "not json").unwrap();
+        let mut unread = schedule.clone();
+        with_reminders(&mut unread, &places, MINUTE, true, 5, true, || true);
+        assert_eq!(
+            unread,
+            json!({"reminders": [], SKILLS_NOTE: REMINDERS_CANT_CHECK})
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Off, or any call but `list_reminders`, the answer is untouched,
+    /// byte for byte.
+    #[test]
+    fn off_a_reminders_answer_is_as_before() {
+        let schedule = json!({"ok": true, "result": {"text": "No reminders."}});
+        set_on_here(Some(false));
+        let mut told = schedule.clone();
+        with_reminders_here(LIST_REMINDERS, &mut told, 1, true, None);
+        assert_eq!(told.to_string(), schedule.to_string());
+        set_on_here(Some(true));
+        let mut other = schedule.clone();
+        with_reminders_here("set_reminder", &mut other, 2, true, None);
+        set_on_here(None);
+        assert_eq!(other.to_string(), schedule.to_string());
+    }
+
+    /// An answer about a skill only answers: it offers no change.
+    #[test]
+    fn the_answers_offer_no_change() {
+        for note in [NEXT, REMINDERS_NOTE] {
+            assert!(note.contains("Only answer: offer to change, turn on or turn off nothing."));
+        }
     }
 
     /// A long description is cut at a word's end within its bound.
