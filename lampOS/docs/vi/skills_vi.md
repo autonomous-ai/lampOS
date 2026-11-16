@@ -2586,7 +2586,8 @@ Yêu cầu của chủ (12/11): một `SKILL.md` tải lên từ app chạy qua 
 đèn, như V1; người xây dựng đầu tiên đồng ý lúc 19:44. Bật trong sản phẩm từ
 13/11 (phán quyết của chủ: luồng tải lên đi qua agent), đặt trong
 `lamp-voice`, `lamp-cloud`, `lamp-skills` và `lamp-skills-manage@`;
-`LAMP_TASK_NET` vẫn tắt, nên tệp cần tới internet vẫn bị từ chối. Khi bật (trong `lamp-voice`, `lamp-cloud`,
+`LAMP_TASK_NET` cũng bật trong sản phẩm, nên tệp cần tới internet được cấp `net`,
+hỏi lời đồng ý bằng giọng nói của chủ ở lần chạy đầu. Khi bật (trong `lamp-voice`, `lamp-cloud`,
 `lamp-skills` và manage helper), một `SKILL.md` trần tối đa 64 KiB thành một
 kỹ năng agent thay vì kỹ năng viết (tắt: như trước, ghi chú tối đa 900 byte):
 tệp được giữ nguyên là `scripts/SKILL.md`; kỹ năng là một công cụ giọng nói
@@ -2595,7 +2596,7 @@ tệp được giữ nguyên là `scripts/SKILL.md`; kỹ năng là một công 
 thư mục và home mới mỗi lần chạy, dữ liệu Hermes của người dùng bị ẩn, token riêng của lần chạy). Quyền được đọc thận
 trọng từ tệp: `camera`, `light`, `speak`, `sound`, và `net` khi tệp có một liên
 kết `http(s)://`, một webhook, hoặc bảo gọi, lấy hay gửi tới một API web hay URL;
-chỉ nhắc "API" hay "URL" thì chưa đủ (cần `LAMP_TASK_NET=on`). Đèn nói lại các quyền khi bật.
+chỉ nhắc "API" hay "URL" thì chưa đủ (cần `LAMP_TASK_NET=on`, bật trong sản phẩm). Đèn nói lại các quyền khi bật.
 Chỉ đèn, giọng (kể cả âm thanh nó phát) và thân thì bật ngay (giọng nói ghi lời đồng ý với
 lamp-control); `sound` (nghe các loại âm thanh), micro, camera, gửi đi hoặc `net` thì hỏi lời đồng ý bằng
 giọng nói một lần, ở lần chạy đầu. Khóa hay token không bao giờ được nói ra,

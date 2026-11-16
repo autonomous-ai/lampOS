@@ -37,6 +37,10 @@ Environment=LAMP_AGENT_SERVICES=on
 # token (runs::FixedWrite), never the agent's words. The same line in lamp-skills, lamp-tasks and lamp-services.
 # On in the product (owner, 13 Nov).
 Environment=LAMP_SKILL_WRITE_AGENT=on
+# A skill's task that reaches the internet (docs/tasks.md, "An agent skill's run and the `net` grant"): `net`
+# kept in the owner's yes and checked by lamp-tasks (task_yes_check), never in a one-run token. The same line in
+# lamp-tasks, lamp-skills, lamp-skills-manage@ and lamp-voice.
+Environment=LAMP_TASK_NET=on
 # The run socket (/run/lampos-control/control.sock) for lamp-tasks' skill runs as `lampos` (#6071 PR 1,
 # docs/control.md "The control socket, lamp-control's side"). With LAMP_CONTROL off, lamp-control serves only it and
 # admin.sock (no TLS door), once the first builder's (b) of 12 Nov 08:15 lands.
