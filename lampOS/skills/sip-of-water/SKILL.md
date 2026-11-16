@@ -1,11 +1,11 @@
 ---
 name: sip-of-water
-description: After someone has sat at the desk an hour and a half, the lamp turns to them and its light breathes once, a slow cool blue, a hint to drink some water, with one short, friendly line suggesting a sip.
+description: After someone has sat at the desk half an hour, the lamp turns to them and its light breathes once, a slow cool blue, a hint to drink some water, with one short, friendly line suggesting a sip.
 ---
 
 # A sip of water
 
-When you have been at your desk for an hour and a half without getting up,
+When you have been at your desk for half an hour without getting up,
 between 10:00 and 17:00, the lamp turns to you and its light breathes once,
 slowly, a cool blue, for about six seconds, and says one short, friendly
 line suggesting a sip of water. Then the light is as it was.
@@ -22,7 +22,7 @@ What it says and when:
   and never in the middle of a conversation, before 10:00, after
   17:00 or at night.
 - With the eyes' activity on, the sitting is yours: someone else sitting down in
-  your chair begins it again, so it is never theirs at your 90 minutes.
+  your chair begins it again, so it is never theirs at your 30 minutes.
 - At most one of the wellbeing nudges (this, Rest your eyes, Stand up and
   Wind down) an hour between them.
 - If it does it twice and you neither look at it nor move nor say
@@ -33,7 +33,7 @@ What it says and when:
   last, unless you ask for all of them, and the lamp says which.
 
 With the lamp's `LAMP_NUDGES_PRESENT` switch on (#5207, off unless set), it
-comes after 50 minutes at the desk, and again each 50 minutes while you
+comes after 30 minutes at the desk, and again each 45 minutes while you
 stay, between 08:00 and 22:00, six times a day at most, and the wellbeing
 nudges share two an hour, never within half an hour of each other.
 

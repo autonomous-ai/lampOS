@@ -1,0 +1,41 @@
+# LAMP_NUDGES_PRESENT=on (#5207): 10:00, 100 minutes at the desk, and
+# lamp-seen saw a drink at 20 minutes (#6543): the sip waits 30 minutes from
+# the drink, at 50, not at 30, and again 45 minutes later, at 95.
+clock = "10:00"
+present = true
+
+[[expect]]
+at = "50m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "50m"
+within = "1m"
+call = "light"
+args = { colour = "blue", level = 2 }
+
+[[expect]]
+at = "50m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk a while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }
+
+[[expect]]
+at = "95m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "95m"
+within = "1m"
+call = "light"
+args = { colour = "blue", level = 2 }
+
+[[expect]]
+at = "95m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk a while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }

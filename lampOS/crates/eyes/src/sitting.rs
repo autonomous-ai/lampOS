@@ -5,7 +5,7 @@
 //! first face ([`crate::activity::Judge`]), on CLOCK_MONOTONIC, which runs on
 //! through a restart of the program and begins again only at a boot. Each
 //! update restarts lamp-eyes, so without this every nudge that waits on
-//! `sitting_s` (a sip of water after 50 minutes, rest your eyes after 45, a
+//! `sitting_s` (a sip of water after 30 minutes, rest your eyes after 45, a
 //! comfort break after 90) began its wait again at each update.
 //!
 //! The sitting is written to one small file, [`PATH`]: on tmpfs, made at

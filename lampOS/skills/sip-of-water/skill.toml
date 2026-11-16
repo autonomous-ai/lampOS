@@ -23,10 +23,10 @@ light = true
 topic = "humans/faces/tracked"
 when = "present"          # a face there, continuously
 near = 0.14               # at the desk, not across the room (Stretch break's line)
-for = "90m"
+for = "30m"
 gap = "2m"                # looking away or leaning out of view does not end the sitting
 rearm = "leaves"          # once a sitting; again only after they have left
-cooldown = "90m"
+cooldown = "45m"
 wait = "10m"              # talking when the time comes: once the talk ends, within ten minutes
 
 [[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
@@ -48,14 +48,14 @@ not_equals = "head_down"
 unknown = "holds"
 
 [[while]]                 # the sitting is the sitter's own (#1678): the eyes' sitting_s, which
-topic = "room/activity"   # begins again when someone else sits down, has lasted 90 minutes
+topic = "room/activity"   # begins again when someone else sits down, has lasted 30 minutes
 field = "sitting_s"       # too, not only a face in the chair. Without the eyes' room/activity
-above = 5399           # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
+above = 1799           # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
 unknown = "holds"
-[[while]]                 # a drink not seen in the last 90 minutes (#6543; the PM: what is seen only
+[[while]]                 # a drink not seen in the last 30 minutes (#6543; the PM: what is seen only
 topic = "humans/doing"    # holds the nudge, never a word of its own). lamp-seen counts drank_s_ago
 field = "drank_s_ago"     # from the desk arrival when it saw nothing, so it holds as the sitting
-above = 5399              # does. Without lamp-seen, or with it gone quiet, the topic is never said
+above = 1799              # does. Without lamp-seen, or with it gone quiet, the topic is never said
 unknown = "holds_stale"   # or has run out, and it runs as before.
 
 [active]                  # only in the day's working hours
@@ -90,11 +90,11 @@ policy = "nudge"
 [[do]]
 body = { look_at = "face" }
 light = { colour = "blue", level = 2, for = "6s", pattern = { kind = "breathe", period = "6s" } }
-say = "They have sat at the desk for about an hour and a half. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health."
+say = "They have sat at the desk for about half an hour. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health."
 
 # With LAMP_NUDGES_PRESENT=on (#5207, off unless set), these stand in for
-# the values above, each key whole: a sip after 50 minutes at the desk, and
-# again each 50 minutes while they stay, over the waking day the quiet hours
+# the values above, each key whole: a sip after 30 minutes at the desk, and
+# again each 45 minutes while they stay, over the waking day the quiet hours
 # leave, six a day at most. The wellbeing group's two an hour, never within
 # 30 minutes of each other, keeps it from crowding the other nudges.
 [present]
@@ -104,9 +104,9 @@ most_a_day = 6
 topic = "humans/faces/tracked"
 when = "present"
 near = 0.14
-for = "50m"
+for = "30m"
 gap = "2m"
-cooldown = "50m"          # no rearm: again after 50 minutes while they stay;
+cooldown = "45m"          # no rearm: again after 45 minutes while they stay;
                           # talking then, every message after is a chance
 
 [[present.while]]
@@ -127,15 +127,15 @@ field = "state"
 not_equals = "head_down"
 unknown = "holds"
 
-[[present.while]]         # the sitter's own sitting has lasted 50 minutes too
+[[present.while]]         # the sitter's own sitting has lasted 30 minutes too
 topic = "room/activity"
 field = "sitting_s"
-above = 2999
+above = 1799
 unknown = "holds"
-[[present.while]]         # and no drink seen in the last 50 minutes, as above
+[[present.while]]         # and no drink seen in the last 30 minutes, as above
 topic = "humans/doing"
 field = "drank_s_ago"
-above = 2999
+above = 1799
 unknown = "holds_stale"
 
 [present.active]          # the waking day: the quiet hours hold the rest

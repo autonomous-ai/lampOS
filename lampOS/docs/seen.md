@@ -361,7 +361,7 @@ that one too, aborts a burst under way.
   dropped.
 - **What was seen** (`sitting.rs`). A burst's answers are read as drinking,
   eating or a break (V1's `drink`, `eat` and `break` groups), never as the
-  raw label. A false "drank" silences sip-of-water for 90 minutes, so a
+  raw label. A false "drank" silences sip-of-water for 30 minutes, so a
   kind counts only when one answer is at least 0.5 sure of it, or at least
   2 of the burst's last 4 answers have it at all (the server sends only
   what clears 0.3).
