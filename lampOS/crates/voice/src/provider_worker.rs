@@ -7628,15 +7628,20 @@ pub(crate) mod tests {
                 (Some(43), held),
             ]
         );
-        // Nor does the thread's file keep them, joined or apart.
+        // Nor does the thread's file keep them, joined or apart. Saved at the
+        // very millisecond train 970 failed on (#7311): its `at_unix_ms`
+        // holds "4821", so the file's words are searched, not its times.
+        let wall = std::time::UNIX_EPOCH + std::time::Duration::from_millis(1_794_821_403_292);
         let kept = crate::thread::THREAD
             .lock()
             .unwrap()
-            .save(std::time::Instant::now(), std::time::SystemTime::now())
+            .save(std::time::Instant::now(), wall)
             .unwrap_or_default();
         assert!(kept.contains("their account"), "{kept}");
+        assert!(kept.contains("4821"), "no time holds the code: {kept}");
+        let words = crate::test_words::strings_of(&kept);
         for planted in ["4 8", "4821", "four eight", "jarvis", "planted"] {
-            assert!(!kept.contains(planted), "{planted}: {kept}");
+            assert!(!words.contains(planted), "{planted}: {kept}");
         }
         crate::sign_in::forget();
     }
