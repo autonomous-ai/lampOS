@@ -2336,6 +2336,8 @@ fn second_route_worker_environment(
         crate::make_skill_agent::ENVIRONMENT,
         // With the lamp's skill-creator guide given to that agent (13 Nov).
         crate::make_skill_agent::GUIDE_ENVIRONMENT,
+        // With the make on the one run path (#7245).
+        crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).
         crate::remark_about_it::ENVIRONMENT,
@@ -2629,6 +2631,7 @@ mod tests {
             crate::made_skill::ENVIRONMENT,
             crate::make_skill_agent::ENVIRONMENT,
             crate::make_skill_agent::GUIDE_ENVIRONMENT,
+            crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
             crate::opens_further::ENVIRONMENT,
