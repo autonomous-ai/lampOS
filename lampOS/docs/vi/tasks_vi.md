@@ -1650,7 +1650,12 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   Thời gian chờ còn bị giới hạn bởi deadline còn lại của lần chạy; khi
   shutdown, subprocess đọc approvals và nhóm tiến trình của nó bị hủy.
   Không giao việc sau khi đã hủy hoặc hết hạn. Tác vụ nói vẫn chỉ chờ
-  cổng, tối đa 60 s.
+  cổng, tối đa 60 s. Một lần chạy người dùng nhờ bằng giọng nói mà bị từ
+  chối như vậy, hoặc vì Harness chưa tìm target của đèn (hay
+  `harness_not_running`, #7282), được nói một lần đúng nguyên văn "I'm still
+  getting ready. Give me a minute and ask me again." (`task::not_ready_line`
+  của lamp-skills); lần chạy do trigger thì không nói gì. Test:
+  `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`.
 - **Ghi cố định bị từ chối.** Task không có script (một ghi cố định) bị
   từ chối trước khi bất cứ gì được đặt sống: "a fixed write is not taken
   by a gateway agent, so nothing was started".
@@ -2254,6 +2259,19 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   thì `hermes`, mặc định (#6498; #6226 từng là `openclaw`). Target
   của đèn vẫn là `lamp`, với engine đó; khi engine được chọn chưa cài mà
   engine kia đã cài, dùng engine kia.
+- **Đèn còn đang chuẩn bị.** Một lần giao việc kết thúc `not_sent` với
+  `openclaw_gateway_not_ready` (Gateway của OpenClaw không trả lời trong
+  60 s) hoặc `harness_not_running` (#7282) được Task news kể bằng lời
+  `failed_not_ready`, "I'm still getting ready. Give me a minute and ask me
+  again.", không phải là việc "did not reach" agent. Với
+  `serve --set-up-later`, từ lúc khởi động hoặc đăng nhập đến khi lần xem
+  targets đầu tiên ổn định (đã đọc file targets và có trả lời đăng nhập;
+  đã đăng nhập thì các máy cũng đã trả lời; tối đa 180 s,
+  `STARTING_AT_MOST`), câu trả lời `targets` có `"lamp":"starting"`, và một
+  lần giao bị từ chối vì không có target được nói cùng câu đó
+  (`Missing::Starting`), không phải "chưa được cài đặt"; sau đó như cũ.
+  Test: `task_news::tests::a_hand_over_to_a_lamp_still_getting_ready_is_told_so`,
+  `engine::tests::the_targets_say_the_lamp_is_starting_before_the_first_look_only`.
 - **Các engine của đèn, có nêu hay không, và lựa chọn trong app (#6492).**
   Không có gì trên đèn được dựng riêng cho từng engine: Harness có nhiều
   engine, Hermes và OpenClaw chỉ là hai trong số đó. Các engine của đèn là

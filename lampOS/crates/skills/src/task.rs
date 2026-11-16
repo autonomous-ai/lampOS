@@ -1175,9 +1175,60 @@ pub fn told(answer: &str) -> Option<Vec<String>> {
     (!lines.is_empty()).then_some(lines)
 }
 
+/// What lamp-tasks says in its refusal of a run when the lamp is still
+/// getting ready: its OpenClaw Gateway not serving yet
+/// (`lamp_tasks::gateway::NOT_READY`), Harness not running yet
+/// (`harness_not_running`, #7282), or no lamp target yet as Harness hasn't
+/// looked (`lamp_tasks::skill_task`). Matched as these exact tokens: the
+/// refusal carries no code of its own for them.
+pub const NOT_READY_SAID: [&str; 3] = [
+    "openclaw_gateway_not_ready",
+    "harness_not_running",
+    "Harness hasn't looked",
+];
+
+/// The words the person hears, once, when a run they asked for by voice is
+/// refused as the lamp is still getting ready ([`NOT_READY_SAID`]) in
+/// lamp-tasks' `answer`; none for any other answer or a run not asked by
+/// voice (a trigger's run says nothing unprompted).
+pub fn not_ready_line(answer: &str, asked_by_voice: bool) -> Option<&'static str> {
+    let answer: serde_json::Value = serde_json::from_str(answer.trim()).ok()?;
+    let refused = answer.get("ok").and_then(serde_json::Value::as_bool) == Some(false);
+    let message = answer.get("message")?.as_str()?;
+    (asked_by_voice && refused && NOT_READY_SAID.iter().any(|said| message.contains(said)))
+        .then_some(lamp_voice::skill_words::NOT_READY_LINE)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    /// A run the person asked for, refused as the lamp is still getting
+    /// ready (its Gateway, Harness not running, Harness not looked yet),
+    /// is told the not-ready sentence; another refusal, a run that went,
+    /// or a trigger's run says nothing.
+    #[test]
+    fn a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so() {
+        for message in [
+            "Harness didn't start the run (openclaw_gateway_not_ready)",
+            "Harness didn't start the run (harness_not_running)",
+            "the lamp has no Harness target of its own yet (Hermes on the lamp is off, or Harness hasn't looked), so nothing was started",
+        ] {
+            let answer = json!({"ok":false,"error":"run_failed","message":message}).to_string();
+            assert_eq!(
+                not_ready_line(&answer, true),
+                Some(lamp_voice::skill_words::NOT_READY_LINE),
+                "{message}"
+            );
+            assert_eq!(not_ready_line(&answer, false), None, "{message}");
+        }
+        let other = json!({"ok":false,"error":"run_failed","message":"Harness isn't set up on this lamp yet, so a skill's run can't be started"});
+        assert_eq!(not_ready_line(&other.to_string(), true), None);
+        let went = json!({"ok":true,"id":"r1","message":"openclaw_gateway_not_ready"});
+        assert_eq!(not_ready_line(&went.to_string(), true), None);
+        assert_eq!(not_ready_line("not json", true), None);
+    }
 
     /// #7200: a run granted the internet that lamp-tasks can't give its
     /// way out (OpenClaw the default: its turns run in its gateway's
