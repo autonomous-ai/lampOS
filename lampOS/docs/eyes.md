@@ -1620,7 +1620,29 @@ With the switch:
     ("J" is "Jay", "B" "Bee", "L" "El"), and a name that is a lone letter
     is judged as that word. Heard "J", said "Jay" and spelled "J a y" agree;
     the eyes still get the model's name, and an alias the eyes keep is left
-    as it is (`a_name_heard_as_its_letter_is_the_same_name`). Letters that disagree with a count
+    as it is (`a_name_heard_as_its_letter_is_the_same_name`).
+    With the same switch, a name kept from letters spelled to it, at the
+    first save at setup and on a rename alike (spelled in the turn in hand
+    after a spell ask, or a correction below), is said back as a
+    statement, not a question: the eyes' answer gets `say_back`, the word
+    and its letters ("Ama: A, M, A. Got it.", `known_faces::spelled_back`),
+    and the model is told to say exactly that and ask nothing more
+    (`SPELLED_KEPT`). A misheard letter (B/D, M/N) is then the person's to
+    hear. The line right after that read-back may correct it, though the
+    lamp's last words were no spell ask: the read-back is found in the
+    lamp's last answer as a word right before its own letters
+    (`spelled_back_in`), and the turn in hand either spells the new name
+    (`spelled_by_them`) or names letters by a word ("No, N as in nose.",
+    "N for nose", `letters_named`) and the new name is the read-back's
+    with only those letters changed, at most as many as it names
+    (`corrects_spelled_back`). Such a line is the rename's yes and passes
+    the name checks and setup's read-back gate; any other name, another
+    letter changed, or no such line is refused as before, and
+    `rename_agreed`'s guards still judge every other yes
+    (`a_spelled_name_kept_is_said_back_and_one_line_corrects_it`). The
+    walk's own read-back of a spelled name before the face question
+    (`onboarding::spelled_name_note`, "…, did I get that right?") is
+    unchanged. Letters that disagree with a count
     they gave ("four letters", five spelled) are refused, as above.
 
   Past setup, and on the speaker's own line (`LAMP_REMEMBER_SPEAKER`), the
