@@ -258,7 +258,13 @@ and none of the skills' own (`crate::use_skill`):
   `lamp-skills`). The enum names as many skills as fit the link's 4 KB for
   parameters (`use_skill::offered`, about 67 with the longest names), so a
   lamp with more keeps the function; the setup line names the rest (`;
-  skills not given: … (past use_skill's bound)`).
+  skills not given: … (past use_skill's bound)`). With
+  `LAMP_SKILL_STATE_TOLD=on` it takes `about` too, a question about any
+  skill on the lamp, given alone, and `skill` is then not required
+  ([skills.md](skills.md), "Asked about by voice"); `about`'s description
+  comes off the same 4 KB, so a few fewer of the longest names fit (none
+  fewer for 40 skills of 18-byte names, more than a product lamp has:
+  `skill_about::tests::use_skill_takes_about_with_the_switch_alone`).
 - **What the session is told:** after the rest of its instruction, "Your
   skills": one line each, its name, its description, and its choice's name
   and words and its yes-or-no's name, each with what its parameter says.
