@@ -4531,15 +4531,25 @@ no network:
   one in its description, each weighed by how few skills have it) in full,
   with what it does (its description, cut at 400 bytes), when it last ran
   by itself when that is kept, and, for a skill whose `[[do]]` hands a task
-  over, whether that task waits for the owner's yes (asked of lamp-control
-  through the manage helper once, for the first such skill, with
-  `LAMP_SKILL_TASKS` on); and to answer from these alone, never guess, say
+  over, whether that task waits for the owner's yes (asked of the manage
+  helper and lamp-control once, for the first such skill, with
+  `LAMP_SKILL_TASKS` on, both within 1.5 s together,
+  `skill_about::YES_CHECK_MOST`, so first audio isn't held; a yes itself
+  still waits 8 s for each. Either not there or not answering in time is
+  never a wait: `waits_for_yes` is left out and `waits_for_yes_unchecked`
+  says "the lamp can't check right now whether its task waits for the
+  owner's yes", `skill_about::task_waits`); and to answer from these alone, never guess, say
   what isn't given isn't kept, and say no skill on the lamp is that one when
   none is (a reminder they set is not a skill), and only to answer:
   "offer to change, turn on or turn off nothing" (on lamp-9adf "is my plant
   watering skill on?" was answered none, then "say so and I'll turn it
   off"). Which skill they mean is the model's. The answer is about 3 to 5
-  KB with 65 skills on the lamp.
+  KB with 65 skills on the lamp, and never past what the link carries
+  (`tools::sendable`, the provider's 4,096 bytes less 16; past it Live gets
+  no answer at all): skills' lines are left out from the end, then the
+  nearest, and how many is said in `skills_left_out`
+  (`skill_about::fit`); one that still doesn't fit is told the lamp can't
+  check its skills right now.
 - **A reminder may be a skill.** On lamp-9adf (#7335's row) "Lamp, is my
   water reminder on or off?" called `list_reminders`, not `use_skill`, and
   with no reminder set the lamp said "No water reminder is set", while Sip
@@ -4557,8 +4567,15 @@ no network:
   check its skills right now: if they may mean one of the lamp's skills, say
   you can't check that right now, and guess nothing."; the names and a turn
   nobody spoke are as below (nothing is added to that turn's answer). An
-  answer that isn't an object is kept under `result`. Off, or any other
-  schedule call, the answer is the schedule's, byte for byte.
+  answer that isn't an object is kept under `result`. A failed answer (not
+  answered, unavailable, or the schedule's uncertain `error`) is kept as it
+  is. The lines fit what the link carries as above, the schedule's own
+  words whole: lines left out from the end and counted in
+  `skills_left_out`, and with no room even for the note, nothing is added.
+  The schedule's route has no settings, so the voice's skills folder is
+  noted as its worker reads `--skills-dir` (`skill_about::note_tools_dir`)
+  for `holds.json`. Off, or any other schedule call, the answer is the
+  schedule's, byte for byte.
 - **A skill asked about may not be one they made.** On lamp-9adf (#7335's
   row) "Lamp, do I have a skill that reads my calendar when I sit down?
   Did it last run?" called `make_skill` for the list of the skills they
@@ -4582,13 +4599,19 @@ no network:
   skills right now: if they may mean a skill they didn't make, say you
   can't check that right now, and guess nothing." A make, a clash's
   choice, a yes, a read-back or remove that waits for a yes, and a turn
-  nobody spoke are untouched; off, every `make_skill` answer is as before,
-  byte for byte.
+  nobody spoke are untouched, and so is an unavailable `make_skill`; the
+  lines fit what the link carries as for reminders; off, every
+  `make_skill` answer is as before, byte for byte.
 - **Never a guess.** A record there and unreadable (the skills folder, the
   `off` file, `holds.json`, a skill's `SKILL.md` or `skill.toml`) tells the
   model only that the lamp can't check its skills right now. A missing
-  `off`, `holds.json` or pushed folder is nothing turned off, held or
-  pushed.
+  `off` or pushed folder is nothing turned off or pushed. A missing
+  `holds.json` is unknown, not nothing: lamp-skills writes it at its first
+  turn whenever it runs (an empty one too) and removes it when a write
+  fails, so with none a skill on by its files is told "on, its snooze
+  can't be checked right now" in its line and "on, but whether it is
+  snoozed or resting, and when it last ran, can't be checked right now" in
+  full, never plain "on".
 - **Names to the owner.** A skill made here (`made: here`) is named only
   when the owner hears (`services::owner_hears`, asked only when there is
   one), as a list's names are; to anyone else it is left out and counted

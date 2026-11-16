@@ -417,6 +417,10 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
             return Err(std::io::Error::other("--skills-dir must be absolute"));
         }
         settings.skills = Some(PathBuf::from(folder));
+        // The voice's skills folder, for the skills' records a schedule
+        // answer carries (`skill_about::with_reminders_here`), whose route
+        // has no settings.
+        crate::skill_about::note_tools_dir(Path::new(folder));
         flags = rest;
     }
     if let [flag, rest @ ..] = flags
@@ -2361,7 +2365,9 @@ fn run_call_with_scope(
             // A reminder asked about may be one of the lamp's skills
             // (`LAMP_SKILL_STATE_TOLD`, #7335's row): `list_reminders`'
             // answer carries the skills' lines too. Off, as before.
-            crate::skill_about::with_reminders_here(&call.name, &mut told, request, heard, lease);
+            crate::skill_about::with_reminders_here(
+                &call.name, &mut told, answered, request, heard, lease,
+            );
             ("the schedule through the executive", (told, answered))
         }
         // A face is the person's at the lamp: only words they said there
