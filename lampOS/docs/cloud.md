@@ -2020,6 +2020,55 @@ words or files, nor a made skill's SHA-256.
   while the counts are there. A pushed skill lives in the developer
   folder, which the report never reads; its runs count by source alone.
 
+### Report counters (#6256 F8, `LAMP_REPORT_COUNTERS`)
+
+Vietnamese: [vi/report-counters_vi.md](vi/report-counters_vi.md).
+
+For Backend's B10 dashboard by region (a lamp in China against the rest):
+an added field under `lamp-report/1`, `metrics`, on a health report, in
+the shape Backend posted on #6256 (12 Nov, with Twelve's `mqtt` block).
+Off unless `LAMP_REPORT_COUNTERS=on`; then still only with the reports'
+three gates and the person's yes. Off, a report is byte for byte as before
+(no `metrics` key). Numbers only: no per-event data, no ids, no words, no
+region (the cloud splits by region itself).
+
+```json
+"metrics": {
+  "voice_turn_ms": {"edges": [500,1000,1500,2000,3000,5000], "counts": [0,4,9,3,1,0,0]},
+  "ota_download_s": {"edges": [30,60,120,300,600], "counts": [0,1,0,0,0,0]},
+  "wifi_setup": {"attempts": 2, "ok": 1, "fail_password": 1, "fail_no_ip": 0, "fail_other": 0},
+  "mqtt": {"transport": "tcp", "reconnects": 0, "tcp_fail": 0, "wss_switches": 0}
+}
+```
+
+A value is in the first bucket whose edge it is under, and past the last
+edge in the last bucket. A block with nothing in it is left out; `mqtt` is
+always there, zeros when nothing went wrong.
+
+| Block | Measured by | How it reaches `lamp-cloud` |
+|---|---|---|
+| `voice_turn_ms` | `lamp-voice`: the end of speech decided to the answer's first audio, the trace's `answer_first_audio` `after_decision_ms` (a lamp's own line, with no end of speech, is not counted) | `voice/turn_time` (`lamp_msgs::VoiceTurnTime {after_ms}`, an event), published with `LAMP_REPORT_COUNTERS=on` in the voice (`turn_time_out.rs`) |
+| `ota_download_s` | `lamp-update`'s `fetching` step: its `step_started_at_unix_ms` to the next step's in the same round; a round that ends in `fetching` (a failed download) counts nothing | `update/status`, read every second with the yes (`counters::Fetching`) |
+| `wifi_setup` | `lamp-setup`'s join (`wifi::join`): `ok`, `fail_password` (`wrong_password`), `fail_no_ip` (`no_dhcp`), `fail_other` (any other reason) | running totals in `/etc/lampOS/setup/wifi-setup.json` (0644, wiped by a factory reset), written with `LAMP_REPORT_COUNTERS=on` in setup (`wifi_counts.rs`) |
+| `mqtt` | `lamp-cloud`'s own connection (`online.rs`): `transport` now (`tcp`, or `wss` while F9's bridge lives), `reconnects` (every CONNACK after the first since `lamp-cloud` started), `tcp_fail` (TCP connections that never reached a CONNACK), `wss_switches` (times it went over to WSS) | in process (`Reports::link`) |
+
+- **Since the last report:** what is counted and not yet acknowledged is
+  kept in the reports' state (`state.json`); a health carries it less what
+  a health handed and not yet acknowledged carries, and the broker's ack
+  takes away only what that report carried. A report lost on the way, or a
+  restart, sends the counts again with the next one. Counts live in memory
+  as they come and reach flash with the state's next write (a report put or
+  acknowledged): no count adds a write of its own.
+- **Setup's joins wait on the lamp** until a report takes them, so a lamp
+  that joined after failures tells of them; what `lamp-cloud` already took
+  is kept as a base, so a join is sent once.
+- **Only with the yes:** a voice wait, a reconnect or a download that comes
+  while there is no yes is not counted (the voice's waits are still taken
+  off the bus and dropped). A no deletes the counts, and setup's joins up
+  to it are never sent.
+- **Bounded:** the counts are a fixed set of numbers (21), whatever
+  happens; `voice/turn_time` is read without waiting, each second.
+
 ### How often, and how it is sent
 
 - **Health:** five minutes after `lamp-cloud` starts, then every 15

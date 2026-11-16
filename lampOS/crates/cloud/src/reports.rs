@@ -29,6 +29,7 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+pub mod counters;
 mod query;
 pub mod skills;
 
@@ -390,6 +391,10 @@ pub struct HealthBody {
     /// wasn't read, so a report without it is unchanged.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skills: Option<skills::SkillsBody>,
+    /// Report counters ([`counters`]): only with their switch, left out
+    /// otherwise, so a report without it is unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metrics: Option<counters::Metrics>,
 }
 
 /// The self-update switch, as `lamp-update.service` reads it (#2709). Set
@@ -719,6 +724,7 @@ pub fn health_body(seen: &Seen) -> HealthBody {
         failed_units,
         waits: seen.waits.clone(),
         skills: None,
+        metrics: None,
     }
 }
 
@@ -1028,6 +1034,8 @@ struct Entry {
     acks: u8,
     /// The skills' day a health carries whole: let go on its ack.
     skill_day: Option<u64>,
+    /// The report counters a health carries: taken away on its ack.
+    carried: counters::Counts,
 }
 
 /// The state the queue keeps beside the crashes. A field a newer build
@@ -1050,6 +1058,12 @@ struct Kept {
     /// the voice's made-skill asks) are not yet deleted: asked of the
     /// manage helper until it says done ([`step`]).
     forget_skill_counts: bool,
+    /// Report counters counted and not yet acknowledged ([`counters`]):
+    /// in memory as they come, on flash with the state's next write (a
+    /// report put or acknowledged), so no count adds a write of its own.
+    counts: counters::Counts,
+    /// Setup's Wi-Fi totals already in `counts`.
+    wifi_base: [u64; 5],
 }
 
 /// The reports' engine: what waits, the counts and the bounds. Nothing in
@@ -1068,6 +1082,13 @@ pub struct Reports {
     later: Vec<u64>,
     /// The journal lines said, each once.
     said: RefCell<VecDeque<String>>,
+    /// With the report counters' switch: setup's Wi-Fi totals' file.
+    counting: Option<PathBuf>,
+    /// The connection's transport now, and whether it has connected yet.
+    transport: counters::Transport,
+    connected_once: bool,
+    /// The download under way, as `update/status` says it.
+    fetching: counters::Fetching,
 }
 
 /// The most journal lines remembered, so that each is said once.
@@ -1136,6 +1157,10 @@ impl Reports {
             error_told: BTreeMap::new(),
             later: Vec::new(),
             said: RefCell::new(VecDeque::new()),
+            counting: None,
+            transport: counters::Transport::Tcp,
+            connected_once: false,
+            fetching: counters::Fetching::default(),
         };
         let now = now_s();
         reports.own_choice(now);
@@ -1169,6 +1194,7 @@ impl Reports {
                         once_more: false,
                         acks: 0,
                         skill_day: None,
+                        carried: counters::Counts::default(),
                     }),
                     Queued::Later(what) => {
                         reports.later.push(seq);
@@ -1419,6 +1445,11 @@ impl Reports {
         // parts' running totals are asked to be deleted ([`step`]).
         self.kept.skills = skills::Days::default();
         self.kept.forget_skill_counts = true;
+        // The report counters too; setup's Wi-Fi joins so far are never sent.
+        self.kept.counts = counters::Counts::default();
+        if let Some(wifi) = &self.counting {
+            self.kept.wifi_base = counters::read_wifi(wifi);
+        }
         let report = self.report(now_s, None, &Seen::default(), Body::Stopped);
         self.put(report);
     }
@@ -1480,6 +1511,7 @@ impl Reports {
             once_more: false,
             acks: 0,
             skill_day: None,
+            carried: counters::Counts::default(),
         });
         self.bound(at_s);
         self.keep();
@@ -1541,6 +1573,7 @@ impl Reports {
                 day: day.map(|(day, _)| day),
             });
         }
+        let carried = self.counters_for(&mut body);
         let mut report = self.report(now_s, build, seen, Body::Health(Box::new(body)));
         // Within [`MOST_BYTES`]: the Store list cut first, then the day.
         while !fits(&report) {
@@ -1560,8 +1593,96 @@ impl Reports {
         let seq = self.put(report)?;
         if let Some(entry) = self.queue.iter_mut().find(|entry| entry.seq == seq) {
             entry.skill_day = skill_day;
+            entry.carried = carried;
         }
         Some(seq)
+    }
+
+    /// The report counters' switch, with setup's Wi-Fi totals' file.
+    pub fn counting(mut self, wifi: Option<PathBuf>) -> Self {
+        self.counting = wifi;
+        self
+    }
+
+    /// With the switch, `body`'s `metrics`: setup's new Wi-Fi joins taken
+    /// in, then all counted and not acknowledged less what a report handed
+    /// and not yet acknowledged carries. Returns what this one carries.
+    fn counters_for(&mut self, body: &mut HealthBody) -> counters::Counts {
+        let Some(wifi) = &self.counting else {
+            return counters::Counts::default();
+        };
+        let totals = counters::read_wifi(wifi);
+        // Totals below the base are a file begun again: counted from 0.
+        let begun_again = totals
+            .iter()
+            .zip(&self.kept.wifi_base)
+            .any(|(now, base)| now < base);
+        let mut joins = counters::Counts::default();
+        for (at, now) in totals.iter().enumerate() {
+            let base = if begun_again {
+                0
+            } else {
+                self.kept.wifi_base[at]
+            };
+            joins.wifi_setup[at] = now - base;
+        }
+        self.kept.counts.add(&joins);
+        self.kept.wifi_base = totals;
+        let mut carried = self.kept.counts;
+        for entry in &self.queue {
+            if entry.kind == Kind::Health && entry.handed {
+                carried.take_away(&entry.carried);
+            }
+        }
+        body.metrics = Some(carried.metrics(self.transport));
+        carried
+    }
+
+    /// Whether the report counters count now: their switch and the yes.
+    fn counts_now(&self) -> bool {
+        self.counting.is_some() && self.consent().share
+    }
+
+    /// The broker's connection, for `mqtt`.
+    pub fn link(&mut self, link: counters::Link) {
+        if self.counting.is_none() {
+            return;
+        }
+        let at = match link {
+            counters::Link::Connected(transport) => {
+                self.transport = transport;
+                // The first connection since `lamp-cloud` started is no
+                // reconnect.
+                if !std::mem::replace(&mut self.connected_once, true) {
+                    return;
+                }
+                0
+            }
+            counters::Link::TcpFailed => 1,
+            counters::Link::ToWss => 2,
+        };
+        if self.counts_now() {
+            self.kept.counts.mqtt[at] = self.kept.counts.mqtt[at].saturating_add(1);
+        }
+    }
+
+    /// An answer's wait, from `voice/turn_time`.
+    pub fn voice_turn(&mut self, after_ms: u64) {
+        if self.counts_now() {
+            self.kept.counts.voice_turn(after_ms);
+        }
+    }
+
+    /// `update/status` looked at, for `ota_download_s`.
+    pub fn update_seen(&mut self, status: &lamp_msgs::UpdateStatus) {
+        if self.counting.is_none() {
+            return;
+        }
+        if let Some(seconds) = self.fetching.look(status)
+            && self.consent().share
+        {
+            self.kept.counts.ota_download(seconds);
+        }
     }
 
     /// The parts' levels from `seen`, for `level_before`, and whether one
@@ -1709,6 +1830,7 @@ impl Reports {
         };
         entry.acks += 1;
         let day = entry.skill_day.take();
+        let carried = std::mem::take(&mut entry.carried);
         let once_more = entry.kind == Kind::Stopped && entry.acks < 2;
         if once_more {
             entry.once_more = true;
@@ -1716,6 +1838,10 @@ impl Reports {
         }
         if let Some(day) = day {
             self.kept.skills.acked(day);
+            self.keep();
+        }
+        if carried != counters::Counts::default() {
+            self.kept.counts.take_away(&carried);
             self.keep();
         }
         if once_more {
@@ -1868,6 +1994,16 @@ pub trait Sources {
     fn forget_skill_counts(&mut self) -> bool {
         true
     }
+    /// The answers' waits taken from `voice/turn_time` since the last look
+    /// (report counters); none by default.
+    fn voice_turns(&mut self) -> Vec<u64> {
+        Vec::new()
+    }
+    /// `update/status` now, if it is fresh (report counters); none by
+    /// default.
+    fn update_status(&mut self) -> Option<lamp_msgs::UpdateStatus> {
+        None
+    }
     /// Whether the voice is resting (not in a turn); true when unknown.
     fn voice_resting(&mut self) -> bool;
     /// Asks taken from `reports/request` since the last look.
@@ -1949,6 +2085,20 @@ pub fn step(
     }
     // Nothing is read without the person's yes.
     let share = shared.with(|reports| reports.consent().share);
+    // The report counters' readings: the voice's waits taken off the bus
+    // either way, and counted only with the yes ([`Reports::voice_turn`]).
+    if shared.with(|reports| reports.counting.is_some()) {
+        let turns = sources.voice_turns();
+        let status = if share { sources.update_status() } else { None };
+        shared.with(|reports| {
+            for after_ms in turns {
+                reports.voice_turn(after_ms);
+            }
+            if let Some(status) = &status {
+                reports.update_seen(status);
+            }
+        });
+    }
     let mut seen = if share {
         sources.seen()
     } else {
@@ -2016,6 +2166,8 @@ pub async fn run(shared: Arc<Shared>, mut sources: impl Sources, build: Option<B
 /// The lamp's bus and systemd, as the driver reads them.
 /// The name `lamp-cloud` takes `reports/request` under.
 const REQUESTS_NAME: &str = "cloud_reports";
+/// The name `lamp-cloud` takes `voice/turn_time` under.
+const TURN_TIMES_NAME: &str = "cloud_turn_times";
 
 pub struct Lamp {
     pub bus: Option<lamp_bus::Bus>,
@@ -2032,6 +2184,8 @@ pub struct Lamp {
     units_read: Option<(Instant, UnitStates)>,
     /// Where the skills are counted from; none reads nothing.
     pub skills: Option<skills::Places>,
+    /// `voice/turn_time`, taken for the report counters.
+    turn_times: Option<lamp_bus::Subscriber>,
 }
 
 impl Lamp {
@@ -2046,6 +2200,7 @@ impl Lamp {
             state: None,
             units_read: None,
             skills: Some(skills::Places::product()),
+            turn_times: None,
         }
     }
 
@@ -2145,6 +2300,36 @@ impl Sources for Lamp {
     fn unit_health(&mut self) -> (BTreeMap<&'static str, u32>, Vec<&'static str>) {
         let found = self.unit_states();
         (found.restarts, found.failed_units)
+    }
+
+    fn voice_turns(&mut self) -> Vec<u64> {
+        if self.turn_times.is_none()
+            && let Some(bus) = &self.bus
+        {
+            self.turn_times = bus
+                .subscribe_typed(
+                    lamp_msgs::VoiceTurnTime::TOPIC,
+                    TURN_TIMES_NAME,
+                    lamp_msgs::VoiceTurnTime::TYPE,
+                )
+                .ok();
+        }
+        let mut turns = Vec::new();
+        if let Some(taking) = self.turn_times.as_mut() {
+            // Bounded by the socket's own buffer; a second's worth at most.
+            while let Ok(Some(message)) = taking.recv(Duration::ZERO) {
+                if let Ok(turn) = message.parse::<lamp_msgs::VoiceTurnTime>() {
+                    turns.push(turn.after_ms);
+                }
+            }
+        }
+        turns
+    }
+
+    fn update_status(&mut self) -> Option<lamp_msgs::UpdateStatus> {
+        self.latest::<lamp_msgs::UpdateStatus>(lamp_msgs::UpdateStatus::TOPIC)
+            .filter(|(_, expired)| !expired)
+            .map(|(status, _)| status)
     }
 
     fn voice_resting(&mut self) -> bool {
@@ -2709,6 +2894,193 @@ pub(crate) mod tests {
             exits: root.join("exits"),
             boot_id: root.join("boot_id"),
         }
+    }
+
+    /// The health's `metrics`, as sent.
+    fn metrics_of(reports: &mut Reports) -> Option<serde_json::Value> {
+        let due = reports.due(ID);
+        let (_, text) = due.last()?;
+        serde_json::from_str::<serde_json::Value>(text)
+            .ok()?
+            .get("metrics")
+            .cloned()
+    }
+
+    fn wifi_file(places: &Places) -> PathBuf {
+        places.setup.with_file_name("wifi-setup.json")
+    }
+
+    #[test]
+    fn counters_are_off_without_their_switch_and_nothing_without_the_yes() {
+        let off = places("counters-off");
+        yes(&off);
+        let mut reports = Reports::open(off.clone());
+        reports.voice_turn(900);
+        reports.link(counters::Link::TcpFailed);
+        // A report without them is as before: no `metrics` key at all.
+        assert!(reports.health(NOW, None, &Seen::default()).is_some());
+        assert_eq!(metrics_of(&mut reports), None);
+        let _ = fs::remove_dir_all(off.own.parent().unwrap());
+        let no_yes = places("counters-no-yes");
+        let mut reports = Reports::open(no_yes.clone()).counting(Some(wifi_file(&no_yes)));
+        reports.voice_turn(900);
+        reports.link(counters::Link::TcpFailed);
+        assert_eq!(reports.kept.counts, counters::Counts::default());
+        assert!(reports.health(NOW, None, &Seen::default()).is_none());
+        let _ = fs::remove_dir_all(no_yes.own.parent().unwrap());
+    }
+
+    #[test]
+    fn counters_ride_until_acknowledged_and_an_ack_takes_away_only_what_it_carried() {
+        let places = places("counters-ack");
+        yes(&places);
+        fs::write(
+            wifi_file(&places),
+            r#"{"attempts":2,"ok":1,"fail_password":1,"fail_no_ip":0,"fail_other":0}"#,
+        )
+        .unwrap();
+        let mut reports = Reports::open(places.clone()).counting(Some(wifi_file(&places)));
+        reports.link(counters::Link::Connected(counters::Transport::Tcp));
+        reports.voice_turn(1_200);
+        reports.link(counters::Link::TcpFailed);
+        reports.link(counters::Link::ToWss);
+        reports.link(counters::Link::Connected(counters::Transport::Wss));
+        let first = reports.health(NOW, None, &Seen::default()).unwrap();
+        assert_eq!(
+            metrics_of(&mut reports).unwrap(),
+            serde_json::json!({
+                "voice_turn_ms": {"edges": [500,1000,1500,2000,3000,5000], "counts": [0,0,1,0,0,0,0]},
+                "wifi_setup": {"attempts": 2, "ok": 1, "fail_password": 1, "fail_no_ip": 0, "fail_other": 0},
+                "mqtt": {"transport": "wss", "reconnects": 1, "tcp_fail": 1, "wss_switches": 1}
+            })
+        );
+        // Handed, not yet acknowledged: the next carries only what came since.
+        reports.voice_turn(6_000);
+        let second = reports.health(NOW + 900, None, &Seen::default()).unwrap();
+        assert_eq!(
+            metrics_of(&mut reports).unwrap(),
+            serde_json::json!({
+                "voice_turn_ms": {"edges": [500,1000,1500,2000,3000,5000], "counts": [0,0,0,0,0,0,1]},
+                "mqtt": {"transport": "wss", "reconnects": 0, "tcp_fail": 0, "wss_switches": 0}
+            })
+        );
+        reports.acked(first);
+        assert_eq!(reports.kept.counts.voice_turn_ms, [0, 0, 0, 0, 0, 0, 1]);
+        // The second lost on the way: sent again with the third, kept across
+        // a restart.
+        reports.unhand(Some(second));
+        drop(reports);
+        let mut reports = Reports::open(places.clone()).counting(Some(wifi_file(&places)));
+        let third = reports.health(NOW + 1_800, None, &Seen::default()).unwrap();
+        assert_eq!(
+            metrics_of(&mut reports).unwrap()["voice_turn_ms"]["counts"],
+            serde_json::json!([0, 0, 0, 0, 0, 0, 1])
+        );
+        reports.acked(third);
+        assert_eq!(reports.kept.counts, counters::Counts::default());
+        // Setup's joins already sent are not sent again; new ones are.
+        fs::write(
+            wifi_file(&places),
+            r#"{"attempts":3,"ok":2,"fail_password":1,"fail_no_ip":0,"fail_other":0}"#,
+        )
+        .unwrap();
+        reports.health(NOW + 2_700, None, &Seen::default()).unwrap();
+        assert_eq!(
+            metrics_of(&mut reports).unwrap()["wifi_setup"],
+            serde_json::json!({"attempts": 1, "ok": 1, "fail_password": 0, "fail_no_ip": 0, "fail_other": 0})
+        );
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
+    }
+
+    #[test]
+    fn a_no_deletes_the_counters_and_setups_joins_before_it_are_never_sent() {
+        let places = places("counters-no");
+        yes(&places);
+        fs::write(wifi_file(&places), r#"{"attempts":4,"fail_other":4}"#).unwrap();
+        let mut reports = Reports::open(places.clone()).counting(Some(wifi_file(&places)));
+        reports.voice_turn(700);
+        reports.set(false, NOW).unwrap();
+        assert_eq!(reports.kept.counts, counters::Counts::default());
+        reports.voice_turn(700);
+        assert_eq!(reports.kept.counts, counters::Counts::default());
+        reports.set(true, NOW + 60).unwrap();
+        reports.health(NOW + 120, None, &Seen::default()).unwrap();
+        let metrics = metrics_of(&mut reports).unwrap();
+        assert!(metrics.get("wifi_setup").is_none(), "{metrics}");
+        assert!(metrics.get("voice_turn_ms").is_none(), "{metrics}");
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
+    }
+
+    #[test]
+    fn the_voices_waits_and_a_download_come_off_the_bus_and_count_only_with_the_yes() {
+        let places = places("counters-bus");
+        let root = places.own.parent().unwrap().join("bus");
+        fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut lamp = Lamp::new(Some(bus.clone()));
+        lamp.systemctl = root.join("no-systemctl");
+        lamp.skills = None;
+        let shared = Shared::new(Reports::open(places.clone()).counting(Some(wifi_file(&places))));
+        let start = Instant::now();
+        let mut timing = Timing::new(start);
+        let at = |timing: &mut Timing, lamp: &mut Lamp, second: u64| {
+            step(
+                &shared,
+                lamp,
+                timing,
+                None,
+                start + Duration::from_secs(second),
+                NOW + second,
+            );
+            shared.with(|reports| reports.kept.counts)
+        };
+        at(&mut timing, &mut lamp, 0);
+        let mut turns = bus
+            .publisher_declared(
+                lamp_msgs::VoiceTurnTime::TOPIC,
+                &lamp_msgs::VoiceTurnTime::declaration(),
+                "voice",
+            )
+            .unwrap();
+        let mut update = bus
+            .publisher_declared(
+                lamp_msgs::UpdateStatus::TOPIC,
+                &lamp_msgs::UpdateStatus::declaration(),
+                "update",
+            )
+            .unwrap();
+        let status = |now: &str, step_ms: u64| {
+            serde_json::json!({
+                "running": null, "now": now, "last": null,
+                "round": {"started_at_unix_ms": 1_000, "step_started_at_unix_ms": step_ms},
+            })
+        };
+        // No yes: the wait is taken off the bus and not counted.
+        turns
+            .publish_json(
+                lamp_ipc::monotonic_us(),
+                &lamp_msgs::VoiceTurnTime { after_ms: 800 },
+            )
+            .unwrap();
+        assert_eq!(at(&mut timing, &mut lamp, 1), counters::Counts::default());
+        yes(&places);
+        turns
+            .publish_json(
+                lamp_ipc::monotonic_us(),
+                &lamp_msgs::VoiceTurnTime { after_ms: 800 },
+            )
+            .unwrap();
+        update
+            .publish_json(lamp_ipc::monotonic_us(), &status("fetching", 2_000))
+            .unwrap();
+        at(&mut timing, &mut lamp, 2);
+        update
+            .publish_json(lamp_ipc::monotonic_us(), &status("switching", 92_000))
+            .unwrap();
+        let counts = at(&mut timing, &mut lamp, 3);
+        assert_eq!(counts.voice_turn_ms, [0, 1, 0, 0, 0, 0, 0]);
+        assert_eq!(counts.ota_download_s, [0, 0, 1, 0, 0, 0]);
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
     }
 
     fn yes(places: &Places) {
