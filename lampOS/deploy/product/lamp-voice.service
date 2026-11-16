@@ -512,6 +512,12 @@ Environment=LAMP_MEMORY_JOURNAL_RESUMES=on
 # on #4479). On lamp-06c1 on 29 Oct, without it, 11 exchanges after a quiz's rules the lamp said there was no quiz
 # (#1693's long-conversation plan, step 3).
 Environment=LAMP_CONVERSATION_SUMMARY=on
+# Each recent exchange is told to the model once (#6218's history side, C131): one the chat's history tells is left
+# out of the system message's thread text (HISTORY_SAID_ONCE, -2.3 KB a cut-in measured on lamp-06c1), and one a
+# stored running note holds (the summary above) is told in the note alone, not again as thread lines or history
+# (HISTORY_AFTER_NOTE). The owner's yes on 16 Nov; a row on lamp-06c1 comes before it trains.
+Environment=LAMP_HISTORY_SAID_ONCE=on
+Environment=LAMP_HISTORY_AFTER_NOTE=on
 # A thing the person already keeps, said again, is that kept thing, not a second one: on lamp-06c1 on 28 Oct
 # (build 8163, the product unit) "remember the meeting room is called orange" said again kept it twice (Friday's
 # run on #3504). A correction (`replaces`) always writes, and the room's scope is told as a first keep (#2176).
