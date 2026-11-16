@@ -1988,11 +1988,41 @@ và có `--targets-from-machines`:
   đăng nhập `Harness is signed in, but this lamp is not among its machines
   yet`. Việc đã bắt đầu dưới id máy của tài khoản chỉ đọc
   được khi đã đăng nhập; các máy tính vẫn cần đăng nhập.
+- **Đăng xuất (#7275, #7273).** Đăng xuất trong app Harness cũng dừng daemon,
+  như đăng nhập, và trước đây không gì khởi động lại nó, nên mọi lần giao việc
+  cho target của đèn đều bị trả lời "Harness is not running here". Khi một
+  lần đọc sign-in chuyển từ đã đăng nhập sang chưa đăng nhập trong lúc target
+  của đèn có thể bật, phần tasks chạy `harness start --restart`
+  (`daemon_restart`, cùng số lần thử và cùng việc chờ không còn việc bận) và
+  journal ghi `Harness signed out: its daemon is started again for the lamp's
+  own target (#7275)`.
+- **Trả lời "not running here" (#7275).** Lưới an toàn khi daemon vẫn mất (chết,
+  hoặc lần khởi động trên thất bại): `new` bị Harness từ chối với "Harness is
+  not running here. Start it with `harness start`." (`NOT_RUNNING` của CLI,
+  trên stderr hoặc stdout) kết thúc `not_sent` với `harness_not_running`, vì
+  chưa có gì được khởi động; dòng dispatch mang nguyên stderr của Harness trên
+  một dòng. Phần tasks đặt lần khởi động daemon đến hạn ngay (`harness start`,
+  đếm lại số lần thử; lần đã đến hạn thì giữ nguyên) và đưa việc đó về đầu
+  hàng đợi, nên cổng daemon khởi động daemon trước khi giao lại. Mỗi việc chỉ
+  một lần: lần trả lời "not running" thứ hai kết thúc `not_sent` với
+  `harness_not_running`, không có `new` thứ ba. Journal ghi `<label>: Harness
+  answered not running here; its daemon is started and the hand-over tried
+  once more`. Quy tắc nằm trong một helper chung (`harness::DaemonOnce`):
+  vòng owner dùng `DaemonOnce::again`/`done`; nơi tự chạy `new` (lần chạy skill,
+  `HarnessRunner`; sau này pane mở trên một session và make runner) dùng `DaemonOnce::run` với `DaemonGate::shared()`,
+  helper này trước hết chờ (tối đa 30 s, `DAEMON_GATE_WAIT`) lần khởi động mà
+  owner đã đặt hoặc đang chạy (ví dụ lần lúc boot) và không bao giờ khởi động
+  lần thứ hai. Giọng nói nói việc `harness_not_running` bằng lời `failed`
+  thường của Task news.
 - **Lời nói.** Dòng health nói `computers_need_sign_in` ("Harness is not signed
   in: tasks go to the lamp's own agent; sign in to hand tasks to your
   computers") thay cho `not_signed_in`, và `harness_status` của giọng nói nói
   như trên.
 - **Test:** `a_lamp_never_signed_in_hands_work_to_its_own_engine`,
+  `a_sign_out_starts_the_daemon_again_for_the_lamps_own_target`,
+  `a_hand_over_harness_answers_not_running_starts_its_daemon_and_goes_once_more`,
+  `a_hand_over_harness_answers_not_running_twice_is_refused_once_with_no_loop`,
+  `a_hand_over_while_the_first_daemon_start_is_under_way_waits_for_that_one`,
   `the_lamps_own_target_signed_out_is_asked_with_no_machines_look_and_no_machine`,
   `signed_out_the_computers_own_id_is_read_with_the_sign_in`.
 - **Chưa thử trên đèn:** chưa đăng nhập, "ask Hermes …" được trả lời và câu hỏi

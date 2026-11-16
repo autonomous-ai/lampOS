@@ -2674,7 +2674,10 @@ impl Runner for HarnessRunner {
     }
 
     fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
-        use crate::harness::{Cli, Closed, EngineKind, Launch, LaunchOutcome, Target};
+        use crate::harness::{
+            Cli, Closed, DaemonGate, DaemonOnce, EngineKind, HARNESS_NOT_RUNNING, Launch,
+            LaunchOutcome, Target,
+        };
         use std::os::unix::fs::DirBuilderExt;
         use std::sync::atomic::AtomicBool;
         let began = std::time::Instant::now();
@@ -2879,7 +2882,16 @@ impl Runner for HarnessRunner {
         if stopped() || std::time::Instant::now() >= until {
             return Err("the skill run ended before hand-over".into());
         }
-        let outcome = cli.launch(&launch);
+        // No Harness daemon here (`harness_not_running`, #7275): started,
+        // after any start lamp-tasks already has under way, and the run
+        // handed over once more; never a third `new` ([`DaemonOnce`]).
+        let outcome = DaemonOnce::run(
+            DaemonGate::shared(),
+            &launch.name,
+            || cli.launch(&launch),
+            |outcome| matches!(outcome, LaunchOutcome::NotSent { code } if code == HARNESS_NOT_RUNNING),
+            || cli.start_daemon(),
+        );
         // Asked of Harness: from here the agent may have begun, unless
         // Harness never sent the creation.
         if !matches!(outcome, LaunchOutcome::NotSent { .. }) {
