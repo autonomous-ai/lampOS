@@ -1351,6 +1351,12 @@ pub struct Engine<P: Persistence> {
     /// lamp has no Hermes target yet (Hermes still installing), the
     /// targets answer says `"lamp":"installing"`.
     hermes_on_lamp: bool,
+    /// Just after a start or a sign-in, before the first look at the
+    /// targets has settled (`serve --set-up-later`: the targets file not
+    /// read yet, or the machines not read yet): the targets answer says
+    /// `"lamp":"starting"`, so a hand-over refused as no target is told the
+    /// lamp is still getting ready, not that nothing is set up.
+    starting: bool,
     /// The lamp's own engines, the default first, then the others in
     /// Harness's order (#6492, [`crate::runtime::lamp_order`]): a `prepare`
     /// naming an engine for the lamp runs on it only while it is here, and
@@ -1394,6 +1400,13 @@ impl<P: Persistence> Engine<P> {
     /// (`LAMP_HERMES_ON_LAMP`, #5978).
     pub fn hermes_on_lamp(&mut self, on: bool) {
         self.hermes_on_lamp = on;
+    }
+
+    /// Whether the first look at the targets is still to settle
+    /// ([`Self::starting`]): set at a start with `serve --set-up-later`,
+    /// cleared once that look has settled.
+    pub fn starting(&mut self, starting: bool) {
+        self.starting = starting;
     }
 
     /// Whether tasks made from now on are closed once told
@@ -1573,6 +1586,7 @@ impl<P: Persistence> Engine<P> {
             last_handover: None,
             close_told: false,
             hermes_on_lamp: false,
+            starting: false,
             lamp_order: Vec::new(),
             lamp_default: None,
             kept_aside,
@@ -1805,6 +1819,11 @@ impl<P: Persistence> Engine<P> {
                     })
                 {
                     told["lamp"] = "installing".into();
+                }
+                // Before the first look settled, no target says nothing
+                // yet: the lamp is still starting.
+                if self.starting {
+                    told["lamp"] = "starting".into();
                 }
                 Some(told)
             }
@@ -5609,6 +5628,37 @@ mod tests {
             true,
         );
         assert!(installed.get("lamp").is_none());
+    }
+
+    /// Just after a start, before the first targets look settled, the
+    /// targets answer says the lamp is starting, and not once it settled:
+    /// then an empty list is "not set up" (or "installing") as before.
+    #[test]
+    fn the_targets_say_the_lamp_is_starting_before_the_first_look_only() {
+        let mut engine = Engine::open(
+            Memory::default(),
+            BTreeMap::new(),
+            STORE,
+            SESSION,
+            &clock(0),
+        )
+        .unwrap();
+        engine.hermes_on_lamp(true);
+        engine.starting(true);
+        let before = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert_eq!(before["lamp"], "starting", "{before}");
+        engine.starting(false);
+        let after = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert_eq!(after["lamp"], "installing", "{after}");
+        engine.hermes_on_lamp(false);
+        let after = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert!(after.get("lamp").is_none(), "{after}");
     }
 
     #[test]

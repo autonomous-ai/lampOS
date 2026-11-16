@@ -5721,6 +5721,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
         let sure = lamp_skills::task_sure::on();
         let found = std::cell::Cell::new(None);
         let refused = std::cell::Cell::new(None);
+        let not_ready = std::cell::Cell::new(None);
         let tried = lamp_skills::task_sure::Tried::default();
         let send = |socket: &Path, line: &str| {
             let sent = hand_over(socket, line);
@@ -5742,6 +5743,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             );
             found.set(lamp_skills::task::told(&answer));
             refused.set(lamp_skills::task::refusal_said(&answer));
+            not_ready.set(lamp_skills::task::not_ready_line(&answer, asked.is_some()));
             lamp_skills::service_write::agent_answered(&answer)
         };
         // Each try afresh: one that returns before `send` keeps nothing of
@@ -5749,6 +5751,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
         let try_hand = || {
             found.set(None);
             refused.set(None);
+            not_ready.set(None);
             tried.once(|| {
                 lamp_skills::task::hand(
                     &skill,
@@ -5785,9 +5788,26 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             let told = lamp_skills::service_read::tell(&[line.to_owned()], &mut room);
             eprintln!("lamp-skills: skill:{skill}: do.task: its refusal said aloud: {told}");
         }
+        // Refused as the lamp is still getting ready: the person who asked
+        // hears so once, not silence; with `LAMP_SKILL_TASK_SURE` on it is
+        // said instead of the run's failed line, never with it, and never
+        // with a refusal already said above.
+        let failed = match not_ready.take() {
+            Some(line) if refused.is_none() => {
+                let asking =
+                    json!({"text": line, "exact": true, "priority": lamp_skills::SAY_PRIORITY});
+                let outcome = say(&say_socket, "say", &skill, asking, &[], || {});
+                eprintln!(
+                    "lamp-skills: skill:{skill}: do.task: the lamp is still getting ready: {outcome}"
+                );
+                let _ = tried.failed();
+                None
+            }
+            _ => tried.failed(),
+        };
         // What its agent found, or with the switch on, why it didn't run
-        // (once: a refusal said above is that).
-        let told = match (found.take(), tried.failed()) {
+        // (once: a refusal or the not-ready line said above is that).
+        let told = match (found.take(), failed) {
             (Some(lines), _) => Some((lines, "what its agent found")),
             (None, Some(line)) if refused.is_none() => Some((vec![line], "what became of its run")),
             (None, _) => None,

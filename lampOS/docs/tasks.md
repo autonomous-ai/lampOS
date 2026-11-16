@@ -742,6 +742,13 @@ of 5 s at most there). Only a known no refuses:
   `failed_signed_out` words: the work didn't start, as the engine isn't
   signed in on their computer, and it has to be signed in there first.
 
+A hand-over that ends `not_sent` as the lamp is still getting ready,
+`openclaw_gateway_not_ready` (its OpenClaw Gateway didn't answer within
+60 s) or `harness_not_running` (#7282), is told with Task news'
+`failed_not_ready` words, "I'm still getting ready. Give me a minute and ask
+me again.", not as work that "did not reach" its agent. Test:
+`task_news::tests::a_hand_over_to_a_lamp_still_getting_ready_is_told_so`.
+
 `null`, no row for that computer and engine, a failed exit, a timeout, or an
 older Harness without the command is no refusal, and is kept as long, so a
 computer that can't say costs one ask. Hermes' `signedIn` is always `null`,
@@ -1777,6 +1784,16 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `engine::tests::the_targets_say_the_lamp_is_installing_only_with_the_switch_on_and_no_lamp_hermes`
     and
     `agent_tasks::tests::a_lamp_whose_hermes_is_installing_says_so_instead_of_asking_for_a_computer`.
+  - **While the lamp is still starting.** With `serve --set-up-later`,
+    from a start or a sign-in until the first targets look has settled
+    (the targets file read and the sign-in answered; signed in, the
+    machines answered too; at most 180 s, `STARTING_AT_MOST`), the
+    `targets` answer says `"lamp":"starting"`. A hand-over then refused as
+    no target is told "I'm still getting ready. Give me a minute and ask me
+    again." (`Missing::Starting`), not that it needs setting up; after
+    that, as before. Tests:
+    `engine::tests::the_targets_say_the_lamp_is_starting_before_the_first_look_only`
+    and the installing test above.
   - **Hermes' home.** Hermes keeps its settings in
     `HERMES_HOME=/var/lib/lampos-hermes/.hermes`, outside `lampos`'s home,
     apart from Harness' sign-in and lamp-cloud's credentials. Hermes saves
@@ -4209,7 +4226,12 @@ file:
   The wait is also bounded by the remaining run deadline; shutdown cancels
   an active approvals subprocess and its process group. No hand-over is
   sent after cancellation or expiry. A spoken task still waits only for
-  the port, up to 60 s.
+  the port, up to 60 s. A run the person asked for by voice that is refused
+  so, or as Harness hasn't looked for the lamp's target yet (or
+  `harness_not_running`, #7282), is said once in exact words, "I'm still
+  getting ready. Give me a minute and ask me again." (lamp-skills'
+  `task::not_ready_line`); a trigger's run says nothing. Test:
+  `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`.
 - **A fixed write is refused.** A task with no script (a fixed write) is
   refused before anything is made live: "a fixed write is not taken by a
   gateway agent, so nothing was started".
