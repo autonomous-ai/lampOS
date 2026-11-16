@@ -172,6 +172,8 @@ func TestOnlyTheOwnerIsHeard(t *testing.T) {
 		t.Error("a message from another server must be refused")
 	}
 
+	// Once the owner chooses channels, other channels need the @mention again.
+	r.cfg.DiscordOpenChannels = []string{"open-1"}
 	noMention := dmEvent("e4", "hello")
 	noMention.GuildID = "guild-1"
 	if reason := r.Handle(noMention); reason == "" {
@@ -405,6 +407,32 @@ func TestServerMessageNeedsMentionOutsideOpenPlaces(t *testing.T) {
 	}
 
 	other := event("9", "open-1", "", false, "owner-1")
+	other.GuildID = "guild-2"
+	if got := r.Handle(other); got != "from another server" {
+		t.Errorf("another server: got %q", got)
+	}
+}
+
+func TestOwnerNeedsNoMentionWhenNoChannelsChosen(t *testing.T) {
+	r := newTestRelay(&fakeGateway{}, &fakeUplink{})
+	r.cfg.DiscordOpenChannels = nil
+	r.cfg.DiscordGuestUserIDs = []string{"guest-1"}
+	ev := func(id, author string) domain.MQTTDiscordEventCommand {
+		return domain.MQTTDiscordEventCommand{EventID: id, DiscordUserID: author, GuildID: "guild-1",
+			ChannelID: "chan-1", Text: "hello", BotUserID: "bot-1"}
+	}
+	if got := r.Handle(ev("1", "owner-1")); got != "" {
+		t.Errorf("owner in any channel: got %q, want accepted", got)
+	}
+	toOthers := ev("2", "owner-1")
+	toOthers.MentionsOthers = true
+	if got := r.Handle(toOthers); got != "server message without an @mention of the bot" {
+		t.Errorf("owner addressing someone else: got %q", got)
+	}
+	if got := r.Handle(ev("3", "guest-1")); got != "guest message without an @mention of the bot" {
+		t.Errorf("guest: got %q", got)
+	}
+	other := ev("4", "owner-1")
 	other.GuildID = "guild-2"
 	if got := r.Handle(other); got != "from another server" {
 		t.Errorf("another server: got %q", got)
