@@ -4680,7 +4680,27 @@ the same code for both writers.
   over. When the agent gives no answer (no make run here, none within its
   90 s, an error), DeepSeek is then asked once, given no repairs, and its
   answer is the make, as a make DeepSeek failed first has its one answer
-  stand. With no Hermes agent on the lamp nothing changes: DeepSeek makes
+  stand.
+- **The agent's own failure is said as the agent's** (the audit's A3, 16
+  Nov: "each morning read my unread mail" with the agent busy was told
+  "Try asking for one thing, like 'say hello when I sit down'"). When the
+  agent made nothing for a reason of its own side (lamp-tasks makes one at
+  a time, `busy`; its run failed, `run_failed`; `no_answer`; no answer
+  within its 90 s; an answer cut or unread) and DeepSeek's failure stands,
+  the person hears, by voice and in the app's `not_kept`, the agent's line
+  in place of the tip to ask for one thing (`NOT_MADE_TRY`,
+  `NOT_KEPT_TRY`) or DeepSeek's `cannot:` of what the agent could make:
+  "The lamp's agent is busy; ask me again in a minute."
+  (`made_skill::AGENT_BUSY_TRY`), "The lamp's agent didn't answer in time;
+  try again." (`AGENT_LATE_TRY`), or "The lamp's agent couldn't make it
+  just now; try again." (`AGENT_FAILED_TRY`); no agent after all
+  (`NoAgent`), what is missing, never "try again": "I couldn't make that
+  one: this lamp has no agent set up to make it." (`AGENT_MISSING`;
+  `make_skill_agent::not_made_try`, `make_skill_local::agent_side`). No
+  make run here (`NoMakeRun`) is not the agent's failure: DeepSeek's
+  stands as it is. So does a skill DeepSeek made after all, a lamp reason
+  of its own (it can't do that yet, they already have it) and the brief's
+  own refusals. With no Hermes agent on the lamp nothing changes: DeepSeek makes
   it alone with its repairs. Either switch off, every make tries DeepSeek
   first, as before.
 - **The brief's own refusals stay DeepSeek's.** A DeepSeek `cannot:` whose
@@ -5162,7 +5182,14 @@ to say aloud what it made; without either the app socket isn't started
    kept and being put on), `on`, or `not_kept` with `why` in plain words:
    the maker's, "it couldn't be put on: <why>" for a kept skill the helper
    didn't put on (its `not_on`), or "it wasn't put on" for one kept more
-   than 30 minutes ago and never put on (`app_make::why_not`). A kept
+   than 30 minutes ago and never put on (`app_make::why_not`). An ask
+   still being made when lamp-voice stopped (a restart or an update; no
+   skill kept from it and no word of why) is marked at the next start,
+   before the socket takes an ask, `not_kept` with "the lamp restarted
+   while making it; try again" (`app_make::cut_by_restart`,
+   `app_make::RESTARTED`; the audit's B4, 16 Nov: it read `making`
+   forever): makes run on lamp-voice's own threads, so none is made then.
+   Another ask may start at once. A kept
    skill with code of its own said back at the lamp, its spoken yes
    awaited now, is `not_kept` with `"awaits_yes": true` beside its `why`
    (#6307, "Made from the app, said back at the lamp" above); the field is
@@ -5212,8 +5239,26 @@ restart it is asked about again and the app is still told:
 
 1. **A name the lamp holds is refused, never replaced**: a skill on the lamp
    by that name (core, from the Store, made, `/var/lib/lampOS/skills`),
-   pushed (`/var/lib/lampOS/skills-dev`), or one kept here, made or added
-   (`upload_skill::taken`).
+   pushed (`/var/lib/lampOS/skills-dev`), or one kept here that still
+   holds it (`upload_skill::taken`, `holds`): one that is on; one made here
+   (by voice or in the app) and not on, a skill with code waiting for its
+   spoken yes among them, which an upload never replaces; an upload
+   waiting for a yes (`CODE_BY_VOICE`); and an upload the manage helper may
+   still put on, being put on or asked and silent past the voice's 8 s
+   ("the lamp didn't say in time whether it is on",
+   `made_skill::NOT_SAID_IN_TIME`), for 64 s from its mark to go on
+   (`goes_on_at_unix_ms`, the keep time before it is marked;
+   `upload_skill::PUTTING_ON_MS`: the mark's 30 s, the helper's 4 s lock
+   wait, `HELPER_LOCK_WAIT`, which reads the package before it locks, and
+   30 s for the install; El's and Heron's P2 on #7243), refused then as "a
+   skill called NAME from a file is still being put on; try again in a
+   minute". Any other upload left off (the helper refused it, or was never
+   reached, so never asked) holds no name (the audit's B1, 16 Nov: a file
+   left off could never be added again, refused as "already on this lamp"
+   while no such skill was on the page): the new file takes its place
+   among the kept ones, one entry, its old package removed from the made
+   skills' folder by name alone (no `/`, no leading `.`), a link removed
+   and never followed.
 2. **A bare `SKILL.md`** becomes a written skill (`upload_skill::written`):
    ```toml
    kind = "installable"
@@ -5257,7 +5302,14 @@ restart it is asked about again and the app is still told:
    added NAME from a file, not from the Skills Store, and it's on: WHAT IT
    DOES, using WHAT IT USES."
    (`upload_skill::on_line`), or "I added a skill from a file but couldn't
-   put it on: <why>." (`upload_skill::not_on_line`).
+   put it on: <why>." (`upload_skill::not_on_line`). Left off, the app is
+   told why: `{"added": {"sha256"}}` answers `{"state": "left_off", "why"}`,
+   its `not_on` and, when the manage helper's check refused it, the
+   helper's own words after it (kept as `check_said`, its "not installed: "
+   cut off, at most 300 bytes, kept in the same write as `not_on`;
+   `upload_skill::left_off_why`), as the skills
+   page says why a skill doesn't load (the audit's B2, 16 Nov). Only the
+   plain `not_on` is said aloud.
 7. **The manage helper holds it again** (`install_made`): a card that says
    `added: file` is held to `capped_added`, and never takes the place of any
    skill, a made one's neither ("… a skill added from a file never takes its
@@ -5267,8 +5319,11 @@ The files' words are never in the journal.
 
 Tests: `upload_skill::tests` (a bare SKILL.md taken as a trigger-less
 written skill; a trigger, no function or more than a made skill may use
-refused; a taken name refused; on at once with no yes, or `left_off` with
-why without a helper; the socket's line with the switch off, without the
+refused; a taken name refused; a file kept and never put on added again,
+its old package's link removed and not followed; a slow helper's upload
+held from its mark, then free; a made skill left off keeping its name; left off by the
+helper's check, the app told why with the check's words; on at once with
+no yes, or `left_off` with why without a helper; the socket's line with the switch off, without the
 say service, kept and then `on`) and, with the
 real `lamp-skills`,
 `made::a_skill_added_from_a_file_is_checked_and_never_takes_a_place`.

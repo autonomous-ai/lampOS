@@ -650,6 +650,17 @@ fn a_skill_added_from_a_file_is_checked_and_never_takes_a_place() {
     );
 }
 
+/// The voice holds an upload's name while the manage helper may still put
+/// it on, its lock wait included (El's and Heron's P2 on #7243): the two
+/// waits are one.
+#[test]
+fn the_voice_holds_an_upload_for_the_helpers_own_lock_wait() {
+    assert_eq!(
+        lamp_voice::upload_skill::HELPER_LOCK_WAIT,
+        package::ASKED_LOCK_WAIT
+    );
+}
+
 /// A skill written in the app (`LAMP_SKILL_WRITTEN`), its files written by
 /// the voice from the person's words: the real checker packs it, it is put
 /// on only once the voice marked it to go on, and then it loads as a function for the
