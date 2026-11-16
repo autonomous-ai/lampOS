@@ -242,7 +242,13 @@ async fn post(
         // Why it refused, as the service's codes alone (#1712: Gemini's chat
         // answered HTTP 400 ten times out of ten on 21 Oct, and nothing said
         // whether for the key, the model or the request).
-        let codes = refusal_codes(&refusal_head(response).await);
+        let retry_after = response
+            .headers()
+            .get("retry-after")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.trim().parse::<u64>().ok());
+        let head = refusal_head(response).await;
+        let codes = refusal_codes(&head);
         if codes.is_empty() {
             eprintln!("lamp-voice second: a service answered HTTP {status}, naming no code");
         } else {
@@ -250,6 +256,21 @@ async fn post(
                 "lamp-voice second: a service answered HTTP {status} ({})",
                 codes.join(", ")
             );
+        }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs() as i64);
+        if let Some(reset) = usage_limit(status, &head, retry_after, now) {
+            match reset {
+                Some(reset) => eprintln!(
+                    "lamp-voice second: the service's usage limit (HTTP {status}, usage_limit) resets at {reset} (in {} s)",
+                    reset - now
+                ),
+                None => eprintln!(
+                    "lamp-voice second: the service's usage limit (HTTP {status}, usage_limit), no reset said"
+                ),
+            }
+            return Err(Error::UsageLimit(reset));
         }
         return Err(Error::Status(status));
     }
@@ -259,20 +280,83 @@ async fn post(
 /// An RFC 3339 time (`2026-11-17T00:00:00Z`, `…+07:00`, with or without
 /// fractions of a second) as seconds since 1970 UTC; nothing for anything
 /// else.
-pub(crate) fn unix_of(_text: &str) -> Option<i64> {
-    None
+pub(crate) fn unix_of(text: &str) -> Option<i64> {
+    let days = crate::local_time::day_of(text.get(..10)?)?;
+    let rest = text.get(10..)?.strip_prefix(['T', 't'])?;
+    let bytes = rest.as_bytes();
+    if bytes.len() < 9 || bytes[2] != b':' || bytes[5] != b':' {
+        return None;
+    }
+    let part = |range: std::ops::Range<usize>| -> Option<i64> {
+        let digits = rest.get(range)?;
+        digits
+            .bytes()
+            .all(|byte| byte.is_ascii_digit())
+            .then(|| digits.parse().ok())?
+    };
+    let (hour, minute, second) = (part(0..2)?, part(3..5)?, part(6..8)?);
+    if hour > 23 || minute > 59 || second > 60 {
+        return None;
+    }
+    let mut zone = &rest[8..];
+    if let Some(fraction) = zone.strip_prefix('.') {
+        zone = fraction.trim_start_matches(|c: char| c.is_ascii_digit());
+    }
+    let east = match zone {
+        "Z" | "z" => 0,
+        _ => {
+            let sign = match zone.as_bytes().first()? {
+                b'+' => 1,
+                b'-' => -1,
+                _ => return None,
+            };
+            let zone_part = |range: std::ops::Range<usize>| -> Option<i64> {
+                let digits = zone.get(range)?;
+                digits
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit())
+                    .then(|| digits.parse().ok())?
+            };
+            if zone.len() != 6 || zone.as_bytes()[3] != b':' {
+                return None;
+            }
+            sign * (zone_part(1..3)? * 3_600 + zone_part(4..6)? * 60)
+        }
+    };
+    Some(days * 86_400 + hour * 3_600 + minute * 60 + second - east)
 }
+
+/// The longest `retry-after` taken as a reset: past it, no time is said.
+const MOST_RETRY_AFTER: u64 = 30 * 86_400;
 
 /// Whether a refusal is the relay's usage limit (#7346): a 429 whose body
 /// names `usage_limit`, and when it comes back (`reset_at`, else
 /// `retry_after` seconds from `now`), if it said. `None` for any other.
+/// The body is [`refusal_head`]'s, at most [`REFUSAL_BYTES`]; one cut
+/// there, or not the relay's, is no usage limit by its word.
 fn usage_limit(
-    _status: u16,
-    _head: &[u8],
-    _retry_after: Option<u64>,
-    _now: i64,
+    status: u16,
+    head: &[u8],
+    retry_after: Option<u64>,
+    now: i64,
 ) -> Option<Option<i64>> {
-    None
+    if status != 429 {
+        return None;
+    }
+    let value = serde_json::from_slice::<serde_json::Value>(head).ok()?;
+    let error = match &value {
+        serde_json::Value::Array(items) => &items.first()?["error"],
+        _ => &value["error"],
+    };
+    if error["code"].as_str() != Some("usage_limit") {
+        return None;
+    }
+    let reset = error["reset_at"].as_str().and_then(unix_of).or_else(|| {
+        retry_after
+            .filter(|seconds| *seconds <= MOST_RETRY_AFTER)
+            .map(|seconds| now + seconds as i64)
+    });
+    Some(reset)
 }
 
 /// The most of a refusal's body [`refusal_head`] reads, and how long it waits.

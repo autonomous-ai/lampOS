@@ -3614,11 +3614,12 @@ impl DownLine {
     }
 
     /// A refusal before any word with `status`: how long the 429s have
-    /// come, once that is [`LIMIT_AFTER`] or more (a usage limit, #7346).
-    /// Another status ends the run of them.
+    /// come, once that is [`LIMIT_AFTER`] or more, or at once when the
+    /// service named it its usage limit (`word`, #7346). Another status
+    /// ends the run of them.
     // ponytail: a burst, hours of no turn, then another burst reads as one
     // run; an answered round in between (the usual case) ends it.
-    fn refused(&self, status: u16) -> Option<Duration> {
+    fn refused(&self, status: u16, word: bool) -> Option<Duration> {
         let mut since = self.refused_since.lock().ok()?;
         if status != 429 {
             *since = None;
@@ -3626,7 +3627,7 @@ impl DownLine {
         }
         let now = tokio::time::Instant::now();
         let lasted = now.duration_since(since.get_or_insert((now, false)).0);
-        (lasted >= LIMIT_AFTER).then_some(lasted)
+        (word || lasted >= LIMIT_AFTER).then_some(lasted)
     }
 
     /// A chat round began: the 429s, if any, have passed.
@@ -8234,16 +8235,26 @@ async fn say_cannot(shared: &Shared, request: u64, heard: bool) -> Result<(), St
     Ok(())
 }
 
+/// How long the usage-limit line with its time may take to render before
+/// the plain one, rendered ahead, is said instead.
+const LIMIT_RENDER_WITHIN: Duration = Duration::from_secs(3);
+
 /// [`DOWN_LINE_LIMIT`] for 429s that have lasted `lasted`, to someone who
-/// spoke only: once a run of 429s, nothing after it until a round begins
-/// or another status ends the run (no `DownLineSaid` then); the slow
-/// line ([`say_down`]) while it isn't rendered. Tells the coordinator as
-/// [`say_down`] does, so no `turn_lost` follows it.
+/// spoke only, once a run of 429s. With the service's `reset`, it says
+/// when it comes back ([`usage_limit::line_at`], in the lamp's local time
+/// and the owner's language), rendered now since the time can't be known
+/// ahead; one that can't be rendered in [`LIMIT_RENDER_WITHIN`] (the voice
+/// may be at the same limit) says the plain line rendered ahead. The slow
+/// line ([`say_down`]) while the plain one isn't rendered. Tells the
+/// coordinator as [`say_down`] does, so no `turn_lost` follows it; a later
+/// ask in the same run hears nothing and tells it too, so no `turn_lost`
+/// is said over it either (the Reviewer-lead's question on #7362).
 async fn say_limit(
     shared: &Shared,
     request: u64,
     heard: bool,
     lasted: Duration,
+    reset: Option<i64>,
 ) -> Result<(), Stop> {
     let Some(down) = shared.down.as_ref().filter(|_| heard) else {
         return Ok(());
@@ -8251,16 +8262,49 @@ async fn say_limit(
     let Some(due) = down.limit_due() else {
         return say_down(shared, request, heard).await;
     };
-    if let Some(clip) = due {
+    if let Some(plain) = due {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs() as i64);
+        let timed = reset.and_then(|reset| {
+            usage_limit::line_at(
+                shared.language,
+                reset,
+                now,
+                crate::local_time::offset_here()?,
+            )
+        });
+        let clip = match &timed {
+            Some(text) => {
+                tokio::time::timeout(LIMIT_RENDER_WITHIN, render_line(&shared.services, text))
+                    .await
+                    .unwrap_or_default()
+            }
+            None => Vec::new(),
+        };
+        let (clip, with_time) = if clip.is_empty() {
+            (plain, false)
+        } else {
+            (clip, true)
+        };
         cue(shared, request, clip).await?;
         down.limit_said();
-        if !shared.emit(ProviderOutput::DownLineSaid { request }).await {
-            return Err(Stop::Gone);
-        }
         eprintln!(
-            "lamp-voice second: request {request} said it has hit its usage limit (429s for {} s)",
-            lasted.as_secs()
+            "lamp-voice second: request {request} said it has hit its usage limit (429s for {} s{})",
+            lasted.as_secs(),
+            if with_time {
+                ", with when it comes back"
+            } else {
+                ""
+            }
         );
+    } else {
+        eprintln!(
+            "lamp-voice second: request {request} heard nothing: its usage limit was said earlier in this run"
+        );
+    }
+    if !shared.emit(ProviderOutput::DownLineSaid { request }).await {
+        return Err(Stop::Gone);
     }
     Ok(())
 }
@@ -16996,16 +17040,24 @@ async fn answer(
                         // silence (#1844's B). The slow line only for one
                         // that passes (429, a 5xx); a key, credit or request
                         // refused says it can't answer, with no promise
-                        // (the Reviewer-lead's P3 on #3771). 429s that last
-                        // are a usage limit and say so (#7346).
+                        // (the Reviewer-lead's P3 on #3771). A usage limit,
+                        // in the service's word or by 429s that last, says
+                        // so (#7346).
+                        let refusal = match error {
+                            net::Error::Status(status) => Some((status, None)),
+                            net::Error::UsageLimit(reset) => Some((429, Some(reset))),
+                            _ => None,
+                        };
                         if first
                             && round == 1
-                            && let net::Error::Status(status) = error
+                            && let Some((status, word)) = refusal
                         {
-                            let limited =
-                                shared.down.as_ref().and_then(|down| down.refused(status));
+                            let limited = shared
+                                .down
+                                .as_ref()
+                                .and_then(|down| down.refused(status, word.is_some()));
                             if let Some(lasted) = limited {
-                                say_limit(shared, request, heard, lasted).await?;
+                                say_limit(shared, request, heard, lasted, word.flatten()).await?;
                             } else if passing(status) {
                                 say_down(shared, request, heard).await?;
                             } else {
