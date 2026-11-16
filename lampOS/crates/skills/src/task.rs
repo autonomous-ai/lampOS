@@ -1187,8 +1187,18 @@ pub const NOT_READY_SAID: [&str; 2] = ["openclaw_gateway_not_ready", "harness_no
 /// The words the person hears, once, when a run they asked for by voice is
 /// refused as the lamp is still getting ready ([`NOT_READY_SAID`]) in
 /// lamp-tasks' `answer`; none for any other answer or a run not asked by
-/// voice (a trigger's run says nothing unprompted).
-pub fn not_ready_line(answer: &str, asked_by_voice: bool) -> Option<&'static str> {
+/// voice (a trigger's run says nothing unprompted), or one refused past
+/// [`lamp_voice::skill_words::NOT_READY_WITHIN_MS`] after the lamp started
+/// (`since_boot_ms`): its Gateway or Harness is broken, not starting, and
+/// the run's failure is told as before (El's P2 on #7351).
+pub fn not_ready_line(
+    answer: &str,
+    asked_by_voice: bool,
+    since_boot_ms: Option<u64>,
+) -> Option<&'static str> {
+    if !lamp_voice::skill_words::not_ready_told(since_boot_ms) {
+        return None;
+    }
     let answer: serde_json::Value = serde_json::from_str(answer.trim()).ok()?;
     let refused = answer.get("ok").and_then(serde_json::Value::as_bool) == Some(false);
     let message = answer.get("message")?.as_str()?;
@@ -1208,25 +1218,50 @@ mod tests {
     /// lamp being off, is never told as not ready (Heron's P2 on #7351).
     #[test]
     fn a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so() {
+        // A minute after the lamp started.
+        const STARTING: Option<u64> = Some(60_000);
         for message in [
             "Harness didn't start the run (openclaw_gateway_not_ready)",
             "Harness didn't start the run (harness_not_running)",
         ] {
             let answer = json!({"ok":false,"error":"run_failed","message":message}).to_string();
             assert_eq!(
-                not_ready_line(&answer, true),
+                not_ready_line(&answer, true, STARTING),
                 Some(lamp_voice::skill_words::NOT_READY_LINE),
                 "{message}"
             );
-            assert_eq!(not_ready_line(&answer, false), None, "{message}");
+            assert_eq!(not_ready_line(&answer, false, STARTING), None, "{message}");
+            // Past the start window, or with no time since the start, the
+            // same refusal is a broken Gateway or Harness: no "give me a
+            // minute" for good (El's P2 on #7351).
+            let window = lamp_voice::skill_words::NOT_READY_WITHIN_MS;
+            assert_eq!(
+                not_ready_line(&answer, true, Some(window)),
+                Some(lamp_voice::skill_words::NOT_READY_LINE),
+                "{message}"
+            );
+            assert_eq!(
+                not_ready_line(&answer, true, Some(window + 1)),
+                None,
+                "{message}"
+            );
+            assert_eq!(
+                not_ready_line(&answer, true, Some(3_600_000)),
+                None,
+                "{message}"
+            );
+            assert_eq!(not_ready_line(&answer, true, None), None, "{message}");
         }
         let other = json!({"ok":false,"error":"run_failed","message":"Harness isn't set up on this lamp yet, so a skill's run can't be started"});
-        assert_eq!(not_ready_line(&other.to_string(), true), None);
+        assert_eq!(not_ready_line(&other.to_string(), true, STARTING), None);
         let hermes_off = json!({"ok":false,"error":"run_failed","message":"the lamp has no Harness target of its own yet (Hermes on the lamp is off, or Harness hasn't looked), so nothing was started"});
-        assert_eq!(not_ready_line(&hermes_off.to_string(), true), None);
+        assert_eq!(
+            not_ready_line(&hermes_off.to_string(), true, STARTING),
+            None
+        );
         let went = json!({"ok":true,"id":"r1","message":"openclaw_gateway_not_ready"});
-        assert_eq!(not_ready_line(&went.to_string(), true), None);
-        assert_eq!(not_ready_line("not json", true), None);
+        assert_eq!(not_ready_line(&went.to_string(), true, STARTING), None);
+        assert_eq!(not_ready_line("not json", true, STARTING), None);
     }
 
     /// #7200: a run granted the internet that lamp-tasks can't give its
