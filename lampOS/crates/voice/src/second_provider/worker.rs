@@ -4319,6 +4319,20 @@ pub fn serve(
         );
     }
     engine = engine.telling_made_not_on(made_not_on);
+    // The same for a light act told as under way ("Warming that up.";
+    // `LAMP_ACTION_CLAIM_DOING=on`, #7285), only beside the check above.
+    let doing_claims = crate::action_claim::doing_on();
+    if doing_claims {
+        eprintln!(
+            "{}",
+            if action_claims {
+                "lamp-voice second: a reply telling a light act as under way with no call is held the same way (LAMP_ACTION_CLAIM_DOING)"
+            } else {
+                "lamp-voice second: LAMP_ACTION_CLAIM_DOING does nothing without LAMP_ACTION_CLAIM_CHECKED"
+            }
+        );
+    }
+    engine = engine.checking_doing_claims(action_claims && doing_claims);
     // A line said to the lamp by name never ends in silence from an empty
     // answer (`LAMP_NO_WORDS_AGAIN=on`, #3704).
     let no_words_again = std::env::var(crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT)

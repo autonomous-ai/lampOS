@@ -81,6 +81,24 @@ fn went(
     first: Vec<net::Result<ChatEvent>>,
     later: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> Went {
+    went_doing(on, worded_on, false, product, heard, written, first, later)
+}
+
+/// [`went`], with `LAMP_ACTION_CLAIM_DOING` as `doing_on` (#7285).
+#[allow(
+    clippy::too_many_arguments,
+    reason = "a test helper: each switch and script part named at the call"
+)]
+fn went_doing(
+    on: bool,
+    worded_on: bool,
+    doing_on: bool,
+    product: bool,
+    heard: &str,
+    written: bool,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(std::iter::once(first).chain(later).collect()),
@@ -127,7 +145,8 @@ fn went(
     .answering_short(product)
     .saying_at_once(product)
     .checking_action_claims(on)
-    .checking_worded_claims(worded_on);
+    .checking_worded_claims(worded_on)
+    .checking_doing_claims(doing_on);
     let labels = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -389,59 +408,185 @@ fn a_change_promised_with_no_call_is_held_and_asked_again() {
     assert!(!told_claim(&went), "{went:?}");
 }
 
+/// One turn with `LAMP_ACTION_CLAIM_DOING` as `doing_on` (#7285), the
+/// claim check on and the product's short lines.
+fn doing(
+    doing_on: bool,
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
+    went_doing(true, false, doing_on, true, heard, false, first, later)
+}
+
+/// The cut-in as lamp-52e6 heard it in 13417's request 21 (#7285).
+const CUT_IN_WARMER: &str = "Hold on. Hey, Lamp. Make the light a little warmer.";
+
 /// #7285, lamp-52e6 core w2 on 13417 (request 21): a story's answer cut
-/// after 5 words, then "Hold on. Hey, Lamp. Make the light a little warmer."
-/// heard whole, answered in 3 words (16 characters) with `calls=none`, and
-/// said: no phrase run lists that wording. The reply echoes the ask, so it
-/// is held, the model asked once more, and the retry's `light_warmer` call
-/// answers with its own line. A second echo with no call is the line that
-/// it wasn't done.
+/// after 5 words, then the cut-in heard whole (10 words), answered in 3
+/// words (16 characters) with `calls=none`, and said: no phrase run lists
+/// a light act told as under way. With `LAMP_ACTION_CLAIM_DOING` the reply
+/// is held and the model asked once more, and the retry's `light_warmer`
+/// answers with its own line; a second such reply is the line that it
+/// wasn't done. Off, it is said as it came, as on the lamp.
 #[test]
 fn a_cut_in_warm_ask_answered_in_words_alone_gets_its_call() {
-    let heard = "Hold on. Hey, Lamp. Make the light a little warmer.";
     for reply in [
         "Warming that up.",
         "Sure, warming it up.",
-        "Okay. A little warmer now!",
-        "A touch warmer, coming up.",
+        "I'm warming it up now.",
     ] {
         // After the call's own line, a round for anything else asked.
         let rounds = vec![calling("light_warmer"), vec![Ok(ChatEvent::Done)]];
-        let went = claimed(true, heard, saying(reply), rounds);
+        let went = doing(true, CUT_IN_WARMER, saying(reply), rounds);
         assert_eq!(went.ran, ["light_warmer"], "{reply}: {went:?}");
         assert_eq!(went.said, said(&["Warmer."]), "{reply}: {went:?}");
         assert!(told_claim(&went), "{reply}: {went:?}");
+        let rounds = vec![calling("light_warmer"), vec![Ok(ChatEvent::Done)]];
+        let off = doing(false, CUT_IN_WARMER, saying(reply), rounds);
+        assert_eq!(off.said, said(&[reply]), "{reply}: {off:?}");
+        assert_eq!((off.asked, off.ran.len()), (1, 0), "{reply}");
     }
-    let went = claimed(
-        true,
-        heard,
-        saying("Warming that up."),
-        vec![saying("Warming that up.")],
-    );
+    let reply = "Warming that up.";
+    let went = doing(true, CUT_IN_WARMER, saying(reply), vec![saying(reply)]);
     assert_eq!(
         went.said,
         said(&[crate::action_claim::NOT_DONE_LINE]),
         "{went:?}"
     );
-    // The light row on 13495: a colour asked, answered in words alone.
-    let went = claimed(
+}
+
+/// #7285, 13495's light row: the colour ask answered in words alone with
+/// `calls=none`. Held, the retry calls `light_colour`.
+#[test]
+fn a_colour_ask_answered_in_words_alone_gets_its_call() {
+    let went = doing(
         true,
         "Hey Lamp, make your light blue.",
-        saying("Blue it is."),
+        saying("Switching to blue."),
         vec![calling("light_colour"), vec![Ok(ChatEvent::Done)]],
     );
     assert_eq!(went.ran, ["light_colour"], "{went:?}");
-    // Not echoes: a refusal, an offer, a question asked, talk.
+    assert!(told_claim(&went), "{went:?}");
+}
+
+/// The Reviewer-lead's HOLD on #7352 (c6919405079): talk that names a
+/// colour or a warmth is never held, even with the same reply on the
+/// retry: only the lamp's reply is read, and it tells no act under way.
+#[test]
+fn talk_naming_a_colour_or_a_warmth_is_said_as_it_came() {
     for (line, reply) in [
-        (heard, "I can't change my light right now."),
-        (heard, "Want it a little warmer?"),
-        ("What colour is your light?", "Blue."),
-        ("Lamp, tell me a story.", "A fox sat by a warm fire."),
+        ("Tell me a story about a red fox.", "A red fox lived alone."),
+        ("That's so cool, tell me more.", "Cool, glad you like it."),
+        ("That's so cool.", "Glad you like it."),
+        ("I love the blue sky today.", "Blue skies are lovely."),
+        ("Remind me, what is your name.", "I remind you, I'm Lamp."),
+        ("Hey Lamp, go on with the story.", "Continuing the story."),
+        ("Thanks, Lamp.", "You're welcome."),
     ] {
-        let went = claimed(true, line, saying(reply), vec![saying("Okay.")]);
+        let went = doing(true, line, saying(reply), vec![saying(reply)]);
         assert_eq!(went.said, said(&[reply]), "{line} / {reply}: {went:?}");
-        assert!(!told_claim(&went), "{line} / {reply}: {went:?}");
+        assert_eq!(went.asked, 1, "{line} / {reply}");
+        assert!(!told_claim(&went), "{line} / {reply}");
     }
+}
+
+/// #7285's 30-replay count, through the scripted second route: the gate's
+/// own asks (core rows, w2's cut-in, the light row) and talk, each with a
+/// words-only reply and `calls=none`; the journal keeps no reply words, so
+/// the replies are written in the shapes the gates measured (3 and 4
+/// words). Before (switch off) no promise is caught; after, every promise
+/// is held and none of the talk is.
+#[test]
+fn thirty_replays_hold_every_act_told_and_no_talk() {
+    // (line, reply, a light act told with no call)
+    let replays: [(&str, &str, bool); 30] = [
+        (CUT_IN_WARMER, "Warming that up.", true),
+        (CUT_IN_WARMER, "Sure, warming it up.", true),
+        (CUT_IN_WARMER, "Okay, warming things up.", true),
+        (CUT_IN_WARMER, "I'm warming it up.", true),
+        (
+            "Hey Lamp, make your light blue.",
+            "Switching to blue.",
+            true,
+        ),
+        (
+            "Hey Lamp, make your light blue.",
+            "Turning it blue now.",
+            true,
+        ),
+        ("Lamp, make it a bit cooler.", "Cooling it down.", true),
+        ("Lamp, dim the light.", "Dimming the light.", true),
+        ("Lamp, brighter please.", "Brightening it up.", true),
+        ("Lamp, make the light red.", "Changing it to red.", true),
+        (
+            "Tell me a story about a red fox.",
+            "A red fox lived alone.",
+            false,
+        ),
+        (
+            "That's so cool, tell me more.",
+            "Cool, glad you like it.",
+            false,
+        ),
+        ("That's so cool.", "Glad you like it.", false),
+        (
+            "I love the blue sky today.",
+            "Blue skies are lovely.",
+            false,
+        ),
+        (
+            "Remind me, what is your name.",
+            "I remind you, I'm Lamp.",
+            false,
+        ),
+        (
+            "Hey Lamp, go on with the story.",
+            "Continuing the story.",
+            false,
+        ),
+        ("Thanks, Lamp.", "You're welcome.", false),
+        ("Lamp, what time is it?", "It's 9:39.", false),
+        ("What colour is your light?", "Blue.", false),
+        ("What colour is your light?", "My light is blue now.", false),
+        ("Is it warm enough?", "Feels cosy to me.", false),
+        (
+            "Lamp, tell me a short story.",
+            "Warming his paws by the fire, the fox slept.",
+            false,
+        ),
+        (
+            "Lamp, make it warmer.",
+            "I can't change my light right now.",
+            false,
+        ),
+        ("Lamp, make it warmer.", "Want it a little warmer?", false),
+        ("Lamp, make it warmer.", "Should I make it warmer?", false),
+        (
+            "Hey Lamp, what's the weather?",
+            "Sunny and warm, 31 degrees.",
+            false,
+        ),
+        ("Good morning, Lamp.", "Good morning! Sleep well?", false),
+        ("Lamp, sing me something.", "Singing isn't my thing.", false),
+        ("Lamp, how are you?", "Doing well, thanks.", false),
+        ("Lamp, keep going.", "Getting to the good part now.", false),
+    ];
+    let mut held = [(0, 0); 2];
+    for (at, on) in [false, true].into_iter().enumerate() {
+        for (line, reply, act) in replays {
+            let went = doing(on, line, saying(reply), vec![saying(reply)]);
+            if told_claim(&went) {
+                if act {
+                    held[at].0 += 1;
+                } else {
+                    held[at].1 += 1;
+                }
+            }
+        }
+    }
+    // (promises held of 10, talk held of 20), before and after.
+    assert_eq!(held, [(0, 0), (10, 0)]);
 }
 
 /// The Reviewer-lead's P3 on #6467: "I'll turn it off." about an alarm,

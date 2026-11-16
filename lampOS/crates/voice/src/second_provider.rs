@@ -1728,6 +1728,8 @@ struct Shared {
     worded_claims: bool,
     /// [`Engine::telling_made_not_on`] (#7270).
     made_not_on: bool,
+    /// [`Engine::checking_doing_claims`] (#7285).
+    doing_claims: bool,
     /// [`Engine::asking_again_for_no_words`] (#3704).
     no_words_again: bool,
     /// [`Engine::asking_again_for_answers`] (Queue #4710, item 3).
@@ -4624,6 +4626,7 @@ impl Engine {
                 action_claims: false,
                 worded_claims: false,
                 made_not_on: false,
+                doing_claims: false,
                 no_words_again: false,
                 answer_again: false,
                 cut_ask_answered: false,
@@ -5910,6 +5913,20 @@ impl Engine {
     pub fn telling_made_not_on(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.made_not_on = on;
+        }
+        self
+    }
+
+    /// `LAMP_ACTION_CLAIM_DOING=on` ([`crate::action_claim::doing_claim`],
+    /// #7285), beside [`Engine::checking_action_claims`]: a reply whose
+    /// first sentence tells one of the light's acts as under way ("Warming
+    /// that up.", "Switching to blue.") is held and judged as a light claim:
+    /// with no call in the turn, asked again once, then said not done.
+    /// Only the reply is read. Nothing without the claim check. Before any
+    /// turn only.
+    pub fn checking_doing_claims(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.doing_claims = on;
         }
         self
     }
@@ -15751,13 +15768,9 @@ async fn answer(
     // ruling on #5215, [`crate::action_claim::stands`]). The strict lines
     // judge every turn.
     let worded_turn = shared.worded_claims && !crate::action_claim::asked_as_a_question(&said);
-    // The spoken line a short reply may echo as done (#7285,
-    // [`crate::action_claim::echoed_claim`]): never one asked as a
-    // question, whose short answer may tell the state ("Blue."). It
-    // judges only a turn with no call yet: beside a call the other runs
-    // judge as before.
-    let echo_line =
-        (heard && !crate::action_claim::asked_as_a_question(&said)).then(|| said.clone());
+    // Whether a light act told as under way is a claim (#7285,
+    // `LAMP_ACTION_CLAIM_DOING`): read from the reply alone.
+    let doing_turn = shared.doing_claims;
     // Whether the line asks to read something back: then a `list_reminders`
     // may back a time a worded claim says (the Reviewer-lead's P2 on #5737).
     let read_asked = crate::action_claim::worded_as_a_question(&said);
@@ -17012,7 +17025,7 @@ async fn answer(
                                     false,
                                     worded_turn,
                                     forget_turn,
-                                    echo_line.as_deref().filter(|_| turn_called.is_empty()),
+                                    doing_turn,
                                 ) {
                                     Some(None) => action_held.take().unwrap_or_default(),
                                     Some(Some(kind))
@@ -17653,9 +17666,7 @@ async fn answer(
                     true,
                     worded_turn,
                     forget_turn,
-                    echo_line
-                        .as_deref()
-                        .filter(|_| turn_called.is_empty() && calls.is_empty()),
+                    doing_turn,
                 )
                 .flatten()
                 .filter(|kind| {
@@ -17710,13 +17721,13 @@ async fn answer(
                 // Whether only the worded claims found it: the journal says so.
                 let worded = if limited {
                     ", in other words: LAMP_ACTION_CLAIM_WORDED, a said limit no call carried"
-                } else if !forget_said
+                } else if doing_turn
+                    && !forget_said
                     && crate::action_claim::claim_as(&held, true, worded_turn)
                         .flatten()
                         .is_none()
                 {
-                    // Only the echo of the line's ask found it (#7285).
-                    ", the reply echoing the line's ask"
+                    ", an act told as under way: LAMP_ACTION_CLAIM_DOING"
                 } else if worded_turn
                     && !forget_said
                     && crate::action_claim::claim(&held, true).flatten().is_none()
