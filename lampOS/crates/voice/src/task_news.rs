@@ -1813,6 +1813,10 @@ fn note_failed(
         // Reopening it could not be confirmed yet (`LAMP_TASKS_RESUME_CLOSED`):
         // the same, and that they may try again in a moment.
         Some("session_resume_unconfirmed") => Some(&words.failed_closed_soon),
+        // The lamp is still getting ready: its OpenClaw Gateway did not
+        // answer in time, or Harness is not running yet (#7282). Told so
+        // at once, not as a hand-over that could not be started.
+        Some("openclaw_gateway_not_ready" | "harness_not_running") => Some(&words.failed_not_ready),
         _ => None,
     };
     if let Some(line) = refused
@@ -3639,6 +3643,24 @@ mod tests {
                 && !no_prompt.contains("offer to try again"),
             "{no_prompt}"
         );
+    }
+
+    /// A hand-over not sent as the lamp is still getting ready (its
+    /// OpenClaw Gateway not answering yet, or Harness not running yet,
+    /// #7282) is told with the not-ready sentence, not as one that did not
+    /// reach its agent.
+    #[test]
+    fn a_hand_over_to_a_lamp_still_getting_ready_is_told_so() {
+        for code in ["openclaw_gateway_not_ready", "harness_not_running"] {
+            let told =
+                note_failed(&own(), &task("openclaw", json!([])), false, Some(code)).unwrap();
+            assert!(
+                told.contains(crate::skill_words::NOT_READY_LINE)
+                    && !told.contains("did not reach")
+                    && !told.contains("offer to try again"),
+                "{code}: {told}"
+            );
+        }
     }
 
     /// Reviewer-two's P2 on #2875: a valid task of 250 three-byte

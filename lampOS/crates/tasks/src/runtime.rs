@@ -2082,6 +2082,12 @@ fn owner<C: Clock>(
     let mut targets_due = Instant::now();
     let mut sign_in_due = Instant::now();
     let mut machines_due = Instant::now();
+    // Just after this start or a sign-in, the targets answer says the lamp
+    // is starting until the first look at the targets settled
+    // ([`starting_settled`]): since when, and whether the machines answered.
+    let mut starting_since = set_up_later.as_ref().map(|_| Instant::now());
+    let mut machines_answered = false;
+    engine.starting(starting_since.is_some());
     // What the last write from the machines said, so the journal has one
     // line a change, not one a look.
     let mut machines_said = String::new();
@@ -2157,6 +2163,12 @@ fn owner<C: Clock>(
             {
                 sign_in_due = Instant::now();
                 machines_due = Instant::now();
+                // Starting again until the machines are read.
+                if set_up_later.is_some() {
+                    starting_since = Some(Instant::now());
+                    machines_answered = false;
+                    engine.starting(true);
+                }
                 // Harness's own sign-in stops its daemon, and its user
                 // service doesn't start it again, so every hand-over after
                 // it says "Harness is not running here" (lamp-75c9, 20 Oct;
@@ -2186,6 +2198,22 @@ fn owner<C: Clock>(
                 lamp_target_defaulted(&later.targets, side);
             }
             look_at_targets(&mut engine, &later.targets, &mut targets_seen, found);
+            if let Some(since) = starting_since
+                && starting_settled(
+                    found,
+                    later.from_machines.is_some(),
+                    machines_answered,
+                    engine.summary()["no_harness"] == true,
+                    since.elapsed(),
+                )
+            {
+                starting_since = None;
+                engine.starting(false);
+                eprintln!(
+                    "tasks: the first targets look settled after {} s: the lamp is no longer starting",
+                    since.elapsed().as_secs()
+                );
+            }
             found.here = engine
                 .targets()
                 .get(LAMP_TARGET)
@@ -2320,6 +2348,7 @@ fn owner<C: Clock>(
                     if let Some(later) = set_up_later.as_ref()
                         && let Some(wanted) = later.from_machines
                     {
+                        machines_answered = true;
                         let said = match read {
                             Ok(listed) => {
                                 let chosen = if engines_on {
@@ -4092,6 +4121,33 @@ struct FileIdentity {
     len: u64,
     modified: i64,
     nanos: i64,
+}
+
+/// The longest the lamp is said to be starting ([`starting_settled`]), so
+/// a Harness that never answers is told as not set up again, as before.
+const STARTING_AT_MOST: Duration = Duration::from_secs(180);
+
+/// Whether the first look at the targets after a start or a sign-in has
+/// settled, `since` it began: the targets file was read (this is asked
+/// right after a look) and the sign-in answered: signed out, the lamp's
+/// own target is written from the lamp itself (offline, as kept); signed
+/// in, the machines have answered too (`from_machines`). No Harness at
+/// all, failed sign-in reads let go ([`SIGN_IN_FAILED_READS`]), or [`STARTING_AT_MOST`]: settled.
+fn starting_settled(
+    found: &SetUp,
+    from_machines: bool,
+    machines_answered: bool,
+    no_harness: bool,
+    since: Duration,
+) -> bool {
+    no_harness
+        || since >= STARTING_AT_MOST
+        || match found.sign_in {
+            None => found.sign_in_failures >= SIGN_IN_FAILED_READS,
+            // Offline, the machines are not asked: the targets are as kept.
+            Some(SignIn::Out | SignIn::Offline) => true,
+            Some(SignIn::In) => !from_machines || machines_answered,
+        }
 }
 
 /// Read the targets again when the file changed (`serve --set-up-later`).
