@@ -373,7 +373,8 @@ It costs one DeepSeek call per batch, off the turn's path, and up to about
 
 ### Told once: after the note, not again as history (`LAMP_HISTORY_AFTER_NOTE`)
 
-With `LAMP_HISTORY_AFTER_NOTE=on` too (off in the product; #6218), the
+With `LAMP_HISTORY_AFTER_NOTE=on` too (on in the product unit, beside
+`LAMP_HISTORY_SAID_ONCE`; #6218, C131), the
 exchanges a stored note holds are told in it alone, not again as the
 thread's lines and the chat's history. Off, a given exchange stays in both
 until the thread drops it, so a turn is told the same talk twice: in the
