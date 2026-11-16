@@ -101,6 +101,12 @@ trigger's `for`, with no margin: if lamp-seen's desk arrival (begun again on
 `room/stood_up`) starts later than the sitting the trigger counts (which
 survives gaps up to 2 minutes), the nudge waits for the timer, and a wait past
 the trigger's `wait` loses that sitting's nudge.
+With `LAMP_SEEN_BREAK_IS_STANDING=on` (#6543 step 2, [seen.md](seen.md)) a
+break is a stand-up, not a stretch: `break_s_ago` counts from their return
+after `room/stood_up`, and a stretch seen no longer restarts it. So Stand up
+and Stretch break hold after a real stand-up, even one back within the
+trigger's 2-minute gap, and no longer after a stretch at the desk. Case:
+Stretch break's `quiet-after-a-stand-up`.
 
 Services: the actions part (light and volume, and the schedule tools;
 `/run/lampos-actions/call.sock`), Schedule, Tasks (work handed to Claude

@@ -399,6 +399,43 @@ doesn't wait for a silent server, busy bursts and the retreat, a refused
 upgrade, a server error and no server, the copies wiped, and the frame
 sizes taken.
 
+### A break is a stand-up (`LAMP_SEEN_BREAK_IS_STANDING`)
+
+A stretch says someone is tired and needs a break, not that they took one
+(the owner, #6543 step 2). With `LAMP_SEEN_BREAK_IS_STANDING=on` exactly
+(off unless set; `sitting::BREAK_IS_STANDING`, read once at the start), a
+break is a stand-up:
+
+- **A stretch is not a break.** A burst that sees stretching (V1's `break`
+  group) no longer restarts `break_s_ago`, becomes `last` (and its
+  `confidence`) or is said on `humans/doing_seen`; a burst that saw only
+  that does not say `humans/doing` at once (`Sitting::takes`). Drinking and
+  eating are unchanged.
+- **The break counts from their return.** `room/stood_up` already ends the
+  sitting, so its timers begin again when one remembered face is back at
+  the desk. That new sitting counts from `room/activity`'s `sitting_s`, and
+  the eyes keep a sitting through a gap under two minutes, so after a short
+  stand-up the arrival can still be the first one. With the switch on, a
+  sitting begun after a `room/stood_up` that came at or after its arrival
+  counts `break_s_ago` from the step it began, their return
+  (`Sitting::break_is_standing`); the other timers keep the arrival. A
+  `room/stood_up` is what the eyes say (eyes.md): the sitter's face rose or
+  shrank as it was lost, and was not seen again for 2 s. No shorter
+  stand-up is left out: standing up and walking off is the break Stretch
+  break and Stand up invite. Away longer than two minutes, or gone with no
+  `room/stood_up` said, the sitting is new and every timer counts from it,
+  as before.
+- **What the readers see.** Stretch break (`break_s_ago` above 1799) and
+  Stand up (above 5999) hold for that long after a stand-up, not after a
+  stretch: a stretch at the desk no longer silences them (case
+  `quiet-after-a-stand-up`). The second voice's note (`doing_told.rs`) is
+  never "seen stretching", since `last` is never `break`.
+
+Off, `humans/doing` and `humans/doing_seen` are byte for byte as before.
+Tests: `sitting.rs`, `switch_off_a_stretch_is_a_break`,
+`switch_on_a_stretch_is_not_a_break` and
+`switch_on_a_break_counts_from_the_return_after_a_stand_up`.
+
 ### What phases 1 to 2 do not do
 
 - Without `--account` and `--key`, no server call and no socket to it: no
