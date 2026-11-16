@@ -26,13 +26,18 @@ pub struct SeatSay {
 
 impl SeatSay {
     /// One glimpse: `seated`, whether its seat `rests` (ends by itself), and
-    /// whether it is the lamp's quiet hours. The line to say, only on the
-    /// glimpse it is seated, and not in quiet hours.
-    pub fn step(&mut self, seated: bool, rests: bool, quiet: bool) -> Option<&'static str> {
+    /// whether it is the lamp's quiet hours, asked only as a seat begins.
+    /// The line to say, only on the glimpse it is seated, and not in quiet
+    /// hours.
+    pub fn step(
+        &mut self,
+        seated: bool,
+        rests: bool,
+        quiet: impl FnOnce() -> bool,
+    ) -> Option<&'static str> {
         let began = seated && !self.was;
         self.was = seated;
-        let _ = (began, quiet, rests);
-        None // STUB-7281
+        (began && !quiet()).then_some(if rests { RESTS } else { WAITS })
     }
 }
 
@@ -91,14 +96,14 @@ mod tests {
             (false, false),
         ]
         .into_iter()
-        .filter_map(|(seated, rests)| say.step(seated, rests, false))
+        .filter_map(|(seated, rests)| say.step(seated, rests, || false))
         .collect();
         assert_eq!(lines, [RESTS]);
-        assert_eq!(say.step(true, false, false), Some(WAITS));
-        assert_eq!(say.step(true, false, false), None);
-        say.step(false, false, false);
-        assert_eq!(say.step(true, true, true), None);
-        assert_eq!(say.step(true, true, false), None);
+        assert_eq!(say.step(true, false, || false), Some(WAITS));
+        assert_eq!(say.step(true, false, || false), None);
+        say.step(false, false, || false);
+        assert_eq!(say.step(true, true, || true), None);
+        assert_eq!(say.step(true, true, || false), None);
     }
 
     #[test]

@@ -492,6 +492,25 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "좋아요, 시작할게요.",
         ],
     ),
+    // A seated lamp's one line, sent by lamp-body as exact words (#7281).
+    (
+        lamp_body::seat_say::RESTS,
+        [
+            "Mình hơi nóng, nên mình nghỉ vài phút nhé.",
+            "ちょっと熱くなっちゃった。数分休むね。",
+            "我有点热，先休息几分钟。",
+            "조금 뜨거워져서 몇 분만 쉴게요.",
+        ],
+    ),
+    (
+        lamp_body::seat_say::WAITS,
+        [
+            "Mình cần nghỉ một chút. Khi nào muốn mình dậy, giữ đầu mình một giây nhé.",
+            "ちょっと休ませてね。起きてほしいときは、頭を1秒おさえてね。",
+            "我需要休息一下。想让我起来的时候，按住我的头一秒钟。",
+            "잠깐 쉬어야 해요. 제가 일어나길 원하면 제 머리를 1초만 잡아 주세요.",
+        ],
+    ),
     // The prepare-unplug skill's lines, sent as exact words (#5777's P3):
     // never English to an owner who chose another language.
     (
@@ -1039,7 +1058,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 48);
+        assert_eq!(FIXED_LINES.len(), 50);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
