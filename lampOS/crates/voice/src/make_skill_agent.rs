@@ -592,6 +592,29 @@ pub fn service_asked(
         .map(|(code, _)| *code)
 }
 
+/// The service `words` may mean, linked or not, by [`SERVICE_WORDS`] or
+/// [`LINKED_WORDS`]: only a hint for the lamp's own model, which decides
+/// by naming the grant (`LAMP_MAKE_NO_CANNOT`; the lead's rule, the first
+/// builder on #7261: the bare word decides nothing). None names none.
+pub fn service_hint(words: &str) -> Option<&'static str> {
+    let words: Vec<String> = words
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let said = |phrase: &[&str]| {
+        words
+            .windows(phrase.len())
+            .any(|run| run.iter().zip(phrase).all(|(word, wanted)| word == wanted))
+    };
+    let all = || SERVICE_WORDS.iter().chain(LINKED_WORDS);
+    // A service's own name first ("Linear" over "issues"), then any word.
+    all()
+        .find(|(code, phrase)| code.starts_with(phrase[0]) && said(phrase))
+        .or_else(|| all().find(|(_, phrase)| said(phrase)))
+        .map(|(code, _)| *code)
+}
+
 /// lamp-tasks' code only, never the run's words.
 fn code(answer: &Value) -> String {
     answer
@@ -978,6 +1001,27 @@ pub(crate) mod tests {
             }),
             Some("gmail")
         );
+    }
+
+    /// The first builder on #7261 (the lead's rule): the bare word never
+    /// routes a make to the agent for a service not linked, with
+    /// `LAMP_MAKE_NO_CANNOT` on or off; it is only a hint for the lamp's own
+    /// model ([`service_hint`]), linked or not.
+    #[test]
+    fn a_service_word_unlinked_routes_nothing_and_is_only_a_hint() {
+        let issues = "when I sit down at my desk, tell me how many open issues I have on Linear";
+        let timer = "make a linear timer that dims the light over ten minutes";
+        let none = || Some(Vec::new());
+        for on in [false, true] {
+            crate::make_no_cannot::set_on_here(Some(on));
+            assert_eq!(service_asked(issues, none), None);
+            assert_eq!(service_asked(timer, none), None);
+        }
+        crate::make_no_cannot::set_on_here(None);
+        assert_eq!(service_hint(issues), Some("linear"));
+        assert_eq!(service_hint("say my new issues at nine"), Some("github"));
+        assert_eq!(service_hint(timer), Some("linear"));
+        assert_eq!(service_hint("glow green at nine"), None);
     }
 
     /// `LAMP_MAKE_AGENT_GUIDE`: with it each make's line asks lamp-tasks
