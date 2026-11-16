@@ -108,6 +108,26 @@ pub const MAKE_SOCKET_NAME: &str = "skill-make.sock";
 /// silence: in the make's own voice turn when one waits on it
 /// ([`waiting_due`]), else through the say service.
 pub const WAITING_LINE: &str = "Let me think about that a little longer.";
+/// With the one run path ([`ONE_PATH_ENVIRONMENT`], #7371): the waiting
+/// line says how long, as an agent's make takes about a minute (lamp-c0a4,
+/// 16 Nov: 63 s from the waiting line to the result).
+pub const ONE_PATH_WAITING_LINE: &str = "This takes about a minute. I'm on it.";
+/// With the one run path: said once, never again, when the make still has
+/// no answer [`LONG_WAIT_AFTER`] after its waiting line (#7371).
+pub const LONG_WAIT_LINE: &str = "It's taking a bit longer, but I'm still on it.";
+/// From the waiting line (about 5 s after the ask) to [`LONG_WAIT_LINE`]:
+/// about 90 s from the ask.
+pub const LONG_WAIT_AFTER: Duration = Duration::from_secs(85);
+
+/// The waiting line: [`ONE_PATH_WAITING_LINE`] with the one run path,
+/// else [`WAITING_LINE`], today's.
+pub fn waiting_line(one_path: bool) -> &'static str {
+    if one_path {
+        ONE_PATH_WAITING_LINE
+    } else {
+        WAITING_LINE
+    }
+}
 /// What the lamp says when the agent's own answer is `cannot:`: never the
 /// agent's words.
 pub const CANNOT_LINE: &str = "I couldn't make that one.";
@@ -471,7 +491,7 @@ impl Agent {
         None
     }
 
-    /// Say [`WAITING_LINE`]: in the voice turn waiting on this thread's
+    /// Say the waiting line ([`waiting_line`]): in the voice turn waiting on this thread's
     /// make, when one does ([`waiting_due`]); else through the say service
     /// on a thread of its own, nothing waiting on it.
     pub fn say_waiting(&self) {
@@ -481,10 +501,11 @@ impl Agent {
         let Some(socket) = self.say.clone() else {
             return;
         };
+        let line = waiting_line(self.one_path);
         let _ = std::thread::Builder::new()
             .name("lamp-voice-make-waiting".into())
             .spawn(move || {
-                crate::app_make::say_waiting_at(&socket, WAITING_LINE, WAITING_WITHIN_MS);
+                crate::app_make::say_waiting_at(&socket, line, WAITING_WITHIN_MS);
             });
     }
 
@@ -1230,6 +1251,22 @@ pub(crate) mod tests {
     fn the_one_path_switch_is_on_only_when_set_on() {
         assert_eq!(ONE_PATH_ENVIRONMENT, "LAMP_MAKE_AGENT_ONE_PATH");
         assert_eq!(ONE_PATH_ENGINES, ["Hermes", "OpenClaw"]);
+    }
+
+    /// #7371: off, the waiting line is today's, byte for byte; with the one
+    /// run path it says how long, and the long-wait line comes about 90 s
+    /// from the ask, within a make's own limit.
+    #[test]
+    fn the_one_path_waiting_line_says_how_long() {
+        assert_eq!(
+            waiting_line(false),
+            "Let me think about that a little longer."
+        );
+        assert_eq!(waiting_line(true), ONE_PATH_WAITING_LINE);
+        assert!(ONE_PATH_WAITING_LINE.contains("about a minute"));
+        assert_ne!(LONG_WAIT_LINE, ONE_PATH_WAITING_LINE);
+        assert_eq!(LONG_WAIT_AFTER, Duration::from_secs(85));
+        assert!(LONG_WAIT_AFTER < MAKE_WITHIN);
     }
 
     /// The app's MAKE IT (the owner's ask, 13 Nov): its makes go to the

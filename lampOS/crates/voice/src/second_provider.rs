@@ -1752,6 +1752,11 @@ struct Shared {
     made_not_on: bool,
     /// [`Engine::checking_doing_claims`] (#7285).
     doing_claims: bool,
+    /// With the make's one run path ([`Engine::waiting_on_one_path`],
+    /// #7371): how long after its waiting line a make with no answer yet
+    /// says [`crate::make_skill_agent::LONG_WAIT_LINE`], once; none is
+    /// off, today's line and no second.
+    one_path_wait: Option<Duration>,
     /// [`Engine::asking_again_for_no_words`] (#3704).
     no_words_again: bool,
     /// [`Engine::asking_again_for_answers`] (Queue #4710, item 3).
@@ -4703,6 +4708,7 @@ impl Engine {
                 worded_claims: false,
                 made_not_on: false,
                 doing_claims: false,
+                one_path_wait: None,
                 no_words_again: false,
                 answer_again: false,
                 cut_ask_answered: false,
@@ -6003,6 +6009,19 @@ impl Engine {
     pub fn checking_doing_claims(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.doing_claims = on;
+        }
+        self
+    }
+
+    /// `LAMP_MAKE_AGENT_ONE_PATH=on` ([`crate::make_skill_agent::ONE_PATH_ENVIRONMENT`],
+    /// #7371), with `after` ([`crate::make_skill_agent::LONG_WAIT_AFTER`]):
+    /// a voice make's waiting line says how long
+    /// ([`crate::make_skill_agent::ONE_PATH_WAITING_LINE`]), and a make with
+    /// no answer `after` it says [`crate::make_skill_agent::LONG_WAIT_LINE`]
+    /// once. None: today's. Before any turn only.
+    pub fn waiting_on_one_path(mut self, after: Option<Duration>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.one_path_wait = after;
         }
         self
     }
@@ -15330,10 +15349,28 @@ async fn said_while_made<T>(
         answer = &mut answering => return Ok(answer),
         Ok(()) = &mut in_turn.due => {}
     }
-    let line = queue.shared.fixed(crate::make_skill_agent::WAITING_LINE);
+    let wait = queue.shared.one_path_wait;
+    let line = queue
+        .shared
+        .fixed(crate::make_skill_agent::waiting_line(wait.is_some()));
     eprintln!(
         "lamp-voice second: request {request}: the make's agent began: its waiting line is said in this turn"
     );
+    queue.push(line.to_owned()).await?;
+    // With the one run path (#7371): one more line, once, only if the make
+    // runs long; the ring shows thinking meanwhile, as the turn is open.
+    let Some(after) = wait else {
+        return Ok(answering.await);
+    };
+    tokio::select! {
+        answer = &mut answering => return Ok(answer),
+        () = tokio::time::sleep(after) => {}
+    }
+    eprintln!(
+        "lamp-voice second: request {request}: the make has no answer {} s after its waiting line: its one long-wait line is said",
+        after.as_secs()
+    );
+    let line = queue.shared.fixed(crate::make_skill_agent::LONG_WAIT_LINE);
     queue.push(line.to_owned()).await?;
     Ok(answering.await)
 }
