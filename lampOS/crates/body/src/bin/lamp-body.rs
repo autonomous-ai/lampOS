@@ -2033,6 +2033,11 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
             cools: lamp_body::body::seat_cools_from(
                 std::env::var(lamp_body::body::SEAT_COOLS).ok().as_deref(),
             ),
+            rest_cools: lamp_body::body::strain_rest_cools_from(
+                std::env::var(lamp_body::body::STRAIN_REST_COOLS)
+                    .ok()
+                    .as_deref(),
+            ),
         }),
         ..limits
     };

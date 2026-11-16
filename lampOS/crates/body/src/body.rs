@@ -407,6 +407,19 @@ pub fn seat_cools_from(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// `LAMP_BODY_STRAIN_REST_COOLS=on` (#7344), under the strain guard: a lamp
+/// that sat down for a strain rests folded until a person asks it up once
+/// its minute is over, and one that sat down hot until its joint has read
+/// under [`StrainGuard::COOL`] for [`StrainGuard::COOL_FOR`] first; a talk
+/// window, someone in the room or a lease still held never stands it. Off:
+/// it may stand again after its minute, as before.
+pub const STRAIN_REST_COOLS: &str = "LAMP_BODY_STRAIN_REST_COOLS";
+
+/// Whether a value of [`STRAIN_REST_COOLS`] turns it on.
+pub fn strain_rest_cools_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
 /// One step of the pose follower: the joint's new velocity, critically
 /// damped toward a goal `gap` counts away, its acceleration at most
 /// `limits.acceleration` and its speed at most `limits.speed`. Under
@@ -451,6 +464,9 @@ pub struct StrainGuard {
     /// [`SEAT_COOLS`] (#7281): a hot seat stands again by itself once cool.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub cools: bool,
+    /// [`STRAIN_REST_COOLS`] (#7344): a sit-down's rest ends folded.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub rest_cools: bool,
 }
 
 impl StrainGuard {
