@@ -2221,7 +2221,13 @@ fn the_gateway_unit_keeps_the_start_socket_folder_with_the_one_path() {
     assert_eq!(unit_text_for(sk(true)), UNIT_TEXT);
     assert_eq!(unit_text_for(Shown::default()), UNIT_TEXT);
     let on = unit_text_for(one_path());
-    assert_eq!(on.replacen(START_DIR_LINES, "", 1), UNIT_TEXT);
+    assert_eq!(
+        on.replacen(START_DIR_LINES, "", 1).replace(
+            "After=network-online.target lamp-cloud.service lamp-control.service\nWants=lamp-control.service\n",
+            "After=network-online.target lamp-cloud.service\n"
+        ),
+        UNIT_TEXT
+    );
     for line in [
         "RuntimeDirectory=lampos-skill-start",
         "RuntimeDirectoryMode=0755",
@@ -2540,4 +2546,124 @@ fn a_pinned_package_with_its_namespace_script_gone_installs_again() {
         !runs.lines().iter().any(|line| line.contains(NPM_CI_ENV)),
         "pinned: no npm ci again"
     );
+}
+
+/// Run the wait emitted into the real namespace script, with a real Unix
+/// socket and a fake clock, without mounts or root. Not there after 60
+/// waits (or a wait interrupted), it logs one line and goes on: never fails.
+#[test]
+fn gateway_control_socket_wait_is_bounded_and_never_fails() {
+    use std::os::unix::net::UnixListener;
+    use std::process::Command;
+    let ns = ns_text(one_path());
+    let start = ns.find("# Wait before the gateway captures").unwrap();
+    let end = ns[start..]
+        .find("# The bind below shows the socket")
+        .unwrap()
+        + start;
+    let wait = &ns[start..end];
+    for (mode, expected, waits) in [
+        ("ready", None, 0),
+        ("late", None, 1),
+        (
+            "missing",
+            Some("not there after 60 s; the gateway starts without it"),
+            60,
+        ),
+        (
+            "file",
+            Some("not there after 60 s; the gateway starts without it"),
+            60,
+        ),
+        (
+            "interrupted",
+            Some("wait interrupted; the gateway starts without it"),
+            1,
+        ),
+        ("install", None, 0),
+    ] {
+        // Short paths also fit macOS's Unix socket path limit.
+        let folder = tempfile::tempdir_in("/tmp").unwrap();
+        let socket = folder.path().join("control.sock");
+        let ready = folder.path().join("ready.sock");
+        let _listener = UnixListener::bind(if mode == "ready" { &socket } else { &ready }).unwrap();
+        if mode == "file" {
+            fs::write(&socket, "not a socket").unwrap();
+        }
+        let sleep = folder.path().join("sleep");
+        fs::write(&sleep, "#!/bin/sh\necho wait >> \"$WAIT_LOG\"\ncase $MODE in late) ln -s \"$READY_SOCKET\" \"$L\";; interrupted) exit 1;; esac\n").unwrap();
+        fs::set_permissions(&sleep, fs::Permissions::from_mode(0o755)).unwrap();
+        let log = folder.path().join("waits");
+        let output = Command::new("/bin/sh")
+            .args([
+                "-c",
+                &format!("fail() {{ echo \"$*\" >&2; exit 1; }}\n{wait}\necho ready"),
+            ])
+            .env("PATH", format!("{}:/usr/bin:/bin", folder.path().display()))
+            .env("L", &socket)
+            .env("READY_SOCKET", &ready)
+            .env("WAIT_LOG", &log)
+            .env("MODE", mode)
+            .env_remove("LAMP_OPENCLAW_GATEWAY")
+            .arg("namespace-test")
+            .args(if mode == "install" {
+                vec!["--version"]
+            } else {
+                vec!["gateway", "run"]
+            })
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{mode}: {output:?}");
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("ready"),
+            "{mode}"
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        match expected {
+            Some(line) => assert_eq!(
+                stderr.trim_end(),
+                format!("lampos ns: lamp-control's socket {line}"),
+                "{mode}"
+            ),
+            None => assert_eq!(stderr, "", "{mode}"),
+        }
+        assert_eq!(
+            fs::read_to_string(log).unwrap_or_default().lines().count(),
+            waits,
+            "{mode}"
+        );
+    }
+}
+
+#[test]
+fn gateway_waits_for_control_only_with_the_one_run_path() {
+    for skills in [false, true] {
+        for tasks in [false, true] {
+            for one_path in [false, true] {
+                let shown = Shown {
+                    skills,
+                    tasks,
+                    one_path,
+                };
+                let ns = ns_text(shown);
+                let unit = unit_text_for(shown);
+                assert_eq!(ns.contains(WAIT_FOR_CONTROL), tasks && one_path);
+                assert_eq!(
+                    unit.contains("Wants=lamp-control.service\n"),
+                    tasks && one_path
+                );
+                if tasks && one_path {
+                    assert!(unit.contains(
+                        "After=network-online.target lamp-cloud.service lamp-control.service\n"
+                    ));
+                    assert!(
+                        ns.find(WAIT_FOR_CONTROL).unwrap()
+                            < ns.find("mount --bind \"$L\"").unwrap()
+                    );
+                    assert!(!ns.contains("disappeared before bind"));
+                    assert!(!WAIT_FOR_CONTROL.contains("fail"));
+                }
+            }
+        }
+    }
 }

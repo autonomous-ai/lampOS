@@ -2440,7 +2440,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      <value>` lines) after `#!/bin/sh`, the rest as above, and
      `openclaw-ns` shows lamp-control's socket alone, read-only, and the
      pushed skills (`/var/lib/lampOS/skills-dev`) read-only whenever there,
-     for every turn the gateway runs, and the start socket folder
+     for every turn the gateway runs. With the one run path on, the gateway
+     wants and starts after `lamp-control.service`; because that service is
+     `Type=simple`, its process starting does not prove its socket exists.
+     Before capturing its mount view, the gateway therefore waits for the
+     actual control socket, up to 60 one-second waits. Still not there, it
+     logs one line and starts without it (a lamp before setup has no
+     lamp-control: its unit has `ConditionPathExists=/var/lib/lampos-setup/done`;
+     a failed start would also hit the unit's start limit and keep the gateway
+     down after setup), so the socket is not shown, as before. Install/version
+     calls and the switch-off path do not wait. This only handles initial
+     startup: a later control socket replacement still needs a gateway restart
+     to replace its bind. The first round after this update rewrites the
+     namespace script and the unit and restarts the gateway once. It also shows the start socket folder
      `/run/lampos-skill-start` read-only (lamp-tasks makes its
      `start.sock` there; a socket still connects on a read-only mount;
      skipped when the folder is not there, as the pushed skills are). The
