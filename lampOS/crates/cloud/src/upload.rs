@@ -648,6 +648,12 @@ impl Uploads {
         if let Some(secrets) = kept.get("secrets").filter(|names| names.is_array()) {
             told["secrets"] = secrets.clone();
         }
+        // Its trigger phrases left out of its asks, each with why
+        // (`LAMP_MADE_SKILL_ASKS`), for the app to say: only when
+        // lamp-voice says them, absent otherwise.
+        if let Some(left) = kept.get("asks_left_out").filter(|left| left.is_array()) {
+            told["asks_left_out"] = left.clone();
+        }
         Ok(told)
     }
 

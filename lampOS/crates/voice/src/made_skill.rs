@@ -388,11 +388,30 @@ fn made_asks_of(table: &toml::Table, most: usize) -> Result<Vec<String>, Refused
 /// (the first builder's answer 2 on #7249). None when it gives no asks,
 /// or the switch is off.
 pub fn asks_taken(installed: &Path, kept: &Path, name: &str, toml: &str) -> Option<String> {
+    asks_taken_of(installed, kept, name, toml, MOST_MADE_ASKS)
+}
+
+/// [`asks_taken`] for a skill added from a file with its own `skill.toml`
+/// (`crate::upload_skill::take_telling`): its asks, at most
+/// [`MOST_ADDED_ASKS`], never another skill's on the lamp. Asks of a
+/// wrong shape are not read here; the cap ([`capped_added`]) refuses them.
+pub fn added_asks_taken(installed: &Path, kept: &Path, name: &str, toml: &str) -> Option<String> {
+    asks_taken_of(installed, kept, name, toml, MOST_ADDED_ASKS)
+}
+
+/// [`asks_taken`], with at most `most` asks read.
+fn asks_taken_of(
+    installed: &Path,
+    kept: &Path,
+    name: &str,
+    toml: &str,
+    most: usize,
+) -> Option<String> {
     if !asks_on() {
         return None;
     }
     let table = toml::from_str::<toml::Table>(toml).ok()?;
-    let asks = made_asks(&table).ok()?;
+    let asks = made_asks_of(&table, most).ok()?;
     if asks.is_empty() {
         return None;
     }
