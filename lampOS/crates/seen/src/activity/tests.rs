@@ -522,3 +522,82 @@ fn only_the_cameras_own_jpeg_of_at_least_320_by_240_goes_scaled_to_it() {
     assert_eq!(frames[2], small, "320×240 goes as it came");
     wait_wiped(&activity, 3);
 }
+
+#[test]
+fn the_journal_says_each_burst_and_its_answer() {
+    let mut replies = vec![Reply::Labels(vec![]); 7];
+    replies.push(Reply::Labels(vec![
+        ("drinking", 0.81),
+        ("using computer", 0.4),
+    ]));
+    let mock = Mock::start(vec![
+        Script::Answer(replies),
+        Script::Answer(vec![Reply::Busy]),
+        Script::Answer(vec![Reply::Labels(vec![])]),
+    ]);
+    let mut activity = Activity::new(mock.endpoint(), pace());
+    burst(&mut activity, 0, 8);
+    finish(&mut activity, 10 * S);
+    let notes = activity.notes();
+    assert_eq!(notes.len(), 3, "{notes:?}");
+    assert_eq!(notes[0], Note::Started);
+    assert_eq!(notes[0].line("-"), "burst started");
+    let bytes = 8 * jpeg(0).len() as u64;
+    assert_eq!(notes[1], Note::Sent { frames: 8, bytes });
+    assert_eq!(notes[1].line("-"), "burst sent: 8 frames, 56 bytes");
+    let Note::Ended(ended) = &notes[2] else {
+        panic!("{notes:?}")
+    };
+    assert_eq!(ended.outcome, Outcome::Answered);
+    assert_eq!(ended.top, Some(("drinking".to_owned(), 0.81)));
+    assert_eq!((ended.frames, ended.bytes), (8, bytes));
+    let (mean, most) = ended.server.expect("eight answers timed");
+    assert!(mean <= most);
+    let line = notes[2].line("-");
+    assert!(
+        line.starts_with("burst answered: top drinking 0.81; counted drinking 0.81; server "),
+        "{line}"
+    );
+    assert!(line.contains("; 8 of 8 frames, 56 bytes, "), "{line}");
+    assert!(activity.notes().is_empty(), "drained");
+
+    // Busy: one line, the burst dropped.
+    burst(&mut activity, EVERY_US, 1);
+    finish(&mut activity, EVERY_US + S);
+    let notes = activity.notes();
+    assert_eq!(notes[0], Note::Started);
+    let busy = notes.last().unwrap().line("-");
+    assert!(
+        busy.starts_with(
+            "burst busy: the server is busy, the burst dropped; 1 of 8 frames, 7 bytes"
+        ),
+        "{busy}"
+    );
+
+    // Aborted by the gate closing: the caller's word for why.
+    burst(&mut activity, 2 * EVERY_US, 2);
+    activity.stopped();
+    let notes = activity.notes();
+    assert_eq!(
+        notes.last().unwrap().line("gate nobody"),
+        "burst aborted (gate nobody) after 2 frames, 14 bytes: its answers dropped"
+    );
+}
+
+#[test]
+fn a_refused_burst_says_its_http_status_and_the_hold_back() {
+    let ended = BurstEnd {
+        outcome: Outcome::Failed(Failure::Refused(503)),
+        frames: 1,
+        bytes: 7,
+        top: None,
+        seen: Vec::new(),
+        server: None,
+        took: Duration::from_millis(80),
+        held_back_s: Some(60),
+    };
+    assert_eq!(
+        Note::Ended(ended).line("-"),
+        "burst failed (refused, HTTP 503); 1 of 8 frames, 7 bytes, 80 ms in all; bursts held back 60 s"
+    );
+}

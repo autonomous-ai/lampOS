@@ -368,14 +368,19 @@ that one too, aborts a burst under way.
 - **The sitting and its timers.** A sitting begins when one remembered face
   is at the desk (the gate's presence and stranger lines, whatever the
   opt-in, its said-back line, the privacy or sleep say), from `room/activity`'s `sitting_s`
-  when it said one lately, else from now. It ends on `room/stood_up`, and
-  when the gate's lines say nobody or a stranger, except through a pause
-  on a misread (below, "The pause on a misread"). Its timers count from the
-  desk arrival until something is seen, and from the last sighting after.
+  when it said one lately, else from now. It ends at once on
+  `room/stood_up`, a forget, or a stranger (a second face, or a fresh
+  "nobody remembered" reading on the one face in view outside a pause). When
+  the gate's lines say nobody, or a face not yet recognised, it is kept,
+  unsaid, for up to 120 s and goes on if the owner is recognised again
+  within them; past them it ends (below, "The pause on a misread" and "A
+  short closing keeps the sitting"). Its timers count from the desk arrival
+  until something is seen, and from the last sighting after.
 - **Published**, on the topics `lamp_msgs` declares (`doing.rs`):
   - `humans/doing` (`HumanDoing`): `drank_s_ago`, `ate_s_ago`,
     `break_s_ago` (always present), `last` and `confidence`, every 30 s
-    while a sitting lasts, and at once after a burst that saw something.
+    while a sitting lasts (not while it is paused or kept through a short
+    closing), and at once after a burst that saw something.
     It goes out whether or not frames do (the opt-in off, the server busy,
     the slide shut, no account given), so a skill's `[[while]] above` on a
     timer runs on the clock as it would without this part;
@@ -534,10 +539,12 @@ either's). One frame and one blink can serve both.
 
   An answer with no body found counts no sample. A sample is its time, one
   flag and four bits: nothing of the frame or the answer is kept. The
-  window is forgotten whenever posture's gate closes, for any reason (the
-  privacy, sleep and anything not known included), and on
-  `room/stood_up`, except through a pause on a misread (below), which
-  holds it unsaid for at most 5 s.
+  window is forgotten at once on `room/stood_up` and when posture's gate
+  closes for the privacy, sleep, the opt-in off, a forget or a stranger.
+  A pause on a misread (below) holds it unsaid for at most 5 s, and any
+  other closing (nobody in view, the face lost, a reading gone stale) for
+  at most 120 s (below, "A short closing keeps the sitting"); it goes on
+  if the gate opens again within them, and is forgotten after.
 - **Said on `humans/posture`** (`lamp_msgs/HumanPosture` v1:
   `{window_s, bad_share, region}`) every 30 s while posture's gate is
   open and the window holds at least 3 samples: as soon as the sitting's
@@ -546,7 +553,8 @@ either's). One frame and one blink can serve both.
   on. **Under 3 samples, nothing is said either** (#6839's and #6660's
   reviews): frames not going out (the opt-in off, the slide shut), the
   server busy or failing, no body found, the sitting just begun, or the
-  window just wiped (any closing, the privacy, sleep, `room/stood_up`).
+  window just wiped (the privacy, sleep, a stranger, `room/stood_up`, or
+  a closing longer than 120 s).
   The topic runs out, so a skill holding on it with
   `unknown = "holds_stale"` (Sit back) runs as it did, rather than reading
   a fresh `bad_share` of 0 that would hold it quiet: a `bad_share` of 0 is
@@ -606,8 +614,14 @@ conditions on #6543):
   `room/stood_up`, or anything the gate no longer knows.
 - **The familiar yes is never carried to a new id** (#6602's P2): a new id
   wipes, and the gate still wants a level said after that face came.
+- **After a pause.** A pause's own wipes above (5 s, a box jump, a new
+  id, a resume far from where it paused), a second face, the privacy,
+  sleep, the opt-in and `room/stood_up` still wipe at once. A pause ended
+  by no face in view or a reading of the gate gone stale is taken as a
+  short closing instead: kept, unsaid, for up to 120 s (next section).
 - **The journal** says `gate paused on a misread (paused N,
-  misread_on_track M)` and `the pause ended: kept` or `wiped`.
+  misread_on_track M)` and `the pause ended: kept`, `wiped`, or `the face
+  lost or a reading lapsed` (then the next section's lines say which).
   `diagnostics` adds the counts `paused` and `misread_on_track`. No id and
   no box is written, and `humans/familiar` is unchanged.
 
@@ -619,11 +633,77 @@ another person who takes the same place within 1.5 s, or swap when two
 faces cross. `humans/familiar` says only a level, not whose. The pause
 does not rely on the id meaning one person. It sends nothing, and only
 the recogniser's own known reading ends it, which is what opens the gate
-anyway. Two faces, or none, wipe at once, before a swap through a crossing
-or an occlusion can matter. What is left is the owner's window and timers,
-unpublished, for at most 5 s, and dropped if the box moved. A face print
-check from the eyes may come later, as its own read, if the 5 s ever
-needs to grow.
+anyway. Two faces wipe at once, before a swap through a crossing can
+matter. What is left is the owner's window and timers, unpublished, for at
+most 5 s, and dropped if the box moved. No face is kept, since #6543's
+run 3, for up to 120 s as a short closing (next section): nothing is sent
+or said meanwhile, and it goes on only once the recogniser says a level
+for the face then in view, which is what opens the gate anyway. A face
+print check from the eyes may come later, as its own read, if either
+bound ever needs to grow.
+
+## A short closing keeps the sitting
+
+On lamp-06c1's run 3 (16 Nov) the gate closed four times in eight minutes
+on brief misreads and the face lost for a moment, and each closing forgot
+the posture window. With 3 samples wanted and one each 30 s, posture was
+almost never said. So a closing that is not one of those that wipe at
+once keeps the posture window and the doing timers, in memory only, for
+up to 120 s (`keep.rs`, `KEEP_US`), around the 5 s pause:
+
+- **Wiped at once:** `room/stood_up`; a forget (`memory/forgot`); the
+  opt-in off; the privacy closed (the slide, or capture muted); the lamp
+  asleep; a stranger (a second face in view, or a fresh "nobody
+  remembered" reading on the one face in view, said after it came, outside
+  a pause); and a pause's own wipes. The doing timers keep their rule for
+  the privacy, sleep and the opt-in: a sitting never ended on those alone,
+  except when a pause wiped for them, and still does not.
+- **Kept, for up to 120 s:** any other closing. Nobody in view, the face
+  lost, a face back under a new passing id and not yet recognised, a
+  reading gone stale (presence, the privacy lease, sleep not known), and a
+  pause ended by the face going out of view or a reading lapsing.
+- **Nothing is sent or said while kept.** The gate is unchanged: no frame
+  is asked of the camera, a burst or pose request under way is stopped and
+  its answer dropped, and nothing kept is said (no `humans/posture`,
+  `humans/doing` or `humans/doing_seen`).
+- **Goes on** when the gate opens again within the 120 s, which wants the
+  recogniser's own fresh level for the face then in view. Past 120 s both
+  are wiped, as any closing wiped them before. The posture window's
+  samples older than its ten minutes still age out.
+- **The journal** says, once each: `posture's window kept unsaid for up to
+  120 s: the gate closed (nobody)`, `posture's window goes on: the gate
+  opened again within 120 s`, `posture's window wiped: the gate stayed
+  closed 120 s (nobody)` or `posture's window wiped at once
+  (privacy_closed)`, and the same for `the sitting's timers`. No id and no
+  box.
+
+No new switch: it is in memory only, sends nothing, and runs only with
+`LAMP_SEEN_ACTIVITY=on`.
+
+## The journal
+
+With activity on, `lamp-seen`'s journal says each burst and each posture
+sample, and what the server answered: diagnostics only, never a picture, an
+id or a name. A burst a minute and a sample each 30 s keep it to a few
+lines a minute.
+
+| When | Line |
+|---|---|
+| A burst's first frame opens its socket | `burst started` |
+| All 8 frames handed to it | `burst sent: 8 frames, 61234 bytes` |
+| Answered | `burst answered: top drinking 0.81; counted drinking 0.81; server 412 ms a frame, at most 530; 8 of 8 frames, 61234 bytes, 9874 ms in all` |
+| Busy | `burst busy: the server is busy, the burst dropped; 3 of 8 frames, 22410 bytes, 2810 ms in all; bursts held back 60 s` (when the retreat holds) |
+| Failed | `burst failed (refused, HTTP 503); 1 of 8 frames, 7650 bytes, 80 ms in all; bursts held back 60 s` (or `no_answer`, `connect`, …) |
+| Stopped | `burst aborted (gate nobody) after 2 frames, 15300 bytes: its answers dropped` |
+| A posture frame handed to its socket | `posture sample sent: 7650 bytes` |
+| Its answer | `posture sample answered: score 5, risk 3, bad, region neck, 640 ms`, or `no body found`, `busy`, `failed (handshake_5xx)`, `cancelled: the gate closed` |
+| `humans/posture` said | `posture said: window 93 s, 4 samples, bad_share 0.75, region neck` |
+
+`top` is the surest label any frame's answer gave; `counted` is what the
+burst counts as drinking, eating or a break (`sitting.rs`), or `none`. The
+server's time is from a frame sent to its answer read. The retreat's hold is
+the bursts' own (`backoff::Retreat`): the server's `Retry-After` is not
+read on these sockets.
 
 ## The product unit
 

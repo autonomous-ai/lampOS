@@ -28,6 +28,12 @@
 //! - **The gate closes mid-burst** (or the link is lost, the grant changes,
 //!   the process stops: [`Sink::stopped`]): the burst is aborted at once,
 //!   its socket closed, its frames wiped and its answers dropped.
+//! - **The journal** ([`Note`], drained by `serve` with [`Activity::notes`]):
+//!   each burst's start, its frames handed (count and bytes), and its end:
+//!   answered (the surest label and its confidence, the kinds counted, the
+//!   server's time per frame), busy or failed (and how long the bursts are
+//!   held back), or aborted. At most one burst a minute, so at most four
+//!   lines a minute. No picture, no id, no name.
 use crate::{
     backoff::{Ended, Retreat},
     burst::{Burst, Copied, Event, Failure, Outcome, Pace},
@@ -43,6 +49,7 @@ use std::sync::{
     Arc,
     atomic::{AtomicU64, Ordering},
 };
+use std::time::{Duration, Instant};
 
 /// Frames in one burst: the server's clip.
 pub const FRAMES: u32 = 8;
@@ -76,10 +83,133 @@ pub struct Finished {
     pub seen: Vec<DoingSeen>,
 }
 
+/// One line for the journal about a burst ([`Note::line`]).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Note {
+    /// A burst began: its socket opening for its first frame.
+    Started,
+    /// Every frame of the burst was handed to it.
+    Sent { frames: u32, bytes: u64 },
+    /// The burst was stopped before its end ([`Sink::stopped`]): the gate
+    /// closed, the link was lost, the grant changed, or the process stops.
+    Aborted { frames: u32, bytes: u64 },
+    /// The burst ended.
+    Ended(BurstEnd),
+}
+
+/// How a burst ended, for [`Note::Ended`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct BurstEnd {
+    pub outcome: Outcome,
+    pub frames: u32,
+    pub bytes: u64,
+    /// The surest label any answer gave, and its confidence.
+    pub top: Option<(String, f64)>,
+    /// The kinds counted from it ([`sitting::read`]).
+    pub seen: Vec<DoingSeen>,
+    /// The server's time per frame, sent to answered: the mean and the most.
+    pub server: Option<(Duration, Duration)>,
+    /// From the burst's start to its end.
+    pub took: Duration,
+    /// How long the next burst is held back by the retreat, if it is.
+    pub held_back_s: Option<u64>,
+}
+
+fn ms(duration: Duration) -> u128 {
+    duration.as_millis()
+}
+
+fn kind(what: lamp_msgs::Doing) -> &'static str {
+    match what {
+        lamp_msgs::Doing::Drinking => "drinking",
+        lamp_msgs::Doing::Eating => "eating",
+        lamp_msgs::Doing::Break => "break",
+        lamp_msgs::Doing::Nothing => "none",
+    }
+}
+
+impl Note {
+    /// The journal's line, without the `lamp-seen: ` prefix. `stopped` says
+    /// why a burst was aborted (the gate's word, or the link).
+    pub fn line(&self, stopped: &str) -> String {
+        match self {
+            Note::Started => "burst started".to_owned(),
+            Note::Sent { frames, bytes } => {
+                format!("burst sent: {frames} frames, {bytes} bytes")
+            }
+            Note::Aborted { frames, bytes } => format!(
+                "burst aborted ({stopped}) after {frames} frames, {bytes} bytes: its answers dropped"
+            ),
+            Note::Ended(ended) => ended.line(),
+        }
+    }
+}
+
+impl BurstEnd {
+    fn line(&self) -> String {
+        let held = self
+            .held_back_s
+            .map(|s| format!("; bursts held back {s} s"))
+            .unwrap_or_default();
+        let sent = format!(
+            "{} of {FRAMES} frames, {} bytes, {} ms in all",
+            self.frames,
+            self.bytes,
+            ms(self.took)
+        );
+        match self.outcome {
+            Outcome::Answered => {
+                let top = self.top.as_ref().map_or_else(
+                    || "no label".to_owned(),
+                    |(label, conf)| format!("top {label} {conf:.2}"),
+                );
+                let seen = if self.seen.is_empty() {
+                    "none".to_owned()
+                } else {
+                    self.seen
+                        .iter()
+                        .map(|s| format!("{} {:.2}", kind(s.what), s.confidence))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+                let server = self.server.map_or_else(
+                    || "no answer timed".to_owned(),
+                    |(mean, most)| format!("server {} ms a frame, at most {}", ms(mean), ms(most)),
+                );
+                format!("burst answered: {top}; counted {seen}; {server}; {sent}{held}")
+            }
+            Outcome::Busy => {
+                format!("burst busy: the server is busy, the burst dropped; {sent}{held}")
+            }
+            Outcome::Failed(failure) => {
+                let failure = match failure {
+                    Failure::Refused(status) => format!("refused, HTTP {status}"),
+                    other => other.as_str().to_owned(),
+                };
+                format!("burst failed ({failure}); {sent}{held}")
+            }
+        }
+    }
+}
+
 struct Running {
     burst: Burst,
     taken: u32,
+    bytes: u64,
+    started: Instant,
     answers: Vec<ActionAnswer>,
+    /// Each answer's time, from its frame sent to it read.
+    took: Vec<Duration>,
+}
+
+/// The surest label in `answers`, and its confidence.
+fn top(answers: &[ActionAnswer]) -> Option<(String, f64)> {
+    answers
+        .iter()
+        .flat_map(|answer| answer.detected_classes.iter())
+        .filter(|class| class.conf.is_finite())
+        .max_by(|a, b| a.conf.total_cmp(&b.conf))
+        .map(|class| (class.class_name.clone(), class.conf))
 }
 
 /// Activity's sink.
@@ -95,6 +225,7 @@ pub struct Activity {
     last_failure: Option<Failure>,
     wiped: Arc<AtomicU64>,
     counts: Counts,
+    notes: Vec<Note>,
 }
 
 fn jitter() -> f64 {
@@ -113,7 +244,22 @@ impl Activity {
             last_failure: None,
             wiped: Arc::new(AtomicU64::new(0)),
             counts: Counts::default(),
+            notes: Vec::new(),
         }
+    }
+
+    /// The journal's notes since the last call, oldest first.
+    pub fn notes(&mut self) -> Vec<Note> {
+        std::mem::take(&mut self.notes)
+    }
+
+    /// How long the retreat holds the next burst back from `now_us`, in
+    /// whole seconds, if it does.
+    fn held_back_s(&self, now_us: u64) -> Option<u64> {
+        self.retreat
+            .until_us()
+            .filter(|until| *until > now_us)
+            .map(|until| (until - now_us).div_ceil(1_000_000))
     }
 
     pub fn counts(&self) -> Counts {
@@ -156,7 +302,10 @@ impl Activity {
                         self.endpoint.public_key = Some(*key);
                     }
                 }
-                Event::Answer(answer) => running.answers.push(answer),
+                Event::Answer(answer, took) => {
+                    running.answers.push(answer);
+                    running.took.push(took);
+                }
                 Event::Done(outcome) => done = Some(outcome),
             }
         }
@@ -182,6 +331,20 @@ impl Activity {
             }
         };
         self.retreat.take(ended, now_us, jitter());
+        let server = running.took.iter().max().map(|most| {
+            let sum: Duration = running.took.iter().sum();
+            (sum / running.took.len() as u32, *most)
+        });
+        self.notes.push(Note::Ended(BurstEnd {
+            outcome,
+            frames: running.taken,
+            bytes: running.bytes,
+            top: top(&running.answers),
+            seen: seen.clone(),
+            server,
+            took: running.started.elapsed(),
+            held_back_s: self.held_back_s(now_us),
+        }));
         Some(Finished { outcome, seen })
     }
 
@@ -193,14 +356,28 @@ impl Activity {
                 self.running = Some(Running {
                     burst,
                     taken: 0,
+                    bytes: 0,
+                    started: Instant::now(),
                     answers: Vec::new(),
+                    took: Vec::new(),
                 });
+                self.notes.push(Note::Started);
                 true
             }
             Err(_) => {
                 self.counts.failed = self.counts.failed.saturating_add(1);
                 self.last_failure = Some(Failure::Connect);
                 self.retreat.take(Ended::Failed, now_us, jitter());
+                self.notes.push(Note::Ended(BurstEnd {
+                    outcome: Outcome::Failed(Failure::Connect),
+                    frames: 0,
+                    bytes: 0,
+                    top: None,
+                    seen: Vec::new(),
+                    server: None,
+                    took: Duration::ZERO,
+                    held_back_s: self.held_back_s(now_us),
+                }));
                 false
             }
         }
@@ -247,12 +424,18 @@ impl Sink for Activity {
         let Some(running) = self.running.as_mut() else {
             return;
         };
+        let size = copy.size() as u64;
         if running.burst.send(copy) {
             running.taken += 1;
+            running.bytes = running.bytes.saturating_add(size);
             self.counts.frames = self.counts.frames.saturating_add(1);
         }
         if running.taken >= FRAMES {
             running.burst.end();
+            self.notes.push(Note::Sent {
+                frames: running.taken,
+                bytes: running.bytes,
+            });
         }
     }
 
@@ -260,6 +443,10 @@ impl Sink for Activity {
         if let Some(mut running) = self.running.take() {
             running.burst.abort();
             self.counts.aborted = self.counts.aborted.saturating_add(1);
+            self.notes.push(Note::Aborted {
+                frames: running.taken,
+                bytes: running.bytes,
+            });
         }
     }
 }
