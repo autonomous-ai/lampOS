@@ -745,8 +745,9 @@ struct TriggerFile {
     /// After a night the lamp rested, a chance waits for another skill's
     /// daily trigger to be judged first (#1672): its greeting comes first.
     yields_to: Option<YieldFile>,
-    /// A shorter `for` while another topic's field is above a line (#3709).
-    sooner: Option<SoonerFile>,
+    /// A shorter `for` while another topic's field is above a line (#3709);
+    /// one table or a list of them (#6543).
+    sooner: Option<SoonersFile>,
     /// Holds only within a while after another of the skill's triggers
     /// ran, once for each of its runs: a word after a nudge (#3504).
     follows: Option<FollowsFile>,
@@ -768,6 +769,36 @@ struct SoonerFile {
     above: f64,
     #[serde(rename = "for")]
     lasting: String,
+}
+
+/// A trigger's `sooner`: one table, as before, or a list of them (#6543).
+/// Read by its shape, so a single table's errors read as they always did.
+struct SoonersFile(Vec<SoonerFile>);
+
+impl<'de> Deserialize<'de> for SoonersFile {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Shape;
+        impl<'de> serde::de::Visitor<'de> for Shape {
+            type Value = SoonersFile;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a sooner table or a list of them")
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                map: A,
+            ) -> Result<SoonersFile, A::Error> {
+                SoonerFile::deserialize(serde::de::value::MapAccessDeserializer::new(map))
+                    .map(|one| SoonersFile(vec![one]))
+            }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                self,
+                seq: A,
+            ) -> Result<SoonersFile, A::Error> {
+                Vec::deserialize(serde::de::value::SeqAccessDeserializer::new(seq)).map(SoonersFile)
+            }
+        }
+        deserializer.deserialize_any(Shape)
+    }
 }
 
 /// `follows = { trigger = "leaned_in", within = "15m" }`.
@@ -2168,10 +2199,10 @@ impl Skill {
                     .is_some()
                     .then(|| (Speech::TOPICS[0].to_owned(), "[again]")),
             )
-            .chain(self.triggers.iter().filter_map(|trigger| {
+            .chain(self.triggers.iter().flat_map(|trigger| {
                 trigger
                     .sooner
-                    .as_ref()
+                    .iter()
                     .map(|sooner| (sooner.topic.clone(), "a trigger's sooner"))
             }))
             .chain(
@@ -2585,9 +2616,10 @@ pub struct Trigger {
     /// The skill and its daily trigger this one's chance waits for, after a
     /// night the lamp rested (#1672): `yields_to`.
     pub yields_to: Option<(String, String)>,
-    /// Its shorter `for` while another topic's field is above a line
-    /// ([`SOONER_ENVIRONMENT`], #3709).
-    pub sooner: Option<Sooner>,
+    /// Its shorter `for`s, each while another topic's field is above a line
+    /// ([`SOONER_ENVIRONMENT`], #3709); empty without `sooner`. Of those
+    /// holding, the shortest `for` wins (#6543).
+    pub sooner: Vec<Sooner>,
     /// Another trigger of the skill, by name, and how long after its run
     /// this one may hold (#3504, `follows`): once for each of its runs.
     pub follows: Option<(String, u64)>,
@@ -3532,32 +3564,31 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         }
     }
     let for_us = optional(&file.lasting)?;
-    let sooner = match file.sooner {
-        None => None,
-        Some(sooner) => {
-            if for_us == 0 {
-                return Err("sooner shortens a trigger's for: give the trigger a for".into());
-            }
-            if !sooner.above.is_finite() {
-                return Err("sooner.above is a number".into());
-            }
-            let sooner_us = duration_us(&sooner.lasting)?;
-            if sooner_us == 0 || sooner_us >= for_us {
-                return Err("sooner.for is shorter than the trigger's for, and above 0".into());
-            }
-            Some(Sooner {
-                test: crate::test(
-                    &sooner.topic,
-                    Some(sooner.field),
-                    None,
-                    Some(sooner.above),
-                    None,
-                )?,
-                topic: sooner.topic,
-                for_us: sooner_us,
-            })
+    let soonest = match file.sooner {
+        None => Vec::new(),
+        Some(SoonersFile(each)) if each.is_empty() => {
+            return Err("sooner is a table or a list of them, not an empty list".into());
         }
+        Some(SoonersFile(each)) => each,
     };
+    let mut sooner = Vec::with_capacity(soonest.len());
+    for one in soonest {
+        if for_us == 0 {
+            return Err("sooner shortens a trigger's for: give the trigger a for".into());
+        }
+        if !one.above.is_finite() {
+            return Err("sooner.above is a number".into());
+        }
+        let sooner_us = duration_us(&one.lasting)?;
+        if sooner_us == 0 || sooner_us >= for_us {
+            return Err("sooner.for is shorter than the trigger's for, and above 0".into());
+        }
+        sooner.push(Sooner {
+            test: crate::test(&one.topic, Some(one.field), None, Some(one.above), None)?,
+            topic: one.topic,
+            for_us: sooner_us,
+        });
+    }
     // A compound comparison can turn false because a selected child is
     // malformed, incorrectly rearming its unchanged valid scalar tuple.
     if when == When::Changes && matches!(&test, Test::Equals(_, Value::Array(_) | Value::Object(_)))
@@ -8557,16 +8588,19 @@ impl Engine {
                 }
                 watch.last_held_us = Some(now_us);
                 let held_us = now_us - watch.since_us.unwrap_or(now_us);
-                // Brought forward while its sooner's field is past its line.
+                // Brought forward while a sooner's field is past its line:
+                // of those holding, the shortest `for` (#6543).
                 let for_us = trigger
                     .sooner
-                    .as_ref()
+                    .iter()
                     .filter(|sooner| {
                         self.sooner
                             && Self::fresh(&self.latest, &sooner.topic, now_us)
                                 .is_some_and(|value| sooner.test.holds(value))
                     })
-                    .map_or(trigger.for_us, |sooner| sooner.for_us);
+                    .map(|sooner| sooner.for_us)
+                    .min()
+                    .unwrap_or(trigger.for_us);
                 if held_us < for_us {
                     continue;
                 }
