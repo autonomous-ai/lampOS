@@ -6957,6 +6957,64 @@ async fn a_usage_limit_in_the_relays_word_says_the_line_at_once_with_the_time() 
     );
 }
 
+/// The first builder's ruling on #7362 (23:56): after the first limit line
+/// of a run, only a line that names the lamp hears it again, at most once
+/// in [`LIMIT_AGAIN_NAMED`]; every other line hears no words at all, and
+/// still tells the coordinator, so no other line takes its place. A round
+/// that begins ends the run, and the next run's first line hears it.
+#[tokio::test(start_paused = true)]
+async fn after_the_first_limit_line_only_a_line_naming_the_lamp_hears_it_again() {
+    const NAMED: &str = "Lamp, what time is it?";
+    const UNNAMED: &str = "What time is it?";
+    let answered = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+    let limited = || vec![Err(net::Error::UsageLimit(None))];
+    // (words, wait before it in s, its chat)
+    let turns = [
+        (UNNAMED, 0, answered()),
+        (UNNAMED, 1, limited()),
+        (UNNAMED, 1, limited()),
+        (NAMED, 301, limited()),
+        (NAMED, 60, limited()),
+        (UNNAMED, 1, limited()),
+        (NAMED, 300, limited()),
+        (NAMED, 1, answered()),
+        (NAMED, 1, limited()),
+    ];
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            turns
+                .iter()
+                .map(|(words, _, _)| Ok((*words).to_owned()))
+                .collect(),
+        ),
+        chats: Mutex::new(turns.iter().map(|(_, _, chat)| chat.clone()).collect()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    let mut heard = Vec::new();
+    for ((_, wait, _), request) in turns.iter().zip(1..) {
+        tokio::time::sleep(Duration::from_secs(*wait)).await;
+        heard.push(sent_with_down(&mut engine, request).await);
+    }
+    let limit = format!("audio:{}", DOWN_LINE_LIMIT.len());
+    let quiet = ["down".to_owned(), "failed".to_owned()];
+    assert!(heard[1].contains(&limit), "the run's first line: {heard:?}");
+    assert_eq!(heard[2], quiet, "unnamed: {heard:?}");
+    assert!(heard[3].contains(&limit), "named, 5 min on: {heard:?}");
+    assert_eq!(heard[4], quiet, "named again within 5 min: {heard:?}");
+    assert_eq!(heard[5], quiet, "unnamed: {heard:?}");
+    assert!(
+        heard[6].contains(&limit),
+        "named, 5 min on again: {heard:?}"
+    );
+    assert!(heard[7].contains(&"complete".to_owned()), "{heard:?}");
+    assert!(
+        heard[8].contains(&limit),
+        "a new run's first line: {heard:?}"
+    );
+}
+
 /// #7346: the usage-limit line is said in each of the owner's languages,
 /// as the other down lines are.
 #[test]
