@@ -2558,7 +2558,7 @@ fn the_product_answers_a_stop_and_asks_after_a_wordless_cut_in() {
 }
 
 /// The wellbeing nudges at a present spacing and Comfort break
-/// (`LAMP_NUDGES_PRESENT`, #5207): water after 50 minutes and each 50 after,
+/// (`LAMP_NUDGES_PRESENT`, #5207): water after 30 minutes and each 45 after,
 /// Comfort break after 90, two an hour at most. Each process that loads the
 /// skills folder reads it, so all three units set it together; set only in
 /// `lamp-skills`, Comfort break would speak while the app lists it off.

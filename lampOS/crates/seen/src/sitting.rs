@@ -2,7 +2,7 @@
 //!
 //! - [`read`] turns one burst's answers into what was seen, as coarse kinds
 //!   (drinking, eating, a break: V1's `drink`, `eat` and `break` groups),
-//!   never the raw label. A false "drank" silences sip-of-water for 90 min,
+//!   never the raw label. A false "drank" silences sip-of-water for 30 min,
 //!   so a kind counts only when one answer is sure of it (at least
 //!   [`SURE`]), or when at least [`RUN`] of the burst's last [`LAST`]
 //!   answers have it at all (the server sends only what clears V1's 0.3).
