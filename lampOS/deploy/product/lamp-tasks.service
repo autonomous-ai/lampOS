@@ -37,8 +37,9 @@ Environment=LAMP_SKILL_TASKS=on
 # lamp-services, written to a 0400 file in its fresh folder, read once and deleted before Hermes starts.
 Environment=LAMP_SKILL_SECRETS=on
 # A skill's task that reaches the internet (docs/tasks.md, "An agent skill's run and the `net` grant"): a run granted
-# `net` keeps the lamp's network, only on lamp-control's kept yes; any other stays LAMP_NS_NET=run. The same line in
-# lamp-skills, lamp-skills-manage@, lamp-control and lamp-voice.
+# `net`, only on lamp-control's kept yes, is held as every run (LAMP_NS_NET=run) and given its own egress socket: the
+# public web on ports 80 and 443 alone, never the lamp's networks or its local ports. The same line in lamp-skills,
+# lamp-skills-manage@, lamp-control, lamp-voice and lamp-cloud.
 Environment=LAMP_TASK_NET=on
 # The lamp's agent's connectors (#6648, docs/services.md "The lamp's agent's connectors"): Hermes's config.yaml
 # gets mcp_servers.lamp-services at start, reaching a linked service only by a skill run's one-run token and grants;

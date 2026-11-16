@@ -3258,7 +3258,7 @@ Yêu cầu của chủ (12/11): một `SKILL.md` tải lên từ app chạy qua 
 đèn, như V1; người xây dựng đầu tiên đồng ý lúc 19:44. Bật trong sản phẩm từ
 13/11 (phán quyết của chủ: luồng tải lên đi qua agent), đặt trong
 `lamp-voice`, `lamp-cloud`, `lamp-skills` và `lamp-skills-manage@`;
-`LAMP_TASK_NET` cũng bật trong sản phẩm, nên tệp cần tới internet được cấp `net`,
+`LAMP_TASK_NET` cũng bật trong sản phẩm, nên tệp cần tới internet được cấp `net` (chỉ web công khai trên cổng 80 và 443, không bao giờ mạng trong nhà),
 hỏi lời đồng ý bằng giọng nói của chủ ở lần chạy đầu. Khi bật (trong `lamp-voice`, `lamp-cloud`,
 `lamp-skills` và manage helper), một `SKILL.md` trần tối đa 64 KiB thành một
 kỹ năng agent thay vì kỹ năng viết (tắt: như trước, ghi chú tối đa 900 byte):

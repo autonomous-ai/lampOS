@@ -21,6 +21,9 @@ signal-hook = "0.4"
 # OpenClaw keeps some transcript events zstd-compressed (`event_zstd`; 27 of 115 rows on lamp-52e6,
 # the large tool results): decoded by a pure-Rust decoder, no C build (#7267, `steps`).
 ruzstd = { version = "=0.7.3", default-features = false, features = ["std"] }
+# The lamp's interface addresses for a `net` run's egress check (`egress`,
+# getifaddrs): the pin the other crates keep, already in the workspace.
+nix = { version = "=0.29.0", default-features = false, features = ["net"] }
 
 [dev-dependencies]
 tempfile = "3"

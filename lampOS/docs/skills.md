@@ -1694,8 +1694,12 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   `hear`, `sound`, `air`, `device`, `camera`, `microphone`, `notes`,
   `speech`), once each, never `skills` (a script never puts skills on the
   lamp). With `LAMP_TASK_NET=on` (on in the product: lamp-tasks, lamp-skills and
-  its manage helper, lamp-control and lamp-voice) one more, `net`
-  ("reaches the internet"): the run keeps the lamp's network; never one of
+  its manage helper, lamp-control, lamp-voice and lamp-cloud's skills page) one more, `net`
+  ("reaches the internet"): the run, held like every run, reaches the
+  public web on ports 80 and 443 through its own egress socket (a proxy
+  and DNS inside the run, every address checked by lamp-tasks: never the
+  lamp's networks, the home router or the lamp's local ports; docs/tasks.md,
+  "An agent skill's run and the `net` grant"); never one of
   lamp-control's own, so the yes holds it and the token never names it. An unknown one refuses the skill. A pushed skill is held to its
   computer's own grants for them too (`package::grants_asked`).
 - **First kind only.** A skill with a `do.task` loads only when its script
@@ -5980,8 +5984,8 @@ the lamp's agent, as V1's did); the first builder's yes at 19:44. On in
 the product since 13 Nov (the owner's ruling: the upload flow goes via the
 agent), set in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
 `lamp-skills-manage@`; `LAMP_TASK_NET` is on in the product too, so a file
-that reaches the internet is granted `net`, asked the owner's spoken yes at
-its first run. `lamp_voice::upload_agent`. With
+that reaches the internet is granted `net` (the public web on 80 and 443
+alone), asked the owner's spoken yes at its first run. `lamp_voice::upload_agent`. With
 `LAMP_UPLOAD_TO_AGENT=on` in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
 its manage helper, a bare `SKILL.md` of at most 64 KiB becomes an agent
 skill instead of a written one (off: a written skill, its note at most 900

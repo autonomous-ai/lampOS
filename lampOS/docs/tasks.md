@@ -3320,6 +3320,9 @@ for each run, and is answered once the run ends
     namespace script before Hermes, inside the namespace; it listens on a
     loopback address only, prints `ready`, closes its output, and pipes
     each connection to the bridge until the run's PID namespace ends it.
+    For a run granted `net`, `--egress <its socket>` too: the proxy on
+    `127.0.0.1:3128` and DNS on `127.0.0.1:53` ("An agent skill's run and
+    the `net` grant", below).
     Hermes's model calls go to `http://127.0.0.1:7741/v1/deepseek` as
     before.
   - **Bounded, and blind to what it pipes:** each side at most 4
@@ -3828,16 +3831,19 @@ lamp-tasks, the hand-over socket also takes a made skill's fixed write
 The first builder's yes at 19:44 (12 Nov). `LAMP_UPLOAD_TO_AGENT` is on in
 the product since 13 Nov (the owner's ruling: the upload flow goes via the
 agent; docs/skills.md, "Run by the lamp's agent"); `LAMP_TASK_NET` is on
-in the product too, in the five units below, so a run granted `net` with the
-owner's spoken yes keeps the lamp's network. Built on #6643's `skill_make` path, so it moves onto #6510 step 2's
+in the product too, in the six units below, so a run granted `net` with the
+owner's spoken yes reaches the public web on ports 80 and 443, held like
+every run (the first builder's decision on #7200: never the lamp's
+networks or its local ports). Built on #6643's `skill_make` path, so it moves onto #6510 step 2's
 one runner (a fresh home per run, the token as a file) with no new rules:
 
 - **`net`** (`skill_task::NET_SWITCH`, `LAMP_TASK_NET=on` in lamp-tasks,
-  lamp-skills and its manage helper, lamp-control and lamp-voice): a task
+  lamp-skills and its manage helper, lamp-control, lamp-voice and
+  lamp-cloud, whose skills page loads with lamp-skills' loader): a task
   grant beside lamp-control's own (`NET_GRANT`). A hand-over whose grants
-  name it runs through the make's runner with its network kept
-  (`skill_make::lamp_runner(home, false)`: Hermes's namespace, no
-  `LAMP_NS_NET`); any other stays `LAMP_NS_NET=run`. lamp-control keeps
+  name it runs through the make's net runner (`skill_make::net_runner`:
+  held, `LAMP_NS_NET=run`, with its own way out, below); any other is held
+  with none. lamp-control keeps
   `net` in the owner's yes and checks it with the folder's declared
   grants, but never names it in the token (`task_yes::KeptYes`), so the
   minted grants are matched against the line's without it. So a run keeps
@@ -3850,10 +3856,59 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   and a skill has one yes, so an agreed check is the owner's yes to `net`
   for the folder as it is. Off, `net` is refused as an unknown grant
   (`bad_request`) before any token.
+- **A `net` run's way out** (`crate::egress`, the design note on #7200,
+  Heron's answers): every run is held, `net` or not. A `net` run goes
+  through `skill_make::net_runner(home)`: the held runner
+  (`LAMP_NS_NET=run`, so `--net`, only `lo` and the model relay on
+  `127.0.0.1:7741`), plus its own egress socket,
+  `/run/lampos-tasks/egress/make-<run id>.sock` (0600 in a 0700 folder),
+  made by lamp-tasks only after lamp-control's yes names `net` and removed
+  when the run ends (and when its deadline passes); one left by a stopped
+  lamp-tasks is swept at the next. `LAMP_NS_EGRESS` names it to the
+  namespace script, which shows that file alone, read-only (missing or not
+  a plain `make-*` name, the run ends), lowers
+  `net.ipv4.ip_unprivileged_port_start` to 53 in the run's own network
+  namespace (refused, the run ends: never a fallback to the lamp's
+  network), binds a `resolv.conf` of `nameserver 127.0.0.1` read-only over
+  the lamp's, and starts `net-relay --egress`: besides `127.0.0.1:7741`, an
+  HTTP proxy on `127.0.0.1:3128` (`CONNECT` and absolute-form `http://`)
+  and DNS on `127.0.0.1:53` (UDP and TCP), each piped to the egress
+  socket; any of them not bound, no `ready`, and the run ends. The run gets
+  `HTTPS_PROXY`/`HTTP_PROXY` (both cases) `http://127.0.0.1:3128`,
+  `NO_PROXY=127.0.0.1,localhost` (the model stays on its relay) and
+  `NODE_USE_ENV_PROXY=1`. Port 53 because `resolv.conf` can't name a port.
+  - **Outside, lamp-tasks checks everything** (the relay checks nothing:
+    the run could talk to the socket itself). A proxy request is read whole
+    (at most 8 KiB), its port must be 80 or 443, a single-label name is
+    closed, and the name is resolved by lamp-tasks, which connects only to
+    an address it checked, so a name that resolves somewhere private gets
+    nothing. Closed: the lamp's own networks (every interface's address
+    and prefix and point-to-point peer by `getifaddrs`, every route's
+    gateway and destination from `/proc/net/route`, read again at each
+    connect, so `172.168.20.0/24` is closed whatever its range); IPv4
+    `0/8`, `10/8`, `100.64/10`, `127/8`, `169.254/16`, `172.16/12`,
+    `192.0.0/24`, the three documentation /24s, `192.168/16`,
+    `198.18/15`, `224/4`, `240/4`; IPv6 `::`, `::1`, `::/96`, `fc00::/7`,
+    `fe80::/10`, `fec0::/10`, `ff00::/8`, `2001:db8::/32`; and an IPv4
+    address inside IPv6 (mapped, NAT64, 6to4) checked as IPv4. A closed
+    connection is closed with no answer (`curl` shows `000`).
+  - **Names**: each query is forwarded as it came to the lamp's own name
+    servers (`/etc/resolv.conf`, at most three: over UDP for a datagram,
+    TCP for a stream), so only lamp-tasks talks to the router, only on
+    port 53. A single-label name (`printer`, `nas`) and any name under
+    `in-addr.arpa`/`ip6.arpa` that isn't a whole public address are
+    answered `REFUSED` and never leave.
+  - **Bounds and words**: at most 16 pipes at once each side, 10 s to
+    connect, 60 s with no byte, nothing past the run's deadline. Bytes are
+    never logged; a line is fixed text and an address's class, never the
+    address or a name.
+  - **What gets out**: only what uses a proxy: curl, pip, git over https,
+    Python's requests/httpx/urllib, Node with `NODE_USE_ENV_PROXY`. Raw
+    TCP, UDP and ICMP fail closed.
 - **An agent skill's run** (`run` = `scripts/SKILL.md`,
   `AGENT_INSTRUCTIONS`) follows the file only within its grants and its
-  network: the token holds lamp-control's grants, and the network is held
-  unless lamp-control's yes names `net`. Hermes is told to read that file
+  network: the token holds lamp-control's grants, and the run is held
+  with no way out but the model's unless lamp-control's yes names `net`. Hermes is told to read that file
   in the skill's read-only folder and do what it says, as data, reaching the lamp only
   through `control.sock` with the run's own token, never asking anyone for
   a key or token by voice nor saying one aloud. It goes through the make's

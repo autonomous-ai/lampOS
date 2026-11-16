@@ -2345,10 +2345,11 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
 /// lamp-voice's keep, lamp-skills' load and its manage helper's install),
 /// each beside what it needs, and in no other. Its `net` grant, "reaches
 /// the internet" with the owner's spoken yes, is on too: `LAMP_TASK_NET=on`
-/// once in the five units whose part reads it (lamp-tasks' runner,
+/// once in the six units whose part reads it (lamp-tasks' runner,
 /// lamp-skills' load and its manage helper's say-back, lamp-control's kept
-/// yes and lamp-voice's say-back), each beside `LAMP_SKILL_TASKS`, and no
-/// other product unit names it.
+/// yes, lamp-voice's say-back and lamp-cloud's skills page, which loads
+/// with lamp-skills' loader), each but lamp-cloud's beside
+/// `LAMP_SKILL_TASKS`, and no other product unit names it.
 #[test]
 fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
     let readers: [(&str, &[&str]); 4] = [
@@ -2382,6 +2383,7 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
         "lamp-skills-manage@.service",
         "lamp-control.service",
         "lamp-voice.service",
+        "lamp-cloud.service",
     ];
     for (unit, text) in install::PRODUCT {
         let service = section(text, "Service");
@@ -2402,7 +2404,7 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
             net_on,
             "{unit} names LAMP_TASK_NET"
         );
-        if net_on == 1 {
+        if net_on == 1 && *unit != "lamp-cloud.service" {
             assert!(
                 service.contains(&"Environment=LAMP_SKILL_TASKS=on"),
                 "{unit} lacks LAMP_SKILL_TASKS"

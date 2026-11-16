@@ -1238,6 +1238,11 @@ pub struct MakeHermes {
     /// The one agent namespace ([`crate::skill_task::AGENT_NS`]), which
     /// the wrapper runs instead with the one run path.
     pub agent_ns: PathBuf,
+    /// A task's run granted `net` ([`net_runner`]): held as every run, and
+    /// given its own egress socket ([`crate::egress::Grant::open`]) while
+    /// it runs, named to the namespace script by
+    /// [`crate::egress::EGRESS_ENV`]. None: no way out but the model's.
+    pub egress: Option<crate::egress::Grant>,
 }
 
 impl Runner for MakeHermes {
@@ -1254,12 +1259,39 @@ impl Runner for MakeHermes {
         if self.hermes.folder != self.make_work || !(own || one_path) {
             return Err(NO_NAMESPACE.into());
         }
+        if self.egress.is_some() && !has(&self.ns, crate::egress::NS_LINE) {
+            return Err(crate::egress::NO_EGRESS.into());
+        }
         Ok(())
     }
 
+    /// With [`MakeHermes::egress`], the run's egress socket is made for its
+    /// own folder (`make-<run id>`) before Hermes starts and removed when
+    /// it ends, whatever the end; nothing piped through it outlives the
+    /// run's deadline.
     fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
         self.ready()?;
-        self.hermes.run(run, end_token)
+        let Some(grant) = &self.egress else {
+            return self.hermes.run(run, end_token);
+        };
+        let name = run
+            .start_in
+            .as_deref()
+            .and_then(Path::file_name)
+            .and_then(|name| name.to_str())
+            .filter(|name| crate::egress::plain_name(name))
+            .ok_or_else(|| "a run granted net has no folder of its own".to_owned())?;
+        let until = std::time::Instant::now() + run.deadline;
+        let served = grant
+            .open(name, until)
+            .map_err(|error| format!("the run's way out was not made: {}", error.kind()))?;
+        let mut hermes = self.hermes.clone();
+        hermes
+            .env
+            .push((crate::egress::EGRESS_ENV.into(), name.to_owned()));
+        let ran = hermes.run(run, end_token);
+        drop(served);
+        ran
     }
 }
 
@@ -1273,6 +1305,18 @@ impl Runner for MakeHermes {
 /// keeps the lamp's network, as Harness's own panes do (the model then
 /// reached at lamp-cloud's forwarder, the one `model.sock` pipes to).
 pub fn lamp_runner(home: &Path, held: bool) -> MakeHermes {
+    lamp_runner_with(home, held, None)
+}
+
+/// The runner a task's run granted `net` goes through (the design note on
+/// #7200): [`lamp_runner`] held, so `--net`, only `lo` and the model
+/// relay as every run, with [`crate::egress::Grant::lamp`]: its own
+/// egress socket, the public web on ports 80 and 443 alone.
+pub fn net_runner(home: &Path) -> MakeHermes {
+    lamp_runner_with(home, true, Some(crate::egress::Grant::lamp()))
+}
+
+fn lamp_runner_with(home: &Path, held: bool, egress: Option<crate::egress::Grant>) -> MakeHermes {
     let mut hermes = crate::skill_task::HermesRunner::lamp(home);
     if !held {
         hermes
@@ -1286,6 +1330,7 @@ pub fn lamp_runner(home: &Path, held: bool) -> MakeHermes {
         wrapper: PathBuf::from(crate::skill_task::HERMES),
         ns: PathBuf::from(NS),
         agent_ns: PathBuf::from(crate::skill_task::AGENT_NS),
+        egress,
     }
 }
 

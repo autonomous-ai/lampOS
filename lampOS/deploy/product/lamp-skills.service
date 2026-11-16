@@ -85,7 +85,7 @@ Environment=LAMP_SKILL_WRITE_AGENT=on
 Environment=LAMP_UPLOAD_TO_AGENT=on
 # A skill's task that reaches the internet (docs/tasks.md, "An agent skill's run and the `net` grant"): `net`
 # read as a task grant, said "reaches the internet". The same line in lamp-tasks, lamp-skills-manage@,
-# lamp-control and lamp-voice.
+# lamp-control, lamp-voice and lamp-cloud.
 Environment=LAMP_TASK_NET=on
 # The owner's typed setup name, for a made skill's read (#5288). A blank fallback when there is none, so the read
 # is skipped ("no owner's face enrolled"), never the unit refused (SetCredential= is LoadCredential='s default,

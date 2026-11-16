@@ -54,7 +54,7 @@ pub const IDLE_WITHIN: Duration = Duration::from_secs(130);
 /// (`hermes_llm::ANSWER_WITHIN`, 600 s) with its head, body and write.
 pub const PIPE_WITHIN: Duration = Duration::from_secs(700);
 /// How often a non-blocking listener is looked at while no one connects.
-const ACCEPT_TICK: Duration = Duration::from_millis(20);
+pub(crate) const ACCEPT_TICK: Duration = Duration::from_millis(20);
 /// The line the relay prints once it listens, then closes its output: the
 /// namespace script waits for it before Hermes runs.
 pub const READY: &str = "ready";
@@ -192,7 +192,7 @@ pub fn pipe(a: Box<dyn End>, b: Box<dyn End>, bounds: Bounds) {
 }
 
 /// One of [`Bounds::most`] held while its pipe lives.
-struct Counted(Arc<AtomicUsize>);
+pub(crate) struct Counted(pub(crate) Arc<AtomicUsize>);
 
 impl Drop for Counted {
     fn drop(&mut self) {
@@ -204,7 +204,7 @@ impl Drop for Counted {
 /// thread of its own, at most `bounds.most` at once (one more closed at
 /// once), until `stop`. A non-blocking listener is looked at every
 /// [`ACCEPT_TICK`]; a blocking one waits.
-fn serve(
+pub(crate) fn serve(
     mut accept: impl FnMut() -> io::Result<Box<dyn End>>,
     connect: Arc<dyn Fn(Duration) -> io::Result<Box<dyn End>> + Send + Sync>,
     bounds: Bounds,
@@ -341,11 +341,21 @@ pub fn relay(listener: &TcpListener, to: &Path, bounds: Bounds, stop: &AtomicBoo
     );
 }
 
-/// `net-relay --listen ADDR --to PATH`: a loopback address and an absolute
-/// socket path, each once, nothing else.
-pub fn relay_args(args: &[String]) -> Result<(SocketAddr, PathBuf), String> {
-    let usage = "usage: lamp-tasks net-relay --listen 127.0.0.1:PORT --to /ABS/SOCKET";
-    let (mut listen, mut to) = (None, None);
+/// What `net-relay` is started with.
+#[derive(Debug, PartialEq, Eq)]
+pub struct RelayArgs {
+    pub listen: SocketAddr,
+    pub to: PathBuf,
+    /// A run granted `net`: its egress socket, where the proxy and the
+    /// name server inside the run pipe to ([`crate::egress::Inside`]).
+    pub egress: Option<PathBuf>,
+}
+
+/// `net-relay --listen ADDR --to PATH [--egress PATH]`: a loopback
+/// address and absolute socket paths, each once, nothing else.
+pub fn relay_args(args: &[String]) -> Result<RelayArgs, String> {
+    let usage = "usage: lamp-tasks net-relay --listen 127.0.0.1:PORT --to /ABS/SOCKET [--egress /ABS/SOCKET]";
+    let (mut listen, mut to, mut egress) = (None, None, None);
     let mut args = args.iter();
     while let Some(arg) = args.next() {
         let value = args.next().ok_or(usage)?;
@@ -364,18 +374,38 @@ pub fn relay_args(args: &[String]) -> Result<(SocketAddr, PathBuf), String> {
                 }
                 to = Some(path);
             }
+            "--egress" if egress.is_none() => {
+                let path = PathBuf::from(value);
+                if !path.is_absolute() {
+                    return Err(usage.into());
+                }
+                egress = Some(path);
+            }
             _ => return Err(usage.into()),
         }
     }
-    Ok((listen.ok_or(usage)?, to.ok_or(usage)?))
+    Ok(RelayArgs {
+        listen: listen.ok_or(usage)?,
+        to: to.ok_or(usage)?,
+        egress,
+    })
 }
 
-/// `lamp-tasks net-relay`: listens, prints [`READY`], puts `/dev/null`
-/// over its output (so the namespace script's `$(...)` ends), and relays
-/// until it is killed (the run's PID namespace ending).
+/// `lamp-tasks net-relay`: listens (with `--egress`, also the proxy and
+/// the name server, [`crate::egress::Inside`]: one not bound, no
+/// [`READY`]), prints [`READY`], puts `/dev/null` over its output (so the
+/// namespace script's `$(...)` ends), and relays until it is killed (the
+/// run's PID namespace ending).
 pub fn relay_main(args: &[String]) -> Result<(), String> {
-    let (listen, to) = relay_args(args)?;
+    let RelayArgs { listen, to, egress } = relay_args(args)?;
     let listener = TcpListener::bind(listen).map_err(|error| format!("{listen}: {error}"))?;
+    let inside = match &egress {
+        Some(_) => Some(crate::egress::Inside::bind(
+            crate::egress::PROXY_LISTEN,
+            crate::egress::DNS_LISTEN,
+        )?),
+        None => None,
+    };
     let mut out = io::stdout();
     writeln!(out, "{READY}")
         .and_then(|()| out.flush())
@@ -385,8 +415,13 @@ pub fn relay_main(args: &[String]) -> Result<(), String> {
         .open("/dev/null")
         .map_err(|error| format!("/dev/null: {error}"))?;
     rustix::stdio::dup2_stdout(&null).map_err(|error| format!("output not closed: {error}"))?;
-    let stop = AtomicBool::new(false);
+    let stop = Arc::new(AtomicBool::new(false));
     let say: Say = Arc::new(|line| eprintln!("{line}"));
+    if let (Some(inside), Some(egress)) = (inside, egress) {
+        inside
+            .serve(&egress, crate::egress::BOUNDS, &stop, &say)
+            .map_err(|error| format!("egress relay not started: {error}"))?;
+    }
     relay(&listener, &to, Bounds::LAMP, &stop, &say);
     Ok(())
 }
@@ -649,7 +684,19 @@ mod tests {
             relay_args(&args(
                 "--listen 127.0.0.1:7741 --to /run/lampos-tasks/model.sock"
             )),
-            Ok((FORWARDER, PathBuf::from(MODEL_SOCKET)))
+            Ok(RelayArgs {
+                listen: FORWARDER,
+                to: PathBuf::from(MODEL_SOCKET),
+                egress: None
+            })
+        );
+        assert_eq!(
+            relay_args(&args(
+                "--listen 127.0.0.1:7741 --to /run/lampos-tasks/model.sock \
+                 --egress /run/lampos-tasks/egress/make-a.sock"
+            ))
+            .map(|got| got.egress),
+            Ok(Some(PathBuf::from("/run/lampos-tasks/egress/make-a.sock")))
         );
         for bad in [
             "",
@@ -661,6 +708,8 @@ mod tests {
             "--listen 127.0.0.1:7741 --listen 127.0.0.1:7742 --to /run/x.sock",
             "--listen 127.0.0.1:7741 --to /run/x.sock --more x",
             "--listen 127.0.0.1:7741 --to",
+            "--listen 127.0.0.1:7741 --to /run/x.sock --egress run/e.sock",
+            "--listen 127.0.0.1:7741 --to /run/x.sock --egress /e.sock --egress /f.sock",
         ] {
             assert!(relay_args(&args(bad)).is_err(), "{bad:?}");
         }
