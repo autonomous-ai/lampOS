@@ -2113,7 +2113,9 @@ fn the_tasks_switch_is_lamp_tasks_own_and_on_in_the_product() {
 /// the product (12 Nov, the lead's ask): `lamp-voice` (the making model's
 /// brief and the yes), `lamp-skills` (a made skill's `do.task` loads) and
 /// its manage helper (a made skill's scripts held to the cap as it is put
-/// on) each set it `on` once, and no product file sets it to anything else.
+/// on) each set it `on` once, and so does `lamp-cloud` (its skills page
+/// loads a made skill's `do.task` as lamp-skills does, 16 Nov); no product
+/// file sets it to anything else.
 #[test]
 fn the_made_scripts_switch_is_on_in_the_product() {
     let name = lamp_voice::made_skill::SCRIPTS_ENVIRONMENT;
@@ -2122,7 +2124,12 @@ fn the_made_scripts_switch_is_on_in_the_product() {
     let setting = format!("{name}=");
     let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
     // Every unit whose part reads it.
-    for unit in ["lamp-skills", "lamp-skills-manage@", "lamp-voice"] {
+    for unit in [
+        "lamp-skills",
+        "lamp-skills-manage@",
+        "lamp-voice",
+        "lamp-cloud",
+    ] {
         let text = fs::read_to_string(product.join(format!("{unit}.service"))).unwrap();
         let lines = text.lines().filter(|line| *line == switch).count();
         assert_eq!(lines, 1, "{unit}");
