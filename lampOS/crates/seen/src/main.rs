@@ -16,8 +16,8 @@
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_camera::frames::{FrameClient, Role};
 use lamp_msgs::{
-    Diagnostic, DoingSeen, ExpressionState, Faces, HumanDoing, HumanFamiliar, HumanPosture, Level,
-    MemoryForgot, MicrophonePrivacy, RoomActivity, RoomPresence, StoodUp,
+    Diagnostic, DoingSeen, ExpressionState, Faces, HumanDoing, HumanDoingMore, HumanFamiliar,
+    HumanPosture, Level, MemoryForgot, MicrophonePrivacy, RoomActivity, RoomPresence, StoodUp,
 };
 use lamp_seen::{
     BUS_NAME, ENVIRONMENT, HEALTH_NAME,
@@ -426,6 +426,22 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         bus.publisher_declared(HumanDoing::TOPIC, &HumanDoing::declaration(), BUS_NAME)?;
     let mut seen_out =
         bus.publisher_declared(DoingSeen::TOPIC, &DoingSeen::declaration(), BUS_NAME)?;
+    // Tiredness, desk work and celebrating, on a topic of their own: off,
+    // it is not even declared.
+    let more_doings = lamp_seen::sitting::more(
+        std::env::var(lamp_seen::sitting::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    );
+    let mut doing_more_out = if more_doings {
+        Some(bus.publisher_declared(
+            HumanDoingMore::TOPIC,
+            &HumanDoingMore::declaration(),
+            BUS_NAME,
+        )?)
+    } else {
+        None
+    };
     let opt_in_file = opt_in::File::in_folder(&config.opt_in_folder);
     let record = opt_in::Record::in_folder(&config.state_folder);
     let mut kept = lamp_msgs::consent::Kept::default();
@@ -700,7 +716,7 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             pose.forget();
         }
         if desk.is_ok() && sitting.is_none() {
-            let begun = Sitting::new(inputs.arrived_us(now));
+            let begun = Sitting::with_more(inputs.arrived_us(now), more_doings);
             sitting = Some(if break_is_standing {
                 begun.break_is_standing(now, stood_up_us)
             } else {
@@ -740,6 +756,9 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
                             let _ = seen_out.publish_json(now, &newly);
                         }
                     }
+                    // Its other timers wait for the next 30 s, so
+                    // humans/doing goes out as often as without them.
+                    sitting.saw_more(&finished.more, now);
                     if finished.seen.iter().any(|seen| sitting.takes(seen.what)) {
                         // Said at once, not at the next 30 s.
                         doing_said = None;
@@ -769,6 +788,9 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             let doing = sitting.doing(now);
             if doing.check().is_ok() {
                 let _ = doing_out.publish_json(now, &doing);
+            }
+            if let (Some(out), Some(more)) = (doing_more_out.as_mut(), sitting.doing_more(now)) {
+                let _ = out.publish_json(now, &more);
             }
             doing_said = Some(Instant::now());
         }
