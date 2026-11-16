@@ -400,6 +400,12 @@ that one too, aborts a burst under way.
     "using computer" and "playing controller" are `computer`, "texting"
     `phone`, "reading", "reading book" and "reading newspaper" `reading`,
     "writing" and "drawing" `writing`; the kind of the surest such label)
+    and `desk_s`, this sitting's desk-work time in seconds: the time
+    between two bursts in a row that both saw desk work, each gap counted
+    up to the burst period (60 s), so a missed burst (busy, failed,
+    paused) never counts the long gap it leaves, and a burst without desk
+    work ends the run (0 before two such bursts; a number only, no
+    picture or label kept),
     and `celebrate_s_ago` (V1's `celebrate` group), and `drank_seen` and
     `ate_seen`, how many drinks and how much eating were newly seen this
     sitting: exactly the sightings `humans/doing_seen` says, so a count is
