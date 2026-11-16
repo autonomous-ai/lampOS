@@ -68,6 +68,17 @@ pub fn from_environment() -> bool {
 /// the function's note, the text after the front matter on one line. It
 /// may speak (the note is the model's own answer) and nothing else.
 pub fn written(card: &str) -> Result<Files, Refused> {
+    written_with(
+        card,
+        &crate::upload_agent::asks_of(&crate::upload_agent::triggers(card)),
+    )
+}
+
+/// [`written`], with its function's `asks` given (`LAMP_MADE_SKILL_ASKS`:
+/// its trigger phrases as [`crate::upload_agent::asks_checked`] keeps
+/// them, so `LAMP_SKILL_NAMED` calls it in code when one is heard); none,
+/// and its `skill.toml` is as before, byte for byte.
+pub fn written_with(card: &str, asks: &[String]) -> Result<Files, Refused> {
     let unread = || Refused(made_skill_md_unread(), None);
     let name = made_skill::card_name(card).ok_or_else(unread)?;
     let tool = name.replace('-', "_");
@@ -102,8 +113,9 @@ pub fn written(card: &str) -> Result<Files, Refused> {
         ));
     }
     let toml = format!(
-        "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"voice\"]\ntool = \"{tool}\"\n\n\
+        "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"voice\"]\ntool = \"{tool}\"\n{}\n\
          [permissions]\nspeak = true\n\n[[do]]\nsay = {}\n",
+        crate::upload_agent::asks_line(asks),
         toml_string(&note)
     );
     Ok(Files {
@@ -242,6 +254,21 @@ pub fn take(
     skill_md: &str,
     at_unix_ms: u64,
 ) -> Result<Made, Refused> {
+    take_telling(place, keeping, skill_toml, skill_md, at_unix_ms).map(|(made, _)| made)
+}
+
+/// [`take`], and a bare `SKILL.md`'s trigger phrases left out of its
+/// function's `asks` with why (`LAMP_MADE_SKILL_ASKS`,
+/// [`crate::upload_agent::asks_checked`]: not plain words the lamp can
+/// start it by, or words that would start another skill on the lamp,
+/// [`made_skill::ask_taken`]), for the app; the rest still goes on.
+pub fn take_telling(
+    place: &Place,
+    keeping: &Keeping,
+    skill_toml: Option<&str>,
+    skill_md: &str,
+    at_unix_ms: u64,
+) -> Result<(Made, Vec<crate::upload_agent::LeftOut>), Refused> {
     // A file saved with Windows line endings reads as any other.
     let skill_md = &skill_md.replace("\r\n", "\n");
     let skill_toml = skill_toml.map(|toml| toml.replace("\r\n", "\n"));
@@ -272,20 +299,37 @@ pub fn take(
     }
     // An agent skill (`LAMP_UPLOAD_TO_AGENT`): the file whole, run by the
     // lamp's agent ([`crate::upload_agent`]).
-    if skill_toml.is_none() && crate::upload_agent::on() {
-        let (files, _) = crate::upload_agent::files(skill_md)?;
-        return made_skill::keep_agent(&files, &format!("{FROM}{at_unix_ms}"), keeping);
+    // Its trigger phrases as its function's asks, each checked as a made
+    // skill's are, none another skill's (`LAMP_MADE_SKILL_ASKS`).
+    let (asks, left_out) =
+        crate::upload_agent::asks_checked(&crate::upload_agent::triggers(skill_md), |ask| {
+            made_skill::ask_taken(&place.skills, &name, ask)
+        });
+    if !left_out.is_empty() {
+        eprintln!(
+            "lamp-voice: a skill added from a file: {} of its trigger phrases left out of its asks",
+            left_out.len()
+        );
     }
-    let files = match skill_toml {
-        Some(toml) => Files {
-            toml: toml.to_owned(),
-            card: skill_md.to_owned(),
-            left_out: None,
-            scripts: Vec::new(),
-        },
-        None => written(skill_md)?,
+    if skill_toml.is_none() && crate::upload_agent::on() {
+        let (files, _) = crate::upload_agent::files_with(skill_md, &asks)?;
+        return made_skill::keep_agent(&files, &format!("{FROM}{at_unix_ms}"), keeping)
+            .map(|made| (made, left_out));
+    }
+    let (files, left_out) = match skill_toml {
+        Some(toml) => (
+            Files {
+                toml: toml.to_owned(),
+                card: skill_md.to_owned(),
+                left_out: None,
+                scripts: Vec::new(),
+            },
+            Vec::new(),
+        ),
+        None => (written_with(skill_md, &asks)?, left_out),
     };
     made_skill::keep_added(&files, &format!("{FROM}{at_unix_ms}"), keeping)
+        .map(|made| (made, left_out))
 }
 
 /// What the lamp says aloud once a skill added from a file is on: its
@@ -414,8 +458,8 @@ pub fn line(
         Some(_) => return Some((json!({"refused": "its skill.toml is text"}), None)),
     };
     Some(
-        match take(place, keeping, skill_toml, skill_md, now_unix_ms) {
-            Ok(made) => {
+        match take_telling(place, keeping, skill_toml, skill_md, now_unix_ms) {
+            Ok((made, left_out)) => {
                 eprintln!("lamp-voice: a skill added from a file: kept; put on now");
                 let mut kept = json!({
                     "name": made.name,
@@ -430,6 +474,16 @@ pub fn line(
                 // (`LAMP_SKILL_SECRETS`); never a value.
                 if let Some(secrets) = made_skill::agent_secrets(&keeping.directory, &made.sha256) {
                     kept["secrets"] = json!(secrets);
+                }
+                // Its trigger phrases left out of its asks, and why
+                // (`LAMP_MADE_SKILL_ASKS`): absent with none, as before.
+                if !left_out.is_empty() {
+                    kept["asks_left_out"] = json!(
+                        left_out
+                            .iter()
+                            .map(|(phrase, why)| json!({"phrase": phrase, "why": why}))
+                            .collect::<Vec<_>>()
+                    );
                 }
                 (json!({ "kept": kept }), Some(made))
             }
@@ -856,6 +910,76 @@ mod tests {
             line(&missing, true, true, &place, &keeping, NOW).unwrap().0,
             json!({"state": "none"})
         );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The first builder's answer 3 on #7249 (`LAMP_MADE_SKILL_ASKS`, with
+    /// `LAMP_UPLOAD_TO_AGENT` off): a bare `SKILL.md`'s trigger phrases
+    /// are its written function's `asks`, each through the same check as
+    /// a made skill's; one refused (a question, one word of its own, or
+    /// words that would start another skill on the lamp) is left out and
+    /// the app is told which and why, while the rest still goes in and the
+    /// skill is kept. Off, its `skill.toml` is byte for byte as before and
+    /// the app is told nothing more.
+    #[test]
+    fn a_bare_files_trigger_phrases_are_its_asks_and_the_app_is_told_those_left_out() {
+        crate::upload_agent::set_on_here(Some(false));
+        let card = "---\nname: tea-tip\ndescription: A tea tip.\n---\n\n# Tea tip\n\n\
+                    Trigger phrases: \"Give me a tea tip\", \"tea please\", \
+                    \"what tea is best?\", \"take a photo\"\n\nGive one short tip.\n";
+        made_skill::set_asks_here(None);
+        let unset = written(card).unwrap();
+        made_skill::set_asks_here(Some(false));
+        assert_eq!(written(card).unwrap().toml, unset.toml, "off, as before");
+        assert!(!unset.toml.contains("asks"), "{}", unset.toml);
+        let (root, kept_off) = keeping("upload-asks-off");
+        let asked = json!({"upload": {"skill_md": card}});
+        let (told, _) = line(&asked, true, true, &place(&root), &kept_off, NOW).unwrap();
+        assert!(told["kept"].get("asks_left_out").is_none(), "{told}");
+        let _ = std::fs::remove_dir_all(&root);
+        made_skill::set_asks_here(Some(true));
+        let (root, keeping) = keeping("upload-asks-on");
+        let place = place(&root);
+        let booth = place.skills.join("photo-booth");
+        std::fs::create_dir_all(&booth).unwrap();
+        std::fs::write(
+            booth.join("skill.toml"),
+            "tool = \"photo_booth\"\nasks = [\"take a photo\"]\n",
+        )
+        .unwrap();
+        let (told, made) = line(&asked, true, true, &place, &keeping, NOW).unwrap();
+        assert!(made.is_some(), "{told}");
+        let left_out = told["kept"]["asks_left_out"].as_array().unwrap();
+        let phrases: Vec<&str> = left_out
+            .iter()
+            .map(|left| left["phrase"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            phrases,
+            ["tea please", "what tea is best?", "take a photo"],
+            "{told}"
+        );
+        assert!(
+            left_out[2]["why"]
+                .as_str()
+                .unwrap()
+                .contains("would start another skill, photo booth"),
+            "{told}"
+        );
+        let files = written_with(card, &["give me a tea tip".to_owned()]).unwrap();
+        assert!(
+            files.toml.contains("asks = [\"give me a tea tip\"]\n"),
+            "{}",
+            files.toml
+        );
+        assert!(made_skill::capped_added(&files.toml).is_ok());
+        made_skill::set_asks_here(Some(false));
+        assert!(
+            made_skill::capped_added(&files.toml).is_err(),
+            "off, an added skill gives no asks"
+        );
+        made_skill::set_asks_here(None);
+        crate::upload_agent::set_on_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
 }
