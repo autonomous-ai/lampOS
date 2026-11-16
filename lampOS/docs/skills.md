@@ -1646,7 +1646,10 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   public web on ports 80 and 443 through its own egress socket (a proxy
   and DNS inside the run, every address checked by lamp-tasks: never the
   lamp's networks, the home router or the lamp's local ports; docs/tasks.md,
-  "An agent skill's run and the `net` grant"); never one of
+  "An agent skill's run and the `net` grant"). That is with lamp-update's
+  one run path off: with it on (`LAMP_SKILL_DEFAULT_AGENT`, on in the
+  product) a `net` run is refused for now (`run_failed`, `NOT_HELD_OFF`), nothing run and
+  nothing said aloud (docs/tasks.md, "On the one run path"). `net` is never one of
   lamp-control's own, so the yes holds it and the token never names it. An unknown one refuses the skill. A pushed skill is held to its
   computer's own grants for them too (`package::grants_asked`).
 - **First kind only.** A skill with a `do.task` loads only when its script
@@ -5860,7 +5863,10 @@ the product since 13 Nov (the owner's ruling: the upload flow goes via the
 agent), set in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
 `lamp-skills-manage@`; `LAMP_TASK_NET` is on in the product too, so a file
 that reaches the internet is granted `net` (the public web on 80 and 443
-alone), asked the owner's spoken yes at its first run. `lamp_voice::upload_agent`. With
+alone), asked the owner's spoken yes at its first run. With lamp-update's
+one run path on (`LAMP_SKILL_DEFAULT_AGENT`, on in the product) its run,
+like every agent skill's run, is refused for now (`run_failed`, `NOT_HELD_OFF`)
+(docs/tasks.md, "On the one run path"). `lamp_voice::upload_agent`. With
 `LAMP_UPLOAD_TO_AGENT=on` in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
 its manage helper, a bare `SKILL.md` of at most 64 KiB becomes an agent
 skill instead of a written one (off: a written skill, its note at most 900
