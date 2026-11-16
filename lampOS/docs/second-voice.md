@@ -3498,7 +3498,8 @@ after a take-over, but now for every turn:
     on 30 Oct a follow-up begun 9 s after the lamp's words and spoken for
     13 s was held, judged 22 s after them (Migrate's launch finding 2 on
     #3997). A busy room's 15 s after the words is still counted to the
-    judging. The journal's "no conversation going on" line says how long
+    judging, unless `LAMP_BUSY_FOLLOW_UP_RENEWS=on` (#7332, below), which
+    measures them to the line's start too. The journal's "no conversation going on" line says how long
     the line ran ("the line ran N s"), when the lamp was "last heard
     saying words, to their end," and adds ", in a busy room, where it goes
     on 15 s".
@@ -4211,6 +4212,62 @@ after a take-over, but now for every turn:
   lamp." and "Not for me either.", and 160 ms for "Not for me to say, but
   it's lovely." and "Not for me to answer, but I think it's lovely.", each
   held to the word that decides it.
+- **Inside a live back-and-forth the doubt goes to the person, with
+  `LAMP_BUSY_FOLLOW_UP_RENEWS=on`** (off unless set, #7332; Sixth's trace
+  and design, with the first builder's 19:54 conditions). On the owner's
+  lamp-74ff on 16 Nov (13500), in a busy room, the owner spoke three times
+  in 26 s and got no answer: r43 called the lamp, r44 followed it up, the
+  model called `not_for_me` on both, so neither of the busy room's clocks
+  moved (`said_until_us` moves only on words said, `called_at` only on a
+  call); r45, judged 16 s after the call, was held ("a busy room, and
+  nothing shows it was called"), and r46 was held as "a reply to a
+  question the lamp left unanswered" (`AFTER_QUESTION`), the owner's own
+  r45. With the switch, five things change, in a room of any kind but
+  mattering in a busy one:
+  - a line let out only as the conversation going on and spoken by the
+    caller (the caller's face alone seen speaking it,
+    `spoken_by_the_caller_alone`, or the conversation's voice) renews the
+    call as a call does (`Heeding::called_at`), whatever the model makes
+    of it; with `LAMP_DECLINE_SILENT` too, its decline keeps that renewal.
+    Another face, or two, renew nothing. Journal: `the caller's own
+    follow-up: it renews the call, and the model is told it is theirs
+    (LAMP_BUSY_FOLLOW_UP_RENEWS)`;
+  - such a line is told `worker::FOLLOW_UP_NOTE` in the place of
+    `CONVERSATION_ALONE`: it is the person the lamp was talking with,
+    speaking again, to be answered unless plainly said to someone else.
+    The first builder's point 1: the old note primed the model to decline
+    exactly the lines a conversation is made of. `LAMP_NOT_FOR_ME_WORDS`
+    and `LAMP_DECLINE_SILENT` treat it as they treat `CONVERSATION_ALONE`;
+  - the busy room's 15 s (`BUSY_GOING_ON_FOR` after the words,
+    `CALL_CARRIES_FOR` after the call, `went_on_told`) are measured to the
+    line's start with `LAMP_WINDOW_FROM_START`, as the conversation's own
+    check already was: a line begun 12 s after the call and judged 17 s
+    after it goes on;
+  - a question held just before a line, said by the same speaker (one face,
+    the same; or both in the conversation's voice), is no question to
+    someone else that the line answers (`Attention::after_a_question`,
+    `carried_past_a_question`). Journal: `the question held just before it
+    was the same speaker's: no reply to someone else`;
+  - with the wait sound, any tool a heard line calls makes it past
+    `cue_after` (1.5 s), not only a connected service's, and the chat round
+    after a call is timed for it too; one sound a round (a tool's sound
+    stands for the round after it), and none once a newer line began, so
+    never over the person's own words. Journal: `made a sound while chat
+    round N had not begun in 1500 ms (LAMP_BUSY_FOLLOW_UP_RENEWS)`.
+  Latency: nothing waits for it. The renewal, the note and the question
+  check are bookkeeping at the verdict; the sound is raced against work
+  already in flight (a tool, a round's first event), never awaited before
+  it, and a round that begins before 1.5 s makes none. On the test clock a
+  3 s tool turn's first audio comes at 1.5 s with the switch, at 3 s
+  without (`tool_round_past_cue_after_makes_one_sound`). Tests (each fails
+  with the switch off): `busy_follow_up_declined_still_renews_the_call`
+  (lamp-74ff's r43 to r46, all let out; off, r45 and r46 held; a
+  colleague's line renews nothing), `busy_follow_up_is_told_it_is_the_callers`,
+  `busy_window_is_measured_to_the_line_start`,
+  `own_held_question_is_no_reply_to_another` (the owner's line let out, a
+  colleague's still held). Not yet shown on a lamp: the first builder's
+  row (the person's follow-ups answered three of three, the colleague
+  track's lines answered none, first audio on tool turns before and after).
 - **A decline says nothing and starts no conversation, with
   `LAMP_DECLINE_SILENT=on`** (off unless set, #3945). Two gaps it closes.
   Words the model streams before its `not_for_me` call ("Sure, I'll stay

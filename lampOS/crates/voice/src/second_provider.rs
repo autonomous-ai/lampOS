@@ -820,6 +820,13 @@ pub const NAME_REPEAT_NOT_A_CALL_ENVIRONMENT: &str = "LAMP_NAME_REPEAT_NOT_A_CAL
 /// [`worker::Heeding::measuring_windows_from_start`], #4594).
 pub const WINDOW_FROM_START_ENVIRONMENT: &str = "LAMP_WINDOW_FROM_START";
 
+/// In a busy room, the caller's own follow-up renews the call and is told
+/// it is theirs, the busy room's 15 s are measured to a line's start, a
+/// held question of the same speaker's is no one else's, and a slow tool or
+/// the round after it makes one wait sound (`LAMP_BUSY_FOLLOW_UP_RENEWS=on`,
+/// [`worker::Heeding::renewing_busy_follow_ups`], [`Engine::cueing_every_tool`], #7332).
+pub const BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT: &str = "LAMP_BUSY_FOLLOW_UP_RENEWS";
+
 /// Where the worker reads whether the lamp's name at a line's start
 /// ([`crate::attention::NAME_AT_THE_START_US`]) is dated from the line's usual
 /// start, not its soft start's lead (`on`, and nothing else;
@@ -8166,6 +8173,40 @@ impl Shared {
     /// words: the half request says and does nothing more), decided once,
     /// at the grace's end, for all of the request's waits. `true` for any
     /// request never kept, and once its grace passed with no newer line.
+    /// Whether a line newer than `request` has begun: the person speaks
+    /// again, and no wait sound goes over their words (#7332).
+    fn newer_line_began(&self, request: u64) -> bool {
+        self.begun
+            .lock()
+            .ok()
+            .and_then(|begun| *begun)
+            .is_some_and(|(latest, _)| latest > request)
+    }
+
+    /// With `LAMP_BUSY_FOLLOW_UP_RENEWS`, whether `request`'s tool calls
+    /// made this round's wait sound already.
+    fn tool_cued_for(&self, request: u64) -> bool {
+        self.tool_cued
+            .lock()
+            .is_ok_and(|cued| *cued == Some(request))
+    }
+
+    fn mark_tool_cued(&self, request: u64) {
+        if let Ok(mut cued) = self.tool_cued.lock() {
+            *cued = Some(request);
+        }
+    }
+
+    /// Takes the mark of [`Self::mark_tool_cued`] for `request`, at the
+    /// round after its calls: whether they made a sound.
+    fn take_tool_cued(&self, request: u64) -> bool {
+        self.tool_cued
+            .lock()
+            .ok()
+            .and_then(|mut cued| cued.take_if(|cued| *cued == request))
+            .is_some()
+    }
+
     async fn kept_for_the_pause(&self, request: u64) -> bool {
         let until = match self.pause_kept.lock().ok().and_then(|kept| *kept) {
             Some((of, _, Some(goes_on))) if of == request => return goes_on,
@@ -14929,10 +14970,12 @@ async fn run_tool_in_context(
     // A connected service can take seconds to answer (a mail box, a web
     // service): past the wait sound's time the person hears it, as for a
     // slow chat, never a silence (`crate::services::DEADLINE`).
-    let cues = shared
-        .cues
-        .as_ref()
-        .filter(|_| heard && crate::services::is_tool(&call.name));
+    // `LAMP_BUSY_FOLLOW_UP_RENEWS` (#7332): any tool, one sound a round.
+    let cues = shared.cues.as_ref().filter(|_| {
+        heard
+            && (crate::services::is_tool(&call.name)
+                || shared.every_tool_cued && !shared.tool_cued_for(request))
+    });
     let Some(cues) = cues else {
         return running.await;
     };
@@ -14940,7 +14983,13 @@ async fn run_tool_in_context(
     match tokio::time::timeout(shared.cue_after, &mut running).await {
         Ok(told) => told,
         Err(_) => {
-            if let Some(clip) = cues.next() {
+            // With the switch: once a round, never over a newer line.
+            let cue_now = !shared.every_tool_cued
+                || !shared.tool_cued_for(request) && !shared.newer_line_began(request);
+            if shared.every_tool_cued && cue_now {
+                shared.mark_tool_cued(request);
+            }
+            if let Some(clip) = cues.next().filter(|_| cue_now) {
                 eprintln!(
                     "lamp-voice second: request {request} made a sound while {} had not answered",
                     call.name
@@ -15610,7 +15659,9 @@ async fn answer(
     // as words is the decline itself (lamp-4ace, r06, request 131). On any
     // other line, or with the switch off, nothing is held.
     let mut opening = (shared.declines_in_words
-        && notes.iter().any(|note| note == worker::CONVERSATION_ALONE))
+        && notes
+            .iter()
+            .any(|note| note == worker::CONVERSATION_ALONE || note == worker::FOLLOW_UP_NOTE))
     .then(String::new);
     // `LAMP_DECLINE_SILENT`: on a spoken line told it may not be for the
     // lamp, round 1's words are held to its end, when its calls say whether
@@ -15621,9 +15672,11 @@ async fn answer(
     // as without the switch.
     let may_be_declined = shared.declines_silent
         && heard
-        && notes
-            .iter()
-            .any(|note| note == worker::DECLINE_NOTE || note == worker::CONVERSATION_ALONE);
+        && notes.iter().any(|note| {
+            note == worker::DECLINE_NOTE
+                || note == worker::CONVERSATION_ALONE
+                || note == worker::FOLLOW_UP_NOTE
+        });
     let round_one_held = may_be_declined
         && shared
             .round_one_held
@@ -16304,6 +16357,10 @@ async fn answer(
                 return Err(Stop::Gone);
             }
             round += 1;
+            // `LAMP_BUSY_FOLLOW_UP_RENEWS` (#7332): a round after a call is
+            // timed for the wait sound, unless the calls made it.
+            let cue_this_round =
+                round > 1 && shared.every_tool_cued && heard && !shared.take_tool_cued(request);
             // What the voice was given before this round: whether it said any.
             let pieces_before = queue.pieces;
             let mut refused = false;
@@ -16518,6 +16575,25 @@ async fn answer(
                             }
                             say_down(shared, request, heard).await?;
                             return Err(Stop::GaveUp);
+                        }
+                    }
+                } else if first
+                    && cue_this_round
+                    && let Some(cues) = shared.cues.as_ref()
+                {
+                    match tokio::time::timeout(shared.cue_after, stream.next()).await {
+                        Ok(next) => next,
+                        Err(_) => {
+                            if !shared.newer_line_began(request)
+                                && let Some(clip) = cues.next()
+                            {
+                                eprintln!(
+                                    "lamp-voice second: request {request} made a sound while chat round {round} had not begun in {} ms (LAMP_BUSY_FOLLOW_UP_RENEWS)",
+                                    shared.cue_after.as_millis()
+                                );
+                                cue(shared, request, clip).await?;
+                            }
+                            stream.next().await
                         }
                     }
                 } else {
