@@ -10,7 +10,7 @@ use lamp_local_time::LocalTime;
 use lamp_msgs::{
     ClockStamp, ExpressionRestOp as Op, ExpressionRestPhase as Phase,
     ExpressionRestRequest as Request, ExpressionRestState as Receipt, ExpressionSleepClaim,
-    ExpressionState, Faces, MicrophonePrivacy, Voice, VoiceMute, VoiceState,
+    ExpressionState, Faces, MicrophonePrivacy, MutedBy, Voice, VoiceMute, VoiceState,
 };
 use serde::Deserialize;
 use std::{
@@ -1151,12 +1151,17 @@ pub fn kept_asleep(bus: &Bus) -> Option<&'static str> {
 /// by them (or put to sleep) or the privacy switch read closed on
 /// `voice/privacy`, the newest word on each, however old. Unlike
 /// [`kept_asleep`], a reading not known (none yet, or a voice starting with
-/// the switch unread) is not privacy: a restart's wait holds the news.
+/// the switch unread) is not privacy: a restart's wait holds the news. Nor
+/// is the restart guard's mute after a fault (`muted_by: restart_guard`,
+/// lamp-c0a4 16 Nov): not the person's choice, so its news is held. Every
+/// other mute, `muted_by` absent or unreadable included, stays private.
 pub fn private_for_news(bus: &Bus) -> Option<&'static str> {
     let latest = |topic| bus.latest(topic).ok().flatten();
     if latest(VoiceMute::TOPIC)
         .and_then(|message| message.parse::<VoiceMute>().ok())
-        .is_some_and(|mute| mute.check().is_ok() && mute.muted)
+        .is_some_and(|mute| {
+            mute.check().is_ok() && mute.muted && mute.muted_by != Some(MutedBy::RestartGuard)
+        })
     {
         return Some("the voice is muted");
     }
