@@ -188,16 +188,19 @@ an event file refuses access, or the sessions are missing, and no row was
 read before, Turns shows the bus's turns instead, as the Timeline's cards
 under a dim **"Turns from the bus."**, words only in monitor mode; with no
 bus turn either, **"No turn heard yet."** The records stay a source only
-where readable, which is dev. Overview's first-audio summary still says
-**"Can't read the voice's sessions: permission."** (or not available yet);
-another I/O failure says the read failed, in Turns too. These are fixed messages: no path, OS error text, or record's words
+where readable, which is dev. Overview's first-audio summary then says
+**"not known from the bus"**: the bus has no timing peek joins to a turn.
+Neither ever shows the permission error on a product lamp. Another I/O
+failure still says the read failed. Timeline only joins the records to
+its cards and shows no read status; `/status`'s end-of-speech worker line
+says "no state in the newest session" when it can't read them. These are fixed messages: no path, OS error text, or record's words
 are sent to the browser. A readable empty session still says there is no
 turn yet, so emptiness is distinct from a failed read.
 
 Previously read rows remain visible with **"Last read is stale."** while
 access is denied. This also holds when a newer session cannot yet be read:
 its first successful read replaces the old session's rows. Overview marks
-its first-audio summary unavailable or stale instead of presenting old
+its first-audio summary stale instead of presenting old
 numbers as current. The next successful read clears the warning, including
 on an already open event stream; no restart or page reload is needed.
 
@@ -717,8 +720,10 @@ own, and asks for it over HTTP:
   and unread bytes appear once after recovery. It prints the first denied
   read and each permission-change-to-event duration and checks the host's
   under-2-second target with a fast synthetic unit-status reader. While
-  denied with no row read, Turns is the empty bus state, never the error.
+  denied with no row read, Turns is the empty bus state and Overview's
+  first audio "not known from the bus", never the error.
 - `with_the_voices_sessions_private_turns_shows_the_bus_turns` (#7208): with
   the sessions folder at mode 0, Turns says "No turn heard yet.", then, once
   a turn is heard and said on the bus, shows its card "from the bus", with
-  no permission error and no words outside monitor mode.
+  no permission error and no words outside monitor mode; Overview's first
+  audio says "not known from the bus".
