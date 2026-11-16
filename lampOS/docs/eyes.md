@@ -1076,9 +1076,13 @@ analysis on #3126). With the switch on:
   more on the same clock, always lets go (the Reviewer-lead's P2 on
   #5546; stamped after the print it held a third check, past 6 s). A held check does not count a visit, and it
   leaves the known file's words and `known-face` as they were and only
-  sets its modified time to now (`who::renew_known`, #4493): the voice
-  takes the file as fresh for 3 s after it was written, so without the
-  renewal it stopped naming a held face a second before the next check. Someone
+  sets both their modified times to now (`who::renew_known`, #4493; the
+  face too since #7146): the voice takes both as fresh for 4 s after they
+  were written (`lamp_msgs::known::FRESH`, twice the eyes' 2 s check,
+  `lamp_msgs::known::RECOGNISE_EVERY`), so without the renewal it stopped
+  naming a held face before the next check. With only the name renewed,
+  a held person's face went stale under it and their line was taken as
+  another face's (#7146). Someone
   else matched, or a face from a photo, replaces them at once. An unknown
   face ends the hold too: a near face that printed and matched nobody keeps
   the held name only if it is still at least 0.30 alike to that person's
@@ -1203,7 +1207,7 @@ print.
   due every 0.5 s (`who::recognise_due_unsure`), not every 2 s, so a print
   comes within the voice's wait.
 - **The second voice waits for it.** A line ending while `known-unsure` is
-  fresh (3 s, as the known file) is tied to no one until it goes, at most
+  fresh (4 s, as the known file) is tied to no one until it goes, at most
   1 s past the line's end (`speaking_faces::known_once_printed`): then the
   known file as it stands, theirs only if a print wrote it back; still
   unsure at the bound, the room's ([second-voice.md](second-voice.md)). A

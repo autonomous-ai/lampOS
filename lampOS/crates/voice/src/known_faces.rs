@@ -2044,9 +2044,10 @@ const NEAR_TO: &str = "You may have misheard their name. Do not say any name you
 const NOT_LIKE_THEM: &str = "You cannot keep this face under that name. Do not say why, and do not say whether you know anyone by it. Ask them for another name they would like to be known by. The lamp's owner can remove an old face in the app.";
 /// Remembering looks for up to four seconds.
 pub const DEADLINE: Duration = Duration::from_secs(6);
-/// The known file counts while it is this fresh: the eyes renew it every
-/// two seconds while the person is there.
-pub(crate) const FRESH: Duration = Duration::from_secs(3);
+/// The known file and its face count while they are this fresh: twice the
+/// eyes' check, which renews both while the person is there
+/// ([`lamp_msgs::known::FRESH`], #7146).
+pub(crate) const FRESH: Duration = lamp_msgs::known::FRESH;
 const MOST_NAME_BYTES: usize = 120;
 
 /// The two functions the model is told of when the eyes remember faces.
@@ -4228,17 +4229,15 @@ mod tests {
         let monotonic = Instant::now();
         let wall = SystemTime::UNIX_EPOCH + Duration::from_secs(100);
         let modified = wall - Duration::from_secs(2);
+        let left = FRESH - Duration::from_secs(2);
         let first = FaceObservation::from_source("Ann", modified, wall, monotonic).unwrap();
-        assert_eq!(first.valid_until(), monotonic + Duration::from_secs(1));
+        assert_eq!(first.valid_until(), monotonic + left);
         let later = Duration::from_millis(500);
         let again =
             FaceObservation::from_source("Ann", modified, wall + later, monotonic + later).unwrap();
         assert_eq!(first.valid_until(), again.valid_until());
-        assert!(!again.is_fresh(monotonic + Duration::from_secs(1)));
-        assert!(
-            FaceObservation::from_source("Ann", modified, wall + Duration::from_secs(1), monotonic)
-                .is_none()
-        );
+        assert!(!again.is_fresh(monotonic + left));
+        assert!(FaceObservation::from_source("Ann", modified, wall + left, monotonic).is_none());
         assert!(
             FaceObservation::from_source("Ann", wall + Duration::from_nanos(1), wall, monotonic)
                 .is_none()

@@ -82,7 +82,8 @@ pub fn known_unsure_of(known: &Path) -> PathBuf {
 /// An unsure check ([`Unprinted::Unsure`]): the known file and its face
 /// move to [`known_unsure_of`], the name first, so no reader of the known
 /// file sees the name held; already unsure, both renewed as
-/// [`renew_known`] renews the known file. No known file, nothing to hold.
+/// [`renew_known`] renews the known file and its face. No known file,
+/// nothing to hold.
 pub fn hold_unsure(known: &Path) {
     let unsure = known_unsure_of(known);
     if !unsure.exists() {
@@ -92,7 +93,6 @@ pub fn hold_unsure(known: &Path) {
         let _ = std::fs::rename(known_face_of(known), known_face_of(&unsure));
     }
     renew_known(&unsure);
-    renew_known(&known_face_of(&unsure));
 }
 
 /// The held face's passing id while unsure ([`hold_unsure`]), for a print
@@ -146,12 +146,15 @@ pub fn keep_known(path: &Path, name: Option<&str>, id: Option<&str>, face: Optio
 }
 
 /// A held check (a miss within [`KNOWN_HOLD`]): the known file's words and
-/// its face beside it stay as they are, and only its modified time is set to
-/// now, so the voice, which takes the file as fresh for a few seconds after
-/// it was written, keeps naming the one held until the hold lets them go.
+/// its face beside it ([`known_face_of`]) stay as they are, and only their
+/// modified times are set to now, so the voice, which takes both as fresh
+/// for [`lamp_msgs::known::FRESH`] after they were written, keeps naming the
+/// one held, and their face, until the hold lets them go (#7146).
 pub fn renew_known(path: &Path) {
-    if let Ok(file) = std::fs::File::options().write(true).open(path) {
-        let _ = file.set_modified(std::time::SystemTime::now());
+    for path in [path.to_owned(), known_face_of(path)] {
+        if let Ok(file) = std::fs::File::options().write(true).open(path) {
+            let _ = file.set_modified(std::time::SystemTime::now());
+        }
     }
 }
 
@@ -1882,9 +1885,10 @@ pub const TAKING_FOR_US: u64 = 4_000_000;
 /// 2026-10-15 the model waited 4.2 s for "I could not see a face".
 pub const NOBODY_FOR_US: u64 = 1_500_000;
 
-/// Whose the near face is, asked at most this often: a print takes a
-/// tenth of a second or more on the lamp.
-pub const RECOGNISE_EVERY: Duration = Duration::from_secs(2);
+/// Whose the near face is, asked at most this often
+/// ([`lamp_msgs::known::RECOGNISE_EVERY`]): the voice's bound on the known
+/// file and its face is twice it ([`lamp_msgs::known::FRESH`]).
+pub const RECOGNISE_EVERY: Duration = lamp_msgs::known::RECOGNISE_EVERY;
 
 /// Off unless `LAMP_FACE_FULL_CROP=on` on lamp-eyes: faces are recognised
 /// and remembered from the frame at its own size ([`align_full`]), and the
@@ -4820,6 +4824,36 @@ mod tests {
         keep_known(&known, None, None, None);
         renew_known(&known);
         assert!(!known.exists());
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    /// #7146: a held check renews the known face beside the known file too,
+    /// so the voice, which takes the face as fresh only as long as the
+    /// name, never reads a held person's face as gone while their name is
+    /// still renewed.
+    #[test]
+    fn a_held_check_renews_the_known_face_as_well_as_the_known_file() {
+        let known = file("known-renew-face").with_file_name("known");
+        let beside = known_face_of(&known);
+        keep_known(&known, Some("Alpha"), None, Some("f3"));
+        let back = std::time::SystemTime::now() - Duration::from_millis(2_500);
+        for path in [&known, &beside] {
+            std::fs::File::options()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_modified(back)
+                .unwrap();
+        }
+        let before = std::time::SystemTime::now();
+        renew_known(&known);
+        for path in [&known, &beside] {
+            assert!(
+                std::fs::metadata(path).unwrap().modified().unwrap() >= before,
+                "{path:?}"
+            );
+        }
+        assert_eq!(std::fs::read_to_string(&beside).unwrap(), "f3\n");
         std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
     }
 

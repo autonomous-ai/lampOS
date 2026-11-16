@@ -24,12 +24,12 @@ use std::{
 
 /// Only the exact value `on`: a known face lost for a few seconds keeps its
 /// memory scope through the gap ([`GAP`]), while the eyes see no face at all
-/// (#2176 row 5b). Off, the scope is the room's as soon as the face's 3 s
+/// (#2176 row 5b). Off, the scope is the room's as soon as the face's 4 s
 /// freshness ends, as before.
 pub const GAP_ENVIRONMENT: &str = "LAMP_FACE_GAP_HOLD";
 
-/// How long past its last fresh sighting (the known file's 3 s freshness, so
-/// about 15 s after the eyes last saw it), and past the end of the lamp's
+/// How long past its last fresh sighting (the known file's 4 s freshness, so
+/// about 16 s after the eyes last saw it), and past the end of the lamp's
 /// last answer to them, a known face's scope is held while the eyes see no
 /// face at all: a hand across, a step out of the picture. A head turned away
 /// is usually still a face in the eyes' look, so it holds nothing. On
@@ -37,7 +37,7 @@ pub const GAP_ENVIRONMENT: &str = "LAMP_FACE_GAP_HOLD";
 /// back to the room's scope mid-conversation. 12 s, not 8: on lamp-c0a4 a
 /// person who turned away and asked again took 8 to 9 s from the end of the
 /// lamp's answer (the first builder on #1722, 21 Oct). One window for both
-/// bounds: a face last seen as the answer ends is fresh 3 s more, so the
+/// bounds: a face last seen as the answer ends is fresh 4 s more, so the
 /// answer's 12 s end first.
 pub const GAP: Duration = Duration::from_secs(12);
 
@@ -117,7 +117,7 @@ pub struct RefreshToken {
 /// cold looks later for its keeper (#2807). On lamp-c0a4 on 23 October a face
 /// remembered through the eyes' own socket about 1 s after a voice restart
 /// said its first line 1 to 2 s later, and the known file names a face for
-/// 3 s after the eyes write it ([`crate::known_faces::FRESH`]): 5 s covers
+/// 4 s after the eyes write it ([`crate::known_faces::FRESH`]): 5 s covers
 /// both with room to spare. Past it, a cache that names nobody means nobody
 /// known is in view, so a room's line has no late look (El's P2 on #3108).
 /// The whole window serves only with the eyes' view, where the keeper must
@@ -2312,7 +2312,7 @@ mod tests {
 
     /// The first builder on #1722 (21 Oct 14:1x): lamp-c0a4's timeline,
     /// replayed. The known person is answered and looks away as the answer
-    /// ends; the eyes' known file, last renewed then, stays fresh up to 3 s
+    /// ends; the eyes' known file, last renewed then, stays fresh up to 4 s
     /// and then goes, with no face in view; the next line, from out of the
     /// picture, is decided 4 to 6 s after the answer. It is held, so it is
     /// told only ([`ScopeSnapshot::held`]); off, it is the room's.
@@ -2341,10 +2341,9 @@ mod tests {
             match gap {
                 Some(_) => {
                     let told = told.unwrap();
-                    assert!(
-                        told.starts_with("known face held, its sighting ends 2"),
-                        "{told}"
-                    );
+                    let ended = Duration::from_secs(5) - crate::known_faces::FRESH;
+                    let held = format!("known face held, its sighting ends {}", ended.as_millis());
+                    assert!(told.starts_with(&held), "{told}");
                     assert!(told.ends_with("ms ago, faces in view 0"), "{told}");
                     assert!(
                         told.contains("last answer to someone known 5000 ms ago"),

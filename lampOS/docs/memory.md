@@ -4643,7 +4643,7 @@ long-lived bus filesystem stalls and the real Health unit remain for First.
 ### Request-bound tool scope
 
 Both voice routes bind memory tool calls to an immutable observation at input
-admission. The face file's original three-second freshness deadline is preserved
+admission. The face file's freshness deadline (`lamp_msgs::known::FRESH`, 4 s) is preserved
 across cache refreshes. Admission reads a nonblocking cache; a missing, expired,
 or contended observation uses the room scope. It does not fall back to a sticky
 conversation owner or a shadow voice candidate. The Second route refreshes off
@@ -4747,8 +4747,8 @@ a refresh that names nobody inside those 5 s does not end it. 5 s because
 on lamp-c0a4 on 23 October a face remembered through the eyes' own socket
 about 1 s after a voice restart said its first line 1 to 2 s later, which
 at `39a68c91b` (cold only until the first refresh) fell past the window and
-was kept as `everyone`'s; and the known file names a face for 3 s after the
-eyes write it. Past those 5 s with nobody named, the cache is warm: nobody
+was kept as `everyone`'s; and the known file names a face for 4 s after the
+eyes write it (3 s until #7146). Past those 5 s with nobody named, the cache is warm: nobody
 known is in view, so a room's line that starts warm and sees no cold event
 before its end plus 300 ms has no late look, and a known face first cached
 during it never takes its keep (El's P2 on #3108). A cold event mid-line
@@ -4834,7 +4834,7 @@ for.
 ### A known face lost for a moment
 
 A request's scope is the known face fresh as it is admitted, and the eyes'
-known file is fresh for 3 s after they last see the face. So on lamp-4ace on
+known file is fresh for 4 s after they last see the face. So on lamp-4ace on
 20 October at 12:13, someone known who was lost for a moment mid-conversation
 had their next line's memory calls go to the room's scope (#2176 row 5b).
 
@@ -4882,12 +4882,12 @@ a gap, only while all of these hold:
   hand-on sends it to the journal, as theirs or anyone's. Its exchange stays
   in the spoken thread, so the conversation carries on when they look back.
 - **Within the gap:** up to 12 s (`GAP`) past the face's last fresh
-  sighting, which is the known file's 3 s freshness, so up to about 15 s
+  sighting, which is the known file's 4 s freshness, so up to about 16 s
   after the eyes last saw it, and up to 12 s past the end of the lamp's last
   answer to them, whichever ends first. Holding never renews it. It was
   8 s until lamp-c0a4, where a person who turned away and asked again took
   8 to 9 s from the end of the lamp's answer (the first builder on #1722,
-  21 Oct). A face last seen as the answer ends stays fresh 3 s more, so
+  21 Oct). A face last seen as the answer ends stays fresh 4 s more, so
   there the answer's 12 s end first.
 
 A different known face is theirs at once, and a privacy change revokes a held

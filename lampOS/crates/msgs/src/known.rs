@@ -9,6 +9,18 @@
 //! file is the name alone, `NAME\n`, as before, and memory's id is
 //! [`person_id`] of the name.
 
+/// How often the eyes ask whose the near face is (`lamp-eyes`'
+/// `who::RECOGNISE_EVERY`): a print takes a tenth of a second or more on
+/// the lamp. Each check rewrites or renews the known file and its face.
+pub const RECOGNISE_EVERY: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// The known file and the known face beside it count while they are this
+/// fresh: two checks of the eyes, so a check late by a slow look never
+/// lets a face still in view go (#7146: on lamp-52e6 a face 3.01 s old,
+/// still in view, was refused by the voice's own 3 s). One bound for the
+/// eyes and the voice, so the two can't drift apart.
+pub const FRESH: std::time::Duration = RECOGNISE_EVERY.saturating_mul(2);
+
 /// The eyes' file of names that may be said to others: `tellable` beside
 /// the known file (`lamp-eyes`, `who::tellable_of`), the names of those who
 /// said yes, one a line, kept current by the eyes. Read by Who was here and

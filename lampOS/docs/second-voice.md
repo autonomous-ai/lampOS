@@ -2937,7 +2937,7 @@ When the coordinator switches (below):
     the forgotten name (`memory/tests/it/voice_name.rs`, #1722, 21 Oct
     15:28).
   - **Never told:** for the room's turn, another person's turn, or a face
-    gone, since the known file is fresh only 3 s. Nor for a line carried in
+    gone, since the known file is fresh only 4 s. Nor for a line carried in
     a person's conversation (`LAMP_CONVERSATION_CARRIES`): its scope is
     theirs, but no face was seen speaking it. A line narrowed to the room
     whose person's face was only alone in view is not named this way; the
@@ -2947,7 +2947,7 @@ When the coordinator switches (below):
     a turn is told by presence and nobody is named (Thirteen's P3 on #5325):
     the session's person, read from the known file, would name a face in
     view to a voice off camera (the reviewer-lead's P3 on #2559).
-  - **Right after `forget_my_face`,** a round within the known file's 3 s
+  - **Right after `forget_my_face`,** a round within the known file's 4 s
     can still carry the name, as on the Live route.
   - **The name switch, not to be confused:** `LAMP_SECOND_KNOWN_NAMES` is the
     speech to text's listening for names; this one tells the model the face's

@@ -605,7 +605,7 @@ impl SpeakingFaces {
     /// left view: in some look from `since` to `to`, and not in the
     /// newest look by `to`. The eyes stop writing the known file
     /// once the face is gone and it is fresh only [`crate::known_faces::FRESH`]
-    /// (3 s), so a line said just after it left, or by it before it left,
+    /// (4 s), so a line said just after it left, or by it before it left,
     /// read at the line's end, named no one (lamp-06c1, 5 Nov, S4: requests
     /// 190 and 191, 3 and 8 s after Olivia's face left; neither carried).
     /// A passing id is one face for as long as it is tracked, so the pair
@@ -2734,6 +2734,44 @@ mod tests {
         assert!(!not_theirs(&speakers, &lan, pair.clone(), true), "hers");
         // Another face seen speaking it: not hers.
         assert!(not_theirs(&["b/f2".to_owned()], &lan, pair, true));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #7146, lamp-52e6 on 15 Nov (row-5485y's u4): at the yes's end the
+    /// known file was 1.13 s old and its face 3.01 s old, the face still in
+    /// view, and the line was taken as another face's. The eyes rewrite both
+    /// once a check, every two seconds and later on a slow look, so the face
+    /// stands as long as the name ([`crate::known_faces::FRESH`]); past it,
+    /// it is nobody's.
+    #[test]
+    fn a_known_face_written_3_01_s_ago_with_the_face_in_view_is_the_known_persons() {
+        let dir =
+            std::env::temp_dir().join(format!("speaking-faces-face-age-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let known = dir.join("known");
+        let eyes = SpeakingFaces::default();
+        let now = Instant::now();
+        let at = |seconds: f32| now - Duration::from_secs_f32(seconds);
+        for (seq, ago) in [(0, 6.0), (1, 3.0), (2, 0.1)] {
+            eyes.look(at(ago), Some((("b", seq), &faces(&[("f1", Yes)]))));
+        }
+        std::fs::write(&known, "Lan\n").unwrap();
+        std::fs::write(known_face_of(&known), "f1\n").unwrap();
+        let aged = |path: &Path, age: Duration| {
+            std::fs::File::options()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_modified(SystemTime::now() - age)
+                .unwrap();
+        };
+        aged(&known, Duration::from_millis(1_130));
+        aged(&known_face_of(&known), Duration::from_millis(3_010));
+        let lan = Some(("Lan".to_owned(), "b/f1".to_owned()));
+        assert_eq!(eyes.known_with_boot(&known), lan, "3.01 s old: hers");
+        aged(&known_face_of(&known), crate::known_faces::FRESH);
+        assert_eq!(eyes.known_with_boot(&known), None, "at the bound: nobody's");
         std::fs::remove_dir_all(dir).unwrap();
     }
 
