@@ -2602,7 +2602,10 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    (`skill_named::shared_note`) nói ra điều đó, nêu tên từng kỹ năng, để
    người dùng biết tạo lại kỹ năng nào bằng từ khác (câu trả lời 2 của first
    builder trên #7249); khi đèn đang chờ câu trả lời thì không có ghi chú.
-   Hai kỹ năng Store cùng một cụm vẫn như trước.
+   Chỉ báo cho câu của chủ đèn (`services::owner_hears`, như `made_run`
+   không nêu tên kỹ năng cho người khác; P2 của sim-2 trên #7249): với câu
+   của người khác thì không báo gì và không nêu tên kỹ năng nào. Hai kỹ năng
+   Store cùng một cụm vẫn như trước.
 7. **`SKILL.md` tải lên** (`upload_agent::files`, `LAMP_UPLOAD_TO_AGENT`):
    các trigger phrase của nó cũng là `asks = [...]` của tool
    (`upload_agent::asks_of`), nên `LAMP_SKILL_NAMED` gọi tool trong code khi
