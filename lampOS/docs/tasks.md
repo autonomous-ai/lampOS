@@ -686,9 +686,15 @@ laptop. **`serve --folder-missing`** (#2840, off unless set): such a task
 ends `not_sent` with `folder_missing`, and the voice tells it with Task
 news' `failed_folder` words: the work didn't start, as the folder it works
 in isn't on their computer (by its name with `LAMP_TASKS_MACHINE_NAMES`),
-and has to be made there first. Without it, and for every other failed
-`new`, the task stays `uncertain` with `new_failed`, and the lamp says the
-work may not have started.
+and has to be made there first. A `new` Harness refuses as no daemon runs
+on this computer ("Harness is not running here. Start it with `harness
+start`.", Harness CLI's `NOT_RUNNING`, on stderr or stdout) ends `not_sent`
+with `harness_not_running`: nothing started (#7275). Its dispatch line
+carries Harness's stderr whole, on one line. The part then starts the
+daemon and tries that hand-over once more ("Harness's daemon, started on a
+not-running answer", below). Without the switch, and for every other
+failed `new`, the task stays `uncertain` with `new_failed`, and the lamp
+says the work may not have started.
 
 **`serve --absolute-folder`** (P4 step 1, off unless set): a `~/…` folder
 is sent as that computer's absolute folder once its home is known. Harness's
@@ -1741,8 +1747,19 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     - **What is said.** The health line says `computers_need_sign_in`
       (above), and the voice's `harness_status` says only the computers
       need the sign-in (below).
-    - **Tests:** `a_lamp_never_signed_in_hands_work_to_its_own_engine`
+    - **A sign-out, or "not running here" (#7275).** Its daemon is
+      started again when a read turns signed out, and on a hand-over
+      answered `harness_not_running`, tried once more after it ("Harness's
+      daemon" under the sign-in, below).
+    - **Tests:** `a_lamp_never_signed_in_hands_work_to_its_own_engine`,
+      `a_sign_out_starts_the_daemon_again_for_the_lamps_own_target`,
+      `a_hand_over_harness_answers_not_running_starts_its_daemon_and_goes_once_more`,
+      `a_hand_over_harness_answers_not_running_twice_is_refused_once_with_no_loop`
+      and `a_hand_over_while_the_first_daemon_start_is_under_way_waits_for_that_one`
       (`tests/runtime.rs`),
+      `a_new_harness_answers_not_running_here_is_not_sent_and_said_whole`,
+      `a_skill_run_harness_answers_not_running_starts_its_daemon_and_goes_once_more`,
+      `daemon_once_waits_for_a_start_under_way_and_tries_new_once_more`,
       `the_lamps_own_target_signed_out_is_asked_with_no_machines_look_and_no_machine`
       and `signed_out_the_computers_own_id_is_read_with_the_sign_in`
       (`tests/harness.rs`).
@@ -2612,8 +2629,34 @@ credential of its own.
   of tasks already handed over go on. Each failure is journalled with when
   it's tried again. If every try runs to its 75 s, a waiting hand-over
   waits about six minutes. **Known limit:** after the fourth failure it
-  isn't tried again until the next sign-in, and hand-overs fail as before,
-  until openharness#1463 is answered.
+  isn't tried again until the next sign-in, a sign-out or a not-running
+  answer (below), and hand-overs fail as before, until openharness#1463 is
+  answered.
+- **Started again after a sign-out (#7275, #7273).** A sign-out in the
+  Harness app stops its daemon too, as a sign-in does, and nothing started
+  it again, so every hand-over to the lamp's own target then said "Harness
+  is not running here". When a sign-in read turns from signed in to signed
+  out while the lamp's own engine may be its target, the part runs
+  `harness start --restart` (`daemon_restart`, with the same tries and the
+  same wait for no busy task) and journals `Harness signed out: its daemon
+  is started again for the lamp's own target (#7275)`.
+- **Started on a not-running answer (#7275).** The safety net when the
+  daemon is gone anyway (it died, or a start above failed): a hand-over
+  `new` answered `harness_not_running` makes the daemon's start due at once
+  (`harness start`, its tries from zero; a start already due is kept), and
+  that task goes back to the front of the queue, so the gate above starts
+  the daemon before it goes again. Once a task: a second not-running
+  answer ends it `not_sent` with `harness_not_running`, never a third
+  `new`. The journal says `<label>: Harness answered not running here; its
+  daemon is started and the hand-over tried once more`. The rule is one
+  shared helper (`harness::DaemonOnce`): the owner loop uses
+  `DaemonOnce::again`/`done` on a task's outcome, and a caller that runs
+  `new` itself (a skill's run, `HarnessRunner`; later a pane opened on one
+  session and a make runner) uses
+  `DaemonOnce::run` with `DaemonGate::shared()`, which first waits (at most
+  30 s, `DAEMON_GATE_WAIT`) for a start the owner has due or under way
+  (the one at boot, say) and never fires a second one. The voice tells a
+  `harness_not_running` task with Task news' plain `failed` words.
 
 The journal says `tasks: sign-in 1: started`, `code given (good for 120 s)`,
 `approved in Harness: asking whether to sign in`, `question told in request

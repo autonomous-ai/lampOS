@@ -2634,6 +2634,128 @@ fn a_missing_folder_after_new_is_not_sent_with_the_switch_and_never_retried() {
     assert_eq!(rig.cli().launch(&launch()), uncertain("new_failed"));
 }
 
+/// No Harness daemon on this computer (build 13373, a product lamp signed
+/// out): `new` exits 1 with Harness CLI's `NOT_RUNNING` words on stderr.
+/// Nothing was started, so it is `not_sent` with `harness_not_running`,
+/// which the owner starts the daemon on and tries once more; `new` itself
+/// is asked once. Its journal line carries Harness's stderr whole, on one
+/// line. Any other failure stays `uncertain` with `new_failed`.
+#[test]
+fn a_new_harness_answers_not_running_here_is_not_sent_and_said_whole() {
+    const NOT_RUNNING: &str = "Harness is not running here. Start it with `harness start`.\n";
+    for (step, outcome) in [
+        (
+            json!({"exit": 1, "stderr": NOT_RUNNING}),
+            not_sent("harness_not_running"),
+        ),
+        (
+            json!({"exit": 1, "stdout": "{\"ok\":false,\"error\":\"NOT_RUNNING\"}\n", "stderr": NOT_RUNNING}),
+            not_sent("harness_not_running"),
+        ),
+        (
+            json!({"exit": 1, "stderr": "Harness is running here.\n"}),
+            uncertain("new_failed"),
+        ),
+        (
+            json!({"exit": 1, "stdout": "{\"ok\":false,\"error\":\"SPAWN_FAILED\"}\n"}),
+            uncertain("new_failed"),
+        ),
+    ] {
+        let mut rig = Rig::new();
+        rig.new_step(step.clone());
+        let (said, lines) = journal_of(&mut rig, &launch());
+        assert_eq!(said, outcome, "{step}");
+        assert_eq!(news(&rig), 1, "{step}");
+        if outcome == not_sent("harness_not_running") {
+            assert_eq!(lines.len(), 1, "{lines:?}");
+            assert!(
+                lines[0].starts_with(
+                    "tasks: lamp-task-001: dispatch not_sent harness_not_running (exit 1, "
+                ),
+                "{}",
+                lines[0]
+            );
+            assert!(
+                lines[0].ends_with(
+                    ", stderr: Harness is not running here. Start it with `harness start`.)"
+                ),
+                "{}",
+                lines[0]
+            );
+        }
+    }
+}
+
+/// The shared rule for any `harness new` caller ([`DaemonOnce::run`]): it
+/// waits for a daemon start already under way (lamp-tasks' first, at boot)
+/// and fires none itself; a not-running answer starts the daemon and asks
+/// `new` once more; twice not running is returned, never a third `new`.
+#[test]
+fn daemon_once_waits_for_a_start_under_way_and_tries_new_once_more() {
+    use lamp_tasks::harness::{DaemonGate, DaemonOnce};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let order = Arc::new(Mutex::new(Vec::<&str>::new()));
+    // A start under way: `new` waits for it, and no second start.
+    let gate = Arc::new(DaemonGate::default());
+    let mut marked = false;
+    gate.starting(&mut marked, true);
+    let (g, o) = (gate.clone(), order.clone());
+    let caller = std::thread::spawn(move || {
+        DaemonOnce::run(
+            &g,
+            "make-1",
+            || {
+                o.lock().unwrap().push("new");
+                "created"
+            },
+            |said| *said == "not running",
+            || {
+                o.lock().unwrap().push("daemon");
+                Ok(())
+            },
+        )
+    });
+    std::thread::sleep(Duration::from_millis(150));
+    assert!(order.lock().unwrap().is_empty());
+    order.lock().unwrap().push("first start done");
+    gate.starting(&mut marked, false);
+    assert_eq!(caller.join().unwrap(), "created");
+    assert_eq!(*order.lock().unwrap(), ["first start done", "new"]);
+    // Not running once: the daemon, then `new` once more.
+    for (answers, news, starts, last) in [(1, 2, 1, "created"), (5, 2, 1, "not running")] {
+        let gate = DaemonGate::default();
+        let (left, asked, started) = (
+            AtomicUsize::new(answers),
+            AtomicUsize::new(0),
+            AtomicUsize::new(0),
+        );
+        let said = DaemonOnce::run(
+            &gate,
+            "make-2",
+            || {
+                asked.fetch_add(1, Ordering::SeqCst);
+                if left
+                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+                    .is_ok()
+                {
+                    "not running"
+                } else {
+                    "created"
+                }
+            },
+            |said| *said == "not running",
+            || {
+                started.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            },
+        );
+        assert_eq!(said, last);
+        assert_eq!(asked.load(Ordering::SeqCst), news);
+        assert_eq!(started.load(Ordering::SeqCst), starts);
+        assert!(!gate.busy());
+    }
+}
+
 /// `harness machines engines`' row for this computer and Codex
 /// (openharness#1888), with these readiness fields.
 fn engines_row(fields: Value) -> Value {
@@ -7149,6 +7271,52 @@ fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothin
     );
     assert!(rig.calls().iter().all(|call| call["args"][0] != "close"));
     nothing_left(&rig);
+}
+
+/// #7275: a made skill's run on the lamp's own target, with no Harness
+/// daemon here, got "Harness is not running here" from `new` and ended.
+/// Now `harness start` runs, and `new` once more ([`DaemonOnce::run`]); a
+/// second not-running answer ends the run with `harness_not_running`, and
+/// never a third `new`.
+#[test]
+fn a_skill_run_harness_answers_not_running_starts_its_daemon_and_goes_once_more() {
+    let not_running = json!({"exit": 1, "stderr": "Harness is not running here. Start it with `harness start`.\n"});
+    let verbs = |rig: &Rig| -> Vec<String> {
+        rig.calls()
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap().to_owned())
+            .filter(|verb| verb == "new" || verb == "start")
+            .collect()
+    };
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"each":[not_running.clone(), {"default":true}]},
+        "start":{"exit":0},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let runner = skill_runner(&rig, Some(EngineKind::Hermes));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    assert_eq!(verbs(&rig), ["new", "start", "new"]);
+    nothing_left(&rig);
+    // Still not running after the start: refused once, no third `new`.
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":not_running,
+        "start":{"exit":0},
+    }));
+    let runner = skill_runner(&rig, Some(EngineKind::Hermes));
+    let said = runner
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert!(said.contains("harness_not_running"), "{said}");
+    assert_eq!(verbs(&rig), ["new", "start", "new"]);
 }
 
 /// The real Hermes, as Harness lists it apart from the wrapper's agent.

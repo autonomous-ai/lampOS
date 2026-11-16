@@ -27,7 +27,7 @@ use std::{
     path::{Path, PathBuf},
     process::{Child, ChildStderr, ChildStdout, Command, Stdio},
     sync::{
-        Arc, Mutex,
+        Arc, Condvar, Mutex,
         atomic::{AtomicBool, Ordering},
     },
     thread,
@@ -1382,6 +1382,16 @@ impl Cli {
             }
             Ok(reply) if self.config.folder_missing && folder_missing(&reply.stdout) => {
                 not_sent("folder_missing")
+            }
+            // No Harness daemon on this computer (`NOT_RUNNING`, "Harness
+            // is not running here. Start it with `harness start`."): `new`
+            // reached nothing that could start an agent, so the task surely
+            // did not start (build 13373, a product lamp signed out, whose
+            // install starts no daemon at boot). The owner starts the
+            // daemon and hands the task over once more
+            // ([`HARNESS_NOT_RUNNING`]).
+            Ok(reply) if not_running_here(&reply.stdout, &reply.stderr) => {
+                not_sent(HARNESS_NOT_RUNNING)
             }
             Ok(_) => uncertain("new_failed"),
             Err(error) if error.spawned => uncertain(error.code),
@@ -4065,6 +4075,171 @@ pub fn parse_engines(bytes: &[u8], machine: &str) -> Result<Vec<EngineRow>, &'st
     Ok(rows)
 }
 
+/// A hand-over `new` refused as no Harness daemon runs on this computer
+/// (Harness's `NOT_RUNNING`): `not_sent`, nothing started. lamp-tasks starts
+/// the daemon and hands the task over once more on it ([`DaemonOnce`]).
+pub const HARNESS_NOT_RUNNING: &str = "harness_not_running";
+
+/// "Not running here → start Harness's daemon → try once more", shared by
+/// every `harness new` caller in lamp-tasks. The product install starts
+/// no daemon at boot (`update/src/harness_install.rs`), and one that died
+/// is never started again otherwise, so lamp-tasks is the only starter
+/// (build 13373, a product lamp signed out).
+///
+/// - The spoken hand-over (`Cli::launch`, `runtime.rs`' owner loop) asks
+///   [`DaemonOnce::again`] with the task's id on a `harness_not_running`
+///   outcome: `true` once a task, and the owner then schedules the daemon's
+///   start and queues the task again, first, behind its daemon gate.
+///   [`DaemonOnce::done`] forgets the task once its outcome is final.
+/// - A caller that runs `new` itself and can wait on the daemon there (a
+///   pane opened on one session, #7258; a make runner, #7245) uses
+///   [`DaemonOnce::run`] with [`DaemonGate::shared`]: it waits for a start
+///   lamp-tasks' owner has due or under way (the one at boot, say, for a
+///   make seconds after it) and never fires a second; then its own `new`,
+///   and on a not-running answer the daemon's start (or the wait for one
+///   already starting) and that `new` once more; a second not-running
+///   answer is returned as it is. Classify raw output with
+///   [`not_running_here`].
+///
+/// Each says [`DaemonOnce::line`] in the journal when it tries again.
+#[derive(Debug, Default)]
+pub struct DaemonOnce {
+    tried: BTreeSet<u64>,
+}
+impl DaemonOnce {
+    /// Whether this outcome of `key`'s `new` is to be tried once more after
+    /// Harness's daemon is started: a `harness_not_running` one, the first
+    /// for that key. Any other outcome, or a second one, is final.
+    pub fn again(&mut self, key: u64, outcome: &LaunchOutcome) -> bool {
+        matches!(outcome, LaunchOutcome::NotSent { code } if code == HARNESS_NOT_RUNNING)
+            && self.tried.insert(key)
+    }
+    /// `key`'s outcome kept as final: forgotten, so the set stays small.
+    pub fn done(&mut self, key: u64) {
+        self.tried.remove(&key);
+    }
+    /// The journal's line when `label`'s `new` is tried once more.
+    pub fn line(label: &str) -> String {
+        format!(
+            "tasks: {label}: Harness answered not running here; \
+             its daemon is started and the hand-over tried once more"
+        )
+    }
+    /// One synchronous `new` with this rule. First a daemon start `gate`
+    /// has due or under way is waited for, at most [`DAEMON_GATE_WAIT`];
+    /// then `new()`, and when `not_running` says its answer is Harness's
+    /// `NOT_RUNNING`, the daemon is started through `gate`
+    /// ([`DaemonGate::start_or_wait`]: `start_daemon()`, or the wait for a
+    /// start already under way) and `new()` once more, whatever the start
+    /// said (a failed start leaves the second answer not running, returned
+    /// as it is). Never a third.
+    pub fn run<T>(
+        gate: &DaemonGate,
+        label: &str,
+        mut new: impl FnMut() -> T,
+        not_running: impl Fn(&T) -> bool,
+        start_daemon: impl FnOnce() -> Result<(), String>,
+    ) -> T {
+        gate.wait(DAEMON_GATE_WAIT);
+        let first = new();
+        if !not_running(&first) {
+            return first;
+        }
+        eprintln!("{}", Self::line(label));
+        if let Err(code) = gate.start_or_wait(start_daemon, DAEMON_GATE_WAIT) {
+            eprintln!("tasks: {label}: Harness's daemon not started: {code}");
+        }
+        new()
+    }
+}
+
+/// The longest [`DaemonOnce::run`] waits on a daemon start under way: a
+/// `harness start` that hangs never holds a caller longer.
+pub const DAEMON_GATE_WAIT: Duration = Duration::from_secs(30);
+
+/// Whether a start of Harness's daemon is due or under way in this
+/// process, so a `harness new` caller waits for it and fires no second one
+/// ([`DaemonOnce::run`]). lamp-tasks' owner loop marks its own starts
+/// (`runtime.rs`: due, or its job in flight) with [`DaemonGate::starting`];
+/// counted per starter, so services in one process (tests) keep apart.
+#[derive(Debug, Default)]
+pub struct DaemonGate {
+    starting: Mutex<usize>,
+    settled: Condvar,
+}
+impl DaemonGate {
+    /// The process's one gate, which every `harness new` caller shares.
+    pub fn shared() -> &'static DaemonGate {
+        static SHARED: std::sync::OnceLock<DaemonGate> = std::sync::OnceLock::new();
+        SHARED.get_or_init(DaemonGate::default)
+    }
+    /// A starter's start begins (`true`) or ends (`false`); `was` is what
+    /// that starter last said, so each counts once.
+    pub fn starting(&self, was: &mut bool, now: bool) {
+        if *was == now {
+            return;
+        }
+        *was = now;
+        let mut starting = self.starting.lock().unwrap_or_else(|e| e.into_inner());
+        if now {
+            *starting += 1;
+        } else {
+            *starting = starting.saturating_sub(1);
+            if *starting == 0 {
+                self.settled.notify_all();
+            }
+        }
+    }
+    /// Whether a start is due or under way now.
+    pub fn busy(&self) -> bool {
+        *self.starting.lock().unwrap_or_else(|e| e.into_inner()) > 0
+    }
+    /// Waits, at most `at_most`, until no start is due or under way.
+    /// Whether none is.
+    pub fn wait(&self, at_most: Duration) -> bool {
+        let starting = self.starting.lock().unwrap_or_else(|e| e.into_inner());
+        let (starting, _) = self
+            .settled
+            .wait_timeout_while(starting, at_most, |n| *n > 0)
+            .unwrap_or_else(|e| e.into_inner());
+        *starting == 0
+    }
+    /// `start()` when no start is due or under way, marked as one while it
+    /// runs; else the wait for that one, at most `at_most`, and no second.
+    pub fn start_or_wait(
+        &self,
+        start: impl FnOnce() -> Result<(), String>,
+        at_most: Duration,
+    ) -> Result<(), String> {
+        {
+            let mut starting = self.starting.lock().unwrap_or_else(|e| e.into_inner());
+            if *starting > 0 {
+                drop(starting);
+                return if self.wait(at_most) {
+                    Ok(())
+                } else {
+                    Err("daemon_start_waited".into())
+                };
+            }
+            *starting += 1;
+        }
+        let started = start();
+        let mut mine = true;
+        self.starting(&mut mine, false);
+        started
+    }
+}
+
+/// Whether a failed `new` says no Harness daemon runs on this computer:
+/// "Harness is not running here. Start it with `harness start`." on stderr
+/// (Harness CLI's `NOT_RUNNING`), or the same words on stdout.
+pub fn not_running_here(stdout: &[u8], stderr: &[u8]) -> bool {
+    const SAID: &[u8] = b"is not running here";
+    [stdout, stderr]
+        .iter()
+        .any(|bytes| bytes.windows(SAID.len()).any(|window| window == SAID))
+}
+
 /// Whether a failed `new` says the target's folder isn't on the computer
 /// (#2840). Harness refuses that before it makes anything (`CWD_NOT_FOUND`,
 /// openharness `core/agents/create.ts`; `INVALID_CWD` in its own words), so
@@ -4191,11 +4366,32 @@ fn dispatch_line(launch: &Launch, outcome: &LaunchOutcome, seen: &Seen, took: Du
         launch.name,
         took.as_secs_f64()
     );
-    if let Some(said) = said_of_stderr(&seen.stderr, &launch.prompt, &seen.machines) {
+    // Harness's own words that no daemon runs here are said whole, on one
+    // line, so the lamp's journal shows them as Harness gave them: they
+    // were matched as that fixed answer, not the person's words.
+    let whole = matches!(outcome, LaunchOutcome::NotSent { code } if code == HARNESS_NOT_RUNNING)
+        .then(|| stderr_one_line(&seen.stderr))
+        .flatten();
+    if let Some(said) =
+        whole.or_else(|| said_of_stderr(&seen.stderr, &launch.prompt, &seen.machines))
+    {
         line.push_str(&format!(", stderr: {said}"));
     }
     line.push(')');
     line
+}
+
+/// All of stderr on one line: each line trimmed, the empty ones left out,
+/// joined with a space. Nothing when it has no words.
+fn stderr_one_line(stderr: &[u8]) -> Option<String> {
+    let text = String::from_utf8_lossy(stderr);
+    let joined = text
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    (!joined.is_empty()).then_some(joined)
 }
 
 /// Stderr's last line that has words, with only what can't be the person's

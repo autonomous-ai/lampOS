@@ -6,9 +6,9 @@ use crate::{
     },
     follow::{CliWatch, Follows, WatchLane},
     harness::{
-        AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, EngineRow, Launch,
-        LaunchOutcome, Listed, MOST_WAITED, Observation, OpenclawHarness, SessionMachines,
-        SessionSeen, SignIn, Target, this_computer,
+        AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, DaemonGate, DaemonOnce, Ended,
+        EngineKind, EngineRow, Launch, LaunchOutcome, Listed, MOST_WAITED, Observation,
+        OpenclawHarness, SessionMachines, SessionSeen, SignIn, Target, this_computer,
     },
     now::Now as TasksNow,
     progress::{Reads, Tracker},
@@ -1558,6 +1558,24 @@ impl SetUp {
         let_go
     }
 }
+/// The owner's own daemon start on the process's [`DaemonGate`]: marked
+/// while one is due or its job is in flight, and let go when the owner
+/// ends, however it ends.
+struct OwnerGate {
+    marked: bool,
+    in_flight: bool,
+}
+impl OwnerGate {
+    fn show(&mut self, due: bool) {
+        let now = due || self.in_flight;
+        DaemonGate::shared().starting(&mut self.marked, now);
+    }
+}
+impl Drop for OwnerGate {
+    fn drop(&mut self) {
+        DaemonGate::shared().starting(&mut self.marked, false);
+    }
+}
 enum Job {
     Launch(LaunchJob),
     Observe(ObservationJob),
@@ -1572,7 +1590,8 @@ enum Job {
     RestartDaemon,
 }
 enum Outcome {
-    Launch(u64, LaunchOutcome),
+    /// A launch's task id, its label, and how it went.
+    Launch(u64, String, LaunchOutcome),
     Observe(ObservationJob, Result<Observation, String>),
     Status(String, Result<Vec<Listed>, String>),
     Close(CloseJob, Result<Closed, String>),
@@ -1930,6 +1949,16 @@ fn owner<C: Clock>(
     // and never connects to Harness's cloud, so the lamp never becomes its
     // own machine. Kept with the due time, through its tries.
     let mut daemon_restart = false;
+    // The tasks handed over once more after Harness answered not running
+    // here (`harness_not_running`): at most once a task.
+    let mut relaunched = DaemonOnce::default();
+    // This owner's daemon start due or under way, as the process's gate
+    // shows it to every other `harness new` caller ([`DaemonGate`]): they
+    // wait for it, and fire no second start. Let go when the owner ends.
+    let mut gate = OwnerGate {
+        marked: false,
+        in_flight: false,
+    };
     // The lamp not among Harness's machines said this sign-in (#7019).
     let mut not_among_said = false;
     // The last sign-in's id. Counted from the clock, so a sign-in after a
@@ -2061,7 +2090,26 @@ fn owner<C: Clock>(
             moved = true;
             let now = clock.sample()?;
             match outcome {
-                Outcome::Launch(id, result) => engine.finish_launch(id, result, &now),
+                // No Harness daemon on this computer (`harness_not_running`):
+                // nothing started, so the daemon is started now and the
+                // task handed over once more, first in the queue, after it
+                // (the pre-launch gate below). The product install starts
+                // no daemon at boot, and one that died later is otherwise
+                // never started again (build 13373, a lamp signed out).
+                // Once a task: a second such answer is final.
+                Outcome::Launch(id, label, result) if relaunched.again(id, &result) => {
+                    eprintln!("{}", DaemonOnce::line(&label));
+                    if start_daemon_due.is_none() {
+                        start_daemon_due = Some(Instant::now());
+                        daemon_tries = 0;
+                        daemon_restart = false;
+                    }
+                    engine.launch_again(id, &now)
+                }
+                Outcome::Launch(id, _, result) => {
+                    relaunched.done(id);
+                    engine.finish_launch(id, result, &now)
+                }
                 Outcome::Observe(job, Ok(value)) => engine.finish_observation(&job, value, &now),
                 Outcome::Observe(job, Err(code)) => engine.observation_failed(&job, &code, &now),
                 Outcome::Close(job, result) => {
@@ -2168,6 +2216,7 @@ fn owner<C: Clock>(
                     Ok(())
                 }
                 Outcome::StartDaemon(restart, started) => {
+                    gate.in_flight = false;
                     daemon_tries += 1;
                     match started {
                         Ok(()) if restart => eprintln!(
@@ -2253,6 +2302,25 @@ fn owner<C: Clock>(
                                     start_daemon_due = Some(Instant::now());
                                     daemon_tries = 0;
                                     daemon_restart = false;
+                                }
+                                // Signed out in the Harness app: Harness's
+                                // sign-out stops its daemon, as its sign-in
+                                // does (openharness#1463), and nothing
+                                // started it again, so every hand-over to
+                                // the lamp's own target said "Harness is
+                                // not running here" (#7275, #7273). Started
+                                // again now, while the lamp may be its own
+                                // target.
+                                if found.sign_in == Some(SignIn::In)
+                                    && sign_in == SignIn::Out
+                                    && lamp_side
+                                {
+                                    eprintln!(
+                                        "tasks: Harness signed out: its daemon is started again for the lamp's own target (#7275)"
+                                    );
+                                    start_daemon_due = Some(Instant::now());
+                                    daemon_tries = 0;
+                                    daemon_restart = true;
                                 }
                                 // Signed in anew: the lamp not among the
                                 // machines may be said again (#7019).
@@ -2629,6 +2697,9 @@ fn owner<C: Clock>(
                 }
             };
             if let Some(job) = next {
+                if matches!(job, Job::StartDaemon(_)) {
+                    gate.in_flight = true;
+                }
                 // The durable attempt precedes this handoff. If this queue or
                 // worker fails, reopening records uncertainty without a resend.
                 jobs.try_send(job).map_err(|_| {
@@ -2637,6 +2708,7 @@ fn owner<C: Clock>(
                 busy = true;
             }
         }
+        gate.show(start_daemon_due.is_some());
         // A task that left the watch leaves the bus at once, not at the
         // next read.
         if moved && let Some(tracker) = tracker.as_mut() {
@@ -4776,6 +4848,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                         let result = match job {
                             Job::Launch(job) => Outcome::Launch(
                                 job.task_id,
+                                job.launch.name.clone(),
                                 crate::gateway::launch_with(gateway.as_mut(), &job.launch, || {
                                     adapter.launch(&job.launch)
                                 }),

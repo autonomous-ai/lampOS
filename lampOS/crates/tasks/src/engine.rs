@@ -2274,6 +2274,29 @@ impl<P: Persistence> Engine<P> {
         Ok(Some(job))
     }
 
+    /// The launch under way back in the queue, where `begin_launch` takes
+    /// it next, as its `new` was refused before anything started: no
+    /// Harness daemon on this computer (`harness_not_running`). The owner
+    /// starts the daemon first, and asks this at most once a task; any
+    /// other outcome is final ([`Self::finish_launch`]).
+    pub fn launch_again(&mut self, task_id: u64, now: &Clock) -> Result<(), Error> {
+        self.clock(now)?;
+        let index = find(&self.state, task_id)?;
+        if self.state.tasks[index].dispatch.state != DispatchState::Attempting {
+            return Err(err(
+                "stale_job",
+                "The launch is not the current committed attempt.",
+            ));
+        }
+        let mut next = self.state.clone();
+        let at = next_audit(&mut next, now)?;
+        let task = &mut next.tasks[index];
+        task.dispatch.state = DispatchState::Queued;
+        task.dispatch.attempted = None;
+        task.updated = at;
+        self.save(next)
+    }
+
     pub fn finish_launch(
         &mut self,
         task_id: u64,
