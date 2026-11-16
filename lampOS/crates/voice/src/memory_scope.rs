@@ -2979,6 +2979,51 @@ mod tests {
         std::fs::remove_dir_all(&directory).unwrap();
     }
 
+    /// #7331: the eyes renew the known file each look by its mtime alone
+    /// (`renew_known`), and may rewrite the same bytes through a temporary
+    /// file and a rename; neither is a change, so neither makes the cache
+    /// cold. The file removed (nobody known near) is one. Pins the
+    /// journal's reading on lamp-52e6; no switch.
+    #[test]
+    fn a_known_file_renewed_or_rewritten_same_is_no_change() {
+        let directory = std::env::temp_dir().join(format!(
+            "known-same-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let known = directory.join("known");
+        let _ = std::fs::remove_file(directory.join("tellable"));
+        std::fs::write(&known, "Ada\n").unwrap();
+        let cache = FaceCache::default();
+        let read = |cache: &FaceCache| {
+            let mut token = cache.begin_refresh();
+            cache.known_file_read(
+                &mut token,
+                crate::known_faces::KnownMark::read(&known),
+                Instant::now(),
+            )
+        };
+        assert!(!read(&cache), "the first read sets the mark");
+        // (1) Only its mtime set, as the eyes' renew does.
+        std::fs::File::options()
+            .write(true)
+            .open(&known)
+            .unwrap()
+            .set_modified(std::time::SystemTime::now() + Duration::from_secs(5))
+            .unwrap();
+        assert!(!read(&cache), "renewed: no change");
+        // (2) The same bytes written through a temporary file and a rename.
+        let tmp = directory.join("known.tmp");
+        std::fs::write(&tmp, "Ada\n").unwrap();
+        std::fs::rename(&tmp, &known).unwrap();
+        assert!(!read(&cache), "rewritten the same: no change");
+        // Removed: a change.
+        std::fs::remove_file(&known).unwrap();
+        assert!(read(&cache), "removed: a change");
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
     /// A refresh as the worker runs it: the known file's mark, then its
     /// observation, both from the file (#4493).
     fn refresh_from(cache: &FaceCache, known: &std::path::Path) -> bool {
