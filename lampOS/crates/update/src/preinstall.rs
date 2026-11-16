@@ -11,10 +11,14 @@
 //! ([`crate::harness_install::ask_install`],
 //! [`crate::hermes_install::ask_install`],
 //! [`crate::openclaw_install::ask_install`]). A part already there is not
-//! asked for again. Nothing is started: there is no systemd in an image
-//! being built, and a lamp's first round after its setup records the parts
-//! as installed, writes again anything its switches show differently, and
-//! starts OpenClaw's gateway.
+//! asked for again. OpenClaw's gateway unit, the round's to write, is
+//! written first ([`write_units`]): its install checks it is this build's.
+//! Nothing is started: there is no systemd in an image being built, so
+//! every `systemctl` the installs run is skipped ([`on_image`]), and a
+//! lamp's first round after its setup records the parts as installed,
+//! writes again anything its switches show differently, and enables and
+//! starts OpenClaw's gateway (whose allow-list edit, done through the
+//! running gateway, it then asks for as it always does).
 //!
 //! The image runs this in its root by `pivot_root` in a mount namespace,
 //! not `chroot`: the kernel refuses a user namespace to a chrooted process,
@@ -22,7 +26,7 @@
 //! (`no_userns`).
 
 use crate::{
-    harness_install::{self, product},
+    harness_install::{self, Pin, product},
     hermes_install, openclaw_install,
     switches::UpdateSwitches,
 };
@@ -102,16 +106,78 @@ pub fn wanted(
 /// ride on it), and a pin that cannot be read is an error, as a round
 /// records it `pin_unreadable`.
 pub fn ask_missing(
-    _root: &Path,
-    _records: &Path,
-    _wanted: &Wanted,
+    root: &Path,
+    records: &Path,
+    wanted: &Wanted,
 ) -> Result<Vec<&'static str>, String> {
-    Ok(Vec::new())
+    if !wanted.harness.on {
+        return Err("Harness before the sign-in is off, and Hermes and OpenClaw ride on it".into());
+    }
+    let pin: Option<Pin> = wanted.harness.pin.clone()?;
+    let mut asked = Vec::new();
+    if !harness_install::present(root) {
+        harness_install::ask_install(records, pin)?;
+        asked.push("Harness");
+    }
+    let (hermes_on, hermes_shown) = wanted.hermes;
+    if hermes_on && !hermes_install::present(root, hermes_shown) {
+        hermes_install::ask_install(records, hermes_shown).map_err(|error| error.to_string())?;
+        asked.push("Hermes");
+    }
+    let (openclaw_on, openclaw_shown) = wanted.openclaw;
+    if openclaw_on && !openclaw_install::present(root, openclaw_shown) {
+        openclaw_install::ask_install(records, openclaw_shown)
+            .map_err(|error| error.to_string())?;
+        asked.push("OpenClaw");
+    }
+    Ok(asked)
+}
+
+/// OpenClaw's gateway unit, as a round writes it for what OpenClaw's
+/// namespace shows, when the switches want OpenClaw: its install fails
+/// (`gateway`) on any other text. Whether it was written anew.
+pub fn write_units(root: &Path, wanted: &Wanted) -> Result<bool, String> {
+    let (openclaw_on, openclaw_shown) = wanted.openclaw;
+    if !openclaw_on {
+        return Ok(false);
+    }
+    crate::writer_unit::write_unit(
+        root,
+        openclaw_install::UNIT,
+        &openclaw_install::unit_text_for(openclaw_shown),
+    )
+}
+
+/// `run` for an image being built: a `systemctl` command (a gateway's
+/// start, lamp-tasks' restart) is said and skipped as done, as there is no
+/// systemd to run it; any other runs through `run`.
+pub fn on_image<'a>(
+    run: &'a mut crate::install::Runner<'a>,
+    said: &'a mut Vec<String>,
+) -> impl FnMut(&[String]) -> Result<String, String> + 'a {
+    move |args: &[String]| {
+        if args.first().map(String::as_str) == Some("systemctl") {
+            said.push(args.join(" "));
+            return Ok(String::new());
+        }
+        run(args)
+    }
 }
 
 /// Every part the switches want there after the one-shot, or the first one
 /// missing.
-pub fn check(_root: &Path, _wanted: &Wanted) -> Result<(), String> {
+pub fn check(root: &Path, wanted: &Wanted) -> Result<(), String> {
+    if !harness_install::present(root) {
+        return Err("Harness is not there".into());
+    }
+    let (hermes_on, hermes_shown) = wanted.hermes;
+    if hermes_on && !hermes_install::present(root, hermes_shown) {
+        return Err("Hermes is not there".into());
+    }
+    let (openclaw_on, openclaw_shown) = wanted.openclaw;
+    if openclaw_on && !openclaw_install::present(root, openclaw_shown) {
+        return Err("OpenClaw is not there".into());
+    }
     Ok(())
 }
 

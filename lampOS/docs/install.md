@@ -662,6 +662,28 @@ reads itself:
   `/var/lib/lampos-update/reset-plan.json.before-<build>` unless it is the
   plan install recorded. A lamp with no plan gets none without `--setup on`
   (docs/updates.md, "Setup's reset plan").
+- **The lamp's agents** (#7274): Harness, Hermes and OpenClaw, installed
+  and never signed in, so a new lamp's app shows them installed from its
+  setup instead of after a download of minutes. After `install --setup on`,
+  the imager runs `lamp-update agents-preinstall` in the image's root
+  (Phase 4b). It reads lamp-update's switches as a `serve` round on a
+  product lamp does, from the one function both use
+  (`crate::preinstall::wanted`), writes each missing part's ask as the
+  round writes it, and OpenClaw's gateway unit, then runs `harness-install`'s
+  one-shot: the same pinned installs a lamp runs after its setup. Every
+  `systemctl` they run is skipped, as there is no systemd on an image: the
+  lamp's first round after setup records the parts installed, enables and
+  starts OpenClaw's gateway and asks for its allow-list edit, and writes
+  again anything its switches show otherwise (no download). It ends with 1
+  unless every part wanted is there, and the imager then stops. It runs
+  under `pivot_root` in a mount namespace, not `chroot`: the kernel refuses
+  a user namespace to a chrooted process, and the Hermes and OpenClaw
+  installs try theirs as `lampos` first (`no_userns`). The factory reset
+  keeps the programs and wipes only the person's state (`forget_agents`).
+  Their size: Hermes about 2.4 GB, Harness about 0.4 GB; the image is built
+  at 12G (OpenClaw's install wants 2 GiB free in `/var/lib`). A lamp-update
+  from before #7274 has no `agents-preinstall`, and the imager makes the
+  image without the agents, as before.
 
 ## At the factory, once per lamp
 
