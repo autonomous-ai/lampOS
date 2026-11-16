@@ -51,6 +51,10 @@
 //! music?" the relaxing music. A phrase two skills give runs neither, and
 //! one that holds another installed skill's name (core and with a choice
 //! included: "light show", "dance for me") is dropped; the names still run.
+//! With `LAMP_MADE_SKILL_ASKS` on, a phrase two skills give, one of them
+//! made on the lamp, still runs neither, but the lamp says so, naming each
+//! ([`SHARED`], the first builder's answer 2 on #7249), so the person
+//! knows which to make again with other words.
 //!
 //! An ask never takes ordinary speech (Thirteen's P1 and P2s and the
 //! Reviewer-lead's P2 on #6842): [`ask_refused`] refuses, as lamp-skills
@@ -435,8 +439,27 @@ fn wanted<'a>(
         .filter(|(name, _)| !name.is_empty() && !plain_word(name))
         .collect();
     shared_among(&mut wanted);
-    let mut phrases: Vec<(String, &'a str)> = Vec::new();
-    for function in &functions {
+    let mut phrases: Vec<(String, &'a str)> = given(&functions, asks, taken)
+        .into_iter()
+        .map(|(phrase, function, _)| (phrase, function))
+        .collect();
+    shared_among(&mut phrases);
+    phrases.retain(|(phrase, _)| !wanted.iter().any(|(name, _)| name == phrase));
+    wanted.extend(phrases);
+    wanted
+}
+
+/// Each of `functions`' asks [`wanted`] may match, loosely, by the function
+/// that gives it, and as it is given: none refused ([`ask_refused`]),
+/// holding another function's name or one of `taken`, empty or a plain
+/// word.
+fn given<'a>(
+    functions: &[&'a str],
+    asks: &BTreeMap<String, Vec<String>>,
+    taken: &[String],
+) -> Vec<(String, &'a str, String)> {
+    let mut given = Vec::new();
+    for function in functions {
         for ask in asks.get(*function).into_iter().flatten() {
             let held = functions
                 .iter()
@@ -447,14 +470,98 @@ fn wanted<'a>(
                 .any(|name| ask_holds_name(ask, name));
             let phrase = loose_ask(ask);
             if ask_refused(ask).is_none() && !held && !phrase.is_empty() && !plain_word(&phrase) {
-                phrases.push((phrase, *function));
+                given.push((phrase, *function, ask.clone()));
             }
         }
     }
-    shared_among(&mut phrases);
-    phrases.retain(|(phrase, _)| !wanted.iter().any(|(name, _)| name == phrase));
-    wanted.extend(phrases);
-    wanted
+    given
+}
+
+/// The call [`heard`] makes of a phrase two skills give, one of them made
+/// on the lamp (`LAMP_MADE_SKILL_ASKS` on, [`shared`]): no skill's. It
+/// runs nothing; the second route tells the model the words and each
+/// skill, by `words` and `skills`, to say so ([`shared_note`]).
+pub const SHARED: &str = "skill_named_shared";
+
+/// A phrase [`wanted`] drops for two skills giving it: loosely, as the
+/// first gives it, and each function giving it.
+type Shared = (String, String, Vec<String>);
+
+/// The phrases two or more of `functions` give ([`given`]), one of them a
+/// made skill's ([`MADE`]), that [`wanted`] dropped and so run none of
+/// them (`wanted`, as it kept them): told when heard, with
+/// `LAMP_MADE_SKILL_ASKS` on alone. A name or an ask one function gives
+/// is never one.
+fn shared(
+    functions: &[&str],
+    asks: &BTreeMap<String, Vec<String>>,
+    taken: &[String],
+    wanted: &[(String, &str)],
+) -> Vec<Shared> {
+    if !crate::made_skill::asks_on() {
+        return Vec::new();
+    }
+    let mut shared: Vec<Shared> = Vec::new();
+    for (phrase, function, ask) in given(functions, asks, taken) {
+        if wanted.iter().any(|(name, _)| *name == phrase) {
+            continue;
+        }
+        match shared.iter_mut().find(|(them, _, _)| *them == phrase) {
+            Some((_, _, giving)) => {
+                if !giving.iter().any(|other| other == function) {
+                    giving.push(function.to_owned());
+                }
+            }
+            None => shared.push((phrase, ask, vec![function.to_owned()])),
+        }
+    }
+    shared.retain(|(_, _, giving)| {
+        giving.len() > 1 && giving.iter().any(|function| function.starts_with(MADE))
+    });
+    shared
+}
+
+/// [`SHARED`]'s call for `heard`, matched as [`named_among`] matches an
+/// ask, when it is one of `shared` alone.
+fn shared_call(heard: &str, shared: &[Shared]) -> Option<(String, Value)> {
+    let phrases: Vec<(String, &str)> = shared
+        .iter()
+        .map(|(phrase, _, _)| (phrase.clone(), phrase.as_str()))
+        .collect();
+    let phrase = named_among(heard, &phrases)?;
+    let (_, words, giving) = shared.iter().find(|(them, _, _)| them == phrase)?;
+    let skills: Vec<String> = giving
+        .iter()
+        .map(|function| spoken(function.strip_prefix(MADE).unwrap_or(function)))
+        .collect();
+    Some((
+        SHARED.to_owned(),
+        json!({ "words": words, "skills": skills }),
+    ))
+}
+
+/// The note the turn is asked with when the heard words are a phrase two
+/// skills give ([`SHARED`]'s `args`): neither is run, and the model says
+/// so, naming each skill, so the person knows which to make again with
+/// other words (the first builder's answer 2 on #7249).
+pub fn shared_note(args: &Value) -> String {
+    let words = args["words"].as_str().unwrap_or_default();
+    let skills: Vec<&str> = args["skills"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
+    let named = match skills.as_slice() {
+        [] => String::new(),
+        [one] => (*one).to_owned(),
+        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+    };
+    format!(
+        "(For you to know: they said “{words}”, the words that start more than one of your skills, \
+         {named}, so none of them is run. Say so in a few words, naming each of them, so they know \
+         which to make again with other words. Call nothing for it.)"
+    )
 }
 
 /// The function among `functions` (skills' functions as their tools file
@@ -578,11 +685,11 @@ pub fn heard(settings: &crate::tools::Settings, heard: &str) -> Option<(String, 
         return None;
     }
     let (functions, asks, taken) = functions(settings);
-    named_among(
-        heard,
-        &wanted(functions.iter().map(String::as_str), &asks, &taken),
-    )
-    .map(|function| call(settings.use_skill, function))
+    let read: Vec<&str> = functions.iter().map(String::as_str).collect();
+    let wanted = wanted(read.iter().copied(), &asks, &taken);
+    named_among(heard, &wanted)
+        .map(|function| call(settings.use_skill, function))
+        .or_else(|| shared_call(heard, &shared(&read, &asks, &taken, &wanted)))
 }
 
 /// Whether `heard` is a line short enough to be a plain ask by a name.
@@ -637,8 +744,8 @@ fn functions(settings: &crate::tools::Settings) -> Read {
 type Stamp = Option<(std::time::SystemTime, u64)>;
 
 /// The files' stamps, and the functions read then, each loosely and with
-/// its own name ([`wanted`]).
-type Kept = (Vec<Stamp>, Vec<(String, String)>);
+/// its own name ([`wanted`]), and the phrases two give ([`shared`]).
+type Kept = (Vec<Stamp>, Vec<(String, String)>, Vec<Shared>);
 
 /// [`heard`], with the functions it matches kept while the files they are
 /// read from are unchanged ([`Heard::stamps`]): reading and parsing the
@@ -668,24 +775,32 @@ impl Heard {
             .kept
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if kept.as_ref().is_none_or(|(at, _)| *at != stamps) {
+        if kept.as_ref().is_none_or(|(at, _, _)| *at != stamps) {
             let (read, asks, taken) = functions(&self.settings);
-            let wanted = wanted(read.iter().map(String::as_str), &asks, &taken)
+            let read: Vec<&str> = read.iter().map(String::as_str).collect();
+            let wanted = wanted(read.iter().copied(), &asks, &taken);
+            let shared = shared(&read, &asks, &taken, &wanted);
+            let wanted = wanted
                 .into_iter()
                 .map(|(name, function)| (name, function.to_owned()))
                 .collect();
-            *kept = Some((stamps, wanted));
+            *kept = Some((stamps, wanted, shared));
         }
-        let wanted: Vec<(String, &str)> = kept
+        let (wanted, shared): (Vec<(String, &str)>, &[Shared]) = kept
             .as_ref()
-            .map(|(_, wanted)| {
-                wanted
-                    .iter()
-                    .map(|(name, function)| (name.clone(), function.as_str()))
-                    .collect()
+            .map(|(_, wanted, shared)| {
+                (
+                    wanted
+                        .iter()
+                        .map(|(name, function)| (name.clone(), function.as_str()))
+                        .collect(),
+                    shared.as_slice(),
+                )
             })
             .unwrap_or_default();
-        named_among(heard, &wanted).map(|function| call(self.settings.use_skill, function))
+        named_among(heard, &wanted)
+            .map(|function| call(self.settings.use_skill, function))
+            .or_else(|| shared_call(heard, shared))
     }
 
     /// What the functions are read from: each skills folder's tools file
@@ -1184,15 +1299,102 @@ mod tests {
                 "don't send my test note",
                 "did you send my test note?",
                 "test note",
-                "shared words here",
             ] {
                 assert_eq!(heard(&settings, line), None, "{line}");
             }
+            assert_eq!(
+                heard(&settings, "shared words here").map(|(name, _)| name),
+                Some(SHARED.to_owned()),
+                "two made skills' phrase runs neither"
+            );
             assert_eq!(
                 heard(&settings, "cozy reading time").map(|(_, args)| args),
                 Some(json!({ crate::made_run::RUN: "desk-glow" }))
             );
         }
+        crate::made_skill::set_asks_here(None);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// The first builder's answer 2 on #7249, with `LAMP_MADE_SKILL_ASKS`
+    /// on: a phrase two skills give, one of them made on the lamp, runs
+    /// neither, and its call ([`SHARED`]) tells the model the words and
+    /// each skill by name, to say so; never with the switch off, never for
+    /// a phrase one skill gives or two Store skills share (as before), and
+    /// a question or a no is none.
+    #[test]
+    fn a_phrase_two_skills_give_starts_neither_and_names_both() {
+        let mut tools = on_a_lamp();
+        tools["asks"] = json!({
+            "photo_booth": ["strike a pose now", "store words twice"],
+            "desk_check": ["strike a pose now", "store words twice"],
+        });
+        tools[crate::tools::MADE_ASKS] = json!({
+            "desk-glow": ["cozy reading time", "shared words here"],
+            "other_glow": ["shared words here"],
+            "test-note": ["strike a pose now"],
+        });
+        let dir = skills_folder("shared", tools);
+        let settings = crate::tools::Settings {
+            skills: Some(dir.clone()),
+            use_skill: true,
+            ..Default::default()
+        };
+        crate::made_skill::set_asks_here(Some(false));
+        for line in [
+            "shared words here",
+            "strike a pose now",
+            "store words twice",
+        ] {
+            assert_eq!(heard(&settings, line), None, "{line}");
+            assert_eq!(Heard::new(settings.clone()).heard(line), None, "{line}");
+        }
+        crate::made_skill::set_asks_here(Some(true));
+        let made_pair = (
+            SHARED.to_owned(),
+            json!({ "words": "shared words here", "skills": ["desk glow", "other glow"] }),
+        );
+        let three = (
+            SHARED.to_owned(),
+            json!({
+                "words": "strike a pose now",
+                "skills": ["photo booth", "desk check", "test note"],
+            }),
+        );
+        for (line, told) in [
+            ("shared words here", &made_pair),
+            ("Lamp, shared words here please.", &made_pair),
+            ("strike a pose now", &three),
+        ] {
+            assert_eq!(heard(&settings, line).as_ref(), Some(told), "{line}");
+            assert_eq!(
+                Heard::new(settings.clone()).heard(line).as_ref(),
+                Some(told),
+                "{line}"
+            );
+        }
+        for line in [
+            "store words twice",
+            "don't say shared words here",
+            "did you say shared words here?",
+        ] {
+            assert_eq!(heard(&settings, line), None, "{line}");
+        }
+        assert_eq!(
+            heard(&settings, "cozy reading time").map(|(_, args)| args),
+            Some(json!({ crate::made_run::RUN: "desk-glow" })),
+            "a phrase one skill gives runs it"
+        );
+        let note = shared_note(&made_pair.1);
+        assert!(
+            note.contains("“shared words here”") && note.contains("desk glow and other glow"),
+            "{note}"
+        );
+        assert!(
+            shared_note(&three.1).contains("photo booth, desk check and test note"),
+            "{}",
+            shared_note(&three.1)
+        );
         crate::made_skill::set_asks_here(None);
         std::fs::remove_dir_all(dir).ok();
     }

@@ -2583,10 +2583,14 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
 3. **Không bao giờ là của kỹ năng khác** (`made_skill::asks_taken`, lúc
    tạo, sau khi tên đã trống): một cụm trùng với ask của kỹ năng khác, hoặc
    chứa tên hay function của kỹ năng khác (đã cài, đẩy lên hoặc trong file
-   tools, gồm kỹ năng core và `made_asks` của kỹ năng tự tạo khác), so như
-   giọng nói so (`skill_named::same_ask`, `ask_holds_name`), bị từ chối kèm
-   lý do nói cho người dùng. Chính kỹ năng đó tạo lại thì không tính là
-   kỹ năng khác.
+   tools, gồm kỹ năng core và `made_asks` của kỹ năng tự tạo khác), hoặc của
+   một kỹ năng tự tạo còn giữ trong `made.json` mà chưa bật (`asks` của nó
+   được giữ kèm lúc tạo, `made_skill::note_asks`, chỉ khi bật công tắc), so
+   như giọng nói so (`skill_named::same_ask`, `ask_holds_name`), bị từ chối
+   kèm lý do nêu tên cả hai kỹ năng (câu trả lời 2 của first builder trên
+   #7249): "the words “take a photo” would start both test note and another
+   skill, photo booth, so neither would start; say other words for test
+   note". Chính kỹ năng đó tạo lại thì không tính là kỹ năng khác.
 4. **Nói lại kèm các từ** (`made_skill::plainly`): "When you say “send my
    test note”, it mails me@example.com ... It starts only when you say it,
    never on its own. It waits for you to agree before it sends anything."
@@ -2611,7 +2615,13 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    lần ghi chỉ theo lời đồng ý đã giữ, một lần mỗi lượt chạy, trong giới hạn
    của ngày, task giữ lời đồng ý, token một lần chạy và grant. Câu phủ
    định, câu hỏi, cụm hai kỹ năng cùng có, chỉ tên kỹ năng, hay khi đèn đang
-   chờ câu trả lời: không bắt đầu gì.
+   chờ câu trả lời: không bắt đầu gì. Một cụm mà hai kỹ năng trở lên cùng
+   có, trong đó có một kỹ năng tự tạo ở đây, là lời gọi `skill_named::SHARED`
+   kèm các từ và từng kỹ năng: không chạy gì, và luồng second bảo model
+   (`skill_named::shared_note`) nói ra điều đó, nêu tên từng kỹ năng, để
+   người dùng biết tạo lại kỹ năng nào bằng từ khác (câu trả lời 2 của first
+   builder trên #7249); khi đèn đang chờ câu trả lời thì không có ghi chú.
+   Hai kỹ năng Store cùng một cụm vẫn như trước.
 7. **`SKILL.md` tải lên** (`upload_agent::files`, `LAMP_UPLOAD_TO_AGENT`):
    các trigger phrase của nó cũng là `asks = [...]` của tool
    (`upload_agent::asks_of`), nên `LAMP_SKILL_NAMED` gọi tool trong code khi

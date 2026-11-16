@@ -15951,6 +15951,21 @@ async fn answer(
         // ask after a question was dropped silently and only talked about).
         let held = yes_held || yes_taken;
         let awaits = lamp_awaits_answer(held, &messages);
+        // Words two skills give, one made on the lamp, start neither
+        // (`LAMP_MADE_SKILL_ASKS`, the first builder's answer 2 on #7249):
+        // nothing is called, and the model is told each skill, to say so;
+        // while the lamp waits for an answer, the model reads the line.
+        let (skill_named, shared_words) = match skill_named {
+            Some((name, args)) if name == crate::skill_named::SHARED => (None, Some(args)),
+            named => (named, None),
+        };
+        if let Some(args) = shared_words.filter(|_| !forgot_before_question && !awaits) {
+            eprintln!(
+                "lamp-voice second: request {request}: the heard words start more than one skill, none called: {}",
+                args["skills"]
+            );
+            messages.push(Message::system(crate::skill_named::shared_note(&args)));
+        }
         if let Some((name, args)) = skill_named
             .as_ref()
             .filter(|_| !forgot_before_question && awaits)

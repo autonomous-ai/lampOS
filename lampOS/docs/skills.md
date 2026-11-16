@@ -5725,11 +5725,14 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
 3. **Never another skill's** (`made_skill::asks_taken`, at the make, after
    its name is free): a phrase that is another skill's ask, or holds
    another skill's name or function, installed, pushed or in the tools
-   file (core skills and other made skills' `made_asks` among them),
-   matched as the voice matches them (`skill_named::same_ask`,
-   `ask_holds_name`), is refused with why, said to the person: "the words
-   “take a photo” would start another skill, photo booth; say other words
-   for it". The same skill made again is no other.
+   file (core skills and other made skills' `made_asks` among them), or a
+   made skill kept in `made.json` and not on (its `asks` kept beside it at
+   the make, `made_skill::note_asks`, with the switch on alone), matched
+   as the voice matches them (`skill_named::same_ask`, `ask_holds_name`),
+   is refused with why, naming both skills (the first builder's answer 2
+   on #7249), said to the person: "the words “take a photo” would start
+   both test note and another skill, photo booth, so neither would start;
+   say other words for test note". The same skill made again is no other.
 4. **Said back with the words** (`made_skill::plainly`): "When you say
    “send my test note”, it mails me@example.com from your Gmail, subject
    “Test note”, saying “This is my test note.”. It starts only when you say
@@ -5763,7 +5766,13 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    one-run token and grants, each step held where it is made. A no, a
    question, a phrase two skills give, the skill's name alone, or a line
    while the lamp waits for an answer starts nothing. The model words the
-   answer in round 2.
+   answer in round 2. A phrase two or more skills give, one of them made
+   here (installed after the make's check, say), is the call
+   `skill_named::SHARED` with the words and each skill: nothing runs, and
+   the second route tells the model (`skill_named::shared_note`) to say so
+   naming each skill, so the person knows which to make again with other
+   words (the first builder's answer 2 on #7249); while the lamp waits for
+   an answer, no note. Two Store skills sharing a phrase stay as before.
 7. **An uploaded `SKILL.md`** (`upload_agent::files`,
    `LAMP_UPLOAD_TO_AGENT`): its trigger phrases are also its tool's
    `asks = [...]` (`upload_agent::asks_of`: lower case, the marks around
@@ -5794,7 +5803,9 @@ Tests: `made_skill::tests::a_made_skill_started_by_its_words_carries_its_asks_on
 `a_made_skills_words_that_start_another_skill_are_refused_at_the_make`;
 `make_skill_local::tests::a_made_skills_own_words_are_told_to_the_maker_only_with_their_switch`,
 `a_skill_started_by_its_words_is_made_with_its_asks_and_its_write`;
-`skill_named::tests::a_made_skills_own_words_run_it_now_only_with_its_switch`;
+`skill_named::tests::a_made_skills_own_words_run_it_now_only_with_its_switch`,
+`a_phrase_two_skills_give_starts_neither_and_names_both`;
+`second_provider::tests::skill_named_words::words_two_skills_give_run_neither_and_the_model_is_told_both`;
 `upload_agent::tests::an_uploaded_files_trigger_phrases_are_its_asks_only_with_their_switch`;
 `upload_skill::tests::a_bare_files_trigger_phrases_are_its_asks_and_the_app_is_told_those_left_out`;
 lamp-skills' `a_skill_started_by_its_own_words_loads_and_runs_now_only_with_its_switch`
