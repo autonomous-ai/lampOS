@@ -5861,8 +5861,10 @@ impl Engine {
 
     /// `LAMP_MADE_NOT_ON_TOLD=on` ([`crate::made_not_on`], #7270): while a
     /// made skill with code of its own is not on after its say-back, a
-    /// heard line's model is told so, and a reply that says it is on is
-    /// said as [`crate::made_not_on::NOT_ON_YET`] (or, its yes too late,
+    /// heard line's model is told so past its wait, and each round's reply
+    /// is held to the round's end and judged by the chat model, in one short
+    /// call: one that says it is on, or will run, is said as
+    /// [`crate::made_not_on::NOT_ON_YET`] (or, its yes too late,
     /// [`crate::made_not_on::NOT_ON_LATE`]). Before any turn only.
     pub fn telling_made_not_on(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
@@ -15231,6 +15233,107 @@ fn made_skill_said(asked: &Asker, said: &str) -> bool {
     matches!(asked, Asker::Written { quoted: false, .. }) && crate::made_skill::tells_made(said)
 }
 
+/// The round's words held by `queue`'s guard of a made skill not on
+/// (`LAMP_MADE_NOT_ON_TOLD`, #7270), at its end, `approves` whether it
+/// called `make_skill` with an `approve_id`: let go beside that call; else
+/// asked of the chat model, with no function, within
+/// [`crate::made_not_on::JUDGE_WITHIN`]. A reply that says the skill is on
+/// or will run is said as the fixed line; one that doesn't is said as it
+/// came; with no plain answer in time, it is said, then the fixed line. The
+/// fixed line at most once a turn.
+async fn said_made_not_on(
+    shared: &Shared,
+    queue: &mut Queue<'_>,
+    approves: bool,
+) -> Result<(), Stop> {
+    let Some(mut guard) = queue.made_not_on.take() else {
+        return Ok(());
+    };
+    let said = said_judged(shared, queue, &mut guard, approves).await;
+    queue.made_not_on = Some(guard);
+    said
+}
+
+/// [`said_made_not_on`], its guard taken out of the queue while it says.
+async fn said_judged(
+    shared: &Shared,
+    queue: &mut Queue<'_>,
+    guard: &mut crate::made_not_on::Guard,
+    approves: bool,
+) -> Result<(), Stop> {
+    let request = guard.request();
+    let held = match guard.round_ended(approves) {
+        crate::made_not_on::Round::Nothing => return Ok(()),
+        crate::made_not_on::Round::Say(held) => {
+            queue.push(held.join(" ")).await?;
+            return Ok(());
+        }
+        crate::made_not_on::Round::Judge(held) => held,
+    };
+    let started = Instant::now();
+    let verdict = tokio::time::timeout(
+        crate::made_not_on::JUDGE_WITHIN,
+        judged_on(shared, &guard.spoken(), &held.join(" ")),
+    )
+    .await
+    .ok()
+    .flatten();
+    let ms = started.elapsed().as_millis();
+    match verdict {
+        Some(true) => {
+            eprintln!(
+                "lamp-voice second: request {request}: the model judged its reply to say the made skill is on or will run, in {ms} ms: not said (LAMP_MADE_NOT_ON_TOLD)"
+            );
+            if let Some(line) = guard.line_once(Instant::now()) {
+                eprintln!(
+                    "lamp-voice second: request {request}: said \"{line}\" in its place (LAMP_MADE_NOT_ON_TOLD)"
+                );
+                queue.push(shared.fixed(line).to_owned()).await?;
+            }
+        }
+        Some(false) => {
+            eprintln!(
+                "lamp-voice second: request {request}: the model judged its reply not to say the made skill is on, in {ms} ms: said (LAMP_MADE_NOT_ON_TOLD)"
+            );
+            queue.push(held.join(" ")).await?;
+        }
+        None => {
+            eprintln!(
+                "lamp-voice second: request {request}: no plain judge of its reply in {ms} ms: said, then that the made skill isn't on (LAMP_MADE_NOT_ON_TOLD)"
+            );
+            queue.push(held.join(" ")).await?;
+            if let Some(line) = guard.line_once(Instant::now()) {
+                queue.push(shared.fixed(line).to_owned()).await?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The chat model's yes or no ([`crate::made_not_on::verdict`]) on whether
+/// `reply` tells the person the made skill `spoken` is on or will run,
+/// asked with no function declared; none on an error or no plain answer.
+async fn judged_on(shared: &Shared, spoken: &str, reply: &str) -> Option<bool> {
+    let mut answer = shared
+        .services
+        .chat_only(crate::made_not_on::judge_messages(spoken, reply), &[]);
+    let mut words = String::new();
+    while let Some(event) = answer.next().await {
+        match event {
+            Ok(ChatEvent::Text(piece)) => words.push_str(&piece),
+            Ok(ChatEvent::Done) => break,
+            Ok(_) => {}
+            Err(error) => {
+                eprintln!(
+                    "lamp-voice second: the judge of a reply about a made skill not on failed: {error} (LAMP_MADE_NOT_ON_TOLD)"
+                );
+                return None;
+            }
+        }
+    }
+    crate::made_not_on::verdict(&words)
+}
+
 /// A turn whose reply claimed an action again with no call of its kind,
 /// after one ask again (`LAMP_ACTION_CLAIM_CHECKED`, #5215): what an earlier
 /// round held is said, then [`crate::action_claim::NOT_DONE_LINE`], and the
@@ -15336,7 +15439,6 @@ async fn answer(
             shared.made_not_on,
             heard,
             request,
-            &said,
             Instant::now(),
         ),
     };
@@ -16404,9 +16506,6 @@ async fn answer(
             let mut split = Sentences::default();
             let mut text = String::new();
             let mut calls = Vec::new();
-            if let Some(guard) = queue.made_not_on.as_mut() {
-                guard.round_begun();
-            }
             let mut reasoning = None;
             let mut called_us = 0;
             let mut silent_after = answered_at_once.then(SilentAfter::default);
@@ -17705,19 +17804,13 @@ async fn answer(
             for sentence in offered(&mut offer_hold, remembers, request, round) {
                 queue.push(sentence).await?;
             }
-            // A claim held that a made skill not on is on (#7270): unsaid
-            // beside its yes's call, whose answer the next round speaks
-            // from; else the fixed line in its place.
+            // The round's words held while a made skill is not on (#7270):
+            // unsaid beside its yes's call, whose answer the next round
+            // speaks from; else judged by the model.
             let approves = calls
                 .iter()
                 .any(|call| crate::made_not_on::approves(&call.name, &call.args));
-            if let Some(line) = queue
-                .made_not_on
-                .as_mut()
-                .and_then(|guard| guard.round_ended(approves, Instant::now()))
-            {
-                queue.push(shared.fixed(line).to_owned()).await?;
-            }
+            said_made_not_on(shared, &mut queue, approves).await?;
             // The round after a turn's calls were all answered short
             // (`LAMP_SHORT_DONE`, #2877): with no words and no calls, the
             // request held nothing more, and the calls' own line is the
