@@ -2021,7 +2021,16 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     again once with the same note, and the journal says `request N: named
     agent, called <names> not start_agent_task: none run, asked again`
     (`agent_tasks_named::named_answered_by_an_own_tool_runs_none_and_is_asked_again_once`;
-    with no agent named, an own tool runs as before). The agent-task tools
+    with no agent named, an own tool runs as before). With
+    `LAMP_NAMED_AGENT_TAKES_LINE=on` (off unless set, #7269; lamp-9b34:
+    "Hey Lamp, OpenClaw, look up the weather in Hanoi this weekend"
+    answered with `weather` twice, no task) the model is never asked round
+    1 of such a line: code calls `start_agent_task` with the heard words as
+    the task, as the hand-over below, and round 2 says it back for a yes;
+    a line that named a skill keeps that skill's call
+    (`agent_tasks_named::a_named_agent_takes_the_line_before_the_weather_tool`,
+    `agent_tasks_named::with_the_switch_on_an_unnamed_ask_still_goes_to_the_model`).
+    The agent-task tools
     (`confirm_agent_task`, `check_agent_task`, `tasks_now`, the status read)
     are not own tools: "Hermes, go ahead and run it" answered with
     `confirm_agent_task` runs as called, nothing asked again (the

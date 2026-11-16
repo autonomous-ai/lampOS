@@ -1189,6 +1189,10 @@ fn worker_command(
             role,
             var(crate::told_when_asked::ENVIRONMENT).as_deref(),
         ))
+        .envs(named_agent_takes_line_worker_environment(
+            role,
+            var(crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT).as_deref(),
+        ))
         .envs(make_skill_asked_worker_environment(
             role,
             var(crate::tools::make_skill_asked::ENVIRONMENT).as_deref(),
@@ -2107,6 +2111,17 @@ fn told_when_asked_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::told_when_asked::ENVIRONMENT, "on"))
+}
+
+// A line naming an agent for the work is handed to it in code as round 1
+// (`agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT`, #7269): the exact
+// `on`, to the second route, whose catch of named agents it is.
+fn named_agent_takes_line_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT, "on"))
 }
 
 // A plain ask to make a skill calls make_skill (`tools::make_skill_asked`,
@@ -3316,6 +3331,13 @@ mod tests {
                         "LAMP_TOLD_WHEN_ASKED",
                         ["second"].as_slice(),
                     ),
+                    // A line naming an agent for the work handed to it in
+                    // code: the second route alone (#7269).
+                    (
+                        named_agent_takes_line_worker_environment,
+                        "LAMP_NAMED_AGENT_TAKES_LINE",
+                        ["second"].as_slice(),
+                    ),
                     // A plain ask to make a skill calls make_skill: the
                     // second route alone (#6835).
                     (
@@ -3629,6 +3651,7 @@ mod tests {
                     crate::tools::skill_asked::ENVIRONMENT,
                     crate::skill_named::ENVIRONMENT,
                     crate::told_when_asked::ENVIRONMENT,
+                    crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT,
                     crate::tools::make_skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
@@ -3978,6 +4001,7 @@ mod tests {
                     "LAMP_MEMORY_STRENGTH=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_MEMORY_WEEKLY_CHAPTERS=on",
+                    "LAMP_NAMED_AGENT_TAKES_LINE=on",
                     "LAMP_NAMED_ALWAYS=on",
                     "LAMP_NAMES_RECORD_TOLD=on",
                     "LAMP_NAMES_RENAME_ASKED=on",

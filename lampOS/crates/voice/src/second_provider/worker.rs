@@ -4154,6 +4154,14 @@ pub fn serve(
         engine = engine.catching_named_agents(Arc::new(move |words: &str| {
             crate::agent_tasks::named_for_work(&place, words)
         }));
+        // And handed to that agent in code as round 1 (#7269).
+        if crate::agent_tasks::named_agent_takes_line_on() {
+            eprintln!(
+                "lamp-voice second: a spoken line naming an agent for the work is handed to it in code as round 1, before any own tool ({})",
+                crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT
+            );
+            engine = engine.handing_named_agents_the_line();
+        }
     }
     // A look reads the eyes' look file with the Live route's bounds: a full
     // look's still may be older and larger (#836, #941).
