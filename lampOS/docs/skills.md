@@ -3818,7 +3818,14 @@ gone ([switches.md](switches.md)). What happens:
      above 0; every day at 22:00, `clock/local`, `known`, `true`,
      `rearm = "ends"`, `during = { from = "22:00", to = "22:01" }`; beside
      it only `for`, `cooldown`, `rearm`, `during` and `days`. The
-     part named is cut to 110 bytes. On lamp-74ff, 10 Nov 17:39, an app make of "glow green
+     part named is cut to 110 bytes. Before that, a `[trigger]`, its
+     `sooner` or a `[[while]]` reading a topic the lamp doesn't have, or a
+     field its message doesn't carry, is refused and repaired with the
+     topics it has and their fields (`made_skill::unread`, `READABLE`,
+     #7357: lamp-c0a4, 16 Nov, a `device/temperature` trigger nothing
+     sends); the system prompt lists the same (`readable_named`), and the
+     repairs used up, the person hears "the lamp has nothing that reads
+     that" (`NOTHING_READS`). On lamp-74ff, 10 Nov 17:39, an app make of "glow green
      when I come back to my desk" was written on the faces, as the built-in
      welcome back is, and refused twice, its repair told only the keys a
      trigger may have. The making model's system prompt says the same
