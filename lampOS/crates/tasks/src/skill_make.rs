@@ -2644,7 +2644,8 @@ mod tests {
     /// ready, Hermes's own `hermes-ns` gone. Without either line, or with
     /// another agent's wrapper, it is refused [`NO_NAMESPACE`]; held, it
     /// is refused [`NOT_HELD_OFF`], as the one run path holds only a
-    /// skill's run off the network. The lines are lamp-update's own.
+    /// skill's run off the network; so is a task's run granted `net`, with
+    /// no egress socket made. The lines are lamp-update's own.
     #[test]
     fn with_the_one_run_path_a_make_is_ready() {
         let dir = tempfile::tempdir().unwrap();
@@ -2681,6 +2682,26 @@ mod tests {
             runner(true, hermes, &with_make).ready(),
             Err(NOT_HELD_OFF.to_owned())
         );
+        // A task's run granted `net` (#7200) is held too, so it is refused
+        // the same way there, before its egress socket is made: the one
+        // run path's wrapper gives `--net` only to a run Harness starts in
+        // its own `skill-<run-id>` folder, never to the make's runner.
+        let mut net = runner(true, hermes, &with_make);
+        let egress = dir.path().join("egress");
+        net.egress = Some(crate::egress::Grant {
+            dir: egress.clone(),
+            ..crate::egress::Grant::lamp()
+        });
+        let folder = dir.path().join("make-a");
+        std::fs::create_dir(&folder).unwrap();
+        let run = make_run_with(
+            &folder,
+            Duration::from_secs(1),
+            false,
+            &CheckSwitches::default(),
+        );
+        assert_eq!(net.run(&run, &|| {}), Err(NOT_HELD_OFF.to_owned()));
+        assert!(!egress.exists());
         assert_eq!(
             lamp_runner(Path::new("/var/lib/lampos-tasks"), false).agent_ns,
             Path::new(crate::skill_task::AGENT_NS)
