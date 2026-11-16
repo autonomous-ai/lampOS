@@ -9281,6 +9281,38 @@ fn calls_of_verb(rig: &Rig, verb: &str) -> Vec<Value> {
         .collect()
 }
 
+/// #7245 (lamp-c0a4, 16 Nov 17:53: Harness's hand-over took 40 of 90 s): a
+/// gateway make's turn gets its whole deadline from the hand-over, so a slow
+/// `harness new` still leaves the agent its time to answer.
+#[test]
+fn a_gateway_make_with_a_slow_hand_over_still_gets_its_whole_time() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true,"write_answer":"ANSWER","delay_ms":2500},
+        "wait":{"stdout":waited("stopped", AGENT),"delay_ms":2000},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 3_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered, json!({"ok": true, "answer": "ANSWER"}));
+    assert_eq!(
+        fs::read_dir(&work).unwrap().count(),
+        0,
+        "the folder is gone"
+    );
+}
+
 /// #7245: a make line with `"one_path":true` on a lamp whose default agent
 /// is an OpenClaw gateway agent is exactly one `harness new openclaw` in a
 /// fresh make folder in the work folder, with no token, no token file and

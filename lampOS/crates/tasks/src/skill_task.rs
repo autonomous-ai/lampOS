@@ -3106,7 +3106,14 @@ impl Runner for HarnessRunner {
         let mut agents = vec![launched];
         let mut seen = agents.clone();
         let cancel = AtomicBool::new(false);
-        let deadline = run.deadline.saturating_sub(began.elapsed());
+        // A voice make's turn gets its whole deadline from the hand-over
+        // (#7245, lamp-c0a4 17:53: Harness's hand-over took 40 of 90 s and
+        // OpenClaw had no time left to write). A skill's run is unchanged.
+        let deadline = if self.makes {
+            run.deadline
+        } else {
+            run.deadline.saturating_sub(began.elapsed())
+        };
         let stopping = self.stopping.get().cloned();
         let stopped = || {
             stopping
