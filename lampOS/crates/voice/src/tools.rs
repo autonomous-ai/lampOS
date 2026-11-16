@@ -1595,6 +1595,34 @@ pub fn skill_asks(settings: &Settings) -> std::collections::BTreeMap<String, Vec
     asks
 }
 
+/// The key of lamp-skills' tools file that gives each skill made on the
+/// lamp started by its own words (`LAMP_MADE_SKILL_ASKS`): its phrases by
+/// the skill's name, for a skill with `asks` and no tool
+/// (`lamp_skills::tools_file`). Absent with none, as before.
+pub const MADE_ASKS: &str = "made_asks";
+
+/// Each made skill's own words, by its name, from the first skills folder
+/// whose tools file gives them ([`MADE_ASKS`]): what
+/// [`crate::skill_named`] matches a heard line against to run it now
+/// (`crate::made_run`). Empty from an older file.
+pub fn made_skill_asks(settings: &Settings) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut asks = std::collections::BTreeMap::new();
+    for file in tools_files(settings) {
+        if let Some(given) = file[MADE_ASKS].as_object() {
+            for (skill, phrases) in given {
+                let phrases: Vec<String> = phrases
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|phrase| phrase.as_str().map(str::to_owned))
+                    .collect();
+                asks.entry(skill.clone()).or_insert(phrases);
+            }
+        }
+    }
+    asks
+}
+
 /// Each skills folder's tools file that can be read, in order.
 fn tools_files(settings: &Settings) -> Vec<Value> {
     let mut files = Vec::new();

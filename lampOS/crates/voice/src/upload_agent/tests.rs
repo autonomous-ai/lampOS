@@ -599,3 +599,46 @@ fn a_tool_missing_a_key_says_to_add_it_in_the_app_and_never_by_voice() {
     set_secrets_here(None);
     switches(false, false);
 }
+
+/// The owner, 16 Nov ("no 'couldn't' here"), with `LAMP_MADE_SKILL_ASKS`
+/// on: an uploaded `SKILL.md`'s trigger phrases are its tool's `asks` too,
+/// each as lamp-skills takes asks (a question, one word, a stop or the
+/// lamp's own words left in the note alone), so `LAMP_SKILL_NAMED` calls
+/// the tool in code when one is heard; the cap takes them only as written.
+/// Off, the `skill.toml` is byte for byte as before.
+#[test]
+fn an_uploaded_files_trigger_phrases_are_its_asks_only_with_their_switch() {
+    let card = "---\nname: focus-mode\ndescription: Starts a focus session.\n---\n\n\
+                # Focus mode\n\n## Trigger phrases\n- \"Start focus mode\"\n- \"Focus time, \
+                please!\"\n- \"what's my focus?\"\n- \"focus\"\n- \"stop\"\n\nDim the light \
+                and keep quiet for 25 minutes.\n";
+    made_skill::set_asks_here(None);
+    let (unset, _) = files(card).unwrap();
+    made_skill::set_asks_here(Some(false));
+    let (off, _) = files(card).unwrap();
+    assert_eq!(off.toml, unset.toml, "off is as before, byte for byte");
+    assert!(!off.toml.contains("asks"), "{}", off.toml);
+    made_skill::set_asks_here(Some(true));
+    let (on, _) = files(card).unwrap();
+    assert!(
+        on.toml
+            .contains("asks = [\"start focus mode\", \"focus time please\"]\n"),
+        "{}",
+        on.toml
+    );
+    assert_eq!(on.card, off.card, "the note is as before");
+    assert!(capped(&on.toml).is_ok());
+    // Only as written: another phrase, or one not plain, refused.
+    for asks in ["[\"what's my focus?\"]", "[\"focus\"]", "[]"] {
+        let text = on
+            .toml
+            .replace("[\"start focus mode\", \"focus time please\"]", asks);
+        assert!(capped(&text).is_err(), "{asks}");
+    }
+    made_skill::set_asks_here(Some(false));
+    assert!(
+        capped(&on.toml).is_err(),
+        "off, an agent skill gives no asks"
+    );
+    made_skill::set_asks_here(None);
+}

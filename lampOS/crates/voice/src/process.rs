@@ -1358,6 +1358,10 @@ fn worker_command(
             role,
             var(crate::made_skill::SAID_ENVIRONMENT).as_deref(),
         ))
+        .envs(made_asks_worker_environment(
+            role,
+            var(crate::made_skill::ASKS_ENVIRONMENT).as_deref(),
+        ))
         .envs(onboarding_worker_environment(
             role,
             var(crate::onboarding::ENVIRONMENT).as_deref(),
@@ -1538,6 +1542,18 @@ fn made_said_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::made_skill::SAID_ENVIRONMENT, "on"))
+}
+
+// A made skill started by its own words (`made_skill::asks_on`), passed
+// the same narrow way: the exact `on`, to the two routes whose
+// `make_skill` briefs and keeps it, and whose heard words run it
+// (`skill_named`, the second route's).
+fn made_asks_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::ASKS_ENVIRONMENT, "on"))
 }
 
 // The second route's scoped context (#1675, #1839), passed the same narrow
@@ -2806,6 +2822,10 @@ mod tests {
             ),
             (
                 crate::made_skill::SAID_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::ASKS_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
         ] {
