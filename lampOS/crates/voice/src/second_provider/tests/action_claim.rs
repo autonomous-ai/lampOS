@@ -483,6 +483,10 @@ fn talk_naming_a_colour_or_a_warmth_is_said_as_it_came() {
         ("Remind me, what is your name.", "I remind you, I'm Lamp."),
         ("Hey Lamp, go on with the story.", "Continuing the story."),
         ("Thanks, Lamp.", "You're welcome."),
+        // The Reviewer-lead's P2 on #7352: an "-ing" opener that acts on
+        // nothing, beside a colour.
+        ("Lamp, what are you up to?", "Thinking about blue whales."),
+        ("Lamp, what are you up to?", "Imagining a red sunset."),
     ] {
         let went = doing(true, line, saying(reply), vec![saying(reply)]);
         assert_eq!(went.said, said(&[reply]), "{line} / {reply}: {went:?}");
@@ -491,7 +495,8 @@ fn talk_naming_a_colour_or_a_warmth_is_said_as_it_came() {
     }
 }
 
-/// #7285's 30-replay count, through the scripted second route: the gate's
+/// #7285's replay count (30, then 35 with five "-ing" talk lines after
+/// the Reviewer-lead's P2 on #7352), through the scripted second route: the gate's
 /// own asks (core rows, w2's cut-in, the light row) and talk, each with a
 /// words-only reply and `calls=none`; the journal keeps no reply words, so
 /// the replies are written in the shapes the gates measured (3 and 4
@@ -500,7 +505,7 @@ fn talk_naming_a_colour_or_a_warmth_is_said_as_it_came() {
 #[test]
 fn thirty_replays_hold_every_act_told_and_no_talk() {
     // (line, reply, a light act told with no call)
-    let replays: [(&str, &str, bool); 30] = [
+    let replays: [(&str, &str, bool); 35] = [
         (CUT_IN_WARMER, "Warming that up.", true),
         (CUT_IN_WARMER, "Sure, warming it up.", true),
         (CUT_IN_WARMER, "Okay, warming things up.", true),
@@ -571,6 +576,31 @@ fn thirty_replays_hold_every_act_told_and_no_talk() {
         ("Lamp, sing me something.", "Singing isn't my thing.", false),
         ("Lamp, how are you?", "Doing well, thanks.", false),
         ("Lamp, keep going.", "Getting to the good part now.", false),
+        (
+            "Lamp, what are you up to?",
+            "Thinking about blue whales.",
+            false,
+        ),
+        (
+            "Lamp, what are you up to?",
+            "Imagining a red sunset.",
+            false,
+        ),
+        (
+            "Lamp, what are you up to?",
+            "Thinking of something warm.",
+            false,
+        ),
+        (
+            "Lamp, what's on your mind?",
+            "Wondering about green hills.",
+            false,
+        ),
+        (
+            "Lamp, where would you go?",
+            "Picturing a warm beach.",
+            false,
+        ),
     ];
     let mut held = [(0, 0); 2];
     for (at, on) in [false, true].into_iter().enumerate() {
@@ -585,7 +615,7 @@ fn thirty_replays_hold_every_act_told_and_no_talk() {
             }
         }
     }
-    // (promises held of 10, talk held of 20), before and after.
+    // (promises held of 10, talk held of 25), before and after.
     assert_eq!(held, [(0, 0), (10, 0)]);
 }
 
