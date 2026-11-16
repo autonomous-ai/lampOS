@@ -1134,6 +1134,15 @@ impl Cli {
     /// Hand `launch` over, and say how it went in one journal line
     /// ([`dispatch_line`]), whatever the outcome.
     pub fn launch(&self, launch: &Launch) -> LaunchOutcome {
+        self.launch_naming(launch).0
+    }
+
+    /// [`Cli::launch`], and with an [`LaunchOutcome::Uncertain`] the agent
+    /// the `new` reply still named by the launch's own name, if any
+    /// ([`named_agent`]): Harness may have made it, so a caller that owns
+    /// the launch can close it (a skill's run, #7171). `None` for any other
+    /// outcome, or a reply naming no agent of that name.
+    pub fn launch_naming(&self, launch: &Launch) -> (LaunchOutcome, Option<String>) {
         let began = Instant::now();
         let mut seen = Seen::default();
         let outcome = self.launch_seen(launch, &mut seen);
@@ -1143,7 +1152,11 @@ impl Cli {
         if let Some(journal) = &self.config.journal {
             journal.lock().unwrap_or_else(|e| e.into_inner()).push(line);
         }
-        outcome
+        let named = seen
+            .named
+            .take()
+            .filter(|_| matches!(outcome, LaunchOutcome::Uncertain { .. }));
+        (outcome, named)
     }
 
     fn launch_seen(&self, launch: &Launch, seen: &mut Seen) -> LaunchOutcome {
@@ -1360,6 +1373,13 @@ impl Cli {
             args[at] = folder.into();
             reply = self.run(&args, left);
             seen.took(&reply);
+        }
+        // The agent a successful `new` names for this launch, kept in case
+        // the reply is then refused as uncertain (#7171).
+        if let Ok(answered) = &reply
+            && answered.success
+        {
+            seen.named = named_agent(&answered.stdout, launch);
         }
         match reply {
             Ok(reply) if reply.success && launch.target.engine.typed_after() => {
@@ -4093,6 +4113,9 @@ struct Seen {
     /// Every word of the machines the preflight listed (names, hostnames,
     /// ids), lowercased: never said ([`said_of_stderr`]).
     machines: BTreeSet<String>,
+    /// The agent a successful `new` reply named by the launch's own name
+    /// ([`named_agent`]), whether or not the reply was then taken.
+    named: Option<String>,
 }
 impl Seen {
     fn took(&mut self, result: &Result<Reply, RunError>) {
@@ -5500,6 +5523,21 @@ fn reply_refusal(bytes: &[u8]) -> &'static str {
         Some("NOT_RUNNING") => "reply_not_running",
         _ => "reply_failed",
     }
+}
+
+/// The agent id a `new` reply names under the launch's own name, read
+/// loosely so a reply [`parse_launch`] refuses still gives it (#7171): a
+/// created agent's `agent.id` and `agent.name`, or an `existing` one's
+/// top-level `agentId` and `name`. `None` when it names none, names
+/// another name, or the id isn't one.
+fn named_agent(bytes: &[u8], launch: &Launch) -> Option<String> {
+    let reply = serde_json::from_slice::<Value>(bytes).ok()?;
+    let (id, name) = match reply.get("agent") {
+        Some(agent) => (agent.get("id"), agent.get("name")),
+        None => (reply.get("agentId"), reply.get("name")),
+    };
+    let id = id?.as_str()?;
+    (name?.as_str()? == launch.name && agent_id(id)).then(|| id.to_owned())
 }
 
 /// `daemon`: the id Harness's daemon here starts work under
