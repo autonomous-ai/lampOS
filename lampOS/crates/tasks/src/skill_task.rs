@@ -242,7 +242,7 @@ pub const SERVICE_GRANTS: &[&str] = &[
     "notion",
 ];
 /// The switch for the task grant [`NET_GRANT`] (`on` exactly; off unless
-/// set, in no unit): with it, a run whose grants name `net` keeps the
+/// set, on in the product): with it, a run whose grants name `net` keeps the
 /// lamp's network, started by the make's runner
 /// ([`crate::skill_make::lamp_runner`] not held); without it, `net` is no
 /// grant and every run stays [`NET_ENV`] `run`. lamp-skills, its manage
