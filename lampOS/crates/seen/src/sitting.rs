@@ -25,7 +25,9 @@
 //!   which still counts as a break too), desk work (V1's `sedentary`, as a
 //!   coarse [`DeskWork`]) and celebrating (V1's `celebrate`), by the same
 //!   sureness rule. They never set `last` or `humans/doing_seen`, and V1's
-//!   `emotional` (laughing, crying, singing) is never said.
+//!   `emotional` (laughing, crying, singing) is never said. The same topic
+//!   says how many drinks and how much eating were newly seen this sitting,
+//!   the sightings `humans/doing_seen` says: a count only of what was seen.
 use crate::wire::{ActionAnswer, group};
 use lamp_msgs::{DeskWork, Doing, DoingSeen, HumanDoing, HumanDoingMore};
 
@@ -178,6 +180,10 @@ pub struct Sitting {
     last_burst: [bool; 3],
     /// [`BREAK_IS_STANDING`] on: a stretch is not taken as a break.
     break_is_standing: bool,
+    /// How many times a drink and eating were newly seen this sitting:
+    /// each sighting said on `humans/doing_seen`, said with [`ENVIRONMENT`].
+    drank_seen: u32,
+    ate_seen: u32,
     /// [`ENVIRONMENT`] on: the timers below are said.
     more: bool,
     tired_us: Option<u64>,
@@ -209,6 +215,8 @@ impl Sitting {
             confidence: 0.0,
             last_burst: [false; 3],
             break_is_standing: false,
+            drank_seen: 0,
+            ate_seen: 0,
             more: false,
             tired_us: None,
             tired_seen: 0,
@@ -291,6 +299,11 @@ impl Sitting {
             } = Some(now_us);
             if !self.last_burst[at] {
                 newly.push(*sighting);
+                match sighting.what {
+                    Doing::Drinking => self.drank_seen = self.drank_seen.saturating_add(1),
+                    Doing::Eating => self.ate_seen = self.ate_seen.saturating_add(1),
+                    _ => {}
+                }
             }
         }
         // The surest of this burst is the last thing seen.
@@ -326,6 +339,8 @@ impl Sitting {
         self.more.then(|| HumanDoingMore {
             tired_s_ago: since(self.tired_us),
             tired_seen: self.tired_seen,
+            drank_seen: self.drank_seen,
+            ate_seen: self.ate_seen,
             desk_work_s_ago: since(self.desk_work_us),
             desk_work: self.desk_work,
             celebrate_s_ago: since(self.celebrate_us),
@@ -457,6 +472,8 @@ mod tests {
                 confidence: 0.0,
                 last_burst: [false; 3],
                 break_is_standing: false,
+                drank_seen: 0,
+                ate_seen: 0,
                 more: false,
                 tired_us: None,
                 tired_seen: 0,
@@ -526,6 +543,58 @@ mod tests {
         // The same stand-up, the switch off: the sitting begun again counts
         // from its arrival, the break included.
         assert_eq!(Sitting::new(0).doing(3_000 * S).break_s_ago, 3_000);
+    }
+
+    #[test]
+    fn drinks_and_eating_are_counted_as_the_sightings_said() {
+        let drink = DoingSeen {
+            what: Doing::Drinking,
+            confidence: 0.7,
+        };
+        let eat = DoingSeen {
+            what: Doing::Eating,
+            confidence: 0.6,
+        };
+        let stretch = DoingSeen {
+            what: Doing::Break,
+            confidence: 0.6,
+        };
+        let mut sitting = Sitting::with_more(0, true);
+        let mut said = 0;
+        // A drink in two bursts in a row is one; again after a burst
+        // without it; eating and a stretch are not drinks.
+        for (at, seen) in [
+            (60, &[drink][..]),
+            (120, &[drink, eat][..]),
+            (180, &[][..]),
+            (240, &[drink, stretch][..]),
+            (300, &[eat][..]),
+            (360, &[drink][..]),
+        ] {
+            said += sitting
+                .saw(seen, at * S)
+                .iter()
+                .filter(|s| s.what == Doing::Drinking)
+                .count();
+        }
+        let more = sitting.doing_more(400 * S).unwrap();
+        assert_eq!((more.drank_seen, more.ate_seen), (3, 2));
+        assert_eq!(
+            more.drank_seen as usize, said,
+            "each one said on doing_seen"
+        );
+        // Nothing seen, no count; a new sitting begins it again.
+        assert_eq!(
+            Sitting::with_more(0, true)
+                .doing_more(S)
+                .unwrap()
+                .drank_seen,
+            0
+        );
+        // Off, the count is never said.
+        let mut off = Sitting::new(0);
+        off.saw(&[drink], 60 * S);
+        assert_eq!(off.doing_more(120 * S), None);
     }
 
     #[test]
@@ -613,6 +682,8 @@ mod tests {
             Some(HumanDoingMore {
                 tired_s_ago: 300,
                 tired_seen: 0,
+                drank_seen: 0,
+                ate_seen: 0,
                 desk_work_s_ago: 300,
                 desk_work: DeskWork::Nothing,
                 celebrate_s_ago: 300,
@@ -631,6 +702,7 @@ mod tests {
         let more_now = sitting.doing_more(500 * S).unwrap();
         assert_eq!(more_now.desk_work_s_ago, 40);
         assert_eq!(more_now.desk_work, DeskWork::Computer);
+        assert_eq!((more_now.drank_seen, more_now.ate_seen), (1, 0));
         // A stretch: a break (on `humans/doing`) and tiredness, counted once
         // across bursts in a row, again after a burst without.
         let stretch = DoingSeen {
@@ -674,6 +746,8 @@ mod tests {
             Some(HumanDoingMore {
                 tired_s_ago: 60,
                 tired_seen: 0,
+                drank_seen: 0,
+                ate_seen: 0,
                 desk_work_s_ago: 60,
                 desk_work: DeskWork::Nothing,
                 celebrate_s_ago: 60,
