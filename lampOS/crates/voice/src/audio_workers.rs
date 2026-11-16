@@ -2586,11 +2586,11 @@ mod capture_wait_tests {
         let waited = wait_between_passes(&[socket.as_fd()], false, started, device(&read, &calls));
         assert_eq!(waited, Waited::Samples);
         assert_eq!(calls.get(), 1);
-        assert!(
-            started.elapsed() < Duration::from_millis(5),
-            "{:?}",
-            started.elapsed()
-        );
+        // The claim: it returned before its own timeout, so it was woken, not
+        // timed out. Not a few-millisecond bound, which a loaded macOS runner
+        // misses (6.8 ms seen in CI); a wait that ran to its bound takes at
+        // least WAIT_AT_MOST.
+        assert!(started.elapsed() < WAIT_AT_MOST, "{:?}", started.elapsed());
     }
 
     /// The stop comes on the coordinator's control socket: it ends the wait
@@ -2605,11 +2605,11 @@ mod capture_wait_tests {
         let waited = wait_between_passes(&[socket.as_fd()], false, started, device(&read, &calls));
         assert_eq!(waited, Waited::Sockets);
         assert_eq!(calls.get(), 1);
-        assert!(
-            started.elapsed() < Duration::from_millis(5),
-            "{:?}",
-            started.elapsed()
-        );
+        // The claim: it returned before its own timeout, so it was woken, not
+        // timed out. Not a few-millisecond bound, which a loaded macOS runner
+        // misses (6.8 ms seen in CI); a wait that ran to its bound takes at
+        // least WAIT_AT_MOST.
+        assert!(started.elapsed() < WAIT_AT_MOST, "{:?}", started.elapsed());
     }
 
     /// A block the device already holds (read ahead of the wait, as its
