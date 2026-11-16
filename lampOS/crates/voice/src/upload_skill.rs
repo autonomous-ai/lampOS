@@ -303,7 +303,7 @@ pub fn take_telling(
     // skill's are, none another skill's (`LAMP_MADE_SKILL_ASKS`).
     let (asks, left_out) =
         crate::upload_agent::asks_checked(&crate::upload_agent::triggers(skill_md), |ask| {
-            made_skill::ask_taken(&place.skills, &name, ask)
+            made_skill::ask_taken(&place.skills, &keeping.directory, &name, ask)
         });
     if !left_out.is_empty() {
         eprintln!(
@@ -963,7 +963,7 @@ mod tests {
             left_out[2]["why"]
                 .as_str()
                 .unwrap()
-                .contains("would start another skill, photo booth"),
+                .contains("and another skill, photo booth, so neither would start"),
             "{told}"
         );
         let files = written_with(card, &["give me a tea tip".to_owned()]).unwrap();
