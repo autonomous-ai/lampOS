@@ -2602,7 +2602,8 @@ bước lên bus thành `tasks/step` (`TaskStep`, `crates/tasks/src/steps.rs`).
   chờ kết quả). Thư mục state được resolve trước (`fs::canonicalize`), nên
   chỉ phần nằm dưới nó không được là link.
 - **Độ trễ:** bước lên bus trong vòng 1 s, và lên trang peek trong khoảng
-  2 s. Peek chỉ hiện bước ở chế độ monitor.
+  2 s. Peek hiện bước ở mọi chế độ; chỉ tham số và kết quả của bước mới cần
+  chế độ monitor.
 
 Fixture `crates/tasks/tests/fixtures/openclaw-session-research.jsonl` có
 mỗi dòng là một `event_json`, mọi chữ đều là chữ bịa ra. Test nạp nó vào một
