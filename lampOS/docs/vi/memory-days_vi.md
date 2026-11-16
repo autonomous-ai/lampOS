@@ -430,6 +430,61 @@ Giữ đến khi bị quên: hết hạn theo ngày, hết hạn khi không dùn
 nightly không đọc bảng này. `forget_all` và `forget_person` xóa chúng. Tối đa
 10.000 bản ghi một người. Memory cũ trả `unknown_op`.
 
+### Loại nguồn, con trỏ, tóm tắt và thời điểm việc (bản ghi liên kết, lát 1)
+
+Kế hoạch bộ nhớ dịch vụ liên kết (16/11; quyết định của builder đầu tiên lúc
+16:57 trên #6811, theo quyết định bản ghi connector của chủ ngày 11/11) cho
+một bản ghi nêu nơi việc đó nằm, để các lát sau giữ việc Harness, lệnh gọi của
+agent và nhắc nhở thành bản ghi. Lát này chỉ là schema: chưa có ai ghi các
+trường mới, và một lần ghi không nêu trường nào hoạt động như trước.
+
+- **Cột.** Mỗi lần mở, sau `days.sql`, `service_records::migrate` thêm từng
+  cột bảng còn thiếu (đọc bằng `pragma table_info`, nên chạy lại không đổi
+  gì), trong một giao dịch: lệnh `ALTER` đầu tiên trên các bảng này.
+  `user_version` giữ 1.
+
+  | Cột | Kiểu | Mặc định | Giới hạn |
+  |---|---|---|---|
+  | `source_kind` | `TEXT NOT NULL`, `CHECK` trong `voice`, `task`, `agent`, `reminder` | `'voice'` | một trong bốn |
+  | `source_ref` | `TEXT NOT NULL`, một object JSON | `'{}'` | tối đa 512 byte |
+  | `summary` | `TEXT NOT NULL` | `''` | tối đa 160 byte |
+  | `deed_unix_ms` | `INTEGER`, null ở bản ghi cũ | null | thời điểm tính bằng ms |
+
+  Cùng chỉ mục `service_records_kind(person, source_kind, changed_unix_ms)`.
+- **`service_record`** nhận thêm bốn trường tùy chọn: `source_kind`,
+  `source_ref`, `summary` và `deed_unix_ms`. Không có trường nào (voice cũ)
+  thì bản ghi là `voice`, như mọi bản ghi trước đây. Loại không biết bị từ
+  chối `bad_kind`, lần ghi đổi loại của một bản ghi đã giữ cũng vậy. Loại
+  liên kết (`task`, `agent`, `reminder`) phải gửi `source_ref` ở mọi lần
+  ghi; bản ghi `voice` thì tùy. `source_ref` là
+  `{service, id, session?, computer?}`: object chỉ gồm các trường đó, mỗi
+  trường là chữ không có ký tự điều khiển, `service` và `id` không rỗng, tối
+  đa 512 byte dạng JSON; khác đi bị từ chối `bad_source_ref`. Session chỉ là
+  tham chiếu mờ: phiên agent ở lại trong agent. `summary` được làm gọn (ký
+  tự điều khiển và chuỗi khoảng trắng thành một khoảng trắng) và cắt ở một
+  ký tự trọn vẹn còn 160 byte. Cập nhật tại chỗ bỏ qua `source_ref`,
+  `summary` hay `deed_unix_ms` thì giữ giá trị đang có. Danh sách trả cả
+  bốn trường.
+- **Giới hạn theo loại.** Mỗi loại liên kết giữ tối đa 2.000 bản ghi một
+  người, nằm trong 10.000: quá mức đó, bản ghi đổi lâu nhất của loại đó bị
+  xóa, không đụng loại khác. Bản ghi `voice` chỉ bị giới hạn bởi 10.000.
+- **Lần quên thắng theo thời điểm việc** (điều kiện 2 của builder đầu
+  tiên). Một lần ghi bị từ chối `forgotten` khi thời điểm sớm hơn trong
+  `asked_unix_ms` và `deed_unix_ms` trước lần quên tất cả mới nhất của người
+  đó, trước một lần quên về một việc khớp với nó, hoặc trước lần quên liên
+  hệ của một địa chỉ nó đã gửi tới. Nhờ vậy một việc làm trước lần quên mà
+  ghi sau đó không bao giờ được giữ.
+- **Recall và quên đọc cả tóm tắt.** `about` của recall và
+  `service_records_forget {about}` khớp tóm tắt của bản ghi như khớp dịch
+  vụ, hành động, lý do, id kết quả và chi tiết. Quên tất cả và quên người
+  xóa cả hàng, nên con trỏ và tóm tắt đi cùng. Không có gì ở dịch vụ nguồn
+  bị động tới.
+- **Quay về bản cũ.** Bản build cũ nêu tên cột ở mọi lệnh insert và select,
+  nên bỏ qua bốn cột này: bản ghi nó ghi là `voice`, và lệnh quên tất cả của
+  nó vẫn xóa cả hàng. Lệnh quên về một việc của bản cũ không đọc `summary`.
+  Memory cũ từ chối một `service_record` mang trường mới (trường yêu cầu của
+  nó đóng), nên bên ghi chỉ gửi chúng khi công tắc của mình bật.
+
 ## Danh bạ dịch vụ (`service_contact`, `LAMP_SERVICE_CONTACTS` của voice)
 
 Công tắc `LAMP_SERVICE_CONTACTS` của voice (mặc định tắt, bật trong sản
