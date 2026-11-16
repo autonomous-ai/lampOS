@@ -207,9 +207,13 @@ fn main() -> ExitCode {
         .then(|| std::env::var_os("STATE_DIRECTORY"))
         .flatten()
         .map(|state| {
-            reports::Shared::new(reports::Reports::open(reports::Places::product(Path::new(
-                &state,
-            ))))
+            // The report counters (#6256 F8): only with their switch too.
+            let counting = reports::counters::on_from_environment()
+                .then(|| reports::counters::WIFI_FILE.into());
+            reports::Shared::new(
+                reports::Reports::open(reports::Places::product(Path::new(&state)))
+                    .counting(counting),
+            )
         });
     let reporting = shared
         .clone()
