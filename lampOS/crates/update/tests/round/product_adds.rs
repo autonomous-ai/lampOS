@@ -755,3 +755,51 @@ fn a_listed_unit_without_its_exit_note_gets_installs_and_one_the_lamp_has_is_kep
     assert!(!lamp.exists("/etc/systemd/system/lamp-voice.service.d"));
     assert_eq!(lamp.calls().first().map(String::as_str), Some("reload"));
 }
+
+/// An exit note that cannot be written (here `lamp-tasks.service.d` is a
+/// plain file) is said and skipped: the round still switches, the other
+/// units get theirs, and the switch does not list it as one it wrote.
+#[test]
+fn an_exit_note_that_cannot_be_written_is_said_and_the_round_still_switches() {
+    use lamp_update::install::EXIT_NOTE;
+    let mut lamp = product_lamp();
+    fs::write(
+        lamp.root.join("etc/systemd/system/lamp-tasks.service"),
+        "[Service]\nExecStart=/opt/lampOS/tasks/current/lamp-tasks\n",
+    )
+    .unwrap();
+    fs::write(
+        lamp.root.join("etc/systemd/system/lamp-tasks.service.d"),
+        "not a folder\n",
+    )
+    .unwrap();
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    let note = "/etc/systemd/system/lamp-tasks.service.d/exit-note.conf";
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with(&format!("{note} is not written: "))
+                && line.ends_with("; the round goes on")),
+        "{:?}",
+        lamp.said
+    );
+    assert!(
+        !lamp
+            .said
+            .iter()
+            .any(|line| line.starts_with(&format!("wrote {note}"))),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(
+        lamp.read("/etc/systemd/system/lamp-tasks.service.d"),
+        "not a folder\n"
+    );
+    for unit in [MOOD, "lamp-update.service"] {
+        let path = format!("/etc/systemd/system/{unit}.d/exit-note.conf");
+        assert_eq!(lamp.read(&path), EXIT_NOTE, "{unit}");
+    }
+    // The switch is done: no journal is left to list the note.
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+}

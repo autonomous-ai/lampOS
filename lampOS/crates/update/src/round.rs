@@ -2516,20 +2516,32 @@ impl Run<'_, '_> {
     /// Each owed exit note ([`Self::exit_notes_owed`]) written as `install`
     /// writes it (`install::EXIT_NOTE`, 0644), its folder made if it is
     /// not there; one there by now is left. The reload of
-    /// [`Self::write_units`], which follows, reads them.
+    /// [`Self::write_units`], which follows, reads them. One that cannot be
+    /// written is said and dropped from [`Self::exit_notes`], so a put-back
+    /// never removes it, and the round goes on: a missing note must not
+    /// hold every later build back.
     fn write_exit_notes(&mut self) -> Result<(), String> {
         for note in self.exit_notes.clone() {
             let path = self.config.on(&note);
             if fs::symlink_metadata(&path).is_ok() {
                 continue;
             }
-            path.parent()
+            let written = path
+                .parent()
                 .map_or(Ok(()), fs::create_dir_all)
-                .and_then(|()| write_whole(&path, crate::install::EXIT_NOTE.as_bytes(), 0o644))
-                .map_err(|error| format!("{note} cannot be written: {error}"))?;
-            self.say(&format!(
-                "wrote {note}: the exit note install writes, which its unit was without"
-            ));
+                .and_then(|()| write_whole(&path, crate::install::EXIT_NOTE.as_bytes(), 0o644));
+            let line = match written {
+                Ok(()) => {
+                    format!(
+                        "wrote {note}: the exit note install writes, which its unit was without"
+                    )
+                }
+                Err(error) => {
+                    self.exit_notes.retain(|listed| *listed != note);
+                    format!("{note} is not written: {error}; the round goes on")
+                }
+            };
+            self.say(&line);
         }
         Ok(())
     }
