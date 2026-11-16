@@ -1520,3 +1520,75 @@ fn monitor_mode_a_session_ending_during_a_read_sends_nothing_read_after() {
     let (status, _, body) = rig.ask_as("lamp-test.local", "GET", "/bus", &with, "");
     assert_eq!(status, 401, "{body}");
 }
+
+/// V1's dark tokens (`system/web/src/index.css`, `.lm-root`), as #7208's
+/// first step copies them.
+const V1_TOKENS: [&str; 13] = [
+    "#0C0B09", "#111009", "#17160F", "#1E1D14", "#2A2820", "#F59E0B", "#2DD4BF", "#34D399",
+    "#F87171", "#60A5FA", "#F0EEE8", "#9A9080", "#504A3C",
+];
+/// Every section the page has had since #5883, by id.
+const SECTION_IDS: [&str; 6] = ["overview", "timeline", "turns", "camera", "body", "health"];
+
+#[test]
+fn the_page_looks_like_v1_and_loads_nothing_from_outside() {
+    let html = page::main_page(false, "lamp-52e6", "0123456789abcdef");
+    for token in V1_TOKENS {
+        assert!(
+            html.contains(&format!(":{token};")),
+            "token {token} missing"
+        );
+    }
+    for class in [
+        ".card{",
+        ".badge{",
+        ".badge-amber{",
+        ".badge-teal{",
+        ".badge-blue{",
+        ".badge-green{",
+        ".badge-red{",
+        ".badge-grey{",
+        ".chip{",
+        "nav a.on{",
+        ".dot{",
+        ".dot.live{",
+    ] {
+        assert!(html.contains(class), "class {class} missing");
+    }
+    assert!(html.contains("@media(max-width:640px)"), "no phone layout");
+    for id in SECTION_IDS {
+        assert!(html.contains(&format!("<section id=\"{id}\"")), "{id} gone");
+        assert!(html.contains(&format!("id=\"{id}-now\"")), "{id}-now gone");
+        assert!(
+            html.contains(&format!("href=\"#{id}\"")),
+            "{id} not in the nav"
+        );
+    }
+    assert!(html.contains("lamp-52e6") && html.contains("0123456789ab"));
+    assert!(html.contains("read only"));
+    let lower = html.to_ascii_lowercase();
+    for outside in [
+        " src=",
+        "href=\"http",
+        "href='http",
+        "@import",
+        "url(",
+        "//cdn",
+        "@font-face",
+    ] {
+        assert!(!lower.contains(outside), "{outside} on the page");
+    }
+}
+
+#[test]
+fn a_hostile_lamp_name_and_build_stay_escaped() {
+    let html = page::main_page(
+        true,
+        "<script>alert(1)</script>\"'&",
+        "\"><img src=x onerror=alert(2)>",
+    );
+    assert!(!html.contains("<script>alert"), "{html}");
+    assert!(!html.contains("<img"), "{html}");
+    assert!(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;&quot;&#39;&amp;"));
+    assert!(html.contains(page::WORDS_SHOWN));
+}
