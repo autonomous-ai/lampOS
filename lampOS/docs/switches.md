@@ -1028,6 +1028,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_SERVICES_LINKED_TOOLS` | Nothing you'd notice, except a slightly quicker answer: the lamp is told only about the services you linked. |
 | `LAMP_SKILL_READS` | A skill you make can read you a linked service, like your calendar, only when you are alone with the lamp. |
 | `LAMP_SKILL_LINK_NOTE` | A skill you made that reads a service you haven't linked tells you once where to link it in the app. |
+| `LAMP_SKILL_TASK_SURE` | A task a skill hands to the lamp's agent waits its turn, and you hear when it fails. |
 | `LAMP_SKILL_LINK_APP` | A skill that needs a service you haven't linked opens that service's Connect in the app for you. |
 | `LAMP_SKILL_WRITES` | A skill you made sends one fixed thing on its own, at most ten a day, and thirty for all your skills together, once you agree, then or later. |
 | `LAMP_SKILL_WRITE_AGENT` | Nothing you'd notice: a skill's fixed send goes through the lamp's agent, still only as you agreed. |
