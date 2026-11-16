@@ -5563,6 +5563,15 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut unlifted_said: Option<&'static str> = None;
     let mut strained_by: Option<(&'static str, u16)> = None;
     let mut seated: Option<(&'static str, &'static str)> = None;
+    // #7281, under `StrainGuard::cools`: the joint (servo order) of a seat
+    // that ends by itself once cool; since when that joint has read cool,
+    // back to back; that it has, for the next step to stand; and when it
+    // last stood by itself, so that it does at most once an hour.
+    let mut seat_rests: Option<usize> = None;
+    let mut cool_since: Option<Duration> = None;
+    let mut seat_cooled = false;
+    let mut self_stood_at: Option<Duration> = None;
+    let mut hot_retreats = 0u16;
     let mut climb = Climb::default();
     let mut arm_over = [0u8; 2];
     let mut arm_off = [0u8; 2];
@@ -5897,10 +5906,24 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         {
             seat_retreats.clear();
             unlifted_said = None;
+            self_stood_at = None;
             eprintln!(
                 "lamp-body: step {}: seated for its {joint} ({why}) until now: let stand again",
                 report.steps
             );
+        } else if seat_cooled && let Some((joint, _)) = seated.take() {
+            // #7281: cool, it stands again by itself. The hour's sit-downs
+            // are kept, so the next hot one seats it again.
+            self_stood_at = Some(now);
+            eprintln!(
+                "lamp-body: step {}: {joint} read under {} for {} min: stands again by itself",
+                report.steps,
+                StrainGuard::COOL,
+                StrainGuard::COOL_FOR.as_secs() / 60
+            );
+        }
+        if seated.is_none() {
+            (seat_rests, cool_since, seat_cooled) = (None, None, false);
         }
         // Only lamp-control's asks (a paired computer's) replace what
         // plays; any other asker's mark is taken as absent.
@@ -7689,6 +7712,16 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
             None => unsent = 0,
         }
+        // #7281: a seat that rests counts its joint's cool reads, back to
+        // back; a held or missing read starts the count again.
+        if let Some(index) = seat_rests {
+            let read = samples[index].temperature;
+            if bus.temperature_held[index] || read == 0 || read >= StrainGuard::COOL {
+                cool_since = None;
+            } else if now.saturating_sub(*cool_since.get_or_insert(now)) >= StrainGuard::COOL_FOR {
+                seat_cooled = true;
+            }
+        }
         let mut glimpse = Glimpse {
             unplug_safe: false,
             unplug_unsafe: None,
@@ -7763,7 +7796,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             toward_refused,
             bad_reads: bus.bad_reads,
             retreats: retreats.into(),
-            hot_retreats: 0,
+            hot_retreats,
             resting_s: match tired_until {
                 Some(until)
                     if until > now
@@ -7784,7 +7817,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 .strain_guard
                 .and_then(|_| climb.observe(now, samples.map(|sample| sample.temperature))),
             seated,
-            seat_rests: false,
+            seat_rests: seat_rests.is_some(),
             waiting: None,
             home: Some(home),
         };
@@ -8012,15 +8045,39 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         if seat_retreats.len() >= StrainGuard::SEAT_AFTER && seated.is_none() {
                             seated = Some((joint.name(), kind));
                             release_due = true;
+                            // #7281: a hot seat ends by itself once cool,
+                            // unless it already stood by itself this hour.
+                            seat_rests = (kind == "hot"
+                                && limits.strain_guard.is_some_and(|guard| guard.cools)
+                                && self_stood_at.is_none_or(|at| {
+                                    now.saturating_sub(at) >= StrainGuard::SEAT_WINDOW
+                                }))
+                            .then_some(joint.index());
+                            cool_since = None;
+                            let cools = if seat_rests.is_some() {
+                                format!(
+                                    "until it reads under {} for {} min, or ",
+                                    StrainGuard::COOL,
+                                    StrainGuard::COOL_FOR.as_secs() / 60
+                                )
+                            } else {
+                                String::new()
+                            };
                             eprintln!(
-                                "lamp-body: step {}: {joint} sat down {kind} for the second time in an hour: seated, its arm let go, until a person holds its head a second, a health check starts or it is started again",
+                                "lamp-body: step {}: {joint} sat down {kind} for the second time in an hour: seated, its arm let go, {cools}until a person holds its head a second, a health check starts or it is started again",
                                 report.steps
                             );
                         }
                     }
                 }
                 if !tired && stand > 0.0 {
+                    // #7281: every sit-down says why as it happens, not only
+                    // in the exit report.
+                    eprintln!("lamp-body: step {}: sat down: {why}", report.steps);
                     retreats = retreats.saturating_add(1);
+                    if hot {
+                        hot_retreats = hot_retreats.saturating_add(1);
+                    }
                     retreated_at.retain(|at| now.saturating_sub(*at) < Standing::RETREAT_WINDOW);
                     retreated_at.push_back(now);
                     if report.retreats.len() < 16 {
