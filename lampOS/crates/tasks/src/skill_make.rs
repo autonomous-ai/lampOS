@@ -787,6 +787,13 @@ fn answer_on_gateway(
     let ran = gateway.run(&run, &|| {});
     drop(folder);
     match ran {
+        // Harness or the gateway not ready yet: said to the person at
+        // once in the lamp's short words, never a silent failure; the
+        // reason is journaled.
+        Err(why) if not_ready(&why) => {
+            eprintln!("[lamp-tasks] skill make: not ready: {why}");
+            refusal(NOT_READY, NOT_READY_LINE)
+        }
         Err(why) => refusal(not_started(&why), &why),
         Ok(_) => match run
             .answer
@@ -797,6 +804,22 @@ fn answer_on_gateway(
             None => refusal("no_answer", NO_GATEWAY_ANSWER),
         },
     }
+}
+
+/// The refusal's code of a gateway make that couldn't start because
+/// Harness or the gateway isn't ready yet (#7245): lamp-voice says
+/// [`NOT_READY_LINE`] for it.
+pub const NOT_READY: &str = "not_ready";
+/// What the person is told, at once, for [`NOT_READY`].
+pub const NOT_READY_LINE: &str = "I'm still getting ready. Give me a minute and ask me again.";
+
+/// Whether a gateway make's run was refused because Harness or the gateway
+/// isn't ready yet: Harness not set up or with no lamp target, or the
+/// gateway not answering ([`crate::gateway::NOT_READY`]).
+fn not_ready(why: &str) -> bool {
+    why.contains(crate::gateway::NOT_READY)
+        || why.starts_with("Harness isn't set up")
+        || why.starts_with("the lamp has no Harness target")
 }
 
 /// Said when a gateway agent's make ended with no answer to read (#7245).
@@ -1018,7 +1041,7 @@ impl MakeHandOvers {
     pub fn lamp(home: &Path, harness: crate::skill_task::SkillHarnessSlot) -> Self {
         let held = held(std::env::var(NET_SWITCH).ok().as_deref());
         eprintln!(
-            "[lamp-tasks] skill make: a make's run {}",
+            "[lamp-tasks] skill make: a make's run on the lamp's Hermes (its namespace path only; a gateway agent's make on the one run path is its gateway's own turn) {}",
             if held {
                 "is held off the network (LAMP_MAKE_AGENT_NET=held)"
             } else {
