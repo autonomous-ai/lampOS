@@ -705,6 +705,18 @@ const CALLED_EVERY: Duration = Duration::from_secs(10);
 /// morning, or gone quiet, holds the lamp folded no longer than this.
 pub const NIGHT_LAPSE: Duration = Duration::from_secs(120);
 
+/// Under `LAMP_BODY_PRESENCE` (#7301): someone at the lamp keeps a
+/// standing lamp up only this long after the last talk or arrival. After
+/// it the lamp folds calmly at the end of its window, the person still
+/// there, and stands again when spoken to: a sway for hours at the edge of
+/// someone's sight is a reason to turn it off (the first builder, 15:42).
+/// lamp-74ff's elbow took 30 to 40 minutes to heat standing (#7289).
+pub const QUIET_STAND: Duration = Duration::from_secs(15 * 60);
+/// Under `LAMP_BODY_PRESENCE`: for this long after an arrival or the end
+/// of talk the shifts at rest come at two energy levels above the owner's,
+/// for this long again at one above, then at the owner's own.
+pub const LIVELY_FOR: Duration = Duration::from_secs(2 * 60);
+
 /// A gesture asked on the mood socket, not one the body makes of itself:
 /// a shift at rest (`crate::idle`, `IDLE` among them) or the turn to a call.
 fn from_outside(clip: &Clip) -> bool {
@@ -814,6 +826,10 @@ pub struct Asked {
     /// 1 for today. Only with `LAMP_BODY_ENERGY=on`; taken only once the
     /// lamp is settled (no gesture, the pose and the arm still).
     pub energy: u8,
+    /// Someone is at the lamp, or was within `presence_in::GRACE_S`
+    /// (`room/presence`, `crate::presence_in`, #7301). Only with
+    /// `LAMP_BODY_PRESENCE=on`; taken only under [`Limits::presence`].
+    pub present: bool,
 }
 
 /// A holder's aim counted from the found `home` (pitch, roll, yaw counts),
@@ -856,6 +872,7 @@ impl Asked {
         replace: false,
         lively: false,
         energy: 0,
+        present: false,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -887,6 +904,7 @@ impl Asked {
         replace: false,
         lively: false,
         energy: 0,
+        present: false,
     };
 }
 
@@ -1215,6 +1233,13 @@ pub struct Limits {
     /// switch, [`crate::energy_in::enabled`], as the level is.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub energy: bool,
+    /// `LAMP_BODY_PRESENCE=on` (#7301): someone at the lamp keeps a standing
+    /// lamp up for a bounded time, its shifts at rest come every 20 to 60 s
+    /// and sag its arm, livelier for a few minutes after an arrival or
+    /// talk. Off: as before. Read by the one reader of the switch,
+    /// [`crate::presence_in::enabled`], as presence is.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub presence: bool,
     /// A load above this on `load_steps` steps in a row makes the joint give
     /// way, and ends the run if it stays or comes back too often.
     pub load: [u16; 3],
@@ -1393,6 +1418,7 @@ impl Limits {
         app_reach: false,
         strain_guard: None,
         energy: false,
+        presence: false,
     };
 }
 
@@ -4326,6 +4352,7 @@ pub(crate) fn run_looking(
         replace: false,
         lively: false,
         energy: 0,
+        present: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -5640,6 +5667,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // and how.
     let mut idle_due: Option<Duration> = None;
     let mut idler = idle::Idler::new(standing.map_or(0, |up| up.idle_seed));
+    idler.alive = limits.presence;
+    // Under `Limits::presence` (#7301): when the lamp was last talked with
+    // or someone last arrived, whether someone was there the step before,
+    // and how much a shift's arm offsets are scaled (`energy::idle_size`).
+    let mut stirred_at: Option<Duration> = None;
+    let mut was_present = false;
+    let mut idle_size = 1.0f32;
     // The energy level taken (`crate::energy`, #6893): 1 is the limits and
     // the stand's pace this body was given, exactly.
     let base = limits;
@@ -6091,6 +6125,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
             _ => mood,
         };
+        // Talk, a call, or someone arriving (#7301): the lively minutes and
+        // the quiet ones count from the last of them.
+        let present = limits.presence && asked_now.present;
+        if mood != Mood::Resting || (present && !was_present) {
+            stirred_at = Some(now);
+        }
+        was_present = present;
         let Pose { pitch, roll, yaw } =
             gestures.target(mood, level, now.as_micros().try_into().unwrap_or(u64::MAX));
         let mut goals = written;
@@ -6271,6 +6312,22 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // Held by lamp-control's lease (#3504): a lamp that is up
                 // stays up while a program moves it; a folded one is not
                 // stood up by a hold alone.
+                awake_until = Some(now + up.awake);
+            } else if present
+                && !asked_now.night
+                && stirred_at.is_some_and(|at| now.saturating_sub(at) < QUIET_STAND)
+                && report.last.is_none_or(|last| {
+                    ARM.iter()
+                        .all(|joint| last[joint.index()].temperature < crate::bus_out::WARM)
+                })
+                && awake_until.is_some_and(|until| now < until)
+            {
+                // Someone at the lamp (#7301): a lamp that is up stays up
+                // for them, as with the lease never standing a folded one,
+                // for no more than `QUIET_STAND` after the last talk or
+                // arrival, never in its night rest and never once an arm
+                // joint is warm: it folds calmly at the window's end,
+                // before the strain guard's hot sit-down.
                 awake_until = Some(now + up.awake);
             }
             // Paused after a gesture was taken: one still waiting is
@@ -6462,6 +6519,24 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             (None, _) => rest_average = None,
         }
         let settled = drifted_at.is_none_or(|at| now.saturating_sub(at) >= SHIFT_QUIET);
+        // Under `Limits::presence` (#7301): livelier for a while after talk
+        // or an arrival, two energy levels above the owner's and then one,
+        // in the waits and the arm's sag only, never the speed or the stand.
+        // With `LAMP_BODY_ENERGY` off the owner's level is 1, and these
+        // minutes still come.
+        if limits.presence {
+            let since = stirred_at.map_or(Duration::MAX, |at| now.saturating_sub(at));
+            let boost = if since < LIVELY_FOR {
+                2
+            } else if since < LIVELY_FOR * 2 {
+                1
+            } else {
+                0
+            };
+            let lively = crate::energy::of((energy + boost).min(5));
+            idler.share = lively.idle_share;
+            idle_size = lively.idle_size;
+        }
         let idling = playing.is_some_and(|(clip, _)| idle::is_move(clip));
         let quiet = upright
             && mood == Mood::Resting
@@ -6470,7 +6545,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             && !asked_now.still
             && easing == [0; 3]
             && in_hand == [0; 3]
-            && !test_held;
+            && !test_held
+            && !asked_now.held;
         if !quiet {
             idle_due = None;
             if idling {
@@ -6785,6 +6861,23 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // already taken up from where the hold carried it.
                 (None, Some(offsets)) if upright => {
                     gesture_wanted = offsets;
+                    // Under `Limits::presence` (#7301) a shift's arm only
+                    // sags toward its fold, by the level's size, and stays
+                    // on its way between the fold and the stand.
+                    if limits.presence
+                        && idle::is_move(clip)
+                        && let Some(up) = standing
+                    {
+                        for index in 0..2 {
+                            gesture_wanted[3 + index] = idle::sag(
+                                offsets[3 + index],
+                                idle_size,
+                                f32::from(arm_goals[index]),
+                                f32::from(up.folded[index]),
+                                f32::from(up.pose[3 + index]),
+                            );
+                        }
+                    }
                     if let Some((at, held)) = resumed {
                         let t = now.saturating_sub(at).as_secs_f32() / EASE_OUT.as_secs_f32();
                         if t < 1.0 {
