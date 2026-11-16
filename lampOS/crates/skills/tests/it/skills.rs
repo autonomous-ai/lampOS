@@ -2641,6 +2641,131 @@ fn a_yawn_in_the_sitting_brings_the_stretch_forward_once() {
     assert!(error.contains("give the trigger a for"), "{error}");
 }
 
+/// #6543: a trigger's `sooner` may be a list. Each entry alone brings the
+/// stretch to its own `for`; with both holding, the shortest wins, whatever
+/// the order. One table in a list is the table alone, and each entry is
+/// checked when it loads as a single one is.
+#[test]
+fn a_list_of_sooners_brings_the_trigger_to_the_shortest_holding() {
+    let dir = tempfile::tempdir().unwrap();
+    let reading =
+        |topics: &str| format!("\n[permissions]\ntopics = [{topics}]\nlight = true\nbody = true\n");
+    let all = r#""humans/faces/tracked", "voice/state", "room/activity", "humans/doing_more""#;
+    let with_sooner = |sooner: &str, topics: &str| {
+        format!(
+            "{}{}",
+            STRETCH.replace(
+                "rearm = \"leaves\"\n",
+                &format!("rearm = \"leaves\"\nsooner = {sooner}\n")
+            ),
+            reading(topics)
+        )
+    };
+    let yawn = r#"{ topic = "room/activity", field = "yawns", above = 0, for = "30m" }"#;
+    let tired = r#"{ topic = "humans/doing_more", field = "tired_seen", above = 0, for = "40m" }"#;
+    // The longer first: the shortest holding wins, not the first.
+    let list = format!("[{tired}, {yawn}]");
+    let skill = skill_with(
+        &dir.path().join("list"),
+        "stretch-break",
+        &with_sooner(&list, all),
+    );
+    let runs = |skill: &Path, yawned: bool, tired_seen: bool| {
+        let mut messages: Vec<(u64, &str, String)> =
+            vec![(0, "voice/state", r#"{"state":"resting"}"#.into())];
+        messages.extend(
+            sitting(0, 3300, &[])
+                .into_iter()
+                .map(|(at, topic, payload)| (at, topic, payload.to_string())),
+        );
+        messages.push((
+            600,
+            "room/activity",
+            format!(
+                r#"{{"state":"at_desk","for_s":60,"sitting_s":600,"baseline":true,"yawns":{}}}"#,
+                u32::from(yawned)
+            ),
+        ));
+        messages.push((
+            600,
+            "humans/doing_more",
+            format!(r#"{{"tired_seen":{}}}"#, u32::from(tired_seen)),
+        ));
+        messages.sort_by_key(|message| message.0);
+        let mut engine = Engine::new(vec![load(skill).unwrap()], true).sooner();
+        let mut at = Vec::new();
+        for (when, topic, payload) in &messages {
+            if !engine
+                .observe(topic, when * 1_000_000, payload.as_bytes(), None)
+                .is_empty()
+            {
+                at.push(*when);
+            }
+        }
+        at
+    };
+    assert_eq!(runs(&skill, false, false), [3000], "neither: its own for");
+    assert_eq!(
+        runs(&skill, true, false),
+        [1800],
+        "a yawn alone: 30 minutes"
+    );
+    assert_eq!(runs(&skill, false, true), [2400], "tired alone: 40 minutes");
+    assert_eq!(runs(&skill, true, true), [1800], "both: the shortest");
+    // One table in a list is the table alone.
+    let single = skill_with(
+        &dir.path().join("single"),
+        "stretch-break",
+        &with_sooner(yawn, all),
+    );
+    let one = skill_with(
+        &dir.path().join("one"),
+        "stretch-break",
+        &with_sooner(&format!("[{yawn}]"), all),
+    );
+    assert_eq!(
+        load(&single).unwrap().triggers,
+        load(&one).unwrap().triggers
+    );
+    for (yawned, tired_seen) in [(false, false), (true, false), (false, true)] {
+        assert_eq!(
+            runs(&single, yawned, tired_seen),
+            runs(&one, yawned, tired_seen)
+        );
+    }
+    // Each entry is checked when it loads.
+    for (sooner, topics, why) in [
+        (
+            format!(
+                r#"[{yawn}, {{ topic = "humans/doing_more", field = "tired_seen", above = 0, for = "50m" }}]"#
+            ),
+            all,
+            "shorter than the trigger's for",
+        ),
+        (
+            format!(
+                r#"[{yawn}, {{ topic = "humans/doing_more", field = "tired_seen", for = "40m" }}]"#
+            ),
+            all,
+            "missing field `above`",
+        ),
+        ("[]".to_owned(), all, "not an empty list"),
+        (
+            list.clone(),
+            r#""humans/faces/tracked", "voice/state", "room/activity""#,
+            "a trigger's sooner reads humans/doing_more",
+        ),
+    ] {
+        let error = load(&skill_with(
+            &dir.path().join("bad"),
+            "stretch-break",
+            &with_sooner(&sooner, topics),
+        ))
+        .unwrap_err();
+        assert!(error.contains(why), "{sooner}: {error}");
+    }
+}
+
 /// #6543: Stretch break's `[[while]]` on `humans/doing` waits for 30
 /// minutes of no stretch seen, its yawn sooner's, not its own 50: with
 /// lamp-seen saying nothing seen, a yawn still brings the stretch to 30
