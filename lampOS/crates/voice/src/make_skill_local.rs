@@ -313,7 +313,9 @@ fn code_rules() -> String {
          each named ```scripts/NAME (letters, digits, -, _ and ., ending .py, .json, .txt or \
          .md), plain text, at most {each} KiB each and {all} KiB in all; and exactly one \
          [[do]] step, alone in its step: task = {{ task = \"what the code does, in a few plain \
-         words\", run = \"scripts/main.py\" }}, run naming one of its .py files; and at the \
+         words\", run = \"scripts/main.py\" }}, its task words on one line and at most \
+         {task_chars} characters, run naming one of its .py files, whose ```scripts/ block must \
+         be written (a do step with no code block is refused); and at the \
          top, before any table, grants = [ ... ] listing only what the code uses on the lamp, \
          of: {grants}. The code is Python 3 run on the lamp; it reaches the lamp only through \
          the lamp's own SDK, with only those grants, and has no other network: {sdk}. There \
@@ -322,6 +324,7 @@ fn code_rules() -> String {
          says back what it uses and waits for the person's yes before it runs any code.",
         sdk = made_skill::SCRIPT_SDK,
         most = made_skill::MOST_SCRIPTS,
+        task_chars = made_skill::MOST_TASK_CHARS,
         each = made_skill::MOST_SCRIPT_BYTES / 1024,
         all = made_skill::MOST_SCRIPTS_BYTES / 1024,
         grants = grants.join(", "),
@@ -3183,6 +3186,25 @@ pub fn answer(
 
 #[cfg(test)]
 pub(crate) mod tests {
+
+    /// #7245 (lamp-c0a4, 16 Nov 19:44-19:58): the agent's code was refused for
+    /// a task's words over the limit or on two lines, and for a do step with
+    /// no code block; the rules both makers read now say both.
+    #[test]
+    fn the_code_rules_say_the_task_words_limit_and_the_code_block() {
+        let rules = code_rules();
+        assert!(
+            rules.contains(&format!(
+                "on one line and at most {} characters",
+                made_skill::MOST_TASK_CHARS
+            )),
+            "{rules}"
+        );
+        assert!(
+            rules.contains("a do step with no code block is refused"),
+            "{rules}"
+        );
+    }
     use super::*;
     use std::io::{Read, Write};
     use std::os::unix::fs::PermissionsExt;

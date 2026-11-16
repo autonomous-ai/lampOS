@@ -673,7 +673,9 @@ sau:
      (`MOST_SCRIPTS`, `MOST_SCRIPT_BYTES`, `MOST_SCRIPTS_BYTES`); đúng một
      bước `[[do]]` chỉ gồm một `task`, `task = { task = "take a photo",
      run = "scripts/main.py" }` (`do.task` của #6305), lời của nó là văn
-     bản thuần và tối đa 120 ký tự, `run` là một tệp `.py` nó đã viết; và
+     bản thuần, trên một dòng và tối đa 120 ký tự (`MOST_TASK_CHARS`), `run`
+     là một tệp `.py` nó đã viết, mà khối mã phải được viết (#7245: system
+     prompt nói cả hai, và rằng bước do không có khối mã bị từ chối); và
      một `grants = [...]` ở đầu tệp gồm các quyền của #6305
      (`made_skill::GRANTS`, đúng các tên của `skill_task_yes::GRANTS`: `body`, `light`, `speak`, `look`, `hear`,
      `sound`, `air`, `device`, `camera`, `microphone`, `notes`, `speech`;

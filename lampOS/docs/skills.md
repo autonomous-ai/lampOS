@@ -3505,8 +3505,10 @@ gone ([switches.md](switches.md)). What happens:
      as a bidirectional mark), at most 8 KiB each and 16 KiB in all
      (`MOST_SCRIPTS`, `MOST_SCRIPT_BYTES`, `MOST_SCRIPTS_BYTES`); exactly one
      `[[do]]` step that is a `task` alone, `task = { task = "take a photo",
-     run = "scripts/main.py" }` (#6305's `do.task`), its words plain and at
-     most 120 characters, its `run` a `.py` file it wrote; and a top-level
+     run = "scripts/main.py" }` (#6305's `do.task`), its words plain, on one
+     line and at most 120 characters (`MOST_TASK_CHARS`), its `run` a `.py`
+     file it wrote, whose block must be written (#7245: the system prompt
+     says both, and that a do step with no code block is refused); and a top-level
      `grants = [...]` of #6305's grants (`made_skill::GRANTS`, the names of
      `skill_task_yes::GRANTS`:
      `body`, `light`, `speak`, `look`, `hear`, `sound`, `air`, `device`,
