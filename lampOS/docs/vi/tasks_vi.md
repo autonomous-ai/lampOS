@@ -1193,11 +1193,20 @@ theo agent mặc định của đèn *là gì*, không bao giờ theo tên của
   trong exec approvals của gateway: `fence-get` (`approvals get --gateway
   --json --timeout <ms>`), `fence-set` (`approvals set --gateway --stdin
   --timeout <ms>`) và `fence-entry` (mục của agent rào, JSON có
-  `{start}`). lamp-tasks không biết lệnh của engine nào: đó là dữ liệu của
-  lamp-update. Mỗi khóa đúng một lần, cổng là một cổng, đường dẫn và tên
-  đều trơn, lượt phải có `{message}` và `fence-entry` phải là một object
-  JSON có `{start}`; nếu không, lần chạy bị từ chối bằng lời ("is a gateway agent's, but
-  ..."). Namespace của gateway phải cho thấy socket của lamp-control
+  `{start}`); và `check` (#7108), phép kiểm tra của chính engine trên một
+  văn bản cấu hình trước khi lamp-tasks rename nó vào chỗ:
+  `LAMP_OPENCLAW_GATEWAY=on OPENCLAW_CONFIG_PATH={file} config validate
+  --json`, các từ `NAME=value` ở đầu là môi trường của lệnh, `{file}` là
+  file chứa văn bản mới, status 0 là chấp nhận
+  (`GatewayAgent::check_config`, tối đa 60 s). Nó chạy trong namespace
+  riêng, không bao giờ trong namespace của gateway đang chạy, nên vẫn chạy
+  được khi gateway chết. lamp-tasks không biết lệnh của engine nào: đó là
+  dữ liệu của lamp-update. Mỗi khóa đúng một lần, cổng là một cổng, đường
+  dẫn và tên đều trơn, lượt phải có `{message}`, `fence-entry` phải là một
+  object JSON có `{start}` và `check`, khi có, phải có `{file}`; nếu không,
+  lần chạy bị từ chối bằng lời ("is a gateway agent's, but ..."). Wrapper
+  ghi trước #7108 không có `check`: lần chạy vẫn tiếp tục, nhưng không ghi
+  hàng rào nào khi còn thiếu nó. Namespace của gateway phải cho thấy socket của lamp-control
   (`AGENT_NS_TASKS_LINE`): nếu không, bị từ chối, nêu
   `LAMP_SKILL_DEFAULT_AGENT` hoặc `LAMP_SKILL_TASKS` của lamp-update. Không
   tra login shell: Harness không khởi động gì; lamp-tasks tự chạy wrapper
@@ -1279,6 +1288,18 @@ chưa có, để việc nói của người dùng giữ agent của chúng. `age
 (không hợp lệ trên 2026.11.2) bị từ chối, "Refused: ... legacy
 `agents.list` ...", và file giữ nguyên. Mọi khóa khác được giữ; file đã
 đúng thì không ghi lại.
+
+**Engine kiểm tra văn bản trước khi nó vào chỗ** (#7108; ngày 15/11 một
+lần merge mà OpenClaw từ chối đã làm gateway của lamp-52e6 chết ở lần
+restart sau, 78/CONFIG, #7101): văn bản đã đổi được ghi vào một file mới
+0600 cạnh `openclaw.json`, `check` của wrapper chạy trên file đó, và chỉ
+status 0 mới rename nó vào chỗ (`hermes_config::replace_checked`). Bị từ
+chối, hoặc dữ liệu của wrapper không có `check`, thì file mới bị xóa và
+`openclaw.json` giữ nguyên từng byte; dòng nhật ký nói vậy ("not written:
+... the engine's own check refused it (status 1)"), còn khi ghi thì nói
+"written, checked by the engine". Cài đặt OpenClaw lúc phần khởi động
+(`openclaw_config::write`) cũng được kiểm tra như vậy khi wrapper của
+OpenClaw có dữ liệu gateway; không có thì ghi như trước.
 
 **Exec approvals của nó không phải là file**: OpenClaw giữ chúng trong kho
 riêng của gateway, và một `exec-approvals.json` cũ trong state của nó sẽ

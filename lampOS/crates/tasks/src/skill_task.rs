@@ -1764,7 +1764,7 @@ pub enum AgentRun {
     /// A gateway agent: the run is one turn on its warm gateway
     /// ([`crate::gateway_run`]), by the data lamp-update wrote in its
     /// wrapper ([`crate::gateway_run::GatewayAgent::of`]).
-    Gateway(crate::gateway_run::GatewayAgent),
+    Gateway(Box<crate::gateway_run::GatewayAgent>),
 }
 
 /// Whether the lamp's default agent `engine` can take a skill's run
@@ -1805,7 +1805,7 @@ pub fn default_agent_takes_runs(
                     gateway.ns.display()
                 )
             }
-            Ok(gateway) => return Ok(AgentRun::Gateway(gateway)),
+            Ok(gateway) => return Ok(AgentRun::Gateway(Box::new(gateway))),
         }
     } else if !wrapper.is_some_and(|text| wrapper_takes_runs(text, engine)) {
         match wrapper {
@@ -2795,7 +2795,7 @@ impl Runner for HarnessRunner {
                     let mut runner = crate::gateway_run::GatewayRunner::lamp(
                         program,
                         self.project.clone(),
-                        gateway,
+                        *gateway,
                     );
                     runner.stopping = self.stopping.get().cloned();
                     return runner.run(run, end_token);

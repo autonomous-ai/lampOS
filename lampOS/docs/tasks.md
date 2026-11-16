@@ -3620,11 +3620,19 @@ default agent is, never by its name (`skill_task::AgentRun`):
   fence in the gateway's exec approvals: `fence-get` (`approvals get
   --gateway --json --timeout <ms>`), `fence-set` (`approvals set --gateway
   --stdin --timeout <ms>`) and `fence-entry` (the fence agent's entry, JSON
-  with `{start}`). lamp-tasks knows no engine's commands: they are
+  with `{start}`); and `check` (#7108), the engine's own check of a config
+  text before lamp-tasks renames it into place: `LAMP_OPENCLAW_GATEWAY=on
+  OPENCLAW_CONFIG_PATH={file} config validate --json`, its leading
+  `NAME=value` words the call's environment, `{file}` the new text's file,
+  status 0 taking it (`GatewayAgent::check_config`, at most 60 s). It runs
+  in namespaces of its own, never the running gateway's, so it works with
+  the gateway down. lamp-tasks knows no engine's commands: they are
   lamp-update's data. Each key once, the port a port, the paths and names
-  plain, the turn must carry `{message}` and `fence-entry` must be a JSON
-  object with `{start}`; else the run is refused in words ("is a gateway agent's,
-  but ..."). The gateway's namespace must show lamp-control's socket
+  plain, the turn must carry `{message}`, `fence-entry` must be a JSON
+  object with `{start}` and `check`, when there, must carry `{file}`; else
+  the run is refused in words ("is a gateway agent's, but ..."). A wrapper
+  written before #7108 has no `check`: its runs go on, but no fence is
+  written while it lacks one. The gateway's namespace must show lamp-control's socket
   (`AGENT_NS_TASKS_LINE`): else refused, naming lamp-update's
   `LAMP_SKILL_DEFAULT_AGENT` or `LAMP_SKILL_TASKS`. No login-shell lookup
   is made: Harness starts nothing; lamp-tasks runs the wrapper itself, by
@@ -3706,6 +3714,19 @@ main` are set, each only when not set already, so the person's spoken
 tasks keep their agent. A legacy `agents.list` (invalid on 2026.11.2) is
 refused, "Refused: ... legacy `agents.list` ...", and the file left as it
 is. Every other key is kept; a file already right is not written.
+
+**The engine checks the text before it lands** (#7108; on 15 Nov a merge
+OpenClaw refused took lamp-52e6's gateway down at its next restart, 78/
+CONFIG, #7101): a changed text goes to a new 0600 file beside
+`openclaw.json`, the wrapper's `check` runs on it, and only status 0
+renames it into place (`hermes_config::replace_checked`). Refused, or
+with no `check` in the wrapper's data, the new file is removed and
+`openclaw.json` stays byte for byte; the journal line says so ("not
+written: ... the engine's own check refused it (status 1)"), and a
+written one says "written, checked by the engine". OpenClaw's settings at
+the part's start (`openclaw_config::write`) are checked the same way when
+OpenClaw's wrapper carries gateway data; without it they are written as
+before.
 
 **Its exec approvals are not a file**: OpenClaw keeps them in the
 gateway's own store, and a legacy `exec-approvals.json` in its state

@@ -426,7 +426,13 @@ pub const GATEWAY_MARK: &str = "# lampOS: a gateway agent: a skill's run is one 
 /// `approvals set --gateway --stdin` (`fence-set`, which needs
 /// `operator.admin`), and the fence agent's entry (`fence-entry`, its
 /// allow-list the runs' start `{start}` alone, no prompt, a prompt's
-/// fallback denied), which lamp-tasks makes sure of before each run's turn.
+/// fallback denied), which lamp-tasks makes sure of before each run's turn;
+/// and OpenClaw's own check of a config text (`check`, #7108: `config
+/// validate --json` on the file `OPENCLAW_CONFIG_PATH` names, status 1
+/// when OpenClaw refuses it), which lamp-tasks runs on each new
+/// `openclaw.json` before renaming it into place. The check starts in
+/// namespaces of its own (`LAMP_OPENCLAW_GATEWAY=on`, never the running
+/// gateway's), so it runs with the gateway down, as after a bad config.
 pub const GATEWAY_DATA: &str = r#"#@port 18789
 #@ns /usr/local/lib/lampos/openclaw-ns
 #@agent lamp-skill-run
@@ -436,6 +442,7 @@ pub const GATEWAY_DATA: &str = r#"#@port 18789
 #@fence-get approvals get --gateway --json --timeout {ms}
 #@fence-set approvals set --gateway --stdin --timeout {ms}
 #@fence-entry {"security":"allowlist","ask":"off","askFallback":"deny","autoAllowSkills":false,"allowlist":[{"pattern":"{start}"}]}
+#@check LAMP_OPENCLAW_GATEWAY=on OPENCLAW_CONFIG_PATH={file} config validate --json
 "#;
 
 /// [`WRAPPER`]'s text for `shown`: with [`Shown::one_path`], OpenClaw a

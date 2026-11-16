@@ -14,8 +14,12 @@
 //! `{ms}` in it; and the run's fence: the arguments that get the gateway's
 //! exec approvals as JSON (`fence-get`) and set them from stdin
 //! (`fence-set`), and the agent's own entry in them (`fence-entry`, JSON
-//! with `{start}` for the runs' start). lamp-tasks knows no engine's
-//! commands: they are data lamp-update writes.
+//! with `{start}` for the runs' start); and the engine's own check of a
+//! config text before lamp-tasks renames it into place (`check`, #7108,
+//! [`GatewayAgent::check_config`]: its leading `NAME=value` words are the
+//! call's environment, `{file}` the new text's file; status 0 takes it).
+//! lamp-tasks knows no engine's commands: they are data lamp-update
+//! writes.
 //!
 //! **A run** ([`GatewayRunner::run`]): the run's folder `skill-<run-id>`
 //! is made 0700 in lamp-tasks' Harness project (which the gateway's
@@ -59,8 +63,9 @@ pub const GATEWAY_MARK: &str = "# lampOS: a gateway agent: a skill's run is one 
 /// Each of the gateway's data lines starts with this, then its key and a
 /// space.
 pub const DATA_PREFIX: &str = "#@";
-/// The keys of the gateway's data, each once.
-pub const KEYS: [&str; 9] = [
+/// The keys of the gateway's data, each once; all but [`CHECK_KEY`] must
+/// be there.
+pub const KEYS: [&str; 10] = [
     "port",
     "ns",
     "agent",
@@ -70,7 +75,17 @@ pub const KEYS: [&str; 9] = [
     "fence-get",
     "fence-set",
     "fence-entry",
+    CHECK_KEY,
 ];
+/// The engine's own config check (#7108), the one key a wrapper written
+/// before it may lack: with none, lamp-tasks writes no fence, never an
+/// unchecked one.
+pub const CHECK_KEY: &str = "check";
+/// How long the engine's config check has at most: a cold start of its
+/// CLI on a lamp, not measured yet.
+// ponytail: a fixed bound, unmeasured on a lamp; tune once a lamp's check
+// is timed.
+pub const CHECK_WITHIN: Duration = Duration::from_secs(60);
 /// The run's token in its folder, read once by [`START_FILE`].
 pub const TOKEN_FILE: &str = "token";
 /// The one command a run on a gateway agent may run, in its folder.
@@ -115,6 +130,10 @@ pub struct GatewayAgent {
     /// The agent's own entry in the approvals, JSON text with `{start}`
     /// for the runs' start pattern.
     pub fence_entry: String,
+    /// The engine's own check of a config text, a template with `{file}`
+    /// for its file and leading `NAME=value` words its environment; `None`
+    /// in a wrapper written before #7108.
+    pub check: Option<Vec<String>>,
 }
 
 /// A plain word of data: letters, digits, `-`, `_`, `.`.
@@ -188,6 +207,16 @@ impl GatewayAgent {
         {
             return Err("the gateway's fence-entry is not a JSON object with {start}".into());
         }
+        let check = found
+            .contains_key(CHECK_KEY)
+            .then(|| args(CHECK_KEY))
+            .transpose()?;
+        if check
+            .as_ref()
+            .is_some_and(|check| !check.iter().any(|word| word.contains("{file}")))
+        {
+            return Err("the gateway's check is never given the config's file".into());
+        }
         Ok(Self {
             port,
             ns,
@@ -198,7 +227,56 @@ impl GatewayAgent {
             fence_get: args("fence-get")?,
             fence_set: args("fence-set")?,
             fence_entry,
+            check,
         })
+    }
+
+    /// The engine's own check ([`Self::check`]) of the config text in
+    /// `file`, run through `program` (the agent's wrapper) with only
+    /// [`RUN_PATH`] and the check's own `NAME=value` words in its
+    /// environment, bounded by [`CHECK_WITHIN`]: `Ok` only when it ends
+    /// with status 0. No check in the data is refused.
+    pub fn check_config(&self, program: &Path, file: &Path) -> Result<(), String> {
+        let check = self
+            .check
+            .as_ref()
+            .ok_or("the default agent's wrapper carries no config check")?;
+        let file = file
+            .to_str()
+            .ok_or("the config's file is not a plain path")?;
+        let mut env = vec![("PATH".to_owned(), RUN_PATH.to_owned())];
+        let mut args = Vec::new();
+        for word in check.iter().map(|word| word.replace("{file}", file)) {
+            match word.split_once('=') {
+                Some((name, value))
+                    if args.is_empty()
+                        && !name.is_empty()
+                        && name
+                            .bytes()
+                            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_') =>
+                {
+                    env.push((name.to_owned(), value.to_owned()));
+                }
+                _ => args.push(word),
+            }
+        }
+        match call(program, &env, &args, CHECK_WITHIN, None, None)? {
+            Turn::Done { code: 0, .. } => Ok(()),
+            // What it said (OpenClaw's `issues`), on one line and short.
+            Turn::Done { code, said } => Err(format!(
+                "the engine's own check refused it (status {code}): {}",
+                said.split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ")
+                    .chars()
+                    .take(400)
+                    .collect::<String>()
+            )),
+            Turn::Cut => Err(format!(
+                "the engine's own check ran past {} s",
+                CHECK_WITHIN.as_secs()
+            )),
+        }
     }
 
     /// [`Self::fence_entry`] for runs started by `start`.
@@ -472,7 +550,7 @@ impl GatewayRunner {
     /// A failure is logged.
     fn after(&self, template: &[String], name: &str, within: Duration) -> bool {
         let args = self.agent.fill(template, name, "", within);
-        match call(self, &args, within, None, None) {
+        match call(&self.program, &self.env, &args, within, None, None) {
             Ok(Turn::Done { code: 0, .. }) => return true,
             Ok(Turn::Done { code, .. }) => {
                 eprintln!(
@@ -559,21 +637,23 @@ enum Turn {
     Cut,
 }
 
-/// `args` run through the runner's program, its environment cleared to
-/// [`GatewayRunner::env`], in a process group of its own killed whole
-/// however it ends; at most `within`, or until `stop` is set.
+/// `args` run through `program`, its environment cleared to `env`
+/// ([`GatewayRunner::env`] for a run's calls), in a process group of its
+/// own killed whole however it ends; at most `within`, or until `stop` is
+/// set.
 fn call(
-    runner: &GatewayRunner,
+    program: &Path,
+    env: &[(String, String)],
     args: &[String],
     within: Duration,
     stop: Option<&AtomicBool>,
     input: Option<&str>,
 ) -> Result<Turn, String> {
     use rustix::process::{Pid, Signal, WaitId, WaitIdOptions, kill_process_group, waitid};
-    let mut child = Command::new(&runner.program)
+    let mut child = Command::new(program)
         .args(args)
         .env_clear()
-        .envs(runner.env.iter().map(|(name, value)| (name, value)))
+        .envs(env.iter().map(|(name, value)| (name, value)))
         .current_dir("/")
         .stdin(if input.is_some() {
             Stdio::piped()
@@ -624,7 +704,9 @@ fn call(
     };
     let _ = kill_process_group(pid, Signal::KILL);
     let _ = child.kill();
-    let _ = child.wait();
+    // The status as the reap gives it: macOS's waitid with NOWAIT says 0
+    // for any exit, so a refusal would read as a success off a lamp.
+    let reaped = child.wait().ok().and_then(|status| status.code());
     // Bounded: a reader or writer still held by a process outside the
     // group is given up, never waited on.
     let said = said_rx.recv_timeout(READ_WITHIN).unwrap_or_else(|_| {
@@ -636,7 +718,10 @@ fn call(
         format!("the default agent's gateway call could not be waited for: {error}")
     })?;
     Ok(match status {
-        Some(Some(code)) => Turn::Done { code, said },
+        Some(Some(code)) => Turn::Done {
+            code: reaped.unwrap_or(code),
+            said,
+        },
         Some(None) => Turn::Done { code: -1, said },
         None => Turn::Cut,
     })
@@ -678,7 +763,7 @@ impl GatewayRunner {
             return Err("the run's deadline passed".into());
         }
         let args = self.agent.fill(template, "", "", within);
-        match call(self, &args, within, None, input)? {
+        match call(&self.program, &self.env, &args, within, None, input)? {
             Turn::Done { code: 0, said } => Ok(said),
             Turn::Done { code, .. } => Err(format!(
                 "the gateway's approvals call ended with status {code}"
@@ -823,7 +908,14 @@ impl GatewayRunner {
             "[lamp-tasks] skill task {}: one turn on the default agent's warm gateway (127.0.0.1:{})",
             run.run, self.agent.port
         );
-        let turn = call(self, &args, left, self.stopping.as_deref(), None)?;
+        let turn = call(
+            &self.program,
+            &self.env,
+            &args,
+            left,
+            self.stopping.as_deref(),
+            None,
+        )?;
         match turn {
             Turn::Done { code: 0, said } => answered(
                 &said,
@@ -873,6 +965,11 @@ mod tests {
         assert_eq!(agent.port, crate::gateway::PORT);
         assert_eq!(agent.agent, crate::openclaw_config::SKILL_RUN_AGENT);
         assert!(agent.turn.iter().any(|word| word.contains("{message}")));
+        assert!(
+            agent
+                .check
+                .is_some_and(|check| check.iter().any(|word| word.contains("{file}")))
+        );
     }
 
     #[test]
@@ -885,6 +982,7 @@ mod tests {
             ("#@port 18789", "#@port nope"),
             ("#@agent ", "#@agent a/b"),
             ("#@ns /", "#@ns rel/"),
+            ("={file} ", "=x "),
         ] {
             let bad = good.replacen(from, to, 1);
             assert_ne!(bad, good, "{from}");
@@ -1230,7 +1328,15 @@ mod tests {
         .unwrap();
         let runner = runner(&rig);
         let began = Instant::now();
-        let turn = call(&runner, &["x".into()], Duration::from_secs(5), None, None).unwrap();
+        let turn = call(
+            &runner.program,
+            &runner.env,
+            &["x".into()],
+            Duration::from_secs(5),
+            None,
+            None,
+        )
+        .unwrap();
         assert!(matches!(turn, Turn::Done { code: 0, .. }));
         assert!(
             began.elapsed() < Duration::from_secs(5) + READ_WITHIN,

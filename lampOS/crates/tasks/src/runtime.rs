@@ -3008,14 +3008,31 @@ fn lamp_folder(home: &Path) -> PathBuf {
 /// `LAMP_OPENCLAW_ON_LAMP` (#6226): OpenClaw's settings written at the
 /// part's start ([`crate::openclaw_config::write`]) under `state_dir`, for
 /// lamp-cloud's forwarder, with the lamp's work folder under `home` its
-/// workspace and the lamp's skills when `skills`. Run as `lampos`,
-/// OpenClaw's own user. One journal line; no token is in the file.
-pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool) -> String {
+/// workspace and the lamp's skills when `skills`. A changed text is first
+/// checked by OpenClaw itself when its wrapper's gateway data (`gateway`)
+/// carries a check (#7108, [`check_of`]); else it is written as before.
+/// Run as `lampos`, OpenClaw's own user. One journal line; no token is in
+/// the file.
+pub fn set_up_openclaw(
+    state_dir: &Path,
+    home: &Path,
+    skills: bool,
+    gateway: Option<&GatewayData>,
+) -> String {
     let workspace = lamp_folder(home);
-    match crate::openclaw_config::write(state_dir, HERMES_FORWARDER_PORT, &workspace, skills) {
+    let check = gateway.and_then(check_of);
+    let check = check
+        .as_ref()
+        .map(|check| check as crate::openclaw_config::Check);
+    match crate::openclaw_config::write(state_dir, HERMES_FORWARDER_PORT, &workspace, skills, check)
+    {
         Ok(changed) => format!(
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config {}{}",
-            if changed { "written" } else { "unchanged" },
+            match (changed, check.is_some()) {
+                (true, true) => "written, checked by the engine",
+                (true, false) => "written",
+                (false, _) => "unchanged",
+            },
             if skills {
                 ""
             } else {
@@ -3026,20 +3043,36 @@ pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool) -> String {
     }
 }
 
-/// Whether the lamp's default agent `engine` is a gateway agent by its
-/// wrapper in `wrappers` ([`crate::skill_task::wrapper_is_gateway`]): the
-/// same data-driven check a run's hand-over makes, naming no engine. No
-/// default, or no wrapper there, is not.
-pub fn default_is_gateway_agent(engine: Option<EngineKind>, wrappers: &Path) -> bool {
-    engine
-        .and_then(|engine| std::fs::read_to_string(wrappers.join(engine.argument())).ok())
-        .is_some_and(|text| crate::skill_task::wrapper_is_gateway(&text))
+/// A gateway agent's wrapper and the data lamp-update wrote in it.
+pub type GatewayData = (PathBuf, crate::gateway_run::GatewayAgent);
+
+/// The engine's own config check (#7108) of a gateway agent's data, run
+/// through its wrapper; `None` when its data carries none.
+fn check_of((program, agent): &GatewayData) -> Option<impl Fn(&Path) -> Result<(), String> + '_> {
+    agent
+        .check
+        .is_some()
+        .then_some(move |file: &Path| agent.check_config(program, file))
+}
+
+/// The gateway data of `engine`'s wrapper in `wrappers` when it is a
+/// gateway agent's ([`crate::skill_task::wrapper_is_gateway`]): the same
+/// data-driven check a run's hand-over makes, naming no engine. No
+/// engine, or no wrapper there, is none.
+pub fn gateway_agent_of(engine: Option<EngineKind>, wrappers: &Path) -> Option<GatewayData> {
+    let program = wrappers.join(engine?.argument());
+    let text = std::fs::read_to_string(&program).ok()?;
+    if !crate::skill_task::wrapper_is_gateway(&text) {
+        return None;
+    }
+    let agent = crate::gateway_run::GatewayAgent::of(&text)?.ok()?;
+    Some((program, agent))
 }
 
 /// At lamp-tasks' start: the fence ([`set_up_skill_run_fence`]) with
 /// `default_agent` (`LAMP_SKILL_DEFAULT_AGENT` and
 /// `LAMP_SKILL_GATEWAY_RUNS` both on) and the lamp's default
-/// agent `engine` a gateway agent ([`default_is_gateway_agent`]), its
+/// agent `engine` a gateway agent ([`gateway_agent_of`]), its
 /// journal line; else nothing is written and `None`.
 pub fn skill_run_fence_at_start(
     default_agent: bool,
@@ -3048,23 +3081,32 @@ pub fn skill_run_fence_at_start(
     state_dir: &Path,
     home: &Path,
 ) -> Option<String> {
-    (default_agent && default_is_gateway_agent(engine, wrappers))
-        .then(|| set_up_skill_run_fence(state_dir, home))
+    let gateway = gateway_agent_of(engine, wrappers).filter(|_| default_agent)?;
+    Some(set_up_skill_run_fence(state_dir, home, &gateway))
 }
 
 /// The fence of a skill's run on OpenClaw's gateway
 /// ([`crate::openclaw_config::write_skill_run_fence`]): the fence agent in
 /// `state_dir`'s config, its workspace in lamp-tasks' Harness project
-/// under `home`. Its approvals are set through the gateway before each
-/// run's turn (`crate::gateway_run`), never written here. One journal
-/// line.
-pub fn set_up_skill_run_fence(state_dir: &Path, home: &Path) -> String {
+/// under `home`, a changed text written only once the engine's own check
+/// in `gateway`'s data takes it (#7108). Its approvals are set through
+/// the gateway before each run's turn (`crate::gateway_run`), never
+/// written here. One journal line, naming the check's result.
+pub fn set_up_skill_run_fence(state_dir: &Path, home: &Path, gateway: &GatewayData) -> String {
     let project = home.join(MACHINES_PROJECT.trim_start_matches("~/"));
-    match crate::openclaw_config::write_skill_run_fence(state_dir, &project) {
+    let check = check_of(gateway);
+    let check = check
+        .as_ref()
+        .map(|check| check as crate::openclaw_config::Check);
+    match crate::openclaw_config::write_skill_run_fence(state_dir, &project, check) {
         Ok(changed) => format!(
             "tasks: OpenClaw's fence for a skill's run ({}): {}",
             crate::openclaw_config::SKILL_RUN_AGENT,
-            if changed { "written" } else { "unchanged" }
+            if changed {
+                "written, checked by the engine"
+            } else {
+                "unchanged"
+            }
         ),
         Err(error) => format!("tasks: OpenClaw's fence for a skill's run not written: {error}"),
     }
@@ -4363,7 +4405,19 @@ pub fn serve<C: Clock>(
         );
         eprintln!(
             "{}",
-            set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &side.home, skills)
+            set_up_openclaw(
+                Path::new(OPENCLAW_STATE_DIR),
+                &side.home,
+                skills,
+                // #7108: OpenClaw's own wrapper's check, whatever the
+                // default agent; none when its wrapper carries no gateway
+                // data.
+                gateway_agent_of(
+                    Some(EngineKind::Openclaw),
+                    Path::new(crate::skill_task::AGENT_WRAPPERS)
+                )
+                .as_ref()
+            )
         );
         // #6685 step 4: with LAMP_SKILL_DEFAULT_AGENT and
         // LAMP_SKILL_GATEWAY_RUNS on and the lamp's
@@ -5044,14 +5098,22 @@ mod tests {
                 .0
                 .to_owned()
         };
-        let own = between("pub const WRAPPER_TEXT: &str = r#\"");
         let data = between("pub const GATEWAY_DATA: &str = r#\"");
+        // lamp-update's gateway data, with a stand-in engine whose config
+        // check (#7108) takes every text.
         let gateway = format!(
-            "#!/bin/sh\n{}{data}{}",
-            crate::gateway_run::GATEWAY_MARK,
-            own.strip_prefix("#!/bin/sh\n").unwrap()
+            "#!/bin/sh\n{}{data}exit 0\n",
+            crate::gateway_run::GATEWAY_MARK
         );
         std::fs::write(wrappers.join("openclaw"), &gateway).unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(
+                wrappers.join("openclaw"),
+                std::fs::Permissions::from_mode(0o755),
+            )
+            .unwrap();
+        }
         let hermes = format!(
             "#!/bin/sh\n{}E=hermes\n{}",
             crate::skill_task::ONE_PATH_MARK,
@@ -6460,7 +6522,7 @@ mod tests {
         .unwrap();
         let home = dir.path().join("home");
         assert_eq!(
-            set_up_openclaw(&state, &home, true),
+            set_up_openclaw(&state, &home, true, None),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config written"
         );
         let config: Value =
@@ -6480,12 +6542,12 @@ mod tests {
             json!(["/var/lib/lampOS/skills"])
         );
         assert_eq!(
-            set_up_openclaw(&state, &home, true),
+            set_up_openclaw(&state, &home, true, None),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config unchanged"
         );
         fs::write(state.join("openclaw.json"), "{\"models\": []}").unwrap();
         assert!(
-            set_up_openclaw(&state, &home, true)
+            set_up_openclaw(&state, &home, true, None)
                 .starts_with("tasks: OpenClaw's settings not written:")
         );
     }

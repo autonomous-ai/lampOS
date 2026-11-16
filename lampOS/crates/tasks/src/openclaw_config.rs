@@ -30,6 +30,13 @@
 //! key of ours that holds something else than what is set, is refused and
 //! left as it is, never rewritten. A file already right is not written.
 //!
+//! A new text is checked by the engine itself before it is renamed into
+//! place (#7108, [`Check`]): the check comes from the default agent's
+//! wrapper data (`crate::gateway_run::GatewayAgent::check_config`), never
+//! from lamp-tasks' own idea of OpenClaw's schema; refused, the file is
+//! left byte for byte. [`write_skill_run_fence`] writes nothing with no
+//! check; [`write`] without one writes as before #7108.
+//!
 //! [`write`] must run as OpenClaw's own user (`lampos`), so the file it
 //! writes is OpenClaw's and no one else's; never through a link.
 use std::fs;
@@ -39,7 +46,11 @@ use std::path::Path;
 use serde_json::{Map, Value, json};
 
 pub use crate::hermes_config::{MODEL, Refused, SKILLS_DIR, TOKEN_ENV};
-use crate::hermes_config::{read_or_empty, replace};
+use crate::hermes_config::{read_or_empty, replace_checked};
+
+/// The engine's own check of a new config text in the file it is given,
+/// run before that file is renamed into place: `Err` in words refuses it.
+pub type Check<'a> = &'a dyn Fn(&Path) -> Result<(), String>;
 
 /// OpenClaw's settings file, in its state folder.
 pub const CONFIG_FILE: &str = "openclaw.json";
@@ -191,8 +202,15 @@ pub fn merge_config(
 
 /// `openclaw.json` under `state_dir` merged ([`merge_config`]); `true`
 /// when it was written, `false` when it was right already. Nothing is
-/// written when it can't be merged.
-pub fn write(state_dir: &Path, port: u16, workspace: &Path, skills: bool) -> io::Result<bool> {
+/// written when it can't be merged, or when `check` (the engine's own,
+/// when the default agent's wrapper carries one) refuses it.
+pub fn write(
+    state_dir: &Path,
+    port: u16,
+    workspace: &Path,
+    skills: bool,
+    check: Option<Check>,
+) -> io::Result<bool> {
     let path = state_dir.join(CONFIG_FILE);
     let text = read_or_empty(&path)?;
     let merged = merge_config(&text, port, workspace, skills).map_err(|refused| {
@@ -205,7 +223,7 @@ pub fn write(state_dir: &Path, port: u16, workspace: &Path, skills: bool) -> io:
         return Ok(false);
     }
     fs::create_dir_all(state_dir)?;
-    replace(&path, &merged)?;
+    replace_checked(&path, &merged, check.unwrap_or(&|_| Ok(())))?;
     Ok(true)
 }
 
@@ -325,10 +343,16 @@ pub fn merge_skill_run_approvals(got: &str, start: &str) -> Result<Option<String
 /// only with `LAMP_SKILL_DEFAULT_AGENT` on: the fence agent in
 /// `state_dir`'s `openclaw.json` ([`merge_skill_run_agent`]) with its
 /// workspace made 0700 in `project`, written only when it changes;
-/// `true` when it was. Its approvals are not a file (a legacy
+/// `true` when it was. A changed text is written only once `check` (the
+/// engine's own, #7108) takes it: with no check, or refused, the file is
+/// left as it is. Its approvals are not a file (a legacy
 /// `exec-approvals.json` would block them): they are set through the
 /// gateway right before each run's turn (`crate::gateway_run`).
-pub fn write_skill_run_fence(state_dir: &Path, project: &Path) -> io::Result<bool> {
+pub fn write_skill_run_fence(
+    state_dir: &Path,
+    project: &Path,
+    check: Option<Check>,
+) -> io::Result<bool> {
     use std::os::unix::fs::DirBuilderExt;
     let workspace = project.join(SKILL_RUN_WORKSPACE);
     fs::DirBuilder::new()
@@ -347,11 +371,17 @@ pub fn write_skill_run_fence(state_dir: &Path, project: &Path) -> io::Result<boo
     if merged == text {
         return Ok(false);
     }
+    let check = check.ok_or_else(|| {
+        io::Error::other(format!(
+            "Refused: {} is not merged for a skill's run: the engine's own check is not there to take it",
+            path.display()
+        ))
+    })?;
     fs::DirBuilder::new()
         .recursive(true)
         .mode(0o700)
         .create(state_dir)?;
-    replace(&path, &merged)?;
+    replace_checked(&path, &merged, check)?;
     Ok(true)
 }
 
@@ -526,15 +556,15 @@ mod tests {
         let state = tempfile::tempdir().unwrap();
         let path = state.path().join(CONFIG_FILE);
         fs::write(&path, INSTALLED).unwrap();
-        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true).unwrap());
-        assert!(!write(state.path(), 7741, Path::new(WORKSPACE), true).unwrap());
+        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, None).unwrap());
+        assert!(!write(state.path(), 7741, Path::new(WORKSPACE), true, None).unwrap());
         let text = fs::read_to_string(&path).unwrap();
         assert!(text.contains("kept-gateway-token"));
         assert!(!text.contains("AUTONOMOUS_API_KEY") && !text.contains("campaign-api"));
         let mode = fs::metadata(&path).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o600);
         fs::write(&path, "{\"models\": []}").unwrap();
-        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true).is_err());
+        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, None).is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), "{\"models\": []}");
     }
 
@@ -545,7 +575,7 @@ mod tests {
         let target = elsewhere.path().join(CONFIG_FILE);
         fs::write(&target, "{}").unwrap();
         std::os::unix::fs::symlink(&target, state.path().join(CONFIG_FILE)).unwrap();
-        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true).is_err());
+        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, None).is_err());
         assert_eq!(fs::read_to_string(&target).unwrap(), "{}");
     }
 
@@ -636,8 +666,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let state = dir.path().join("state");
         let project = dir.path().join("project");
-        assert!(write_skill_run_fence(&state, &project).unwrap());
-        assert!(!write_skill_run_fence(&state, &project).unwrap());
+        assert!(write_skill_run_fence(&state, &project, Some(&|_| Ok(()))).unwrap());
+        assert!(!write_skill_run_fence(&state, &project, Some(&|_| Ok(()))).unwrap());
         assert!(project.join(SKILL_RUN_WORKSPACE).is_dir());
         assert!(!dir.path().join(".openclaw/exec-approvals.json").exists());
         assert!(!state.join("exec-approvals.json").exists());
@@ -647,11 +677,36 @@ mod tests {
             .mode();
         assert_eq!(mode & 0o777, 0o600);
         fs::write(state.join(CONFIG_FILE), r#"{"agents":{"list":[]}}"#).unwrap();
-        let error = write_skill_run_fence(&state, &project).unwrap_err();
+        let error = write_skill_run_fence(&state, &project, Some(&|_| Ok(()))).unwrap_err();
         assert!(error.to_string().starts_with("Refused"));
         assert_eq!(
             fs::read_to_string(state.join(CONFIG_FILE)).unwrap(),
             r#"{"agents":{"list":[]}}"#
         );
+    }
+
+    /// #7108: a text the engine's own check refuses, or a fence with no
+    /// check to take it, is never renamed into place: the file stays byte
+    /// for byte and no new file is left beside it.
+    #[test]
+    fn a_text_the_engines_check_refuses_is_left_unwritten() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        let project = dir.path().join("project");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        fs::write(&path, INSTALLED).unwrap();
+        let refuse: Check = &|file| {
+            assert_ne!(fs::read_to_string(file).unwrap(), INSTALLED);
+            Err("the engine's own check refused it (status 1)".into())
+        };
+        let error = write(&state, 7741, Path::new(WORKSPACE), true, Some(refuse)).unwrap_err();
+        assert!(error.to_string().contains("refused"), "{error}");
+        let error = write_skill_run_fence(&state, &project, Some(refuse)).unwrap_err();
+        assert!(error.to_string().contains("refused"), "{error}");
+        let error = write_skill_run_fence(&state, &project, None).unwrap_err();
+        assert!(error.to_string().contains("check is not there"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
     }
 }
