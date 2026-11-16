@@ -928,7 +928,9 @@ and 950 without it) for six steps, is more than 160 counts from its goal for
 half a second, or reads 62 or warmer for a second sends the lamp back down
 the way it came. It rests there for a minute whatever it is told, and after
 the third time inside half an hour (`Standing::RETREAT_WINDOW`) for half an
-hour (`Standing::LONG_REST`), and then it may rise again; the report lists
+hour (`Standing::LONG_REST`), and then it may rise again (on a window still
+open from talk, a face or a lease; with `LAMP_BODY_STRAIN_REST_COOLS=on`
+only when a person asks it up, "The strain guard"); the report lists
 each time (`retreats`). While it rests so, its health is a warning, "its arm
 sat down for a strain three times in half an hour: it rests folded and may
 rise again in N min" (`Glimpse::resting_s`), never an error, so the lamp
@@ -1065,6 +1067,33 @@ after lamp-52e6's runs on #4501); off unless the unit sets
 - **Each sit-down says why** (#7281). The journal says `sat down: {why}`
   (e.g. `elbow_pitch at 62 degrees`) as it happens, not only in the exit
   report, and the fold line says `it sat down hot` when one was for heat.
+- **A rest ends folded (`LAMP_BODY_STRAIN_REST_COOLS=on`, #7344).** Off
+  unless exactly `on`, set in no unit until its row on lamp-52e6; read only
+  with the guard on (`StrainGuard::rest_cools`). Off, a lamp sat down for
+  any reason above stands again once its minute is over if a window is
+  still open: the talk's `--awake-seconds`, a face in front of it, or
+  lamp-control's lease renewing it (Sixth's trace: talk at 0 s, a shoulder
+  load at 30 s, up again at about 91 s with nobody asking). On, every
+  sit-down that does not seat it rests folded until a person asks it up
+  once its minute is over (`Glimpse::rest_waits`): a new line (the voice
+  listening again after it was not, or its name heard), a tap's wake, a
+  head pad or the button held a second or a self-test started (as for a
+  seat, `src/unseat_in.rs`), or a gesture asked under lamp-control's lease.
+  A window still open, someone in front of it and a lease only held are
+  never an ask, and an ask inside the minute is spent. One that sat down
+  hot first cools: the joint that sat it down reads under 50
+  (`StrainGuard::COOL`) for 5 min back to back (`StrainGuard::COOL_FOR`, a
+  held or missing read starts the count again), the measure #7306's hot
+  seat uses, and only an ask after that stands it. Its health says so from
+  the sit-down on, before a warm joint: `resting: the elbow sat down hot;
+  it stays folded until it reads under 50 for 5 min, and then someone
+  speaks to it, holds its head a second or runs a health check`, or for a
+  load, tracking or long strain `resting: the shoulder sat down for a
+  strain; it stays folded until someone speaks to it, holds its head a
+  second or runs a health check`. The journal says the sit-down's rest, the
+  cooling and the ask that ends it. A second hot or strained sit-down
+  within the hour still seats it, as above. Nothing is said aloud at the
+  sit-down.
 - **The day's peaks are kept.** Each joint's highest load and temperature
   in each local day go to `/var/lib/lampos-body/peaks/YYYY-MM-DD.json`
   (`{"day":…,"joints":{"elbow":{"load":…,"temperature":…},…}}`,
@@ -1077,7 +1106,12 @@ Shown by tests only (`a_long_strain_twice_in_an_hour_seats_the_lamp_until_a_pers
 `without_the_strain_guard_a_load_under_the_bound_never_sits_it_down`,
 `under_the_strain_guard_an_elbow_that_cannot_lift_is_said_at_once_and_seats_on_the_second_try`,
 `a_joint_warming_eight_degrees_in_five_minutes_is_said_before_it_is_warm`,
-the peaks' and the unseat reader's own); not yet on a lamp.
+the peaks' and the unseat reader's own;
+`a_lamp_folded_for_a_strain_stays_down_on_an_old_talk_window_until_a_new_line`,
+`a_lamp_folded_for_a_strain_under_a_held_lease_stays_down`,
+`a_lamp_folded_for_a_strain_with_someone_in_front_of_it_stays_down`,
+`a_lamp_folded_hot_stays_down_until_cool_and_then_a_new_line` for #7344);
+not yet on a lamp.
 
 The pose lamp-4ace is given is the old runtime's idle pose
 (`hal/recordings/idle.csv`, first frame): head pitch 1,772, shoulder 2,657,
@@ -2885,6 +2919,7 @@ The report is `ok` with no message, or a warning:
 | --- | --- | --- |
 | `warn` | `seated: the elbow retreated twice in an hour (strained); hold its head a second, or run a health check, to let it stand again` | With the strain guard, until a person or a self-test lets it stand (above, "The strain guard"). Said before a warm joint (#7281) |
 | `warn` | `seated: the elbow sat down hot twice in an hour; it stands again by itself once it reads under 50 for 5 min, or when its head is held a second` | With `LAMP_BODY_SEAT_COOLS=on`, a hot seat that will end by itself (#7281) |
+| `warn` | `resting: the elbow sat down hot; it stays folded until it reads under 50 for 5 min, and then someone speaks to it, holds its head a second or runs a health check` (or `… sat down for a strain; it stays folded until someone speaks to it, …`) | With `LAMP_BODY_STRAIN_REST_COOLS=on`, from a sit-down until a person asks it up (above, "The strain guard"); said before a warm joint |
 | `warn` | `shoulder is warm: it reads 55, and the body stops at 62` | Any of the five joints reads 55 or more. The body ends its run, or sends the arm down, at 62 |
 | `warn` | `its elbow pushed as hard as it may and did not move, in two long rests' tries: …` | Without the strain guard, after two long rests begun by a stand that never lifted (#4390) |
 | `warn` | `the elbow strained: it read a load of 500 too long while standing, and the lamp sat down to rest` | With the strain guard, while it rests from a long strain |
