@@ -4034,6 +4034,15 @@ pub fn serve(
                 crate::known_faces::RENAME_YES_ENVIRONMENT
             );
             engine = engine.holding_renames_for_yes(true);
+            // A rename question cut before its name was heard is asked
+            // again, once (`LAMP_NAME_LEARN_FIX`, #7331).
+            if crate::known_faces::name_learn_fix_on() {
+                eprintln!(
+                    "lamp-voice second: a face rename whose question was cut before its name was heard is asked again ({})",
+                    crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT
+                );
+                engine = engine.learning_names(true);
+            }
         } else {
             eprintln!(
                 "lamp-voice second: {} is on but names are not checked or the eyes' socket is not known: renames are as before",

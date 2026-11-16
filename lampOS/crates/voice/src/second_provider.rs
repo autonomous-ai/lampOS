@@ -2097,6 +2097,13 @@ struct Shared {
     /// The face rename the lamp asked about, held for the person's yes
     /// ([`held_rename::HeldRename`]).
     held_rename: Mutex<held_rename::HeldRenames>,
+    /// A held rename whose question was cut before its name was heard is
+    /// asked again once, not dropped (`LAMP_NAME_LEARN_FIX`, #7331,
+    /// [`Engine::learning_names`]).
+    name_learn_fix: bool,
+    /// Where a held rename reads what was played of a cut answer; the
+    /// thread's when unset ([`held_rename::take`]).
+    cut_window: Option<CutWindow>,
     /// Where a held save reads what was said; the thread's window when
     /// unset ([`said_window`]).
     said_window: Option<SaidWindow>,
@@ -4732,6 +4739,8 @@ impl Engine {
                 face_kept_at: Mutex::new(None),
                 rename_yes: false,
                 held_rename: Mutex::new(held_rename::HeldRenames::default()),
+                name_learn_fix: false,
+                cut_window: None,
                 said_window: None,
                 setup_open: None,
                 forget_sight: None,
@@ -5275,6 +5284,25 @@ impl Engine {
     pub fn holding_renames_for_yes(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.rename_yes = on;
+        self
+    }
+
+    /// A held rename whose question a line cut before its name was played
+    /// is kept, and the model told to ask it again, once
+    /// (`LAMP_NAME_LEARN_FIX`, #7331, [`held_rename::take`]). Off, such a
+    /// rename is dropped as no yes, as before.
+    pub fn learning_names(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.name_learn_fix = on;
+        self
+    }
+
+    /// Where a held rename reads what was played of a cut answer, in place
+    /// of the thread ([`CutWindow`]).
+    #[cfg(test)]
+    pub(crate) fn reading_cut_from(mut self, window: CutWindow) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.cut_window = Some(window);
         self
     }
 
@@ -14130,6 +14158,21 @@ fn take_held_forget(
     }
 }
 
+/// What was played of a request's answer, when it is the answer the
+/// thread holds as cut last (`crate::thread::Thread::cut_played`).
+pub(crate) type CutWindow = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
+
+/// [`CutWindow`] for `request`: the test's, else the thread's.
+fn cut_played(shared: &Shared, request: u64) -> Option<String> {
+    match &shared.cut_window {
+        Some(window) => window(request),
+        None => crate::thread::THREAD
+            .lock()
+            .ok()
+            .and_then(|thread| thread.cut_played(request)),
+    }
+}
+
 /// What a held setup save reads of what was said.
 pub(crate) type SaidWindow = Arc<dyn Fn() -> crate::known_faces::Said + Send + Sync>;
 
@@ -15520,7 +15563,11 @@ async fn answer(
     let (mut held_rename_runs, held_rename_dropped) =
         match held_rename::take(shared, request, heard, scope.as_ref(), (shared.clock)()) {
             held_rename::Taken::Runs(call) => (Some(call), None),
-            held_rename::Taken::Dropped(name, why) => (None, Some((name, why))),
+            held_rename::Taken::Dropped(name, why) => {
+                (None, Some(held_rename::dropped_note(&name, why)))
+            }
+            // Its question was cut before it was heard (`LAMP_NAME_LEARN_FIX`).
+            held_rename::Taken::AskAgain(name) => (None, Some(held_rename::ask_again_note(&name))),
             held_rename::Taken::Nothing => (None, None),
         };
     // And, while one asked has not run, that nothing was renamed.
@@ -16064,8 +16111,8 @@ async fn answer(
                 }
             }
         }
-        if let Some((name, why)) = held_rename_dropped.filter(|_| !forgot_before_question) {
-            messages.push(Message::system(held_rename::dropped_note(&name, why)));
+        if let Some(note) = held_rename_dropped.filter(|_| !forgot_before_question) {
+            messages.push(Message::system(note));
         }
         if let Some(note) = rename_told {
             messages.push(Message::system(note));

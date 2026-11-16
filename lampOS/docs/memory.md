@@ -4188,7 +4188,16 @@ then use that person's scope:
     is not; a known face's own personal line, said again, is kept to them.
     A text from the app is always the room's, so its personal `remember`
     gets the same note: to have it kept, the person says it again at the
-    lamp, known.
+    lamp, known. With `LAMP_NAME_LEARN_FIX=on` (off unless set, second
+    route only, #7331), a `remember` whose text gives the speaker's own name
+    (`known_faces::gives_a_name`, or `named::name_in` for the model's "The
+    user's name is Ada.") is told instead to call `remember_my_face` with
+    that name, so the eyes take a fresh look and judge the face
+    (`needs_face::withheld`, journal `TO_FACE_SAVE`, no words): on
+    lamp-52e6 the owner's "my name is ..." came back not kept while a
+    recognition flicker held their face as nobody's. Any other personal
+    line is still not kept. Set it only with `LAMP_NAMES=checked` and the
+    eyes' who socket, which give the model that function.
   - **The observation pass keeps only what rests on the person's words**
     (finding M on #3504): `OBSERVE_PROMPT` says `heard` is the person's and
     `said` the lamp's, never to propose what only the lamp said, and to keep

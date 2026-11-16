@@ -66,6 +66,13 @@ async fn run(turns: &[Turn], on: bool) -> Ran {
 
 /// [`run`], with one turn cut ([`Cut`]) while its forget waits to return.
 async fn run_cut(turns: &[Turn], on: bool, cut: Cut) -> Ran {
+    run_all(turns, on, cut, None).await
+}
+
+/// [`run_cut`]; with `cut_ask`, the answer of the turn at that index is cut
+/// by the next line with none of it played (`LAMP_SAID_AS_HEARD`), and
+/// `LAMP_NAME_LEARN_FIX` is as given.
+async fn run_all(turns: &[Turn], on: bool, cut: Cut, cut_ask: Option<(usize, bool)>) -> Ran {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
     let first = 19_000 + 100 * NEXT.fetch_add(1, Ordering::Relaxed);
@@ -157,7 +164,13 @@ async fn run_cut(turns: &[Turn], on: bool, cut: Cut) -> Ran {
         .announcing(false)
         .reading_said_from(Arc::new(move || reading.lock().unwrap().clone()))
         .confirming_forgets_by_sight(eyes.clone(), path.clone())
-        .holding_renames_for_yes(on);
+        .holding_renames_for_yes(on)
+        .learning_names(cut_ask.is_some_and(|(_, fix)| fix))
+        .reading_cut_from(Arc::new(move |request| {
+            cut_ask
+                .filter(|(at, _)| first + *at as u64 == request)
+                .map(|_| crate::said_as_heard::CUT.to_owned())
+        }));
     engine.memory_camera(true, 1);
     eyes.look(
         Instant::now(),
@@ -269,7 +282,13 @@ async fn run_cut(turns: &[Turn], on: bool, cut: Cut) -> Ran {
         let lamp_said = match lamp {
             Lamp::Says(line) | Lamp::Saves(_, line) | Lamp::Calls(_, _, line) => line,
         };
-        before.push(((*said).to_owned(), (*lamp_said).to_owned()));
+        // A cut answer is kept as what was played of it: none.
+        let lamp_said = if cut_ask.is_some_and(|(cut, _)| cut == at) {
+            crate::said_as_heard::CUT
+        } else {
+            lamp_said
+        };
+        before.push(((*said).to_owned(), lamp_said.to_owned()));
     }
     let _ = std::fs::remove_file(known_face_of(&path));
     let _ = std::fs::remove_file(&path);
@@ -761,4 +780,31 @@ async fn face_forget_context_drops_a_pending_rename_from_the_same_turn() {
                 .contains("A face forget call has run")
         );
     }
+}
+
+/// #7331 (lamp-52e6, 15 Nov): the rename question was cut by the person's
+/// next line before any of it played, so that line read no read-back and
+/// the hold was dropped as "not a yes". With `LAMP_NAME_LEARN_FIX` the hold
+/// is kept, the model is told to ask again, and the yes to the question
+/// asked again runs it; off, it is dropped and nothing is renamed.
+#[tokio::test]
+async fn a_rename_question_cut_before_its_name_keeps_the_hold() {
+    let turns: [Turn; 3] = [
+        ASKS,
+        ("Yes.", Lamp::Says(ASKED), &["f1"]),
+        ("Yes, please.", Lamp::Says("Got it."), &["f1"]),
+    ];
+    let asked_again = |ran: &Ran| {
+        // The second turn's one chat round, after the first turn's two.
+        ran.asked[2]
+            .iter()
+            .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+            .any(|content| content.contains("was cut before they heard it"))
+    };
+    let on = run_all(&turns, true, Cut::None, Some((0, true))).await;
+    assert!(asked_again(&on), "the model is told to ask again");
+    assert_eq!(on.sent, renamed());
+    let off = run_all(&turns, true, Cut::None, Some((0, false))).await;
+    assert!(!asked_again(&off));
+    assert!(off.sent.is_empty(), "{:?}", off.sent);
 }
