@@ -1667,6 +1667,10 @@ struct Shared {
     verdicts: Option<Verdicts>,
     /// Where each answered turn's decision is said, with its tools.
     decisions: Option<Decisions>,
+    /// The newest line that goes on from an earlier one, folded into it or
+    /// chained after it, and that earlier request: `(request, host)`, for
+    /// its decision's `host_request`.
+    hosted: Mutex<Option<(u64, u64)>>,
     /// [`Engine::asking_again`]: told of cut-ins, and asked after a hold.
     ask_again: Option<(CutIn, AskAgain)>,
     /// When a cut-in was last held as misheard with the lamp's hum: the
@@ -4582,6 +4586,7 @@ impl Engine {
                 opened: None,
                 verdicts: None,
                 decisions: None,
+                hosted: Mutex::new(None),
                 ask_again: None,
                 misheard_at_us: Mutex::new(None),
                 holding_answer: false,
@@ -7029,6 +7034,13 @@ impl Engine {
                 // Its link: the line before's, when it begins with that
                 // line's sound or words, else its own.
                 let folded = carried.is_some() || before.is_some();
+                // Folded into the line before: that is its host (#7267).
+                if folded
+                    && let Some((host, _, _)) = before_link
+                    && let Ok(mut hosted) = self.shared.hosted.lock()
+                {
+                    *hosted = Some((request, host));
+                }
                 let (link, began) = match before_link.filter(|_| folded) {
                     Some((_, link, began)) => (link, began),
                     None => (after_end, now),
@@ -7046,6 +7058,10 @@ impl Engine {
                     && let Some((before, before_link, before_began)) = before_link
                     && of == before
                 {
+                    // Chained after the line before: that is its host.
+                    if let Ok(mut hosted) = self.shared.hosted.lock() {
+                        *hosted = Some((request, of));
+                    }
                     self.chain_heard(request, (of, words, before_began), before_link);
                 }
                 let (audio, heard) = mpsc::channel(AUDIO_QUEUE);
@@ -12741,10 +12757,11 @@ struct TurnTools {
 
 impl TurnTools {
     /// One round, asked on `messages` without `without` (or, `quoted`, with
-    /// no function at all), and its `calls`.
+    /// no function at all), and its `calls`. Without `services` (only the
+    /// decision's names are wanted, #7267) what was offered is not asked.
     fn round(
         &mut self,
-        services: &dyn Services,
+        services: Option<&dyn Services>,
         messages: &[Message],
         without: &[&str],
         calls: &[net::ToolCall],
@@ -12754,7 +12771,9 @@ impl TurnTools {
         let declared = if quoted {
             Some(false)
         } else {
-            services.declares(messages, without, crate::remember::REMEMBER)
+            services.and_then(|services| {
+                services.declares(messages, without, crate::remember::REMEMBER)
+            })
         };
         if let Some(offered) = declared {
             self.remember_offered = Some(self.remember_offered.unwrap_or(false) || offered);
@@ -12781,6 +12800,15 @@ impl TurnTools {
             yes(self.prepared),
         )
     }
+}
+
+/// A fault's category as a decision's error code (`voice/decision`,
+/// #7267): `rate_limited`, `transport`, …; never server text.
+fn fault_code(fault: &Fault) -> String {
+    serde_json::to_value(fault)
+        .ok()
+        .and_then(|value| value["category"].as_str().map(str::to_owned))
+        .unwrap_or_else(|| "fault".to_owned())
 }
 
 /// A called function's name as the journal may say it: the model writes
@@ -15555,7 +15583,11 @@ async fn answer(
     let called = &called_any;
     // The turn's tools, for its journal line (`LAMP_MEMORY_REPLACES`).
     let turn_tools = Mutex::new(TurnTools::default());
-    let tools_noted = shared.note_tools.then_some(&turn_tools);
+    // Its first answer audio after the words were heard, in ms, for its
+    // decision (`voice/decision`, #7267).
+    let first_reply_ms = Mutex::new(None::<u32>);
+    // Its tools' names for its decision too (`voice/decision`, #7267).
+    let tools_noted = (shared.note_tools || shared.decisions.is_some()).then_some(&turn_tools);
     // `LAMP_NOT_FOR_ME_WORDS`: on a line told it may be people's talk, the
     // reply's text is held until its opening is known: "not for me" written
     // as words is the decline itself (lamp-4ace, r06, request 131). On any
@@ -17468,7 +17500,7 @@ async fn answer(
                 && let Ok(mut noted) = noted.lock()
             {
                 noted.round(
-                    shared.services.as_ref(),
+                    shared.note_tools.then_some(shared.services.as_ref()),
                     &messages,
                     withheld(scope.as_ref()),
                     &calls,
@@ -18824,10 +18856,13 @@ async fn answer(
                             did(Did::Spoke(monotonic_us()));
                         }
                         reached(&times, |times| &mut times.audio);
+                        let first_ms = began.elapsed().as_millis();
                         eprintln!(
-                            "lamp-voice second: request {request} first answer audio {} ms after the words were heard",
-                            began.elapsed().as_millis()
+                            "lamp-voice second: request {request} first answer audio {first_ms} ms after the words were heard"
                         );
+                        if let Ok(mut first) = first_reply_ms.lock() {
+                            *first = Some(u32::try_from(first_ms).unwrap_or(u32::MAX));
+                        }
                         if asked == Asker::Spoken {
                             worker::name_sounded(request);
                         }
@@ -18887,6 +18922,38 @@ async fn answer(
         && let Ok(noted) = turn_tools.lock()
     {
         shared.turn_tools_said(noted.line(request));
+    }
+    // The turn's decision (`voice/decision`, #7267): answered, with the
+    // names its tools tally holds, once its model finished, or declined
+    // after a tool ran (a decline before any is held back, `voice/turn`);
+    // or failed, with the fault's category, or `gave_up` when its first
+    // round never began. With its first answer audio's time and the line
+    // it goes on from, when known.
+    if let Some(told) = shared.decisions.as_ref() {
+        let answered_here =
+            ended.is_ok() || (matches!(ended, Err(Stop::Declined)) && ran.load(Ordering::Relaxed));
+        let decision = match &ended {
+            Err(Stop::Failed(fault)) => Some(lamp_msgs::VoiceDecision::failed(
+                request,
+                &fault_code(fault),
+            )),
+            Err(Stop::GaveUp) => Some(lamp_msgs::VoiceDecision::failed(request, "gave_up")),
+            _ if answered_here => turn_tools.lock().ok().map(|noted| {
+                lamp_msgs::VoiceDecision::answered(request, noted.calls.keys().map(String::as_str))
+            }),
+            _ => None,
+        };
+        if let Some(mut decision) = decision {
+            decision.first_reply_ms = first_reply_ms.lock().ok().and_then(|first| *first);
+            decision.host_request = shared
+                .hosted
+                .lock()
+                .ok()
+                .and_then(|hosted| *hosted)
+                .filter(|(of, _)| *of == request)
+                .map(|(_, host)| host);
+            told(decision);
+        }
     }
     // A forget held in this turn stands only on its answer said whole.
     settle_held_forget(

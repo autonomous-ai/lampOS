@@ -30,7 +30,7 @@ use crate::ring_wire::RingPhase;
 use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{
     LineBy, LineSource, LinkFault, Room, RoomState, SaidLine, Speech, TurnVerdict, Voice,
-    VoiceLink, VoiceRemarked, VoiceState, VoiceTurn,
+    VoiceDecision, VoiceLink, VoiceRemarked, VoiceState, VoiceTurn,
 };
 use std::{
     io,
@@ -158,6 +158,34 @@ impl TurnOut {
         let _ = self
             .turn
             .publish_json(now_us, &VoiceTurn { request, verdict });
+    }
+}
+
+/// Each turn's decision (`voice/decision`, #7267): answered with its
+/// tools' names, a hand-over's step with its task's number, or held back.
+/// Names and numbers only, so it goes whenever the bus is on.
+pub struct DecisionOut {
+    decision: Publisher,
+}
+
+impl DecisionOut {
+    pub fn on(root: &Path) -> io::Result<Self> {
+        let bus = Bus::new(root)?;
+        Ok(Self {
+            decision: bus.publisher_declared(
+                VoiceDecision::TOPIC,
+                &VoiceDecision::declaration(),
+                SOURCE,
+            )?,
+        })
+    }
+
+    /// Says `decision`, once. One its own check refuses is not sent; a send
+    /// that fails changes nothing for the voice.
+    pub fn tell(&mut self, decision: &VoiceDecision, now_us: u64) {
+        if decision.check().is_ok() {
+            let _ = self.decision.publish_json(now_us, decision);
+        }
     }
 }
 
