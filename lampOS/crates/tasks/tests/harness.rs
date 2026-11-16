@@ -7440,6 +7440,7 @@ fn skill_runner_with(
         agent_ns: None,
         login: None,
         starts: Default::default(),
+        makes: false,
     }
 }
 
@@ -9362,4 +9363,267 @@ fn issue_6691_named_reads_each_sessions_id_name_and_folder_from_one_ps() {
         rig.cli().named("not a machine"),
         Err("invalid_machine".into())
     );
+}
+
+/// #7245: the lamp's make runner with an OpenClaw gateway default, its
+/// gateway's namespace showing lamp-control's socket: the one run path's
+/// runner with `makes` on, as `MakeGateway::lamp` makes it.
+fn make_gateway(
+    rig: &Rig,
+    default: EngineKind,
+    gateway: bool,
+) -> lamp_tasks::skill_make::MakeGateway {
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let wrapper = if gateway {
+        openclaw_gateway_wrapper(&gateway_ns)
+    } else {
+        "#!/bin/sh\nexec openclaw-own \"$@\"\n".to_owned()
+    };
+    let mut runner = one_path_runner(rig, default, &[("openclaw", &wrapper)], Some("#!/bin/sh\n"));
+    // A make is on the one run path whatever lamp-tasks' own switch.
+    runner.default_agent = false;
+    runner.makes = true;
+    lamp_tasks::skill_make::MakeGateway::of(Arc::new(runner))
+}
+
+/// A stand-in for the lamp's Hermes in its namespace (`MakeHermes`): it
+/// counts its runs and writes `HERMES` as the make's answer.
+#[derive(Default)]
+struct MakeHermesStandIn(std::sync::atomic::AtomicUsize);
+
+impl Runner for MakeHermesStandIn {
+    fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+        self.0.fetch_add(1, Ordering::AcqRel);
+        fs::write(run.start_in.as_ref().unwrap().join("answer.md"), "HERMES").unwrap();
+        Ok(0)
+    }
+}
+
+/// A voice make's line (#7245), with `one_path` when given; its rules
+/// carry the guide's check line, which a gateway make never gets.
+fn make_line(one_path: Option<bool>, within_ms: u64) -> Vec<u8> {
+    let mut line = json!({
+        "op":"skill_make",
+        "rules":"RULES\n/opt/lampOS/skills/current/lamp-skills pack --out /tmp/lamp-check draft/NAME\n",
+        "within_ms":within_ms,
+        "guide":true,
+    });
+    if let Some(one_path) = one_path {
+        line["one_path"] = json!(one_path);
+    }
+    serde_json::to_vec(&line).unwrap()
+}
+
+/// The rig's make work folder, made empty.
+fn make_work(rig: &Rig) -> PathBuf {
+    let work = rig.root.path().join("work");
+    fs::create_dir(&work).unwrap();
+    work
+}
+
+/// Every Harness call of verb `verb`.
+fn calls_of_verb(rig: &Rig, verb: &str) -> Vec<Value> {
+    rig.calls()
+        .into_iter()
+        .filter(|call| call["args"][0] == verb)
+        .collect()
+}
+
+/// #7245: a make line with `"one_path":true` on a lamp whose default agent
+/// is an OpenClaw gateway agent is exactly one `harness new openclaw` in a
+/// fresh make folder in the work folder, with no token, no token file and
+/// nothing made live; the answer is the agent's `answer.md`; then its
+/// session is closed `--now` and the folder is gone. The lamp's Hermes
+/// never runs.
+#[test]
+fn a_one_path_make_on_a_gateway_default_is_one_harness_new_then_closed_and_gone() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true,"write_answer":"ANSWER"},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+    let hermes = MakeHermesStandIn::default();
+    let mut told = 0;
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || told += 1,
+    );
+    assert_eq!(answered, json!({"ok": true, "answer": "ANSWER"}));
+    assert_eq!(told, 1, "started told once");
+    assert_eq!(
+        hermes.0.load(Ordering::Acquire),
+        0,
+        "never the lamp's Hermes"
+    );
+    let news = calls_of_verb(&rig, "new");
+    assert_eq!(news.len(), 1, "exactly one harness new");
+    assert_eq!(news[0]["args"][1], "openclaw");
+    let folder = PathBuf::from(news[0]["args"][4].as_str().unwrap());
+    assert_eq!(folder.parent(), Some(work.as_path()), "in the work folder");
+    let name = folder.file_name().unwrap().to_str().unwrap();
+    assert!(name.starts_with("make-"), "{name}");
+    assert_eq!(news[0]["args"][6], name);
+    let task = news[0]["args"][9].as_str().unwrap();
+    assert!(
+        task.contains("rules.md") && task.contains("answer.md"),
+        "{task}"
+    );
+    assert!(
+        !task.contains("lamp-skills"),
+        "no check on a gateway: {task}"
+    );
+    let closes = calls_of_verb(&rig, "close");
+    assert_eq!(closes.len(), 1, "closed once");
+    assert_eq!(
+        closes[0]["args"],
+        json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"])
+    );
+    assert_eq!(
+        rig.calls().last().unwrap()["args"][0],
+        "close",
+        "closed last"
+    );
+    assert_eq!(
+        fs::read_dir(&work).unwrap().count(),
+        0,
+        "the folder is gone"
+    );
+    assert!(!rig.root.path().join("runs").exists(), "no token file");
+    assert!(
+        !rig.root.path().join("project").exists(),
+        "no skill-* folder"
+    );
+    for call in rig.calls() {
+        assert!(!call.to_string().contains(RUN_SECRET), "{call}");
+    }
+}
+
+/// #7245: a gateway make that ends in an error (Harness says `failed`) or
+/// at its deadline is refused, and still its session is closed `--now`
+/// once and its folder removed; an answer written before is never kept.
+#[test]
+fn a_one_path_gateway_make_ending_in_an_error_or_its_deadline_is_closed_and_gone() {
+    for timeout in [false, true] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":{"default":true,"write_answer":"ANSWER"},
+            "wait": if timeout {
+                json!({"stdout":waited("idle", AGENT),"delay_ms":5000})
+            } else {
+                json!({"stdout":waited("failed", AGENT)})
+            },
+            "show":{"default":true},
+            "close":{"exit":0},
+        }));
+        let work = make_work(&rig);
+        let gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+        let hermes = MakeHermesStandIn::default();
+        let began = Instant::now();
+        let answered = lamp_tasks::skill_make::answer_with(
+            &make_line(Some(true), if timeout { 1_000 } else { 20_000 }),
+            true,
+            &work,
+            &hermes,
+            Some(&gateway),
+            &mut || {},
+        );
+        assert_eq!(answered["ok"], false, "{timeout}: {answered}");
+        assert_eq!(answered["error"], "run_failed", "{answered}");
+        let why = answered["message"].as_str().unwrap();
+        if timeout {
+            assert!(why.contains("deadline"), "{why}");
+            assert!(
+                began.elapsed() < Duration::from_secs(4),
+                "{:?}",
+                began.elapsed()
+            );
+        } else {
+            assert!(why.contains("failed"), "{why}");
+        }
+        assert_eq!(hermes.0.load(Ordering::Acquire), 0);
+        assert_eq!(calls_of_verb(&rig, "new").len(), 1);
+        let closes = calls_of_verb(&rig, "close");
+        assert_eq!(closes.len(), 1, "{timeout}: closed once");
+        assert_eq!(
+            closes[0]["args"],
+            json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"])
+        );
+        assert_eq!(fs::read_dir(&work).unwrap().count(), 0, "{timeout}: gone");
+    }
+}
+
+/// #7245: without the field, a make goes to the lamp's Hermes in its
+/// namespace as before, whatever the default agent, and Harness is never
+/// asked; with the field and the lamp's Hermes the default, the same.
+/// With the field and a default that is neither a gateway agent nor
+/// Hermes, it is refused in words and nothing runs.
+#[test]
+fn a_make_without_one_path_or_on_hermes_goes_to_the_lamps_hermes() {
+    for (one_path, default) in [
+        (None, EngineKind::Openclaw),
+        (Some(false), EngineKind::Openclaw),
+        (Some(true), EngineKind::Hermes),
+    ] {
+        let rig = Rig::new();
+        skill_ok_plan(&rig, "stopped");
+        let work = make_work(&rig);
+        let gateway = make_gateway(&rig, default, default == EngineKind::Openclaw);
+        let hermes = MakeHermesStandIn::default();
+        let answered = lamp_tasks::skill_make::answer_with(
+            &make_line(one_path, 20_000),
+            true,
+            &work,
+            &hermes,
+            Some(&gateway),
+            &mut || {},
+        );
+        assert_eq!(
+            answered,
+            json!({"ok": true, "answer": "HERMES"}),
+            "{one_path:?} {default:?}"
+        );
+        assert_eq!(hermes.0.load(Ordering::Acquire), 1);
+        assert!(rig.calls().is_empty(), "{one_path:?}: Harness never asked");
+        assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+    }
+    // OpenClaw the default with no gateway data: refused, nothing runs.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let work = make_work(&rig);
+    let gateway = make_gateway(&rig, EngineKind::Openclaw, false);
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered["error"], "run_failed", "{answered}");
+    assert!(
+        answered["message"]
+            .as_str()
+            .unwrap()
+            .contains("(openclaw) is neither a gateway agent nor the lamp's Hermes"),
+        "{answered}"
+    );
+    assert_eq!(hermes.0.load(Ordering::Acquire), 0);
+    assert!(rig.calls().is_empty());
+    assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
 }
