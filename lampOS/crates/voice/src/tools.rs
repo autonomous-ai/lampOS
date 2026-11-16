@@ -2335,13 +2335,22 @@ fn run_call_with_scope(
                 crate::agent_tasks::DEADLINE,
             ),
         ),
-        Route::MakeLocal(skills) => (
-            "the lamp's own model",
-            (
-                crate::make_skill_local::answer(call, request, heard, lease, skills.as_deref()),
-                true,
-            ),
-        ),
+        Route::MakeLocal(skills) => {
+            let mut told =
+                crate::make_skill_local::answer(call, request, heard, lease, skills.as_deref());
+            // A question about their skills that came to the made ones
+            // (`LAMP_SKILL_STATE_TOLD`, #7335's row): the answer carries
+            // every skill's line too. A make's is untouched; off, as before.
+            crate::skill_about::with_made_here(
+                call,
+                &mut told,
+                request,
+                heard,
+                lease,
+                skills.as_deref(),
+            );
+            ("the lamp's own model", (told, true))
+        }
         Route::Schedule(directory) => {
             let (mut told, answered) = ask_schedule_for(
                 directory,
@@ -3849,6 +3858,38 @@ mod tests {
             json!({"op":"call","name":"set_timer","args":{"text":"Tea","seconds":60}})
         );
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #7335's row: with `LAMP_SKILL_STATE_TOLD`, `make_skill`'s list of
+    /// the skills made, run through its route, carries the skills' records
+    /// too (here none can be read at the product's place, so the lamp says
+    /// it can't check them); off, it is the list alone.
+    #[test]
+    fn a_made_skills_list_carries_the_skills_only_with_the_switch() {
+        let call = ToolCall {
+            id: "1".into(),
+            name: crate::made_skill::MAKE.into(),
+            args: json!({crate::made_list::LIST: true}),
+        };
+        let route = Route::MakeLocal(None);
+        crate::skill_about::set_on_here(Some(false));
+        let (_, (off, _)) = run_call_with_scope(&route, &call, 1, true, None);
+        crate::skill_about::set_on_here(Some(true));
+        let (whom, (on, answered)) = run_call_with_scope(&route, &call, 2, true, None);
+        crate::skill_about::set_on_here(None);
+        assert_eq!(whom, "the lamp's own model");
+        assert!(answered);
+        assert!(off.get(crate::skill_about::SKILLS_NOTE).is_none(), "{off}");
+        assert!(on[crate::skill_about::SKILLS_NOTE].is_string(), "{on}");
+        let mut without = on.clone();
+        for key in [
+            crate::skill_about::SKILLS_NOTE,
+            crate::skill_about::SKILLS_ON_THE_LAMP,
+            "made_here_not_named",
+        ] {
+            without.as_object_mut().unwrap().remove(key);
+        }
+        assert_eq!(without, off);
     }
 
     /// #7335's row: with `LAMP_SKILL_STATE_TOLD`, `list_reminders`' answer
