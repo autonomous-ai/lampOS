@@ -51,8 +51,10 @@ impl Lamp {
         lamp.append(text);
         lamp
     }
+    /// The state folder as it really is: on a Mac, `TMPDIR` is under
+    /// `/var`, a link.
     fn state(&self) -> PathBuf {
-        self.root.path().join("state")
+        self.root.path().canonicalize().unwrap().join("state")
     }
     fn database(&self) -> PathBuf {
         self.state().join("agents/main").join(DATABASE)
@@ -696,4 +698,68 @@ fn a_compressed_event_asking_a_large_window_is_skipped() {
     assert_eq!(steps.len(), 3);
     // The fixture's own frames ask for small windows and decode.
     assert!(decoded(TOOL_RESULT_ZST).is_ok());
+}
+
+/// Thirteen's HOLD (#7286, 16:27): the steps' SQLite reads never run on
+/// the serve loop that accepts the voice's socket.
+#[test]
+fn the_serve_loop_never_reads_steps() {
+    let runtime = include_str!("../runtime.rs");
+    assert!(
+        !runtime.contains(".tick(&report.watched"),
+        "the serve loop reads steps itself"
+    );
+    assert!(runtime.contains("crate::steps::spawn("));
+}
+
+/// Thirteen's HOLD: SQLite's NOFOLLOW refuses a link anywhere in the path,
+/// so a state folder reached through a link (a data partition) must still
+/// be read; only what lies under it must not be a link.
+#[test]
+fn a_state_folder_reached_through_a_link_is_read() {
+    let lamp = Lamp::with("");
+    let elsewhere = tempfile::tempdir().unwrap();
+    let linked = elsewhere.path().join("state");
+    std::os::unix::fs::symlink(lamp.state(), &linked).unwrap();
+    let mut reader = switched(Some("on"), vec![linked]).unwrap();
+    reader.tick(&watched(None), 0, WALL);
+    lamp.append(&call("c1", "exec", 1));
+    assert_eq!(reader.tick(&watched(None), EVERY_MS, WALL).len(), 1);
+}
+
+/// Heron's read (#7286, 15:45): a key or token in a call's arguments or a
+/// tool's result never reaches the bus.
+#[test]
+fn secrets_in_args_and_results_are_redacted() {
+    let calls = [
+        (
+            r#"{"command":"curl -H 'Authorization: Bearer abc123def456' https://example.org"}"#,
+            "abc123def456",
+        ),
+        (
+            r#"{"command":"export X_API_KEY=hunter2 && run"}"#,
+            "hunter2",
+        ),
+        (r#"{"url":"https://example.org","api_key":"hunter3"}"#, "hunter3"),
+        (
+            r#"{"command":"echo sk-proj-AbCdEf0123456789xyz"}"#,
+            "sk-proj-AbCdEf0123456789xyz",
+        ),
+    ];
+    for (i, (arguments, secret)) in calls.iter().enumerate() {
+        let line = format!(
+            r#"{{"type":"message","message":{{"role":"assistant","content":[{{"type":"toolCall","id":"c{i}","name":"exec","arguments":{arguments}}}],"timestamp":5}}}}"#
+        ) + "\n";
+        let steps = own(&line);
+        assert_eq!(steps.len(), 1, "{arguments}");
+        assert!(!steps[0].args.contains(secret), "{}", steps[0].args);
+        assert!(steps[0].args.contains("***"), "{}", steps[0].args);
+    }
+    let token = "ghp_0123456789abcdefABCDEF0123456789abcd";
+    let steps = own(&(call("c1", "exec", 1) + &result("c1", &format!("token is {token}"), 2)));
+    let done = steps.last().unwrap();
+    assert_eq!(done.result, "token is ***");
+    // Plain words stay.
+    let steps = own(&(call("c2", "exec", 1) + &result("c2", "3 files changed", 2)));
+    assert_eq!(steps.last().unwrap().result, "3 files changed");
 }
