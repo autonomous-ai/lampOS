@@ -1880,21 +1880,53 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   `launch_timeout`): 30 s Harness chờ Gateway, lần gửi đầu chậm và phần chuẩn
   bị sau đó. Có bằng chứng thì việc là `Created` như trước, nên một lần chạy
   đọc rảnh chưa được hỏi rồi dùng công cụ (trường hợp của #6499) vẫn được
-  tính. Không có bằng chứng: harness đó được đóng và gọi `new` thêm một lần
-  (`harness reply` tắt trên đèn bán ra), kiểm tra bằng chứng như trên. Vẫn
-  không có: harness thứ hai cũng được đóng và việc là `not_sent`,
-  `openclaw_not_taken`, để giọng nói báo người dùng rằng việc chưa đến được
-  agent, không bao giờ báo là đã bắt đầu. Harness không đóng được thì lần
-  giao là `uncertain` (`openclaw_not_closed` với harness đầu,
-  `openclaw_not_taken` với harness thứ hai) và không khởi động thêm gì: một
-  harness còn chạy vẫn có thể nhận việc cùng lúc với harness khác. `new` lần
-  hai lỗi là `openclaw_new_again_failed`; harness đã dừng là
-  `stopped_before_message`, và `show` lỗi là uncertain kèm mã lỗi. Không bao
-  giờ khởi động lần thứ ba. Kiểm thử:
+  tính. Không có bằng chứng: trước khi đóng gì, lamp-tasks đọc bản ghi của
+  chính Gateway về phiên của harness đó (#7287, P2 của Reviewer-lead: trên
+  fc4b câu hỏi đầu đến 65 s sau `new`, nên đóng rồi `new` lần hai có thể chạy
+  câu hỏi hai lần). Bản ghi là cơ sở dữ liệu agent của OpenClaw 2026.11.2,
+  `/var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite`
+  (dưới `OPENCLAW_STATE_DIR`, như Harness đọc), mở chỉ đọc: lamp-tasks chạy
+  bằng `lampos`, cùng user với Gateway, và namespace của Gateway thấy thư mục
+  đó ở cùng đường dẫn, nên không gọi CLI của OpenClaw. Được tính là đã nhận
+  khi phiên `agent:main:harness-<agentId>` (so theo 8 ký tự đầu của id) có
+  một dòng transcript có vai trò (tin nhắn của người dùng, câu trả lời, kết
+  quả công cụ) hoặc có trạng thái chạy. Đã nhận, hoặc bản ghi không đọc được
+  (không có file, schema khác, bận quá 1 s): harness được giữ, không đóng gì
+  và không bao giờ gọi `new` lần nữa; nó được theo dõi đến giới hạn của lần
+  giao, và vẫn không có bằng chứng thì lần giao là `uncertain`,
+  `openclaw_taken_unseen` hoặc `openclaw_record_unread`. Chỉ khi đọc được bản
+  ghi và nó không có gì của phiên đó thì harness mới được đóng và gọi `new`
+  thêm một lần (`harness reply` tắt trên đèn bán ra), kiểm tra bằng chứng như
+  trên. Vẫn không có: bản ghi của nó cũng được đọc (đã nhận hoặc không đọc
+  được: `uncertain` với cùng các mã, được giữ), và không có gì thì harness
+  thứ hai cũng được đóng và việc là `not_sent`, `openclaw_not_taken`, để
+  giọng nói báo người dùng rằng việc chưa đến được agent, không bao giờ báo là
+  đã bắt đầu. Harness không đóng được thì lần giao là `uncertain`
+  (`openclaw_not_closed` với harness đầu, `openclaw_not_taken` với harness
+  thứ hai) và không khởi động thêm gì: một harness còn chạy vẫn có thể nhận
+  việc cùng lúc với harness khác. `new` lần hai lỗi, hoặc không còn thời gian
+  cho nó, là `openclaw_new_again_failed`; harness đã dừng là
+  `stopped_before_message`, lệnh dừng của chủ là `cancelled`, và `show` lỗi
+  là uncertain kèm mã lỗi. Không bao giờ khởi động lần thứ ba.
+- **Một giới hạn cho cả lần giao** (#7287, P2 của Heron): mọi lần chờ bằng
+  chứng, các lần đọc bản ghi, các lần đóng và `new` lần hai đều chạy trong
+  `until` của chính lần giao (lúc bắt đầu cộng `launch_timeout`, 60 s trên
+  đèn), mỗi lệnh bị giới hạn bởi phần thời gian còn lại. Mỗi lần chờ bằng
+  chứng là `OPENCLAW_PROOF_WITHIN` (45 s), không quá ba phần tư
+  `launch_timeout`, và các lần xem cùng `new` lần hai kết thúc trước `until`
+  một phần tám `launch_timeout` (7,5 s), để lần đóng cuối vẫn kịp. Vậy lâu
+  nhất luồng `tasks-harness` (worker duy nhất cũng phục vụ `show`, đóng, trạng
+  thái và đăng nhập của mọi việc khác) bị một lần giao OpenClaw giữ là lần
+  chờ Gateway trước đó (`READY_WITHIN`, tối đa 60 s) cộng 60 s cho chính lần
+  giao, tổng 120 s, trong khi trước đây riêng nhánh đóng rồi khởi động lại có
+  thể mất khoảng 330 s. Lệnh dừng của chủ được kiểm tra ở mỗi lệnh. Kiểm thử:
   `openclaw_idle_with_no_ask_then_a_tool_within_the_bound_is_created`,
   `openclaw_idle_with_no_ask_throughout_is_closed_started_once_more_and_not_sent`,
   `openclaw_not_taken_then_taken_on_the_second_new_is_created_on_it`,
-  `openclaw_not_taken_and_not_closed_is_uncertain_with_nothing_more_started`
+  `openclaw_not_taken_and_not_closed_is_uncertain_with_nothing_more_started`,
+  `openclaw_taken_in_the_gateway_record_but_unseen_is_kept_never_started_twice`,
+  `openclaw_with_no_readable_gateway_record_is_never_started_twice`,
+  `openclaw_no_proof_path_ends_within_one_launch_bound`
   và `openclaw_asked_after_new_is_created_with_nothing_more_called`
   (`tests/harness.rs`).
 - **Chưa bao giờ bắt đầu: báo và đóng** (#6577): một việc giao cho OpenClaw
