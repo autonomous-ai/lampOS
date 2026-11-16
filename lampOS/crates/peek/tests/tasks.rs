@@ -115,6 +115,7 @@ fn nothing_handed_over_says_so() {
 
 #[test]
 fn the_overview_line_counts_working_tasks_per_engine() {
+    // Working and just handed over.
     let mut sample = sample();
     sample
         .tasks
@@ -122,12 +123,28 @@ fn the_overview_line_counts_working_tasks_per_engine() {
     sample.tasks.push(progress(5, "claude", AgentState::Idle));
     assert_eq!(
         page::tasks_line(Some(&sample)),
+        "2 working (OpenClaw 2, Hermes 0, Claude 0), 1 just handed over"
+    );
+    // Working only.
+    sample.unread.clear();
+    assert_eq!(
+        page::tasks_line(Some(&sample)),
         "2 working (OpenClaw 2, Hermes 0, Claude 0)"
     );
+    // Only just handed over: no empty brackets.
+    assert_eq!(
+        page::tasks_line(Some(&status(vec![], vec![3], vec![]))),
+        "none working, 1 just handed over"
+    );
+    // None, with or without ended ones.
     assert_eq!(
         page::tasks_line(Some(&status(vec![], vec![], vec![]))),
-        "none"
+        "none working"
     );
+    let mut ended = self::sample();
+    ended.tasks.clear();
+    ended.unread.clear();
+    assert_eq!(page::tasks_line(Some(&ended)), "none working");
     assert_eq!(page::tasks_line(None), "not known");
 }
 
