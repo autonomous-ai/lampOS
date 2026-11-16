@@ -1404,6 +1404,14 @@ impl Reports {
         if was && !share {
             self.stopped(now_s);
         }
+        if share && !was {
+            // A yes after a no (or before any answer): setup counted every
+            // join meanwhile, and none made without the yes is ever sent,
+            // so the base starts at its totals now (the Reviewer-lead, #7228).
+            if let Some(wifi) = &self.counting {
+                self.kept.wifi_base = counters::read_wifi(wifi);
+            }
+        }
         if share {
             // A yes again: a `stopped` already through once must not come
             // after the new reports and delete them.
@@ -3008,6 +3016,43 @@ pub(crate) mod tests {
         let metrics = metrics_of(&mut reports).unwrap();
         assert!(metrics.get("wifi_setup").is_none(), "{metrics}");
         assert!(metrics.get("voice_turn_ms").is_none(), "{metrics}");
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
+    }
+
+    /// The Reviewer-lead's P2 on #7228: setup counts every join, so a join
+    /// made while the answer is no must never ride a report after a later
+    /// yes. Only joins after the yes are sent.
+    #[test]
+    fn a_wifi_join_made_during_a_no_is_never_sent_after_a_later_yes() {
+        let places = places("counters-no-join-yes");
+        yes(&places);
+        fs::write(wifi_file(&places), r#"{"attempts":1,"ok":1}"#).unwrap();
+        let mut reports = Reports::open(places.clone()).counting(Some(wifi_file(&places)));
+        reports.set(false, NOW).unwrap();
+        // A join while the answer is no.
+        fs::write(
+            wifi_file(&places),
+            r#"{"attempts":2,"ok":1,"fail_other":1}"#,
+        )
+        .unwrap();
+        reports.set(true, NOW + 60).unwrap();
+        reports.health(NOW + 120, None, &Seen::default()).unwrap();
+        let metrics = metrics_of(&mut reports).unwrap();
+        assert!(metrics.get("wifi_setup").is_none(), "{metrics}");
+        // A join after the yes is sent, and only it.
+        fs::write(
+            wifi_file(&places),
+            r#"{"attempts":3,"ok":2,"fail_other":1}"#,
+        )
+        .unwrap();
+        reports.health(NOW + 180, None, &Seen::default()).unwrap();
+        let after = counters::read_wifi(&wifi_file(&places));
+        let sent = reports.kept.counts.wifi_setup;
+        assert_eq!(
+            sent.iter().sum::<u64>(),
+            2,
+            "one join after the yes: {sent:?} of {after:?}"
+        );
         let _ = fs::remove_dir_all(places.own.parent().unwrap());
     }
 
