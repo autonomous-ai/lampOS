@@ -51,8 +51,8 @@
 //! `write` step or a `do.task`'s service grant the voice's own check
 //! accepts, and Hermes would take the asked-for step out.
 //!
-//! With [`ONE_PATH_ENVIRONMENT`] `on` too (`LAMP_MAKE_AGENT_ONE_PATH`, off
-//! unless set; #7245), a make goes to the lamp's agent when it is one the
+//! With [`ONE_PATH_ENVIRONMENT`] `on` too (`LAMP_MAKE_AGENT_ONE_PATH`, on
+//! in the product's lamp-voice; #7245), a make goes to the lamp's agent when it is one the
 //! one run path takes ([`ONE_PATH_ENGINES`]: Hermes or OpenClaw), and its
 //! line carries `"one_path":true` so lamp-tasks' make socket picks its
 //! runner by `default_agent_takes_runs` (#7133's `HarnessRunner` for a

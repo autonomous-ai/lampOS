@@ -1143,14 +1143,14 @@ trên `PATH` đăng nhập của `lampos` (lần tìm thất bại thì giữ l�
 vẫn đúng qua nhiều vòng chỉ được ghi log một lần. Lần chạy của kỹ năng vẫn
 chỉ tới Hermes (`HarnessRunner`, ở trên).
 
-### Một lần tạo bằng giọng nói trên OpenClaw, qua đường chạy chung (`LAMP_MAKE_AGENT_ONE_PATH`, tắt, #7245)
+### Một lần tạo bằng giọng nói trên OpenClaw, qua đường chạy chung (`LAMP_MAKE_AGENT_ONE_PATH`, bật, #7245)
 
 Trên lamp-c0a4 (bản build 13333, OpenClaw là mặc định, 16/11 11:46) một
 lần tạo DeepSeek không giữ được chưa bao giờ được giao: "the lamp's agent
 is OpenClaw: only Hermes has a namespace runner for a make today". Sau
 #7133, đèn OpenClaw chạy được việc của một kỹ năng nhưng chưa tạo được kỹ
-năng. Với `LAMP_MAKE_AGENT_ONE_PATH=on` của lamp-voice (tắt trừ khi đặt,
-không unit nào đặt; [switches.md](../switches.md)), lần tạo được giao cho
+năng. Với `LAMP_MAKE_AGENT_ONE_PATH=on` của lamp-voice (bật trong unit
+lamp-voice của sản phẩm; [switches.md](../switches.md)), lần tạo được giao cho
 agent của đèn mỗi khi lamp-tasks báo agent đó nhận lần chạy, Hermes hay
 OpenClaw, qua đường chạy chung, không có runner thứ hai:
 

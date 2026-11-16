@@ -3663,13 +3663,13 @@ engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
 line that stays true round after round is logged once. Skill runs still go
 to Hermes alone (`HarnessRunner`, above).
 
-### A voice make on OpenClaw, through the one run path (`LAMP_MAKE_AGENT_ONE_PATH`, off, #7245)
+### A voice make on OpenClaw, through the one run path (`LAMP_MAKE_AGENT_ONE_PATH`, on, #7245)
 
 On lamp-c0a4 (build 13333, OpenClaw the default, 16 Nov 11:46) a make
 DeepSeek didn't keep was never handed over: "the lamp's agent is OpenClaw:
 only Hermes has a namespace runner for a make today". After #7133 an
 OpenClaw lamp could run a skill's job but not make one. With lamp-voice's
-`LAMP_MAKE_AGENT_ONE_PATH=on` (off unless set, in no unit;
+`LAMP_MAKE_AGENT_ONE_PATH=on` (on in the product's lamp-voice;
 [switches.md](switches.md)), the make goes to the lamp's agent whenever
 lamp-tasks says it takes runs, Hermes or OpenClaw, through the one run
 path, with no second runner:
