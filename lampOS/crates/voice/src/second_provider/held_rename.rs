@@ -29,6 +29,9 @@ pub(super) struct HeldRename {
     /// The asking line's session and known person ([`rename_asker`]).
     asker: (u64, String),
     at: Instant,
+    /// Its question was cut before its name was heard and the model told to
+    /// ask it again ([`Taken::AskAgain`]): only once.
+    asked_again: bool,
 }
 
 /// A rename asked and not run: told to the model on each turn of its
@@ -158,6 +161,9 @@ pub(super) struct YesTurn<'a> {
     pub one_face: Option<&'a str>,
 }
 
+/// [`verdict`]'s refusal of a turn that is no yes to the new name.
+const NOT_A_YES: &str = "not a yes to the new name";
+
 /// Whether the held rename runs on this turn: `Ok` to run it, else why not,
 /// and whether the person said yes all the same, for the model to be told
 /// (left untold, it made up a reason on lamp-52e6, Fifth's run B on #5415).
@@ -181,7 +187,7 @@ pub(super) fn verdict(turn: &YesTurn) -> Result<(), (&'static str, bool)> {
         return Err(("not the same session", false));
     }
     if !crate::known_faces::rename_agreed(turn.name, turn.said) {
-        return Err(("not a yes to the new name", false));
+        return Err((NOT_A_YES, false));
     }
     spoke_it(&turn.asker.1, turn.seen.as_ref(), turn.one_face).map_err(|why| (why, true))
 }
@@ -251,6 +257,7 @@ pub(super) fn after_face_save(
                 request,
                 asker,
                 at: now,
+                asked_again: false,
             });
         }
         (Some(_), _, _) => {
@@ -307,11 +314,27 @@ pub(super) enum Taken {
     /// A yes to the new name that did not count, and why: the model is
     /// told so.
     Dropped(String, &'static str),
+    /// Kept: its question was cut before its name was heard, so the model
+    /// is told to ask it again (`LAMP_NAME_LEARN_FIX`, #7331).
+    AskAgain(String),
+}
+
+/// Whether the held rename's question, `held`'s answer, was cut before its
+/// name was heard: the thread holds it as the answer cut last, and what
+/// was played of it does not say `name` (`LAMP_SAID_AS_HEARD`). The lamp-52e6
+/// trace on #7331: a line began over the question, none of it played, and
+/// the hold was dropped as "not a yes to the new name".
+fn question_cut(shared: &Shared, held: u64, name: &str) -> bool {
+    super::cut_played(shared, held)
+        .is_some_and(|played| !crate::known_faces::said_by_them(name, &played))
 }
 
 /// The held rename `request` runs, if any. Every later spoken turn takes the
-/// hold ([`verdict`]); a turn the lamp wrote leaves it as it is. The journal
-/// never has the words or the names.
+/// hold ([`verdict`]); a turn the lamp wrote leaves it as it is. With
+/// `LAMP_NAME_LEARN_FIX`, a turn that is no yes to it only because its
+/// question was cut before its name was heard ([`question_cut`]) keeps it,
+/// once, and the model is told to ask again; every other guard stands. The
+/// journal never has the words or the names.
 pub(super) fn take(
     shared: &Shared,
     request: u64,
@@ -363,6 +386,26 @@ pub(super) fn take(
         Ok(()) => {
             eprintln!("{}", runs_line(request, held.request, scope));
             Taken::Runs(held.call)
+        }
+        Err((NOT_A_YES, _))
+            if shared.name_learn_fix
+                && !held.asked_again
+                && question_cut(shared, held.request, &name) =>
+        {
+            eprintln!(
+                "lamp-voice second: request {request}: kept the held face rename (held in request {}): its question was cut before its name was heard, asked again (LAMP_NAME_LEARN_FIX)",
+                held.request
+            );
+            // Never over a rename held since the lock was let go.
+            if let Ok(mut renames) = shared.held_rename.lock()
+                && renames.held.is_none()
+            {
+                renames.held = Some(HeldRename {
+                    asked_again: true,
+                    ..held
+                });
+            }
+            Taken::AskAgain(name)
         }
         Err((why, told)) => {
             eprintln!(
@@ -541,6 +584,14 @@ pub(super) fn ran_note(name: &str, result: &Value) -> String {
 pub(super) fn not_ran_note(name: &str, why: &str) -> String {
     format!(
         "(For you to know: they said yes to being known as {name}, but the face was not renamed: {why}. The face keeps the name it had: do not say it changed.)"
+    )
+}
+
+/// What the model is told when the held rename's question was cut before
+/// its name was heard ([`Taken::AskAgain`]).
+pub(super) fn ask_again_note(name: &str) -> String {
+    format!(
+        "(For you to know, not to answer: your question whether to know them as {name} was cut before they heard it, so nothing was renamed and their words were no answer to it. Ask it again, in a few words: whether you should know them as {name} instead.)"
     )
 }
 
@@ -856,7 +907,7 @@ mod tests {
         ] {
             assert_eq!(
                 verdict(&seen_turn(&turn, &asker, &theirs)),
-                Err(("not a yes to the new name", false)),
+                Err((NOT_A_YES, false)),
                 "{}",
                 turn.this
             );

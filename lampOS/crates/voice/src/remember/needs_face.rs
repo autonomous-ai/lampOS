@@ -31,20 +31,57 @@ pub const NOT_KEPT: &str = "This wasn't kept: nobody known is speaking. If they 
 pub const SKIPPED_REMEMBER: &str =
     "lamp-voice provider: a remember about a person was not kept: speaker unknown (skipped=1)";
 
+/// The journal's line for a `remember` of the speaker's own name sent to
+/// the face save ([`withheld`]): no words of it.
+pub const TO_FACE_SAVE: &str = "lamp-voice provider: a remember of the speaker's own name while nobody is known was sent to the face save (LAMP_NAME_LEARN_FIX)";
+
 /// What the model is told instead of the memory's answer, when `on`, nobody
 /// is known (`person` is `None`, the room's scope) and the `remember`'s text
-/// is about a person. `None`: ask the memory as before.
-pub(crate) fn withheld(call: &ToolCall, person: Option<&str>, on: bool) -> Option<Value> {
-    let personal = call.name == super::REMEMBER
-        && call
-            .args
-            .get("text")
-            .and_then(Value::as_str)
-            .is_some_and(super::about_someone);
+/// is about a person. `None`: ask the memory as before. With `to_face`
+/// (`LAMP_NAME_LEARN_FIX`, #7331), a text that gives the speaker's own name
+/// ([`crate::known_faces::gives_a_name`], or `named::name_in` for the
+/// model's "The user's name is ...") is told to go to the face save
+/// ([`face_save_note`]) in place of [`NOT_KEPT`]: on lamp-52e6 the owner's
+/// "my name is ..." came back NOT_KEPT while the eyes held their face as
+/// nobody's. The face save takes a fresh look and the eyes judge the face.
+pub(crate) fn withheld(
+    call: &ToolCall,
+    person: Option<&str>,
+    on: bool,
+    to_face: bool,
+) -> Option<Value> {
+    let text = call.args.get("text").and_then(Value::as_str);
+    let personal = call.name == super::REMEMBER && text.is_some_and(super::about_someone);
     (on && person.is_none() && personal).then(|| {
+        let text = text.unwrap_or_default();
+        let name = super::named::name_in(text)
+            .map(|name| name.trim().to_owned())
+            .filter(|name| !name.is_empty());
+        if to_face && (name.is_some() || crate::known_faces::gives_a_name(text)) {
+            eprintln!("{TO_FACE_SAVE}");
+            return json!({"remembered": false, "note": face_save_note(name.as_deref())});
+        }
         eprintln!("{SKIPPED_REMEMBER}");
         json!({"remembered": false, "note": NOT_KEPT})
     })
+}
+
+/// What the model is told for their own name given while nobody is known
+/// ([`withheld`]): to keep it with their face, by the name when it reads.
+fn face_save_note(name: Option<&str>) -> String {
+    let call = match name {
+        Some(name) => format!(
+            "call {} now with name \"{name}\"",
+            crate::known_faces::REMEMBER
+        ),
+        None => format!(
+            "call {} now with the name they gave",
+            crate::known_faces::REMEMBER
+        ),
+    };
+    format!(
+        "Not kept as a memory: this is their own name, and the lamp keeps a name with the face. Don't say it wasn't kept; {call}, so the lamp looks at them and keeps their face under it, and say what it answers."
+    )
 }
 
 /// Whether a conversation that ended is given to the observation pass: when
@@ -116,7 +153,7 @@ mod tests {
     #[test]
     fn an_unknown_speaker_s_personal_remember_is_not_kept_and_says_why() {
         for text in [PERSONAL, KEYS] {
-            let told = withheld(&remember(text), None, true).expect(text);
+            let told = withheld(&remember(text), None, true, false).expect(text);
             assert_eq!(told["remembered"], false);
             let note = told["note"].as_str().unwrap();
             assert!(note.contains("nobody known is speaking"), "{note}");
@@ -138,8 +175,8 @@ mod tests {
     #[test]
     fn the_same_line_said_again_by_a_known_person_is_kept_to_them() {
         let call = remember(PERSONAL);
-        assert!(withheld(&call, None, true).is_some());
-        assert_eq!(withheld(&call, Some(MINH), true), None);
+        assert!(withheld(&call, None, true, false).is_some());
+        assert_eq!(withheld(&call, Some(MINH), true, false), None);
         let (socket, served) =
             super::super::tests::memory("needs-face-again", 1, |_| json!({"ok":true,"id":1}));
         let deadline = std::time::Duration::from_secs(2);
@@ -157,20 +194,53 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
+    /// #7331 (lamp-52e6, 15 Nov): the owner's "my name is ..." on a line the
+    /// eyes held as nobody's came back NOT_KEPT. With `LAMP_NAME_LEARN_FIX`
+    /// a name given while nobody is known goes to the face save, which takes
+    /// a fresh look and judges the face; any other personal line is still
+    /// not kept, and so is the name with the switch off.
+    #[test]
+    fn a_name_given_with_nobody_known_goes_to_the_face_save() {
+        for (text, name) in [
+            ("my name is Ada", "Ada"),
+            ("The user's name is Ada.", "Ada"),
+        ] {
+            let told = withheld(&remember(text), None, true, true).expect(text);
+            assert_eq!(told["remembered"], false, "{text}");
+            let note = told["note"].as_str().unwrap();
+            assert!(note.contains(crate::known_faces::REMEMBER), "{note}");
+            assert!(note.contains(&format!("\"{name}\"")), "{note}");
+            assert_ne!(note, NOT_KEPT);
+        }
+        let told = withheld(&remember(PERSONAL), None, true, true).unwrap();
+        assert_eq!(told["note"], NOT_KEPT);
+        let told = withheld(&remember("my favourite colour is blue"), None, true, true).unwrap();
+        assert_eq!(told["note"], NOT_KEPT);
+        // Switch off: not kept, as before.
+        let told = withheld(&remember("my name is Ada"), None, true, false).unwrap();
+        assert_eq!(told["note"], NOT_KEPT);
+        // A known face's own name goes to the memory as before.
+        assert_eq!(
+            withheld(&remember("my name is Ada"), Some(MINH), true, true),
+            None
+        );
+        assert!(!TO_FACE_SAVE.contains("Ada"));
+    }
+
     #[test]
     fn an_unknown_speaker_s_room_fact_is_still_kept() {
-        assert_eq!(withheld(&remember(ROOM), None, true), None);
+        assert_eq!(withheld(&remember(ROOM), None, true, false), None);
     }
 
     #[test]
     fn a_known_face_s_personal_remember_is_kept_to_them() {
-        assert_eq!(withheld(&remember(PERSONAL), Some(MINH), true), None);
-        assert_eq!(withheld(&remember(KEYS), Some(MINH), true), None);
+        assert_eq!(withheld(&remember(PERSONAL), Some(MINH), true, false), None);
+        assert_eq!(withheld(&remember(KEYS), Some(MINH), true, false), None);
     }
 
     #[test]
     fn switch_off_a_personal_remember_goes_to_the_room_as_today() {
-        assert_eq!(withheld(&remember(PERSONAL), None, false), None);
+        assert_eq!(withheld(&remember(PERSONAL), None, false, false), None);
     }
 
     #[test]

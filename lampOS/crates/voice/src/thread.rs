@@ -1557,6 +1557,22 @@ impl Thread {
         }
     }
 
+    /// What was played of `request`'s answer, when it is the answer a line
+    /// or a Stop cut last ([`Self::heard_only`]): its kept words,
+    /// [`crate::said_as_heard::CUT`] for none, empty for a private one.
+    /// `None` for any other request. What a held face rename reads to tell a
+    /// question cut before its name was heard (`LAMP_NAME_LEARN_FIX`, #7331).
+    pub fn cut_played(&self, request: u64) -> Option<String> {
+        (self.cut == Some(request)).then(|| {
+            self.exchanges
+                .iter()
+                .rev()
+                .find(|exchange| exchange.request == request)
+                .map(|exchange| exchange.lamp.clone())
+                .unwrap_or_default()
+        })
+    }
+
     /// [`Self::answered_last_but`], and whether that line was cut: kept as
     /// heard after a cut ([`Self::heard_only`]), or a line began over it
     /// ([`Self::began_over_the_lamps_voice`]). A yes to it is no
