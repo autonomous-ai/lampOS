@@ -1226,6 +1226,96 @@ pub(crate) fn as_said(name: &str, said: &Said) -> (String, Said) {
     (name, said)
 }
 
+/// What the lamp says once it kept a name from letters spelled to it
+/// (`LAMP_NAME_LEARN_FIX`, #7331): a statement, the word and its letters,
+/// "Ada: A, D, A. Got it.", never another question (the first builder on
+/// #7331: a question is one more thing a next line can cut).
+fn spelled_back(name: &str) -> String {
+    let letters: Vec<String> = name
+        .chars()
+        .filter(|c| c.is_alphabetic())
+        .map(|c| c.to_uppercase().collect())
+        .collect();
+    format!("{name}: {}. Got it.", letters.join(", "))
+}
+
+/// The letters of a name the lamp's line `lamp` said back by its letters
+/// ([`spelled_back`]): a word, or up to three in a row, right before a run
+/// of their own letters ("Ada: A, D, A.").
+fn spelled_back_in(lamp: &str) -> Option<String> {
+    let words = folded_words(lamp);
+    let single = |word: &String| word.chars().count() == 1;
+    (1..words.len()).find_map(|start| {
+        if !single(&words[start]) || single(&words[start - 1]) {
+            return None;
+        }
+        let run: String = words[start..]
+            .iter()
+            .take_while(|word| single(word))
+            .map(String::as_str)
+            .collect();
+        (run.chars().count() >= 2
+            && (1..=start.min(3)).any(|count| words[start - count..start].concat() == run))
+        .then_some(run)
+    })
+}
+
+/// The letters a line names one by one by a word they start: "N as in
+/// nose", "N for nose".
+fn letters_named(turn: &str) -> Vec<char> {
+    let words = folded_words(turn);
+    let named = |letter: &str, word: &str| {
+        letter.chars().count() == 1 && word.chars().count() > 1 && word.starts_with(letter)
+    };
+    (0..words.len())
+        .filter_map(|at| match &words[at..] {
+            [letter, as_, in_, word, ..] if as_ == "as" && in_ == "in" && named(letter, word) => {
+                letter.chars().next()
+            }
+            [letter, for_, word, ..] if for_ == "for" && named(letter, word) => {
+                letter.chars().next()
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// Whether the turn in hand corrects the name the lamp's last answer said
+/// back by its letters ([`spelled_back_in`]) into `name`, in one line
+/// (`LAMP_NAME_LEARN_FIX`, #7331): it spells `name` ([`spelled_by_them`]),
+/// or `name` is that name with only letters the line names changed, at
+/// most as many as it names ("No, N as in nose." makes "Ama" "Ana", never
+/// "Nna" nor "Ava"). Such a line is the rename's yes: the lamp's last
+/// words were no spell ask, but its letters were what they answered.
+fn corrects_spelled_back(name: &str, said: &Said) -> bool {
+    let Some(old) = said
+        .before
+        .last()
+        .and_then(|(_, lamp)| spelled_back_in(lamp))
+    else {
+        return false;
+    };
+    let new = folded_words(name).concat();
+    if new.is_empty() || new == old {
+        return false;
+    }
+    if spelled_by_them(name, &said.this) {
+        return true;
+    }
+    let named = letters_named(&said.this);
+    let (old, new): (Vec<char>, Vec<char>) = (old.chars().collect(), new.chars().collect());
+    let changed: Vec<char> = old
+        .iter()
+        .zip(&new)
+        .filter(|(was, now)| was != now)
+        .map(|(_, now)| *now)
+        .collect();
+    old.len() == new.len()
+        && !changed.is_empty()
+        && changed.len() <= named.len()
+        && changed.iter().all(|letter| named.contains(letter))
+}
+
 /// The runs of single letters in `theirs`, each put together as a word
 /// ([`said_by_them`]'s rules).
 fn spelled_runs(theirs: &[String]) -> Vec<String> {
@@ -1933,6 +2023,9 @@ const NAME_UNCHANGED: &str = "I cannot safely replace a saved name from this req
 /// With `LAMP_NAME_LEARN_FIX` (#7331): a new face not kept for want of
 /// the person's yes to keeping it ([`run_switched`]).
 pub(crate) const ASK_FACE_FIRST: &str = "I have not kept their face: a name is not a yes to keeping a face. Ask them only this, with their name: \"Shall I remember your face as <their name>?\" Call this again only after their yes; if they say no, keep nothing and say that's fine.";
+/// With `LAMP_NAME_LEARN_FIX` (#7331): what the model is told beside a
+/// name kept from letters spelled to it ([`spelled_back`]).
+pub(crate) const SPELLED_KEPT: &str = "Say say_back exactly as it is, a statement: the name, its letters, and that you've got it. Ask nothing more about the name. If their next line fixes a letter (\"No, N as in nose\") or spells it again, call this again with replace true and the name that makes: that line is their yes, so don't ask again.";
 pub(crate) const NOT_AGREED: &str = "They have not said yes to that name yet. Say the new name back and ask whether they want to be known by it instead. Only if they say yes, call this again with the new name and replace true.";
 /// What the model is told when the face is near someone known by a name one
 /// letter from the one heard (#2176 row 4): the name may be misheard, so
@@ -2586,11 +2679,25 @@ fn run_switched(
     // asked for a spelling.
     let replacing = call.args.get("replace").and_then(Value::as_bool) == Some(true);
     let spelled_rename = checked && switches.name_learn_fix && replacing && spelling_asked(said);
-    let least = if spelled_rename { 2 } else { 3 };
+    // Right after the lamp said a spelled name back by its letters
+    // ([`spelled_back`]), a line may correct it ([`corrects_spelled_back`]).
+    let after_spelled_back = checked
+        && switches.name_learn_fix
+        && call.name == REMEMBER
+        && said
+            .before
+            .last()
+            .is_some_and(|(_, lamp)| spelled_back_in(lamp).is_some());
+    let least = if spelled_rename || after_spelled_back {
+        2
+    } else {
+        3
+    };
     let joined = (checked && call.name == REMEMBER)
         .then(|| letters_as_word_of(name, least))
         .flatten();
     let name = joined.as_deref().unwrap_or(name);
+    let corrected = after_spelled_back && corrects_spelled_back(name, said);
     let setup = checked && switches.at_setup && call.name == REMEMBER;
     // With `LAMP_NAME_LEARN_FIX`, a new face is kept only on the person's
     // leave: their own ask for it ("remember my face") or their yes to the
@@ -2603,6 +2710,7 @@ fn run_switched(
         && call.name == REMEMBER
         && !replacing
         && !setup
+        && !corrected
         && !speaker_gave_face_leave(
             &said.this,
             said.before.last().map(|(_, lamp)| lamp.as_str()),
@@ -2627,7 +2735,8 @@ fn run_switched(
         heard_for_rename(&heard_name, &heard_said)
     } else {
         name_heard(&heard_name, &heard_said)
-    } || (setup && said_back_and_agreed(&heard_name, &heard_said));
+    } || (setup && said_back_and_agreed(&heard_name, &heard_said))
+        || corrected;
     let name = if checked && call.name == REMEMBER && !heard {
         // Only after the lamp asked them to spell, and as many spelled runs
         // as the model's name has words: "L O R E N, and I'm at I B M" is
@@ -2656,6 +2765,7 @@ fn run_switched(
     if setup
         && !(spelling_asked(said) && spelled_by_them(name, &said.this))
         && !said_back_and_agreed(name, said)
+        && !corrected
     {
         return (json!({"error": SAY_IT_BACK}), true);
     }
@@ -2669,6 +2779,7 @@ fn run_switched(
     // hand after the lamp asked for a spelling is their yes, as at setup:
     // spelling is how a person fixes a misheard name (#7331).
     let agreed = (spelled_rename && spelled_by_them(name, &said.this))
+        || corrected
         || if switches.rename_yes {
             rename_agreed(&heard_name, &heard_said)
         } else {
@@ -2710,10 +2821,25 @@ fn run_switched(
         Some(fence) => crate::remember::bounded_exchange_fenced(socket, &line, DEADLINE, fence),
         None => crate::tools::exchange(socket, &line, DEADLINE),
     };
+    // With `LAMP_NAME_LEARN_FIX`, a name kept from letters spelled to it,
+    // after a spell ask or as a correction of a read-back, at setup and on
+    // a rename alike, is said back as a statement ([`spelled_back`]).
+    let kept_spelled = checked
+        && switches.name_learn_fix
+        && call.name == REMEMBER
+        && (corrected || (spelling_asked(said) && spelled_by_them(name, &said.this)));
     match answer {
         Some(answer) => {
             *replaced = replaced_of(&answer);
-            (told_asking(&answer, switches.visits), true)
+            let mut told = told_asking(&answer, switches.visits);
+            if kept_spelled
+                && let Some(kept) = told["remembered"].as_str().map(str::to_owned)
+                && let Some(told) = told.as_object_mut()
+            {
+                told.insert("say_back".into(), json!(spelled_back(&kept)));
+                told.insert("note".into(), json!(SPELLED_KEPT));
+            }
+            (told, true)
         }
         None => (
             json!({"error": "My eye is not answering right now, so I could not do that."}),
@@ -6120,6 +6246,83 @@ mod tests {
                 .map(|(name, _)| json!({"remember": name, "one_face": true, "replace": true}))
                 .collect::<Vec<_>>()
         );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// #7331 (the Reviewer-lead's P2-1 on #7343, the first builder at
+    /// 21:03): a spelled name was kept with no word of what was kept, so
+    /// letters misheard (B/D, M/N) went unseen. With `LAMP_NAME_LEARN_FIX`,
+    /// a name kept from letters spelled to it, at setup or on a rename, is
+    /// said back as a statement, the word and its letters ("Ama: A, M, A.
+    /// Got it."), and one line right after that fixes a letter ("No, N as
+    /// in nose.") or spells it again renames it with no further yes. Off,
+    /// nothing is said back and such a line is refused.
+    #[test]
+    fn a_spelled_name_kept_is_said_back_and_one_line_corrects_it() {
+        let switches = |name_learn_fix: bool, at_setup: bool| FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix,
+            at_setup,
+            ..FaceSwitches::default()
+        };
+        let call = |name: &str, replace: bool| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": name, "replace": replace}),
+        };
+        let after = |lamp: &str, this: &str| Said {
+            this: this.into(),
+            before: vec![("Call me something else.".into(), lamp.into())],
+        };
+        let spelled = after("How do you spell it?", "A, m, a.");
+        let read_back = "Ama: A, M, A. Got it.";
+        let (socket, sent) = eyes(vec![
+            json!({"remembered": "Ama", "replaced": ["Tove"]}),
+            json!({"remembered": "Ama"}),
+            json!({"remembered": "Ama"}),
+            json!({"remembered": "Ana", "replaced": ["Ama"]}),
+            json!({"remembered": "Ana", "replaced": ["Ama"]}),
+            json!({"remembered": "Ana", "replaced": ["Ama"]}),
+        ]);
+        let run = |call: &ToolCall, switches: FaceSwitches, said: &Said| {
+            run_switched(&socket, call, switches, said, None, &mut None).0
+        };
+        // Kept from letters, on a rename and at setup: said back.
+        let told = run(&call("Ama", true), switches(true, false), &spelled);
+        assert_eq!(told["say_back"], read_back, "{told}");
+        assert_eq!(told["note"], SPELLED_KEPT);
+        let told = run(&call("Ama", false), switches(true, true), &spelled);
+        assert_eq!(told["say_back"], read_back, "{told}");
+        // Off: kept at setup as before, nothing said back.
+        let told = run(&call("Ama", false), switches(false, true), &spelled);
+        assert_eq!(told["ok"], true, "{told}");
+        assert_eq!(told.get("say_back"), None);
+        // One line right after the read-back corrects it, on a rename and
+        // at setup, and the name it makes is said back again.
+        for (this, at_setup) in [
+            ("No, N as in nose.", false),
+            ("No, it's A n a.", false),
+            ("No, N as in nose.", true),
+        ] {
+            let said = after(read_back, this);
+            let off = run(&call("Ana", true), switches(false, at_setup), &said);
+            assert!(refused_here(&off), "off, {this}: {off}");
+            let on = run(&call("Ana", true), switches(true, at_setup), &said);
+            assert_eq!(on["say_back"], "Ana: A, N, A. Got it.", "{this}: {on}");
+        }
+        // A line that fixes another letter, more letters than it names,
+        // or another name, renames nothing.
+        for (name, this) in [
+            ("Ava", "No, N as in nose."),
+            ("Nna", "No, N as in nose."),
+            ("Linh", "No, N as in nose."),
+            ("Ana", "Nice, thanks."),
+        ] {
+            let on = run(&call(name, true), switches(true, false), &after(read_back, this));
+            assert!(refused_here(&on), "{name}, {this}: {on}");
+        }
+        assert_eq!(sent.join().unwrap().len(), 6);
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
 
