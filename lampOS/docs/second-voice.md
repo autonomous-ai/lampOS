@@ -2572,7 +2572,8 @@ order is kept. A written turn is the same from the chat on.
   for. With
   Days memory, the note is asked once per run of turns for one person.
   A run ends when the person changes or the worker restarts, and, with
-  `LAMP_MEMORY_REOPEN_QUIET=on` (off unless set, #1693 (1)), when no turn
+  `LAMP_MEMORY_REOPEN_QUIET=on` (off unless set, on in the product unit;
+  #1693 (1), C20), when no turn
   was told for ten minutes (`thread::REMEMBERED_FOR`, after which the
   thread's exchanges aren't told either). The next turn then asks the note
   again as a new session, so the same person back the next morning can be

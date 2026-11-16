@@ -3492,7 +3492,8 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   `days::forgetting_a_kept_thing_removes_its_day`,
   `days::a_kept_day_is_given_only_to_the_person_who_kept_it`.
 - **The same person, the next day** (#1693 (1), `LAMP_MEMORY_REOPEN_QUIET=on`,
-  the second route only; off unless set). A Live session asks for the note
+  the second route only; off unless set, on in the product unit since the
+  owner's yes on 16 Nov, C20). A Live session asks for the note
   each time it connects. The second route asked only when the person
   changed or the worker restarted, so someone who talked to it last night
   and is the first known person this morning kept last night's note, and
