@@ -9,7 +9,7 @@
 //! until it stands.
 
 /// Said as a hot seat begins that will end by itself once cool.
-pub const RESTS: &str = "I'm a bit warm, so I'll rest a few minutes.";
+pub const RESTS: &str = "I'm a bit warm, so I'll rest a little while.";
 /// Said as a seat begins that waits for a person.
 pub const WAITS: &str = "I need a rest. Hold my head a second when you'd like me up.";
 /// The voice's say service, as the first stand asks it (`first_stand`).

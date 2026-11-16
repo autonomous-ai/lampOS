@@ -1053,7 +1053,7 @@ after lamp-52e6's runs on #4501); off unless the unit sets
   As a seat begins, lamp-body asks the voice's say service
   (`/run/lampos-say/say.sock`, `"exact": true`, the first stand's way) for
   one fixed line, said in the owner's language (`language::FIXED_LINES`):
-  "I'm a bit warm, so I'll rest a few minutes." only when it will stand by
+  "I'm a bit warm, so I'll rest a little while." only when it will stand by
   itself, and "I need a rest. Hold my head a second when you'd like me
   up." otherwise. Never in the quiet hours (`lamp_local_time::quiet_hours`),
   where the seated pose says it; the say service refuses it while muted or
