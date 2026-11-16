@@ -2261,8 +2261,10 @@ người nhận hay nội dung:
    từ chối như với giọng nói. Repository GitHub được duyệt là riêng tư mà
    giờ công khai thì chờ, như ở trên.
 6. **Giới hạn** (`skill_writes::Ledger`, `skill-writes.json` trong thư mục
-   kho): tối đa 10 lần gửi mỗi kỹ năng và 30 lần cho mọi kỹ năng trong bất
-   kỳ 24 giờ nào. Mỗi lần gửi được đếm trước khi gửi, từng lần một, nên hai
+   kho): tối đa 50 lần gửi mỗi kỹ năng và 200 lần cho mọi kỹ năng trong bất
+   kỳ 24 giờ nào, và tối đa 5 lần mỗi kỹ năng trong bất kỳ một giờ nào
+   (`PER_SKILL_HOUR`), để một trigger bật tắt liên tục không bao giờ tiêu
+   hết lượt cả ngày của kỹ năng trong vài phút. Mỗi lần gửi được đếm trước khi gửi, từng lần một, nên hai
    lần cùng lúc không bao giờ cùng vượt giới hạn. Lần gửi thất bại sau đó
    vẫn được đếm. Sổ chỉ giữ tên kỹ năng và thời điểm, nên khởi động lại
    không quên các lần gửi trong ngày. Nó đóng khi lỗi: sổ không đọc được,
@@ -2410,8 +2412,8 @@ bởi một lượt chạy của kỹ năng trên Hermes của đèn, không ph�
   (`serve::Services::run_fixed_write`): lời đồng ý đã giữ của chủ khớp đúng
   nội dung đó (lượt chạy đổi một trường nào bị từ chối "not sent: this write
   is not the one the owner said yes to", không bao giờ bị giữ chờ lời đồng ý
-  nói ra), liên kết lúc đồng ý, giới hạn trong ngày (10 mỗi kỹ năng, 30 cho
-  tất cả) và nhật ký đã gửi, và **một lần mỗi lượt chạy**: lần thử thứ hai,
+  nói ra), liên kết lúc đồng ý, giới hạn trong ngày (50 mỗi kỹ năng, 200 cho
+  tất cả, 5 mỗi kỹ năng một giờ) và nhật ký đã gửi, và **một lần mỗi lượt chạy**: lần thử thứ hai,
   dù gửi gì, cũng bị từ chối ("not sent: a skill's fixed write is sent once
   a run …"). Tác tử được báo "Sent, as the owner said yes to it." Mọi lệnh
   gọi khác của lượt đó bị từ chối, và khi công tắc tắt ở đây thì lệnh gọi
@@ -2542,7 +2544,7 @@ lẫn lượt chạy đều không giữ token nào.
   nói là quá dài, và lượt chạy kết thúc mà không gửi gì. Lần ghi chỉ được
   gửi bằng đường gửi hiện có, lời đồng ý nói ra qua
   cổng của giọng nói, và khi đó tính vào giới hạn của kỹ năng như lần ghi
-  của kỹ năng tự tạo (10 lần một ngày mỗi kỹ năng, 30 lần cho mọi kỹ năng,
+  của kỹ năng tự tạo (50 lần một ngày mỗi kỹ năng, 200 lần cho mọi kỹ năng,
   `skill_writes::Ledger`): vượt quá thì "not sent".
 - **Giọng nói đọc lại nó** (`crates/voice/src/run_write_yes.rs`, với
   `LAMP_SKILL_TASKS=on` cả trong `lamp-voice`). Bộ điều phối hỏi chương
@@ -2684,7 +2686,7 @@ qua một socket mở.
   owner's yes: nothing is sent". Giọng nói đọc lại lệnh ghi đang giữ
   (`run_write_yes`, "Your <skill> skill wants to send: …") và chờ lời đồng ý
   nói rõ của chủ (cơ chế chờ của #6558); chỉ khi đó chương trình này mới gửi,
-  tính vào giới hạn của kỹ năng (3 lần một ngày mỗi kỹ năng, 10 cho tất cả).
+  tính vào giới hạn của kỹ năng (20 lần một ngày mỗi kỹ năng, 100 cho tất cả).
   Lệnh ghi cố định của một kỹ năng tự tạo chạy qua tác tử
   (`LAMP_SKILL_WRITE_AGENT`, bật trong sản phẩm) là lệnh ghi duy nhất được
   gửi theo lệnh gọi của một lượt chạy, và chỉ như lời đồng ý đã giữ của chủ,
