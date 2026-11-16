@@ -574,26 +574,45 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   says "Sorry, I can't answer just now." (`DOWN_LINE_CANNOT`) instead, at
   most once a minute, since asking again won't mend it and the slow line
   would promise it would (the Reviewer-lead's P3 on #3771); its journal:
-  `said it can't answer just now`. A 429 that keeps coming is a usage
-  limit, not a burst (#7346: lamp-74ff's relay answered 429 for over an
-  hour on 16 Nov, and the lamp said "slow" and "still slow" the whole
-  time): the route keeps when the first 429 before any word came, and a
-  429 that comes `LIMIT_AFTER` (2 min) or more after it, with no chat round
-  begun between, says "I've hit my usage limit." (`DOWN_LINE_LIMIT`, V1's
-  `PhraseLLMLimit`) instead of the slow line, once a run of 429s: every
-  later 429 in the same run says neither line and sends no `DownLineSaid`,
+  `said it can't answer just now`. A usage limit says so, not "slow"
+  (#7346: lamp-74ff's relay answered 429 for over an hour on 16 Nov, and
+  the lamp said "slow" and "still slow" the whole time). It is recognised
+  first by the relay's own word: a 429 whose body has `error.code`
+  `usage_limit` (Backend, #1711; `net::usage_limit`, read from the first
+  4 KiB of the body, `REFUSAL_BYTES`, so a large body is never read whole)
+  is a usage limit at once (`net::Error::UsageLimit`). Its time back is the
+  body's `reset_at` (RFC 3339), else `now + retry-after` seconds (at most
+  30 days). The journal: `the service's usage limit (HTTP 429, usage_limit)
+  resets at <unix s> (in N s)`, with no key and no account. Without that
+  word (an older relay, another service, a body that isn't JSON), the
+  fallback is persistence: the route keeps when the first 429 before any
+  word came, and a 429 that comes `LIMIT_AFTER` (2 min) or more after it,
+  with no chat round begun between, is a usage limit too (a rate burst's
+  per-minute window passes well within 2 min). Either says "I've hit my
+  usage limit." (`DOWN_LINE_LIMIT`, V1's `PhraseLLMLimit`) instead of the
+  slow line, and with a time back it says when, in the lamp's local time
+  (`local_time::offset_here`) and the owner's language
+  (`usage_limit::line_at`): "I've hit my usage limit. It comes back at
+  7 AM." ("Mình hết hạn mức rồi, 7 giờ sáng sẽ có lại."), and for a time
+  more than a day away the day only ("It comes back on Tuesday."). That
+  line can't be rendered ahead, so it is rendered when it is said, within
+  3 s (`LIMIT_RENDER_WITHIN`); if the voice can't render it (it may be at
+  the same limit), the plain line rendered ahead with the other down lines
+  is said instead, and with no local time known, the plain line too. It is
+  said once a run of 429s: every later ask in the same run hears nothing,
   however long the run lasts (V2's ruling on #7362's row: on lamp-52e6 at
-  23:21 and again at 23:24 it was said twice in one run). Any chat round
-  that begins, or a refusal with another status, ends the run, and a later
-  run says it once again. Recognised by how long the 429s
-  last, not by their body: the relay is not in this repo, its body is
-  unknown (the journal keeps only its codes) and a rate burst's per-minute
-  window passes well within 2 min. Until the line is rendered the slow line
-  is said as before. Its journal: `said it has hit its usage limit (429s
-  for N s)`. The journal: `said its thoughts are slow`,
+  23:21 and again at 23:24 it was said twice in one run), and still sends
+  `DownLineSaid`, so the coordinator says no `turn_lost` over it either
+  (the Reviewer-lead's question on #7362: `turn_lost` is an audible
+  recording). Any chat round that begins, or a refusal with another status,
+  ends the run, and a later run says it once again. Until the plain line is
+  rendered the slow line is said as before. Its journal: `said it has hit
+  its usage limit (429s for N s)`, `, with when it comes back` when timed,
+  and `heard nothing: its usage limit was said earlier in this run` for the
+  quiet asks. The journal: `said its thoughts are slow`,
   and `(again, the shorter line)` for the second. Once the slow line (either
-  one) or the usage-limit line has been handed over, the route sends
-  `DownLineSaid` for the request,
+  one) or the usage-limit line has been handed over, or a quiet ask in a
+  limit run has ended, the route sends `DownLineSaid` for the request,
   before its `TurnFailed`, and the coordinator then says no `turn_lost` over
   it (#4332, failure-notices.md): one failure line a turn. The four lines are
   rendered together, each until it is kept: one whose render failed is asked
