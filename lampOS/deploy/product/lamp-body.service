@@ -42,8 +42,6 @@ Environment=LAMP_BODY_POSE_ASK=on
 Environment=LAMP_HEAD_TOUCH=on
 # A long strain or a fast-warming joint sits the arm down; twice within an hour seats it until a head hold (#4501, #4899).
 Environment=LAMP_BODY_STRAIN_GUARD=on
-# A lamp seated hot stands again by itself once cool (50 for 5 min), once an hour; a seat says one line (#7281).
-Environment=LAMP_BODY_SEAT_COOLS=on
 # "I'm unplugging you" folds the arm first (#1674, unplug.md): set on Body, Expression, Skills and Voice together
 # (#5747); lamp-52e6 20 Oct, #1699 row 1: ask, fold 6.7 s, head and base home, ready, Expression asleep.
 Environment=LAMP_UNPLUG=on
