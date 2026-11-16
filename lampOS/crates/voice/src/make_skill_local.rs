@@ -2304,10 +2304,15 @@ fn made_and_journaled_by(
         // never handed over (the Reviewer-lead on #6439); one of a send
         // ([`made_skill::BRIEFS_SEND_REFUSALS`]) goes to the agent when it
         // makes service skills, as it can send.
-        Some(_)
+        // With the one run path (#7245), the lamp's agent can do what a
+        // plain skill can't (write a file, run a job), so the brief's
+        // "Not possible yet: a skill can't" goes to it; the brief's other
+        // refusals stay DeepSeek's.
+        Some((agent, _))
             if models_cannot.get()
                 && matches!(&made, Err(Refused(why, _)) if made_skill::briefs_own_refusal(why)
-                    && !(agent_services && made_skill::briefs_send_refusal(why))) =>
+                    && !(agent_services && made_skill::briefs_send_refusal(why))
+                    && !(agent.one_path && made_skill::briefs_skill_cant(why))) =>
         {
             eprintln!(
                 "lamp-voice: a skill made here: DeepSeek's cannot is one the brief asks for: \
@@ -5629,6 +5634,40 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(told["made"], "evening-dim", "{told}");
         assert_eq!(served.join().unwrap(), 1);
         assert_eq!(tasks.hand_overs(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7245 (lamp-c0a4, 16 Nov 17:24): DeepSeek *refuses* a file-writing
+    /// make with the brief's "Not possible yet: a skill can't". With the one
+    /// run path on, that refusal goes to the lamp's agent; off, it stays
+    /// DeepSeek's as before, and the brief's other refusals stay with it on.
+    #[test]
+    fn with_the_one_path_a_skill_cant_refusal_goes_to_the_agent() {
+        let (root, keeping) = keeping("agent-skill-cant");
+        let cant = "cannot: Not possible yet: a skill can't write a file. You could ask for a reminder instead.";
+        let tasks = agent_answering(vec![Some(good())]);
+        let off = tasks.agent();
+        let (url, served) = service(vec![(200, cant.to_owned())]);
+        let told = made_by(&keeping, url, Some(&off), NOW);
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.hand_overs(), 0, "off: DeepSeek's refusal stands");
+        let on = crate::make_skill_agent::Agent {
+            one_path: true,
+            ..tasks.agent()
+        };
+        let own =
+            "cannot: I can't do that yet: hearing what is said. You could ask for a glow instead.";
+        let (url, served) = service(vec![(200, own.to_owned())]);
+        let told = made_by(&keeping, url, Some(&on), NOW + 1);
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.hand_overs(), 0, "on: the brief's other refusals stay");
+        let (url, served) = service(vec![(200, cant.to_owned())]);
+        let told = made_by(&keeping, url, Some(&on), NOW + 2);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.hand_overs(), 1, "on: the agent makes it");
         let _ = std::fs::remove_dir_all(&root);
     }
 
