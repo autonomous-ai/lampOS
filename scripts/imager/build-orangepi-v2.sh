@@ -18,7 +18,10 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/check_ext4.sh"
 
 DEVICE_TYPE="lamp"
-OUT_IMG_SIZE="${OUT_IMG_SIZE:-8G}"
+# 12G: Harness, Hermes (2.4 GB) and OpenClaw come on the image (#7274), and OpenClaw's
+# install wants 2 GiB free in /var/lib; at 8G the root had 1.8 GiB left. The card's own
+# size is taken at first boot (resize-once).
+OUT_IMG_SIZE="${OUT_IMG_SIZE:-12G}"
 AP_BAND="${AP_BAND:-2.4}"
 AP_CHANNEL="${AP_CHANNEL:-}"
 COUNTRY_CODE="${COUNTRY_CODE:-US}"
@@ -529,6 +532,48 @@ done
 for path in /opt/hal /usr/local/bin/os-server /usr/local/bin/bootstrap-server /usr/local/bin/software-update; do
   [ ! -e "${MNT}${path}" ] || err "V1's ${path} is on the image"
 done
+
+# Phase 4b: the lamp's agents on the image (#7274): Harness, Hermes and OpenClaw, put there
+# by lamp-update's own installs, as lamp-update's switches on a product lamp want them
+# (`lamp-update agents-preinstall`), so a new lamp's app shows them installed from setup.
+# Run under pivot_root in a mount namespace, not chroot: the kernel refuses a user namespace
+# to a chrooted process, and the Hermes and OpenClaw installs try theirs as lampos first.
+# A build of lampOS from before #7274 has no agents-preinstall: the image is made without them.
+UPDATE_BIN=/opt/lampOS/update/current/lamp-update
+if chroot "${MNT}" "${UPDATE_BIN}" --help 2>&1 | grep -q 'agents-preinstall'; then
+  log "Phase 4b — the lamp's agents (lamp-update agents-preinstall)"
+  mkdir -p "${MNT}/proc" "${MNT}/sys" "${MNT}/dev"
+  unshare --mount --fork bash -euo pipefail -c '
+    mount --make-rprivate /
+    mount --bind "$1" "$1"
+    mount -t proc proc "$1/proc"
+    mount --rbind /dev "$1/dev"
+    mount --rbind /sys "$1/sys"
+    mkdir -p "$1/.pivot-old"
+    cd "$1"
+    pivot_root . .pivot-old
+    umount -l /.pivot-old
+    rmdir /.pivot-old
+    cd /
+    exec "$2" agents-preinstall
+  ' agents "${MNT}" "${UPDATE_BIN}" 2>&1 | tee /work/agents.log \
+    || err "the lamp's agents were not put on the image (/work/agents.log)"
+  for f in /usr/local/bin/harness /usr/local/bin/hermes /usr/local/bin/openclaw \
+           /etc/systemd/system/lamp-openclaw-gateway.service; do
+    [ -e "${MNT}${f}" ] || err "missing after the agents' install: ${f}"
+  done
+  # Installed, never signed in: nothing of a person's is on the image.
+  for f in /var/lib/lampos-tasks/.harness/auth /var/lib/lampos-tasks/.harness/connections; do
+    [ ! -e "${MNT}${f}" ] || err "a sign-in is on the image: ${f}"
+  done
+  for f in harness-ask.json hermes-ask.json openclaw-ask.json; do
+    [ ! -e "${MNT}/var/lib/lampos-update/${f}" ] || err "an install ask is left on the image: ${f}"
+  done
+  log "The lamp's agents: $(du -sh "${MNT}/var/lib/lampos-tasks" "${MNT}/var/lib/lampos-hermes" \
+    "${MNT}/var/lib/lampos-openclaw" 2>/dev/null | awk '{printf "%s %s; ", $2, $1}')"
+else
+  log "Phase 4b skipped: this lampOS build's lamp-update has no agents-preinstall (#7274)"
+fi
 
 # Phase 5: resize-once.service (as build-orangepi.sh).
 log "Phase 5 — resize-once (first-boot expand)"
