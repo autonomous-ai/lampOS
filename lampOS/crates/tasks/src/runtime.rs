@@ -1562,18 +1562,19 @@ impl SetUp {
 /// while one is due or its job is in flight, and let go when the owner
 /// ends, however it ends.
 struct OwnerGate {
+    gate: &'static DaemonGate,
     marked: bool,
     in_flight: bool,
 }
 impl OwnerGate {
     fn show(&mut self, due: bool) {
         let now = due || self.in_flight;
-        DaemonGate::shared().starting(&mut self.marked, now);
+        self.gate.starting(&mut self.marked, now);
     }
 }
 impl Drop for OwnerGate {
     fn drop(&mut self) {
-        DaemonGate::shared().starting(&mut self.marked, false);
+        self.gate.starting(&mut self.marked, false);
     }
 }
 enum Job {
@@ -1956,6 +1957,7 @@ fn owner<C: Clock>(
     // shows it to every other `harness new` caller ([`DaemonGate`]): they
     // wait for it, and fire no second start. Let go when the owner ends.
     let mut gate = OwnerGate {
+        gate: DaemonGate::shared(),
         marked: false,
         in_flight: false,
     };
@@ -2315,12 +2317,18 @@ fn owner<C: Clock>(
                                     && sign_in == SignIn::Out
                                     && lamp_side
                                 {
+                                    // A plain `harness start`, not
+                                    // `--restart`: it starts the stopped
+                                    // daemon and leaves a running one
+                                    // alone, so it never waits for busy
+                                    // tasks (the restart gate below) while
+                                    // every hand-over fails.
                                     eprintln!(
                                         "tasks: Harness signed out: its daemon is started again for the lamp's own target (#7275)"
                                     );
                                     start_daemon_due = Some(Instant::now());
                                     daemon_tries = 0;
-                                    daemon_restart = true;
+                                    daemon_restart = false;
                                 }
                                 // Signed in anew: the lamp not among the
                                 // machines may be said again (#7019).
@@ -2698,7 +2706,10 @@ fn owner<C: Clock>(
             };
             if let Some(job) = next {
                 if matches!(job, Job::StartDaemon(_)) {
+                    // Shown before the job is handed on, so no other
+                    // `harness new` caller fires its own start meanwhile.
                     gate.in_flight = true;
+                    gate.show(true);
                 }
                 // The durable attempt precedes this handoff. If this queue or
                 // worker fails, reopening records uncertainty without a resend.
@@ -6805,5 +6816,41 @@ mod tests {
         fs::write(&path, theirs).unwrap();
         assert!(!write(&[machine('b', "Office iMac", false)]).changed);
         assert!(!names.exists());
+    }
+
+    /// #7275: the owner's mark on the daemon gate follows its start due or
+    /// in flight, and is let go once neither is: after a start that failed
+    /// its last try (no start due again), and when the owner ends, so a
+    /// `harness new` caller never waits `DAEMON_GATE_WAIT` on a start that
+    /// will not come.
+    #[test]
+    fn the_owners_daemon_gate_mark_is_let_go_after_the_last_failed_try() {
+        use super::{DaemonGate, OwnerGate};
+        let shared: &'static DaemonGate = Box::leak(Box::default());
+        let mut gate = OwnerGate {
+            gate: shared,
+            marked: false,
+            in_flight: false,
+        };
+        // Due: marked.
+        gate.show(true);
+        assert!(shared.busy());
+        for last in [false, true] {
+            // Its job handed on: no start due, the job in flight.
+            gate.in_flight = true;
+            gate.show(true);
+            gate.show(false);
+            assert!(shared.busy());
+            // It failed: due again later while tries are left, else none.
+            gate.in_flight = false;
+            gate.show(!last);
+            assert_eq!(shared.busy(), !last);
+        }
+        assert!(shared.wait(std::time::Duration::ZERO));
+        // Marked again, and let go when the owner ends.
+        gate.show(true);
+        assert!(shared.busy());
+        drop(gate);
+        assert!(!shared.busy());
     }
 }

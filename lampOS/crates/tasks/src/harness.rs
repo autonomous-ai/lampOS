@@ -4366,11 +4366,13 @@ fn dispatch_line(launch: &Launch, outcome: &LaunchOutcome, seen: &Seen, took: Du
         launch.name,
         took.as_secs_f64()
     );
-    // Harness's own words that no daemon runs here are said whole, on one
-    // line, so the lamp's journal shows them as Harness gave them: they
-    // were matched as that fixed answer, not the person's words.
+    // Harness's own words that no daemon runs here are said whole, so the
+    // lamp's journal shows them as Harness gave them: only stderr's lines
+    // that are that fixed answer, never another line, which may hold the
+    // person's words. Any other stderr (and a not-running answer said on
+    // stdout only) goes through `said_of_stderr`'s cut.
     let whole = matches!(outcome, LaunchOutcome::NotSent { code } if code == HARNESS_NOT_RUNNING)
-        .then(|| stderr_one_line(&seen.stderr))
+        .then(|| not_running_lines(&seen.stderr))
         .flatten();
     if let Some(said) =
         whole.or_else(|| said_of_stderr(&seen.stderr, &launch.prompt, &seen.machines))
@@ -4381,14 +4383,15 @@ fn dispatch_line(launch: &Launch, outcome: &LaunchOutcome, seen: &Seen, took: Du
     line
 }
 
-/// All of stderr on one line: each line trimmed, the empty ones left out,
-/// joined with a space. Nothing when it has no words.
-fn stderr_one_line(stderr: &[u8]) -> Option<String> {
+/// Stderr's lines that say Harness is not running here ([`not_running_here`]),
+/// each trimmed, joined with a space on one line. Nothing when no line says
+/// it: the rest of stderr is never said whole.
+fn not_running_lines(stderr: &[u8]) -> Option<String> {
     let text = String::from_utf8_lossy(stderr);
     let joined = text
         .lines()
         .map(str::trim)
-        .filter(|line| !line.is_empty())
+        .filter(|line| not_running_here(&[], line.as_bytes()))
         .collect::<Vec<_>>()
         .join(" ");
     (!joined.is_empty()).then_some(joined)
