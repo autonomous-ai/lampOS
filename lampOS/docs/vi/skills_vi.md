@@ -3273,6 +3273,47 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   Lần chạy có thể đã bắt đầu (`run_failed`, không có trả lời) vẫn được đếm.
   Trên lamp-9adf ngày 15/11, một kỹ năng hiện diện bị từ chối `busy` đã tiêu
   lần chạy cuối của ngày, và kỹ năng đến lượt 4 giây sau không còn lần nào.
+  Với `LAMP_SKILL_TASK_SURE=on` (chỉ `lamp-skills`, tắt nếu không đặt,
+  không unit sản phẩm nào đặt; `task_sure`), thêm hai điều. **Lần chạy
+  thất bại được nói ra** (`task_sure::failed_line`): khi lamp-tasks trả lời
+  `ok:false`, hoặc không có trả lời, đèn nói với chủ đèn một câu ngắn cố
+  định, sau cổng của câu trả lời cần nói (dưới: chủ đèn một mình, giờ yên
+  lặng, lượt đọc duy nhất của đèn; `LAMP_TOLD_WHEN_ASKED` bỏ giờ yên lặng
+  như với câu trả lời của agent), không bao giờ là lời của tác vụ hay lời
+  của lamp-tasks: `missing_secret` "<Skill> couldn't run: it needs a key added in the app, on its page.";
+  mọi lời từ chối khác trước khi agent bắt đầu, hoặc không tới được
+  lamp-tasks, "<Skill> couldn't run this time."; `run_failed`, không có trả
+  lời hay mọi thứ khác "<Skill> didn't finish this time.". Nhật ký ghi
+  `do.task: what became of its run: told 1` (hoặc kết quả của cổng). Trước
+  đây chỉ nhật ký có nó, kể cả sau khi giọng nói đã nói "<skill> is running
+  now". **Lần chạy bị từ chối `busy` chờ đến lượt** (`task_sure::Line`,
+  `task_sure::LAMP`): lamp-tasks chạy mỗi lúc một tác vụ của kỹ năng, nên
+  hai tác vụ đến hạn cùng một phút (thư buổi sáng và lịch, cùng lúc 8:00)
+  thì mất một. Nó chờ trong hàng duy nhất của đèn, tối đa 4 cái trong hàng
+  (tính cả cái đang được giao từ hàng, nên không bao giờ quá 4 cái chờ),
+  vào trước ra trước, mỗi cái tối đa 15 phút từ lúc bắt đầu chờ, và được giao lại ngay khi lần giao đang chạy của
+  lamp-skills kết thúc (`Handing`), hoặc mỗi 10 giây khi lamp-tasks nói
+  `busy` mà lamp-skills không có lần giao nào đang chạy. Tác vụ đến hạn khi
+  đã có cái đang chờ thì xếp sau nó. Lần thử lại trả về trước khi được gửi
+  (cái "có" của nó đã đổi trong lúc chờ, thư mục mất, hết giới hạn) không
+  phải `busy`: nó rời hàng ngay với lý do của chính nó (`task_sure::Tried`).
+  Mỗi lần thử bị `busy` được ghi nhật ký
+  và gỡ khỏi sổ như trên, nên cách đếm như trước; lần chạy chỉ được đếm ở
+  lần thử lamp-tasks nhận. Quá giới hạn hay quá 15 phút thì bỏ và nói
+  "<Skill> didn't run this time: the lamp was busy with other skills."
+  (nhật ký: `do.task: not handed over: lamp-tasks is busy and 4 tasks wait
+  already` hoặc `its turn didn't come in 15 minutes`); kỹ năng có tác vụ
+  trước vẫn đang chờ thì chỉ ghi nhật ký (`its last task waits its turn
+  already`). Nó chờ trên luồng giao việc riêng, không bao giờ trên vòng
+  lặp chính, và không giữ token hay tệp nào, nên lamp-skills dừng thì nó
+  chỉ kết thúc. Tắt: một lần thử, không nói gì về thất bại, như trước.
+  Test (`task_sure::tests`): `a_failed_run_is_one_fixed_line_a_reason`,
+  `a_busy_task_is_handed_over_after_the_first_ends`,
+  `the_line_holds_at_most_its_bound`, `a_wait_past_its_longest_is_let_go`,
+  `a_busy_try_is_tried_again_after_every`, `the_line_is_first_in_first_out`,
+  `a_task_past_the_bound_is_let_go_and_none_jumps_the_line`,
+  `a_try_refused_before_its_send_is_no_busy`,
+  `off_it_is_one_try_as_before`; `service_read::tests::a_failed_runs_line_is_told_only_through_the_gate`.
   Lần chạy chỉ gồm `do.task` được kiểm tra trước, chỉ đọc
   (biết thư mục của nó, rồi `task::would_refuse`: công tắc, `--state-dir`,
   lần trước còn chạy, giới hạn): bị từ chối thì không giao gì, `Done` của lần chạy ghi "not made: "
