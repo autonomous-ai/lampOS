@@ -516,22 +516,14 @@ fn path(decision: Option<&Decision>) -> String {
                     HandStage::Declined => " · declined",
                 });
             }
-            format!("<span class=\"badge badge-blue\">{}</span>", escape(&text))
+            // `engine_name` escapes what it does not know; the rest is ours.
+            format!("<span class=\"badge badge-blue\">{text}</span>")
         }
         DecisionKind::HeldBack => "<span class=\"badge badge-grey\">HELD BACK</span>".to_owned(),
         DecisionKind::Error => format!(
             "<span class=\"badge badge-red\">{}</span>",
             escape(decision.error_code.as_deref().unwrap_or("error"))
         ),
-    }
-}
-
-/// An engine as people know it.
-fn engine_name(engine: &str) -> &str {
-    match engine {
-        "openclaw" => "OpenClaw",
-        "hermes" => "Hermes",
-        other => other,
     }
 }
 
