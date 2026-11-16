@@ -124,6 +124,12 @@ pub struct HumanDoingMore {
     pub desk_work_s_ago: u32,
     /// The desk work last seen this sitting; `none` before any.
     pub desk_work: DeskWork,
+    /// This sitting's desk-work time, in seconds: the time between two
+    /// bursts in a row that both saw desk work, each gap counted up to the
+    /// burst period (60 s), so a missed burst never counts a long gap. 0
+    /// before any; a number only. Absent (an older `lamp-seen`) reads as 0.
+    #[serde(default)]
+    pub desk_s: u32,
     /// Seconds since celebrating (celebrating, clapping, applauding) was
     /// seen, or since the desk arrival.
     pub celebrate_s_ago: u32,
@@ -348,10 +354,16 @@ mod tests {
             ate_seen: 1,
             desk_work_s_ago: 0,
             desk_work: DeskWork::Computer,
+            desk_s: 1_200,
             celebrate_s_ago: 600,
         };
-        let text = r#"{"tired_s_ago":60,"tired_seen":2,"drank_seen":3,"ate_seen":1,"desk_work_s_ago":0,"desk_work":"computer","celebrate_s_ago":600}"#;
+        let text = r#"{"tired_s_ago":60,"tired_seen":2,"drank_seen":3,"ate_seen":1,"desk_work_s_ago":0,"desk_work":"computer","desk_s":1200,"celebrate_s_ago":600}"#;
         round_trip(&more, text);
+        // `desk_s` came later: absent, it reads as 0.
+        assert_eq!(
+            serde_json::from_str::<HumanDoingMore>(&text.replace(r#""desk_s":1200,"#, "")).unwrap(),
+            HumanDoingMore { desk_s: 0, ..more }
+        );
         for field in [
             "tired_s_ago",
             "tired_seen",
