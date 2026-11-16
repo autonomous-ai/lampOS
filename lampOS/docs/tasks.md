@@ -3657,7 +3657,10 @@ path, with no second runner:
   skill's run on OpenClaw" below), told `answer.md` by its full path.
   `answer.md` is read back as above; with none, the agent's chat answer is
   taken when it is a make's answer itself, a `cannot:` line or the fenced
-  blocks, at most 20 KiB (`skill_make::chat_is_answer`, #7278). No
+  blocks, at most 20 KiB (`skill_make::chat_is_answer`, #7278). A chat
+  answer Harness says is `truncated` (the end `show` reads at most 4,000
+  characters, `Cli::shown_end`) is never taken: a make's answer cut
+  mid-file stays `no_answer` (#7376). No
   token is minted and no skill-start run is opened (`gateway::open_start`
   is not called): a make has no grants. The Harness session and the folder
   are removed however the make ends: an answer, `cannot:`, past its

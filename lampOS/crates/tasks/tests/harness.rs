@@ -9506,6 +9506,44 @@ fn a_gateway_make_with_no_answer_file_takes_a_cannot_chat_answer() {
     }
 }
 
+/// #7376 (Heron's HOLD): the end `show` reads at most 4,000 characters, so a
+/// make's fenced answer longer than that comes back cut, still holding a
+/// ``` fence. A chat answer Harness says is `truncated` is never taken as
+/// the make's answer: with no `answer.md` it is `no_answer`, at a `stopped`
+/// end (the `show` that found its session bound) and at an `idle` one (the
+/// run's end `show`).
+#[test]
+fn a_gateway_make_with_no_answer_file_never_takes_a_cut_chat_answer() {
+    let chat = "skill.toml:\n```toml\nname = \"x\"\n```\nSKILL.md:\n```markdown\n# x\n```\nrun.py:\n```python\nprint(";
+    for end in ["stopped", "idle"] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":{"default":true},
+            "wait":{"stdout":waited(end, AGENT)},
+            "show":step(json!({"id":AGENT,"agent":"OpenClaw","state":"idle","ask":"make","answer":chat,"truncated":true,"tools":1})),
+            "close":{"exit":0},
+        }));
+        let work = make_work(&rig);
+        let gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+        let hermes = MakeHermesStandIn::default();
+        let answered = lamp_tasks::skill_make::answer_with(
+            &make_line(Some(true), 20_000),
+            true,
+            &work,
+            &hermes,
+            Some(&gateway),
+            &mut || {},
+        );
+        assert_eq!(answered["error"], "no_answer", "{end}: {answered}");
+        assert_eq!(
+            fs::read_dir(&work).unwrap().count(),
+            0,
+            "{end}: the folder is gone"
+        );
+    }
+}
+
 /// #7245: a make line with `"one_path":true` on a lamp whose default agent
 /// is an OpenClaw gateway agent is exactly one `harness new openclaw` in a
 /// fresh make folder in the work folder, with no token, no token file and

@@ -2785,8 +2785,9 @@ fn session_bound(seen: &crate::harness::Observation) -> bool {
 
 /// What an agent Harness says `stopped` comes to ([`after_stop`]).
 enum AfterStop {
-    /// It had a session: the run's end, with the agent's last answer.
-    Bound(String),
+    /// It had a session: the run's end, with what `show` read of it (its
+    /// last answer, and whether it was cut).
+    Bound(crate::harness::Observation),
     /// None bound, and this agent, a new one, is live in the run's folder.
     Moved(String),
     /// None bound, and none live in the run's folder within the look.
@@ -2818,7 +2819,7 @@ fn after_stop(
         if let Ok(seen) = cli.observe(machine, agent)
             && session_bound(&seen)
         {
-            return AfterStop::Bound(seen.answer);
+            return AfterStop::Bound(seen);
         }
         if let Ok(live) = cli.live_in(machine, folder)
             && let Some(live) = live.into_iter().find(|id| !seen.contains(id))
@@ -3226,7 +3227,7 @@ impl Runner for HarnessRunner {
         // bound (#6432's [`after_stop`]): its agent started, so the end
         // need not be shown again (#6835 gap 1). Its answer, kept.
         let bound = std::cell::Cell::new(false);
-        let bound_answer = std::cell::RefCell::new(None::<String>);
+        let bound_answer = std::cell::RefCell::new(None::<crate::harness::Observation>);
         let ended = std::thread::scope(|scope| {
             let (done, wakes) = std::sync::mpsc::channel::<()>();
             let cancel = &cancel;
@@ -3321,7 +3322,7 @@ impl Runner for HarnessRunner {
                 // ready as a shell, the same id with agent "Terminal", and
                 // `wait` reads it idle: asked, so such a run is never said
                 // done (#6835 gap 1).
-                let (seen, answer) = if bound.get() {
+                let (seen, shown_answer) = if bound.get() {
                     (AgentSeen::Started(agent.to_string()), bound_answer.take())
                 } else {
                     // One `show`: the agent Harness names, and its answer.
@@ -3338,6 +3339,10 @@ impl Runner for HarnessRunner {
                         answer,
                     )
                 };
+                // Whether Harness cut the answer it read (`--chars 4000`):
+                // a make never takes a cut chat as its answer (#7376).
+                let cut = shown_answer.as_ref().is_some_and(|seen| seen.truncated);
+                let answer = shown_answer.map(|seen| seen.answer);
                 eprintln!("{}", run_line(&run.run, &state, took, &seen));
                 if seen == AgentSeen::NeverStarted {
                     // Never success, and never made again: Harness says it
@@ -3365,11 +3370,12 @@ impl Runner for HarnessRunner {
                         // No `answer.md`: the agent's chat answer, only when
                         // it is a make's answer itself (#7278, lamp-c0a4
                         // 19:03: OpenClaw replied its `cannot:` line in chat
-                        // and wrote no file).
+                        // and wrote no file), and never one Harness cut
+                        // (#7376): a cut make answer stays `no_answer`.
                         let text = crate::skill_make::answer_in(&started.folder).or_else(|| {
                             answer
                                 .as_deref()
-                                .filter(|chat| crate::skill_make::chat_is_answer(chat))
+                                .filter(|chat| !cut && crate::skill_make::chat_is_answer(chat))
                                 .map(str::to_owned)
                         });
                         if let Some(text) = text {
