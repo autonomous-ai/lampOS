@@ -282,10 +282,12 @@ impl CloudRequest {
     }
 
     pub(super) fn can_submit(&self, cloud: &CloudAvailability) -> bool {
-        !self.input_abandoned
-            && self.outcome.is_none()
-            && !self.input_end_submitted
-            && cloud.ready_session() == Some(self.session)
+        self.input_open() && cloud.ready_session() == Some(self.session)
+    }
+
+    /// Input may still go out for this request, its session ready or not.
+    pub(super) fn input_open(&self) -> bool {
+        !self.input_abandoned && self.outcome.is_none() && !self.input_end_submitted
     }
 
     pub(super) fn complete(&mut self, idle: bool) -> io::Result<()> {
