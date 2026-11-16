@@ -151,6 +151,75 @@ pub fn energy_in(data: &serde_json::Value) -> Result<Option<u8>, &'static str> {
     }
 }
 
+/// The fixed words that move the level, each a whole word or phrase in
+/// lowercase, and how far: no model is asked. A lively word adds 2, a
+/// cheerful one 1, a calm one takes 2 away.
+const ENERGY_WORDS: &[(&str, i8)] = &[
+    ("energetic", 2),
+    ("lively", 2),
+    ("excited", 2),
+    ("hyper", 2),
+    ("bubbly", 2),
+    ("playful", 2),
+    ("cheerful", 1),
+    ("upbeat", 1),
+    ("fun", 1),
+    ("curious", 1),
+    ("friendly", 1),
+    ("calm", -2),
+    ("gentle", -2),
+    ("quiet", -2),
+    ("sleepy", -2),
+    ("serene", -2),
+    ("shy", -2),
+];
+
+/// Vietnamese words kept pending the first builder's answer on #6893
+/// (English-only keyword table?). A deliberate non-ASCII fixture; dropped
+/// in one line, the `chain` in [`energy_of`].
+const VI_WORDS: &[(&str, i8)] = &[
+    // Vietnamese: energetic, lively, excited, hyper, playful.
+    ("năng động", 2),
+    ("sôi nổi", 2),
+    ("hào hứng", 2),
+    ("hiếu động", 2),
+    ("nghịch ngợm", 2),
+    // Vietnamese: cheerful, upbeat, fun, curious, friendly.
+    ("vui vẻ", 1),
+    ("vui tươi", 1),
+    ("vui tính", 1),
+    ("tò mò", 1),
+    ("thân thiện", 1),
+    // Vietnamese: calm, gentle, quiet, sleepy, serene, shy.
+    ("điềm tĩnh", -2),
+    ("nhẹ nhàng", -2),
+    ("trầm lặng", -2),
+    ("buồn ngủ", -2),
+    ("thanh thản", -2),
+    ("nhút nhát", -2),
+];
+
+/// The level the owner's words give when none was chosen: 1, moved by
+/// each of [`ENERGY_WORDS`] (and [`VI_WORDS`]) found as whole words, held
+/// to 1 to 5. No match, or only calm ones, is 1, as the lamp always moved.
+pub fn energy_of(words: &str) -> u8 {
+    let lower = words.to_lowercase();
+    let said: Vec<&str> = lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let moved: i32 = ENERGY_WORDS
+        .iter()
+        .chain(VI_WORDS)
+        .map(|(phrase, by)| {
+            let phrase: Vec<&str> = phrase.split(' ').collect();
+            let found = said.windows(phrase.len()).filter(|w| *w == phrase).count();
+            found as i32 * i32::from(*by)
+        })
+        .sum();
+    (1 + moved).clamp(1, 5) as u8
+}
+
 /// The level kept at `path` ([`ENERGY_FILE`]): none, or one that does
 /// not read, is level 1.
 pub fn energy_kept(path: &std::path::Path) -> crate::Energy {
@@ -244,6 +313,26 @@ mod tests {
         ] {
             assert_eq!(energy_in(&refused), Err(ENERGY_UNFIT), "{refused}");
         }
+    }
+
+    #[test]
+    fn the_words_give_a_level_from_the_fixed_table() {
+        assert_eq!(energy_of("Energetic, playful and EXCITED!"), 5);
+        assert_eq!(energy_of("lively"), 3);
+        assert_eq!(energy_of("cheerful and curious"), 3);
+        assert_eq!(energy_of("calm and quiet"), 1);
+        assert_eq!(energy_of("a wise old owl"), 1);
+        assert_eq!(energy_of(""), 1);
+        // Whole words only: "funny" and "shyness" are neither "fun" nor "shy".
+        assert_eq!(energy_of("funny"), 1);
+        assert_eq!(energy_of("playful, no shyness"), 3);
+        // A calm word takes a lively one back.
+        assert_eq!(energy_of("playful but gentle"), 1);
+        // Vietnamese (VI_WORDS, pending #6893): "lively and playful",
+        // "cheerful", "calm, gentle".
+        assert_eq!(energy_of("Sôi nổi và nghịch ngợm"), 5);
+        assert_eq!(energy_of("vui vẻ"), 2);
+        assert_eq!(energy_of("điềm tĩnh, nhẹ nhàng"), 1);
     }
 
     #[test]
