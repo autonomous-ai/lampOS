@@ -466,7 +466,9 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
     }
     // With posture sending, the on line owed names it, and posture sends
     // nothing until that line has begun for the kept yes.
-    let mut said_back = SaidBack::with_posture(outlet.pose.is_some());
+    // With LAMP_SEEN_MORE_DOINGS on, it names tiredness, desk work and
+    // celebrating too, and humans/doing_more waits for it the same way.
+    let mut said_back = SaidBack::with_posture(outlet.pose.is_some()).with_more(more_doings);
     let mut posture_out = match outlet.pose {
         Some(_) => Some(bus.publisher_declared(
             HumanPosture::TOPIC,
@@ -693,6 +695,13 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         {
             pose.forget();
         }
+        // Tiredness, desk work and celebrating only while the opt-in is on
+        // and the line naming them has begun for the kept yes; otherwise
+        // none is timed or said, and what was seen is forgotten.
+        let more_said = said_back.said_more(opted_in, &kept, &record);
+        if !more_said && let Some(sitting) = seat.sitting_mut() {
+            sitting.forget_more();
+        }
         // Kept through a short closing: nothing said from it.
         let sitting_held = plan.sitting.holds();
         if let Some((taker, marked)) = frames.as_mut() {
@@ -725,7 +734,9 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
                     }
                     // Its other timers wait for the next 30 s, so
                     // humans/doing goes out as often as without them.
-                    sitting.saw_more(&finished.more, now);
+                    if more_said {
+                        sitting.saw_more(&finished.more, now);
+                    }
                     if finished.seen.iter().any(|seen| sitting.takes(seen.what)) {
                         // Said at once, not at the next 30 s.
                         doing_said = None;
@@ -756,7 +767,9 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             if doing.check().is_ok() {
                 let _ = doing_out.publish_json(now, &doing);
             }
-            if let (Some(out), Some(more)) = (doing_more_out.as_mut(), sitting.doing_more(now)) {
+            if let (true, Some(out), Some(more)) =
+                (more_said, doing_more_out.as_mut(), sitting.doing_more(now))
+            {
                 let _ = out.publish_json(now, &more);
             }
             doing_said = Some(Instant::now());
