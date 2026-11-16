@@ -1618,6 +1618,18 @@ With the switch:
   check is as before. Nobody is known yet at setup, so the line is the
   room's: another voice's "Yes." or spelling counts the same as theirs
   ([onboarding.md](onboarding.md), step 2).
+- **A new face only on a yes to keeping it** (`LAMP_NAME_LEARN_FIX=on`,
+  off unless set, #7331). Past setup, a `remember_my_face` with no
+  `replace` is sent to the eyes only when the turn in hand asks for their
+  own face ("remember my face") or agrees to the lamp's face question in
+  its last answer ("Shall I remember your face as Ada?"; both
+  `known_faces::speaker_gave_face_leave`). Anything else, a name alone, a
+  no or another answer, sends nothing, before the name's own checks, and
+  the model is told to ask that question (`ASK_FACE_FIRST`). A name is no
+  yes to keeping a face (the first builder on #7331). Setup asks its own
+  face question, and a rename takes its own yes. Off, a new face is kept
+  on the call as before
+  (`known_faces::tests::a_new_face_is_kept_only_on_a_yes_to_keeping_it`).
 - **The word that called the lamp is not their name**
   (`known_faces::only_the_call`, 25 Oct).
   - **What's refused:** a name heard only as the line's opening word, past any greeting and set off by a comma or a

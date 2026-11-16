@@ -915,6 +915,7 @@ pub(crate) fn refused_here(told: &Value) -> bool {
             ONLY_THE_CALL,
             SAY_IT_BACK,
             NOT_AGREED,
+            ASK_FACE_FIRST,
         ]
         .contains(&error)
     })
@@ -1861,6 +1862,9 @@ const NOT_OWN_NAME: &str = "I could not confirm that this was their own name, so
 const NAME_UNCHANGED: &str = "I cannot safely replace a saved name from this request, so I have not changed anyone's saved face.";
 /// What the model is told when it would replace a name before the person
 /// agreed to the new one.
+/// With `LAMP_NAME_LEARN_FIX` (#7331): a new face not kept for want of
+/// the person's yes to keeping it ([`run_switched`]).
+pub(crate) const ASK_FACE_FIRST: &str = "I have not kept their face: a name is not a yes to keeping a face. Ask them only this, with their name: \"Shall I remember your face as <their name>?\" Call this again only after their yes; if they say no, keep nothing and say that's fine.";
 pub(crate) const NOT_AGREED: &str = "They have not said yes to that name yet. Say the new name back and ask whether they want to be known by it instead. Only if they say yes, call this again with the new name and replace true.";
 /// What the model is told when the face is near someone known by a name one
 /// letter from the one heard (#2176 row 4): the name may be misheard, so
@@ -2520,6 +2524,24 @@ fn run_switched(
         .flatten();
     let name = joined.as_deref().unwrap_or(name);
     let setup = checked && switches.at_setup && call.name == REMEMBER;
+    // With `LAMP_NAME_LEARN_FIX`, a new face is kept only on the person's
+    // leave: their own ask for it ("remember my face") or their yes to the
+    // lamp's face question ("Shall I remember your face as Ada?",
+    // [`speaker_gave_face_leave`]). A name given is no yes to keeping a
+    // face (the first builder on #7331); setup asks its own face question.
+    // Before the name's own checks, so a no is never asked to spell.
+    if checked
+        && switches.name_learn_fix
+        && call.name == REMEMBER
+        && !replacing
+        && !setup
+        && !speaker_gave_face_leave(
+            &said.this,
+            said.before.last().map(|(_, lamp)| lamp.as_str()),
+        )
+    {
+        return (json!({"error": ASK_FACE_FIRST}), true);
+    }
     // At setup, a name not heard is taken as they spelled it in the turn in
     // hand: the letters are their own words, not the model's guess (#5140
     // row 6, lamp-0c4e: a misheard name never passed this check).
@@ -5903,6 +5925,62 @@ mod tests {
                 .iter()
                 .map(|(_, _, _, word)| json!({"remember": word, "one_face": true, "replace": true}))
                 .collect::<Vec<_>>()
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// #7331 (the first builder's question, the Reviewer-lead's P2-3 on
+    /// #7343): a save of a new face took no yes, so a name given while
+    /// nobody was known led straight to keeping that face. With
+    /// `LAMP_NAME_LEARN_FIX`, a new face (no `replace`) is kept only on the
+    /// person's own ask for it or their yes to the lamp's face question
+    /// ("Shall I remember your face as Ada?"); a name alone or a no sends
+    /// nothing, and the model is told to ask. Off, as before.
+    #[test]
+    fn a_new_face_is_kept_only_on_a_yes_to_keeping_it() {
+        let switches = |name_learn_fix: bool| FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix,
+            ..FaceSwitches::default()
+        };
+        let save = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Ada"}),
+        };
+        let asked = |this: &str| Said {
+            this: this.into(),
+            before: vec![(
+                "My name is Ada.".into(),
+                "Nice to meet you, Ada! Shall I remember your face as Ada?".into(),
+            )],
+        };
+        let (socket, sent) = eyes(vec![json!({"remembered": "Ada"}); 3]);
+        let run = |on: bool, said: &Said| {
+            run_switched(&socket, &save, switches(on), said, None, &mut None).0
+        };
+        // Off: a name alone keeps the face, as before.
+        assert_eq!(run(false, &Said::now("My name is Ada."))["ok"], true);
+        // On: a name alone, a no, or another answer send nothing.
+        for said in [
+            Said::now("My name is Ada."),
+            asked("No, thanks."),
+            asked("Why do you ask?"),
+        ] {
+            let told = run(true, &said);
+            assert_eq!(told["error"], ASK_FACE_FIRST, "{said:?}: {told}");
+            assert!(refused_here(&told));
+        }
+        // On: their yes to the face question, or their own ask, keeps it.
+        assert_eq!(run(true, &asked("Yes."))["ok"], true);
+        assert_eq!(
+            run(true, &Said::now("Remember my face, my name is Ada."))["ok"],
+            true
+        );
+        assert_eq!(
+            sent.join().unwrap(),
+            vec![json!({"remember": "Ada", "one_face": true, "replace": false}); 3]
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }

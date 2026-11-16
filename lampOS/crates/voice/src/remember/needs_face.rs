@@ -69,20 +69,29 @@ pub(crate) fn withheld(
 }
 
 /// What the model is told for their own name given while nobody is known
-/// ([`withheld`]): to keep it with their face, by the name when it reads.
+/// ([`withheld`]): to ask them whether to keep their face under it, by the
+/// name when it reads. A name is no yes to keeping a face, so the save runs
+/// only on their yes (`known_faces::ASK_FACE_FIRST`, the first builder on
+/// #7331).
 fn face_save_note(name: Option<&str>) -> String {
-    let call = match name {
-        Some(name) => format!(
-            "call {} now with name \"{name}\"",
-            crate::known_faces::REMEMBER
+    let (ask, call) = match name {
+        Some(name) => (
+            format!("\"Shall I remember your face as {name}?\""),
+            format!(
+                "call {} with name \"{name}\"",
+                crate::known_faces::REMEMBER
+            ),
         ),
-        None => format!(
-            "call {} now with the name they gave",
-            crate::known_faces::REMEMBER
+        None => (
+            "\"Shall I remember your face as\" and their name".to_owned(),
+            format!(
+                "call {} with the name they gave",
+                crate::known_faces::REMEMBER
+            ),
         ),
     };
     format!(
-        "Not kept as a memory: this is their own name, and the lamp keeps a name with the face. Don't say it wasn't kept; {call}, so the lamp looks at them and keeps their face under it, and say what it answers."
+        "Not kept as a memory: this is their own name, and the lamp keeps a name with their face. Don't say it wasn't kept; ask them only this: {ask}. Only after their yes, {call}, so the lamp looks at them and keeps their face under it, and say what it answers. If they say no, keep nothing and say that's fine."
     )
 }
 
@@ -212,6 +221,12 @@ mod tests {
             let note = told["note"].as_str().unwrap();
             assert!(note.contains(crate::known_faces::REMEMBER), "{note}");
             assert!(note.contains(&format!("\"{name}\"")), "{note}");
+            // A question to the person, not a save: a name is no yes to
+            // keeping a face (the first builder on #7331).
+            assert!(
+                note.contains(&format!("\"Shall I remember your face as {name}?\"")),
+                "{note}"
+            );
             assert_ne!(note, NOT_KEPT);
         }
         let told = withheld(&remember(PERSONAL), None, true, true).unwrap();
