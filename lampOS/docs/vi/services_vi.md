@@ -2133,7 +2133,8 @@ someone came in, 2 of 5 read", "not read: <lỗi rõ ràng của dịch vụ>", 
 bao giờ một tiêu đề, người gửi hay chủ đề.
 
 **Chưa liên kết lúc chạy** (`LAMP_SKILL_LINK_NOTE=on` trong `lamp-skills`,
-cùng `--state-dir` của nó; tắt, [switches.md](../switches.md)). Một lần đọc
+cùng `--state-dir` của nó; bật trong unit sản phẩm, tắt nếu không đặt,
+[switches.md](../switches.md)). Một lần đọc
 bị từ chối vì dịch vụ chưa liên kết (`NOT_LINKED`; không bao giờ "couldn't
 be reached" hay một lời từ chối khác) được nói một lần, như lời chính xác qua
 socket nói sau khi cổng được xét lại: "Gmail isn't linked to this lamp yet.
