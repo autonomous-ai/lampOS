@@ -4425,7 +4425,15 @@ first."). Then, in code (`made_run::asked`):
   counts the run in `task-runs.json`, the read waits for its room, and the
   services use their own tokens. As for a tool's run, the Policy is not
   asked and its trigger's `[[while]]`, quiet hours, cooldown, day's most
-  and group's hour are neither asked nor spent: a person asked. The
+  and group's hour are neither asked nor spent: a person asked. Its own
+  words (a say step's) ask the say service's priority 8
+  (`lamp_skills::MOST_SAY_PRIORITY`, a due reminder's), so they are said
+  after a second of quiet, never the 15 s (`say::QUIET_US`) a say at the
+  normal priority 5 waits after a turn (lamp-9adf, 16 Nov 15:36: "Lamp,
+  moon time." had its skill's line 20 s after the call). lamp-skills
+  answers `{"ran": NAME, "says": BOOL}`, `says` true when the run has a
+  say step of its own text (the only say the voice takes of a made
+  skill), told to the model as `says` (`made_run::speaks_itself`). The
   journal says "run now, as its owner asked by voice", or why not.
 - **Said plainly.** Run, the model says only that NAME is running now,
   never what it found, sent or did, nor that it is done; what a read or a
@@ -5656,8 +5664,11 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    a stop, the lamp's own words), each with at least two words of its own
    past those said around an ask (`skill_named::own_words_of`: "yes
    please" is one), none twice; otherwise a repair with
-   `made_skill::MADE_ASKS_FORM`. Never in a skill added from a file
-   (`capped_added`). The tidy keeps them.
+   `made_skill::MADE_ASKS_FORM`. A skill added from a file
+   (`capped_added`) may give them only beside its tool, at most 8
+   (`made_skill::MOST_ADDED_ASKS`, its trigger phrases, item 7), held to
+   the same shape; without a tool, or with the switch off, they are
+   refused. The tidy keeps them.
 3. **Never another skill's** (`made_skill::asks_taken`, at the make, after
    its name is free): a phrase that is another skill's ask, or holds
    another skill's name or function, installed, pushed or in the tools
@@ -5701,8 +5712,14 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    has them, once a run, within the day's bounds, a task with its yes, its
    one-run token and grants, each step held where it is made. A no, a
    question, a phrase two skills give, the skill's name alone, or a line
-   while the lamp waits for an answer starts nothing. The model words the
-   answer in round 2. A phrase two or more skills give, one of them made
+   while the lamp waits for an answer starts nothing. A run that speaks
+   its own words (lamp-skills' `says`, `made_run::speaks_itself`) ends the
+   turn there, with no round 2 and no line of the lamp's own, so the
+   skill's say, at priority 8, is the first thing heard, about a second
+   after the person stops (lamp-9adf, 16 Nov 15:36: "Moon time is running
+   now." came first and the skill's line 20 s after the call). Otherwise,
+   a run that says nothing itself or one refused, the model words the
+   answer in round 2, a refusal with why. A phrase two or more skills give, one of them made
    here (installed after the make's check, say), is the call
    `skill_named::SHARED` with the words and each skill: nothing runs, and
    the second route tells the model (`skill_named::shared_note`) to say so
@@ -5728,6 +5745,13 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    which and why in the upload's answer, `kept.asks_left_out =
    [{phrase, why}]` (`upload_skill::take_telling`), while the rest still
    go in and the skill is kept. None left out, the answer is as before.
+   `lamp-cloud` copies `asks_left_out` into the app's answer only when it
+   is a list, as it copies `secrets` ([cloud.md](cloud.md), "A skill added
+   from a file"). An uploaded file's own `skill.toml` with `asks` gets the
+   same clash check (`made_skill::added_asks_taken`, in `take_telling`):
+   one that would start another skill on the lamp refuses the upload with
+   why, naming both skills, since the file is the person's own and is
+   kept whole or not at all.
 
 Set it alike in `lamp-voice` (which passes the exact `on` to its
 `provider` and `second` workers), `lamp-skills`, `lamp-skills-manage@`,

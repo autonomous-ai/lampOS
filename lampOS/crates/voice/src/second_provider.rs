@@ -18481,6 +18481,25 @@ async fn answer(
             if forgot_this_round {
                 continue;
             }
+            // A made skill the heard words started in code, run now, that
+            // speaks its own words (`LAMP_MADE_SKILL_ASKS`,
+            // `made_run::speaks_itself`): the turn ends here with no line of
+            // the lamp's own, so the skill's say is the first thing heard,
+            // never queued behind "Moon time is running now." (lamp-9adf,
+            // 16 Nov 15:36: the skill's line came 20 s after the call, the
+            // say service's quiet after the lamp's own turn). Refused, or a
+            // run that says nothing itself, round 2 says what happened.
+            if calls.len() == 1
+                && calls[0].id == crate::skill_named::CALL_ID
+                && skill_ran
+                    .as_ref()
+                    .is_some_and(|(_, told)| crate::made_run::speaks_itself(told))
+            {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: the heard words started a made skill that speaks itself; no round 2, its own words come first"
+                );
+                return Ok(());
+            }
             // Every call a plain keep the memory made (C59): the lamp says
             // so itself, and the turn ends with no second round. One held,
             // refused or answered anything else counts short, and the turn
