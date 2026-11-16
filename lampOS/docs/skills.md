@@ -5233,12 +5233,15 @@ the same code for both writers.
   90 s from the ask) says "It's taking a bit longer, but I'm still on it."
   (`make_skill_agent::LONG_WAIT_LINE`) once, never again; the journal says
   "the make has no answer 85 s after its waiting line: its one long-wait
-  line is said". No line repeats. The ring shows the thinking look for the
-  whole wait with no change here: the turn stays open while the make runs,
-  and with no audio playing its phase is Waiting (`ring_wire::RingPhase`),
-  the thinking look. Off: today's line, and no second. Tests:
-  `the_one_path_waiting_line_says_how_long` and
-  `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`.
+  line is said". No line repeats. The lamp shows thinking between the
+  waiting line and the result: once each waiting line's audio is sent its
+  generation completes (`GenerationComplete`, then `MakeWaiting`), so its
+  playback ends and ring and body show the thinking look
+  (`ring_wire::RingPhase::Waiting`) until the next audio. Off: today's line,
+  and no second. Tests: `the_one_path_waiting_line_says_how_long`,
+  `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`,
+  `a_one_path_makes_waiting_line_completes_its_generation_after_its_audio`
+  and `a_one_path_makes_wait_shows_thinking_between_its_waiting_line_and_the_answer`.
 - **The journal.** "made by DeepSeek", "it asks for a linked service
   (gmail): straight to the agent (Hermes), DeepSeek not asked" (the
   service's code, never the person's words), "the agent (Hermes) made none

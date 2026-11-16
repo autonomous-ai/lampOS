@@ -80,6 +80,7 @@ pub(super) fn cancelled_output(event: &ProviderOutput, through: Option<u64>) -> 
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
         | ProviderOutput::DownLineSaid { request }
+        | ProviderOutput::MakeWaiting { request }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::TurnFailed { request, .. }
         | ProviderOutput::ReminderDeferred { request, .. }

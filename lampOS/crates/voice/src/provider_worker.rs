@@ -1206,6 +1206,15 @@ pub enum ProviderOutput {
     DownLineSaid {
         request: u64,
     },
+    /// With the make's one run path (`LAMP_MAKE_AGENT_ONE_PATH`, #7371),
+    /// the make's waiting line, or its long-wait line, was said whole for
+    /// `request`: sent just after that line's `GenerationComplete`, which
+    /// follows its last audio. The turn stays open for the make's answer;
+    /// the coordinator shows thinking until audio comes again. Never sent
+    /// with the switch off.
+    MakeWaiting {
+        request: u64,
+    },
     /// The second route's times for `request` (19 Oct: an A/B is scored on
     /// each request's first answer audio, never a wait cue), sent once,
     /// before its `TurnComplete` or `TurnFailed`, for every request: in
@@ -1593,6 +1602,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
         | ProviderOutput::DownLineSaid { request }
+        | ProviderOutput::MakeWaiting { request }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         };

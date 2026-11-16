@@ -535,6 +535,7 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
             ProviderOutput::OwnWordsSaid { request } => (format!("own_words:{request}"), false),
             ProviderOutput::ServiceCalled { request } => (format!("service:{request}"), false),
             ProviderOutput::StopAnswered { request } => (format!("stop:{request}"), false),
+            ProviderOutput::MakeWaiting { request } => (format!("make_waiting:{request}"), false),
             other => panic!("the second route never sends {other:?}"),
         };
         if labels.last() != Some(&label) || !label.starts_with("audio:") {
@@ -954,6 +955,105 @@ async fn a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_mor
             "said:Made.".into()
         ]
     );
+}
+
+/// lamp-c0a4, 16 Nov (#7371): after the one run path's waiting line the
+/// turn stays open for the make, about 80 s, and its generation never
+/// completed, so the lamp's playback never ended and it showed speaking
+/// all along. On the one path the line's generation completes once its
+/// last audio is sent, then `MakeWaiting`, before anything more; the
+/// long-wait line's too. With the switch off, no generation completes
+/// before the answer's, as before.
+#[tokio::test]
+async fn a_one_path_makes_waiting_line_completes_its_generation_after_its_audio() {
+    let labels = |after: Option<Duration>, request: u64| async move {
+        let asked = call("c1", crate::made_skill::MAKE, json!({"request": "x"}));
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [
+                    vec![
+                        text("I'll make it now."),
+                        Ok(ChatEvent::ToolCalls(vec![asked])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Made."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let tools: ToolRunner = Arc::new(move |request, _, name, _| {
+            Box::pin(async move {
+                if name == crate::made_skill::MAKE {
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                    assert!(crate::make_skill_agent::waiting_due(request));
+                    tokio::time::sleep(Duration::from_millis(400)).await;
+                }
+                json!({"ok": true})
+            })
+        });
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        );
+        if after.is_some() {
+            engine = engine.waiting_on_one_path(after);
+        }
+        engine.submit(written(request, "Make me x."));
+        let mut labels: Vec<String> = Vec::new();
+        for label in turn(&mut engine).await {
+            let label = if label.starts_with("audio:") {
+                "audio".to_owned()
+            } else {
+                label.replacen("said: ", "said:", 1)
+            };
+            if labels.last() != Some(&label) {
+                labels.push(label);
+            }
+        }
+        // From the waiting line on.
+        let from = labels
+            .iter()
+            .position(|label| {
+                label.ends_with(crate::make_skill_agent::waiting_line(after.is_some()))
+            })
+            .unwrap();
+        labels.split_off(from)
+    };
+    let waiting = format!("said:{}", crate::make_skill_agent::ONE_PATH_WAITING_LINE);
+    let long = format!("said:{}", crate::make_skill_agent::LONG_WAIT_LINE);
+    let answer = ["said:Made.", "audio", "generated", "complete"];
+    let waited = |request: u64| {
+        [
+            "audio".to_owned(),
+            "generated".into(),
+            format!("make_waiting:{request}"),
+        ]
+    };
+    let mut expected = vec![waiting.clone()];
+    expected.extend(waited(7_372_001));
+    expected.extend(answer.map(String::from));
+    assert_eq!(
+        labels(Some(Duration::from_secs(60)), 7_372_001).await,
+        expected
+    );
+    let mut expected = vec![waiting];
+    expected.extend(waited(7_372_002));
+    expected.push(long);
+    expected.extend(waited(7_372_002));
+    expected.extend(answer.map(String::from));
+    assert_eq!(
+        labels(Some(Duration::from_millis(30)), 7_372_002).await,
+        expected
+    );
+    let mut expected = vec![
+        format!("said:{}", crate::make_skill_agent::WAITING_LINE),
+        "audio".into(),
+    ];
+    expected.extend(answer.map(String::from));
+    assert_eq!(labels(None, 7_372_003).await, expected);
 }
 
 /// lamp-4ace, 20 Oct 21:31: "Lamp, what's my name?" was answered with

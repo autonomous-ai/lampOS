@@ -2354,12 +2354,16 @@ cả hai người viết.
   "It's taking a bit longer, but I'm still on it."
   (`make_skill_agent::LONG_WAIT_LINE`) một lần, không bao giờ lặp lại; nhật
   ký ghi "the make has no answer 85 s after its waiting line: its one
-  long-wait line is said". Không câu nào lặp lại. Vòng đèn giữ dáng suy
-  nghĩ suốt thời gian chờ mà không cần đổi gì ở đây: lượt vẫn mở trong lúc
-  lần tạo chạy, và khi không có âm thanh đang phát thì pha của nó là Waiting
-  (`ring_wire::RingPhase`), tức dáng suy nghĩ. Tắt: câu chờ như hôm nay, và
-  không có câu thứ hai. Test: `the_one_path_waiting_line_says_how_long` và
-  `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`.
+  long-wait line is said". Không câu nào lặp lại. Từ lúc nói xong câu chờ
+  tới khi có kết quả, đèn hiện dáng suy nghĩ: âm thanh của mỗi câu chờ gửi
+  xong là lượt sinh của nó kết thúc (`GenerationComplete`, rồi
+  `MakeWaiting`), nên phần phát dừng lại, vòng đèn và thân đèn chuyển sang
+  dáng suy nghĩ (`ring_wire::RingPhase::Waiting`) cho tới khi có âm thanh
+  tiếp theo. Tắt: câu chờ như hôm nay, và không có câu thứ hai. Test:
+  `the_one_path_waiting_line_says_how_long`,
+  `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`,
+  `a_one_path_makes_waiting_line_completes_its_generation_after_its_audio`
+  và `a_one_path_makes_wait_shows_thinking_between_its_waiting_line_and_the_answer`.
 - **Nhật ký.** "made by DeepSeek", "it asks for a linked service (gmail):
   straight to the agent (Hermes), DeepSeek not asked" (mã của dịch vụ,
   không bao giờ là lời của người dùng), "the agent (Hermes) made none

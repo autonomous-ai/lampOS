@@ -8132,7 +8132,8 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::ServiceCalled { request }
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
-        | ProviderOutput::DownLineSaid { request } => Some(*request),
+        | ProviderOutput::DownLineSaid { request }
+        | ProviderOutput::MakeWaiting { request } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
     }
 }
@@ -15193,9 +15194,11 @@ async fn said_while_made<T>(
     eprintln!(
         "lamp-voice second: request {request}: the make's agent began: its waiting line is said in this turn"
     );
-    queue.push(line.to_owned()).await?;
+    // On the one run path its generation completes once it is played, so
+    // the lamp thinks while the make goes on; else as before.
+    queue.push_ending(line.to_owned(), wait.is_some()).await?;
     // With the one run path (#7371): one more line, once, only if the make
-    // runs long; the ring shows thinking meanwhile, as the turn is open.
+    // runs long; the ring and body show thinking meanwhile.
     let Some(after) = wait else {
         return Ok(answering.await);
     };
@@ -15208,7 +15211,7 @@ async fn said_while_made<T>(
         after.as_secs()
     );
     let line = queue.shared.fixed(crate::make_skill_agent::LONG_WAIT_LINE);
-    queue.push(line.to_owned()).await?;
+    queue.push_ending(line.to_owned(), true).await?;
     Ok(answering.await)
 }
 
@@ -19085,7 +19088,7 @@ async fn answer(
         // #4338): said with the next piece, as one, so no sentence of the
         // answer is silently dropped.
         let mut carried: Option<String> = None;
-        while let Some((text, packets)) = queued.recv().await {
+        while let Some((text, packets, ends)) = queued.recv().await {
             // Nothing of it goes out while its pause's grace keeps it back
             // (`LAMP_ENDPOINT_PAUSE_JOIN`): a line begun meanwhile cuts it
             // short unheard, and it says nothing more.
@@ -19250,6 +19253,19 @@ async fn answer(
                         did(Did::Said(request, until));
                     }
                 }
+            }
+            // A make's waiting line on the one run path (#7371), played
+            // whole: its generation is over, after its last audio, so the
+            // lamp's playback ends and it thinks until the make's answer.
+            // One carried unsaid ends nothing: it is said with the next.
+            if ends
+                && played
+                && (!shared
+                    .emit(ProviderOutput::GenerationComplete { request })
+                    .await
+                    || !shared.emit(ProviderOutput::MakeWaiting { request }).await)
+            {
+                return Err(Stop::Gone);
             }
         }
         // The answer's last piece could not be started twice: nothing came
@@ -19522,7 +19538,9 @@ struct Queue<'a> {
     speech: &'a mut JoinSet<()>,
     /// Said before the first sentence of the answer, if due.
     announcement: Option<Packets>,
-    sentences: mpsc::Sender<(String, Packets)>,
+    /// Each piece with whether its generation completes once it is played
+    /// (the make's waiting lines on the one run path, #7371).
+    sentences: mpsc::Sender<(String, Packets, bool)>,
     /// Some of the answer itself is on its way.
     started: bool,
     /// How many pieces of it went to the voice: whether a round said any.
@@ -19560,12 +19578,20 @@ impl Drop for Queue<'_> {
 impl Queue<'_> {
     async fn announce(&mut self) -> Result<(), Stop> {
         match self.announcement.take() {
-            Some(packets) => self.send(ANNOUNCEMENT.to_owned(), packets).await,
+            Some(packets) => self.send(ANNOUNCEMENT.to_owned(), packets, false).await,
             None => Ok(()),
         }
     }
 
     async fn push(&mut self, text: String) -> Result<(), Stop> {
+        self.push_ending(text, false).await
+    }
+
+    /// [`Self::push`], and with `ends` its generation completes once it is
+    /// played whole: `GenerationComplete` and then
+    /// [`ProviderOutput::MakeWaiting`] go just after its last audio, in
+    /// order, from the saying half (#7371).
+    async fn push_ending(&mut self, text: String, ends: bool) -> Result<(), Stop> {
         // `LAMP_MADE_NOT_ON_TOLD` (#7270): a claim that a made skill not on
         // is on, and the rest of its round, wait for the round's end.
         if let Some(guard) = self.made_not_on.as_mut()
@@ -19623,7 +19649,7 @@ impl Queue<'_> {
             heard_at: self.heard_at,
         };
         let packets = start_speech(self.shared, self.speech, spoken, turn);
-        self.send(text, packets).await
+        self.send(text, packets, ends).await
     }
 
     /// A fixed line (`line`) said from its clip rendered ahead, as the
@@ -19655,13 +19681,13 @@ impl Queue<'_> {
                 }
             }
         });
-        self.send(line.to_owned(), queued).await
+        self.send(line.to_owned(), queued, false).await
     }
 
-    async fn send(&mut self, text: String, packets: Packets) -> Result<(), Stop> {
+    async fn send(&mut self, text: String, packets: Packets, ends: bool) -> Result<(), Stop> {
         // Closed only when the saying half stopped; its error is the one kept.
         self.sentences
-            .send((text, packets))
+            .send((text, packets, ends))
             .await
             .map_err(|_| Stop::Gone)
     }

@@ -1311,6 +1311,12 @@ struct Reply {
     /// `turn_lost`. Not `had_audio`: an answer cut off mid-sentence still
     /// owes it.
     down_line_said: bool,
+    /// With the make's one run path (`ProviderOutput::MakeWaiting`, #7371):
+    /// the make's waiting line was said whole and the turn waits on the
+    /// make. The body then shows speaking only while audio is queued or
+    /// playing, so it thinks between that line and the make's answer.
+    /// Never set with the switch off.
+    make_waiting: bool,
 }
 impl Reply {
     /// Whether a mark for this turn can still be sent: its input still
@@ -4317,6 +4323,13 @@ fn observe_provider_output(
                 current.down_line_said = true;
             }
         }
+        // The make's waiting line was said whole (#7371): thinking until
+        // audio comes again.
+        ProviderOutput::MakeWaiting { request } => {
+            if let Some(current) = reply.as_mut().filter(|r| r.owner.turn() == *request) {
+                current.make_waiting = true;
+            }
+        }
         ProviderOutput::HoldingAnswer { request, session } => {
             if let Some(current) = reply.as_ref().filter(|r| r.owner.turn() == *request) {
                 current.cloud.require_output()?;
@@ -4380,6 +4393,19 @@ fn observe_provider_output(
         }
     }
     Ok(())
+}
+
+/// The answer has arrived and is about to be spoken: the body's head comes
+/// back to the person before the first word, not during it. While a make
+/// waits on the one run path (`Reply::make_waiting`, #7371), its waiting
+/// line played out, that is only once audio is queued again: the body
+/// thinks meanwhile, as the ring does. Without it, as before.
+fn about_to_speak(reply: Option<&Reply>) -> bool {
+    reply.is_some_and(|current| {
+        current.had_audio
+            && current.local_input_ended
+            && (!current.make_waiting || !current.pcm.is_empty())
+    })
 }
 
 /// Sending is bounded independently of answer delivery. No queued Audio/End
@@ -8810,7 +8836,9 @@ fn conversation_with_gate_inner(
                     )?;
                 }
                 // Put on its turn by `observe_provider_output`.
-                ProviderOutput::NewsAnswered { .. } | ProviderOutput::OwnWordsSaid { .. } => {}
+                ProviderOutput::NewsAnswered { .. }
+                | ProviderOutput::OwnWordsSaid { .. }
+                | ProviderOutput::MakeWaiting { .. } => {}
                 // Put on its turn by `observe_provider_output` too. A call's
                 // line the slow chat answered with its down line (#5563):
                 // its try is the provider's, never the person's miss.
@@ -12189,11 +12217,7 @@ fn conversation_with_gate_inner(
         if let Some(body) = body_link.as_mut() {
             use crate::ring_wire::RingPhase;
             let phase = RingPhase::from_snapshot(snapshot).filter(|_| !sound_now);
-            // The answer has arrived and is about to be spoken: the head
-            // comes back to the person before the first word, not during it.
-            let about_to_speak = reply
-                .as_ref()
-                .is_some_and(|current| current.had_audio && current.local_input_ended);
+            let about_to_speak = about_to_speak(reply.as_ref());
             attention.observe(
                 reply
                     .as_ref()
@@ -15979,6 +16003,7 @@ fn commit_written_turn(
         news: Vec::new(),
         news_not_heard: None,
         down_line_said: false,
+        make_waiting: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -16224,6 +16249,7 @@ fn commit_admitted_input(
         news: Vec::new(),
         news_not_heard: None,
         down_line_said: false,
+        make_waiting: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -16337,6 +16363,7 @@ fn commit_offline_input(
         news: Vec::new(),
         news_not_heard: None,
         down_line_said: false,
+        make_waiting: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -16515,6 +16542,7 @@ fn commit_own_line(
         news: Vec::new(),
         news_not_heard: None,
         down_line_said: false,
+        make_waiting: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -16629,6 +16657,7 @@ fn continue_after_early_end(
         news: Vec::new(),
         news_not_heard: None,
         down_line_said: false,
+        make_waiting: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -19039,6 +19068,7 @@ mod tests {
                 news: Vec::new(),
                 news_not_heard: None,
                 down_line_said: false,
+                make_waiting: false,
                 last_provider_audio_at_us: None,
                 start: StartGate::new(0),
                 need: StartNeed::default(),
@@ -19132,6 +19162,117 @@ mod tests {
             source_offset: 0,
             samples,
         }
+    }
+
+    /// What the ring shows for `owner`'s turn, and the body's mood for it as
+    /// the loop tells the body, the waiting arm alone (nothing attended, no
+    /// walk, no sound), read back from the body's socket.
+    fn shown(
+        owner: &mut Controller,
+        reply: &Option<Reply>,
+        body: &mut crate::body_link::BodyLink,
+        socket: &std::os::unix::net::UnixDatagram,
+        at_us: u64,
+    ) -> (Option<crate::ring_wire::RingPhase>, String) {
+        use crate::ring_wire::RingPhase;
+        let ring = RingPhase::from_snapshot(owner.snapshot(now()).unwrap());
+        let told = match ring {
+            Some(RingPhase::Waiting) if about_to_speak(reply.as_ref()) => Some(RingPhase::Speaking),
+            phase => phase,
+        };
+        body.tell(told, 0, at_us);
+        let mut message = [0; 128];
+        let read = socket.recv(&mut message).unwrap();
+        let told: serde_json::Value = serde_json::from_slice(&message[..read]).unwrap();
+        (ring, told["mood"].as_str().unwrap().to_owned())
+    }
+
+    /// lamp-c0a4, 16 Nov (#7371): with the make's one run path its waiting
+    /// line ("This takes about a minute. I'm on it.") was followed by about
+    /// 80 s of an open turn, and ring and body showed speaking throughout:
+    /// the line's generation never completed, so its playback never
+    /// retired, and the body took audio once heard for audio to come. With
+    /// the one path's `GenerationComplete` and `MakeWaiting` after the
+    /// line's audio, its last block retires, and ring and body think
+    /// through the quiet until the answer's audio comes; with neither (the
+    /// switch off), all of it shows speaking, as before.
+    #[test]
+    fn a_one_path_makes_wait_shows_thinking_between_its_waiting_line_and_the_answer() {
+        use crate::ring_wire::RingPhase::{Speaking, Waiting};
+        let run = |one_path: bool| {
+            let dir = SessionDirectory::create().unwrap();
+            let at = dir.path.join("body.sock");
+            let socket = std::os::unix::net::UnixDatagram::bind(&at).unwrap();
+            let mut body = crate::body_link::BodyLink::to(at).unwrap();
+            let (mut owner, current, _) = active_reply();
+            let turn = current.owner;
+            let mut reply = Some(current);
+            let mut cloud = CloudAvailability::default();
+            cloud.observe(ready_link(1, 1), monotonic_us()).unwrap();
+            let mut seen = Vec::new();
+            // The waiting line's audio, in play.
+            seen.push(shown(&mut owner, &reply, &mut body, &socket, 1_000_000));
+            if one_path {
+                for event in [
+                    ProviderOutput::GenerationComplete {
+                        request: turn.turn(),
+                    },
+                    ProviderOutput::MakeWaiting {
+                        request: turn.turn(),
+                    },
+                ] {
+                    observe_provider_output(&mut cloud, &mut reply, &event).unwrap();
+                }
+            }
+            // The speaker takes what it is given; a final block retires.
+            let current = reply.as_mut().unwrap();
+            let mut sequence = 40;
+            while let Some((_, last)) = current.next_speaker_chunk() {
+                sequence += 1;
+                if last {
+                    current.final_chunk = Some(sequence);
+                    let token = current.retire_playback(sequence, 240).unwrap();
+                    owner.playback_ended(now(), token).unwrap();
+                }
+            }
+            // The quiet while the make goes on.
+            for second in 2..=3 {
+                seen.push(shown(
+                    &mut owner,
+                    &reply,
+                    &mut body,
+                    &socket,
+                    second * 1_000_000,
+                ));
+            }
+            // The make's answer comes.
+            reply
+                .as_mut()
+                .unwrap()
+                .append_provider_packet(vec![22; 480], monotonic_us(), true);
+            seen.push(shown(&mut owner, &reply, &mut body, &socket, 4_000_000));
+            seen
+        };
+        let phases = |seen: Vec<(Option<crate::ring_wire::RingPhase>, String)>| {
+            seen.into_iter()
+                .map(|(ring, mood)| (ring.unwrap(), mood))
+                .collect::<Vec<_>>()
+        };
+        let speaking = || (Speaking, "speaking".to_owned());
+        let thinking = || (Waiting, "thinking".to_owned());
+        assert_eq!(
+            phases(run(true)),
+            [
+                speaking(),
+                thinking(),
+                thinking(),
+                (Waiting, "speaking".into())
+            ]
+        );
+        assert_eq!(
+            phases(run(false)),
+            [speaking(), speaking(), speaking(), speaking()]
+        );
     }
 
     #[test]
@@ -20277,6 +20418,7 @@ mod tests {
             news: Vec::new(),
             news_not_heard: None,
             down_line_said: false,
+            make_waiting: false,
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
             need: StartNeed::default(),
@@ -20628,6 +20770,7 @@ mod tests {
             news: Vec::new(),
             news_not_heard: None,
             down_line_said: false,
+            make_waiting: false,
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
             need: StartNeed::default(),
