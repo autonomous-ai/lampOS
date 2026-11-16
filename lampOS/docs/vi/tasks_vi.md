@@ -1398,7 +1398,19 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   `main` và khỏi agent hàng rào đã rút lại `lamp-skill-run` (#7101). Mỗi
   vòng có gateway đang chạy, lamp-update thêm lại mục của `main` (mục đã
   có thì không bị ghi lại), nên một lần khôi phục cài đặt gốc xoá exec
-  approvals của OpenClaw sẽ có lại mục này. Với
+  approvals của OpenClaw sẽ có lại mục này. Một lần gateway (khởi động
+  lại) không chờ vòng đó (#7280): ngay sau lần đọc approvals xác nhận một
+  lần khởi động gateway mới (`gateway::Serving`, ở trên), trước khi giao
+  việc của lần chạy đầu tiên, lamp-tasks chạy đúng lệnh thêm đó
+  (`openclaw approvals allowlist add --gateway --agent main
+  /usr/local/lib/lampos/skill-start`, `gateway::ALLOWLIST_ADD`, dưới
+  quyền `lampos` với môi trường của lần đọc, giới hạn 20 s). Lần khởi
+  động mà danh sách đã có mục thì không ghi gì, và các lần chạy sau trên
+  cùng lần khởi động không chạy lệnh thêm. Lệnh thêm thất bại được ghi
+  journal ("tasks: the OpenClaw Gateway's allow-list add for
+  /usr/local/lib/lampos/skill-start did not succeed; the next run tries
+  again") và không giữ lần chạy lại, nhưng lần khởi động không được giữ,
+  nên lần chạy sau đọc và thêm lại. Với
   `tools.exec.mode: "ask"` mặc định của OpenClaw, nếu không có mục này
   thì exec của một lượt không giao diện bị từ chối. Một
   exec bị từ chối vẫn kết thúc lượt là `stopped`, nên phép kiểm tra đóng

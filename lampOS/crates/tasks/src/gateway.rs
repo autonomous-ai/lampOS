@@ -104,6 +104,22 @@ pub const APPROVALS_ENV: [(&str, &str); 4] = [
     ("PATH", "/var/lib/lampos-openclaw/node/bin:/usr/bin:/bin"),
     ("SHELL", "/bin/sh"),
 ];
+/// Agent `main`'s exec allow-list entry for the launcher, put back once
+/// per Gateway start (#7280): lamp-update's own add
+/// (`lamp_update::openclaw_install::exec_allowlist_args`, agent `RUN_AGENT`,
+/// path `SKILL_START`), through the same wrapper, as `lampos` with
+/// [`APPROVALS_ENV`]. OpenClaw takes an entry already there without
+/// writing, so a start that keeps it writes nothing.
+pub const ALLOWLIST_ADD: [&str; 8] = [
+    "/usr/local/bin/openclaw",
+    "approvals",
+    "allowlist",
+    "add",
+    "--gateway",
+    "--agent",
+    "main",
+    crate::skill_start::LAUNCHER,
+];
 /// One approvals read's bound: OpenClaw's CLI is Node, slow to start on a
 /// lamp; past it the read is killed and counts as not served yet.
 const READ_WITHIN: Duration = Duration::from_secs(20);
@@ -121,9 +137,15 @@ const READ_EVERY: Duration = Duration::from_secs(3);
 /// that succeeded is kept against the inode of the socket listening on
 /// [`PORT`] ([`listener_inode`]); a restarted Gateway listens on a new
 /// socket, so it is read again. With no inode found, every look reads.
+/// Right after a read that qualifies a start, the launcher's allow-list
+/// entry is added again ([`ALLOWLIST_ADD`], #7280): a restarted Gateway
+/// may have lost it, and lamp-update's round may be far off.
 pub struct Serving {
     port: Box<dyn Probe>,
     read: Box<dyn Probe>,
+    /// The allow-list add run once per qualifying read: none, in tests
+    /// that do not ask for one.
+    add: Option<Box<dyn Probe>>,
     /// Whether the last look found the port answering.
     port_answered: bool,
     /// The listening socket's inode now ([`listener_inode`]).
@@ -179,6 +201,11 @@ impl Serving {
                 .get_or_init(|| std::sync::Arc::new(std::sync::Mutex::new(None)))
                 .clone(),
         )
+        .with_add(Box::new(ApprovalsRead::new(
+            ALLOWLIST_ADD.map(str::to_owned).to_vec(),
+            READ_WITHIN,
+            READ_EVERY,
+        )))
     }
 
     /// With no listener known: every look reads.
@@ -186,6 +213,7 @@ impl Serving {
         Self {
             port,
             read,
+            add: None,
             port_answered: false,
             listener: Box::new(|| None),
             served: std::sync::Arc::new(std::sync::Mutex::new(None)),
@@ -201,6 +229,12 @@ impl Serving {
     ) -> Self {
         self.listener = listener;
         self.served = served;
+        self
+    }
+
+    /// With `add` run after each read that qualifies a start (#7280).
+    pub fn with_add(mut self, add: Box<dyn Probe>) -> Self {
+        self.add = Some(add);
         self
     }
 }
@@ -224,7 +258,21 @@ impl Probe for Serving {
         // A read from the old process does not qualify its replacement.
         let same_listener = listener == (self.listener)();
         let read = read && same_listener && !cancelled() && Instant::now() < until;
+        // A failed add does not hold the run (the entry may be there): the
+        // start is just not kept, so the next run reads and adds again.
+        let added = !read
+            || self.add.as_mut().is_none_or(|add| {
+                let added = add.ready_until(until, cancelled);
+                if !added {
+                    eprintln!(
+                        "tasks: the OpenClaw Gateway's allow-list add for {} did not succeed; the next run tries again",
+                        crate::skill_start::LAUNCHER
+                    );
+                }
+                added
+            });
         if read
+            && added
             && listener.is_some()
             && let Ok(mut served) = self.served.lock()
         {
@@ -246,7 +294,8 @@ impl Probe for Serving {
 
 /// The Gateway's approvals read ([`APPROVALS_READ`]) run as lamp-tasks'
 /// own user, each bounded by `within`, at most once every `every`: ready
-/// when one exits 0. Only a read: nothing is set.
+/// when one exits 0. Only a read: nothing is set. The same runner carries
+/// [`ALLOWLIST_ADD`], OpenClaw's own add of one entry (#7280).
 pub struct ApprovalsRead {
     argv: Vec<String>,
     within: Duration,
@@ -1076,6 +1125,131 @@ mod tests {
             4,
             "no socket found, yet not read"
         );
+    }
+
+    /// An allow-list add standing in for [`ALLOWLIST_ADD`] (#7280): a
+    /// script over a list file that, as OpenClaw's add, writes its last
+    /// word only when the list lacks it. Each run is counted in `runs`,
+    /// each write in `writes`; it exits `code`.
+    fn add_script(dir: &Path, code: u8) -> (ApprovalsRead, PathBuf) {
+        let list = dir.join("list");
+        let script = dir.join("add");
+        std::fs::write(
+            &script,
+            format!(
+                "#!/bin/sh\necho run >> {d}/runs\neval last=\\${{$#}}\ngrep -qxF \"$last\" {list} 2>/dev/null || {{ echo \"$last\" >> {list}; echo write >> {d}/writes; }}\nexit {code}\n",
+                d = dir.display(),
+                list = list.display()
+            ),
+        )
+        .unwrap();
+        let mut argv = ALLOWLIST_ADD.map(str::to_owned).to_vec();
+        argv[0] = script.display().to_string();
+        argv.insert(0, "/bin/sh".into());
+        let add = ApprovalsRead::new(argv, Duration::from_secs(5), Duration::from_millis(1));
+        (add, list)
+    }
+
+    fn lines(at: &Path) -> usize {
+        std::fs::read_to_string(at).map_or(0, |text| text.lines().count())
+    }
+
+    /// A look at the Gateway on listening socket `socket`, with `add`.
+    fn look_with_add(
+        socket: u64,
+        served: &Arc<Mutex<Option<u64>>>,
+        add: ApprovalsRead,
+    ) -> (bool, Option<u64>) {
+        struct Reads;
+        impl Probe for Reads {
+            fn ready(&mut self) -> bool {
+                true
+            }
+        }
+        let port = Fake {
+            ready_from: Some(1),
+            ..Fake::default()
+        };
+        let mut serving = Serving::new(Box::new(port), Box::new(Reads))
+            .with_listener(Box::new(move || Some(socket)), served.clone())
+            .with_add(Box::new(add));
+        let ready = serving.ready();
+        (ready, *served.lock().unwrap())
+    }
+
+    /// #7280: a Gateway start whose allow-list lacks the launcher's entry
+    /// gets it at the first run's look, before the hand-over; a later run
+    /// on the same start adds nothing.
+    #[test]
+    fn a_gateway_start_whose_list_lacks_the_entry_gets_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let served = Arc::new(Mutex::new(None));
+        let (add, list) = add_script(dir.path(), 0);
+        assert_eq!(look_with_add(7, &served, add), (true, Some(7)));
+        assert_eq!(
+            std::fs::read_to_string(&list).unwrap(),
+            format!("{}\n", crate::skill_start::LAUNCHER)
+        );
+        assert_eq!(lines(&dir.path().join("writes")), 1);
+        let (add, _) = add_script(dir.path(), 0);
+        assert_eq!(look_with_add(7, &served, add), (true, Some(7)));
+        assert_eq!(
+            lines(&dir.path().join("runs")),
+            1,
+            "added again, same start"
+        );
+    }
+
+    /// #7280: a restarted Gateway (a new socket) whose list has the entry
+    /// is asked once and nothing is written.
+    #[test]
+    fn a_gateway_start_whose_list_has_the_entry_writes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let list = dir.path().join("list");
+        std::fs::write(&list, format!("{}\n", crate::skill_start::LAUNCHER)).unwrap();
+        let served = Arc::new(Mutex::new(Some(7)));
+        let (add, _) = add_script(dir.path(), 0);
+        assert_eq!(look_with_add(8, &served, add), (true, Some(8)));
+        assert_eq!(lines(&dir.path().join("runs")), 1, "a new start not asked");
+        assert_eq!(lines(&dir.path().join("writes")), 0, "written though there");
+        assert_eq!(
+            std::fs::read_to_string(&list).unwrap(),
+            format!("{}\n", crate::skill_start::LAUNCHER)
+        );
+    }
+
+    /// #7280: an add that fails does not hold the run, but the start is not
+    /// kept, so the next run adds again.
+    #[test]
+    fn a_failed_add_is_tried_again_by_the_next_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let served = Arc::new(Mutex::new(None));
+        let (add, _) = add_script(dir.path(), 1);
+        assert_eq!(look_with_add(7, &served, add), (true, None));
+        let (add, _) = add_script(dir.path(), 0);
+        assert_eq!(look_with_add(7, &served, add), (true, Some(7)));
+        assert_eq!(lines(&dir.path().join("runs")), 2);
+    }
+
+    /// The add is lamp-update's own `exec_allowlist_args` add, word for
+    /// word: its wrapper, agent and launcher.
+    #[test]
+    fn the_allowlist_add_is_lamp_updates() {
+        let source = include_str!("../../update/src/openclaw_install.rs");
+        for (name, value) in [
+            ("WRAPPER", ALLOWLIST_ADD[0]),
+            ("RUN_AGENT", ALLOWLIST_ADD[6]),
+            ("SKILL_START", ALLOWLIST_ADD[7]),
+        ] {
+            assert!(
+                source.contains(&format!("pub const {name}: &str = \"{value}\";")),
+                "{name}"
+            );
+        }
+        assert!(source.contains(
+            "\"approvals\",\n            \"allowlist\",\n            op,\n            \"--gateway\",\n            \"--agent\","
+        ));
+        assert!(source.contains("edit(\"add\", RUN_AGENT, SKILL_START)"));
     }
 
     /// #7170: a read that hangs is killed at its bound and counts as not

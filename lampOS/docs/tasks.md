@@ -3849,7 +3849,18 @@ file:
   out of `main` and of the withdrawn fence agent `lamp-skill-run`
   (#7101). Every round with the gateway active, lamp-update adds
   `main`'s entry again (an entry there is not written twice), so a
-  factory reset that wipes OpenClaw's approvals gets it back. With
+  factory reset that wipes OpenClaw's approvals gets it back. A gateway
+  (re)start does not wait for that round (#7280): right after the
+  approvals read that qualifies a new gateway start (`gateway::Serving`,
+  above), before the first run's hand-over, lamp-tasks runs the same add
+  (`openclaw approvals allowlist add --gateway --agent main
+  /usr/local/lib/lampos/skill-start`, `gateway::ALLOWLIST_ADD`, as
+  `lampos` with the read's environment, bounded at 20 s). A start whose
+  list has the entry writes nothing, and later runs on the same start
+  run no add. A failed add is journaled ("tasks: the OpenClaw Gateway's
+  allow-list add for /usr/local/lib/lampos/skill-start did not succeed;
+  the next run tries again") and does not hold the run, but the start
+  is not kept, so the next run reads and adds again. With
   OpenClaw's stock `tools.exec.mode: "ask"`, a headless
   turn's exec is denied without this entry. A denied exec still ends the turn as
   `stopped`, so the fail-closed check above tells a denied run from a
