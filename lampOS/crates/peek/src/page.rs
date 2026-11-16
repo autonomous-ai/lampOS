@@ -692,15 +692,12 @@ fn span(seconds: u64) -> String {
 
 /// The overview's tasks line: how many are working, and per engine of the
 /// tasks it lists (watched or ended), how many of them, in the order
-/// they were handed over; `none` when nothing
-/// is being worked on. HTML: an engine's name is escaped.
+/// they were handed over (`none working` when none is), then how many
+/// were just handed over, if any. HTML: an engine's name is escaped.
 pub fn tasks_line(status: Option<&TaskStatus>) -> String {
     let Some(status) = status else {
         return "not known".to_owned();
     };
-    if status.tasks.is_empty() && status.unread.is_empty() {
-        return "none".to_owned();
-    }
     let mut engines: Vec<(&str, usize)> = Vec::new();
     // In the order the tasks were handed over.
     let mut named: Vec<(u64, &str, bool)> = status
@@ -732,7 +729,15 @@ pub fn tasks_line(status: Option<&TaskStatus>) -> String {
         .iter()
         .map(|(engine, count)| format!("{} {count}", engine_name(engine)))
         .collect();
-    format!("{working} working ({})", each.join(", "))
+    let mut line = if working == 0 {
+        "none working".to_owned()
+    } else {
+        format!("{working} working ({})", each.join(", "))
+    };
+    if !status.unread.is_empty() {
+        let _ = write!(line, ", {} just handed over", status.unread.len());
+    }
+    line
 }
 
 /// The Harness tasks the lamp handed over, at `now_unix_ms`: a card for
