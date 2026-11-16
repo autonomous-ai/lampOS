@@ -316,6 +316,15 @@ pub fn take_telling(
         return made_skill::keep_agent(&files, &format!("{FROM}{at_unix_ms}"), keeping)
             .map(|made| (made, left_out));
     }
+    // The file's own `skill.toml`: its asks (shape-checked by the cap,
+    // `made_skill::capped_added`) never another skill's on the lamp, as a
+    // made skill's are at the make; the file is the person's own, so it
+    // is refused with why rather than kept with some of its asks cut.
+    if let Some(why) = skill_toml.and_then(|toml| {
+        made_skill::added_asks_taken(&place.skills, &keeping.directory, &name, toml)
+    }) {
+        return Err(Refused(why, None));
+    }
     let (files, left_out) = match skill_toml {
         Some(toml) => (
             Files {
@@ -980,6 +989,44 @@ mod tests {
         );
         made_skill::set_asks_here(None);
         crate::upload_agent::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+    /// Reviewer's P3 on #7249: an uploaded file's own `skill.toml` with an
+    /// ask that would start another skill on the lamp is refused with why,
+    /// naming both, as a made skill's is at the make; with its other asks
+    /// alone it is kept.
+    #[test]
+    fn an_uploaded_skill_tomls_asks_never_take_another_skills() {
+        let toml_with = |asks: &str| {
+            format!(
+                "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"voice\"]\n\
+                 tool = \"tea_tip\"\nasks = [{asks}]\n\n[permissions]\nspeak = true\n\n\
+                 [[do]]\nsay = \"A tea tip.\"\n"
+            )
+        };
+        made_skill::set_asks_here(Some(true));
+        let (root, keeping) = keeping("upload-toml-asks-taken");
+        let place = place(&root);
+        let booth = place.skills.join("photo-booth");
+        std::fs::create_dir_all(&booth).unwrap();
+        std::fs::write(
+            booth.join("skill.toml"),
+            "tool = \"photo_booth\"\nasks = [\"take a photo\"]\n",
+        )
+        .unwrap();
+        let taken = toml_with("\"give me a tea tip\", \"take a photo\"");
+        let why = take(&place, &keeping, Some(&taken), CARD, NOW)
+            .unwrap_err()
+            .0;
+        assert!(
+            why.contains("“take a photo” would start both tea tip and another skill, photo booth"),
+            "{why}"
+        );
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        let free = toml_with("\"give me a tea tip\"");
+        let made = take(&place, &keeping, Some(&free), CARD, NOW).unwrap();
+        assert_eq!(made.name, "tea-tip");
+        made_skill::set_asks_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
 }
