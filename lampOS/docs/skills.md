@@ -224,6 +224,7 @@ must not leave a step silently undone)*.
 | `trigger.absent_for` | no | `appears` only: at least this long before, it did not hold, counted from the last time it held in a hold that lasted its `for`: a glimpse shorter than `for` lost past its `gap` (a face caught for 2 s as someone sits down) is no visit and does not start the clock again (#2825). At the program's start nothing has been away: someone there at the first message is not greeted |
 | `trigger.rearm` | no | `leaves` or `ends`, which mean the same: once each time it holds, and again only after it stopped. Without it, `present` runs at every message once `for` has passed, as often as `cooldown` lets it. Or a line, on a trigger with a `field` (#1021): `{ below = N, for = D }` (or `above`): once each time it holds, and again only after the trigger's field has been below N, by the messages of its topic, for D since the last chance; a dip that does not stay past the line does not count, however often the trigger stops and holds again (Stuffy air: `{ below = 1000, for = "10m" }` on a trigger above 1,200). A chance held back by a condition, the cooldown or the Policy is spent as one that ran, unless `wait` keeps one held back by a condition; one that comes in the quiet hours is kept (`[quiet]`): the line waits for the chance taken |
 | `trigger.cooldown` | no | Not again within this long of the last run. A run the Policy refused does not count |
+| `trigger.lively` | no | `true` or `false` (the default) (#6893, Music sway): under `LAMP_BODY_ENERGY=on`, its `cooldown` and `rearm` follow the character's energy level (`lamp_body::energy::GESTURE`): at level 1 as written; at 2 to 5 the cooldown is at most 20, 15, 10 and 6 minutes (never longer than written), and from level 4 its `rearm` is dropped (a playlist never stays under the line). Above level 1 its skill's gestures and moves say `"lively": true`, so the body drops them while lamp-control holds it. Test: `music_sway_follows_the_energy_level_and_level_one_is_as_written` |
 | `trigger.wait` | no | With `rearm` or `when = "appears"`, at most `1h`: a chance held back by a `[[while]]` condition (someone talking) is kept while the trigger still holds, for at most this long, and taken at the trigger's first message after every condition holds again: the lamp acts once the talk ends, within the same sitting, instead of giving up its turn (#1021). It began waiting when the chance came, or for a chance kept through the `[quiet]` hours, when they end; the trigger stopping (past its `gap`) ends it. A chance let go past its `wait` says so once in the journal (below). Without it, a chance held back by a condition is spent, and says only a `not run: its while did not hold` line in the journal (below). A chance held back by `absent_for` or the cooldown is spent either way |
 | `trigger.rise` | no | `{ by = N, within = D }` (#1684): the trigger holds only while its `field`'s newest reading is at least N (more than 0) above the lowest reading of its topic in the D before it (1 s to 1 h), the newest itself not among them. With `above`, that level must hold too (Smoky air, as designed: `above = 150`, `rise = { by = 100, within = "3m" }`); without it, any number does. Not with `equals`, `below` or `each`. It goes with `for`, `gap`, `rearm`, `cooldown`, `wait` and `[quiet]` as any trigger does. A message with no number in the field (`null`, as the air part sends a value its sensor does not know yet) is passed over as if it never came: it neither breaks the hold nor counts as one, and nothing is compared with it. With no reading in the D before (the topic silent that long, or the program just started or reloaded), nothing rose: a sensor that comes back high after a dropout longer than D is not a rise. A gap shorter than D is not a dropout: what came before it is still compared. A reading of 0 is a reading. The readings are kept for each trigger, at most 3,600 (past that the oldest goes, which can only make a rise smaller), and begin again at every reload *(chosen: an edit may change the field or the while)*. With the Policy asked, its answer finds the rise as the newest reading had it. Tests (`crates/skills/tests/it/skills.rs`, `a_rise_*`): 80 to 400 at once speaks once, after its `for`; 80 to 300 over 30 minutes (22 in any 3) never; haze at 130 and 170 by turns never; a 15 s puff to 300 never; 40 to 140 never (no level); 5 minutes of silence or of `null`, then 400, never; a second rise before 10 minutes under the rearm line never, one after it does, unless the cooldown holds |
 | `trigger.sooner` | no | `{ topic = T, field = F, above = N, for = D }` (#3709): while F of T's newest value that still lasts is above N, the trigger needs to have held only D, shorter than its own `for` (which it must have; 0 or longer is refused when it loads). Its topic is read only if `[permissions] topics` lists it. With `rearm` it still takes one chance each time it holds: brought forward, never twice. Kept only with `LAMP_YAWN_SOONER=on` in `lamp-skills`; off, it is read, checked and ignored. Stretch break has `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`: a yawn the eyes saw this sitting (`LAMP_EYES_YAWN=on`) brings its stretch to 30 minutes, as V1's yawn rule did. Tests: `a_yawn_in_the_sitting_brings_the_stretch_forward_once` |
@@ -1777,7 +1778,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   same say-back ("Photo booth hands one task to the lamp's agent: … It
   runs only once you agree.", `skill_task_yes::asked_aloud`). It refuses,
   and nothing is said, in the lamp's quiet hours
-  (`lamp_local_time::quiet_hours`), outside `LAMP_PRIVATE_ROOM` unless the
+  (`lamp_local_time::quiet_hours`; with `LAMP_TOLD_WHEN_ASKED=on`, not when
+  the owner asked for that skill by voice within five minutes, below),
+  outside `LAMP_PRIVATE_ROOM` unless the
   owner is seen alone (as a run's write is read back,
   `run_write_yes::read_back_allowed_now`), with the switch off, or once
   agreed. Otherwise the say goes through every gate a skill's say has
@@ -4203,6 +4206,23 @@ Could you ask me again?". On lamp-9adf (11 Nov 21:28) a line begun inside the
 lamp's own answer got "I made lamp test event … It waits for you to agree"
 with `calls=none`, and no skill was made. "I made a mistake." and "I made a mistake: …" are no claims.
 Test: `action_claim::tests::a_skill_said_made_is_a_claim_only_a_make_backs`.
+The lamp's own note of a make already done is the one exception: a turn the
+lamp wrote, never an add-on's quoted line, that opens on
+`made_skill::ALREADY_DONE` (the app's MAKE IT line, made or with code and its
+yes awaited, and a cut voice make's line, all through `app_make::say_note`)
+counts that make as the turn's `make_skill` call
+(`second_provider::made_skill_said`, `made_skill::tells_made`), so its "I
+made …" is said as it came. Only a made note counts: the note of a skill not
+made (`made_skill::not_made_in_their_language`) opens on `ALREADY_DONE` too,
+counts as no make, and an "I made …" to it is still held. The make counted
+isn't tied to a skill's name, so on that one turn "I made" of another skill
+would stand too, and the say socket doesn't check which skill wrote a note;
+both are bounded to that turn.
+On lamp-9adf (15 Nov, build 13162, 14:36, 14:38, 14:40) the app's line was
+asked again and said as "Sorry, I didn't do that." after the skill was kept
+and put on. Any other turn claiming a make with no call is still held. Test:
+`second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`,
+`a_not_made_notes_made_claim_is_held`.
 
 **Removed by voice** (#6960, Twelve's three tries on lamp-c0a4, 12843:
 "delete the skill called moon fact" went to `lamp_help`, whose notes said
@@ -4487,7 +4507,9 @@ Tests:
 The owner's ask, 12 Nov; on in all five product units since 13 Nov. With
 `LAMP_AGENT_SERVICES=on` in `lamp-voice`
 (set alike in lamp-tasks, lamp-skills, lamp-skills-manage@ and lamp-control,
-[services.md](services.md), "The lamp's agent's connectors"; `on` exactly; `made_skill::AGENT_SERVICES_ENVIRONMENT`,
+and in lamp-cloud, whose skills page loads skills with lamp-skills' own
+switches so a connector skill isn't listed as not loading, [cloud.md](cloud.md),
+"Where it reads"; [services.md](services.md), "The lamp's agent's connectors"; `on` exactly; `made_skill::AGENT_SERVICES_ENVIRONMENT`,
 `made_skill::agent_services_on`), and `LAMP_MADE_SCRIPTS=on` beside it (a
 made `task` step is held to that cap and loads only with it), a voice make
 of a skill that reads or writes a linked service (Gmail, Calendar, GitHub,
@@ -4549,7 +4571,43 @@ answer held in quiet hours leaves a line (#7180). Its end is said as before
 kept in the state folder's `task-telling.json` (its skill and when it
 began, never a word of it), so one a restart of lamp-skills drops unsaid is
 said at the next start (`what its agent found: dropped unsaid, lamp-skills
-restarted while it waited`, `task::telling_dropped`). A run
+restarted while it waited`, `task::telling_dropped`).
+
+With `LAMP_TOLD_WHEN_ASKED=on` (`lamp-skills` and `lamp-voice`, off unless
+set; #7180, the first builder's ruling): a run the owner asked for by voice
+keeps its word in quiet hours. On lamp-9adf at 02:28 on 16 Nov a run now
+was answered "Running … now", and its agent's answer then waited behind
+the lamp's quiet hours, with nothing said, until it was skipped an hour
+later. Only a run started by the owner's own spoken ask: a run now
+(`made_run`, the voice's alone on the call socket, which asked whose line
+it was) of a skill with a task marks it (`task::asked_by_voice`), taken once by that run's
+hand-over (`task::take_asked_by_voice`), so a trigger's run, the app's or a
+schedule's after it keeps the quiet as before. Only if the agent's answer
+is ready within five minutes of the ask
+(`told_when_asked::lifted_until`); then the lamp's quiet hours and the
+skill's own `[quiet]` are lifted for it until five minutes after it was
+ready (`told_when_asked::quiet_holds`), so a wait for the owner never
+speaks at one in the morning unasked. Every other part of the gate stays:
+the owner in view and alone, no voice for a minute, not private or
+paused, the lamp's one read turn, and the night's volume. The journal says
+which: `what its agent found: told in quiet hours too, its owner asked by
+voice N s before (LAMP_TOLD_WHEN_ASKED)`, or `its quiet holds, ready N s
+after its owner's ask, past five minutes`. The same switch lets the voice
+ask a task's first yes in quiet hours (above) when the owner asked for that
+skill by voice within five minutes: a skill the heard words named
+(`LAMP_SKILL_NAMED`), the owner heard saying it (`services::owner_hears`),
+is kept with its time in `/run/lampos-voice/spoken-asks.json` (the voice's
+own runtime folder, so no skill or add-on can stand for an ask;
+`told_when_asked::keep`). Whose line it was is judged on a thread of its
+own, so the named call never waits for it; the say service's ask, in
+quiet hours only, waits up to 2 s for it instead
+(`told_when_asked::asked_within_waiting`, `ASKED_WAIT`,
+`Here::asked_by_voice`). Tests:
+`told_when_asked::tests` (with `a_spoken_ask_kept_a_little_later_is_waited_for`), `skill_task_yes::tests::asked_by_voice_it_is_said_in_quiet_hours`,
+`task::tests::a_run_asked_by_voice_is_taken_once`, and
+`a_line_the_voice_heard_holds_a_reads_gate` in lamp-skills' main.
+
+A run
 with no read grant (a send, a script's task) tells nothing, as before.
 Tests: `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
 `service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,
@@ -4702,6 +4760,54 @@ the same code for both writers.
   go in the rules: each is a placeholder there
   (`own1.lamp@example.invalid`), put back in the agent's answer before the
   checks.
+- **With the lamp's skill-creator guide (`LAMP_MAKE_AGENT_GUIDE=on`,
+  off unless set; the owner's ask, 13 Nov).** As V1's `skill-creator`
+  did, the agent drafts, checks and fixes before it answers. Each make's
+  line also says `"guide":true`, and lamp-tasks writes the guide,
+  `guide.md` (0600), beside `rules.md` in the make's folder
+  (`lamp_tasks::skill_make::GUIDE`, from `skill_make_guide.md`: a lamp
+  version of V1's `skills/skill-creator/SKILL.md`, Apache-2.0, its first
+  line naming that origin and license; V1's evals, benchmarks and viewer
+  left out). The run is told to read the guide first, the rules winning
+  where they differ: take the intent from the person's words alone (what
+  the lamp does, when, and what the form can't do, left out), draft the
+  skill in `draft/NAME` in its folder, check it with the lamp's own check,
+  `/opt/lampOS/skills/current/lamp-skills pack --out /tmp/lamp-check
+  draft/NAME` (the same `pack` the voice keeps a made skill with; `/opt`
+  is shown in the make's namespace, and the package goes to the run's own
+  `/tmp`), fix it by the check's words at most twice, then write
+  `answer.md` as the rules say. Each answer is given 90 s
+  (`make_skill_agent::GUIDED_WRITE_WITHIN`), the same as without the guide
+  (`WRITE_WITHIN`), within the agent's 120 s. The voice still puts the answer through its whole check;
+  one it refuses goes back with the check's words (`REPAIR_MARK`) at most
+  2 more times (`GUIDED_MOST_REPAIRS`), each begun only while one more
+  answer fits the 120 s, and one still refused is said as not made, as
+  today. Off, the line, the run's words and the make's folder are today's,
+  byte for byte. Read by the second route's worker (passed by
+  `process::second_route_worker_environment`).
+  - **The guide's check is the voice's** (Heron's P2 on #6768). lamp-tasks
+    starts the run with a cleared environment, so the guided line also
+    carries the worker's values of the two switches `lamp-skills pack`
+    reads that change what it refuses (`make_skill_agent::CHECK_SWITCHES`,
+    `"switches":{"LAMP_AGENT_SERVICES":"on"|"off","LAMP_SKILL_WRITES":"on"|"off"}`,
+    `on` only for an exact `on`), and lamp-tasks puts each `on` in the
+    run's environment ([tasks.md](tasks.md)). So a `write` step, or a
+    `do.task` with a linked service's grants, that the voice would keep
+    packs in the run too, and Hermes is never told to take out the step
+    that was asked for. Off, the line is today's, with no `switches`.
+  - **What the person hears while it works** (Heron's P3 on #6768): "Let
+    me think about that a little longer." once, through the say service,
+    as lamp-tasks says the first hand-over's run started (never after a
+    cut turn, and dropped if it can't be said within 15 s), then nothing
+    until the lamp says the skill back or that it couldn't make it. With
+    the guide one answer may take up to 90 s, plus up to 5 s of lamp-tasks'
+    grace, and the agent's part up to 120 s with a repair. A voice repair
+    begins only while one more 90 s answer still ends within the 120 s, so
+    only after an answer that came within 30 s: after an answer of 60 s or
+    more no voice repair fits and the voice's check of that answer stands,
+    and both repairs happen only when the first answer and the first
+    repair together took 30 s or less. The fixes that usually fit are the
+    guide's own, inside the run.
 - **No make run, no hand-over.** When lamp-tasks can't give that run (an
   older build with no make socket, `LAMP_SKILL_TASKS` off, or held and a
   Hermes wrapper without the network lines), the make is not handed over
@@ -4779,13 +4885,25 @@ the same code for both writers.
   `make_skill_agent::tests` (the rules sent as one `skill_make` line and
   the answer read back, never a `prepare`; an older lamp-tasks or a make run
   refused is never handed over; no `lamp` target is no agent; a silent
-  run times out), and lamp-tasks' `skill_make::tests` (see
-  [tasks.md](tasks.md)).
+  run times out; `the_guide_is_asked_for_only_with_its_switch`,
+  `the_checks_switches_are_lamp_tasks_list_with_this_workers_values`;
+  lamp-skills' `tests/it/make_check.rs` packs a `write` and a service
+  `do.task` draft in the make exactly when the voice's check does), the
+  guide's
+  `with_the_guide_a_refused_answer_goes_back_with_the_checks_words_and_its_fix_is_kept`
+  and `with_the_guide_an_answer_still_refused_after_its_rounds_is_refused_as_today`,
+  and lamp-tasks' `skill_make::tests` (see [tasks.md](tasks.md)).
 - **Not yet shown on a lamp:** its row, the 16 makes (twelve simple, four
   known DeepSeek failures) on a lamp with an agent, comparing kept, the
   say-back and the time with DeepSeek's; a `curl` from inside a make's run, answered by default and failing with `held`
   ([tasks.md](tasks.md)); and the three mail makes refused on lamp-9adf
-  made by the agent, straight, with `LAMP_AGENT_SERVICES` on.
+  made by the agent, straight, with `LAMP_AGENT_SERVICES` on. With the
+  guide: a make DeepSeek can't keep made by Hermes, its draft checked and
+  fixed in its run, said back, and kept on; a mail-sending (`write`) make
+  whose step survives the guide's check there, which also shows that
+  Hermes's terminal passes the run's `LAMP_*` switches to the check it
+  runs; and how long its answer takes
+  there.
 
 ##### A made skill loosened (`LAMP_MADE_SKILL_LOOSE=on`, on in the product)
 

@@ -88,12 +88,19 @@ pub fn second_wanted(args: &[String]) -> bool {
     args.iter().any(|arg| arg == FLAG_SECOND)
 }
 
+/// Why the real voice is refused off Linux, said as one line. Not a claim that macOS has no
+/// lamp-voice: it builds there and takes `bus:` devices; what it waits for is the Mac privacy rule.
+fn refused_off_linux() -> String {
+    format!(
+        "{FLAG} is for Linux only for now: lamp-voice builds on macOS and takes bus devices there, \
+         but nothing opens a host microphone on a Mac until the Mac privacy rule is written and read twice (#6811)"
+    )
+}
+
 /// Why the voice cannot be started with these flags and this bin folder, said before anything starts.
 pub fn check(args: &[String], bin: &Path) -> Result<(), String> {
     if !cfg!(target_os = "linux") {
-        return Err(format!(
-            "{FLAG} is for Linux only: lamp-voice's capture and speaker are ALSA, and macOS has no lamp-voice"
-        ));
+        return Err(refused_off_linux());
     }
     if !args.iter().any(|arg| arg == "--microphone") {
         return Err(format!(
@@ -676,6 +683,17 @@ pub fn watched_command(
 
 #[cfg(test)]
 mod tests {
+    /// The Mac's refusal says what it waits for, on every OS (the check that
+    /// uses it runs only off Linux).
+    #[test]
+    fn the_refusal_off_linux_names_the_privacy_rule_not_a_missing_voice() {
+        let said = refused_off_linux();
+        assert!(said.contains("is for Linux only for now"), "{said}");
+        assert!(said.contains("host microphone"), "{said}");
+        assert!(said.contains("#6811"), "{said}");
+        assert!(!said.contains("has no lamp-voice"), "{said}");
+    }
+
     use super::*;
     use crate::keys::{self, Origin};
     use std::os::unix::fs::PermissionsExt;
@@ -767,7 +785,9 @@ mod tests {
             // Off Linux it is refused before anything else is looked at.
             let refused =
                 check(&args(&["run", "/d", "--real-voice", "--microphone"]), &bin).unwrap_err();
-            assert!(refused.contains("is for Linux only"), "{refused}");
+            assert!(refused.contains("is for Linux only for now"), "{refused}");
+            assert!(refused.contains("host microphone"), "{refused}");
+            assert!(!refused.contains("has no lamp-voice"), "{refused}");
             let _ = fs::remove_dir_all(&bin);
             return;
         }

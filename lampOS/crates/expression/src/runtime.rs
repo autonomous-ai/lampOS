@@ -539,6 +539,9 @@ pub struct Service {
     /// nothing is asked of the body or the light.
     pause: lamp_body::pause_in::PauseIn,
     paused: bool,
+    /// With `LAMP_BODY_ENERGY=on` (#6893), the character's energy level,
+    /// read as the body reads it.
+    energy: Option<lamp_body::energy_in::EnergyIn>,
     rest: Option<(Subscriber, Publisher)>,
     /// With rest requests, `expression/sleep_claim` read once a second
     /// (#940): when it was last read, and the claim last said in the journal.
@@ -623,6 +626,7 @@ impl Service {
             clock_unset: false,
             pause: lamp_body::pause_in::PauseIn::on(bus.clone()),
             paused: false,
+            energy: None,
             rest: None,
             sleep_claim: None,
             rest_refusal_said: None,
@@ -740,10 +744,21 @@ impl Service {
         self
     }
 
+    /// Read the character's energy level (`character/energy`, #6893): above
+    /// 1 a pause nod may come sooner after the last. Off unless
+    /// `LAMP_BODY_ENERGY=on`.
+    pub fn with_energy(mut self, bus: &Bus) -> Self {
+        self.energy = Some(lamp_body::energy_in::EnergyIn::on(bus.clone()));
+        self
+    }
+
     /// The clock is injected here too: tests can use real sockets without
     /// sleeping through any behavior. Each valid topic has a bounded budget.
     pub fn step(&mut self, now: impl Fn() -> u64, wall_ms: u64) -> Output {
         let began = now();
+        if let Some(energy) = self.energy.as_mut() {
+            self.engine.set_energy(energy.level());
+        }
         if self.rest.is_some() {
             self.engine.set_rest_paused(began, self.pause.paused());
             if let Some(bus) = &self.privacy {

@@ -756,8 +756,7 @@ pub struct SkillRun {
     pub skill: String,
     pub prompt: String,
     pub folder: PathBuf,
-    /// The skill's script, `folder`'s, run as it is: what a gateway agent's
-    /// run starts ([`crate::gateway_run::start_text`]).
+    /// The skill's script, `folder`'s, run as it is.
     pub script: PathBuf,
     /// The skill's task as a JSON string, so its words are data.
     pub task: String,
@@ -1595,21 +1594,6 @@ pub const WRAPPER_RUN_LINES: [&str; 2] = [
 /// Said when the wrapper lacks [`WRAPPER_RUN_LINES`]: nothing is started.
 pub const NOT_FOUND_BY_FOLDER: &str = "the lamp's Hermes can't take a skill's run through Harness yet (its wrapper doesn't find a run by its folder: lamp-update's LAMP_SKILL_TASKS is off or its round hasn't run), so nothing was started";
 
-/// Said instead of why a run wasn't started through Harness when Harness
-/// says it isn't signed in (the first builder's 10:44 on the Queue, until
-/// #6685's PR 3 starts a run without Harness): lamp-skills' journal line
-/// for the skill's `do.task` carries it ([`unless_signed_out`]).
-pub const SIGNED_OUT: &str = "This skill's task can't run yet: Harness isn't signed in on this lamp. Sign in to Harness from the app to let it run.";
-
-/// `why` a run wasn't started, or [`SIGNED_OUT`] when Harness's own
-/// `auth status` says it isn't signed in; a sign-in not read keeps `why`.
-pub fn unless_signed_out(why: String, sign_in: Result<crate::harness::SignIn, String>) -> String {
-    match sign_in {
-        Ok(crate::harness::SignIn::Out) => SIGNED_OUT.into(),
-        _ => why,
-    }
-}
-
 /// Whether `wrapper` (a wrapper's text) carries [`WRAPPER_RUN_LINES`] and
 /// [`WRAPPER_NET_LINES`].
 pub fn finds_runs_by_folder(wrapper: &str) -> bool {
@@ -1642,6 +1626,13 @@ pub struct SkillHarness {
     /// at each run (#6685); `None` before Harness has said, then the lamp
     /// target's own engine counts.
     pub default_engine: Box<dyn Fn() -> Option<crate::harness::EngineKind> + Send + Sync>,
+    /// The wait before a launch spoken tasks have (#6226), made at each
+    /// run: by default, with the config's `openclaw_gateway` on, until the
+    /// Gateway serves its RPCs, not only its port (#7170,
+    /// [`crate::gateway::Gateway::serving`]).
+    /// The runner waits only for an OpenClaw launch, within the run's
+    /// remaining deadline and while lamp-tasks is not stopping.
+    pub gateway: Box<dyn Fn() -> Option<crate::gateway::Gateway> + Send + Sync>,
 }
 
 impl SkillHarness {
@@ -1667,12 +1658,23 @@ impl SkillHarness {
         config.restart_daemon = false;
         config.health_after_start = false;
         config.session_machines = None;
+        let waits = config.openclaw_gateway;
         Self {
             config,
             session,
             lamp,
             default_engine: Box::new(|| None),
+            gateway: Box::new(move || waits.then(crate::gateway::Gateway::serving)),
         }
+    }
+
+    /// With the wait before a launch made by `gateway` (tests).
+    pub fn with_gateway(
+        mut self,
+        gateway: Box<dyn Fn() -> Option<crate::gateway::Gateway> + Send + Sync>,
+    ) -> Self {
+        self.gateway = gateway;
+        self
     }
 
     /// With the lamp's default engine read by `default_engine` (#6685).
@@ -1752,23 +1754,8 @@ pub fn ns_takes_runs(script: &str) -> bool {
     script.contains(AGENT_NS_HOME_LINE) && script.contains(AGENT_NS_TASKS_LINE)
 }
 
-/// How the lamp's default agent takes a skill's run, by its own data
-/// (#6685), never by its name: the one hand-over ([`answer`]) has two
-/// adapters behind it.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AgentRun {
-    /// A per-run agent: started for the run alone through Harness, by the
-    /// one run path's wrapper ([`wrapper_takes_runs`]), in a network
-    /// namespace of its own.
-    PerRun,
-    /// A gateway agent: the run is one turn on its warm gateway
-    /// ([`crate::gateway_run`]), by the data lamp-update wrote in its
-    /// wrapper ([`crate::gateway_run::GatewayAgent::of`]).
-    Gateway(crate::gateway_run::GatewayAgent),
-}
-
 /// Whether the lamp's default agent `engine` can take a skill's run
-/// ([`DEFAULT_AGENT_SWITCH`] on), and how ([`AgentRun`]), from what is on
+/// ([`DEFAULT_AGENT_SWITCH`] on), from what is on
 /// the lamp: its wrapper's text (`wrapper`, [`AGENT_WRAPPERS`]`/<engine>`)
 /// and its namespace script's (`script`: a gateway agent's own, by its
 /// data, else [`AGENT_NS`]), each `None`
@@ -1777,7 +1764,10 @@ pub enum AgentRun {
 /// lamp; a per-run agent needs [`wrapper_takes_runs`] and
 /// [`ns_takes_runs`]; a gateway agent needs its wrapper lamp-update's
 /// with whole, plain gateway data, and its gateway's namespace showing
-/// lamp-control's socket ([`AGENT_NS_TASKS_LINE`]). Refused in words,
+/// lamp-control's socket ([`AGENT_NS_TASKS_LINE`]). Either way, an
+/// accepted run is the same one: `harness new <engine>` in the run's own
+/// folder ([`HarnessRunner`]); a gateway agent's Harness pane joins its
+/// gateway's namespaces, so the turn runs there. Refused in words,
 /// naming the engine as data: nothing goes to another agent instead. A
 /// wrapper lamp-update wrote ([`WRAPPER_MARK`]) with neither a per-run
 /// start in it (not all of [`WRAPPER_RUN_LINES`]) nor gateway data is an
@@ -1787,11 +1777,11 @@ pub fn default_agent_takes_runs(
     engine: crate::harness::EngineKind,
     wrapper: Option<&str>,
     script: Option<&str>,
-) -> Result<AgentRun, String> {
+) -> Result<(), String> {
     let name = engine.argument();
     let gateway = wrapper
         .filter(|text| lamp_updates(text))
-        .and_then(crate::gateway_run::GatewayAgent::of);
+        .and_then(crate::gateway::GatewayAgent::of);
     let why = if engine.cloud() {
         format!("{name} runs in its maker's cloud, never on the lamp")
     } else if let Some(gateway) = gateway {
@@ -1805,7 +1795,7 @@ pub fn default_agent_takes_runs(
                     gateway.ns.display()
                 )
             }
-            Ok(gateway) => return Ok(AgentRun::Gateway(gateway)),
+            Ok(_) => return Ok(()),
         }
     } else if !wrapper.is_some_and(|text| wrapper_takes_runs(text, engine)) {
         match wrapper {
@@ -1824,7 +1814,7 @@ pub fn default_agent_takes_runs(
             "the agent namespace {AGENT_NS} doesn't show lamp-control's socket: lamp-update's {SWITCH} is off or its round hasn't run"
         )
     } else {
-        return Ok(AgentRun::PerRun);
+        return Ok(());
     };
     Err(not_set_up(name, &why))
 }
@@ -1842,43 +1832,6 @@ pub fn hermes_waits_for_its_round(
 ) -> bool {
     engine == crate::harness::EngineKind::Hermes
         && wrapper.is_some_and(|text| lamp_updates(text) && !wrapper_takes_runs(text, engine))
-}
-
-/// Whether `wrapper` (a wrapper's text) is a gateway agent's that
-/// lamp-update wrote, with whole, plain data: what
-/// [`default_agent_takes_runs`] hands to [`AgentRun::Gateway`], by the
-/// agent's own data, never its name.
-pub fn wrapper_is_gateway(wrapper: &str) -> bool {
-    lamp_updates(wrapper)
-        && crate::gateway_run::GatewayAgent::of(wrapper).is_some_and(|data| data.is_ok())
-}
-
-/// A skill's run on a gateway agent (#6685 step 4, [`AgentRun::Gateway`]):
-/// `on` exactly, lamp-tasks' own; off unless set. Off, a default agent
-/// whose wrapper is a gateway agent's is refused as before the gateway
-/// path, in the same words ([`no_fenced_run_path`]), and no fence is
-/// written at start; per-run agents are unaffected either way.
-pub const GATEWAY_RUNS_SWITCH: &str = "LAMP_SKILL_GATEWAY_RUNS";
-
-/// [`GATEWAY_RUNS_SWITCH`] in lamp-tasks' environment: `on` exactly.
-pub fn gateway_runs_on() -> bool {
-    std::env::var(GATEWAY_RUNS_SWITCH).is_ok_and(|value| value == "on")
-}
-
-/// `kind` as the run's way, with [`GATEWAY_RUNS_SWITCH`] `on` or not: a
-/// gateway agent's is refused in words with it off, as before the gateway
-/// path; a per-run agent's is as it is either way.
-pub fn gateway_runs_allowed(kind: AgentRun, on: bool, name: &str) -> Result<AgentRun, String> {
-    match kind {
-        AgentRun::Gateway(_) if !on => Err(not_set_up(
-            name,
-            &format!(
-                "{}; lamp-tasks' {GATEWAY_RUNS_SWITCH} is off",
-                no_fenced_run_path(name)
-            ),
-        )),
-        kind => Ok(kind),
-    }
 }
 
 /// Why an agent `name` whose wrapper has no per-run start can't take a
@@ -2231,6 +2184,14 @@ pub fn starts_without_harness(default_agent: bool, here: HarnessHere, harness_se
         }
 }
 
+/// Read as `here`, a run whose default agent takes no skill's run with no
+/// Harness goes through Harness instead of being refused (#7133): signed
+/// out, Harness's own lamp target works with no account (#6407). With no
+/// Harness program there is no other way, so it is refused in words.
+pub fn signed_out_through_harness(here: HarnessHere) -> bool {
+    here == HarnessHere::SignedOut
+}
+
 /// What a skill's run started with no Harness needs (#6685 PR 3), set by
 /// `runtime::serve` before a run can begin.
 pub struct NoHarness {
@@ -2276,14 +2237,20 @@ pub type SkillHarnessSlot = std::sync::Arc<std::sync::OnceLock<SkillHarness>>;
 ///   its folder ([`finds_runs_by_folder`]) is refused in words.
 /// - **The run's folder** `skill-<run-id>` ([`RUN_FOLDER_PREFIX`]) is made
 ///   0700 in lamp-tasks' Harness project ([`HarnessRunner::project`],
-///   `~/harnesses/lamp-tasks`), and the run's token written to
-///   [`HarnessRunner::runs`]`/<run-id>` ([`RunTokenFile`]), always before
-///   the launch. The agent is started there, the folder `new`'s
-///   positional argument, with routing off ([`SkillHarness::new`]); its
-///   wrapper reads the token file once,
-///   deletes it, and gives the run the token, the socket, the SDK and a
-///   network namespace of its own. The token is never in Harness's
-///   arguments or state.
+///   `~/harnesses/lamp-tasks`), always before the launch. The agent is
+///   started there, the folder `new`'s positional argument, with routing
+///   off ([`SkillHarness::new`]). The run's token reaches it one of two
+///   ways, never in Harness's arguments or state:
+///   - **Hermes (a wrapper's own namespace):** the token is written to
+///     [`HarnessRunner::runs`]`/<run-id>` ([`RunTokenFile`]) before the
+///     launch; the wrapper reads it once, deletes it, and gives the run
+///     the token, the socket, the SDK and a network namespace of its own.
+///   - **A gateway default (OpenClaw):** no token file. The run is made
+///     live in memory ([`crate::gateway::open_start`]), the Harness task
+///     names only the skill-start launcher and the run's id, and the
+///     launcher claims the run's script and token once over lamp-tasks'
+///     socket and becomes the run's fence ([`crate::skill_start`]); the
+///     run is done only when its fence said `started`.
 /// - **Its end:** `harness wait --any` on the one agent, asked again until
 ///   it ends or the run's deadline ([`SkillRun::deadline`]) cancels it.
 ///   At the deadline, `harness close --now` ([`crate::harness::Cli::close_now`]).
@@ -2343,6 +2310,9 @@ pub struct HarnessRunner {
     /// With [`DEFAULT_AGENT_SWITCH`] on, what a run with no Harness needs
     /// ([`NoHarness`], #6685 PR 3); empty, every run goes through Harness.
     pub no_harness: NoHarnessSlot,
+    /// A gateway agent's runs live for the launcher
+    /// ([`crate::skill_start::Server`] serves the same, #7133).
+    pub starts: crate::skill_start::Starts,
 }
 
 impl HarnessRunner {
@@ -2366,7 +2336,25 @@ impl HarnessRunner {
             login: Some(LoginLookup::lamp(home)),
             stopping: std::sync::OnceLock::new(),
             no_harness: NoHarnessSlot::default(),
+            starts: Default::default(),
         }
+    }
+
+    /// Whether the lamp's default agent takes a skill's run with no
+    /// Harness ([`default_agent_takes_tasks`]), as [`Self::run_without_harness`]
+    /// checks it, read now; nothing is started.
+    fn takes_without_harness(&self, local: &NoHarness) -> Result<(), String> {
+        let engine = (local.default_engine)().ok_or("the lamp has no default agent yet")?;
+        let wrappers = self
+            .wrappers
+            .as_ref()
+            .ok_or("the agents' wrappers aren't known here")?;
+        let read = |path: &Path| std::fs::read_to_string(path).ok();
+        default_agent_takes_tasks(
+            engine,
+            read(&wrappers.join(engine.argument())).as_deref(),
+            self.agent_ns.as_deref().and_then(read).as_deref(),
+        )
     }
 
     /// A skill's run on the lamp's default agent with no Harness (#6685
@@ -2566,6 +2554,9 @@ struct Started<'a> {
     agent: Option<String>,
     folder: PathBuf,
     token: Option<crate::run_token_file::RunTokenFile>,
+    /// A gateway agent's run live for its launcher (#7133): no longer live
+    /// once its token is ended, so a later claim is refused.
+    live: Option<crate::skill_start::Live>,
 }
 
 impl Started<'_> {
@@ -2574,6 +2565,7 @@ impl Started<'_> {
     /// there was no session to close.
     fn close(&mut self) -> Option<Result<crate::harness::Closed, String>> {
         (self.end_token)();
+        drop(self.live.take());
         let agent = self.agent.take()?;
         let closed = self
             .cli
@@ -2689,33 +2681,36 @@ impl Runner for HarnessRunner {
         // With the switch on and no Harness account (or no Harness), the
         // lamp's own agent with no Harness (#6685 PR 3), read as last
         // known: nothing is asked here.
-        if let Some(local) = self.no_harness.get()
-            && starts_without_harness(
-                self.default_agent,
-                (local.here)(),
-                self.harness.get().is_some(),
-            )
-        {
-            return self.run_without_harness(local, run, end_token);
+        if let Some(local) = self.no_harness.get() {
+            let here = (local.here)();
+            if starts_without_harness(self.default_agent, here, self.harness.get().is_some()) {
+                match self.takes_without_harness(local) {
+                    // Signed out with Harness set up, a default agent whose
+                    // wrapper takes no skill's run with no Harness (a
+                    // gateway agent's, OpenClaw's) goes through Harness's
+                    // own lamp target below, which works signed out
+                    // (#6407): a reset lamp with OpenClaw its default runs
+                    // its skills (#7133). Hermes's wrapper keeps the run.
+                    Err(_) if signed_out_through_harness(here) => eprintln!(
+                        "[lamp-tasks] skill task {}: direct execution is unavailable; Harness is signed out, so trying Harness's own lamp target",
+                        run.run
+                    ),
+                    _ => return self.run_without_harness(local, run, end_token),
+                }
+            }
         }
         let Some(harness) = self.harness.get() else {
             return Err(
                 "Harness isn't set up on this lamp yet, so a skill's run can't be started".into(),
             );
         };
-        // Signed out, a run Harness can't start says so ([`SIGNED_OUT`]),
-        // asked only once the run is refused.
-        let signed_out = |why: String| {
-            let sign_in = Cli::new(harness.config.clone(), harness.session.clone())
-                .map_err(|error| error.to_string())
-                .and_then(|cli| cli.signed_in());
-            unless_signed_out(why, sign_in)
-        };
+        // A refused run keeps its own reason: the lamp's own Harness works
+        // signed out (#6407), so no sign-in is ever asked for (#7019).
         let Some(lamp) = (harness.lamp)() else {
-            return Err(signed_out(
+            return Err(
                 "the lamp has no Harness target of its own yet (Hermes on the lamp is off, or Harness hasn't looked), so nothing was started"
                     .into(),
-            ));
+            );
         };
         // With the switch on, the lamp's default agent by the one run path
         // (#6685), or none: one check for every engine, refused in words.
@@ -2729,47 +2724,46 @@ impl Runner for HarnessRunner {
                 .wrappers
                 .as_ref()
                 .and_then(|wrappers| read(&wrappers.join(engine.argument())));
+            // A gateway agent, by its wrapper's own data (no engine's name):
+            // its tools run in its gateway, so its run's token goes through
+            // the skill-start launcher, never a file (#7133).
+            let gateway_agent = self.wrappers.as_ref().and_then(|_| {
+                wrapper
+                    .as_deref()
+                    .and_then(crate::gateway::GatewayAgent::of)
+                    .and_then(Result::ok)
+            });
             let checked = match &self.wrappers {
                 Some(wrappers) => {
                     // The namespace the agent runs in, by its own data: a
                     // gateway agent's gateway's, else the agent namespace.
-                    let ns = wrapper
-                        .as_deref()
-                        .and_then(crate::gateway_run::GatewayAgent::of)
-                        .and_then(Result::ok)
-                        .map(|gateway| gateway.ns)
+                    let ns = gateway_agent
+                        .as_ref()
+                        .map(|gateway| gateway.ns.clone())
                         .or_else(|| self.agent_ns.clone());
                     default_agent_takes_runs(
                         engine,
                         wrapper.as_deref(),
                         ns.as_deref().and_then(read).as_deref(),
                     )
-                    .and_then(|kind| match kind {
-                        // Live, here at the run's start: what Harness would
-                        // start is the wrapper, before any token file is
-                        // written.
-                        AgentRun::PerRun => match &self.login {
-                            Some(login) => login_finds_wrapper(login, engine, wrappers)
-                                .map(|()| AgentRun::PerRun),
-                            None => Err(not_set_up(
-                                engine.argument(),
-                                "lampos's login shell can't be asked",
-                            )),
-                        },
-                        // Harness starts nothing: lamp-tasks runs the
-                        // wrapper itself, by its full path; only with
-                        // LAMP_SKILL_GATEWAY_RUNS on, else refused as before.
-                        gateway @ AgentRun::Gateway(_) => {
-                            gateway_runs_allowed(gateway, gateway_runs_on(), engine.argument())
-                        }
+                    // Live, here at the run's start: what Harness would
+                    // start is the wrapper, before any token file is
+                    // written. The same for a per-run agent and a gateway
+                    // agent: both are `harness new <engine>` below.
+                    .and_then(|()| match &self.login {
+                        Some(login) => login_finds_wrapper(login, engine, wrappers),
+                        None => Err(not_set_up(
+                            engine.argument(),
+                            "lampos's login shell can't be asked",
+                        )),
                     })
                 }
                 // Tests with no wrapper: a cloud agent is still refused.
                 None if engine.cloud() => default_agent_takes_runs(engine, None, None),
-                None => Ok(AgentRun::PerRun),
+                None => Ok(()),
             };
             match checked {
-                Ok(AgentRun::PerRun) => Some(engine),
+                Ok(()) => Some((engine, gateway_agent.is_some())),
                 // The lamp's Hermes the default, its wrapper not yet
                 // rewritten (an older updater's round, #6898): the run goes
                 // the switch-off way below, as before (#6914).
@@ -2784,28 +2778,12 @@ impl Runner for HarnessRunner {
                     eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
                     return Err(why);
                 }
-                // The other adapter behind the same hand-over: one turn on
-                // the agent's warm gateway (#6685 step 4).
-                Ok(AgentRun::Gateway(gateway)) => {
-                    let program = self
-                        .wrappers
-                        .as_deref()
-                        .unwrap_or(Path::new(AGENT_WRAPPERS))
-                        .join(engine.argument());
-                    let mut runner = crate::gateway_run::GatewayRunner::lamp(
-                        program,
-                        self.project.clone(),
-                        gateway,
-                    );
-                    runner.stopping = self.stopping.get().cloned();
-                    return runner.run(run, end_token);
-                }
             }
         } else {
             None
         };
-        let (engine, agent) = match one_path {
-            Some(engine) => (engine, "the lamp's default agent"),
+        let (engine, agent, by_start) = match one_path {
+            Some((engine, by_start)) => (engine, "the lamp's default agent", by_start),
             None => {
                 if let Some(wrapper) = &self.held_by
                     && !std::fs::read_to_string(wrapper)
@@ -2813,7 +2791,7 @@ impl Runner for HarnessRunner {
                 {
                     return Err(NOT_FOUND_BY_FOLDER.into());
                 }
-                (EngineKind::Hermes, "the lamp's Hermes")
+                (EngineKind::Hermes, "the lamp's Hermes", false)
             }
         };
         let token = run
@@ -2845,17 +2823,31 @@ impl Runner for HarnessRunner {
             agent: None,
             folder,
             token: None,
+            live: None,
         };
-        // Always before the launch: the agent's wrapper reads it at its start.
-        started.token = Some(crate::run_token_file::RunTokenFile::write(
-            &self.runs, &run.run, &token,
-        )?);
+        // Always before the launch. A per-run agent's wrapper reads it at
+        // its start; a gateway agent's tools never see that wrapper, and
+        // its run's folder is in `WORK`, which every agent of the gateway
+        // reads and writes: so nothing is written there, the run is made
+        // live for the launcher to claim once, and the task asks the agent
+        // to run the launcher with the run's id (#7133).
+        let prompt = if by_start {
+            let (live, prompt) =
+                crate::gateway::open_start(&self.starts, &started.folder, run, token.secret())?;
+            started.live = Some(live);
+            prompt
+        } else {
+            started.token = Some(crate::run_token_file::RunTokenFile::write(
+                &self.runs, &run.run, &token,
+            )?);
+            run.prompt.clone()
+        };
         let Some(project) = started.folder.to_str().map(str::to_owned) else {
             return Err("the run's folder is not a plain path".into());
         };
         let launch = Launch {
             name: format!("{RUN_FOLDER_PREFIX}{}", run.run),
-            prompt: run.prompt.clone(),
+            prompt,
             target: Target {
                 machine_id: lamp.machine_id.clone(),
                 project,
@@ -2863,6 +2855,30 @@ impl Runner for HarnessRunner {
             },
             session: None,
         };
+        // As a spoken task's launch (#6226): an engine whose Gateway must
+        // answer first is waited for, else not sent; for a run, until it
+        // serves its RPCs, not only its port, at most SERVING_WITHIN (#7170).
+        let mut gateway = (harness.gateway)();
+        let stopping = self.stopping.get().cloned();
+        let stopped = || {
+            stopping
+                .as_ref()
+                .is_some_and(|stop| stop.load(Ordering::Acquire))
+        };
+        let until = began + run.deadline;
+        if engine == EngineKind::Openclaw
+            && let Some(gateway) = gateway.as_mut()
+            && let Err(why) = gateway.before_launch_until(until, &stopped)
+        {
+            eprintln!("tasks: {why}; the hand-over is not sent");
+            return Err(format!(
+                "Harness didn't start the run ({})",
+                crate::gateway::NOT_READY
+            ));
+        }
+        if stopped() || std::time::Instant::now() >= until {
+            return Err("the skill run ended before hand-over".into());
+        }
         let outcome = cli.launch(&launch);
         // Asked of Harness: from here the agent may have begun, unless
         // Harness never sent the creation.
@@ -2882,10 +2898,7 @@ impl Runner for HarnessRunner {
                 return Err("Harness didn't start the run at once, so it was given up".into());
             }
             LaunchOutcome::NotSent { code } | LaunchOutcome::Uncertain { code } => {
-                return Err(unless_signed_out(
-                    format!("Harness didn't start the run ({code})"),
-                    cli.signed_in(),
-                ));
+                return Err(format!("Harness didn't start the run ({code})"));
             }
         };
         started.agent = Some(launched.clone());
@@ -3033,6 +3046,21 @@ impl Runner for HarnessRunner {
                     });
                 }
                 let ended = ended_as(&state, agent);
+                // Failing closed: a gateway agent's run whose launcher never
+                // claimed its start, or whose fence never said it started
+                // the script, never ran the skill's script.
+                let ended = if by_start && ended.is_ok() {
+                    started
+                        .live
+                        .as_ref()
+                        .map_or_else(
+                            || crate::gateway::start_ran(false, false),
+                            crate::skill_start::Live::ran,
+                        )
+                        .and(ended)
+                } else {
+                    ended
+                };
                 let answer = answer.filter(|answer| !answer.trim().is_empty());
                 // What of its agent's answer is kept: its length only, never
                 // its words (#7180).
@@ -3185,7 +3213,14 @@ impl HandOvers {
     /// `net` through the make's runner instead
     /// ([`crate::skill_make::lamp_runner`], with [`NET_SWITCH`] on), and
     /// lamp-skills alone as caller.
-    pub fn lamp(home: &Path, harness: SkillHarnessSlot, no_harness: NoHarnessSlot) -> Self {
+    /// A gateway agent's runs are made live in `starts`, which
+    /// lamp-tasks' launcher socket serves (#7133).
+    pub fn lamp(
+        home: &Path,
+        harness: SkillHarnessSlot,
+        no_harness: NoHarnessSlot,
+        starts: crate::skill_start::Starts,
+    ) -> Self {
         let net = net_on(std::env::var(NET_SWITCH).ok().as_deref());
         eprintln!(
             "[lamp-tasks] skill task: the net grant is {}",
@@ -3197,6 +3232,7 @@ impl HandOvers {
         );
         let mut runner = HarnessRunner::lamp(home, harness);
         runner.no_harness = no_harness;
+        runner.starts = starts;
         let keys = crate::skill_keys::on(std::env::var(crate::skill_keys::SWITCH).ok().as_deref());
         if keys {
             eprintln!(
@@ -4883,27 +4919,6 @@ mod tests {
         assert!(!environment.contains("CARGO"), "{environment}");
     }
 
-    /// The first builder's 10:44 on the Queue: a run Harness can't start
-    /// says why in the person's words when Harness is signed out; signed
-    /// in, offline or a sign-in not read keeps its own words.
-    #[test]
-    fn a_run_refused_with_harness_signed_out_says_so() {
-        use crate::harness::SignIn;
-        let why = || "Harness didn't start the run (new_failed)".to_owned();
-        assert_eq!(
-            unless_signed_out(why(), Ok(SignIn::Out)),
-            "This skill's task can't run yet: Harness isn't signed in on this lamp. \
-             Sign in to Harness from the app to let it run."
-        );
-        for sign_in in [
-            Ok(SignIn::In),
-            Ok(SignIn::Offline),
-            Err("auth_status_failed".to_owned()),
-        ] {
-            assert_eq!(unless_signed_out(why(), sign_in), why());
-        }
-    }
-
     #[test]
     fn a_run_returns_its_exit_status() {
         let dir = tempfile::tempdir().unwrap();
@@ -5331,11 +5346,11 @@ mod tests {
         let ns = ns_with_runs();
         assert_eq!(
             default_agent_takes_runs(Hermes, Some(ONE_PATH_HERMES), Some(&ns)),
-            Ok(AgentRun::PerRun)
+            Ok(())
         );
         assert_eq!(
             default_agent_takes_runs(Claude, Some(ONE_PATH_CLAUDE), Some(&ns)),
-            Ok(AgentRun::PerRun)
+            Ok(())
         );
         let refused = |engine, wrapper: Option<&str>, script: Option<&str>, why: &str| {
             let said = default_agent_takes_runs(engine, wrapper, script).unwrap_err();
@@ -5411,7 +5426,7 @@ mod tests {
         );
     }
 
-    /// #6685 step 4: which adapter takes a run is the agent's data, never
+    /// #6685: whether a gateway agent takes a run is its data, never
     /// its name: lamp-update's gateway data makes any engine a gateway
     /// agent, its namespace must show lamp-control's socket, bad data is
     /// refused in words, and an agent with neither data is still refused.
@@ -5431,18 +5446,19 @@ mod tests {
         let data = between("pub const GATEWAY_DATA: &str = r#\"");
         let gateway = format!(
             "#!/bin/sh\n{}{data}{}",
-            crate::gateway_run::GATEWAY_MARK,
+            crate::gateway::GATEWAY_MARK,
             own.strip_prefix("#!/bin/sh\n").unwrap()
         );
         let shown = format!("#!/bin/sh\n{AGENT_NS_TASKS_LINE}");
+        let agent = crate::gateway::GatewayAgent::of(&gateway).unwrap().unwrap();
+        assert_eq!(agent.port, crate::gateway::PORT);
+        assert_eq!(agent.ns, PathBuf::from("/usr/local/lib/lampos/openclaw-ns"));
         for engine in [Openclaw, Claude, Hermes] {
-            match default_agent_takes_runs(engine, Some(&gateway), Some(&shown)) {
-                Ok(AgentRun::Gateway(agent)) => {
-                    assert_eq!(agent.port, crate::gateway::PORT);
-                    assert_eq!(agent.ns, PathBuf::from("/usr/local/lib/lampos/openclaw-ns"));
-                }
-                other => panic!("{engine:?}: {other:?}"),
-            }
+            assert_eq!(
+                default_agent_takes_runs(engine, Some(&gateway), Some(&shown)),
+                Ok(()),
+                "{engine:?}"
+            );
         }
         let said =
             default_agent_takes_runs(Openclaw, Some(&gateway), Some("#!/bin/sh\n")).unwrap_err();
@@ -5466,13 +5482,39 @@ mod tests {
         assert!(said.ends_with("so nothing was started"), "{said}");
     }
 
-    /// #6882: with LAMP_SKILL_GATEWAY_RUNS off, a gateway default agent is
-    /// refused in the words from before the gateway path, naming the
-    /// switch; on, it runs as one turn on its gateway. A per-run agent is
-    /// as it is either way.
+    /// #6685 (the lead's decision): a skill's run on a gateway default
+    /// agent is `harness new <engine>` as a per-run agent's is. The
+    /// runner's run names no runner of its own for a gateway and writes no
+    /// `openclaw.json`: such a write broke Harness's own OpenClaw tasks.
     #[test]
-    fn a_gateway_default_runs_only_with_the_gateway_runs_switch() {
-        use crate::harness::EngineKind::Openclaw;
+    fn the_runners_run_names_no_gateway_runner_and_no_openclaw_json_write() {
+        let source = include_str!("skill_task.rs");
+        let run = source
+            .split_once("impl Runner for HarnessRunner {\n")
+            .and_then(|(_, rest)| rest.split_once("\n}\n"))
+            .unwrap()
+            .0;
+        assert!(run.contains("cli.launch(&launch)"));
+        for named in [
+            "GatewayRunner",
+            "gateway_run",
+            "openclaw_config",
+            "openclaw.json",
+            "CONFIG_FILE",
+            "write_skill_run_fence",
+        ] {
+            assert!(!run.contains(named), "{named}");
+        }
+    }
+
+    /// #6685 (the lead's decision): signed out, a gateway default agent
+    /// (OpenClaw's wrapper with lamp-update's gateway data, its gateway's
+    /// namespace showing lamp-control's socket) is refused in words when
+    /// its wrapper has no task entry, and Hermes's one run path wrapper
+    /// still takes the run as before.
+    #[test]
+    fn signed_out_a_gateway_default_with_no_task_entry_is_refused_in_words() {
+        use crate::harness::EngineKind::{Hermes, Openclaw};
         let openclaw_rs = include_str!("../../update/src/openclaw_install.rs");
         let between = |from: &str| {
             openclaw_rs
@@ -5486,30 +5528,24 @@ mod tests {
         let data = between("pub const GATEWAY_DATA: &str = r#\"");
         let gateway = format!(
             "#!/bin/sh\n{}{data}{}",
-            crate::gateway_run::GATEWAY_MARK,
+            crate::gateway::GATEWAY_MARK,
             own.strip_prefix("#!/bin/sh\n").unwrap()
         );
-        assert!(wrapper_is_gateway(&gateway));
-        assert!(!wrapper_is_gateway(&own));
         let shown = format!("#!/bin/sh\n{AGENT_NS_TASKS_LINE}");
-        let kind = default_agent_takes_runs(Openclaw, Some(&gateway), Some(&shown)).unwrap();
-        let said = gateway_runs_allowed(kind.clone(), false, "openclaw").unwrap_err();
+        assert_eq!(
+            default_agent_takes_runs(Openclaw, Some(&gateway), Some(&shown)),
+            Ok(())
+        );
+        let said = default_agent_takes_tasks(Openclaw, Some(&gateway), Some(&shown)).unwrap_err();
         assert!(
-            said.contains("this agent has no fenced run path for a skill's run yet"),
+            said.starts_with("the lamp's default agent (openclaw) isn't set up for a skill's run yet (its wrapper /usr/local/bin/openclaw takes no skill's run without Harness"),
             "{said}"
         );
-        assert!(said.contains(GATEWAY_RUNS_SWITCH), "{said}");
         assert!(said.ends_with("so nothing was started"), "{said}");
-        assert!(matches!(
-            gateway_runs_allowed(kind, true, "openclaw"),
-            Ok(AgentRun::Gateway(_))
-        ));
-        for on in [false, true] {
-            assert_eq!(
-                gateway_runs_allowed(AgentRun::PerRun, on, "hermes"),
-                Ok(AgentRun::PerRun)
-            );
-        }
+        assert_eq!(
+            default_agent_takes_tasks(Hermes, Some(ONE_PATH_HERMES), Some(&ns_with_runs())),
+            Ok(())
+        );
     }
 
     /// The reviewer's P2 on #6817: the login-shell lookup is lamp-update's
@@ -5669,6 +5705,7 @@ mod tests {
             login: None,
             stopping: std::sync::OnceLock::new(),
             no_harness,
+            starts: Default::default(),
         }
     }
 
@@ -5808,6 +5845,28 @@ mod tests {
         assert!(!dir.path().join("project").exists());
     }
 
+    /// #7190: runs the wrapper in `dir/bin` once, before a run's clock
+    /// starts, with [`WARM_ARG`], which the body given to [`warmable`]
+    /// exits on at once. macOS checks a just-written executable at its
+    /// first exec, which takes seconds on a busy Mac (16 test threads);
+    /// a second exec of the same file is not checked again.
+    fn warm(dir: &Path) {
+        let status = std::process::Command::new(dir.join("bin/hermes"))
+            .arg(WARM_ARG)
+            .status()
+            .unwrap();
+        assert!(status.success(), "the wrapper warmed: {status}");
+    }
+
+    /// What [`warm`] passes; never [`TASK_ARG`], a run's own argument.
+    const WARM_ARG: &str = "--warm";
+
+    /// A wrapper body run as `body`, or that exits 0 at once when given
+    /// [`WARM_ARG`].
+    fn warmable(body: &str) -> String {
+        format!("[ \"$1\" = {WARM_ARG} ] && exit 0\n{body}")
+    }
+
     /// Whether process `pid` is gone, waited for up to two seconds.
     fn gone(pid: &str) -> bool {
         let began = std::time::Instant::now();
@@ -5835,8 +5894,10 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let top = std::fs::canonicalize(dir.path()).unwrap();
             let child = top.join("child");
-            let body = format!("sleep 30 &\necho $! > {}\nwait", child.display());
+            let body = warmable(&format!("sleep 30 &\necho $! > {}\nwait", child.display()));
             let runner = local_runner(&top, HarnessHere::Absent, true, Some(&local_wrapper(&body)));
+            // The deadline's clock starts once the wrapper can start.
+            warm(&top);
             let flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             runner.stop_on(flag.clone());
             let deadline = if stop {
@@ -5882,8 +5943,9 @@ mod tests {
             dir.path(),
             HarnessHere::Absent,
             true,
-            Some(&local_wrapper("exit 3")),
+            Some(&local_wrapper(&warmable("exit 3"))),
         );
+        warm(dir.path());
         let said = runner
             .run(&skill_run("tok", Duration::from_secs(10)), &|| {})
             .unwrap_err();
@@ -6142,7 +6204,12 @@ mod tests {
             let runner = crate::skill_make::lamp_runner(home, held);
             assert_eq!(runner.hermes.folder, Path::new(MAKE_WORK));
         }
-        let lamp = HandOvers::lamp(home, std::sync::Arc::default(), std::sync::Arc::default());
+        let lamp = HandOvers::lamp(
+            home,
+            std::sync::Arc::default(),
+            std::sync::Arc::default(),
+            Default::default(),
+        );
         assert_eq!(lamp.work.as_deref(), Some(Path::new(MAKE_WORK)));
         assert!(lamp.held.is_some());
     }

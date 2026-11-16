@@ -1313,6 +1313,15 @@ struct Reply {
     down_line_said: bool,
 }
 impl Reply {
+    /// Whether a mark for this turn can still be sent: its input still
+    /// open to the provider, no End queued or sent. A lamp's own written
+    /// line is its start and end at once, and a local-only turn (#830) or
+    /// an abandoned one is closed: a mark queued for one could never be
+    /// sent and would outlive its turn (#7219).
+    fn takes_marks(&self) -> bool {
+        !self.local_input_ended && self.cloud.input_open()
+    }
+
     fn settled(&self, speaker_pending: &Option<PendingSpeaker>) -> bool {
         self.output_settled(speaker_pending) && !self.requested_audio_waiting()
     }
@@ -6911,7 +6920,14 @@ fn conversation_with_gate_inner(
     let news_by_skill = crate::task_news::by_skill();
     let mut reminder_held: Option<(String, u64)> = None;
     let mut news_held: Option<(String, u64)> = None;
-    let mut gesture_cue = crate::body_link::Cue::default();
+    let mut gesture_cue = crate::body_link::Cue::seeded(monotonic_us());
+    // The character's energy level, read as the body reads it, under its
+    // switch (`LAMP_BODY_ENERGY=on`, #6893): above 1 an answer with no
+    // gesture of its own may get a small fill. Off, level 1: as before.
+    let mut energy = lamp_body::energy_in::enabled_from_environment()
+        .then(|| lamp_bus::Bus::from_environment().ok())
+        .flatten()
+        .map(lamp_body::energy_in::EnergyIn::on);
     leases.keep(rig, owner, &mut stalls)?;
     // What the voice is doing, heard and said, for whoever listens on the
     // lamp's bus. Nothing here waits for a listener.
@@ -7893,14 +7909,13 @@ fn conversation_with_gate_inner(
             crate::sleep_asked::switched_on(),
             controls.as_ref(),
             onboarding.as_ref(),
-        ) && let Some(current) = reply.as_ref()
-            && onboarding_marked != Some(current.owner.turn())
-        {
-            onboarding_marked = Some(current.owner.turn());
-            provider_queue.push_back(ProviderInput::Onboarding {
-                request: current.owner.turn(),
-                privacy_generation: snapshot.microphone_generation(),
-            });
+        ) {
+            mark_onboarding(
+                &mut provider_queue,
+                &mut onboarding_marked,
+                reply.as_ref(),
+                snapshot.microphone_generation(),
+            );
         }
         // A sleep asked aloud whose turn is gone without being heard whole
         // (cut by the person, or failed), or whose cap has passed: at the
@@ -9293,20 +9308,27 @@ fn conversation_with_gate_inner(
                     // The lamp's own words, as its answer begins: a nod
                     // with a yes, a shake with a no, when it has a body.
                     // Held words are not its own yet.
+                    gesture_cue.level = energy.as_mut().map_or(1, |energy| energy.level());
                     if !held
                         && let (Some(turn), Some(body)) = (request, body_link.as_mut())
-                        && let Some(gesture) = gesture_cue.heard(turn, &text, finished)
+                        && let Some((gesture, lively)) =
+                            gesture_cue.heard_lively(turn, &text, finished, monotonic_us())
                     {
-                        body.gesture(gesture);
+                        if lively {
+                            body.lively_gesture(gesture);
+                        } else {
+                            body.gesture(gesture);
+                        }
                         // The face's accent with the move (#940).
                         if let Some(choreography) = choreography.as_mut() {
                             choreography
                                 .set_accent(crate::ring_face::accent_code(gesture), monotonic_us());
                         }
-                        record(
-                            trace,
-                            json!({"kind":"body_gesture_asked","turn":turn,"gesture":gesture,"at_us":monotonic_us()}),
-                        )?;
+                        let mut asked = json!({"kind":"body_gesture_asked","turn":turn,"gesture":gesture,"at_us":monotonic_us()});
+                        if lively {
+                            asked["lively"] = json!(true);
+                        }
+                        record(trace, asked)?;
                     }
                     record(
                         trace,
@@ -10023,7 +10045,7 @@ fn conversation_with_gate_inner(
             // reads the mark only once the line's words are in.
             if matches!(step, AdmissionStep::Audio(_) | AdmissionStep::End(_))
                 && let Some(current) = reply.as_ref()
-                && !current.local_input_ended
+                && current.takes_marks()
                 && current.owner.turn() > step_call_told
                 && sentence_turn != Some(current.owner.turn())
                 // Its End sent early: nothing more goes for it.
@@ -11568,10 +11590,16 @@ fn conversation_with_gate_inner(
                             if let Some(bus) = bus_out.as_mut() {
                                 bus.said(turn, &text, finished, monotonic_us());
                             }
+                            gesture_cue.level = energy.as_mut().map_or(1, |energy| energy.level());
                             if let Some(body) = body_link.as_mut()
-                                && let Some(gesture) = gesture_cue.heard(turn, &text, finished)
+                                && let Some((gesture, lively)) =
+                                    gesture_cue.heard_lively(turn, &text, finished, monotonic_us())
                             {
-                                body.gesture(gesture);
+                                if lively {
+                                    body.lively_gesture(gesture);
+                                } else {
+                                    body.gesture(gesture);
+                                }
                                 // The face's accent with the move (#940).
                                 if let Some(choreography) = choreography.as_mut() {
                                     choreography.set_accent(
@@ -11579,10 +11607,11 @@ fn conversation_with_gate_inner(
                                         monotonic_us(),
                                     );
                                 }
-                                record(
-                                    trace,
-                                    json!({"kind":"body_gesture_asked","turn":turn,"gesture":gesture,"at_us":monotonic_us()}),
-                                )?;
+                                let mut asked = json!({"kind":"body_gesture_asked","turn":turn,"gesture":gesture,"at_us":monotonic_us()});
+                                if lively {
+                                    asked["lively"] = json!(true);
+                                }
+                                record(trace, asked)?;
                             }
                         }
                         // An answer that opened with nothing said ends
@@ -11923,6 +11952,16 @@ fn conversation_with_gate_inner(
                     trace,
                     json!({"kind":"second_look_due","turn":turn,"at_us":monotonic_us(),"name_score":score}),
                 )?;
+            }
+            // Whatever is still queued for the settled turn can never be
+            // sent (its input is closed) and would outlive it, as the cancel
+            // paths' `provider_queue.clear()` keeps from happening (#7219):
+            // dropped with it. Another turn's input still fails as unowned.
+            let dropped = drop_settled_input(&mut provider_queue, turn);
+            if dropped > 0 {
+                eprintln!(
+                    "lamp-voice: request {turn}: {dropped} queued input it could no longer send dropped as it settled"
+                );
             }
             *reply = None;
         }
@@ -16881,6 +16920,34 @@ fn after_start(
     marks
 }
 
+/// The turn in hand marked as begun while the walk is under way, once,
+/// if [`after_start`] did not mark it as it began, and only while it
+/// [takes marks](Reply::takes_marks).
+fn mark_onboarding(
+    queue: &mut VecDeque<ProviderInput>,
+    marked: &mut Option<u64>,
+    reply: Option<&Reply>,
+    privacy_generation: u64,
+) {
+    let Some(current) =
+        reply.filter(|current| *marked != Some(current.owner.turn()) && current.takes_marks())
+    else {
+        return;
+    };
+    *marked = Some(current.owner.turn());
+    queue.push_back(ProviderInput::Onboarding {
+        request: current.owner.turn(),
+        privacy_generation,
+    });
+}
+
+/// Drops what is queued for `turn` as its reply settles, and says how much.
+fn drop_settled_input(queue: &mut VecDeque<ProviderInput>, turn: u64) -> usize {
+    let before = queue.len();
+    queue.retain(|command| second::request_of(command) != turn);
+    before - queue.len()
+}
+
 /// Whether the provider worker is told the walk's state `now` (its turn in
 /// hand, under way or not), having been told `told` last: each turn while
 /// the walk is under way, so a worker started since learns it, and once
@@ -20764,6 +20831,91 @@ mod tests {
         assert!(speaker.data.receive::<SpeakerChunk>().unwrap().is_none());
         assert_eq!(reply.as_ref().unwrap().pcm.len(), 480);
         assert!(!reply.as_ref().unwrap().cloud.started);
+    }
+
+    /// #7219: with `LAMP_SLEEP_ASKED=on`, the walk's own written line (its
+    /// start and end at once) was marked as begun in the walk after it was
+    /// sent. The mark could never be sent, and once the line had played and
+    /// its reply settled, the next flush found input with no owner and the
+    /// voice exited ("provider input lost its owner").
+    #[test]
+    fn a_written_line_in_the_walk_takes_no_onboarding_mark_it_could_never_send() {
+        let (_owner, mut reply) = current_input();
+        reply.as_mut().unwrap().local_input_ended = true;
+        let request = reply.as_ref().unwrap().owner.turn();
+        let mut cloud = CloudAvailability::default();
+        cloud.observe(ready_link(1, 1), monotonic_us()).unwrap();
+        let mut queue = VecDeque::from([ProviderInput::Written {
+            request,
+            session: 1,
+            privacy_generation: 1,
+            text: "Say only this: Hi.".into(),
+            look: false,
+            search: false,
+            quoted: false,
+        }]);
+        flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        assert!(queue.is_empty());
+        let mut marked = None;
+        mark_onboarding(&mut queue, &mut marked, reply.as_ref(), 1);
+        flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        // The line played and settled: its reply ends.
+        reply = None;
+        flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        assert!(queue.is_empty());
+    }
+
+    /// The same for a turn that never went out (a local-only turn, #830,
+    /// heard while the lamp is offline in its walk): its input is closed to
+    /// the provider from the start, though its sound is still coming in.
+    #[test]
+    fn a_local_only_line_in_the_walk_takes_no_onboarding_mark() {
+        let (_owner, mut reply) = current_input();
+        reply.as_mut().unwrap().cloud = CloudRequest::local_only();
+        let mut cloud = CloudAvailability::default();
+        cloud.observe(ready_link(1, 1), monotonic_us()).unwrap();
+        let mut queue = VecDeque::new();
+        let mut marked = None;
+        mark_onboarding(&mut queue, &mut marked, reply.as_ref(), 1);
+        flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        reply = None;
+        flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        assert!(queue.is_empty());
+    }
+
+    /// A settled turn's queued input goes with it; another turn's stays,
+    /// so the flush still fails loud on it.
+    #[test]
+    fn a_settled_turn_drops_only_its_own_queued_input() {
+        let mut queue = VecDeque::from([
+            ProviderInput::Onboarding {
+                request: 4,
+                privacy_generation: 1,
+            },
+            ProviderInput::Onboarding {
+                request: 5,
+                privacy_generation: 1,
+            },
+        ]);
+        assert_eq!(drop_settled_input(&mut queue, 4), 1);
+        assert_eq!(queue.len(), 1);
+        assert_eq!(drop_settled_input(&mut queue, 5), 1);
+        assert!(queue.is_empty());
+    }
+
+    /// A heard line still open is marked once, and the mark is sent.
+    #[test]
+    fn an_open_heard_line_in_the_walk_is_marked_once() {
+        let (_owner, mut reply) = current_input();
+        let mut cloud = CloudAvailability::default();
+        cloud.observe(ready_link(1, 1), monotonic_us()).unwrap();
+        let mut queue = VecDeque::from([start_command(&reply)]);
+        let mut marked = None;
+        mark_onboarding(&mut queue, &mut marked, reply.as_ref(), 1);
+        mark_onboarding(&mut queue, &mut marked, reply.as_ref(), 1);
+        assert_eq!(queue.len(), 2);
+        flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        assert!(queue.is_empty());
     }
 
     #[test]

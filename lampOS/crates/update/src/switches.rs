@@ -264,9 +264,6 @@ pub struct UpdateSwitches {
     /// crate::agent_ns::DEFAULT_AGENT_SWITCH), read as `tasks` is, and
     /// only with `tasks` on.
     pub one_path: bool,
-    /// `LAMP_SKILL_GATEWAY_RUNS` (crate::agent_ns::GATEWAY_RUNS_SWITCH),
-    /// read as `tasks` is and only with it on (#6882).
-    pub gateway_runs: bool,
 }
 
 /// lamp-update's switches, each by [`update_switch`], `env` giving
@@ -287,17 +284,12 @@ pub fn update_switches(
     let one_path_env = env(one_path);
     let tasks =
         (tasks_env.is_some() || product) && update_switch(root, tasks, tasks_env.as_deref());
-    let runs = crate::agent_ns::GATEWAY_RUNS_SWITCH;
-    let runs_env = env(runs);
     UpdateSwitches {
         engines: update_switch(root, engines, env(engines).as_deref()),
         tasks,
         one_path: tasks
             && (one_path_env.is_some() || product)
             && update_switch(root, one_path, one_path_env.as_deref()),
-        gateway_runs: tasks
-            && (runs_env.is_some() || product)
-            && update_switch(root, runs, runs_env.as_deref()),
     }
 }
 
@@ -506,10 +498,8 @@ mod tests {
         let tasks = crate::hermes_install::TASKS_SWITCH;
         assert!(crate::models::file_says_on(product, engines));
         assert!(crate::models::file_says_on(product, tasks));
-        // The one run path is off in the product (#7019): the file lamp-update
-        // reads it from doesn't set it.
         let one_path = crate::agent_ns::DEFAULT_AGENT_SWITCH;
-        assert!(!crate::models::file_says_on(product, one_path));
+        assert!(crate::models::file_says_on(product, one_path));
 
         let root = tempfile::tempdir().unwrap();
         // No file, nothing set: off.
@@ -526,12 +516,6 @@ mod tests {
         // The unit lacks the lines: the carried file turns them on.
         assert!(update_switch(root.path(), engines, None));
         assert!(update_switch(root.path(), tasks, None));
-        assert!(!update_switch(root.path(), one_path, None));
-        // A lamp's own file setting it (a test fixture, not the product's)
-        // turns it on, read from the file as the others are.
-        let mut fixture = product.to_vec();
-        fixture.extend_from_slice(b"LAMP_SKILL_DEFAULT_AGENT=on\n");
-        std::fs::write(&at, &fixture).unwrap();
         assert!(update_switch(root.path(), one_path, None));
         // The environment set always wins over the file.
         assert!(!update_switch(
@@ -576,8 +560,7 @@ mod tests {
             UpdateSwitches {
                 engines: true,
                 tasks: true,
-                one_path: false,
-                gateway_runs: false,
+                one_path: true,
             }
         );
         assert!(restart_for(started, now));
@@ -598,51 +581,16 @@ mod tests {
             |name: &str| (name == crate::agent_ns::DEFAULT_AGENT_SWITCH).then(|| "off".into());
         let no_path = update_switches(root.path(), true, one_path_off);
         assert!(no_path.tasks && !no_path.one_path);
-        assert!(!restart_for(now, no_path));
-        // Off in the product's file (#7019); a lamp's own file setting it (a
-        // test fixture) turns it on, on a product lamp only, and the
-        // environment's off still wins.
-        let mut fixture = std::fs::read(&at).unwrap();
-        fixture.extend_from_slice(b"LAMP_SKILL_DEFAULT_AGENT=on\n");
-        std::fs::write(&at, &fixture).unwrap();
-        let with_path = update_switches(root.path(), true, unset);
-        assert!(with_path.tasks && with_path.one_path);
-        assert!(restart_for(now, with_path));
-        assert!(!update_switches(root.path(), false, unset).one_path);
-        assert!(!update_switches(root.path(), true, one_path_off).one_path);
-        assert!(!update_switches(root.path(), true, tasks_off).one_path);
-        std::fs::write(
-            &at,
-            include_bytes!("../../../deploy/product/settings/update.env"),
-        )
-        .unwrap();
-        // A gateway default agent's runs (#6882): no product file sets it,
-        // so off; set in the environment, on, with tasks on only.
-        assert!(!now.gateway_runs);
-        let runs = |name: &str| (name == crate::agent_ns::GATEWAY_RUNS_SWITCH).then(|| "on".into());
-        assert!(update_switches(root.path(), true, runs).gateway_runs);
-        assert!(!update_switches(root.path(), false, runs).gateway_runs);
-        let both = |name: &str| {
-            [
-                crate::agent_ns::GATEWAY_RUNS_SWITCH,
-                crate::hermes_install::TASKS_SWITCH,
-            ]
-            .contains(&name)
-            .then(|| "on".into())
-        };
-        assert!(update_switches(root.path(), false, both).gateway_runs);
-        let runs_off =
-            |name: &str| (name == crate::agent_ns::GATEWAY_RUNS_SWITCH).then(|| "off".into());
-        let not_exact =
-            |name: &str| (name == crate::agent_ns::GATEWAY_RUNS_SWITCH).then(|| "On".into());
-        assert!(!update_switches(root.path(), true, not_exact).gateway_runs);
-        // From the file on a product lamp, as tasks; on another lamp, not.
+        assert!(restart_for(now, no_path));
+        // lamp-tasks' gateway runs switch (#6882) is no switch of lamp-update's
+        // (#6685): set in the environment or in the file, it changes nothing here.
+        let runs_switch = concat!("LAMP_SKILL_", "GATEWAY_RUNS");
+        let runs = |name: &str| (name == runs_switch).then(|| "on".into());
+        assert_eq!(update_switches(root.path(), true, runs), now);
         let mut file = std::fs::read(&at).unwrap();
-        file.extend_from_slice(b"LAMP_SKILL_GATEWAY_RUNS=on\n");
+        file.extend_from_slice(format!("{runs_switch}=on\n").as_bytes());
         std::fs::write(&at, &file).unwrap();
-        assert!(update_switches(root.path(), true, unset).gateway_runs);
-        assert!(!update_switches(root.path(), false, unset).gateway_runs);
-        assert!(!update_switches(root.path(), true, runs_off).gateway_runs);
+        assert_eq!(update_switches(root.path(), true, unset), now);
         std::fs::write(
             &at,
             include_bytes!("../../../deploy/product/settings/update.env"),

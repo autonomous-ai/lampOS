@@ -130,13 +130,18 @@ impl Monitor {
     }
 }
 
-/// The lamp's host name and its `.local` name, as avahi gives it.
-pub fn own_names() -> Vec<String> {
-    let name = ["/proc/sys/kernel/hostname", "/etc/hostname"]
+/// The lamp's host name, lower case, or empty when it can't be read.
+pub fn host_name() -> String {
+    ["/proc/sys/kernel/hostname", "/etc/hostname"]
         .iter()
         .find_map(|path| fs::read_to_string(path).ok())
         .map(|name| name.trim().to_ascii_lowercase())
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
+
+/// The lamp's host name and its `.local` name, as avahi gives it.
+pub fn own_names() -> Vec<String> {
+    let name = host_name();
     if name.is_empty() {
         return Vec::new();
     }
@@ -171,6 +176,96 @@ pub fn lan_peer(peer: IpAddr) -> bool {
         IpAddr::V6(v6) => {
             let first = v6.segments()[0];
             v6.is_loopback() || first & 0xffc0 == 0xfe80 || first & 0xfe00 == 0xfc00
+        }
+    }
+}
+
+/// Whether `peer` is inside the lamp's own interface subnet, `local` (the
+/// address the request came to) with that interface's `prefix` length.
+/// No /0: a prefix of 0 would be every address.
+pub fn on_the_lamps_subnet(local: IpAddr, prefix: u32, peer: IpAddr) -> bool {
+    match (local.to_canonical(), peer.to_canonical()) {
+        (IpAddr::V4(local), IpAddr::V4(peer)) if (1..=32).contains(&prefix) => {
+            (u32::from(local) ^ u32::from(peer)) >> (32 - prefix) == 0
+        }
+        (IpAddr::V6(local), IpAddr::V6(peer)) if (1..=128).contains(&prefix) => {
+            (u128::from(local) ^ u128::from(peer)) >> (128 - prefix) == 0
+        }
+        _ => false,
+    }
+}
+
+/// Whether the connection's peer is on the local network: [`lan_peer`], or
+/// inside the subnet of the interface the request came to (#7208: an office
+/// LAN on 172.168.20.0/24 is no RFC1918 range but is the lamp's own).
+pub fn peer_answered(conn: &Conn) -> bool {
+    let (peer, local) = (conn.peer.ip(), conn.local.ip());
+    lan_peer(peer)
+        || interface_prefix(local).is_some_and(|prefix| on_the_lamps_subnet(local, prefix, peer))
+}
+
+/// The prefix length of the interface that holds `local`, if one does.
+#[allow(unsafe_code)]
+pub fn interface_prefix(local: IpAddr) -> Option<u32> {
+    let local = local.to_canonical();
+    if local.is_unspecified() {
+        return None;
+    }
+    let mut list: *mut libc::ifaddrs = std::ptr::null_mut();
+    // SAFETY: getifaddrs fills `list` with a linked list that stays valid
+    // until the one freeifaddrs below; each entry's address and mask are
+    // read only as the family the address names.
+    unsafe {
+        if libc::getifaddrs(&mut list) != 0 {
+            return None;
+        }
+        let mut found = None;
+        let mut at = list;
+        while let Some(entry) = at.as_ref() {
+            at = entry.ifa_next;
+            if entry.ifa_addr.is_null() || entry.ifa_netmask.is_null() {
+                continue;
+            }
+            // The mask's own family can be unset (macOS): read it as the
+            // address's.
+            let family = i32::from((*entry.ifa_addr).sa_family);
+            let (Some(address), Some(mask)) = (
+                ip_of(entry.ifa_addr, family),
+                ip_of(entry.ifa_netmask, family),
+            ) else {
+                continue;
+            };
+            if address == local {
+                found = Some(match mask {
+                    IpAddr::V4(mask) => u32::from(mask).leading_ones(),
+                    IpAddr::V6(mask) => u128::from(mask).leading_ones(),
+                });
+                break;
+            }
+        }
+        libc::freeifaddrs(list);
+        found
+    }
+}
+
+/// The address in `sockaddr`, read as `family`.
+///
+/// # Safety
+/// `sockaddr` points to a valid socket address of at least `family`'s size.
+#[allow(unsafe_code)]
+unsafe fn ip_of(sockaddr: *const libc::sockaddr, family: i32) -> Option<IpAddr> {
+    // SAFETY: the caller's.
+    unsafe {
+        match family {
+            libc::AF_INET => {
+                let v4 = &*sockaddr.cast::<libc::sockaddr_in>();
+                Some(IpAddr::from(u32::from_be(v4.sin_addr.s_addr).to_be_bytes()))
+            }
+            libc::AF_INET6 => {
+                let v6 = &*sockaddr.cast::<libc::sockaddr_in6>();
+                Some(IpAddr::from(v6.sin6_addr.s6_addr))
+            }
+            _ => None,
         }
     }
 }
@@ -307,6 +402,35 @@ mod tests {
         ] {
             assert!(!lan_peer(far.parse().unwrap()), "{far}");
         }
+    }
+
+    /// #7208: the office LAN is 172.168.20.0/24, not RFC1918; lamp-52e6 at
+    /// 172.168.20.21 refused a Mac at 172.168.20.239.
+    #[test]
+    fn a_peer_on_the_lamps_own_subnet_is_answered() {
+        let ip = |text: &str| text.parse::<IpAddr>().unwrap();
+        let local = ip("172.168.20.21");
+        assert!(!lan_peer(ip("172.168.20.239")), "172.168 is not RFC1918");
+        assert!(on_the_lamps_subnet(local, 24, ip("172.168.20.239")));
+        assert!(on_the_lamps_subnet(local, 24, ip("::ffff:172.168.20.239")));
+        assert!(on_the_lamps_subnet(local, 16, ip("172.168.21.5")));
+        assert!(!on_the_lamps_subnet(local, 24, ip("172.168.21.5")));
+        assert!(!on_the_lamps_subnet(local, 24, ip("8.8.8.8")));
+        assert!(!lan_peer(ip("8.8.8.8")));
+        assert!(!on_the_lamps_subnet(local, 0, ip("8.8.8.8")), "no /0");
+        assert!(!on_the_lamps_subnet(local, 33, ip("172.168.20.21")));
+        assert!(!on_the_lamps_subnet(local, 24, ip("fe80::1")));
+        let v6 = ip("2001:db8:1::5");
+        assert!(on_the_lamps_subnet(v6, 64, ip("2001:db8:1::9")));
+        assert!(!on_the_lamps_subnet(v6, 64, ip("2001:db8:2::9")));
+    }
+
+    #[test]
+    fn loopback_is_its_own_interface() {
+        let local: IpAddr = "127.0.0.1".parse().unwrap();
+        assert!(interface_prefix(local).is_some_and(|prefix| prefix >= 8));
+        assert_eq!(interface_prefix("0.0.0.0".parse().unwrap()), None);
+        assert_eq!(interface_prefix("203.0.113.9".parse().unwrap()), None);
     }
 
     #[test]

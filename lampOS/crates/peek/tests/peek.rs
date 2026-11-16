@@ -3,7 +3,7 @@
 use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{
     BodyOffsets, Diagnostic, ExpressionBody, ExpressionGaze, ExpressionLease, Face, Faces, Health,
-    HealthItem, JointState, Level, Light, RoomPresence, SkillEvent, SkillStage, Speech,
+    HealthItem, JointState, Level, Light, RoomPresence, SkillEvent, SkillStage, Speech, TaskStatus,
     TurnVerdict, VoiceState, VoiceTurn,
 };
 use lamp_peek::{
@@ -1039,6 +1039,38 @@ fn the_one_page_streams_each_section_and_never_a_word() {
     assert!(!page.contains(page::WORDS_SHOWN), "{page}");
 }
 
+/// The Tasks section (#7208): `tasks/status`, the kept value lamp-tasks
+/// publishes, is read and streamed live; a value that does not read as a
+/// `TaskStatus` (a hostile state) is said to be unreadable, never shown.
+#[test]
+fn the_stream_shows_the_lamps_harness_tasks_from_tasks_status() {
+    let rig = Rig::new("tasks", None);
+    let mut tasks = rig.publisher(TaskStatus::TOPIC, &TaskStatus::declaration(), "tasks");
+    let mut working = serde_json::json!({
+        "store_id": "0123456789abcdef0123456789abcdef",
+        "run": 1,
+        "tasks": [{"task": 1, "engine": "openclaw", "state": "working", "working_s": 120,
+                   "read_unix_ms": 1, "changes": 0, "changed": false, "new_share": 0.0,
+                   "signs": [], "signs_seen": []}],
+    });
+    tasks.publish_json(1, &working).unwrap();
+    let sections = stream_until(&rig, "", "OpenClaw");
+    let shown = &sections["tasks"];
+    assert!(shown.contains("badge-blue\">working"), "{shown}");
+    assert!(
+        sections["overview"].contains("1 working (OpenClaw 1)"),
+        "{:?}",
+        sections["overview"]
+    );
+    working["tasks"][0]["state"] = "<script>alert(1)</script>".into();
+    tasks.publish_json(2, &working).unwrap();
+    let sections = stream_until(&rig, "", "can't be read");
+    assert!(
+        !format!("{sections:?}").contains("<script>"),
+        "{sections:?}"
+    );
+}
+
 /// Monitor mode's timeline (#5883, second piece): a turn planted on a real
 /// bus, heard, understood, the light, a skill, said, shows in that order
 /// with each step's time from the end of speech, its words escaped, and
@@ -1519,4 +1551,76 @@ fn monitor_mode_a_session_ending_during_a_read_sends_nothing_read_after() {
     );
     let (status, _, body) = rig.ask_as("lamp-test.local", "GET", "/bus", &with, "");
     assert_eq!(status, 401, "{body}");
+}
+
+/// V1's dark tokens (`system/web/src/index.css`, `.lm-root`), as #7208's
+/// first step copies them.
+const V1_TOKENS: [&str; 13] = [
+    "#0C0B09", "#111009", "#17160F", "#1E1D14", "#2A2820", "#F59E0B", "#2DD4BF", "#34D399",
+    "#F87171", "#60A5FA", "#F0EEE8", "#9A9080", "#504A3C",
+];
+/// Every section the page has had since #5883, by id.
+const SECTION_IDS: [&str; 6] = ["overview", "timeline", "turns", "camera", "body", "health"];
+
+#[test]
+fn the_page_looks_like_v1_and_loads_nothing_from_outside() {
+    let html = page::main_page(false, "lamp-52e6", "0123456789abcdef");
+    for token in V1_TOKENS {
+        assert!(
+            html.contains(&format!(":{token};")),
+            "token {token} missing"
+        );
+    }
+    for class in [
+        ".card{",
+        ".badge{",
+        ".badge-amber{",
+        ".badge-teal{",
+        ".badge-blue{",
+        ".badge-green{",
+        ".badge-red{",
+        ".badge-grey{",
+        ".chip{",
+        "nav a.on{",
+        ".dot{",
+        ".dot.live{",
+    ] {
+        assert!(html.contains(class), "class {class} missing");
+    }
+    assert!(html.contains("@media(max-width:640px)"), "no phone layout");
+    for id in SECTION_IDS {
+        assert!(html.contains(&format!("<section id=\"{id}\"")), "{id} gone");
+        assert!(html.contains(&format!("id=\"{id}-now\"")), "{id}-now gone");
+        assert!(
+            html.contains(&format!("href=\"#{id}\"")),
+            "{id} not in the nav"
+        );
+    }
+    assert!(html.contains("lamp-52e6") && html.contains("0123456789ab"));
+    assert!(html.contains("read only"));
+    let lower = html.to_ascii_lowercase();
+    for outside in [
+        " src=",
+        "href=\"http",
+        "href='http",
+        "@import",
+        "url(",
+        "//cdn",
+        "@font-face",
+    ] {
+        assert!(!lower.contains(outside), "{outside} on the page");
+    }
+}
+
+#[test]
+fn a_hostile_lamp_name_and_build_stay_escaped() {
+    let html = page::main_page(
+        true,
+        "<script>alert(1)</script>\"'&",
+        "\"><img src=x onerror=alert(2)>",
+    );
+    assert!(!html.contains("<script>alert"), "{html}");
+    assert!(!html.contains("<img"), "{html}");
+    assert!(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;&quot;&#39;&amp;"));
+    assert!(html.contains(page::WORDS_SHOWN));
 }

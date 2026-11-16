@@ -280,6 +280,10 @@ pub struct Asker {
     /// `"replace": true`: ends the motion playing, if it is `skill` or
     /// lower ([`crate::body::Asked::replace`]). Absent, false.
     pub replace: bool,
+    /// `"lively": true`: started of itself only above energy level 1,
+    /// dropped while lamp-control holds the body
+    /// ([`crate::body::Asked::lively`]). Absent, false.
+    pub lively: bool,
 }
 
 impl Asker {
@@ -304,12 +308,15 @@ fn asked(datagram: &[u8]) -> Option<(serde_json::Value, Asker)> {
         priority: Option<Priority>,
         #[serde(default)]
         replace: bool,
+        #[serde(default)]
+        lively: bool,
     }
     let message: Message = serde_json::from_slice(datagram).ok()?;
     let asker = Asker {
         source: message.source,
         priority: message.priority,
         replace: message.replace,
+        lively: message.lively,
     };
     Some((message.sent, asker))
 }

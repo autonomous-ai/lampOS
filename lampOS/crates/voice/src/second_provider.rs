@@ -1512,6 +1512,10 @@ pub type ReadBackAsked = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 /// The call a heard line plainly asks for by an installed skill's name, as
 /// its name and arguments, or none (`crate::skill_named::heard`, #6772).
 pub type SkillNamed = Arc<dyn Fn(&str) -> Option<(String, Value)> + Send + Sync>;
+/// An installed skill's own ask phrases, by its function's name
+/// (`crate::tools::skill_asks`, #5749): what a called skill's recording
+/// may play for besides a line that asks to play.
+pub type SkillAsks = Arc<dyn Fn(&str) -> Vec<String> + Send + Sync>;
 /// The agent a spoken line's own words name to do the work, as the person
 /// calls it, or none (#6547 (1b), `crate::agent_tasks::named_for_work`).
 pub type NamedAgent = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
@@ -1864,6 +1868,9 @@ struct Shared {
     /// The skill a heard line plainly asks for by its name: called in code
     /// as round 1 ([`Engine::calling_skills_named`]).
     skill_named: Option<SkillNamed>,
+    /// A called skill's own ask phrases: a line that holds one that asks to
+    /// play is an ask for its recording ([`Engine::playing_for_skill_asks`]).
+    skill_asks: Option<SkillAsks>,
     /// With the tasks part: the agent a spoken line's words name for the
     /// work, whose round 1 answered in words alone is asked again once
     /// ([`Engine::catching_named_agents`], #6547 (1b)).
@@ -4639,6 +4646,7 @@ impl Engine {
                 named_ask: None,
                 read_back_asked: None,
                 skill_named: None,
+                skill_asks: None,
                 named_agent: None,
                 named_asked_again: crate::agent_tasks::AskedAgain::default(),
                 #[cfg(test)]
@@ -6342,6 +6350,17 @@ impl Engine {
     pub fn calling_skills_named(mut self, named: SkillNamed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.skill_named = Some(named);
+        }
+        self
+    }
+
+    /// With the skills' files: a called skill's recording also plays for a
+    /// line that holds one of that skill's own ask phrases that asks to
+    /// play (`crate::requested_audio::asks_to_play_or_skill_ask`, #5749).
+    /// Before any turn only.
+    pub fn playing_for_skill_asks(mut self, asks: SkillAsks) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.skill_asks = Some(asks);
         }
         self
     }
@@ -15135,6 +15154,17 @@ fn held_for_a_claim(held: &mut Option<String>, piece: String) -> String {
     }
 }
 
+/// Whether the turn is the lamp's own note of a skill made already, with
+/// no call of its own: one it wrote ([`Asker::Written`], never an add-on's
+/// quoted line) that tells of a make ([`crate::made_skill::tells_made`]),
+/// as the app's make line and a cut voice make's line are told
+/// (`app_make::say_note`); never the note of a skill not made.
+/// `LAMP_ACTION_CLAIM_CHECKED` counts that make as the turn's call, so its
+/// "I made …" is never said as not done.
+fn made_skill_said(asked: &Asker, said: &str) -> bool {
+    matches!(asked, Asker::Written { quoted: false, .. }) && crate::made_skill::tells_made(said)
+}
+
 /// A turn whose reply claimed an action again with no call of its kind,
 /// after one ask again (`LAMP_ACTION_CLAIM_CHECKED`, #5215): what an earlier
 /// round held is said, then [`crate::action_claim::NOT_DONE_LINE`], and the
@@ -15184,6 +15214,7 @@ async fn answer(
     let looking = matches!(asked, Asker::Written { looking: true, .. });
     let searching = matches!(asked, Asker::Written { search: true, .. });
     let quoted = matches!(asked, Asker::Written { quoted: true, .. });
+    let made_said = made_skill_said(&asked, &said);
     let heard_at = Instant::now();
     // The request's own words, for a forget it calls (#3113): never the
     // next line, which may be someone else's.
@@ -15958,6 +15989,34 @@ async fn answer(
                 &crate::skill_named::spoken(function),
             )));
         }
+        // The owner's own spoken ask of the skill, kept so its task's first
+        // yes may be asked in the lamp's quiet hours (#7180,
+        // `LAMP_TOLD_WHEN_ASKED`): only the owner heard saying it, judged
+        // on a thread of its own and never waited for here, so the named
+        // call runs as soon as it would without the switch; the say
+        // service's ask waits a little for it instead
+        // (`told_when_asked::ASKED_WAIT`).
+        if crate::told_when_asked::on()
+            && let Some(call) = &named_call
+        {
+            let skill = crate::skill_named::function_of(&call.name, &call.args).to_owned();
+            let lease = scope.clone();
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_millis() as u64);
+            drop(tokio::task::spawn_blocking(move || {
+                if !crate::services::owner_hears(request, heard, lease.as_ref()) {
+                    return;
+                }
+                if let Err(error) = crate::told_when_asked::keep(
+                    std::path::Path::new(crate::told_when_asked::SPOKEN_ASKS_FILE),
+                    &skill,
+                    now_ms,
+                ) {
+                    eprintln!("lamp-voice second: request {request}: {error}");
+                }
+            }));
+        }
         // Their yes did not count (#2377): told once, beside the request.
         if let Some(told) = unseen_yes {
             messages.push(Message::system(told));
@@ -16011,6 +16070,14 @@ async fn answer(
                 crate::made_skill::MAKE.to_owned(),
                 serde_json::json!({ crate::make_skill_local::READ_BACK: name }),
             ));
+        }
+        // So is the make the lamp's own note says is done
+        // ([`made_skill_said`]: an app's make, a voice make's line after its
+        // turn was cut): the skill was made outside the turn, so its line
+        // stands (lamp-9adf, 15 Nov, build 13162: "I made …" said as "Sorry,
+        // I didn't do that." after the app's MAKE IT, three of three).
+        if made_said {
+            turn_called.push((crate::made_skill::MAKE.to_owned(), Value::Null));
         }
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
@@ -16957,6 +17024,11 @@ async fn answer(
                     .then_some(named_agent.as_deref())
                     .flatten();
                 let came = if let Some(agent) = handed {
+                    // Issued now, as a model's call is when it comes
+                    // (#7203): a requested-audio context with
+                    // `issued_us` 0 is refused, and the tasks part is
+                    // never asked ("couldn't reach Claude Code").
+                    called_us = monotonic_us();
                     calls.push(net::ToolCall {
                         id: format!("handed-{request}"),
                         name: start.to_owned(),
@@ -18130,8 +18202,18 @@ async fn answer(
                             // lamp-52e6 on 9 Nov, the skill's "only when …
                             // explicitly asks" left to the model. Refused, and
                             // the model told so, never its "next" confirmation.
+                            // A line that holds the called skill's own ask to
+                            // play asks too (#5749).
                             if answer.requested_audio.is_some()
                                 && !crate::requested_audio::asks_to_play(&heard_words)
+                                && !shared.skill_asks.as_ref().is_some_and(|asks| {
+                                    crate::requested_audio::asks_to_play_or_skill_ask(
+                                        &heard_words,
+                                        &asks(crate::skill_named::function_of(
+                                            &call.name, &call.args,
+                                        )),
+                                    )
+                                })
                             {
                                 eprintln!(
                                     "lamp-voice second: request {request}: {} offered a recording for a line that did not ask to play; refused",

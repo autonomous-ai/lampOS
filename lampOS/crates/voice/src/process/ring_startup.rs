@@ -129,8 +129,33 @@ impl Worker {
         extra: &[&str],
         on_wait: impl FnMut() -> io::Result<()>,
     ) -> io::Result<RingStartup> {
+        // Every ring entry of the binary is Linux-only (`main.rs`), so off
+        // Linux a ring child would exec, fail its usage check and be reaped.
+        // No child, no sockets and no directory is made instead.
+        if !cfg!(target_os = "linux") {
+            return Self::ring_not_on_this_os(on_wait);
+        }
         Self::spawn_optional_ring_reading(executable, directory, parent, extra, on_wait, |name| {
             std::env::var_os(name)
+        })
+    }
+
+    /// The ring's startup where no ring worker exists: the same answer as a
+    /// ring that could not start and left no child (`worker: None`), which
+    /// the muted wait and the coordinator already take as "no light". A
+    /// mandatory fault found while it waits is still returned first, as
+    /// `spawn_optional_ring_reading` does. It touches nothing the privacy
+    /// gate reads.
+    pub(super) fn ring_not_on_this_os(
+        mut on_wait: impl FnMut() -> io::Result<()>,
+    ) -> io::Result<RingStartup> {
+        on_wait()?;
+        Ok(RingStartup::Unavailable {
+            worker: None,
+            error: io::Error::new(
+                io::ErrorKind::Unsupported,
+                "the ring worker runs on Linux only",
+            ),
         })
     }
 

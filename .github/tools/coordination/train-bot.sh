@@ -9,6 +9,9 @@
 #   rest go again at once. Nothing eligible: wait 60 s.
 #   16 Nov (#7181): a crate train whose only red is a cancelled job goes again once; one that fails to compile or lint
 #   with no PR to name goes again once, then its PRs go alone, one a train (run_train, README.md).
+#   16 Nov (#7188): with two lanes, a lane's train runs in the background under its real process id (the text "$!" was
+#   kept before): a lane is busy until its train is done with, rounds are 3 min apart while a train runs, and a stop
+#   ends the lanes still waiting for their trains (lane_running, stop_lanes, README.md).
 # DRY=1: print what one round would carry and stop (with two lanes: each PR's lane, then each lane's round).
 # 3 Nov: moved into .github/tools/coordination (Python stays out of lampOS/, Thirteen on #5068); every path comes from
 #   the environment (README.md):
@@ -314,9 +317,46 @@ NOCRATES_LANE="${NOCRATES_LANE:-on}"; two=0; [[ $NOCRATES_LANE == off ]] || two=
 m=$(git ls-remote origin 'refs/heads/first/train-nc-*' | sed -E 's#.*/train-nc-##' | grep -E '^[0-9]+$' | sort -n | tail -1); m=${m:-0}
 # A restart clears a stop: train-bot.stop (the whole bot, exit 2) and train-bot.stop-nc (the no-crates lane alone).
 [[ ${DRY:-0} == 1 ]] || rm -f $SP/train-bot.stop $SP/train-bot.stop-nc
+# job[LANE]: the process id of the lane's train running in the background (lane_round, with two lanes).
+# 16 Nov (#7188): `job[$lane]=$!` kept the text "$!" (zsh 5.9), so nothing below ever saw a lane's train: no lane read
+# as running, the wait between rounds broke at its first look, and a stop ended nothing. A lane was kept to one train
+# only by its open train PR (the main loop's list), so it read as free while its closed train was still being done with.
 typeset -A job; job=()
-# A stop (kill) takes the lanes running in the background with it, and their merge-when-green.sh.
-trap 'for j in ${(v)job}; do pkill -P $j 2>/dev/null; kill $j 2>/dev/null; done; exit 143' TERM INT
+# lane_running LANE: the lane's train is still this shell's own job. Read from the shell's job table, never from
+# `kill -0`: a process id is given out again once its process has ended, and another live process must not hold a lane
+# busy or be signalled by a stop.
+zmodload zsh/parameter || { echo "zsh/parameter (the shell's job table) can't be loaded: refusing to start" >&2; exit 1; }
+lane_running() {
+  [[ -n ${job[$1]} && " ${(v)jobstates} " == *":${job[$1]}="(running|suspended)* ]]
+}
+# proc_tree PID...: each process and every process under it, a parent before its children.
+proc_tree() {
+  local p
+  for p in "$@"; do print -r -- $p; proc_tree $(pgrep -P $p); done
+}
+# stop_lanes: what a stop (kill) does to the lanes. A lane still waiting for its train (train-bot.wait-LANE names the
+# train: lane_round) is ended with its merge-when-green.sh and all that runs, the lane first, so that it never takes
+# the end of its wait for a failed train. Its train PR stays open with nothing waiting on it, which is said. A lane past
+# its wait (run_train emptied the file), or whose train's merge call is under way (it can't be taken back), is left to
+# finish its train and end by itself: stopped there, it would leave a merged train's PRs open and the Queue untold, or
+# a failed train's PRs not held. README.md, "Running the train bot".
+stop_lanes() {
+  local l name; local -a t
+  for l in ${(k)job}; do
+    lane_running $l || continue
+    name=crate; [[ $l == nc ]] && name=no-crates
+    if [[ ! -s $SP/train-bot.wait-$l ]]; then
+      say "stopped: the $name lane is past its wait: it finishes its train and ends by itself"; continue
+    fi
+    t=($(proc_tree ${job[$l]}))
+    if ps -o command= -p ${(j:,:)t} 2>/dev/null | grep -qE '(^|[ /])gh pr merge '; then
+      say "stopped: the $name lane's train is being merged: it finishes its train and ends by itself"; continue
+    fi
+    kill $t 2>/dev/null
+    say "stopped: train $(<$SP/train-bot.wait-$l) is left open with nothing waiting on it"
+  done
+}
+trap 'stop_lanes; exit 143' TERM INT
 # halt LANE: the crate lane (or the only lane) stops the bot for the first builder, as before (exit 2; from a lane
 # running in the background, through train-bot.stop, which the main loop reads). The no-crates lane stops alone.
 halt() {
@@ -384,6 +424,8 @@ run_train() {
   # --no-crates too, so a crate train's merge under it rebuilds it only on an overlap.
   local flags=(--behind-unrelated); [[ $lane == nc ]] && flags+=--no-crates
   $TOOLS_DIR/merge-when-green.sh $tp $flags --precheck $carried >> $LOG 2>&1; rc=$?
+  # 16 Nov (#7188): the wait is over. From here a stop leaves this lane to finish its train (stop_lanes).
+  (( two )) && : > $SP/train-bot.wait-$lane
   # 10 Nov 00:1x (train 761): GitHub merged the train, yet its merge was answered as behind lamp-voice (rc 3), so the
   # bot rebuilt it, could not close it, and left its PRs open. A train GitHub says is merged goes on as merged.
   if [[ $rc != 0 && $(gh pr view $tp -R $REPO --json state --jq .state 2>/dev/null) == MERGED ]]; then
@@ -491,7 +533,8 @@ run_train() {
       echo 1 > $cancf
       say "train $n (#$tp) failed (rc $rc) with no failing test named: its only red was a cancelled job (${(j:, :)cj}): cut again once"
       queue_post "Train bot, $(date +%H:%M): train $n (#$tp) failed with no failing test named; its only red was a cancelled job (${(j:, :)cj}): cut again once."
-      # Closed last: a round may take the lane as free as soon as its train PR is closed, and the count is written by then.
+      # Closed last, with the count written by then: until #7188 a round took the lane as free as soon as its train PR
+      # was closed. Since then the lane is busy until this returns.
       gh pr close $tp -R $REPO -c "Train bot: closed, its only red was a cancelled job (${(j:, :)cj}), with no failing test named; the same PRs go again once." >/dev/null
       return 0
     fi
@@ -512,7 +555,8 @@ run_train() {
     # train it had to itself) is left out on the head the train carried (lib.sh, coord_sit_out, into $aloneout: no
     # HOLD, told once on the PR, a new head brings it back) and named once on the Queue with the files and the first
     # error line of the failed job's log. One that passes alone merges as usual. The train PR is closed last, after all
-    # of that is kept and posted: a round may take the lane as free as soon as its train PR is closed.
+    # of that is kept and posted: until #7188 a round took the lane as free as soon as its train PR was closed (since
+    # then the lane is busy until this returns).
     ef=${(j:,:)${(f)errfiles}}; p=${carried[1]}; note="the PRs touching those files sit out, the rest go again"
     ch=$(awk -v p=$p '$1 == p { print $2; exit }' $SP/train-carried-$lane.txt 2>/dev/null)
     if (( ${#carried} == 1 )) && [[ -n $ch ]] && { grep -qx -- "$p $ch" $alonef 2>/dev/null || grep -qxF -- "$p again $ch $ef" $told; }; then
@@ -607,7 +651,7 @@ run_train() {
 # lane_round LANE BUSY PR...: what one lane does this round with its PRs: nothing (busy, stopped, rows alone, none),
 # DRY=1's line, or a train built and run (in the background with two lanes). Returns 0 when it started a train.
 lane_round() {
-  local lane=$1 busy=$2 name p solo; shift 2
+  local lane=$1 busy=$2 name p solo pid; shift 2
   local l=("$@"); [[ -n ${l[1]} ]] || l=()
   if (( two )); then [[ $lane == nc ]] && name="no-crates lane: " || name="crate lane: "; fi
   if [[ $lane == nc && -f $SP/train-bot.stop-nc ]]; then [[ ${DRY:-0} == 1 ]] && say "dry: ${name}stopped (train-bot.stop-nc)"; return 1; fi
@@ -634,11 +678,15 @@ lane_round() {
   if [[ ${DRY:-0} == 1 ]]; then say "dry: ${name}would carry ${l[*]} onto $LV"; return 1; fi
   # 16 Nov (#7181): a lane stopped the bot (halt, train-bot.stop) while this round read the PRs: no new train. A round
   # can begin once the failed train's PR is closed, a moment before the stop is written; it used to cut one more train.
+  # 16 Nov (#7188): the lane that stops the bot now reads as busy until it has; this still keeps the other lane, in a
+  # round under way, from a new train.
   [[ -f $SP/train-bot.stop ]] && return 1
   # A PR that can't be built into its train alone (it conflicts, or a check on its head went red) leaves $alonef: the
   # lane would wait on it every round.
   build_train $lane $l || { [[ -n $solo ]] && coord_drop_pr $alonef $solo; return 1; }
-  if (( two )); then run_train $lane & job[$lane]=$!; else run_train $lane; fi
+  # 16 Nov (#7188): the process id goes through a plain variable: `job[$lane]=$!` kept the text "$!" (zsh 5.9).
+  # train-bot.wait-LANE names the train while its lane waits for it, for a stop (stop_lanes).
+  if (( two )); then print -r -- "$tn (#$tp)" > $SP/train-bot.wait-$lane; run_train $lane & pid=$!; job[$lane]=$pid; else run_train $lane; fi
   return 0
 }
 # dropped PR KEY WHY: say "#PR left out: WHY" once per head (its ref eligible() fetched), for the PRs train-hold.txt and
@@ -648,15 +696,23 @@ dropped() {
   local h=$(git rev-parse -q --verify refs/remotes/pr/$1 2>/dev/null)
   grep -qx -- "$1 $2 $h" $told || { say "#$1 left out: $3" >&2; tell "$1 $2 $h"; }
 }
+looked=0
 while true; do
   # A lane in the background stopped the bot (halt): let the other lane's train finish, then stop.
   if [[ -f $SP/train-bot.stop ]]; then (( ${#job} )) && wait; say "stopped for the first builder"; exit 2; fi
-  for l in ${(k)job}; do kill -0 ${job[$l]} 2>/dev/null || unset "job[$l]"; done
+  for l in ${(k)job}; do lane_running $l || unset "job[$l]"; done
   open=(${(f)"$(gh pr list -R $REPO --base lamp-voice --state open --limit 50 --json headRefName --jq '.[]|select(.headRefName|startswith("first/train-"))|.headRefName')"})
+  # 16 Nov (#7188): a train PR open at the start is not this bot's to run: a stop left it (stop_lanes), or it was built
+  # by hand. Its lane waits for it, below, and that is said once, so a wait with nothing behind it shows in the log.
+  if (( ! looked )) && [[ ${DRY:-0} != 1 ]]; then
+    for b in $open; do say "train PR $b was open at the start and this bot is not running it: its lane waits until it is merged or closed"; done
+  fi
+  looked=1
   busy_c=0; busy_n=0
   if (( two )); then
     # Each lane waits only for its own train: first/train-nc-N for the no-crates lane, any other first/train-* (a crate
-    # train, or one built by hand) for the crate lane.
+    # train, or one built by hand) for the crate lane. 16 Nov (#7188): and for its own train still running here, also
+    # once that train's PR has closed, until it is done with (its PRs closed, or held and told why).
     for b in $open; do if [[ $b == first/train-nc-* ]]; then busy_n=1; else busy_c=1; fi; done
     [[ -n ${job[crates]} ]] && busy_c=1; [[ -n ${job[nc]} ]] && busy_n=1
     if (( busy_c && busy_n )) && [[ ${DRY:-0} != 1 ]]; then sleep 30; continue; fi
@@ -706,9 +762,11 @@ while true; do
   # Wait up to 60 s, less when a lane's train ends (a rebuild goes at once, as with one lane). While a train runs in a
   # lane, rounds are 3 min apart: each round reads every open PR (eligible), and one lane used to read none while its
   # train ran, so this bounds the extra GitHub API calls the second lane makes.
+  # 16 Nov (#7188): until then no lane's train showed here: the wait after a train was cut broke at its first look,
+  # 10 s in, and every other one lasted a minute, whether a train ran or had just ended.
   waits=6; (( ${#job} )) && waits=18
   for i in {1..$waits}; do
     sleep 10
-    for l in ${(k)job}; do kill -0 ${job[$l]} 2>/dev/null || { unset "job[$l]"; break 2; }; done
+    for l in ${(k)job}; do lane_running $l || { unset "job[$l]"; break 2; }; done
   done
 done

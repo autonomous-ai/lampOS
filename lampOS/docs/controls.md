@@ -184,7 +184,7 @@ timeline through both. The product's lamp-controls turns it on (29 Oct,
 Controls'. Tests:
 `crates/controls/tests/it/head_pet.rs`.
 
-**Asked aloud (#3748, `LAMP_SLEEP_ASKED=on`, off unless on; on in the product since #6853).** "Lamp, go
+**Asked aloud (#3748, `LAMP_SLEEP_ASKED=on`, off unless on; on in the product by #6853, PARKED (#7219) off there since: it broke a fresh lamp's onboarding walk; uncomment its line in `deploy/product/lamp-voice.service` to turn it on).** "Lamp, go
 to sleep" is the voice's own function `go_to_sleep`, on both routes. The
 model is told to say only "Going to sleep. Tap my head to wake me.". Once
 that turn ends heard whole (as a say's `spoken`), the voice asks the same
@@ -199,7 +199,11 @@ coordinator marks every turn in hand while it is
 request begun in the walk is marked right after its Start, before any of
 its sound, so the mark reaches the worker before the model can call
 (Sixth's P3 on #3835); a turn begun before the walk is marked at the next
-poll. Only with head sleep (`LAMP_HEAD_TOUCH=on` and the durable
+poll while its input is still open. A turn whose input is closed (its End
+queued or sent, as a lamp's own written line's is from its start, or a
+local-only turn) takes no mark: it could never be sent, and outliving its
+turn it ended the voice (#7219). What is still queued for a turn as it
+settles is dropped with it. Only with head sleep (`LAMP_HEAD_TOUCH=on` and the durable
 mute), since a tap on the head is how it wakes: without it the function is
 not declared at all, and the journal says so once. A held line's call is
 refused, as every action's is.

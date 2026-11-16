@@ -26,6 +26,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | `tests/test_rows.py` | Tests for `rows.py`. Run with the others. |
 | `tests/test_red_checks.py` | Tests for #6556 B and C: a red check of any kind ends `merge-when-green.sh`'s wait, a failed job's own log is read (`coord_red_jobs`), the PRs a red workflow takes (`coord_prs_taken`), a PR with a red check on its own head sits out (also when it went red between the round's read and the cut), a PR the ARM64 run takes waits for its own head's ARM64 run all green, and the bot's per-PR cache. Run with the others. |
 | `tests/test_failed_trains.py` | Tests for #7181: a train whose only red is a cancelled job is cut again once and the second stops the bot, and a set that fails to compile or lint twice the same way goes alone, one PR a train, with the PR that fails alone left out and named on the Queue; and, from the first read of #7186, a PR that fails alone while lamp-voice's own head is red is not left out and the bot stops. The bot's own loop runs for real (not `DRY=1`) on the temporary repository, with a stand-in `gh` that opens, merges, closes and comments on PRs there only. Run with the others. |
+| `tests/test_lane_pids.py` | Tests for #7188: with two lanes, a lane is busy until its train is done with while the other lane still gets its train, the wait between rounds lasts while a train runs and ends when one ends, a stop ends each waiting lane with its `merge-when-green.sh` and lets a lane past its wait finish, a train PR left open is said at the next start, and no process but the bot's own job reads as a lane or is signalled by a stop. The bot's own loop runs for real, as in `tests/test_failed_trains.py`, with a stand-in `sleep` for the bot's own waits. Run with the others. |
 | `tests/test_behind_unrelated.py`, `tests/test_lanes.py` | Tests for `behind-unrelated.sh`, `merge-when-green.sh`, the lanes and the bot's dry round, on a temporary repository with a stand-in `gh`. Run all: `python3 -I -m pytest -q .github/tools/coordination/tests` from the repo root. |
 | `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710, #5385, #6059, #6809, #6811) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
 | `build-rows-pr.sh` | Regenerates `lampOS/docs/build-rows.md` from the review page. If it changed, it pushes a branch `first/build-rows-MMDD-HHMM` and opens a docs-only PR. |
@@ -68,6 +69,7 @@ State never lives in the repo. It lives in `$LAMP_COORD_STATE`:
 - `train-hold.txt`: PR numbers that sit out.
 - `train-only.txt`: while it exists, a train carries only the PRs it names.
   Each PR either file leaves out is said in the log once per head (`#N left out: named in train-hold.txt`, `#N left out: not named in train-only.txt`; 14 Nov: trains 905-907 left out #7016 and #7022 with no line).
+- `train-bot.wait-crates`, `train-bot.wait-nc`: with two lanes, the train a lane is waiting for (`N (#P)`); empty once its wait is over. A stop reads them ("Running the train bot" below).
 - `train-bot.cancelled-crates`: 1 after a crate train whose only red was a cancelled job was cut again, else 0 (below).
 - `train-bot.alone`: PRs, each with its head, that go alone, one a train (below).
 - `train-bot.alone-out`: PRs, each with its head, that failed to compile or lint alone and sit out on that head (below).
@@ -108,12 +110,19 @@ nohup .github/tools/coordination/train-bot.sh > "$S/train-bot.out" 2>&1 &
 echo $! > "$S/train-bot.pid"
 ```
 
-Stop: `kill "$(cat "$S/train-bot.pid")"` (it stops both lanes). Restart: stop, check no train is open, start.
+Stop: `kill "$(cat "$S/train-bot.pid")"`. The bot ends at once, or as soon as the command it is in returns (with two lanes: a sleep of at most 30 s, or one `gh` or `git` call).
+With two lanes, since 16 Nov (#7188) the stop takes the lanes with it. Before, it ended nothing but the bot: the bot kept the text `$!` for each lane's process id, so each lane went on in the background and merged or closed its train later.
+
+- A lane still waiting for its train is ended, with its `merge-when-green.sh` and all that runs. Its train PR stays open with nothing waiting on it, and the log says `stopped: train N (#P) is left open with nothing waiting on it`.
+- A lane whose train is being merged, or has merged or failed, is left to finish it (close its PRs and post on the Queue, or hold its PRs and tell them why) and ends by itself. The log says `stopped: the crate lane is past its wait: it finishes its train and ends by itself` (or `…'s train is being merged: …`).
+
+Restart: stop, check no train is open, start. Close a train PR the stop left open (the same PRs go again): a lane waits for any open train PR, and the bot says so once at its start (`train PR first/train-N was open at the start and this bot is not running it: its lane waits until it is merged or closed`).
+A stop that comes within a moment of a merge call's start or end can still leave that train merged with its PRs open and no Queue post: after a stop, look at the last train of each lane.
 
 The bot stops by itself (exit 2) when two crate trains in a row time out, or a crate run fails with no failing test named.
 A crate train whose only red is a cancelled job is cut again once first; the second such train in a row stops it ("A failed train with no PR to name" below).
 It also stops when a PR fails to compile or lint alone while lamp-voice's own head is red (the same section).
-Once a lane has stopped the bot (the file `train-bot.stop` in the state folder), a round already under way builds no new train.
+Once a lane has stopped the bot (the file `train-bot.stop` in the state folder), a round already under way builds no new train, and the bot ends when the other lane's train has finished (16 Nov, #7188: before, it ended at once and left that train running in the background).
 It says so on the Queue (#6811, the last issue in lib.sh's `COORD_QUEUE_ISSUES`).
 If the Queue refuses the post (an issue takes at most 2,500 comments), the bot logs it instead.
 The no-crates lane stops alone (the file `train-bot.stop-nc` in the state folder) when two of its trains in a row time out or GitHub refuses its merge; delete the file, or restart the bot, to start it again.
@@ -153,6 +162,9 @@ The bot now sends each eligible PR to exactly one lane, by its files (`lib.sh`, 
 - **The crate lane** takes every other PR, mixed ones too, as before: `first/train-N`, one ARM64 run. The SDK (`lampOS/sdk/`) and the docs `lampos-sdk.yml` takes are inputs, so their PRs go here.
 
 The lanes run side by side, one train each, in their own worktrees, and neither takes the other's PRs.
+Each lane's train runs in the background, and the bot keeps its process id (16 Nov, #7188: before, it kept the text `$!`, so a lane read as free as soon as its train PR closed and the wait between rounds broke at its first look).
+A lane is busy while its train PR is open and until the bot is done with that train: its PRs closed after a merge, or held and told why after a failure.
+While a lane's train runs, the bot's rounds (each reads every open PR) are 3 min apart, and a train's end starts the next round within 10 s; with no train running, rounds are a minute apart.
 Neither rebuilds the other: each merges with `--behind-unrelated`, pinned to its head.
 A no-crates merge moves `lamp-voice` by non-input files only, so a crate train behind it merges as it is unless they share a file.
 A no-crates train passes `--no-crates`: a train that itself changes no input merges as it is behind gained inputs too, since none of its checks reads them.
@@ -197,7 +209,7 @@ When none of the train's PRs changes the failing files, or every one of several 
 
 A listed PR that can't be built into its train (it conflicts, or a check on its own head went red) leaves `train-bot.alone`, so the lane never waits on it.
 Closed and pushed PRs leave both files.
-The bot closes such a failed train's PR last, after everything above is kept and posted: a round may take the lane as free as soon as its train PR is closed.
+The bot closes such a failed train's PR last, after everything above is kept and posted: until #7188 a round took the lane as free as soon as its train PR was closed (since then the lane is busy until the bot is done with the train).
 
 **Not while lamp-voice itself is red.** With lamp-voice itself broken (a toolchain or a runner change, not a PR), every PR would fail alone and be left out on its head, and a fix to lamp-voice would bring none of them back until each author pushed (the first read of #7186).
 So before a PR is left out for failing alone, the bot fetches lamp-voice and reads its own head (`lib.sh`, `coord_lv_state`): the latest push run of `lampos-clippy.yml` and of `lampos-arm64.yml` on that commit.
@@ -290,7 +302,7 @@ and a login whose READ-OKs on the head are all unsigned is one reader.
 - A PR with a red check on its own head sits out; a check still running is not red. A PR with a file the ARM64 run takes (lib.sh, `coord_arm_takes`) also waits until its own head's ARM64 run is there and all green: `(build)`, `(release)` and every shard `(k/N)`, at least one (`coord_arm64_green_jq`). Absent or still running, it is left out and told once per head (train 841, #6662: #6572's head had no ARM64 run at the cut). A PR the ARM64 run doesn't take (docs, tools, the SDK alone) is unchanged. The checks are read again just before the PR is cherry-picked into a train, so one that went red after the round read it is left out (train 836, #6556).
 - A PR stacked on another open PR sits out until that PR is on `lamp-voice`.
 - No merge commits: the bot cherry-picks with `--no-merges` and merges by rebase.
-- Each lane runs one train at a time: the no-crates lane waits while a `first/train-nc-*` PR is open, the crate lane while any other `first/train-*` PR is open. With `NOCRATES_LANE=off`, one lane waits while any `first/train-*` PR is open.
+- Each lane runs one train at a time: the no-crates lane waits while a `first/train-nc-*` PR is open, the crate lane while any other `first/train-*` PR is open, and each until the bot is done with its own last train (16 Nov, #7188). With `NOCRATES_LANE=off`, one lane waits while any `first/train-*` PR is open.
 - A train of rows PRs alone waits for a code PR, or until the oldest is 3 h old, in the crate lane and with `NOCRATES_LANE=off`. In the no-crates lane it goes at once: no code PR rides there, and a crate train merges with `--behind-unrelated` when lamp-voice gained only files it doesn't touch.
 
 ## Promoting a build to stable

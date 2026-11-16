@@ -109,7 +109,9 @@ activity followed by a false edge in the same turn, fresh Listening readiness,
 fresh joints and a quiet room. It starts 240 ms into that pause, rises to a
 `head_pitch` offset of +0.08 radians at 500 ms into the clip, holds that
 offset through 650 ms, and returns to zero at 1.2 seconds. The start-to-start
-cooldown is four seconds. The shape changes only head pitch and has no light
+cooldown is four seconds; with `LAMP_BODY_ENERGY=on` an energy level above 1
+shortens it to 3.75 down to 3 s at level 5, never longer than the catalogue's
+(`lamp_body::energy::pause_cooldown_us`, #6893, [body.md](body.md)). The shape changes only head pitch and has no light
 modulation.
 
 `Behaviour.continue_in` defaults to `[]`. Its only permitted extension is

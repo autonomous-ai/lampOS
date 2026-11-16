@@ -169,7 +169,7 @@ fn monitor_refuses(monitor: &Monitor, request: &Request) -> Option<Response> {
         .get::<ConnectInfo<Conn>>()
         .map(|info| info.0)
         .or_else(|| extensions.get::<MockConnectInfo<Conn>>().map(|info| info.0));
-    let Some(conn) = conn.filter(|conn| monitor::lan_peer(conn.peer.ip())) else {
+    let Some(conn) = conn.filter(monitor::peer_answered) else {
         return Some(
             (
                 StatusCode::FORBIDDEN,
@@ -373,8 +373,18 @@ fn form_decoded(value: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// The one page, with the lamp's name and this binary's build (its
+/// release folder, as `/status` reads a unit's) in its top bar.
 async fn index(State(served): State<Arc<Served>>) -> Html<String> {
-    Html(page::main_page(served.peek.monitor.is_some()))
+    let build = std::env::current_exe()
+        .ok()
+        .and_then(|program| units::build_of(&program))
+        .unwrap_or_else(|| "unreleased".to_owned());
+    Html(page::main_page(
+        served.peek.monitor.is_some(),
+        &monitor::host_name(),
+        &build,
+    ))
 }
 
 async fn cam() -> Html<String> {
@@ -535,6 +545,12 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         )
     };
     let light = read(lamp_msgs::Light::TOPICS[1]);
+    // A kept value: read as the others, no subscriber needed. One that
+    // does not read as a `TaskStatus` is said to be unreadable.
+    let tasks_kept = read(lamp_msgs::TaskStatus::TOPIC);
+    let tasks = tasks_kept
+        .as_ref()
+        .and_then(|message| message.parse::<lamp_msgs::TaskStatus>().ok());
     let overview = page::overview(&page::Glance {
         voice: voice.as_ref(),
         light: light.as_ref(),
@@ -545,6 +561,7 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         health: health.as_ref(),
         turns: &turns,
         units: &units,
+        tasks: tasks.as_ref(),
     });
     events.push(Event::default().event("overview").data(overview));
     events.push(
@@ -553,6 +570,11 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
             .data(page::timeline(&entries, &turns, words)),
     );
     events.push(Event::default().event("turns").data(page::turns(&turns)));
+    let tasks_html = match (&tasks_kept, &tasks) {
+        (Some(_), None) => "<p class=\"warn\">The tasks' progress can't be read.</p>".to_owned(),
+        _ => page::tasks(tasks.as_ref(), now_unix_ms()),
+    };
+    events.push(Event::default().event("tasks").data(tasks_html));
     events.push(Event::default().event("body").data(page::body(
         joints.as_ref(),
         report.as_ref(),

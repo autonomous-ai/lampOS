@@ -594,12 +594,19 @@ pub struct Here {
     /// (`run_write_yes::read_back_allowed_now`, as a run's write's
     /// read-back and an app make's code are said).
     pub owner_sees_alone: bool,
+    /// The owner asked for this skill by voice within
+    /// [`crate::told_when_asked::WITHIN_MS`], with
+    /// [`crate::told_when_asked::ENVIRONMENT`] on: its ask is said in the
+    /// lamp's quiet hours too (#7180), every other guard as it is.
+    pub asked_by_voice: bool,
 }
 
 /// The ask for the yes to the skill `skill`'s task, said unasked when its
 /// trigger fires and lamp-skills finds no yes for its folder (#6071's V2;
 /// `{"skill", "task_yes": true}` on the say service): with the switch on,
-/// outside the lamp's quiet hours, and only where it can be said whole
+/// outside the lamp's quiet hours (or in them, the owner having asked for
+/// the skill by voice just before, `here.asked_by_voice`, #7180), and only
+/// where it can be said whole
 /// (`here`); then the skill as the manage helper reads it now (`asks`,
 /// [`asks_by`]), not agreed already, said back as `read_back` says it
 /// ([`line`], word for word, [`skill_write_yes::say_whole`]) after
@@ -615,7 +622,7 @@ pub fn asked_aloud(
     if !on() {
         return Err(OFF.into());
     }
-    if here.quiet_hours {
+    if here.quiet_hours && !here.asked_by_voice {
         return Err(QUIET_HOURS.into());
     }
     if !here.owner_sees_alone {
@@ -635,6 +642,12 @@ pub fn asked_aloud(
         "note": note,
         "at_unix_ms": now_unix_ms,
     }))?;
+    if here.quiet_hours {
+        eprintln!(
+            "lamp-voice: a skill's task ask is said in the lamp's quiet hours: its owner asked for it by voice ({})",
+            crate::told_when_asked::ENVIRONMENT
+        );
+    }
     eprintln!(
         "lamp-voice: a skill's task with no yes is said back unasked ({} grant(s))",
         task.grants.len()
@@ -649,11 +662,22 @@ pub fn asked_aloud_here(skill: &str) -> Result<String, String> {
     let now_unix_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_millis() as u64);
+    let quiet_hours = crate::run_write_yes::quiet_hours_now();
     asked_aloud(
         skill,
         Here {
-            quiet_hours: crate::run_write_yes::quiet_hours_now(),
+            quiet_hours,
             owner_sees_alone: crate::run_write_yes::read_back_allowed_now(),
+            // Looked for only in quiet hours, where it matters, and waited
+            // for a little there (the voice keeps it off the turn's thread).
+            asked_by_voice: quiet_hours
+                && crate::told_when_asked::on()
+                && crate::told_when_asked::asked_within_waiting(
+                    Path::new(crate::told_when_asked::SPOKEN_ASKS_FILE),
+                    skill,
+                    now_unix_ms,
+                    crate::told_when_asked::ASKED_WAIT,
+                ),
         },
         |name| {
             asks_by(
@@ -1487,6 +1511,7 @@ mod tests {
         Here {
             quiet_hours: false,
             owner_sees_alone: true,
+            asked_by_voice: false,
         }
     }
 
@@ -1597,6 +1622,45 @@ mod tests {
         assert_eq!(told["approved"], true, "{told}");
     }
 
+    /// The owner's own spoken ask of the skill (#7180): its first yes is
+    /// asked in the lamp's quiet hours too, as said and kept as by day;
+    /// the owner not seen alone still keeps it for later.
+    #[test]
+    fn asked_by_voice_it_is_said_in_quiet_hours() {
+        let asked_at_night = Here {
+            quiet_hours: true,
+            owner_sees_alone: true,
+            asked_by_voice: true,
+        };
+        set_on_here(Some(true));
+        let mut kept = None;
+        let note = asked_aloud(
+            "photo-booth",
+            asked_at_night,
+            |_| Ok(Some(booth(false))),
+            |value| {
+                kept = Some(value.clone());
+                Ok(())
+            },
+            1,
+        );
+        assert!(note.unwrap().starts_with(ASKED_OPENS));
+        assert_eq!(kept.unwrap()["skill"], "photo-booth");
+        let not_alone = Here {
+            quiet_hours: true,
+            owner_sees_alone: false,
+            asked_by_voice: true,
+        };
+        let refused = asked_aloud(
+            "photo-booth",
+            not_alone,
+            |_| panic!("read"),
+            |_| panic!("kept"),
+            1,
+        );
+        assert_eq!(refused.unwrap_err(), NOT_WHOLE_HERE);
+    }
+
     /// Not said whole here, nothing is said and nothing kept, so the next
     /// trigger asks again: the lamp's quiet hours, outside the private room
     /// with the owner not seen alone, the switch off; and nothing is asked
@@ -1607,10 +1671,12 @@ mod tests {
         let quiet = Here {
             quiet_hours: true,
             owner_sees_alone: true,
+            asked_by_voice: false,
         };
         let others = Here {
             quiet_hours: false,
             owner_sees_alone: false,
+            asked_by_voice: false,
         };
         for (here, why) in [(quiet, QUIET_HOURS), (others, NOT_WHOLE_HERE)] {
             set_on_here(Some(true));

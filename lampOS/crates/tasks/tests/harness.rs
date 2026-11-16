@@ -4,8 +4,8 @@ use lamp_tasks::harness::{
     AccountMachine, CLOSE_BUDGET, CLOSE_READ_TIMEOUT, Cli, CliConfig, Closed, Ended, EngineKind,
     EngineRow, JoinedOn, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED,
     PS_STDOUT_LIMIT, PsSession, SessionMachines, SignIn, Target, WATCH_LINE_LIMIT, WatchEnd,
-    WatchEvent, WatchLine, iso_unix_ms, parse_auth_here, parse_auth_status, parse_engines,
-    parse_machines, parse_ps, parse_wait, parse_watch_line, this_computer,
+    WatchEvent, WatchLine, iso_unix_ms, parse_auth_here, parse_auth_status, parse_daemon_here,
+    parse_engines, parse_machines, parse_ps, parse_wait, parse_watch_line, this_computer,
 };
 use lamp_tasks::runtime::{
     HarnessSwitches, NEW_FOLDER_FILE, SESSION_INDEX_FILE, targets_from_machines,
@@ -126,6 +126,7 @@ impl Rig {
             journal: None,
             calls: None,
             session_machines: None,
+            daemon_here: Default::default(),
             health_after_start: false,
             openclaw_gateway: false,
             user_runtime_root: root.path().join("run-user"),
@@ -4291,6 +4292,222 @@ fn signed_out_the_computers_own_id_is_read_with_the_sign_in() {
     assert!(!this_computer("lamp"));
 }
 
+/// R5 on #7133 (lamp-c0a4, 15 Nov): Harness's daemon starts work under
+/// the session's `machineId` when one is on disk, whatever `loggedIn` says,
+/// else under `computerId` (openharness `wantedDaemonIdentity`). The lamp's
+/// own target keeps the `computerId` (no machines look, no `--machine`),
+/// and its `new` reply is matched against the daemon's id: no session,
+/// `computerId`; a session read signed out, or signed in, `machineId`.
+#[test]
+fn the_lamps_own_target_dispatches_under_the_id_the_daemon_runs_as() {
+    for (auth, daemon) in [
+        (json!({"loggedIn":false,"computerId":COMPUTER}), COMPUTER),
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER,"machineId":MACHINE}),
+            MACHINE,
+        ),
+        (
+            json!({"loggedIn":true,"computerId":COMPUTER,"machineId":MACHINE}),
+            MACHINE,
+        ),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "auth": step(auth.clone()),
+            "new": step(json!({"ok":true,"machineId":daemon,"agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes","permissionMode":null,"bypassPermission":false}})),
+            "show": step(json!({"id":AGENT,"state":"idle","ask":"Inspect the authored fixture","answer":"Observed answer","truncated":false,"tools":2})),
+        }));
+        let mut request = launch();
+        request.target = Target {
+            machine_id: COMPUTER.into(),
+            project: "~/harnesses/lamp-tasks/lamp".into(),
+            engine: EngineKind::Hermes,
+        };
+        let cli = rig.cli();
+        assert!(cli.signed_in_here().is_ok(), "{auth}");
+        assert_eq!(
+            cli.launch(&request),
+            LaunchOutcome::Created {
+                agent_id: AGENT.into()
+            },
+            "{auth}"
+        );
+        let new = rig
+            .calls()
+            .into_iter()
+            .find(|call| call["args"][0] == "new")
+            .expect("a new");
+        assert!(
+            !new["args"]
+                .as_array()
+                .expect("args")
+                .iter()
+                .any(|arg| arg == "--machine"),
+            "{auth}"
+        );
+    }
+    // Another id than the daemon's is still not this work.
+    let rig = Rig::new();
+    rig.plan(json!({
+        "auth": step(json!({"loggedIn":false,"computerId":COMPUTER,"machineId":MACHINE})),
+        "new": step(json!({"ok":true,"machineId":COMPUTER,"agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes","permissionMode":null,"bypassPermission":false}})),
+    }));
+    let mut request = launch();
+    request.target = Target {
+        machine_id: COMPUTER.into(),
+        project: "~/harnesses/lamp-tasks/lamp".into(),
+        engine: EngineKind::Hermes,
+    };
+    let cli = rig.cli();
+    assert!(cli.signed_in_here().is_ok());
+    assert_eq!(
+        cli.launch(&request),
+        LaunchOutcome::Uncertain {
+            code: "machine_mismatch".into()
+        }
+    );
+}
+
+/// R5 again on #7133 (lamp-c0a4, 15 Nov, 4732ecb5): a skill's run has a
+/// Cli of its own, made from the same config, which reads no sign-in. It
+/// matches its `new` against the id the spoken tasks' Cli read, with no
+/// second `auth status`.
+#[test]
+fn a_skill_runs_own_cli_matches_the_daemon_id_the_spoken_cli_read() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "auth": step(json!({"loggedIn":false,"computerId":COMPUTER,"machineId":MACHINE})),
+        "new": step(json!({"ok":true,"machineId":MACHINE,"agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes","permissionMode":null,"bypassPermission":false}})),
+        "show": step(json!({"id":AGENT,"state":"idle","ask":"Inspect the authored fixture","answer":"Observed answer","truncated":false,"tools":2})),
+    }));
+    let mut request = launch();
+    request.target = Target {
+        machine_id: COMPUTER.into(),
+        project: "~/harnesses/lamp-tasks/lamp".into(),
+        engine: EngineKind::Hermes,
+    };
+    assert!(rig.cli().signed_in_here().is_ok());
+    let skill_run = rig.cli();
+    assert_eq!(
+        skill_run.launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    let auths = rig
+        .calls()
+        .into_iter()
+        .filter(|call| call["args"][0] == "auth")
+        .count();
+    assert_eq!(auths, 1, "the skill run's Cli read auth status again");
+}
+
+/// The same, before any sign-in read (a skill's first run after a start):
+/// the run's Cli reads `auth status` itself, before its `new`. Never
+/// signed in nor paired is a lamp's plain case (the dev's rule, 15 Nov):
+/// `loggedIn` is never looked at; with no session the id is this
+/// computer's `computerId`; a failed read leaves the `computerId` too, and
+/// the run still goes. The lamp's own target has no machines look and no
+/// `--machine`.
+#[test]
+fn a_skill_run_before_any_sign_in_read_reads_the_daemon_id_itself() {
+    let failed = json!({"stdout":"{}\n","exit":1});
+    for (auth, daemon) in [
+        (
+            step(json!({"loggedIn":false,"computerId":COMPUTER,"machineId":MACHINE})),
+            MACHINE,
+        ),
+        (
+            step(json!({"loggedIn":true,"computerId":COMPUTER,"machineId":MACHINE})),
+            MACHINE,
+        ),
+        (
+            step(json!({"loggedIn":false,"computerId":COMPUTER})),
+            COMPUTER,
+        ),
+        (
+            step(json!({"loggedIn":true,"computerId":COMPUTER})),
+            COMPUTER,
+        ),
+        (failed.clone(), COMPUTER),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "auth": auth.clone(),
+            "new": step(json!({"ok":true,"machineId":daemon,"agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes","permissionMode":null,"bypassPermission":false}})),
+            "show": step(json!({"id":AGENT,"state":"idle","ask":"Inspect the authored fixture","answer":"Observed answer","truncated":false,"tools":2})),
+        }));
+        let mut request = launch();
+        request.target = Target {
+            machine_id: COMPUTER.into(),
+            project: "~/harnesses/lamp-tasks/lamp".into(),
+            engine: EngineKind::Hermes,
+        };
+        assert_eq!(
+            rig.cli().launch(&request),
+            LaunchOutcome::Created {
+                agent_id: AGENT.into()
+            },
+            "{auth}"
+        );
+        let calls = rig.calls();
+        let order: Vec<&str> = calls
+            .iter()
+            .filter_map(|call| call["args"][0].as_str())
+            .filter(|verb| *verb != "show")
+            .collect();
+        assert_eq!(order, ["auth", "new"], "{auth}");
+        assert!(
+            !calls.iter().any(|call| call["args"]
+                .as_array()
+                .is_some_and(|args| args.iter().any(|arg| arg == "--machine"))),
+            "{auth}"
+        );
+    }
+}
+
+/// The daemon's id from `auth status` (R5 on #7133): `machineId` when
+/// present, never decided by `loggedIn`; a missing, empty or malformed one
+/// falls back to `computerId`, not to none.
+#[test]
+fn the_daemons_id_is_the_sessions_machine_else_this_computers_own() {
+    for (reply, daemon) in [
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER}),
+            Some(COMPUTER),
+        ),
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER,"machineId":MACHINE}),
+            Some(MACHINE),
+        ),
+        (
+            json!({"loggedIn":true,"computerId":COMPUTER,"machineId":MACHINE}),
+            Some(MACHINE),
+        ),
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER,"machineId":""}),
+            Some(COMPUTER),
+        ),
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER,"machineId":null}),
+            Some(COMPUTER),
+        ),
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER,"machineId":"lamp"}),
+            Some(COMPUTER),
+        ),
+        (json!({"loggedIn":false,"computerId":"c"}), None),
+        (json!({"loggedIn":false}), None),
+    ] {
+        assert_eq!(
+            parse_daemon_here(reply.to_string().as_bytes()).as_deref(),
+            daemon,
+            "{reply}"
+        );
+    }
+    assert_eq!(parse_daemon_here(b"not json"), None);
+}
+
 /// #6407, a product lamp never signed in: Harness 0.6 refuses `machines`
 /// and every `--machine` then, and `new` with none starts the work on this
 /// computer under its own id. The lamp's own target named by that id is
@@ -4301,6 +4518,7 @@ fn the_lamps_own_target_signed_out_is_asked_with_no_machines_look_and_no_machine
     let rig = Rig::new();
     rig.plan(json!({
         "machines": {"exit": 1, "stdout": "{\"error\":\"NOT_SIGNED_IN\"}\n"},
+        "auth": step(json!({"loggedIn":false,"computerId":COMPUTER})),
         "new": step(json!({"ok":true,"machineId":COMPUTER,"agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes","permissionMode":null,"bypassPermission":false}})),
         "show": step(json!({"id":AGENT,"state":"idle","ask":"Inspect the authored fixture","answer":"Observed answer","truncated":false,"tools":2})),
         "ps": step(json!({"harnesses":[{"id":AGENT,"state":"idle","lastActive":null}]})),
@@ -4331,6 +4549,8 @@ fn the_lamps_own_target_signed_out_is_asked_with_no_machines_look_and_no_machine
     assert_eq!(
         calls,
         [
+            // The daemon's id, read before the first `new` (R5 on #7133).
+            json!(["auth", "status", "--json"]),
             json!([
                 "new",
                 "hermes",
@@ -6042,6 +6262,30 @@ fn openclaw_is_offered_only_by_a_harness_from_0_6_11() {
     }
 }
 
+/// #7133: the version's three answers. Only a version read says too old;
+/// a failed run or words that are no version say nothing (a Harness not
+/// answering yet at a boot), so lamp-tasks reads it again instead.
+#[test]
+fn the_harness_version_says_runs_too_old_or_nothing() {
+    use lamp_tasks::harness::OpenclawHarness;
+    for (version, want) in [
+        (json!({"stdout":"0.6.11\n"}), OpenclawHarness::Runs),
+        (
+            json!({"stdout":"0.6.10\n"}),
+            OpenclawHarness::TooOld((0, 6, 10)),
+        ),
+        (
+            json!({"stdout":"0.6.12\n","exit":1}),
+            OpenclawHarness::Unread,
+        ),
+        (json!({"stdout":"starting…\n"}), OpenclawHarness::Unread),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"--version": version.clone()}));
+        assert_eq!(rig.cli().openclaw_harness(), want, "{version}");
+    }
+}
+
 /// #6274: a name said nearly right, one word misheard or misspelt, finds
 /// the one closest session when a look at it (`look_session`) finds
 /// nothing by its name, folder or work: one slip in a word of 4 to 7
@@ -6782,6 +7026,7 @@ fn skill_runner_with(
         wrappers: None,
         agent_ns: None,
         login: None,
+        starts: Default::default(),
     }
 }
 
@@ -7413,6 +7658,660 @@ fn a_skill_run_goes_to_the_default_agent_by_the_one_path() {
     assert_eq!(engine_of(off, &rig), "hermes");
 }
 
+/// lamp-update's OpenClaw wrapper with its gateway data (a gateway agent),
+/// as its own source has them, its gateway's namespace script `ns`.
+fn openclaw_gateway_wrapper(ns: &std::path::Path) -> String {
+    let openclaw_rs = include_str!("../../update/src/openclaw_install.rs");
+    let between = |from: &str| {
+        openclaw_rs
+            .split_once(from)
+            .and_then(|(_, rest)| rest.split_once("\"#;"))
+            .unwrap()
+            .0
+            .to_owned()
+    };
+    let own = between("pub const WRAPPER_TEXT: &str = r#\"");
+    let data = between("pub const GATEWAY_DATA: &str = r#\"");
+    let at = data
+        .lines()
+        .find_map(|line| line.strip_prefix("#@ns "))
+        .unwrap()
+        .to_owned();
+    format!(
+        "#!/bin/sh\n{}{}{}",
+        lamp_tasks::gateway::GATEWAY_MARK,
+        data.replacen(&format!("#@ns {at}"), &format!("#@ns {}", ns.display()), 1),
+        own.strip_prefix("#!/bin/sh\n").unwrap()
+    )
+}
+
+/// Every file named `openclaw.json` under `dir`.
+fn openclaw_json_under(dir: &std::path::Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let mut todo = vec![dir.to_owned()];
+    while let Some(at) = todo.pop() {
+        for entry in fs::read_dir(&at).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.is_dir() && !path.is_symlink() {
+                todo.push(path);
+            } else if entry.file_name() == "openclaw.json" {
+                found.push(path);
+            }
+        }
+    }
+    found
+}
+
+/// The skill-start launcher as the kernel would name it (#7133): its
+/// own uid, its program the launcher file itself.
+struct LauncherPeer;
+
+const TEST_LAUNCHER: &str = "/test/skill-start";
+
+impl lamp_tasks::skill_start::Peers for LauncherPeer {
+    fn peer(&self, _: &std::os::unix::net::UnixStream) -> Option<lamp_tasks::skill_start::Peer> {
+        Some(lamp_tasks::skill_start::Peer {
+            pid: 7133,
+            uid: 990,
+        })
+    }
+    fn exe_link(&self, _: u32) -> std::io::Result<PathBuf> {
+        Ok(TEST_LAUNCHER.into())
+    }
+    fn exe_file(&self, _: u32) -> std::io::Result<lamp_tasks::skill_start::FileSeen> {
+        Ok(launcher_seen())
+    }
+    fn file(&self, _: &std::path::Path) -> std::io::Result<lamp_tasks::skill_start::FileSeen> {
+        Ok(launcher_seen())
+    }
+    fn environ(&self, _: u32) -> std::io::Result<Vec<u8>> {
+        Ok(b"PATH=/usr/bin\0".to_vec())
+    }
+    fn maps(&self, _: u32) -> std::io::Result<String> {
+        Ok(format!(
+            "aaaa1000-aaab0000 r-xp 00001000 b3:02 2 {TEST_LAUNCHER}\n"
+        ))
+    }
+    fn status(&self, _: u32) -> std::io::Result<String> {
+        Ok("Name:\tskill-start\nTracerPid:\t0\n".into())
+    }
+    fn proc_owner(&self, _: u32) -> std::io::Result<u32> {
+        Ok(0)
+    }
+    /// Every line from the launcher's own pid.
+    fn read_line(
+        &self,
+        stream: &std::os::unix::net::UnixStream,
+        most: usize,
+    ) -> std::io::Result<(String, Option<u32>)> {
+        use std::io::Read as _;
+        let mut line = String::new();
+        let mut byte = [0u8; 1];
+        loop {
+            if (&*stream).read(&mut byte)? == 0 {
+                return Err(std::io::ErrorKind::UnexpectedEof.into());
+            }
+            if byte[0] == b'\n' {
+                return Ok((line, Some(7133)));
+            }
+            if line.len() >= most {
+                return Err(std::io::ErrorKind::InvalidData.into());
+            }
+            line.push(byte[0] as char);
+        }
+    }
+}
+
+fn launcher_seen() -> lamp_tasks::skill_start::FileSeen {
+    lamp_tasks::skill_start::FileSeen {
+        file: true,
+        uid: 0,
+        mode: 0o100755,
+        // `b3:02`, as Linux encodes it.
+        dev: (0xb3 << 8) | 0x02,
+        ino: 2,
+    }
+}
+
+/// What the launcher saw of run `task-1` (#7133): its folder's entries
+/// when it was live, lamp-tasks' answer to its claim.
+struct Claimed {
+    entries: Vec<String>,
+    answer: String,
+}
+
+/// The launcher for run `task-1`: once it is live, claims it on lamp-tasks'
+/// launcher side (a socket pair, as the launcher's connection), then says
+/// `then` (`started`, or nothing, as a fence that failed). With `claim`
+/// off, only waits to see it live. `None` when it never was live.
+fn launch_start(
+    rig: &Rig,
+    starts: &lamp_tasks::skill_start::Starts,
+    claim: bool,
+    then: Option<&'static str>,
+) -> thread::JoinHandle<Option<Claimed>> {
+    use std::io::{Read as _, Write as _};
+    let folder = rig.root.path().join("project/skill-task-1");
+    let starts = starts.clone();
+    thread::spawn(move || {
+        let until = Instant::now() + Duration::from_secs(20);
+        while Instant::now() < until {
+            if starts.is_live("task-1") {
+                let mut entries: Vec<String> = fs::read_dir(&folder)
+                    .map(|read| {
+                        read.flatten()
+                            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                entries.sort();
+                if !claim {
+                    return Some(Claimed {
+                        entries,
+                        answer: String::new(),
+                    });
+                }
+                let (near, far) = std::os::unix::net::UnixStream::pair().unwrap();
+                let server = lamp_tasks::skill_start::Server {
+                    socket: PathBuf::from("/unused"),
+                    starts: starts.clone(),
+                    peers: Arc::new(LauncherPeer),
+                    own_uid: 990,
+                    launcher: TEST_LAUNCHER.into(),
+                    started_within: Duration::from_secs(5),
+                };
+                let served = thread::spawn(move || server.one(far));
+                let read_answer = || {
+                    let mut answer = String::new();
+                    let mut byte = [0u8; 1];
+                    while (&near).read(&mut byte).unwrap_or(0) == 1 && byte[0] != b'\n' {
+                        answer.push(byte[0] as char);
+                    }
+                    answer
+                };
+                (&near).write_all(b"task-1\n").unwrap();
+                let mut answer = read_answer();
+                // `checked <nonce>`: the launcher's `ready` echoes it (#7133).
+                if let Some(nonce) = answer
+                    .strip_prefix(lamp_tasks::skill_start::CHECKED)
+                    .and_then(|rest| rest.strip_prefix(' '))
+                {
+                    (&near)
+                        .write_all(
+                            format!("{} {nonce}\n", lamp_tasks::skill_start::READY).as_bytes(),
+                        )
+                        .unwrap();
+                    answer = read_answer();
+                }
+                if let Some(line) = then {
+                    (&near).write_all(format!("{line}\n").as_bytes()).unwrap();
+                }
+                drop(near);
+                served.join().unwrap();
+                return Some(Claimed { entries, answer });
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
+        None
+    })
+}
+
+/// #6685 (the lead's decision): with the switch on and OpenClaw the
+/// lamp's default, a gateway agent by its wrapper's data whose gateway's
+/// namespace shows lamp-control's socket, a skill's run is `harness new
+/// openclaw` in its own folder, as Hermes's is, and no `openclaw.json` is
+/// written anywhere. Its tools run in the gateway, which no wrapper's
+/// environment reaches, and its folder is in `WORK`, which every agent
+/// of the gateway reads and writes (#7133): before `new` the run is live
+/// for the skill-start launcher and its folder holds nothing (no `token`,
+/// no `start`); the Harness task names the launcher and the run's id and
+/// never the token; the launcher's claim gets the run's grant; once its
+/// fence says `started` the run ends well, with nothing left, and the
+/// run is no longer live.
+#[test]
+fn an_openclaw_gateway_default_runs_through_harness_new_like_hermes() {
+    for state in ["stopped", "idle"] {
+        let rig = Rig::new();
+        skill_ok_plan(&rig, state);
+        let gateway_ns = rig.root.path().join("openclaw-ns");
+        fs::write(
+            &gateway_ns,
+            format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+        )
+        .unwrap();
+        let wrapper = openclaw_gateway_wrapper(&gateway_ns);
+        assert!(lamp_tasks::gateway::GatewayAgent::of(&wrapper).is_some_and(|data| data.is_ok()));
+        // The agent namespace shows nothing: the gateway's own is what counts.
+        let runner = one_path_runner(
+            &rig,
+            EngineKind::Openclaw,
+            &[("openclaw", &wrapper)],
+            Some("#!/bin/sh\n"),
+        );
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        let run = skill_run(Duration::from_secs(20));
+        assert_eq!(runner.run(&run, &|| {}), Ok(0));
+        assert!(run.started.load(std::sync::atomic::Ordering::Acquire));
+        let calls = rig.calls();
+        for call in &calls {
+            assert!(!call.to_string().contains(RUN_SECRET), "{call}");
+        }
+        let verbs: Vec<&str> = calls
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap())
+            .collect();
+        // OpenClaw's own launch looks at its new agent once (`show`).
+        assert_eq!(verbs, ["machines", "new", "show", "wait", "show", "close"]);
+        let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+        assert_eq!(new["args"][1], "openclaw");
+        assert!(
+            new.to_string().contains("skill-task-1"),
+            "the run's own folder: {new}"
+        );
+        let claimed = launched.join().unwrap().expect("live before it ended");
+        assert_eq!(
+            claimed.entries,
+            Vec::<String>::new(),
+            "no token or start in WORK"
+        );
+        let grant = lamp_tasks::skill_start::parse_answer(&claimed.answer).unwrap();
+        assert_eq!(grant.token, RUN_SECRET);
+        assert_eq!(grant.interpreter, "python3");
+        assert_eq!(
+            grant.script,
+            PathBuf::from("/var/lib/lampOS/skills/photo-booth/scripts/main.py")
+        );
+        assert_eq!(
+            grant.skill,
+            PathBuf::from("/var/lib/lampOS/skills/photo-booth")
+        );
+        assert_eq!(grant.run, rig.root.path().join("project/skill-task-1"));
+        assert_eq!(grant.socket, skill_task::CONTROL_SOCKET);
+        let task = new.to_string();
+        assert!(
+            task.contains("Run `/usr/local/lib/lampos/skill-start task-1` once"),
+            "the task names the launcher and the run: {task}"
+        );
+        assert!(!task.contains("/start`"), "{task}");
+        assert!(!runner.starts.is_live("task-1"), "not live after its end");
+        assert!(runner.starts.claim("task-1").is_err());
+        assert_eq!(openclaw_json_under(rig.root.path()), Vec::<PathBuf>::new());
+        nothing_left(&rig);
+    }
+
+    // Its gateway's namespace without lamp-control's socket: refused in
+    // words, nothing asked of Harness.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(&gateway_ns, "#!/bin/sh\n").unwrap();
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+        Some(&ns_with_runs()),
+    );
+    let said = runner
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert!(
+        said.starts_with(
+            "the lamp's default agent (openclaw) isn't set up for a skill's run yet ("
+        ) && said.contains("doesn't show lamp-control's socket"),
+        "{said}"
+    );
+    assert!(rig.calls().is_empty(), "nothing asked");
+    assert!(!rig.root.path().join("runs").exists());
+}
+
+/// #7133 (First's gap on the final head): signed out with OpenClaw the
+/// default, a gateway agent whose wrapper takes no skill's run with no
+/// Harness goes through Harness's own lamp target, not refused: a reset
+/// lamp runs its skills. Hermes's one run path wrapper still takes its run
+/// with no Harness, and with no Harness program the gateway default is
+/// still refused in words.
+#[test]
+fn signed_out_a_gateway_default_is_taken_through_harness_not_refused() {
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let wrapper = openclaw_gateway_wrapper(&gateway_ns);
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &wrapper)],
+        Some("#!/bin/sh\n"),
+    );
+    let _ = runner.no_harness.set(NoHarness {
+        here: Box::new(|| HarnessHere::SignedOut),
+        default_engine: Box::new(|| Some(EngineKind::Openclaw)),
+        home: rig.root.path().to_owned(),
+    });
+    let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+    let run = skill_run(Duration::from_secs(20));
+    assert_eq!(runner.run(&run, &|| {}), Ok(0));
+    let calls = rig.calls();
+    let new = calls
+        .iter()
+        .find(|call| call["args"][0] == "new")
+        .expect("a new");
+    assert_eq!(new["args"][1], "openclaw");
+    let claimed = launched.join().unwrap().expect("live before it ended");
+    let grant = lamp_tasks::skill_start::parse_answer(&claimed.answer).unwrap();
+    assert_eq!(grant.token, RUN_SECRET);
+    assert!(!runner.starts.is_live("task-1"), "not live after its end");
+    assert_eq!(openclaw_json_under(rig.root.path()), Vec::<PathBuf>::new());
+    nothing_left(&rig);
+
+    // No Harness program at all: no other way, refused in words.
+    let rig = Rig::new();
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+        Some(&ns_with_runs()),
+    );
+    let _ = runner.no_harness.set(NoHarness {
+        here: Box::new(|| HarnessHere::Absent),
+        default_engine: Box::new(|| Some(EngineKind::Openclaw)),
+        home: rig.root.path().to_owned(),
+    });
+    let said = runner
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert!(
+        said.contains("takes no skill's run without Harness"),
+        "{said}"
+    );
+    assert!(rig.calls().is_empty(), "nothing asked");
+}
+
+/// #7133: a gateway default's run whose launcher never claimed its start
+/// fails in words, never done; one claimed whose fence never said
+/// `started` fails in its own words. Either way its token is ended with
+/// lamp-control while the run is still live, then it is live no more.
+/// Hermes's run is asked with the run's own words, as before.
+#[test]
+fn a_gateway_default_whose_start_never_ran_fails_and_hermes_is_as_before() {
+    for (state, claim, said_is) in [
+        (
+            "stopped",
+            false,
+            "the default agent never started the skill's script",
+        ),
+        (
+            "idle",
+            false,
+            "the default agent never started the skill's script",
+        ),
+        (
+            "idle",
+            true,
+            "the skill's start was claimed but its script never started (its fence failed)",
+        ),
+    ] {
+        let rig = Rig::new();
+        skill_ok_plan(&rig, state);
+        let gateway_ns = rig.root.path().join("openclaw-ns");
+        fs::write(
+            &gateway_ns,
+            format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+        )
+        .unwrap();
+        let runner = one_path_runner(
+            &rig,
+            EngineKind::Openclaw,
+            &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+            Some("#!/bin/sh\n"),
+        );
+        let launched = launch_start(&rig, &runner.starts, claim, None);
+        let starts = runner.starts.clone();
+        let live_at_end = std::cell::Cell::new(None);
+        let said = runner
+            .run(&skill_run(Duration::from_secs(20)), &|| {
+                if live_at_end.get().is_none() {
+                    live_at_end.set(Some(starts.is_live("task-1")));
+                }
+            })
+            .unwrap_err();
+        assert_eq!(said, said_is);
+        let launched = launched.join().unwrap().expect("it was live");
+        assert_eq!(launched.entries, Vec::<String>::new());
+        assert_eq!(
+            live_at_end.get(),
+            Some(true),
+            "token ended while the run was still live"
+        );
+        assert!(!starts.is_live("task-1"));
+        nothing_left(&rig);
+    }
+
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_runs()),
+    );
+    let run = skill_run(Duration::from_secs(20));
+    assert_eq!(runner.run(&run, &|| {}), Ok(0));
+    let calls = rig.calls();
+    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+    assert_eq!(new["args"][1], "hermes");
+    assert!(
+        new["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|arg| arg == &json!(run.prompt)),
+        "Hermes's task is the run's own words: {new}"
+    );
+    assert!(!new.to_string().contains("skill-start"), "{new}");
+    assert!(!runner.starts.is_live("task-1"));
+    nothing_left(&rig);
+}
+
+/// A Gateway probe for a skill's run: ready from look `ready_from` (never
+/// with none); each look notes whether Harness was already asked `new`.
+struct SkillProbe {
+    calls: PathBuf,
+    ready_from: Option<usize>,
+    looks: Arc<Mutex<Vec<bool>>>,
+}
+impl lamp_tasks::gateway::Probe for SkillProbe {
+    fn ready(&mut self) -> bool {
+        let asked_new = fs::read_to_string(&self.calls).is_ok_and(|text| {
+            text.lines()
+                .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+                .any(|call| call["args"][0] == "new")
+        });
+        let mut looks = self.looks.lock().unwrap();
+        looks.push(asked_new);
+        self.ready_from.is_some_and(|from| looks.len() >= from)
+    }
+}
+
+/// `runner` with the wait spoken tasks have before a launch, its probe
+/// [`SkillProbe`], bounded by `within`.
+fn with_gateway(
+    rig: &Rig,
+    mut runner: HarnessRunner,
+    default: EngineKind,
+    ready_from: Option<usize>,
+    within: Duration,
+) -> (HarnessRunner, Arc<Mutex<Vec<bool>>>) {
+    let looks = Arc::new(Mutex::new(Vec::new()));
+    let calls = rig.root.path().join("calls.jsonl");
+    let seen = looks.clone();
+    let lamp = Target {
+        machine_id: MACHINE.into(),
+        project: "~/harnesses/lamp-tasks/lamp".into(),
+        engine: EngineKind::Hermes,
+    };
+    runner.harness = Arc::default();
+    let _ = runner.harness.set(
+        SkillHarness::new(
+            rig.config.clone(),
+            "stable-session_123".into(),
+            Box::new(move || Some(lamp.clone())),
+        )
+        .with_default_engine(Box::new(move || Some(default)))
+        .with_gateway(Box::new(move || {
+            Some(lamp_tasks::gateway::Gateway::with_bounds(
+                Box::new(SkillProbe {
+                    calls: calls.clone(),
+                    ready_from,
+                    looks: seen.clone(),
+                }),
+                within,
+                Duration::from_millis(20),
+            ))
+        })),
+    );
+    (runner, looks)
+}
+
+/// #6226 for a skill's run (#6685): with OpenClaw the lamp's default, a
+/// skill's run's `harness new openclaw` waits for the Gateway as a spoken
+/// task's launch does (`gateway::launch_with`): one coming up is waited
+/// for and `new` is asked only once it answers; one that never answers
+/// within the bound is not asked `new` at all, the run refused with
+/// spoken tasks' code and nothing left. Hermes's run never waits.
+#[test]
+fn an_openclaw_default_skill_run_waits_for_the_gateway_before_new() {
+    let openclaw_runner = |rig: &Rig| {
+        let gateway_ns = rig.root.path().join("openclaw-ns");
+        fs::write(
+            &gateway_ns,
+            format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+        )
+        .unwrap();
+        one_path_runner(
+            rig,
+            EngineKind::Openclaw,
+            &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+            Some("#!/bin/sh\n"),
+        )
+    };
+    let verbs = |rig: &Rig| -> Vec<String> {
+        rig.calls()
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap().to_owned())
+            .collect()
+    };
+
+    // Coming up: looked at until it answers, and only then `new`.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let (runner, looks) = with_gateway(
+        &rig,
+        openclaw_runner(&rig),
+        EngineKind::Openclaw,
+        Some(4),
+        Duration::from_secs(10),
+    );
+    // The agent runs the launcher, whose fence starts the script (#7133).
+    let watched = launch_start(&rig, &runner.starts, true, Some("started"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    assert!(watched.join().unwrap().is_some());
+    assert_eq!(
+        *looks.lock().unwrap(),
+        [false; 4],
+        "no `new` before it answered"
+    );
+    assert!(verbs(&rig).contains(&"new".to_owned()));
+    nothing_left(&rig);
+
+    // Never answering: no `new` within the bound, refused, nothing left.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let within = Duration::from_millis(300);
+    let (runner, looks) = with_gateway(
+        &rig,
+        openclaw_runner(&rig),
+        EngineKind::Openclaw,
+        None,
+        within,
+    );
+    let run = skill_run(Duration::from_secs(20));
+    let began = Instant::now();
+    let said = runner.run(&run, &|| {}).unwrap_err();
+    assert!(began.elapsed() >= within, "waited the bound");
+    assert!(
+        said.contains(lamp_tasks::gateway::NOT_READY),
+        "refused with spoken tasks' code: {said}"
+    );
+    assert!(looks.lock().unwrap().len() >= 2, "looked at again");
+    assert!(
+        !verbs(&rig).contains(&"new".to_owned()),
+        "{:?}",
+        verbs(&rig)
+    );
+    assert!(!run.started.load(Ordering::Acquire));
+    nothing_left(&rig);
+
+    // Stop during startup: never hand over a run after the owner ends it.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let (runner, _) = with_gateway(
+        &rig,
+        openclaw_runner(&rig),
+        EngineKind::Openclaw,
+        None,
+        Duration::from_secs(30),
+    );
+    let stop = Arc::new(AtomicBool::new(false));
+    runner.stop_on(stop.clone());
+    let run = skill_run(Duration::from_secs(20));
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            std::thread::sleep(Duration::from_millis(200));
+            stop.store(true, Ordering::Release);
+        });
+        let began = Instant::now();
+        assert!(runner.run(&run, &|| {}).is_err());
+        assert!(began.elapsed() < Duration::from_secs(5));
+    });
+    assert!(!verbs(&rig).contains(&"new".to_owned()));
+    assert!(!run.started.load(Ordering::Acquire));
+    nothing_left(&rig);
+
+    // Hermes the default: never waited for, whatever the Gateway.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let hermes = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_runs()),
+    );
+    let (runner, looks) = with_gateway(
+        &rig,
+        hermes,
+        EngineKind::Hermes,
+        None,
+        Duration::from_secs(10),
+    );
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    assert!(looks.lock().unwrap().is_empty(), "Hermes never waits");
+    let calls = rig.calls();
+    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+    assert_eq!(new["args"][1], "hermes");
+    nothing_left(&rig);
+}
+
 /// #6685 PR 3: with the switch on and Harness read signed in (or offline,
 /// or not read yet), a skill's run still goes through Harness, `harness
 /// new <default>`, even though the default agent's wrapper takes a run
@@ -7779,14 +8678,20 @@ fn a_skill_run_is_refused_with_no_harness_or_an_old_wrapper() {
     refused(old, &rig, skill_task::NOT_FOUND_BY_FOLDER);
 }
 
-/// The first builder's 10:44 on the Queue: with Harness signed out, a run
-/// with no lamp target, or one Harness didn't start, says why in the
-/// person's words ([`skill_task::SIGNED_OUT`]), after one `auth status`;
-/// nothing is left. Signed in, its own words stay.
+/// #7019 (the lead): the lamp's own Harness works signed out (#6407), so a
+/// skill's run refused with Harness signed out keeps its own reason, with no
+/// lamp target or one Harness didn't start, and never asks for a sign-in;
+/// nothing is left.
 #[test]
-fn a_skill_run_refused_with_harness_signed_out_says_so() {
+fn a_skill_run_refused_with_harness_signed_out_keeps_its_own_reason() {
     let signed_out = step(json!({"loggedIn":false,"computerId":"c"}));
-    for engine in [None, Some(EngineKind::Hermes)] {
+    for (engine, said) in [
+        (None, "the lamp has no Harness target of its own yet"),
+        (
+            Some(EngineKind::Hermes),
+            "Harness didn't start the run (new_failed)",
+        ),
+    ] {
         let rig = Rig::new();
         rig.plan(json!({
             "auth":signed_out.clone(),
@@ -7796,25 +8701,16 @@ fn a_skill_run_refused_with_harness_signed_out_says_so() {
         let why = skill_runner(&rig, engine)
             .run(&skill_run(Duration::from_secs(20)), &|| {})
             .unwrap_err();
-        assert_eq!(why, skill_task::SIGNED_OUT, "{engine:?}");
-        let calls = rig.calls();
-        assert_eq!(
-            calls.last().unwrap()["args"],
-            json!(["auth", "status", "--json"])
+        assert!(why.starts_with(said), "{engine:?}: {why}");
+        let lower = why.to_lowercase();
+        assert!(
+            !lower.contains("sign in") && !lower.contains("signed in"),
+            "{engine:?}: {why}"
         );
+        let calls = rig.calls();
         assert!(calls.iter().all(|call| call["args"][0] != "close"));
         nothing_left(&rig);
     }
-    let rig = Rig::new();
-    rig.plan(json!({
-        "auth":step(json!({"loggedIn":true,"computerId":"c","machineId":MACHINE})),
-        "machines":{"default":true},
-        "new":{"exit":1},
-    }));
-    let why = skill_runner(&rig, Some(EngineKind::Hermes))
-        .run(&skill_run(Duration::from_secs(20)), &|| {})
-        .unwrap_err();
-    assert_eq!(why, "Harness didn't start the run (new_failed)");
 }
 
 /// #6691: lamp-tasks' start reads each session's id and name from one `ps`

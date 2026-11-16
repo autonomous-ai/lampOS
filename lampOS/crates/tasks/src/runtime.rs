@@ -7,8 +7,8 @@ use crate::{
     follow::{CliWatch, Follows, WatchLane},
     harness::{
         AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, EngineRow, Launch,
-        LaunchOutcome, Listed, MOST_WAITED, Observation, SessionMachines, SessionSeen, SignIn,
-        Target, this_computer,
+        LaunchOutcome, Listed, MOST_WAITED, Observation, OpenclawHarness, SessionMachines,
+        SessionSeen, SignIn, Target, this_computer,
     },
     now::Now as TasksNow,
     progress::{Reads, Tracker},
@@ -328,6 +328,74 @@ impl LampSide {
     }
 }
 
+/// The waits before Harness's version is read again while it was not read
+/// at lamp-tasks' start (#7133: at a boot Harness may not answer yet), about
+/// 31 minutes in all; after them OpenClaw stays as chosen.
+pub const OPENCLAW_VERSION_AGAIN: [Duration; 9] = [
+    Duration::from_secs(5),
+    Duration::from_secs(10),
+    Duration::from_secs(20),
+    Duration::from_secs(40),
+    Duration::from_secs(60),
+    Duration::from_secs(120),
+    Duration::from_secs(300),
+    Duration::from_secs(600),
+    Duration::from_secs(720),
+];
+
+/// One `harness --version` reading taken (#6226, #7133): a version read
+/// and older than 0.6.11 takes OpenClaw out of the lamp's engines
+/// (`gateway.refused`); a version read and new enough puts it back; none
+/// read changes nothing, so a Harness that does not answer yet at a boot
+/// never takes away the owner's OpenClaw. Journaled; the reading back.
+pub fn settle_openclaw_harness(
+    shared: &crate::gateway::Shared,
+    read: OpenclawHarness,
+) -> OpenclawHarness {
+    match read {
+        OpenclawHarness::Runs => {
+            if shared.refused.swap(false, Ordering::AcqRel) {
+                eprintln!(
+                    "tasks: the Harness here now runs OpenClaw: it is the lamp's engine again"
+                );
+            }
+        }
+        OpenclawHarness::TooOld((major, minor, patch)) => {
+            shared.refused.store(true, Ordering::Release);
+            eprintln!(
+                "tasks: the Harness here is {major}.{minor}.{patch}, older than 0.6.11; OpenClaw is not the lamp's engine"
+            );
+        }
+        OpenclawHarness::Unread => eprintln!(
+            "tasks: Harness's version not read (it may not answer yet); OpenClaw stays the lamp's engine, the version read again later"
+        ),
+    }
+    read
+}
+
+/// Harness's version read again after each of `waits` until one is read
+/// ([`settle_openclaw_harness`]), quietly: only a version read is
+/// journaled, and the end of the waits with none. The last reading back.
+pub fn read_openclaw_harness_again(
+    shared: &crate::gateway::Shared,
+    mut read: impl FnMut() -> OpenclawHarness,
+    mut wait: impl FnMut(Duration),
+    waits: &[Duration],
+) -> OpenclawHarness {
+    for pause in waits {
+        wait(*pause);
+        let now = read();
+        if now != OpenclawHarness::Unread {
+            return settle_openclaw_harness(shared, now);
+        }
+    }
+    eprintln!(
+        "tasks: Harness's version still not read after {} tries; OpenClaw stays the lamp's engine",
+        waits.len()
+    );
+    OpenclawHarness::Unread
+}
+
 /// The lamp's engines in the order its target is chosen from now (#6226,
 /// #6492): the default first, then every other in Harness's order.
 ///
@@ -438,6 +506,24 @@ fn refresh_lamp_reported(side: &LampSide, known: &Known, listed: &[AccountMachin
         }
         *kept = reported;
     }
+}
+
+/// #7019: after a factory reset and the owner's sign-in, the `lamp` target
+/// needs Harness's machines to mark one `current` ([`Known::lamp_engine`]).
+/// While signed in with the lamp side on, a look that lists none says so
+/// in the journal, once a sign-in (`said` kept by the loop, cleared at the
+/// next one). Log-only: nothing else changes.
+pub fn lamp_not_among_machines(
+    lamp_side: bool,
+    signed_in: bool,
+    listed: &[AccountMachine],
+    said: &mut bool,
+) -> Option<&'static str> {
+    if !lamp_side || !signed_in || *said || listed.iter().any(|machine| machine.current) {
+        return None;
+    }
+    *said = true;
+    Some("tasks: Harness is signed in, but this lamp is not among its machines yet")
 }
 
 /// Whether the app's choice went while the part runs (#7019): the side
@@ -1479,8 +1565,9 @@ enum Job {
     Close(CloseJob),
     SignIn,
     Machines,
-    /// `harness start` after a sign-in by code (openharness#1463).
-    StartDaemon,
+    /// `harness start` at a part's start (#5379, #6407), or `harness start
+    /// --restart` after a sign-in by code (`true`, #7019).
+    StartDaemon(bool),
     /// `harness start --restart` once, its env file changed (#5978).
     RestartDaemon,
 }
@@ -1491,7 +1578,7 @@ enum Outcome {
     Close(CloseJob, Result<Closed, String>),
     SignIn(Result<(SignIn, Option<String>), String>),
     Machines(Result<Vec<AccountMachine>, String>),
-    StartDaemon(Result<(), String>),
+    StartDaemon(bool, Result<(), String>),
     RestartDaemon(Result<(), String>),
 }
 pub(crate) struct Binding {
@@ -1838,6 +1925,13 @@ fn owner<C: Clock>(
     // hand-over waits while a try is due.
     let mut start_daemon_due: Option<Instant> = None;
     let mut daemon_tries: u32 = 0;
+    // After a sign-in the daemon is started again, not started (#7019): one
+    // started signed out at this start keeps running under `harness start`
+    // and never connects to Harness's cloud, so the lamp never becomes its
+    // own machine. Kept with the due time, through its tries.
+    let mut daemon_restart = false;
+    // The lamp not among Harness's machines said this sign-in (#7019).
+    let mut not_among_said = false;
     // The last sign-in's id. Counted from the clock, so a sign-in after a
     // restart isn't taken for one before it (the reviewer's P3 on #2174).
     // This run's id for the app (#5198): views are ordered by `revision`
@@ -1869,9 +1963,13 @@ fn owner<C: Clock>(
                 // Harness's own sign-in stops its daemon, and its user
                 // service doesn't start it again, so every hand-over after
                 // it says "Harness is not running here" (lamp-75c9, 20 Oct;
-                // openharness#1463): started here.
+                // openharness#1463): started here. Started again, not
+                // started (#7019): a daemon started signed out at this
+                // start still runs, and `harness start` would leave it so.
                 start_daemon_due = Some(Instant::now());
                 daemon_tries = 0;
+                daemon_restart = true;
+                not_among_said = false;
             }
         }
         if looked_aside.elapsed() >= LOOK_ASIDE_EVERY {
@@ -2001,6 +2099,17 @@ fn owner<C: Clock>(
                                 } else {
                                     BTreeMap::new()
                                 };
+                                let signed_in = set_up
+                                    .as_ref()
+                                    .is_some_and(|found| found.sign_in == Some(SignIn::In));
+                                if let Some(line) = lamp_not_among_machines(
+                                    later.lamp.is_some(),
+                                    signed_in,
+                                    &listed,
+                                    &mut not_among_said,
+                                ) {
+                                    eprintln!("{line}");
+                                }
                                 let said = machines_written(
                                     &later.targets,
                                     &listed,
@@ -2058,9 +2167,12 @@ fn owner<C: Clock>(
                     }
                     Ok(())
                 }
-                Outcome::StartDaemon(started) => {
+                Outcome::StartDaemon(restart, started) => {
                     daemon_tries += 1;
                     match started {
+                        Ok(()) if restart => eprintln!(
+                            "tasks: Harness's daemon started again after the sign-in (#7019)"
+                        ),
                         Ok(()) => eprintln!(
                             "tasks: Harness's daemon started (openharness#1463)"
                         ),
@@ -2140,6 +2252,12 @@ fn owner<C: Clock>(
                                     );
                                     start_daemon_due = Some(Instant::now());
                                     daemon_tries = 0;
+                                    daemon_restart = false;
+                                }
+                                // Signed in anew: the lamp not among the
+                                // machines may be said again (#7019).
+                                if sign_in == SignIn::In && found.sign_in != Some(SignIn::In) {
+                                    not_among_said = false;
                                 }
                                 found.sign_in_read(sign_in);
                             }
@@ -2411,10 +2529,17 @@ fn owner<C: Clock>(
             // reviewer-lead's P2 on #2309).
             // A start that failed is tried again later, and until then no
             // hand-over goes either: it would fail on the stopped daemon.
+            // The restart after a sign-in (#7019) waits, as #5978's does,
+            // until no task is busy (watched): a task the lamp's own daemon
+            // runs since before the sign-in finishes first. New hand-overs
+            // wait for it too, as for any start due.
             let daemon = match start_daemon_due {
-                Some(due) if due <= Instant::now() => {
+                Some(due)
+                    if due <= Instant::now()
+                        && (!daemon_restart || engine.watched(&now).is_empty()) =>
+                {
                     start_daemon_due = None;
-                    Some(Job::StartDaemon)
+                    Some(Job::StartDaemon(daemon_restart))
                 }
                 _ => None,
             };
@@ -3023,50 +3148,6 @@ pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool) -> String {
             }
         ),
         Err(error) => format!("tasks: OpenClaw's settings not written: {error}"),
-    }
-}
-
-/// Whether the lamp's default agent `engine` is a gateway agent by its
-/// wrapper in `wrappers` ([`crate::skill_task::wrapper_is_gateway`]): the
-/// same data-driven check a run's hand-over makes, naming no engine. No
-/// default, or no wrapper there, is not.
-pub fn default_is_gateway_agent(engine: Option<EngineKind>, wrappers: &Path) -> bool {
-    engine
-        .and_then(|engine| std::fs::read_to_string(wrappers.join(engine.argument())).ok())
-        .is_some_and(|text| crate::skill_task::wrapper_is_gateway(&text))
-}
-
-/// At lamp-tasks' start: the fence ([`set_up_skill_run_fence`]) with
-/// `default_agent` (`LAMP_SKILL_DEFAULT_AGENT` and
-/// `LAMP_SKILL_GATEWAY_RUNS` both on) and the lamp's default
-/// agent `engine` a gateway agent ([`default_is_gateway_agent`]), its
-/// journal line; else nothing is written and `None`.
-pub fn skill_run_fence_at_start(
-    default_agent: bool,
-    engine: Option<EngineKind>,
-    wrappers: &Path,
-    state_dir: &Path,
-    home: &Path,
-) -> Option<String> {
-    (default_agent && default_is_gateway_agent(engine, wrappers))
-        .then(|| set_up_skill_run_fence(state_dir, home))
-}
-
-/// The fence of a skill's run on OpenClaw's gateway
-/// ([`crate::openclaw_config::write_skill_run_fence`]): the fence agent in
-/// `state_dir`'s config, its workspace in lamp-tasks' Harness project
-/// under `home`. Its approvals are set through the gateway before each
-/// run's turn (`crate::gateway_run`), never written here. One journal
-/// line.
-pub fn set_up_skill_run_fence(state_dir: &Path, home: &Path) -> String {
-    let project = home.join(MACHINES_PROJECT.trim_start_matches("~/"));
-    match crate::openclaw_config::write_skill_run_fence(state_dir, &project) {
-        Ok(changed) => format!(
-            "tasks: OpenClaw's fence for a skill's run ({}): {}",
-            crate::openclaw_config::SKILL_RUN_AGENT,
-            if changed { "written" } else { "unchanged" }
-        ),
-        Err(error) => format!("tasks: OpenClaw's fence for a skill's run not written: {error}"),
     }
 }
 
@@ -4258,10 +4339,22 @@ pub fn serve<C: Clock>(
     let skill_stop = stop.clone();
     match std::env::var_os("HOME").map(PathBuf::from) {
         Some(home) if skill_tasks => {
+            // A gateway agent's skill run is claimed by the launcher on
+            // its own socket (#7133): served with the same switch. One not
+            // bound leaves such a run failing closed, the rest as it is.
+            let starts = crate::skill_start::Starts::default();
+            // Bound once its folder is there and again when it comes back
+            // (the Reviewer-lead's boot-order P2): the serving thread says
+            // each change.
+            if let Err(error) = crate::skill_start::Server::lamp(starts.clone()).start(stop.clone())
+            {
+                eprintln!("tasks: the skill-start launcher's socket is not served: {error}")
+            }
             match crate::skill_task::HandOvers::lamp(
                 &home,
                 skill_harness.clone(),
                 no_harness.clone(),
+                starts,
             )
             .start(true, stop.clone())
             {
@@ -4365,22 +4458,6 @@ pub fn serve<C: Clock>(
             "{}",
             set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &side.home, skills)
         );
-        // #6685 step 4: with LAMP_SKILL_DEFAULT_AGENT and
-        // LAMP_SKILL_GATEWAY_RUNS on and the lamp's
-        // default agent a gateway agent (its wrapper's own data), the
-        // fence a skill's run on its warm gateway is held to. Otherwise
-        // (Hermes the default, say) nothing here is written; a default
-        // changed later is fenced at lamp-tasks' next start.
-        if let Some(line) = skill_run_fence_at_start(
-            std::env::var(crate::skill_task::DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on")
-                && crate::skill_task::gateway_runs_on(),
-            lamp_default(side),
-            Path::new(crate::skill_task::AGENT_WRAPPERS),
-            Path::new(OPENCLAW_STATE_DIR),
-            &side.home,
-        ) {
-            eprintln!("{line}");
-        }
     }
     let served = serve_with_adapter(config, clock, stop, move |session| {
         // The update hold (#5229), off unless set: held, or lifted on a
@@ -4496,16 +4573,40 @@ pub fn serve<C: Clock>(
                 }
             }
         }
+        let probe = openclaw_on.then(|| cli.clone());
         let cli = Cli::new(cli, session.into())?;
         // A Harness before 0.6.11 has no OpenClaw (#6226): the lamp's
-        // target is never OpenClaw with it.
-        if let Some(side) = lamp_side.as_ref().filter(|_| openclaw_on)
-            && !cli.runs_openclaw()
-        {
-            side.gateway.refused.store(true, Ordering::Release);
-            eprintln!(
-                "tasks: the Harness here is older than 0.6.11 or its version not read; OpenClaw is not the lamp's engine"
-            );
+        // target is never OpenClaw with it. Only a version READ says so: at
+        // a boot Harness may not answer yet, and a version not read is
+        // read again later, never taken as old (#7133, lamp-c0a4).
+        if let Some(side) = lamp_side.as_ref().filter(|_| openclaw_on) {
+            let shared = side.gateway.clone();
+            let first = cli.openclaw_harness();
+            if let OpenclawHarness::Unread = settle_openclaw_harness(&shared, first) {
+                match probe.map(|config| Cli::new(config, session.into())) {
+                    Some(Ok(probe)) => {
+                        let spawned = thread::Builder::new()
+                            .name("openclaw-version".into())
+                            .spawn(move || {
+                                read_openclaw_harness_again(
+                                    &shared,
+                                    || probe.openclaw_harness(),
+                                    thread::sleep,
+                                    &OPENCLAW_VERSION_AGAIN,
+                                );
+                            });
+                        if let Err(error) = spawned {
+                            eprintln!(
+                                "tasks: Harness's version not read again: {error}; OpenClaw stays the lamp's engine"
+                            );
+                        }
+                    }
+                    Some(Err(error)) => eprintln!(
+                        "tasks: Harness's version not read again: {error}; OpenClaw stays the lamp's engine"
+                    ),
+                    None => {}
+                }
+            }
         }
         Ok(Production::Cli(Box::new(cli)))
     });
@@ -4693,7 +4794,12 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                             }
                             Job::SignIn => Outcome::SignIn(adapter.signed_in_here()),
                             Job::Machines => Outcome::Machines(adapter.machines()),
-                            Job::StartDaemon => Outcome::StartDaemon(adapter.start_daemon()),
+                            Job::StartDaemon(false) => {
+                                Outcome::StartDaemon(false, adapter.start_daemon())
+                            }
+                            Job::StartDaemon(true) => {
+                                Outcome::StartDaemon(true, adapter.restart_daemon())
+                            }
                             Job::RestartDaemon => Outcome::RestartDaemon(adapter.restart_daemon()),
                         };
                         if outcomes_tx.try_send(result).is_err() {
@@ -5023,60 +5129,6 @@ fn with_sign_in(
 #[cfg(test)]
 mod tests {
     use super::code_handed;
-
-    /// #6882 P2-3: the fence is written at start only with the switch on
-    /// and the lamp's default agent a gateway agent by its wrapper's data;
-    /// a Hermes (per-run) default, no wrapper, or no default writes none.
-    #[test]
-    fn the_fence_is_written_only_for_a_gateway_default_agent() {
-        use super::{EngineKind, skill_run_fence_at_start};
-        let dir = tempfile::tempdir().unwrap();
-        let wrappers = dir.path().join("bin");
-        let state = dir.path().join("state");
-        let home = dir.path().join("home");
-        std::fs::create_dir_all(&wrappers).unwrap();
-        let openclaw_rs = include_str!("../../update/src/openclaw_install.rs");
-        let between = |from: &str| {
-            openclaw_rs
-                .split_once(from)
-                .and_then(|(_, rest)| rest.split_once("\"#;"))
-                .unwrap()
-                .0
-                .to_owned()
-        };
-        let own = between("pub const WRAPPER_TEXT: &str = r#\"");
-        let data = between("pub const GATEWAY_DATA: &str = r#\"");
-        let gateway = format!(
-            "#!/bin/sh\n{}{data}{}",
-            crate::gateway_run::GATEWAY_MARK,
-            own.strip_prefix("#!/bin/sh\n").unwrap()
-        );
-        std::fs::write(wrappers.join("openclaw"), &gateway).unwrap();
-        let hermes = format!(
-            "#!/bin/sh\n{}E=hermes\n{}",
-            crate::skill_task::ONE_PATH_MARK,
-            crate::skill_task::WRAPPER_RUN_LINES.concat()
-        );
-        std::fs::write(wrappers.join("hermes"), hermes).unwrap();
-        let config = state.join(crate::openclaw_config::CONFIG_FILE);
-        let at = |on, engine| skill_run_fence_at_start(on, engine, &wrappers, &state, &home);
-        for (on, engine) in [
-            (true, Some(EngineKind::Hermes)),
-            (true, Some(EngineKind::Claude)),
-            (true, None),
-            (false, Some(EngineKind::Openclaw)),
-        ] {
-            assert_eq!(at(on, engine), None, "{on} {engine:?}");
-            assert!(!config.exists(), "{on} {engine:?}");
-        }
-        let said = at(true, Some(EngineKind::Openclaw)).unwrap();
-        assert!(said.contains("written"), "{said}");
-        let text = std::fs::read_to_string(&config).unwrap();
-        assert!(
-            text.contains(crate::openclaw_config::SKILL_RUN_AGENT),
-            "{text}"
-        );
-    }
 
     /// #5488: `status` says Harness's sign-in once it was read, and nothing
     /// else changes.
@@ -5825,6 +5877,26 @@ mod tests {
         }
     }
 
+    /// #7019: signed in with the lamp side on, a look marking no machine
+    /// `current` is said once a sign-in; not with one `current`, nor
+    /// signed out, nor with the lamp side off.
+    #[test]
+    fn the_lamp_not_among_harnesss_machines_is_said_once_while_signed_in() {
+        let none = [machine('b', "office", false)];
+        let here = [machine('a', "lamp", true), machine('b', "office", false)];
+        let mut said = false;
+        assert_eq!(
+            lamp_not_among_machines(true, true, &none, &mut said),
+            Some("tasks: Harness is signed in, but this lamp is not among its machines yet")
+        );
+        assert_eq!(lamp_not_among_machines(true, true, &none, &mut said), None);
+        let mut said = false;
+        assert_eq!(lamp_not_among_machines(true, true, &here, &mut said), None);
+        assert_eq!(lamp_not_among_machines(true, false, &none, &mut said), None);
+        assert_eq!(lamp_not_among_machines(false, true, &none, &mut said), None);
+        assert!(!said);
+    }
+
     /// #1676: the lamp itself is left out; the first is `office`, the
     /// voice's own default; the rest by their names made into aliases,
     /// each once; at most 8.
@@ -6054,6 +6126,80 @@ mod tests {
         let only = LampSide::with_order(PathBuf::new(), vec![Openclaw]);
         only.gateway.refused.store(true, Ordering::Release);
         assert!(lamp_order(&only).is_empty());
+    }
+
+    /// #7133 (lamp-c0a4, after a reboot): Harness not answering its
+    /// version at lamp-tasks' start never takes OpenClaw away; a version
+    /// read later that runs it keeps it, read again with the waits given.
+    #[test]
+    fn a_version_not_read_at_the_start_keeps_openclaw_and_is_read_again() {
+        use EngineKind::{Hermes, Openclaw};
+        let side = LampSide::new(PathBuf::new());
+        let first = settle_openclaw_harness(&side.gateway, OpenclawHarness::Unread);
+        assert_eq!(first, OpenclawHarness::Unread);
+        assert_eq!(lamp_order(&side), [Hermes, Openclaw], "not latched");
+        let mut reads = vec![
+            OpenclawHarness::Runs,
+            OpenclawHarness::Unread,
+            OpenclawHarness::Unread,
+        ];
+        let mut waited = Vec::new();
+        let last = read_openclaw_harness_again(
+            &side.gateway,
+            || reads.pop().unwrap(),
+            |pause| waited.push(pause),
+            &OPENCLAW_VERSION_AGAIN,
+        );
+        assert_eq!(last, OpenclawHarness::Runs);
+        assert_eq!(
+            waited,
+            OPENCLAW_VERSION_AGAIN[..3],
+            "read again until read, then no more"
+        );
+        assert_eq!(lamp_order(&side), [Hermes, Openclaw]);
+    }
+
+    /// #6226 kept: a version READ and older than 0.6.11 takes OpenClaw
+    /// out, at the start or when read again later.
+    #[test]
+    fn a_version_read_older_than_0_6_11_leaves_openclaw_out() {
+        use EngineKind::Hermes;
+        let side = LampSide::new(PathBuf::new());
+        settle_openclaw_harness(&side.gateway, OpenclawHarness::TooOld((0, 6, 10)));
+        assert_eq!(lamp_order(&side), [Hermes]);
+        let later = LampSide::new(PathBuf::new());
+        settle_openclaw_harness(&later.gateway, OpenclawHarness::Unread);
+        let mut reads = vec![OpenclawHarness::TooOld((0, 6, 2)), OpenclawHarness::Unread];
+        read_openclaw_harness_again(
+            &later.gateway,
+            || reads.pop().unwrap(),
+            |_| {},
+            &OPENCLAW_VERSION_AGAIN,
+        );
+        assert_eq!(lamp_order(&later), [Hermes]);
+    }
+
+    /// #7133: a read error, every time, is never latched: after all the
+    /// waits OpenClaw is still the lamp's, and nothing is read past them.
+    #[test]
+    fn a_version_never_read_is_never_latched() {
+        use EngineKind::{Hermes, Openclaw};
+        let side = LampSide::new(PathBuf::new());
+        settle_openclaw_harness(&side.gateway, OpenclawHarness::Unread);
+        let mut tries = 0;
+        let last = read_openclaw_harness_again(
+            &side.gateway,
+            || {
+                tries += 1;
+                OpenclawHarness::Unread
+            },
+            |_| {},
+            &OPENCLAW_VERSION_AGAIN,
+        );
+        assert_eq!(last, OpenclawHarness::Unread);
+        assert_eq!(tries, OPENCLAW_VERSION_AGAIN.len());
+        assert!(!side.gateway.refused.load(Ordering::Acquire));
+        assert_eq!(lamp_order(&side), [Hermes, Openclaw]);
     }
 
     /// #6492: the app's choice of the lamp's default engine is refused

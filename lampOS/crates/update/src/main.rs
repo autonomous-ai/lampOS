@@ -50,6 +50,8 @@ install lampOS on a blank lamp (docs/install.md): the newest build's binary of e
         product part, in its folder with its current link; the product units, tmpfiles,
         users and zone; enables the lamp and starts nothing. Run again, it changes
         nothing. As root, on the lamp itself.
+region  the name and time servers for the region lamp-cloud keeps (docs/install.md, #6256):
+        China's only on a lamp placed in China. As root; lamp-region.service runs it.
 harness-off undoes install's Harness at boot, and only that: as lampos, the Harness CLI's
         `harness service uninstall` and `harness stop`, then `loginctl disable-linger
         lampos`, then install's record of it. Harness itself, its sign-in and the
@@ -163,8 +165,7 @@ fn main() -> ExitCode {
         }
         "check" | "once" | "serve" => return on_the_lamp(command, &options),
         "install" => install(&options),
-        // PARKED (#6386): `region` (#6256); re-enable when China is scheduled and stable's lamp-update carries #6810.
-        // "region" => region(&options),
+        "region" => region(&options),
         "harness-off" => harness_off(&options),
         "harness-on" => harness_on(&options),
         "harness-install" => harness_install(&options),
@@ -420,19 +421,16 @@ fn install(options: &BTreeMap<String, String>) -> Result<(), String> {
     Ok(())
 }
 
-// PARKED (#6386): re-enable when China is scheduled and stable's lamp-update carries #6810; its help, put back with it:
-// region  the name and time servers for the region lamp-cloud keeps (docs/install.md, #6256):
-//         China's only on a lamp placed in China. As root; lamp-region.service runs it.
-// fn region(options: &BTreeMap<String, String>) -> Result<(), String> {
-//     known(options, &[])?;
-//     let mut say = |line: &str| eprintln!("lamp-update: {line}");
-//     let mut changed = Vec::new();
-//     install::region_servers(Path::new("/"), &mut System, &mut changed, &mut say)?;
-//     for line in &changed {
-//         println!("{line}");
-//     }
-//     Ok(())
-// }
+fn region(options: &BTreeMap<String, String>) -> Result<(), String> {
+    known(options, &[])?;
+    let mut say = |line: &str| eprintln!("lamp-update: {line}");
+    let mut changed = Vec::new();
+    install::region_servers(Path::new("/"), &mut System, &mut changed, &mut say)?;
+    for line in &changed {
+        println!("{line}");
+    }
+    Ok(())
+}
 
 fn harness_off(options: &BTreeMap<String, String>) -> Result<(), String> {
     known(options, &[])?;
@@ -1081,13 +1079,12 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             product,
             openclaw::SKILLS_PRODUCT_DEFAULT,
         );
-        // A skill's run on OpenClaw is one turn on its warm gateway (#6685 step 4),
-        // only with the one run path on (LAMP_SKILL_DEFAULT_AGENT=on, read only with
-        // LAMP_SKILL_TASKS on) and a gateway default agent's runs on too
-        // (LAMP_SKILL_GATEWAY_RUNS=on, #6882, as lamp-tasks reads it): then its
-        // wrapper carries its gateway data and its namespace shows lamp-control's
-        // socket alone and the pushed skills. Otherwise, as before: none of these.
-        let shown = openclaw::shown(skills, switches.one_path, switches.gateway_runs);
+        // A skill's run on OpenClaw (#6685): with the one run path on
+        // (LAMP_SKILL_DEFAULT_AGENT=on, read only with LAMP_SKILL_TASKS on), as
+        // Hermes's one run path wrapper, its wrapper carries its gateway data and
+        // its namespace shows lamp-control's socket alone and the pushed skills.
+        // Otherwise, as before: none of these.
+        let shown = openclaw::shown(skills, switches.one_path);
         if acts && wanted && harness.is_none() {
             say("OpenClaw on the lamp: off, as Harness before the sign-in is off");
         }
@@ -1292,6 +1289,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     &records,
                     shown,
                     &mut systemd,
+                    &mut lamp_update::install::output_of,
                     now_unix_ms,
                     window,
                     &mut say,

@@ -297,10 +297,10 @@ would take a Live session past its 32, and its marks, called only after its look
 other installable skills, which their owner puts on; and Laugh glance,
 parked (#1669). A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
-product lamp has 45 functions of its own: the voice's own 27 (with
+product lamp has 44 functions of its own: the voice's own 26 (with
 `LAMP_REPORTS=on`, #2862, `reports_stop` and `reports_state` among them,
-and `LAMP_MEMORY_ROLE=on`'s `set_role` and `end_role` since 9 Nov, and
-`LAMP_SLEEP_ASKED=on`'s `go_to_sleep` since #6853), the
+and `LAMP_MEMORY_ROLE=on`'s `set_role` and `end_role` since 9 Nov;
+`LAMP_SLEEP_ASKED=on`'s `go_to_sleep` is PARKED (#7219), 45 with it on), the
 actions part's 17 and `use_skill`, reaching Dance's `dance` and Pose's
 `set_pose`, which comes with the product since #4135 (`PRODUCT_FUNCTIONS` in
 `crates/update/tests/functions.rs`, which fails if one is left out or the
@@ -1053,9 +1053,6 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    V1's Jev client does (#811 point 2).
    It never writes `/etc/lampOS/body/lamp.env`, and says that the body waits
    for it.
-   **PARKED (#6386): install does none of this paragraph and touches no
-   name or time server; `lamp-update region` and the two units are out of
-   the product (the units in `deploy/product/parked/`); re-enable when China is scheduled and stable's lamp-update carries #6810.**
    **Name and time servers: China's on a lamp placed in China only**
    (#6256, #6414; `install::region_servers`, also `lamp-update region`). The
    region is the one `lamp-cloud` keeps from the ping's reply in
@@ -1121,8 +1118,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    target (`lamp-setup.service`, `lamp-waking.service`,
    `lamp-setup-wifi-restore.service` and `lamp-setup-recover.service`,
    [setup.md](setup.md)), `lamp-records.timer`, `lamp-selftest.timer`,
-   `lamp-update-back.timer`, `lampos-setup-done.path` (`lamp-region.service`
-   and `lamp-region.path`, #6256, are PARKED (#6386), above), and the helpers'
+   `lamp-update-back.timer`, `lampos-setup-done.path`, `lamp-region.service`
+   and `lamp-region.path` (#6256, below), and the helpers'
    sockets `lamp-skills-manage.socket`, `lamp-setup-change.socket`,
    `lamp-setup-wifi.socket` and `lamp-eyes-camera.socket` (`install::enabled`;
    a test holds this list to it; #2853; each template is started by its socket,
@@ -2413,7 +2410,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the wrapper as `lampos`, on loopback `ws://127.0.0.1:18789`, with the
      token in `/var/lib/lampos-openclaw/gateway-token` (0600 `lampos`),
      made once by lamp-update at the install. One Gateway serves every
-     pane.
+     pane. Its unit is written by a round only, never by the one-shot:
+     a one-shot that finds an earlier build's unit (a lamp-update ahead
+     of its units) changes nothing and takes nothing out, journals
+     "OpenClaw's install waits: lamp-openclaw-gateway.service is not
+     this build's yet; …", and leaves a working OpenClaw and its gateway
+     as they are; the next round writes the unit and asks again (#7135).
    - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
      lamp-cloud's `/var/lib/lampos-cloud/hermes-token`, as Hermes's does,
      for the `lampos` provider's `apiKey` (`${LAMP_HERMES_TOKEN}`).
@@ -2421,13 +2423,110 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      product lamp, read only with `LAMP_OPENCLAW_ON_LAMP` on), as
      `LAMP_HERMES_SKILLS` does for Hermes: on, `openclaw-ns` shows
      `/run/lampos-skills` read-only; off, nothing under `/run`.
-   - **No skill's run on OpenClaw yet** (#6685): its one gateway has no
-     wrapper started per run, so it has no part in the one run path ("One
-     agent namespace for every engine"), and `openclaw-ns` never shows
-     lamp-control's socket or lamp-tasks' runs' token folder. With
-     `LAMP_SKILL_DEFAULT_AGENT=on` and OpenClaw the lamp's default,
-     lamp-tasks refuses a skill's run in words (docs/tasks.md, "The lamp's
-     default agent"); OpenClaw's own fenced path per run is a later step.
+   - **A skill's run on OpenClaw is a gateway agent's** (#6685, the
+     lead's decision): its one gateway has no wrapper started per run
+     (OpenClaw 2026.11.2 can't open its state outside its gateway's PID
+     namespace), so its wrapper never takes the one run path's per-run
+     form. With the one run path on (`LAMP_SKILL_DEFAULT_AGENT=on`, read
+     only with `LAMP_SKILL_TASKS` on, the same switch Hermes's one run
+     path wrapper follows, and nothing else: lamp-update reads no gateway
+     runs switch, `openclaw_install::shown`), OpenClaw's install writes
+     its wrapper with the gateway mark (`GATEWAY_MARK`, `# lampOS: a
+     gateway agent: a skill's run is one turn on its warm gateway (#6685).
+     Written by lamp-update.`) and its data (`GATEWAY_DATA`, `#@<key>
+     <value>` lines) after `#!/bin/sh`, the rest as above, and
+     `openclaw-ns` shows lamp-control's socket alone, read-only, and the
+     pushed skills (`/var/lib/lampOS/skills-dev`) read-only whenever there,
+     for every turn the gateway runs. With the one run path on, the gateway
+     wants and starts after `lamp-control.service`; because that service is
+     `Type=simple`, its process starting does not prove its socket exists.
+     Before capturing its mount view, the gateway therefore waits for the
+     actual control socket, up to 60 one-second waits. Still not there, it
+     logs one line and starts without it (a lamp before setup has no
+     lamp-control: its unit has `ConditionPathExists=/var/lib/lampos-setup/done`;
+     a failed start would also hit the unit's start limit and keep the gateway
+     down after setup), so the socket is not shown, as before. Install/version
+     calls and the switch-off path do not wait. This only handles initial
+     startup: a later control socket replacement still needs a gateway restart
+     to replace its bind. The first round after this update rewrites the
+     namespace script and the unit and restarts the gateway once. It also shows the start socket folder
+     `/run/lampos-skill-start` read-only (lamp-tasks makes its
+     `start.sock` there; a socket still connects on a read-only mount;
+     skipped when the folder is not there, as the pushed skills are). The
+     folder is lamp-update's, not under lamp-tasks' runtime folder (which
+     a lamp-tasks restart wipes, leaving the gateway's bind stale): with
+     the switch on, the gateway's unit gets `RuntimeDirectory=lampos-skill-start`,
+     `RuntimeDirectoryMode=0755` and `RuntimeDirectoryPreserve=yes`, so
+     systemd makes it `lampos`'s, 0755, before every gateway start and keeps
+     it past a stop or restart until a reboot; Harness's one-shot also
+     makes it at once (`install -d -o lampos -g lampos -m 0755`). Not a
+     tmpfiles.d line: neither the round's sandbox nor the one-shot's can
+     write `/etc/tmpfiles.d`. Off, the unit is as before byte for byte,
+     and the one-shot takes the folder out (and with OpenClaw off). A skill's run on OpenClaw is
+     then a Harness `new` OpenClaw turn (agent `main`), which execs the
+     launcher `/usr/local/lib/lampos/skill-start` by absolute path
+     (docs/tasks.md). The launcher is a byte copy (never a link) of the
+     installed lamp-tasks, `/opt/lampOS/tasks/current/lamp-tasks`,
+     root's, 0755, written whole beside and renamed in by Harness's
+     one-shot (the round's sandbox cannot write `/usr/local/lib/lampos`):
+     a round compares its bytes and mode with the installed lamp-tasks
+     and asks the one-shot when they differ; with the switch off it is
+     taken out, and with OpenClaw off it goes with the entry points. The
+     launcher's safety depends on lamp-tasks choosing launcher mode first
+     in `main()`, by `/proc/self/exe`, and then taking exactly one run id
+     (#7133). That
+     exec is allowed by exactly one entry in agent `main`'s exec
+     allow-list, `/usr/local/lib/lampos/skill-start` (`SKILL_START`: no
+     glob, no argument pattern), in OpenClaw's exec approvals (its state
+     database, not `openclaw.json`): with OpenClaw's stock
+     `tools.exec.mode: "ask"`, a headless turn's exec is denied otherwise,
+     since nobody can answer the approval. The work folder
+     (`/var/lib/lampos-tasks/harnesses/lamp-tasks`) stays writable to the
+     gateway and every OpenClaw agent, so nothing in it is allowlisted;
+     an earlier build's glob there
+     (`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`) is
+     taken out of `main` and of the withdrawn fence agent
+     `lamp-skill-run` (#7101; an old `lamp-skill-run` entry, harmless,
+     cannot be removed by the CLI once that agent is gone from
+     `openclaw.json`, so that remove's failure is expected, journaled
+     once per try, and nothing depends on it). The install runs, as `lampos` through the
+     wrapper (which joins the running gateway), after the gateway's
+     (re)start: `/usr/local/bin/openclaw approvals allowlist add
+     --gateway --agent main /usr/local/lib/lampos/skill-start`, then
+     `... remove --gateway --agent main <glob>` and `... remove
+     --gateway --agent lamp-skill-run <glob>`; with the switch off,
+     `remove` of `main`'s launcher entry and of the glob. Only with
+     `lamp-openclaw-gateway.service` active (else one journal line, and
+     the next round asks again). An add refused only because the
+     gateway just (re)started is not ready yet (its namespace does not
+     show Node, `'node': No such file or directory`, then `Config
+     unavailable`) is tried again in the same run, 40 times 3 s apart (two
+     minutes) at most (#7135). A remove that fails is journaled and
+     passed over; an add that fails is journaled and not done: the
+     install is still `installed`, nothing is taken down, and the record's
+     `exec_allowlist` stays false, so the next round asks the one-shot
+     again, which then only writes the launcher and edits the allow-list.
+     The entry is re-checked every round: with the switch on, the record
+     saying it was added and the gateway active, the round itself runs
+     the same `approvals allowlist add` (as `lampos`, through the wrapper;
+     OpenClaw takes an entry already there without writing), so a factory
+     reset that wipes OpenClaw's approvals gets it back on the next
+     round; an add refused sets `exec_allowlist` false and asks the
+     one-shot, and the removes stay the one-shot's. A gateway active but
+     not ready yet (Node not there yet, or `Config unavailable`, as after
+     a boot) is asked again the same way, 40 times 3 s apart; still not
+     ready, the entry is unknown, not refused: nothing is marked or asked,
+     and the next round checks again (#7135, lamp-c0a4's reboot at
+     22:59:00, where it had started a reinstall). With the switch off
+     and the gateway not active, nothing is run and `exec_allowlist`
+     stays true (carried through the `installing` record too), so each
+     round asks the one-shot again until `main`'s removes have run with
+     the gateway active; only then does it go false.
+     Off, the wrapper and `openclaw-ns` are as before #6685, byte for
+     byte. lamp-update never writes OpenClaw's shared
+     `openclaw.json` for a skill's run and never changes `tools.exec`: its
+     one write of that file is the install's own `gateway` block (the
+     gateway's token, above), with any switch.
    - **Records:** `openclaw-install.json` (the record), `openclaw-ask.json`
      (the ask) and `openclaw.lock` (one install at a time), beside
      Hermes's in lamp-update's records.
@@ -2620,7 +2719,9 @@ yet on a lamp.
 - **Hermes and OpenClaw** keep their own wrappers and namespace scripts
   ("Hermes on the lamp", "OpenClaw on the lamp") with the one run path
   off. With it on (below), Hermes's wrapper is the one run path's;
-  OpenClaw's stays its own and takes no skill's run.
+  OpenClaw's is its own with the gateway mark and data, never the per-run
+  form, and takes a skill's run the same way as Hermes, through Harness
+  ("OpenClaw on the lamp").
 - **Written by a round** (`crates/update/src/agent_ns/rounds.rs`), only
   with `LAMP_AGENT_NS=on` exactly in lamp-update's own unit (no product
   unit sets it; any other value or none is off), by a `serve` with
@@ -2672,8 +2773,8 @@ yet on a lamp.
 - **The one run path** (#6685, `LAMP_SKILL_DEFAULT_AGENT=on` in
   lamp-update's own unit or, not set there, its carried switch file
   `/etc/lampOS/update.env` on a product lamp (`switches::update_switches`,
-  as `LAMP_SKILL_TASKS` is), read only with `LAMP_SKILL_TASKS` on; off in
-  the product: no product unit and not that file sets it; lamp-tasks reads
+  as `LAMP_SKILL_TASKS` is), read only with `LAMP_SKILL_TASKS` on; on in
+  the product, in that unit, that file and lamp-tasks' unit, which reads
   the same switch). One way to run a skill
   for every agent: every agent's wrapper is one text
   (`wrapper::one_path_text`), Hermes's included, and no agent is named in

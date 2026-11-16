@@ -68,6 +68,19 @@ fn turn_with(
     first: Vec<net::Result<ChatEvent>>,
     later: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> Went {
+    went(on, worded_on, product, heard, false, first, later)
+}
+
+/// [`turn_with`], `heard` the lamp's own written turn when `written`.
+fn went(
+    on: bool,
+    worded_on: bool,
+    product: bool,
+    heard: &str,
+    written: bool,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(std::iter::once(first).chain(later).collect()),
@@ -120,9 +133,13 @@ fn turn_with(
         .build()
         .unwrap()
         .block_on(async {
-            engine.submit(start(1));
-            engine.submit(audio(1, 1));
-            engine.submit(end(1));
+            if written {
+                engine.submit(super::written(1, heard));
+            } else {
+                engine.submit(start(1));
+                engine.submit(audio(1, 1));
+                engine.submit(end(1));
+            }
             turn(&mut engine).await
         });
     let asked = script.asked.lock().unwrap();
@@ -450,6 +467,96 @@ fn a_claim_beside_its_call_is_untouched() {
         "{:?}",
         on.said
     );
+}
+
+/// lamp-9adf, 15 Nov, build 13162 (14:36, 14:38, 14:40): a skill made
+/// through the app's MAKE IT was kept and put on, and the lamp's own note
+/// of it ([`crate::made_skill::ALREADY_DONE`] first) was answered "I made
+/// …" with no call in the turn: asked again, then said as
+/// [`crate::action_claim::NOT_DONE_LINE`]. The make ran outside the turn,
+/// so that note's line, and a with-code make's say-back, are said as they
+/// came. The same words on any other turn with no make are still held.
+#[test]
+fn a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held() {
+    let on = "I made evening dim, and it's on: it dims the light at ten.";
+    let with_code = format!(
+        "I made photo booth: it runs its own code to take a photo.{}",
+        crate::made_skill::RUNS_AFTER_YES
+    );
+    let words = |went: &Went| -> String {
+        went.said
+            .iter()
+            .map(|said| said.trim_start_matches("said:"))
+            .collect()
+    };
+    for (note, reply) in [
+        (crate::made_skill::in_their_language(on), on.to_owned()),
+        (
+            format!(
+                "{}{}",
+                crate::made_skill::ALREADY_DONE,
+                crate::skill_write_yes::say_whole(&with_code)
+            ),
+            with_code.clone(),
+        ),
+    ] {
+        let got = went(true, false, true, &note, true, saying(&reply), vec![]);
+        assert_eq!(words(&got), reply, "{got:?}");
+        assert_eq!((got.asked, got.ran.len()), (1, 0), "{got:?}");
+        assert!(!told_claim(&got), "{got:?}");
+        // Another written turn, or a spoken one, claiming the make with no
+        // call: asked again, then the line that it wasn't done.
+        for (heard, written) in [
+            ("Say hello.", true),
+            ("Make me a skill that dims the light at ten.", false),
+        ] {
+            let got = went(
+                true,
+                false,
+                true,
+                heard,
+                written,
+                saying(&reply),
+                vec![saying(&reply)],
+            );
+            assert_eq!(
+                got.said,
+                said(&[crate::action_claim::NOT_DONE_LINE]),
+                "{heard}"
+            );
+            assert_eq!(got.asked, 2, "{heard}");
+            assert!(told_claim(&got), "{heard}");
+        }
+    }
+}
+
+/// A make that didn't happen: the lamp's note of a skill not made
+/// ([`crate::made_skill::not_made_in_their_language`]) opens on
+/// [`crate::made_skill::ALREADY_DONE`] too, but counts as no make, so a
+/// reply of "I made …" to it is asked again and then said as
+/// [`crate::action_claim::NOT_DONE_LINE`] (#7128's second read).
+#[test]
+fn a_not_made_notes_made_claim_is_held() {
+    let reply = "I made evening dim, and it's on: it dims the light at ten.";
+    let note = crate::made_skill::not_made_in_their_language(&crate::made_skill::not_made_line(
+        "A skill can't hear words.",
+    ));
+    let got = went(
+        true,
+        false,
+        true,
+        &note,
+        true,
+        saying(reply),
+        vec![saying(reply)],
+    );
+    assert_eq!(
+        got.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{got:?}"
+    );
+    assert_eq!(got.asked, 2, "{got:?}");
+    assert!(told_claim(&got), "{got:?}");
 }
 
 /// An answer that claims nothing is untouched, byte for byte.

@@ -65,6 +65,10 @@ hound.workspace = true
 # The public skill format's schema patterns (tests/it/format.rs); already
 # in the lock through other crates, so nothing new is fetched.
 regex = "1"
+# A voice make's run as lamp-tasks starts it (tests/it/make_check.rs,
+# Heron's P2 on #6768): the guide's check packs what the voice's packs.
+# Tested against, never linked.
+lamp-tasks = { path = "../tasks" }
 
 [lints]
 workspace = true

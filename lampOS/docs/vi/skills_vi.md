@@ -1500,6 +1500,24 @@ là đã làm. Mô hình được hỏi lại một lần, và lần thứ hai v
 lamp test event … It waits for you to agree" với `calls=none`, và không kỹ
 năng nào được tạo. "I made a mistake." và "I made a mistake: …" không phải lời nói đã làm. Kiểm
 thử: `action_claim::tests::a_skill_said_made_is_a_claim_only_a_make_backs`.
+Ngoại lệ duy nhất là ghi chú của chính đèn về một lần tạo đã xong: một lượt do
+đèn viết, không bao giờ là câu trích của add-on, mở đầu bằng
+`made_skill::ALREADY_DONE` (câu của MAKE IT trong ứng dụng, đã tạo hoặc có
+code và đang chờ lời đồng ý, và câu của một lần tạo bằng giọng nói bị cắt,
+đều qua `app_make::say_note`) tính lần tạo đó là lời gọi `make_skill` của
+lượt (`second_provider::made_skill_said`, `made_skill::tells_made`), nên
+câu "I made …" được nói như nó đến. Chỉ ghi chú đã tạo mới được tính: ghi chú
+của một kỹ năng không tạo được (`made_skill::not_made_in_their_language`)
+cũng mở đầu bằng `ALREADY_DONE`, nhưng không tính là lần tạo nào, và câu "I
+made …" đáp lại nó vẫn bị giữ. Lần tạo được tính không gắn với tên kỹ năng,
+nên trong đúng lượt đó câu "I made" về một kỹ năng khác cũng được nói, và
+socket say không kiểm tra kỹ năng nào viết ghi chú; cả hai chỉ giới hạn trong
+lượt đó. Trên lamp-9adf (15/11, bản 13162, 14:36, 14:38, 14:40) câu của ứng
+dụng bị hỏi lại rồi nói thành "Sorry, I didn't do that." sau khi kỹ năng đã
+được giữ và bật. Mọi lượt khác nói đã tạo mà không có lời gọi vẫn bị giữ
+lại. Kiểm thử:
+`second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`,
+`a_not_made_notes_made_claim_is_held`.
 
 **Gỡ bằng giọng nói** (#6960, ba lần thử của Twelve trên lamp-c0a4, 12843:
 "delete the skill called moon fact" đi tới `lamp_help`, mà ghi chú của nó
@@ -1763,7 +1781,9 @@ từ chối; và `the_read_steps_are_the_catalogues_readable_services`),
 Yêu cầu của chủ, 12/11; bật trong cả năm unit sản phẩm từ 13/11. Với
 `LAMP_AGENT_SERVICES=on` trong `lamp-voice`
 (đặt giống nhau trong lamp-tasks, lamp-skills, lamp-skills-manage@ và
-lamp-control,
+lamp-control, và trong lamp-cloud, nơi trang kỹ năng nạp kỹ năng với chính
+các công tắc của lamp-skills để một kỹ năng connector không bị liệt kê là
+không nạp được, [cloud.md](../cloud.md), "Where it reads";
 [services_vi.md](services_vi.md); đúng `on`; `made_skill::AGENT_SERVICES_ENVIRONMENT`) và
 `LAMP_MADE_SCRIPTS=on` bên cạnh (bước `task` của skill tự làm chịu giới hạn
 đó), một skill làm bằng giọng nói mà đọc hoặc ghi một dịch vụ đã liên kết
@@ -1821,9 +1841,46 @@ quiet hours` sau một giờ); trong lúc chờ nó được giữ trong
 `task-telling.json` của thư mục state (tên skill và lúc bắt đầu chờ, không
 bao giờ có lời của nó), nên câu trả lời bị bỏ dở vì lamp-skills khởi động
 lại được ghi ở lần khởi động sau (`what its agent found: dropped unsaid,
-lamp-skills restarted while it waited`, `task::telling_dropped`). Lần chạy
-không có quyền đọc (gửi thư, task của một script) không nói gì, như trước.
-Test:
+lamp-skills restarted while it waited`, `task::telling_dropped`).
+
+Với `LAMP_TOLD_WHEN_ASKED=on` (`lamp-skills` và `lamp-voice`, tắt nếu không
+đặt; #7180, quyết định của first builder): lần chạy chủ đèn nhờ bằng giọng
+nói giữ lời trong giờ yên lặng. Trên lamp-9adf lúc 02:28 ngày 16/11, một
+lần chạy ngay được trả lời "Running … now", rồi câu trả lời của agent chờ
+sau giờ yên lặng, không nói gì, đến khi bị bỏ qua sau một giờ. Chỉ lần chạy
+do chính chủ đèn nhờ bằng lời: lần chạy ngay (`made_run`, chỉ của giọng
+nói trên call socket, đã hỏi câu đó là của ai) của một kỹ năng có tác vụ
+đánh dấu kỹ năng đó
+(`task::asked_by_voice`), lần giao việc của chính lần chạy đó lấy dấu một
+lần (`task::take_asked_by_voice`), nên lần chạy sau đó do trigger, app hay
+lịch vẫn giữ yên lặng như trước. Chỉ khi câu trả lời của agent có trong
+vòng năm phút sau lời nhờ (`told_when_asked::lifted_until`); khi đó giờ yên
+lặng của đèn và `[quiet]` của kỹ năng được bỏ cho nó đến năm phút sau lúc
+câu trả lời có (`told_when_asked::quiet_holds`), nên khi chờ chủ đèn, đèn
+không bao giờ tự nói lúc một giờ sáng. Mọi phần khác của cổng vẫn giữ: chủ
+đèn trong khung hình và một mình, không có giọng nói trong một phút, không
+riêng tư hay tạm dừng, lượt đọc duy nhất của đèn, và âm lượng ban đêm.
+Nhật ký ghi rõ: `what its agent found: told in quiet hours too, its owner
+asked by voice N s before (LAMP_TOLD_WHEN_ASKED)`, hoặc `its quiet holds,
+ready N s after its owner's ask, past five minutes`. Cùng công tắc đó cho
+giọng nói hỏi cái "có" đầu tiên của tác vụ trong giờ yên lặng (ở trên) khi
+chủ đèn vừa nhờ kỹ năng đó bằng giọng nói trong vòng năm phút: kỹ năng mà
+lời nghe được gọi tên (`LAMP_SKILL_NAMED`), nghe chủ đèn nói
+(`services::owner_hears`), được giữ cùng thời điểm trong
+`/run/lampos-voice/spoken-asks.json` (thư mục runtime riêng của giọng nói,
+nên không kỹ năng hay add-on nào giả được lời nhờ; `told_when_asked::keep`).
+Việc xét câu đó là của ai chạy trên một luồng riêng, nên lần gọi theo tên
+không bao giờ phải chờ nó; thay vào đó, lời hỏi của say service, chỉ trong
+giờ yên lặng, chờ nó tối đa 2 giây
+(`told_when_asked::asked_within_waiting`, `ASKED_WAIT`,
+`Here::asked_by_voice`). Test: `told_when_asked::tests` (cả
+`a_spoken_ask_kept_a_little_later_is_waited_for`),
+`skill_task_yes::tests::asked_by_voice_it_is_said_in_quiet_hours`,
+`task::tests::a_run_asked_by_voice_is_taken_once`, và
+`a_line_the_voice_heard_holds_a_reads_gate` trong main của lamp-skills.
+
+Lần chạy không có quyền đọc (gửi thư, task của một
+script) không nói gì, như trước. Test:
 `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
 `service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,
 `service_read::tests::a_wait_for_the_gate_says_why_once`,
@@ -1955,6 +2012,57 @@ cả hai người viết.
   (người nhận của chính họ khi ghi) không bao giờ nằm trong luật: mỗi địa
   chỉ là một chỗ giữ (`own1.lamp@example.invalid`), được đặt lại trong câu
   trả lời của agent trước khi kiểm tra.
+- **Với hướng dẫn skill-creator của đèn (`LAMP_MAKE_AGENT_GUIDE=on`, tắt
+  nếu không đặt; yêu cầu của chủ sở hữu, 13/11).** Như `skill-creator` của
+  V1, agent viết nháp, kiểm tra và sửa trước khi trả lời. Dòng của mỗi lần
+  tạo còn ghi `"guide":true`, và lamp-tasks ghi hướng dẫn, `guide.md`
+  (0600), cạnh `rules.md` trong thư mục của lần tạo
+  (`lamp_tasks::skill_make::GUIDE`, từ `skill_make_guide.md`: bản cho đèn
+  của `skills/skill-creator/SKILL.md` của V1, Apache-2.0, dòng đầu ghi
+  nguồn gốc và giấy phép đó; bỏ phần eval, benchmark và viewer của V1).
+  Lần chạy được dặn đọc hướng dẫn trước, luật thắng khi hai bên khác nhau:
+  lấy ý định chỉ từ lời người dùng (đèn làm gì, khi nào, và điều gì dạng
+  kỹ năng không làm được, ghi là bỏ ra), viết nháp kỹ năng trong
+  `draft/NAME` trong thư mục của nó, kiểm tra bằng kiểm tra của chính đèn,
+  `/opt/lampOS/skills/current/lamp-skills pack --out /tmp/lamp-check
+  draft/NAME` (đúng `pack` mà giọng nói dùng để giữ một kỹ năng tự tạo;
+  `/opt` hiện trong namespace của lần tạo, và gói được ghi vào `/tmp` riêng
+  của lần chạy), sửa theo lời của kiểm tra tối đa hai lần, rồi ghi
+  `answer.md` như luật nói. Mỗi câu trả lời có 90 giây
+  (`make_skill_agent::GUIDED_WRITE_WITHIN`), bằng khi không có hướng dẫn
+  (`WRITE_WITHIN`), trong 120 giây của agent. Giọng nói vẫn cho câu trả lời qua toàn bộ kiểm tra của nó; câu
+  bị từ chối được gửi lại kèm lời của kiểm tra (`REPAIR_MARK`) tối đa thêm
+  2 lần (`GUIDED_MOST_REPAIRS`), mỗi lần chỉ bắt đầu khi thêm một câu trả
+  lời vẫn vừa 120 giây, và câu vẫn bị từ chối được nói là không tạo được,
+  như hôm nay. Tắt thì dòng, lời dặn lần chạy và thư mục của lần tạo giữ
+  nguyên từng byte như hôm nay. Worker của tuyến thứ hai đọc nó (được
+  `process::second_route_worker_environment` chuyển cho).
+  - **Kiểm tra của hướng dẫn là kiểm tra của giọng nói** (P2 của Heron
+    trên #6768). lamp-tasks bắt đầu lần chạy với môi trường đã xoá sạch,
+    nên dòng có hướng dẫn còn mang giá trị của worker cho hai công tắc mà
+    `lamp-skills pack` đọc và làm đổi điều nó từ chối
+    (`make_skill_agent::CHECK_SWITCHES`,
+    `"switches":{"LAMP_AGENT_SERVICES":"on"|"off","LAMP_SKILL_WRITES":"on"|"off"}`,
+    chỉ `on` khi đúng là `on`), và lamp-tasks đưa mỗi `on` vào môi trường
+    của lần chạy ([tasks_vi.md](tasks_vi.md)). Nhờ vậy một bước `write`,
+    hay một `do.task` có grant của dịch vụ liên kết, mà giọng nói sẽ giữ
+    thì cũng đóng gói được trong lần chạy, và Hermes không bao giờ bị bảo
+    bỏ đúng bước đã được yêu cầu. Tắt thì dòng giữ như hôm nay, không có
+    `switches`.
+  - **Người dùng nghe gì trong lúc chờ** (P3 của Heron trên #6768): "Let me
+    think about that a little longer." một lần, qua dịch vụ nói, khi
+    lamp-tasks báo lần chạy của lần giao đầu tiên đã bắt đầu (không bao giờ
+    sau một lượt bị cắt, và bỏ qua nếu không nói được trong 15 giây), rồi
+    im lặng cho đến khi đèn nói lại kỹ năng hoặc nói không tạo được. Với
+    hướng dẫn, một câu trả lời có thể mất tới 90 giây, cộng tối đa 5 giây
+    chờ thêm của lamp-tasks, và phần của agent tới 120 giây khi có một lần
+    sửa. Một lần sửa của giọng nói chỉ bắt đầu khi thêm một câu trả lời 90
+    giây vẫn kết thúc trong 120 giây, tức là chỉ sau một câu trả lời đến
+    trong 30 giây: sau một câu trả lời từ 60 giây trở lên thì không còn lần
+    sửa nào của giọng nói vừa, và kết luận của kiểm tra giọng nói cho câu
+    đó giữ nguyên; cả hai lần sửa chỉ xảy ra khi câu trả lời đầu và lần sửa
+    đầu cộng lại không quá 30 giây. Những lần sửa thường vừa là của chính
+    hướng dẫn, bên trong lần chạy.
 - **Không có lần chạy tạo thì không giao.** Khi lamp-tasks không cho được
   lần chạy đó (bản cũ không có socket tạo, `LAMP_SKILL_TASKS` tắt, hoặc khi
   `held` mà wrapper của Hermes không có các dòng mạng), lần tạo không được
@@ -2032,14 +2140,26 @@ cả hai người viết.
   `make_skill_agent::tests` (luật gửi thành một dòng `skill_make` và câu trả
   lời được đọc lại, không bao giờ là `prepare`; lamp-tasks cũ hay lần chạy
   bị từ chối thì không bao giờ được giao; không có target `lamp` là
-  không có agent; lần chạy im lặng thì hết giờ), và `skill_make::tests` của
-  lamp-tasks (xem [tasks_vi.md](tasks_vi.md)). Chưa thử trên đèn: một lệnh
+  không có agent; lần chạy im lặng thì hết giờ;
+  `the_guide_is_asked_for_only_with_its_switch`,
+  `the_checks_switches_are_lamp_tasks_list_with_this_workers_values`;
+  `tests/it/make_check.rs` của lamp-skills đóng gói một bản nháp `write` và
+  một bản nháp `do.task` dịch vụ trong lần tạo đúng khi kiểm tra của giọng
+  nói đóng gói được), các test của hướng dẫn
+  `with_the_guide_a_refused_answer_goes_back_with_the_checks_words_and_its_fix_is_kept`
+  và `with_the_guide_an_answer_still_refused_after_its_rounds_is_refused_as_today`,
+  và `skill_make::tests` của lamp-tasks (xem [tasks_vi.md](tasks_vi.md)). Chưa thử trên đèn: một lệnh
   `curl` từ bên trong lần chạy của một lần tạo phải thất bại.
 - **Chưa thử trên đèn:** hàng kiểm tra của nó, 16 lần tạo (mười hai lần đơn
   giản, bốn lỗi DeepSeek đã biết) trên một đèn có agent, so sánh với
   DeepSeek: có giữ không, phần nói lại và thời gian. Người dùng của agent có
   thuộc nhóm `lamp-agents` trên đèn hay không. Ba lần tạo gửi thư bị từ chối
-  trên lamp-9adf được agent tạo thẳng khi `LAMP_AGENT_SERVICES` bật.
+  trên lamp-9adf được agent tạo thẳng khi `LAMP_AGENT_SERVICES` bật. Với
+  hướng dẫn: một lần tạo DeepSeek không giữ được do Hermes tạo, bản nháp được
+  kiểm tra và sửa trong lần chạy, được nói lại và được bật; một lần tạo gửi
+  mail (`write`) mà bước của nó vẫn còn sau kiểm tra của hướng dẫn ở đó, cũng
+  cho thấy terminal của Hermes chuyển các công tắc `LAMP_*` của lần chạy cho
+  kiểm tra nó chạy; và câu trả lời mất bao lâu ở đó.
 
 ### Kỹ năng tự tạo được nới lỏng (`LAMP_MADE_SKILL_LOOSE=on`, bật trong sản phẩm)
 
@@ -3168,7 +3288,9 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   của say service, giọng nói tự đọc kỹ năng trên đèn qua manage helper và
   lamp-control, rồi dựng đúng câu nói lại như khi được hỏi
   (`skill_task_yes::asked_aloud`). Nó từ chối, không nói gì, trong giờ yên
-  lặng của đèn, ngoài `LAMP_PRIVATE_ROOM` khi không thấy chủ đèn ở một mình,
+  lặng của đèn (với `LAMP_TOLD_WHEN_ASKED=on` thì không, khi chủ đèn vừa
+  nhờ kỹ năng đó bằng giọng nói trong vòng năm phút, xem bên dưới), ngoài
+  `LAMP_PRIVATE_ROOM` khi không thấy chủ đèn ở một mình,
   khi công tắc tắt, hoặc khi đã đồng ý. Nếu không, câu nói đi qua mọi cổng
   của một say của kỹ năng, như lượt riêng của đèn mà không ai nói. Ghi chú
   được giữ cho worker của route thứ hai trong

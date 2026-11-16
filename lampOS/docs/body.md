@@ -1198,8 +1198,59 @@ A new level is taken only once the lamp is settled: no gesture playing or waitin
 still (every joint under 1 count a second) and the arm not rising or folding, so a speed cap never drops
 under a joint still moving. On the host, a 480-count turn of the base lands in 1.12 s at level 5 and
 1.92 s at level 1. Every other bound (strain, load, tip, reach, the servo's own speed) is untouched.
-The table also holds each level's head roll standing, lean toward a listener and nod size; those are
-not applied yet (a later part of #6893), nor how often gestures play, which lives outside the body.
+The same level also sets the head's roll standing, a lean toward a listener and the size of a nod
+while it speaks (`energy.rs` `TABLE`):
+
+| level | head roll standing, counts | listening lean, shoulder/elbow | nod x |
+|---|---|---|---|
+| 1 | the unit's (`--stand-roll`, none in the product) | none | 1.0 |
+| 2 | the unit's | none | 1.1 |
+| 3 | 120 | -10/-15 | 1.2 |
+| 4 | 160 | -20/-25 | 1.3 |
+| 5 | 200 | -25/-30 | 1.4 |
+
+- **Roll.** `Limits::at` raises `stand_roll` to the level's, never under the unit's. It is the head's
+  roll reach once stood, so it widens the moods' bounds (listening tilts 0.85 of it, about 170 counts
+  at level 5), a holder's pose and its glance, gestures (a clip's roll is laid over the pose instead of
+  dropped once `stand_roll` passes `roll`, played under the servo's speed by the stretch below) and the
+  tilting shifts at rest. Tilting stood up needs a stand: a body started without `--stand` keeps the
+  roll it was given at every level and says so once in the journal; it starts as ever. The roll's goal
+  moves no faster than `ROLL_SPEED` (300 counts a second, acceleration 6x; `Limits::for_roll`) at any
+  level, never under the unit's speed, while the rest of the pose takes the level's: at 800 a listening
+  tilt that swapped sides (about 340 counts) left the servo about 95 counts behind at a load of about
+  210, and the head met resistance on its roll 1 and 3 times in two level-5 windows against 0 at level 1
+  (lamp-52e6, row-6893g, 15 Nov).
+- **Nod.** Speaking, what Expression asks of the head (its nods as speech pauses) is scaled by the
+  level's share before `EXPRESSION_REACH` cuts it, so a nod never goes past that reach (60 counts of
+  pitch): on the host Expression's 30 counts nod 30 at level 1 and 42 at level 5.
+- **Listening lean (#6891).** `mood_lean(mood, level)`: speaking and reading lean `LEAN` at every level
+  (as above); listening leans the level's own, eased in as the speaking lean is, and from one to the
+  other at the same pace. Not for its name alone (`--look-at-name`), and let go while a hand on the
+  lamp is given way to; a strain sits it down as ever, and V1's anti-tip rule cuts any lean back past
+  its line (on the host, a stand at the line keeps the arm where level 1 has it).
+
+How often clips start of themselves per level is `energy.rs` `GESTURE`, read under the same switch by
+the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body's reader):
+
+| level | fill (answers with no cue) | fill gap, s | pause nod gap, s | `lively` cooldown | rearm |
+|---|---|---|---|---|---|
+| 1 | none | - | the catalogue's (4) | as written (music sway 30 min) | as written |
+| 2 | 10% | 60 | 3.75 | 20 min | as written |
+| 3 | 20% | 45 | 3.5 | 15 min | as written |
+| 4 | 30% | 30 | 3.25 | 10 min | none |
+| 5 | 40% | 20 | 3 | 6 min | none |
+
+- **Fill.** The voice (`body_link::Cue::heard_lively`): an answer whose opening `cue_for` gives no
+  gesture gets a nod, an acknowledge or a curious at the level's share, never within the gap of the
+  last fill and never the last fill again. A matched cue is sent as before at every level.
+- **Pause nod.** Expression's pause clip waits `pause_cooldown_us`: the catalogue's cooldown at level 1,
+  else the level's gap, never longer than the catalogue's and never under 3 s.
+- **Music.** A skill trigger with `lively = true` (Music sway, [skills.md](skills.md)): its cooldown at
+  most the level's, never longer than written; from level 4 its rearm is dropped.
+- **Under lamp-control's lease.** A fill, and a lively skill's gesture or move above level 1, say
+  `"lively": true` on the mood socket (`Asked::lively`): the body drops it while lamp-control holds it
+  (`dropped: lamp-control holds it`). Every other gesture is taken under the lease as before, so level 1
+  is today exactly.
 
 ### A stand asked by voice
 
@@ -1835,7 +1886,8 @@ first words of what the lamp itself says (`crates/voice/src/body_link.rs`,
 `cue_for`): a nod with "yes", "sure", "of course", "okay"; a shake with "no",
 "nope", "I don't think"; a greeting with "hello", "hi", "good morning"; a
 laugh with "haha"; the shy dip with "thank you". Most answers begin with
-none of these and get no gesture. "No problem" and "no worries" get none.
+none of these and get no gesture (above energy level 1, a small fill:
+"How lively it moves" above). "No problem" and "no worries" get none.
 The same in Vietnamese: a nod with "ừ", "dạ", "vâng", "đúng rồi", "có chứ";
 a shake with "không", "chưa"; a greeting with "chào", "xin chào"; a laugh
 with "hihi"; the shy dip with "cảm ơn"; none for "không sao" and "không có

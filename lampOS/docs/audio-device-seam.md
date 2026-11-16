@@ -330,9 +330,22 @@ instead of ALSA:
   capture worker takes only `bus:` devices (`BusCapture`) and the speaker only
   `bus:speaker1`; a card name there is refused with "this build has no sound
   card". The `sim-macos` job runs clippy for `lamp-voice` and the lib tests of
-  `bus_speaker`, `bus_capture`, `audio_workers` and `peer_stop`, and one `transport` test of the
+  `bus_speaker`, `bus_capture`, `audio_workers`, `peer_stop` and `process::ring_startup_tests`, and one `transport` test of the
   receive side. The workflow's `lampOS/crates/voice/**` path also runs the Linux `sim` job on
   every voice change.
+
+**The ring worker is Linux only.** Every `worker ring` entry of the binary
+(`--caps`, `--continuous`, `--privacy --bus-root`, and the plain one) is
+compiled on Linux only. Off Linux `Worker::spawn_optional_ring_with_tick`
+therefore starts nothing: no child, no sockets, no `ring` directory. It runs
+the caller's mandatory supervision once (`on_wait`, so a privacy fault is
+still returned first) and answers `RingStartup::Unavailable { worker: None }`
+("the ring worker runs on Linux only"), the answer for a ring that never
+started: the coordinator latches it off with no restart, and the muted wait
+goes on without its light. The ring is a light, never a gate: nothing here
+touches the privacy worker, the gate or `state.allowed`. Until the Mac's
+privacy gate is settled (#6811), the real voice on a Mac is for `bus:`
+devices only, with no host microphone.
 
 Latency: the first block is published in the call that wrote it, with no
 thread, wait or copy beyond the one into the message. The sound the

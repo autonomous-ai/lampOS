@@ -216,6 +216,10 @@ impl Runs {
                 put_package(&self.root, self.package);
                 Ok(String::new())
             } else if line.ends_with(" --version") {
+                // It runs in the namespace script: none there, it fails.
+                if fs::metadata(on(&self.root, NS)).is_err() {
+                    return Err(format!("{NS}: No such file or directory"));
+                }
                 Ok("OpenClaw 2026.11.2\n".into())
             } else {
                 Ok(String::new())
@@ -283,11 +287,13 @@ fn install(lamp: &Lamp, runs: &Runs, at: u64) -> Option<OpenclawInstall> {
 }
 
 fn round(lamp: &Lamp, systemd: &mut Fake, skills: bool, at: u64) -> Option<OpenclawInstall> {
+    let runs = Runs::new(lamp);
     after_round(
         lamp.root(),
         &lamp.records(),
         sk(skills),
         systemd,
+        &mut runs.runner(),
         at,
         Ok(crate::hermes_schedule::Window::Reached),
         &mut quiet(),
@@ -1243,6 +1249,7 @@ fn an_ask_from_the_app_tries_a_recent_openclaw_failure_again() {
             &lamp.records(),
             sk(false),
             systemd,
+            &mut Runs::new(&lamp).runner(),
             at,
             Ok(crate::hermes_schedule::Window::Asked),
             &mut quiet(),
@@ -1336,42 +1343,124 @@ fn the_one_path_makes_openclaw_a_gateway_agent_and_off_changes_nothing() {
     assert!(!GATEWAY_DATA.contains("--local"));
     let ns = ns_text(on);
     assert!(ns.contains(
-        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\n"
+        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\nQ=/run/lampos-skill-start\n"
     ));
     assert!(!ns_text(sk(true)).contains("L=/run/lampos-control/control.sock"));
 }
 
-/// #6882: with the one run path on but LAMP_SKILL_GATEWAY_RUNS off,
-/// lamp-tasks refuses a gateway default agent's runs, so OpenClaw is shown
-/// exactly what it is with the one run path off: its namespace text and
-/// its wrapper byte for byte, no control socket, no pushed skills shown
-/// for every turn, no gateway mark. With both on, all three.
+/// #6685 (the lead): the one run path alone (`LAMP_SKILL_DEFAULT_AGENT`
+/// on, as Hermes's one run path wrapper) shows OpenClaw lamp-control's
+/// socket, the pushed skills and the gateway mark: no second switch. Its
+/// wrapper and namespace are byte for byte what both switches on wrote
+/// before (#6882's `one_path && gateway_runs`, built here the old way), so
+/// lamp-tasks' acceptance of that text holds. Off, as before #6685.
 #[test]
-fn gateway_runs_off_shows_openclaw_what_the_one_path_off_does() {
+fn the_one_path_alone_shows_openclaw_what_both_switches_did() {
     for skills in [false, true] {
-        let before = sk(skills);
-        let off = shown(skills, true, false);
-        assert_eq!(off, before);
-        assert_eq!(ns_text(off), ns_text(before));
-        assert_eq!(wrapper_text_for(off), wrapper_text_for(before));
-        assert_eq!(wrapper_text_for(off), wrapper_text());
-        // Without the one run path the runs switch alone changes nothing.
-        assert_eq!(shown(skills, false, true), before);
-        assert_eq!(shown(skills, false, false), before);
-        let ns = ns_text(off);
-        assert!(!ns.contains("/run/lampos-control/control.sock"), "{ns}");
-        assert!(!wrapper_text_for(off).contains(GATEWAY_MARK));
-
-        let on = shown(skills, true, true);
+        let on = shown(skills, true);
         assert!(on.tasks && on.one_path && on.skills == skills);
+        // Today's `one_path && gateway_runs` text, built the old way.
+        let old = Shown {
+            skills,
+            tasks: true,
+            one_path: true,
+        };
+        let old_wrapper = format!(
+            "#!/bin/sh\n{GATEWAY_MARK}{GATEWAY_DATA}{}",
+            wrapper_text().strip_prefix("#!/bin/sh\n").unwrap()
+        );
+        assert_eq!(wrapper_text_for(on).as_bytes(), old_wrapper.as_bytes());
+        assert_eq!(ns_text(on).as_bytes(), ns_text(old).as_bytes());
         let ns = ns_text(on);
-        assert!(ns.contains("L=/run/lampos-control/control.sock"), "{ns}");
+        assert!(ns.contains(
+            " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\nQ=/run/lampos-skill-start\n"
+        ), "{ns}");
         assert!(ns.contains("/var/lib/lampOS/skills-dev, read-only, when there, for the\n"));
         assert!(ns.contains("if [ -d \"$P\" ]; then mkdir -m 0700"));
         assert!(!ns.contains("if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]"));
+        // The gateway form, never the per-run one: OpenClaw can't open its
+        // state outside its gateway's PID namespace.
         let wrapper = wrapper_text_for(on);
-        assert!(wrapper.starts_with(&format!("#!/bin/sh\n{GATEWAY_MARK}{GATEWAY_DATA}")));
+        assert!(wrapper.starts_with(&format!("#!/bin/sh\n{GATEWAY_MARK}")));
+        assert!(!wrapper.contains(agent_ns::wrapper::ONE_PATH_MARK));
+        assert!(wrapper[..512].contains(agent_ns::wrapper::MARK));
+
+        // Off: byte for byte as before #6685.
+        let before = sk(skills);
+        let off = shown(skills, false);
+        assert_eq!(off, before);
+        assert_eq!(ns_text(off), ns_text(before));
+        assert_eq!(wrapper_text_for(off), wrapper_text());
+        assert!(!ns_text(off).contains("/run/lampos-control/control.sock"));
+        assert!(!wrapper_text_for(off).contains(GATEWAY_MARK));
     }
+}
+
+/// #6685 (the lead): lamp-update reads no gateway runs switch of its own,
+/// in any of the files that decide what OpenClaw is shown.
+#[test]
+fn lamp_update_reads_no_gateway_runs_switch() {
+    let switch = concat!("LAMP_SKILL_", "GATEWAY_RUNS");
+    for (name, source) in [
+        (
+            "openclaw_install.rs",
+            include_str!("../openclaw_install.rs"),
+        ),
+        ("switches.rs", include_str!("../switches.rs")),
+        ("agent_ns.rs", include_str!("../agent_ns.rs")),
+        ("main.rs", include_str!("../main.rs")),
+        ("hermes_install.rs", include_str!("../hermes_install.rs")),
+    ] {
+        assert!(!source.contains(switch), "{name} reads {switch}");
+        assert!(!source.contains("GATEWAY_RUNS_SWITCH"), "{name}");
+        assert!(!source.contains("gateway_runs"), "{name}");
+    }
+}
+
+/// #6685 (the lead): nothing the one run path changes writes OpenClaw's
+/// shared config ([`CONFIG`]). The one write of it in lamp-update is the
+/// install's own `gateway` block ([`gateway_config`], the gateway's token,
+/// as before #6685), which takes no [`Shown`]: the switches never reach it.
+/// The written wrapper and namespace never name it.
+#[test]
+fn the_one_path_writes_nothing_to_openclaws_shared_config() {
+    let source = include_str!("../openclaw_install.rs");
+    let code = source.split("\n#[cfg(test)]").next().unwrap();
+    assert_eq!(code.matches("on(root, CONFIG)").count(), 1);
+    let writer = code
+        .split_once("fn gateway_config(")
+        .unwrap()
+        .1
+        .split_once("\n}\n")
+        .unwrap()
+        .0;
+    assert!(writer.contains("on(root, CONFIG)"));
+    assert!(!writer.contains("Shown"));
+    assert!(
+        !code.contains("CONFIG, "),
+        "CONFIG handed to another writer"
+    );
+    for skills in [false, true] {
+        for one_path in [false, true] {
+            let shown = shown(skills, one_path);
+            assert!(!wrapper_text_for(shown).contains("openclaw.json"));
+            assert!(!ns_text(shown).contains("openclaw.json"));
+        }
+    }
+    // And the files `shown` reaches are the wrapper and the namespace
+    // script alone, never the config.
+    let entry_points = code
+        .split_once("fn write_entry_points(root: &Path, shown: Shown)")
+        .unwrap()
+        .1
+        .split_once("\n}\n")
+        .unwrap()
+        .0;
+    assert!(entry_points.contains("write_root_file(root, NS, &ns_text(shown), 0o755)"));
+    assert!(
+        entry_points.contains("write_root_file(root, WRAPPER, &wrapper_text_for(shown), 0o755)")
+    );
+    assert!(!entry_points.contains("CONFIG"));
 }
 
 /// The one run path is carried through the one-shot's ask, so its
@@ -1565,5 +1654,1016 @@ fn the_gateways_namespace_shows_the_pushed_skills_read_only_with_the_one_path() 
         // No model socket and no relay without LAMP_NS_NET, either way.
         assert!(!lines.iter().any(|line| line.contains("model.sock")));
         assert!(!lines.iter().any(|line| line.contains("net-relay")));
+    }
+}
+
+/// The one run path's launcher and its socket folder (#6685): fixed
+/// root paths, never under Harness's project, which every gateway agent
+/// can write.
+#[test]
+fn the_launcher_is_a_fixed_root_path_outside_the_work_folder() {
+    assert_eq!(SKILL_START, "/usr/local/lib/lampos/skill-start");
+    assert_eq!(START_SOCKET_DIR, "/run/lampos-skill-start");
+    // Never under lamp-tasks' runtime folder, which its restart wipes.
+    assert!(!START_SOCKET_DIR.starts_with("/run/lampos-tasks"));
+    assert_eq!(TASKS_BINARY, "/opt/lampOS/tasks/current/lamp-tasks");
+    assert_eq!(Path::new(SKILL_START).parent(), Path::new(NS).parent());
+    for path in [SKILL_START, START_SOCKET_DIR] {
+        assert!(!ALLOWED.iter().any(|shown| path.starts_with(shown)));
+    }
+}
+
+fn one_path() -> Shown {
+    shown(true, true)
+}
+
+const TASKS_BYTES: &[u8] = b"\x7fELF a stand-in for lamp-tasks";
+
+/// The installed lamp-tasks, with `bytes`.
+fn tasks_there(lamp: &Lamp, bytes: &[u8]) {
+    let at = lamp.at(TASKS_BINARY);
+    fs::create_dir_all(at.parent().unwrap()).unwrap();
+    fs::write(at, bytes).unwrap();
+}
+
+/// The approvals lines of `runs`.
+fn approvals(runs: &Runs) -> Vec<String> {
+    runs.lines()
+        .into_iter()
+        .filter(|line| line.contains(" approvals "))
+        .collect()
+}
+
+/// An allow-list edit as lamp-update runs it: as `lampos`, through the
+/// wrapper, into the running gateway.
+fn approvals_line(edit: &str, agent: &str, path: &str) -> String {
+    format!("{AS_LAMPOS}{WRAPPER} approvals allowlist {edit} --gateway --agent {agent} {path}")
+}
+
+fn on_lines() -> [String; 3] {
+    [
+        approvals_line("add", "main", SKILL_START),
+        approvals_line("remove", "main", OLD_RUN_START),
+        approvals_line("remove", "lamp-skill-run", OLD_RUN_START),
+    ]
+}
+
+/// An install with this build's own pins, as the one-shot runs it over
+/// an OpenClaw already there.
+fn install_built(lamp: &Lamp, runs: &Runs, at: u64) -> Option<OpenclawInstall> {
+    let mut run = runs.runner();
+    install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut run,
+        &mut || at,
+        &mut quiet(),
+        &Kit::BUILT,
+    )
+    .unwrap()
+}
+
+fn round_shown(lamp: &Lamp, systemd: &mut Fake, shown: Shown) -> Option<OpenclawInstall> {
+    round_with(lamp, systemd, shown, &Runs::new(lamp))
+}
+
+/// A round whose commands `runs` answers and logs.
+fn round_with(
+    lamp: &Lamp,
+    systemd: &mut Fake,
+    shown: Shown,
+    runs: &Runs,
+) -> Option<OpenclawInstall> {
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        shown,
+        systemd,
+        &mut runs.runner(),
+        10,
+        Ok(crate::hermes_schedule::Window::Reached),
+        &mut quiet(),
+    )
+}
+
+/// #6685: with the one run path on, the install writes the launcher (a
+/// byte copy of lamp-tasks, 0755), restarts the gateway, then gives agent
+/// `main` the launcher's exact path through the running gateway as
+/// `lampos` and takes the earlier glob out of `main` and the withdrawn
+/// fence agent; never through OpenClaw's config.
+#[test]
+fn the_one_path_lets_agent_main_run_the_launcher_alone() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    assert!(lamp.asked().unwrap().one_path);
+    let runs = Runs::new(&lamp);
+    let said = install(&lamp, &runs, 20).unwrap();
+    assert_eq!(said.install, "installed", "{:#?}", runs.lines());
+    assert!(said.exec_allowlist);
+    assert_eq!(fs::read(lamp.at(SKILL_START)).unwrap(), TASKS_BYTES);
+    assert!(
+        fs::symlink_metadata(lamp.at(SKILL_START))
+            .unwrap()
+            .is_file()
+    );
+    assert_eq!(mode(&lamp.at(SKILL_START)), 0o755);
+    assert_eq!(approvals(&runs), on_lines());
+    assert_eq!(
+        fs::read_to_string(lamp.unit()).unwrap(),
+        unit_text_for(one_path())
+    );
+    let made = runs.position(&format!(
+        "install -d -o lampos -g lampos -m 0755 {START_SOCKET_DIR}"
+    ));
+    let restart = runs.position(&format!("systemctl restart {UNIT}"));
+    assert!(
+        made < restart
+            && runs.position("systemctl try-restart lamp-tasks.service") < restart
+            && restart < runs.position(&format!("systemctl is-active --quiet {UNIT}"))
+            && restart < runs.position(" approvals allowlist add ")
+    );
+    assert!(
+        !approvals(&runs)
+            .iter()
+            .any(|line| line.contains("openclaw.json")
+                || line.contains("approvals set")
+                || line.contains(NS)
+                || line.contains('*') && line.contains(" add "))
+    );
+    let config: serde_json::Value =
+        serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap();
+    assert_eq!(
+        config.as_object().unwrap().keys().collect::<Vec<_>>(),
+        ["gateway"]
+    );
+
+    // Done: a round asks nothing, and an install asked again runs no
+    // approvals command and leaves the launcher as it is.
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    assert_eq!(lamp.asked(), None);
+    let written = fs::metadata(lamp.at(SKILL_START)).unwrap().ino();
+    ask(&lamp.records(), false, one_path()).unwrap();
+    let again = Runs::new(&lamp);
+    assert!(install_built(&lamp, &again, 30).unwrap().exec_allowlist);
+    assert_eq!(approvals(&again), Vec::<String>::new());
+    assert_eq!(fs::metadata(lamp.at(SKILL_START)).unwrap().ino(), written);
+}
+
+/// A new lamp-tasks: the round sees the launcher is not its copy and asks
+/// the one-shot, which writes it again without installing anything.
+#[test]
+fn the_launcher_follows_the_installed_lamp_tasks() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+    round_shown(&lamp, &mut systemd, one_path());
+    assert_eq!(lamp.asked(), None);
+
+    tasks_there(&lamp, b"\x7fELF the next lamp-tasks");
+    round_shown(&lamp, &mut systemd, one_path());
+    assert!(lamp.asked().unwrap().one_path, "asked again");
+    let runs = Runs::new(&lamp);
+    let said = install_built(&lamp, &runs, 40).unwrap();
+    assert!(said.install == "installed" && said.exec_allowlist);
+    assert_eq!(
+        fs::read(lamp.at(SKILL_START)).unwrap(),
+        b"\x7fELF the next lamp-tasks"
+    );
+    assert_eq!(mode(&lamp.at(SKILL_START)), 0o755);
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line.contains(NPM_CI_ENV) || line.contains("systemctl restart"))
+    );
+
+    // A mode not 0755 is due too.
+    fs::set_permissions(lamp.at(SKILL_START), fs::Permissions::from_mode(0o775)).unwrap();
+    assert!(launcher_due(lamp.root(), one_path()));
+}
+
+/// An OpenClaw installed by an earlier build (the glob's, or none): the
+/// round asks the one-shot, which writes the launcher and edits the
+/// allow-list without installing anything again.
+#[test]
+fn an_openclaw_installed_before_the_launcher_gets_it() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+    let mut old = lamp.said().unwrap();
+    old.exec_allowlist = false;
+    write(&lamp.records(), old);
+    tasks_there(&lamp, TASKS_BYTES);
+
+    round_shown(&lamp, &mut systemd, one_path());
+    assert!(lamp.asked().unwrap().one_path, "asked again");
+    let runs = Runs::new(&lamp);
+    let said = install_built(&lamp, &runs, 40).unwrap();
+    assert!(said.install == "installed" && said.exec_allowlist);
+    assert_eq!(fs::read(lamp.at(SKILL_START)).unwrap(), TASKS_BYTES);
+    assert_eq!(approvals(&runs), on_lines());
+    assert!(!runs.lines().iter().any(|line| line.contains(NPM_CI_ENV)));
+}
+
+/// An add that fails (the gateway not answering yet) is not done: the
+/// install is still `installed`, the entry points stay, the record says
+/// no entry, and the next round asks again; the next try adds it.
+#[test]
+fn a_failed_add_is_retried_and_never_fails_the_install() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    let runs = Runs {
+        fail_on: Some(" approvals allowlist add "),
+        ..Runs::new(&lamp)
+    };
+    let said = install(&lamp, &runs, 20).unwrap();
+    assert_eq!(
+        (said.install.as_str(), said.error.as_deref()),
+        ("installed", None)
+    );
+    assert!(!said.exec_allowlist);
+    assert!(lamp.at(WRAPPER).exists() && lamp.at(NS).exists() && lamp.at(SKILL_START).exists());
+    assert_eq!(approvals(&runs), on_lines(), "the removes still run");
+
+    round_shown(&lamp, &mut systemd, one_path());
+    assert!(lamp.asked().unwrap().one_path, "asked again");
+    let runs = Runs::new(&lamp);
+    assert!(install_built(&lamp, &runs, 30).unwrap().exec_allowlist);
+    assert_eq!(
+        approvals(&runs)[0],
+        approvals_line("add", "main", SKILL_START)
+    );
+}
+
+/// The gateway not running: nothing is run against it, said, and retried.
+#[test]
+fn no_gateway_running_leaves_the_allow_list_for_the_next_round() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+    let mut old = lamp.said().unwrap();
+    old.exec_allowlist = false;
+    write(&lamp.records(), old);
+    ask(&lamp.records(), false, one_path()).unwrap();
+    let runs = Runs {
+        fail_on: Some(" is-active "),
+        ..Runs::new(&lamp)
+    };
+    let said = install_built(&lamp, &runs, 30).unwrap();
+    assert!(said.install == "installed" && !said.exec_allowlist);
+    assert_eq!(approvals(&runs), Vec::<String>::new());
+}
+
+/// A remove that fails is passed over: the add still counts.
+#[test]
+fn a_failed_remove_is_not_fatal() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    let runs = Runs {
+        fail_on: Some(" approvals allowlist remove "),
+        ..Runs::new(&lamp)
+    };
+    let said = install(&lamp, &runs, 20).unwrap();
+    assert!(said.install == "installed" && said.exec_allowlist);
+    assert_eq!(approvals(&runs), on_lines());
+}
+
+/// With the one run path off, the install takes the launcher and agent
+/// `main`'s entries out (failures passed over), and adds nothing.
+#[test]
+fn the_one_path_off_takes_the_launcher_and_the_entries_out() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+    assert!(lamp.at(SKILL_START).exists());
+    fs::write(lamp.at(START_SOCKET_DIR).join("start.sock"), "").unwrap();
+
+    // Off: the round sees the entry recorded and the launcher there.
+    round_shown(&lamp, &mut systemd, sk(true));
+    assert!(!lamp.asked().unwrap().one_path, "asked with it off");
+    let runs = Runs {
+        fail_on: Some(" approvals allowlist remove "),
+        ..Runs::new(&lamp)
+    };
+    let said = install(&lamp, &runs, 30).unwrap();
+    assert!(said.install == "installed" && !said.exec_allowlist);
+    assert!(fs::symlink_metadata(lamp.at(SKILL_START)).is_err());
+    assert!(fs::symlink_metadata(lamp.at(START_SOCKET_DIR)).is_err());
+    assert_eq!(fs::read_to_string(lamp.unit()).unwrap(), UNIT_TEXT);
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line.contains(START_SOCKET_DIR))
+    );
+    assert_eq!(
+        approvals(&runs),
+        [
+            approvals_line("remove", "main", SKILL_START),
+            approvals_line("remove", "main", OLD_RUN_START)
+        ]
+    );
+    assert!(!launcher_due(lamp.root(), sk(true)));
+    round_shown(&lamp, &mut systemd, sk(true));
+    assert_eq!(lamp.asked(), None, "nothing left to do");
+}
+
+/// #6685: a factory reset wipes OpenClaw's approvals and keeps the
+/// record (`exec_allowlist` true): every round with the gateway up runs
+/// agent `main`'s add again (only it: no remove, no install, no one-shot).
+/// An add refused marks the record and asks the one-shot; with the
+/// gateway down the round runs nothing and keeps the record.
+#[test]
+fn every_round_adds_agent_mains_entry_again_with_the_gateway_up() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+    assert!(lamp.said().unwrap().exec_allowlist);
+
+    for _ in 0..2 {
+        let runs = Runs::new(&lamp);
+        assert_eq!(round_with(&lamp, &mut systemd, one_path(), &runs), None);
+        assert_eq!(
+            approvals(&runs),
+            [approvals_line("add", "main", SKILL_START)]
+        );
+        assert!(
+            runs.position(&format!("systemctl is-active --quiet {UNIT}"))
+                < runs.position(" approvals ")
+        );
+        assert_eq!(lamp.asked(), None, "no one-shot");
+        assert!(lamp.said().unwrap().exec_allowlist);
+    }
+
+    let down = Runs {
+        fail_on: Some(" is-active "),
+        ..Runs::new(&lamp)
+    };
+    round_with(&lamp, &mut systemd, one_path(), &down);
+    assert_eq!(approvals(&down), Vec::<String>::new());
+    assert!(lamp.said().unwrap().exec_allowlist && lamp.asked().is_none());
+
+    let refused = Runs {
+        fail_on: Some(" approvals allowlist add "),
+        ..Runs::new(&lamp)
+    };
+    round_with(&lamp, &mut systemd, one_path(), &refused);
+    assert!(!lamp.said().unwrap().exec_allowlist);
+    assert!(lamp.asked().unwrap().one_path, "the one-shot is asked");
+    let runs = Runs::new(&lamp);
+    assert!(install_built(&lamp, &runs, 40).unwrap().exec_allowlist);
+    assert_eq!(approvals(&runs), on_lines());
+
+    // With the one run path off, a round adds nothing.
+    let off = Runs::new(&lamp);
+    round_with(&lamp, &mut systemd, sk(true), &off);
+    assert!(!approvals(&off).iter().any(|line| line.contains(" add ")));
+}
+
+/// #7135 (c0a4's reboot #3, 22:59:00): a round right after a boot found
+/// the gateway active but not ready ("Config unavailable"), read it as the
+/// entry gone, and asked the one-shot, which reinstalled OpenClaw. Not
+/// ready is unknown: the add is asked again until taken; never taken, the
+/// record keeps the entry and nothing is asked. Another refusal still
+/// marks the record and asks the one-shot, once.
+#[test]
+fn a_round_reads_a_gateway_not_ready_as_unknown_never_as_the_entry_gone() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+    assert!(lamp.said().unwrap().exec_allowlist && lamp.asked().is_none());
+
+    let round = |systemd: &mut Fake, run: &mut Runner| {
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            one_path(),
+            systemd,
+            run,
+            30,
+            Ok(crate::hermes_schedule::Window::Reached),
+            &mut quiet(),
+        )
+    };
+    let not_ready = [
+        format!("{CONFIG_NOT_READY}; cannot validate --agent."),
+        format!("/usr/bin/env: {NODE_NOT_READY}"),
+    ];
+    for why in &not_ready {
+        // Not ready twice, then taken: one round, the entry kept.
+        let mut adds = 0;
+        let mut run = |argv: &[String]| -> Result<String, String> {
+            if argv.iter().any(|arg| arg == "add") {
+                adds += 1;
+                if adds < 3 {
+                    return Err(why.clone());
+                }
+            }
+            Ok(String::new())
+        };
+        round(&mut systemd, &mut run);
+        assert_eq!(adds, 3, "{why}");
+        assert!(lamp.said().unwrap().exec_allowlist, "{why}");
+        assert_eq!(lamp.asked(), None, "{why}");
+
+        // Never ready in the round: unknown, nothing marked or asked.
+        let mut adds = 0;
+        let mut run = |argv: &[String]| -> Result<String, String> {
+            if argv.iter().any(|arg| arg == "add") {
+                adds += 1;
+                return Err(why.clone());
+            }
+            Ok(String::new())
+        };
+        round(&mut systemd, &mut run);
+        assert_eq!(adds, ADD_TRIES, "{why}");
+        assert!(lamp.said().unwrap().exec_allowlist, "{why}");
+        assert_eq!(lamp.asked(), None, "no reinstall: {why}");
+    }
+
+    // Another refusal: marked and asked, not tried again.
+    let mut adds = 0;
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        if argv.iter().any(|arg| arg == "add") {
+            adds += 1;
+            return Err("unknown agent".into());
+        }
+        Ok(String::new())
+    };
+    round(&mut systemd, &mut run);
+    assert_eq!(adds, 1);
+    assert!(!lamp.said().unwrap().exec_allowlist);
+    assert!(lamp.asked().unwrap().one_path, "the one-shot is asked");
+}
+
+/// The one run path switched off with the gateway down: nothing is run,
+/// and the record keeps the entry, so the next round asks again; with
+/// the gateway up, the removes run and the record drops it.
+#[test]
+fn a_switch_off_with_the_gateway_down_is_retried_until_the_removes_run() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+
+    round_shown(&lamp, &mut systemd, sk(true));
+    assert!(!lamp.asked().unwrap().one_path);
+    let down = Runs {
+        fail_on: Some(" is-active "),
+        ..Runs::new(&lamp)
+    };
+    let said = install_built(&lamp, &down, 30).unwrap();
+    assert!(said.install == "installed" && said.exec_allowlist);
+    assert_eq!(approvals(&down), Vec::<String>::new());
+
+    // Again with the gateway down, OpenClaw now there as off wants it
+    // (nothing installed): still kept.
+    round_shown(&lamp, &mut systemd, sk(true));
+    assert!(present(lamp.root(), sk(true)) && !lamp.asked().unwrap().one_path);
+    let down = Runs {
+        fail_on: Some(" is-active "),
+        ..Runs::new(&lamp)
+    };
+    let said = install_built(&lamp, &down, 35).unwrap();
+    assert!(said.install == "installed" && said.exec_allowlist);
+    assert!(!down.lines().iter().any(|line| line.contains(NPM_CI_ENV)));
+
+    round_shown(&lamp, &mut systemd, sk(true));
+    assert!(!lamp.asked().unwrap().one_path, "asked again");
+    let up = Runs::new(&lamp);
+    let said = install_built(&lamp, &up, 40).unwrap();
+    assert!(said.install == "installed" && !said.exec_allowlist);
+    assert_eq!(
+        approvals(&up),
+        [
+            approvals_line("remove", "main", SKILL_START),
+            approvals_line("remove", "main", OLD_RUN_START)
+        ]
+    );
+    round_shown(&lamp, &mut systemd, sk(true));
+    assert_eq!(lamp.asked(), None, "nothing left to do");
+}
+
+/// OpenClaw off on the lamp: the launcher and the socket folder go with
+/// the entry points.
+#[test]
+fn openclaw_off_takes_the_launcher_out() {
+    let lamp = Lamp::new();
+    fs::write(lamp.at(SKILL_START), TASKS_BYTES).unwrap();
+    fs::write(lamp.at(WRAPPER), "old").unwrap();
+    fs::create_dir_all(lamp.at(START_SOCKET_DIR)).unwrap();
+    ask(&lamp.records(), true, Shown::default()).unwrap();
+    assert_eq!(install(&lamp, &Runs::new(&lamp), 9), None);
+    assert!(fs::symlink_metadata(lamp.at(SKILL_START)).is_err());
+    assert!(fs::symlink_metadata(lamp.at(START_SOCKET_DIR)).is_err());
+}
+
+/// The exact edits, on and off.
+#[test]
+fn the_allow_list_edits_name_the_launcher_exactly() {
+    assert_eq!(
+        exec_allowlist_args(one_path())[0],
+        [
+            "approvals",
+            "allowlist",
+            "add",
+            "--gateway",
+            "--agent",
+            "main",
+            SKILL_START
+        ]
+    );
+    for shown in [one_path(), sk(true)] {
+        for args in exec_allowlist_args(shown) {
+            assert_eq!(args[3], "--gateway");
+            assert!(args[2] == "remove" || args[6] == SKILL_START);
+        }
+    }
+    assert!(
+        exec_allowlist_args(sk(true))
+            .iter()
+            .all(|args| args[2] == "remove")
+    );
+}
+
+/// #6685: with the one run path on, the gateway's unit makes the start
+/// socket folder at each start and keeps it past a stop; off, the unit is
+/// as before, byte for byte.
+#[test]
+fn the_gateway_unit_keeps_the_start_socket_folder_with_the_one_path() {
+    assert_eq!(unit_text_for(sk(true)), UNIT_TEXT);
+    assert_eq!(unit_text_for(Shown::default()), UNIT_TEXT);
+    let on = unit_text_for(one_path());
+    assert_eq!(
+        on.replacen(START_DIR_LINES, "", 1).replace(
+            "After=network-online.target lamp-cloud.service lamp-control.service\nWants=lamp-control.service\n",
+            "After=network-online.target lamp-cloud.service\n"
+        ),
+        UNIT_TEXT
+    );
+    for line in [
+        "RuntimeDirectory=lampos-skill-start",
+        "RuntimeDirectoryMode=0755",
+        "RuntimeDirectoryPreserve=yes",
+    ] {
+        assert_eq!(on.lines().filter(|l| *l == line).count(), 1, "{line}");
+    }
+    assert_eq!(format!("/run/{}", "lampos-skill-start"), START_SOCKET_DIR);
+    let service = on.find("[Service]").unwrap();
+    assert!(on.find("RuntimeDirectory=").unwrap() > service);
+    assert!(on.find("RuntimeDirectory=").unwrap() < on.find("ExecStart=").unwrap());
+}
+
+/// #6685: with the one run path on, the gateway's namespace shows the
+/// start socket folder read-only, skipped when it is not there; off,
+/// never touched.
+#[test]
+fn the_gateways_namespace_shows_the_start_socket_folder_read_only() {
+    for (one_path, folder_there) in [(false, true), (true, true), (true, false)] {
+        let lines = run_ns_stubbed(one_path, |at| {
+            if folder_there {
+                fs::create_dir_all(at(START_SOCKET_DIR)).unwrap();
+            }
+        });
+        let (stage, start) = lines.1;
+        let lines = lines.0;
+        let wanted = [
+            format!("mkdir -m 0700 {stage}/q"),
+            format!("mount --bind {start} {stage}/q"),
+            format!("mount --move {stage}/q {start}"),
+            format!("mount -o remount,bind,ro,nosuid,nodev,relatime {start}"),
+            format!("rmdir {stage}/q"),
+        ];
+        if one_path && folder_there {
+            let places: Vec<usize> = wanted
+                .iter()
+                .map(|line| {
+                    lines
+                        .iter()
+                        .position(|l| l == line)
+                        .unwrap_or_else(|| panic!("no `{line}` in {lines:#?}"))
+                })
+                .collect();
+            assert!(places.is_sorted(), "{lines:#?}");
+        } else {
+            assert!(
+                !lines.iter().any(|line| line.contains("lampos-skill-start")),
+                "{lines:#?}"
+            );
+        }
+    }
+    let on = ns_text(one_path());
+    for line in [
+        "\nQ=/run/lampos-skill-start\n",
+        "if [ -d \"$Q\" ]; then mkdir -m 0700 \"$S/q\" && mount --bind \"$Q\" \"$S/q\" || fail \"no $Q\"; else Q=; fi\n",
+        "if [ -n \"$Q\" ]; then mkdir -p \"$Q\" && mount --move \"$S/q\" \"$Q\" && ro \"$Q\" || fail \"$Q not shown\"; fi\n",
+    ] {
+        assert_eq!(on.matches(line).count(), 1, "{line}");
+    }
+    for shown in [sk(false), sk(true)] {
+        assert!(!ns_text(shown).contains("lampos-skill-start"));
+    }
+}
+
+/// [`ns_text`] for `one_path` (tasks on, skills off) run under `sh` with
+/// every mount stubbed on a stand-in root `made` fills, no `LAMP_NS_NET`
+/// (as the gateway's unit runs it): the stubs' log, and the staging folder
+/// and [`START_SOCKET_DIR`] as the script names them.
+fn run_ns_stubbed(
+    one_path: bool,
+    made: impl Fn(&dyn Fn(&str) -> String),
+) -> (Vec<String>, (String, String)) {
+    let folder = tempfile::tempdir().unwrap();
+    let base = folder.path().to_string_lossy().into_owned();
+    let at = |path: &str| format!("{base}/root{path}");
+    let stubs = folder.path().join("stubs");
+    fs::create_dir_all(&stubs).unwrap();
+    let log = folder.path().join("log");
+    let resolv = at("/run/systemd/resolve/stub-resolv.conf");
+    for dir in [
+        PLACE,
+        WORK,
+        SKILLS,
+        "/etc/lampOS",
+        "/dev/shm",
+        "/run/systemd/resolve",
+    ] {
+        fs::create_dir_all(at(dir)).unwrap();
+    }
+    made(&at);
+    fs::write(&resolv, "nameserver 127.0.0.53\n").unwrap();
+    let uid_map = folder.path().join("uid_map");
+    fs::write(&uid_map, "         0        996          1\n").unwrap();
+    let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
+                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; readlink) echo \"$RESOLV\";; \
+                unshare) echo ran;; esac\n";
+    for name in [
+        "mount", "findmnt", "mkdir", "rmdir", "rm", "touch", "readlink", "unshare", "ip",
+    ] {
+        let path = stubs.join(name);
+        fs::write(&path, stub).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let mut text = ns_text(Shown {
+        skills: false,
+        tasks: true,
+        one_path,
+    });
+    let moved = [
+        "/var/tmp",
+        "/var/lib",
+        "/etc/lampOS",
+        "/etc/resolv.conf",
+        "/dev/shm",
+        "/tmp",
+        "/run",
+    ];
+    for (n, path) in moved.iter().enumerate() {
+        text = text.replace(path, &format!("\u{1}{n}\u{1}"));
+    }
+    for (n, path) in moved.iter().enumerate() {
+        text = text.replace(&format!("\u{1}{n}\u{1}"), &at(path));
+    }
+    let text = text
+        .replace("/proc/self/uid_map", &uid_map.to_string_lossy())
+        .replace("/usr/bin/unshare", &stubs.join("unshare").to_string_lossy());
+    let script = folder.path().join("openclaw-ns");
+    fs::write(&script, text).unwrap();
+    let out = std::process::Command::new("/bin/sh")
+        .arg(&script)
+        .arg("gateway")
+        .current_dir(at(WORK))
+        .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
+        .env("LOG", &log)
+        .env("RESOLV", &resolv)
+        .env("LAMP_NS_UID", "996")
+        .env("LAMP_NS_GID", "994")
+        .env_remove("LAMP_NS_NET")
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{out:?}");
+    let lines = fs::read_to_string(&log)
+        .unwrap()
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    (lines, (at("/tmp/.lampos-ns"), at(START_SOCKET_DIR)))
+}
+
+/// The namespace lamp-update writes for OpenClaw with the one run path
+/// holds, byte for byte, the line lamp-tasks reads as it showing
+/// lamp-control's socket (`lamp_tasks::skill_task::AGENT_NS_TASKS_LINE`,
+/// the contract between the two): without it, lamp-tasks refuses every
+/// skill's run on OpenClaw as "doesn't show lamp-control's socket"
+/// (c0a4's #7133 dry run, 15 Nov, when `Q=` went inside that line).
+#[test]
+fn the_openclaw_namespace_keeps_the_line_lamp_tasks_reads() {
+    const AGENT_NS_TASKS_LINE: &str = " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\n";
+    for skills in [false, true] {
+        let ns = ns_text(shown(skills, true));
+        assert_eq!(ns.matches(AGENT_NS_TASKS_LINE).count(), 1, "{ns}");
+        assert!(ns.contains("\nQ=/run/lampos-skill-start\n"), "{ns}");
+    }
+}
+
+/// #7135 (V2's HOLD, walk4 on a lamp): a one-shot whose gateway unit is an
+/// earlier build's (a binary ahead of its units) waits for the round that
+/// writes it: OpenClaw's wrapper, namespace script and gateway stay as
+/// they are, nothing is stopped, and the record is no failure. Once the
+/// round has written the unit, the same ask installs as before.
+#[test]
+fn an_earlier_builds_gateway_unit_waits_and_never_takes_openclaw_out() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round(&lamp, &mut systemd, true, 10).unwrap();
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 20).unwrap().install, "installed");
+    // An earlier build's unit and wrapper, as a staged binary finds them.
+    fs::write(
+        lamp.unit(),
+        "[Unit]\nDescription=an earlier build's gateway\n",
+    )
+    .unwrap();
+    fs::write(
+        lamp.at(WRAPPER),
+        "#!/bin/sh\n# an earlier build's wrapper\n",
+    )
+    .unwrap();
+    let ns_before = fs::read(lamp.at(NS)).unwrap();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    let said = install(&lamp, &runs, 30).unwrap();
+    assert_ne!(said.install, "failed", "{:#?}", runs.lines());
+    assert_eq!(
+        fs::read_to_string(lamp.at(WRAPPER)).unwrap(),
+        "#!/bin/sh\n# an earlier build's wrapper\n",
+        "left as it is"
+    );
+    assert_eq!(fs::read(lamp.at(NS)).unwrap(), ns_before, "left as it is");
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line.contains("systemctl stop")),
+        "{:#?}",
+        runs.lines()
+    );
+    // The round writes this build's unit and asks again: installed.
+    round(&lamp, &mut systemd, true, 40);
+    assert_eq!(
+        fs::read_to_string(lamp.unit()).unwrap(),
+        unit_text_for(sk(true))
+    );
+    let runs = Runs::new(&lamp);
+    if lamp.asked().is_none() {
+        lamp.ask();
+    }
+    assert_eq!(
+        install(&lamp, &runs, 50).unwrap().install,
+        "installed",
+        "{:#?}",
+        runs.lines()
+    );
+    assert_eq!(
+        fs::read_to_string(lamp.at(WRAPPER)).unwrap(),
+        wrapper_text_for(sk(true))
+    );
+}
+
+/// #7135 (c0a4's first run denied): a gateway just started answers the
+/// allow-list add "Config unavailable" until its config is read. The add
+/// is tried again until it is taken, so the install records the entry and
+/// a skill's first run is not denied; any other refusal is not retried.
+#[test]
+fn the_allowlist_add_is_tried_again_while_the_gateways_config_is_not_ready() {
+    let mut adds = 0;
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        if argv.iter().any(|arg| arg == "add") {
+            adds += 1;
+            if adds < 3 {
+                return Err(format!("{CONFIG_NOT_READY}: cannot validate --agent."));
+            }
+        }
+        Ok(String::new())
+    };
+    let shown = Shown {
+        one_path: true,
+        ..Shown::default()
+    };
+    assert_eq!(exec_allowlist(&mut run, shown, &mut quiet()), Some(true));
+    assert_eq!(adds, 3);
+
+    let mut adds = 0;
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        if argv.iter().any(|arg| arg == "add") {
+            adds += 1;
+            return Err("unknown agent".into());
+        }
+        Ok(String::new())
+    };
+    assert_eq!(exec_allowlist(&mut run, shown, &mut quiet()), Some(false));
+    assert_eq!(adds, 1, "another refusal is not retried");
+}
+
+/// #7135 (c0a4, 21:22:21, an update's one-shot): the add joined a gateway
+/// just restarted whose namespace did not show Node yet, then answered
+/// "Config unavailable". Both are tried again in the same one-shot, so the
+/// entry lands and a skill's first run after an update is not denied.
+#[test]
+fn the_allowlist_add_is_tried_again_while_the_gateways_node_is_not_there_yet() {
+    let mut adds = 0;
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        if argv.iter().any(|arg| arg == "add") {
+            adds += 1;
+            match adds {
+                1 | 2 => return Err(format!("/usr/bin/env: {NODE_NOT_READY}")),
+                3 => return Err(format!("{CONFIG_NOT_READY}: cannot validate --agent.")),
+                _ => {}
+            }
+        }
+        Ok(String::new())
+    };
+    let shown = Shown {
+        one_path: true,
+        ..Shown::default()
+    };
+    assert_eq!(exec_allowlist(&mut run, shown, &mut quiet()), Some(true));
+    assert_eq!(adds, 4);
+}
+
+/// #7135 (V2, 52e6 stuck): the package pinned already, the namespace
+/// script gone (a failed install took it out), the one-shot writes it
+/// again before `--version` runs in it, and installs; never `installer`
+/// on every try.
+#[test]
+fn a_pinned_package_with_its_namespace_script_gone_installs_again() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round(&lamp, &mut systemd, true, 10).unwrap();
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 20).unwrap().install, "installed");
+    fs::remove_file(lamp.at(NS)).unwrap();
+    fs::remove_file(lamp.at(WRAPPER)).unwrap();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    let said = install(&lamp, &runs, 30).unwrap();
+    assert_eq!(said.install, "installed", "{:#?}", runs.lines());
+    // The ask as written here: every switch off.
+    assert_eq!(
+        fs::read_to_string(lamp.at(NS)).unwrap(),
+        ns_text(Shown::default())
+    );
+    assert!(
+        !runs.lines().iter().any(|line| line.contains(NPM_CI_ENV)),
+        "pinned: no npm ci again"
+    );
+}
+
+/// Run the wait emitted into the real namespace script, with a real Unix
+/// socket and a fake clock, without mounts or root. Not there after 60
+/// waits (or a wait interrupted), it logs one line and goes on: never fails.
+#[test]
+fn gateway_control_socket_wait_is_bounded_and_never_fails() {
+    use std::os::unix::net::UnixListener;
+    use std::process::Command;
+    let ns = ns_text(one_path());
+    let start = ns.find("# Wait before the gateway captures").unwrap();
+    let end = ns[start..]
+        .find("# The bind below shows the socket")
+        .unwrap()
+        + start;
+    let wait = &ns[start..end];
+    for (mode, expected, waits) in [
+        ("ready", None, 0),
+        ("late", None, 1),
+        (
+            "missing",
+            Some("not there after 60 s; the gateway starts without it"),
+            60,
+        ),
+        (
+            "file",
+            Some("not there after 60 s; the gateway starts without it"),
+            60,
+        ),
+        (
+            "interrupted",
+            Some("wait interrupted; the gateway starts without it"),
+            1,
+        ),
+        ("install", None, 0),
+    ] {
+        // Short paths also fit macOS's Unix socket path limit.
+        let folder = tempfile::tempdir_in("/tmp").unwrap();
+        let socket = folder.path().join("control.sock");
+        let ready = folder.path().join("ready.sock");
+        let _listener = UnixListener::bind(if mode == "ready" { &socket } else { &ready }).unwrap();
+        if mode == "file" {
+            fs::write(&socket, "not a socket").unwrap();
+        }
+        let sleep = folder.path().join("sleep");
+        fs::write(&sleep, "#!/bin/sh\necho wait >> \"$WAIT_LOG\"\ncase $MODE in late) ln -s \"$READY_SOCKET\" \"$L\";; interrupted) exit 1;; esac\n").unwrap();
+        fs::set_permissions(&sleep, fs::Permissions::from_mode(0o755)).unwrap();
+        let log = folder.path().join("waits");
+        let output = Command::new("/bin/sh")
+            .args([
+                "-c",
+                &format!("fail() {{ echo \"$*\" >&2; exit 1; }}\n{wait}\necho ready"),
+            ])
+            .env("PATH", format!("{}:/usr/bin:/bin", folder.path().display()))
+            .env("L", &socket)
+            .env("READY_SOCKET", &ready)
+            .env("WAIT_LOG", &log)
+            .env("MODE", mode)
+            .env_remove("LAMP_OPENCLAW_GATEWAY")
+            .arg("namespace-test")
+            .args(if mode == "install" {
+                vec!["--version"]
+            } else {
+                vec!["gateway", "run"]
+            })
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{mode}: {output:?}");
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("ready"),
+            "{mode}"
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        match expected {
+            Some(line) => assert_eq!(
+                stderr.trim_end(),
+                format!("lampos ns: lamp-control's socket {line}"),
+                "{mode}"
+            ),
+            None => assert_eq!(stderr, "", "{mode}"),
+        }
+        assert_eq!(
+            fs::read_to_string(log).unwrap_or_default().lines().count(),
+            waits,
+            "{mode}"
+        );
+    }
+}
+
+#[test]
+fn gateway_waits_for_control_only_with_the_one_run_path() {
+    for skills in [false, true] {
+        for tasks in [false, true] {
+            for one_path in [false, true] {
+                let shown = Shown {
+                    skills,
+                    tasks,
+                    one_path,
+                };
+                let ns = ns_text(shown);
+                let unit = unit_text_for(shown);
+                assert_eq!(ns.contains(WAIT_FOR_CONTROL), tasks && one_path);
+                assert_eq!(
+                    unit.contains("Wants=lamp-control.service\n"),
+                    tasks && one_path
+                );
+                if tasks && one_path {
+                    assert!(unit.contains(
+                        "After=network-online.target lamp-cloud.service lamp-control.service\n"
+                    ));
+                    assert!(
+                        ns.find(WAIT_FOR_CONTROL).unwrap()
+                            < ns.find("mount --bind \"$L\"").unwrap()
+                    );
+                    assert!(!ns.contains("disappeared before bind"));
+                    assert!(!WAIT_FOR_CONTROL.contains("fail"));
+                }
+            }
+        }
     }
 }

@@ -1185,6 +1185,10 @@ fn worker_command(
             role,
             var(crate::skill_named::ENVIRONMENT).as_deref(),
         ))
+        .envs(told_when_asked_worker_environment(
+            role,
+            var(crate::told_when_asked::ENVIRONMENT).as_deref(),
+        ))
         .envs(make_skill_asked_worker_environment(
             role,
             var(crate::tools::make_skill_asked::ENVIRONMENT).as_deref(),
@@ -2024,6 +2028,18 @@ fn skill_named_worker_environment(
         .then_some((crate::skill_named::ENVIRONMENT, "on"))
 }
 
+// A skill the heard words named, its owner heard saying it, is kept as
+// their spoken ask, so its task's first yes may be asked in quiet hours
+// (`told_when_asked`, #7180): the exact `on`, to the second route, whose
+// named call it is.
+fn told_when_asked_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::told_when_asked::ENVIRONMENT, "on"))
+}
+
 // A plain ask to make a skill calls make_skill (`tools::make_skill_asked`,
 // #6835), passed the same narrow way: the exact `on`, to the second route,
 // whose chat can be made to call a function.
@@ -2318,6 +2334,8 @@ fn second_route_worker_environment(
         crate::made_skill::ENVIRONMENT,
         // A make it didn't make handed to the lamp's agent (#6059's proposal).
         crate::make_skill_agent::ENVIRONMENT,
+        // With the lamp's skill-creator guide given to that agent (13 Nov).
+        crate::make_skill_agent::GUIDE_ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).
         crate::remark_about_it::ENVIRONMENT,
@@ -2610,6 +2628,7 @@ mod tests {
             crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT,
             crate::made_skill::ENVIRONMENT,
             crate::make_skill_agent::ENVIRONMENT,
+            crate::make_skill_agent::GUIDE_ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
             crate::opens_further::ENVIRONMENT,
@@ -3190,6 +3209,13 @@ mod tests {
                         "LAMP_SKILL_NAMED",
                         ["second"].as_slice(),
                     ),
+                    // Its owner's spoken ask of a named skill kept: the
+                    // second route alone (#7180).
+                    (
+                        told_when_asked_worker_environment,
+                        "LAMP_TOLD_WHEN_ASKED",
+                        ["second"].as_slice(),
+                    ),
                     // A plain ask to make a skill calls make_skill: the
                     // second route alone (#6835).
                     (
@@ -3502,6 +3528,7 @@ mod tests {
                     crate::tools::reminders_asked::ENVIRONMENT,
                     crate::tools::skill_asked::ENVIRONMENT,
                     crate::skill_named::ENVIRONMENT,
+                    crate::told_when_asked::ENVIRONMENT,
                     crate::tools::make_skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
@@ -3628,6 +3655,7 @@ mod tests {
                     || name == crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT
                     || name == crate::made_skill::ENVIRONMENT
                     || name == crate::make_skill_agent::ENVIRONMENT
+                    || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
                     || name == crate::opens_further::ENVIRONMENT
@@ -3798,6 +3826,7 @@ mod tests {
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
+                    "LAMP_MAKE_AGENT_GUIDE=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MAKE_SKILL_AGENT=on",
                     "LAMP_MAKE_SKILL_ASKED=on",
@@ -3920,6 +3949,7 @@ mod tests {
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
+                    "LAMP_TOLD_WHEN_ASKED=on",
                     "LAMP_TURNED_FACE_SPEAKS=on",
                     "LAMP_TURNED_SPEAKING=on",
                     "LAMP_TWO_FACES_HELD=on",

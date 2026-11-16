@@ -14,20 +14,33 @@ writes `monitor` (#5883).
 
 ## The one page
 
-`/` is one page with a sidebar: **Overview, Timeline, Turns, Camera, Body,
-Health** (the lead's second step on #1711, 20 Oct, after V1's monitor;
-Timeline is #5883's second piece). One event
+`/` is one page with a sidebar: **Overview, Timeline, Turns, Tasks, Camera,
+Body, Health** (the lead's second step on #1711, 20 Oct, after V1's monitor;
+Timeline is #5883's second piece; Tasks is #7208's third step). One event
 stream (`GET /events`, server-sent events) keeps every section fresh: the
 camera's frame four times a second (`serve::PUSH_EVERY`), the others once a
 second. Each section is HTML made and escaped on the lamp (`crates/peek/src/page.rs`).
 The page's few lines of script only put it in its place, and read nothing
 from the address but which section is shown.
 
+It looks like V1's Flow Monitor (#7208): V1's dark tokens
+(`system/web/src/index.css`, `.lm-root`) copied as CSS variables, a left nav
+with an icon per section and the shown one highlighted, and a top bar with
+the lamp's host name, lamp-peek's build (its release folder), `read only`,
+and a live dot that turns grey within 3 s of the stream stopping. Each
+section sits in a card. Under 640 px the nav is a strip on top. Everything is
+inline: no font, script, stylesheet or picture comes from anywhere else, so
+the page works with the lamp offline. The shared classes for the sections
+are `card`, `badge` with `badge-amber` (the device), `badge-teal` (the lamp's
+parts), `badge-blue` (the agent), `badge-green`, `badge-red`, `badge-grey`,
+and `chip`.
+
 | Section | What it shows | Where it comes from |
 |---|---|---|
-| Overview | The voice's state; the light shown (`on, blue at 3`, `off`); someone here or not; the camera's state, faces in view and who is followed; the lamp's health level and its worst item; the newest turn's first audio and the median of the last ten; any unit running another build than its release | the kept values below, `light/state`, the turns, `/status`'s rows |
+| Overview | The voice's state; the light shown (`on, blue at 3`, `off`); someone here or not; the camera's state, faces in view and who is followed; the lamp's health level and its worst item; the newest turn's first audio and the median of the last ten; any unit running another build than its release; the Harness tasks working, per engine, and how many were just handed over (`1 working (OpenClaw 1, Hermes 0)`, `none working, 1 just handed over`, `none working`) | the kept values below, `light/state`, the turns, `/status`'s rows, `tasks/status` |
 | Timeline | The newest 30 turns, newest first, step by step as V1's Flow Monitor: **heard**, **understood** (answered or held back, with the record's `admission_basis` and final words' time), **did** (the light asked for, when it changes, and each skill's stage), **said** (with the record's first audio and how it ended). Each step's time from the end of speech, the slowest wait marked, and the clock time in UTC. In monitor mode only, the words heard and said, and on top of the page and the section "Words anyone says to the lamp show here while this is on." | the bus ([below](#the-timeline-from-the-bus-5883-second-piece)), joined with the turns' records |
 | Turns | The newest 20 turns, newest first, as V1's Flow: what took the turn (`local_speech`, or the lamp's own: `skill_says`, `lamp_tells_news`...; `lamp_speaks_first` in records from before #2825), then from the end of speech the final words, the first token and the first audio, each with its own time in brackets and the slowest marked; then how it ended (`played`, `no audio`, `failed`, or why it was cut) and what held it, if anything did | the voice's own session records ([below](#turns-from-the-voices-records)) |
+| Tasks | A card for each Harness task the lamp handed over: its number, its engine (OpenClaw, Hermes, Claude, Codex, OpenCode, Devin, Devin Cloud, else the bus name escaped), its state as a badge (working blue; starting, installing, needs input amber; idle green; failed red; stopped, offline, unknown, missing grey), "started N min ago" (`working_s`), "last active N ago" (`last_active_unix_ms`), its progress line's changes and new signs as chips (tests pass, fixed, pull request ...). A task not read yet is "just handed over". Under **Ended**, greyed, each that settled: done (idle), needs input, stopped or failed, with the UTC time and how long ago. No status on the bus says "No word from lamp-tasks"; an empty one "Nothing is being worked on."; one that does not read, that it can't be read. Never a task's words, prompt, folder or answer: `tasks/status` carries none, and nothing else about tasks is read | `tasks/status`, the kept value `lamp-tasks serve --progress` publishes, read each push like the others (no subscriber) |
 | Camera | The frame `/cam.svg` draws, faces as boxes | as `/cam` |
 | Body | Each joint where it is against where it was last asked to be (`commanded`), how far off (marked past 0.05 rad) and its effort; the body's own word: its level and sentence, its state (`ready`, `paused`, `stopping`), `standing` from 0 folded to 1 standing, the warmest joint, "met resistance" in the last minute and since it started; its last stop and why, as it said it | `body/joint_states`; the body's diagnostic, sent by the body about the body (`watch::body_of`) |
 | Health | Each part's item as `lamp-health show` gives it: its level, its message as it says it (cut to 160 characters, escaped), and how long ago; the parts never heard from; each unit's build | `lamp/health`; `/status`'s rows |
@@ -391,8 +404,11 @@ Environment=LAMP_PEEK=monitor
   page is `http://lamp-xxxx.local/`. The static token is not read: no
   `/token` form or `Authorization` header opens it.
 - **Local network only.** A request from a peer outside 10/8, 172.16/12,
-  192.168/16, 169.254/16, fe80::/10, fc00::/7 or loopback (IPv4 mapped in
-  IPv6 read as IPv4) gets 403 and nothing of the lamp. `Host` must be the
+  192.168/16, 169.254/16, fe80::/10, fc00::/7, loopback, or the subnet of
+  the lamp's own interface the request came to (its address and prefix, read
+  with `getifaddrs`; never a /0; #7208: the office LAN, 172.168.20.0/24, is
+  no RFC1918 range), IPv4 mapped in IPv6 read as IPv4, gets 403 and nothing
+  of the lamp. `Host` must be the
   lamp's host name, its `.local` name (`/proc/sys/kernel/hostname`), or the
   address the request came to, with or without a port; any other name gets
   403 (DNS rebinding). Both checks come before anything else, on every path.
@@ -489,7 +505,7 @@ own, and asks for it over HTTP:
   for the network with no token or a short one, and 0, saying it is off,
   without `LAMP_PEEK=on`.
 - `the_one_page_streams_each_section_and_never_a_word`: on a real bus and a
-  session folder of its own, the stream carries all six sections:
+  session folder of its own, the stream carries all seven sections:
   - a turn's steps with their own times and the slowest marked;
   - a turn the lamp began itself, and what held it;
   - an elbow 0.2 off where it was asked to be;
@@ -499,9 +515,25 @@ own, and asks for it over HTTP:
   A word planted in a `transcript` record, in `voice/heard` and among the
   body's values is in no section, nor on the page; the timeline has the
   turn heard without its words, and no words line.
+- `the_stream_shows_the_lamps_harness_tasks_from_tasks_status`: a
+  `tasks/status` with OpenClaw working shows its card in Tasks and
+  `1 working (OpenClaw 1)` in Overview; a value with a `<script>` state is
+  said to be unreadable, and no `<script>` reaches any section.
+- `tests/tasks.rs` (#7208): OpenClaw working, Hermes settled idle and one
+  unread task are three cards with their engine and state badges, the
+  Hermes one greyed under Ended as done; each state's colour; an empty
+  status says nothing is being worked on; the overview line counts working
+  tasks per engine, with or without ones just handed over, and never
+  empty brackets; a hostile engine name is escaped.
 - `the_stream_reads_only_and_asks_for_the_token`: POST, PUT, DELETE and
   PATCH get 405; without the token, 401 and no event; with its cookie, the
   sections.
+- `the_page_looks_like_v1_and_loads_nothing_from_outside`: the page carries
+  V1's token values, the shared classes and the phone layout, keeps every
+  section's id, place and nav link, and has no `src=`, `href="http`,
+  `@import`, `url(` or `@font-face`.
+- `a_hostile_lamp_name_and_build_stay_escaped`: a `<script>` host name and an
+  `<img>` build show as text in the top bar, never as markup.
 - `turns::tests::a_turns_steps_and_end_are_read_from_its_records_and_nothing_else`
   and `turns::tests::the_records_are_read_on_from_where_the_last_read_ended`:
   - only new lines are taken, and half a line waits for its end;
@@ -520,6 +552,11 @@ own, and asks for it over HTTP:
     203.0.113.9 gets 403 on every view, `/in` and the stream; from the
     LAN, `Host` other than the lamp's names or address gets 403, and the
     lamp's own gets the way in, the views 401 without a session.
+  - `monitor::tests::a_peer_on_the_lamps_own_subnet_is_answered` (#7208):
+    172.168.20.239 to a lamp at 172.168.20.21/24 is answered, 172.168.21.5
+    and 8.8.8.8 are not, a /0 answers nobody; and
+    `monitor::tests::loopback_is_its_own_interface`: the interface's prefix
+    is read for 127.0.0.1, none for an address no interface holds.
   - `monitor_mode_a_code_opens_once_and_its_cookie_dies_with_a_restart`:
     the binary on a real socket; the admin socket is 0600; `?code=` is 400;
     the code posted once sets the cookie, which opens every view; posted

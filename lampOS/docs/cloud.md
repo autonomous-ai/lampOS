@@ -130,7 +130,7 @@ against lamp-06c1.
   the same folder (`/var/lib/lampos-cloud/region`, 0644, written whole and
   renamed into place) and the journal says `the backend places the lamp in
   region "CN"`. It is kept across boots and read at start, so only a change
-  is written; the voice reads it (`second-voice.md`), and on a change root's `lamp-region.service` gives a lamp in `CN`, and only it, China's name and time servers (`install.md`, #6256); PARKED (#6386): that unit is out of the product until China is scheduled and stable's lamp-update carries #6810. A failing ping is said once, and
+  is written; the voice reads it (`second-voice.md`), and on a change root's `lamp-region.service` gives a lamp in `CN`, and only it, China's name and time servers (`install.md`, #6256). A failing ping is said once, and
   once when it answers again. When the lamp's address moves, the HTTP
   client is made afresh, as V1 drops its idle connections.
 
@@ -1040,7 +1040,16 @@ are off on this lamp"`, as `lamp-skills` does not run it then.
 (the product unit's `--dir`), with `lamp-skills`' own loader
 (`lamp_skills::load_each`), so the page says what `lamp-skills list` says,
 a tool's name taken among them; no socket, topic or copy of the schema of
-its own. The folder is 0755 and its files 0644, so `lamp-cloud` reads it as
+its own. The loader reads some of its switches from the process it runs in,
+so `lamp-cloud.service` carries the ones in `lamp-skills.service` that change
+whether or how a skill loads, `on` alike in both: `LAMP_AGENT_SERVICES` (a
+`do.task`'s connector grants, `gmail-read`), `LAMP_MADE_SCRIPTS` (a made
+skill's own code), `LAMP_SKILL_WRITES` (a write step), `LAMP_MADE_SKILL_LOOSE`
+(a made skill's lamp-written limits left out), `LAMP_UPLOAD_TO_AGENT` and
+`LAMP_NUDGES_PRESENT`. Without them a connector skill `lamp-skills` runs was
+listed `Doesn't load: grants: "gmail-read" is not a grant` (16 Nov).
+`lamp-cloud` runs no task, write or make by them; install's test holds the two
+units alike ([switches.md](switches.md)). The folder is 0755 and its files 0644, so `lamp-cloud` reads it as
 `lampos` under its unit's `ProtectSystem=strict` with nothing widened. On
 this Mac the 13 skills of `lampOS/skills/` are read in 32 ms (a debug
 build; not yet timed on a lamp). A folder that can't be read is answered

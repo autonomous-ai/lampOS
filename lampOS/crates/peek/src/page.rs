@@ -12,15 +12,17 @@ use crate::{
 };
 use lamp_bus::Message;
 use lamp_msgs::{
-    ExpressionBody, Faces, Health, JointState, Level, Light, RoomPresence, TurnVerdict, VoiceState,
+    AgentState, ExpressionBody, Faces, Health, JointState, Level, Light, RoomPresence, Sign,
+    TaskStatus, TurnVerdict, VoiceState,
 };
 use std::fmt::Write;
 
 /// The sections, in the sidebar's order: each one's id and its name.
-pub const SECTIONS: [(&str, &str); 6] = [
+pub const SECTIONS: [(&str, &str); 7] = [
     ("overview", "Overview"),
     ("timeline", "Timeline"),
     ("turns", "Turns"),
+    ("tasks", "Tasks"),
     ("camera", "Camera"),
     ("body", "Body"),
     ("health", "Health"),
@@ -44,11 +46,18 @@ pub struct Glance<'a> {
     pub health: Option<&'a Message>,
     pub turns: &'a Snapshot,
     pub units: &'a [UnitRow],
+    /// The Harness tasks the lamp handed over (`tasks/status`).
+    pub tasks: Option<&'a TaskStatus>,
 }
 
-/// The page itself: the sidebar and an empty place for each section, which
-/// the stream fills; with `words`, [`WORDS_SHOWN`] on top.
-pub fn main_page(words: bool) -> String {
+/// Each section's icon in the nav, in [`SECTIONS`]' order.
+const ICONS: [&str; SECTIONS.len()] = ["◉", "☰", "⇄", "✓", "◎", "⚙", "♥"];
+
+/// The page itself: the top bar with the lamp's `name` and `build`, the
+/// nav and an empty place for each section, which the stream fills; with
+/// `words`, [`WORDS_SHOWN`] on top. Its look is V1's Flow Monitor's dark
+/// theme (#7208): no font, script or picture from anywhere else.
+pub fn main_page(words: bool, name: &str, build: &str) -> String {
     let top = if words {
         format!("<p class=\"words\">{WORDS_SHOWN}</p>")
     } else {
@@ -56,11 +65,14 @@ pub fn main_page(words: bool) -> String {
     };
     let mut nav = String::new();
     let mut sections = String::new();
-    for (id, name) in SECTIONS {
-        let _ = write!(nav, "<a href=\"#{id}\">{name}</a>");
+    for ((id, section), icon) in SECTIONS.into_iter().zip(ICONS) {
+        let _ = write!(
+            nav,
+            "<a href=\"#{id}\"><span class=\"icon\">{icon}</span>{section}</a>"
+        );
         let _ = write!(
             sections,
-            "<section id=\"{id}\"><h2>{name}</h2><div id=\"{id}-now\">waiting for the lamp...</div></section>"
+            "<section id=\"{id}\"><h2>{section}</h2><div class=\"card\" id=\"{id}-now\">waiting for the lamp...</div></section>"
         );
     }
     let ids = SECTIONS
@@ -68,14 +80,22 @@ pub fn main_page(words: bool) -> String {
         .map(|(id, _)| format!("'{id}'"))
         .collect::<Vec<_>>()
         .join(",");
+    let name = escape(name);
+    let build = escape(&build.chars().take(12).collect::<String>());
     format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><title>lamp-peek</title>\
+        "<!doctype html><html><head><meta charset=\"utf-8\"><title>lamp-peek · {name}</title>\
          <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>{STYLE}</style></head>\
-         <body><nav><b>lamp-peek</b>{nav}<span class=\"small\">read only</span>\
-         <a href=\"/bus\">bus</a><a href=\"/status\">units</a></nav><main>{top}{sections}</main>\
+         <body><nav><b class=\"brand\">lamp-peek</b>{nav}<span class=\"grow\"></span>\
+         <a href=\"/bus\"><span class=\"icon\">≡</span>bus</a><a href=\"/status\"><span class=\"icon\">▤</span>units</a></nav>\
+         <div class=\"page\"><header><span id=\"live\" class=\"dot\" title=\"live while the lamp streams\"></span>\
+         <b>{name}</b><span class=\"badge badge-grey\">build {build}</span>\
+         <span class=\"badge badge-amber\">read only</span></header><main>{top}{sections}</main></div>\
          <script>(function(){{var ids=[{ids}];var es=new EventSource('/events');\
-         ids.forEach(function(id){{es.addEventListener(id,function(e){{\
+         var dot=document.getElementById('live');var last=0;\
+         ids.forEach(function(id){{es.addEventListener(id,function(e){{last=Date.now();\
          document.getElementById(id+'-now').innerHTML=e.data;}});}});\
+         es.onerror=function(){{last=0;}};\
+         setInterval(function(){{dot.className=Date.now()-last<3000?'dot live':'dot';}},500);\
          function show(){{var at=(location.hash||'#overview').slice(1);\
          if(ids.indexOf(at)<0){{at='overview';}}\
          ids.forEach(function(id){{document.getElementById(id).hidden=id!==at;}});\
@@ -85,12 +105,51 @@ pub fn main_page(words: bool) -> String {
     )
 }
 
-const STYLE: &str = "body{font-family:sans-serif;margin:0;display:flex;min-height:100vh}\
-nav{width:150px;background:#20242a;color:#e8e8e8;padding:12px;display:flex;flex-direction:column;gap:6px}\
-nav a{color:#e8e8e8;text-decoration:none;padding:4px 6px;border-radius:4px}nav a.on{background:#3a4048}\
-main{flex:1;padding:12px 16px}td,th{padding:2px 8px;text-align:left}.small{font-size:12px;color:#9aa0a6}\
-.ok{color:#1b7f3b}.warn{color:#b26a00}.error{color:#c62828}.stale{color:#6d6d6d}\
-.slow{background:#fde0dc}.words{background:#fff4d6;padding:6px 8px}.differs{background:#fde0dc}svg{max-width:640px;width:100%}";
+/// The page's look: V1's dark tokens (`system/web/src/index.css`'s
+/// `.lm-root`, copied) as variables, and the classes the sections use:
+/// `card`, `badge` with `badge-amber` (the device), `badge-teal` (the
+/// lamp's parts), `badge-blue` (the agent), `badge-green`, `badge-red` and
+/// `badge-grey`, `chip`, and the nav's `on`. Under 640 px the nav is a
+/// strip on top.
+const STYLE: &str = ":root{--bg:#0C0B09;--sidebar:#111009;--card:#17160F;--surface:#1E1D14;\
+--border:#2A2820;--border-hi:#3A3828;--amber:#F59E0B;--amber-dim:rgba(245,158,11,0.12);\
+--teal:#2DD4BF;--teal-dim:rgba(45,212,191,0.12);--green:#34D399;--green-dim:rgba(52,211,153,0.12);\
+--red:#F87171;--red-dim:rgba(248,113,113,0.10);--blue:#60A5FA;--blue-dim:rgba(96,165,250,0.12);\
+--text:#F0EEE8;--dim:#9A9080;--muted:#504A3C;color-scheme:dark;}\
+*{box-sizing:border-box}body{margin:0;display:flex;min-height:100vh;background:var(--bg);color:var(--text);\
+font:14px/1.45 system-ui,-apple-system,'Segoe UI',sans-serif}\
+nav{width:190px;flex:none;background:var(--sidebar);border-right:1px solid var(--border);padding:14px 10px;\
+display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh}\
+nav .brand{color:var(--amber);padding:4px 10px 12px;letter-spacing:.04em}\
+nav a{color:var(--dim);text-decoration:none;padding:7px 10px;border-radius:8px;white-space:nowrap}\
+nav a:hover{color:var(--text);background:var(--surface)}\
+nav a.on{color:var(--amber);background:var(--amber-dim)}\
+.icon{display:inline-block;width:1.4em}.grow{flex:1}\
+.page{flex:1;min-width:0;display:flex;flex-direction:column}\
+header{display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--border);\
+background:var(--sidebar);position:sticky;top:0;z-index:1}\
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}\
+.dot.live{background:var(--green);box-shadow:0 0 6px var(--green)}\
+main{padding:16px 20px;max-width:1100px}h2{font-size:15px;margin:0 0 10px}h3{font-size:14px;margin:14px 0 6px}\
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px;\
+overflow-x:auto}\
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;\
+letter-spacing:.04em;border:1px solid currentColor}\
+.badge-amber{color:var(--amber);background:var(--amber-dim)}.badge-teal{color:var(--teal);background:var(--teal-dim)}\
+.badge-blue{color:var(--blue);background:var(--blue-dim)}.badge-green{color:var(--green);background:var(--green-dim)}\
+.badge-red{color:var(--red);background:var(--red-dim)}.badge-grey{color:var(--dim);background:var(--surface)}\
+.chip{display:inline-block;padding:1px 8px;margin:2px 4px 2px 0;border-radius:6px;font-size:12px;\
+background:var(--surface);border:1px solid var(--border);color:var(--text)}\
+table{border-collapse:collapse;width:100%}td,th{padding:5px 8px;text-align:left;border-bottom:1px solid var(--border)}\
+th{color:var(--dim);font-weight:500}.small{font-size:12px;color:var(--dim)}\
+.ok{color:var(--green)}.warn{color:var(--amber)}.error{color:var(--red)}.stale{color:var(--muted)}\
+.slow,.differs{background:var(--red-dim)}.words{background:var(--amber-dim);color:var(--amber);\
+border:1px solid var(--border);border-radius:8px;padding:6px 10px}\
+svg{max-width:640px;width:100%}\
+@media(max-width:640px){body{flex-direction:column}\
+nav{width:auto;height:auto;flex-direction:row;overflow-x:auto;position:static;border-right:0;\
+border-bottom:1px solid var(--border);padding:6px}nav .brand{display:none}nav .grow{display:none}\
+header{padding:8px 16px;flex-wrap:wrap}main{padding:12px 16px}}.card.ended{opacity:.6}";
 
 /// A level's name and its colour's class.
 fn level_class(level: Level) -> &'static str {
@@ -197,6 +256,7 @@ pub fn overview(glance: &Glance) -> String {
             read_notice(glance.turns.status)
         },
     ));
+    rows.push(("tasks".into(), tasks_line(glance.tasks)));
     let differs: Vec<String> = glance
         .units
         .iter()
@@ -574,5 +634,183 @@ pub fn health(health: Option<&Message>, units: &[UnitRow]) -> String {
         );
     }
     html.push_str("</table>");
+    html
+}
+
+/// An engine's name as people know it, from its name on the bus
+/// (`EngineKind::bus_name`); another name as it came, escaped.
+fn engine_name(engine: &str) -> String {
+    match engine {
+        "openclaw" => "OpenClaw",
+        "hermes" => "Hermes",
+        "claude" => "Claude",
+        "codex" => "Codex",
+        "opencode" => "OpenCode",
+        "devin" => "Devin",
+        "devin_cloud" => "Devin Cloud",
+        other => return escape(other),
+    }
+    .to_owned()
+}
+
+/// A state's word and its badge's colour; a settled `idle` is `done`.
+fn state_badge(state: AgentState, settled: bool) -> (&'static str, &'static str) {
+    match state {
+        AgentState::Working => ("working", "badge-blue"),
+        AgentState::Starting => ("starting", "badge-amber"),
+        AgentState::Installing => ("installing", "badge-amber"),
+        AgentState::NeedsInput => ("needs input", "badge-amber"),
+        AgentState::Idle if settled => ("done", "badge-green"),
+        AgentState::Idle => ("idle", "badge-green"),
+        AgentState::Failed => ("failed", "badge-red"),
+        AgentState::Stopped => ("stopped", "badge-grey"),
+        AgentState::Offline => ("offline", "badge-grey"),
+        AgentState::Unknown => ("unknown", "badge-grey"),
+        AgentState::Missing => ("missing", "badge-grey"),
+    }
+}
+
+fn sign_name(sign: Sign) -> &'static str {
+    match sign {
+        Sign::TestsPass => "tests pass",
+        Sign::BuildWorks => "build works",
+        Sign::Fixed => "fixed",
+        Sign::Found => "found the cause",
+        Sign::Done => "done",
+        Sign::PullRequest => "pull request",
+    }
+}
+
+/// `seconds` as a person reads it: `40 s`, `5 min`, `2 h 10 min`.
+fn span(seconds: u64) -> String {
+    match seconds {
+        0..60 => format!("{seconds} s"),
+        60..3600 => format!("{} min", seconds / 60),
+        _ => format!("{} h {} min", seconds / 3600, seconds / 60 % 60),
+    }
+}
+
+/// The overview's tasks line: how many are working, and per engine of the
+/// tasks it lists (watched or ended), how many of them, in the order
+/// they were handed over (`none working` when none is), then how many
+/// were just handed over, if any. HTML: an engine's name is escaped.
+pub fn tasks_line(status: Option<&TaskStatus>) -> String {
+    let Some(status) = status else {
+        return "not known".to_owned();
+    };
+    let mut engines: Vec<(&str, usize)> = Vec::new();
+    // In the order the tasks were handed over.
+    let mut named: Vec<(u64, &str, bool)> = status
+        .tasks
+        .iter()
+        .map(|task| {
+            (
+                task.task,
+                task.engine.as_str(),
+                task.state == AgentState::Working,
+            )
+        })
+        .chain(
+            status
+                .settled
+                .iter()
+                .map(|task| (task.task, task.engine.as_str(), false)),
+        )
+        .collect();
+    named.sort_unstable();
+    for (_, engine, working) in named {
+        match engines.iter_mut().find(|(name, _)| *name == engine) {
+            Some((_, count)) => *count += usize::from(working),
+            None => engines.push((engine, usize::from(working))),
+        }
+    }
+    let working: usize = engines.iter().map(|(_, count)| count).sum();
+    let each: Vec<String> = engines
+        .iter()
+        .map(|(engine, count)| format!("{} {count}", engine_name(engine)))
+        .collect();
+    let mut line = if working == 0 {
+        "none working".to_owned()
+    } else {
+        format!("{working} working ({})", each.join(", "))
+    };
+    if !status.unread.is_empty() {
+        let _ = write!(line, ", {} just handed over", status.unread.len());
+    }
+    line
+}
+
+/// The Harness tasks the lamp handed over, at `now_unix_ms`: a card for
+/// each watched task with its engine, state, start, last activity, changes
+/// and signs; one for each just handed over; and, greyed under Ended, each
+/// that settled, with how and when. Only `tasks/status`'s typed fields: a
+/// task's words, prompt, folder and answer are never on the bus, and
+/// nothing else about tasks is read.
+pub fn tasks(status: Option<&TaskStatus>, now_unix_ms: u64) -> String {
+    let Some(status) = status else {
+        return "<p>No word from lamp-tasks: its progress (tasks/status) is not on the bus.</p>"
+            .to_owned();
+    };
+    if status.tasks.is_empty() && status.unread.is_empty() && status.settled.is_empty() {
+        return "<p>Nothing is being worked on.</p>".to_owned();
+    }
+    let mut html = String::new();
+    if status.tasks.is_empty() && status.unread.is_empty() {
+        html.push_str("<p>Nothing is being worked on.</p>");
+    }
+    for task in &status.tasks {
+        let (state, colour) = state_badge(task.state, false);
+        let _ = write!(
+            html,
+            "<div class=\"card task\"><b>task {}</b> <span class=\"badge\">{}</span>\
+             <span class=\"badge {colour}\">{state}</span><div class=\"small\">",
+            task.task,
+            engine_name(&task.engine)
+        );
+        let mut said = Vec::new();
+        if let Some(working_s) = task.working_s {
+            said.push(format!("started {} ago", span(working_s)));
+        }
+        if let Some(at) = task.last_active_unix_ms {
+            said.push(format!(
+                "last active {} ago",
+                span(now_unix_ms.saturating_sub(at) / 1000)
+            ));
+        }
+        said.push(format!(
+            "{} change{}",
+            task.changes,
+            if task.changes == 1 { "" } else { "s" }
+        ));
+        html.push_str(&said.join(" · "));
+        html.push_str("</div>");
+        for sign in &task.signs {
+            let _ = write!(html, "<span class=\"chip\">{}</span>", sign_name(*sign));
+        }
+        html.push_str("</div>");
+    }
+    for task in &status.unread {
+        let _ = write!(
+            html,
+            "<div class=\"card task\"><b>task {task}</b> \
+             <span class=\"badge badge-amber\">just handed over</span></div>"
+        );
+    }
+    if !status.settled.is_empty() {
+        html.push_str("<h3>Ended</h3>");
+    }
+    for task in &status.settled {
+        let (state, colour) = state_badge(task.state, true);
+        let _ = write!(
+            html,
+            "<div class=\"card task ended\"><b>task {}</b> <span class=\"badge\">{}</span>\
+             <span class=\"badge {colour}\">{state}</span>\
+             <div class=\"small\">ended {}, {} ago</div></div>",
+            task.task,
+            engine_name(&task.engine),
+            clock(task.at_unix_ms),
+            span(now_unix_ms.saturating_sub(task.at_unix_ms) / 1000)
+        );
+    }
     html
 }
