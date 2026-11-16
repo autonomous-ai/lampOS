@@ -230,6 +230,7 @@ pub(super) fn commit_sound_turn(
         news: Vec::new(),
         news_not_heard: None,
         down_line_said: false,
+        make_waiting: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
