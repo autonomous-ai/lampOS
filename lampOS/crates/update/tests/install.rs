@@ -2722,6 +2722,47 @@ fn the_product_lets_a_skills_task_reach_the_public_web() {
     }
 }
 
+/// A skill the owner asks for by voice at night is told within its run
+/// (#7180; lamp-9adf, 16 Nov 02:28: its answer waited behind quiet hours and
+/// was skipped): `LAMP_TOLD_WHEN_ASKED` on, once, in the two units whose part
+/// reads it (lamp-skills' told answer, lamp-voice's second route and say
+/// service), each beside the skill task switch it rides on, and in no other.
+#[test]
+fn the_product_tells_a_skill_asked_for_by_voice_in_quiet_hours() {
+    let readers = ["lamp-skills.service", "lamp-voice.service"];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let wanted = usize::from(readers.contains(unit));
+        assert_eq!(
+            service
+                .iter()
+                .filter(|line| line.contains("LAMP_TOLD_WHEN_ASKED"))
+                .count(),
+            wanted,
+            "{unit}"
+        );
+        if wanted == 0 {
+            continue;
+        }
+        for line in [
+            "Environment=LAMP_TOLD_WHEN_ASKED=on",
+            "Environment=LAMP_SKILL_TASKS=on",
+        ] {
+            assert_eq!(
+                service.iter().filter(|set| **set == line).count(),
+                1,
+                "{unit} lacks {line}"
+            );
+        }
+    }
+    for unit in readers {
+        assert!(
+            install::PRODUCT.iter().any(|(name, _)| *name == unit),
+            "{unit} is not a product unit"
+        );
+    }
+}
+
 /// A gateway agent's (OpenClaw's) run granted `net` (#7742): its own
 /// egress socket, relayed in its skill-start fence alone, with
 /// `LAMP_TASK_NET_GATEWAY=on` once in the three units whose part reads it,
@@ -2753,6 +2794,51 @@ fn the_product_lets_a_gateway_agents_task_reach_the_public_web() {
             assert!(service.contains(&net.as_str()), "{unit} lacks {net}");
         }
     }
+}
+
+/// A skill's read whose service isn't linked says once where to link it
+/// (#5518; the bundled Morning mail, Morning agenda and Tomorrow's plan
+/// otherwise say nothing, every day): `LAMP_SKILL_LINK_NOTE` on, once, in
+/// lamp-skills alone, the one unit whose part reads it, beside
+/// `LAMP_SKILL_READS` and with the `--state-dir` it keeps its note in.
+#[test]
+fn the_product_tells_once_that_a_skills_read_service_is_not_linked() {
+    let reader = "lamp-skills.service";
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let wanted = usize::from(*unit == reader);
+        assert_eq!(
+            service
+                .iter()
+                .filter(|line| line.contains("LAMP_SKILL_LINK_NOTE"))
+                .count(),
+            wanted,
+            "{unit}"
+        );
+        if wanted == 0 {
+            continue;
+        }
+        for line in [
+            "Environment=LAMP_SKILL_LINK_NOTE=on",
+            "Environment=LAMP_SKILL_READS=on",
+        ] {
+            assert_eq!(
+                service.iter().filter(|set| **set == line).count(),
+                1,
+                "{unit} lacks {line}"
+            );
+        }
+        assert!(
+            service
+                .iter()
+                .any(|line| line.starts_with("ExecStart=") && line.contains(" --state-dir ")),
+            "{unit} runs without --state-dir"
+        );
+    }
+    assert!(
+        install::PRODUCT.iter().any(|(name, _)| *name == reader),
+        "{reader} is not a product unit"
+    );
 }
 
 /// An uploaded skill's keys go in through the app and reach only its run

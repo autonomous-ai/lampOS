@@ -2044,7 +2044,8 @@ apart stopped a read before a word. Anything else closes it at once.
 error>", never a title, sender or subject.
 
 **Not linked at the run** (`LAMP_SKILL_LINK_NOTE=on` in `lamp-skills`,
-with its `--state-dir`; off, [switches.md](switches.md)). A read refused
+with its `--state-dir`; on in the product unit, off unless set,
+[switches.md](switches.md)). A read refused
 because the service isn't linked (`NOT_LINKED`; never "couldn't be
 reached" or another refusal) is said once, as exact words through the say
 socket after the gate is judged again: "Gmail isn't linked to this lamp
