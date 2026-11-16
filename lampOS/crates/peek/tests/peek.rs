@@ -1872,3 +1872,248 @@ fn the_monitor_banner_shows_once_and_only_in_monitor_mode() {
         );
     }
 }
+
+/// A monitor-mode rig and the cookie header its one session opens with.
+fn monitor_rig(name: &str) -> (Rig, String) {
+    let monitor = monitor_names();
+    let session = {
+        let mut gate = monitor.gate();
+        let code = gate.issue(Instant::now()).unwrap();
+        match gate.redeem(&code, Instant::now()).unwrap() {
+            Redeemed::Session(session) => session,
+            other => panic!("{other:?}"),
+        }
+    };
+    let rig = Rig::monitor(
+        name,
+        monitor,
+        conn("192.168.1.20:50000", "192.168.1.5:80"),
+    );
+    (rig, format!("Cookie: peek_session={session}\r\n"))
+}
+
+/// #7267 PR 3's fixture bus: request 3 a weather turn answered with ⚡;
+/// request 5 handed to OpenClaw as task 2, whose steps come out of order
+/// (one result hostile) and end in a reply; request 6 with no decision;
+/// request 8 a follow-up steered under request 5; request 9 an error with
+/// its code; request 7 handed as task 4, which takes 60 steps. Then the
+/// stream until `wanted` shows. The JSON is the shape V2 confirmed for
+/// `voice/decision` and `tasks/step` (#7267).
+fn agent_turns(rig: &Rig, headers: &str, host: &str, wanted: &str) -> String {
+    let mut heard = rig.publisher(Speech::TOPICS[0], &Speech::declaration(), "voice");
+    let mut said = rig.publisher(Speech::TOPICS[1], &Speech::declaration(), "voice");
+    let mut decision = rig.publisher(
+        lamp_msgs::VoiceDecision::TOPIC,
+        &lamp_msgs::VoiceDecision::declaration(),
+        "voice",
+    );
+    let mut steps = rig.publisher(
+        lamp_msgs::TaskStep::TOPIC,
+        &lamp_msgs::TaskStep::declaration(),
+        "tasks",
+    );
+    let speech = |request: u64, text: &str| Speech {
+        text: text.into(),
+        finished: true,
+        locale: None,
+        request: Some(request),
+    };
+    let step = |task: u64, n: u32, kind: &str, tool: &str, args: &str, result: &str| {
+        serde_json::json!({
+            "task": task, "engine": "openclaw", "n": n, "at_unix_ms": 1_000 + u64::from(n),
+            "kind": kind, "tool": tool, "args": args, "result": result, "ok": kind != "error",
+        })
+    };
+    let mut seq = 0;
+    let mut next = || {
+        seq += 1;
+        seq
+    };
+    for (request, choice) in [
+        (
+            3,
+            serde_json::json!({"request": 3, "kind": "answered", "tools": ["weather"], "first_reply_ms": 1800}),
+        ),
+        (
+            5,
+            serde_json::json!({"request": 5, "kind": "handed", "task": 2, "engine": "openclaw", "stage": "started"}),
+        ),
+        (6, serde_json::Value::Null),
+        (
+            8,
+            serde_json::json!({"request": 8, "kind": "answered", "tools": ["timer"], "host_request": 5}),
+        ),
+        (
+            9,
+            serde_json::json!({"request": 9, "kind": "error", "error_code": "tool_timeout"}),
+        ),
+        (
+            7,
+            serde_json::json!({"request": 7, "kind": "handed", "task": 4, "engine": "openclaw", "stage": "started"}),
+        ),
+    ] {
+        heard
+            .publish_json(next(), &speech(request, &format!("heard {request}")))
+            .unwrap();
+        if !choice.is_null() {
+            decision.publish_json(next(), &choice).unwrap();
+        }
+        said.publish_json(next(), &speech(request, &format!("said {request}")))
+            .unwrap();
+    }
+    for (n, tool, result) in [
+        (2, "fetch", "<script>alert(1)</script>"),
+        (3, "write", "saved the list"),
+        (1, "search", "found three flights"),
+    ] {
+        steps
+            .publish_json(next(), &step(2, n, "call", tool, "q=flights", result))
+            .unwrap();
+    }
+    steps
+        .publish_json(
+            next(),
+            &step(2, 4, "reply", "reply", "", "Three flights found."),
+        )
+        .unwrap();
+    for n in 1..=60 {
+        steps
+            .publish_json(
+                next(),
+                &step(4, n, "call", "look", "", &format!("seen {n}")),
+            )
+            .unwrap();
+        thread::sleep(Duration::from_millis(2));
+    }
+    stream_until_as(rig, host, headers, wanted)["timeline"].clone()
+}
+
+/// `text` holds each of `wanted`, in order.
+fn in_order(text: &str, wanted: &[&str]) {
+    let mut from = 0;
+    for wanted in wanted {
+        let at = text[from..]
+            .find(wanted)
+            .unwrap_or_else(|| panic!("{wanted} not after {from}: {text}"));
+        from += at + wanted.len();
+    }
+}
+
+/// The card of `request`, from its start to its header's request number.
+fn card_head(timeline: &str, request: u64) -> &str {
+    let before = timeline
+        .split(&format!("request {request} ·"))
+        .next()
+        .unwrap();
+    &before[before.rfind("class=\"turn card\"").unwrap()..]
+}
+
+/// A weather turn on a real bus: its row reads LOCAL with the tool, DONE,
+/// and ⚡ from the decision's first reply.
+#[test]
+fn a_weather_turn_reads_local_weather_with_its_first_reply() {
+    let (rig, cookie) = monitor_rig("dec-weather");
+    let timeline = agent_turns(&rig, &cookie, "lamp-test.local", "10 more");
+    in_order(
+        card_head(&timeline, 3),
+        &[
+            "<span class=\"badge badge-green\">LOCAL · weather</span>",
+            "<span class=\"badge badge-green\">DONE</span>",
+            "<span class=\"lat ok\">⚡ 1800 ms</span>",
+        ],
+    );
+}
+
+/// A handed turn and three steps of its task: AGENT with the engine and
+/// the task, then the steps in their numbers' order and the reply, escaped.
+#[test]
+fn a_handed_turn_shows_its_task_steps_in_order_with_the_reply() {
+    let (rig, cookie) = monitor_rig("dec-handed");
+    let timeline = agent_turns(&rig, &cookie, "lamp-test.local", "10 more");
+    in_order(
+        &timeline,
+        &[
+            "<span class=\"badge badge-blue\">AGENT · OpenClaw · task 2 · started</span>",
+            "<span class=\"lbl\">IN</span> “heard 5”",
+            "<span class=\"lbl\">OUT</span> “said 5”",
+            "<span class=\"lbl\">CALL</span> 1 · search · q=flights → found three flights",
+            "<span class=\"lbl\">CALL</span> 2 · fetch · q=flights → &lt;script&gt;alert(1)&lt;/script&gt;",
+            "<span class=\"lbl\">CALL</span> 3 · write · q=flights → saved the list",
+            "<span class=\"lbl\">REPLY</span> Three flights found.",
+        ],
+    );
+    assert!(!timeline.contains("<script>"), "{timeline}");
+}
+
+/// Outside monitor mode the tool names and numbers show, but no step's
+/// arguments, result or reply.
+#[test]
+fn without_monitor_mode_step_words_are_absent_and_tool_names_shown() {
+    let rig = Rig::new("dec-quiet", None);
+    let timeline = agent_turns(&rig, "", "localhost", "10 more");
+    for name in ["1 · search", "2 · fetch", "3 · write", "AGENT · OpenClaw"] {
+        assert!(timeline.contains(name), "{name}: {timeline}");
+    }
+    for words in [
+        "found three flights",
+        "saved the list",
+        "alert(1)",
+        "q=flights",
+        "Three flights found.",
+        "seen 1",
+    ] {
+        assert!(!timeline.contains(words), "{words}: {timeline}");
+    }
+}
+
+/// A task's 60 steps: the first 50 show, and the rest are counted.
+#[test]
+fn a_task_shows_at_most_fifty_steps_and_counts_the_rest() {
+    let (rig, cookie) = monitor_rig("dec-fifty");
+    let timeline = agent_turns(&rig, &cookie, "lamp-test.local", "10 more");
+    assert!(timeline.contains("50 · look · – → seen 50"), "{timeline}");
+    assert!(!timeline.contains("51 · look"), "{timeline}");
+    assert_eq!(timeline.matches("10 more").count(), 1, "{timeline}");
+}
+
+/// A turn with no decision on the bus (an older lamp) shows a neutral
+/// path, never a guessed LOCAL, AGENT or SKILL; an error shows its code
+/// and ERROR, outside monitor mode too.
+#[test]
+fn no_decision_shows_a_neutral_path_and_an_error_its_code() {
+    let rig = Rig::new("dec-none", None);
+    let timeline = agent_turns(&rig, "", "localhost", "10 more");
+    assert!(
+        card_head(&timeline, 6).contains("<span class=\"badge badge-grey\">PATH ?</span>"),
+        "{timeline}"
+    );
+    for guess in [">LOCAL<", ">AGENT<", ">SKILL<"] {
+        assert!(!timeline.contains(guess), "{guess}: {timeline}");
+    }
+    in_order(
+        card_head(&timeline, 9),
+        &[
+            "<span class=\"badge badge-red\">tool_timeout</span>",
+            "<span class=\"badge badge-red\">ERROR</span>",
+        ],
+    );
+}
+
+/// A follow-up steered under its host turn shows inside the host's card,
+/// not as a row of its own.
+#[test]
+fn a_steered_follow_up_nests_under_its_host_turn() {
+    let (rig, cookie) = monitor_rig("dec-follow");
+    let timeline = agent_turns(&rig, &cookie, "lamp-test.local", "10 more");
+    in_order(
+        &timeline,
+        &[
+            "AGENT · OpenClaw · task 2",
+            "request 5 ·",
+            "<div class=\"follow\">",
+            "LOCAL · timer",
+            "request 8 ·",
+        ],
+    );
+    assert_eq!(timeline.matches("request 8 ·").count(), 1, "{timeline}");
+}
