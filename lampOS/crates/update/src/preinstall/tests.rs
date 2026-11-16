@@ -227,3 +227,54 @@ fn on_an_image_systemctl_is_skipped_and_the_rest_runs() {
     assert_eq!(skipped, ["systemctl restart lamp-openclaw-gateway.service"]);
     assert_eq!(ran, ["runuser -u lampos -- true"]);
 }
+
+/// On an image, lamp-update's own unit's `Environment=` lines are what a
+/// round there runs with, its drop-ins after it in name order: the
+/// product's `LAMP_SKILL_TASKS=on` and `LAMP_SKILL_DEFAULT_AGENT=on` give
+/// Hermes and OpenClaw the namespace a round on the lamp wants (lamp-dbda,
+/// 16 Nov: read from no unit, both were installed shown without them, and
+/// the first round found them not this build's).
+#[test]
+fn the_image_s_own_unit_gives_the_switches_a_round_runs_with() {
+    let root = folder("unit-env");
+    let units = root.join("etc/systemd/system");
+    fs::create_dir_all(units.join("lamp-update.service.d")).unwrap();
+    fs::write(
+        units.join("lamp-update.service"),
+        "[Unit]\nDescription=x\n[Service]\nEnvironment=LAMP_BUS_ROOT=/run/lampos-bus\n\
+         Environment=LAMP_SKILL_TASKS=on\nEnvironment=LAMP_SKILL_DEFAULT_AGENT=on\n\
+         Environment=LAMP_HERMES_SKILLS=on\nExecStart=/x\n",
+    )
+    .unwrap();
+    fs::write(
+        units.join("lamp-update.service.d/zz.conf"),
+        "[Service]\nEnvironment=LAMP_HERMES_SKILLS=off\n",
+    )
+    .unwrap();
+    let set = unit_environment(&root);
+    let get = |name: &str| {
+        set.iter()
+            .find(|(set, _)| set == name)
+            .map(|(_, value)| value.clone())
+    };
+    assert_eq!(get("LAMP_SKILL_TASKS").as_deref(), Some("on"), "{set:?}");
+    assert_eq!(get("LAMP_SKILL_DEFAULT_AGENT").as_deref(), Some("on"));
+    // The drop-in comes after the unit.
+    assert_eq!(get("LAMP_HERMES_SKILLS").as_deref(), Some("off"));
+
+    let switches = crate::switches::update_switches(&root, true, |name| {
+        get(name).map(std::ffi::OsString::from)
+    });
+    assert!(switches.tasks && switches.one_path, "{switches:?}");
+    let wanted = wanted(true, switches, &get);
+    assert_eq!(
+        wanted.hermes.1,
+        hermes_install::Shown {
+            skills: false,
+            tasks: true,
+            one_path: true,
+        }
+    );
+    assert_eq!(wanted.openclaw.1, openclaw_install::shown(true, true));
+    fs::remove_dir_all(&root).unwrap();
+}
