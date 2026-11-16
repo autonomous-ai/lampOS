@@ -1627,9 +1627,11 @@ pub struct SkillHarness {
     /// target's own engine counts.
     pub default_engine: Box<dyn Fn() -> Option<crate::harness::EngineKind> + Send + Sync>,
     /// The wait before a launch spoken tasks have (#6226), made at each
-    /// run: by default the config's own ([`crate::harness::Cli::openclaw_gateway`]).
-    /// [`crate::gateway::launch_with`] decides by the launch's engine
-    /// whether it is waited for.
+    /// run: by default, with the config's `openclaw_gateway` on, until the
+    /// Gateway serves its RPCs, not only its port (#7170,
+    /// [`crate::gateway::Gateway::serving`]).
+    /// The runner waits only for an OpenClaw launch, within the run's
+    /// remaining deadline and while lamp-tasks is not stopping.
     pub gateway: Box<dyn Fn() -> Option<crate::gateway::Gateway> + Send + Sync>,
 }
 
@@ -1662,9 +1664,7 @@ impl SkillHarness {
             session,
             lamp,
             default_engine: Box::new(|| None),
-            gateway: Box::new(move || {
-                waits.then(|| crate::gateway::Gateway::new(Box::new(crate::gateway::Loopback)))
-            }),
+            gateway: Box::new(move || waits.then(crate::gateway::Gateway::serving)),
         }
     }
 
@@ -2691,8 +2691,8 @@ impl Runner for HarnessRunner {
                     // own lamp target below, which works signed out
                     // (#6407): a reset lamp with OpenClaw its default runs
                     // its skills (#7133). Hermes's wrapper keeps the run.
-                    Err(why) if signed_out_through_harness(here) => eprintln!(
-                        "[lamp-tasks] skill task {}: {why}; Harness is signed out, so it goes through Harness's own lamp target",
+                    Err(_) if signed_out_through_harness(here) => eprintln!(
+                        "[lamp-tasks] skill task {}: direct execution is unavailable; Harness is signed out, so trying Harness's own lamp target",
                         run.run
                     ),
                     _ => return self.run_without_harness(local, run, end_token),
@@ -2856,10 +2856,30 @@ impl Runner for HarnessRunner {
             session: None,
         };
         // As a spoken task's launch (#6226): an engine whose Gateway must
-        // answer first is waited for, at most the same bound, else not sent.
+        // answer first is waited for, else not sent; for a run, until it
+        // serves its RPCs, not only its port, at most SERVING_WITHIN (#7170).
         let mut gateway = (harness.gateway)();
-        let outcome =
-            crate::gateway::launch_with(gateway.as_mut(), &launch, || cli.launch(&launch));
+        let stopping = self.stopping.get().cloned();
+        let stopped = || {
+            stopping
+                .as_ref()
+                .is_some_and(|stop| stop.load(Ordering::Acquire))
+        };
+        let until = began + run.deadline;
+        if engine == EngineKind::Openclaw
+            && let Some(gateway) = gateway.as_mut()
+            && let Err(why) = gateway.before_launch_until(until, &stopped)
+        {
+            eprintln!("tasks: {why}; the hand-over is not sent");
+            return Err(format!(
+                "Harness didn't start the run ({})",
+                crate::gateway::NOT_READY
+            ));
+        }
+        if stopped() || std::time::Instant::now() >= until {
+            return Err("the skill run ended before hand-over".into());
+        }
+        let outcome = cli.launch(&launch);
         // Asked of Harness: from here the agent may have begun, unless
         // Harness never sent the creation.
         if !matches!(outcome, LaunchOutcome::NotSent { .. }) {
