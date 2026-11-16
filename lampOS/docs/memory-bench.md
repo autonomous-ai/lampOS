@@ -121,7 +121,7 @@ rewrite a failed run out of the ledger.
 | Kind | What it tests | Scoring |
 |---|---|---|
 | Recall | Names, values, objects, and exact past statements | Registered exact answers and aliases |
-| When | When an event was discussed or happened | Parsed date with the registered one-day tolerance |
+| When | When an event was discussed or happened | Parsed date with the registered tolerance: one day, or exact for "last week" |
 | Changed facts | Latest value versus retired history | Exact value valid at the question time |
 | Across days | A grounded account of a changing situation | Required points, exclusions, and citations |
 | Understanding | Correct answers to the same trait questions across all arms | Trait recall and false claims separately; candidate owner-model inspection is an additional diagnostic |
