@@ -3919,7 +3919,7 @@ và ăn mừng, `lamp-seen` chỉ phát khi `LAMP_SEEN_MORE_DOINGS=on`) là mộ
 `seen`, nên kỹ năng được `humans/doing` không bao giờ nhận nó. Chưa kỹ năng
 nào đọc nó. Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
 lúc đến bàn khi chưa thấy gì, nên `[[while]] topic = "humans/doing" field =
-"drank_s_ago" above = 5399 unknown = "holds_stale"` vẫn đúng với người đèn
+"drank_s_ago" above = 1799 unknown = "holds_stale"` vẫn đúng với người đèn
 chưa thấy uống, như khi chỉ có đồng hồ; mỗi giá trị `humans/posture` được
 nói đều có `window_s` (0 lúc cửa sổ bắt đầu), và chủ đề không được nói khi
 cửa sổ của lamp-seen chưa có mẫu nào (ảnh không được gửi đi, máy chủ bận,
@@ -3929,8 +3929,8 @@ từng nói gì; `unknown = "holds_stale"` đúng cả khi giá trị đã hết
 
 Năm kỹ năng đi kèm đọc chúng như vậy (#6543, phần kỹ năng), mỗi điều kiện có
 `unknown = "holds_stale"`, nên khi không có `lamp-seen`, hoặc nó đã im, mỗi
-kỹ năng chạy đúng như trước: Uống ngụm nước (`drank_s_ago` trên 5399, và
-2999 trong `[present]`), Đứng dậy (`break_s_ago` trên 5999), Vươn vai
+kỹ năng chạy đúng như trước: Uống ngụm nước (`drank_s_ago` trên 1799, 30
+phút của các trigger, ở cả hai khối), Đứng dậy (`break_s_ago` trên 5999), Vươn vai
 (`break_s_ago` trên 1799: 30 phút của `sooner` theo cái ngáp, không phải 50
 phút của chính nó, nên một cái ngáp vẫn đưa lần vươn vai sớm lên), Hỏi bữa ăn
 (`ate_s_ago` trên 4499, 75 phút của các trigger; phiên bản 1.1.0) và Ngồi
