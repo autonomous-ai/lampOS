@@ -86,6 +86,14 @@ pub const MANAGE_SOCKET: &str = "/run/lampos-skills-manage/manage.sock";
 /// The longest the helper is waited for: its own 4 s for the skills
 /// folder, and the install, while the person waits for the answer.
 const PUT_ON_WAIT: Duration = Duration::from_secs(8);
+/// Why a kept skill isn't on when the manage helper isn't there to ask
+/// ([`put_on_within`]): never asked, so it never puts it on.
+pub const NOT_REACHED: &str = "the lamp's skills couldn't be reached";
+/// Why a kept skill isn't on when the manage helper was asked and gave no
+/// answer within [`PUT_ON_WAIT`] ([`put_on_within`]): it may still put it
+/// on, until its mark lapses and its lock wait ends
+/// (`crate::upload_skill::taken` holds the name that long).
+pub const NOT_SAID_IN_TIME: &str = "the lamp didn't say in time whether it is on";
 /// The longest `lamp-skills pack` may take.
 const PACK_WITHIN: Duration = Duration::from_secs(20);
 /// The most of either file taken from an answer.
@@ -1145,6 +1153,27 @@ pub const NOT_MADE_TRY: &str =
     "I couldn't make that one. Try asking for one thing, like 'say hello when I sit down'.";
 /// What the person hears when the lamp couldn't keep what it made.
 pub const NOT_KEPT_TRY: &str = "Something went wrong keeping it. Please try again.";
+/// What the person hears when a make handed to the lamp's agent
+/// (`LAMP_MAKE_SKILL_AGENT`) failed on the agent's side, never their ask
+/// ([`crate::make_skill_agent::not_made_try`]): lamp-tasks makes one at a
+/// time (`busy`), the agent gave no answer within its 90 s, or its run
+/// failed. Never [`NOT_MADE_TRY`]'s tip to ask for one thing, which is
+/// about the ask.
+pub const AGENT_BUSY_TRY: &str = "The lamp's agent is busy; ask me again in a minute.";
+pub const AGENT_LATE_TRY: &str = "The lamp's agent didn't answer in time; try again.";
+pub const AGENT_FAILED_TRY: &str = "The lamp's agent couldn't make it just now; try again.";
+/// The lamp has no agent to hand the make to after all (no `lamp` target
+/// in its tasks part): what is missing, never "try again", which can't
+/// help (El's P3 on #7243).
+pub const AGENT_MISSING: &str =
+    "I couldn't make that one: this lamp has no agent set up to make it.";
+/// The agent's lines, each said whole as it is.
+const AGENT_TRIES: [&str; 4] = [
+    AGENT_BUSY_TRY,
+    AGENT_LATE_TRY,
+    AGENT_FAILED_TRY,
+    AGENT_MISSING,
+];
 
 /// The reasons [`plain_reason`] gives as they are: the model's silence or
 /// cut, said plainly with what to try.
@@ -1154,8 +1183,9 @@ const PLAIN_REASONS: [&str; 2] = [MODEL_CUT_OFF, MODEL_SILENT];
 /// lamp's own reason `why` (never the model's `cannot:` sentence, which
 /// is already the person's words and goes as it is) in everyday words.
 /// What it can't do yet ([`CANT_YET`]), that they already have it
-/// ([`ALREADY_HAVE`]), the model's silence or cut and a name with no free
-/// one left go as they are; the lamp failing to write, check or keep it is
+/// ([`ALREADY_HAVE`]), the model's silence or cut, the lamp's agent's own
+/// failure ([`AGENT_BUSY_TRY`] and the two beside it) and a name with no
+/// free one left go as they are; the lamp failing to write, check or keep it is
 /// [`NOT_KEPT_TRY`]; any other (the check's refusal, a skill that couldn't
 /// be said plainly, a form the lamp can't read, each with its repairs used
 /// up) is [`NOT_MADE_TRY`]. The detailed reason stays in the journal.
@@ -1165,6 +1195,7 @@ pub fn plain_reason(why: &str) -> String {
         || why.starts_with(ALREADY_HAVE)
         || why.starts_with(NAME_TAKEN_HEAD)
         || [NOT_MADE_TRY, NOT_KEPT_TRY].contains(&why)
+        || AGENT_TRIES.contains(&why)
         || PLAIN_REASONS.contains(&why)
     {
         return why.to_owned();
@@ -1191,6 +1222,7 @@ pub fn not_made_line(why: &str) -> String {
     if why.starts_with(CANT_YET)
         || why.starts_with(ALREADY_HAVE)
         || [NOT_MADE_TRY, NOT_KEPT_TRY].contains(&why)
+        || AGENT_TRIES.contains(&why)
     {
         return match why.ends_with(['.', '!', '?']) {
             true => why.to_owned(),
@@ -8809,17 +8841,57 @@ pub fn going_on(directory: &Path, sha256: &str, now_unix_ms: u64) -> Option<Stri
 /// as `not_on`: the app's and the counts' "not on" ([`crate::app_make`],
 /// [`crate::made_counts`]).
 fn not_on(directory: &Path, sha256: &str, why: &str) {
+    not_on_said(directory, sha256, why, None);
+}
+
+/// [`not_on`], with the manage helper's own words `said` when its check
+/// refused it, kept as `check_said` ([`check_said`]) in the same write:
+/// a settle poll never reads the one without the other (El's P3 on #7243).
+/// The check's words are only of the refusal they came with: none, and
+/// any kept before is dropped.
+fn not_on_said(directory: &Path, sha256: &str, why: &str, said: Option<&str>) {
+    let said = said.and_then(check_said);
     let mut entries = index(directory);
     let mut found = false;
     for entry in &mut entries {
         if entry["sha256"] == sha256 && entry["on"] != true {
             entry["not_on"] = json!(why);
+            match &said {
+                Some(said) => entry["check_said"] = json!(said),
+                None => {
+                    if let Some(entry) = entry.as_object_mut() {
+                        entry.remove("check_said");
+                    }
+                }
+            }
             found = true;
         }
     }
     if found && let Err(error) = write_index(directory, &entries) {
         eprintln!("lamp-voice: a made skill not on, and why not kept: {error}");
     }
+}
+
+/// The most bytes of the manage helper's own refusal kept beside a kept
+/// skill ([`check_said`]).
+const MOST_CHECK_SAID_BYTES: usize = 300;
+
+/// The manage helper's own words `said` when its check refused a kept
+/// skill, as they are kept beside it as `check_said` ([`not_on_said`]):
+/// its "not installed: " cut off, no control characters, at most
+/// [`MOST_CHECK_SAID_BYTES`]; none when nothing is left. What the app is
+/// told of a skill added from a file left off
+/// (`crate::upload_skill::left_off_why`), as the skills page says why a
+/// skill doesn't load. Never said aloud.
+fn check_said(said: &str) -> Option<String> {
+    let said = said.trim();
+    let said = said.strip_prefix("not installed: ").unwrap_or(said);
+    let said: String = said
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    let said = cut_bytes(said.trim(), MOST_CHECK_SAID_BYTES);
+    (!said.is_empty()).then(|| said.to_owned())
 }
 
 /// What the lamp says once a made skill is on (the owner, 10 Nov: no
@@ -9112,11 +9184,14 @@ pub fn put_on_within(
     if entry["on"] == true {
         return Ok(name);
     }
-    let refused = |why: String| {
+    // Why, and the helper's own words when its check refused it, kept in
+    // one write, so nobody reads the one without the other.
+    let refused_said = |why: String, said: Option<&str>| {
         eprintln!("lamp-voice: a made skill was not put on: {name}: {why}");
-        not_on(directory, sha256, &why);
+        not_on_said(directory, sha256, &why, said);
         Err(why)
     };
+    let refused = |why: String| refused_said(why, None);
     if let Err(error) = goes_on(directory, sha256, now_unix_ms) {
         eprintln!("lamp-voice: a made skill: its mark to go on not kept: {error}");
         return refused("the lamp couldn't keep it".into());
@@ -9125,11 +9200,11 @@ pub fn put_on_within(
     // only one asked and silent may still (the reviewer's P3 on #2424).
     let Some(answer) = crate::tools::reached(socket, &json!({ "install_made": sha256 }), wait)
     else {
-        return refused("the lamp's skills couldn't be reached".into());
+        return refused(NOT_REACHED.into());
     };
     match answer.as_ref().map(|answer| answer.get("done").is_some()) {
         // No answer in time: the helper may still put it on.
-        None => refused("the lamp didn't say in time whether it is on".into()),
+        None => refused(NOT_SAID_IN_TIME.into()),
         Some(true) => {
             let mut entries = index(directory);
             for entry in &mut entries {
@@ -9137,6 +9212,7 @@ pub fn put_on_within(
                     entry["on"] = json!(true);
                     if let Some(entry) = entry.as_object_mut() {
                         entry.remove("not_on");
+                        entry.remove("check_said");
                     }
                 }
             }
@@ -9160,7 +9236,7 @@ pub fn put_on_within(
                 ));
             }
             eprintln!("lamp-voice: the skills helper refused a made skill: {why}");
-            refused("the lamp's check didn't let it on".into())
+            refused_said("the lamp's check didn't let it on".into(), Some(why))
         }
     }
 }

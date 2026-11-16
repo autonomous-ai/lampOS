@@ -12,8 +12,11 @@
 //!   from the Skills Store" ([`on_line`]).
 //! - **A name the lamp holds is refused, never replaced**: a skill on the
 //!   lamp by that name (core, from the Store, pushed or made), or one kept
-//!   here, made or added ([`taken`]). The manage helper holds it again at
-//!   the install.
+//!   here, made or added, that is on, made here and not on, or added from
+//!   a file and still able to go on ([`taken`]). The manage helper holds it
+//!   again at the install. A file kept and left off, which no helper can
+//!   still put on, holds nothing: the new file takes its place in the kept
+//!   ones, its old package removed (`made_skill`'s `remember`).
 //! - **It never starts on its own**: no trigger, no `[ask]`; it runs only
 //!   when the person asks, through its function
 //!   ([`made_skill::capped_added`]). Otherwise a made skill's cap: the
@@ -142,15 +145,82 @@ fn toml_string(text: &str) -> String {
     quoted
 }
 
-/// Why `name` can't be added: a skill on the lamp by that name, in
-/// `skills` or `pushed`, or one kept in `made` (made or added). None when
-/// it is free.
-pub fn taken(name: &str, skills: &Path, pushed: &Path, made: &Path) -> Option<String> {
+/// The manage helper's own wait for the skills' lock before an install
+/// (`lamp_skills::package::ASKED_LOCK_WAIT`, held equal by a test there).
+pub const HELPER_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(4);
+
+/// How long a kept skill the helper may still put on holds its name, from
+/// its mark to go on (`goes_on_at_unix_ms`, the mark the helper checks;
+/// the keep time before it is marked) ([`taken`]): the mark's own
+/// [`made_skill::GOES_ON_WITHIN`], within which the helper may still take
+/// it, then the helper's lock wait ([`HELPER_LOCK_WAIT`]: it reads the
+/// package before it locks), then room for the install itself. Past that,
+/// no helper can still put it on (El's and Heron's P2 on #7243).
+pub const PUTTING_ON_MS: u64 =
+    made_skill::GOES_ON_WITHIN.as_millis() as u64 + HELPER_LOCK_WAIT.as_millis() as u64 + 30_000;
+
+/// Whether the kept entry `kept` still holds its name at `now_unix_ms`
+/// against a file added again ([`taken`]). On, it does; so does one not
+/// added from a file (made by voice or in the app, a skill with code
+/// waiting for its spoken yes among them, Heron's and El's P3 on #7243:
+/// an upload never takes their place), and one the manage helper may
+/// still put on: being put on, or asked and silent
+/// ([`made_skill::NOT_SAID_IN_TIME`]), within [`PUTTING_ON_MS`] of its
+/// mark. An upload left off for any other reason (the helper refused it,
+/// or was never reached, so never asked) holds nothing.
+fn holds(kept: &Value, now_unix_ms: u64) -> bool {
+    if kept["on"] == true || kept["added"] != "file" {
+        return true;
+    }
+    let not_on = kept["not_on"].as_str();
+    if not_on == Some(made_skill::CODE_BY_VOICE) {
+        return true;
+    }
+    let may_go_on = match not_on {
+        None => kept["offered_at_unix_ms"].as_u64().is_none(),
+        Some(why) => why == made_skill::NOT_SAID_IN_TIME,
+    };
+    let from = kept["goes_on_at_unix_ms"]
+        .as_u64()
+        .or_else(|| kept["at_unix_ms"].as_u64())
+        .unwrap_or(0);
+    may_go_on && now_unix_ms.saturating_sub(from) < PUTTING_ON_MS
+}
+
+/// Why `name` can't be added at `now_unix_ms` (the lamp's clock, as the
+/// kept ones' times are): a skill on the lamp by that name, in `skills` or
+/// `pushed`, or one kept in `made` (made or added) that still holds it
+/// ([`holds`]). None when it is free. A file kept and left off holds
+/// nothing (the audit's B1, 16 Nov: a file left off could never be added
+/// again, refused as "already on this lamp" while no such skill was on the
+/// page), unless the helper may still put it on: then it is still being
+/// put on, and said so.
+pub fn taken(
+    name: &str,
+    skills: &Path,
+    pushed: &Path,
+    made: &Path,
+    now_unix_ms: u64,
+) -> Option<String> {
     let on_the_lamp = |folder: &Path| std::fs::symlink_metadata(folder.join(name)).is_ok();
-    (on_the_lamp(skills)
-        || on_the_lamp(pushed)
-        || made_skill::kept_names(made).iter().any(|kept| kept == name))
-    .then(|| {
+    let held: Vec<Value> = made_skill::entries(made)
+        .into_iter()
+        .filter(|kept| kept["name"] == name && holds(kept, now_unix_ms))
+        .collect();
+    if !on_the_lamp(skills)
+        && !on_the_lamp(pushed)
+        && !held.is_empty()
+        && held.iter().all(|kept| {
+            kept["on"] != true
+                && kept["added"] == "file"
+                && kept["not_on"] != made_skill::CODE_BY_VOICE
+        })
+    {
+        return Some(format!(
+            "a skill called {name} from a file is still being put on; try again in a minute"
+        ));
+    }
+    (on_the_lamp(skills) || on_the_lamp(pushed) || !held.is_empty()).then(|| {
         format!(
             "a skill called {name} is already on this lamp, and one added from a file never takes its place"
         )
@@ -218,7 +288,13 @@ pub fn take_telling(
     // added again 3 minutes after the app removed its skill was refused as
     // "already on this lamp" until the record was dropped at 16:23.
     made_skill::drop_gone(keeping);
-    if let Some(why) = taken(&name, &place.skills, &place.pushed, &keeping.directory) {
+    if let Some(why) = taken(
+        &name,
+        &place.skills,
+        &place.pushed,
+        &keeping.directory,
+        crate::app_make::now_unix_ms(),
+    ) {
         return Err(Refused(why, None));
     }
     // An agent skill (`LAMP_UPLOAD_TO_AGENT`): the file whole, run by the
@@ -318,8 +394,27 @@ pub fn state(directory: &Path, sha256: &str) -> &'static str {
     "kept"
 }
 
+/// Why the skill added from a file `sha256`, kept in `directory`, was left
+/// off, in plain words: its `not_on`, and the manage helper's own words
+/// when its check refused it (`check_said`), so the app shows why as the
+/// skills page says why a skill doesn't load. None when nothing says.
+pub fn left_off_why(directory: &Path, sha256: &str) -> Option<String> {
+    let entries = made_skill::entries(directory);
+    let entry = entries
+        .iter()
+        .find(|entry| entry["sha256"] == sha256 && entry["added"] == "file")?;
+    let not_on = entry["not_on"].as_str().filter(|why| !why.is_empty())?;
+    Some(
+        match entry["check_said"].as_str().filter(|said| !said.is_empty()) {
+            Some(said) => format!("{not_on}: {said}"),
+            None => not_on.to_owned(),
+        },
+    )
+}
+
 /// One line on the app-make socket, if it is an upload's (`upload`) or
-/// asks what became of one (`{"added": {"sha256"}}`, [`state`]): the answer, and
+/// asks what became of one (`{"added": {"sha256"}}`, [`state`], with
+/// `why` when left off, [`left_off_why`]): the answer, and
 /// once kept, the skill to put on at once. `on` is the switch; `can_ask`,
 /// whether the say service is there to say it aloud. None for a line that
 /// is not an upload's.
@@ -337,7 +432,15 @@ pub fn line(
             return Some((json!({"refused": OFF}), None));
         }
         let sha256 = added["sha256"].as_str().unwrap_or_default();
-        return Some((json!({"state": state(&keeping.directory, sha256)}), None));
+        let state = state(&keeping.directory, sha256);
+        let mut told = json!({ "state": state });
+        // Left off: why, for the app (the audit's B2, 16 Nov).
+        if state == "left_off"
+            && let Some(why) = left_off_why(&keeping.directory, sha256)
+        {
+            told["why"] = json!(why);
+        }
+        return Some((told, None));
     }
     let upload = asked.get("upload")?;
     if !on {
@@ -515,9 +618,10 @@ mod tests {
         assert!(take(&place, &keeping, None, CARD, NOW).is_err());
         std::fs::remove_dir_all(place.pushed.join("tea-tip")).unwrap();
         take(&place, &keeping, None, CARD, NOW).unwrap();
-        // Kept here once: a second upload by that name is refused too.
+        // Kept here once and being put on now: a second upload by that
+        // name is refused too, as still being put on.
         let why = take(&place, &keeping, None, CARD, NOW + 1).unwrap_err().0;
-        assert!(why.contains("already on this lamp"), "{why}");
+        assert!(why.contains("still being put on"), "{why}");
         assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -544,6 +648,208 @@ mod tests {
         let again = take(&place, &keeping, None, CARD, NOW + 2).unwrap();
         assert_eq!(again.name, "tea-tip");
         assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The audit's B1 (16 Nov): a file kept and never put on (left off, or
+    /// cut off before it went on) holds no name. The fixed file takes its
+    /// place, one entry, the old package removed without following a link
+    /// (its target outside is untouched) and never outside the folder. On,
+    /// the name is held again.
+    #[test]
+    fn a_file_kept_but_never_put_on_can_be_added_again() {
+        use crate::make_skill_local::tests::manage_helper;
+        let (root, keeping) = keeping("upload-left-off");
+        let place = place(&root);
+        let made = take(&place, &keeping, None, CARD, NOW).unwrap();
+        // Left off: no helper to put it on.
+        made_skill::put_on(&keeping, &made).unwrap_err();
+        assert_eq!(state(&keeping.directory, &made.sha256), "left_off");
+        // Its old package a link to a file outside the folder.
+        let outside = root.join("outside.tar");
+        std::fs::write(&outside, "keep me").unwrap();
+        let link = keeping.directory.join("old-tea-tip.tar");
+        std::os::unix::fs::symlink(&outside, &link).unwrap();
+        let index = keeping.directory.join(made_skill::INDEX);
+        let mut entries = made_skill::entries(&keeping.directory);
+        entries[0]["package"] = json!("old-tea-tip.tar");
+        entries[0]["sha256"] = json!("b".repeat(64));
+        std::fs::write(&index, serde_json::to_vec(&entries).unwrap()).unwrap();
+        let again = take(&place, &keeping, None, CARD, NOW + 1).unwrap();
+        let entries = made_skill::entries(&keeping.directory);
+        assert_eq!(entries.len(), 1, "{entries:?}");
+        assert_eq!(entries[0]["sha256"], again.sha256.as_str());
+        assert!(
+            std::fs::symlink_metadata(&link).is_err(),
+            "the link removed"
+        );
+        assert_eq!(std::fs::read_to_string(&outside).unwrap(), "keep me");
+        assert!(again.package.is_file());
+        // Cut off before it went on (no word of why), long ago: free too.
+        let mut entries = made_skill::entries(&keeping.directory);
+        entries[0]["at_unix_ms"] = json!(1);
+        std::fs::write(&index, serde_json::to_vec(&entries).unwrap()).unwrap();
+        let third = take(&place, &keeping, None, CARD, NOW + 2).unwrap();
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        // On: the name is held.
+        let asked = manage_helper(&keeping.manage);
+        made_skill::put_on(&keeping, &third).unwrap();
+        asked.join().unwrap();
+        std::fs::create_dir_all(keeping.installed.join("tea-tip")).unwrap();
+        let why = take(&place, &keeping, None, CARD, NOW + 3).unwrap_err().0;
+        assert!(why.contains("already on this lamp"), "{why}");
+        // Held by the kept entry on alone, the folder aside.
+        let now = crate::app_make::now_unix_ms();
+        let elsewhere = root.join("elsewhere");
+        assert!(taken("tea-tip", &elsewhere, &elsewhere, &keeping.directory, now).is_some());
+        assert!(taken("tea-tip", &elsewhere, &elsewhere, &root.join("none"), now).is_none());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// El's and Heron's P2 on #7243: a helper asked and silent past the
+    /// voice's wait may still put the old file on (it reads the package
+    /// before it waits for the lock), so its name is held, timed from its
+    /// mark to go on (not from when it was kept), until no helper can still
+    /// take it; then the file may be added again.
+    #[test]
+    fn a_file_a_slow_helper_may_still_put_on_holds_its_name() {
+        use std::io::{BufRead, Write};
+        let (root, keeping) = keeping("upload-slow");
+        let place = place(&root);
+        let made = take(&place, &keeping, None, CARD, NOW).unwrap();
+        let listener = std::os::unix::net::UnixListener::bind(&keeping.manage).unwrap();
+        let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+        let helper = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            // Held on the lock past the voice's wait, then done.
+            done_rx.recv().unwrap();
+            let _ = writeln!(&stream, r#"{{"done": "installed"}}"#);
+        });
+        let now = crate::app_make::now_unix_ms();
+        let silent = made_skill::put_on_within(
+            &keeping.directory,
+            &keeping.manage,
+            &made.sha256,
+            now,
+            std::time::Duration::from_millis(200),
+        );
+        assert_eq!(silent, Err(made_skill::NOT_SAID_IN_TIME.to_owned()));
+        assert_eq!(state(&keeping.directory, &made.sha256), "left_off");
+        // Held: the app's retry is told it is still being put on, and the
+        // kept one stays, its package with it.
+        let why = take(&place, &keeping, None, CARD, NOW + 1).unwrap_err().0;
+        assert!(why.contains("still being put on"), "{why}");
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        assert!(made.package.is_file());
+        done_tx.send(()).unwrap();
+        helper.join().unwrap();
+        // Timed from the mark, not the keep: kept long ago, marked now,
+        // still held.
+        let index = keeping.directory.join(made_skill::INDEX);
+        let mut entries = made_skill::entries(&keeping.directory);
+        entries[0]["at_unix_ms"] = json!(1);
+        std::fs::write(&index, serde_json::to_vec(&entries).unwrap()).unwrap();
+        assert!(take(&place, &keeping, None, CARD, NOW + 2).is_err());
+        // Its mark, the helper's lock wait and the install's room past:
+        // free.
+        entries[0]["goes_on_at_unix_ms"] = json!(now - PUTTING_ON_MS - 1);
+        std::fs::write(&index, serde_json::to_vec(&entries).unwrap()).unwrap();
+        let again = take(&place, &keeping, None, CARD, NOW + 3).unwrap();
+        assert_eq!(again.name, "tea-tip");
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's and El's P3 on #7243: only an upload left off frees its
+    /// name. A skill made here and left off (a skill with code waiting for
+    /// its spoken yes, or one the helper never reached) keeps it, and so
+    /// does an upload waiting for a yes.
+    #[test]
+    fn a_made_skill_left_off_keeps_its_name_from_a_file() {
+        let (root, keeping) = keeping("upload-made-off");
+        let place = place(&root);
+        std::fs::create_dir_all(&keeping.directory).unwrap();
+        let index = keeping.directory.join(made_skill::INDEX);
+        let entry = |not_on: &str, added: bool| {
+            let mut entry = json!({"from": "local:1:1", "name": "tea-tip", "version": "1.0.0",
+                "sha256": "c".repeat(64), "package": "tea-tip-1.0.0-cccccccccccc.tar",
+                "at_unix_ms": 1, "goes_on_at_unix_ms": 1, "not_on": not_on});
+            if added {
+                entry["added"] = json!("file");
+            }
+            entry
+        };
+        for (not_on, added) in [
+            (made_skill::CODE_BY_VOICE, false),
+            (made_skill::NOT_REACHED, false),
+            ("the lamp's check didn't let it on", false),
+            (made_skill::CODE_BY_VOICE, true),
+        ] {
+            std::fs::write(&index, serde_json::to_vec(&[entry(not_on, added)]).unwrap()).unwrap();
+            let why = take(&place, &keeping, None, CARD, NOW).unwrap_err().0;
+            assert!(
+                why.contains("already on this lamp"),
+                "{not_on} {added}: {why}"
+            );
+            assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        }
+        // An upload the helper was never asked about, or refused: free.
+        for not_on in [made_skill::NOT_REACHED, "the lamp's check didn't let it on"] {
+            std::fs::write(&index, serde_json::to_vec(&[entry(not_on, true)]).unwrap()).unwrap();
+            take(&place, &keeping, None, CARD, NOW).unwrap();
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The audit's B2 (16 Nov): left off by the manage helper's check, the
+    /// app is told why, the check's own words with it, as the skills page
+    /// says why a skill doesn't load; never "it was kept but isn't on" alone.
+    #[test]
+    fn a_file_left_off_tells_the_app_why() {
+        use std::io::{BufRead, Write};
+        let (root, keeping) = keeping("upload-why");
+        let place = place(&root);
+        let asked = json!({"upload": {"skill_md": CARD}});
+        let (_, made) = line(&asked, true, true, &place, &keeping, NOW).unwrap();
+        let made = made.unwrap();
+        let listener = std::os::unix::net::UnixListener::bind(&keeping.manage).unwrap();
+        let helper = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            writeln!(
+                &stream,
+                r#"{{"refused": "not installed: its skill.toml asks for the camera, which a skill added from a file can't"}}"#
+            )
+            .unwrap();
+        });
+        let said = put_on_said(&keeping, &made);
+        helper.join().unwrap();
+        // Said aloud as before: the lamp's plain words alone.
+        assert_eq!(
+            said,
+            "I added a skill from a file but couldn't put it on: the lamp's check didn't let it on."
+        );
+        let added = json!({"added": {"sha256": made.sha256}});
+        let (told, _) = line(&added, true, true, &place, &keeping, NOW).unwrap();
+        assert_eq!(
+            told,
+            json!({
+                "state": "left_off",
+                "why": "the lamp's check didn't let it on: its skill.toml asks for the camera, \
+                        which a skill added from a file can't"
+            })
+        );
+        // Left off with no helper at all: why, with no check's words.
+        made_skill::put_on(&keeping, &made).unwrap_err();
+        let (told, _) = line(&added, true, true, &place, &keeping, NOW).unwrap();
+        assert_eq!(told["why"], "the lamp's skills couldn't be reached");
         let _ = std::fs::remove_dir_all(&root);
     }
 

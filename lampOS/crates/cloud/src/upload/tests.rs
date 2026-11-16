@@ -280,6 +280,24 @@ fn left_off_or_never_asked_is_a_failure() {
     let uploads = uploads(&dir, "http://127.0.0.1:9", &socket);
     let kept = json!({"sha256": "a".repeat(64)});
     assert_eq!(uploads.settle(kept.clone()), Err(LEFT_OFF.to_owned()));
+    // Left off and why, as lamp-voice says it (the audit's B2, 16 Nov):
+    // told to the app whole, the journal's words fixed.
+    let (socket, _seen) = voice(
+        "left-why",
+        vec![
+            json!({"state": "left_off", "why": "the lamp's check didn't let it on: its skill.toml asks for the camera"}),
+        ],
+    );
+    let told = self::uploads(&dir, "http://127.0.0.1:9", &socket)
+        .settle(kept.clone())
+        .unwrap_err();
+    assert_eq!(
+        told,
+        format!(
+            "{LEFT_OFF}: the lamp's check didn't let it on: its skill.toml asks for the camera"
+        )
+    );
+    assert_eq!(journaled(&told), LEFT_OFF);
     let mut waits = Uploads::new(
         "http://127.0.0.1:9",
         "k",
