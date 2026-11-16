@@ -1427,12 +1427,17 @@ impl ScopeLease {
     }
 
     /// Whether `args`, a `forget`'s, is exactly the forget marked by
-    /// [`Self::mark_forget_agreed`]: its `source_id` alone.
+    /// [`Self::mark_forget_agreed`]: its `source_id`, and at most the words
+    /// it was about (`about`, text), which take that person's exchanges
+    /// about it too (C128).
     pub(crate) fn agreed_forget(&self, args: &serde_json::Value) -> bool {
         let marked = self.context.forget_agreed.load(Ordering::Acquire);
         marked != 0
             && args["source_id"].as_u64() == Some(marked)
-            && args.as_object().is_some_and(|args| args.len() == 1)
+            && args.as_object().is_some_and(|args| {
+                args.iter()
+                    .all(|(key, value)| key == "source_id" || (key == "about" && value.is_string()))
+            })
     }
 
     /// Whether [`Self::mark_everything_asked`] was marked for this request.
