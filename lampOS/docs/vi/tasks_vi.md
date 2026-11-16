@@ -1115,6 +1115,55 @@ trên `PATH` đăng nhập của `lampos` (lần tìm thất bại thì giữ l�
 vẫn đúng qua nhiều vòng chỉ được ghi log một lần. Lần chạy của kỹ năng vẫn
 chỉ tới Hermes (`HarnessRunner`, ở trên).
 
+### Một lần tạo bằng giọng nói trên OpenClaw, qua đường chạy chung (`LAMP_MAKE_AGENT_ONE_PATH`, tắt, #7245)
+
+Trên lamp-c0a4 (bản build 13333, OpenClaw là mặc định, 16/11 11:46) một
+lần tạo DeepSeek không giữ được chưa bao giờ được giao: "the lamp's agent
+is OpenClaw: only Hermes has a namespace runner for a make today". Sau
+#7133, đèn OpenClaw chạy được việc của một kỹ năng nhưng chưa tạo được kỹ
+năng. Với `LAMP_MAKE_AGENT_ONE_PATH=on` của lamp-voice (tắt trừ khi đặt,
+không unit nào đặt; [switches.md](../switches.md)), lần tạo được giao cho
+agent của đèn mỗi khi lamp-tasks báo agent đó nhận lần chạy, Hermes hay
+OpenClaw, qua đường chạy chung, không có runner thứ hai:
+
+- **Dòng:** `{"op":"skill_make","rules","within_ms","one_path":true}`.
+  `one_path` là boolean, mặc định `false`; không có nó, socket tạo chạy
+  `MakeHermes`, không đổi, giống từng byte.
+- **Runner, chọn theo dữ liệu của agent:** với dòng có trường này, socket
+  tạo chọn runner như lần chạy của kỹ năng
+  (`skill_task::default_agent_takes_runs`). Hermes giữ `MakeHermes` (ở
+  trên). Agent gateway (OpenClaw) nhận `skill_make::MakeGateway`, một
+  `Runner`.
+- **Lần tạo qua gateway:** một thư mục `make-<run id>` mới trong thư mục
+  làm việc, luật trong `rules.md`, gửi thành một lượt qua
+  `harness new <engine>` của Harness trong thư mục đó (`HarnessRunner` của
+  #7133, "Lần chạy kỹ năng trên OpenClaw" bên dưới). `answer.md` được đọc
+  lại như trên. Không token nào được tạo và không lần chạy skill-start nào
+  được mở (không gọi `gateway::open_start`): lần tạo không có quyền nào.
+  Phiên Harness và thư mục bị xoá dù lần tạo kết thúc thế nào: có câu trả
+  lời, `cannot:`, quá hạn hay lỗi.
+- **Không có `lamp-skills pack` trong lần chạy:** danh sách exec cho phép
+  của OpenClaw chỉ có skill-start, nên lần tạo qua gateway bỏ bước kiểm tra
+  của hướng dẫn; giọng nói vẫn đưa câu trả lời qua toàn bộ kiểm tra và sửa
+  của nó.
+- **Câu trả lời `cannot:`** được trả về giọng nói nguyên văn, cho phương án
+  dự phòng của #7234.
+- **Một phiên (`LAMP_TASKS_ONE_SESSION`, #7258):** khi bật, lần tạo sẽ vào
+  phiên chung dưới dạng một tin nhắn thay vì phiên riêng. Lựa chọn nằm ở
+  một hàm seam duy nhất, để #7258 tiếp quản tại đó; mỗi lần tạo một phiên
+  là phương án dự phòng khi công tắc đó tắt.
+- **Nhật ký:** `tasks: make: handed to <engine> on the one run path in
+  <ms> ms`, rồi `tasks: make: <engine> session closed, folder removed`.
+  lamp-voice ghi `a skill made here: the lamp's agent is OpenClaw: handed
+  over on the one run path`.
+
+**Các hàng trên đèn (chưa chạy):** trên lamp-c0a4 với công tắc bật, từ các
+clip phát sẵn: "make me a skill that, when I say apple file, has an agent
+write three apple facts into a file for me" được agent tạo, giữ, đọc lại,
+đồng ý; "apple file" chạy nó trên OpenClaw, tệp có ba sự thật; sau đó
+không còn thư mục `make-*`, phiên Harness hay lần chạy skill-start nào; trên
+đèn Hermes, các hàng tạo kỹ năng hôm nay vẫn đạt.
+
 ### Lệnh ghi cố định của một kỹ năng tự tạo trên Hermes của đèn (`LAMP_SKILL_WRITE_AGENT`, bật trong sản phẩm)
 
 Quyết định của chủ đèn (13/11): mọi thứ chạm vào một dịch vụ đã liên kết
