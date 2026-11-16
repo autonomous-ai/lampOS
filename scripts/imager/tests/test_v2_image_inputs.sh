@@ -37,8 +37,8 @@ grep -F -- '-e OUT_IMG_SIZE=16G ' "$ROOT/explicit.txt" >/dev/null || fail 'expli
 pass explicit_size_is_forwarded
 render "$ROOT/default.txt"
 grep -F -- '-e OUT_IMG_SIZE= ' "$ROOT/default.txt" >/dev/null || fail 'default size was not forwarded'
-grep -F 'OUT_IMG_SIZE="${OUT_IMG_SIZE:-8G}"' "$BUILDER" >/dev/null || fail 'default size changed'
-pass empty_size_keeps_8G_default
+grep -F 'OUT_IMG_SIZE="${OUT_IMG_SIZE:-12G}"' "$BUILDER" >/dev/null || fail 'default size changed (12G since #7274: the agents on the image)'
+pass empty_size_keeps_12G_default
 
 # This exact block is the only variant-marker writer. Exercise the production
 # block, including its actual removal command, with no unrelated image phases.
