@@ -1171,6 +1171,7 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   | `known_faces` | knows whether a face is one it has met, never whose | the privacy switch stops it | `known_faces` |
   | `presence` | notices whether someone is at the desk, with the camera | the privacy switch stops it | `room/presence`, `room/activity` |
   | `seen` | knows when you were last seen drinking, eating or stretching, and how you sat, from pictures sent to be labelled | the privacy switch stops it | `humans/doing`, `humans/doing_seen`, `humans/posture` (#6543; `lamp-seen` publishes them, coming with phases 2 and 3) |
+  | `seen_more` | knows when you last looked tired, worked at the desk and at what, or celebrated, from pictures sent to be labelled | the privacy switch stops it | `humans/doing_more` (#6543; `lamp-seen` says it only with `LAMP_SEEN_MORE_DOINGS=on`). Its own use, apart from `seen`: a skill given drinking, eating and breaks never receives tiredness or desk work; one names this topic, and the owner agrees to it |
   | `hearing` | hears what is said to it | the privacy switch stops it | `voice/heard`, `name/heard` |
   | `room_sound` | hears how loud the room is | the privacy switch stops it | `ears/level`, `ears/sudden` |
   | `touch` | feels a touch on the lamp | — | `controls/touch`, `controls/gesture`, `controls/pet` |

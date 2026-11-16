@@ -2,12 +2,18 @@
 //! the person at the desk was seen doing and how they sat, from pictures
 //! sent to be labelled. Declared now; `lamp-seen` publishes them later.
 use lamp_bus::Kind;
-use lamp_msgs::{DoingSeen, HumanDoing, HumanPosture, declaration_of, doing_topics, first_topics};
+use lamp_msgs::{
+    DoingSeen, HumanDoing, HumanDoingMore, HumanPosture, declaration_of, doing_topics, first_topics,
+};
 use std::time::Duration;
 
 #[test]
 fn doing_and_posture_are_kept_and_a_sighting_is_an_event_apart_from_the_first_topics() {
-    for kept in [HumanDoing::declaration(), HumanPosture::declaration()] {
+    for kept in [
+        HumanDoing::declaration(),
+        HumanPosture::declaration(),
+        HumanDoingMore::declaration(),
+    ] {
         assert_eq!(kept.kind, Kind::Latest);
         assert_eq!(kept.period_ms, Some(30_000));
         assert_eq!(kept.lifespan_ms, Some(90_000));
@@ -19,6 +25,10 @@ fn doing_and_posture_are_kept_and_a_sighting_is_an_event_apart_from_the_first_to
         HumanPosture::declaration().type_name,
         "lamp_msgs/HumanPosture"
     );
+    assert_eq!(
+        HumanDoingMore::declaration().type_name,
+        "lamp_msgs/HumanDoingMore"
+    );
     let seen = DoingSeen::declaration();
     assert_eq!(seen.kind, Kind::Event);
     assert_eq!(seen.period_ms, None);
@@ -26,7 +36,12 @@ fn doing_and_posture_are_kept_and_a_sighting_is_an_event_apart_from_the_first_to
     let names: Vec<&str> = doing_topics().iter().map(|(name, _)| *name).collect();
     assert_eq!(
         names,
-        ["humans/doing", "humans/doing_seen", "humans/posture"]
+        [
+            "humans/doing",
+            "humans/doing_seen",
+            "humans/posture",
+            "humans/doing_more"
+        ]
     );
     for (name, declared) in doing_topics() {
         assert_eq!(declaration_of(name), Some(declared), "{name}");

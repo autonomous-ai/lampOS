@@ -1,6 +1,6 @@
 //! What the person at the desk was last seen doing, and how they sat, from
 //! pictures sent to be labelled (#6543, cloud perception): `humans/doing`,
-//! `humans/doing_seen` and `humans/posture`. Labels and numbers only: no
+//! `humans/doing_seen`, `humans/doing_more` and `humans/posture`. Labels and numbers only: no
 //! picture, no box, no raw label and nobody's identity. Only this sitting:
 //! the timers begin again on `room/stood_up`, so no history is kept.
 //!
@@ -74,6 +74,68 @@ impl HumanDoing {
             )));
         }
         Ok(())
+    }
+}
+
+/// The desk work last seen, as a coarse kind: never the raw label
+/// ("reading newspaper").
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeskWork {
+    /// "using computer", "playing controller".
+    Computer,
+    /// "texting".
+    Phone,
+    /// "reading", "reading book", "reading newspaper".
+    Reading,
+    /// "writing", "drawing".
+    Writing,
+    /// No desk work seen yet this sitting.
+    #[serde(rename = "none")]
+    Nothing,
+}
+
+/// The sitting's other timers (#6543): how long the person has not been
+/// seen tired, at desk work or celebrating, the desk work last seen, and
+/// how often tiredness was. A topic of its own, apart from `humans/doing`,
+/// so a skill given drinking, eating and breaks does not receive these:
+/// one reads them only by naming `humans/doing_more`, which the owner
+/// agrees to as a use of its own. Said by `lamp-seen` only with
+/// `LAMP_SEEN_MORE_DOINGS=on`.
+///
+/// Every field is always present, and each timer counts from the desk
+/// arrival until its kind is seen, as `HumanDoing`'s do. None of these ever
+/// sets `HumanDoing::last` or says `humans/doing_seen`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HumanDoingMore {
+    /// Seconds since tiredness was seen (a yawn, or a stretch of an arm or
+    /// a leg), or since the desk arrival.
+    pub tired_s_ago: u32,
+    /// How many times tiredness was newly seen this sitting (not seen in
+    /// the burst before), as a sighting is counted for `humans/doing_seen`.
+    pub tired_seen: u32,
+    /// Seconds since desk work was seen, or since the desk arrival.
+    pub desk_work_s_ago: u32,
+    /// The desk work last seen this sitting; `none` before any.
+    pub desk_work: DeskWork,
+    /// Seconds since celebrating (celebrating, clapping, applauding) was
+    /// seen, or since the desk arrival.
+    pub celebrate_s_ago: u32,
+}
+
+impl HumanDoingMore {
+    pub const TYPE: &str = "lamp_msgs/HumanDoingMore";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "humans/doing_more";
+    /// Said every 30 s while someone sits at the desk, with `humans/doing`.
+    pub const EVERY: Duration = Duration::from_secs(30);
+    /// A value means nothing this long after it was said.
+    pub const LASTS: Duration = Duration::from_secs(90);
+
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+            .every(Self::EVERY)
+            .lasting(Self::LASTS)
     }
 }
 
@@ -183,6 +245,7 @@ pub fn doing_topics() -> Vec<(&'static str, Declaration)> {
         (HumanDoing::TOPIC, HumanDoing::declaration()),
         (DoingSeen::TOPIC, DoingSeen::declaration()),
         (HumanPosture::TOPIC, HumanPosture::declaration()),
+        (HumanDoingMore::TOPIC, HumanDoingMore::declaration()),
     ]
 }
 
@@ -268,6 +331,42 @@ mod tests {
         assert!(
             serde_json::from_str::<HumanDoing>(&text.replace("drinking", "eating burger")).is_err()
         );
+    }
+
+    #[test]
+    fn doing_more_is_three_timers_a_count_and_a_coarse_desk_work() {
+        let more = HumanDoingMore {
+            tired_s_ago: 60,
+            tired_seen: 2,
+            desk_work_s_ago: 0,
+            desk_work: DeskWork::Computer,
+            celebrate_s_ago: 600,
+        };
+        let text = r#"{"tired_s_ago":60,"tired_seen":2,"desk_work_s_ago":0,"desk_work":"computer","celebrate_s_ago":600}"#;
+        round_trip(&more, text);
+        for field in [
+            "tired_s_ago",
+            "tired_seen",
+            "desk_work_s_ago",
+            "desk_work",
+            "celebrate_s_ago",
+        ] {
+            needs::<HumanDoingMore>(text, field);
+        }
+        for kind in ["computer", "phone", "reading", "writing", "none"] {
+            let text = text.replace("computer", kind);
+            assert!(
+                serde_json::from_str::<HumanDoingMore>(&text).is_ok(),
+                "{kind}"
+            );
+        }
+        // Never a raw label, and never an emotion.
+        for label in ["using computer", "texting", "laughing"] {
+            assert!(
+                serde_json::from_str::<HumanDoingMore>(&text.replace("computer", label)).is_err(),
+                "{label}"
+            );
+        }
     }
 
     #[test]
