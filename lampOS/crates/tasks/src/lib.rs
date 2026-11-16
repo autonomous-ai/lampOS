@@ -23,4 +23,5 @@ pub mod skill_keys;
 pub mod skill_make;
 pub mod skill_start;
 pub mod skill_task;
+pub mod steps;
 pub mod store;

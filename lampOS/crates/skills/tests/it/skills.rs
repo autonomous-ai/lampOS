@@ -756,6 +756,13 @@ fn a_skill_reads_and_does_only_what_its_permissions_declare() {
             "\"voice/state\", \"voice/state\"]",
             "[permissions] topics lists one twice",
         ),
+        // An agent's steps carry its words: never a skill's to read (#7267).
+        (
+            "welcome-back",
+            "\"voice/state\"]",
+            "\"voice/state\", \"tasks/step\"]",
+            "[permissions] topics: tasks/step is never a skill's to read",
+        ),
         (
             "welcome-back",
             "speak = true\n",
