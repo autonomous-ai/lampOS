@@ -2,7 +2,7 @@ use lamp_bus::Bus;
 use lamp_msgs::{AgentState, Diagnostic, Level, Sign, TaskStatus};
 use lamp_tasks::{
     engine::{CLOSE_RETRY_MS, CLOSE_TRIES, Clock as Sample, WATCH_EARLY_MS},
-    follow::WatchLane,
+    follow::{FOLLOW_TRIES, WatchLane},
     harness::{
         AccountMachine, Closed, Ended, EngineKind, EngineRow, Launch, LaunchOutcome, Listed,
         Observation, SessionSeen, SignIn, Target, WatchEnd, WatchEvent,
@@ -101,6 +101,9 @@ struct Counts {
     /// What the held `watch` says next, once set; `done` and `failed` end
     /// it, as `Cli::watch` does.
     watch_says: Mutex<Option<WatchEvent>>,
+    /// Each `watch` fails before its first line while set, as a child that
+    /// cannot reach Harness (#7122).
+    watch_fails: AtomicBool,
     /// `show` finds the agent idle with this answer while set, as Harness
     /// gives it: its `ask` is the task's own text.
     plain: Mutex<Option<String>>,
@@ -210,6 +213,9 @@ impl WatchLane for ScriptWatch {
     ) -> WatchEnd {
         assert_eq!(machine, "0123456789abcdef0123456789abcdef");
         self.0.watches.lock().unwrap().push(agent.to_owned());
+        if self.0.watch_fails.load(Ordering::SeqCst) {
+            return WatchEnd::Failed("DISCONNECTED".into());
+        }
         self.0.watching.fetch_add(1, Ordering::SeqCst);
         // The first line is how the harness stands now.
         on_event(WatchEvent::Working);
@@ -1700,6 +1706,86 @@ fn a_held_watch_reads_the_agent_at_once_on_done_and_is_let_go() {
     assert_eq!(s.counts.watching.load(Ordering::SeqCst), 0);
     assert_eq!(s.counts.watches.lock().unwrap().len(), 1);
     assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1);
+}
+
+/// #7122: a watch that fails before its first line [`FOLLOW_TRIES`] times
+/// in a row is given up, and none is started again; the task is still the
+/// watch's looks', which find it settled: it settles once on
+/// `tasks/status`, with one read.
+#[test]
+fn a_watch_given_up_still_leaves_the_task_to_the_looks_and_it_settles_once() {
+    let mut s = Running::unstarted(false, true, true, false);
+    s.config.push_watch = true;
+    s.counts.watch_fails.store(true, Ordering::SeqCst);
+    s.start();
+    let bus = Bus::new(&s.config.bus_root).unwrap();
+    let mut watch = bus
+        .subscribe_typed(TaskStatus::TOPIC, "tasks_test", TaskStatus::TYPE)
+        .unwrap();
+    thread::sleep(Duration::from_millis(250));
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    let id = prepared["id"].as_u64().unwrap();
+    let places = |status: &TaskStatus| {
+        [
+            status.tasks.iter().any(|task| task.task == id),
+            status.unread.contains(&id),
+            status.settled.iter().any(|settled| settled.task == id),
+        ]
+    };
+    // The watch fails at once, then after 3 s and 10 s: given up.
+    let start = Instant::now();
+    while s.counts.watches.lock().unwrap().len() < FOLLOW_TRIES as usize {
+        assert!(
+            start.elapsed() < Duration::from_secs(20),
+            "watches started: {}",
+            s.counts.watches.lock().unwrap().len()
+        );
+        thread::sleep(Duration::from_millis(20));
+    }
+    thread::sleep(Duration::from_millis(200));
+    assert_eq!(
+        s.counts.watches.lock().unwrap().len(),
+        FOLLOW_TRIES as usize,
+        "a watch started after it was given up"
+    );
+    assert_eq!(s.counts.watching.load(Ordering::SeqCst), 0);
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 0);
+    // Still worked on, never settled, while the watch failed.
+    let mut last = None;
+    while let Some(message) = watch.recv(Duration::from_millis(100)).unwrap() {
+        let status: TaskStatus = message.parse().unwrap();
+        assert_ne!(places(&status), [false, false, true], "{status:?}");
+        last = Some(status);
+    }
+    if let Some(status) = last {
+        assert_eq!(places(&status), [true, false, false], "{status:?}");
+    }
+    // The watch's first look finds it settled: one value moves it, once.
+    s.clock.0.lock().unwrap().monotonic_ms = WATCH_EARLY_MS;
+    let moved = loop {
+        let status = next_status(&mut watch);
+        if places(&status) != [true, false, false] {
+            break status;
+        }
+    };
+    assert_eq!(places(&moved), [false, false, true], "{moved:?}");
+    assert_eq!(moved.settled.len(), 1, "{moved:?}");
+    assert_eq!(moved.settled[0].state, AgentState::NeedsInput);
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1);
+    // Nothing more: no second settle, no further read, no new watch.
+    let quiet = Instant::now();
+    while let Some(message) = watch.recv(Duration::from_millis(300)).unwrap() {
+        assert!(quiet.elapsed() < Duration::from_secs(3), "values go on");
+        let status: TaskStatus = message.parse().unwrap();
+        assert_eq!(places(&status), [false, false, true], "{status:?}");
+        assert_eq!(status.settled.len(), 1, "{status:?}");
+    }
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        s.counts.watches.lock().unwrap().len(),
+        FOLLOW_TRIES as usize
+    );
 }
 
 /// #5230: a watch held when the part stops is ended with it.
