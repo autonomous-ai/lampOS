@@ -362,6 +362,10 @@ Environment=LAMP_SPOKEN_TO=on
 # Inside a live back-and-forth a follow-up the model lets pass still renews the call for the caller's next line, and the
 # next line is told it is theirs (#7332: lamp-74ff, 16 Nov, three of the owner's lines in 26 s held). Caller's face only.
 Environment=LAMP_BUSY_FOLLOW_UP_RENEWS=on
+# A face turned to the lamp lets a line out only when it is seen speaking it or the line is in the conversation's voice;
+# a still face while others talk is talk for the room (#7297, docs/switches.md): lamp-74ff, 16 Nov, answered desk talk
+# as "someone is turned to the lamp" with no face seen speaking; row-7297c on lamp-52e6. Needs LAMP_EYES_SPEAKING.
+Environment=LAMP_TURNED_FACE_SPEAKS=on
 # "Lamp," that Deepgram writes "One," calls the lamp, "Wang," and "Lung," too with one person in a conversation,
 # and a retry of a line held as said to someone by name is no reply to them (#4710, lamp-3e83 2 Nov). On after the
 # tester's check on lamp-3e83 (3 Nov, 9680: "One, …" and its retry answered, held on 2 Nov) and lamp-06c1's played
