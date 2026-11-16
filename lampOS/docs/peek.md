@@ -35,6 +35,29 @@ are `card`, `badge` with `badge-amber` (the device), `badge-teal` (the lamp's
 parts), `badge-blue` (the agent), `badge-green`, `badge-red`, `badge-grey`,
 and `chip`.
 
+Timeline and Turns show each turn as V1's turn card (#7208, step 2;
+`docs/flow-monitor.md`'s "Turn Item Display" in the V1 repo), newest first.
+A Timeline card's header line has the type icon (🎙 someone's words, ✦ the
+lamp's own) and what took the turn, the path badge (**LOCAL** green,
+**AGENT** blue, **SKILL** teal), the status badge (**ACTIVE** amber and
+pulsing while the newest turn has not ended, **DONE** green, **ERROR** red
+when the record says the answer failed; an older turn that never ended says
+**NO END** in grey), **⏱** the whole turn from its first step to its end,
+and **⚡** the first token from the record, both in ms with V1's colours:
+⏱ green to 5 s, amber to 15 s, red past it; ⚡ green to 3 s, amber to 8 s,
+red past it (`page::total`, `page::first_token`). Then the **IN** line (the
+words heard), the **DID** chips (the light, each skill's stage) and the
+**OUT** line (the words said, the record's first audio and how it ended),
+then each step as a chip with its time from the end of speech, the slowest
+marked. The words show only in monitor mode; otherwise IN and OUT say
+"words hidden", whatever a turn carries. The path is read from the bus
+alone: a skill's stage makes it SKILL, words said or a first token AGENT,
+anything else LOCAL. More than 60 s between one turn's end and the next
+one's start draws a break, as V1's session grouping does
+(`page::BREAK_MS`). A Turns card has the type icon, what took the turn, the
+status (DONE once the record has an outcome), ⚡, the three steps as chips
+and an **END** line.
+
 | Section | What it shows | Where it comes from |
 |---|---|---|
 | Overview | The voice's state; the light shown (`on, blue at 3`, `off`); someone here or not; the camera's state, faces in view and who is followed; the lamp's health level and its worst item; the newest turn's first audio and the median of the last ten; any unit running another build than its release; the Harness tasks working, per engine, and how many were just handed over (`1 working (OpenClaw 1, Hermes 0)`, `none working, 1 just handed over`, `none working`) | the kept values below, `light/state`, the turns, `/status`'s rows, `tasks/status` |
