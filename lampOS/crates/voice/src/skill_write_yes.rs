@@ -448,6 +448,27 @@ pub fn code_yes_awaited(sha256: &str, now: Instant) -> bool {
     })
 }
 
+/// The made skill with code of its own that is not on and whose yes was
+/// asked before `request` (#7270, `crate::made_not_on`): its name, and
+/// whether its yes is past [`YES_WITHIN`] at `now`, so no yes takes it any
+/// more. Only within `within` of its wait's start; never a remove's, a
+/// skill's task's or a write's wait (a skill that writes is on already),
+/// and none once the wait is answered, dropped or taken by its yes.
+pub fn code_not_on(request: u64, now: Instant, within: Duration) -> Option<(String, bool)> {
+    kept::waiting(|waiting| {
+        let waiting = waiting.as_ref().filter(|waiting| {
+            waiting.asks.code
+                && !waiting.asks.remove
+                && request > waiting.request
+                && now.saturating_duration_since(waiting.at) <= within
+        })?;
+        Some((
+            waiting.asks.skill.clone(),
+            now.saturating_duration_since(waiting.at) > YES_WITHIN,
+        ))
+    })
+}
+
 /// Whether a made skill's writes wait for the yes at `now`: the echo hold
 /// is on ([`crate::second_provider`]).
 pub fn awaited(now: Instant) -> bool {
