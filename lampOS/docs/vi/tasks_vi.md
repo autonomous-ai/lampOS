@@ -2559,8 +2559,11 @@ bước lên bus thành `tasks/step` (`TaskStep`, `crates/tasks/src/steps.rs`).
   đọc lỗi về sau thì không đăng gì, và không đặt lại hay dời vị trí đã đọc.
 - **Chỉ lời của chính việc đó:** mỗi việc bắt đầu sau `seq` lớn nhất của
   phiên vào lúc việc được theo dõi lần đầu. Không đọc gì tới `seq` đó, kể
-  cả với việc giao từ lần khởi động trước. Khi một việc mới bắt đầu trên
-  cùng phiên, việc cũ chỉ đọc tới chỗ việc mới bắt đầu.
+  cả với việc giao từ lần khởi động trước. Mỗi việc được giữ kèm agent id
+  của Harness. Khi một việc mới bắt đầu trên cùng agent, việc cũ chỉ đọc
+  tới chỗ việc mới bắt đầu. Điều này vẫn đúng khi việc cũ bắt đầu trước lúc
+  OpenClaw tạo phiên: khi chưa có phiên, việc cũ không đọc gì. Giới hạn
+  này chỉ được xóa khi id của phiên đổi.
 - **Cái gì thành một bước:**
   - Mỗi `toolCall` thành `call`, được đăng ngay với `ok` trống (đang
     chạy). `args` là `arguments.command`, hoặc JSON gọn của các tham số.
@@ -2576,9 +2579,10 @@ bước lên bus thành `tasks/step` (`TaskStep`, `crates/tasks/src/steps.rs`).
   `event_zstd` (27 trên 115 dòng ở 52e6, là các kết quả tool lớn) được giải
   nén bằng `ruzstd` 0.7.3, thư viện thuần Rust, không cần build C. Việc
   giải nén chạy theo luồng và dừng ở 64 KiB + 1 byte, không bao giờ giải
-  nén thêm. Dòng giải nén ra quá 64 KiB, hoặc bị hỏng, thì bị bỏ qua và
-  được đếm.
-- **Không kỹ năng nào được đọc:** `tasks/step` nằm trong `NEVER_READ` của
+  nén thêm. Dòng giải nén ra quá 64 KiB, bị hỏng, hoặc có frame đòi window
+  lớn hơn 1 MiB (đọc header trước, vì bộ giải nén sẽ giữ trước cả window,
+  tới 100 MiB), thì bị bỏ qua và được đếm.
+- **Không kỹ năng nào được đọc:** `tasks/step` (cùng `voice/decision`) nằm trong `NEVER_READ` của
   `lamp-skills`.
 - **Giới hạn:**
   - Tối đa 50 bước một việc; các bước sau bị bỏ và được đếm.

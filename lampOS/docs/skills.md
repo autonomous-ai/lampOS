@@ -2541,10 +2541,12 @@ core = []       # a core skill's alone (kind = "core"): its core-only grants
   what it lacks: `lamp-skills: not loaded: /var/lib/lampOS/skills/x: not
   permitted: a [[while]] reads voice/state, and voice/state is not in
   [permissions] topics`. A topic in `NEVER_READ` is no skill's to read,
-  whatever it lists: `tasks/step`, an agent's steps with its tool's words,
-  shown only on the owner's dev monitor (#7267, [tasks.md](tasks.md), "An
-  agent's steps"). A skill that lists it is refused at load with
-  `[permissions] topics: tasks/step is never a skill's to read`.
+  whatever it lists (#7267). There are two: `tasks/step`, an agent's
+  steps with its tool's words ([tasks.md](tasks.md), "An agent's steps"),
+  and `voice/decision`, the tools a turn called for what was said. Both
+  are shown only on the owner's dev monitor. A skill that lists one is
+  refused at load with `[permissions] topics: <topic> is never a skill's
+  to read`.
   Declaring more than it reads is allowed; the
   program subscribes only to what a skill's triggers, conditions, look at
   a face and `[again]` read and it lists (a say's words come from the
