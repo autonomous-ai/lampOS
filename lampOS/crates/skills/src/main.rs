@@ -7039,6 +7039,54 @@ mod tests {
         assert_eq!(heard.len(), 1, "{heard:?}");
     }
 
+    /// Task news's run with `voice/mute` saying muted by `muted_by`.
+    fn tell_news_muted_by(prefix: &str, muted_by: lamp_msgs::MutedBy) -> (String, usize) {
+        let dir = tempfile::Builder::new()
+            .prefix(prefix)
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        bus.publisher_declared(
+            lamp_msgs::VoiceMute::TOPIC,
+            &lamp_msgs::VoiceMute::declaration(),
+            "voice",
+        )
+        .unwrap()
+        .publish_json(
+            clock::now_us(),
+            &lamp_msgs::VoiceMute {
+                muted: true,
+                reason: None,
+                muted_by: Some(muted_by),
+                control: false,
+                hears_name: false,
+            },
+        )
+        .unwrap();
+        let voice = muted_voice(UnixListener::bind(dir.path().join("say.sock")).unwrap(), 1);
+        let outcome = tell_news(dir.path(), &bus);
+        drop(UnixStream::connect(dir.path().join("say.sock")));
+        (outcome, voice.join().unwrap().len())
+    }
+
+    /// lamp-c0a4, 16 Nov 15:35 and 12:59: the voice back from a fault,
+    /// muted by the restart guard, is not privacy: its news is held, asked
+    /// again, and told once.
+    #[test]
+    fn task_news_refused_under_the_restart_guards_mute_is_held_and_told_once() {
+        let (outcome, asked) = tell_news_muted_by("ng", lamp_msgs::MutedBy::RestartGuard);
+        assert_eq!(outcome, "say: spoken");
+        assert_eq!(asked, 2, "asked again once, and told");
+    }
+
+    /// Muted by the person's button, news refused is not held, as before.
+    #[test]
+    fn task_news_refused_muted_by_the_button_is_not_held() {
+        let (outcome, asked) = tell_news_muted_by("nb", lamp_msgs::MutedBy::Button);
+        assert_eq!(outcome, "say: refused (the lamp is muted)");
+        assert_eq!(asked, 1);
+    }
+
     /// The say service [`voice`] runs.
     struct Voice {
         stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
