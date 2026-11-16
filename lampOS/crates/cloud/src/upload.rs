@@ -18,7 +18,8 @@
 //!   refused, [`FROM_THE_STORE`]; the Store has its own route.
 //! - **No code**: a `run.py`, or any file but `skill.toml` and `SKILL.md`.
 //! - **A name the lamp holds** (core, Store, pushed; lamp-voice adds those
-//!   made or added here) is refused, never replaced.
+//!   made or added here that are on or being put on) is refused, never
+//!   replaced.
 //!
 //! Then the two files go to lamp-voice's app-make socket
 //! (`lamp_voice::upload_skill`), which holds them to a made skill's checks
@@ -179,6 +180,10 @@ pub fn journaled(why: &str) -> &str {
     ];
     if FIXED.contains(&why) {
         why
+    // Left off, and why (lamp-voice's words, which may name the skill):
+    // the fixed words alone.
+    } else if why.starts_with(&format!("{LEFT_OFF}: ")) {
+        LEFT_OFF
     } else {
         REFUSED_BY_ITS_CHECKS
     }
@@ -654,20 +659,24 @@ impl Uploads {
     /// What became of the skill `kept`, asked of lamp-voice every
     /// [`Self::settle_every`] for at most [`Self::settle_within`]: on by a
     /// spoken yes is `success` (with `"state": "on"`), left off, let go or
-    /// never asked is `failure` with why.
+    /// never asked is `failure` with why (left off: [`LEFT_OFF`] and
+    /// lamp-voice's why, [`left_off`]).
     pub fn settle(&self, mut kept: Value) -> Result<Option<Value>, String> {
         let sha256 = kept["sha256"].as_str().unwrap_or_default().to_owned();
         let until = Instant::now() + self.settle_within;
         loop {
-            let state = exchange(&self.socket, &json!({"added": {"sha256": sha256}}))
-                .ok()
+            let told = exchange(&self.socket, &json!({"added": {"sha256": sha256}})).ok();
+            let state = told
+                .as_ref()
                 .and_then(|told| told["state"].as_str().map(str::to_owned));
             match state.as_deref() {
                 Some("on") => {
                     kept["state"] = json!("on");
                     return Ok(Some(kept));
                 }
-                Some("left_off") => return Err(LEFT_OFF.into()),
+                // Why it was left off, as lamp-voice says it (the audit's
+                // B2, 16 Nov), so the app shows it.
+                Some("left_off") => return Err(left_off(told.as_ref())),
                 Some("none") => return Err(LET_GO.into()),
                 _ if Instant::now() >= until => return Err(NEVER_ASKED.into()),
                 _ => std::thread::sleep(self.settle_every),
@@ -675,6 +684,29 @@ impl Uploads {
         }
     }
 }
+
+/// The failure of a skill left off: [`LEFT_OFF`], then why when lamp-voice
+/// says it (`{"state": "left_off", "why"}`, its `not_on` and the manage
+/// helper's own words), at most [`MOST_WHY_BYTES`].
+fn left_off(told: Option<&Value>) -> String {
+    let why = told
+        .and_then(|told| told["why"].as_str())
+        .map(str::trim)
+        .filter(|why| !why.is_empty());
+    match why {
+        Some(why) => {
+            let mut at = why.len().min(MOST_WHY_BYTES);
+            while !why.is_char_boundary(at) {
+                at -= 1;
+            }
+            format!("{LEFT_OFF}: {}", &why[..at])
+        }
+        None => LEFT_OFF.to_owned(),
+    }
+}
+
+/// The most bytes of lamp-voice's why a skill was left off, told to the app.
+const MOST_WHY_BYTES: usize = 400;
 
 /// One request on a runtime of its own, never longer than [`WITHIN`]: no
 /// redirect followed, HTTPS only unless `https_only` is off (tests). The

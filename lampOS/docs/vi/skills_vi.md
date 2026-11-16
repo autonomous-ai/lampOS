@@ -1930,7 +1930,19 @@ cả hai người viết.
   Khi agent không trả lời (không có lần chạy tạo ở đây, không trả lời trong
   90 giây, lỗi), DeepSeek khi đó được hỏi một lần, không được sửa, và câu
   trả lời của nó là kết quả, như khi DeepSeek thất bại trước thì câu trả
-  lời duy nhất của nó giữ nguyên. Khi đèn không có agent Hermes thì không
+  lời duy nhất của nó giữ nguyên. Khi agent không tạo được vì lý do phía
+  nó (lamp-tasks chỉ tạo một lần một, `busy`; lần chạy lỗi, `run_failed`;
+  `no_answer`; không trả lời trong 90 giây) và thất bại của DeepSeek giữ
+  nguyên, người dùng nghe câu của agent thay cho lời khuyên "Try asking for
+  one thing" (mục A3, 16/11): "The lamp's agent is busy; ask me again in a
+  minute.", "The lamp's agent didn't answer in time; try again." hoặc "The
+  lamp's agent couldn't make it just now; try again."; khi rốt cuộc không
+  có agent (`NoAgent`), câu nói rõ cái thiếu, không bao giờ "try again":
+  "I couldn't make that one: this lamp has no agent set up to make it."
+  (`AGENT_MISSING`; `make_skill_agent::not_made_try`,
+  `make_skill_local::agent_side`).
+  Không có lần chạy tạo ở đây (`NoMakeRun`) thì thất bại của DeepSeek giữ
+  nguyên như cũ. Khi đèn không có agent Hermes thì không
   đổi gì: DeepSeek tự tạo với các lần sửa của nó. Tắt một trong hai công
   tắc thì mọi lần tạo vẫn thử DeepSeek trước, như trước.
 - **Những lời từ chối của chính brief vẫn là của DeepSeek.** Một `cannot:`
@@ -2363,7 +2375,14 @@ từ chối ngay như mọi câu nói, và kỹ năng vẫn bật.
 - `{"made": {"request_id"}}`: trạng thái của lời nhờ từ ứng dụng: `making`
   (đang tạo, hoặc đã giữ và đang bật), `on`, hoặc `not_kept` kèm `why` (lời
   rõ ràng của người tạo, "it couldn't be put on: …" khi helper không bật,
-  hoặc "it wasn't put on" khi giữ hơn 30 phút mà chưa bật). Kỹ năng đã giữ
+  hoặc "it wasn't put on" khi giữ hơn 30 phút mà chưa bật). Lời nhờ còn
+  đang tạo khi `lamp-voice` dừng (khởi động lại hay cập nhật; chưa giữ kỹ
+  năng nào và chưa có lý do) được đánh dấu ở lần khởi động sau, trước khi
+  socket nhận lời nhờ, là `not_kept` với "the lamp restarted while making
+  it; try again" (`app_make::cut_by_restart`, `app_make::RESTARTED`; mục
+  B4 của bản rà soát, 16/11: nó hiện `making` mãi): việc tạo chạy trên các
+  luồng của chính `lamp-voice`, nên lúc đó không có gì đang tạo. Lời nhờ
+  khác có thể bắt đầu ngay. Kỹ năng đã giữ
   có mã riêng, đã được đọc lại tại đèn và đang chờ lời đồng ý bằng lời, là
   `not_kept` kèm `"awaits_yes": true` bên cạnh `why` (#6307, "Tạo từ ứng
   dụng, đọc lại tại đèn" ở trên); ngoài ra không có trường này. Lời nhờ mới
@@ -2662,7 +2681,25 @@ năng), nên sau khi khởi động lại nó được hỏi tiếp và ứng d�
 
 1. **Tên đèn đang giữ bị từ chối, không bao giờ bị thay**: kỹ năng có tên
    đó trên đèn (lõi, từ Store, tự tạo), được đẩy từ máy tính, hay đang giữ
-   ở đây, tự tạo hoặc thêm từ tệp (`upload_skill::taken`).
+   ở đây mà vẫn giữ tên (`upload_skill::taken`, `holds`): đang bật; tạo
+   trên đèn (bằng giọng nói hay trong ứng dụng) mà chưa bật, kể cả kỹ năng
+   có mã đang chờ lời "có", mà tệp tải lên không bao giờ thay; tệp tải lên
+   đang chờ lời "có" (`CODE_BY_VOICE`); và tệp tải lên mà helper quản lý
+   vẫn có thể bật, đang bật hoặc đã được hỏi mà im quá 8 s của giọng nói
+   ("the lamp didn't say in time whether it is on",
+   `made_skill::NOT_SAID_IN_TIME`), trong 64 s kể từ dấu bật
+   (`goes_on_at_unix_ms`, trước khi đánh dấu thì là lúc giữ;
+   `upload_skill::PUTTING_ON_MS`: 30 s của dấu, 4 s chờ khóa của helper,
+   `HELPER_LOCK_WAIT`, vì helper đọc gói trước khi khóa, và 30 s cho việc
+   cài; P2 của El và Heron trên #7243), lúc đó bị từ chối là "a skill
+   called NAME from a file is still being put on; try again in a minute".
+   Tệp tải lên bị để tắt vì lý do khác (helper từ chối, hoặc không liên lạc
+   được nên chưa hề được hỏi) không giữ tên (mục B1 của bản rà soát, 16/11:
+   tệp bị để tắt không bao giờ thêm lại được, bị từ chối là "already on
+   this lamp" dù trang không có kỹ năng đó): tệp mới thay chỗ nó trong các
+   kỹ năng đã giữ, một mục, gói cũ bị xóa khỏi thư mục kỹ năng tự tạo chỉ
+   theo tên (không `/`, không bắt đầu bằng `.`), symlink bị xóa chứ không
+   bị đi theo.
 2. **Một `SKILL.md` trần** thành một kỹ năng viết (`upload_skill::written`):
    không có trigger, `tool` theo tên kỹ năng (`-` thành `_`), chỉ có quyền
    `speak`, và một bước `say` là phần chữ sau front matter trên một dòng
@@ -2686,7 +2723,15 @@ năng), nên sau khi khởi động lại nó được hỏi tiếp và ứng d�
    chuyện (`app_make::say_line`): "I added NAME from
    a file, not from the Skills Store, and it's on: WHAT IT DOES, using WHAT IT USES."
    (`upload_skill::on_line`), hoặc "I added a skill from a file but
-   couldn't put it on: <lý do>." (`upload_skill::not_on_line`).
+   couldn't put it on: <lý do>." (`upload_skill::not_on_line`). Khi bị để
+   tắt, ứng dụng được báo lý do: `{"added": {"sha256"}}` trả lời
+   `{"state": "left_off", "why"}`, là `not_on` và, khi kiểm tra của helper
+   quản lý từ chối, lời của chính helper sau đó (giữ là `check_said`, bỏ
+   "not installed: ", tối đa 300 byte, ghi cùng một lần với `not_on`;
+   `upload_skill::left_off_why`), như
+   trang kỹ năng báo vì sao một kỹ năng không tải được (mục B2, 16/11);
+   `lamp-cloud` gửi `failure` "it was kept but isn't on: <why>". Chỉ
+   `not_on` dễ hiểu được nói ra.
 7. **Helper quản lý kiểm tra lại** (`install_made`): thẻ có `added: file`
    theo `capped_added`, và không bao giờ thay chỗ kỹ năng nào, kể cả kỹ
    năng tự tạo.

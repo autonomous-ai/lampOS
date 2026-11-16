@@ -1597,7 +1597,10 @@ is Backend3's.
    code), and so is one with any file but `skill.toml` and `SKILL.md`, or
    either longer than 8 KiB. A skill by its name on the lamp
    (`/var/lib/lampOS/skills`, core, from the Store or made) or pushed
-   (`/var/lib/lampOS/skills-dev`) is refused, never replaced. A made or
+   (`/var/lib/lampOS/skills-dev`) is refused, never replaced; one kept by
+   `lamp-voice` and left off holds no name once no manage helper can still
+   put it on, and the new file takes its place there ([skills.md](skills.md), "Added from a file"; the audit's
+   B1, 16 Nov). A made or
    added skill removed since (by the app or `lamp-skills remove`) is
    dropped from the kept ones first (`made_skill::drop_gone`, as a voice
    make's name is), so the same file can be added again at once (lamp-9adf,
@@ -1613,7 +1616,12 @@ is Backend3's.
    every 5 s, for at most 2 h: `on` is `success`; `left_off` (since #5977,
    kept and not put on by the manage helper) is `failure`, said with
    `lamp-cloud`'s own words, "it was kept but isn't on"
-   (`upload::LEFT_OFF`; never asked about: "it was kept but never put on",
+   (`upload::LEFT_OFF`), then `: ` and why when `lamp-voice` says it
+   (`{"state": "left_off", "why"}`: its `not_on` and the manage helper's
+   own words, at most 400 bytes, `upload::left_off`; the audit's B2, 16
+   Nov: the app showed no reason), as the skills page says why a skill
+   doesn't load; the journal keeps "it was kept but isn't on" alone, as
+   the why may name the skill (never asked about: "it was kept but never put on",
    `upload::NEVER_ASKED`); let go, or not on within the wait, is `failure` too. The next upload need not wait
    for it.
 7. **The result** goes to the app as the kind's second reply, on the
@@ -1644,7 +1652,7 @@ The journal says the bytes taken, kept or not and why not, and whether a
 yes put it on, never the file's words or its name (`upload::tests`).
 
 Tests: `upload::tests` (the switch and the kind's id; a bare SKILL.md taken
-from the message with the key and `success` only once on; left off or
+from the message with the key and `success` only once on; left off (with why when told) or
 never asked a failure; a package's refusal; a SHA-256, size, id or format
 that doesn't match; too big; a Store-signed package; a bare card with
 CRLF read as a card; `run.py` and other
