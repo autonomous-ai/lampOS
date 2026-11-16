@@ -2779,8 +2779,11 @@ impl Rig {
                             // closes before that exit can be read, so the
                             // receive error alone is no failure (lamp-52e6's
                             // reboot, 27 Oct 16:37: `Transport endpoint is
-                            // not connected`, #3697).
-                            let ends_itself = privacy_controls && worker.role == "privacy";
+                            // not connected`, #3697). Off Linux any worker's
+                            // closed socket reads as ECONNRESET (`os error 54`,
+                            // run 4 of the Mac start): the same, never on Linux.
+                            let ends_itself = (privacy_controls && worker.role == "privacy")
+                                || crate::peer_stop::control_receive_of_ended_worker(error.kind());
                             if !ends_itself {
                                 failure.push(CleanupStage::ControlReceive, &worker.role, error);
                             }
