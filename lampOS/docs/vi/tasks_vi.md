@@ -1286,6 +1286,15 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   native), script còn chạy bản static một lần như `skill-start` không có
   run id, và nó phải thoát với mã 2. Nên launcher không chạy `ld.so` và
   không chạy code preload nào trước `main()`.
+- **Socket của lamp-control trong gateway (#7135).** Namespace của OpenClaw
+  cho thấy socket của lamp-control (`AGENT_NS_TASKS_LINE`). Khi bật one run
+  path, gateway yêu cầu khởi động lamp-control và chạy sau service đó, rồi
+  chờ socket thực sự tồn tại trước khi tạo mount view (tối đa 60 lần chờ một
+  giây). Vẫn chưa có socket thì ghi một dòng log và khởi động không có nó
+  (đèn chưa setup thì chưa có lamp-control); khi tắt switch và khi cài
+  đặt/đọc version thì không chờ. Nếu socket bị thay thế sau đó, vẫn cần khởi
+  động lại gateway. Vòng đầu tiên sau bản cập nhật này ghi lại script
+  namespace và unit, rồi khởi động lại gateway một lần.
 - **Socket.** Launcher gửi run id tới `/run/lampos-skill-start/start.sock`
   (0600). lamp-update sở hữu thư mục `/run/lampos-skill-start` (0755, của
   `lampos`): unit của gateway OpenClaw tạo nó làm `RuntimeDirectory` ở mỗi
