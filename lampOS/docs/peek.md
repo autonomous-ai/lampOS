@@ -38,21 +38,29 @@ and `chip`.
 Timeline and Turns show each turn as V1's turn card (#7208, step 2;
 `docs/flow-monitor.md`'s "Turn Item Display" in the V1 repo), newest first.
 A Timeline card's header line has the type icon (🎙 someone's words, ✦ the
-lamp's own) and what took the turn, the path badge (**LOCAL** green,
-**AGENT** blue, **SKILL** teal), the status badge (**ACTIVE** amber and
-pulsing while the newest turn has not ended, **DONE** green, **ERROR** red
-when the record says the answer failed; an older turn that never ended says
-**NO END** in grey), **⏱** the whole turn from its first step to its end,
-and **⚡** the first token from the record, both in ms with V1's colours:
-⏱ green to 5 s, amber to 15 s, red past it; ⚡ green to 3 s, amber to 8 s,
-red past it (`page::total`, `page::first_token`). Then the **IN** line (the
-words heard), the **DID** chips (the light, each skill's stage) and the
-**OUT** line (the words said, the record's first audio and how it ended),
-then each step as a chip with its time from the end of speech, the slowest
-marked. The words show only in monitor mode; otherwise IN and OUT say
-"words hidden", whatever a turn carries. The path is read from the bus
-alone: a skill's stage makes it SKILL, words said or a first token AGENT,
-anything else LOCAL. More than 60 s between one turn's end and the next
+lamp's own) and what took the turn, the path badge from the voice's
+decision (#7267, [below](#what-the-lamp-decided-and-what-its-agent-did-7267)):
+**LOCAL · weather** green (with the tools it called), **AGENT · OpenClaw ·
+task 2 · started** blue, **HELD BACK** grey, an error's code red, or
+**PATH ?** grey where the bus has no decision (an older lamp; nothing is
+guessed). Then the status badge (**ERROR** red when the record says the
+answer failed, or the decision or a step of its task is an error; **DONE**
+green once the turn ended and any task it handed over replied, failed or
+settled; **ACTIVE** amber and pulsing while the newest turn, or a task it
+handed over, goes on; an older turn that never ended says **NO END** in
+grey), **⏱** the whole turn from its first step to its end, and **⚡** the
+first reply from the decision (else the first token from the record), both
+in ms with V1's colours: ⏱ green to 5 s, amber to 15 s, red past it; ⚡
+green to 3 s, amber to 8 s, red past it (`page::total`,
+`page::first_token`). Then the **IN** line (the words heard), the **DID**
+chips (the light, each skill's stage) and the **OUT** line (the words said,
+the record's first audio and how it ended). Clicking the card opens its
+events (a `<details>`, kept open across the stream's refreshes): each step
+as a chip with its time from the end of speech, the slowest marked, then
+each step of the task's agent. The words show only in monitor mode;
+otherwise IN and OUT say "words hidden", whatever a turn carries. A
+follow-up steered under another turn shows inside that turn's card. More
+than 60 s between one turn's end and the next
 one's start draws a break, as V1's session grouping does
 (`page::BREAK_MS`). A Turns card has the type icon, what took the turn, the
 status (DONE once the record has an outcome), ⚡, the three steps as chips
@@ -61,7 +69,7 @@ and an **END** line.
 | Section | What it shows | Where it comes from |
 |---|---|---|
 | Overview | The voice's state; the light shown (`on, blue at 3`, `off`); someone here or not; the camera's state, faces in view and who is followed; the lamp's health level and its worst item; the newest turn's first audio and the median of the last ten; any unit running another build than its release; the Harness tasks working, per engine, and how many were just handed over (`1 working (OpenClaw 1, Hermes 0)`, `none working, 1 just handed over`, `none working`) | the kept values below, `light/state`, the turns, `/status`'s rows, `tasks/status` |
-| Timeline | The newest 30 turns, newest first, step by step as V1's Flow Monitor: **heard**, **understood** (answered or held back, with the record's `admission_basis` and final words' time), **did** (the light asked for, when it changes, and each skill's stage), **said** (with the record's first audio and how it ended). Each step's time from the end of speech, the slowest wait marked, and the clock time in UTC. In monitor mode only, the words heard and said, and once, on top of the page, "Words anyone says to the lamp show here while this is on." | the bus ([below](#the-timeline-from-the-bus-5883-second-piece)), joined with the turns' records |
+| Timeline | The newest 30 turns, newest first, step by step as V1's Flow Monitor: **heard**, **understood** (answered or held back, with the record's `admission_basis` and final words' time), **decided** (the path: the tools, or the engine and task handed to), **did** (the light asked for, when it changes, and each skill's stage), **said** (with the record's first audio and how it ended); in the card's events, each step of the task's agent (its number and tool; in monitor mode its arguments and result), its reply or error, at most 50 a task. Each step's time from the end of speech, the slowest wait marked, and the clock time in UTC. In monitor mode only, the words heard and said and the agent's words, and once, on top of the page, "Words anyone says to the lamp show here while this is on." | the bus ([below](#the-timeline-from-the-bus-5883-second-piece)): `voice/decision`, `tasks/step`, `tasks/status` too, joined with the turns' records |
 | Turns | The newest 20 turns, newest first, as V1's Flow: what took the turn (`local_speech`, or the lamp's own: `skill_says`, `lamp_tells_news`...; `lamp_speaks_first` in records from before #2825), then from the end of speech the final words, the first token and the first audio, each with its own time in brackets and the slowest marked; then how it ended (`played`, `no audio`, `failed`, or why it was cut) and what held it, if anything did | the voice's own session records ([below](#turns-from-the-voices-records)) |
 | Tasks | A card for each Harness task the lamp handed over: its number, its engine (OpenClaw, Hermes, Claude, Codex, OpenCode, Devin, Devin Cloud, else the bus name escaped), its state as a badge (working blue; starting, installing, needs input amber; idle green; failed red; stopped, offline, unknown, missing grey), "started N min ago" (`working_s`), "last active N ago" (`last_active_unix_ms`), its progress line's changes and new signs as chips (tests pass, fixed, pull request ...). A task not read yet is "just handed over". Under **Ended**, greyed, each that settled: done (idle), needs input, stopped or failed, with the UTC time and how long ago. No status on the bus says "No word from lamp-tasks"; an empty one "Nothing is being worked on."; one that does not read, that it can't be read. Never a task's words, prompt, folder or answer: `tasks/status` carries none, and nothing else about tasks is read | `tasks/status`, the kept value `lamp-tasks serve --progress` publishes, read each push like the others (no subscriber) |
 | Camera | The frame `/cam.svg` draws, faces as boxes | as `/cam` |
@@ -83,14 +91,43 @@ number `voice/heard`, `voice/turn` and `voice/said` share (the records'
   stage (`triggered`, `asked`, `allowed`, `not allowed`, `done`), never its
   `why`. Each goes to the newest turn that holds its time: from the turn's
   first step until it ended, at most 60 s (`timeline::TURN_LASTS_MS`).
-  Outside a turn it is not shown. A function's name is not on the bus, so a
-  tool call shows only by the light or a skill it moved.
+  Outside a turn it is not shown.
+- **decided**: `voice/decision` ([below](#what-the-lamp-decided-and-what-its-agent-did-7267)).
 - **said**: `voice/said`, finished. It ends the turn.
 
 A request number seen again more than 60 s after its turn began is another
 turn: the voice counts again from its start. The newest 30 turns are kept,
-in memory only (`timeline::KEPT`). These two topics are read only for the
-timeline: `/bus` neither counts nor lists them.
+in memory only (`timeline::KEPT`). `light/command`, `skills/events`,
+`voice/decision`, `tasks/step` and `tasks/status` are read only for the
+timeline (`timeline::TOPICS`): `/bus` neither counts nor lists them. A
+topic nobody publishes (an older lamp) leaves its part of the card empty.
+
+### What the lamp decided, and what its agent did (#7267)
+
+- **The decision**, `voice/decision`, joined by the request number: the
+  kind (answered, handed, held back, error), the tools' names (at most 8,
+  40 bytes each), the task and engine of a hand-over and its stage
+  (prepared, started, declined), the first reply's time (⚡), the request a
+  steered follow-up belongs under, and an error's code. Names, numbers and
+  codes only: shown in every mode. The newest decision of a turn is its
+  path.
+- **The agent's steps**, `tasks/step`, joined to the turn by the task's
+  number (`voice/decision`'s `task` is `tasks/step`'s `task`): each step's
+  number and tool (40 bytes), its kind (a call, the reply, an error) and,
+  in monitor mode only, its arguments and result (each cut to 120 bytes on
+  a whole character). Outside monitor mode those words are never kept. A
+  step whose number came before replaces it. The first 50 steps of a task
+  show, by number (`timeline::MOST_STEPS`); later ones are counted ("10
+  more"). The newest 30 tasks are kept, in memory only.
+- **Settled**, `tasks/status`' `settled` list: a task the tasks part found
+  settled ends its turn's ACTIVE.
+- `voice/decision`'s first reply, follow-up and error fields and
+  `tasks/step`'s kind, arguments and ok are not in `lamp_msgs` yet (PR 1
+  and PR 2 of #7267): peek reads both topics into its own
+  `timeline::Decision` and `timeline::AgentStep`, whose missing fields
+  default, and switches to `lamp_msgs`' types once they land.
+
+These come in the same stream push as every section: no new poll.
 
 **Words, in monitor mode only.** `main.rs` makes the timeline with words
 only for `LAMP_PEEK=monitor`. Then it keeps the finished words heard and
@@ -608,6 +645,18 @@ own, and asks for it over HTTP:
     turn that holds its time, and not before it, after it ended or after a
     held-back verdict; a number seen again 60 s later is another turn;
     words cut to 300 characters.
+  - #7267, on a real bus with a weather turn, a turn handed to OpenClaw
+    whose task's steps come out of order and end in a reply, a turn with no
+    decision, a steered follow-up, an error and a task of 60 steps:
+    `a_weather_turn_reads_local_weather_with_its_first_reply` (LOCAL ·
+    weather, DONE, ⚡ from the decision);
+    `a_handed_turn_shows_its_task_steps_in_order_with_the_reply` (AGENT ·
+    OpenClaw · task 2, the steps by number, the reply, `<script>` escaped);
+    `without_monitor_mode_step_words_are_absent_and_tool_names_shown`;
+    `a_task_shows_at_most_fifty_steps_and_counts_the_rest`;
+    `no_decision_shows_a_neutral_path_and_an_error_its_code` (PATH ?, never
+    a guessed LOCAL, AGENT or SKILL);
+    `a_steered_follow_up_nests_under_its_host_turn`.
 - `units::tests::a_command_past_its_deadline_is_killed_and_tells_nothing`:
   a command that ends tells its output; `sleep 30` with a 200 ms deadline
   tells nothing, well within 5 s; past the deadline none is started.
