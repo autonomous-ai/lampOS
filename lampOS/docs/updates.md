@@ -1529,6 +1529,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | **The switch** (`switch`) | |
 | `waiting for a quiet moment: …` | once per wait, with why it isn't quiet yet |
 | `switching to build N` | the parts' switch begins |
+| `wrote …: the exit note install writes, which its unit was without` | a switch on a managed updater, before the reload: one of Cloud's fixed services, on the lamp or written by the round, had no `UNIT.d/exit-note.conf`, so `install`'s note is written (0644); one there is kept (#7135, "A part added over the air") |
 | `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
 | `lamp-body's restart was refused (…); tried once more after 3 s, its let-go` | lamp-body's restart in the switch was refused; it is tried once more after 3 s (#7067, "lamp-body's one retry") |
 | `lamp-body's start count is not reset: …` | before its one retry, lamp-body's start count (`systemctl reset-failed`) could not be reset; the retry is still made, and may then meet systemd's start limit (#7067) |
