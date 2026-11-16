@@ -8259,6 +8259,32 @@ fn an_openclaw_default_skill_run_waits_for_the_gateway_before_new() {
     assert!(!run.started.load(Ordering::Acquire));
     nothing_left(&rig);
 
+    // Stop during startup: never hand over a run after the owner ends it.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let (runner, _) = with_gateway(
+        &rig,
+        openclaw_runner(&rig),
+        EngineKind::Openclaw,
+        None,
+        Duration::from_secs(30),
+    );
+    let stop = Arc::new(AtomicBool::new(false));
+    runner.stop_on(stop.clone());
+    let run = skill_run(Duration::from_secs(20));
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            std::thread::sleep(Duration::from_millis(200));
+            stop.store(true, Ordering::Release);
+        });
+        let began = Instant::now();
+        assert!(runner.run(&run, &|| {}).is_err());
+        assert!(began.elapsed() < Duration::from_secs(5));
+    });
+    assert!(!verbs(&rig).contains(&"new".to_owned()));
+    assert!(!run.started.load(Ordering::Acquire));
+    nothing_left(&rig);
+
     // Hermes the default: never waited for, whatever the Gateway.
     let rig = Rig::new();
     skill_ok_plan(&rig, "stopped");
