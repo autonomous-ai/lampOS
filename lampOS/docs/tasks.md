@@ -2015,7 +2015,11 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     builder's yes): it calls `start_agent_task` with the heard words as the
     task and nothing else, so the agent and its place are set from those
     words as for a model's call, and a computer named with none paired is
-    refused the same way (`NO_COMPUTER_PAIRED`, #6786). The call only
+    refused the same way (`NO_COMPUTER_PAIRED`, #6786). It is issued as a
+    model's call is, stamped when it is made, so with requested audio on its
+    `RequestedAudioContext` carries a nonzero `issued_us` and the tasks part
+    is asked (#7203; before, 0 was refused and the lamp said it couldn't
+    reach the agent). The call only
     prepares: its answer goes to the next round, which says the task back
     and asks whether to start it; nothing starts before the person's yes,
     and they may cancel. A line naming no agent (the read-back catch below)

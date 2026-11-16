@@ -16957,6 +16957,11 @@ async fn answer(
                     .then_some(named_agent.as_deref())
                     .flatten();
                 let came = if let Some(agent) = handed {
+                    // Issued now, as a model's call is when it comes
+                    // (#7203): a requested-audio context with
+                    // `issued_us` 0 is refused, and the tasks part is
+                    // never asked ("couldn't reach Claude Code").
+                    called_us = monotonic_us();
                     calls.push(net::ToolCall {
                         id: format!("handed-{request}"),
                         name: start.to_owned(),

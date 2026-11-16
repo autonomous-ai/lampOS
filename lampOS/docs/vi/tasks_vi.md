@@ -1614,6 +1614,10 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   người nói đã nghe, không thêm gì khác, nên agent và nơi làm được đặt từ
   chính lời đó như với lệnh gọi của model, và một máy tính được nêu khi
   chưa ghép đôi vẫn bị từ chối như cũ (`NO_COMPUTER_PAIRED`, #6786). Lệnh
+  gọi được phát như lệnh gọi của model, đóng dấu lúc được tạo, nên khi bật
+  requested audio, `RequestedAudioContext` của nó có `issued_us` khác 0 và
+  phần tasks được hỏi (#7203; trước đây giá trị 0 bị từ chối và đèn nói
+  không liên lạc được với agent). Lệnh
   gọi này chỉ chuẩn bị: câu trả lời của nó đi vào vòng sau, vòng đó đọc
   lại việc và hỏi có bắt đầu không; không gì bắt đầu trước tiếng yes của
   người nói, và họ vẫn có thể huỷ. Câu không nêu agent nào (lần bắt đọc

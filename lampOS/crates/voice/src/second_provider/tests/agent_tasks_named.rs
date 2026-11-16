@@ -65,6 +65,23 @@ fn went_answered(
     asked_before: bool,
     answer: Value,
 ) -> Went {
+    went_in(heard, first, later, asked_before, answer, None)
+}
+
+/// The requested-audio contexts the calls were run with.
+type AudioContexts = Arc<Mutex<Vec<(String, lamp_msgs::RequestedAudioContext)>>>;
+
+/// [`went_answered`], and with `audio_contexts`, the worker's requested-audio
+/// runner on, as on a lamp: each call runs through it, its context
+/// kept in `audio_contexts`.
+fn went_in(
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+    asked_before: bool,
+    answer: Value,
+    audio_contexts: Option<AudioContexts>,
+) -> Went {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(std::iter::once(first).chain(later).collect()),
@@ -72,6 +89,7 @@ fn went_answered(
     });
     let calls: Calls = Arc::default();
     let seen = calls.clone();
+    let audio_answer = answer.clone();
     let tools: ToolRunner = Arc::new(move |_, heard, name, args| {
         seen.lock().unwrap().push((name, args, heard));
         let answer = answer.clone();
@@ -89,6 +107,36 @@ fn went_answered(
         .announcing(false)
         .catching_named_agents(Arc::new(named))
         .keeping_named_ask_journal(journal.clone());
+    if let Some(contexts) = audio_contexts {
+        let boot = lamp_turn_owner::BootId::new([72; 16]).unwrap();
+        let scoped_seen = calls.clone();
+        let scoped_answer = audio_answer.clone();
+        let scoped: ScopedToolRunner = Arc::new(move |_, heard, name, args, _| {
+            scoped_seen.lock().unwrap().push((name, args, heard));
+            let answer = scoped_answer.clone();
+            Box::pin(async move { answer })
+        });
+        let audio_seen = calls.clone();
+        let runner: RequestedAudioRunner = Arc::new(move |context, call, _| {
+            contexts.lock().unwrap().push((call.name.clone(), context));
+            audio_seen
+                .lock()
+                .unwrap()
+                .push((call.name, call.args, true));
+            let answer = audio_answer.clone();
+            Box::pin(async move { crate::tools::ToolAnswer::plain(answer) })
+        });
+        engine = engine
+            .with_memory_scope(
+                boot,
+                Arc::default(),
+                scoped,
+                Some(Arc::new(|_: &crate::memory_scope::ScopeLease| {
+                    Told::from("SYSTEM".to_owned())
+                })),
+            )
+            .requesting_audio(boot, runner);
+    }
     if asked_before {
         assert!(engine.shared.named_asked_again.first(1));
     }
@@ -229,6 +277,40 @@ fn named_with_no_start_twice_is_handed_over_in_code_and_said_back() {
         [ASKED_AGAIN.to_owned(), handed_in_code("Hermes")],
         "{went:?}"
     );
+}
+
+/// #7203: the same hand-over in code on a lamp, the worker's
+/// requested-audio runner on. Its call is issued like a model's: the
+/// context it runs with passes `RequestedAudioContext::check` (a nonzero
+/// `issued_us`), so the tasks part is asked. Before, `issued_us` was 0, the
+/// call was refused, and the lamp said it couldn't reach Claude Code.
+#[test]
+fn a_call_handed_over_in_code_is_issued_as_a_models_call_is() {
+    const HEARD: &str = "Have Hermes write a poem about tea in a file.";
+    let contexts: AudioContexts = Arc::default();
+    let went = went_in(
+        HEARD,
+        saying("Sure, here is a poem about tea."),
+        vec![
+            saying("Tea leaves dance in the cup."),
+            saying(POEM_READ_BACK),
+        ],
+        false,
+        json!({"ok": true}),
+        Some(contexts.clone()),
+    );
+    assert_eq!(
+        went.journal,
+        [ASKED_AGAIN.to_owned(), handed_in_code("Hermes")],
+        "{went:?}"
+    );
+    let contexts = contexts.lock().unwrap();
+    assert_eq!(contexts.len(), 1, "{contexts:?}");
+    let (name, context) = &contexts[0];
+    assert_eq!(name, crate::agent_tasks::START);
+    assert_eq!(context.call_id, "handed-1");
+    assert_ne!(context.issued_us, 0, "{context:?}");
+    assert!(context.check().is_ok(), "{context:?}");
 }
 
 /// #6547 cause 3's control: Hermes named and round 1 answered with the
