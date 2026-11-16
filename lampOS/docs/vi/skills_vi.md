@@ -1899,11 +1899,16 @@ build 13135, `morning-unread-mail` đọc Gmail 19 lần, kết thúc idle, và
 không nói gì). Một lần chạy được cấp quyền đọc một dịch vụ đã liên kết kết
 thúc với câu trả lời cuối của agent trong câu trả lời của lamp-tasks
 (docs/vi/tasks_vi.md, "Điều agent tìm thấy"; `LAMP_AGENT_SERVICES=on`
-trong lamp-tasks, như trong sản phẩm), và `lamp-skills` nói nó cho chủ như
+trong lamp-tasks, như trong sản phẩm), chỉ qua một runner giữ câu trả lời
+đó (của Harness: lần chạy khởi động không có Harness hay trong home mới
+không giữ câu trả lời nào, nên không bao giờ được bảo rằng câu trả lời của
+nó sẽ được nói), và `lamp-skills` nói nó cho chủ như
 các dòng của một `do.read` (`service_read::tell`): sau cùng một cổng (chỉ
 khuôn mặt đã biết của chủ trong tầm nhìn và ổn định 5 giây, không có giọng
 nói trong một phút, không riêng tư, không tạm dừng, không trong giờ yên
-lặng, chờ tối đa 60 phút rồi bỏ qua không nói), trong lượt đọc duy nhất của
+lặng của đèn hay `[quiet]` riêng của skill, như một `do.read`
+(`task::TaskStep::quiet`), chờ tối đa 60 phút rồi bỏ qua không nói), trong
+lượt đọc duy nhất của
 đèn, mỗi câu một dòng bằng lời chính xác (không bao giờ là một lượt cho mô
 hình, nên nội dung thư không bao giờ là chỉ dẫn), cổng được xét lại trước
 mỗi dòng, có người đến thì dừng với "I'll tell you the rest later." Các câu
@@ -1964,7 +1969,10 @@ script) không nói gì, như trước. Test:
 `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
 `service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,
 `service_read::tests::a_wait_for_the_gate_says_why_once`,
-`task::tests::a_told_answer_a_restart_dropped_is_found_at_the_next_start`.
+`task::tests::a_told_answer_a_restart_dropped_is_found_at_the_next_start`,
+`tests::a_task_step_loads_with_its_skills_own_quiet`, và
+`a_tasks_told_answer_is_held_to_its_skills_own_quiet` trong main của
+lamp-skills.
 
 ### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, bật trong sản phẩm, đề xuất trên #6059)
 

@@ -4870,7 +4870,7 @@ fn manifest(
                         .into(),
                 );
             }
-            steps.push(Step::Call(Call::Task(Box::new(task.step(dir)?))));
+            steps.push(Step::Call(Call::Task(Box::new(task.step(dir, quiet)?))));
             ons.resize(steps.len(), None);
             continue;
         }
@@ -12655,6 +12655,26 @@ mod tests {
         assert_eq!(lamp_voice::made_skill::MANNERS_GROUP, "wellbeing");
         assert_eq!(lamp_voice::made_skill::MANNERS_PER_HOUR, 1);
         assert_eq!(lamp_voice::made_skill::MANNERS_MOST_A_DAY, 3);
+    }
+
+    /// #7104 (P3): a `do.task` loads with its skill's own `[quiet]`, as a
+    /// `do.read` does, for what its agent found to be held to it.
+    #[test]
+    fn a_task_step_loads_with_its_skills_own_quiet() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = task_skill(
+            dir.path(),
+            "evening-mail",
+            "version = \"1.0.0\"\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\n\
+             equals = \"resting\"\n[ask]\npolicy = \"nudge\"\n[quiet]\nfrom = \"22:00\"\n\
+             to = \"08:00\"\n[permissions]\ntopics = [\"voice/state\"]\n\
+             [[do]]\ntask = { task = \"Sum up today's mail\", run = \"scripts/main.py\" }\n",
+        );
+        let skill = load(&folder).unwrap();
+        assert_eq!(skill.quiet, Some((22 * 60, 8 * 60)));
+        assert_eq!(skill.task_step().unwrap().quiet, skill.quiet);
+        let folder = task_skill(dir.path(), "photo-booth", PHOTO_BOOTH);
+        assert_eq!(load(&folder).unwrap().task_step().unwrap().quiet, None);
     }
 
     const MORNING_MAIL: &str = "version = \"1.0.0\"\ngrants = [\"gmail-read\", \"gmail-write\"]\n\
