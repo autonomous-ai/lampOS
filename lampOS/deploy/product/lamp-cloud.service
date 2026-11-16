@@ -48,6 +48,16 @@ Environment=LAMP_SKILLS_PAGE=on
 # Wellbeing nudges at a present spacing and Comfort break (#5207): the skills page and report list the skills with
 # their [present] values, as lamp-skills runs them (Comfort break on). The same line in lamp-skills.service and lamp-skills-manage@.service.
 Environment=LAMP_NUDGES_PRESENT=on
+# So the skills page loads skills as lamp-skills does: its list loads each skill in this process
+# (lamp_skills::load_each), and these four of lamp-skills' switches change what loads. A connector's
+# grants (`gmail-read`, LAMP_AGENT_SERVICES, task::grants_of), a made skill's own code (LAMP_MADE_SCRIPTS,
+# task::origin_refuses), a write step (LAMP_SKILL_WRITES) and a made skill's lamp-written limits left out
+# (LAMP_MADE_SKILL_LOOSE): without them the page said "Doesn't load" of a skill lamp-skills runs (16 Nov,
+# lamp build 13329). Only loading reads them here; lamp-cloud runs no task, write or make with them.
+Environment=LAMP_AGENT_SERVICES=on
+Environment=LAMP_MADE_SCRIPTS=on
+Environment=LAMP_SKILL_WRITES=on
+Environment=LAMP_MADE_SKILL_LOOSE=on
 # The owner's approximate place from the app (#4333): owner.place and owner.place.clear, rounded to about a
 # kilometre and kept in the person's folder through `lamp-setup change`. The lead's yes on 3 Nov.
 Environment=LAMP_OWNER_PLACE=on

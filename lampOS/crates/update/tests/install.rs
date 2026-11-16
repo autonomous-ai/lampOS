@@ -1994,15 +1994,17 @@ fn the_product_lets_a_made_skill_read_a_linked_service() {
 /// A made skill loosened (#6059): `LAMP_MADE_SKILL_LOOSE=on` alike in the
 /// three units that read it, `lamp-voice` (makes the skill, both routes),
 /// `lamp-skills` and its manage helper (a made say's cooldown at least a
-/// minute as it is put on, `made_skill::capped`), each once, and no other
-/// product unit names it: with it on in the voice alone, a made say under
-/// an hour apart would be refused at install.
+/// minute as it is put on, `made_skill::capped`), each once, and
+/// `lamp-cloud`, whose skills page loads skills as lamp-skills does
+/// (16 Nov); no other product unit names it: with it on in the voice
+/// alone, a made say under an hour apart would be refused at install.
 #[test]
 fn the_product_loosens_a_made_skill_alike_in_its_three_units() {
     let owners = [
         "lamp-voice.service",
         "lamp-skills.service",
         "lamp-skills-manage@.service",
+        "lamp-cloud.service",
     ];
     for (unit, text) in install::PRODUCT {
         let service = section(text, "Service");
@@ -2032,8 +2034,9 @@ fn the_product_loosens_a_made_skill_alike_in_its_three_units() {
 /// (sends it on the owner's yes to its content, with writes on),
 /// `lamp-skills` (loads a write step and runs it), its manage helper (loads
 /// a made write as it is put on) and `lamp-voice` (carries a write in a
-/// made skill and takes the yes), each once, and no other product unit
-/// names it.
+/// made skill and takes the yes), each once, and `lamp-cloud` (its skills
+/// page loads a write step as lamp-skills does, 16 Nov); no other product
+/// unit names it.
 #[test]
 fn the_product_lets_a_made_skill_write_after_its_owners_yes() {
     let owners = [
@@ -2041,6 +2044,7 @@ fn the_product_lets_a_made_skill_write_after_its_owners_yes() {
         "lamp-skills.service",
         "lamp-skills-manage@.service",
         "lamp-voice.service",
+        "lamp-cloud.service",
     ];
     for (unit, text) in install::PRODUCT {
         let service = section(text, "Service");
@@ -2079,8 +2083,10 @@ fn the_product_lets_a_made_skill_write_after_its_owners_yes() {
 /// MCP server), `lamp-skills` and its manage helper (a `do.task`'s service
 /// grants load and are put on), `lamp-voice` (a service skill made as a
 /// `do.task`, its grants said back) and `lamp-control` (the grants kept in
-/// the yes and the run's token), each once, and no other product unit
-/// names it. It does nothing without `LAMP_SKILL_TASKS` on in those parts.
+/// the yes and the run's token), each once, and `lamp-cloud`, whose skills
+/// page only loads a skill's grants as lamp-skills does (16 Nov); no other
+/// product unit names it. It does nothing without `LAMP_SKILL_TASKS` on in
+/// the parts that run a task (all but `lamp-cloud`).
 #[test]
 fn the_product_gives_the_lamps_agent_the_linked_services() {
     let name = lamp_skills::task::AGENT_SERVICES_ENVIRONMENT;
@@ -2092,6 +2098,7 @@ fn the_product_gives_the_lamps_agent_the_linked_services() {
         "lamp-skills-manage@.service",
         "lamp-voice.service",
         "lamp-control.service",
+        "lamp-cloud.service",
     ];
     for (unit, text) in install::PRODUCT {
         let service = section(text, "Service");
@@ -2099,7 +2106,7 @@ fn the_product_gives_the_lamps_agent_the_linked_services() {
         let mentioned = service.iter().filter(|line| line.contains(name)).count();
         assert_eq!(on, usize::from(owners.contains(unit)), "{unit}");
         assert_eq!(mentioned, on, "{unit}");
-        if on == 1 {
+        if on == 1 && *unit != "lamp-cloud.service" {
             assert!(
                 service.contains(&"Environment=LAMP_SKILL_TASKS=on"),
                 "{unit} lacks LAMP_SKILL_TASKS"
@@ -2368,6 +2375,62 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
         assert!(
             install::PRODUCT.iter().any(|(name, _)| *name == unit),
             "{unit} is not a product unit"
+        );
+    }
+}
+
+/// The skills page loads skills as lamp-skills does (16 Nov, lamp build
+/// 13329: a connector skill lamp-skills ran was listed "Doesn't load:
+/// grants: \"gmail-read\" is not a grant"). `lamp-cloud` answers
+/// `skills.list` with `lamp_skills::load_each` in its own process, and the
+/// loader reads these switches from that process: a `do.task`'s connector
+/// grants (`task::grants_of`), a made skill's own code and an uploaded
+/// agent skill (`task::origin_refuses`), a write step, a made skill's
+/// lamp-written limits left out (`shed_made_manners`) and a skill's
+/// `[present]` values. Each is set `on` once in both units, and the
+/// network grant (`LAMP_TASK_NET`, read by `grants_of` too) in neither.
+#[test]
+fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
+    let loading = [
+        lamp_skills::task::AGENT_SERVICES_ENVIRONMENT,
+        lamp_skills::task::MADE_ENVIRONMENT,
+        lamp_skills::service_write::ENVIRONMENT,
+        lamp_voice::made_skill::LOOSE_ENVIRONMENT,
+        lamp_voice::upload_agent::ENVIRONMENT,
+        lamp_skills::PRESENT_ENVIRONMENT,
+    ];
+    assert_eq!(
+        loading,
+        [
+            "LAMP_AGENT_SERVICES",
+            "LAMP_MADE_SCRIPTS",
+            "LAMP_SKILL_WRITES",
+            "LAMP_MADE_SKILL_LOOSE",
+            "LAMP_UPLOAD_TO_AGENT",
+            "LAMP_NUDGES_PRESENT",
+        ]
+    );
+    let service = |name: &str| {
+        let (_, text) = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("{name} is not a product unit"));
+        section(text, "Service")
+    };
+    for unit in ["lamp-skills.service", "lamp-cloud.service"] {
+        let lines = service(unit);
+        for name in loading {
+            let switch = format!("Environment={name}=on");
+            assert_eq!(
+                lines.iter().filter(|line| **line == switch).count(),
+                1,
+                "{unit} lacks {switch}"
+            );
+        }
+        let net = lamp_voice::skill_task_yes::NET_ENVIRONMENT;
+        assert!(
+            !lines.iter().any(|line| line.contains(net)),
+            "{unit} sets {net}"
         );
     }
 }
