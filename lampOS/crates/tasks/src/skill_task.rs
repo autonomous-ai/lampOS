@@ -3259,10 +3259,20 @@ impl Runner for HarnessRunner {
                 // start, or whose fence never said it started the script,
                 // never ran the skill's script.
                 let ended = if self.makes {
-                    if ended.is_ok()
-                        && let Some(text) = crate::skill_make::answer_in(&started.folder)
-                    {
-                        let _ = run.answer.set(text);
+                    if ended.is_ok() {
+                        // No `answer.md`: the agent's chat answer, only when
+                        // it is a make's answer itself (#7278, lamp-c0a4
+                        // 19:03: OpenClaw replied its `cannot:` line in chat
+                        // and wrote no file).
+                        let text = crate::skill_make::answer_in(&started.folder).or_else(|| {
+                            answer
+                                .as_deref()
+                                .filter(|chat| crate::skill_make::chat_is_answer(chat))
+                                .map(str::to_owned)
+                        });
+                        if let Some(text) = text {
+                            let _ = run.answer.set(text);
+                        }
                     }
                     ended
                 } else if by_start && ended.is_ok() {
