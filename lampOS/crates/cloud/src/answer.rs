@@ -227,6 +227,12 @@ pub trait Lamp {
         None
     }
 
+    /// The owner's language, as the lines said to them are chosen
+    /// (`system.info`'s `host.language`): `en` unless the lamp knows.
+    fn owner_language(&self) -> &'static str {
+        "en"
+    }
+
     /// A skill added from a file in the owner's app
     /// (`LAMP_SKILL_UPLOAD=on` with the skills page, `crate::upload`).
     fn upload(&self) -> Option<std::sync::Arc<crate::upload::Uploads>> {
@@ -366,7 +372,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 75] = [
+pub const KINDS: [(&str, Switch); 76] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -423,6 +429,7 @@ pub const KINDS: [(&str, Switch); 75] = [
     (crate::share::KINDS[0], SHARE),
     (crate::share::KINDS[1], SHARE),
     (crate::share::KINDS[2], SHARE),
+    (crate::share::KINDS[3], SHARE),
     (crate::upload::KIND, |lamp| lamp.upload().is_some()),
     // An uploaded skill's keys from the app (`LAMP_SKILL_SECRETS`): with
     // the skills page, while lamp-services' admin socket is there.
@@ -838,7 +845,14 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 .skills()
                 .zip(lamp.share())
                 .ok_or_else(|| not_here(kind))?;
-            crate::share::share(&store, &places, data, &std::env::temp_dir()).map(Some)
+            crate::share::share(
+                &store,
+                &places,
+                data,
+                &std::env::temp_dir(),
+                lamp.owner_language(),
+            )
+            .map(Some)
         }
         "skills.shared" if on(lamp, kind) => {
             let store = lamp.share().ok_or_else(|| not_here(kind))?;
@@ -847,6 +861,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         "skills.unshare" if on(lamp, kind) => {
             let store = lamp.share().ok_or_else(|| not_here(kind))?;
             crate::share::unshare(&store, data).map(Some)
+        }
+        // Who can see a sent skill, changed later (#5209): the mode on its
+        // own, with no new review. It is also the `can` key that says
+        // `skills.share` takes `visibility`.
+        "skills.visibility" if on(lamp, kind) => {
+            let store = lamp.share().ok_or_else(|| not_here(kind))?;
+            crate::share::set_visibility(&store, data).map(Some)
         }
         // A skill added from a file in the owner's app (`LAMP_SKILL_UPLOAD`),
         // `skills.upload.<upload_id>`: no file inline. Taken `starting`; the
@@ -2054,6 +2075,7 @@ pub mod tests {
                     "skills.share",
                     "skills.shared",
                     "skills.unshare",
+                    "skills.visibility",
                 ],
             ),
             (
