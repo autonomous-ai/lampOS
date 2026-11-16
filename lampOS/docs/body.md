@@ -962,6 +962,39 @@ started again, and the arm may need looking at" (`Glimpse::cannot_lift`).
 The voice doesn't say this line; it shows on the lamp's health. A sit-down
 of an arm that did lift is as before: nothing let go, no count.
 
+### A stand the arm can't reach is eased (#7289)
+
+Always on. Fully stood up (`stand` 1.0) and asked its stand goal and nothing
+else, a shoulder or elbow held more than 20 counts short of that goal
+(`STAND_EASE_SHORT`) at a load over 150 (`STAND_EASE_LOAD`) for 60 s
+(`STAND_EASE_STEPS`, 3,000 steps) has its stand goal eased to where it
+holds plus 5 counts toward the goal (`STAND_EASE_MARGIN`), for the rest of
+the run. The servo stops pushing at a goal it can't reach. On lamp-74ff
+(13373) the elbow held 41 to 47 short of its measured 2,562 at loads of
+176 to 200, reached 62 °C in about 40 min and sat down hot; lamp-52e6's
+elbow holds 3 short at 24 and is left as it is.
+
+- A gesture, a lean, a hold, a cut by the anti-tip rule or a sit-down
+  writes another goal; while it does, the count pauses. It resets only
+  when the joint is at its goal or unloaded.
+- Never above the measured stand (the eased goal lies between where the
+  joint holds and the goal), and never more than 80 counts under it
+  (`STAND_EASE_FLOOR`): a joint held farther short is a hand pushing it
+  down, not the arm's reach. It is not eased, and the journal says so once
+  per joint: `elbow_pitch held 120 short of its stand goal 2600, load 190:
+  past 80, not eased`.
+- An ease is one journal line: `elbow_pitch held short of its stand: goal
+  2600 eased to 2560, held at 2555, load 190`. A start begins from the
+  measured stand again.
+- The strain guard, the load bound and the heat bound below judge every
+  step as before: a real strain still sits it down.
+
+The numbers are from two lamps (`ponytail:` in the code); retune them from
+more arms' journals. Shown by tests only
+(`a_standing_elbow_held_45_short_at_load_190_has_its_stand_goal_eased`,
+`a_standing_elbow_3_short_at_load_24_keeps_its_stand_goal`,
+`a_standing_elbow_pushed_120_down_by_a_hand_is_not_eased`); not yet on a lamp.
+
 ### The strain guard (`LAMP_BODY_STRAIN_GUARD=on`, #4390, #4501)
 
 On in the product unit (`lampOS/deploy/product/lamp-body.service`, #4899,
