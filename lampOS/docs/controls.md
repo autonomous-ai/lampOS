@@ -1829,8 +1829,12 @@ press that comes meanwhile puts the guard back. Tests:
 A stop that keeps the guard's mute says which gate kept it, in one journal
 line (#7368): "lamp-voice: the mute the restart guard restored is kept at this
 stop: <why>", where why is "the run did not end clean", "no stop was asked
-for", "the mute record could not be saved earlier", "a control was in flight"
-or "a control was taken and not yet saved" (`HandControls::kept_on_stop_why`).
+for", "the mute record could not be saved earlier", "a control was in
+flight" or "a control was taken and not yet saved"
+(`HandControls::kept_on_stop_why`, looked at before the release), or
+"a press came as it was saved" when nothing kept it at that look but a press
+during the release's save put the guard back
+(`HandControls::kept_after_release`).
 It is said only for the guard's mute, never a person's, and changes nothing
 the stop does. Test: `a_kept_guard_mute_names_its_gate`.
 **A head tap wakes such a mute, as it wakes sleep** (`Receiver::request_wake_after_fault`):
