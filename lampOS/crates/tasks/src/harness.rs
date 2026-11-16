@@ -2532,8 +2532,10 @@ impl Cli {
     /// of it has the harness closed and `new` asked once more, proved the
     /// same way; still none, its record is read too, and only with nothing
     /// there is it closed and the task not sent, `openclaw_not_taken`, so
-    /// the person hears it failed. A harness that can't be closed ends it
-    /// uncertain, with nothing more started: one left running could still
+    /// the person hears it failed. A close refused as `WORKING` proves the
+    /// prompt taken after all, and that harness is the launch. A harness
+    /// that can't be closed otherwise ends it uncertain, with nothing more
+    /// started: one left running could still
     /// take its prompt beside a second (Heron's P2 on #6504). Nothing is
     /// ever started a third time or replied.
     fn openclaw_first_prompt(
@@ -2575,8 +2577,10 @@ impl Cli {
         if self.cancelled(None) {
             return uncertain("cancelled");
         }
-        if !self.openclaw_closed(launch, &agent_id, until, seen) {
-            return uncertain("openclaw_not_closed");
+        match self.openclaw_closed(launch, &agent_id, until, seen) {
+            OpenclawClosed::Closed => {}
+            OpenclawClosed::Working => return LaunchOutcome::Created { agent_id },
+            OpenclawClosed::Not => return uncertain("openclaw_not_closed"),
         }
         eprintln!(
             "tasks: {}: OpenClaw showed no sign it took its prompt within {} s of new, and its Gateway's record holds none: the harness is closed, and it is started once more",
@@ -2622,8 +2626,10 @@ impl Cli {
             "tasks: {}: OpenClaw took no prompt on its second new either: not sent (openclaw_not_taken)",
             launch.name
         );
-        if !self.openclaw_closed(launch, &agent_id, until, seen) {
-            return uncertain("openclaw_not_taken");
+        match self.openclaw_closed(launch, &agent_id, until, seen) {
+            OpenclawClosed::Closed => {}
+            OpenclawClosed::Working => return LaunchOutcome::Created { agent_id },
+            OpenclawClosed::Not => return uncertain("openclaw_not_taken"),
         }
         LaunchOutcome::NotSent {
             code: "openclaw_not_taken".into(),
@@ -2723,15 +2729,17 @@ impl Cli {
     }
 
     /// `harness close` of an OpenClaw harness that took no prompt, by the
-    /// launch's `until`: whether it is closed (or gone). Not closed (no
-    /// time left included) is journaled with why.
+    /// launch's `until`: whether it is closed (or gone), refused as
+    /// `WORKING` (proof it took its prompt after all: a slow Gateway's
+    /// first turn just past the proof bound, lamp-c0a4 #7287), or not
+    /// closed. Each but closed is journaled with why.
     fn openclaw_closed(
         &self,
         launch: &Launch,
         agent_id: &str,
         until: Instant,
         seen: &mut Seen,
-    ) -> bool {
+    ) -> OpenclawClosed {
         let left = until.saturating_duration_since(Instant::now());
         let closed = (!left.is_zero()).then(|| {
             self.run(
@@ -2748,10 +2756,19 @@ impl Cli {
         if let Some(closed) = &closed {
             seen.took(closed);
         }
+        if let Some(Ok(reply)) = &closed
+            && close_refused_working(reply.code, &reply.stdout)
+        {
+            eprintln!(
+                "tasks: {}: OpenClaw's harness was working when it was to be closed: its prompt is taken, kept",
+                launch.name
+            );
+            return OpenclawClosed::Working;
+        }
         let why = match &closed {
             None => "no_time_left".to_owned(),
             Some(Ok(reply)) => match self::closed(reply.code) {
-                Ok(Closed::Closed | Closed::Gone) => return true,
+                Ok(Closed::Closed | Closed::Gone) => return OpenclawClosed::Closed,
                 Ok(Closed::Refused | Closed::Left) => "refused".to_owned(),
                 Err(code) => code,
             },
@@ -2761,7 +2778,7 @@ impl Cli {
             "tasks: {}: OpenClaw's harness took no prompt and wasn't closed ({why}), so nothing more is started",
             launch.name
         );
-        false
+        OpenclawClosed::Not
     }
 
     /// `show` read until the harness just started is idle (or, with
@@ -6223,6 +6240,29 @@ pub fn background_refusal(stdout: &[u8], stderr: &[u8]) -> bool {
             .windows(SAID.len())
             .any(|window| window == SAID)
     })
+}
+
+/// Whether a `harness close` was refused because the harness is working
+/// or waiting for the person: exit 1 with `WORKING` as its `--json`
+/// reply's `error` (or `code`), nothing else. `AGENT_CHANGED`, a gone
+/// harness or any other refusal is not.
+fn close_refused_working(code: Option<i32>, stdout: &[u8]) -> bool {
+    code == Some(1)
+        && serde_json::from_slice::<Value>(stdout).is_ok_and(|reply| {
+            reply["error"].as_str() == Some("WORKING") || reply["code"].as_str() == Some("WORKING")
+        })
+}
+
+/// What closing an OpenClaw harness with no proof came to
+/// ([`Cli::openclaw_closed`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OpenclawClosed {
+    /// Closed or gone: a `new` more may be asked.
+    Closed,
+    /// Refused as `WORKING`: it took its prompt, and is the launch.
+    Working,
+    /// Not closed, for any other reason: nothing more is started.
+    Not,
 }
 
 /// `harness close`'s exit code (Harness 0.4.18's CLI): 0 closed, 5 refused

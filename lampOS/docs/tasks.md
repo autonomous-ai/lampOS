@@ -2336,8 +2336,11 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     read too (taken or unreadable: `uncertain` with the same codes, kept),
     and with nothing there the second harness is closed too and the task
     is `not_sent`, `openclaw_not_taken`, so the voice tells the person it
-    did not reach the agent, never that it started. A harness that can't
-    be closed ends the launch `uncertain` (`openclaw_not_closed` for the
+    did not reach the agent, never that it started. A close refused with
+    exit 1 `WORKING` is proof the prompt was taken after all (a slow
+    Gateway just past the 45 s bound, lamp-c0a4): that harness, first or
+    second, is kept and the launch is `accepted` on it. A harness that
+    can't be closed otherwise ends the launch `uncertain` (`openclaw_not_closed` for the
     first, `openclaw_not_taken` for the second) with nothing more started:
     one left running could still take its task beside another. A second
     `new` that fails, or that no time is left for, is
