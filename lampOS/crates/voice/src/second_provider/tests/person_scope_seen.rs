@@ -3752,7 +3752,10 @@ async fn their_seen_yes_within_thirty_seconds_runs_that_forget_by_id() {
         false,
     )
     .await;
-    assert_eq!(forgets_ran(&got), [json!({"source_id": UMBRELLA.0})]);
+    assert_eq!(
+        forgets_ran(&got),
+        [json!({"source_id": UMBRELLA.0, "about": UMBRELLA.1})]
+    );
     assert_eq!(got.calls, [Some(a)], "in A's scope only");
 }
 
@@ -3773,7 +3776,10 @@ async fn an_unseen_yes_runs_it_only_in_the_private_room() {
         )
         .await;
         if runs {
-            assert_eq!(forgets_ran(&got), [json!({"source_id": UMBRELLA.0})]);
+            assert_eq!(
+                forgets_ran(&got),
+                [json!({"source_id": UMBRELLA.0, "about": UMBRELLA.1})]
+            );
             assert_eq!(got.calls, [Some(a.clone())], "in A's scope only");
         } else {
             assert_eq!(forgets_ran(&got), Vec::<Value>::new(), "kept");

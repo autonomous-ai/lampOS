@@ -784,7 +784,12 @@ Only a plain yes on a later line within 30 s
 with their face seen saying it, or in the private room
 (`LAMP_PRIVATE_ROOM`) on a line theirs by their face alone in view, runs
 exactly that forget by id in their scope (`ScopeLease::mark_forget_agreed`,
-never `forget_last`). The yes may say the forget too
+never `forget_last`). The held forget carries the subject's words
+(`about`); once the by-id forget is confirmed, that person's own exchanges
+about those words go too (`exchanges_forget`,
+`remember::agreed_forget_exchanges`), by the same match as a forget about
+and in their scope alone, never another's or the room's, so recall no longer
+tells the talk about it (C128; lamp-06c1, build 13523). The yes may say the forget too
 (`known_faces::plain_agreement_to_forget`, Thirteen's P2 on #6673): "Yes,
 forget it.", "Sure, go ahead and forget it.", "Ừ, quên đi.", and the forget
 said back alone, "Forget it." or "Quên đi.", which is only ever read as the

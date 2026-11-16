@@ -2132,13 +2132,32 @@ fn run_call_with_scope(
                                     eprintln!(
                                         "lamp-voice: request {request}: the forget their yes agreed to runs in their scope by its id (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
                                     );
-                                    crate::remember::run_scoped_for(
+                                    // By its id alone; the words it was
+                                    // about then take their exchanges about
+                                    // it, theirs only, as a forget about
+                                    // does (C128, lamp-06c1 build 13523).
+                                    let by_id = ToolCall {
+                                        args: json!({"source_id": call.args["source_id"]}),
+                                        ..call.clone()
+                                    };
+                                    let told = crate::remember::run_scoped_for(
                                         socket,
-                                        call,
+                                        &by_id,
                                         deadline.saturating_sub(started.elapsed()),
                                         lease,
                                         &person,
-                                    )
+                                    );
+                                    match call.args.get("about") {
+                                        Some(about) => crate::remember::agreed_forget_exchanges(
+                                            socket,
+                                            told,
+                                            about,
+                                            &person,
+                                            deadline.saturating_sub(started.elapsed()),
+                                            lease,
+                                        ),
+                                        None => told,
+                                    }
                                 }
                                 None => {
                                     eprintln!(
@@ -6614,6 +6633,96 @@ mod tests {
                         .is_some_and(|note| note.contains("still kept")),
                     "{told}"
                 );
+            }
+            std::fs::remove_file(socket).unwrap();
+        }
+    }
+
+    /// lamp-06c1, build 13523 (C128): the agreed one-face forget held with
+    /// its `about` words runs the kept thing by its id, and then that
+    /// person's exchanges about those words (`exchanges_forget`), as a
+    /// forget about does: in their scope alone, never another's or the
+    /// room's. A by-id forget the memory did not confirm takes no
+    /// exchanges.
+    #[test]
+    fn an_agreed_one_face_forget_about_takes_their_exchanges_about_it() {
+        let nell = crate::remember::person_id("Nell");
+        for (at, confirmed) in [(0u64, true), (1, false)] {
+            let socket = std::env::temp_dir().join(format!(
+                "one-face-agreed-about-{at}-{}.sock",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let by_id: &'static [u8] = if confirmed {
+                b"{\"ok\":true,\"removed\":1}\n"
+            } else {
+                b"{\"ok\":false,\"error\":\"busy\"}\n"
+            };
+            // Each line the memory is asked, answered in turn; the next
+            // waited for half a second at most.
+            listener.set_nonblocking(true).unwrap();
+            let served = std::thread::spawn(move || {
+                let mut asked = vec![];
+                for answer in [by_id, b"{\"ok\":true,\"removed\":2}\n".as_slice()] {
+                    let until = Instant::now() + Duration::from_millis(500);
+                    let mut stream = loop {
+                        match listener.accept() {
+                            Ok((stream, _)) => break stream,
+                            Err(_) if Instant::now() < until => {
+                                std::thread::sleep(Duration::from_millis(5));
+                            }
+                            Err(_) => return asked,
+                        }
+                    };
+                    stream.set_nonblocking(false).unwrap();
+                    let mut line = String::new();
+                    BufReader::new(stream.try_clone().unwrap())
+                        .read_line(&mut line)
+                        .unwrap();
+                    stream.write_all(answer).unwrap();
+                    asked.push(serde_json::from_str::<Value>(&line).unwrap());
+                }
+                asked
+            });
+            let owner = crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new([0x58; 16]).unwrap(),
+                    session: 1,
+                    request: 6_674_000 + at,
+                },
+                crate::memory_scope::ScopeSnapshot::of("Nell"),
+            );
+            let lease = owner.lease();
+            assert!(lease.read_by_one_face());
+            let yes = crate::second_provider::one_face_forget_yes_for_test();
+            lease.mark_forget_agreed(&yes, 3);
+            let settings = Settings {
+                memory: Some(socket.clone()),
+                ..Default::default()
+            };
+            let call = ToolCall {
+                id: "a13523".into(),
+                name: crate::remember::FORGET.into(),
+                args: json!({"source_id": 3, "about": "the recheck party"}),
+            };
+            assert!(lease.agreed_forget(&call.args), "agreed with its words");
+            let told = answer_scoped(&settings, &call, 6_674_000 + at, false, &lease);
+            let asked = served.join().unwrap();
+            assert_eq!(asked[0]["person"], json!(nell), "{told}");
+            assert!(asked[0].get("about").is_none(), "by its id: {asked:?}");
+            if confirmed {
+                assert_eq!(asked.len(), 2, "{asked:?} {told}");
+                assert_eq!(asked[1]["op"], json!("exchanges_forget"), "{asked:?}");
+                assert_eq!(asked[1]["person"], json!(nell), "theirs only: {asked:?}");
+                assert_eq!(
+                    asked[1]["about"],
+                    json!([["recheck", "party"]]),
+                    "{asked:?}"
+                );
+                assert_eq!(told["exchanges"], json!(2), "{told}");
+            } else {
+                assert_eq!(asked.len(), 1, "no exchanges asked: {asked:?} {told}");
             }
             std::fs::remove_file(socket).unwrap();
         }
