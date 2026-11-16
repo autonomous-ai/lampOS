@@ -6,6 +6,11 @@
 //!   so a kind counts only when one answer is sure of it (at least
 //!   [`SURE`]), or when at least [`RUN`] of the burst's last [`LAST`]
 //!   answers have it at all (the server sends only what clears V1's 0.3).
+//! - With [`BREAK_IS_STANDING`] on, a break is a stand-up, not a stretch
+//!   (#6543 step 2): a stretch is a sign they need one, not that they took
+//!   it. A stretch then neither restarts `break_s_ago` nor becomes `last`
+//!   or a `humans/doing_seen`, and a sitting begun after `room/stood_up`
+//!   counts its break from that return ([`Sitting::break_is_standing`]).
 //! - [`Sitting`] keeps the sitting's timers, published as
 //!   `humans/doing` (`lamp_msgs::HumanDoing`): every timer always present,
 //!   counting from the desk arrival when nothing has been seen, so a
@@ -14,6 +19,11 @@
 //!   nobody or a stranger: no history is kept.
 use crate::wire::{ActionAnswer, group};
 use lamp_msgs::{Doing, DoingSeen, HumanDoing};
+
+/// The switch for a break that is a stand-up, not a stretch: `on` exactly
+/// ([`crate::switched_on`]); anything else and a stretch is a break, as
+/// before.
+pub const BREAK_IS_STANDING: &str = "LAMP_SEEN_BREAK_IS_STANDING";
 
 /// One answer this sure of a kind is enough.
 pub const SURE: f64 = 0.5;
@@ -78,6 +88,8 @@ pub struct Sitting {
     /// The kinds the last burst that answered saw, so a kind seen in two
     /// bursts in a row is one sighting.
     last_burst: [bool; 3],
+    /// [`BREAK_IS_STANDING`] on: a stretch is not taken as a break.
+    break_is_standing: bool,
 }
 
 fn index(kind: Doing) -> Option<usize> {
@@ -99,7 +111,31 @@ impl Sitting {
             last: Doing::Nothing,
             confidence: 0.0,
             last_burst: [false; 3],
+            break_is_standing: false,
         }
+    }
+
+    /// With [`BREAK_IS_STANDING`] on, for a sitting begun at `now_us`: a
+    /// stretch is no longer a break ([`Sitting::takes`]), and if
+    /// `room/stood_up` came at `stood_up_us`, at or after the arrival this
+    /// sitting counts from, the break counts from `now_us`, their return.
+    /// The arrival can be from before that stand-up, as `room/activity`'s
+    /// `sitting_s` goes on through a gap under two minutes; the other
+    /// timers keep counting from it. A stand-up before the arrival (a gap
+    /// longer than that, or none said) leaves the break counting from the
+    /// arrival, as every timer does: there the sitting itself is new.
+    pub fn break_is_standing(mut self, now_us: u64, stood_up_us: Option<u64>) -> Self {
+        self.break_is_standing = true;
+        if stood_up_us.is_some_and(|at| at >= self.arrived_us) {
+            self.break_us = Some(now_us.max(self.arrived_us));
+        }
+        self
+    }
+
+    /// Whether a sighting of `kind` is taken: every kind, except a break
+    /// (a stretch) with [`BREAK_IS_STANDING`] on.
+    pub fn takes(&self, kind: Doing) -> bool {
+        !(self.break_is_standing && kind == Doing::Break)
     }
 
     /// Take one burst's sightings at `now_us`; returns those newly seen
@@ -108,7 +144,7 @@ impl Sitting {
         let mut this_burst = [false; 3];
         let mut newly = Vec::new();
         for sighting in seen {
-            let Some(at) = index(sighting.what) else {
+            let Some(at) = index(sighting.what).filter(|_| self.takes(sighting.what)) else {
                 continue;
             };
             this_burst[at] = true;
@@ -122,7 +158,10 @@ impl Sitting {
             }
         }
         // The surest of this burst is the last thing seen.
-        if let Some(surest) = seen.iter().find(|s| index(s.what).is_some()) {
+        if let Some(surest) = seen
+            .iter()
+            .find(|s| index(s.what).is_some() && self.takes(s.what))
+        {
             self.last = surest.what;
             self.confidence = surest.confidence.clamp(0.0, 1.0);
         }
@@ -240,5 +279,95 @@ mod tests {
         assert!(sitting.saw(&[], 720 * S).is_empty());
         assert_eq!(sitting.doing(720 * S).last, Doing::Drinking, "kept");
         assert_eq!(sitting.saw(&[drink], 780 * S), [drink]);
+    }
+
+    const STRETCH: DoingSeen = DoingSeen {
+        what: Doing::Break,
+        confidence: 0.8,
+    };
+
+    #[test]
+    fn switch_off_a_stretch_is_a_break() {
+        let mut sitting = Sitting::new(0);
+        assert_eq!(sitting.saw(&[STRETCH], 600 * S), [STRETCH]);
+        let doing = sitting.doing(660 * S);
+        assert_eq!(doing.break_s_ago, 60);
+        assert_eq!(doing.last, Doing::Break);
+        assert!(sitting.takes(Doing::Break));
+        // Off, `break_is_standing` is never called: `new` alone is the old
+        // sitting, field for field.
+        assert_eq!(
+            Sitting::new(5 * S),
+            Sitting {
+                arrived_us: 5 * S,
+                drank_us: None,
+                ate_us: None,
+                break_us: None,
+                last: Doing::Nothing,
+                confidence: 0.0,
+                last_burst: [false; 3],
+                break_is_standing: false,
+            }
+        );
+    }
+
+    #[test]
+    fn switch_on_a_stretch_is_not_a_break() {
+        let mut sitting = Sitting::new(0).break_is_standing(0, None);
+        assert!(!sitting.takes(Doing::Break));
+        assert!(sitting.takes(Doing::Drinking));
+        // A stretch alone: not new, not last, the break still from the
+        // arrival.
+        assert!(sitting.saw(&[STRETCH], 600 * S).is_empty());
+        let doing = sitting.doing(660 * S);
+        assert_eq!(doing.break_s_ago, 660);
+        assert_eq!(doing.last, Doing::Nothing);
+        assert_eq!(doing.confidence, 0.0);
+        doing.check().unwrap();
+        // A stretch surer than a drink: the drink is new and last.
+        let drink = DoingSeen {
+            what: Doing::Drinking,
+            confidence: 0.6,
+        };
+        let surest_first = [
+            DoingSeen {
+                confidence: 0.9,
+                ..STRETCH
+            },
+            drink,
+        ];
+        assert_eq!(sitting.saw(&surest_first, 720 * S), [drink]);
+        let doing = sitting.doing(780 * S);
+        assert_eq!((doing.drank_s_ago, doing.break_s_ago), (60, 780));
+        assert_eq!(doing.last, Doing::Drinking);
+        assert!((doing.confidence - 0.6).abs() < 1e-6);
+    }
+
+    #[test]
+    fn switch_on_a_break_counts_from_the_return_after_a_stand_up() {
+        // Sat from 0; stood up at 2_070 s, back at 2_160 s, within the
+        // two-minute gap, so the arrival is still 0 (`room/activity`).
+        let sitting = Sitting::new(0).break_is_standing(2_160 * S, Some(2_072 * S));
+        let doing = sitting.doing(3_000 * S);
+        assert_eq!(doing.break_s_ago, 840, "from the return");
+        assert_eq!(
+            (doing.drank_s_ago, doing.ate_s_ago),
+            (3_000, 3_000),
+            "the others from the arrival"
+        );
+        assert_eq!(doing.last, Doing::Nothing);
+        // Back after a longer gap: the sitting is new, every timer from it.
+        let sitting = Sitting::new(2_400 * S).break_is_standing(2_400 * S, Some(2_072 * S));
+        assert_eq!(sitting.doing(3_000 * S).break_s_ago, 600);
+        // No stand-up said: from the arrival.
+        let sitting = Sitting::new(0).break_is_standing(2_160 * S, None);
+        assert_eq!(sitting.doing(3_000 * S).break_s_ago, 3_000);
+        // A stretch after the return changes nothing.
+        let mut sitting = Sitting::new(0).break_is_standing(2_160 * S, Some(2_072 * S));
+        assert!(sitting.saw(&[STRETCH], 2_900 * S).is_empty());
+        assert_eq!(sitting.doing(3_000 * S).break_s_ago, 840);
+        // The same stand-up, the switch off: the sitting begun again counts
+        // from its arrival, the break included.
+        assert_eq!(Sitting::new(0).doing(3_000 * S).break_s_ago, 3_000);
     }
 }

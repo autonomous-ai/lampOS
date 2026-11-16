@@ -1,0 +1,6 @@
+# As acts-when-lamp-seen-saw-no-stretch, with LAMP_SEEN_BREAK_IS_STANDING=on
+# and the 48 s gone at 35 minutes a stand-up (room/stood_up): lamp-seen's
+# sitting begins again at their return, 36 minutes, and counts break_s_ago
+# from it. At 50 it is 840, under its 30 minutes, so the stretch is held
+# through its ten minutes' wait and let go (#6543 step 2).
+none = true

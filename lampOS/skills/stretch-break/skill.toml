@@ -58,6 +58,8 @@ field = "break_s_ago"     # from the desk arrival when it saw nothing, so it hol
 above = 1799              # does. Without lamp-seen, or with it gone quiet, the topic is never said
 unknown = "holds_stale"   # or has run out, and it runs as before. 30 minutes, not 50: a yawn
                           # brings the stretch to 30 (the sooner above), and this keeps it.
+                          # With LAMP_SEEN_BREAK_IS_STANDING=on a break is a stand-up, not a
+                          # stretch: break_s_ago counts from their return (#6543 step 2).
 
 # One nudge an hour between the wellbeing skills (#1685): with none of the
 # installable ones on the lamp, it is the only member and nothing changes.
