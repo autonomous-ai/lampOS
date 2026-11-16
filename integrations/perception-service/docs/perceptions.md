@@ -93,17 +93,18 @@ A 3-stage pipeline: 2D keypoints → optional 3D lift → optional RULA ergonomi
   maps to a `RiskLevel` (`models/pose.py`): `NEGLIGIBLE(1)`, `LOW(2)`, `MEDIUM(3)`,
   `HIGH(4)` — the standard ergonomics escalation for "how urgently should this
   posture change". The 3D lift and ergo stages only run when enabled in config.
-- RULA is fed the 2D keypoints (z = 0) even when the 3D lift runs. For 2D input
-  the neck angle is shoulder midpoint -> ear midpoint against the trunk, signed by
+- RULA is fed the 2D keypoints (z = 0) even when the 3D lift runs. Sessions that
+  send `ergo_mode: "desk"` get a second RULA assessor (desk mode); others get the
+  original one, unchanged. In desk mode, for 2D input the neck angle is shoulder midpoint -> ear midpoint against the trunk, signed by
   the facing side (nose x offset from the ear midpoint): towards the face is
   flexion (neck 1–3), behind the trunk by 5° or more is extension (neck 4). A
   frontal view gives an unsigned angle (`rula/utils.py` `signed_flexion_angle`,
   `facing_direction_2d`). See [known-issues.md](known-issues.md#pose-estimation-rtmpose--rula).
-- RULA needs the hips (H36M `SPINE`) to define the trunk. With
-  `POSE__ERGO_UPPER_BODY_PARTIAL=true` (default off), hidden hips with confident
+- RULA needs the hips (H36M `SPINE`) to define the trunk. In desk mode, hidden hips with confident
   shoulders, nose and ears give an upper-body score instead of no `ergo`: the
   shoulder line stands in for the trunk, trunk and legs score 1, and
-  `ErgoAssessment.partial` is `true` (`false` on full answers).
+  `ErgoAssessment.partial` is `true` (`false` on full desk answers, `None` and
+  left off the wire outside desk mode).
 
 ## 4. Speech emotion (SER)
 

@@ -45,6 +45,7 @@ class PosePerceptionSession(
         pose3d_batcher: InputBatcher[Pose3DInput, RawPose3DDetection | None] | None = None,
         ergo_batcher: InputBatcher[ErgoInput, ErgoAssessment | None] | None = None,
         config: PosePerceptionSessionConfig | None = None,
+        desk_ergo_batcher: InputBatcher[ErgoInput, ErgoAssessment | None] | None = None,
     ) -> None:
         config = get_or_default(config, PosePerceptionSessionConfig())
         super().__init__(config)
@@ -54,6 +55,12 @@ class PosePerceptionSession(
             pose3d_batcher
         )
         self._ergo_batcher: InputBatcher[ErgoInput, ErgoAssessment | None] | None = ergo_batcher
+        self._desk_ergo_batcher: InputBatcher[ErgoInput, ErgoAssessment | None] | None = (
+            desk_ergo_batcher
+        )
+        # Per session, not in the config object: sessions share one config object,
+        # so one lamp's opt-in must not reach another lamp's session.
+        self._ergo_mode: str = "default"
 
         self._kps_buffer: list[npt.NDArray[np.float32]] = []
         self._scores_buffer: list[npt.NDArray[np.float32]] = []
@@ -150,8 +157,9 @@ class PosePerceptionSession(
                     confs=[float(c) for c in lifter_scores[0]],
                 )
 
-        if self._ergo_batcher is not None and has_valid_pose:
-            ergo_assessor = cast(ErgoAssessor, self._ergo_batcher.predictor)
+        ergo_batcher = self._active_ergo_batcher()
+        if ergo_batcher is not None and has_valid_pose:
+            ergo_assessor = cast(ErgoAssessor, ergo_batcher.predictor)
             ergo_graph: GraphEnum = ergo_assessor.GRAPH_TYPE
 
             if (
@@ -176,7 +184,7 @@ class PosePerceptionSession(
                 )
 
             ergo_input: ErgoInput = (ergo_kps[0], ergo_scores[0])
-            ergo_futures = await self._ergo_batcher.submit([ergo_input])
+            ergo_futures = await ergo_batcher.submit([ergo_input])
             ergo_result: ErgoAssessment | None = await ergo_futures[0]
             if ergo_result is not None:
                 result.ergo = ergo_result
@@ -194,6 +202,18 @@ class PosePerceptionSession(
 
         return result
 
+    def _active_ergo_batcher(
+        self,
+    ) -> InputBatcher[ErgoInput, ErgoAssessment | None] | None:
+        """The desk batcher when this session opted in and the server allows it, else the default."""
+        if self._ergo_mode == "desk" and self._desk_ergo_batcher is not None:
+            return self._desk_ergo_batcher
+        return self._ergo_batcher
+
+    @property
+    def ergo_mode(self) -> str:
+        return self._ergo_mode
+
     @override
     def update_config(
         self,
@@ -201,8 +221,11 @@ class PosePerceptionSession(
         frame_interval: float | Omit = omit,
         confidence_threshold_2d: float | Omit = omit,
         min_valid_keypoints: int | Omit = omit,
+        ergo_mode: str | Omit = omit,
         **kwargs: Any,
     ) -> None:
+        if not isinstance(ergo_mode, Omit):
+            self._ergo_mode = ergo_mode
         super().update_config(
             frame_interval=frame_interval,
             confidence_threshold_2d=confidence_threshold_2d,
@@ -212,9 +235,10 @@ class PosePerceptionSession(
     @override
     def _post_config_update(self) -> None:
         self._logger.info(
-            "[session %s] Config updated — frame_interval=%.2f, confidence_threshold_2d=%.2f, min_valid_keypoints=%d",
+            "[session %s] Config updated — frame_interval=%.2f, confidence_threshold_2d=%.2f, min_valid_keypoints=%d, ergo_mode=%s",
             self._session_id,
             self._config.frame_interval,
             self._config.confidence_threshold_2d,
             self._config.min_valid_keypoints,
+            self._ergo_mode,
         )

@@ -63,6 +63,7 @@ async def pose_estimation_ws(websocket: WebSocket):
                             frame_interval=req.frame_interval,
                             confidence_threshold_2d=req.confidence_threshold_2d,
                             min_valid_keypoints=req.min_valid_keypoints,
+                            ergo_mode=req.ergo_mode,
                         )
                         await websocket.send_json({"status": "config_updated"})
 

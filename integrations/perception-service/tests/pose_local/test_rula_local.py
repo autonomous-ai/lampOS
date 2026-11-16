@@ -238,8 +238,8 @@ def _desk_side_view_2d(neck_deg: float, facing: int = 1, chin_up: bool = False) 
     return kps
 
 
-def _neck(kps: np.ndarray) -> tuple[int, int]:
-    result = RULAAssessor().predict([(kps, _all_confident())])[0]
+def _neck(kps: np.ndarray, desk_mode: bool = True) -> tuple[int, int]:
+    result = RULAAssessor(desk_mode=desk_mode).predict([(kps, _all_confident())])[0]
     assert result is not None
     return result.left.body_scores.neck, result.left.body_scores.neck_angle
 
@@ -295,7 +295,7 @@ class TestSignedFlexion2D:
         """3D input keeps the head - neck vector: head forward in depth is flexion."""
         kps = _upright_skeleton_3d()
         kps[10] = [0, 100, -40]  # head forward in depth
-        result = RULAAssessor().predict([(kps, _all_confident())])[0]
+        result = RULAAssessor(desk_mode=True).predict([(kps, _all_confident())])[0]
         assert result is not None
         legacy_angle = int(np.degrees(np.arctan2(40, 50)))
         assert abs(result.left.body_scores.neck_angle) == legacy_angle
@@ -333,12 +333,12 @@ def _to_h36m(kps: np.ndarray, scores: np.ndarray) -> tuple[np.ndarray, np.ndarra
 
 
 class TestUpperBodyPartial:
-    def test_hips_hidden_flag_off_returns_none(self):
+    def test_hips_hidden_default_mode_returns_none(self):
         result = RULAAssessor().predict([_to_h36m(*_desk_frontal_coco())])[0]
         assert result is None
 
-    def test_hips_hidden_flag_on_returns_partial(self):
-        assessor = RULAAssessor(upper_body_partial=True)
+    def test_hips_hidden_desk_mode_returns_partial(self):
+        assessor = RULAAssessor(desk_mode=True)
         result = assessor.predict([_to_h36m(*_desk_frontal_coco())])[0]
         assert result is not None
         assert result.partial is True
@@ -354,7 +354,7 @@ class TestUpperBodyPartial:
     def test_partial_arms_and_neck_match_full_body(self):
         """Same frame with hips visible: arm and neck subscores do not change."""
         kps, scores = _desk_frontal_coco()
-        part = RULAAssessor(upper_body_partial=True).predict([_to_h36m(kps, scores)])[0]
+        part = RULAAssessor(desk_mode=True).predict([_to_h36m(kps, scores)])[0]
         scores[11:13] = 0.9
         full = RULAAssessor().predict([_to_h36m(kps, scores)])[0]
         assert part is not None and full is not None
@@ -369,7 +369,7 @@ class TestUpperBodyPartial:
         rad = np.radians(15)
         rot = np.array([[np.cos(rad), -np.sin(rad)], [np.sin(rad), np.cos(rad)]], dtype=np.float32)
         kps = ((kps - center) @ rot.T + center).astype(np.float32)
-        result = RULAAssessor(upper_body_partial=True).predict([_to_h36m(kps, scores)])[0]
+        result = RULAAssessor(desk_mode=True).predict([_to_h36m(kps, scores)])[0]
         assert result is not None and result.partial
         assert result.left.body_scores.neck == 1
         assert abs(result.left.body_scores.neck_angle) <= 1
@@ -377,49 +377,88 @@ class TestUpperBodyPartial:
     def test_partial_needs_face(self):
         kps, scores = _desk_frontal_coco()
         scores[3] = 0.1  # L ear hidden -> HEAD low
-        result = RULAAssessor(upper_body_partial=True).predict([_to_h36m(kps, scores)])[0]
+        result = RULAAssessor(desk_mode=True).predict([_to_h36m(kps, scores)])[0]
         assert result is None
 
     def test_partial_needs_shoulders(self):
         kps, scores = _desk_frontal_coco()
         scores[6] = 0.1  # R shoulder hidden -> THORAX low
-        result = RULAAssessor(upper_body_partial=True).predict([_to_h36m(kps, scores)])[0]
+        result = RULAAssessor(desk_mode=True).predict([_to_h36m(kps, scores)])[0]
         assert result is None
 
-    def test_full_body_unchanged_and_not_partial(self):
+    def test_full_body_desk_mode_not_partial(self):
+        """Hips visible, frontal view (facing unknown): desk scores equal the default ones."""
         kps, scores = _desk_frontal_coco()
         scores[11:13] = 0.9  # hips visible
         h = _to_h36m(kps, scores)
         off = RULAAssessor().predict([h])[0]
-        on = RULAAssessor(upper_body_partial=True).predict([h])[0]
+        on = RULAAssessor(desk_mode=True).predict([h])[0]
         assert off is not None and on is not None
-        assert off == on
         assert on.partial is False
+        assert off.partial is None
+        assert (off.left, off.right, off.score, off.risk_level) == (
+            on.left,
+            on.right,
+            on.score,
+            on.risk_level,
+        )
 
     def test_partial_in_wire_dict(self):
         from dataclasses import asdict
 
         full = RULAAssessor().predict([(_upright_skeleton_2d(), _all_confident())])[0]
         assert full is not None
-        assert asdict(full)["partial"] is False
-        part = RULAAssessor(upper_body_partial=True).predict([_to_h36m(*_desk_frontal_coco())])[0]
+        assert asdict(full)["partial"] is None
+        desk_full = RULAAssessor(desk_mode=True).predict([(_upright_skeleton_2d(), _all_confident())])[0]
+        assert desk_full is not None
+        assert asdict(desk_full)["partial"] is False
+        part = RULAAssessor(desk_mode=True).predict([_to_h36m(*_desk_frontal_coco())])[0]
         assert part is not None
         assert asdict(part)["partial"] is True
 
 
-class TestUpperBodyPartialConfig:
-    def test_env_flag_default_off_and_parsed(self, monkeypatch):
+# --- Default mode keeps the original (pre-desk) scores exactly ---
+
+
+class TestDefaultModeUnchanged:
+    def test_2d_side_view_upright_keeps_old_neck_4(self):
+        """The original 2D rule reads every neck as extension: upright scores 4."""
+        score, angle = _neck(_desk_side_view_2d(0), desk_mode=False)
+        assert score == 4
+        assert angle < 0
+
+    def test_2d_forward_keeps_old_neck_4(self):
+        assert _neck(_desk_side_view_2d(25), desk_mode=False)[0] == 4
+
+    def test_2d_upright_skeleton_old_answer(self):
+        """Pinned from origin/main: the upright 2D fixture (head straight above neck)."""
+        result = RULAAssessor().predict([(_upright_skeleton_2d(), _all_confident())])[0]
+        assert result is not None
+        assert result.partial is None
+        assert result.left.body_scores.neck == 1  # angle 0 exactly, the sign does not matter
+        assert result.left.body_scores.trunk == 1
+
+    def test_2d_hunched_skeleton_old_neck(self):
+        """Hunched 2D fixture: head forward still reads as extension (neck 4) by default."""
+        off = RULAAssessor().predict([(_hunched_skeleton_2d(), _all_confident())])[0]
+        assert off is not None
+        assert off.left.body_scores.neck == 4
+        assert off.left.body_scores.neck_angle < 0
+
+
+class TestDeskModeConfig:
+    def test_env_kill_switch_default_on_and_parsed(self, monkeypatch):
         from config import PoseSetting, Settings
 
-        assert PoseSetting().ergo_upper_body_partial is False
-        monkeypatch.setenv("POSE__ERGO_UPPER_BODY_PARTIAL", "true")
-        assert Settings().pose.ergo_upper_body_partial is True
+        assert PoseSetting().ergo_desk_mode is True
+        monkeypatch.setenv("POSE__ERGO_DESK_MODE", "false")
+        assert Settings().pose.ergo_desk_mode is False
 
     def test_factory_passes_flag(self):
         from core.enums.pose import ErgoAssessorEnum
         from core.perception.pose.utils import ErgoAssessorFactory
 
-        on = ErgoAssessorFactory(ErgoAssessorEnum.RULA, upper_body_partial=True).create()
+        on = ErgoAssessorFactory(ErgoAssessorEnum.RULA, desk_mode=True).create()
         result = on.predict([_to_h36m(*_desk_frontal_coco())])[0]
         assert result is not None and result.partial
         off = ErgoAssessorFactory(ErgoAssessorEnum.RULA).create()

@@ -126,7 +126,7 @@ checkpoint override and threshold(s).
 | `POSE__LIFTER_3D` | `tcpformer` | 3D lifter (set empty to disable 3D) |
 | `POSE__ERGO_ASSESSOR` | `rula` | Ergonomics assessor (empty to disable) |
 | `POSE__CONFIDENCE_THRESHOLD_2D`, `POSE__ERGO_CONFIDENCE_THRESHOLD` | _(none)_ | Thresholds |
-| `POSE__ERGO_UPPER_BODY_PARTIAL` | `false` | Score the upper body when only the hips are hidden; the `ergo` answer then has `partial: true` |
+| `POSE__ERGO_DESK_MODE` | `true` | Honour a session's `ergo_mode: "desk"` opt-in (2D neck sign + upper-body `partial` score); `false` ignores it |
 | `POSE__BATCH_SIZE` | `1` | Max items per GPU batch |
 | `POSE__BATCH_TIMEOUT` | `0.1` | Seconds to wait for batch to fill |
 | `PERSON_DETECTOR__ENABLED` | `false` | Crop person before action recognition |

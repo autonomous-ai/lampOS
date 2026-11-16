@@ -68,8 +68,9 @@ class PoseSetting(BaseModel):
     lifter_3d_frame_h: int | None = None
     ergo_assessor: ErgoAssessorEnum | None = ErgoAssessorEnum.RULA
     ergo_confidence_threshold: float | None = None
-    # Score the upper body when only the hips are hidden (answer has partial=true).
-    ergo_upper_body_partial: bool = False
+    # Kill switch for desk RULA (2D neck sign + upper-body partial score). It is
+    # only used by pose sessions that send ergo_mode="desk"; off ignores that opt-in.
+    ergo_desk_mode: bool = True
     batch_size: int | None = None
     batch_timeout: float | None = None
 

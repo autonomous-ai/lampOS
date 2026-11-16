@@ -32,6 +32,7 @@ class PosePerception(PerceptionBase[PosePerceptionSession]):
         estimator_2d_factory: PoseEstimator2DFactory,
         lifter_3d_factory: PoseLifter3DFactory | None = None,
         ergo_assessor_factory: ErgoAssessorFactory | None = None,
+        desk_ergo_assessor_factory: ErgoAssessorFactory | None = None,
         default_config: PosePerceptionSessionConfig | None = None,
         batch_size: int | None = None,
         batch_timeout: float | None = None,
@@ -41,6 +42,8 @@ class PosePerception(PerceptionBase[PosePerceptionSession]):
         self._estimator_2d_factory: PoseEstimator2DFactory = estimator_2d_factory
         self._lifter_3d_factory: PoseLifter3DFactory | None = lifter_3d_factory
         self._ergo_assessor_factory: ErgoAssessorFactory | None = ergo_assessor_factory
+        # Desk RULA for sessions that opt in (ergo_mode="desk"); None = opt-in ignored.
+        self._desk_ergo_assessor_factory: ErgoAssessorFactory | None = desk_ergo_assessor_factory
         self._default_config: PosePerceptionSessionConfig | None = default_config
 
         self._batch_size: int | None = batch_size
@@ -53,6 +56,8 @@ class PosePerception(PerceptionBase[PosePerceptionSession]):
         self._pose2d_batcher: InputBatcher[cv2t.MatLike, RawPose2DDetection] | None = None
         self._pose3d_batcher: InputBatcher[Pose3DInput, RawPose3DDetection | None] | None = None
         self._ergo_batcher: InputBatcher[ErgoInput, ErgoAssessment | None] | None = None
+        self._desk_ergo_assessor: ErgoAssessor | None = None
+        self._desk_ergo_batcher: InputBatcher[ErgoInput, ErgoAssessment | None] | None = None
         self._running: bool = False
 
     @override
@@ -78,6 +83,12 @@ class PosePerception(PerceptionBase[PosePerceptionSession]):
             self._ergo_batcher = InputBatcher(self._ergo_assessor, batch_size=self._batch_size, batch_timeout=self._batch_timeout)
             await self._ergo_batcher.start()
 
+        if self._ergo_assessor_factory is not None and self._desk_ergo_assessor_factory is not None:
+            self._desk_ergo_assessor = self._desk_ergo_assessor_factory.create()
+            await asyncio.to_thread(self._desk_ergo_assessor.start)
+            self._desk_ergo_batcher = InputBatcher(self._desk_ergo_assessor, batch_size=self._batch_size, batch_timeout=self._batch_timeout)
+            await self._desk_ergo_batcher.start()
+
         self._running = True
         self._logger.info("Ready")
 
@@ -95,6 +106,10 @@ class PosePerception(PerceptionBase[PosePerceptionSession]):
             await self._ergo_batcher.stop()
             self._ergo_batcher = None
 
+        if self._desk_ergo_batcher is not None:
+            await self._desk_ergo_batcher.stop()
+            self._desk_ergo_batcher = None
+
         if self._estimator_2d is not None:
             await asyncio.to_thread(self._estimator_2d.stop)
             self._estimator_2d = None
@@ -106,6 +121,10 @@ class PosePerception(PerceptionBase[PosePerceptionSession]):
         if self._ergo_assessor is not None:
             await asyncio.to_thread(self._ergo_assessor.stop)
             self._ergo_assessor = None
+
+        if self._desk_ergo_assessor is not None:
+            await asyncio.to_thread(self._desk_ergo_assessor.stop)
+            self._desk_ergo_assessor = None
 
         self._running = False
         self._logger.info("Stopped")
@@ -130,5 +149,6 @@ class PosePerception(PerceptionBase[PosePerceptionSession]):
             pose2d_batcher=self._pose2d_batcher,
             pose3d_batcher=self._pose3d_batcher,
             ergo_batcher=self._ergo_batcher,
+            desk_ergo_batcher=self._desk_ergo_batcher,
             config=config,
         )

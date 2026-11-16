@@ -62,14 +62,17 @@ việc build lại engine trong lúc xử lý request.
 Tương tự, đầu vào speaker embedding bị cắt còn 3000 frame (30 giây) trước khi
 suy luận, thấp hơn giới hạn 5546 frame của engine đã cache, nên clip dài được
 embed từ 30 giây đầu thay vì phải build lại engine (#555).
-RULA của pose chạy trên keypoint 2D. Với đầu vào 2D, góc cổ là đường từ trung điểm
-hai vai tới trung điểm hai tai, lấy dấu theo phía khuôn mặt hướng tới (độ lệch x của
-mũi so với trung điểm hai tai), nên đầu thẳng hoặc cúi về trước được điểm cổ 1–3 và chỉ
-khi đầu ngả ra sau từ 5° trở lên mới được 4; góc nhìn chính diện cho góc không dấu.
-RULA cần hông; khi bật `POSE__ERGO_UPPER_BODY_PARTIAL=true` (mặc định tắt), khung hình
-ở bàn làm việc bị che hông nhưng thấy rõ vai, mũi và hai tai được chấm điểm phần thân
-trên (thân và chân coi như trung tính) và câu trả lời `ergo` có `partial: true`; câu trả
-lời đủ thân có `partial: false`, server cũ không gửi field này.
+RULA của pose chạy trên keypoint 2D. Session pose nào gửi `"ergo_mode": "desk"` trong
+message `config` sẽ được chấm RULA kiểu bàn làm việc (desk); mọi session khác (đèn V1)
+vẫn nhận điểm gốc, không đổi. Ở chế độ desk, góc cổ 2D là đường từ trung điểm hai vai
+tới trung điểm hai tai, lấy dấu theo phía khuôn mặt hướng tới (độ lệch x của mũi so với
+trung điểm hai tai), nên đầu thẳng hoặc cúi về trước được điểm cổ 1–3 và chỉ khi đầu ngả
+ra sau từ 5° trở lên mới được 4 (quy tắc gốc đọc mọi góc cổ 2D thành 4); góc nhìn chính
+diện cho góc không dấu. Chế độ desk còn chấm điểm phần thân trên cho khung hình bị che
+hông nhưng thấy rõ vai, mũi và hai tai (thân và chân coi như trung tính), với
+`partial: true` trong `ergo`; câu trả lời desk đủ thân có `partial: false`, câu trả lời
+mặc định không có key `partial`. `POSE__ERGO_DESK_MODE=false` (mặc định true) là công tắc
+tắt khẩn cấp, bỏ qua opt-in.
 Phát hiện vật thể OWLv2 chạy bằng hai graph ONNX: graph text biến prompt thành query
 embedding, graph ảnh dùng các embedding đó để phát hiện. Các preset prompt có tên (hiện chỉ
 có `fire_hazard_v1`, 46 prompt nguy cơ cháy mà HAL dùng) được encode một lần khi dlserver

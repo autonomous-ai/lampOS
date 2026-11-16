@@ -147,12 +147,19 @@ def build_pose_perception() -> PosePerception:
         )
 
     ergo_factory: ErgoAssessorFactory | None = None
+    desk_ergo_factory: ErgoAssessorFactory | None = None
     if settings.pose.ergo_assessor is not None:
         ergo_factory = ErgoAssessorFactory(
             model_name=settings.pose.ergo_assessor,
             confidence_threshold=settings.pose.ergo_confidence_threshold,
-            upper_body_partial=settings.pose.ergo_upper_body_partial,
         )
+        if settings.pose.ergo_desk_mode:
+            # Only sessions that send ergo_mode="desk" use it; the rest keep ergo_factory.
+            desk_ergo_factory = ErgoAssessorFactory(
+                model_name=settings.pose.ergo_assessor,
+                confidence_threshold=settings.pose.ergo_confidence_threshold,
+                desk_mode=True,
+            )
 
     default_config: PosePerceptionSessionConfig = PosePerceptionSessionConfig()
     if settings.pose.confidence_threshold_2d is not None:
@@ -164,6 +171,7 @@ def build_pose_perception() -> PosePerception:
         estimator_2d_factory=estimator_2d_factory,
         lifter_3d_factory=lifter_3d_factory,
         ergo_assessor_factory=ergo_factory,
+        desk_ergo_assessor_factory=desk_ergo_factory,
         default_config=default_config,
         batch_size=settings.pose.batch_size,
         batch_timeout=settings.pose.batch_timeout,

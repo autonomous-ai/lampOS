@@ -22,6 +22,9 @@ class PoseConfigRequest(BaseModel):
     frame_interval: float | Omit = omit
     confidence_threshold_2d: float | Omit = omit
     min_valid_keypoints: int | Omit = omit
+    # Opt-in per session: "desk" scores RULA with the 2D neck sign and the
+    # upper-body partial score (ergo.partial). Unset or "default" = original RULA.
+    ergo_mode: Literal["default", "desk"] | Omit = omit
 
 
 class PoseHeartBeatRequest(BaseModel):
@@ -78,10 +81,17 @@ class PoseEstimateResponse(BaseModel):
                 confs=detection.pose_3d.confs,
             )
 
+        ergo: dict[str, Any] | None = None
+        if detection.ergo is not None:
+            ergo = asdict(detection.ergo)
+            # partial is set only in desk mode; the default answer keeps its old keys.
+            if ergo.get("partial") is None:
+                ergo.pop("partial", None)
+
         return PoseEstimateResponse(
             pose_2d=pose_2d,
             pose_3d=pose_3d,
-            ergo=asdict(detection.ergo) if detection.ergo is not None else None,
+            ergo=ergo,
         )
 
 

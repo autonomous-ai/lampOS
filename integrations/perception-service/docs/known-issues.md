@@ -44,15 +44,16 @@ Tracked model accuracy and architecture limitations that affect production quali
   keypoints to compute trunk angle. If hips are occluded (desk, table edge,
   close-up framing), the assessor returns None and no ergo score is produced
   for that frame. This is common in seated desk setups where the camera is
-  at monitor height. With `POSE__ERGO_UPPER_BODY_PARTIAL=true` (default off), a
+  at monitor height. For a session that sends `ergo_mode: "desk"`, a
   frame whose only gap is the hips (shoulders, nose and both ears confident) is
   scored on the upper body instead: the trunk reference is the perpendicular of
   the shoulder line (image vertical when the shoulders overlap in a side view),
   trunk and legs are assumed neutral, and `ergo.partial` is `true`.
 
-- **Neck flexion in 2D** (fixed): RULA is fed 2D keypoints (z = 0), where the
-  old sign rule (`cross(trunk_up, v)[0]`) is always 0, so every neck angle came
-  out negative and scored 4 ("extension"). For 2D input the neck is now the
+- **Neck flexion in 2D** (fixed in desk mode only): RULA is fed 2D keypoints
+  (z = 0), where the old sign rule (`cross(trunk_up, v)[0]`) is always 0, so every
+  neck angle comes out negative and scores 4 ("extension"). Default sessions (V1
+  lamps) keep that rule unchanged. With `ergo_mode: "desk"` the 2D neck is the
   shoulder midpoint -> ear midpoint line, and its sign comes from the face: the
   nose's x offset from the ear midpoint gives the side the person faces, and a
   lean towards that side is flexion. Leans behind the trunk line under 5° count

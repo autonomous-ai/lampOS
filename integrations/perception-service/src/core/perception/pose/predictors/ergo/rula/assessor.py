@@ -49,10 +49,15 @@ class RULAAssessor(ErgoAssessor):
     Sides are assessed independently after aligning spine->thorax to vertical;
     the overall score is the worse side. Low-confidence joints are skipped.
 
-    With *upper_body_partial*, a frame whose hips are hidden (spine below the
-    threshold) but whose shoulders, nose and ears are confident is still scored:
-    the shoulder line stands in for the trunk, trunk and legs are assumed neutral
-    (score 1) and the result carries ``partial=True``.
+    *desk_mode* (off by default) turns on two changes for seated desk frames; with
+    it off the scores are exactly the original ones:
+
+    - 2D input: the neck is thorax -> ear midpoint, signed by the facing side of
+      the face (the original rule always reads 2D as extension, neck 4).
+    - A frame whose hips are hidden (spine below the threshold) but whose
+      shoulders, nose and ears are confident is still scored: the shoulder line
+      stands in for the trunk, trunk and legs are assumed neutral (score 1) and
+      the result carries ``partial=True`` (``False`` on a full-body desk answer).
     """
 
     GRAPH_TYPE: GraphEnum = GraphEnum.H36M
@@ -67,10 +72,10 @@ class RULAAssessor(ErgoAssessor):
         muscle_use_score: int | None = None,
         force_load_score: int | None = None,
         batch_size: int | None = None,
-        upper_body_partial: bool | None = None,
+        desk_mode: bool | None = None,
     ) -> None:
         super().__init__(batch_size=batch_size)
-        self._upper_body_partial: bool = bool(get_or_default(upper_body_partial, False))
+        self._desk_mode: bool = bool(get_or_default(desk_mode, False))
         self._confidence_threshold: float = get_or_default(
             confidence_threshold, self.DEFAULT_CONFIDENCE_THRESHOLD
         )
@@ -272,7 +277,7 @@ class RULAAssessor(ErgoAssessor):
 
         partial: bool = False
         if scores[spine_idx] < self._confidence_threshold:
-            if not (self._upper_body_partial and self._upper_body_visible(scores)):
+            if not (self._desk_mode and self._upper_body_visible(scores)):
                 return None
             partial = True
 
@@ -281,7 +286,8 @@ class RULAAssessor(ErgoAssessor):
             kps_3d = self._with_shoulder_trunk(kps_3d)
         aligned: npt.NDArray[np.float32] = align_to_vertical(kps_3d)
 
-        planar: bool = is_planar(*kps_3d)
+        # The original rule (cross product x part) stays outside desk mode.
+        planar: bool = self._desk_mode and is_planar(*kps_3d)
 
         left: SideAssessment = self._assess_side(aligned, scores, "left", planar, partial)
         right: SideAssessment = self._assess_side(aligned, scores, "right", planar, partial)
@@ -293,7 +299,7 @@ class RULAAssessor(ErgoAssessor):
             right=right,
             score=overall_score,
             risk_level=risk_level_from_score(overall_score),
-            partial=partial,
+            partial=partial if self._desk_mode else None,
         )
 
     @override
@@ -312,11 +318,12 @@ class RULAAssessor(ErgoAssessor):
         for result in results:
             if result is not None:
                 self._logger.info(
-                    "RULA score=%d (L=%d, R=%d), risk=%s, partial=%s",
+                    "RULA score=%d (L=%d, R=%d), risk=%s, desk=%s, partial=%s",
                     result.score,
                     result.left.score,
                     result.right.score,
                     result.risk_level.name,
+                    self._desk_mode,
                     result.partial,
                 )
 
