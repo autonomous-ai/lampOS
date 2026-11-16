@@ -54,7 +54,7 @@ changed):
   clip, a look up, a dip; a tilt either way only on a head that tilts
   standing, which lamp-4ace's does not) after a random wait of 40 s to 3 min
   (`docs/body.md`, since 2026-10-16). With `LAMP_BODY_PRESENCE=on` (#7301,
-  on in the product) a standing lamp stays up while someone is at it, for
+  off in the product until its lamp-52e6 row) a standing lamp stays up while someone is at it, for
   at most 15 quiet minutes, and shifts every 20 to 60 s, livelier for a few
   minutes after talk or an arrival, with a sixth move that sags the arm
   toward its fold (`docs/body.md`, "Someone at the lamp"). While a body clip plays, Expression's
