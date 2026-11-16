@@ -625,12 +625,12 @@ impl Waiting {
             )
         })?;
         worker.check_running().map_err(unavailable)?;
-        let at = monotonic_us();
-        if self.sequence != 0
-            && self.gate.state(MonoTime::from_micros(at)) == PrivacyState::Unavailable
-        {
-            return Err(unavailable("Controls privacy freshness lost while waiting"));
-        }
+        // Freshness is judged only once the queue is drained, below: a look
+        // held past 50 ms (the muted ring light's start between its two
+        // ticks, lamp-e82d) still has fresh readings queued behind the one
+        // it holds, and judging that one first failed every retry with the
+        // slide closed. This renewal is the wait's Denied authority, so it
+        // grants nothing whatever the gate reads.
         self.renew(worker, indicator, PUBLISH_EVERY_US, Renewal::AfterGate)?;
         let mut empty = false;
         for _ in 0..16 {
@@ -1480,6 +1480,81 @@ pub(crate) mod tests {
     #[test]
     fn a_stale_first_observation_alone_still_ends_the_wait_unavailable() {
         let error = first_look_over(&[(80_000, true)])
+            .err()
+            .expect("no fresh reading");
+        assert!(is_unavailable(&*error), "{error}");
+        assert!(
+            error
+                .to_string()
+                .contains("Controls privacy unavailable while waiting"),
+            "{error}"
+        );
+    }
+
+    /// A first look over one fresh Muted observation, then a look `gap`
+    /// later with `then` queued just before it (ages at that look), as a
+    /// muted ring light's start holds the wait between its two ticks. The
+    /// second look's result, and the fixture ended.
+    fn second_look_after(gap: Duration, then: &[(u64, bool)]) -> Result<Step> {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut worker, mut peer, input) = Worker::cooperative_fixture(&directory.path, "privacy");
+        let mut waiting = Waiting::new(new_boot().unwrap()).unwrap();
+        peer.control
+            .send(WorkerEvent::Privacy {
+                acquired_at_us: monotonic_us(),
+                muted: true,
+                receipt: None,
+            })
+            .unwrap();
+        let first = waiting
+            .step(&mut worker, None, &mut |_, _, _| Ok(()), &mut |_| Ok(false))
+            .expect("a fresh Muted first look keeps the wait");
+        assert_eq!(first.physical, PrivacyState::Muted);
+        std::thread::sleep(gap);
+        let now = monotonic_us();
+        for &(age_us, muted) in then {
+            peer.control
+                .send(WorkerEvent::Privacy {
+                    acquired_at_us: now - age_us,
+                    muted,
+                    receipt: None,
+                })
+                .unwrap();
+        }
+        let step = waiting.step(&mut worker, None, &mut |_, _, _| Ok(()), &mut |_| Ok(false));
+        drop(peer);
+        drop(input);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !matches!(worker.try_exit(), Ok(Some(_))) {
+            assert!(Instant::now() < deadline, "the fixture did not end");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        worker.send_stop_until_peer_gone();
+        cleanup(&mut worker, None, &directory.path).unwrap();
+        drop(worker);
+        let _ = fs::remove_dir(&directory.path);
+        step
+    }
+
+    /// lamp-e82d, 16 Nov: the muted ring light's start held the wait past
+    /// 50 ms between two looks, and the second look ended the wait
+    /// "Controls privacy freshness lost while waiting" on the reading it
+    /// already held, before reading the fresh ones queued meanwhile; each
+    /// retry did the same while the slide stayed closed. Freshness is judged
+    /// once the queue is drained, so the wait goes on, muted.
+    #[test]
+    fn a_look_held_past_freshness_with_fresh_readings_queued_keeps_the_wait() {
+        let step = second_look_after(Duration::from_millis(80), &[(0, true)])
+            .expect("fresh readings queued during the gap keep the wait");
+        assert_eq!(step.physical, PrivacyState::Muted);
+        assert!(!step.allowed);
+    }
+
+    /// The same gap with nothing fresh queued still ends the wait, closed,
+    /// by the check after the drain.
+    #[test]
+    fn a_look_held_past_freshness_with_nothing_fresh_still_ends_the_wait() {
+        let error = second_look_after(Duration::from_millis(80), &[])
             .err()
             .expect("no fresh reading");
         assert!(is_unavailable(&*error), "{error}");
