@@ -2435,7 +2435,11 @@ Khi đèn ở chế độ riêng tư (công tắc riêng tư đọc là đóng t
 trả lời tiếp theo, như trước; công tắc chưa đọc được, như lúc voice khởi động
 lại, không tính là riêng tư, và lệnh tắt mic của restart guard sau một lỗi
 (`muted_by: restart_guard`) cũng không, nên tin lúc đó được giữ. Giữ quá 5 phút (`NEWS_HELD_MOST_MS`) kể từ lần
-từ chối đầu thì tin bị bỏ. Từ chối vì lý do khác thì không giữ. Journal có
+từ chối đầu thì tin bị bỏ. Từ chối vì lý do khác thì không giữ. Một lần nhờ
+mà voice đã nhận nhưng không bắt đầu được trước khi hết hạn thì trả về
+`say: expired`; lần đó không được nhờ lại, voice vẫn giữ tin và kể ở câu
+trả lời kế tiếp (lamp-c0a4, 16/11: tin của task 83 hết hạn lúc 20:14:18 khi
+voice còn đang khởi động, và được kể ở câu trả lời kế tiếp lúc 20:18:55). Journal có
 một dòng khi giữ, và một dòng khi kể, khi nhường cho chế độ riêng tư hoặc khi
 bỏ, chỉ có số việc, số đếm và mã, không bao giờ có lời của tin:
 

@@ -4960,7 +4960,11 @@ held and waits for the next reply, as before; a switch not yet read, as a
 restarting voice has it, is not privacy, nor is the restart guard's mute
 after a fault (`muted_by: restart_guard`), so its news is held. Held past 5 min
 (`NEWS_HELD_MOST_MS`) from the first refusal, it is dropped. Any other
-refusal is not held. The journal has one line when it is held, and one when
+refusal is not held. An ask the voice takes but cannot begin before its
+life ends comes back `say: expired`; it is not asked again, and the voice
+keeps the news and tells it at the next reply (lamp-c0a4, 16 Nov: task 83's
+news expired at 20:14:18 under a voice still starting, and was told at the
+next reply at 20:18:55). The journal has one line when it is held, and one when
 it is told, let go to privacy or dropped, with the task's number, counts and
 codes, never the news's words:
 
