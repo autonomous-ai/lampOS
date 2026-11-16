@@ -39,6 +39,10 @@
 //! - [`pause`]: a stranger reading on the same tracked face pauses the gate
 //!   (nothing sent, nothing said) instead of ending the sitting; anything
 //!   else, or 5 s, wipes what the pause kept.
+//! - [`keep`]: any other short closing (the face lost, a reading gone
+//!   stale) keeps the posture window and the doing timers, unsaid, for up
+//!   to 120 s; standing up, a forget, the opt-in off, the privacy, sleep and
+//!   a stranger still wipe at once.
 //! - [`pose`]: posture (phase 3): one frame every 30 s to the pose model,
 //!   one socket each, its RULA score kept as this sitting's rolling window
 //!   and said on `humans/posture`; off unless `LAMP_SEEN_POSTURE=on`, and
@@ -51,6 +55,7 @@ pub mod crypto;
 pub mod endpoint;
 pub mod frames;
 pub mod gate;
+pub mod keep;
 pub mod link;
 pub mod mark;
 pub mod opt_in;
