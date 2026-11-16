@@ -1781,7 +1781,9 @@ từ chối; và `the_read_steps_are_the_catalogues_readable_services`),
 Yêu cầu của chủ, 12/11; bật trong cả năm unit sản phẩm từ 13/11. Với
 `LAMP_AGENT_SERVICES=on` trong `lamp-voice`
 (đặt giống nhau trong lamp-tasks, lamp-skills, lamp-skills-manage@ và
-lamp-control,
+lamp-control, và trong lamp-cloud, nơi trang kỹ năng nạp kỹ năng với chính
+các công tắc của lamp-skills để một kỹ năng connector không bị liệt kê là
+không nạp được, [cloud.md](../cloud.md), "Where it reads";
 [services_vi.md](services_vi.md); đúng `on`; `made_skill::AGENT_SERVICES_ENVIRONMENT`) và
 `LAMP_MADE_SCRIPTS=on` bên cạnh (bước `task` của skill tự làm chịu giới hạn
 đó), một skill làm bằng giọng nói mà đọc hoặc ghi một dịch vụ đã liên kết
