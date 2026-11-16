@@ -7049,6 +7049,27 @@ it is a 3 × 140-character summary with no tool names, read every 30 s.
     because OpenClaw writes it in WAL), never through a link
     (`SQLITE_OPEN_NOFOLLOW`), with a 100 ms busy wait. It is opened once
     per read.
+  - `SQLITE_OPEN_NOFOLLOW` refuses a link anywhere in the path. So the
+    state folder is resolved first (`fs::canonicalize`, which allows a
+    data partition or a moved folder), and only what lies under it must
+    not be a link.
+- **Its own thread:** the reads, decoding and parsing run on a thread of
+  their own, `tasks-steps`, never on the serve loop that accepts the
+  voice's and the app's sockets. Every 100 ms that thread takes the
+  watched tasks from the store owner's report, then reads once a second.
+  Before publishing, each step is checked against `TaskStep::check()`.
+- **Secrets redacted:** before a step is cut, `args`, `result`, replies
+  and errors have `***` in place of each of these:
+  - the word after `Bearer` or `Basic`;
+  - the value of `NAME=value`, or of `NAME: value`, whose name says
+    secret (KEY, TOKEN, SECRET, PASSWORD, AUTH, COOKIE);
+  - such a key's value inside a call's JSON arguments, at any depth;
+  - a token-shaped word: 24 or more letters, digits, `-` or `_` with both
+    a letter and a digit, or a known key prefix (`sk-`, `ghp_`, `xoxb-`,
+    `AKIA` and others).
+
+  These are words matched, not understood, so a long hash or id is hidden
+  too.
 - **Which session:** Harness runs OpenClaw as `openclaw tui --session
   harness-<agentId>`, and lamp-tasks knows each task's `agentId`. On 52e6
   the keys are exactly `agent:main:harness-<uuid>`. The task's session is
@@ -7178,6 +7199,10 @@ Tests (`crates/tasks/src/steps/tests.rs`):
 - `a_task_begun_before_its_session_is_bounded_by_the_next`
 - `two_tasks_begun_before_their_session_give_it_to_the_newer`
 - `a_compressed_event_asking_a_large_window_is_skipped`
+- `the_serve_loop_never_reads_steps`
+- `the_steps_thread_publishes_and_stops`
+- `a_state_folder_reached_through_a_link_is_read`
+- `secrets_in_args_and_results_are_redacted`
 - `the_session_is_harness_named_one`
 - `a_link_or_another_schema_is_never_read`
 - `the_root_is_the_wrappers_state_unless_set`
