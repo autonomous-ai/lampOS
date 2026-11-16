@@ -5298,10 +5298,13 @@ pub const NOTHING_READS: &str = "the lamp has nothing that reads that";
 /// 16 Nov: "over 28 degrees turn the light blue" was made on a
 /// `device/temperature` trigger, field `max_c`, that nothing on the lamp
 /// sends, and kept in general words though it could never start): a
-/// topic not in [`READABLE`], or a field its message doesn't carry (its
+/// topic no `lamp_msgs` declares, or a field its message doesn't carry (its
 /// first part, for a dotted one), in its `[trigger]` (a table or a list),
-/// a trigger's `sooner` or a `[[while]]`. The part, for the journal, and
-/// the repair's lines, naming it and the topics there are with their
+/// a trigger's `sooner` or a `[[while]]`. A topic is one the lamp has
+/// when `lamp_msgs` declares it ([`lamp_has`]); a field is checked only on
+/// [`READABLE`]'s topics, and a declared topic not among them is none here
+/// (it keeps its loosened path in [`plainly`]). The part, for the journal,
+/// and the repair's lines, naming it and the topics there are with their
 /// fields. A topic the lamp has but can't start a made skill on yet
 /// ([`topic_cant_yet`]) is none here: it is said so, never repaired. The
 /// faces' field is left to [`plainly`], which says why a face has none.
@@ -5337,12 +5340,15 @@ fn unread(table: &toml::Table) -> Option<(String, String)> {
         if topic_cant_yet(topic).is_some() {
             return None;
         }
-        let Some((_, fields)) = READABLE.iter().find(|(known, _)| *known == topic) else {
+        if !lamp_has(topic) {
             return Some(format!(
                 "{what}'s topic {} is not one the lamp has",
                 named(topic)
             ));
-        };
+        }
+        // A topic the lamp has but can't say keeps its loosened path
+        // ([`plainly`]); the fields are checked for [`READABLE`]'s only.
+        let (_, fields) = READABLE.iter().find(|(known, _)| *known == topic)?;
         let field = read.get("field")?.as_str()?;
         let head = field.split('.').next().unwrap_or(field);
         (topic != FACES_TOPIC && !fields.contains(&head))
@@ -5355,6 +5361,35 @@ fn unread(table: &toml::Table) -> Option<(String, String)> {
     );
     Some((part, lines))
 }
+
+/// Whether the lamp has `topic` (#7357): one `lamp_msgs` declares
+/// ([`lamp_msgs::declaration_of`], or [`DECLARED_BESIDE`]), or
+/// lamp-skills' own clock ([`CLOCK_TOPIC`]). Not only [`READABLE`]'s: a
+/// hand on the lamp (`body/hand`) is one it has, though no saying here
+/// knows it. Held to every topic `lamp_msgs` names by
+/// `every_topic_lamp_msgs_names_is_one_the_lamp_has`.
+fn lamp_has(topic: &str) -> bool {
+    topic == CLOCK_TOPIC
+        || DECLARED_BESIDE.contains(&topic)
+        || lamp_msgs::declaration_of(topic).is_some()
+}
+
+/// The topics `lamp_msgs` declares a type for that
+/// [`lamp_msgs::declaration_of`] doesn't list, each by its own `TOPIC`.
+const DECLARED_BESIDE: [&str; 12] = [
+    lamp_msgs::AirState::TOPIC,
+    lamp_msgs::MoodState::TOPIC,
+    lamp_msgs::RoomSound::TOPIC,
+    lamp_msgs::SuddenSound::TOPIC,
+    lamp_msgs::Addressed::TOPIC,
+    lamp_msgs::VoiceRemarked::TOPIC,
+    lamp_msgs::SpeakerCheckRequest::TOPIC,
+    lamp_msgs::SpeakerCheck::TOPIC,
+    lamp_msgs::SelfTest::TOPIC,
+    lamp_msgs::EngineInstallAsk::TOPIC,
+    lamp_msgs::UpdateStatus::TOPIC,
+    lamp_msgs::UpdateCheck::TOPIC,
+];
 
 /// How a repair of a read the lamp doesn't have begins ([`unread`]).
 const NOTHING_READS_HEAD: &str = "The lamp has nothing that reads that: ";
@@ -11275,6 +11310,84 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(unread(&toml::from_str(&heard).unwrap()).is_none());
         // The making model is told the same list.
         assert_eq!(readable_named().split("; ").count(), SAYABLE_TOPICS.len());
+    }
+
+    /// #7357, Seventh's HOLD at d76106fea2: a topic the lamp has is one
+    /// `lamp_msgs` declares (or lamp-skills' clock), not only [`READABLE`]'s.
+    /// A loosened make on a hand pushing the lamp (`body/hand`, which
+    /// built-in skills trigger on) is kept in general words, as before
+    /// #7357, never refused as a read the lamp doesn't have; an invented
+    /// topic still is, in every mode.
+    #[test]
+    fn a_declared_topic_is_one_the_lamp_has_and_an_invented_one_is_not() {
+        let light = "light = { colour = \"blue\" }";
+        let hand = made_with(
+            "topic = \"body/hand\"\nfield = \"pushed\"\nequals = true\n",
+            light,
+        );
+        assert!(unread(&toml::from_str(&hand).unwrap()).is_none());
+        let kept = plainly_as(&topic_granted(&hand), false, true);
+        assert!(kept.is_ok(), "{kept:?}");
+        for (reads, general) in [(false, false), (false, true), (true, true)] {
+            assert!(
+                !matches!(plainly_as(&hand, reads, general), Err(Refused(why, _)) if why == NOTHING_READS),
+                "body/hand, reads {reads}, general {general}"
+            );
+        }
+        let phone = made_with(
+            "topic = \"phone/battery\"\nfield = \"percent\"\nbelow = 20\n",
+            light,
+        );
+        for (reads, general) in [(false, false), (false, true), (true, true)] {
+            match plainly_as(&phone, reads, general) {
+                Err(Refused(why, Some(lines))) => {
+                    assert_eq!(why, NOTHING_READS);
+                    assert!(
+                        lines.contains("the trigger's topic phone/battery is not one the lamp has"),
+                        "{lines}"
+                    );
+                }
+                other => panic!("phone/battery, reads {reads}, general {general}: {other:?}"),
+            }
+        }
+        // Every sayable topic is a declared one (the clock is lamp-skills').
+        for (topic, _) in READABLE {
+            assert!(lamp_has(topic), "{topic}");
+        }
+        assert!(lamp_has(lamp_msgs::Hand::TOPIC));
+        assert!(!lamp_has("phone/battery"));
+    }
+
+    /// #7357: every topic `lamp_msgs` names (each `TOPIC` const and
+    /// `TOPICS` list in its source, a census of the declarations) is one
+    /// the lamp has ([`lamp_has`]): a topic declared and left out of
+    /// [`lamp_msgs::declaration_of`] fails here until it is named.
+    #[test]
+    fn every_topic_lamp_msgs_names_is_one_the_lamp_has() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../msgs/src");
+        let mut named = Vec::new();
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_none_or(|ext| ext != "rs") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            // Only the declarations, never the tests' own strings.
+            let text = text.split("#[cfg(test)]").next().unwrap_or(&text);
+            let mut rest = text;
+            while let Some(at) = rest.find("pub const ") {
+                rest = &rest[at + "pub const ".len()..];
+                let (name, after) = rest.split_once(':').unwrap();
+                if !name.ends_with("TOPIC") && !name.ends_with("TOPICS") {
+                    continue;
+                }
+                let value = &after[..after.find(';').unwrap()];
+                named.extend(value.split('"').skip(1).step_by(2).map(str::to_owned));
+            }
+        }
+        assert!(named.len() > 80, "{}", named.len());
+        let missing: Vec<&String> = named.iter().filter(|topic| !lamp_has(topic)).collect();
+        assert!(missing.is_empty(), "{missing:?}");
     }
 
     /// #7357: [`READABLE`]'s fields are each message's own, as it is
