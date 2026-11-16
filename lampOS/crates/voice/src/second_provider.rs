@@ -324,7 +324,8 @@ pub const DOWN_LINE_CANNOT: &str = "Sorry, I can't answer just now.";
 /// with no answer between: a usage limit, not a burst, so no promise of a
 /// moment (#7346: lamp-74ff's relay answered 429 for over an hour on
 /// 16 Nov and the lamp kept saying its thoughts were slow). V1's
-/// `PhraseLLMLimit`. At most once in [`DOWN_LINE_EVERY`].
+/// `PhraseLLMLimit`. Once a run of 429s: said again only after a chat round
+/// begins or another status ends the run (V2's ruling on #7362's row).
 pub const DOWN_LINE_LIMIT: &str = "I've hit my usage limit.";
 /// How long 429s must keep coming, with no answer between, before they are
 /// taken for a usage limit: a rate burst's per-minute window passes in one.
@@ -3512,12 +3513,12 @@ struct DownLine {
     again: Mutex<Option<Vec<i16>>>,
     cannot: Mutex<Option<Vec<i16>>>,
     cannot_at: Mutex<Option<tokio::time::Instant>>,
-    /// [`DOWN_LINE_LIMIT`], and when it was last said.
+    /// [`DOWN_LINE_LIMIT`].
     limit: Mutex<Option<Vec<i16>>>,
-    limit_at: Mutex<Option<tokio::time::Instant>>,
     /// When the first of the 429s before any word came, with no chat round
-    /// begun and no other refusal since (#7346).
-    refused_since: Mutex<Option<tokio::time::Instant>>,
+    /// begun and no other refusal since, and whether this run has said
+    /// [`DOWN_LINE_LIMIT`] (#7346).
+    refused_since: Mutex<Option<(tokio::time::Instant, bool)>>,
     rendering: AtomicBool,
     /// When the last was said, and whether it was [`DOWN_LINE_AGAIN`].
     said_at: Mutex<Option<(tokio::time::Instant, bool)>>,
@@ -3623,7 +3624,7 @@ impl DownLine {
             return None;
         }
         let now = tokio::time::Instant::now();
-        let lasted = now.duration_since(*since.get_or_insert(now));
+        let lasted = now.duration_since(since.get_or_insert((now, false)).0);
         (lasted >= LIMIT_AFTER).then_some(lasted)
     }
 
@@ -3635,20 +3636,23 @@ impl DownLine {
     }
 
     /// [`DOWN_LINE_LIMIT`]: `None` when not rendered yet (the slow line
-    /// then, as before), `Some(None)` when said in the last
-    /// [`DOWN_LINE_EVERY`] (never twice in a row: nothing), else its clip.
+    /// then, as before), `Some(None)` when this run of 429s has said it
+    /// (once a run, V2's ruling on #7362's row: nothing then), else its clip.
     fn limit_due(&self) -> Option<Option<Vec<i16>>> {
         let clip = self.limit.lock().ok()?.clone()?;
-        let at = *self.limit_at.lock().ok()?;
-        if at.is_some_and(|at| tokio::time::Instant::now().duration_since(at) < DOWN_LINE_EVERY) {
-            return Some(None);
-        }
-        Some(Some(clip))
+        let said = self
+            .refused_since
+            .lock()
+            .ok()?
+            .is_some_and(|(_, said)| said);
+        Some((!said).then_some(clip))
     }
 
     fn limit_said(&self) {
-        if let Ok(mut at) = self.limit_at.lock() {
-            *at = Some(tokio::time::Instant::now());
+        if let Ok(mut since) = self.refused_since.lock()
+            && let Some((_, said)) = since.as_mut()
+        {
+            *said = true;
         }
     }
 
@@ -8233,7 +8237,8 @@ async fn say_cannot(shared: &Shared, request: u64, heard: bool) -> Result<(), St
 }
 
 /// [`DOWN_LINE_LIMIT`] for 429s that have lasted `lasted`, to someone who
-/// spoke only: once in [`DOWN_LINE_EVERY`], nothing within it; the slow
+/// spoke only: once a run of 429s, nothing after it until a round begins
+/// or another status ends the run (no `DownLineSaid` then); the slow
 /// line ([`say_down`]) while it isn't rendered. Tells the coordinator as
 /// [`say_down`] does, so no `turn_lost` follows it.
 async fn say_limit(

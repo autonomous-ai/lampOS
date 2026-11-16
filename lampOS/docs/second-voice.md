@@ -580,10 +580,12 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   time): the route keeps when the first 429 before any word came, and a
   429 that comes `LIMIT_AFTER` (2 min) or more after it, with no chat round
   begun between, says "I've hit my usage limit." (`DOWN_LINE_LIMIT`, V1's
-  `PhraseLLMLimit`) instead of the slow line, at most once a minute
-  (`DOWN_LINE_EVERY`) and never twice in a row: another 429 within that
-  minute says neither line. Any chat round that begins, or a refusal with
-  another status, ends the run of 429s. Recognised by how long the 429s
+  `PhraseLLMLimit`) instead of the slow line, once a run of 429s: every
+  later 429 in the same run says neither line and sends no `DownLineSaid`,
+  however long the run lasts (V2's ruling on #7362's row: on lamp-52e6 at
+  23:21 and again at 23:24 it was said twice in one run). Any chat round
+  that begins, or a refusal with another status, ends the run, and a later
+  run says it once again. Recognised by how long the 429s
   last, not by their body: the relay is not in this repo, its body is
   unknown (the journal keeps only its codes) and a rate burst's per-minute
   window passes well within 2 min. Until the line is rendered the slow line
