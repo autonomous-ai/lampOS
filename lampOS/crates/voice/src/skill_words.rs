@@ -345,6 +345,28 @@ fn failed_closed_soon() -> String {
 /// one constant once both are on lamp-voice.
 pub const NOT_READY_LINE: &str = "I'm still getting ready. Give me a minute and ask me again.";
 
+/// How long after the lamp starts a not-ready refusal is told as
+/// [`NOT_READY_LINE`] (El's P2 on #7351): lamp-tasks' own most for a lamp
+/// said to be starting (`STARTING_AT_MOST`, 180 s). Past it, a Gateway or
+/// Harness still not up is broken, not starting, and is told as a plain
+/// failure, as before, never "give me a minute" for good.
+pub const NOT_READY_WITHIN_MS: u64 = 180_000;
+
+/// Whether a not-ready refusal at `since_boot_ms` after the lamp started
+/// is told as [`NOT_READY_LINE`]: within [`NOT_READY_WITHIN_MS`]; an
+/// unknown time is not.
+pub fn not_ready_told(since_boot_ms: Option<u64>) -> bool {
+    since_boot_ms.is_some_and(|since| since <= NOT_READY_WITHIN_MS)
+}
+
+/// The time since the lamp started, from `/proc/uptime`; none where it
+/// can't be read.
+pub fn since_boot_ms() -> Option<u64> {
+    let uptime = std::fs::read_to_string("/proc/uptime").ok()?;
+    let seconds: f64 = uptime.split_whitespace().next()?.parse().ok()?;
+    (seconds.is_finite() && seconds >= 0.0).then_some((seconds * 1000.0) as u64)
+}
+
 /// [`NewsWords::failed_not_ready`]'s words, built in.
 fn failed_not_ready() -> String {
     format!(
