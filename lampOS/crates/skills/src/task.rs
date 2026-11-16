@@ -131,10 +131,15 @@ pub const OFF: &str =
 pub const SCRIPTS: &str = "scripts";
 /// The most bytes of a `do.task`'s `task`.
 pub const MOST_TASK_BYTES: usize = 500;
-/// The most runs a skill hands over in any 24 hours.
-pub const PER_SKILL: usize = 3;
-/// The most runs every skill together hands over in any 24 hours.
-pub const ALL_SKILLS: usize = 10;
+/// The most runs a skill hands over in any 24 hours: 3 from 11 Nov, raised
+/// on the owner's ask (15 Nov), since a presence skill fires each time
+/// someone comes back to the desk and 3 ran out before lunch on lamp-9adf.
+/// One run at a time, 840 s a run and the owner's yes stay the safety.
+pub const PER_SKILL: usize = 20;
+/// The most runs every skill together hands over in any 24 hours: 10 from
+/// 11 Nov, raised with [`PER_SKILL`] (lamp-9adf's 10 were spent by 09:39 on
+/// 15 Nov).
+pub const ALL_SKILLS: usize = 100;
 /// The window the bounds count in, milliseconds.
 pub const DAY_MS: u64 = 86_400_000;
 /// The longest a run is waited for: lamp-tasks answers the hand-over line
@@ -1746,8 +1751,9 @@ mod tests {
         assert_eq!(refuses(), Some(NO_CONTROL));
     }
 
-    /// One at a time a skill, and at most three a skill a day; an
-    /// unreadable ledger, or one with a run after now, counts as full.
+    /// One at a time a skill, and at most [`PER_SKILL`] a skill a day: the
+    /// last of them goes, the next is refused; an unreadable ledger, or one
+    /// with a run after now, counts as full.
     #[test]
     fn one_task_at_a_time_and_a_daily_cap() {
         let dir = tempfile::tempdir().unwrap();
@@ -1756,10 +1762,14 @@ mod tests {
         let busy = begin("cap-skill", Some(state), 1_001).unwrap_err();
         assert!(busy.contains("still under way"), "{busy}");
         drop(first);
-        drop(begin("cap-skill", Some(state), 2_000).unwrap());
-        drop(begin("cap-skill", Some(state), 3_000).unwrap());
-        let spent = begin("cap-skill", Some(state), 4_000).unwrap_err();
-        assert!(spent.contains("3 runs in 24 hours"), "{spent}");
+        for run in 2..=PER_SKILL as u64 {
+            drop(begin("cap-skill", Some(state), run * 1_000).unwrap());
+        }
+        let spent = begin("cap-skill", Some(state), (PER_SKILL as u64 + 1) * 1_000).unwrap_err();
+        assert!(
+            spent.contains(&format!("{PER_SKILL} runs in 24 hours")),
+            "{spent}"
+        );
         // A day on, it may again.
         drop(begin("cap-skill", Some(state), 1_000 + DAY_MS).unwrap());
         // Set back: full.
@@ -1771,14 +1781,17 @@ mod tests {
                 .unwrap_err()
                 .contains("can't be read")
         );
-        // Across every skill: at most ten.
+        // Across every skill: at most [`ALL_SKILLS`], the last of them let
+        // through and the next refused.
         let runs: Vec<(String, u64)> = (0..ALL_SKILLS)
             .map(|at| (format!("s{at}"), at as u64))
             .collect();
+        let now = ALL_SKILLS as u64 + 1;
+        assert!(bounded(&runs[1..], "another", now).is_ok());
         assert!(
-            bounded(&runs, "another", 100)
+            bounded(&runs, "another", now)
                 .unwrap_err()
-                .contains("10 runs")
+                .contains(&format!("{ALL_SKILLS} runs"))
         );
     }
 
