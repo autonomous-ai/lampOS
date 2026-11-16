@@ -1596,6 +1596,277 @@ Không dòng nào trong số này tự ghi tên engine theo lời của lamp-tas
 default agent` khi Harness báo stopped, hoặc `not known (harness show: …)`
 khi không đọc được câu trả lời. Hermes và OpenClaw đều như vậy.
 
+### Một phiên cho agent mặc định của đèn (#7246, tắt trừ khi `LAMP_TASKS_ONE_SESSION=on`)
+
+Giai đoạn 1 của #7246, thiết kế cuối của lead: agent mặc định của đèn giữ
+MỘT pane Harness, và mọi việc nói cùng mọi lần chạy kỹ năng là một tin
+nhắn gõ vào pane đó. Tắt (mọi giá trị khác `on` đúng nguyên văn, mặc định,
+không có trong unit nào), mỗi việc và mỗi lần chạy vẫn là `harness new`
+riêng như trên, không đổi một byte (`crates/tasks/src/one_session.rs`).
+
+- **OpenClaw trước.** Pane chỉ được mở khi agent mặc định của đèn là
+  OpenClaw. Đèn mặc định Hermes giữ đường đi hiện nay theo từng việc, một
+  pane cho mỗi việc và mỗi lần chạy, cho tới khi dòng thử H1 chạy được
+  trên một đèn Hermes.
+- **Mở ngay khi khởi động, khi agent sẵn sàng.** Khi công tắc bật (cùng
+  `LAMP_SKILL_TASKS` và `LAMP_SKILL_DEFAULT_AGENT`), một luồng của
+  lamp-tasks (`one-session`) chạy mỗi 2 s. Nó chỉ mở pane khi Harness đã
+  thiết lập, Harness được gọi với tư cách người dùng
+  (`--harness-as-person`, như unit sản phẩm), biết máy của đèn, agent mặc
+  định là OpenClaw và gateway trả lời trong 25 s
+  (`LAMP_PLACE_GATEWAY_WITHIN`: một lần đọc approvals của nó, khoảng 10 s
+  trên đèn kể cả khi đã ấm; chỉ đọc trên luồng này, không bao giờ trên
+  đường giao việc). Lệnh mở là `harness new openclaw` trong
+  `~/harnesses/lamp-tasks/one-session` (project Harness của lamp-tasks
+  `~/harnesses/lamp-tasks` cùng `FOLDER`, thư mục 0700), tên `lamp-one-openclaw` (chỉ để đọc trong `harness ps`),
+  với lời nhắc đầu ngắn; nó chờ tối đa 120 s cho lượt đầu rảnh. `new` lỗi
+  thì thử lại sau 5 s, gấp đôi dần tới 5 phút.
+- **Chưa có agent sẵn sàng: không phiên, không vòng lặp.** Trên đèn mới
+  hoặc đã đăng xuất, hoặc đèn có mặc định không phải OpenClaw, không mở
+  pane nào và không thử `harness new` nào. Đèn được xem lại sau 60 s
+  (`NOT_READY_FIRST`), gấp đôi dần tới 10 phút (`NOT_READY_MOST`), hoặc
+  ngay lập tức khi có tác nhân: daemon của Harness khởi động, hoặc máy hay
+  engine mặc định của đèn đổi (mỗi lượt chỉ đọc nhẹ hai giá trị này, không
+  gọi gateway). Mỗi lý do mới được ghi journal một lần: `tasks: one
+  session: not opened: <why>`, ví dụ `Harness is not set up`, `Harness is
+  called as an agent`, `the lamp's own machine is not known (signed
+  out?)`, `the default engine is hermes, not OpenClaw` hoặc `OpenClaw's
+  gateway is not ready: <why>`. Khi pane đã mở thì không tìm lại nữa.
+- **Chỉ khi gọi với tư cách người dùng.** Harness chỉ đóng pane rảnh sau
+  30 phút khi pane do agent mở, nên khi Harness được gọi với tư cách agent
+  thì không mở pane nào và mọi việc đi đường riêng.
+- **Đường riêng, khi công tắc bật.** Việc nói vẫn có `harness new` riêng
+  chỉ khi nó không dành cho pane (máy hoặc engine khác với mặc định của
+  chính đèn, hoặc người dùng nêu một phiên); lần chạy kỹ năng chỉ khi nó
+  không dành cho OpenClaw là agent mặc định của gateway (ví dụ mặc định
+  Hermes) hoặc Harness được gọi với tư cách agent. Việc dành cho pane
+  không bao giờ lùi về `new` riêng.
+- **Giữ lại khi chưa biết vị trí của đèn.** Việc nói có thể dành cho pane
+  trong lúc vị trí của đèn chưa được biết (ngay sau khi khởi động, hoặc
+  khi daemon của Harness không chạy; đăng nhập hay đăng xuất đều vậy)
+  không đi đường riêng. Nó được giữ trong hàng đợi tới khi biết vị trí,
+  tối đa 15 phút (`QUEUE_WAIT`), rồi thất bại `busy` mà không có
+  `harness new` nào.
+- **Tìm lại theo id đã giữ.** Agent id của pane từ lệnh `new` được giữ
+  trong `one-session.json` ở thư mục store của lamp-tasks
+  (`/var/lib/lampos-tasks/store`, 0600). Lần mở sau (khởi động lại
+  lamp-tasks, hoặc khởi động lại máy, khi Harness tự khôi phục pane với
+  cùng id) tra bằng `show`: còn sống thì nhận lại, không `new`; dừng hoặc
+  mất thì `harness resume <id>` một lần; nếu không được thì `new` mới.
+  Không bao giờ tìm theo tên: `new` với tên đã có sẽ tạo pane thứ hai, và
+  agent có thể đổi tên pane.
+- **Pane đã giữ đang hỏi thì không nhận lại.** Pane đã giữ đọc ra
+  `needs-input` có một câu hỏi không ai giữ. Nó không được nhận lại. Như
+  mọi pane đã giữ mà không lấy lại được (mất và không resume được, resume
+  xong vẫn mất, không đọc được, hoặc của máy hay engine khác), nó bị đóng
+  `--now` và cuộc hội thoại OpenClaw của nó bị xoá (`sessions.delete`)
+  trước khi mở pane mới (`dropped <id> (not taken back)`).
+  Lần đóng thất bại trên máy này thì lùi lại và thử lại, không bao giờ
+  `new` bên cạnh một pane có thể vẫn còn sống (`<id> not closed: <code>`),
+  trừ khi Harness trả lời lần đóng bằng `UNKNOWN_HARNESS` (hoặc `GONE`):
+  pane đó đã mất, nên bị bỏ như một pane đã đóng và pane mới được mở
+  (`<id> already gone (UNKNOWN_HARNESS); a new pane`).
+- **`new` không chắc chắn không bao giờ bị làm hai lần.** `harness new`
+  trả về không chắc chắn hoặc không khởi động ngay có thể đã tạo pane. Pane
+  được tìm bằng một lần `harness ps`, khớp với thư mục riêng của pane
+  (`one-session`). Tìm thấy thì giữ làm pane. Không thấy, hoặc `ps` không
+  trả lời được, thì lần mở thất bại (`harness new: uncertain, looked for
+  next`), lùi lại như một `new` lỗi, và lần mở sau tìm lại trước mọi `new`
+  khác.
+- **Chỉ mở lại khi pane đã chết.** Dừng, lỗi, mất (`UNKNOWN_HARNESS`)
+  hoặc không chạy: mở lại một lần cho lượt đó. `offline`, `unknown`,
+  `starting`, `installing` và `working` thì chờ. Daemon của Harness khởi
+  động lại (đăng nhập, #7141, hoặc file env đổi) chỉ bỏ pane khỏi bộ nhớ;
+  lần mở sau nhận lại theo id đã giữ. Lỗi lần hai được ghi journal
+  `<task> not typed: <why>` và không tạo phiên thứ hai: lần chạy kỹ năng
+  thất bại (`the lamp's one session could not take the run: <why>`), việc
+  nói nhận trả lời `busy` (xem dưới).
+- **Mọi thứ là một tin nhắn.** Việc nói cho chính đèn (machine id của
+  đèn, engine mặc định, không nêu phiên nào) và lần chạy kỹ năng cho agent
+  mặc định của gateway được gõ vào pane bằng
+  `harness reply --machine <id> <pane> --json -- <words>`
+  (`Cli::reply_to`). Lời bắt đầu bằng một dòng `New task <id>:`, rồi tới
+  việc (với lần chạy kỹ năng: việc của launcher như trước). Lời chỉ được
+  gõ khi `show` đọc pane rảnh và lời trước đã được nhận (không có `told`,
+  hoặc `told.taken`): Harness xếp hàng lời gõ trước lúc đó, sẽ trộn hai
+  việc. Pane không bao giờ bị đóng khi một việc xong.
+- **Lượt của việc nói.** Store theo dõi pane như một phiên người dùng đã
+  có (`Joined`) và không bao giờ đóng nó. Store chỉ đọc pane cho việc đó
+  khi lời của việc đã được thấy là đã nhận. Không thấy nhận trong 120 s
+  (`OPEN_IDLE_WITHIN`) hoặc tới khi lamp-tasks dừng, việc thành không chắc
+  chắn (`one_session_not_taken`) và không bao giờ được gõ lại.
+- **Giữ tới khi câu trả lời được nói ra.** Pane được giữ tới khi câu trả
+  lời của việc được giọng nói nói ra, không chỉ được đọc: lượt kế tiếp
+  trong pane chiếm chỗ của việc này trong store. Câu đang được phát thì
+  chưa tính là đã nói. Câu trả lời vẫn chưa nói 60 s sau khi được đọc
+  (`UNTOLD_CLOSE_MS`), hoặc được đọc ở lần khởi động trước, cũng nhả pane.
+  Rồi hàng đợi đi tiếp.
+- **Việc nói kết thúc mà không có câu trả lời.** Việc nói kết thúc không
+  có câu trả lời (bị huỷ, hoặc một câu hỏi không ai trả lời) vẫn giữ pane.
+  Luồng `one-session` sau đó đóng pane `--now`, xoá cuộc hội thoại
+  OpenClaw của nó (`sessions.delete`) và id đã giữ, rồi nhả pane. Lần xem
+  sau mở pane mới.
+- **Lần chờ ngắn của việc nói (`SPOKEN_PANE_WAIT`).** Store chỉ giao việc
+  nói dành cho pane cho worker tasks-harness, worker phục vụ mọi lần giao
+  việc và mọi lần đọc, khi pane rảnh: khi pane đang bị giữ, một việc nói
+  khác đang được giao, hoặc một việc vừa được đưa lại chưa tới 2 s, việc
+  vẫn ở `queued` trong store, đứng đầu hàng đợi của pane. Trên worker,
+  việc chờ tới lượt và chờ pane rảnh bị giới hạn 5 s hoặc tới khi
+  lamp-tasks dừng. Nhận trả lời `busy` sau giới hạn đó hoặc khi dừng, mà
+  chưa gõ gì, việc được đưa lại vào hàng đợi của store đúng chỗ cũ
+  (`Engine::put_back_launch`), có ghi journal, và pane không được thử lại
+  trong 2 s (`PANE_RETRY`). Hàng đợi đầy trả lời ngay và việc thất bại
+  `busy` như trước, việc đã được đưa lại tổng cộng 15 phút kể từ lần giao
+  đầu (`QUEUE_WAIT`) cũng vậy.
+- **Lượt của lần chạy kỹ năng.** Kết thúc khi `harness wait`, rồi `show`,
+  đọc pane rảnh trên đúng dòng đầu của lần chạy đó; pane rảnh trên lời
+  hỏi khác thì chờ tiếp, nên mỗi lần chạy chỉ giữ câu trả lời của lượt
+  mình. `started` của launcher vẫn quyết định kỹ năng đã chạy hay chưa.
+  Lượt dừng lại để hỏi người dùng (`needs-input`) kết thúc lần chạy đó, và
+  pane bị đóng `--now` rồi mở lại ở lần sau.
+- **Lần chạy kỹ năng chờ skill-start có trong allow-list.** Ngay sau khi
+  gateway khởi động, allow-list exec của agent `main` chưa có
+  `/usr/local/lib/lampos/skill-start` cho tới khi lamp-update thêm lại, và
+  lệnh exec của agent sẽ bị từ chối. Nên trước khi gõ lần chạy kỹ năng vào
+  pane, lamp-tasks đọc approvals của gateway
+  (`openclaw approvals get --gateway --json`, trong 20 s). Không có mục cho
+  launcher dưới `main` hoặc `*` thì lần chạy không được gõ: nó thất bại
+  ngay với mã `skill_start_not_allowed` (lần ghi cố định vẫn là
+  `not_started`), không xếp hàng hay tạo gì. Lần đọc lỗi hoặc không phải
+  JSON thì lần chạy vẫn được gõ. Lần đọc đã thấy mục đó được giữ tới khi
+  socket lắng nghe của gateway đổi.
+- **Một hàng đợi, mỗi lúc một lượt.** Harness không có lệnh steer và
+  không có turn id: pane bận trả lời `NOT_IDLE`. Nên việc đến khi pane
+  đang bị giữ sẽ chờ trong một hàng FIFO trong lamp-tasks: tối đa 4 việc
+  chờ, mỗi việc tối đa 15 phút, việc nói đi trước lần chạy kỹ năng. Hàng
+  đợi đầy, hoặc việc đã chờ 15 phút, bị từ chối `busy` ("the lamp's agent
+  session is busy and its queue is full; one task runs at a time"), nên
+  lamp-skills vẫn thử lại (#7239). Không có phiên tràn.
+- **Việc đang chờ thì được báo.** Việc nói phải chờ vẫn ở `queued` trong
+  store, và metadata của việc có `"queued": {"position": <n>}` (1 là kế
+  tiếp), để câu đầu của đèn có thể nói nó đang làm xong việc trước. Câu
+  nói của giọng nói cho việc này là việc tiếp theo.
+- **Không reset sau lần chạy kỹ năng.** Những gì một lần chạy đã đọc vẫn
+  ở lại trong phiên (giai đoạn này chỉ một người dùng, lý do 2 của lead).
+  Lần bắt đầu lại duy nhất là xoay vòng: pane mới sau 40 lượt
+  (`ROTATE_TURNS`) hoặc 250k token (`ROTATE_TOKENS`), như gateway của
+  Hermes xoay vòng (`runtimes/hermes/rotation.go`). Harness không cho biết
+  số token, nên token được ước tính 4 ký tự một token từ lời đã gõ, câu
+  trả lời của các lần chạy kỹ năng đã đọc và câu trả lời của việc nói mà
+  store đã đọc. Bộ đếm bắt đầu từ 0 khi pane được mở hoặc nhận lại. Ở lượt
+  kế tiếp sau khi vượt một trong hai ngưỡng, pane cũ bị đóng `--now`, phiên
+  OpenClaw của nó bị xoá (`sessions.delete`) và id đã giữ bị quên, rồi một
+  pane mới được mở, không bao giờ nhận lại pane cũ. Trong một pane, nén
+  ngữ cảnh là việc của engine.
+- **Theo từng lần chạy, như trước.** Thư mục `skill-<run id>`, claim của
+  launcher, pass và token cho dịch vụ liên kết của lần chạy kỹ năng vẫn là
+  của riêng nó, và được kết thúc và xoá khi nó xong; chỉ phiên là dùng
+  chung. Ghi vào dịch vụ liên kết vẫn cần chủ đèn nói đồng ý.
+- **Huỷ hoặc hết hạn của lần chạy kỹ năng** kết thúc lượt: token của lần
+  chạy bị kết thúc trước, rồi pane bị đóng `--now`, vì Harness không có
+  lệnh ngắt, phiên OpenClaw của nó bị xoá (`sessions.delete`) và file id
+  đã giữ bị xoá; lần mở sau tạo pane mới. Đóng do `needs-input` của lần
+  chạy kỹ năng cũng vậy.
+- **Journal.** Id là 8 ký tự đầu của pane; mỗi dòng bắt đầu bằng
+  `tasks: one session: ` trừ các dòng theo từng việc và từng lần chạy ở
+  cuối.
+  `on (LAMP_TASKS_ONE_SESSION=on)`; `not opened: <why>` (khi chưa có agent
+  sẵn sàng, hoặc `<why>; tried again in <s> s` sau một `new` lỗi);
+  `opened <id> (openclaw) in <ms> ms`, sau `reopened after <why>` khi nó
+  thay một pane; `adopted <id> (<state>)`, `resumed <id> (<state>)`,
+  `<id> resumed <state>; a new pane`, `<id> not resumed: <code>; a new
+  pane`; `rotated after <n> turns, ~<t> tokens`; `reused (<n>th turn) for
+  <task>`; `<task> queued behind <holder>`; `<task> refused busy, <n>
+  already wait`; `<task> waited its most, refused busy`; `<task>'s turn
+  is done; the queue goes on`; `<task>: open failed: <why>`; `<task> not
+  typed: <why>`; `the old pane <id> not closed: <why>`; `<id> not closed:
+  <code>`; `<id> already gone (UNKNOWN_HARNESS); a new pane`; `<id>'s OpenClaw session not deleted: <code>`;
+  `closed --now after <task>'s turn was cancelled; opened again next`,
+  hoặc `not closed after <task>'s turn was cancelled: <why>`;
+  `<task>'s turn asks something; closed --now, opened again next`;
+  `<task>'s turn ended unanswered; the pane is closed next`; `found <id>
+  an uncertain new made`;
+  `let go: Harness's daemon started` hoặc `let go: Harness's daemon
+  restarted`; `the lamp signed out; its pane is removed`; `dropped <id>
+  (<why>)`. Mỗi việc và mỗi lần chạy kỹ năng: `tasks: <task>: turn
+  accepted in <ms> ms (<n>th turn)`, thời gian từ lúc giao việc tới lúc
+  agent nhận lời. Mỗi việc nói được đưa lại: `tasks: <task>: the lamp's
+  pane was not free within 5 s; queued again`. Mỗi việc nói có lời không
+  thấy được nhận: `tasks: <task>: its words were not seen taken in <ms>
+  ms`. Mỗi việc nói được giữ chờ vị trí của đèn: `tasks: <task>: held
+  until the lamp's place is known (at most <n> min)`, rồi `tasks: <task>:
+  the lamp's place is known; held no longer` hoặc `tasks: <task>: the
+  lamp's place not known in <n> min; busy`. Mỗi lần chạy kỹ năng không
+  được gõ: `tasks: <task>: not typed into the one session: <why>`.
+
+#### Phiên chung giữ những gì
+
+Lời trong pane được giữ ở các nơi sau trên đèn, đều thuộc `lampos`:
+
+| Cái gì | Ở đâu | Quyền |
+|--------|-------|-------|
+| Agent id, máy và engine của pane | `/var/lib/lampos-tasks/store/one-session.json` | 0600, trong thư mục trạng thái 0700 |
+| Thư mục của pane, nơi chạy `harness new` | `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session` | thư mục 0700 (lamp-tasks tạo); `/var/lib/lampos-tasks` là 0700 (`StateDirectoryMode=0700`) |
+| Bản ghi của Harness về pane (registry, bản ghi agent đã dừng) | `/var/lib/lampos-tasks/.harness/cli/data/registry.json`, `.../cli/data/stopped-agents/` | trong home Harness 0700 |
+| Chính cuộc hội thoại (phiên OpenClaw `agent:main:harness-<agent id>`) | `/var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite` (bản OpenClaw cũ: `state/agents/main/sessions/*.jsonl`) | `/var/lib/lampos-openclaw` và `state` 0700 (lamp-update tạo); OpenClaw ghi không có `UMask=`, nên chính các thư mục 0700 chặn người dùng khác |
+| Với pane Hermes (không mở ở giai đoạn 1) | `/var/lib/lampos-hermes/.hermes/state.db` (+ `-wal`, `-shm`), `sessions/` | `/var/lib/lampos-hermes` 0700 |
+
+Khi nào bị xoá:
+
+- **Đổi engine mặc định: xoá.** Khi mặc định không còn là OpenClaw, hoặc
+  machine id của đèn đổi, luồng `one-session` đóng pane `--now`, xoá
+  phiên OpenClaw của nó qua gateway
+  (`openclaw gateway call sessions.delete`, kèm transcript), và xoá
+  `one-session.json` (`OneSession::drop_pane`). `close` của Harness giữ
+  nguyên kho của OpenClaw, nên lamp-tasks tự xoá phiên. Chỉ tính khi thật
+  sự đổi: máy và engine cũ lẫn mới đều đã biết và khác nhau. Một lần đọc
+  mà một trong hai chưa biết (Harness chưa thiết lập, danh sách máy lỗi)
+  thì giữ pane; trường khác của vị trí pane, như thư mục, cũng giữ pane.
+- **Reset nhà máy: xoá.** Reset dừng user manager của `lampos` (cùng
+  daemon của Harness và pane), rồi xoá thư mục store,
+  `harnesses/lamp-tasks` và `.harness/cli/data`, trạng thái OpenClaw trừ
+  `openclaw.json`, và `state.db` cùng `sessions/` của Hermes.
+- **Đăng xuất: xoá.** Khi sign-in của Harness, đã đọc là đăng nhập, lần
+  sau đọc là đăng xuất (`harness_sign_in_read`), pane bị xoá theo cùng
+  cách (`OneSession::drop_pane`) ở lượt kế tiếp của luồng `one-session`
+  khi không có gì giữ pane. Riêng daemon của Harness khởi động lại chỉ bỏ
+  id khỏi bộ nhớ; pane được giữ.
+- **Khởi động khi đang đăng xuất.** `one-session.json` cũng giữ
+  `signed_in`: đèn có đăng nhập hay không lúc pane được tạo (chỉ ghi lúc
+  đó). Ở lần khởi động đọc đèn là đăng xuất, pane đã giữ được tạo khi đăng
+  nhập bị xoá theo cùng cách; file không có trường này tính là đăng nhập.
+  Pane đã giữ được tạo khi đăng xuất thì được nhận lại khi đèn vẫn đăng
+  xuất (đèn xuất xưởng chạy đăng xuất, #6407).
+
+#### Pass của lần chạy kỹ năng giới hạn những gì trong một phiên
+
+Pass của lần chạy kỹ năng là token một lần chạy của nó: lamp-control tạo
+token từ lời đồng ý của chủ đèn cho kỹ năng đó, và token ghi tên các grant
+của lời đồng ý ấy (`Tokens::mint`). Trong một phiên, token vẫn là của
+riêng lần chạy, không phải của phiên: launcher `skill-start` nhận lần chạy
+một lần và trao token cho script của kỹ năng qua fd 3 bên trong hàng rào
+(fence) của lần chạy, không bao giờ qua lời gõ vào pane, một file hay một
+đối số. Với token đó, script chạm tới đèn qua socket của lamp-control
+(`LAMP_CONTROL_SOCKET`) cho các grant mà lời đồng ý ghi tên, và chạm tới
+dịch vụ liên kết của chủ đèn chỉ theo các grant `<code>-read` hoặc
+`<code>-write` mà token ghi tên (`SERVICE_GRANTS`), qua lamp-control tới
+lamp-services; token riêng của các dịch vụ không bao giờ rời kho của root.
+Token bị kết thúc khi lần chạy kết thúc, dù kết thúc thế nào (đã trả lời,
+bị huỷ, tới hạn chót hay khi lamp-tasks dừng), cùng với lượt nhận của
+launcher, và thư mục `skill-<run id>` của lần chạy bị xoá, nên một lượt
+sau trong cùng phiên không còn giữ pass nào. Một lần ghi vào dịch vụ liên
+kết vẫn chờ lời đồng ý nói ra của chủ đèn: lamp-services chỉ gửi đúng thứ
+chủ đèn đã đồng ý, một lần mỗi lần chạy.
+
+Việc tiếp theo: #7260 (proposal: in the one session, a skill's run keeps the reach of its grants).
+
+- **Các dòng thử trên c0a4 (#7246):** M1 (bộ nhớ, tắt rồi bật công tắc:
+  một phiên, không bị OOM kill, lamp-voice không thoát, MemAvailable thấp
+  nhất ít nhất 600 MB), rồi L1 khi tắt và L2, G1 khi bật: việc nói và lần
+  chạy kỹ năng đi qua một pane (một `new`, một `reply` cho mỗi việc, không
+  `close`), token của mỗi lần chạy kỹ năng được kết thúc và thư mục bị xoá,
+  và một việc báo `queued` khi việc khác đang làm.
+
 ### Giới hạn được chấp nhận cho thứ Hai: grant của kỹ năng đang chạy trong gateway
 
 Được chấp nhận cho đợt phát hành thứ Hai theo #6882 (a) (first builder,

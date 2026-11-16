@@ -7440,6 +7440,17 @@ fn skill_runner_with(
         agent_ns: None,
         login: None,
         starts: Default::default(),
+        one_session: None,
+        // Agent main's exec allow-list has the launcher.
+        skill_start_allowed: lamp_tasks::gateway::SkillStartAllowed::new(
+            Box::new(|| {
+                Ok(json!({"file":{"agents":{"main":{"allowlist":[
+                    {"pattern":lamp_tasks::skill_start::LAUNCHER}
+                ]}}}})
+                .to_string())
+            }),
+            Box::new(|| Some(1)),
+        ),
         makes: false,
     }
 }
@@ -9438,6 +9449,297 @@ fn issue_6691_named_reads_each_sessions_id_name_and_folder_from_one_ps() {
         rig.cli().named("not a machine"),
         Err("invalid_machine".into())
     );
+}
+
+/// The OpenClaw gateway default's runner with `LAMP_TASKS_ONE_SESSION` on
+/// (#7246): its one session's queue bounds short, its boot fixed.
+fn one_session_runner(rig: &Rig) -> HarnessRunner {
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let wrapper = openclaw_gateway_wrapper(&gateway_ns);
+    let mut runner = one_path_runner(
+        rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &wrapper)],
+        Some("#!/bin/sh\n"),
+    );
+    runner.one_session = Some(Arc::new(
+        lamp_tasks::one_session::OneSession::new(
+            Duration::from_secs(5),
+            Duration::from_millis(20),
+            Duration::from_secs(5),
+        )
+        .with_state_file(rig.root.path().join("one-session.json"))
+        .with_session_delete(Box::new(|_| Ok(()))),
+    ));
+    runner
+}
+
+/// A pane whose turn for run `task-1` is idle, as `show` reads it.
+fn one_session_plan(rig: &Rig) {
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":json!({
+            "id":AGENT,"state":"idle","ask":"New task task-1:\nRun the skill.",
+            "answer":"Took the photo.","truncated":false,"tools":1
+        }).to_string()},
+        "reply":{"default":true},
+        "close":{"exit":0},
+    }));
+}
+
+/// #7246: with `LAMP_TASKS_ONE_SESSION` on, an OpenClaw gateway default's
+/// skill runs share one Harness pane: one `new` (the pane's own, in its
+/// folder `one-session`, not the run's), each run typed into it with
+/// `reply` after its header line, and no `close` at a run's end; each
+/// run's folder, launcher claim and token stay its own and are gone after.
+/// Off (`an_openclaw_gateway_default_runs_through_harness_new_like_hermes`),
+/// every run is its own `new` and `close`.
+#[test]
+fn with_one_session_on_runs_share_one_pane_and_it_is_never_closed() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    one_session_plan(&rig);
+    let runner = one_session_runner(&rig);
+    for _ in 0..3 {
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        let run = skill_run(Duration::from_secs(20));
+        assert_eq!(runner.run(&run, &|| {}), Ok(0));
+        assert_eq!(
+            run.answer.get().map(String::as_str),
+            Some("Took the photo.")
+        );
+        let claimed = launched.join().unwrap().expect("live before it ended");
+        let grant = lamp_tasks::skill_start::parse_answer(&claimed.answer).unwrap();
+        assert_eq!(grant.token, RUN_SECRET);
+        assert!(!runner.starts.is_live("task-1"), "not live after its end");
+        nothing_left(&rig);
+    }
+    let calls = rig.calls();
+    let verbs: Vec<&str> = calls
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        verbs.iter().filter(|verb| **verb == "new").count(),
+        1,
+        "{verbs:?}"
+    );
+    assert_eq!(
+        verbs.iter().filter(|verb| **verb == "reply").count(),
+        3,
+        "{verbs:?}"
+    );
+    assert_eq!(
+        verbs.iter().filter(|verb| **verb == "close").count(),
+        0,
+        "{verbs:?}"
+    );
+    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+    assert_eq!(new["args"][1], "openclaw");
+    assert!(new.to_string().contains("one-session"), "{new}");
+    assert!(!new.to_string().contains("skill-task-1"), "{new}");
+    for reply in calls.iter().filter(|call| call["args"][0] == "reply") {
+        assert_eq!(reply["args"][3], AGENT, "the one pane: {reply}");
+        let words = reply["args"][6].as_str().unwrap();
+        assert!(words.starts_with("New task task-1:\n"), "{words}");
+        assert!(
+            words.contains("Run `/usr/local/lib/lampos/skill-start task-1` once"),
+            "{words}"
+        );
+        assert!(!words.contains(RUN_SECRET));
+    }
+    assert!(rig.root.path().join("project/one-session").is_dir());
+    let named = new["args"]
+        .as_array()
+        .unwrap()
+        .windows(2)
+        .any(|pair| pair[0] == "--name" && pair[1] == "lamp-one-openclaw");
+    assert!(named, "the pane's fixed name: {new}");
+    // Opened as the person: Harness's 30-min close of an idle pane is for
+    // one an agent started.
+    assert!(new["environment"].get("AI_AGENT").is_none(), "{new}");
+}
+
+/// #7246: with Harness called as an agent (not `--harness-as-person`), no
+/// pane is shared, since Harness would close an idle one an agent started
+/// after 30 min: each run is its own `new` and `close`, as off.
+#[test]
+fn with_one_session_on_as_an_agent_each_run_keeps_its_own_pane() {
+    let rig = Rig::new();
+    one_session_plan(&rig);
+    let runner = one_session_runner(&rig);
+    for _ in 0..2 {
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        assert_eq!(
+            runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+            Ok(0)
+        );
+        launched.join().unwrap();
+        nothing_left(&rig);
+    }
+    let calls = rig.calls();
+    let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
+    assert_eq!((count("new"), count("close"), count("reply")), (2, 2, 0));
+}
+
+/// #7246: only an OpenClaw default shares the one pane. A Hermes default
+/// whose wrapper is a gateway agent's (its run's token through the
+/// skill-start launcher, as OpenClaw's) keeps today's per-run path, even
+/// with the switch on and Harness called as the person: each run its own
+/// `new hermes` and `close`, nothing typed with `reply`.
+#[test]
+fn with_one_session_on_a_hermes_default_keeps_the_per_run_path() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    one_session_plan(&rig);
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let wrapper = openclaw_gateway_wrapper(&gateway_ns);
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", &wrapper)],
+        Some("#!/bin/sh\n"),
+    );
+    runner.one_session = one_session_runner(&rig).one_session;
+    for _ in 0..2 {
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        assert_eq!(
+            runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+            Ok(0)
+        );
+        launched.join().unwrap();
+        nothing_left(&rig);
+    }
+    let calls = rig.calls();
+    let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
+    assert_eq!((count("new"), count("close"), count("reply")), (2, 2, 0));
+    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+    assert_eq!(new["args"][1], "hermes");
+    assert!(!new.to_string().contains("one-session"), "{new}");
+}
+
+/// #7246: a run past its deadline in the one pane ends its turn: the
+/// token ended, the pane closed `--now` (Harness has no interrupt verb),
+/// and the next run opens a new pane and goes on in it.
+#[test]
+fn with_one_session_on_a_deadline_closes_the_pane_and_the_next_run_reopens() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    one_session_plan(&rig);
+    let runner = one_session_runner(&rig);
+    // The pane opened; then a turn that never ends.
+    let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    launched.join().unwrap();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":"{\"harnesses\":[]}","exit":124,"delay_ms":200},
+        "show":{"default":true},
+        "reply":{"default":true},
+        "close":{"exit":0},
+    }));
+    let ended = std::cell::Cell::new(None);
+    let said = runner
+        .run(&skill_run(Duration::from_secs(2)), &|| {
+            ended
+                .get()
+                .is_none()
+                .then(|| ended.set(Some(rig.calls().len())));
+        })
+        .unwrap_err();
+    assert_eq!(said, "the run was ended at its deadline, 2 s");
+    let calls = rig.calls();
+    let closed = calls
+        .iter()
+        .position(|call| call["args"][0] == "close")
+        .expect("the pane closed");
+    assert!(calls[closed].to_string().contains("--now"));
+    assert!(
+        ended.get().is_some_and(|at| at <= closed),
+        "the token first"
+    );
+    nothing_left(&rig);
+    // The next run: a new pane, typed into.
+    one_session_plan(&rig);
+    let before = rig.calls().len();
+    let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    launched.join().unwrap();
+    let after: Vec<String> = rig.calls()[before..]
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(
+        after.iter().filter(|verb| *verb == "new").count(),
+        1,
+        "{after:?}"
+    );
+    assert_eq!(
+        after.iter().filter(|verb| *verb == "close").count(),
+        0,
+        "{after:?}"
+    );
+}
+
+/// #7246 (the Reviewer-lead's #4): a pane that stays busy until a skill
+/// run's deadline fails the run in words; it never runs its own
+/// `harness new`, a second session.
+#[test]
+fn with_one_session_on_a_busy_pane_never_makes_a_second_session() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    one_session_plan(&rig);
+    let runner = one_session_runner(&rig);
+    let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    launched.join().unwrap();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("working", AGENT)},
+        "show":{"stdout":json!({
+            "id":AGENT,"state":"working","ask":"Someone else's.",
+            "answer":"","truncated":false,"tools":1
+        }).to_string()},
+        "reply":{"default":true},
+        "close":{"exit":0},
+    }));
+    let before = rig.calls().len();
+    let said = runner
+        .run(&skill_run(Duration::from_secs(2)), &|| {})
+        .unwrap_err();
+    assert!(
+        said.contains("one session could not take the run"),
+        "{said}"
+    );
+    let after: Vec<String> = rig.calls()[before..]
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert!(!after.iter().any(|verb| verb == "new"), "{after:?}");
+    nothing_left(&rig);
 }
 
 /// #7245: the lamp's make runner with an OpenClaw gateway default, its

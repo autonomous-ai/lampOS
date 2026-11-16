@@ -416,6 +416,42 @@ fn session_seen(
     }
 }
 
+/// `show` of the lamp's one standing pane (#7246, [`Cli::observe_pane`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PaneSeen {
+    pub seen: Observation,
+    /// The last words typed were taken: `show` has no `told`, or its
+    /// `told.taken` is true. Words typed while earlier ones are untaken
+    /// are queued by Harness behind them, which mixes two tasks' answers.
+    pub taken: bool,
+}
+
+/// Whether `show`'s answer says the last words typed were taken
+/// ([`PaneSeen::taken`]).
+fn told_taken(bytes: &[u8]) -> bool {
+    let reply = serde_json::from_slice::<Value>(bytes).unwrap_or_default();
+    match reply.get("told") {
+        None | Some(Value::Null) => true,
+        Some(told) => told["taken"] == true,
+    }
+}
+
+/// How typing into the lamp's one standing pane went ([`Cli::reply_to`],
+/// `LAMP_TASKS_ONE_SESSION`, #7246).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Typed {
+    /// Harness took the words for that pane.
+    Typed,
+    /// The pane is busy with a turn (`NOT_IDLE`): nothing typed.
+    NotIdle,
+    /// Harness says the pane was closed or stopped (`NOT_RUNNING`).
+    NotRunning,
+    /// Nothing typed, with why.
+    NotSent(String),
+    /// The words may have been typed: never typed again.
+    Uncertain(String),
+}
+
 /// How closing one harness this lamp started went (#1390).
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -1936,6 +1972,54 @@ impl Cli {
         }
     }
 
+    /// `LAMP_TASKS_ONE_SESSION` (#7246): `words` typed into the lamp's one
+    /// standing pane, `agent_id` on `machine`, with `harness reply`, the
+    /// verb [`Cli::reply_named`] types with, but by the pane's own id:
+    /// lamp-tasks opened that pane, so nothing is looked up by name. One
+    /// try under the operation lock; never typed twice here. Harness has
+    /// no steer and no turn id, so a busy pane is `NotIdle` (its
+    /// `NOT_IDLE`, retryable) and the caller waits for idle first.
+    pub fn reply_to(&self, machine: &str, agent_id: &str, words: &str) -> Typed {
+        if !machine_id(machine) || !self::agent_id(agent_id) {
+            return Typed::NotSent("invalid_agent".into());
+        }
+        if words.trim().is_empty()
+            || words.len() > MAX_PROMPT_BYTES
+            || words.starts_with("--")
+            || words.contains('\0')
+        {
+            return Typed::NotSent("invalid_prompt".into());
+        }
+        let Ok(_guard) = self.operation.try_lock() else {
+            return Typed::NotSent("busy".into());
+        };
+        let reply = self.run(
+            &[
+                "reply".into(),
+                "--machine".into(),
+                machine.into(),
+                agent_id.into(),
+                "--json".into(),
+                "--".into(),
+                words.into(),
+            ],
+            self.config.launch_timeout,
+        );
+        match reply {
+            Ok(reply) if reply.success && replied(&reply.stdout, agent_id) => Typed::Typed,
+            // Taken, with an answer that can't say for this pane: the words
+            // may be there.
+            Ok(reply) if reply.success => Typed::Uncertain("reply_uncertain".into()),
+            Ok(reply) => match reply_refusal(&reply.stdout) {
+                "reply_not_idle" => Typed::NotIdle,
+                "reply_not_running" => Typed::NotRunning,
+                refused => Typed::NotSent(refused.into()),
+            },
+            Err(error) if error.spawned => Typed::Uncertain("reply_uncertain".into()),
+            Err(error) => Typed::NotSent(format!("reply_{}", error.code)),
+        }
+    }
+
     /// A look at the session the person named (#6274), found as a named
     /// hand-over finds it ([`Cli::find_named`], near-miss names included)
     /// but with no words to type: `join` for "open the customer survey
@@ -3096,6 +3180,74 @@ impl Cli {
         agent_id: &str,
         timeout: Duration,
     ) -> Result<Vec<u8>, String> {
+        let reply = self.show_reply(machine, agent_id, timeout)?;
+        if !reply.success {
+            return Err("observe_failed".into());
+        }
+        Ok(reply.stdout)
+    }
+
+    /// `LAMP_TASKS_ONE_SESSION` (#7246): [`Cli::observe`] of the lamp's one
+    /// standing pane, with a pane Harness no longer has (`UNKNOWN_HARNESS`
+    /// or `GONE`, as after a user-manager restart killed every pane) told
+    /// apart as `gone`, so it is reopened and not waited on, and whether
+    /// the last words typed were taken ([`PaneSeen::taken`]).
+    pub fn observe_pane(&self, machine: &str, agent_id: &str) -> Result<PaneSeen, String> {
+        let reply = self.show_reply(machine, agent_id, self.config.read_timeout)?;
+        if !reply.success {
+            return Err(if gone(&reply.stdout) {
+                "gone".into()
+            } else {
+                "observe_failed".into()
+            });
+        }
+        let seen = parse_reading(&reply.stdout, agent_id).map_err(str::to_string)?;
+        Ok(PaneSeen {
+            taken: told_taken(&reply.stdout),
+            seen,
+        })
+    }
+
+    /// `LAMP_TASKS_ONE_SESSION` (#7246): `harness resume --machine <id>
+    /// <agent> --json` of the lamp's one standing pane, stopped or gone,
+    /// once: its state after, or why not. A Harness with no `resume` is
+    /// `session_closed`, and a fresh `new` follows.
+    pub fn resume_pane(&self, machine: &str, agent_id: &str) -> Result<String, String> {
+        if !machine_id(machine) || !self::agent_id(agent_id) {
+            return Err("invalid_agent".into());
+        }
+        let mut seen = Seen::default();
+        if !self.has_resume(self.config.read_timeout, &mut seen) {
+            return Err("session_closed".into());
+        }
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run(
+                &[
+                    "resume".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    agent_id.into(),
+                    "--json".into(),
+                ],
+                self.config.launch_timeout,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err(resume_refusal(&reply.stdout).into());
+        }
+        parse_resume(&reply.stdout, agent_id)
+            .map(|(_, state)| state)
+            .ok_or_else(|| "session_closed".into())
+    }
+
+    /// `harness show --json` of one agent, as Harness answered it.
+    fn show_reply(
+        &self,
+        machine: &str,
+        agent_id: &str,
+        timeout: Duration,
+    ) -> Result<Reply, String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
@@ -3103,24 +3255,19 @@ impl Cli {
             return Err("invalid_agent_id".into());
         }
         let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
-        let reply = self
-            .run(
-                &[
-                    "show".into(),
-                    "--machine".into(),
-                    machine.into(),
-                    agent_id.into(),
-                    "--chars".into(),
-                    "4000".into(),
-                    "--json".into(),
-                ],
-                timeout,
-            )
-            .map_err(|error| error.code.to_string())?;
-        if !reply.success {
-            return Err("observe_failed".into());
-        }
-        Ok(reply.stdout)
+        self.run(
+            &[
+                "show".into(),
+                "--machine".into(),
+                machine.into(),
+                agent_id.into(),
+                "--chars".into(),
+                "4000".into(),
+                "--json".into(),
+            ],
+            timeout,
+        )
+        .map_err(|error| error.code.to_string())
     }
 
     /// Close a harness this lamp started, once its result has been told
@@ -3146,7 +3293,7 @@ impl Cli {
         agent_id: &str,
         within: Duration,
     ) -> Result<Closed, String> {
-        self.close_with(machine, agent_id, within, false)
+        self.close_with(machine, agent_id, within, false, false)
     }
 
     /// Stop a skill run lamp-tasks itself started, at its deadline or its
@@ -3164,7 +3311,22 @@ impl Cli {
         agent_id: &str,
         within: Duration,
     ) -> Result<Closed, String> {
-        self.close_with(machine, agent_id, within, true)
+        self.close_with(machine, agent_id, within, true, false)
+    }
+
+    /// `LAMP_TASKS_ONE_SESSION` (#7246): [`Cli::close_now`] of the lamp's
+    /// one standing pane, with a close Harness refuses because it no longer
+    /// has the pane (`UNKNOWN_HARNESS` or `GONE`, read as
+    /// [`Cli::observe_pane`] reads them) told apart as
+    /// [`CLOSE_UNKNOWN_HARNESS`], so the pane is let go and not closed
+    /// again forever. Every other failure is as [`Cli::close_now`]'s.
+    pub fn close_pane_now(
+        &self,
+        machine: &str,
+        agent_id: &str,
+        within: Duration,
+    ) -> Result<Closed, String> {
+        self.close_with(machine, agent_id, within, true, true)
     }
 
     /// The agent `harness show <id> --json` names for one harness of this
@@ -3225,13 +3387,16 @@ impl Cli {
         Ok((agent, answer))
     }
 
-    /// `harness close`, with `--now` only when asked ([`Cli::close_now`]).
+    /// `harness close`, with `--now` only when asked ([`Cli::close_now`]),
+    /// and a pane Harness no longer has told apart only when asked
+    /// ([`Cli::close_pane_now`]).
     fn close_with(
         &self,
         machine: &str,
         agent_id: &str,
         within: Duration,
         now: bool,
+        tell_gone: bool,
     ) -> Result<Closed, String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
@@ -3268,6 +3433,9 @@ impl Cli {
         // (#5689).
         if !now && !reply.success && background_refusal(&reply.stdout, &reply.stderr) {
             return Err(CLOSE_BACKGROUND_COMMANDS.into());
+        }
+        if tell_gone && !reply.success && gone(&reply.stdout) {
+            return Err(CLOSE_UNKNOWN_HARNESS.into());
         }
         closed(reply.code)
     }
@@ -6266,6 +6434,9 @@ pub const BACKGROUND_COMMANDS: &str = "background_commands";
 /// Harness refused the close itself for background commands still running
 /// (#5689).
 pub const CLOSE_BACKGROUND_COMMANDS: &str = "close_background_commands";
+/// Harness refused the one standing pane's close because it no longer has
+/// that pane (`UNKNOWN_HARNESS` or `GONE`, #7246): already gone.
+pub const CLOSE_UNKNOWN_HARNESS: &str = "UNKNOWN_HARNESS";
 
 /// Whether a refused `close` says background commands still run: Harness
 /// 0.6.52's `N background commands running; --now closes anyway`, in its

@@ -4137,6 +4137,276 @@ is the name Harness's `show` gives for the session, or `the lamp's default
 agent` when Harness says stopped, or `not known (harness show: …)` when its
 reply can't be read. The same holds for Hermes and OpenClaw.
 
+### One session for the lamp's default agent (#7246, off unless `LAMP_TASKS_ONE_SESSION=on`)
+
+Phase 1 of #7246, the lead's final design: the lamp's default agent keeps
+ONE Harness pane, and every spoken task and every skill run is a message
+typed into it. Off (any value but `on` exactly, the default, in no unit),
+every task and run is its own `harness new` as above, byte for byte
+(`crates/tasks/src/one_session.rs`).
+
+- **OpenClaw first.** The pane is opened only when the lamp's default
+  agent is OpenClaw. A Hermes default keeps today's per-task path, one
+  pane per task and per run, until row H1 shows it on a Hermes lamp.
+- **Opened at start, when the agent is ready.** With the switch on (and
+  `LAMP_SKILL_TASKS` and `LAMP_SKILL_DEFAULT_AGENT`), a thread of
+  lamp-tasks (`one-session`) ticks every 2 s. It opens the pane only once
+  Harness is set up, Harness is called as the person
+  (`--harness-as-person`, as the product's unit does), the lamp's own
+  machine is known, its default agent is OpenClaw and the gateway
+  answers within 25 s (`LAMP_PLACE_GATEWAY_WITHIN`: one read of its
+  approvals, about 10 s on a lamp even warm; read on this thread only,
+  never on a hand-over's way). The open is `harness new openclaw` in
+  `~/harnesses/lamp-tasks/one-session` (lamp-tasks' Harness project
+  `~/harnesses/lamp-tasks` and `FOLDER`, folder 0700), named
+  `lamp-one-openclaw` (for `harness ps` only), with a short first prompt;
+  it waits up to 120 s for that first turn to be idle. A `new` that fails
+  is tried again after 5 s, doubling to 5 min.
+- **No agent ready: no session, no loop.** On a fresh or signed-out lamp,
+  or one whose default is not OpenClaw, no pane is opened and no `harness
+  new` is tried. The lamp is looked at again after 60 s
+  (`NOT_READY_FIRST`), doubling to 10 min (`NOT_READY_MOST`), or at once
+  when a trigger fires: Harness's daemon started, or the lamp's machine or
+  default engine changed (a cheap read of both at each tick, with no
+  gateway call). Each new reason is journaled once: `tasks: one session:
+  not opened: <why>`, for example `Harness is not set up`, `Harness is
+  called as an agent`, `the lamp's own machine is not known (signed
+  out?)`, `the default engine is hermes, not OpenClaw` or `OpenClaw's
+  gateway is not ready: <why>`. Once the pane is open, it is not looked
+  for again.
+- **As the person only.** Harness closes an idle pane after 30 min only
+  when an agent started it, so with Harness called as an agent no pane is
+  opened and every task goes the per-run way.
+- **The per-run way, with the switch on.** A spoken task still gets its
+  own `harness new` only when it is not for the pane (another machine or
+  engine than the lamp's own default, or a session the person named); a
+  skill run only when it is not for OpenClaw as the gateway default agent
+  (a Hermes default, say) or Harness is called as an agent. Work for the
+  pane never falls back to its own `new`.
+- **Held while the lamp's place is not known.** A spoken task that may be
+  for the pane while the lamp's place is not known yet (just after a
+  start, or with Harness's daemon down; signed in or out alike) is not
+  sent the per-run way. It is held in the queue until the place is known,
+  at most 15 min (`QUEUE_WAIT`), then fails `busy` with no `harness new`.
+- **Found again by its kept id.** The pane's agent id from its `new` is
+  kept in `one-session.json` in lamp-tasks' store folder
+  (`/var/lib/lampos-tasks/store`, 0600). At the next open (a lamp-tasks
+  restart, or a boot, which Harness's own restore brings back under the
+  same id) it is looked up with `show`: live, it is adopted with no
+  `new`; stopped or gone, `harness resume <id>` once; else a fresh `new`.
+  It is never found by name: a `new` with a name already there makes a
+  second pane, and the agent may retitle it.
+- **A kept pane that is asking is not adopted.** A kept pane read
+  `needs-input` has an ask nobody holds. It is not adopted. Like every
+  kept pane not taken back (gone and not resumed, resumed gone, not read,
+  or for another machine or engine), it is closed `--now` and its OpenClaw
+  conversation deleted (`sessions.delete`) before the new pane is opened
+  (`dropped <id> (not taken back)`).
+  A close that fails on this machine backs off and is tried again, never
+  a `new` beside a pane that may still be live (`<id> not closed:
+  <code>`), except a close Harness answers `UNKNOWN_HARNESS` (or `GONE`):
+  that pane is already gone, so it is dropped as a closed one is and the
+  new pane opened (`<id> already gone (UNKNOWN_HARNESS); a new pane`).
+- **An uncertain `new` is never made twice.** A `harness new` that comes
+  back uncertain or not started at once may have made the pane. It is
+  looked for with one `harness ps`, matched on the pane's own folder
+  (`one-session`). Found, it is kept as the pane. Not found, or `ps`
+  cannot say, the open fails (`harness new: uncertain, looked for next`),
+  backs off as a failed `new` does, and the next open looks again before
+  any other `new`.
+- **Reopened only when dead.** Stopped, failed, gone (`UNKNOWN_HARNESS`)
+  or not running: reopened once for that turn. `offline`, `unknown`,
+  `starting`, `installing` and `working` are waited on. A restart of
+  Harness's daemon (a sign-in, #7141, or its env file changed) only drops
+  the pane from memory; the next open adopts it by its kept id. A second
+  failure is journaled `<task> not typed: <why>` and makes no second
+  session: a skill run fails (`the lamp's one session could not take the
+  run: <why>`), a spoken task is answered `busy` (below).
+- **Everything is a message.** A spoken task for the lamp itself (its
+  machine id, its default engine, no session named) and a skill run for
+  the gateway default agent are typed into the pane with
+  `harness reply --machine <id> <pane> --json -- <words>`
+  (`Cli::reply_to`). The words start with one line, `New task <id>:`,
+  then the task (a skill run's: the launcher's task as before). They are
+  typed only once `show` reads the pane idle with its last words taken
+  (no `told`, or `told.taken`): Harness queues words typed before that,
+  which would mix two tasks. The pane is never closed at a task's end.
+- **A spoken task's turn.** The store watches the pane as a session the
+  person already had (`Joined`) and never closes it. The store reads the
+  pane for the task only once its words were seen taken. Not seen taken
+  within 120 s (`OPEN_IDLE_WITHIN`) or by lamp-tasks' stop, the task is
+  uncertain (`one_session_not_taken`) and never typed again.
+- **Held until the answer is told.** The pane is held until the task's
+  answer is told by the voice, not only read: the next turn in the pane
+  takes the task's place in the store. A playout under way is not told
+  yet. An answer still untold 60 s after it was read (`UNTOLD_CLOSE_MS`),
+  or read in an earlier boot, lets the pane go too. Then the queue goes
+  on.
+- **A spoken task that ends unanswered.** A spoken task that ends with no
+  answer (cancelled, or an ask nobody answered) keeps the pane held. The
+  `one-session` thread then closes it `--now`, deletes its OpenClaw
+  conversation (`sessions.delete`) and its kept id, and lets the pane go.
+  The next look opens a new pane.
+- **A spoken task's short wait (`SPOKEN_PANE_WAIT`).** The store hands a
+  spoken task for the pane to the tasks-harness worker, which serves
+  every hand-over and read, only with the pane free: while the pane is
+  held, another spoken task is being handed over, or one was put back
+  less than 2 s ago, it stays `queued` in the store, first in the pane's
+  queue. On the worker, its wait for its turn and for an idle pane is
+  bounded by 5 s or lamp-tasks' stop. Answered `busy` past that bound or
+  at the stop, with nothing typed, it is put back in the store's queue in
+  its place (`Engine::put_back_launch`), journaled, and the pane is not
+  tried again for 2 s (`PANE_RETRY`). A full queue answers at once and
+  the task fails `busy` as before, and so does a task already put back
+  for 15 min in all since its first hand-over (`QUEUE_WAIT`).
+- **A skill run's turn.** It ends when `harness wait`, then `show`, read
+  the pane idle on that run's own header line; a pane idle on another ask
+  is waited on again, so each run keeps only its own turn's answer. The
+  launcher's `started` still decides whether the skill ran. A turn that
+  stops to ask the person something (`needs-input`) ends that run, and
+  the pane is closed `--now` and opened again next.
+- **A skill run waits for skill-start on the allow-list.** Right after a
+  gateway start, agent `main`'s exec allow-list has no
+  `/usr/local/lib/lampos/skill-start` until lamp-update adds it again, and
+  the agent's exec would be denied. So before a skill run is typed into
+  the pane, lamp-tasks reads the gateway's approvals
+  (`openclaw approvals get --gateway --json`, within 20 s). With no entry
+  for the launcher under `main` or `*`, the run is not typed: it fails at
+  once with code `skill_start_not_allowed` (a fixed write's stays
+  `not_started`), with nothing queued or made. A read that fails or is
+  not JSON lets the run be typed. A read that found the entry is kept
+  until the gateway's listening socket changes.
+- **One queue, one turn at a time.** Harness has no steer verb and no
+  turn id: a busy pane answers `NOT_IDLE`. So work that arrives while the
+  pane is held waits in one FIFO in lamp-tasks: at most 4 waiting, each
+  at most 15 min, spoken tasks ahead of skill runs. A full queue, or one
+  that waited 15 min, is refused `busy` ("the lamp's agent session is
+  busy and its queue is full; one task runs at a time"), so lamp-skills'
+  retry (#7239) still applies. There is no overflow session.
+- **A waiting task is told.** A spoken task that waits stays `queued` in
+  the store, and its task metadata carries `"queued": {"position": <n>}`
+  (1 the next), so the lamp's first line can say it is finishing the
+  earlier task. The voice's words for it are a follow-up.
+- **No reset after a skill run.** What a run read stays in the session
+  (one user in this phase, the lead's reason 2). The only fresh start is
+  the rotation: a new pane after 40 turns (`ROTATE_TURNS`) or 250k tokens
+  (`ROTATE_TOKENS`), as Hermes' gateway rotates (`runtimes/hermes/rotation.go`).
+  Harness shows no token count, so tokens are estimated at 4 characters
+  a token from the words typed, the skill runs' answers read and the
+  spoken tasks' answers the store read. The counts start at 0 when a pane
+  is opened or adopted. At the next turn past either bound the old pane
+  is closed `--now`, its OpenClaw session is deleted
+  (`sessions.delete`) and its kept id forgotten, and a new one is opened,
+  never adopted back. Within a pane, compaction is the engine's own.
+- **Per run, as before.** A skill run's folder `skill-<run id>`, its
+  launcher claim, its pass and its token for linked services stay its
+  own, and are ended and removed at its end; only the session is shared.
+  A write to a linked service still needs the owner's spoken yes.
+- **A skill run's cancel or deadline** ends the turn: the run's token is
+  ended first, then the pane is closed `--now`, since Harness has no
+  interrupt verb, its OpenClaw session is deleted (`sessions.delete`) and
+  its kept id file removed; the next open makes a new pane. A skill run's
+  `needs-input` close is the same.
+- **Journal.** Ids are the pane's first 8 characters; each line starts
+  `tasks: one session: ` but the per-task and per-run lines at the end.
+  `on (LAMP_TASKS_ONE_SESSION=on)`; `not opened: <why>` (with no agent
+  ready, or `<why>; tried again in <s> s` after a failed `new`);
+  `opened <id> (openclaw) in <ms> ms`, after `reopened after <why>` when
+  it replaces one; `adopted <id> (<state>)`, `resumed <id> (<state>)`,
+  `<id> resumed <state>; a new pane`, `<id> not resumed: <code>; a new
+  pane`; `rotated after <n> turns, ~<t> tokens`; `reused (<n>th turn) for
+  <task>`; `<task> queued behind <holder>`; `<task> refused busy, <n>
+  already wait`; `<task> waited its most, refused busy`; `<task>'s turn
+  is done; the queue goes on`; `<task>: open failed: <why>`; `<task> not
+  typed: <why>`; `the old pane <id> not closed: <why>`; `<id> not closed:
+  <code>`; `<id> already gone (UNKNOWN_HARNESS); a new pane`; `<id>'s OpenClaw session not deleted: <code>`;
+  `closed --now after <task>'s turn was cancelled; opened again next`,
+  or `not closed after <task>'s turn was cancelled: <why>`;
+  `<task>'s turn asks something; closed --now, opened again next`;
+  `<task>'s turn ended unanswered; the pane is closed next`; `found <id>
+  an uncertain new made`;
+  `let go: Harness's daemon started` or `let go: Harness's daemon
+  restarted`; `the lamp signed out; its pane is removed`; `dropped <id>
+  (<why>)`. Per task and per skill run: `tasks: <task>: turn accepted in
+  <ms> ms (<n>th turn)`, the time from the hand-over to the agent taking
+  the words. Per spoken task put back: `tasks: <task>: the lamp's pane
+  was not free within 5 s; queued again`. Per spoken task whose words
+  were not seen taken: `tasks: <task>: its words were not seen taken in
+  <ms> ms`. Per spoken task held for the lamp's place: `tasks: <task>:
+  held until the lamp's place is known (at most <n> min)`, then `tasks:
+  <task>: the lamp's place is known; held no longer` or `tasks: <task>:
+  the lamp's place not known in <n> min; busy`. Per skill run not typed:
+  `tasks: <task>: not typed into the one session: <why>`.
+
+#### What the one session keeps
+
+The pane's words are kept in these places on the lamp, all owned by
+`lampos`:
+
+| What | Where | Mode |
+|------|-------|------|
+| The pane's agent id, machine and engine | `/var/lib/lampos-tasks/store/one-session.json` | 0600, in the 0700 state folder |
+| The pane's folder, where `harness new` is started | `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session` | folder 0700 (lamp-tasks creates it); `/var/lib/lampos-tasks` is 0700 (`StateDirectoryMode=0700`) |
+| Harness's records of the pane (registry, stopped-agent record) | `/var/lib/lampos-tasks/.harness/cli/data/registry.json`, `.../cli/data/stopped-agents/` | inside the 0700 Harness home |
+| The conversation itself (OpenClaw session `agent:main:harness-<agent id>`) | `/var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite` (older OpenClaw releases: `state/agents/main/sessions/*.jsonl`) | `/var/lib/lampos-openclaw` and `state` 0700 (lamp-update creates them); OpenClaw writes with no `UMask=`, so the 0700 folders keep other users out |
+| With a Hermes pane (not opened in phase 1) | `/var/lib/lampos-hermes/.hermes/state.db` (+ `-wal`, `-shm`), `sessions/` | `/var/lib/lampos-hermes` 0700 |
+
+When it is removed:
+
+- **Default engine switch: removed.** When the default is no longer
+  OpenClaw, or the lamp's machine id changes, the `one-session` thread
+  closes the pane `--now`, deletes its OpenClaw session through the
+  gateway (`openclaw gateway call sessions.delete`, with its transcript),
+  and deletes `one-session.json` (`OneSession::drop_pane`). Harness's
+  `close` keeps OpenClaw's own store, which is why lamp-tasks deletes the
+  session itself. Only a real move counts: the old and the new machine
+  and engine both known and different. A read with either unknown
+  (Harness not set up yet, the machine list failed) keeps the pane, and
+  so does any other field of its place, such as its folder.
+- **Factory reset: removed.** The reset stops `lampos`'s user manager
+  (and with it Harness's daemon and the pane), then wipes the store
+  folder, `harnesses/lamp-tasks` and `.harness/cli/data`, OpenClaw's
+  state but `openclaw.json`, and Hermes' `state.db` and `sessions/`.
+- **Sign-out: removed.** When Harness's sign-in, read signed in, is next
+  read signed out (`harness_sign_in_read`), the pane is removed the same
+  way (`OneSession::drop_pane`) at the `one-session` thread's next tick
+  with nothing holding it. A restart of Harness's daemon alone only drops
+  the id from memory; the pane is kept.
+- **A start signed out.** `one-session.json` also keeps `signed_in`:
+  whether the lamp was signed in when the pane was made (written then
+  only). At a start that reads the lamp signed out, a kept pane made
+  signed in is removed the same way; a file without the field counts as
+  signed in. A kept pane made signed out is adopted while the lamp is
+  still signed out (the ship lamp runs signed out, #6407).
+
+#### What a skill run's pass bounds in the one session
+
+A skill run's pass is its one-run token: lamp-control mints it from the
+owner's yes for that skill, and it names that yes's grants
+(`Tokens::mint`). In the one session it stays the run's own, not the
+session's: the `skill-start` launcher claims the run once and hands the
+token to the skill's script on fd 3 inside the run's fence, never in the
+pane's words, a file or an argument. With it the script reaches the lamp
+through lamp-control's socket (`LAMP_CONTROL_SOCKET`) for the grants the
+yes names, and the owner's linked services only as the `<code>-read` or
+`<code>-write` grants it names (`SERVICE_GRANTS`), through lamp-control
+to lamp-services; the services' own tokens never leave root's store. The
+token is ended when the run ends, however it ends (answered, cancelled,
+at its deadline or at lamp-tasks' stop), the launcher's claim with it,
+and the run's folder `skill-<run id>` is removed, so a later turn in the
+same session holds no pass. A write to a linked service still waits for
+the owner's spoken yes: lamp-services sends only what the owner said yes
+to, once a run.
+
+Follow-up: #7260 (proposal: in the one session, a skill's run keeps the reach of its grants).
+
+- **Rows on c0a4 (#7246):** M1 (memory, the switch off then on: one
+  session, no OOM kill, no lamp-voice exit, lowest MemAvailable at least
+  600 MB), then L1 with the switch off and L2 and G1 with it on: spoken
+  tasks and skill runs through one pane (one `new`, `reply` per task, no
+  `close`), each skill run's token ended and folder gone, and a task said
+  `queued` while another works.
+
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 
 Accepted for Monday's ship as #6882 (a) (the first builder, #7133,
