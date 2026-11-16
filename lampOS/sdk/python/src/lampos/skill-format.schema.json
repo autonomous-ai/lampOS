@@ -359,6 +359,11 @@
           "maxLength": 200,
           "description": "When to call the stop function and when not, in short (#6218): the tools file's when with LAMP_USE_SKILL_SUMMARY on."
         },
+        "group": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,64}$",
+          "description": "In a skill with no [budget] (#7401): the skills under the skills folder that name the same group share the stop function, with no limit of their own. Refused beside a [budget]; a pushed skill shares nothing."
+        },
         "done": {
           "type": "object",
           "additionalProperties": false,

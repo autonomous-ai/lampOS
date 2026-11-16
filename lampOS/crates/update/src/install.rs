@@ -525,6 +525,29 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "an installable skill from the Skills Store: tomorrow's Google Calendar read once an \
          evening, which needs its owner's calendar linked",
     ),
+    // The seen reactions (#6543): off until the owner's day-long row at
+    // lamp-06c1, at most one wrong remark in a working day, through the lead.
+    (
+        "seen-celebrate",
+        "off until the owner's day-long row at lamp-06c1 (#6543): a warm line when lamp-seen sees \
+         celebrating, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use",
+    ),
+    (
+        "seen-drink",
+        "off until the owner's day-long row at lamp-06c1 (#6543): a light line when lamp-seen \
+         newly sees a drink, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use",
+    ),
+    (
+        "seen-eat",
+        "off until the owner's day-long row at lamp-06c1 (#6543): a light line when lamp-seen \
+         newly sees eating, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use",
+    ),
+    (
+        "seen-tired",
+        "off until the owner's day-long row at lamp-06c1 (#6543): a light line when lamp-seen \
+         newly sees a yawn or stretch, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's \
+         `seen_more` use",
+    ),
     (
         "quiet-focus",
         "an installable skill, not yet tried on a lamp: one warm word when they look up after 45 \

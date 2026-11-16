@@ -47,7 +47,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const USAGE: &str = "usage: lamp-seen serve [--bus-root ABSOLUTE_PATH] [--opt-in-folder ABSOLUTE_PATH] [--state-folder ABSOLUTE_PATH] [--say-socket ABSOLUTE_PATH] [--frames-socket ABSOLUTE_PATH --own-boot HEX32 --controller-boot HEX32 | --frame-link-file ABSOLUTE_PATH] [--account ABSOLUTE_PATH --key ABSOLUTE_PATH [--public-key-file ABSOLUTE_PATH]] [--run-for-ms N]\n       lamp-seen frame-link [--file ABSOLUTE_PATH] [--socket ABSOLUTE_PATH]\n\nOff unless LAMP_SEEN_ACTIVITY=on: off, it idles and touches nothing. On, it reads the bus\n(voice/privacy, room/presence, humans/faces/tracked, expression/state,\nmemory/forgot, room/activity, room/stood_up) and the owner's opt-in (seen-activity.json in\n--opt-in-folder, default /var/lib/lampOS/consent, read again every 2 s and never written),\nsays on diagnostics whether a frame may be asked for, and says the sitting's timers on humans/doing every 30 s\nwhile someone sits at the desk (no stranger check). With --frames-socket it is the camera frame\nlink's perception consumer (or, with --frame-link-file, the link and boots that file keeps):\na frame asked for only while the gate is open and once the ring\nsaid it drew its mark (light/mark, light/mark_drawn). With --account (setup's\nbackend.json) and --key (the account key) too, one burst of 8 frames a minute goes to the\nperception service's activity socket, encrypted, on a socket closed after each burst, and\nwhat was seen goes on humans/doing and humans/doing_seen (#6543 phase 2); without them each\ncopy is dropped at once. No frame is asked for before the on line for the kept yes has\nbegun. The opt-in is said back once each way, on and off (a forget included; an on line not\nbegun is withdrawn), through the voice's say service\n(--say-socket, LAMP_SAY_SOCKET or /run/lampos-say/say.sock), and what was said back is\nkept in --state-folder (default /var/lib/lampos-seen). memory/forgot turns the opt-in off\nuntil the voice removes the kept yes or a later yes is given. With LAMP_SEEN_POSTURE=on and the account too, one frame every 30 s goes, encrypted,\nto the pose model on a socket closed after it, and humans/posture is said every 30 s while\nsomeone sits (#6543 phase 3).\n\nframe-link: with LAMP_SEEN_ACTIVITY=on, keeps in --file (/run/lampos-seen/frame-link.env)\ntwo new boots from /dev/urandom, made once, as LAMP_EYES_FRAME_LINK=--frame-link SOCKET\n--frame-link-controller HEX32 --frame-link-reader HEX32 and LAMP_EYES_VISITS=--visits on\n(humans/familiar, kept as it was) for lamp-eyes.service, the socket\n--socket (/run/lampos-eyes-frames/camera.frames); off, removes the file.";
+const USAGE: &str = "usage: lamp-seen serve [--bus-root ABSOLUTE_PATH] [--opt-in-folder ABSOLUTE_PATH] [--state-folder ABSOLUTE_PATH] [--say-socket ABSOLUTE_PATH] [--frames-socket ABSOLUTE_PATH --own-boot HEX32 --controller-boot HEX32 | --frame-link-file ABSOLUTE_PATH] [--account ABSOLUTE_PATH --key ABSOLUTE_PATH [--public-key-file ABSOLUTE_PATH]] [--run-for-ms N]\n       lamp-seen frame-link [--file ABSOLUTE_PATH] [--socket ABSOLUTE_PATH]\n\nOff unless LAMP_SEEN_ACTIVITY=on: off, it idles and touches nothing. On, it reads the bus\n(voice/privacy, room/presence, humans/faces/tracked, expression/state,\nmemory/forgot, room/activity, room/stood_up) and the owner's opt-in (seen-activity.json in\n--opt-in-folder, default /var/lib/lampOS/consent, read again every 2 s and never written),\nsays on diagnostics whether a frame may be asked for, and says the sitting's timers on humans/doing every 30 s\nwhile someone sits at the desk (no stranger check). With --frames-socket it is the camera frame\nlink's perception consumer (or, with --frame-link-file, the link and boots that file keeps):\na frame asked for only while the gate is open and once the ring\nsaid it drew its mark (light/mark, light/mark_drawn). With --account (setup's\nbackend.json) and --key (the account key) too, one burst of 8 frames a minute (or the cloud's seen_clip, 15-60 s, with LAMP_SEEN_BURST_15S=on) goes to the\nperception service's activity socket, encrypted, on a socket closed after each burst, and\nwhat was seen goes on humans/doing and humans/doing_seen (#6543 phase 2); without them each\ncopy is dropped at once. No frame is asked for before the on line for the kept yes has\nbegun. The opt-in is said back once each way, on and off (a forget included; an on line not\nbegun is withdrawn), through the voice's say service\n(--say-socket, LAMP_SAY_SOCKET or /run/lampos-say/say.sock), and what was said back is\nkept in --state-folder (default /var/lib/lampos-seen). memory/forgot turns the opt-in off\nuntil the voice removes the kept yes or a later yes is given. With LAMP_SEEN_POSTURE=on and the account too, one frame every 30 s goes, encrypted,\nto the pose model on a socket closed after it, and humans/posture is said every 30 s while\nsomeone sits (#6543 phase 3).\n\nframe-link: with LAMP_SEEN_ACTIVITY=on, keeps in --file (/run/lampos-seen/frame-link.env)\ntwo new boots from /dev/urandom, made once, as LAMP_EYES_FRAME_LINK=--frame-link SOCKET\n--frame-link-controller HEX32 --frame-link-reader HEX32 and LAMP_EYES_VISITS=--visits on\n(humans/familiar, kept as it was) for lamp-eyes.service, the socket\n--socket (/run/lampos-eyes-frames/camera.frames); off, removes the file.";
 
 /// One step of the loop.
 const TICK: Duration = Duration::from_millis(100);
@@ -561,6 +561,16 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             lamp_seen::heat::SWITCH
         );
     }
+    // A burst a minute, or the cloud's seen_clip (15-60 s) once
+    // LAMP_SEEN_BURST_15S=on allows faster (#7401): the heat multiplies
+    // whichever is in force.
+    let fastest_us =
+        activity::fastest_us(std::env::var(activity::FAST_ENVIRONMENT).ok().as_deref());
+    eprintln!(
+        "lamp-seen: a burst a minute, or the cloud's seen_clip down to {} s",
+        fastest_us / 1_000_000
+    );
+    let mut clip_in = lamp_seen::clip::ClipIn::at(PathBuf::from(lamp_seen::clip::FILE), fastest_us);
     let mut paced = lamp_seen::heat::Pace::FULL;
     let mut doing_said: Option<Instant> = None;
     let started = Instant::now();
@@ -716,24 +726,35 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         }
         // Kept through a short closing: nothing said from it.
         let sitting_held = plan.sitting.holds();
+        // Whether this tick's burst answer raised a count (#7401).
+        let mut raised = false;
         if let Some((taker, marked)) = frames.as_mut() {
-            // The pace for the board's heat: the next burst and posture
-            // frame only, never the frames within a burst or any gate.
-            if let Some(heat_in) = heat_in.as_mut() {
-                let level = heat_in.level();
-                let pace = lamp_seen::heat::Pace::at(level, true)
-                    .holding(holds.as_ref().is_some_and(hold::Hold::held));
-                if pace != paced {
+            // The pace for the cloud's seen_clip and the board's heat: the
+            // next burst and posture frame only, never the frames within a
+            // burst or any gate.
+            let burst_every_us = clip_in.every_us(unix_s());
+            let level = heat_in
+                .as_mut()
+                .map_or(lamp_msgs::HeatLevel::Ok, lamp_seen::heat::HeatIn::level);
+            let pace = lamp_seen::heat::Pace::at_every(level, heat_in.is_some(), burst_every_us)
+                .holding(holds.as_ref().is_some_and(hold::Hold::held));
+            if pace != paced {
+                if heat_in.is_some() {
                     eprintln!("lamp-seen: {}", pace.line(level));
-                    paced = pace;
+                } else {
+                    eprintln!(
+                        "lamp-seen: bursts every {} s",
+                        pace.burst_every_us / 1_000_000
+                    );
                 }
-                let outlet = marked.inner_mut();
-                if let Some(activity) = outlet.activity.as_mut() {
-                    activity.set_every_us(pace.burst_every_us);
-                }
-                if let Some(pose) = outlet.pose.as_mut() {
-                    pose.set_every_us(pace.posture_every_us);
-                }
+                paced = pace;
+            }
+            let outlet = marked.inner_mut();
+            if let Some(activity) = outlet.activity.as_mut() {
+                activity.set_every_us(pace.burst_every_us);
+            }
+            if let Some(pose) = outlet.pose.as_mut() {
+                pose.set_every_us(pace.posture_every_us);
             }
             if plan.posture.holds()
                 && let Some(pose) = marked.inner_mut().pose.as_mut()
@@ -757,20 +778,19 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
                 // Kept: the burst under way is aborted below, and
                 // what it saw is dropped, never said.
                 if let Some(sitting) = seat.sitting_mut().filter(|_| !sitting_held) {
-                    for newly in sitting.saw(&finished.seen, now) {
+                    // A burst that did not answer is not taken: it ends no
+                    // sighting (one move is one count, #7401).
+                    let before = sitting.counts();
+                    for newly in sitting.took(&finished, more_said, now) {
                         if newly.check().is_ok() {
                             let _ = seen_out.publish_json(now, &newly);
                         }
                     }
-                    // Its other timers wait for the next 30 s, so
-                    // humans/doing goes out as often as without them.
-                    if more_said {
-                        sitting.saw_more(&finished.more, now);
-                    }
-                    if finished.seen.iter().any(|seen| sitting.takes(seen.what)) {
-                        // Said at once, not at the next 30 s.
-                        doing_said = None;
-                    }
+                    // A count raised, or a kind of humans/doing seen: both
+                    // topics said in this tick, not at the next 30 s, so a
+                    // seen reaction's count reaches it at once (#7401).
+                    raised |= sitting.counts() != before
+                        || finished.seen.iter().any(|seen| sitting.takes(seen.what));
                 }
             }
             taker.step(gate, now, marked);
@@ -791,7 +811,7 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             }
         }
         if let Some(sitting) = seat.sitting().filter(|_| !sitting_held)
-            && doing_said.is_none_or(|at| at.elapsed() >= HumanDoing::EVERY)
+            && doing_due(doing_said, raised)
         {
             let doing = sitting.doing(now);
             if doing.check().is_ok() {
@@ -816,6 +836,15 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
     }
     let _ = diagnostics.publish_json(monotonic_us(), &Diagnostic::stopping(HEALTH_NAME));
     Ok(())
+}
+
+/// Whether `humans/doing` and `humans/doing_more` are said this tick: every
+/// [`HumanDoing::EVERY`] since they were last said (`said`), and at once
+/// when this tick's burst answer `raised` a count or saw a kind of
+/// `humans/doing` (#7401: a count up is a reaction right away, not up to
+/// 30 s later). The 30 s beat goes on from that saying.
+fn doing_due(said: Option<Instant>, raised: bool) -> bool {
+    raised || said.is_none_or(|at| at.elapsed() >= HumanDoing::EVERY)
 }
 
 /// `lamp-seen frame-link`: the link kept with the switch on, removed off.
@@ -871,6 +900,35 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #7401: a count an answer raised is said in that tick, not at the
+    /// next 30 s; without one, the 30 s beat stands, and goes on from it.
+    #[test]
+    fn a_count_raised_by_an_answer_is_said_in_that_tick() {
+        let just = Some(Instant::now());
+        assert!(doing_due(just, true), "said at once");
+        assert!(!doing_due(just, false), "else at the 30 s beat");
+        assert!(doing_due(None, false), "the first saying");
+        let beat = Instant::now().checked_sub(HumanDoing::EVERY);
+        assert!(beat.is_none() || doing_due(beat, false), "the beat");
+        // In `serve`'s tick: the counts before and after the answer.
+        let mut sitting = lamp_seen::sitting::Sitting::with_more(0, true);
+        let before = sitting.counts();
+        let answer = lamp_seen::activity::Finished {
+            outcome: lamp_seen::burst::Outcome::Answered,
+            seen: Vec::new(),
+            more: lamp_seen::sitting::More {
+                tired: true,
+                ..Default::default()
+            },
+        };
+        sitting.took(&answer, true, 15_000_000);
+        let raised = sitting.counts() != before;
+        assert!(raised && doing_due(just, raised));
+        let before = sitting.counts();
+        sitting.took(&answer, true, 30_000_000);
+        assert!(sitting.counts() == before, "the same yawn raises nothing");
+    }
 
     fn args(text: &str) -> impl Iterator<Item = String> {
         text.split_whitespace()

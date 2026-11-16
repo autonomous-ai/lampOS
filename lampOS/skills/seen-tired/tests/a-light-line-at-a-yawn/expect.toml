@@ -1,0 +1,14 @@
+# 14:00, tiredness seen at 10 minutes: it turns to them and says one line.
+clock = "14:00"
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them yawn or stretch at the desk. Say one short, light line about it, the way a friend would, at most twenty words; you may ask lightly if it has been a long day. Say only what you saw: never that they look tired, no feeling named, no diagnosis, nothing about sleep or bed, their health, body or looks, and never mention a camera." }

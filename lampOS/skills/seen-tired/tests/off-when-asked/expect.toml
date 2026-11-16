@@ -1,0 +1,8 @@
+# 14:00, seen_remarks(how = "off") at a minute, tiredness seen at 10: nothing ([stop]).
+clock = "14:00"
+none = true
+
+[[call_tool]]
+name = "seen_remarks"
+at = "1m"
+args = { how = "off" }

@@ -1,0 +1,14 @@
+# 10:00, eating seen at 10 minutes while they talk to the lamp (9 to 14): nothing while they talk, one line once the voice rests at 14, though the count rose four minutes before.
+clock = "10:00"
+
+[[expect]]
+at = "14m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "14m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them eating at the desk. Say one friendly, casual sentence about it, the way a friend would, at most twenty words: enjoy it, or a light question about the meal. Not advice and no count. Say only what you saw; nothing about their health, diet, body or looks, and never mention a camera." }

@@ -545,6 +545,10 @@ fn every_skill_folder_says_its_kind_and_version() {
             "morning-agenda",
             "morning-mail",
             "quiet-focus",
+            "seen-celebrate",
+            "seen-drink",
+            "seen-eat",
+            "seen-tired",
             "tomorrows-plan",
             "who-was-here"
         ]
@@ -566,8 +570,14 @@ fn every_skill_folder_says_its_kind_and_version() {
             .filter(|skill| !skill.enabled)
             .map(|skill| skill.name.as_str())
             .collect::<Vec<_>>(),
-        ["comfort-break"],
-        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207); Bedtime and Morning is on since #5753"
+        [
+            "comfort-break",
+            "seen-celebrate",
+            "seen-drink",
+            "seen-eat",
+            "seen-tired"
+        ],
+        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207); Bedtime and Morning is on since #5753; the seen reactions are off until the owner's day-long row (#6543)"
     );
 }
 
@@ -8700,7 +8710,7 @@ fn humans_doing_more_reaches_a_skill_only_with_the_owners_seen_more_yes() {
 /// The owner's seen_more yes to `names` kept in a state folder of its own,
 /// as the app's `skills.seen_more` keeps it (#6543), and read by `engine`:
 /// the folder, to be kept while the engine runs.
-fn seen_more_yes(engine: &mut Engine, names: &[&str]) -> tempfile::TempDir {
+pub(crate) fn seen_more_yes(engine: &mut Engine, names: &[&str]) -> tempfile::TempDir {
     let state = tempfile::tempdir().unwrap();
     let names = names.iter().map(|name| (*name).to_owned()).collect();
     lamp_skills::keep_names(&state.path().join(lamp_skills::SEEN_MORE_FILE), &names).unwrap();
