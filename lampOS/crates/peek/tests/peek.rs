@@ -1993,9 +1993,7 @@ fn agent_turns(rig: &Rig, headers: &str, host: &str, wanted: &str) -> String {
         )
         .unwrap();
     // Tasks 6 and 7 settle, failed and waiting for the person, with no step.
-    let settled = |task: u64, state: &str| {
-        serde_json::json!({"task": task, "engine": "hermes", "state": state, "settled": true, "at_unix_ms": 5_000})
-    };
+    let settled = |task: u64, state: &str| serde_json::json!({"task": task, "engine": "hermes", "state": state, "settled": true, "at_unix_ms": 5_000});
     rig.publisher(
         lamp_msgs::TaskStatus::TOPIC,
         &lamp_msgs::TaskStatus::declaration(),
@@ -2243,7 +2241,7 @@ fn a_handed_turn_times_to_its_agent_reply_and_labels_its_first_reply() {
         ],
         ..timeline::Agent::default()
     };
-    let html = page::timeline(&[handed_card(Some(agent))], &current(Vec::new()), false, None);
+    let html = page::timeline(&[handed_card(Some(agent))], &current(Vec::new()), false);
     assert!(
         html.contains("<span class=\"lat warn\">⏱ 8000 ms</span>"),
         "{html}"
@@ -2264,7 +2262,6 @@ fn a_handed_turn_times_to_its_agent_reply_and_labels_its_first_reply() {
         &entries,
         &current(vec![card_record(5, 400, "played")]),
         false,
-        None,
     );
     assert!(
         html.contains(
@@ -2289,7 +2286,7 @@ fn an_active_card_with_no_event_for_five_minutes_reads_stale() {
     let active = "<span class=\"badge badge-amber pulse\">ACTIVE</span>";
     let stale = "<span class=\"badge badge-grey\">STALE</span>";
     let records = current(Vec::new());
-    let at = |now| page::timeline(std::slice::from_ref(&going), &records, false, Some(now));
+    let at = |now| page::timeline_at(std::slice::from_ref(&going), &records, false, Some(now));
     assert!(at(1_000 + page::STALE_MS).contains(active));
     let html = at(1_000 + page::STALE_MS + 1);
     assert!(html.contains(stale) && !html.contains(active), "{html}");
@@ -2298,7 +2295,7 @@ fn an_active_card_with_no_event_for_five_minutes_reads_stale() {
         seen_unix_ms: 10 * page::STALE_MS,
         ..timeline::Agent::default()
     }));
-    let html = page::timeline(
+    let html = page::timeline_at(
         std::slice::from_ref(&handed),
         &records,
         false,
@@ -2306,6 +2303,6 @@ fn an_active_card_with_no_event_for_five_minutes_reads_stale() {
     );
     assert!(html.contains(active), "{html}");
     handed.agent = None;
-    let html = page::timeline(&[handed], &records, false, Some(10 * page::STALE_MS));
+    let html = page::timeline_at(&[handed], &records, false, Some(10 * page::STALE_MS));
     assert!(html.contains(stale), "{html}");
 }

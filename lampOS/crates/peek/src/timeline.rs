@@ -18,10 +18,9 @@
 use crate::watch::plain;
 use lamp_bus::Message;
 use lamp_msgs::{
-    HandStage, Light, SkillEvent, SkillStage, Speech, TaskStatus, TaskStep, TurnVerdict,
+    AgentState, Light, SkillEvent, SkillStage, Speech, StepKind, TaskStatus, TaskStep, TurnVerdict,
     VoiceDecision, VoiceTurn, cut_whole_chars,
 };
-use serde::Deserialize;
 use std::collections::{BTreeMap, VecDeque};
 
 /// The most turns kept.
@@ -51,98 +50,54 @@ pub const STEP_WORD_BYTES: usize = 120;
 /// The most tools kept of one decision.
 pub const MOST_TOOLS: usize = 8;
 
-/// A turn's decision (`voice/decision`), as peek reads it. PR 1/PR 2
-/// (#7267) own the real types; switch to lamp_msgs::VoiceDecision once
-/// `first_reply_ms`, `host_request` and the error kind land there. The
-/// fields not there yet default, so today's payloads read too.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
-pub struct Decision {
-    pub request: u64,
-    pub kind: DecisionKind,
-    #[serde(default)]
-    pub tools: Vec<String>,
-    #[serde(default)]
-    pub task: Option<u64>,
-    #[serde(default)]
-    pub engine: Option<String>,
-    #[serde(default)]
-    pub stage: Option<HandStage>,
-    /// ⚡: from the end of speech to the first reply.
-    #[serde(default)]
-    pub first_reply_ms: Option<u64>,
-    /// The turn a steered follow-up belongs under.
-    #[serde(default)]
-    pub host_request: Option<u64>,
-    /// An error's code: a name, not words.
-    #[serde(default)]
-    pub error_code: Option<String>,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DecisionKind {
-    #[default]
-    Answered,
-    Handed,
-    HeldBack,
-    Error,
-}
-
-/// One step of a task's agent (`tasks/step`), as peek reads it. PR 1/PR 2
-/// (#7267) own the real types; switch to lamp_msgs::TaskStep once `kind`,
-/// `args` and `ok` land there.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
-pub struct AgentStep {
-    pub task: u64,
-    pub engine: String,
-    pub n: u32,
-    pub at_unix_ms: u64,
-    #[serde(default)]
-    pub kind: StepKind,
-    #[serde(default)]
-    pub tool: String,
-    /// Words: empty unless kept with words on.
-    #[serde(default)]
-    pub args: String,
-    /// Words: the call's result, the reply, or the error's text; empty
-    /// unless kept with words on.
-    #[serde(default)]
-    pub result: String,
-    #[serde(default = "yes")]
-    pub ok: bool,
-}
-
-fn yes() -> bool {
-    true
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum StepKind {
-    #[default]
-    Call,
-    Reply,
-    Error,
-}
-
-/// What a task's agent did: its first [`MOST_STEPS`] steps by number, how
-/// many more came, and whether the tasks part found it settled.
+/// What a task's agent did: its first [`MOST_STEPS`] steps by number; past
+/// them, how many calls came and its newest reply or error (`end`), kept
+/// so the card's status and ⏱ stay right; how the tasks part found it
+/// settled, and when; and when the tasks part last listed it as going.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Agent {
-    pub steps: Vec<AgentStep>,
+    pub steps: Vec<TaskStep>,
     pub more: u32,
-    pub settled: bool,
+    pub end: Option<TaskStep>,
+    /// The settled state (`idle`, `needs_input`, `stopped`, `failed`) and
+    /// when, by the tasks part's clock.
+    pub settled: Option<(AgentState, u64)>,
+    /// When `tasks/status` last listed it working or unread, by the bus.
+    pub seen_unix_ms: u64,
 }
 
 impl Agent {
-    /// Whether the agent is done: it replied, failed, or settled.
-    pub fn ended(&self) -> bool {
-        self.settled || self.steps.iter().any(|step| step.kind != StepKind::Call)
+    /// Its steps and, past them, its kept end.
+    fn all(&self) -> impl Iterator<Item = &TaskStep> {
+        self.steps.iter().chain(&self.end)
     }
 
-    /// Whether a step of it is an error.
+    /// Whether the agent is done: it replied, failed, or settled.
+    pub fn ended(&self) -> bool {
+        self.settled.is_some() || self.all().any(|step| step.kind != StepKind::Call)
+    }
+
+    /// Whether it failed: an error step, or settled `failed`.
     pub fn failed(&self) -> bool {
-        self.steps.iter().any(|step| step.kind == StepKind::Error)
+        matches!(self.settled, Some((AgentState::Failed, _)))
+            || self.all().any(|step| step.kind == StepKind::Error)
+    }
+
+    /// When it ended: its last reply or error, or its settling.
+    pub fn ended_at(&self) -> Option<u64> {
+        self.all()
+            .filter(|step| step.kind != StepKind::Call)
+            .map(|step| step.at_unix_ms)
+            .chain(self.settled.map(|(_, at)| at))
+            .max()
+    }
+
+    /// Its newest sign of life: a step, its settling, or a listing.
+    pub fn last_heard(&self) -> u64 {
+        self.all()
+            .map(|step| step.at_unix_ms)
+            .chain(self.settled.map(|(_, at)| at))
+            .fold(self.seen_unix_ms, u64::max)
     }
 }
 
@@ -154,7 +109,7 @@ pub enum Step {
     /// The voice's verdict: answered, or held back.
     Understood(TurnVerdict),
     /// What the voice decided (#7267).
-    Decided(Decision),
+    Decided(VoiceDecision),
     /// What the lamp did: `light blue at 3`, `skill wave done`.
     Did(String),
     /// The words said, finished; the words only with words on.
@@ -175,16 +130,32 @@ pub struct Entry {
 }
 
 impl Entry {
-    /// Its newest decision.
-    pub fn decision(&self) -> Option<&Decision> {
-        self.steps
+    /// Its decisions, oldest first.
+    fn decisions(&self) -> impl DoubleEndedIterator<Item = &VoiceDecision> {
+        let mut decisions: Vec<(u64, &VoiceDecision)> = self
+            .steps
             .iter()
             .filter_map(|(at, step)| match step {
                 Step::Decided(decision) => Some((*at, decision)),
                 _ => None,
             })
-            .max_by_key(|(at, _)| *at)
-            .map(|(_, decision)| decision)
+            .collect();
+        decisions.sort_by_key(|(at, _)| *at);
+        decisions.into_iter().map(|(_, decision)| decision)
+    }
+
+    /// Its newest decision: the latest of a request wins.
+    pub fn decision(&self) -> Option<&VoiceDecision> {
+        self.decisions().next_back()
+    }
+
+    /// ⚡: the newest decision's first reply, words heard to the answer's
+    /// first audio. It may come in a later decision than the path's.
+    pub fn first_reply_ms(&self) -> Option<u64> {
+        self.decisions()
+            .rev()
+            .find_map(|decision| decision.first_reply_ms)
+            .map(u64::from)
     }
 
     /// Its first step's time.
@@ -264,9 +235,10 @@ impl Timeline {
     }
 
     /// A step of a task's agent: its words only with words on, each part
-    /// cut; one of the same number replaces it; past [`MOST_STEPS`] it is
-    /// only counted.
-    pub fn step(&mut self, mut step: AgentStep) {
+    /// cut; one of the same number replaces it. Past [`MOST_STEPS`] a call
+    /// is only counted, and a reply or error is kept as its end (the
+    /// newest), so the card still knows how it ended.
+    pub fn step(&mut self, mut step: TaskStep) {
         step.tool = cut_whole_chars(&step.tool, NAME_BYTES).to_owned();
         step.engine = plain(&step.engine);
         if self.words {
@@ -279,8 +251,13 @@ impl Timeline {
         let agent = self.agent(step.task);
         match agent.steps.binary_search_by_key(&step.n, |kept| kept.n) {
             Ok(at) => agent.steps[at] = step,
-            Err(_) if agent.steps.len() >= MOST_STEPS => agent.more += 1,
-            Err(at) => agent.steps.insert(at, step),
+            Err(at) if agent.steps.len() < MOST_STEPS => agent.steps.insert(at, step),
+            Err(_) if step.kind == StepKind::Call => agent.more += 1,
+            Err(_) => {
+                if agent.end.as_ref().is_none_or(|end| end.n <= step.n) {
+                    agent.end = Some(step);
+                }
+            }
         }
     }
 
@@ -303,23 +280,29 @@ impl Timeline {
             };
             self.add(request, at, step);
         } else if topic == VoiceDecision::TOPIC {
-            if let Ok(mut decision) = message.parse::<Decision>() {
+            if let Ok(mut decision) = message.parse::<VoiceDecision>() {
                 decision.tools.truncate(MOST_TOOLS);
                 for tool in &mut decision.tools {
                     *tool = cut_whole_chars(tool, NAME_BYTES).to_owned();
                 }
                 decision.engine = decision.engine.as_deref().map(plain);
-                decision.error_code = decision.error_code.as_deref().map(plain);
+                decision.error = decision.error.as_deref().map(plain);
                 self.add(decision.request, at, Step::Decided(decision));
             }
         } else if topic == TaskStep::TOPIC {
-            if let Ok(step) = message.parse::<AgentStep>() {
+            if let Ok(step) = message.parse::<TaskStep>() {
                 self.step(step);
             }
         } else if topic == TaskStatus::TOPIC {
+            // Published once a second while the tasks part runs: a task it
+            // lists is going, one it lets go has settled.
             if let Ok(status) = message.parse::<TaskStatus>() {
+                let going = status.tasks.iter().map(|progress| progress.task);
+                for task in going.chain(status.unread.iter().copied()) {
+                    self.agent(task).seen_unix_ms = at;
+                }
                 for settled in status.settled {
-                    self.agent(settled.task).settled = true;
+                    self.agent(settled.task).settled = Some((settled.state, settled.at_unix_ms));
                 }
             }
         } else if topic == VoiceTurn::TOPIC {
