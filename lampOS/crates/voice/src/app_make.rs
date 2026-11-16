@@ -401,8 +401,14 @@ fn why_not(entry: &Value, made: Option<&Value>) -> Value {
 /// What the app is told of its ask `request_id`, or of its newest: its
 /// state ([`state`]), and once on, the skill's name, what it does, its
 /// version, what it may use and its SHA-256; when not kept or not on, why,
-/// in plain words ([`why_not`]). Only the app's own asks: a skill made by
-/// voice is never told here. `{"state": "none"}` with none.
+/// in plain words ([`why_not`]). A kept skill with code of its own said
+/// back at the lamp, whose spoken yes is awaited now
+/// ([`crate::skill_write_yes::code_yes_awaited_told`], #6307, as the
+/// second route's worker keeps it), is also told
+/// `"awaits_yes": true`, so the app keeps asking until the yes puts it
+/// `on`; not said back (someone else present, or not on the second
+/// route), nothing waits and the field is absent. Only the app's own asks:
+/// a skill made by voice is never told here. `{"state": "none"}` with none.
 pub fn status(directory: &Path, request_id: Option<&str>, now_unix_ms: u64) -> Value {
     let entries = asks(directory);
     let entry = match request_id {
@@ -421,6 +427,13 @@ pub fn status(directory: &Path, request_id: Option<&str>, now_unix_ms: u64) -> V
     let made = made_of(directory, entry);
     if state == "not_kept" {
         told["why"] = why_not(entry, made.as_ref());
+        if let Some(made) = &made
+            && made["uses"]["code"] == true
+            && let Some(sha256) = made["sha256"].as_str()
+            && crate::skill_write_yes::code_yes_awaited_told(sha256, now_unix_ms)
+        {
+            told["awaits_yes"] = json!(true);
+        }
     } else if let Some(made) = made {
         for field in ["name", "description", "version", "sha256", "uses"] {
             told[field] = made[field].clone();
@@ -632,17 +645,20 @@ pub const VOICE_MAKE_SKILL: &str = "voice-make";
 /// service isn't there.
 pub fn say_line_at(socket: &Path, line: &str) -> Option<crate::say::Outcome> {
     said("a skill made by voice", line, |words, note, within_ms| {
-        socket_ask(socket, words, note, within_ms)
+        socket_ask(socket, words, note, crate::say::NORMAL_PRIORITY, within_ms)
     })
 }
 
 /// One short `line` said while a voice make goes on (the lamp's agent
 /// writing it, `LAMP_MAKE_SKILL_AGENT`), asked as written on the say socket
 /// at `socket` under [`VOICE_MAKE_SKILL`], not begun after `within_ms`.
-/// Asked once, never again after a drop; nothing waits on it but the
-/// caller's own thread. Its outcome is journaled.
+/// Asked at [`LINE_PRIORITY`] (#6749): at priority 5 it needed the say
+/// service's whole 15 s of quiet after "I'll make it now", its own wait,
+/// and on lamp-9adf it was `expired` 2 of 2. Asked once, never again after
+/// a drop; nothing waits on it but the caller's own thread. Its outcome is
+/// journaled.
 pub fn say_waiting_at(socket: &Path, line: &str, within_ms: u64) {
-    let answered = socket_ask(socket, line, false, within_ms);
+    let answered = socket_ask(socket, line, false, LINE_PRIORITY, within_ms);
     let outcome = loop {
         match answered.recv() {
             Ok(crate::say::Answer::Done(outcome)) => break Some(outcome),
@@ -654,13 +670,14 @@ pub fn say_waiting_at(socket: &Path, line: &str, within_ms: u64) {
 }
 
 /// One ask of `words` on the say socket at `socket`, as a note or as
-/// written, not begun after `within_ms`: its answers, read until the
+/// written, at `priority`, not begun after `within_ms`: its answers, read until the
 /// outcome. The receiver's sender is dropped, with no outcome, when the
 /// socket isn't there or goes quiet past the ask's wait.
 fn socket_ask(
     socket: &Path,
     words: &str,
     note: bool,
+    priority: u8,
     within_ms: u64,
 ) -> std::sync::mpsc::Receiver<crate::say::Answer> {
     use crate::say::{Answer, Outcome};
@@ -669,7 +686,7 @@ fn socket_ask(
     let ask = json!({
         "skill": VOICE_MAKE_SKILL,
         key: words,
-        "priority": crate::say::NORMAL_PRIORITY,
+        "priority": priority,
         "expires_in_ms": within_ms,
     });
     let Ok(mut stream) = std::os::unix::net::UnixStream::connect(socket) else {
@@ -1364,6 +1381,34 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// lamp-9adf, 14 Nov (#6749): a make's waiting line, asked at priority
+    /// 5 with 15 s to begin, needed the say service's whole 15 s of quiet
+    /// after "I'll make it now" and answered `expired`, unsaid. Asked on
+    /// the say socket, it is urgent, so it may begin a second after the
+    /// lamp's last turn, well within its own wait, and as written.
+    #[test]
+    fn a_makes_waiting_line_is_asked_urgent_within_its_wait() {
+        let dir = folder("say-waiting");
+        let socket = dir.join("say.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            writeln!(&stream, r#"{{"outcome":"spoken"}}"#).unwrap();
+            serde_json::from_str::<Value>(&line).unwrap()
+        });
+        let line = "Let me think about that a little longer.";
+        say_waiting_at(&socket, line, 15_000);
+        let asked = served.join().unwrap();
+        assert_eq!(asked["skill"], VOICE_MAKE_SKILL);
+        assert_eq!(asked["text"], line);
+        assert!(asked["priority"].as_u64().unwrap() >= u64::from(crate::say::URGENT_FROM));
+        let quiet_ms = crate::say::URGENT_QUIET_US / 1_000;
+        assert!(asked["expires_in_ms"].as_u64().unwrap() > quiet_ms);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// The first builder, 11 Nov 10:16: an app make's refusal was said
     /// about 30 s after it, through the say service's whole quiet. The
     /// app's own line, made, refused or written, is asked urgent, so it is
@@ -1749,6 +1794,9 @@ mod tests {
         let id = wait.split('"').nth(1).unwrap().to_owned();
         assert_eq!(wait.trim(), yes::then_wait(&id));
         assert!(yes::waiting_note(5, now).is_none());
+        // The lamp's words of request 5 kept (none kept reads as a
+        // say-back cut before its first word, #7072).
+        yes::lamp_said(5, "The lamp's model wrote its code.");
         let told_next = yes::waiting_note(6, now).unwrap();
         assert!(
             told_next.contains(&format!("approve_id \"{id}\"")),
@@ -1810,6 +1858,120 @@ mod tests {
         assert_eq!(status(&keeping.directory, Some("r1"), at)["state"], "on");
         // On: said again, nothing more waits.
         assert_eq!(asked_in(10, &note, true), note);
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_scripts_here(None);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// #6307: the app is told `"awaits_yes": true` beside `not_kept` only
+    /// while an app's make with code of its own was said back at the lamp
+    /// and its spoken yes is awaited. Not said back (the owner not seen
+    /// alone), today's answer stands with no such field; a status asked
+    /// after the yes reads `on`, and nothing waits any more.
+    #[test]
+    fn the_app_is_told_a_said_back_make_with_code_awaits_its_yes() {
+        use crate::make_skill_local::tests::{
+            CODE_CARD, CODE_TOML, chat_at, keeping, manage_helper, service, task_asks,
+        };
+        use crate::skill_write_yes as yes;
+        made_skill::set_scripts_here(Some(true));
+        let (root, keeping) = keeping("app-code-awaits");
+        // The wait kept as the second route's worker keeps it, in a file
+        // the status reads (sim-2's HOLD: two processes on a lamp).
+        let awaited = root.join("code-yes-awaited.json");
+        yes::set_code_awaited_file_here(Some(awaited.clone()));
+        let at = now_unix_ms();
+        let brief = begin(&keeping.directory, "make me a photo booth", "r1", at).unwrap();
+        let answer = format!(
+            "```skill.toml\n{CODE_TOML}```\n\n```SKILL.md\n{CODE_CARD}```\n\n\
+             ```scripts/main.py\nprint('photo')\n```\n"
+        );
+        let (url, served) = service(vec![(200, answer)]);
+        let mut said = Vec::new();
+        make_here(&keeping, &brief, "r1", at, chat_at(url), |line| {
+            said.push(line.to_owned())
+        });
+        assert_eq!(served.join().unwrap(), 1);
+        let [line] = said.as_slice() else {
+            panic!("{said:?}")
+        };
+        let note = say_note(line).unwrap();
+        let dir = &keeping.directory;
+        let sha256 = made_skill::entries(dir)[0]["sha256"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let now = std::time::Instant::now();
+        let asked_in = |request: u64, alone: bool| {
+            crate::make_skill_local::app_code_asked(
+                dir,
+                request,
+                note.clone(),
+                now_unix_ms(),
+                now,
+                || alone,
+            )
+        };
+        let not_kept = json!({
+            "request_id": "r1",
+            "state": "not_kept",
+            "why": format!("it couldn't be put on: {}", made_skill::CODE_BY_VOICE),
+        });
+        // Kept, not said back yet: today's answer, no field.
+        assert_eq!(status(dir, Some("r1"), at), not_kept);
+        // Not said back: another person present; nothing waits, no field.
+        asked_in(4, false);
+        assert_eq!(status(dir, Some("r1"), at), not_kept);
+        // Said back: its yes awaited, and the app told so.
+        let turn = asked_in(5, true);
+        let id = turn.rsplit('"').nth(1).unwrap().to_owned();
+        let mut awaits = not_kept.clone();
+        awaits["awaits_yes"] = json!(true);
+        assert_eq!(status(dir, Some("r1"), at), awaits);
+        // Read where the wait isn't held, as the outer voice process
+        // reads it: from the file alone, and past its window no more.
+        let read_apart = |when: u64| {
+            let (awaited, sha256) = (awaited.clone(), sha256.clone());
+            std::thread::spawn(move || {
+                yes::set_code_awaited_file_here(Some(awaited));
+                yes::code_yes_awaited_told(&sha256, when)
+            })
+            .join()
+            .unwrap()
+        };
+        assert!(read_apart(at));
+        assert!(!read_apart(
+            now_unix_ms() + yes::YES_WITHIN.as_millis() as u64 + 1_000
+        ));
+        // The wait dropped (a yes not the owner's): no field again.
+        assert!(yes::drop_wait(&id));
+        assert_eq!(status(dir, Some("r1"), at), not_kept);
+        // Said back again, and the owner's yes puts it on: the app's next
+        // ask reads `on`, with no `why` and no field.
+        let turn = asked_in(6, true);
+        let id = turn.rsplit('"').nth(1).unwrap().to_owned();
+        assert_eq!(status(dir, Some("r1"), at), awaits);
+        yes::lamp_said(6, line);
+        let asked = manage_helper(&keeping.manage);
+        crate::skill_task_yes::set_on_here(Some(true));
+        let folder = "cd".repeat(32);
+        let agreed = yes::approve(&id, 7, true, true, now, |asks| {
+            crate::make_skill_local::code_approve(
+                &keeping,
+                asks,
+                |name| Ok(Some(task_asks(name, &folder, &sha256, &["camera"]))),
+                |_| Ok(json!({ "approved": 1 })),
+            )
+        });
+        assert_eq!(agreed["approved"], true, "{agreed}");
+        assert_eq!(asked.join().unwrap()["install_made"], sha256.as_str());
+        let told = status(dir, Some("r1"), at);
+        assert_eq!(told["state"], "on", "{told}");
+        assert!(told.get("why").is_none(), "{told}");
+        assert!(told.get("awaits_yes").is_none(), "{told}");
+        assert!(!yes::code_yes_awaited(&sha256, std::time::Instant::now()));
+        assert!(!awaited.exists(), "the file goes once none waits");
+        yes::set_code_awaited_file_here(None);
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_scripts_here(None);
         let _ = fs::remove_dir_all(&root);

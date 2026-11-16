@@ -26,6 +26,9 @@ toml = { version = "1", default-features = false, features = ["parse", "serde", 
 zune-jpeg = "=0.4.21"
 jpeg-encoder = "=0.7.1"
 rustix = { version = "=1.1.5", features = ["fs", "pty", "termios", "event", "process"] }
+# The local speech-to-text socket (listen.rs, sim-3-P4 step 2): the blocking
+# tungstenite under lamp-control's tokio-tungstenite, already in Cargo.lock.
+tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 
 # The resident speech synthesizer on macOS (apple_speech.rs, sim-3-P4 step 1b,
 # the first builder on #6811, 13 Nov 21:28): Apple's AVFAudio through the objc2

@@ -1756,6 +1756,54 @@ fn the_product_keeps_what_was_heard() {
     );
 }
 
+/// CAM++ one way only (`LAMP_SAME_VOICE_CONFIRMS`, the memory owner's
+/// decision of 4 Nov) stays off in the product: the lead's ruling of 11 Nov
+/// (#1711) keeps the lead's 20 Oct ruling, as CAM++'s weights are trained on
+/// VoxCeleb, whose training data is not cleared for commercial use. It turns
+/// on only with a speaker model whose training data is cleared. No product
+/// unit, nor the generic voice, sets it or its bar; the voice keeps the
+/// services-only prints.
+#[test]
+fn the_product_voice_does_not_confirm_the_known_person_by_their_voice() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    let voice = section(unit("lamp-voice.service"), "Service");
+    for line in [
+        "Environment=LAMP_SAME_VOICE_FOR=services",
+        "Environment=LAMP_VOICE_ROUTE=second",
+    ] {
+        assert_eq!(
+            voice.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice lacks {line}"
+        );
+    }
+    assert!(
+        !voice
+            .iter()
+            .any(|set| set.starts_with("Environment=LAMP_SAME_VOICE_CONFIRM")),
+        "the lead's 11 Nov ruling (#1711): off until a speaker model whose training data is cleared for commercial use"
+    );
+    for other in [
+        "lamp-voice.service",
+        "lamp-cloud.service",
+        "lamp-update.service",
+        "lamp-services.service",
+    ] {
+        assert!(!unit(other).contains("LAMP_SAME_VOICE_CONFIRM"), "{other}");
+    }
+    let generic = include_str!("../../../deploy/units/lamp-voice.service");
+    assert!(
+        !generic.contains("LAMP_SAME_VOICE_CONFIRMS"),
+        "the generic voice"
+    );
+}
+
 /// A don't-know about the person's own kept thing recalls first
 /// (`LAMP_MEMORY_DONT_KNOW_RECALLS`, task C57): the memory owner's call on
 /// 5 Nov, after lamp-06c1 said "I don't remember any holiday plans" without
@@ -2066,6 +2114,82 @@ fn the_product_gives_the_lamps_agent_the_linked_services() {
     }
 }
 
+/// The one run path off in the product (#6685, #7019): no product unit
+/// sets `LAMP_SKILL_DEFAULT_AGENT`, and lamp-update's carried switch file
+/// doesn't either, so the staging build ships it off and a lamp turns it
+/// on by a drop-in (or its own file). Reading it from the file is
+/// `switches`' own test, on a fixture.
+#[test]
+fn the_product_leaves_the_one_run_path_off() {
+    let name = lamp_update::agent_ns::DEFAULT_AGENT_SWITCH;
+    assert_eq!(name, "LAMP_SKILL_DEFAULT_AGENT");
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let set = service
+            .iter()
+            .filter(|line| line.starts_with("Environment=") && line.contains(name))
+            .count();
+        assert_eq!(set, 0, "{unit}");
+    }
+    let carried = install::UPDATE_SETTING.1;
+    assert!(
+        !carried
+            .lines()
+            .any(|line| line.trim_start().starts_with(&format!("{name}="))),
+        "update.env sets {name}"
+    );
+    assert!(carried.lines().any(|line| line == "LAMP_SKILL_TASKS=on"));
+}
+
+/// A made skill's fixed write runs through the lamp's agent in the product
+/// (#6824): the owner's ruling on 13 Nov. `LAMP_SKILL_WRITE_AGENT=on` in
+/// the four units that read it, `lamp-skills` (hands the write to
+/// lamp-tasks, the direct send its fallback), `lamp-tasks` (runs it on the
+/// lamp's Hermes), `lamp-control` (mints its one write grant's token and
+/// gives its call the write by it, never the agent's words) and
+/// `lamp-services` (sends it only through `skill_write`, once a run), each
+/// once, and no other product unit names it. lamp-skills and lamp-tasks
+/// hand it over only with the agent's connectors on too.
+#[test]
+fn the_product_runs_a_made_skills_fixed_write_through_the_lamps_agent() {
+    let name = lamp_skills::service_write::AGENT_ENVIRONMENT;
+    assert_eq!(name, "LAMP_SKILL_WRITE_AGENT");
+    let switch = format!("Environment={name}=on");
+    let owners = [
+        "lamp-skills.service",
+        "lamp-tasks.service",
+        "lamp-control.service",
+        "lamp-services.service",
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains(name))
+            .count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner}"
+        );
+    }
+    for owner in ["lamp-skills.service", "lamp-tasks.service"] {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == owner)
+            .unwrap()
+            .1;
+        assert!(
+            section(text, "Service").contains(&"Environment=LAMP_AGENT_SERVICES=on"),
+            "{owner} lacks LAMP_AGENT_SERVICES"
+        );
+    }
+}
+
 /// A skill added from a file in the app, on at once (#5080, #5977): the
 /// switch is on in both parts that read it, `lamp-cloud` (the kind, with
 /// the skills page) and `lamp-voice` (the app-make socket, with the maker
@@ -2136,9 +2260,7 @@ fn the_product_tells_the_app_a_skill_needs_a_connector() {
 fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
     for (unit, text) in install::PRODUCT {
         let service = section(text, "Service");
-        // Off again in every unit (14 Nov, the first builder, #1711): a voice
-        // make with code ran out its 45 s on 9adf, until a code make passes there.
-        let wanted = 0;
+        let wanted = usize::from(*unit == "lamp-voice.service");
         assert_eq!(
             service
                 .iter()
@@ -2161,6 +2283,132 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
                 "the voice lacks {line}"
             );
         }
+    }
+}
+
+/// An uploaded `SKILL.md` runs through the lamp's agent (the owner's ruling,
+/// 13 Nov: the upload flow goes via the agent): `LAMP_UPLOAD_TO_AGENT` on,
+/// once, in the four units whose part reads it (lamp-cloud's upload,
+/// lamp-voice's keep, lamp-skills' load and its manage helper's install),
+/// each beside what it needs, and in no other; `LAMP_TASK_NET` stays off,
+/// in no unit.
+#[test]
+fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
+    let readers: [(&str, &[&str]); 4] = [
+        ("lamp-cloud.service", &["Environment=LAMP_SKILL_UPLOAD=on"]),
+        (
+            "lamp-voice.service",
+            &[
+                "Environment=LAMP_SKILL_UPLOAD=on",
+                "Environment=LAMP_SKILL_TASKS=on",
+                "Environment=LAMP_AGENT_SERVICES=on",
+            ],
+        ),
+        (
+            "lamp-skills.service",
+            &[
+                "Environment=LAMP_SKILL_TASKS=on",
+                "Environment=LAMP_AGENT_SERVICES=on",
+            ],
+        ),
+        (
+            "lamp-skills-manage@.service",
+            &[
+                "Environment=LAMP_SKILL_TASKS=on",
+                "Environment=LAMP_AGENT_SERVICES=on",
+            ],
+        ),
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let needs = readers
+            .iter()
+            .find(|(name, _)| name == unit)
+            .map(|(_, needs)| *needs);
+        assert_eq!(
+            service
+                .iter()
+                .filter(|line| line.contains("LAMP_UPLOAD_TO_AGENT"))
+                .count(),
+            usize::from(needs.is_some()),
+            "{unit}"
+        );
+        assert!(
+            !service.iter().any(|line| line.contains("LAMP_TASK_NET")),
+            "{unit} sets LAMP_TASK_NET"
+        );
+        let Some(needs) = needs else {
+            continue;
+        };
+        for line in ["Environment=LAMP_UPLOAD_TO_AGENT=on"].iter().chain(needs) {
+            assert_eq!(
+                service.iter().filter(|set| **set == *line).count(),
+                1,
+                "{unit} lacks {line}"
+            );
+        }
+    }
+    for (unit, _) in readers {
+        assert!(
+            install::PRODUCT.iter().any(|(name, _)| *name == unit),
+            "{unit} is not a product unit"
+        );
+    }
+}
+
+/// An uploaded skill's keys go in through the app and reach only its run
+/// (#6686, the first builder's ruling, 12 Nov 19:44 on #6059):
+/// `LAMP_SKILL_SECRETS=on` in the four units that read it, each once, and
+/// no other product unit names it: `lamp-services` (root's store, its two
+/// doors), `lamp-cloud` (the app's three kinds, with `LAMP_CLOUD` and the
+/// services' admin socket), `lamp-voice` (an agent skill's tool, never a
+/// key by voice) and `lamp-tasks` (a run's keys file, read once), each
+/// beside the parts it rides.
+#[test]
+fn the_product_takes_a_skills_keys_in_the_app() {
+    let name = "LAMP_SKILL_SECRETS";
+    let switch = format!("Environment={name}=on");
+    let owners: [(&str, &[&str]); 4] = [
+        (
+            "lamp-services.service",
+            &[
+                "Environment=LAMP_SERVICES=on",
+                "Environment=LAMP_SKILL_TASKS=on",
+            ],
+        ),
+        (
+            "lamp-cloud.service",
+            &[
+                "Environment=LAMP_CLOUD=on",
+                "Environment=LAMP_SERVICES=on",
+                "Environment=LAMP_SKILL_UPLOAD=on",
+            ],
+        ),
+        (
+            "lamp-voice.service",
+            &[
+                "Environment=LAMP_SKILL_UPLOAD=on",
+                "Environment=LAMP_SKILL_TASKS=on",
+            ],
+        ),
+        ("lamp-tasks.service", &["Environment=LAMP_SKILL_TASKS=on"]),
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let beside = owners.iter().find(|(owner, _)| owner == unit);
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = service.iter().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(beside.is_some()), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+        for line in beside.map_or(&[][..], |(_, lines)| lines) {
+            assert!(service.contains(line), "{unit} lacks {line}");
+        }
+    }
+    for (owner, _) in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner}"
+        );
     }
 }
 
@@ -2452,6 +2700,33 @@ fn the_product_keeps_a_cut_answer_as_heard() {
     }
 }
 
+/// A stop that commits a turn gets the stop line, never the model
+/// (`LAMP_SPOKEN_STOP_ENDS`). The stop words heard while the lamp speaks
+/// (`LAMP_STOP_WORDS=heard-always`, #5032, #5905) stay off in the product:
+/// turning them on waits for the stop keyword spotted by lamp-name's on-mic
+/// model (the first builder's ruling on #5905, 15 November). The unit keeps
+/// the line parked, commented out.
+#[test]
+fn the_product_answers_a_stop_and_leaves_its_stop_words_off() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_SPOKEN_STOP_ENDS=on"),
+        "the voice lacks LAMP_SPOKEN_STOP_ENDS"
+    );
+    assert!(
+        !service
+            .iter()
+            .any(|line| line.starts_with("Environment=LAMP_STOP_WORDS=")),
+        "the product sets LAMP_STOP_WORDS (#5905: off until the stop keyword)"
+    );
+    assert!(voice.contains("PARKED (#5905)"), "the parked line is gone");
+}
+
 /// A person's turn is also told the room's lines of the same conversation
 /// (`LAMP_CONVERSATION_ROOM_LINES_TOLD`, #4339): on lamp-3e83 on 30 Oct a
 /// search answered in the room's thread was unknown to the person's next
@@ -2581,6 +2856,22 @@ fn the_product_is_a_private_room_with_its_owner() {
     assert!(
         section(voice, "Service").contains(&"Environment=LAMP_PRIVATE_ROOM=on"),
         "the voice lacks LAMP_PRIVATE_ROOM"
+    );
+}
+
+/// The private room reaches a made skill's read too: `lamp-skills` judges
+/// its gate itself, so without the switch there it would still ask for the
+/// owner's known face alone.
+#[test]
+fn a_made_skills_read_is_in_the_private_room_too() {
+    let skills = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-skills.service")
+        .unwrap()
+        .1;
+    assert!(
+        section(skills, "Service").contains(&"Environment=LAMP_PRIVATE_ROOM=on"),
+        "lamp-skills lacks LAMP_PRIVATE_ROOM"
     );
 }
 

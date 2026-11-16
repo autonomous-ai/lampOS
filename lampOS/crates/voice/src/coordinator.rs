@@ -58,9 +58,11 @@ use std::{
     io::{self, Write},
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
-    process::Command,
     time::{Duration, Instant},
 };
+// The legacy-owner guard (Linux) runs systemctl; the tests spawn this binary.
+#[cfg(any(target_os = "linux", test))]
+use std::process::Command;
 mod camera;
 pub mod motor;
 use motor::{OptionalMotor, PreparedMotor};
@@ -3103,6 +3105,9 @@ pub fn run_directed_session(
     output: &Path,
     options: SessionOptions,
 ) -> Result<()> {
+    if let Ok(second::Routes::SecondOnly(_)) = second::routes_from_environment(false, true) {
+        eprintln!("{}", second::DIRECTED_SECOND_LINE);
+    }
     let termination = Termination::install()?;
     let cues = options
         .cue_socket
@@ -3177,7 +3182,7 @@ pub fn run_serve(config: &Path, output: &Path, options: SessionOptions) -> Resul
             crate::second_config::PRODUCT_PATH
         ),
     }
-    if let second::Routes::SecondOnly(_) = second::routes_from_environment(true)? {
+    if let second::Routes::SecondOnly(_) = second::routes_from_environment(true, true)? {
         eprintln!("{}", second::SECOND_ONLY_LINE);
     }
     second::route_flags_from_environment()?;
@@ -3379,7 +3384,8 @@ fn run_source(
     // Which route answers, when it is the second alone; a wrong value is
     // refused when the workers start (`spawn_rig`).
     if let Ok(routes) = second::routes_from_environment(
-        lifetime.continuous() && matches!(source, ProviderSource::Gemini(_)),
+        lifetime.continuous(),
+        matches!(source, ProviderSource::Gemini(_)),
     ) {
         routes.mark(&mut run_start);
     }
@@ -3669,6 +3675,14 @@ fn flush_cues(trace: &mut SessionState, cues: &mut Option<CueSink>) {
     trace.flush(cues, monotonic_us());
 }
 
+/// Off Linux there is no systemd, and so none of the lamp's units to coexist with: nothing
+/// to refuse. (macOS has no `/usr/bin/systemctl`; the guard's first call would fail the start.)
+#[cfg(not(target_os = "linux"))]
+fn refuse_legacy_owners() -> io::Result<()> {
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
 fn refuse_legacy_owners() -> io::Result<()> {
     // This is a coexistence guard for the test board, not a legacy runtime
     // dependency. An absent unit is fine; a running writer forbids this run.
@@ -4652,6 +4666,7 @@ fn provider_arguments(
     arguments.extend(crate::room_told::arguments_from_environment());
     arguments.extend(crate::air_told::arguments_from_environment());
     arguments.extend(crate::seems_told::arguments_from_environment());
+    arguments.extend(crate::doing_told::arguments_from_environment());
     arguments.extend(crate::health_told::arguments_from_environment());
     if keep_link {
         arguments.push(crate::provider_worker::KEEP_LINK_FLAG.to_owned());
@@ -4726,7 +4741,8 @@ fn spawn_rig(
     // by, or, with `LAMP_VOICE_ROUTE=second`, have it as its only voice in
     // Gemini's place (`run_serve` refused a wrong value before any of this).
     let routes = second::routes_from_environment(
-        lifetime.continuous() && matches!(source, ProviderSource::Gemini(_)),
+        lifetime.continuous(),
+        matches!(source, ProviderSource::Gemini(_)),
     )?;
     // Texts are answered by the second route's worker (#1673): without it,
     // `lamp-cloud` refuses each one, and the journal says why, once.
@@ -14874,7 +14890,16 @@ fn play_exact_line(
     }
     // A skill's step's line (#5999) also waits for the quiet its priority
     // bought it as a say; a computer's or the unplug's does not.
-    let decided = crate::say::may_play_exact_after(now_is, says.exact_quiet_us());
+    // The unplug's lines answer the conversation they are in (#6899), but
+    // still wait, as a quiet line with no gap, for a turn still on its way
+    // to the speaker and for anyone heard (#7060: a "No." still queued).
+    let answers = says.exact_answers();
+    let gate = crate::say::SoundNow {
+        conversing: now_is.conversing && !answers,
+        ..*now_is
+    };
+    let quiet = says.exact_quiet_us().or(answers.then_some(0));
+    let decided = crate::say::may_play_exact_after(&gate, quiet);
     match decided {
         crate::say::ExactNow::Wait(_) => return Ok(None),
         crate::say::ExactNow::Refuse(why) => {

@@ -1,0 +1,23 @@
+# 10:00, 100 minutes; lamp-seen saw a drink at 30 minutes, then went quiet at
+# 40 (#6543): its last value ran out 90 s on, so at 90 minutes the
+# condition holds (unknown = "holds_stale") and the sip comes as without
+# lamp-seen, though the last value said a drink an hour ago.
+clock = "10:00"
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "light"
+args = { colour = "blue", level = 2 }
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "say"
+args = { note = "They have sat at the desk for about an hour and a half. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }

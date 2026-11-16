@@ -633,7 +633,8 @@ pub fn line_in_echo_tail(request: u64) {
 }
 
 /// The line of `request` heard no words, however it is asked (as the name,
-/// "Lamp.", when a call was heard in it), or its answer only declined so
+/// "Lamp.", when a call was heard in it), or was only the lamp's name
+/// ("Hey Lamp", answered as a call, #6363), or its answer only declined so
 /// the words it cut short are answered in its place (`second_provider`,
 /// `LAMP_CUT_ASK_ANSWERED`): the lamp's words in it answer no new request
 /// of the person's, so they never make it the read-back's one answer
@@ -1726,7 +1727,16 @@ fn owner_among(
 /// (`known_faces::most_faces_lately`); no count is not alone. One of the
 /// checks for the owner's service records told in full ([`records_in_full`]).
 pub(crate) fn owner_alone() -> bool {
+    #[cfg(test)]
+    if let Some(alone) = ALONE_FOR_TEST.with(std::cell::Cell::get) {
+        return alone;
+    }
     crate::known_faces::most_faces_lately() == Some(1)
+}
+
+#[cfg(test)]
+thread_local! {
+    static ALONE_FOR_TEST: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
 /// Whether a read is said in full: the owner's face seen saying the line
@@ -1920,8 +1930,21 @@ pub(crate) fn seen_saying_owner(request: u64, owner: &str) -> (bool, bool) {
     {
         return (false, false);
     }
-    let line = crate::speaking_faces::line_seen(request);
-    let seen = crate::remember::speaker_of(line.as_ref()).as_deref() == Some(owner);
+    seen_saying_owner_in(crate::speaking_faces::line_seen(request).as_ref(), owner)
+}
+
+/// [`seen_saying_owner`] of the eyes' reading `line`.
+///
+/// A line their face was taken as saying only by their own voice
+/// (`LineSeen::by_voice`, `LAMP_SAME_VOICE_CONFIRMS`) is not seen saying
+/// it: the confirm is for memory, never a send, a full read or the owner's
+/// enrolled print.
+fn seen_saying_owner_in(
+    line: Option<&crate::speaking_faces::LineSeen>,
+    owner: &str,
+) -> (bool, bool) {
+    let seen = line.is_some_and(|line| !line.by_voice)
+        && crate::remember::speaker_of(line).as_deref() == Some(owner);
     let other = line.is_some_and(|line| {
         crate::speaking_faces::someone_elses(&line.speakers, owner, line.known.clone())
     });
@@ -2172,6 +2195,8 @@ pub fn run(
     let turn = Turn {
         heard,
         owner: owner.as_deref(),
+        // Sends stay on the second route alone, private room or not: the
+        // Live route never prepares or sends a write (`NO_SEND_HERE`).
         sends: judge.is_some(),
         seen_owner,
         in_echo_tail,
@@ -2683,6 +2708,39 @@ fn codes_in(told: &Value) -> Option<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `LAMP_SAME_VOICE_CONFIRMS` beside the services (the memory owner's
+    /// switch-on, 10 Nov): a line their face was taken as saying only because
+    /// their voice confirmed it is theirs for memory, never the owner's face
+    /// seen saying it for a send, a full read or their enrolled print. A
+    /// voice like theirs off camera while they sit silent in view sends
+    /// nothing.
+    #[test]
+    fn a_line_their_voice_alone_confirmed_is_not_their_face_seen_saying_it() {
+        let owner = crate::known_faces::memory_person("Mai");
+        let line = |by_voice: bool| crate::speaking_faces::LineSeen {
+            request: 5_900_001,
+            speakers: vec!["b1/f1".to_owned()],
+            known: Some(("Mai".to_owned(), "b1/f1".to_owned())),
+            enrollment: None,
+            by_voice,
+        };
+        assert_eq!(
+            seen_saying_owner_in(Some(&line(false)), &owner),
+            (true, false),
+            "their face seen saying it"
+        );
+        assert_eq!(
+            seen_saying_owner_in(Some(&line(true)), &owner),
+            (false, false),
+            "only their voice confirmed it"
+        );
+        assert_eq!(
+            crate::remember::speaker_of(Some(&line(true))),
+            Some(owner),
+            "memory still reads it as theirs"
+        );
+    }
 
     /// What is linked, by name, each once, from `lamp-services`' own answer
     /// (#5523): its code when it gives no name; none without a list.
@@ -4675,5 +4733,127 @@ mod tests {
         assert_eq!(send_state(2), None, "the oldest refusal went");
         assert_eq!(send_state(3), None);
         assert_eq!(send_state(10_001), Some(SendState::Asked));
+    }
+
+    /// The private room (P2 on #5553): a read heard at the lamp is said in
+    /// full with no voice asked of the second route, so it never waits
+    /// [`PRINT_WAIT`] for a print the room ignores, even with one face in
+    /// view and a judge that knows no print.
+    #[test]
+    fn a_private_room_read_asks_no_voice_and_does_not_wait() {
+        use std::io::{BufRead, BufReader, Write};
+        let folder = std::env::temp_dir().join(format!("private-read-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let listener =
+            std::os::unix::net::UnixListener::bind(folder.join(crate::tools::CALL_SOCKET)).unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                let answer = json!({"ok":true,"result":{"source":"Gmail","quoted":[
+                    {"id":"1","from":"Ann","subject":"Dinner","date":"d","text":"Home by 7"}
+                ]}});
+                writeln!(stream, "{answer}").unwrap();
+            }
+        });
+        let asked = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = asked.clone();
+        judging_voices(std::sync::Arc::new(move |_| {
+            counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            None
+        }));
+        crate::person::set_private_room_for_test(Some(true));
+        ALONE_FOR_TEST.with(|alone| alone.set(Some(true)));
+        let began = Instant::now();
+        let (told, answered) = run(
+            &folder,
+            &call(READ, json!({"service":"gmail","what":"recent"})),
+            7_001,
+            true,
+            None,
+        );
+        let took = began.elapsed();
+        crate::person::set_private_room_for_test(None);
+        ALONE_FOR_TEST.with(|alone| alone.set(None));
+        assert!(answered, "{told}");
+        assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(took < PRINT_WAIT, "waited {took:?}");
+        assert_eq!(told["quoted"][0]["text"], "Home by 7", "in full: {told}");
+        assert!(told.get("others_here").is_none(), "{told}");
+        std::fs::remove_dir_all(folder).unwrap();
+    }
+
+    /// A tools folder whose socket answers every call with `result`, and
+    /// counts the calls.
+    fn services_saying(
+        name: &str,
+        result: Value,
+    ) -> (PathBuf, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        use std::io::{BufRead, BufReader, Write};
+        let folder = std::env::temp_dir().join(format!("saying-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let listener =
+            std::os::unix::net::UnixListener::bind(folder.join(crate::tools::CALL_SOCKET)).unwrap();
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = calls.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                writeln!(stream, "{}", json!({"ok":true,"result":result})).unwrap();
+            }
+        });
+        (folder, calls)
+    }
+
+    /// The private room (P2 on #5569): the second route still prepares a
+    /// write, with no voice asked, and the model is told to say its
+    /// read-back; the Live route, with no judge, still never does.
+    #[test]
+    fn a_private_room_write_is_prepared_on_the_second_route_only() {
+        let write = call(
+            WRITE,
+            json!({"service":"gmail","action":"send","to":"ann@b.test"}),
+        );
+        let prepared = json!({"read_back":"To Ann: home by 7","send_id":"s1"});
+        crate::person::set_private_room_for_test(Some(true));
+
+        // The Live route: no judge, so refused before any service call.
+        let (folder, calls) = services_saying("private-live", prepared.clone());
+        let (told, answered) = run(&folder, &write, 7_101, true, None);
+        assert!(answered, "{told}");
+        assert_eq!(told["error"], NO_SEND_HERE, "{told}");
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(kept::pending(|pending| pending.is_none()));
+        std::fs::remove_dir_all(folder).unwrap();
+
+        // The second route: prepared and kept, its voice never asked.
+        let asked = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = asked.clone();
+        judging_voices(std::sync::Arc::new(move |_| {
+            counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            None
+        }));
+        let (folder, calls) = services_saying("private-second", prepared);
+        let (told, answered) = run(&folder, &write, 7_102, true, None);
+        crate::person::set_private_room_for_test(None);
+        assert!(answered, "{told}");
+        assert!(told.get("error").is_none(), "{told}");
+        assert_eq!(told["next"], READ_BACK_NEXT, "{told}");
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 0);
+        let kept = kept::pending(|pending| pending.clone()).expect("a write waiting");
+        assert_eq!((kept.send_id.as_str(), kept.request), ("s1", 7_102));
+        assert_eq!(kept.service, "gmail");
+        std::fs::remove_dir_all(folder).unwrap();
     }
 }

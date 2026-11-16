@@ -134,6 +134,10 @@ pub struct SpeakerDevice {
 impl SpeakerDevice {
     /// The board's speaker, the default.
     pub const BOARD: &'static str = "plug:device_speaker";
+    /// `--speaker-device bus:speaker1`: the voice's sound put on the bus (`speaker1/play`) for a
+    /// simulator to play, the mirror of `MicrophoneDevice::BUS_MIC1`. The only bus device a
+    /// speaker takes; any other name starting `bus:` is refused.
+    pub const BUS_SPEAKER1: &'static str = "bus:speaker1";
     const LONGEST: usize = 64;
 
     pub fn as_str(&self) -> &str {
@@ -156,6 +160,12 @@ impl FromStr for SpeakerDevice {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "--speaker-device takes an ALSA device name: 1 to 64 of letters, digits and : , . _ = -, starting with a letter or digit",
+            ));
+        }
+        if value.starts_with("bus:") && value != Self::BUS_SPEAKER1 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "--speaker-device takes bus:speaker1 as its only bus device",
             ));
         }
         let mut bytes = [0u8; Self::LONGEST];
@@ -1055,6 +1065,21 @@ mod tests {
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
     }
+    #[test]
+    fn the_speaker_device_takes_bus_speaker1_and_no_other_bus_name() {
+        let chosen = DirectedOptions::parse(&args(&["--speaker-device", "bus:speaker1"])).unwrap();
+        assert_eq!(chosen.speaker_device(), "bus:speaker1");
+        // The worker is named it as an ALSA device is, and the rest of its argv is the board's.
+        for other in ["bus:speaker2", "bus:mic1", "bus:", "bus:speaker1x"] {
+            assert!(
+                DirectedOptions::parse(&args(&["--speaker-device", other])).is_err(),
+                "{other}"
+            );
+        }
+        // An ALSA name that merely contains `bus` is still an ALSA name.
+        assert!(DirectedOptions::parse(&args(&["--speaker-device", "plughw:bus"])).is_ok());
+    }
+
     #[test]
     fn the_speaker_device_is_an_alsa_name_and_absent_changes_nothing() {
         let absent = DirectedOptions::parse(&args(&[])).unwrap();

@@ -1,0 +1,22 @@
+# As a-sip-after-90-minutes, with lamp-seen's humans/doing every 30 s (#6543):
+# no drink seen, so drank_s_ago is the sitting's length and at 90 minutes it
+# turns to them and its light breathes once, as on the clock alone.
+clock = "10:00"
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "light"
+args = { colour = "blue", level = 2 }
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "say"
+args = { note = "They have sat at the desk for about an hour and a half. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }

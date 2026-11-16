@@ -15,7 +15,10 @@
 //! With `LAMP_SKILL_WRITES=on` too, `lamp-skills.service` may make a made
 //! skill's one fixed write, approved at install ([`skill_writes`]). With
 //! `LAMP_SKILL_TASKS=on`, `lamp-control.service` may read, or prepare a
-//! write, for a skill's run under its grants (#6432).
+//! write, for a skill's run under its grants (#6432). With
+//! `LAMP_SKILL_SECRETS=on`, an uploaded skill's keys given in the app are
+//! kept here too, and `lamp-tasks.service` may ask for a run's
+//! ([`skill_secrets`]).
 pub mod catalog;
 pub mod mail;
 pub mod mcp;
@@ -24,6 +27,7 @@ pub mod net;
 pub mod reads;
 pub mod refresh;
 pub mod serve;
+pub mod skill_secrets;
 pub mod skill_writes;
 pub mod spoken;
 pub mod store;

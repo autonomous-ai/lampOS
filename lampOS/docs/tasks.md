@@ -1929,8 +1929,12 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     the computer staff (Claude Code when none is read); never a fixed list
     of agents. A name counts only as the doer: after "ask", "have", "tell",
     "get" or "let", or "with", "using", "via" or "use" (not "don't ask …",
-    "did you ask …"), or first in the line before a comma ("Hey Lamp,
-    Hermes, …"); any case, its words together or apart ("Open Claw"). One
+    "did you ask …"), or first in the line (after an opening: hey, hi, ok,
+    okay, lamp, please; a stop before it is fine) with a comma after it
+    ("Hey Lamp, Hermes, …") or, as speech to text often hears it, with a
+    work verb (`WORK_VERBS`) right after it, after "please" or a stop too
+    ("Hey Lamp Hermes look up …", "Hermes. Look up …", #7023); any case,
+    its words together or apart ("Open Claw"). One
     of the lamp's engines named: `where` `lamp` and that `engine`, whatever
     the model sent. One of the staff named: `where` `computer`, `who` them,
     no `engine`. A name on both the lamp and a computer is the lamp's,
@@ -1952,6 +1956,7 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     A turn where the model calls no `start_agent_task` is caught on the
     second route (next point).
     Tests: `agent_tasks::tests::the_heard_words_name_the_doer_and_the_place`,
+    `agent_tasks::tests::a_name_called_first_is_the_doer_as_heard`,
     `agent_tasks::tests::an_agent_on_both_works_on_the_lamp_unless_the_computer_is_needed`,
     `agent_tasks::tests::the_heard_words_set_where_engine_and_who`,
     `agent_tasks::tests::the_heard_words_set_the_engine_and_place_over_the_model`.
@@ -1960,7 +1965,8 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     an agent for the work, read exactly as above (the doer only, from the
     lamp's engines while the lamp has its target and the staff, Claude Code
     when none is read; a mention such as "What is Hermes?" names nothing;
-    an agent only called by name first in the line, "Hermes, …", counts
+    an agent only called by name first in the line, "Hermes, …" or
+    "Hermes look up …", counts
     only when the rest of the line asks for work: a work verb such as
     write, make, fix, list or look (`WORK_VERBS`), or at least
     `WHOLE_ASK_FEWEST` (4) ask words beside the words of consent, as
@@ -2185,6 +2191,17 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     Harness's order (`lamp_order`): the owner's choice in the app when it is
     among them, else `LAMP_LAMP_ENGINE`'s (any engine's name), else the
     build's (`lamp_engines`' first switched on), else the first of them.
+    The default is the same before any look (`lamp_default`, #7019): after
+    a start, while the first look is not back (about 30 s) or when it times
+    out, work naming no engine runs on it (Hermes first, by the build's
+    order), never on the `lamp` target's engine left in the targets file;
+    that engine is used only while the lamp has no engine of its own, or
+    while the owner's choice (the app's, else `LAMP_LAMP_ENGINE`'s) is an
+    engine outside the switched-on order, such as a third engine Harness
+    reports on the lamp: that can't be checked before a look, so the
+    targets file's engine, which the last look wrote from it, is kept
+    (the Reviewer-lead's P2 on #7036; shown in
+    `engine::tests::before_a_look_an_app_choice_of_a_third_engine_keeps_the_targets_files_engine`).
     The `targets` answer's `lamp` entry says the default as its `engine`
     and lists them all, default first:
     `{"alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]}`
@@ -2217,13 +2234,27 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     missing, not valid, or naming an engine Harness starts with no task is
     no choice. A choice no longer among the lamp's engines (Harness no
     longer reports it, or its switch is off) is passed over, not wiped.
-    The lamp's reset wipes it with the tasks folder. Shown in tests:
+    The lamp's reset wipes it with the tasks folder. When the app's choice
+    goes (#7019), the `lamp` target's `engine` in the targets file is
+    written as the lamp's default at once (`runtime::lamp_target_to_default`),
+    not left until the next machines' look: at start when no choice is kept
+    (no file, or one not valid), and while running when the file is removed
+    (at each look at the targets, at least every 60 s: `runtime::app_choice_dropped`,
+    only a file not found, so a read error keeps the choice). Only a
+    targets file this part wrote from the machines (its mark beside it) is
+    written, the mark first as there; one written by hand or a pairing, the
+    other targets and the lamp target's machine are left as they are. One
+    journal line: `no app choice: the lamp's target written on its default
+    engine, hermes`. Shown in tests:
     `engine::tests::a_named_engine_runs_the_lamps_work_on_it_even_when_not_first`,
     `engine::tests::a_named_engine_not_in_the_lamps_order_is_refused_never_moved`,
     `engine::tests::no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it`,
+    `engine::tests::with_no_app_choice_and_no_look_yet_the_builds_default_wins_over_the_targets_file`,
     `engine::tests::a_third_engine_harness_reports_on_the_lamp_can_be_named_and_be_the_default`,
     `runtime::tests::the_apps_engine_default_is_kept_used_at_once_and_read_again`,
     `runtime::tests::the_lamps_engines_are_harness_s_the_default_first_then_harness_s_order`,
+    `runtime::tests::a_first_look_that_times_out_leaves_the_builds_default_hermes`,
+    `runtime::tests::when_the_apps_choice_goes_the_lamp_targets_engine_is_rewritten_to_the_default`,
     `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
     `readiness::tests::the_lamps_installed_engines_keep_harness_s_order`,
     `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.
@@ -2690,6 +2721,30 @@ for each run, and is answered once the run ends
   `bad_request`, `too_long` (over 8192 bytes), `no_token` (lamp-control gave
   no one-run token), `run_failed`, or `busy` (another skill's task is
   running: one runs at a time).
+- **What its agent found** (`tells_answer`): with `LAMP_AGENT_SERVICES=on`
+  here, a run granted a linked service's read (`gmail-read`) that ended
+  well answers `{"ok":true,"id":N,"answer":"..."}`, the agent's last
+  answer as the run's end `show` gave it (`--chars 4000`, `Cli::shown_end`;
+  for a `stopped` end, the `show` that found its session bound), every run
+  of whitespace or control characters one space, at most 3,000 bytes
+  (`told_answer`, `MOST_TOLD_BYTES`). Its words end with `TELL_LINE`, so
+  the agent ends with a few plain sentences for the owner. lamp-skills says
+  them to the owner (docs/skills.md, "A linked service as a task for the
+  lamp's agent"). On lamp-9adf, 15 Nov (build 13135), a voice-made
+  `morning-unread-mail` ran 19 Gmail reads and ended idle, and nothing was
+  said: the answer was read by that `show` and dropped. Any other run's
+  answer is as before; the journal never has the answer. It has the
+  answer's length at each step, never its words (#7180): the `show` call
+  line's `answer=N` (bytes in Harness's reply), `its answer not read:
+  CODE` when that reply isn't one `parse_show` takes, the run's
+  `its agent's answer: N bytes kept` (or `none in its end's show`, or
+  `not kept, its run didn't end well`), and `its hand-over's answer
+  tells N bytes` (or `nothing`, or `nothing: not a run that tells`).
+  lamp-skills says what lamp-tasks' answer carried (docs/skills.md). On
+  lamp-9adf, 16 Nov, a run's end `show` gave 360 bytes and nothing was
+  said (#7180), which these lines place. Tests:
+  `a_service_reads_ended_answer_carries_what_its_agent_found`,
+  `a_skill_runs_end_keeps_its_agents_last_answer`.
 - **A one-run token** (the first builder's 12:45 conditions on #6071): for
   each run lamp-tasks asks lamp-control (#6304, PR #6408) for a token on
   its admin socket, `/run/lampos-control/admin.sock` (`ControlTokens`, the
@@ -2765,11 +2820,12 @@ for each run, and is answered once the run ends
     its round not run): nothing is made or started, so a run never starts
     with no token on the lamp's network.
   - **The lamp's default agent, by the one run path, with
-    `LAMP_SKILL_DEFAULT_AGENT=on`** (#6685, off until c0a4's row and two
+    `LAMP_SKILL_DEFAULT_AGENT=on`** (#6685, off in the product: no product
+    unit and not `/etc/lampOS/update.env` sets it, until c0a4's row and two
     reads). One way to run a skill for every agent in the lamp's Harness:
     no per-agent code and no engine name in the run path. lamp-tasks reads
     the lamp's default engine at each run (`runtime::lamp_default`, the
-    app's choice first; before Harness has said, the lamp target's engine)
+    app's choice first; before Harness has said, the build's order, #7019)
     and makes one check for whichever it is
     (`skill_task::default_agent_takes_runs`):
     - an agent in its maker's cloud (`EngineKind::cloud`, Devin Cloud) never
@@ -2814,12 +2870,24 @@ for each run, and is answered once the run ends
     fails the check is refused in words, journaled: "the lamp's default
     agent (<engine>) isn't set up for a skill's run yet (<why>), so nothing
     was started", with nothing made or asked, and no other agent runs it
-    instead. A wrapper lamp-update wrote (its mark, `WRAPPER_MARK`, in the
+    instead. One exception, so the switch is safe whatever order a lamp's
+    units and its updater change in (#6914, #6898): when the default is the
+    lamp's Hermes and its wrapper is lamp-update's but not yet its one run
+    path's (an older updater's round), the run goes the switch-off way,
+    through the lamp's Hermes as before, journaled "run through the lamp's
+    Hermes as with LAMP_SKILL_DEFAULT_AGENT off until lamp-update rewrites
+    its wrapper" (`skill_task::hermes_waits_for_its_round`). That way's own
+    check still holds: a wrapper that doesn't find a run by its folder is
+    refused as with the switch off. Any other default is still refused.
+    A wrapper lamp-update wrote (its mark, `WRAPPER_MARK`, in the
     first 512 bytes) without the run lines is said as an agent with no
     fenced run path for a skill's run yet, whatever lamp-update's switch,
-    with no engine named in the check: OpenClaw's one gateway has no
-    wrapper started per run, so as the default it is refused this way until
-    it has a fenced path of its own (a later step). The token file is written before the launch, as for
+    with no engine named in the check. An agent whose wrapper is a
+    gateway agent's (OpenClaw's with lamp-update's `LAMP_SKILL_DEFAULT_AGENT`
+    and `LAMP_SKILL_GATEWAY_RUNS` on, below,
+    "A skill's run on a gateway agent") takes the run as one turn on its
+    warm gateway instead; OpenClaw's wrapper with the switch off has no
+    gateway data either, so it is refused this way. The token file is written before the launch, as for
     Hermes, and the run is `harness new <engine>` in its own folder (below).
     Messages after the launch say "the lamp's default agent". Off, every
     run is the lamp's Hermes through its own wrapper, as above (the
@@ -3238,7 +3306,13 @@ as a Harness task with the agent's own tools
   `prepare_runtime`) with its generations' `.leases`, while `facts.json`,
   `pm-runtime/selected.json`, the environments and `tools` stay
   read-only; no install lock at all (the lasting Hermes never started)
-  ends it before Hermes runs. These lines mount with `mount -n`: they run
+  ends it before Hermes runs, and none of these is reached through a
+  link (a link at a key, `pm-runtime`, `environments`, `generations` or
+  generation folder skips that
+  lock or ends the make; each bound lock or `.leases` is checked again
+  after its mount, its `stat -c %d:%i` before the bind against the bind
+  target's after it, and a target that is a link is refused too, so a
+  link swapped in between is unmounted and ends the make the same way). These lines mount with `mount -n`: they run
   after `/run` is read-only, where util-linux cannot write its utab. It leaves Hermes's folder and the work
   folder read-only, and hides the rest of the work folder's `lamp` under
   another tmpfs, the make's own folder alone moved back, read-write
@@ -3359,13 +3433,15 @@ engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
 line that stays true round after round is logged once. Skill runs still go
 to Hermes alone (`HarnessRunner`, above).
 
-### A made skill's fixed write on the lamp's Hermes (`LAMP_SKILL_WRITE_AGENT`, off)
+### A made skill's fixed write on the lamp's Hermes (`LAMP_SKILL_WRITE_AGENT`, on in the product)
 
 The owner's ruling (13 Nov): everything that touches a linked service runs
-through the lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`,
-on in no product unit) and `LAMP_AGENT_SERVICES=on` in lamp-tasks, the
-hand-over socket also takes a made skill's fixed write (`do.write`,
-docs/skills.md) as a run (`skill_task::WriteHandOver`, `answer_with`):
+through the lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`;
+on in the product's `lamp-skills`, `lamp-tasks`, `lamp-control` and
+`lamp-services` units, each once) and `LAMP_AGENT_SERVICES=on` in
+lamp-tasks, the hand-over socket also takes a made skill's fixed write
+(`do.write`, docs/skills.md) as a run (`skill_task::WriteHandOver`,
+`answer_with`):
 
 - **The line:** `{"op":"skill_write","skill","folder","grants","write"}`,
   every field needed and no other taken. `skill` and `folder` are checked
@@ -3401,10 +3477,12 @@ docs/skills.md) as a run (`skill_task::WriteHandOver`, `answer_with`):
   `a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
   `a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`.
 
-### An agent skill's run and the `net` grant (`LAMP_UPLOAD_TO_AGENT`, `LAMP_TASK_NET`, off)
+### An agent skill's run and the `net` grant (`LAMP_UPLOAD_TO_AGENT` on, `LAMP_TASK_NET` off)
 
-The first builder's yes at 19:44 (12 Nov), both switches off and set in no
-unit. Built on #6643's `skill_make` path, so it moves onto #6510 step 2's
+The first builder's yes at 19:44 (12 Nov). `LAMP_UPLOAD_TO_AGENT` is on in
+the product since 13 Nov (the owner's ruling: the upload flow goes via the
+agent; docs/skills.md, "Run by the lamp's agent"); `LAMP_TASK_NET` stays
+off and set in no unit. Built on #6643's `skill_make` path, so it moves onto #6510 step 2's
 one runner (a fresh home per run, the token as a file) with no new rules:
 
 - **`net`** (`skill_task::NET_SWITCH`, `LAMP_TASK_NET=on` in lamp-tasks,
@@ -3471,6 +3549,264 @@ Tests: `skill_task::tests::the_net_grant_keeps_the_network_and_no_grant_holds_it
 `a_fresh_home_is_taken_with_the_lasting_home_covered`,
 `an_agent_run_follows_its_file_in_a_fresh_home_with_no_key`,
 `an_agent_run_granted_a_service_has_the_lamps_connectors_in_its_fresh_home`.
+
+### A run's keys, read once (`LAMP_SKILL_SECRETS`, on in the product)
+
+The first builder's ruling (12 Nov 19:44 on #6059): a skill's keys reach
+its run only as an environment file read once (docs/skills.md, "Its keys,
+given in the app"). With `LAMP_SKILL_SECRETS=on` in lamp-tasks
+(`skill_keys::SWITCH`, on in the product's `lamp-tasks.service`), each
+hand-over, before its token is minted (`skill_task::answer_with`, `Agent::keys`):
+
+- **Asked of lamp-services** (`skill_keys::ServicesKeys`): one line on
+  its tools socket, `/run/lampos-services/tools/call.sock`,
+  `{"op":"run_secrets","skill"}`, which lamp-services answers for
+  lamp-tasks.service's cgroup alone: the set values of the names the
+  skill's `skill.toml` needs and the names missing, each checked here
+  again (plain names, one-line values of at most 4096 bytes, at most 16).
+  A skill's run (Hermes) stays in lamp-tasks.service's cgroup, but its
+  namespace shows it no `/run`, so it never reaches that socket.
+- **A name missing:** refused `missing_secret`, "photo booth didn't run: it
+  needs TELEGRAM_BOT_TOKEN added in the app, on the skill's page", with no
+  token minted and nothing started. lamp-services not reached: a skill
+  whose `skill.toml` has no `secrets` line runs with none; one that has is
+  refused `no_secrets`.
+- **The file:** `.run-env` in the run's own fresh folder (`make-<run id>`,
+  with its fresh home, `skill_make::fresh_home`: a run given keys always
+  gets one, through the make's runner, held off the network unless it is
+  granted `net`), made new, never through a link, 0400 from its first byte, lamp-tasks' own
+  user's, the run's: one `export NAME='value'` a line, each value
+  single-quoted for the shell (`skill_keys::shell_quoted`).
+- **Read once:** the runner starts `/bin/sh -c LAUNCH lamp-run <file>
+  /usr/local/bin/hermes chat -q <words>` (`skill_keys::LAUNCH`): the shell
+  reads the file, deletes it whatever came of the read, and only then
+  execs Hermes's wrapper, so the values are in the run's environment
+  alone; a file it can't read starts nothing (exit 97). lamp-tasks
+  removes the file again after the run, and the folder with it. The
+  values are never in the token, the arguments, the run's words (which
+  name the variables and say never to print, write, send or say one), a
+  journal line (counts only) or the skill's folder.
+
+Tests: `skill_keys::tests` (the answer read whole or not at all, the file
+0400 and quoted, the launch reading it once and deleting it before the
+program, a missing name said, a `skill.toml` naming `secrets` seen),
+`skill_task::tests::a_runs_keys_reach_it_only_in_its_environment_file_and_a_missing_one_runs_nothing`,
+`the_lamps_runner_reads_the_keys_file_once_and_deletes_it_before_the_run`.
+
+## A skill's run on a gateway agent (#6685 step 4, option (a), off unless `LAMP_SKILL_DEFAULT_AGENT=on` and `LAMP_SKILL_GATEWAY_RUNS=on`)
+
+A made skill's fixed write (`LAMP_SKILL_WRITE_AGENT`, above) is never a
+gateway agent's run: it has no script for the run's `start`, so it is
+refused before anything began (`not_started`), and lamp-skills sends it
+itself. A run is marked begun only once its turn is sent.
+
+With the one run path on, the one hand-over (`skill_task::answer`, the
+`Runner` interface) has two adapters behind it, chosen by what the lamp's
+default agent is, never by its name (`skill_task::AgentRun`):
+
+- **A per-run agent** (`AgentRun::PerRun`): its wrapper is the one run
+  path's (`wrapper_takes_runs`); the run is `harness new <engine>` in its
+  own folder, in a network namespace of its own (above). Hermes, Claude
+  Code.
+- **A gateway agent** (`AgentRun::Gateway`): its wrapper is lamp-update's
+  (`WRAPPER_MARK`) with `gateway_run::GATEWAY_MARK` as its second line and
+  the gateway's data after it, shell comments `#@<key> <value>` that no
+  shell runs (`lamp_update::openclaw_install::GATEWAY_DATA`): `port` (the
+  gateway's loopback port, 18789), `ns` (the namespace script the gateway
+  runs in, `/usr/local/lib/lampos/openclaw-ns`), `agent` (the fence agent,
+  `lamp-skill-run`), and `turn`, `stop` and `end`: the arguments, after
+  the wrapper, of one turn, of its stop and of its end, as templates
+  (`{name}`, `{agent}`, `{message}`, `{secs}`, `{ms}`); and the run's
+  fence in the gateway's exec approvals: `fence-get` (`approvals get
+  --gateway --json --timeout <ms>`), `fence-set` (`approvals set --gateway
+  --stdin --timeout <ms>`) and `fence-entry` (the fence agent's entry, JSON
+  with `{start}`). lamp-tasks knows no engine's commands: they are
+  lamp-update's data. Each key once, the port a port, the paths and names
+  plain, the turn must carry `{message}` and `fence-entry` must be a JSON
+  object with `{start}`; else the run is refused in words ("is a gateway agent's,
+  but ..."). The gateway's namespace must show lamp-control's socket
+  (`AGENT_NS_TASKS_LINE`): else refused, naming lamp-update's
+  `LAMP_SKILL_DEFAULT_AGENT` or `LAMP_SKILL_TASKS`. No login-shell lookup
+  is made: Harness starts nothing; lamp-tasks runs the wrapper itself, by
+  its full path. OpenClaw is the one gateway agent today: lamp-update
+  writes its wrapper this way only with `LAMP_SKILL_DEFAULT_AGENT=on`
+  (with `LAMP_SKILL_TASKS` on); off, its wrapper and namespace are byte
+  for byte as before.
+
+**A run on a gateway agent** (`gateway_run::GatewayRunner`):
+
+1. lamp-tasks makes `skill-<run-id>` (0700) in its Harness project
+   `/var/lib/lampos-tasks/harnesses/lamp-tasks`, which OpenClaw's
+   namespace shows, and writes in it `token` (the run's one-run token,
+   0600, made exclusively) and `start` (0700,
+   `gateway_run::start_text`): the one command the run may run. `start`
+   reads `token` once and deletes it (a second start has none and fails),
+   and runs the skill's script as it is (`python3 <skill
+   folder>/<script>`) fenced apart from the gateway (see "What the
+   gateway's fence does and doesn't stop" below), with only
+   `LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET`, `PYTHONPATH`, `PATH`
+   (`/usr/local/bin:/usr/bin:/bin`) and `HOME` (the run's folder) in its
+   environment (`env -i`). The token is never in the turn's words, its
+   arguments, the gateway's config or its session.
+2. The gateway must answer on `127.0.0.1:<port>` (`gateway::answers`),
+   waited for at most 60 s (`gateway::READY_WITHIN`); else `run_failed`
+   "the default agent's gateway did not answer ...", and no turn is sent.
+3. **The fence, made sure of** (`GatewayRunner::ensure_fence`), right
+   before each turn, since the gateway may come up after lamp-tasks
+   starts: `fence-get` through the wrapper; the answer must be the
+   approvals document (with `version` or `agents`), or it under `file`
+   beside its hash; any other shape is refused, never guessed at
+   (`gateway_run::set_entry`). When `agents.lamp-skill-run` is not
+   already the fence's entry, the whole document, every other key kept,
+   goes to `fence-set` on stdin, and `fence-get` again must show it. Each
+   call is bounded to 10 s (`AFTER_WITHIN`) and read to 256 KiB. Any
+   failure is `run_failed` "the default agent's fence for a skill's run
+   is not set (...), so nothing was started": no turn is sent and the
+   script never runs. The fence's write (`exec.approvals.get`/`set`, as
+   `sessions.delete` in step 5) needs the `operator.admin` scope, which
+   the lamp's loopback CLI with the shared gateway token gets (local
+   pairing is approved by itself, `gateway.nodes.pairing.autoApproveLocal`,
+   on by default); if the write fails, the run is refused as above.
+4. One turn, through the wrapper (which joins the running gateway's
+   namespaces, `nsenter`): `openclaw gateway call agent --expect-final
+   --json --timeout <ms> --params {"agentId":"lamp-skill-run",
+   "sessionKey":"agent:lamp-skill-run:skill-<run-id>","message":<words>,
+   "idempotencyKey":"skill-<run-id>","timeout":<secs>,"deliver":false}`:
+   the gateway's own RPC, never `openclaw agent --local`, so no turn ever
+   runs outside the warm gateway (a plain `openclaw agent` falls back to
+   a local run when the gateway is unreachable). The words
+   (`gateway_run::prompt`) say to run `start` once and nothing else, the
+   task quoted as data. The process is in a group of its own, its
+   environment cleared to `PATH`, its answer read to 256 KiB.
+5. **Its end.** The run is held to its deadline (14 minutes, the token's
+   life; the gateway is told the same as the turn's `timeout`, so it ends
+   the turn itself too). Exit 0 with the gateway's `status` `ok` (or none)
+   is `{"ok":true,"id":0}`; another `status` or exit status is
+   `run_failed` in words. At the deadline, or as lamp-tasks stops, the
+   token is ended with lamp-control first, then the turn's process group
+   is killed; `run_failed` "the run was ended at its deadline, 840 s".
+   However it ends: the token ended, then (once a turn was sent)
+   `chat.abort` and `sessions.delete` (with its transcript) on the run's
+   session, each bounded to 10 s and journaled when they fail, then the
+   run's folder removed. Nothing the turn printed is kept.
+
+**The fence lamp-tasks writes** (`openclaw_config::write_skill_run_fence`,
+at lamp-tasks' start with `LAMP_SKILL_DEFAULT_AGENT=on` only, as
+`lampos`, OpenClaw's user; off, nothing), for OpenClaw 2026.11.2: in
+OpenClaw's `openclaw.json`, `agents.entries` gets the fence agent
+`lamp-skill-run` (keyed, with no `id` and no `default`): its own workspace
+`/var/lib/lampos-tasks/harnesses/lamp-tasks/gateway-skill-runs` (0700),
+sandbox off, `tools.allow: ["exec"]` (no read, write, edit, web, browser,
+process or session tools), nothing elevated, and its exec on the gateway's
+host by an allow-list with no safe binaries (`host: gateway`,
+`mode: allowlist`, `safeBins: []`; never `mode` with the legacy
+`security`/`ask`, which OpenClaw's schema refuses). With a second agent,
+`agents.ownership: explicit` and `agents.defaults.systemAgent.agentId:
+main` are set, each only when not set already, so the person's spoken
+tasks keep their agent. A legacy `agents.list` (invalid on 2026.11.2) is
+refused, "Refused: ... legacy `agents.list` ...", and the file left as it
+is. Every other key is kept; a file already right is not written.
+
+**Its exec approvals are not a file**: OpenClaw keeps them in the
+gateway's own store, and a legacy `exec-approvals.json` in its state
+blocks them, so lamp-tasks writes none. They are set through the gateway
+before each run's turn (step 3 above): `agents.lamp-skill-run` gets
+`security: allowlist`, `ask: off`, `askFallback: deny`,
+`autoAllowSkills: false` and one allow-list entry:
+`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`
+(`openclaw_config::skill_run_approvals`, the same as lamp-update's
+`fence-entry`).
+
+### What the gateway's fence does and doesn't stop, compared with Hermes's `--net`
+
+- **Network.** Hermes's run is in a network namespace of its own with only
+  `lo` and lamp-tasks' model bridge: it can reach nothing else. A turn on
+  the gateway runs in the gateway's process, which has the lamp's normal
+  network (its unit has no network namespace: its model provider is at
+  `127.0.0.1:7741` and it binds loopback). The turn's model and the
+  gateway can reach anything the lamp can. The skill's script is fenced
+  like Hermes's `--net`: `start` runs it in a network namespace of its own
+  with only `lo` (left down, and no model bridge: the script has no use
+  for one), so it reaches lamp-control's unix socket and nothing else, not
+  even the gateway's loopback port.
+- **Filesystem.** Both run in a mount namespace that shows only the
+  agent's own folder, the work folder, the skills read-only and
+  lamp-control's socket (OpenClaw's `ALLOWED`; `/run`, `/var/lib` and
+  `/etc/lampOS` empty and read-only otherwise). The gateway's namespace is
+  shared by every OpenClaw turn: the run's folder is visible to a spoken
+  OpenClaw task running at the same time (it is 0700, but the same
+  `lampos` user). The skill's script sees less: `start`
+  (`gateway_run::start_text`) puts it in a user, mount and PID namespace
+  of its own inside the gateway's, with a fresh `/tmp` and an empty 0700
+  tmpfs over `/var/lib`, `/var/tmp` and `/dev/shm` (`gateway_run::HIDDEN`)
+  and over the runs' project, then shows again only the run's own folder
+  and its skill's folder. So OpenClaw's state (`openclaw.json`, which
+  holds the gateway's admin token, and `gateway-token` under
+  `/var/lib/lampos-openclaw`), the other runs' folders and the other
+  skills are not there. `/run` is the gateway's: lamp-control's socket
+  (`/run/lampos-control/control.sock`, bound alone, read-only) stays
+  reachable, and the SDK (`/usr/local/lib/lampos/sdk-python`) is not
+  hidden. Its own `/proc` lists only the script's processes, so the
+  gateway's environment cannot be read there. The script runs as the
+  caller's own ids in a nested user namespace, where none of these mounts
+  can be undone.
+- **Environment.** The script gets only its token, lamp-control's socket,
+  `PYTHONPATH`, a fixed `PATH` and `HOME` (the run's folder): `env -i`,
+  nothing of the gateway's (not its forwarder token `LAMP_HERMES_TOKEN`
+  nor `OPENCLAW_STATE_DIR`). The token reaches the script through a pipe,
+  never an argument.
+- **Fail closed.** Any step that fails (the namespaces, a mount, a hidden
+  path inside a folder shown again, the move back) ends `start` with
+  "the run's fence was not made (...): the script was not run" before the
+  script runs; it never falls back to running the script unfenced. The
+  token is deleted either way.
+- **What a gateway run does not stop, plainly.** Every other OpenClaw
+  agent on the lamp (`main` and any the person added) runs as the same
+  `lampos` user in the gateway's namespace: those agents see
+  lamp-control's socket and skills-dev too while the switch is on. Only
+  lamp-control's own checks of the run's token hold against them. So
+  `LAMP_SKILL_GATEWAY_RUNS` (switches.md) stays off until the fence is
+  checked on a lamp or the first builder accepts this in writing; off,
+  lamp-update leaves OpenClaw's wrapper and namespace as before the one
+  run path, and lamp-tasks refuses such a run in words.
+- **Exec.** Hermes's run may run any command in its namespace (its
+  hardline list holds, approvals are off). The fence agent's only tool is
+  `exec`, and its allow-list matches resolved binary paths: only a run's
+  `start` runs, no chaining or redirection unless each part is allowed.
+  This is OpenClaw's policy, enforced in the gateway's own process, not by
+  the kernel: a bug in it, or a change in a later OpenClaw, opens it.
+  The script `start` runs is the skill's as the owner said yes to; what
+  that script runs is not fenced by OpenClaw, only by `start`'s
+  namespaces above.
+- **Token scope.** The same in both: one token per run, minted for that
+  run's skill and grants, ended with lamp-control when the run ends,
+  given only in the script's environment. With Hermes the token is in the
+  agent's own environment for the whole run; on the gateway it is in a
+  0600 file in the run's folder until `start` reads it once, so the
+  model has no tool to read it, and after the first start it is gone.
+- **Concurrency.** Hermes's run is a process of its own, killed with its
+  group. A gateway turn shares the one gateway with the person's spoken
+  OpenClaw tasks: a long turn takes the gateway's CPU and memory from them
+  (`MemoryMax=2500M` for all of them together), and OpenClaw queues turns
+  per session and globally, so a skill's run may wait behind a spoken
+  task. The kill at the deadline ends lamp-tasks' call and asks the
+  gateway to abort the turn (`chat.abort`), and the turn's own `timeout`
+  ends it on the gateway; whether OpenClaw kills an exec still running
+  then is OpenClaw's (its exec `timeout`), not checked here. The token
+  ended first means such a leftover can do nothing on the lamp.
+- **Not verified on a lamp.** The keys of `openclaw.json`, the exec
+  approvals' path and form, `gateway call agent` / `chat.abort` /
+  `sessions.delete` and their parameters are as OpenClaw 2026.11.2 has
+  them (its package; `approvals get --gateway --json` read on c0a4's
+  2026.11.2, nothing written); a whole run is not yet tried on a lamp.
+  `start`'s fence is checked on a computer with `unshare` and `mount`
+  stood in for: that nested user, network, mount and PID namespaces are
+  allowed inside the gateway's, and that the mounts and `--mount-proc`
+  succeed there, is for a lamp to show. Runs are one at a time (`skill_task` takes one). lamp-update's
+  `tools.exec.mode` key is kept as it was. Expected cost: no new process
+  beyond one CLI call (a turn starts in seconds on a warm gateway, not the
+  ~53 s to a ready per-run gateway, and adds the turn's own memory to the
+  gateway, not ~1.5 GB of a gateway of its own); to be measured on c0a4.
 
 ## Devin (#1854)
 
@@ -4379,6 +4715,67 @@ corrected ask, read back again, and started only on a yes:
   as above. A no with nothing waiting, in the request that prepared the
   task, or past the 120 s, does nothing. The Live route has no such hook
   yet: there a plain no still calls nothing.
+- **A plain yes starts the task in code (#7027, with or without the
+  switch).** On lamp-9adf 2 of 5 asks lost the person's yes after the
+  read-back: once the chat round never began (`chat round 1 had not begun
+  in 4500 ms; the turn ends unanswered`), so nothing called
+  `confirm_agent_task`; once the model answered the yes in words with
+  `calls=none`. Now, on the second route, before the chat round is asked, a
+  heard line that is a whole plain yes (`services::plain_yes`, the one
+  deterministic test; no word was added for this) starts the task waiting
+  in code (`agent_tasks::yes_taken`, hooked as the engine's
+  `taking_a_task_yes`), only when all of these hold:
+  - it is a later request than the one that prepared the task, within
+    `CONFIRM_WITHIN` (120 s), heard, never typed in the app (`may_confirm`,
+    and not `messages::is_text`);
+  - the line began clear of the lamp's voice and of its words' echo tail
+    (not `over_the_lamps_voice`, not `in_echo_tail_of`), and was not held as
+    the lamp's own echo;
+  - no session was named for the task (`LAMP_TASKS_REPLY_NAMED`), as for
+    the one yes below;
+  - the lamp's line just before it read the task back as the one-yes rule
+    requires (`read_back_heard`: within 120 s, not cut, ending with a
+    question, naming who and every content word, `reads_back`).
+
+  It goes through `confirm_agent_task`'s own path (`agent_tasks::run`), so
+  every check of a confirm holds and the tasks part is sent its `status`
+  and `confirm` once, off the runtime's thread (`spawn_blocking`, bounded
+  by `DEADLINE`, 3.5 s): the yes's round is asked after that, where before
+  the same two requests followed a whole chat round. The journal says
+  `lamp-voice second: request N: a plain yes to the task read back: the yes
+  taken in code, the task started before the chat round (#7027)` and
+  `lamp-voice: tasks: request N: task <id> started: the yes taken in code,
+  before the chat round (#7027)`; the line is told, in place of the
+  waiting note, "they said yes to the task you read back, and it is handed
+  over to <who> now: confirm_agent_task was called for it, so call
+  nothing.", then the `next` a confirm gives without the lead-in (nothing
+  was said before a call). A plain no (above) is
+  journalled the same way: `lamp-voice second: request N: a plain no to the
+  task read back: the no taken in code, the task dropped before the chat
+  round (#7027)`. The model's own `confirm_agent_task` in that request then
+  finds nothing waiting and asks the tasks part nothing: after the yes it
+  answers `already_handed_over` with "It is already handed over on their
+  yes: do not call this again. …", after the no "Not started: they said no
+  to it, and it was dropped. …", never "Nothing is prepared yet …"; and a
+  task it prepares again in that request is never started by the same yes.
+  Anything else stays the model's to judge, as before: "Yes, but make it
+  six fruits.", a typed yes, a yes over the lamp's voice, a yes in the
+  request that prepared the task, or a confirm the tasks part did not take
+  (journalled `a plain yes to its read-back was not started in code (…);
+  the line goes to the model`). While a task waits, a line of only a plain
+  yes or no is never held as a short sound, and one whose final words came
+  back empty with a whole plain yes or no on the way is taken as said, as
+  for a waiting write (#6840). The Live route has no such hook yet. Tests:
+  `a_whole_plain_yes_to_the_read_back_is_taken_in_code_and_nothing_else`,
+  `a_plain_yes_taken_in_code_starts_it_once_and_the_models_confirm_is_a_no_op`,
+  `a_yes_with_more_words_or_in_the_prepares_request_is_not_taken_in_code`,
+  `a_plain_no_taken_in_code_leaves_the_models_confirm_nothing_to_redo`, and
+  on the second route (`second_provider/tests/task_yes_in_code.rs`)
+  `a_plain_yes_starts_the_task_though_the_chat_round_never_begins`,
+  `a_plain_yes_starts_the_task_though_the_model_calls_nothing`,
+  `a_plain_no_drops_the_task_in_code`, `a_yes_with_more_in_it_goes_to_the_model`,
+  `a_yes_over_the_lamps_voice_is_not_taken_in_code`,
+  `a_typed_yes_is_not_taken_in_code`. Not yet played on a lamp.
 - a `start_agent_task` that prepares while another task still waits for its
   yes replaces it, but only from a request that could say yes to it
   (`may_confirm`): a later request than the one that prepared it, heard (or

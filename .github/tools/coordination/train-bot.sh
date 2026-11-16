@@ -7,6 +7,8 @@
 #   left out), push first/train-N, open its PR, wait for ARM64 and clippy, merge by rebase, then close each carried PR whose
 #   commits are all on lamp-voice. A failed run: the PRs touching the failing tests' crates are left out, told why, and the
 #   rest go again at once. Nothing eligible: wait 60 s.
+#   16 Nov (#7181): a crate train whose only red is a cancelled job goes again once; one that fails to compile or lint
+#   with no PR to name goes again once, then its PRs go alone, one a train (run_train, README.md).
 # DRY=1: print what one round would carry and stop (with two lanes: each PR's lane, then each lane's round).
 # 3 Nov: moved into .github/tools/coordination (Python stays out of lampOS/, Thirteen on #5068); every path comes from
 #   the environment (README.md):
@@ -18,7 +20,7 @@
 #   WORKTREE_NC       the no-crates lane's (default: $LAMP_COORD_STATE/wt-trainbot-nc)
 #   NOCRATES_LANE     on (default): two lanes, crate trains and no-crates trains side by side (#5212 part 3, below);
 #                     off: one lane, as before
-#   PYTHON            the Python for markers.py, reads2.py and qholds.py (default: python3)
+#   PYTHON            the Python for markers.py, reads2.py, rows.py and qholds.py (default: python3)
 #   Markers count only from logins with write access: $LAMP_COORD_STATE/writers.txt (fetched, an hour's cache) plus
 #   $LAMP_COORD_STATE/writers-extra.txt (lib.sh). A PR whose head is in another repository is never carried.
 TOOLS_DIR="${TOOLS_DIR:-${0:A:h}}"
@@ -44,6 +46,11 @@ told=$SP/train-bot.told; touch $told
 # 12 Nov (#6556 B): "<PR> <head>" lines for PRs a train's red non-cargo check sat out (run_train); eligible() leaves
 # those heads out with no HOLD posted, and a new head brings the PR back.
 sitout=$SP/train-bot.sitout; touch $sitout
+# 16 Nov (#7181): two more files of "<PR> <head>" lines, for a crate train that fails to compile or lint with no PR to
+# name (run_train). $alonef: PRs that rode two such trains; the crate lane carries each alone, one a train (lane_round).
+# $aloneout: PRs that failed so alone; eligible() leaves those heads out with no HOLD posted, and a new head brings
+# the PR back.
+alonef=$SP/train-bot.alone; aloneout=$SP/train-bot.alone-out; touch $alonef $aloneout
 # tell KEY: remember KEY in the told list. 6 Nov (the reviewer's P3 on #5542): it was append-only, a line per PR per
 # head; it keeps its last 5000 lines, kept long so a `stacked` or `conflict` key is not dropped and its PR comment posted twice.
 tell() { print -r -- "$1" >> $told; tail -n 5000 $told > $told.new && mv $told.new $told; }
@@ -84,7 +91,7 @@ head_green() {
   return 1
 }
 eligible() {
-  local p head ok sha held two own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl
+  local p head ok sha held two rw sw own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl; local -a so
   # 3 Nov 15:4x (the Reviewer-lead's HOLD on #5068): the repo is public, so markers count only from accounts with write
   # access (lib.sh, coord_writers). Every fetch fails closed: without the writers list, or without the Queue (every
   # issue in lib.sh's COORD_QUEUE_ISSUES) and so its HOLDs, no PR is eligible this round; without a PR's head, comments or body, that PR is not.
@@ -199,6 +206,32 @@ eligible() {
     fi
     [[ $two == none || $two == met* ]] || { once reads2$p "#$p left out: reads2.py said '${two}'"; continue; }
     fine reads2$p
+    # 14 Nov (the lead): a behaviour PR's lamp row comes before its train. A writer's `ROW` line on the PR (or a tester's
+    # "lamp row for #N"), or a reader's "no row needed" in a READ-OK on this head (or a same-patch one), for docs, tests,
+    # or code behind a switch that's off (rows.py). A DEFAULT-ON always needs its row. Any other answer fails closed.
+    # 14 Nov (the readers' P3s on #7034): a ROW line names this PR, a FAIL row is no row, and a PR whose diff turns a
+    # LAMP_ switch on in a product unit (coord_switch_on; an unread diff leaves it out) needs a row: "no row needed"
+    # doesn't carry it (rows.py --switch-on).
+    sw=$(coord_switch_on $head) || { once switch$p "#$p left out: its diff can't be read for a switch turned on"; continue; }
+    fine switch$p
+    so=(); [[ $sw == on ]] && so=(--switch-on)
+    rw=$($PYTHON -I $TOOLS_DIR/rows.py --writers $wf $so --pr $p $heads < $cf)
+    # 14 Nov 15:40 (the lead): a row names the lamp, the build and quotes the journal lines; one that lacks a part is no
+    # row, said once per head with the parts it lacks (rows.py's "row-incomplete lamp,journal").
+    if [[ $rw == row-incomplete\ * ]]; then
+      grep -qx "$p rowpart $head" $told || { say "#$p left out: its ROW doesn't name the lamp, the build and the journal lines (missing: ${${rw#row-incomplete }//,/, })" >&2; tell "$p rowpart $head"; }
+      continue
+    fi
+    if [[ $rw == none && $sw == on ]]; then
+      grep -qx "$p norow-on $head" $told || { say "#$p left out: it turns a switch on in the product, and no ROW line names it on head ${head:0:9}" >&2; tell "$p norow-on $head"; }
+      continue
+    fi
+    if [[ $rw == none ]]; then
+      grep -qx "$p norow $head" $told || { say "#$p left out: no ROW line and no reader's \"no row needed\" on head ${head:0:9}" >&2; tell "$p norow $head"; }
+      continue
+    fi
+    [[ $rw == row || $rw == no-row-needed ]] || { once rows$p "#$p left out: rows.py said '${rw}'"; continue; }
+    fine rows$p
     # 13 Nov: with --always no PR rides on one read, so a ONE READ opt-out (4 Nov, #5305; 7 Nov, #5635) no longer lowers
     # it, and its once-a-head line is gone with it.
     # 30 Oct 15:0x (the Reviewer-lead's 14:58): a PR whose own ARM64 run on this head is red sits out. #4507's run was red
@@ -213,6 +246,12 @@ eligible() {
     # with no HOLD posted: a push (a new head) brings it back.
     if grep -qx "$p $head" $sitout 2>/dev/null; then
       grep -qx "$p sitout $head" $told || { say "#$p left out: a train's non-cargo check failed on files it changes, at ${head:0:9}; a new head brings it back" >&2; tell "$p sitout $head"; }
+      continue
+    fi
+    # 16 Nov (#7181): and a PR that failed to compile or lint alone in a train (run_train, $aloneout) stays out on
+    # that head the same way, said once per head (dropped).
+    if grep -qx "$p $head" $aloneout 2>/dev/null; then
+      dropped $p alone "alone in a train, it failed to compile or lint at ${head:0:9}; a new head brings it back"
       continue
     fi
     nout=$((nout+1))
@@ -338,6 +377,7 @@ build_train() {
 # two lanes it runs in the background, one per lane.
 run_train() {
   local lane=$1 rc slow slowf=$SP/train-bot.slow-$1 five fivef=$SP/train-bot.5xx-$1 p left added c run fails errfiles heldany hit d deps t names dd NV w out other jl; local -a red redjobs redwfs
+  local cancf=$SP/train-bot.cancelled-$1 ef ch err why note lvh lvs; local -a canc failed cj hitp solo
   # 3 Nov 15:4x: the PRs to recheck go as arguments; merge-when-green.sh runs still-eligible.sh on them (no eval).
   # 4 Nov (#5212 part 2): --behind-unrelated, so a green train behind lamp-voice only by files it doesn't touch, and no
   # build input (behind-unrelated.sh), merges as it is instead of being rebuilt. Part 3: a no-crates train passes
@@ -386,6 +426,7 @@ run_train() {
   fi
   if [[ $rc == 0 ]]; then
     [[ $lane == nc ]] && rm -f $SP/train-bot.nc-one
+    [[ $lane == nc ]] || echo 0 > $cancf
     git fetch -q origin lamp-voice; NV=$(git rev-parse --short=9 origin/lamp-voice)
     for p in $carried; do
       # 31 Oct 09:4x (Fourth, 09:26): fetch the PR's head again first. A commit pushed while the train ran was never
@@ -435,14 +476,85 @@ run_train() {
   # A compile or lint error (clippy, or a test build): the files it names, and the PRs that touch those files.
   errfiles=$(grep -oE -- '--> (lampOS/)?crates/[^:]+' $jl | sed -E 's#^--> (lampOS/)?#lampOS/#' | sort -u)
   redwfs=(${(u)redwfs})
+  # 16 Nov (#7181, train 940): its macOS job was cancelled at the job's 30-minute limit by a hung test, so the train was
+  # red with no failed job and no failing test, and the bot stopped ("red: none found") until it was restarted by hand.
+  # A train whose checks failed (rc 2) and whose only red is a cancelled or timed-out job (lib.sh,
+  # coord_cancelled_jobs), with no failed job and no test or file named, is closed and the same PRs go again, once,
+  # said here and on the Queue. Counted in a file per lane, as the slow trains are, and set back by a merge and by a red
+  # of any other kind. The second such train in a row goes on below as before (it stops the bot, or sits out the PRs a
+  # timed-out check takes), with the cancelled job named.
+  canc=(); [[ $rc == 2 && -z $fails && -z $errfiles ]] && canc=(${(f)"$(coord_cancelled_jobs $h)"})
+  failed=(${red:|canc})
+  if (( ${#canc} && ! ${#failed} )); then
+    cj=(); for c in $canc; do cj+="${c#* }"; done
+    if [[ $(cat $cancf 2>/dev/null) != 1 ]]; then
+      echo 1 > $cancf
+      say "train $n (#$tp) failed (rc $rc) with no failing test named: its only red was a cancelled job (${(j:, :)cj}): cut again once"
+      queue_post "Train bot, $(date +%H:%M): train $n (#$tp) failed with no failing test named; its only red was a cancelled job (${(j:, :)cj}): cut again once."
+      # Closed last: a round may take the lane as free as soon as its train PR is closed, and the count is written by then.
+      gh pr close $tp -R $REPO -c "Train bot: closed, its only red was a cancelled job (${(j:, :)cj}), with no failing test named; the same PRs go again once." >/dev/null
+      return 0
+    fi
+    for c in ${canc:|red}; do redjobs+="${c#* } (cancelled)"; done
+  fi
+  echo 0 > $cancf
   if [[ -n $errfiles ]]; then
     say "train $n (#$tp) failed to compile or lint in: ${(f)errfiles}"
-    gh pr close $tp -R $REPO -c "Train bot: closed, a compile or lint error in ${(j:, :)${(f)errfiles}}; the PRs touching those files sit out, the rest go again." >/dev/null
-    for p in $carried; do
-      if gh pr diff $p -R $REPO --name-only | grep -qxF -f <(print -l ${(f)errfiles}); then
-        gh pr comment $p -R $REPO --body "HOLD train $n: a compile or lint error in a file this PR changes (${(j:, :)${(f)errfiles}}). Train bot, $(date +%H:%M): rebase onto lamp-voice, run clippy with --all-targets, and a reader posts a new READ-OK." >/dev/null; say "  held #$p"
-      fi
+    hitp=(); for p in $carried; do
+      gh pr diff $p -R $REPO --name-only | grep -qxF -f <(print -l ${(f)errfiles}) && hitp+=$p
     done
+    # 16 Nov (#7181, trains 948 to 950): each carried the same two PRs and failed to compile in a file neither of them
+    # changed, so nobody was held and the pair was cut again, three times, until a person held one. A compile or lint
+    # error names a PR only when some of the train's PRs change the failing files and others don't. When none does, or
+    # every one of several does, the same PRs go again once: each PR's head and the failing files are kept in the told
+    # list. A PR that rides a second such train, on that head and with those files, goes alone, one a train ($alonef,
+    # lane_round). A PR that fails to compile or lint alone (in such a train of its own, or twice the same way in a
+    # train it had to itself) is left out on the head the train carried (lib.sh, coord_sit_out, into $aloneout: no
+    # HOLD, told once on the PR, a new head brings it back) and named once on the Queue with the files and the first
+    # error line of the failed job's log. One that passes alone merges as usual. The train PR is closed last, after all
+    # of that is kept and posted: a round may take the lane as free as soon as its train PR is closed.
+    ef=${(j:,:)${(f)errfiles}}; p=${carried[1]}; note="the PRs touching those files sit out, the rest go again"
+    ch=$(awk -v p=$p '$1 == p { print $2; exit }' $SP/train-carried-$lane.txt 2>/dev/null)
+    if (( ${#carried} == 1 )) && [[ -n $ch ]] && { grep -qx -- "$p $ch" $alonef 2>/dev/null || grep -qxF -- "$p again $ch $ef" $told; }; then
+      err=$(coord_first_error $jl)
+      # 16 Nov (the first read of #7186): with lamp-voice itself broken (a toolchain or a runner change, not a PR),
+      # every PR would fail alone and be left out on its head, and a fix to lamp-voice would bring none of them back
+      # until each author pushed. So lamp-voice's own head is read first (lib.sh, coord_lv_state: its latest push run of
+      # the ARM64 and of the clippy workflow). A job a train waits for failed there: no PR is blamed, nothing is kept
+      # or posted on the PR, and the bot stops for the first builder, saying so in its one Queue post. A run missing or
+      # still going can't say: the PR is left out as below, and the log says there was no run to check.
+      git fetch -q origin lamp-voice 2>/dev/null; lvh=$(git rev-parse -q --verify origin/lamp-voice 2>/dev/null); lvs=$(coord_lv_state $lvh)
+      if [[ $lvs == red\ * ]]; then
+        say "  lamp-voice itself is red at ${lvh:0:9} in ${lvs#red }: #$p is not left out; stopping for the first builder"
+        queue_post "Train bot, $(date +%H:%M): train $n (#$tp) carried #$p alone and failed to compile or lint in ${ef//,/, }, but lamp-voice itself is red at \`${lvh:0:9}\` in ${lvs#red }, so no PR is blamed; stopped for the first builder."
+        gh pr close $tp -R $REPO -c "Train bot: closed, a compile or lint error in ${(j:, :)${(f)errfiles}}; lamp-voice itself is red at ${lvh:0:9} in ${lvs#red }, so no PR is blamed." >/dev/null
+        halt crates
+      fi
+      [[ $lvs == ok ]] || say "  lamp-voice's own run at ${${lvh:0:9}:-its head} was not there to check (${lvs#none }): the failure is taken as #$p's"
+      coord_drop_pr $alonef $p
+      for p in ${(f)"$(coord_sit_out $aloneout $SP/train-carried-$lane.txt $told "Train $n (#$tp) carried this PR alone and failed to compile or lint in ${ef//,/, }${err:+ ($err)}." $p)"}; do
+        say "  #$p, alone in the train, is left out on the head it carried until a new push${err:+ ($err)}"
+        queue_post "Train bot, $(date +%H:%M): train $n (#$tp) carried #$p alone and failed to compile or lint in ${ef//,/, }${err:+: \`$err\`}. #$p is left out on that head until a new push; the rest go on."
+      done
+      note="#${carried[1]}, alone in it, is left out on that head until a new push"
+    elif (( ! ${#hitp} || ( ${#hitp} == ${#carried} && ${#carried} > 1 ) )); then
+      solo=()
+      for c in ${(f)"$(<$SP/train-carried-$lane.txt)"}; do
+        if grep -qxF -- "${c%% *} again ${c#* } $ef" $told; then
+          grep -qx -- "$c" $alonef 2>/dev/null || print -r -- $c >> $alonef
+          solo+="#${c%% *}"
+        else tell "${c%% *} again ${c#* } $ef"; fi
+      done
+      why="no carried PR changes"; (( ${#hitp} )) && why="every carried PR changes"
+      if (( ${#solo} )); then say "  $why them, a second time: ${(j:, :)solo} go alone, one a train"; note="$why those files, a second time: ${(j:, :)solo} go alone, one a train"
+      else say "  $why them: the same PRs go again once"; note="$why those files: the same PRs go again once"; fi
+    else
+      # Some change the failing files and others don't, or the train's one PR changes them: held, as before.
+      for p in $hitp; do
+        gh pr comment $p -R $REPO --body "HOLD train $n: a compile or lint error in a file this PR changes (${(j:, :)${(f)errfiles}}). Train bot, $(date +%H:%M): rebase onto lamp-voice, run clippy with --all-targets, and a reader posts a new READ-OK." >/dev/null; say "  held #$p"
+      done
+    fi
+    gh pr close $tp -R $REPO -c "Train bot: closed, a compile or lint error in ${(j:, :)${(f)errfiles}}; $note." >/dev/null
     return
   fi
   say "train $n (#$tp) failed (rc $rc); failing crates: ${fails:-none found}"
@@ -495,7 +607,7 @@ run_train() {
 # lane_round LANE BUSY PR...: what one lane does this round with its PRs: nothing (busy, stopped, rows alone, none),
 # DRY=1's line, or a train built and run (in the background with two lanes). Returns 0 when it started a train.
 lane_round() {
-  local lane=$1 busy=$2 name; shift 2
+  local lane=$1 busy=$2 name p solo; shift 2
   local l=("$@"); [[ -n ${l[1]} ]] || l=()
   if (( two )); then [[ $lane == nc ]] && name="no-crates lane: " || name="crate lane: "; fi
   if [[ $lane == nc && -f $SP/train-bot.stop-nc ]]; then [[ ${DRY:-0} == 1 ]] && say "dry: ${name}stopped (train-bot.stop-nc)"; return 1; fi
@@ -509,10 +621,32 @@ lane_round() {
   if (( ! ${#l} )); then [[ ${DRY:-0} == 1 ]] && say "dry: ${name}nothing eligible"; return 1; fi
   # After a failed no-crates train of several PRs, one PR a train (run_train).
   [[ $lane == nc && -f $SP/train-bot.nc-one ]] && l=(${l[1]})
+  # 16 Nov (#7181): the PRs in $alonef (run_train) go alone, one a train: the first of them in this round's order, on the
+  # head listed, and the rest wait for the next round. A PR closed or pushed since leaves $alonef and $aloneout here:
+  # run_train writes them before it closes its train PR, so no train is writing them now (not in a dry round, which may
+  # run beside the bot).
+  if [[ $lane != nc ]]; then
+    [[ ${DRY:-0} == 1 ]] || { grep -q ' ' $SP/elig-open.txt 2>/dev/null && for p in $alonef $aloneout; do coord_sitout_trim $p $SP/elig-open.txt; done; }
+    for p in $l; do
+      grep -qx -- "$p $(git rev-parse -q --verify refs/remotes/pr/$p 2>/dev/null)" $alonef 2>/dev/null && { l=($p); solo=$p; break; }
+    done
+  fi
   if [[ ${DRY:-0} == 1 ]]; then say "dry: ${name}would carry ${l[*]} onto $LV"; return 1; fi
-  build_train $lane $l || return 1
+  # 16 Nov (#7181): a lane stopped the bot (halt, train-bot.stop) while this round read the PRs: no new train. A round
+  # can begin once the failed train's PR is closed, a moment before the stop is written; it used to cut one more train.
+  [[ -f $SP/train-bot.stop ]] && return 1
+  # A PR that can't be built into its train alone (it conflicts, or a check on its head went red) leaves $alonef: the
+  # lane would wait on it every round.
+  build_train $lane $l || { [[ -n $solo ]] && coord_drop_pr $alonef $solo; return 1; }
   if (( two )); then run_train $lane & job[$lane]=$!; else run_train $lane; fi
   return 0
+}
+# dropped PR KEY WHY: say "#PR left out: WHY" once per head (its ref eligible() fetched), for the PRs train-hold.txt and
+# train-only.txt drop below. 14 Nov: trains 905-907 left out #7016 and #7022 with no line in the log because
+# train-only.txt didn't name them. 16 Nov (#7181): eligible() says a PR that failed to compile or lint alone with it too.
+dropped() {
+  local h=$(git rev-parse -q --verify refs/remotes/pr/$1 2>/dev/null)
+  grep -qx -- "$1 $2 $h" $told || { say "#$1 left out: $3" >&2; tell "$1 $2 $h"; }
 }
 while true; do
   # A lane in the background stopped the bot (halt): let the other lane's train finish, then stop.
@@ -542,12 +676,12 @@ while true; do
   # 28 Oct 11:5x (first builder): PRs named in $LAMP_COORD_STATE/train-hold.txt sit out (read, but owing a lamp run the
   # lead's 09:36 merge condition asks of onboarding fixes), so a READ-OK alone doesn't carry them.
   if [[ -s $SP/train-hold.txt && -n ${list[1]} ]]; then
-    kept=(); for p in $list; do grep -qw $p $SP/train-hold.txt || kept+=$p; done; list=($kept)
+    kept=(); for p in $list; do if grep -qw $p $SP/train-hold.txt; then dropped $p hold "named in train-hold.txt"; else kept+=$p; fi; done; list=($kept)
   fi
   # 28 Oct 09:5x (first builder): the lead's 12:00 onboarding deadline. While $LAMP_COORD_STATE/train-only.txt is there, a
   # train carries only the PRs it names (in train-first.txt's order), so a failure elsewhere costs no onboarding rerun.
   if [[ -f $SP/train-only.txt && -n ${list[1]} ]]; then
-    only=(); for p in $list; do grep -qw $p $SP/train-only.txt && only+=$p; done; list=($only)
+    only=(); for p in $list; do if grep -qw $p $SP/train-only.txt; then only+=$p; else dropped $p only "not named in train-only.txt"; fi; done; list=($only)
   fi
   if (( ! two )); then
     # One lane, as before.

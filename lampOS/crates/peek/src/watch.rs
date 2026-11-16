@@ -2,7 +2,10 @@
 //! each topic, a short tail of what came, the eyes' last word on the
 //! camera and the body's on itself. Of each message it keeps only what
 //! [`what`] says of it: never the words of `voice/heard` or `voice/said`,
-//! and of the diagnostics only the body's own sentence ([`body_of`]).
+//! and of the diagnostics only the body's own sentence ([`body_of`]). The
+//! turns' timeline is fed from here too ([`crate::timeline`]), which keeps
+//! words only in monitor mode.
+use crate::timeline::{self, Timeline};
 use lamp_bus::{Bus, Message};
 use lamp_msgs::{Diagnostic, Level, Speech, VoiceTurn};
 use std::{
@@ -23,6 +26,15 @@ pub const EVENTS: [&str; 4] = [
     Speech::TOPICS[1],
     VoiceTurn::TOPIC,
     Diagnostic::TOPIC,
+];
+/// Every topic listened to: [`EVENTS`], and those only the timeline reads.
+pub const LISTENED: [&str; 6] = [
+    EVENTS[0],
+    EVENTS[1],
+    EVENTS[2],
+    EVENTS[3],
+    timeline::TOPICS[0],
+    timeline::TOPICS[1],
 ];
 /// The name its subscribers have on the bus.
 pub const SUBSCRIBER: &str = "peek";
@@ -124,12 +136,18 @@ pub struct Seen {
     pub camera: Option<(String, Instant)>,
     /// The body's last word on itself.
     pub body: Option<BodyReport>,
+    /// The newest turns, step by step.
+    pub timeline: Timeline,
 }
 
 impl Seen {
     /// Count `message` and keep what it says.
     pub fn take(&mut self, message: &Message, now: Instant) {
+        self.timeline.take(message);
         let header = &message.header;
+        if timeline::TOPICS.contains(&header.topic.as_str()) {
+            return;
+        }
         let count = self.counts.entry(header.topic.clone()).or_default();
         count.messages += 1;
         count.last_unix_ms = header.at_unix_ms;
@@ -231,10 +249,10 @@ pub fn camera_of(message: &Message) -> Option<String> {
         .then(|| value.value.clone())
 }
 
-/// Listen to [`EVENTS`] on `bus` until `stop` is set, keeping what came in
+/// Listen to [`LISTENED`] on `bus` until `stop` is set, keeping what came in
 /// `seen`. Ends with the first error the bus gives.
 pub fn watch(bus: &Bus, seen: &Mutex<Seen>, stop: &AtomicBool) -> io::Result<()> {
-    let mut subscribers = EVENTS
+    let mut subscribers = LISTENED
         .iter()
         .map(|topic| bus.subscribe(topic, SUBSCRIBER))
         .collect::<io::Result<Vec<_>>>()?;

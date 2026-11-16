@@ -276,7 +276,7 @@ fn answer(stream: &mut TcpStream, status: u16, why: &str) -> io::Result<()> {
 
 /// Whether `given` is `token`, in a time that does not depend on where they
 /// first differ.
-fn same(given: &str, token: &str) -> bool {
+pub(crate) fn same(given: &str, token: &str) -> bool {
     let (a, b) = (given.as_bytes(), token.as_bytes());
     if a.len() != b.len() || b.is_empty() {
         return false;

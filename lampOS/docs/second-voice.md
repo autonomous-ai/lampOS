@@ -2125,8 +2125,16 @@ order is kept. A written turn is the same from the chat on.
   to that scope's turns; a request with no kept words keeps none, and a
   forget drops them. They are not written to the thread file (an older
   build would set the file aside, #1505): after a restart, earlier
-  exchanges are words only. Any other call that took arguments (a keep, a
-  skill's) is never kept: its arguments are the person's words, and told
+  exchanges are words only. A skill's call through `use_skill` is kept
+  with its `skill`, `choice` and `flag` only (`SKILL_KEPT_FIELDS`: a
+  skill's name, a word from its own list, a yes-or-no), and only when it
+  has no other field, its result told "(done earlier: the skill ran then.
+  The rest of its result was not kept. A new ask for it needs its own
+  call.)" (`SKILL_RAN_EARLIER`; #7076: on lamp-52e6 on 14 Nov a second
+  "Lamp, I'm unplugging you now." 8 s after a prepare-unplug run was
+  answered in words, `calls=none`, the earlier asks told as words alone).
+  Any other call that took arguments (a keep, a skill's by its own
+  function) is never kept: its arguments are the person's words, and told
   bare it would teach calling it bare (Fourteen's P3 on #5018). A light's,
   volume's or Schedule's call whose arguments pass 256 bytes is kept bare
   if its function takes none, else not at all (every Schedule function
@@ -2149,6 +2157,22 @@ order is kept. A written turn is the same from the chat on.
   not 429 or 5xx) with kept calls in the history is asked once more
   without them, in words only (`without_kept_calls`, the Reviewer-lead's
   P2 on #5018). Off, the history is as before, byte for byte.
+  The system message also carries the scope's thread text, its exchanges
+  of the last ten minutes as "Person: …"/"You: …" lines after a note
+  ("A moment ago…", `Thread::recall_for`), so without more each exchange
+  in the history is told twice (#6218: a long talk's prompt near 14k
+  tokens). With `LAMP_HISTORY_SAID_ONCE=on` (off unless set) the thread
+  text leaves out every exchange the history of the same request tells,
+  matched by its place in the thread as the history picked it
+  (`Thread::recent_picks_for`, `Thread::recent_picks_with_room_lines`,
+  `Thread::recall_for_leaving_out`): only the scope's exchanges the
+  history did not take stay, after the note for its newest exchange, and
+  with none left there is no thread text; the running summary is still
+  told. A scope keeps twelve exchanges, as many as the history takes, so
+  the thread text is left only when the room's lines
+  (`LAMP_CONVERSATION_ROOM_LINES_TOLD`) take some of the history's
+  places. Scopes, the withheld name and the byte budget are as with it
+  off; off, the thread text is told whole, byte for byte as before.
 - **What a stored running note holds is not told again as history**
   (`LAMP_HISTORY_AFTER_NOTE=on`, off in the product; #6218). With
   `LAMP_CONVERSATION_SUMMARY` on, a turn's system message tells its scope's
@@ -2157,14 +2181,17 @@ order is kept. A written turn is the same from the chat on.
   exchanges the note was made from are still in both. With the switch,
   those exchanges are left out of the thread's lines and the history,
   their kept calls with them, but only once the job that gave them had its
-  note kept (`Thread::folded`), and only while that note (its lineage) is
-  the one told: a dropped, failed, empty or forgotten job, or no note told,
+  note kept (`Thread::folded`), and only while that note (its lineage, at
+  the version they were folded into or a later one) is the one told: a dropped, failed, empty or forgotten job, or no note told,
   leaves every exchange told as before. The same newest exchanges are
   chosen, then the folded leave; the room's lines told to a person stay;
   a withheld name is taken out as before. The mark is RAM only, as the
   note is: after a restart everything is told in full
   ([conversation-thread.md](conversation-thread.md)). Off, the system
-  message and history are as before, byte for byte.
+  message and history are as before, byte for byte. With
+  `LAMP_HISTORY_SAID_ONCE` on too, the history is the same, and the
+  thread's lines leave out both the folded exchanges and those the history
+  tells (the history's picks, the folded already out of them).
 - **A tool call knows whether it was heard.** The engine passes `heard`
   to the tool runner: true in a spoken turn, false in a written one, as the
   Live route does, so a yes to prepared work cannot come in a turn the lamp
@@ -2349,6 +2376,17 @@ order is kept. A written turn is the same from the chat on.
     second of the lamp's own arrival move was answered as the name, and the
     one "Yes." after it found the mail dropped. Test:
     `a_wordless_call_between_a_read_back_and_its_yes_keeps_the_write`.
+  - So too a line that is only the lamp's name, with words ("Hey Lamp"):
+    answered as a call, with or without `LAMP_SECOND_NAME_CARRIES`, its
+    answer is no answer to a waiting write's read-back
+    (`services::answered_in_place`), unless said by the name just before,
+    so the yes after it still sends. Only the name alone: a call with a
+    word past it ("Hey Lamp, no.") or one word asked as the name ("No.")
+    still drops the write, so a stray "Yes." never sends what was just
+    declined. On lamp-9adf on 14 Nov "Hey Lamp"
+    between an event's read-back and its "Yes." was answered as a call, and
+    the yes found the event dropped (#6363). Test:
+    `a_name_only_line_between_a_read_back_and_its_yes_keeps_the_write`.
 - **In a busy room, a line going on waits for the Policy**
   (`LAMP_GOING_ON_ASKS=on`, with the rule and the bus, #1522; #1712, item
   4): a line the rule would let out only as a conversation going on, and
@@ -6175,6 +6213,33 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   count (#2733). Nothing of the read is kept past the note: no person, no
   picture. The journal, at that first audio: `request N is told how the
   person seems`.
+- **What a known person was last seen doing (`LAMP_SECOND_DOING=on`,
+  #6543):** off. With `LAMP_BUS=on`, `humans/doing` is read every 2 s
+  (`worker::doing_task`, `crate::doing_told`), a value fresh within the
+  message's 90 s (`HumanDoing::LASTS`) and not expired as the bus has it
+  (a stamp from another boot or ahead of now never counts, even with the
+  wall clock stepped back), with `last` not `none` and a
+  `confidence` of 0.5 or over (`SURE_FROM`: a drink told that wasn't
+  costs more than one missed), and only while exactly one face is in view
+  (`humans/faces`), since with two it may be the other's. Only the last
+  thing seen is told, as a kind (drinking, eating, stretching) and a
+  rounded time ("just now", "about 5 minutes ago", "about an hour ago"),
+  never the raw label, a count or a name. The note is context only: the
+  model is told not to mention it unless the person brings it up, never to
+  say it saw it, never to comment on it or on their body, and to use it
+  only so a reply fits. The lamp never volunteers it, so it never says
+  "enjoy your lunch" (the PM's calls on #6543: no reaction to a seen drink
+  or meal, no per-person history, never speak of the body). It goes to a
+  spoken request whose scope is a known person in view, as for how they
+  seem (`Engine::noting_what_they_did`, `worker::doing_noting`); not in a
+  busy room, never a written turn. Spent once an answer given it begins to
+  be heard, and each sighting is told once (a sighting is its kind and the
+  time it was seen, within 60 s). Each request keeps the sighting it was
+  given (up to 4 in flight), so an answer heard spends only that one: a
+  newer sighting given to a request still in flight is still told.
+  Nothing of it is kept past the note. The
+  journal, at that first audio: `request N is told what the person was
+  last seen doing`.
 - **An answer may leave a soft door** (`LAMP_OPENS_FURTHER=on`, #5194;
   [`opens_further`](../crates/voice/src/opens_further.rs)). The lead's
   testers, 4 Nov: "whatever you ask the lamp, it only answers that; it never

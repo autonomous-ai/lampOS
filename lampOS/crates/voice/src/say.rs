@@ -73,7 +73,9 @@
 //!   [`may_play_exact`] says so: it waits while someone is talking with the
 //!   lamp, its speaker is busy or an answer is owed (never for the room's
 //!   speech nobody addresses to it), is refused paused or muted, and has no
-//!   quiet gap or one-in-30-s rarity. `spoken` means played whole, as a sound's.
+//!   quiet gap or one-in-30-s rarity. The prepare-unplug skill's exact lines
+//!   don't wait for a conversation, as they answer it, only for a turn
+//!   still on its way and anyone heard ([`Says::exact_answers`], #6899). `spoken` means played whole, as a sound's.
 //!   lamp-control adds `by`, the asking computer's name (lamp-control's
 //!   alone, with exact `text` only), so that `voice/line` (#4209) can tell
 //!   whose words they were; every line the voice plays without the model,
@@ -2268,6 +2270,20 @@ impl Says {
     pub fn quiet_needed_us(&self) -> Option<u64> {
         self.next_index()
             .map(|index| quiet_for(self.waiting[index].request.priority))
+    }
+
+    /// Whether the next exact line is the prepare-unplug skill's (#6899):
+    /// its lines answer the person's own unplug conversation (the turn-off
+    /// ask, the update line after a yes, the stay after a no), so a
+    /// conversation going on doesn't hold them, only the lamp's speaker,
+    /// a turn still on its way to it, anyone heard and an answer owed
+    /// (#7060: taken while the "No." was still queued, the stay line was
+    /// dropped). Held for the conversation, the update line
+    /// after "Yes." waited out its 30 s and was never said (row-5747n D,
+    /// lamp-52e6, build 12200).
+    pub fn exact_answers(&self) -> bool {
+        self.next_of(|request| matches!(request.words, Words::ExactSound { .. }))
+            .is_some_and(|index| self.waiting[index].request.skill == "prepare-unplug")
     }
 
     /// The quiet the next exact line needs since the last turn: none
@@ -5093,6 +5109,52 @@ mod tests {
         let mut answer = String::new();
         BufReader::new(stream).read_to_string(&mut answer).unwrap();
         answer
+    }
+
+    /// lamp-9adf, 14 Nov (#6749): a voice make's waiting line asked at
+    /// priority 5 with 15 s to begin, the lamp's own "I'll make it now"
+    /// ending as it was read, needs the whole [`QUIET_US`] after that turn:
+    /// by then its wait is over, and it is `expired`, never said. Asked
+    /// urgent, as the make's say-socket line now is, it is taken once the
+    /// urgent quiet has passed, well within the same wait.
+    #[test]
+    fn a_makes_waiting_line_at_normal_priority_expires_before_its_quiet() {
+        let line = |priority: u8| {
+            format!(
+                "{{\"skill\":\"voice-make\",\"text\":\"Let me think about that a little longer.\",\"priority\":{priority},\"expires_in_ms\":15000}}\n"
+            )
+        };
+        for (priority, said) in [(NORMAL_PRIORITY, false), (URGENT_FROM, true)] {
+            let dir = socket_dir(&format!("wait{priority}"));
+            let path = dir.join("say.sock");
+            let mut says = Says::serve(&path, None, &dir, Recordings::none()).unwrap();
+            let client = {
+                let (path, line) = (path.clone(), line(priority));
+                thread::spawn(move || exchange(&path, &line))
+            };
+            // The lamp's own turn ends as the ask comes in.
+            let last_turn_us = loop {
+                let now = lamp_ipc::monotonic_us();
+                says.poll(now);
+                if says.quiet_needed_us().is_some() {
+                    break now;
+                }
+                thread::sleep(Duration::from_millis(5));
+            };
+            // The coordinator's gate: the quiet the ask's priority needs.
+            let quiet = says.quiet_needed_us().unwrap();
+            let at = last_turn_us + quiet;
+            says.poll(at);
+            assert_eq!(says.take(at).is_some(), said, "priority {priority}");
+            if said {
+                drop(says);
+                let _ = client.join();
+            } else {
+                assert_eq!(client.join().unwrap(), "{\"outcome\":\"expired\"}\n");
+                drop(says);
+            }
+            let _ = fs::remove_dir_all(&dir);
+        }
     }
 
     /// The reviewer on #954: sixteen clients each sending a little of a line

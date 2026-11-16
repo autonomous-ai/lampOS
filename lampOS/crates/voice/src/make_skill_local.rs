@@ -19,10 +19,9 @@
 //!
 //! [`made_skill::MAKE`] is the voice's own, whether or not a tasks part is
 //! there: a computer's agent is never handed a skill to make. With
-//! `LAMP_MAKE_SKILL_AGENT=on` (off in the product again since 14 Nov, until
-//! a make with code passes on 9adf) a voice make the lamp's model didn't make goes to
-//! the lamp's own agent when it is Hermes, the one engine with a namespace
-//! runner for a make today
+//! `LAMP_MAKE_SKILL_AGENT=on` (on in the product's lamp-voice) a voice make the
+//! lamp's model didn't make goes to the lamp's own agent when it is
+//! Hermes, the one engine with a namespace runner for a make today
 //! ([`crate::make_skill_agent`]): DeepSeek
 //! then gets one try and no repairs, and the agent gets them.
 use crate::made_skill::{self, Keeping, Made, Refused};
@@ -233,6 +232,23 @@ fn system_for(reads: bool, agent: bool) -> String {
     } else {
         ("the two fenced blocks", String::new())
     };
+    // A start said to the lamp (#6526), told only with its switch: off, the
+    // model still hears that a skill can't hear what is said, and the
+    // prompt is as before.
+    let (hear, said) = if made_skill::said_on() {
+        (
+            "hear what is said in the room (a request told to the lamp is a [said] start, \
+             below)",
+            format!("\n{}", made_skill::SAID_RULES),
+        )
+    } else {
+        ("hear what is said", String::new())
+    };
+    // Its can't-yet example, with writes on, is then the room's talk alone.
+    let cant_example = match cant_example {
+        "hearing what is said" if made_skill::said_on() => "hearing what is said in the room",
+        other => other,
+    };
     format!(
         "You write skills for a lamp. Answer exactly as the request says, with {blocks} \
          and nothing else. Use only the keys and values the request names, written as \
@@ -250,7 +266,7 @@ fn system_for(reads: bool, agent: bool) -> String {
          [trigger] table (never [[trigger]]; coming to the desk is room/presence, never the \
          faces): {triggers} A body step is one gesture, one of: {gestures}. Set none of \
          most_a_day, [quiet], [budget] or [rest] unless the request asks {limits} A skill can't yet \
-         hear what is said, know who someone is, {cant_send}: a \
+         {hear}, know who someone is, {cant_send}: a \
          request that needs one, or anything else no step or trigger here or below does, is \
          answered with one line and no blocks: {cannot} then one short sentence said to the \
          person, beginning \"{cant_yet}\" and naming what in plain words (\"{cant_yet} \
@@ -267,7 +283,7 @@ fn system_for(reads: bool, agent: bool) -> String {
          else in for it, and add no time of day the request didn't name. When a part of the \
          request can't be done with these (dimming slowly, over a minute), make the rest and \
          add one line after the blocks: {left_out} what was left out, in a few words.\n\n\
-         {services}{code}"
+         {services}{code}{said}"
     )
 }
 
@@ -590,8 +606,8 @@ pub fn tool() -> lamp_gemini::Tool {
     let writes = made_skill::writes_on();
     let mut description = "Make a new skill for the lamp: something the lamp then does by itself, \
              whatever the lamp can do (its light, its head, a few exact words it says, its hum, a read of a linked service), at a time each day, when someone comes or goes, a face comes \
-             into view, someone gets up, pats its head, the air gets stuffy, or when it is resting (\"make me a skill that dims the light at 10 pm\"). Call it only when the \
-             person asks for a skill to be made. In the same breath, before you call it, say in a \
+             into view, someone gets up, pats its head, the air gets stuffy, or when it is resting (\"make me a skill that dims the light at 10 pm\"). Make one only when the \
+             person asks for it. In the same breath, before you call it, say in a \
              few words that you'll make it now. The skill is made, checked, kept and put on the \
              lamp at once: then say exactly the line you are told, nothing more."
         .to_owned();
@@ -613,8 +629,10 @@ pub fn tool() -> lamp_gemini::Tool {
     if code {
         description.push_str(CODE_TOLD);
     }
-    // A made skill removed by voice (#6960): the same function, its
-    // `remove` alone; whether a line asks it is the model's judgment.
+    // A made skill removed by voice (#6960), run now (lamp-9adf, 15 Nov),
+    // and those made listed: the same function, its `remove`, `run` or
+    // `made` alone; whether a line asks any, or a read-back, is the
+    // model's judgment.
     description.push_str(REMOVE_TOLD);
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
@@ -643,8 +661,14 @@ const CODE_REQUEST_TOLD: &str = " A made skill's own script may check what the l
 /// What [`tool`]'s description adds for a remove (#6960): on lamp-c0a4
 /// "delete the skill called moon fact" went to `lamp_help` and "remove the
 /// moon fact skill" to a read-back, since nothing here named a remove.
-pub const REMOVE_TOLD: &str = " When asked to delete or remove a skill, call it with remove \
-     alone, saying nothing first.";
+/// And for a run now (lamp-9adf, 15 Nov at 15:49 and 15:52: "Run my
+/// unread mail skill now, please." went to a read-back, since nothing here
+/// named a run, and nothing ran), and for the skills made, listed
+/// (`crate::made_list`: "which skills have you made for me?" was answered
+/// from the thread with no call), in the same sentence, so every switch on
+/// still fits the link's 1,024 bytes.
+pub const REMOVE_TOLD: &str = " To delete or remove a skill, call it with remove alone; to run \
+     one they made now, run alone; to list those they made, made alone; say nothing first.";
 
 /// What [`tool`]'s description adds with a made skill's writes on.
 pub const READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
@@ -657,9 +681,8 @@ pub const TASKS_READ_BACK_TOLD: &str = " Call it with read_back alone too when t
 /// What [`tool`]'s description adds with a made skill's writes and a
 /// skill's tasks both on: [`READ_BACK_TOLD`] and [`TASKS_READ_BACK_TOLD`]
 /// in one sentence.
-pub const BOTH_READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
-     what a skill they made sends or what a skill on the lamp uses, or to hear one read back, \
-     saying nothing first.";
+pub const BOTH_READ_BACK_TOLD: &str = " Call it with read_back alone to hear what a skill they \
+     made sends or what a skill on the lamp uses, saying nothing first.";
 
 /// The function's parameters: the request, and with a made skill's writes
 /// (#6066) or code (#6307) on, the yes to one that waits for it,
@@ -686,7 +709,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     // lamp (#6593, [`crate::made_clash`]): its id and the choice, alone.
     parameters["properties"][crate::made_clash::CLASH_ID] = json!({
         "type": "string",
-        "description": "Only when a skill you just made clashes with one on the lamp and the person then chooses: its clash_id, given with choice alone, with no request."
+        "description": "Only when a skill you just made clashes with one or more on the lamp and the person then chooses: its clash_id, given with choice alone, with no request."
     });
     // A made skill removed by voice (#6960, [`crate::made_remove`]): the
     // name as heard, matched in code to the person's own made skills.
@@ -694,10 +717,22 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         "type": "string",
         "description": "Only when the person asks to delete or remove a skill: its name as they said it, given alone with no request."
     });
+    // The skills the person made, listed by voice ([`crate::made_list`]):
+    // how many, and the newest by name to the owner.
+    parameters["properties"][crate::made_list::LIST] = json!({
+        "type": "boolean",
+        "description": "Only when the person asks which skills they made, or you made for them, or how many: true, given alone with no request. Never answer that from the conversation."
+    });
+    // A made skill run now by voice ([`crate::made_run`]): the name as
+    // heard, matched in code to the person's own made skills, as a remove's.
+    parameters["properties"][crate::made_run::RUN] = json!({
+        "type": "string",
+        "description": "Only when the person asks to run, start or do a skill they made, now: its name as they said it, given alone with no request. Never to hear what it sends or uses."
+    });
     parameters["properties"][crate::made_clash::CHOICE] = json!({
         "type": "string",
         "enum": crate::made_clash::CHOICES,
-        "description": "With clash_id only: replace the other skill, keep both (they may take turns), or cancel, as the person chose in any words."
+        "description": "With clash_id only: replace the other skill or skills, keep them all (they may take turns), or cancel, as the person chose in any words."
     });
     if code {
         let request = format!(
@@ -987,17 +1022,18 @@ fn make_with_by(
         .and_then(|made| made_skill::needs_link(&made.uses, linked));
     // A skill made by voice that clashes with one on the lamp (#6593: the
     // same trigger, both using the light or both moving the head) is not
-    // put on: the person is asked to replace the other, keep both or
-    // cancel ([`crate::made_clash`]). One with code of its own waits for
-    // its yes as it did.
+    // put on: the person is asked, of every skill it clashes with, to
+    // replace them, keep them or cancel ([`crate::made_clash`]). One with
+    // code of its own waits for its yes as it did.
     if made_in != 0
         && let Ok(made) = &made
         && !made.uses.code
-        && let Some(clash) = crate::made_clash::found(keeping, made)
+        && let clashes = crate::made_clash::found(keeping, made)
+        && !clashes.is_empty()
     {
-        MADE_LINE.with(|kept| kept.replace(Some(crate::made_clash::cut_line(made, &clash))));
+        MADE_LINE.with(|kept| kept.replace(Some(crate::made_clash::cut_line(made, &clashes))));
         let told =
-            crate::made_clash::asked(keeping, made, &clash, made_in, std::time::Instant::now());
+            crate::made_clash::asked(keeping, made, &clashes, made_in, std::time::Instant::now());
         if let Some(asked) = asked {
             asked.made(&made.name, &told, now_unix_ms);
         }
@@ -1239,7 +1275,10 @@ fn already_made(name: &str, told: &Value) -> Value {
 /// package, and what must be heard whole before the yes, each write's
 /// plain words as the say-back has them. None for a skill that writes
 /// nothing.
-fn asks_of(directory: &std::path::Path, made: &Made) -> Option<crate::skill_write_yes::Asks> {
+pub(crate) fn asks_of(
+    directory: &std::path::Path,
+    made: &Made,
+) -> Option<crate::skill_write_yes::Asks> {
     let writes = made_skill::writes_of(directory, &made.sha256);
     if writes.is_empty() {
         return None;
@@ -1975,11 +2014,19 @@ pub fn read_back_heard(heard: &str) -> Option<String> {
         return None;
     }
     let keeping = Keeping::when(true)?;
+    read_back_asked(heard, &read_back_names(&keeping))
+}
+
+/// The skills [`read_back_heard`] reads back, from `keeping`: the made
+/// skills kept on the lamp, those no longer on it dropped first
+/// ([`made_skill::drop_gone`], #7100), and the pushed ones.
+pub(crate) fn read_back_names(keeping: &Keeping) -> Vec<String> {
+    made_skill::drop_gone(keeping);
     let mut names = made_skill::kept_on_names(&keeping.directory);
     names.extend(crate::skill_task_yes::pushed_names(&made_skill::pushed(
         &keeping.installed,
     )));
-    read_back_asked(heard, &names)
+    names
 }
 
 /// Whether a model's call `name` with `args` is the skill `asked` run or
@@ -2654,6 +2701,7 @@ pub fn answer(
     request: u64,
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
+    skills: Option<&std::path::Path>,
 ) -> Value {
     // The person's choice on a made skill that clashes with one on the
     // lamp (#6593): only the owner's own later line, as for a yes.
@@ -2726,6 +2774,17 @@ pub fn answer(
     if let Some(name) = call.args[crate::made_remove::REMOVE].as_str() {
         return crate::made_remove::asked_here(name, request, heard, lease);
     }
+    // The skills the person made, listed by voice: how many, and the
+    // newest by name to the owner alone.
+    if call.args[crate::made_list::LIST] == true {
+        return crate::made_list::listed_here(request, heard, lease);
+    }
+    // A skill the person made, run once now by voice (lamp-9adf, 15 Nov:
+    // "Run my unread mail skill now" was read back, and nothing ran): the
+    // owner's alone, held to its trigger's bounds ([`crate::made_run`]).
+    if let Some(name) = call.args[crate::made_run::RUN].as_str() {
+        return crate::made_run::asked_here(name, request, heard, lease, skills);
+    }
     // A made skill read back by voice (`LAMP_SKILL_WRITES`): what it
     // sends, and its yes awaited again when it waits for one. Or a skill on
     // the lamp with a task (`LAMP_SKILL_TASKS`, #6305): what its script
@@ -2738,6 +2797,7 @@ pub fn answer(
         let Some(keeping) = Keeping::when(true) else {
             return crate::tools::unavailable();
         };
+        made_skill::drop_gone(&keeping);
         let asking = Asking {
             request,
             heard,
@@ -2992,7 +3052,7 @@ pub(crate) mod tests {
             args: serde_json::json!({"request": "Glow green when I come back to my desk."}),
         };
         assert_eq!(
-            answer(&call, 1, false, None),
+            answer(&call, 1, false, None, None),
             serde_json::json!({"error": NOT_ASKED_ALOUD})
         );
     }
@@ -3012,7 +3072,7 @@ pub(crate) mod tests {
                 name: crate::made_skill::MAKE.to_owned(),
                 args,
             };
-            let told = answer(&call, 2, true, None);
+            let told = answer(&call, 2, true, None, None);
             assert_eq!(told["error"], NO_REQUEST, "{told}");
             assert!(told["next"].is_string(), "{told}");
         }
@@ -3685,7 +3745,16 @@ light = { dim = 1 }
         );
         assert_eq!(first["made"], "green-on-return", "{first}");
         let _ = take_said_line();
-        helper.join().unwrap();
+        let asked = helper.join().unwrap();
+        // Installed as the helper installs it (#7100: one whose folder is
+        // gone is no longer on).
+        let folder = keeping.installed.join("green-on-return");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join(".package.json"),
+            json!({"sha256": asked["install_made"]}).to_string(),
+        )
+        .unwrap();
         std::fs::remove_file(&keeping.manage).unwrap();
         let helper = manage_helper(&keeping.manage);
         let second = make_with(
@@ -4834,7 +4903,7 @@ light = { dim = 1 }
             ..Settings::default()
         };
         assert!(settings.tasks.is_none());
-        assert_eq!(route(&settings, made_skill::MAKE), Route::MakeLocal);
+        assert_eq!(route(&settings, made_skill::MAKE), Route::MakeLocal(None));
         assert_eq!(route(&settings, "put_on_made_skill"), Route::Nobody);
         let (root, keeping) = keeping("no-tasks");
         let (url, served) = service(vec![(200, good())]);
@@ -6019,7 +6088,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 tasks,
                 ..Settings::default()
             };
-            assert_eq!(route(&on, made_skill::MAKE), Route::MakeLocal);
+            assert_eq!(route(&on, made_skill::MAKE), Route::MakeLocal(None));
             assert_eq!(
                 declared(&on)
                     .iter()
@@ -6118,6 +6187,29 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         "---\nname: photo-booth\ndescription: Takes a photo.\n---\n\n# Photo booth\n";
     const CODE_REQUEST: &str = "make me a photo booth that takes a photo when I sit down";
 
+    /// #6526, with `LAMP_MADE_SKILL_SAID` off: the making model is told a
+    /// skill can't hear what is said, as before, and never of a said start;
+    /// on, it is told the form ([`made_skill::SAID_RULES`]) and that only
+    /// the room's talk is out of reach.
+    #[test]
+    fn a_said_start_is_told_to_the_maker_only_with_its_switch() {
+        made_skill::set_said_here(Some(false));
+        let off = system_with(false);
+        assert!(
+            off.contains("A skill can't yet hear what is said, know who"),
+            "{off}"
+        );
+        assert!(!off.contains("[said]"), "{off}");
+        made_skill::set_said_here(Some(true));
+        let on = system_with(false);
+        assert!(on.ends_with(made_skill::SAID_RULES), "{on}");
+        assert!(
+            on.contains("A skill can't yet hear what is said in the room (a request told"),
+            "{on}"
+        );
+        made_skill::set_said_here(None);
+    }
+
     /// #6307, with `LAMP_MADE_SCRIPTS` off: the making model is never told
     /// a skill may carry code, nor the function that a yes may put one on;
     /// on, it is told the form, its bounds and its grants.
@@ -6195,7 +6287,20 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let all = tool();
         assert!(all.description.len() <= 1_024, "{}", all.description.len());
         assert!(!all.description.contains("yes"), "{}", all.description);
-        assert!(all.parameters.unwrap().to_string().len() <= 4_096);
+        // The skills made, listed (lamp-9adf, 15 Nov): named with every
+        // switch on, its parameter beside remove.
+        assert!(
+            all.description
+                .contains("to list those they made, made alone"),
+            "{}",
+            all.description
+        );
+        let parameters = all.parameters.unwrap();
+        assert_eq!(
+            parameters["properties"][crate::made_list::LIST]["type"],
+            "boolean"
+        );
+        assert!(parameters.to_string().len() <= 4_096);
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_writes_here(None);
         made_skill::set_scripts_here(None);

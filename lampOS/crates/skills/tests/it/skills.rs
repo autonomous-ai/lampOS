@@ -549,11 +549,12 @@ fn every_skill_folder_says_its_kind_and_version() {
             "who-was-here"
         ]
     );
-    // Meal check is 1.0.1 for its `[present.budget]` (#5207), so the Store's
-    // package reaches a lamp that has 1.0.0.
+    // Meal check is 1.0.1 for its `[present.budget]` (#5207), and 1.1.0 for
+    // its `[[while]]` on humans/doing (#6543), so the Store's package reaches
+    // a lamp that has the one before.
     for skill in &skills {
         let version = if skill.name == "meal-check" {
-            "1.0.1"
+            "1.1.0"
         } else {
             "1.0.0"
         };
@@ -2640,6 +2641,62 @@ fn a_yawn_in_the_sitting_brings_the_stretch_forward_once() {
     assert!(error.contains("give the trigger a for"), "{error}");
 }
 
+/// #6543: Stretch break's `[[while]]` on `humans/doing` waits for 30
+/// minutes of no stretch seen, its yawn sooner's, not its own 50: with
+/// lamp-seen saying nothing seen, a yawn still brings the stretch to 30
+/// minutes; a stretch seen at 25 minutes holds it, and the wait lets it go.
+#[test]
+fn a_yawn_still_brings_the_stretch_forward_with_lamp_seen_saying_no_stretch() {
+    let skill = load(&skills_root().join("stretch-break")).unwrap();
+    let yawned = r#"{"state":"at_desk","for_s":60,"sitting_s":600,"baseline":true,"yawns":1}"#;
+    let runs = |stretched_at: Option<u64>| {
+        let mut messages: Vec<(u64, &str, String)> =
+            vec![(0, "voice/state", r#"{"state":"resting"}"#.into())];
+        // lamp-seen's word first at each 30 s, before the faces of that second.
+        for at in (0..=3300).step_by(30) {
+            let stretch = stretched_at.filter(|seen| at >= *seen);
+            let break_s = stretch.map_or(at, |seen| at - seen);
+            messages.push((
+                at,
+                "humans/doing",
+                format!(
+                    r#"{{"drank_s_ago":{at},"ate_s_ago":{at},"break_s_ago":{break_s},"last":"{}","confidence":0.9}}"#,
+                    if stretch.is_some() { "break" } else { "none" }
+                ),
+            ));
+        }
+        messages.extend(
+            sitting(0, 3300, &[])
+                .into_iter()
+                .map(|(at, topic, payload)| (at, topic, payload.to_string())),
+        );
+        messages.push((600, "room/activity", yawned.into()));
+        messages.sort_by_key(|message| message.0);
+        let mut engine = Engine::new(vec![skill.clone()], true).sooner();
+        let mut at = Vec::new();
+        for (when, topic, payload) in &messages {
+            let lasting = (*topic == "humans/doing").then_some(90_000);
+            // A run that makes its calls, not a chance let go.
+            if engine
+                .observe(topic, when * 1_000_000, payload.as_bytes(), lasting)
+                .iter()
+                .any(|run| !run.calls.is_empty())
+            {
+                at.push(*when);
+            }
+        }
+        at
+    };
+    assert_eq!(
+        runs(None),
+        [1800],
+        "nothing seen: brought forward, as before"
+    );
+    // A stretch seen at 25 minutes holds the yawn's 30 through its 10
+    // minutes' wait, and the chance is let go for this sitting (`rearm`).
+    assert!(runs(Some(1500)).is_empty(), "a stretch seen at 25 minutes");
+}
+
 /// #940 item 3: a light file's pattern is loaded into its call, its kind's
 /// period when it names none and a low of 1; a kind the ring does not play,
 /// a pattern without the light's level, a low at the level or a period out
@@ -3300,10 +3357,17 @@ fn a_meal_check_names_no_food_and_takes_no_picture() {
             );
         }
     }
+    // `humans/doing` (#6543) is lamp-seen's timers, never a picture: a meal
+    // seen only holds the question.
     assert_eq!(
         toml["permissions"]["topics"].as_array().unwrap(),
-        &["humans/faces/tracked", "voice/state", "room/activity"]
-            .map(|topic| toml::Value::String(topic.to_owned()))
+        &[
+            "humans/faces/tracked",
+            "voice/state",
+            "room/activity",
+            "humans/doing"
+        ]
+        .map(|topic| toml::Value::String(topic.to_owned()))
     );
     assert_eq!(skill.kind, SkillKind::Installable);
 }
@@ -3427,10 +3491,17 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
             );
         }
     }
+    // `humans/posture` (#6543) is lamp-seen's share of bad samples, never a
+    // picture or a keypoint: a better trigger, never words of the body.
     assert_eq!(
         toml["permissions"]["topics"].as_array().unwrap(),
-        &["room/activity", "humans/faces/tracked", "voice/state"]
-            .map(|topic| toml::Value::String(topic.to_owned()))
+        &[
+            "room/activity",
+            "humans/faces/tracked",
+            "voice/state",
+            "humans/posture"
+        ]
+        .map(|topic| toml::Value::String(topic.to_owned()))
     );
     // In the wellbeing group's hour, as the other nudges: another wellbeing
     // skill's run holds it back (`a_shared_budget_gives_its_group_its_runs_an_hour_between_them`);
@@ -8188,8 +8259,12 @@ impl ToolProgram {
         let mut heard = self.heard.lock().unwrap();
         heard
             .get_or_insert_with(|| {
+                // Looks for new subscribers at every line: a publisher looks
+                // at most every 200 ms, so words said within that of a
+                // search's or a show's own subscriber would be lost to it.
                 Bus::new(self._dir.path().join("bus"))
                     .unwrap()
+                    .rescan_every(Duration::ZERO)
                     .publisher_declared(
                         lamp_msgs::Speech::TOPICS[0],
                         &lamp_msgs::Speech::declaration(),
@@ -8548,6 +8623,84 @@ body = { mood = "reading", for = "10s", toward = -0.5 }
     assert!(after.iter().all(|pose| pose != turned), "{after:?}");
 }
 
+/// #6834: a customer lamp's body was down (stopped at every start, then
+/// not standing), every gesture was dropped, and the voice still told its
+/// owner it was dancing. A call whose skill would move the body while the
+/// lamp's health says the body is down, or the body says it does not
+/// stand this run, is refused: the model is told it can't move and why,
+/// and no gesture is asked of the body. A body that is up still moves.
+#[test]
+fn a_gesture_is_refused_aloud_while_the_body_is_down() {
+    let jive = r#"
+tool = "jive"
+[permissions]
+body = true
+[[do]]
+body = { gesture = "nod" }
+"#;
+    let program = ToolProgram::with("jive", jive, &[]);
+    let bus = Bus::new(program._dir.path().join("bus")).unwrap();
+    let mut health = bus
+        .publisher_declared(
+            lamp_msgs::Health::TOPIC,
+            &lamp_msgs::Health::declaration(),
+            "health",
+        )
+        .unwrap();
+    let mut limits = bus
+        .publisher_declared(
+            lamp_msgs::BodyLimits::TOPIC,
+            &lamp_msgs::BodyLimits::declaration(),
+            "body",
+        )
+        .unwrap();
+    let body = |level, message: &str| lamp_msgs::Health {
+        level,
+        message: format!("body: {message}"),
+        items: vec![lamp_msgs::HealthItem {
+            name: "body".into(),
+            level,
+            message: message.into(),
+            age_ms: 0,
+        }],
+        missing: Vec::new(),
+        quiet_ms: 0,
+    };
+    let stands = |stands| lamp_msgs::BodyLimits {
+        joints: Vec::new(),
+        speed: 50.0,
+        acceleration: 400.0,
+        force: None,
+        heat_stop: 62,
+        stands,
+    };
+    let ask = "My arm is not folded all the way down. Please fold it gently down, and I will start by myself.";
+    let refused = |program: &ToolProgram| {
+        let answer = program.call("jive", "{}");
+        assert_eq!(answer["ok"], false, "{answer}");
+        let error = answer["error"].as_str().unwrap_or_default().to_owned();
+        assert!(error.starts_with(lamp_skills::CANNOT_MOVE), "{answer}");
+        assert!(program.said().iter().all(|said| !said.contains("nod")));
+        error
+    };
+    // Let go and asking for a hand: refused, with what it asks.
+    health
+        .publish_json(1, &body(lamp_msgs::Level::Error, ask))
+        .unwrap();
+    limits.publish_json(1, &stands(true)).unwrap();
+    assert!(refused(&program).contains(ask));
+    // Up, but not standing this run: refused.
+    health
+        .publish_json(2, &body(lamp_msgs::Level::Ok, ""))
+        .unwrap();
+    limits.publish_json(2, &stands(false)).unwrap();
+    refused(&program);
+    // Up and standing: it moves.
+    limits.publish_json(3, &stands(true)).unwrap();
+    assert_eq!(program.call("jive", "{}")["ok"], true);
+    assert!(program.said().iter().any(|said| said.contains("nod")));
+}
+
 /// #4135: a `stand` step is a percent of the lamp's own stand, 1 to 100,
 /// in a skill its tool alone starts, and needs `body`. Out of range or
 /// without the grant, the skill is refused as it loads.
@@ -8704,7 +8857,7 @@ for = "2s"
 "#;
 
 /// #1679: a light show plays its frames in turn, each its while, and gives
-/// the light back after; someone speaking (the voice listening) stops it
+/// the light back after; someone speaking (words heard, #5744) stops it
 /// within a fifth of a second, and the light is given back then.
 #[test]
 fn a_light_show_plays_its_frames_in_turn_and_stops_when_someone_speaks() {
@@ -8740,6 +8893,7 @@ show = "short"
             },
         )
         .unwrap();
+    program.heard("wait");
     program.clock.skip(Duration::from_millis(400));
     // Within a fifth of a second of the program's clock, well before the
     // frame's two seconds end: a look at the frame's end alone is too late.
@@ -8749,6 +8903,94 @@ show = "short"
     );
     program.clock.skip(Duration::from_secs(5));
     assert_eq!(program.colours(0), Vec::<String>::new());
+}
+
+/// A light show asked in turn 23, with the voice listening to a line of
+/// turn `turn` during its first frame, `words` heard in it: the run's done
+/// event, and the colours asked for in the 600 ms after the line.
+fn show_over_a_line(words: &str, turn: u64) -> (Vec<String>, SkillEvent) {
+    let show = r#"
+tool = "light_show"
+[[do]]
+show = "short"
+"#;
+    let mut program = ToolProgram::with("show", show, &[("short", SHORT_SHOW)]);
+    let bus = Bus::new(program._dir.path().join("bus")).unwrap();
+    let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+    // Read by the program's loop before the call: no wait is needed.
+    program.heard_in("lamp, a party light show", Some(23));
+    assert_eq!(program.call("light_show", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["purple"]);
+    program
+        .voice
+        .publish_json(
+            1,
+            &VoiceState {
+                state: lamp_msgs::Voice::Listening,
+            },
+        )
+        .unwrap();
+    program.heard_in(words, Some(turn));
+    program.clock.skip(Duration::from_millis(400));
+    let after = program.colours_within(1, Duration::from_millis(600));
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let done = loop {
+        assert!(Instant::now() < deadline, "the run never ended");
+        program.clock.skip(Duration::from_millis(500));
+        if let Some(message) = events.recv(Duration::from_millis(100)).unwrap() {
+            let event: SkillEvent = message.parse().unwrap();
+            if event.stage == SkillStage::Done {
+                break event;
+            }
+        }
+    };
+    (after, done)
+}
+
+/// #5744, Fifth's row-5744e S2 on lamp-52e6: request 24, a line of room
+/// sound with 0 words, set the voice listening, and the show stopped in its
+/// third frame. The voice listening alone no longer stops a show: it plays
+/// all its frames and says so.
+#[test]
+fn a_line_with_no_words_does_not_stop_a_light_show() {
+    let (after, done) = show_over_a_line("", 24);
+    // Nothing given back in the frame the line came in.
+    assert_eq!(after, Vec::<String>::new(), "{}", done.why);
+    assert!(
+        done.why.contains("show short: 3 frames shown"),
+        "{}",
+        done.why
+    );
+    assert!(!done.why.contains("stopped"), "{}", done.why);
+}
+
+/// Words of a later turn than the one that asked still stop a show in the
+/// frame they come in, and the light is given back then.
+#[test]
+fn a_later_turns_words_stop_a_light_show() {
+    let (after, done) = show_over_a_line("stop", 24);
+    assert_eq!(after, ["blue"], "{}", done.why);
+    assert!(
+        done.why
+            .contains("show short: stopped in frame 1 of 3, someone spoke to the lamp"),
+        "{}",
+        done.why
+    );
+}
+
+/// Thirteen's HOLD on #7061: on Live the last pieces of the line that
+/// asked for the show can come after the call. Words of the asking turn do
+/// not stop it, as they do not end a search: the program reads what was
+/// heard before a show's call too, so the asking turn is known.
+#[test]
+fn the_asking_turns_late_words_do_not_stop_a_light_show() {
+    let (after, done) = show_over_a_line("light show please", 23);
+    assert_eq!(after, Vec::<String>::new(), "{}", done.why);
+    assert!(
+        done.why.contains("show short: 3 frames shown"),
+        "{}",
+        done.why
+    );
 }
 
 /// A show after the model's line, as light-show has it (#5745).

@@ -30,3 +30,6 @@ wellbeing skills, which a case of one skill cannot show, is
 | `present-every-50-minutes` | `present = true` (`LAMP_NUDGES_PRESENT=on`, #5207): 10:00, four hours without getting up | Pass: At 50, 100, 150 and 200 minutes (no rearm, `cooldown` 50 minutes) |
 | `present-quiet-at-night` | `present = true`: 21:20, 100 minutes | Pass: Nothing: due at 22:10, in its quiet hours |
 | `present-quiet-when-45-minutes` | `present = true`: 10:00, 45 minutes, then away | Pass: Nothing |
+| `a-sip-when-lamp-seen-saw-no-drink` | As `a-sip-after-90-minutes`, with `lamp-seen`'s `humans/doing` every 30 s and no drink seen (#6543) | Pass: At 90 minutes, as there: `drank_s_ago` is the sitting's length |
+| `quiet-after-a-drink-was-seen` | 10:00, 100 minutes, a drink seen at 80 minutes (#6543) | Pass: Nothing: `drank_s_ago` 600 at 90, held through the wait and let go |
+| `a-sip-when-lamp-seen-went-quiet` | 10:00, 100 minutes, a drink seen at 30 minutes, then `lamp-seen` quiet from 40 (#6543) | Pass: At 90 minutes: the last value ran out, so `unknown = "holds_stale"` holds |

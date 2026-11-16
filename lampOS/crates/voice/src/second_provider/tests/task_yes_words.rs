@@ -64,6 +64,12 @@ fn whole() -> String {
 /// `heard` now, with `make_skill` declared and the force on, as the worker
 /// gives it.
 fn forced(heard: &str) -> Option<Value> {
+    wired(heard).get("tool_choice").cloned()
+}
+
+/// The request body the second route's chat sends for `heard` now, as
+/// [`forced`] builds it.
+fn wired(heard: &str) -> Value {
     let declared = vec![crate::make_skill_local::tool()];
     let chat = crate::second_provider::net::Chat::deepseek(
         "deepseek-chat",
@@ -74,7 +80,45 @@ fn forced(heard: &str) -> Option<Value> {
     .unwrap();
     chat.forcing(yes::approve_force());
     let line = [Message::system("You are a lamp."), Message::user(heard)];
-    chat.wire(&line).2.get("tool_choice").cloned()
+    chat.wire(&line).2
+}
+
+/// The `make_skill` parameters the request for `heard` declares.
+fn make_form(heard: &str) -> Value {
+    let body = wired(heard);
+    body["tools"]
+        .as_array()
+        .and_then(|tools| {
+            tools
+                .iter()
+                .find(|tool| tool["function"]["name"] == crate::made_skill::MAKE)
+        })
+        .map(|tool| tool["function"]["parameters"].clone())
+        .unwrap()
+}
+
+/// #6921 P3: the forced approval round is told only `approve_id` and
+/// `answer`, both required, so the forced call carries no make or edit
+/// beside the answer; the answer's choices are kept. Without the force
+/// the form is told whole.
+#[test]
+fn photo2_the_forced_round_is_told_only_the_approval_fields() {
+    said_back_unasked(Some(&whole()));
+    let form = make_form("Yes.");
+    let mut told: Vec<&str> = form["properties"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    told.sort_unstable();
+    assert_eq!(told, [yes::ANSWER, yes::APPROVE_ID]);
+    assert_eq!(form["required"], json!(yes::APPROVE_FIELDS));
+    assert_eq!(form["properties"][yes::ANSWER]["enum"], json!(yes::ANSWERS));
+    yes::clear_for_test();
+    let whole_form = make_form("Yes.");
+    assert!(whole_form["properties"].as_object().unwrap().len() > 2);
+    task_yes::set_on_here(None);
 }
 
 fn make_skill_forced() -> Option<Value> {

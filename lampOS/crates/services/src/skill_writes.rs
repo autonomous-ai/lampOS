@@ -64,7 +64,7 @@ pub const FUNCTION: &str = "skill_write";
 /// A made skill's fixed write run through the lamp's agent (the owner's
 /// ruling, 13 Nov: everything that touches a linked service runs through
 /// it): `on` only, here, in `lamp-skills`, `lamp-tasks` and `lamp-control`,
-/// on in no product unit. On, `lamp-skills` hands the write to `lamp-tasks`
+/// on in the product's four units. On, `lamp-skills` hands the write to `lamp-tasks`
 /// as a skill's run with its one write grant, and the run's `service_write`
 /// is held here to [`Services::skill_write`](crate::serve::Services::skill_write)'s
 /// checks, once a run (`serve::Services::run_tool`).

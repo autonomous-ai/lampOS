@@ -43,7 +43,9 @@ at 14:11 on 3 Nov 2026):
 
 **In the product today, anyone who speaks to the lamp** (`LAMP_PRIVATE_ROOM=on`, the owner's call on 6 Nov). The lamp is a private room between it and its owner, so whoever speaks is the owner, and no ownership check runs: telling who is speaking wasn't reliable enough, and the lamp refused its own owner. A line must still be spoken (`NOT_HEARD`), and a write is still read back, and sent only by the model's call with its `send_id` after a spoken answer (the owner, 10 Nov: the model decides confirm or cancel; the lamp checks only the send_id, a later request, two minutes and an uncut read-back). Writes stay on the second route only.
 
-**The accepted cost (the owner, 6 Nov):** no face is asked for at all, with nobody in view too. So a TV, a video call or a recording that says "read my mail" can get it read aloud in full. The owner chose this over any face-in-view rule, so the lamp doesn't refuse.
+**The accepted cost (the project owner, 6 Nov, 18:08: "no more checking ownership"):** no face is asked for at all, with nobody in view too. So a TV, a video call or a recording that says "read my mail" can get it read aloud in full; a send still needs its read-back and a spoken answer after it. The owner chose this over any face-in-view rule, so the lamp doesn't refuse.
+
+With the switch on, no line is held to a voice: a read is said in full with no voice asked of the second route and no wait for a print (`services::run`), and the second route makes no services prints, so `LAMP_SAME_VOICE_FOR=services` starts no same-voice child there (`checking_the_voice_for`). On the Live route a read is said in full too, so its "never in full" below no longer holds with the switch on; it still never prepares or sends a write (`NO_SEND_HERE`), switch on or off. A made skill's read is in the private room as well: `lamp-skills.service` sets `LAMP_PRIVATE_ROOM=on`, and its gate then asks for no owner's name or known face, while two faces in view still hold it ("A made skill's read", below).
 
 The rules below are what applies with the switch off; they stay in the code for a later feature.
 
@@ -1579,8 +1581,19 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   write waits for its answer: not answered as a call"): on a tester's lamp
   on 13 Nov a line of no words at the second of the lamp's own arrival move
   was answered as the name, and the one "Yes." after it found the mail
-  dropped (#6363). A line with words of its own answered in a held line's
-  place (a real question cut short) still counts as another request (the
+  dropped (#6363). So too a line that is only the lamp's name ("Hey
+  Lamp", told to the model as only the name and answered as a call, with or
+  without `LAMP_SECOND_NAME_CARRIES`), unless said by the name just before:
+  it is answered, and the yes after it still sends. Only the name alone
+  counts: a call with a word past it ("Hey Lamp, no.") or one word asked as
+  the name ("No.") still drops the write, so a stray "Yes." never sends
+  what was just declined. On a tester's lamp on
+  14 Nov "Hey Lamp" between an event's read-back and its "Yes." was
+  answered as a call, and the yes found the event dropped (#6363). Test:
+  `a_name_only_line_between_a_read_back_and_its_yes_keeps_the_write`. A
+  line with words of its own answered in a held line's place (a real
+  question cut short), or begun with the name and answered with no send
+  ("Hey Lamp, what time is it?"), still counts as another request (the
   Reviewer-lead's P3 on #6367).
 - **The lamp's own echo is no line of the person's** (#5846). A line the
   second route holds as the lamp's own words heard back (`own_echo`,
@@ -1878,6 +1891,17 @@ publishes, every 250 ms:
 | That face is the owner's known face | The eyes' known file (fresh within 2 s), its name the owner's, case aside | "not the owner" / "the owner not in view" |
 | No voice heard in the last minute | Each line on `voice/heard`, marked as it comes by a thread of `lamp-skills`' own (the topic is an event: the bus keeps no latest of it, so before this fix the row never held a read back; lamp-9adf, 5 Nov) | "a voice heard" |
 
+In the private room (`LAMP_PRIVATE_ROOM=on`, set in the product's
+`lamp-skills.service` and read as the voice reads it,
+`lamp_voice::person::private_room`, into `Seen::private_room`) no ownership
+check runs: the rows for an owner face enrolled and the owner's known face
+don't apply, so one face alone in view will do, known or not, with no name
+typed at setup. One face at most still holds ("not alone"): counting faces
+is not an ownership check, and a skill reads unasked, so a second person
+in view doesn't hear the owner's mail or calendar. Nobody in view still
+holds it ("the owner not in view"), and the other rows hold as above. The
+cost the owner accepted: one stranger alone in view hears it.
+
 All must hold steadily for 5 s. Until then the run waits, at most 60
 minutes, and then skips the day with nothing said ("skipped: <why>").
 A configured trigger window determines when a read becomes due, not a
@@ -1924,7 +1948,9 @@ counted. A title, sender or subject is cut to 100 characters. The gate is
 judged again before every line. If someone comes (a second face, another
 face, a voice), the lamp stops after the line it is on and says only "I'll
 tell you the rest later."; if the gate closes for another reason (privacy,
-a pause, quiet hours, the owner gone), it stops with nothing said. The
+a pause, quiet hours, the owner gone), it stops with nothing said. In the
+private room a second face that comes and a voice heard stop it the same
+way, with the same line. The
 owner not told, or nobody in view, is looked at again for up to 5 s
 (`BLINK`) with nothing said meanwhile, as the eyes renew the known face's
 mark every 2 s and it is read fresh for 2 s: on lamp-9adf a renewal 2.1 s
@@ -2242,13 +2268,14 @@ whole):
 - A contact named without an address: the lamp keeps no contact book, so
   the making model asks for the address.
 
-### Through the lamp's agent (`LAMP_SKILL_WRITE_AGENT`, off)
+### Through the lamp's agent (`LAMP_SKILL_WRITE_AGENT`, on in the product)
 
 The owner's ruling (13 Nov, here in chat; the first builder's task asked on
 Queue #6809): everything that touches a linked service runs through the
-lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`, on in no
-product unit), and `LAMP_AGENT_SERVICES=on`, a made skill's fixed write is
-sent by a skill's run on the lamp's Hermes, not by `lamp-skills`:
+lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`; on in the
+product's `lamp-skills`, `lamp-tasks`, `lamp-control` and `lamp-services`
+units, each once), and `LAMP_AGENT_SERVICES=on`, a made skill's fixed write
+is sent by a skill's run on the lamp's Hermes, not by `lamp-skills`:
 
 - **lamp-skills** never calls this program for it. It hands the write to
   lamp-tasks on the `do.task` socket as
@@ -2385,7 +2412,24 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   the run, and lamp-control refuses a `send_id` or `said` before it reaches
   here (and so does this program). A run's write while another write waits
   for its yes is refused ("another write waits for the person's yes"),
-  so it never drops the person's own. The write is sent only by the
+  so it never drops the person's own. **A run's write whose read-back
+  can't fit the voice's one note is refused before it is held**
+  (`serve::run_read_back_room`): the room is `serve::RUN_NOTE_ROOM` (591
+  bytes: the note's 1,024, `lamp_gemini::wire::MAX_NOTE_BYTES`, less its
+  fixed words, send id and time left) less twice the skill's name and the
+  service's code, counted as the note writes it, a JSON string's bytes (a
+  line break or a quote mark two, an accented letter two or three;
+  `serve::run_read_back_bytes`). Over it, nothing is held and the run is
+  told the room in characters, the read-back's length and at least how
+  much to shorten it by ("nothing was prepared: the lamp reads a write back
+  to the owner in one go, and this read-back is 600 characters, over the
+  546 it can read out ... Shorten the text by at least 54 characters and
+  call service_write again", `serve::run_too_long`), so the agent shortens
+  it and calls again. Its `service_write` tool says so beforehand, naming
+  448 characters, the room for the longest skill name and service code
+  (`mcp_server::write_short`). Before this (lamp-9adf, build 13135), a
+  mail of 10 unread subjects was held, then only said too long, and the
+  run ended with nothing sent. The write is sent only by the
   existing send, the spoken yes through the voice's gate, and then counts
   against the skills' bounds as a made skill's write does (10 a day a skill,
   30 across every skill, `skill_writes::Ledger`): over them it is "not sent".
@@ -2418,6 +2462,9 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   tells it. A read-back too long for one note
   (1 024 bytes) is never cut: the lamp says only that the skill wanted to
   send something too long to read out, nothing waits, and the hold lapses.
+  This is only the backstop: this program refuses such a write before it
+  is held (above), and the voice's test holds `serve::run_read_back_room`
+  to its note exactly (`lamp_services_room_for_a_read_back_is_one_note_exactly`).
 - **The yes.** The voice's worker reads the note back exactly and keeps the
   write waiting for its send as a write its own model prepared
   (`services::wait_for_run_yes`), the note's request as its read-back's,
@@ -2526,8 +2573,9 @@ never through an open socket.
   owner's plain spoken yes (#6558's wait); only then does this program send
   it, counted in the skills' bounds (3 a day a skill, 10 across them). A
   made skill's fixed write run through the agent (`LAMP_SKILL_WRITE_AGENT`,
-  off) is the one write sent on a run's call, and only as the owner's kept
-  yes has it, once ("A made skill's write", "Through the lamp's agent").
+  on in the product) is the one write sent on a run's call, and only as the
+  owner's kept yes has it, once ("A made skill's write", "Through the
+  lamp's agent").
 - **The journal** gets a refusal's length only from the server; the parts it
   calls journal the service and the `what` or `action`, never the text, an
   address or a subject.
@@ -2991,11 +3039,21 @@ reach. With `LAMP_SERVICES_TOLD=on` (passed to both routes' workers alone), on
 the second route a spoken line admitted as the owner's (`services::owner_of`) is told, beside its words, the services linked now by
 name, each once, and that the lamp uses them itself: "(For you to know, not
 to answer: the lamp's owner linked these services to you in the app's
-Connectors: Notion, Gmail. They are yours to use for the owner: read from
+Linked accounts: Notion, Gmail. They are yours to use for the owner: read from
 one with service_read, and send, post or create with service_write, when
 they ask. Asked about one, use it, or say plainly what you can do with it;
-never say it is the app's job or that you don't know it.)"
-(`services_told::note`). The names are what `lamp-services` last said on
+never say it is the app's job or that you don't know it. A service the
+lamp can link (Gmail, Google Calendar, Google Drive, Figma, GitHub, Linear, Asana, Ahrefs, Facebook Page, Slack, monday.com, HubSpot, Amplitude, Notion) but not in this list isn't linked to this lamp yet. It
+can be linked in the app: open this lamp, then Settings, then Linked
+accounts. Any other service the lamp can't link yet: say so. The services
+it can link are in the app: open this lamp, then Settings, then Linked
+accounts.)" (`services_told::note`). The linkable names are the
+catalogue's (`services_told::linkable`: each service once, by the name a
+person hears), and the two sentences after them are `lamp-services`' own
+`NOT_LINKED` and `CANT_LINK`, so a service of the catalogue missing from
+the list is answered with where to link it (#5867), and one outside it,
+such as Outlook, with "the lamp can't link it yet", never sent to a screen
+that has no Outlook (Thirteen's P2 on #7013). The names are what `lamp-services` last said on
 `services_connected` (its `name`, else its code; an expired link too, since
 a read renews it), asked off the line's path as each line begins
 (`services::Linked`, at most once a second, 500 ms at most) and after each
@@ -3020,8 +3078,9 @@ with `LAMP_PRIVATE_ROOM=on`: its session keeps what it was told, so with
 the private room off a guest later in the session would hear the names
 (#5598), and the Live route is told nothing there. It is told again when a
 link is made or removed, or in a fresh session; when everything it was told
-of is unlinked, it is told once that nothing is linked now
-(`services_told::UNLINKED_NOTE`). Every call from a line not the owner's is
+of is unlinked, it is told once that nothing is linked now, and where the
+services it can link are: open this lamp, then Settings, then Linked
+accounts (`services_told::UNLINKED_NOTE`, in `CANT_LINK`'s words). Every call from a line not the owner's is
 still refused (`OWNER_ONLY`).
 
 ## What is not done yet

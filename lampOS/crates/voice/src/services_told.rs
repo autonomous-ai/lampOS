@@ -41,12 +41,36 @@ pub fn on_from_environment() -> bool {
     on(std::env::var(ENVIRONMENT).ok().as_deref())
 }
 
-/// What the model is told of `names`, the services linked now.
+/// What the model is told of `names`, the services linked now, and where
+/// one not among them is linked: the words `lamp-services` answers a call
+/// to an unlinked service with (`NOT_LINKED`, #6847), for a service of the
+/// lamp's catalogue ([`linkable`]) only; for any other, the lamp can't link
+/// it yet (`CANT_LINK`), as `lamp-services` answers (Thirteen's P2 on
+/// #7013: "How do I link my Outlook?" must not be sent to a screen with no
+/// Outlook). Without them the model, asked of a service missing from the
+/// list, never calls `service_read`, so never hears where to link it
+/// (#5867).
 pub fn note(names: &[String]) -> String {
     format!(
-        "(For you to know, not to answer: the lamp's owner linked these services to you in the app's Connectors: {}. They are yours to use for the owner: read from one with service_read, and send, post or create with service_write, when they ask. Asked about one, use it, or say plainly what you can do with it; never say it is the app's job or that you don't know it.)",
-        names.join(", ")
+        "(For you to know, not to answer: the lamp's owner linked these services to you in the app's Linked accounts: {}. They are yours to use for the owner: read from one with service_read, and send, post or create with service_write, when they ask. Asked about one, use it, or say plainly what you can do with it; never say it is the app's job or that you don't know it. A service the lamp can link ({}) but not in this list {} Any other service the lamp can't link yet: say so. {})",
+        names.join(", "),
+        linkable(),
+        lamp_services::serve::NOT_LINKED,
+        lamp_services::serve::CANT_LINK
     )
+}
+
+/// The services the lamp can link, by the names a person hears, each once,
+/// in the catalogue's order: one service under two links ("Gmail with
+/// Google sign-in", Figma's two codes) is said by its first name.
+pub fn linkable() -> String {
+    let mut said: Vec<&str> = Vec::new();
+    for service in lamp_services::catalog::SERVICES {
+        if !said.iter().any(|name| service.name.starts_with(name)) {
+            said.push(service.name);
+        }
+    }
+    said.join(", ")
 }
 
 /// The note for a line whose owner is `owner` (the owner's memory id when
@@ -58,8 +82,10 @@ pub fn note_for(owner: Option<&str>, names: &[String]) -> Option<String> {
 }
 
 /// What the Live route is told when everything it was told of in this
-/// session has since been unlinked (Jarvis's P3 on #5598).
-pub const UNLINKED_NOTE: &str = "(For you to know, not to answer: nothing is linked to you in the app's Connectors now. The services you were told of earlier in this conversation are no longer linked.)";
+/// session has since been unlinked (Jarvis's P3 on #5598), and where the
+/// ones the lamp can link are, in `CANT_LINK`'s words (#5867), which never
+/// say every service can be linked (Thirteen's P2 on #7013).
+pub const UNLINKED_NOTE: &str = "(For you to know, not to answer: nothing is linked to you in the app's Linked accounts now. The services you were told of earlier in this conversation are no longer linked. The services it can link are in the app: open this lamp, then Settings, then Linked accounts.)";
 
 /// What the Live route told of what is linked: once a session for each
 /// set of names, so a session is told again only when a link is made or
@@ -186,6 +212,65 @@ mod tests {
         live.told(1, Vec::new());
         assert_eq!(live.due(1, Some("owner"), &[], true), None);
         assert_eq!(live.due(2, Some("owner"), &[], true), None);
+    }
+
+    /// #5867: asked of a service not in the list, the model never calls
+    /// `service_read`, so the told note and [`UNLINKED_NOTE`] say where one
+    /// is linked themselves, in the words `lamp-services` uses
+    /// (`NOT_LINKED`), and never the old Connectors section.
+    #[test]
+    fn the_told_notes_say_where_a_service_is_linked() {
+        let not_linked = lamp_services::serve::NOT_LINKED;
+        let (_, path) = not_linked
+            .split_once("in the app: ")
+            .expect("NOT_LINKED says where in the app");
+        assert_eq!(path, "open this lamp, then Settings, then Linked accounts.");
+        let cant_link = lamp_services::serve::CANT_LINK;
+        assert!(
+            cant_link.ends_with(&format!("in the app: {path}")),
+            "{cant_link}"
+        );
+        let told = note(&names(&["Gmail"]));
+        assert!(
+            told.ends_with(&format!(
+                "A service the lamp can link ({}) but not in this list {not_linked} Any other service the lamp can't link yet: say so. {cant_link})",
+                linkable()
+            )),
+            "{told}"
+        );
+        assert!(
+            UNLINKED_NOTE.ends_with(&format!("{cant_link})")),
+            "{UNLINKED_NOTE}"
+        );
+        for told in [told.as_str(), UNLINKED_NOTE] {
+            assert!(told.starts_with("(For you to know, not to answer: "));
+            assert!(!told.contains("Connectors"), "{told}");
+        }
+    }
+
+    /// Thirteen's P2 on #7013: a service outside the lamp's catalogue, such
+    /// as Outlook, is never said to be linkable; each one in it is named
+    /// once, by the name a person hears.
+    #[test]
+    fn only_the_services_the_lamp_can_link_are_said_to_be_linkable() {
+        let said = linkable();
+        // As services.md quotes it.
+        assert_eq!(
+            said,
+            "Gmail, Google Calendar, Google Drive, Figma, GitHub, Linear, Asana, Ahrefs, Facebook Page, Slack, monday.com, HubSpot, Amplitude, Notion"
+        );
+        let listed: Vec<&str> = said.split(", ").collect();
+        assert_eq!(listed.first(), Some(&"Gmail"), "{said}");
+        for name in ["Google Calendar", "Slack", "Notion", "Figma"] {
+            assert_eq!(
+                listed.iter().filter(|one| **one == name).count(),
+                1,
+                "{name}: {said}"
+            );
+        }
+        assert!(!said.contains("Google sign-in"), "{said}");
+        assert!(!said.contains("Outlook"), "{said}");
+        assert!(note(&names(&["Gmail"])).contains("can't link yet"));
     }
 
     #[test]

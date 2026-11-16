@@ -38,6 +38,11 @@ Environment=LAMP_BODY_POSE_ASK=on
 # A made skill reads a linked service to its owner alone (#5288, #5303): a skill's read step, said behind its
 # gate (the owner's face alone, no voice, not private), through lamp-services' tools socket. Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
+# The private room (the owner's call, 6 Nov), as in lamp-voice.service: a made skill's read runs no ownership check,
+# so it needs no owner's name or known face, but still one face alone in view: two faces hold it, a second face
+# mid-read stops it. No voice heard, not private, not paused and not in quiet hours still hold it, and a voice heard
+# mid-read still stops it.
+Environment=LAMP_PRIVATE_ROOM=on
 # A Store or pushed skill's `do.task` (#6305, #6071 PR 2, docs/skills.md "A skill's task"): handed to lamp-tasks
 # only with lamp-control's kept yes to its grants and folder's SHA-256; at most 3 a skill and 10 in all a day.
 Environment=LAMP_SKILL_TASKS=on
@@ -66,6 +71,14 @@ Environment=LAMP_MADE_SCRIPTS=on
 # <code>-read / <code>-write (task::grants_of), said back plainly and kept in the owner's yes. The same line in
 # lamp-tasks, lamp-skills-manage@, lamp-voice and lamp-control. On in the product (owner, 13 Nov).
 Environment=LAMP_AGENT_SERVICES=on
+# A made skill's fixed write through the lamp's agent (#6824, docs/services.md "Through the lamp's agent"): handed
+# to lamp-tasks as a skill's run with its one write grant, sent straight only when the agent couldn't take it.
+# The same line in lamp-tasks, lamp-control and lamp-services. On in the product (owner, 13 Nov).
+Environment=LAMP_SKILL_WRITE_AGENT=on
+# An uploaded SKILL.md run by the lamp's agent (the owner's ruling, 13 Nov; docs/skills.md "Run by the lamp's agent"):
+# the file kept whole and followed by Hermes in a fresh home, its grants read from it and said back. The same line
+# in lamp-cloud, lamp-voice, lamp-skills and lamp-skills-manage@.
+Environment=LAMP_UPLOAD_TO_AGENT=on
 # The owner's typed setup name, for a made skill's read (#5288). A blank fallback when there is none, so the read
 # is skipped ("no owner's face enrolled"), never the unit refused (SetCredential= is LoadCredential='s default,
 # systemd 252). One newline, never empty: an empty SetCredential= in a unit file fails the start at CREDENTIALS

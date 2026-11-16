@@ -16,7 +16,7 @@ most_a_day = 2
 # and a turn and a tilt. It says one short line, worded by the voice (the owner, 25 Oct).
 [permissions]
 speak = true             # one short line, worded by the voice (the owner, 25 Oct: a lamp that talks to you, not only hints)
-topics = ["humans/faces/tracked", "voice/state", "room/activity"]
+topics = ["humans/faces/tracked", "voice/state", "room/activity", "humans/doing"]
 body = true
 
 # Stretch break's sitting (skills/stretch-break/skill.toml), held longer.
@@ -53,6 +53,11 @@ topic = "room/activity"   # begins again when someone else sits down, has lasted
 field = "sitting_s"       # too, not only a face in the chair. Without the eyes' room/activity
 above = 5999           # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
 unknown = "holds"
+[[while]]                 # a stretch not seen in the last 100 minutes (#6543; the PM: what is seen only
+topic = "humans/doing"    # holds the nudge, never a word of its own). lamp-seen counts break_s_ago
+field = "break_s_ago"     # from the desk arrival when it saw nothing, so it holds as the sitting
+above = 5999              # does. Without lamp-seen, or with it gone quiet, the topic is never said
+unknown = "holds_stale"   # or has run out, and it runs as before.
 
 [active]                  # in the day
 from = "08:00"

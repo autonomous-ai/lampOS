@@ -280,6 +280,38 @@ releases.
 The ARM64 workflow runs them; Linux Clippy also checks the standalone tool.
 These tests do not establish a real stable promotion or lamp acceptance.
 
+### The stable build on the CDN
+
+After a promotion, the `mirror-cdn` job (`.github/scripts/lampos-mirror.py`)
+puts the same build on `https://cdn.autonomous.ai/lampos/stable/`. It is off
+until repository variable `LAMPOS_CDN_MIRROR` is exactly `on`, and a failure
+in it never fails the promotion: the GitHub stable feed above stays the one
+lamps read until a lamp is pointed at the CDN one.
+
+The job builds `lamp-update` from its own commit and never runs an updater
+it downloads. It reads the stable envelope, refuses it unless its files
+folder is the build's own release (`lampos-lamp-voice-<sequence>`), and
+verifies its signature with the trusted public key using that locally built
+`lamp-update check` before anything else is fetched. It then downloads every file, unit
+and model the signed manifest names from the build's own releases and checks
+each size and SHA-256. It copies them to `lampos/stable/<sequence>/files/`
+and `lampos/stable/<sequence>/models/<release>/<name>`. A folder of one
+sequence is never overwritten: an object already there with the same bytes is
+left alone, one with other bytes fails the job. It then rewrites `files_url`
+and each model's `url` to those copies, signs the manifest again with the
+same key (same sequence, commit and channel; nothing else changes) and puts it
+at `lampos/stable/lampos-manifest.json` last, with `Cache-Control: no-cache`.
+Before it replaces the head it refuses a later sequence already there. Last,
+every copied object and the head are read back through the CDN and checked,
+and `lamp-update check --channel-url https://cdn.autonomous.ai/lampos/stable/`
+verifies the head the way a lamp would.
+
+Every write is to a path that starts with `lampos/`, checked before it is
+made; any other destination stops the step. The job runs from `lamp-voice`
+only, never for a pull request or a tag. The `lampos-cdn-probe` workflow,
+run by hand on `lamp-voice`, writes one file under `lampos/_probe/`, reads it
+back with `gcloud` and through the CDN, and deletes it.
+
 ### The build and its identity
 
 - The job checks out that run's `github.sha` and downloads
@@ -1006,6 +1038,32 @@ each under the quiet rule. A round
    trace on #3689, 29–30 Oct). Old voice and restarted new servers still
    need compatibility in both directions; restart order does not make the
    round atomic.
+   **lamp-body's one retry (#7067).** A part whose restart systemd refuses
+   puts the build back. lamp-body alone gets one more try first: its start
+   refuses a joint already under load beyond its start limit, and the
+   refused start lets go of the joints. So when lamp-body's restart is
+   refused, the switch says `lamp-body's restart was refused (…); tried once
+   more after 3 s, its let-go`, waits 3 s (`round::BODY_LET_GO`), clears
+   its start count (`systemctl reset-failed lamp-body.service`), and
+   restarts it once more. lamp-body allows 3 starts in 600 s
+   (`StartLimitBurst=3`, `Restart=on-failure` after 15 s): without the
+   reset, the refused start, the retry and a put-back's restart would leave
+   systemd's own restart at `start-limit-hit`, and the old build's body
+   down. With it, the retry spends no more of the count than a refused
+   restart did before. If that stands, the journal says `lamp-body's
+   restart tried once more: it stands` and the switch goes on to the watch.
+   If it is refused again, it says `lamp-body's restart tried once more:
+   refused again (…)` and the build is put back as before. Any other part's
+   refused restart puts the build back at once, with no retry.
+
+   **Why:** on lamp-fc4b (13050, 14 Nov 16:00) the new lamp-body refused its
+   first start because `wrist_pitch` already carried load 208 against its
+   start limit of 170. Its second start, 2 s later, stood, but by then
+   lamp-update had put 13039 back and refused 13050. The same switch to
+   13059 at 16:47, with the wrist not loaded, stood at the first start. A
+   customer lamp resting against something would miss an update the same
+   way.
+
 9. **Watch.** Every second for `--watch-s` (60): each restarted unit must
    not fail, stop, be in `auto-restart`, be started again by systemd
    (`NRestarts`) or change process (`MainPID`). At the end it must be
@@ -1472,6 +1530,10 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `waiting for a quiet moment: …` | once per wait, with why it isn't quiet yet |
 | `switching to build N` | the parts' switch begins |
 | `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
+| `lamp-body's restart was refused (…); tried once more after 3 s, its let-go` | lamp-body's restart in the switch was refused; it is tried once more after 3 s (#7067, "lamp-body's one retry") |
+| `lamp-body's start count is not reset: …` | before its one retry, lamp-body's start count (`systemctl reset-failed`) could not be reset; the retry is still made, and may then meet systemd's start limit (#7067) |
+| `lamp-body's restart tried once more: it stands` | that one retry stood; the switch goes on to the watch |
+| `lamp-body's restart tried once more: refused again (…)` | the retry was refused too; the build is put back |
 | `setup is complete; its phone grace period is not restarted` | a completed setup's unit changed, and isn't restarted |
 | `the first update after setup: setup is done; its phone grace period is not restarted` | the first update after setup, before the walk: setup is done and its new unit still skips once done, so it isn't restarted though its unit differs from this build's (#6284) |
 | `started lamp-setup-recover.service, its switch on` | the switch's watch passed and the build is kept; recovery is enabled and `LAMP_WIFI_RECOVERY` reads `on` (#4863, "A part added over the air") |
@@ -1639,6 +1701,32 @@ build could carry it units or settings.
    checked its signature, and it has read `state.json` under the lock; then
    `self.json` goes. A binary that cannot reach the channel or refuses the
    manifest waits and tries again every 30 s, and doesn't confirm.
+   Phase 1's `exec` replaces only the process whose round moved the link: a
+   `lamp-update once` run by hand beside `serve` (lamp-52e6, 13 Nov, #6898)
+   switched and confirmed while `serve` went on in the old build, whose
+   rounds then saw `update/current` already on the new binary and never
+   switched again, until a restart. So `serve` itself checks, at its start
+   (after the confirmation above) and after each round, that
+   `/proc/self/exe` is `update/current`'s binary (`own::reexec`, both
+   resolved; a binary whose build folder was cleaned away since it started
+   is read as the link's own text, `… (deleted)`, so it is another build's
+   too). Only a build's own binary goes: one run from anywhere but
+   `/opt/lampOS/update/<sha256>/lamp-update`, such as a test binary a
+   drop-in's `ExecStart` names, serves on as it is, saying once `this
+   program (<path>) is no build's under /opt/lampOS/update/: it serves on,
+   not /opt/lampOS/update/current's`. The product unit runs
+   `/opt/lampOS/update/current/lamp-update`, so a lamp always runs a
+   build's. When it is another build's and no `self.json` waits, it
+   `exec`s that binary in its own place, with the same options and
+   `LAMP_UPDATE_REEXECED=<sha256>`, saying `this program is not
+   /opt/lampOS/update/current's build B: it starts that one in its place`.
+   The records' lock is not held there and is close-on-exec, as in phase 1.
+   A binary started so that still is not `update/current`'s never goes
+   again for that build (`… still runs another build than … after starting
+   it in its place: it serves on`). An `exec` that fails is said, and this
+   build serves on. It goes with `--apply off` too: it only follows a link
+   another lamp-update already switched and confirmed, and applies nothing
+   itself.
 3. **Back.** `lamp-update-back` is a copy of the installed build's
    `lamp-update` at `/usr/local/lib/lampos/lamp-update-back`. It is outside
    `lamp-update.service`'s `ReadWritePaths`, so no round writes it itself.
@@ -2432,7 +2520,10 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   home. lamp-update reads each switch at its start
   (`switches::update_switches`): set in its environment, `on` exactly, and
   that always wins; not set there at all, this file, by the models switch
-  file's rule (`LAMP_SKILL_TASKS` from the file only on a product lamp); a
+  file's rule (`LAMP_SKILL_TASKS` and `LAMP_SKILL_DEFAULT_AGENT` from the
+  file only on a product lamp; the product's file doesn't set
+  `LAMP_SKILL_DEFAULT_AGENT`, so it is off there until a lamp's own file or
+  unit drop-in sets it); a
   missing or garbled file is off. A round places it as it does
   `models.env`. After each `serve` round lamp-update reads them again, and
   when they differ from its start's (the round wrote or changed the file,

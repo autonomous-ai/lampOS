@@ -1,0 +1,22 @@
+# As invites-a-stand-after-100-minutes, with lamp-seen's humans/doing every
+# 30 s (#6543) and no stretch seen: break_s_ago is the sitting's length, so
+# the invitation comes at 100 minutes as on the clock alone.
+clock = "10:00"
+
+[[expect]]
+at = "100m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "100m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "100m"
+within = "1m"
+call = "say"
+args = { note = "They have been sitting for a very long time. In one short, friendly line, suggest standing up and moving about for a minute." }

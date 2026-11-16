@@ -1844,26 +1844,289 @@ async fn air_task(bus: lamp_bus::Bus, air: Arc<Mutex<crate::air_told::AirTold>>)
     }
 }
 
-/// `humans/seems` as the eyes say it, read every second while the voice runs
-/// (`LAMP_SECOND_SEEMS=on`): a fresh read (within `HumanSeems::LASTS`)
-/// with the time it was said; a FER+ read in `latest`, while both readers
-/// run, breaks the run of Blendshape V2's (`crate::seems_told`).
-/// Memory's forgets (`memory/forgot`, from the app or by voice) reach the
-/// conversation's thread and running summary
-/// ([`crate::conversation_summary::memory_forgot`]), looked at every half
-/// second, off any turn's path (the reviewer-lead's P2 on #4479). With the
-/// summary off (`summary` false) they still drop a write waiting for its
-/// send (`conversation_summary::memory_forgot_waiting`, #5968).
-async fn forgot_task(mut forgot: crate::bus_out::ForgotIn, summary: bool) {
+/// Drain at most eight validated messages once. Pending writes for the whole
+/// batch retire before any summary or confirmation lock can delay cleanup.
+fn forget_pending(forgot: &mut crate::bus_out::ForgotIn, now_us: u64) -> Vec<Option<String>> {
+    let forgotten = forgot.forgotten(now_us);
+    crate::conversation_summary::memory_forgotten_waiting(&forgotten);
+    forgotten
+}
+
+fn forget_cleanup(
+    forgotten: &[Option<String>],
+    owner: Option<&crate::same_voice::OwnerVoice>,
+    summaries: bool,
+) {
+    if summaries {
+        crate::conversation_summary::memory_forgotten(forgotten);
+    }
+    if let Some(owner) = owner {
+        for person in forgotten {
+            match person.as_deref() {
+                None => owner.forget_all(),
+                Some(person) if lamp_msgs::known::is_person_id(person) => {
+                    owner.forget_person(person)
+                }
+                Some(_) => {}
+            }
+        }
+    }
+}
+
+/// Existing synchronous tests exercise the same drain and cleanup functions.
+#[cfg(test)]
+fn forget_received(
+    forgot: &mut crate::bus_out::ForgotIn,
+    now_us: u64,
+    owner: Option<&crate::same_voice::OwnerVoice>,
+    summaries: bool,
+) {
+    let forgotten = forget_pending(forgot, now_us);
+    forget_cleanup(&forgotten, owner, summaries);
+}
+
+/// With no owner voice (`LAMP_SAME_VOICE_CONFIRMS` off, as in the product)
+/// the forget is lamp-voice's inline one, unchanged: drained and applied on
+/// the reactor, the thread and notes with the summary on, the waiting write
+/// alone with it off (Jarvis's finding on #6397 at `00a3aebe7e`).
+fn forget_inline(forgot: &mut crate::bus_out::ForgotIn, now_us: u64, summary: bool) -> usize {
+    if summary {
+        crate::conversation_summary::memory_forgot(forgot, now_us)
+    } else {
+        crate::conversation_summary::memory_forgot_waiting(forgot, now_us)
+    }
+}
+
+/// Only with the owner voice: keep one subscriber and await at most one
+/// cleanup job. Summary and owner locks stay off the current-thread reactor;
+/// later batches wait for this one.
+async fn forget_batch(
+    mut forgot: crate::bus_out::ForgotIn,
+    now_us: u64,
+    owner: Arc<crate::same_voice::OwnerVoice>,
+    summaries: bool,
+) -> Option<crate::bus_out::ForgotIn> {
+    let forgotten = forget_pending(&mut forgot, now_us);
+    if !forgotten.is_empty() {
+        match tokio::task::spawn_blocking(move || {
+            forget_cleanup(&forgotten, Some(&owner), summaries);
+            forgot
+        })
+        .await
+        {
+            Ok(reader) => Some(reader),
+            Err(_) => {
+                eprintln!(
+                    "lamp-voice second: memory forget cleanup stopped: its blocking worker did not finish"
+                );
+                None
+            }
+        }
+    } else {
+        Some(forgot)
+    }
+}
+
+async fn forgot_task(
+    mut forgot: crate::bus_out::ForgotIn,
+    owner: Option<Arc<crate::same_voice::OwnerVoice>>,
+    summaries: bool,
+) {
     let mut every = tokio::time::interval(Duration::from_millis(500));
     every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let Some(owner) = owner else {
+        loop {
+            every.tick().await;
+            forget_inline(&mut forgot, monotonic_us(), summaries);
+        }
+    };
     loop {
         every.tick().await;
-        if summary {
-            crate::conversation_summary::memory_forgot(&mut forgot, monotonic_us());
-        } else {
-            crate::conversation_summary::memory_forgot_waiting(&mut forgot, monotonic_us());
+        let Some(reader) = forget_batch(forgot, monotonic_us(), owner.clone(), summaries).await
+        else {
+            return;
+        };
+        forgot = reader;
+    }
+}
+
+#[cfg(test)]
+mod forget_fanout_tests {
+    use super::*;
+
+    /// Unloaded host measurement of the actual synchronous boundary: bus drain
+    /// plus pending retirement, including logging. Test pending state uses TLS,
+    /// so this excludes production mutex contention. Publish and fixture setup
+    /// are outside the interval; no polling or storage claim.
+    #[tokio::test(flavor = "current_thread")]
+    async fn measure_forget_pending_host_boundary() {
+        let dir = crate::process::SessionDirectory::create().unwrap();
+        let bus = lamp_bus::Bus::new(&dir.path).unwrap();
+        let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+        let mut memory = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "memory",
+            )
+            .unwrap();
+        let person = lamp_msgs::known::person_id("Synthetic latency owner");
+        let event = lamp_msgs::MemoryForgot {
+            person: Some(person.clone()),
+        };
+        let mut repeated = Vec::with_capacity(200);
+        let mut first_us = 0.0;
+        for sample in 0..=200u64 {
+            crate::services::pending_for_test(Some(crate::services::Pending::new(
+                "synthetic",
+                sample,
+                Instant::now(),
+                "Synthetic draft",
+                &person,
+            )));
+            memory.publish_json(sample + 1, &event).unwrap();
+            // Synthetic monotonic time admits the next drain without sleeping;
+            // this intentionally does not measure the 500 ms production poll.
+            let now_us = 1_000_000 + sample * 500_000;
+            let began = Instant::now();
+            let forgotten = forget_pending(&mut forgot, now_us);
+            let elapsed_us = began.elapsed().as_secs_f64() * 1_000_000.0;
+            assert_eq!(forgotten, [Some(person.clone())]);
+            assert!(!crate::services::pending_for_test_is_some());
+            if sample == 0 {
+                first_us = elapsed_us;
+            } else {
+                repeated.push(elapsed_us);
+            }
         }
+        repeated.sort_by(f64::total_cmp);
+        // Nearest-rank percentiles over the 200 repeated samples, excluding
+        // first use. The 1 ms target is evaluated from evidence, not asserted.
+        eprintln!(
+            "forget_pending host: first_us={first_us:.3} repeated=200 p50_us={:.3} p95_us={:.3} max_us={:.3}",
+            repeated[99], repeated[189], repeated[199],
+        );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn forget_batches_keep_the_eight_message_bound_and_subscriber() {
+        let dir = crate::process::SessionDirectory::create().unwrap();
+        let bus = lamp_bus::Bus::new(&dir.path).unwrap();
+        let forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+        let mut memory = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "memory",
+            )
+            .unwrap();
+        crate::services::pending_for_test(Some(crate::services::Pending::new(
+            "synthetic",
+            1,
+            Instant::now(),
+            "Synthetic draft",
+            "person_test",
+        )));
+        for seq in 1..=8 {
+            memory
+                .publish_json(seq, &serde_json::json!({"person": 42}))
+                .unwrap();
+        }
+        memory
+            .publish_json(9, &serde_json::json!({"person": null}))
+            .unwrap();
+        let mut forgot = forgot;
+        assert_eq!(forget_inline(&mut forgot, 1_000_000, false), 0);
+        assert!(
+            crate::services::pending_for_test_is_some(),
+            "the ninth message belongs to the next batch"
+        );
+        assert_eq!(forget_inline(&mut forgot, 1_500_000, false), 1);
+        assert!(!crate::services::pending_for_test_is_some());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn pending_writes_retire_with_all_optional_consumers_off() {
+        let person = lamp_msgs::known::person_id("Synthetic pending owner");
+        for (payload, retires) in [
+            (serde_json::json!({"person": person}), true),
+            (serde_json::json!({"person": "everyone"}), true),
+            (serde_json::json!({"person": null}), true),
+            (serde_json::json!({"person": "r-example"}), false),
+            (serde_json::json!({"person": 42}), false),
+        ] {
+            let dir = crate::process::SessionDirectory::create().unwrap();
+            let bus = lamp_bus::Bus::new(&dir.path).unwrap();
+            let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+            let mut memory = bus
+                .publisher_declared(
+                    lamp_msgs::MemoryForgot::TOPIC,
+                    &lamp_msgs::MemoryForgot::declaration(),
+                    "memory",
+                )
+                .unwrap();
+            crate::services::pending_for_test(Some(crate::services::Pending::new(
+                "synthetic",
+                1,
+                Instant::now(),
+                "Synthetic draft",
+                &person,
+            )));
+            memory.publish_json(1, &payload).unwrap();
+            forget_inline(&mut forgot, 1_000_000, false);
+            assert_eq!(
+                !crate::services::pending_for_test_is_some(),
+                retires,
+                "{payload}"
+            );
+            crate::services::pending_for_test(None);
+        }
+    }
+
+    /// The product's off path (no owner voice, the summary on): the task
+    /// clears the thread inline on the reactor, as lamp-voice does, and keeps
+    /// reading. The waiting write is this thread's own (TLS), so it retires
+    /// only if the forget ran here and not on a blocking worker.
+    #[tokio::test(flavor = "current_thread")]
+    async fn no_owner_forgets_inline_on_the_reactor_and_keeps_reading() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let dir = crate::process::SessionDirectory::create().unwrap();
+        let bus = lamp_bus::Bus::new(&dir.path).unwrap();
+        let forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+        let mut memory = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "memory",
+            )
+            .unwrap();
+        let person = lamp_msgs::known::person_id("Synthetic inline owner");
+        crate::remember::role::hold(&person, Some("Synthetic role".into()));
+        crate::services::pending_for_test(Some(crate::services::Pending::new(
+            "synthetic",
+            1,
+            Instant::now(),
+            "Synthetic draft",
+            &person,
+        )));
+        memory
+            .publish_json(
+                1,
+                &lamp_msgs::MemoryForgot {
+                    person: Some(person.clone()),
+                },
+            )
+            .unwrap();
+        let task = tokio::spawn(forgot_task(forgot, None, true));
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(
+            !crate::services::pending_for_test_is_some(),
+            "the thread's forget ran inline on this thread"
+        );
+        assert_eq!(crate::remember::role::cached(&person), None);
+        assert!(!task.is_finished(), "no cleanup stop on the off path");
+        task.abort();
+        crate::services::pending_for_test(None);
     }
 }
 
@@ -1890,6 +2153,49 @@ async fn seems_task(bus: lamp_bus::Bus, seems: Arc<Mutex<crate::seems_told::Seem
             seems.seen_in_view(read, faces, monotonic_us());
         }
     }
+}
+
+/// `humans/doing` as lamp-seen says it, read every two seconds while the
+/// voice runs (`LAMP_SECOND_DOING=on`, #6543): a fresh value (within
+/// `HumanDoing::LASTS`) with the time it was said, kept only with exactly
+/// one face in view (`crate::doing_told`).
+async fn doing_task(bus: lamp_bus::Bus, doing: Arc<Mutex<crate::doing_told::DoingTold>>) {
+    let mut every = tokio::time::interval(crate::doing_told::POLL);
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        every.tick().await;
+        let now_ms = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_millis() as u64);
+        let read = doing_read(
+            bus.latest(lamp_msgs::HumanDoing::TOPIC).ok().flatten(),
+            now_ms,
+        );
+        let faces = crate::known_faces::faces_in_view(&bus);
+        if let Ok(mut doing) = doing.lock() {
+            doing.seen_in_view(read, faces, now_ms, monotonic_us());
+        }
+    }
+}
+
+/// The newest `humans/doing` message as [`doing_task`] keeps it, with the
+/// time it was said, at `now_ms` on the wall clock: none when it is older
+/// than `HumanDoing::LASTS` by its wall stamp, or expired as the bus has it
+/// (`message.expired`, as `faces_in_view` reads it): a stamp from another
+/// boot or ahead of now is never fresh, even with the wall clock stepped
+/// back (Heron's P3 on #6661).
+fn doing_read(
+    message: Option<lamp_bus::Message>,
+    now_ms: u64,
+) -> Option<(lamp_msgs::HumanDoing, u64)> {
+    let fresh_ms = lamp_msgs::HumanDoing::LASTS.as_millis() as u64;
+    message
+        .filter(|message| !message.expired)
+        .filter(|message| now_ms.saturating_sub(message.header.at_unix_ms) < fresh_ms)
+        .and_then(|message| {
+            let said_ms = message.header.at_unix_ms;
+            Some((message.parse::<lamp_msgs::HumanDoing>().ok()?, said_ms))
+        })
 }
 
 /// The most requests remembered as given the air's note and not yet heard.
@@ -1949,6 +2255,41 @@ fn seems_noting(
         busy,
         clock,
     )
+}
+
+/// What a known person was last seen doing, as context only
+/// (`LAMP_SECOND_DOING=on`, `crate::doing_told`, #6543): given as the air's
+/// note is ([`air_noting`]), not in a busy room, and spent once an answer
+/// it was given begins to be heard. Unlike the air's, each request keeps
+/// the sighting it was given, so an answer heard spends only that one and
+/// never a newer one given to a request still in flight (Heron's P3 on
+/// #6661). Which requests may be given it (a known person in view, spoken)
+/// is the engine's to say.
+fn doing_noting(
+    doing: Arc<Mutex<crate::doing_told::DoingTold>>,
+    busy: impl Fn(u64) -> bool + Send + Sync + 'static,
+    clock: fn() -> u64,
+) -> (
+    crate::second_provider::TaskNote,
+    crate::second_provider::AirHeard,
+) {
+    let spent = doing.clone();
+    let note: crate::second_provider::TaskNote = Arc::new(move |request| {
+        let now = clock();
+        if busy(now) {
+            return None;
+        }
+        doing.lock().ok()?.due(request, now)
+    });
+    let heard: crate::second_provider::AirHeard = Arc::new(move |request| {
+        let Ok(mut doing) = spent.lock() else { return };
+        if doing.told(request, clock()) {
+            eprintln!(
+                "lamp-voice second: request {request} is told what the person was last seen doing"
+            );
+        }
+    });
+    (note, heard)
 }
 
 /// A note `due` says, given to a request unless the room is `busy`, and
@@ -2950,7 +3291,8 @@ pub fn serve(
             crate::services::Linked::new(folder)
         });
     let has_tasks = tools.tasks.is_some();
-    // The tasks part, for a heard plain no to a task read back (#6582).
+    // The tasks part, for a heard plain no to a task read back (#6582), and
+    // a heard plain yes to it (#7027).
     let tasks_declined = tools.tasks.clone();
     // Whom a line's words ask by name, with `LAMP_TASKS_NAMED_ASK=on`: its
     // forced call goes to that one, and the journal says so (#1722).
@@ -3099,6 +3441,32 @@ pub fn serve(
         };
         let (note, heard) = seems_noting(told.clone(), busy, monotonic_us);
         engine = engine.noting_how_they_seem(note, heard);
+    }
+    // What a known person was last seen doing, with `LAMP_SECOND_DOING=on`
+    // and the bus (#6543): context only, never raised by the lamp.
+    let doing = files
+        .second_doing
+        .then(|| {
+            files
+                .bus_root
+                .as_deref()
+                .and_then(|root| lamp_bus::Bus::new(root).ok())
+        })
+        .flatten()
+        .map(|bus| {
+            (
+                bus,
+                Arc::new(Mutex::new(crate::doing_told::DoingTold::default())),
+            )
+        });
+    if let Some((_, told)) = &doing {
+        let busy = |now| {
+            crate::room_told::room()
+                .lock()
+                .is_ok_and(|mut room| room.at(now) == crate::room_told::Room::Busy)
+        };
+        let (note, heard) = doing_noting(told.clone(), busy, monotonic_us);
+        engine = engine.noting_what_they_did(note, heard);
     }
     if let Some(runner) = audio_runner {
         engine = engine.requesting_audio(boots.own, runner);
@@ -3304,6 +3672,16 @@ pub fn serve(
             "lamp-voice second: the exchanges a stored running note holds are told in it alone, not again as history (LAMP_HISTORY_AFTER_NOTE)"
         );
         HISTORY_AFTER_NOTE.store(true, std::sync::atomic::Ordering::Release);
+    }
+    // A recent exchange told as a history message is not told again in the
+    // thread's text (`LAMP_HISTORY_SAID_ONCE=on`, #6218).
+    if std::env::var(crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT)
+        .is_ok_and(|value| value == "on")
+    {
+        eprintln!(
+            "lamp-voice second: each recent exchange is told once, as a history message, and left out of the thread's text (LAMP_HISTORY_SAID_ONCE)"
+        );
+        HISTORY_SAID_ONCE.store(true, std::sync::atomic::Ordering::Release);
     }
     if std::env::var(crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT)
         .is_ok_and(|value| value == "on")
@@ -3720,8 +4098,14 @@ pub fn serve(
     // A heard plain no to a task read back drops it, in the tasks part too
     // (#6582).
     if let Some(place) = tasks_declined {
+        // And a heard whole plain yes to it starts it in code, before the
+        // chat round (#7027).
+        let yes_place = place.clone();
         engine = engine.declining_a_task_waiting(Arc::new(move |request, words: &str| {
             crate::agent_tasks::declined(&place, request, words)
+        }));
+        engine = engine.taking_a_task_yes(Arc::new(move |request, words: &str| {
+            crate::agent_tasks::yes_taken(&yes_place, request, words)
         }));
     }
     if let Some(place) = named_agent {
@@ -4082,14 +4466,19 @@ pub fn serve(
         }
         // The services' prints only while one is linked (the reader's P3
         // on #5293), known from `lamp-services` itself.
+        // With `LAMP_SAME_VOICE_CONFIRMS` too, every line is printed, linked
+        // or not: the confirm reads the same prints (`services_prints_while`).
+        let confirms = confirming_where(printing, files.same_voice_confirms);
         if printing == Printing::ForServices
             && let Some(folder) = services_folder
             && let Ok(mut heeding) = heeding.lock()
         {
-            heeding.printing_only_while_linked(
+            services_prints_while(
+                &mut heeding,
                 linked_told
                     .clone()
                     .unwrap_or_else(|| crate::services::Linked::new(folder)),
+                confirms.is_some(),
             );
         }
         // What is linked, told to the owner's line, asked again as each line
@@ -4104,10 +4493,14 @@ pub fn serve(
         let hears = printing == Printing::ForEverything;
         // One way only (`LAMP_SAME_VOICE_CONFIRMS`, the memory owner's
         // decision of 4 Nov): no rule judges by voice, and the known
-        // person's own voice only confirms their line.
-        if let Some(bar) = files.same_voice_confirms.filter(|_| hears) {
+        // person's own voice only confirms their line, from the prints for
+        // every rule or the services' alone (`confirming_where`).
+        if let Some(bar) = confirms {
             engine = confirming_by_voice(engine, &heeding, bar);
         }
+        // Whether a voice can show another person to the carry's rules:
+        // never while it only confirms (`voice_shows_another`).
+        let shows_another = voice_shows_another(printing, files.same_voice_confirms);
         // The name heard only in the room's sound opens nothing alone
         // (`LAMP_NAME_SECOND_SIGN=on`, the first builder at 21:03 on
         // #1722).
@@ -4818,14 +5211,14 @@ pub fn serve(
             let another = another_voice.clone();
             engine = engine.carrying_past_silent_where_heard(
                 keeps,
-                hears,
+                shows_another,
                 Arc::new(move || another.load(std::sync::atomic::Ordering::Acquire)),
             );
         }
         // A carried line read as its person's only where the same-voice
         // check runs (`LAMP_CONVERSATION_CARRIED_MEMORY`, Jarvis's P2 on
         // #5842): without it no other voice could ever show.
-        engine = engine.reading_carried_where_heard(hears);
+        engine = engine.reading_carried_where_heard(shows_another);
         remarked_by = Some(heeding.clone());
         // A line begun in a computer's turn is a call, as on the Live route.
         let opening = heeding.clone();
@@ -4921,17 +5314,28 @@ pub fn serve(
         );
         runtime.spawn(seems_task(bus, told));
     }
-    // Memory's forgets, with the bus: with the running summary on, a forget
-    // from the app drops the conversation's notes as one by voice does; on
-    // or off, it drops a write waiting for its send (Reviewer-two's HOLD on
-    // #5968 at `8c1cbd4268`).
+    if let Some((bus, told)) = doing {
+        eprintln!(
+            "lamp-voice second: what a known person was last seen doing is told beside what they say, as context only (LAMP_SECOND_DOING)"
+        );
+        runtime.spawn(doing_task(bus, told));
+    }
+    // One bus reader fans out each forget to notes and the exact cache used
+    // by this Engine. Confirmation cleanup does not depend on summaries.
+    let confirmation_owner = engine
+        .shared
+        .voice_confirms
+        .as_ref()
+        .map(|confirms| confirms.owner.clone());
+    let summaries = crate::conversation_summary::on();
+    // #5968: even with both optional consumers off, pending writes must forget.
     if let Some(forgot) = files
         .bus_root
         .as_deref()
         .and_then(|root| lamp_bus::Bus::new(root).ok())
         .and_then(|bus| crate::bus_out::ForgotIn::on(&bus).ok())
     {
-        runtime.spawn(forgot_task(forgot, crate::conversation_summary::on()));
+        runtime.spawn(forgot_task(forgot, confirmation_owner, summaries));
     }
     if let Some((chat, root)) = texts {
         let (character, tools) = texts_from;
@@ -5181,10 +5585,12 @@ pub(crate) fn named_asks(place: crate::agent_tasks::Place) -> crate::second_prov
             [agent] => Some(crate::second_provider::net::Forced {
                 name: crate::agent_tasks::START,
                 only: Some((crate::agent_tasks::WHO, agent)),
+                fields: None,
             }),
             _ => Some(crate::second_provider::net::Forced {
                 name: crate::agent_tasks::START,
                 only: None,
+                fields: None,
             }),
         }
     })
@@ -5216,6 +5622,7 @@ pub(crate) fn remember_asks() -> crate::second_provider::net::Force {
             crate::second_provider::net::Forced {
                 name: crate::known_faces::REMEMBER,
                 only: None,
+                fields: None,
             },
         )
     })
@@ -5244,6 +5651,7 @@ pub(crate) fn rename_asks(
         .then_some(crate::second_provider::net::Forced {
             name: crate::known_faces::REMEMBER,
             only: None,
+            fields: None,
         })
     })
 }
@@ -5449,9 +5857,12 @@ fn made_running(
     let watched = std::sync::Arc::downgrade(&turn);
     tokio::task::spawn_blocking(move || {
         crate::make_skill_local::set_turn(watched);
+        // The agent's waiting line goes to this request's turn (#6749).
+        crate::make_skill_agent::set_made_for(request);
         // Nothing an earlier call left on this thread is taken as this one's.
         let _ = crate::make_skill_local::take_said_line();
         let answer = work();
+        crate::make_skill_agent::set_made_for(0);
         let line = crate::make_skill_local::take_said_line();
         if given.send(answer).is_ok() {
             drop(pending);
@@ -6907,6 +7318,15 @@ fn checking_the_voice_for(
         let Some(model) = model else {
             return Printing::None;
         };
+        // The private room (`person::private_room`): no line is held to a
+        // voice there (`crate::services::run`), so the services' prints
+        // would be made for nothing.
+        if crate::person::private_room() {
+            eprintln!(
+                "lamp-voice second: the same voice is for the linked services only (LAMP_SAME_VOICE_FOR=services), and the lamp is a private room (LAMP_PRIVATE_ROOM): not started, no line printed"
+            );
+            return Printing::None;
+        }
         if !services_on {
             eprintln!(
                 "lamp-voice second: the same voice is for the linked services only (LAMP_SAME_VOICE_FOR=services), and none are on: not started"
@@ -6967,6 +7387,56 @@ enum Printing {
     ForServices,
 }
 
+/// The bar `LAMP_SAME_VOICE_CONFIRMS` (`confirms`) confirms at on this
+/// route, given what is printed: from the prints for every rule, or from
+/// the services' alone (`LAMP_SAME_VOICE_FOR=services`, as the product sets
+/// both: the memory owner's switch-on, 10 Nov); none with no print. Before,
+/// only the first, so beside the services the confirm never ran.
+fn confirming_where(printing: Printing, confirms: Option<f32>) -> Option<f32> {
+    confirms.filter(|_| printing != Printing::None)
+}
+
+/// Whether a voice can ever show another person in the conversation here,
+/// for the carry past a silent face (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`)
+/// and a carried line read as theirs (`LAMP_CONVERSATION_CARRIED_MEMORY`):
+/// only the prints for every rule, and never while the voice only confirms
+/// (`Voices::confirming_only` judges nothing, so no other voice is ever
+/// recorded and "no other voice" would always hold).
+fn voice_shows_another(printing: Printing, confirms: Option<f32>) -> bool {
+    printing == Printing::ForEverything && confirms.is_none()
+}
+
+/// The services' prints on `heeding`, made only while `linked` says a
+/// service is linked (the reader's P3 on #5293). With the confirm reading
+/// them (`confirming`), every heard line is printed, linked or not, as the
+/// known person's own voice must be learnt from their lines; what is linked
+/// is still asked as each line begins (`Heeding::asking_what_is_linked`).
+fn services_prints_while(
+    heeding: &mut Heeding,
+    linked: Arc<crate::services::Linked>,
+    confirming: bool,
+) {
+    if confirming {
+        heeding.asking_what_is_linked(linked);
+    } else {
+        heeding.printing_only_while_linked(linked);
+    }
+}
+
+/// Where the confirm reads a line's print on `heeding`: the voices kept for
+/// every rule, or the services' alone ([`Heeding::kept_voices`]), whatever
+/// `Voices::confirming_only` says.
+fn confirm_print_of(heeding: &Arc<Mutex<Heeding>>) -> crate::second_provider::PrintOf {
+    let heeding = heeding.clone();
+    Arc::new(move |request| {
+        heeding
+            .lock()
+            .ok()?
+            .kept_voices()?
+            .print_to_confirm(request)
+    })
+}
+
 /// `LAMP_SAME_VOICE_CONFIRMS` on `engine` and `heeding`, the check's
 /// printer already started: `heeding`'s voices judge nothing
 /// (`same_voice::Voices::confirming_only`), and the engine reads each
@@ -6982,17 +7452,9 @@ fn confirming_by_voice(engine: Engine, heeding: &Arc<Mutex<Heeding>>, bar: f32) 
     eprintln!(
         "lamp-voice second: the voice only confirms: a known person's line no face was seen speaking, their face the one face in view, is theirs at cosine {bar:.2} or over against their own voice; nothing ends, holds or splits a conversation by voice (LAMP_SAME_VOICE_CONFIRMS)"
     );
-    let heeding = heeding.clone();
     engine.confirming_by_voice(crate::second_provider::VoiceConfirms {
         owner: Arc::new(crate::same_voice::OwnerVoice::new(bar)),
-        print_of: Arc::new(move |request| {
-            heeding
-                .lock()
-                .ok()?
-                .voices
-                .as_mut()?
-                .print_to_confirm(request)
-        }),
+        print_of: confirm_print_of(heeding),
     })
 }
 
@@ -12628,8 +13090,17 @@ pub(crate) fn thread_and_history(
         withheld,
         ROOM_LINES_TOLD.load(std::sync::atomic::Ordering::Acquire),
         HISTORY_AFTER_NOTE.load(std::sync::atomic::Ordering::Acquire),
+        HISTORY_SAID_ONCE.load(std::sync::atomic::Ordering::Acquire),
     )
 }
+
+/// `LAMP_HISTORY_SAID_ONCE=on` (#6218), set once as the worker starts
+/// ([`serve`]): an exchange told as a history message is left out of the
+/// thread text of the same request
+/// ([`crate::thread::Thread::recall_for_leaving_out`]), so each recent
+/// exchange reaches the model once, not twice.
+pub(crate) static HISTORY_SAID_ONCE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// `LAMP_HISTORY_AFTER_NOTE=on` (#6218), set once as the worker starts
 /// ([`serve`]): the exchanges the scope's running note holds, once a job
@@ -12658,8 +13129,10 @@ pub(crate) const SAID_IN_THE_ROOM: &str = "(said in the room)";
 /// same conversation too, marked; the thread's text and the running
 /// summary stay the scope's own, and a turn of the room's is told only
 /// the room's, as ever. With `after_note` as [`HISTORY_AFTER_NOTE`], the
-/// exchanges the running note told here holds are left out of both. In
-/// memory, under the thread's one lock: no new read on the reply's path.
+/// exchanges the running note told here holds are left out of both. With
+/// `said_once` as [`HISTORY_SAID_ONCE`], the thread's text also leaves out
+/// the exchanges the history tells. In memory, under the thread's one
+/// lock: no new read on the reply's path.
 fn thread_and_history_told(
     used: usize,
     file: Option<&Path>,
@@ -12667,37 +13140,82 @@ fn thread_and_history_told(
     withheld: Option<&str>,
     room_lines: bool,
     after_note: bool,
+    said_once: bool,
+) -> (String, Vec<Message>) {
+    thread_and_history_summed(
+        used,
+        file,
+        whose,
+        withheld,
+        room_lines,
+        said_once,
+        |whose, now, room| {
+            // The lineage of the note told (`LAMP_HISTORY_AFTER_NOTE`):
+            // none when none is, so nothing is left out for it.
+            if after_note {
+                crate::conversation_summary::told_with_lineage(whose, now, room)
+            } else {
+                (crate::conversation_summary::told(whose, now, room), None)
+            }
+        },
+    )
+}
+
+/// [`thread_and_history_told`] with the scope's running summary and the
+/// lineage of its note from `summary` (as
+/// `crate::conversation_summary::told_with_lineage`, or a test's).
+fn thread_and_history_summed(
+    used: usize,
+    file: Option<&Path>,
+    whose: Option<&str>,
+    withheld: Option<&str>,
+    room_lines: bool,
+    said_once: bool,
+    summary: impl FnOnce(Option<&str>, Instant, usize) -> (String, Option<crate::thread::NoteVersion>),
 ) -> (String, Vec<Message>) {
     let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(used);
     let now = Instant::now();
     // The scope's own running summary first, within the room, never
     // another scope's (`LAMP_CONVERSATION_SUMMARY`); a name withheld is
-    // taken out of it as out of the thread. The lineage of the note told
-    // (`LAMP_HISTORY_AFTER_NOTE`): none when none is, so nothing is left
-    // out for it.
-    let (summary, note) = if after_note {
-        crate::conversation_summary::told_with_lineage(whose, now, room)
-    } else {
-        (crate::conversation_summary::told(whose, now, room), None)
-    };
+    // taken out of it as out of the thread.
+    let (summary, note) = summary(whose, now, room);
     let summary = match withheld {
         Some(name) if !summary.is_empty() => crate::person::without_name(&summary, name),
         _ => summary,
     };
     let room = room.saturating_sub(summary.len());
     let (thread, recent) = crate::thread::current(file, |thread| {
-        (
-            thread.recall_after_note(whose, now, room, note),
+        let recent = match whose {
+            Some(person) if room_lines => thread.recent_with_room_lines_after_note(
+                person,
+                now,
+                HISTORY_WITHIN,
+                HISTORY_EXCHANGES,
+                note,
+            ),
+            _ => thread.recent_after_note(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES, note),
+        };
+        // The exchanges the history tells, picked as it picks them (the
+        // note's left out already), left out of the thread's text
+        // (`LAMP_HISTORY_SAID_ONCE`); off, the text is the scope's recall
+        // less the note's, as before.
+        let told = if said_once {
             match whose {
-                Some(person) if room_lines => thread.recent_with_room_lines_after_note(
+                Some(person) if room_lines => thread.recent_picks_with_room_lines(
                     person,
                     now,
                     HISTORY_WITHIN,
                     HISTORY_EXCHANGES,
                     note,
                 ),
-                _ => thread.recent_after_note(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES, note),
-            },
+                _ => thread.recent_picks_for(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES, note),
+            }
+        } else {
+            Vec::new()
+        };
+        (
+            thread.recall_for_leaving_out(whose, now, room, note, &told),
+            recent,
         )
     })
     .unwrap_or_default();
@@ -13454,6 +13972,202 @@ mod route_checks;
 
 #[cfg(test)]
 mod tests {
+    /// Exercise optional confirmation and summaries independently through the
+    /// production async batch; pending TLS stays on this current-thread reactor.
+    #[tokio::test(flavor = "current_thread")]
+    async fn pending_owner_and_summary_consumers_follow_the_engine_matrix() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for summaries in [false, true] {
+            for confirming in [false, true] {
+                let dir = crate::process::SessionDirectory::create().unwrap();
+                let bus = lamp_bus::Bus::new(&dir.path).unwrap();
+                let forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+                let mut memory = bus
+                    .publisher_declared(
+                        lamp_msgs::MemoryForgot::TOPIC,
+                        &lamp_msgs::MemoryForgot::declaration(),
+                        "memory",
+                    )
+                    .unwrap();
+                let person = lamp_msgs::known::person_id("Synthetic matrix owner");
+                let owner = Arc::new(crate::same_voice::OwnerVoice::new(0.45));
+                for request in 1..=3 {
+                    assert!(owner.learn(&person, request, vec![1.0, 0.0]));
+                }
+                let before = owner.generation();
+                let mut engine = Engine::new(
+                    Arc::new(Silent),
+                    Told::default,
+                    Arc::new(|_, _, _, _| Box::pin(async { serde_json::Value::Null })),
+                );
+                if confirming {
+                    engine = engine.confirming_by_voice(crate::second_provider::VoiceConfirms {
+                        owner: owner.clone(),
+                        print_of: Arc::new(|_| None),
+                    });
+                }
+                let actual_owner = engine
+                    .shared
+                    .voice_confirms
+                    .as_ref()
+                    .map(|confirms| confirms.owner.clone());
+                crate::services::pending_for_test(Some(crate::services::Pending::new(
+                    "synthetic",
+                    1,
+                    Instant::now(),
+                    "Synthetic draft",
+                    &person,
+                )));
+                memory
+                    .publish_json(
+                        1,
+                        &lamp_msgs::MemoryForgot {
+                            person: Some(person.clone()),
+                        },
+                    )
+                    .unwrap();
+                match actual_owner {
+                    Some(owner) => assert!(
+                        forget_batch(forgot, 1_000_000, owner, summaries)
+                            .await
+                            .is_some()
+                    ),
+                    None => {
+                        let mut forgot = forgot;
+                        assert_eq!(forget_inline(&mut forgot, 1_000_000, summaries), 1);
+                    }
+                }
+                assert!(!crate::services::pending_for_test_is_some());
+                assert_eq!(owner.known(&person), if confirming { 0 } else { 3 });
+                assert_eq!(
+                    owner.generation(),
+                    before.wrapping_add(u64::from(confirming))
+                );
+                if confirming {
+                    assert!(!owner.learn_at(before, &person, 9, vec![1.0, 0.0]));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn app_forget_bus_clears_the_engines_confirmation_cache_without_summaries() {
+        use crate::same_voice::{Confirmed, OWNER_PRINTS, OwnerVoice};
+        let _one = crate::provider_worker::tests::one_thread();
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let bus = lamp_bus::Bus::new(&directory.path).unwrap();
+        let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+        let mut memory = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "memory",
+            )
+            .unwrap();
+        let mut other = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        let owner = Arc::new(OwnerVoice::new(0.45));
+        let engine = Engine::new(
+            Arc::new(Silent),
+            Told::default,
+            Arc::new(|_, _, _, _| Box::pin(async { serde_json::Value::Null })),
+        )
+        .confirming_by_voice(crate::second_provider::VoiceConfirms {
+            owner: owner.clone(),
+            print_of: Arc::new(|_| Some(vec![1.0, 0.0])),
+        });
+        let person = lamp_msgs::known::person_id("Synthetic owner");
+        let another = lamp_msgs::known::person_id("Synthetic other");
+        let teach = || {
+            for request in 1..=OWNER_PRINTS as u64 {
+                assert!(owner.learn(&person, request, vec![1.0, 0.0]));
+            }
+        };
+        teach();
+        let before = owner.generation();
+        let event = |person: Option<&str>| lamp_msgs::MemoryForgot {
+            person: person.map(str::to_owned),
+        };
+        other.publish_json(1, &event(Some(&person))).unwrap();
+        memory.publish_json(2, &event(Some("bad-person"))).unwrap();
+        memory.publish_json(3, &event(Some("everyone"))).unwrap();
+        let actual_owner = engine
+            .shared
+            .voice_confirms
+            .as_ref()
+            .unwrap()
+            .owner
+            .as_ref();
+        forget_received(&mut forgot, 1_000_000, Some(actual_owner), false);
+        assert_eq!(
+            owner.known(&person),
+            OWNER_PRINTS,
+            "other source, malformed event and room preserve prints"
+        );
+        assert_eq!(
+            owner.generation(),
+            before,
+            "ignored events do not invalidate observations"
+        );
+        assert!(matches!(
+            owner.judge(&person, &[1.0, 0.0]),
+            Confirmed::Theirs(_)
+        ));
+        memory.publish_json(4, &event(Some(&another))).unwrap();
+        forget_received(&mut forgot, 1_500_000, Some(actual_owner), false);
+        assert_eq!(
+            owner.known(&person),
+            OWNER_PRINTS,
+            "another person's prints stay"
+        );
+        assert_eq!(
+            owner.judge_at(before, &person, &[1.0, 0.0]),
+            Confirmed::Unknown
+        );
+        assert!(
+            !owner.learn_at(before, &person, 90, vec![1.0, 0.0]),
+            "another person's forget still fences pending observations"
+        );
+        let before = owner.generation();
+        memory.publish_json(5, &event(Some(&person))).unwrap();
+        forget_received(&mut forgot, 2_000_000, Some(actual_owner), false);
+        assert_eq!(owner.known(&person), 0);
+        assert_eq!(owner.judge(&person, &[1.0, 0.0]), Confirmed::Unknown);
+        assert!(!owner.learn_at(before, &person, 91, vec![1.0, 0.0]));
+        teach();
+        assert_eq!(
+            owner.judge_at(before, &person, &[1.0, 0.0]),
+            Confirmed::Unknown
+        );
+        let before = owner.generation();
+        memory.publish_json(6, &event(None)).unwrap();
+        forget_received(&mut forgot, 2_500_000, Some(actual_owner), false);
+        assert_eq!(owner.known(&person), 0);
+        assert_eq!(owner.judge(&person, &[1.0, 0.0]), Confirmed::Unknown);
+        assert!(!owner.learn_at(before, &person, 92, vec![1.0, 0.0]));
+
+        // One drained event reaches both consumers when both are enabled.
+        teach();
+        crate::remember::role::hold(&person, Some("Synthetic role".into()));
+        memory.publish_json(7, &event(Some(&person))).unwrap();
+        forget_received(&mut forgot, 3_000_000, Some(actual_owner), true);
+        assert_eq!(owner.known(&person), 0);
+        assert_eq!(crate::remember::role::cached(&person), None);
+
+        // Summary-only operation retains its previous consumer behavior.
+        teach();
+        crate::remember::role::hold(&person, Some("Synthetic role".into()));
+        memory.publish_json(8, &event(Some(&person))).unwrap();
+        forget_received(&mut forgot, 3_500_000, None, true);
+        assert_eq!(owner.known(&person), OWNER_PRINTS);
+        assert_eq!(crate::remember::role::cached(&person), None);
+    }
+
     /// #5139 (a tester's lamp-0c4e, 3 Nov): with no owner the by-default
     /// name was skipped with no word. Told once, at the first reply with no
     /// owner; not on the next, nor with an owner; once more after an owner
@@ -13729,6 +14443,167 @@ mod tests {
         assert!(note(7).is_some() && note(8).is_some(), "due for both");
         heard(7);
         assert_eq!(note(9), None, "the earlier one's answer spent it");
+    }
+
+    /// #6543 (`LAMP_SECOND_DOING`): what the person was last seen doing is
+    /// given as context only, never in a busy room, spent only once its
+    /// request's answer is heard, and told once for each sighting.
+    #[test]
+    fn what_they_were_seen_doing_is_given_once_and_spent_when_heard() {
+        let doing = Arc::new(Mutex::new(crate::doing_told::DoingTold::default()));
+        let busy = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let room_busy = busy.clone();
+        let (note, heard) = super::doing_noting(
+            doing.clone(),
+            move |_| room_busy.load(std::sync::atomic::Ordering::Relaxed),
+            monotonic_us,
+        );
+        assert_eq!(note(1), None, "nothing read yet");
+        let now_ms = 1_800_000_000_000;
+        let drank = lamp_msgs::HumanDoing {
+            drank_s_ago: 120,
+            ate_s_ago: 3000,
+            break_s_ago: 3000,
+            last: lamp_msgs::Doing::Drinking,
+            confidence: 0.8,
+        };
+        doing
+            .lock()
+            .unwrap()
+            .seen_in_view(Some((drank, now_ms)), Some(1), now_ms, monotonic_us());
+        // Due, but the room is busy: neither said nor counted.
+        busy.store(true, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(note(2), None, "never in a busy room");
+        busy.store(false, std::sync::atomic::Ordering::Relaxed);
+        let said = note(3).expect("due once the room is not busy");
+        assert!(said.contains("seen drinking about 2 minutes ago"), "{said}");
+        assert!(said.contains("Don't mention it unless they bring it up"));
+        // Request 3 cut short before any word: not spent.
+        heard(99);
+        assert!(note(4).is_some(), "not heard: still due for the next");
+        heard(4);
+        assert_eq!(note(5), None, "heard once: told");
+        // The next message of the same sighting: not told again.
+        let later = lamp_msgs::HumanDoing {
+            drank_s_ago: 150,
+            ..drank
+        };
+        doing.lock().unwrap().seen_in_view(
+            Some((later, now_ms + 30_000)),
+            Some(1),
+            now_ms + 30_000,
+            monotonic_us(),
+        );
+        assert_eq!(note(6), None, "one sighting, told once");
+        // Two faces in view: the drink may be the other's.
+        let again = lamp_msgs::HumanDoing {
+            drank_s_ago: 10,
+            ..drank
+        };
+        doing.lock().unwrap().seen_in_view(
+            Some((again, now_ms + 900_000)),
+            Some(2),
+            now_ms + 900_000,
+            monotonic_us(),
+        );
+        assert_eq!(note(7), None, "two faces in view");
+        // Heron's P3 on #6661: A given one sighting, B a newer one; A's
+        // answer heard spends only A's, so B's is still due.
+        let ate = lamp_msgs::HumanDoing {
+            last: lamp_msgs::Doing::Eating,
+            ate_s_ago: 5,
+            ..drank
+        };
+        doing.lock().unwrap().seen_in_view(
+            Some((again, now_ms + 900_000)),
+            Some(1),
+            now_ms + 900_000,
+            monotonic_us(),
+        );
+        assert!(note(10).is_some(), "A given the drink");
+        doing.lock().unwrap().seen_in_view(
+            Some((ate, now_ms + 901_000)),
+            Some(1),
+            now_ms + 901_000,
+            monotonic_us(),
+        );
+        assert!(
+            note(11).unwrap().contains("seen eating"),
+            "B given the meal"
+        );
+        heard(10);
+        assert!(
+            note(12).unwrap().contains("seen eating"),
+            "B's not spent by A"
+        );
+        heard(11);
+        assert_eq!(note(13), None, "B's heard: told");
+    }
+
+    /// `humans/doing` as [`super::doing_task`] keeps it: fresh only within
+    /// `HumanDoing::LASTS` (90 s) by its wall stamp and never expired as the
+    /// bus has it, even when the wall clock says it is fresh (Heron's P3 on
+    /// #6661).
+    #[test]
+    fn a_doing_read_past_ninety_seconds_or_expired_is_not_kept() {
+        let now_ms = 1_800_000_000_000;
+        let drank = lamp_msgs::HumanDoing {
+            drank_s_ago: 120,
+            ate_s_ago: 3000,
+            break_s_ago: 3000,
+            last: lamp_msgs::Doing::Drinking,
+            confidence: 0.8,
+        };
+        let message = |at_unix_ms: u64, expired: bool| lamp_bus::Message {
+            header: lamp_bus::Header {
+                topic: lamp_msgs::HumanDoing::TOPIC.into(),
+                kind: lamp_bus::Kind::Latest,
+                enc: lamp_bus::JSON.into(),
+                type_name: Some(lamp_msgs::HumanDoing::TYPE.into()),
+                source: "seen".into(),
+                boot: "0123456789abcdef".into(),
+                seq: 1,
+                at_us: 1,
+                at_unix_ms,
+                expires_ms: Some(lamp_msgs::HumanDoing::LASTS.as_millis() as u64),
+                clock: None,
+            },
+            payload: serde_json::to_vec(&drank).unwrap(),
+            gap: 0,
+            publisher_restarted: false,
+            expired,
+        };
+        let lasts_ms = lamp_msgs::HumanDoing::LASTS.as_millis() as u64;
+        assert_eq!(lasts_ms, 90_000);
+        assert_eq!(
+            super::doing_read(Some(message(now_ms - 1_000, false)), now_ms),
+            Some((drank, now_ms - 1_000)),
+            "fresh"
+        );
+        assert!(
+            super::doing_read(Some(message(now_ms - lasts_ms + 1, false)), now_ms).is_some(),
+            "just inside 90 s"
+        );
+        assert_eq!(
+            super::doing_read(Some(message(now_ms - lasts_ms, false)), now_ms),
+            None,
+            "a latched value 90 s old is stale"
+        );
+        assert_eq!(
+            super::doing_read(Some(message(now_ms - 600_000, false)), now_ms),
+            None,
+            "a latched value ten minutes old is stale"
+        );
+        // Fresh by the wall clock (stepped back, or a stamp ahead of now)
+        // but expired as the bus judged it: not kept.
+        for at_unix_ms in [now_ms - 1_000, now_ms + 60_000] {
+            assert_eq!(
+                super::doing_read(Some(message(at_unix_ms, true)), now_ms),
+                None,
+                "expired at {at_unix_ms}"
+            );
+        }
+        assert_eq!(super::doing_read(None, now_ms), None, "none on the bus");
     }
 
     /// migrate-P2, the product's route: with the coordinator's mark, a line
@@ -18219,6 +19094,10 @@ mod tests {
         assert!(starts(false, true));
         assert!(!starts(true, false), "no services, no child");
         assert!(!starts(false, false));
+        // The private room: no line is held to a voice, so no child.
+        crate::person::set_private_room_for_test(Some(true));
+        assert!(!starts(true, true), "the private room, no child");
+        crate::person::set_private_room_for_test(None);
         // No model: nothing, as without the switch.
         let heeding = Mutex::new(Heeding::new(true, true, None, None));
         assert_eq!(
@@ -18299,6 +19178,97 @@ mod tests {
         );
         heeding.hear_for_services(6, Heard::Samples(&[1; 48_000]));
         assert_eq!(*ungated.lock().unwrap(), [6]);
+    }
+
+    /// `LAMP_SAME_VOICE_CONFIRMS` beside `LAMP_SAME_VOICE_FOR=services`, as
+    /// the product sets both (the memory owner's switch-on, 10 Nov): the
+    /// confirm reads the services' prints, every line printed whether or not
+    /// a service is linked, and the services still judge by them. Before,
+    /// the confirm ran only with the prints for every rule, so in the
+    /// product it confirmed nothing.
+    #[test]
+    fn the_voice_confirms_from_the_services_prints_and_they_still_judge() {
+        use super::Printing::{ForEverything, ForServices, None as NoPrint};
+        use crate::second_provider::Heard;
+        use std::collections::VecDeque;
+        struct Answering(Arc<Mutex<VecDeque<u64>>>);
+        impl crate::same_voice::Printer for Answering {
+            fn ask(&mut self, request: u64, _samples: &[i16]) -> bool {
+                self.0.lock().unwrap().push_back(request);
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                let request = self.0.lock().unwrap().pop_front()?;
+                Some((request, Ok(vec![1.0, 0.0, 0.0])))
+            }
+        }
+        assert_eq!(super::confirming_where(ForServices, Some(0.45)), Some(0.45));
+        assert_eq!(
+            super::confirming_where(ForEverything, Some(0.45)),
+            Some(0.45)
+        );
+        assert_eq!(super::confirming_where(NoPrint, Some(0.45)), None);
+        assert_eq!(super::confirming_where(ForServices, None), None);
+        let heard = |confirming: bool| {
+            let asked = Arc::new(Mutex::new(VecDeque::new()));
+            let heeding = Arc::new(Mutex::new(Heeding::new(true, true, None, None)));
+            {
+                let mut heeding = heeding.lock().unwrap();
+                heeding.checking_the_voice_for_services(Box::new(Answering(asked)));
+                super::services_prints_while(
+                    &mut heeding,
+                    crate::services::Linked::told(false),
+                    confirming,
+                );
+            }
+            let hook = super::hearing_hook(&heeding, false, false, true).expect("for the services");
+            hook(
+                1,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            hook(1, Heard::Samples(&[1; 48_000]));
+            hook(1, Heard::Ended);
+            heeding
+        };
+        let heeding = heard(true);
+        assert!(
+            super::confirm_print_of(&heeding)(1).is_some(),
+            "nothing linked, the confirm still has the line's print"
+        );
+        assert!(
+            heeding
+                .lock()
+                .unwrap()
+                .kept_voices()
+                .unwrap()
+                .print_of(1)
+                .is_some(),
+            "the services still judge by it"
+        );
+        let heeding = heard(false);
+        assert!(
+            super::confirm_print_of(&heeding)(1).is_none(),
+            "without the confirm, nothing linked, nothing printed"
+        );
+    }
+
+    /// A voice that only confirms can never show another person, so the
+    /// rules that need one to stay safe stay as without a voice: the carry
+    /// past a silent face (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`) and a
+    /// carried line read as theirs (`LAMP_CONVERSATION_CARRIED_MEMORY`).
+    /// Before, with the prints for every rule and the confirm on, both acted
+    /// with no voice able to say "someone else": a guest off camera, their
+    /// mouth not read, was carried into the person's conversation.
+    #[test]
+    fn a_voice_that_only_confirms_shows_no_other_person_to_the_carry() {
+        use super::Printing::{ForEverything, ForServices, None as NoPrint};
+        assert!(super::voice_shows_another(ForEverything, None));
+        assert!(!super::voice_shows_another(ForEverything, Some(0.45)));
+        assert!(!super::voice_shows_another(ForServices, Some(0.45)));
+        assert!(!super::voice_shows_another(ForServices, None));
+        assert!(!super::voice_shows_another(NoPrint, None));
     }
 
     /// #2191 on a lamp without `LAMP_SPOKEN_TO` (lamp-52e6 and lamp-4ace):
@@ -21875,7 +22845,7 @@ mod tests {
                 .cloned()
                 .collect()
         };
-        let (_, theirs) = thread_and_history_told(0, None, Some(&a), None, true, false);
+        let (_, theirs) = thread_and_history_told(0, None, Some(&a), None, true, false, false);
         assert_eq!(
             users(&theirs),
             [
@@ -21885,18 +22855,18 @@ mod tests {
             ],
             "A's turn: the room's line among A's, marked"
         );
-        let (_, rooms) = thread_and_history_told(0, None, None, None, true, false);
+        let (_, rooms) = thread_and_history_told(0, None, None, None, true, false, false);
         assert_eq!(
             users(&rooms),
             [Message::user("Can you look it up?")],
             "the room's turn: never A's"
         );
-        let (_, others) = thread_and_history_told(0, None, Some(&b), None, true, false);
+        let (_, others) = thread_and_history_told(0, None, Some(&b), None, true, false, false);
         assert!(
             others.is_empty(),
             "B's turn: neither A's nor A's conversation's"
         );
-        let (_, off) = thread_and_history_told(0, None, Some(&a), None, false, false);
+        let (_, off) = thread_and_history_told(0, None, Some(&a), None, false, false, false);
         assert_eq!(
             users(&off),
             [
@@ -21906,7 +22876,7 @@ mod tests {
             "off: A's alone"
         );
         crate::thread::THREAD.lock().unwrap().forget();
-        let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true, false);
+        let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true, false, false);
         assert!(forgotten.is_empty(), "a forget drops the room's lines too");
     }
 
@@ -21984,8 +22954,8 @@ mod tests {
             }
             panic!("the note was never kept");
         };
-        let off = || thread_and_history_told(0, None, Some(&tom), None, false, false);
-        let on = || thread_and_history_told(0, None, Some(&tom), None, false, true);
+        let off = || thread_and_history_told(0, None, Some(&tom), None, false, false, false);
+        let on = || thread_and_history_told(0, None, Some(&tom), None, false, true, false);
         let off_folded = told_with(None, true, &off);
         let off_unfolded = told_with(None, false, &off);
         assert_eq!(off_folded, off_unfolded, "off: byte for byte as before");
@@ -22015,8 +22985,8 @@ mod tests {
         );
         // The room's lines told: the room's line at 3, among Tom's folded
         // ones, stays, marked; Tom's folded ones leave.
-        let rooms_on = || thread_and_history_told(0, None, Some(&tom), None, true, true);
-        let rooms_off = || thread_and_history_told(0, None, Some(&tom), None, true, false);
+        let rooms_on = || thread_and_history_told(0, None, Some(&tom), None, true, true, false);
+        let rooms_off = || thread_and_history_told(0, None, Some(&tom), None, true, false, false);
         let (_, rooms) = told_with(Some(3), true, &rooms_on);
         let rooms_text = serde_json::to_string(&rooms).unwrap();
         assert!(
@@ -22036,6 +23006,192 @@ mod tests {
             told_with(Some(3), false, &rooms_off),
             "off with the room's lines: as before"
         );
+        // With `LAMP_HISTORY_SAID_ONCE` on too: the history is the same, and
+        // the thread's text leaves out both the folded exchanges and those
+        // the history tells, so it is the note alone, each exchange told
+        // once, with the room's lines or without.
+        let both = || thread_and_history_told(0, None, Some(&tom), None, false, true, true);
+        let (both_text, both_history) = told_with(None, true, &both);
+        assert_eq!(both_history, on_folded.1, "the history is the same");
+        assert!(both_text.contains("NOTE-HOLDS"), "{both_text}");
+        assert!(!both_text.contains("question"), "{both_text}");
+        assert!(on_folded.0.starts_with(&both_text) && on_folded.0.len() > both_text.len());
+        let rooms_both = || thread_and_history_told(0, None, Some(&tom), None, true, true, true);
+        let (rooms_both_text, rooms_both_history) = told_with(Some(3), true, &rooms_both);
+        assert_eq!(
+            serde_json::to_string(&rooms_both_history).unwrap(),
+            rooms_text,
+            "the room's lines: the history is the same"
+        );
+        assert!(!rooms_both_text.contains("question"), "{rooms_both_text}");
+        crate::thread::THREAD.lock().unwrap().forget();
+    }
+
+    /// #6218's thread for `LAMP_HISTORY_SAID_ONCE`: A's eight exchanges,
+    /// then six of the room's in the same conversation, the lamp's words
+    /// naming the owner, Minh.
+    fn said_once_thread(a: &str) {
+        let now = Instant::now();
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        thread.forget();
+        for n in 1..=8u64 {
+            thread.person(&format!("Question {n} from A?"), true, now);
+            thread.lamp_for(n, &format!("Answer {n} for you, Minh."), now, Some(a));
+        }
+        for n in 9..=14u64 {
+            thread.person(&format!("Room question {n}?"), true, now);
+            thread.lamp_for(n, &format!("Room answer {n}."), now, None);
+        }
+    }
+
+    /// The history's messages as one text, for what it says.
+    fn history_text(history: &[Message]) -> String {
+        serde_json::to_string(history).unwrap()
+    }
+
+    /// No running summary, no note: for [`thread_and_history_summed`].
+    fn no_summary(
+        _: Option<&str>,
+        _: Instant,
+        _: usize,
+    ) -> (String, Option<crate::thread::NoteVersion>) {
+        (String::new(), None)
+    }
+
+    /// `LAMP_HISTORY_SAID_ONCE` off (#6218): the thread's text is the
+    /// scope's whole recall, byte for byte as before, the history's
+    /// exchanges among it.
+    #[test]
+    fn history_said_once_off_tells_the_thread_whole() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let a = crate::remember::person_id("A");
+        said_once_thread(&a);
+        let expected = crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .recall_for(Some(&a), Instant::now(), lamp_gemini::MAX_INSTRUCTION_BYTES)
+            .unwrap();
+        for room_lines in [false, true] {
+            let (thread, history) =
+                thread_and_history_summed(0, None, Some(&a), None, room_lines, false, no_summary);
+            assert_eq!(thread, expected, "room lines {room_lines}");
+            assert!(
+                history_text(&history).contains("Question 8 from A?"),
+                "room lines {room_lines}"
+            );
+        }
+        for n in 1..=8 {
+            assert!(expected.contains(&format!("Person: Question {n} from A?\n")));
+        }
+        crate::thread::THREAD.lock().unwrap().forget();
+    }
+
+    /// `LAMP_HISTORY_SAID_ONCE` on (#6218): with the room's lines taking
+    /// six of the history's twelve, A's two oldest exchanges are told only
+    /// in the thread's text, and the six newest only as messages.
+    #[test]
+    fn history_said_once_tells_each_exchange_once() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let a = crate::remember::person_id("A");
+        said_once_thread(&a);
+        let (off, _) = thread_and_history_summed(0, None, Some(&a), None, true, false, no_summary);
+        let (thread, history) =
+            thread_and_history_summed(0, None, Some(&a), None, true, true, no_summary);
+        let history = history_text(&history);
+        for n in 1..=2 {
+            let question = format!("Question {n} from A?");
+            assert!(thread.contains(&format!("Person: {question}\n")), "{n}");
+            assert!(!history.contains(&question), "{n}");
+        }
+        for n in 3..=8 {
+            let question = format!("Question {n} from A?");
+            assert!(!thread.contains(&question), "{n}");
+            assert!(history.contains(&question), "{n}");
+        }
+        assert!(
+            !thread.contains("Room question"),
+            "the room's stay the history's"
+        );
+        assert!(history.contains("Room question 14?"));
+        // The note stays the one for the newest exchange: the talk is going on.
+        assert!(thread.starts_with("\n\nA moment ago\n"));
+        eprintln!(
+            "history said once, room lines: thread text {} bytes off, {} on",
+            off.len(),
+            thread.len()
+        );
+        crate::thread::THREAD.lock().unwrap().forget();
+    }
+
+    /// `LAMP_HISTORY_SAID_ONCE` on (#6218): every exchange of the scope is
+    /// told as a message, so no thread text is told; the running summary
+    /// still is. Twelve exchanges of a long talk's length.
+    #[test]
+    fn history_said_once_with_only_recent_exchanges_keeps_the_summary_alone() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let a = crate::remember::person_id("A");
+        let now = Instant::now();
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.forget();
+            for n in 1..=HISTORY_EXCHANGES as u64 {
+                thread.person(
+                    &format!("Question {n}: what do you make of the third chapter, and why does the ending land the way it does?"),
+                    true,
+                    now,
+                );
+                thread.lamp_for(
+                    n,
+                    &format!("Answer {n}: the third chapter turns on a quiet choice, and the ending lands because it pays that choice back without saying so. It trusts you to notice the echo, which is why it stays with you after the last page."),
+                    now,
+                    Some(&a),
+                );
+            }
+        }
+        let summary = "\n\nEarlier in this conversation\nThey are reading a novel.\n";
+        let summed = |said_once| {
+            thread_and_history_summed(0, None, Some(&a), None, false, said_once, |_, _, _| {
+                (summary.to_owned(), None)
+            })
+        };
+        let (off, off_history) = summed(false);
+        let (on, on_history) = summed(true);
+        assert_eq!(on, summary, "no thread text, the summary kept");
+        assert!(off.starts_with(summary) && off.len() > summary.len());
+        assert_eq!(
+            history_text(&on_history),
+            history_text(&off_history),
+            "the history is the same"
+        );
+        assert_eq!(on_history.len(), HISTORY_EXCHANGES * 2);
+        eprintln!(
+            "history said once, {HISTORY_EXCHANGES} recent exchanges: system message's thread part {} bytes off, {} on ({} saved); history {} bytes either way",
+            off.len(),
+            on.len(),
+            off.len() - on.len(),
+            history_text(&on_history).len()
+        );
+        crate::thread::THREAD.lock().unwrap().forget();
+    }
+
+    /// `LAMP_HISTORY_SAID_ONCE` on (#6218): the owner's name withheld is
+    /// taken out of the lamp's words in what is left of the thread's text,
+    /// and of the history's, as with it off.
+    #[test]
+    fn history_said_once_still_withholds_the_name() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let a = crate::remember::person_id("A");
+        said_once_thread(&a);
+        let (thread, history) =
+            thread_and_history_summed(0, None, Some(&a), Some("Minh"), true, true, no_summary);
+        let (unwithheld, _) =
+            thread_and_history_summed(0, None, Some(&a), None, true, true, no_summary);
+        assert!(unwithheld.contains("Minh"));
+        assert!(thread.contains("You: Answer 1 for you"));
+        assert!(!thread.contains("Minh"), "{thread}");
+        let history = history_text(&history);
+        assert!(history.contains("Answer 8 for you"));
+        assert!(!history.contains("Minh"), "{history}");
         crate::thread::THREAD.lock().unwrap().forget();
     }
 
@@ -30599,7 +31755,11 @@ mod memory_observer {
                     .last()
                     .and_then(Message::words)
                     .is_some_and(|words| words.contains(word))
-                    .then_some(Forced { name, only: None })
+                    .then_some(Forced {
+                        name,
+                        only: None,
+                        fields: None,
+                    })
             })
         };
         let both = crate::second_provider::worker::first_force(

@@ -203,6 +203,14 @@ Environment=LAMP_SPOKEN_STOP_ENDS=on
 # the first builder's call on #1711, 8 Nov, after lamp-52e6's row on #5054 that day, 8 loud stops over a story an arm:
 # the stop line said 3/8 off, 6/8 with this (committed 5/8 against 6/8), the old FAIL's pattern 0/8 in both.
 Environment=LAMP_STOP_WORDS_KEYTERM=on
+# A short stop over the answer reads as neither talk nor quiet, and the answer went on: on lamp-06c1 9 of 9 spoken
+# stops were lost (#5032). Everything heard while the lamp speaks goes to the speech to text, and a short stop command
+# stops the answer as the hand does, whether or not the lamp paused: on lamp-52e6 on 11 Nov a 0.5 s "Stop." made no
+# pause, so `heard` (a pause's audio only) never heard it (the lead's call on #5905). Its words only judge a stop and are
+# never kept (the first builder's condition on #5032). Its cost: the whole answer's audio streamed (stop-word.md).
+# PARKED (#5905): off in the product; turning it on waits for the stop keyword spotted by lamp-name's on-mic
+# model (the first builder's ruling on #5905, 15 Nov). To turn it on, uncomment the next line.
+#Environment=LAMP_STOP_WORDS=heard-always
 # An answer cut by a line or a stop is kept as the words that were played, so "go on" picks up from the cut
 # (#3997): probe-cut-in on lamp-06c1 on 30 Oct, resume 19/20 to 20/20 with LAMP_CUT_IN_TOLD; two played demos, 2 of 2.
 Environment=LAMP_SAID_AS_HEARD=on
@@ -295,6 +303,12 @@ Environment=LAMP_WAIT_KEEPS_ANSWER=on
 Environment=LAMP_STOP_TOLD=on
 Environment=LAMP_ASKER_FIRST=record
 Environment=LAMP_NAMES=checked
+# A known face giving another name is asked before a rename, and only their yes renames it, the old name kept as an
+# alias (#5485, docs/eyes.md): 9 of 9 on lamp-52e6, 9 Nov; re-run on 13143, 15 Nov (#6859). Accepted risk, the first
+# builder's on #6594: with no face seen speaking, a voice off camera can start the ask and give the yes; it renames
+# only a face already known, and the new name is said back. Both need LAMP_NAMES=checked and the eyes' who socket.
+Environment=LAMP_NAMES_RENAME_ASKED=on
+Environment=LAMP_NAMES_RENAME_YES=on
 Environment=LAMP_STAFF_NOTE=on
 Environment=LAMP_TASK_NEWS_AT_PAUSE=on
 Environment=LAMP_MEMORY_RULES=on
@@ -425,10 +439,16 @@ Environment=LAMP_TASK_NEWS=skill
 # voice and from the app, each put on by a plain "Yes." (#4946). A computer's agent no longer makes one
 # (the first builder, 3 Nov, on the Queue).
 Environment=LAMP_MAKE_SKILL=on
+# A voice make the lamp's own model can't keep goes to the lamp's own agent when it is Hermes (#6059, docs/skills.md); on again 15 Nov, a code make passed 3 of 3 on 9adf.
+Environment=LAMP_MAKE_SKILL_AGENT=on
 Environment=LAMP_APP_MAKE_SKILL=on
 # A skill added from a file in the app, on a spoken yes (#5080): lamp-cloud hands it over the app-make socket,
 # the same line in lamp-cloud.service; it never starts on its own.
 Environment=LAMP_SKILL_UPLOAD=on
+# An uploaded SKILL.md run by the lamp's agent (the owner's ruling, 13 Nov; docs/skills.md "Run by the lamp's agent"):
+# the file kept whole and followed by Hermes in a fresh home, its grants read from it and said back. The same line
+# in lamp-cloud, lamp-voice, lamp-skills and lamp-skills-manage@.
+Environment=LAMP_UPLOAD_TO_AGENT=on
 Environment=LAMP_SCHEDULE_TOOLS=on
 # The person's linked services, read by voice for the owner only (Queue #4710): declared only when
 # lamp-services' tools.json is there, so a lamp whose update has not yet put lamp-services on is told
@@ -452,6 +472,9 @@ Environment=LAMP_SKILL_WRITES=on
 # A Store or pushed skill's `do.task` (#6305, docs/skills.md "A skill's task"): its task and each grant said back,
 # and the person's yes recorded by lamp-control (task_yes_record); passed to the provider and second routes.
 Environment=LAMP_SKILL_TASKS=on
+# A skill's keys given in the app (#6686, docs/skills.md "Its keys, given in the app"): an agent skill's tool says to add a
+# missing key in the app, never by voice; passed to the provider and second routes.
+Environment=LAMP_SKILL_SECRETS=on
 # A made skill's code of its own (#6307, docs/skills.md "Made by voice"): the making model may write up to 4
 # scripts/ files run by one task step, said back with its grants; on only at the person's later yes to that package's
 # SHA-256, never at once; passed to both routes. The same line in lamp-skills and lamp-skills-manage@.

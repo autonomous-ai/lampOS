@@ -1,0 +1,15 @@
+# As acts-after-50-minutes, with lamp-seen's humans/doing every 30 s (#6543)
+# and no stretch seen: it acts once, at about 50 minutes, as on the clock alone.
+[[expect]]
+at = "50m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+call = "body.gesture"
+args = { gesture = "stretching" }
+
+[[expect]]
+call = "say"
+args = { note = "They have been sitting a while. In one short, playful line, suggest a quick stretch, as the lamp stretches too." }

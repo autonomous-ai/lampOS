@@ -24,3 +24,5 @@ wellbeing skills, which a case of one skill cannot show, is
 | `quiet-while-the-talk-goes-on` | 10:00, 110 minutes, a talk from minute 95 that does not end | Pass: Nothing |
 | `quiet-in-the-evening` | 20:00, 110 minutes: due at 21:40 | Pass: Nothing (`[active]` 08:00 to 20:00) |
 | `off-when-asked` | 10:00, `wellbeing_nudges(how = "off")` at a minute, 110 minutes | Pass: Nothing (`[stop]`) |
+| `a-stand-when-lamp-seen-saw-no-stretch` | As `invites-a-stand-after-100-minutes`, with `lamp-seen`'s `humans/doing` every 30 s and no stretch seen (#6543) | Pass: At 100 minutes, as there |
+| `quiet-after-a-stretch-was-seen` | 10:00, 110 minutes, a stretch seen at 95 minutes (#6543) | Pass: Nothing: `break_s_ago` 300 at 100, held through the wait and let go |

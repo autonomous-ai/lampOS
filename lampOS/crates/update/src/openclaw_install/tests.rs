@@ -350,7 +350,8 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
             version: 1,
             remove: false,
             skills: true,
-            tasks: false
+            tasks: false,
+            one_path: false
         })
     );
     assert_eq!(round(&lamp, &mut systemd, true, 11), None, "one at a time");
@@ -1020,8 +1021,9 @@ fn the_one_shot_installs_openclaw_after_hermes() {
     assert!(lamp.said().is_some());
 }
 
-/// Turns: Hermes's install under way holds OpenClaw's ask to a later round,
-/// and OpenClaw's holds Hermes's; one stuck past its bound holds nothing.
+/// Turns: Hermes's install under way leaves OpenClaw's ask for the same
+/// one-shot (#7019), and OpenClaw's holds Hermes's; one stuck past its
+/// bound holds nothing.
 #[test]
 fn the_two_installs_take_turns_in_the_one_shot() {
     let lamp = Lamp::new();
@@ -1034,7 +1036,7 @@ fn the_two_installs_take_turns_in_the_one_shot() {
     .unwrap();
     let mut systemd = Fake::default();
     assert_eq!(round(&lamp, &mut systemd, false, 200), None);
-    assert_eq!(lamp.asked(), None, "no ask while Hermes's runs");
+    assert!(lamp.asked().is_some(), "asked, for after Hermes's");
     assert!(!systemd.asked.contains(&"start"));
     let stuck = 100 + hermes_install::STUCK_AFTER.as_millis() as u64;
     assert_eq!(
@@ -1056,6 +1058,25 @@ fn the_two_installs_take_turns_in_the_one_shot() {
     );
     assert_eq!(held, None);
     assert!(!lamp.records().join(hermes_install::ASK).exists());
+}
+
+/// #7019: with Hermes's install under way, OpenClaw's ask is still written,
+/// so the one-shot running Hermes's reads it after Hermes and lays out
+/// OpenClaw's wrapper; no second one-shot is started.
+#[test]
+fn openclaw_asks_while_hermes_s_install_is_under_way() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let hermes = serde_json::json!({"install": "installing", "revision": 1, "at_unix_ms": 100});
+    fs::write(
+        lamp.records().join(hermes_install::RECORD),
+        hermes.to_string(),
+    )
+    .unwrap();
+    let mut systemd = Fake::default();
+    assert_eq!(round(&lamp, &mut systemd, false, 200), None);
+    assert!(lamp.asked().is_some(), "OpenClaw's ask is written");
+    assert!(!systemd.asked.contains(&"start"), "no second one-shot");
 }
 
 /// One watch for both: a freeze with OpenClaw's install alone under way is
@@ -1285,5 +1306,264 @@ fn openclaws_namespace_never_shows_the_runs_token_folder() {
             ns_text(sk(skills)),
             "OpenClaw is not on the one run path yet"
         );
+    }
+}
+
+/// #6685 step 4: with the one run path off, OpenClaw's wrapper is
+/// byte for byte as before; on, it is a gateway agent's: the mark and the
+/// data after `#!/bin/sh`, the rest as before, lamp-update's mark in its
+/// first 512 bytes, and its namespace shows lamp-control's socket alone.
+#[test]
+fn the_one_path_makes_openclaw_a_gateway_agent_and_off_changes_nothing() {
+    for shown in [sk(false), sk(true)] {
+        assert_eq!(wrapper_text_for(shown), wrapper_text());
+    }
+    let on = Shown {
+        skills: true,
+        tasks: true,
+        one_path: true,
+    };
+    let text = wrapper_text_for(on);
+    let head = format!("#!/bin/sh\n{GATEWAY_MARK}{GATEWAY_DATA}");
+    assert!(text.starts_with(&head), "{text}");
+    assert_eq!(&text[head.len()..], &wrapper_text()["#!/bin/sh\n".len()..]);
+    assert!(text[..512].contains(agent_ns::wrapper::MARK));
+    for line in GATEWAY_DATA.lines() {
+        assert!(line.starts_with("#@"), "{line}");
+    }
+    assert!(GATEWAY_DATA.contains(&format!("#@port {PORT}\n")));
+    assert!(GATEWAY_DATA.contains(&format!("#@ns {NS}\n")));
+    assert!(!GATEWAY_DATA.contains("--local"));
+    let ns = ns_text(on);
+    assert!(ns.contains(
+        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\n"
+    ));
+    assert!(!ns_text(sk(true)).contains("L=/run/lampos-control/control.sock"));
+}
+
+/// #6882: with the one run path on but LAMP_SKILL_GATEWAY_RUNS off,
+/// lamp-tasks refuses a gateway default agent's runs, so OpenClaw is shown
+/// exactly what it is with the one run path off: its namespace text and
+/// its wrapper byte for byte, no control socket, no pushed skills shown
+/// for every turn, no gateway mark. With both on, all three.
+#[test]
+fn gateway_runs_off_shows_openclaw_what_the_one_path_off_does() {
+    for skills in [false, true] {
+        let before = sk(skills);
+        let off = shown(skills, true, false);
+        assert_eq!(off, before);
+        assert_eq!(ns_text(off), ns_text(before));
+        assert_eq!(wrapper_text_for(off), wrapper_text_for(before));
+        assert_eq!(wrapper_text_for(off), wrapper_text());
+        // Without the one run path the runs switch alone changes nothing.
+        assert_eq!(shown(skills, false, true), before);
+        assert_eq!(shown(skills, false, false), before);
+        let ns = ns_text(off);
+        assert!(!ns.contains("/run/lampos-control/control.sock"), "{ns}");
+        assert!(!wrapper_text_for(off).contains(GATEWAY_MARK));
+
+        let on = shown(skills, true, true);
+        assert!(on.tasks && on.one_path && on.skills == skills);
+        let ns = ns_text(on);
+        assert!(ns.contains("L=/run/lampos-control/control.sock"), "{ns}");
+        assert!(ns.contains("/var/lib/lampOS/skills-dev, read-only, when there, for the\n"));
+        assert!(ns.contains("if [ -d \"$P\" ]; then mkdir -m 0700"));
+        assert!(!ns.contains("if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]"));
+        let wrapper = wrapper_text_for(on);
+        assert!(wrapper.starts_with(&format!("#!/bin/sh\n{GATEWAY_MARK}{GATEWAY_DATA}")));
+    }
+}
+
+/// The one run path is carried through the one-shot's ask, so its
+/// install writes the wrapper the round looks for.
+#[test]
+fn the_ask_carries_the_one_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let on = Shown {
+        skills: true,
+        tasks: true,
+        one_path: true,
+    };
+    ask(dir.path(), false, on).unwrap();
+    let asked: Ask = serde_json::from_slice(&fs::read(dir.path().join(ASK)).unwrap()).unwrap();
+    assert!(asked.one_path && asked.tasks && asked.skills);
+    ask(dir.path(), false, sk(true)).unwrap();
+    let text = fs::read_to_string(dir.path().join(ASK)).unwrap();
+    assert!(
+        !text.contains("one_path"),
+        "off writes the ask as before: {text}"
+    );
+}
+
+/// #6882 P1-1: with the one run path on, OpenClaw's namespace shows the
+/// pushed skills' folder without `LAMP_NS_NET` (the gateway's unit never
+/// sets it), each edit found once; off, the text is byte for byte
+/// Hermes's with only [`ENGINE_EDITS`], as before.
+#[test]
+fn the_one_path_shows_the_pushed_skills_without_ns_net_and_off_changes_nothing() {
+    for skills in [false, true] {
+        for tasks in [false, true] {
+            let mut before = hermes_install::ns_text(skills, tasks);
+            // A voice make's home lines are Hermes's alone (lamp-voice's
+            // `ns_text`): taken out with `tasks`, as there.
+            if tasks {
+                before = before.replacen(hermes_install::NS_HOME_LINE, "", 1);
+            }
+            for (from, to) in ENGINE_EDITS {
+                before = before.replace(from, to);
+            }
+            let before = before.replacen(RUN_LINE, &format!("{NPM_CI_MODE}{RUN_LINE}"), 1);
+            let off = Shown {
+                skills,
+                tasks,
+                one_path: false,
+            };
+            assert_eq!(ns_text(off), before, "off: as before");
+            if !tasks {
+                assert_eq!(
+                    ns_text(Shown {
+                        one_path: true,
+                        ..off
+                    }),
+                    before
+                );
+                continue;
+            }
+            for (from, _) in RUNS_EDITS {
+                assert_eq!(before.matches(from).count(), 1, "`{from}`");
+            }
+            let on = ns_text(Shown {
+                one_path: true,
+                ..off
+            });
+            assert!(
+                on.contains("if [ -d \"$P\" ]; then mkdir -m 0700 \"$S/p\""),
+                "{on}"
+            );
+            // LAMP_NS_NET's other steps stay behind it.
+            assert_eq!(
+                on.matches("if [ \"${LAMP_NS_NET-}\" = run ]").count(),
+                before.matches("if [ \"${LAMP_NS_NET-}\" = run ]").count() - 1
+            );
+            assert!(on.contains("model.sock"));
+            let checked = std::process::Command::new("/bin/sh")
+                .args(["-n", "-c", &on])
+                .output()
+                .unwrap();
+            assert!(checked.status.success(), "{checked:?}");
+        }
+    }
+}
+
+/// #6882 P1-1, run under `sh` with every mount stubbed on a stand-in
+/// root that has the pushed skills' folder, and no `LAMP_NS_NET` (as the
+/// gateway's unit runs it): with the one run path on, the folder is
+/// staged, moved back and remounted read-only; off, never touched.
+#[test]
+fn the_gateways_namespace_shows_the_pushed_skills_read_only_with_the_one_path() {
+    for one_path in [false, true] {
+        let folder = tempfile::tempdir().unwrap();
+        let base = folder.path().to_string_lossy().into_owned();
+        let at = |path: &str| format!("{base}/root{path}");
+        let stubs = folder.path().join("stubs");
+        fs::create_dir_all(&stubs).unwrap();
+        let log = folder.path().join("log");
+        let resolv = at("/run/systemd/resolve/stub-resolv.conf");
+        for made in [
+            PLACE,
+            WORK,
+            SKILLS,
+            "/etc/lampOS",
+            "/dev/shm",
+            "/run/systemd/resolve",
+            hermes_install::PUSHED,
+        ] {
+            fs::create_dir_all(at(made)).unwrap();
+        }
+        fs::write(&resolv, "nameserver 127.0.0.53\n").unwrap();
+        let uid_map = folder.path().join("uid_map");
+        fs::write(&uid_map, "         0        996          1\n").unwrap();
+        let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
+                    case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; readlink) echo \"$RESOLV\";; \
+                    unshare) echo ran;; esac\n";
+        for name in [
+            "mount", "findmnt", "mkdir", "rmdir", "rm", "touch", "readlink", "unshare", "ip",
+        ] {
+            let path = stubs.join(name);
+            fs::write(&path, stub).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let mut text = ns_text(Shown {
+            skills: false,
+            tasks: true,
+            one_path,
+        });
+        let moved = [
+            "/var/tmp",
+            "/var/lib",
+            "/etc/lampOS",
+            "/etc/resolv.conf",
+            "/dev/shm",
+            "/tmp",
+            "/run",
+        ];
+        for (n, path) in moved.iter().enumerate() {
+            text = text.replace(path, &format!("\u{1}{n}\u{1}"));
+        }
+        for (n, path) in moved.iter().enumerate() {
+            text = text.replace(&format!("\u{1}{n}\u{1}"), &at(path));
+        }
+        let text = text
+            .replace("/proc/self/uid_map", &uid_map.to_string_lossy())
+            .replace("/usr/bin/unshare", &stubs.join("unshare").to_string_lossy());
+        let script = folder.path().join("openclaw-ns");
+        fs::write(&script, text).unwrap();
+        let out = std::process::Command::new("/bin/sh")
+            .arg(&script)
+            .arg("gateway")
+            .current_dir(at(WORK))
+            .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
+            .env("LOG", &log)
+            .env("RESOLV", &resolv)
+            .env("LAMP_NS_UID", "996")
+            .env("LAMP_NS_GID", "994")
+            .env_remove("LAMP_NS_NET")
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "{out:?}");
+        let lines: Vec<String> = fs::read_to_string(&log)
+            .unwrap()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        let stage = at("/tmp/.lampos-ns");
+        let pushed = at(hermes_install::PUSHED);
+        let wanted = [
+            format!("mkdir -m 0700 {stage}/p"),
+            format!("mount --bind {pushed} {stage}/p"),
+            format!("mount --move {stage}/p {pushed}"),
+            format!("mount -o remount,bind,ro,nosuid,nodev,relatime {pushed}"),
+            format!("rmdir {stage}/p"),
+        ];
+        let places: Vec<Option<usize>> = wanted
+            .iter()
+            .map(|line| lines.iter().position(|l| l == line))
+            .collect();
+        if one_path {
+            let places: Vec<usize> = places
+                .iter()
+                .zip(&wanted)
+                .map(|(at, line)| at.unwrap_or_else(|| panic!("no `{line}` in {lines:#?}")))
+                .collect();
+            assert!(places.is_sorted(), "{lines:#?}");
+        } else {
+            assert!(
+                !lines.iter().any(|line| line.contains(&pushed)),
+                "{lines:#?}"
+            );
+        }
+        // No model socket and no relay without LAMP_NS_NET, either way.
+        assert!(!lines.iter().any(|line| line.contains("model.sock")));
+        assert!(!lines.iter().any(|line| line.contains("net-relay")));
     }
 }

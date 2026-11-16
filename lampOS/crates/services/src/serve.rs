@@ -11,7 +11,7 @@ use crate::reads::{self, ANSWER_MOST, Asker, Plan};
 use crate::refresh::Backend;
 use crate::store::{Entry, Store};
 use crate::writes::{self, Action, Desk};
-use crate::{skill_writes, spoken, tools};
+use crate::{skill_secrets, skill_writes, spoken, tools};
 use serde_json::{Value, json};
 use std::{
     fmt,
@@ -83,6 +83,39 @@ pub fn read_back_sha256(read_back: &str) -> String {
         .map(|byte| format!("{byte:02x}"))
         .collect()
 }
+/// The room a skill run's read-back has in the voice's note, in bytes as
+/// the note writes it ([`run_read_back_bytes`]), before the skill's name
+/// (said twice there) and the service's code ([`run_read_back_room`]):
+/// `lamp_gemini::wire::MAX_NOTE_BYTES` (1,024) less the note's fixed words,
+/// its 32-character send id and three digits of time left (lamp-voice's
+/// `run_write_yes::RunWrite::note`, whose test holds it to this exactly).
+/// The voice never cuts a longer one, only says it was too long and sends
+/// nothing, so a run's write over it is refused here, held nowhere, with
+/// the room named for the run's agent to shorten it and call again.
+pub const RUN_NOTE_ROOM: usize = 591;
+
+/// The most bytes `read_back` of `skill`'s run's write to `service` (the
+/// code it is held for) may take in the voice's note.
+pub fn run_read_back_room(skill: &str, service: &str) -> usize {
+    RUN_NOTE_ROOM.saturating_sub(2 * skill.len() + service.len())
+}
+
+/// The bytes `read_back` takes in the voice's note: as a JSON string's,
+/// without its quotes (a line break or a quote mark two, an accented
+/// letter two or three).
+pub fn run_read_back_bytes(read_back: &str) -> usize {
+    serde_json::to_string(read_back).map_or(usize::MAX, |json| json.len().saturating_sub(2))
+}
+
+/// What a skill run's write too long to read back is told: the room, its
+/// own length and at least how much to shorten it by.
+pub fn run_too_long(room: usize, bytes: usize) -> String {
+    format!(
+        "nothing was prepared: the lamp reads a write back to the owner in one go, and this read-back is {bytes} characters, over the {room} it can read out (a line break, a quote mark or an accented letter counts as two or more). Shorten the text by at least {} characters and call service_write again.",
+        bytes.saturating_sub(room)
+    )
+}
+
 /// The fixed-write runs kept, one send each ([`Services::run_fixed_write`]):
 /// one run at a time on the lamp, so more than enough.
 pub const FIXED_RUNS_KEPT: usize = 32;
@@ -165,6 +198,10 @@ pub enum Admin {
     /// The owner's yes to a made skill's writes, from the app (#6066):
     /// `{"skill", "writes": [...]}`, as [`Services::skill_write_approve`].
     ApproveSkillWrites(Value),
+    /// An uploaded skill's keys, from the app (`LAMP_SKILL_SECRETS`):
+    /// listed, one set or unset, or all dropped as it is removed
+    /// ([`skill_secrets::Ask`], its value hidden).
+    SkillSecrets(skill_secrets::Ask),
 }
 
 impl fmt::Debug for Admin {
@@ -182,6 +219,7 @@ impl fmt::Debug for Admin {
                 .debug_tuple("ApproveSkillWrites")
                 .field(&"<hidden>")
                 .finish(),
+            Self::SkillSecrets(ask) => f.debug_tuple("SkillSecrets").field(ask).finish(),
         }
     }
 }
@@ -226,6 +264,14 @@ pub fn parse_admin(line: &str) -> Result<Admin, String> {
             }
             Ok(Admin::ApproveSkillWrites(args))
         }
+        Some(
+            op @ (skill_secrets::LIST_OP
+            | skill_secrets::SET_OP
+            | skill_secrets::UNSET_OP
+            | skill_secrets::DROP_OP),
+        ) => skill_secrets::Ask::parse(op, object)
+            .map(Admin::SkillSecrets)
+            .map_err(str::to_owned),
         Some("set" | "remove" | "wipe" | "list" | skill_writes::APPROVE) => {
             Err("the request has fields it doesn't take".into())
         }
@@ -258,6 +304,7 @@ pub fn parse_tool(line: &str) -> Result<(String, Value), String> {
                 skill_writes::SENT,
                 skill_writes::APPROVED,
                 RUN_WAITING,
+                skill_secrets::NAMES_CALL,
             ]
             .contains(name)
         })
@@ -327,6 +374,10 @@ pub struct Services<H, M> {
     /// calls on other threads never write a list older than one already
     /// written, nor share the temporary file (Jarvis's P3 on #6476).
     linked_tools_write: Mutex<()>,
+    /// `LAMP_SKILL_SECRETS=on`: an uploaded skill's keys, in the store's
+    /// `skill-secrets` folder, set from the app and asked for by
+    /// lamp-tasks for a run ([`skill_secrets`]); none off.
+    pub skill_secrets: Option<skill_secrets::Secrets>,
 }
 
 /// What a call to a service not linked is told, after its name: and where
@@ -438,6 +489,40 @@ impl<H: Http, M: Mail> Services<H, M> {
             linked_tools: None,
             linked_tools_write: Mutex::new(()),
             desk: Desk::default(),
+            skill_secrets: None,
+        }
+    }
+
+    /// With `LAMP_SKILL_SECRETS` as `on` gives it: the keys kept in the
+    /// store's own folder, for the skills in [`Self::skills_dir`] (set
+    /// first), and those of a skill no longer there dropped now.
+    pub fn with_skill_secrets(mut self, on: bool) -> Self {
+        self.skill_secrets =
+            on.then(|| skill_secrets::Secrets::new(&self.store.0, &self.skills_dir));
+        if let Some(secrets) = &self.skill_secrets {
+            secrets.sweep();
+        }
+        self
+    }
+
+    /// Whether a peer in `cgroup` is `lamp-tasks` on the tools' door with
+    /// `LAMP_SKILL_SECRETS=on`: then [`skill_secrets::Secrets::run`]
+    /// answers it, and nothing else.
+    pub fn secrets_caller(&self, door: Door, cgroup: &str) -> bool {
+        door == Door::Tools
+            && self.skill_secrets.is_some()
+            && from_asker(cgroup, skill_secrets::RUN_ASKER_CGROUP)
+    }
+
+    /// lamp-tasks' ask for a run's keys, and the journal's line (counts
+    /// only).
+    pub fn run_secrets(&self, line: &str) -> (Value, String) {
+        match &self.skill_secrets {
+            Some(secrets) => secrets.run(line),
+            None => (
+                json!({"ok": false, "error": skill_secrets::OFF}),
+                "a skill's run asked for keys with LAMP_SKILL_SECRETS off".into(),
+            ),
         }
     }
 
@@ -562,7 +647,7 @@ impl<H: Http, M: Mail> Services<H, M> {
                 Err(RUN_PREPARES_ONLY.into())
             }
             tools::WRITE if self.desk.waiting_at(Instant::now()) => Err(RUN_WRITE_WAITS.into()),
-            tools::WRITE => match self.write(&args).await {
+            tools::WRITE => match self.write_for(&args, Some(&skill)).await {
                 Ok(mut held) => {
                     if let Some(send_id) = held
                         .as_object_mut()
@@ -794,6 +879,16 @@ impl<H: Http, M: Mail> Services<H, M> {
             Err(why) => return (refused(&why), format!("a request refused: {why}")),
         };
         match asked {
+            Admin::SkillSecrets(ask) => match &self.skill_secrets {
+                Some(secrets) => match secrets.answer(&ask) {
+                    (Ok(view), said) => (json!({"ok": true, "result": view}), said),
+                    (Err(why), said) => (refused(why), said),
+                },
+                None => (
+                    refused(skill_secrets::OFF),
+                    "a skill's keys asked with LAMP_SKILL_SECRETS off".into(),
+                ),
+            },
             Admin::List => (
                 json!({"ok": true, "connected": self.store.list(crate::now_secs())}),
                 "listed".into(),
@@ -916,6 +1011,22 @@ impl<H: Http, M: Mail> Services<H, M> {
                 // The voice's own: a skill run's write waiting for its yes.
                 RUN_WAITING if asker == Asker::Owner && self.skill_tasks => {
                     Ok(self.run_waiting(Instant::now()))
+                }
+                // The voice's own: which keys an agent skill needs and has,
+                // names only, before its tool runs (`LAMP_SKILL_SECRETS`).
+                skill_secrets::NAMES_CALL if asker == Asker::Owner => {
+                    let skill = args
+                        .get("skill")
+                        .and_then(Value::as_str)
+                        .filter(|skill| skill_writes::skill_name_ok(skill));
+                    match (&self.skill_secrets, skill) {
+                        (None, _) => Err(skill_secrets::OFF.to_owned()),
+                        (Some(_), None) => Err(skill_secrets::BAD_SKILL.to_owned()),
+                        (Some(secrets), Some(skill)) => secrets
+                            .answer(&skill_secrets::Ask::List(skill.to_owned()))
+                            .0
+                            .map_err(str::to_owned),
+                    }
                 }
                 // A made skill's write is `lamp-skills`' alone.
                 _ => Err("no such function".into()),
@@ -1868,6 +1979,13 @@ impl<H: Http, M: Mail> Services<H, M> {
     }
 
     async fn write(&self, args: &Value) -> Result<Value, String> {
+        self.write_for(args, None).await
+    }
+
+    /// [`Self::write`], for the skill `run` names when a skill's run
+    /// prepares it: a read-back too long for the voice's one note
+    /// ([`run_read_back_room`]) is refused before it is held.
+    async fn write_for(&self, args: &Value, run: Option<&str>) -> Result<Value, String> {
         if !self.write_on {
             return Err("writing to services is off on this lamp".into());
         }
@@ -1938,6 +2056,13 @@ impl<H: Http, M: Mail> Services<H, M> {
             } else {
                 "Nothing is sent yet. Read read_back to the person in full; send only if they agree, in any words."
             };
+            if let Some(skill) = run {
+                let room = run_read_back_room(skill, pending.service);
+                let bytes = run_read_back_bytes(&read_back);
+                if bytes > room {
+                    return Err(run_too_long(room, bytes));
+                }
+            }
             let send_id = self.desk.hold(pending, Instant::now());
             return Ok(json!({
                 "read_back": read_back,
@@ -2465,7 +2590,9 @@ fn answer_one<H: Http, M: Mail>(
     let skill = !asker && services.skill_caller(door, &cgroup);
     // A skill's run (#6432): `lamp-control`, only with LAMP_SKILL_TASKS=on.
     let run = !asker && !skill && services.run_caller(door, &cgroup);
-    if !asker && !skill && !run {
+    // A run's keys (`LAMP_SKILL_SECRETS`): `lamp-tasks`, for that alone.
+    let keys = !asker && !skill && !run && services.secrets_caller(door, &cgroup);
+    if !asker && !skill && !run && !keys {
         return writeln!(&*stream, "{}", door.refusal());
     }
     let mut line = String::new();
@@ -2482,6 +2609,11 @@ fn answer_one<H: Http, M: Mail>(
         }
         Door::Tools if skill => runtime.block_on(services.skill_tool(&line)),
         Door::Tools if run => runtime.block_on(services.run_tool(&line)),
+        Door::Tools if keys => {
+            let (answer, said) = services.run_secrets(&line);
+            eprintln!("lamp-services: {said}");
+            answer
+        }
         Door::Tools => runtime.block_on(services.tool(&line)),
     };
     writeln!(&*stream, "{answer}")
@@ -2746,6 +2878,59 @@ mod tests {
         }
         // Nor does it make lamp-control a made skill's caller.
         assert!(!on.with_skill_reads(true).skill_caller(Door::Tools, control));
+    }
+
+    /// `LAMP_SKILL_SECRETS`: a skill's keys set and listed on the admin
+    /// door (names back, the value never in the answer, its journal line
+    /// or the request's `Debug`), refused with the switch off; and the run
+    /// door is lamp-tasks' alone, with the switch on.
+    #[test]
+    fn a_skills_keys_go_in_from_the_app_and_out_to_lamp_tasks_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("skills").join("photo-booth");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join("skill.toml"),
+            "secrets = [\"GEMINI_API_KEY\"]\n",
+        )
+        .unwrap();
+        let set = json!({"op": "skill_secret_set", "skill": "photo-booth",
+            "name": "GEMINI_API_KEY", "value": "test-value-123"})
+        .to_string();
+        assert!(!format!("{:?}", parse_admin(&set).unwrap()).contains("test-value-123"));
+        let off = services(dir.path(), "[]", true);
+        let (answer, _) = run(off.admin(&set));
+        assert_eq!(answer["error"], skill_secrets::OFF);
+        let on = services(dir.path(), "[]", true).with_skill_secrets(true);
+        let (answer, said) = run(on.admin(&set));
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert_eq!(answer["result"]["set"], json!(["GEMINI_API_KEY"]));
+        assert!(!answer.to_string().contains("test-value-123"));
+        assert!(!said.contains("test-value-123"), "{said}");
+        let (listed, _) = run(on.admin(r#"{"op":"skill_secrets","skill":"photo-booth"}"#));
+        assert_eq!(
+            listed["result"],
+            json!({"skill": "photo-booth", "needed": ["GEMINI_API_KEY"], "set": ["GEMINI_API_KEY"]})
+        );
+        let tasks = "0::/lampos.slice/lampos-parts.slice/lamp-tasks.service\n";
+        assert!(!off.secrets_caller(Door::Tools, tasks));
+        assert!(on.secrets_caller(Door::Tools, tasks));
+        assert!(!on.secrets_caller(Door::Admin, tasks));
+        for other in [
+            "0::/lampos.slice/lampos-parts.slice/lamp-skills.service\n",
+            "0::/lampos.slice/lampos-parts.slice/lamp-control.service\n",
+            "0::/lampos.slice/lampos-parts.slice/lamp-tasks.service-evil\n",
+            "0::/lampos.slice/lampos-voice.slice/lamp-voice.service\n",
+        ] {
+            assert!(!on.secrets_caller(Door::Tools, other), "{other}");
+        }
+        let (given, said) = on.run_secrets(r#"{"op":"run_secrets","skill":"photo-booth"}"#);
+        assert_eq!(given["values"]["GEMINI_API_KEY"], "test-value-123");
+        assert!(!said.contains("test-value-123"));
+        // A wipe (a sign-out, an unpairing) takes them with the rest.
+        run(on.admin(r#"{"op":"wipe"}"#));
+        let (given, _) = on.run_secrets(r#"{"op":"run_secrets","skill":"photo-booth"}"#);
+        assert_eq!(given["missing"], json!(["GEMINI_API_KEY"]));
     }
 
     fn run_line(name: &str, args: Value) -> String {
@@ -3033,6 +3218,54 @@ mod tests {
             "{refused}"
         );
         assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
+    }
+
+    /// A skill run's write whose read-back can't fit the voice's one note
+    /// is refused with the room it has, by how much to shorten it, and
+    /// nothing held (the voice would only say it was too long and send
+    /// nothing); one at the room is held as any.
+    #[test]
+    fn a_skill_runs_write_too_long_to_read_back_is_refused_with_its_room() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = services(dir.path(), "[]", true).with_skill_tasks(true);
+        run(services.admin(&set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+        )));
+        let draft = |text: &str| {
+            json!({"service":"gmail","action":"send_mail","to":["me@home.test"],
+                "subject":"Unread","text":text})
+        };
+        let room = run_read_back_room("mail-count", "gmail");
+        assert_eq!(room, RUN_NOTE_ROOM - 2 * "mail-count".len() - "gmail".len());
+        // The read-back's own words around one character of text.
+        let probe = run(services.run_tool(&run_line(tools::WRITE, draft("x"))));
+        let words = run_read_back_bytes(probe["result"]["read_back"].as_str().unwrap()) - 1;
+        services.desk.forget(None);
+        *services.run_held.lock().unwrap() = None;
+        let fits = "x".repeat(room - words);
+        // One byte over (a line break is two in the note): refused, held
+        // nowhere, the room and the shortening named.
+        let over = format!("x\n{}", &fits[2..]);
+        let refused = run(services.run_tool(&run_line(tools::WRITE, draft(&over))));
+        assert_eq!(refused["ok"], false, "{refused}");
+        assert_eq!(refused["error"], run_too_long(room, room + 1), "{refused}");
+        let error = refused["error"].as_str().unwrap();
+        assert!(
+            error.contains(&format!("over the {room}")) && error.contains("at least 1 character"),
+            "{error}"
+        );
+        assert!(!services.desk.waiting());
+        assert!(services.run_held.lock().unwrap().is_none());
+        // At the room: held for the yes.
+        let held = run(services.run_tool(&run_line(tools::WRITE, draft(&fits))));
+        assert_eq!(held["ok"], true, "{held}");
+        assert_eq!(
+            run_read_back_bytes(held["result"]["read_back"].as_str().unwrap()),
+            room
+        );
+        assert!(services.desk.waiting());
+        assert!(services.mail.sent.lock().unwrap().is_empty());
     }
 
     /// #6432: the voice asks for a run's held write (its own call, with

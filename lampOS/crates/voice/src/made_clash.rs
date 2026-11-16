@@ -6,17 +6,22 @@
 //! I'm present" showed only some of the time.
 //!
 //! A clash is found after the made skill is checked and kept, before it is
-//! put on ([`found`]): nothing is put on, and the model is told the other
-//! skill's spoken name and to ask, word for word, whether to replace it,
-//! keep both (they may take turns: nothing makes either win yet) or cancel
-//! ([`asked`]). Each later heard line on the second route is told the
+//! put on ([`found`]), with every skill on the lamp it clashes with, not
+//! only the first (lamp-9adf, 13 Nov: with three on one arrival, the two
+//! after the first still clashed once it was replaced): nothing is put on,
+//! and the model is told the spoken name of every one ([`spoken_list`]: a
+//! replace never takes off one it didn't name, Heron's P2 on #6976) and to
+//! ask, word for word, whether to replace
+//! them, keep them (they may take turns: nothing makes any win yet) or
+//! cancel ([`asked`]). Each later heard line on the second route is told the
 //! clash's id and question while it waits ([`waiting_note`]), as that
 //! route's history keeps no call's answer. Their answer, in a later line
 //! the owner said, comes back as
 //! `make_skill` with [`CLASH_ID`] and [`CHOICE`] alone ([`chosen`]):
-//! replace puts the new one on, then takes the other off through the
-//! manage helper's own remove (as the app's remove does); keep puts the new
-//! one on beside it; cancel puts nothing on and drops the made one.
+//! replace puts the new one on, then takes each of the others off through
+//! the manage helper's own remove (as the app's remove does), all within
+//! [`REPLACE_WITHIN`]; keep puts the
+//! new one on beside them; cancel puts nothing on and drops the made one.
 //!
 //! Replace takes a skill off the lamp, so the choice is guarded as a made
 //! skill's yes is (`crate::skill_write_yes`, Heron's P2 on #6614):
@@ -48,6 +53,16 @@ pub const CLASH_WITHIN: Duration = Duration::from_secs(300);
 
 /// How long the manage helper is waited on for a remove or a put-on.
 const HELPER_WAIT: Duration = Duration::from_secs(8);
+
+/// How long a replace's removes take, all together (Heron's P2 on #6976:
+/// each waited [`HELPER_WAIT`] in turn, so a hung helper and six clashes
+/// held the turn about 48 s). A remove is started only while its own
+/// [`HELPER_WAIT`] still ends inside it, so the last one ends within it
+/// too; one not started is not removed, and is told so ([`NO_TIME`]).
+pub const REPLACE_WITHIN: Duration = Duration::from_secs(12);
+
+/// Why a remove not started within [`REPLACE_WITHIN`] wasn't done.
+const NO_TIME: &str = "there wasn't time to ask the lamp in this turn";
 
 /// How many of the lamp's answers a clash keeps, each at most
 /// [`SAID_MOST`] bytes.
@@ -137,19 +152,24 @@ pub struct Clash {
     pub shares: &'static str,
 }
 
-/// The skill on the lamp that `made`, just kept and not yet on, clashes
+/// Every skill on the lamp that `made`, just kept and not yet on, clashes
 /// with ([`shared`]): first those installed (`keeping.installed`, and the
-/// skills pushed beside it), each by its `skill.toml`; then the made skills
-/// kept here and on whose folder isn't there, by the signature kept with
-/// them. None when nothing clashes, or the made one's signature isn't kept.
-pub fn found(keeping: &Keeping, made: &Made) -> Option<Clash> {
+/// skills pushed beside it), each by its `skill.toml`, in folder order;
+/// then the made skills kept here and on whose folder isn't there, by the
+/// signature kept with them. Empty when nothing clashes, or the made one's
+/// signature isn't kept.
+pub fn found(keeping: &Keeping, made: &Made) -> Vec<Clash> {
     let entries = made_skill::entries(&keeping.directory);
-    let mine = entries
+    let Some(mine) = entries
         .iter()
         .find(|entry| entry["sha256"] == made.sha256.as_str())
         .map(|entry| entry["clash"].clone())
-        .filter(Value::is_object)?;
+        .filter(Value::is_object)
+    else {
+        return Vec::new();
+    };
     let mut seen = Vec::new();
+    let mut clashes = Vec::new();
     for folder in [
         keeping.installed.clone(),
         made_skill::pushed_folder(&keeping.installed),
@@ -170,28 +190,101 @@ pub fn found(keeping: &Keeping, made: &Made) -> Option<Clash> {
                 continue;
             }
             seen.push(name.to_owned());
+            // A name in both folders is one skill: named once.
+            if clashes.iter().any(|clash: &Clash| clash.name == name) {
+                continue;
+            }
             let Ok(toml) = std::fs::read_to_string(path.join("skill.toml")) else {
                 continue;
             };
             if let Some(shares) = shared(&mine, &signature(&toml)) {
-                return Some(Clash {
+                clashes.push(Clash {
                     name: name.to_owned(),
                     shares,
                 });
             }
         }
     }
-    entries
+    for entry in entries
         .iter()
         .filter(|entry| entry["on"] == true && entry["sha256"] != made.sha256.as_str())
-        .filter_map(|entry| Some((entry["name"].as_str()?, &entry["clash"])))
-        .filter(|(name, _)| *name != made.name && !seen.iter().any(|seen| seen == name))
-        .find_map(|(name, theirs)| {
-            shared(&mine, theirs).map(|shares| Clash {
+    {
+        let Some(name) = entry["name"].as_str() else {
+            continue;
+        };
+        if name == made.name
+            || seen.iter().any(|seen| seen == name)
+            || clashes.iter().any(|clash| clash.name == name)
+        {
+            continue;
+        }
+        if let Some(shares) = shared(&mine, &entry["clash"]) {
+            clashes.push(Clash {
                 name: name.to_owned(),
                 shares,
-            })
+            });
+        }
+    }
+    clashes
+}
+
+/// Every one of `names`' spoken names: "a", "a and b", "a, b, c and d".
+/// None is left out, however many (Heron's P2 on #6976: "and 2 more" let a
+/// replace take off two skills the person never heard named). Two that
+/// sound the same are told apart by their folder ([`told_names`]).
+pub fn spoken_list(names: &[String]) -> String {
+    joined(&told_names(names))
+}
+
+/// Each of `names` as said: its spoken name, and, when another of them has
+/// the same words (Heron's P3 on #6976: "glow a and glow a"), its folder
+/// too, as "glow a (folder glow-a)".
+fn told_names(names: &[String]) -> Vec<String> {
+    let spoken: Vec<String> = names
+        .iter()
+        .map(|name| made_skill::spoken_name(name))
+        .collect();
+    let words: Vec<Vec<String>> = spoken
+        .iter()
+        .map(|said| crate::services::check_words(said))
+        .collect();
+    names
+        .iter()
+        .zip(&spoken)
+        .zip(&words)
+        .map(|((name, said), heard)| {
+            if words.iter().filter(|other| *other == heard).count() > 1 {
+                format!("{said} (folder {name})")
+            } else {
+                said.clone()
+            }
         })
+        .collect()
+}
+
+/// `told` as one spoken list: "a", "a and b", "a, b and c".
+fn joined(told: &[String]) -> String {
+    match told.split_last() {
+        None => String::new(),
+        Some((last, [])) => last.clone(),
+        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+    }
+}
+
+/// What the made one shares with `clashes`, all told: the light, the head
+/// or both.
+fn shares_of(clashes: &[Clash]) -> &'static str {
+    let light = clashes.iter().any(|clash| clash.shares.contains("light"));
+    let head = clashes.iter().any(|clash| clash.shares.contains("head"));
+    match (light, head) {
+        (true, true) => "the light and the head",
+        (false, true) => "the head",
+        _ => "the light",
+    }
+}
+
+fn names_of(clashes: &[Clash]) -> Vec<String> {
+    clashes.iter().map(|clash| clash.name.clone()).collect()
 }
 
 /// A clash waiting for the person's choice: one at a time, the newest.
@@ -200,7 +293,8 @@ struct Waiting {
     keeping: Keeping,
     sha256: String,
     name: String,
-    other: String,
+    /// The skills on the lamp it clashes with, by folder name.
+    others: Vec<String>,
     /// What the lamp must have said whole, uncut, before a replace or a
     /// keep is taken ([`question`]).
     question: String,
@@ -242,24 +336,40 @@ static IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 /// The line said for a clash when the turn that made it was cut: the model
 /// never had the question to ask, so the person is told it wasn't put on.
-pub fn cut_line(made: &Made, clash: &Clash) -> String {
-    format!(
-        "I made {}, but didn't put it on: {} starts at the same moment and uses {}. Ask me \
-         again to replace it or to keep both.",
-        made_skill::spoken_name(&made.name),
-        made_skill::spoken_name(&clash.name),
-        clash.shares
-    )
+pub fn cut_line(made: &Made, clashes: &[Clash]) -> String {
+    let new = made_skill::spoken_name(&made.name);
+    let others = spoken_list(&names_of(clashes));
+    let shares = shares_of(clashes);
+    if clashes.len() == 1 {
+        format!(
+            "I made {new}, but didn't put it on: {others} starts at the same moment and uses \
+             {shares}. Ask me again to replace it or to keep both."
+        )
+    } else {
+        format!(
+            "I made {new}, but didn't put it on: {others} start at the same moment and use \
+             {shares}. Ask me again to replace them or to keep them all."
+        )
+    }
 }
 
 /// The question the lamp asks of a clash, word for word: said whole before
 /// a replace or a keep is taken. "Keep both" promises no winner: nothing
-/// yet makes the newer one's light come last (Heron's P2 on #6614).
-fn question(new: &str, other: &str, shares: &str) -> String {
-    format!(
-        "{new} would start at the same moment as {other}, which is on the lamp, and both use \
-         {shares}. Shall I replace {other}, keep both (they may take turns), or cancel?"
-    )
+/// yet makes the newer one's light come last (Heron's P2 on #6614). With
+/// more than one, `others` names every one of them ([`spoken_list`]).
+fn question(new: &str, others: &str, many: bool, shares: &str) -> String {
+    if many {
+        format!(
+            "{new} would start at the same moment as {others}, which are on the lamp, and they \
+             all use {shares}. Shall I replace them all, keep them all (they may take turns), or \
+             cancel?"
+        )
+    } else {
+        format!(
+            "{new} would start at the same moment as {others}, which is on the lamp, and both \
+             use {shares}. Shall I replace {others}, keep both (they may take turns), or cancel?"
+        )
+    }
 }
 
 /// What the model is told to say of a clash: `question`, word for word.
@@ -279,26 +389,35 @@ fn then_choose(id: &str) -> String {
     )
 }
 
-/// `made`, kept and not on, clashes with `clash`: it waits for the person's
+/// `made`, kept and not on, clashes with `clashes` (one or more, from
+/// [`found`]): it waits for the person's
 /// choice, asked in a later line than `request`, at most [`CLASH_WITHIN`]
 /// after `now`. A clash waiting before it is let go, its made one dropped
 /// ([`made_skill::forget_unput`]). What the model is told: the other
-/// skill's spoken name, and the question to ask word for word.
-pub fn asked(keeping: &Keeping, made: &Made, clash: &Clash, request: u64, now: Instant) -> Value {
+/// skills' spoken names, and the question to ask word for word.
+pub fn asked(
+    keeping: &Keeping,
+    made: &Made,
+    clashes: &[Clash],
+    request: u64,
+    now: Instant,
+) -> Value {
     let id = format!(
         "clash-{}",
         IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     );
     let new = made_skill::spoken_name(&made.name);
-    let other = made_skill::spoken_name(&clash.name);
-    let question = question(&new, &other, clash.shares);
+    let others = names_of(clashes);
+    let spoken = spoken_list(&others);
+    let shares = shares_of(clashes);
+    let question = question(&new, &spoken, clashes.len() > 1, shares);
     let before = kept::waiting(|waiting| {
         waiting.replace(Waiting {
             id: id.clone(),
             keeping: keeping.clone(),
             sha256: made.sha256.clone(),
             name: made.name.clone(),
-            other: clash.name.clone(),
+            others: others.clone(),
             question: question.clone(),
             request,
             at: now,
@@ -311,13 +430,15 @@ pub fn asked(keeping: &Keeping, made: &Made, clash: &Clash, request: u64, now: I
     }
     eprintln!(
         "lamp-voice: request {request}: a made skill {} clashes with {} ({}): not put on, the person is asked",
-        made.name, clash.name, clash.shares
+        made.name,
+        others.join(", "),
+        shares
     );
     json!({
         "made": made.name,
         "on": false,
-        "clashes_with": other,
-        "shares": clash.shares,
+        "clashes_with": spoken,
+        "shares": shares,
         CLASH_ID: id,
         "next": format!("{} {}", say_whole(&question), then_choose(&id)),
     })
@@ -345,7 +466,7 @@ pub fn waiting_note(request: u64, now: Instant) -> Option<String> {
              {CLASH_ID} and {CHOICE} \"replace\", \"keep\" or \"cancel\", never a request. If \
              they say anything else, don't call it: nothing is put on.)",
             made_skill::spoken_name(&waiting.name),
-            made_skill::spoken_name(&waiting.other),
+            spoken_list(&waiting.others),
             waiting.question,
             waiting.id
         ))
@@ -454,18 +575,32 @@ fn said_whole_before(waiting: &Waiting, request: u64) -> bool {
     })
 }
 
-/// How a choice is carried out: the other skill taken off by name, and the
-/// new one put on by its SHA-256 (its name once on, or why not).
+/// Why a remove didn't take a skill off.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NotOff {
+    /// It is still on: refused, or the helper couldn't be reached.
+    Refused(String),
+    /// The helper didn't answer in time: it may be off, or still on
+    /// (Heron's P3 on #6976: never told as "still on").
+    Unsure(String),
+}
+
+/// How a choice is carried out: the other skill taken off by name, the
+/// new one put on by its SHA-256 (its name once on, or why not), and the
+/// clock a replace's removes are timed by ([`REPLACE_WITHIN`]).
 pub struct Hands<'a> {
-    pub remove: &'a dyn Fn(&Keeping, &str) -> Result<(), String>,
+    pub remove: &'a dyn Fn(&Keeping, &str) -> Result<(), NotOff>,
     pub put_on: &'a dyn Fn(&Keeping, &str) -> Result<String, String>,
+    pub clock: &'a dyn Fn() -> Instant,
 }
 
 /// The product's [`Hands`]: the manage helper's own `{"remove": NAME}`, as
-/// the app's remove asks it, and [`made_skill::put_on_within`].
+/// the app's remove asks it, [`made_skill::put_on_within`], and the real
+/// clock.
 pub fn helper_hands() -> Hands<'static> {
     Hands {
-        remove: &|keeping, name| remove_by_helper(&keeping.manage, name),
+        clock: &Instant::now,
+        remove: &|keeping, name| remove_said(&keeping.manage, name),
         put_on: &|keeping, sha256| {
             made_skill::put_on_within(
                 &keeping.directory,
@@ -478,20 +613,33 @@ pub fn helper_hands() -> Hands<'static> {
     }
 }
 
+/// [`remove_said`] in plain words alone, as `crate::made_remove` tells
+/// it.
 pub(crate) fn remove_by_helper(socket: &Path, name: &str) -> Result<(), String> {
+    remove_said(socket, name).map_err(|(NotOff::Refused(why) | NotOff::Unsure(why))| why)
+}
+
+/// The manage helper's own `{"remove": NAME}`: off, or why not, and
+/// whether it may be off all the same ([`NotOff`]).
+fn remove_said(socket: &Path, name: &str) -> Result<(), NotOff> {
     match crate::tools::reached(socket, &json!({ "remove": name }), HELPER_WAIT) {
-        None => Err("the lamp's skills couldn't be reached".into()),
-        Some(None) => Err("the lamp didn't say in time whether it is off".into()),
+        None => Err(NotOff::Refused(
+            "the lamp's skills couldn't be reached".into(),
+        )),
+        // Asked, with no answer in time: the helper may have taken it off.
+        Some(None) => Err(NotOff::Unsure(
+            "the lamp didn't say in time whether it is off".into(),
+        )),
         Some(Some(answer)) if answer.get("done").is_some() => Ok(()),
         Some(Some(answer)) => {
             eprintln!(
                 "lamp-voice: the skills helper didn't remove {name}: {}",
                 answer["refused"].as_str().unwrap_or_default()
             );
-            Err(format!(
+            Err(NotOff::Refused(format!(
                 "the lamp didn't let {} be removed",
                 made_skill::spoken_name(name)
-            ))
+            )))
         }
     }
 }
@@ -511,6 +659,69 @@ pub struct Answer<'a> {
 /// changes, and the clash waits on.
 const NOT_THEIRS: &str = "Say plainly, in a few words, that only the lamp's owner can choose \
                           that, out loud. Call nothing.";
+
+/// What a replace says when not every other skill came off: those it
+/// removed, then those not, each with its own reason (Heron's P3 on #6976:
+/// not the first one's for all), together when the reason is the same;
+/// one the helper didn't answer for in time "may still be on", never
+/// "is still on". `others` is every one it asked of, so two that sound the
+/// same are told apart as in the question ([`told_names`]).
+fn not_all_removed(
+    new: &str,
+    others: &[String],
+    removed: &[String],
+    still_on: &[(String, String)],
+    unsure: &[(String, String)],
+    all_on: &str,
+) -> String {
+    let told = told_names(others);
+    let say = |names: &[&String]| -> String {
+        let said: Vec<String> = names
+            .iter()
+            .map(|name| {
+                others
+                    .iter()
+                    .position(|other| other == *name)
+                    .map_or_else(|| made_skill::spoken_name(name), |at| told[at].clone())
+            })
+            .collect();
+        joined(&said)
+    };
+    fn grouped(failed: &[(String, String)]) -> Vec<(Vec<&String>, &str)> {
+        let mut groups: Vec<(Vec<&String>, &str)> = Vec::new();
+        for (name, why) in failed {
+            match groups.iter_mut().find(|(_, same)| same == why) {
+                Some((names, _)) => names.push(name),
+                None => groups.push((vec![name], why)),
+            }
+        }
+        groups
+    }
+    let mut parts = Vec::new();
+    for (names, why) in grouped(still_on) {
+        let was = if names.len() > 1 { "weren't" } else { "wasn't" };
+        parts.push(format!("{} {was} removed: {why}", say(&names)));
+    }
+    for (names, why) in grouped(unsure) {
+        parts.push(format!("{} may still be on: {why}", say(&names)));
+    }
+    let lead = if removed.is_empty() {
+        format!("{new} is on, but")
+    } else {
+        let removed: Vec<&String> = removed.iter().collect();
+        format!("{new} is on, and I removed {}, but", say(&removed))
+    };
+    let tail = if removed.is_empty() && unsure.is_empty() {
+        format!(" {all_on}")
+    } else if still_on.is_empty() {
+        String::new()
+    } else {
+        let names: Vec<&String> = still_on.iter().map(|(name, _)| name).collect();
+        let are = if names.len() > 1 { "are" } else { "is" };
+        format!(" {} {are} still on.", say(&names))
+    };
+    format!("{lead} {}.{tail}", parts.join("; "))
+}
 
 /// The person's choice `answer` at `now`. Only the owner's line answers
 /// (`owners`, as for a yes: `LAMP_PRIVATE_ROOM` on, any heard line), only a
@@ -549,9 +760,16 @@ pub fn chosen(
         }
         let Some(choice) = choice.and_then(|choice| CHOICES.into_iter().find(|c| *c == choice))
         else {
+            // Asked again as the question was: of one, or of them all
+            // (Heron's P3 on #6976).
+            let again = if waiting.others.len() > 1 {
+                "replace them all, keep them all, or cancel"
+            } else {
+                "replace it, keep both, or cancel"
+            };
             return Took::Refused(json!({
                 "error": "the choice is replace, keep or cancel",
-                "next": "Ask them again, in a few words: replace it, keep both, or cancel."
+                "next": format!("Ask them again, in a few words: {again}.")
             }));
         };
         let why = if !heard {
@@ -606,7 +824,13 @@ pub fn chosen(
         Took::Taken(waiting, choice) => (waiting, choice),
     };
     let new = made_skill::spoken_name(&waiting.name);
-    let other = made_skill::spoken_name(&waiting.other);
+    let others = spoken_list(&waiting.others);
+    let many = waiting.others.len() > 1;
+    let (stays, all_on) = if many {
+        ("stay as they were", "All are on.")
+    } else {
+        ("stays as it was", "Both are on.")
+    };
     let said = |line: String| made_skill::in_their_language(&line);
     match choice {
         "cancel" => {
@@ -615,58 +839,102 @@ pub fn chosen(
                 "made": waiting.name,
                 "on": false,
                 "cancelled": true,
-                "next": said(format!("OK, I didn't put {new} on. {other} stays as it was."))
+                "next": said(format!("OK, I didn't put {new} on. {others} {stays}."))
             })
         }
-        // The new one on first, then the other off: a put-on that fails
+        // The new one on first, then each other off: a put-on that fails
         // takes nothing off (Heron's P3 on #6614).
         "replace" => {
             if let Err(why) = (hands.put_on)(&waiting.keeping, &waiting.sha256) {
                 return json!({
                     "error": format!("not put on: {why}"),
                     "next": said(format!(
-                        "{} {other} stays as it was.",
+                        "{} {others} {stays}.",
                         made_skill::not_on_line(&why)
                     ))
                 });
             }
-            if let Err(why) = (hands.remove)(&waiting.keeping, &waiting.other) {
+            // Each is asked on its own: one refused (a core skill) leaves
+            // the others' removes as they were. All of them end within
+            // [`REPLACE_WITHIN`]: one whose own wait would end past it is
+            // not started, and is told as not removed.
+            let deadline = (hands.clock)() + REPLACE_WITHIN;
+            let mut removed = Vec::new();
+            let mut still_on: Vec<(String, String)> = Vec::new();
+            let mut unsure: Vec<(String, String)> = Vec::new();
+            for other in &waiting.others {
+                let outcome = if (hands.clock)() + HELPER_WAIT > deadline {
+                    Err(NotOff::Refused(NO_TIME.to_owned()))
+                } else {
+                    (hands.remove)(&waiting.keeping, other)
+                };
+                match outcome {
+                    Ok(()) => {
+                        made_skill::forget_named(&waiting.keeping.directory, other);
+                        removed.push(other.clone());
+                    }
+                    Err(NotOff::Refused(why)) => {
+                        eprintln!(
+                            "lamp-voice: request {request}: a made skill's clash: {} on, {other} not removed: {why}",
+                            waiting.name
+                        );
+                        still_on.push((other.clone(), why));
+                    }
+                    // Kept in `made.json`: it may still be on.
+                    Err(NotOff::Unsure(why)) => {
+                        eprintln!(
+                            "lamp-voice: request {request}: a made skill's clash: {} on, {other} may still be on: {why}",
+                            waiting.name
+                        );
+                        unsure.push((other.clone(), why));
+                    }
+                }
+            }
+            if !removed.is_empty() {
                 eprintln!(
-                    "lamp-voice: request {request}: a made skill's clash: {} on, {} not removed: {why}",
-                    waiting.name, waiting.other
+                    "lamp-voice: request {request}: a made skill's clash: {} removed for {}",
+                    removed.join(", "),
+                    waiting.name
                 );
+            }
+            if still_on.is_empty() && unsure.is_empty() {
                 return json!({
                     "made": waiting.name,
                     "on": true,
-                    "not_removed": waiting.other,
-                    "next": said(format!(
-                        "{new} is on, but {other} wasn't removed: {why}. Both are on."
-                    ))
+                    "replaced": removed,
+                    "next": said(format!("Done: {new} is on, and I removed {others}."))
                 });
             }
-            made_skill::forget_named(&waiting.keeping.directory, &waiting.other);
-            eprintln!(
-                "lamp-voice: request {request}: a made skill's clash: {} removed for {}",
-                waiting.other, waiting.name
-            );
-            json!({
+            let line = not_all_removed(&new, &waiting.others, &removed, &still_on, &unsure, all_on);
+            let names = |failed: &[(String, String)]| -> Vec<String> {
+                failed.iter().map(|(name, _)| name.clone()).collect()
+            };
+            let mut told = json!({
                 "made": waiting.name,
                 "on": true,
-                "replaced": waiting.other,
-                "next": said(format!("Done: {new} is on, and I removed {other}."))
-            })
+                "not_removed": names(&still_on),
+                "next": said(line)
+            });
+            if !removed.is_empty() {
+                told["replaced"] = json!(removed);
+            }
+            if !unsure.is_empty() {
+                told["may_still_be_on"] = json!(names(&unsure));
+            }
+            told
         }
         _ => match (hands.put_on)(&waiting.keeping, &waiting.sha256) {
             Ok(_) => {
                 eprintln!(
                     "lamp-voice: request {request}: a made skill's clash: {} kept beside {}",
-                    waiting.name, waiting.other
+                    waiting.name,
+                    waiting.others.join(", ")
                 );
                 json!({
                     "made": waiting.name,
                     "on": true,
                     "kept_both": true,
-                    "next": said(format!("Done: {new} is on beside {other}. Both are on."))
+                    "next": said(format!("Done: {new} is on beside {others}. {all_on}"))
                 })
             }
             Err(why) => json!({
@@ -864,6 +1132,7 @@ mod tests {
         let hands = Hands {
             remove: &remove,
             put_on: &put_on,
+            clock: &Instant::now,
         };
         let clash = Clash {
             name: "glow-blue-on-return".to_owned(),
@@ -871,7 +1140,13 @@ mod tests {
         };
         let now = Instant::now();
         let ask = || {
-            let told = asked(&keeping, &made("glow-green"), &clash, 3, now);
+            let told = asked(
+                &keeping,
+                &made("glow-green"),
+                std::slice::from_ref(&clash),
+                3,
+                now,
+            );
             said_whole(&told, 3);
             told
         };
@@ -899,7 +1174,11 @@ mod tests {
 
         let replaced = chosen(pick(&first, "replace", 4, true), || true, now, &hands);
         assert_eq!(replaced["on"], true, "{replaced}");
-        assert_eq!(replaced["replaced"], "glow-blue-on-return", "{replaced}");
+        assert_eq!(
+            replaced["replaced"],
+            json!(["glow-blue-on-return"]),
+            "{replaced}"
+        );
         // The new one on first, then the other off (Heron's P3 on #6614).
         assert_eq!(taken(&done), ["on abab", "remove glow-blue-on-return"]);
         // Answered once: asked again, nothing waits.
@@ -951,13 +1230,20 @@ mod tests {
         let hands = Hands {
             remove: &remove,
             put_on: &put_on,
+            clock: &Instant::now,
         };
         let clash = Clash {
             name: "glow-blue-on-return".to_owned(),
             shares: "the light",
         };
         let now = Instant::now();
-        let told = asked(&keeping, &made("glow-green"), &clash, 3, now);
+        let told = asked(
+            &keeping,
+            &made("glow-green"),
+            std::slice::from_ref(&clash),
+            3,
+            now,
+        );
         let id = told[CLASH_ID].as_str().unwrap().to_owned();
         assert!(awaited(now), "the echo hold is on while a clash waits");
 
@@ -1014,7 +1300,13 @@ mod tests {
             name: "glow-blue-on-return".to_owned(),
             shares: "the light",
         };
-        let told = asked(&keeping, &made("glow-green"), &clash, 3, now);
+        let told = asked(
+            &keeping,
+            &made("glow-green"),
+            std::slice::from_ref(&clash),
+            3,
+            now,
+        );
         let id = told[CLASH_ID].as_str().unwrap().to_owned();
         assert!(waiting_note(3, now).is_none(), "the make's own request");
         assert!(waiting_note(2, now).is_none(), "an earlier request");
@@ -1036,11 +1328,12 @@ mod tests {
         );
 
         // Answered: no note after it.
-        let never = |_: &Keeping, _: &str| -> Result<(), String> { Ok(()) };
+        let never = |_: &Keeping, _: &str| -> Result<(), NotOff> { Ok(()) };
         let off = |_: &Keeping, _: &str| -> Result<String, String> { Ok(String::new()) };
         let hands = Hands {
             remove: &never,
             put_on: &off,
+            clock: &Instant::now,
         };
         let cancelled = chosen(pick(&id, "cancel", 4, true), || true, now, &hands);
         assert_eq!(cancelled["cancelled"], true, "{cancelled}");
@@ -1059,7 +1352,11 @@ mod tests {
             *removed.lock().unwrap() += 1;
             Ok(())
         };
-        let remove_no = |_: &Keeping, _: &str| Err("the lamp didn't let it be removed".to_owned());
+        let remove_no = |_: &Keeping, _: &str| {
+            Err(NotOff::Refused(
+                "the lamp didn't let it be removed".to_owned(),
+            ))
+        };
         let on_no = |_: &Keeping, _: &str| Err("the lamp's skills couldn't be reached".to_owned());
         let on_ok = |_: &Keeping, _: &str| Ok("glow-green".to_owned());
         let clash = Clash {
@@ -1068,7 +1365,13 @@ mod tests {
         };
         let now = Instant::now();
         let ask = || {
-            let told = asked(&keeping, &made("glow-green"), &clash, 3, now);
+            let told = asked(
+                &keeping,
+                &made("glow-green"),
+                std::slice::from_ref(&clash),
+                3,
+                now,
+            );
             said_whole(&told, 3);
             told[CLASH_ID].as_str().unwrap().to_owned()
         };
@@ -1076,6 +1379,7 @@ mod tests {
         let hands = Hands {
             remove: &remove_ok,
             put_on: &on_no,
+            clock: &Instant::now,
         };
         let failed = chosen(pick(&ask(), "replace", 4, true), || true, now, &hands);
         assert_eq!(*removed.lock().unwrap(), 0, "nothing taken off: {failed}");
@@ -1090,6 +1394,7 @@ mod tests {
         let hands = Hands {
             remove: &remove_no,
             put_on: &on_ok,
+            clock: &Instant::now,
         };
         let both = chosen(pick(&ask(), "replace", 4, true), || true, now, &hands);
         assert_eq!(both["on"], true, "{both}");
@@ -1100,6 +1405,475 @@ mod tests {
             "{next}"
         );
         assert!(next.contains("Both are on"), "{next}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Lamp-9adf, 13 Nov (Fourteen's 15:54 on #6593): three skills on the
+    /// lamp on one moment with the light. Only the first in folder order was
+    /// named and replaced, so after "replace it" the other two still
+    /// clashed. A make that clashes with all three names all three, and in
+    /// a fresh lamp each time: replace puts the new one on, then takes each
+    /// of the three off; keep both takes none off; cancel neither.
+    #[test]
+    fn a_make_clashing_with_three_names_and_replaces_all_three() {
+        const THREE: [&str; 3] = [
+            "blink-green-twice",
+            "glow-green-on-return",
+            "green-blink-on-return",
+        ];
+        let now = Instant::now();
+        for choice in ["replace", "keep", "cancel"] {
+            let (root, keeping) = keeping(&format!("clash-three-{choice}"));
+            for name in THREE {
+                installed(&keeping, name, RESTING, "light = { colour = \"green\" }");
+            }
+            let (url, served) = service(vec![(200, good())]);
+            let told = crate::make_skill_local::make_with(
+                3,
+                Some("make me a skill that dims the light at 10 pm"),
+                "dim the light at 10 pm",
+                &keeping,
+                chat_at(url),
+                NOW,
+                || None,
+            );
+            assert_eq!(served.join().unwrap(), 1);
+            assert_eq!(told["on"], false, "{told}");
+            let next = told["next"].as_str().unwrap();
+            let question = next.split('"').nth(1).unwrap();
+            for name in THREE {
+                let spoken = made_skill::spoken_name(name);
+                assert!(question.contains(&spoken), "{spoken} named: {question}");
+                assert!(
+                    told["clashes_with"].as_str().unwrap().contains(&spoken),
+                    "{told}"
+                );
+            }
+            let line = crate::make_skill_local::take_said_line().unwrap();
+            for name in THREE {
+                assert!(line.contains(&made_skill::spoken_name(name)), "{line}");
+            }
+            said_whole(&told, 3);
+
+            let done: Mutex<Vec<String>> = Mutex::new(Vec::new());
+            let remove = |_: &Keeping, name: &str| {
+                done.lock().unwrap().push(format!("remove {name}"));
+                Ok(())
+            };
+            let put_on = |_: &Keeping, _: &str| {
+                done.lock().unwrap().push("on".to_owned());
+                Ok("evening-dim".to_owned())
+            };
+            let hands = Hands {
+                remove: &remove,
+                put_on: &put_on,
+                clock: &Instant::now,
+            };
+            let id = told[CLASH_ID].as_str().unwrap().to_owned();
+            let answered = chosen(pick(&id, choice, 4, true), || true, now, &hands);
+            let done = done.into_inner().unwrap();
+            let next = answered["next"].as_str().unwrap_or_default().to_owned();
+            match choice {
+                "replace" => {
+                    assert_eq!(answered["on"], true, "{answered}");
+                    assert_eq!(
+                        answered["replaced"],
+                        json!(THREE),
+                        "all three taken off: {answered}"
+                    );
+                    // The new one on first, then each of the three off.
+                    assert_eq!(
+                        done,
+                        [
+                            "on",
+                            "remove blink-green-twice",
+                            "remove glow-green-on-return",
+                            "remove green-blink-on-return"
+                        ]
+                    );
+                }
+                "keep" => {
+                    assert_eq!(answered["kept_both"], true, "{answered}");
+                    assert_eq!(done, ["on"], "none taken off");
+                }
+                _ => {
+                    assert_eq!(answered["cancelled"], true, "{answered}");
+                    assert!(done.is_empty(), "nothing done");
+                }
+            }
+            for name in THREE {
+                assert!(
+                    next.contains(&made_skill::spoken_name(name)),
+                    "{choice}: {next}"
+                );
+            }
+            forget_waiting();
+            let _ = std::fs::remove_dir_all(&root);
+        }
+    }
+
+    /// Many clashes are each named, none cut to "and N more" (Heron's P2
+    /// on #6976). A replace where one of them is refused (a core skill)
+    /// still takes the others off, and says which stays on.
+    #[test]
+    fn many_clashes_are_all_named_and_each_is_removed_on_its_own() {
+        let names = |n: usize| -> Vec<String> {
+            ["glow-a", "glow-b", "glow-c", "glow-d", "glow-e"][..n]
+                .iter()
+                .map(|name| (*name).to_owned())
+                .collect()
+        };
+        assert_eq!(spoken_list(&names(1)), "glow a");
+        assert_eq!(spoken_list(&names(2)), "glow a and glow b");
+        assert_eq!(spoken_list(&names(3)), "glow a, glow b and glow c");
+        assert_eq!(
+            spoken_list(&names(5)),
+            "glow a, glow b, glow c, glow d and glow e"
+        );
+
+        let (root, keeping) = keeping("clash-many");
+        let clashes: Vec<Clash> = names(5)
+            .into_iter()
+            .map(|name| Clash {
+                name,
+                shares: "the light",
+            })
+            .collect();
+        let now = Instant::now();
+        let told = asked(&keeping, &made("glow-green"), &clashes, 3, now);
+        let question = told["next"].as_str().unwrap().split('"').nth(1).unwrap();
+        assert!(
+            question.contains("glow a, glow b, glow c, glow d and glow e, which are on the lamp"),
+            "{question}"
+        );
+        assert!(question.contains("replace them all"), "{question}");
+        said_whole(&told, 3);
+        let removed: Mutex<Vec<String>> = Mutex::new(Vec::new());
+        let remove = |_: &Keeping, name: &str| {
+            if name == "glow-c" {
+                return Err(NotOff::Refused(
+                    "the lamp didn't let glow c be removed".to_owned(),
+                ));
+            }
+            removed.lock().unwrap().push(name.to_owned());
+            Ok(())
+        };
+        let put_on = |_: &Keeping, _: &str| Ok("glow-green".to_owned());
+        let hands = Hands {
+            remove: &remove,
+            put_on: &put_on,
+            clock: &Instant::now,
+        };
+        let id = told[CLASH_ID].as_str().unwrap().to_owned();
+        let replaced = chosen(pick(&id, "replace", 4, true), || true, now, &hands);
+        assert_eq!(
+            replaced["replaced"],
+            json!(["glow-a", "glow-b", "glow-d", "glow-e"]),
+            "{replaced}"
+        );
+        assert_eq!(replaced["not_removed"], json!(["glow-c"]), "{replaced}");
+        let next = replaced["next"].as_str().unwrap();
+        assert!(next.contains("but glow c wasn't removed"), "{next}");
+        assert!(next.contains("glow c is still on"), "{next}");
+        assert_eq!(removed.into_inner().unwrap().len(), 4);
+        forget_waiting();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Clashes on the light, one per folder name.
+    fn clashes_of(names: &[&str]) -> Vec<Clash> {
+        names
+            .iter()
+            .map(|name| Clash {
+                name: (*name).to_owned(),
+                shares: "the light",
+            })
+            .collect()
+    }
+
+    /// Heron's P2 on #6976: a make that clashes with five named only three
+    /// and "2 more", and a replace then took all five off. Now the
+    /// question, the cut line, the waiting note and the done line each name
+    /// all five, and a replace takes off exactly those named, no other.
+    #[test]
+    fn five_clashes_are_all_named_and_a_replace_removes_exactly_those() {
+        const FIVE: [&str; 5] = [
+            "blink-green-twice",
+            "glow-blue-on-return",
+            "glow-green-on-return",
+            "green-blink-on-return",
+            "rest-glow",
+        ];
+        let (root, keeping) = keeping("clash-five");
+        for name in FIVE {
+            installed(&keeping, name, RESTING, "light = { colour = \"green\" }");
+        }
+        // Another trigger: on the lamp, never named, never taken off.
+        installed(
+            &keeping,
+            "arrival-glow",
+            "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n",
+            "light = { colour = \"blue\" }",
+        );
+        let (url, served) = service(vec![(200, good())]);
+        let told = crate::make_skill_local::make_with(
+            3,
+            Some("make me a skill that dims the light at 10 pm"),
+            "dim the light at 10 pm",
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(told["on"], false, "{told}");
+        let question = told["next"].as_str().unwrap().split('"').nth(1).unwrap();
+        let cut = crate::make_skill_local::take_said_line().unwrap();
+        let note = waiting_note(4, Instant::now()).unwrap();
+        let clashes_with = told["clashes_with"].as_str().unwrap();
+        for said in [question, cut.as_str(), note.as_str(), clashes_with] {
+            assert!(!said.contains("more"), "none cut: {said}");
+            for name in FIVE {
+                let spoken = made_skill::spoken_name(name);
+                assert!(said.contains(&spoken), "{spoken} named: {said}");
+            }
+            assert!(!said.contains("arrival glow"), "{said}");
+        }
+        said_whole(&told, 3);
+
+        let done: Mutex<Vec<String>> = Mutex::new(Vec::new());
+        let remove = |_: &Keeping, name: &str| {
+            done.lock().unwrap().push(name.to_owned());
+            Ok(())
+        };
+        let put_on = |_: &Keeping, _: &str| Ok("evening-dim".to_owned());
+        let hands = Hands {
+            remove: &remove,
+            put_on: &put_on,
+            clock: &Instant::now,
+        };
+        let id = told[CLASH_ID].as_str().unwrap().to_owned();
+        let replaced = chosen(
+            pick(&id, "replace", 4, true),
+            || true,
+            Instant::now(),
+            &hands,
+        );
+        assert_eq!(*done.lock().unwrap(), FIVE, "exactly those named");
+        assert_eq!(replaced["replaced"], json!(FIVE), "{replaced}");
+        let next = replaced["next"].as_str().unwrap();
+        for name in FIVE {
+            let spoken = made_skill::spoken_name(name);
+            assert!(next.contains(&spoken), "{spoken} told removed: {next}");
+        }
+        forget_waiting();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P2 on #6976: each remove waited its own 8 s in turn, so a
+    /// hung helper held the turn 8 s per clash. Now every remove ends
+    /// within [`REPLACE_WITHIN`]: one whose own wait would end past it is
+    /// never started, and is told as not removed. On a clock of the test's
+    /// own, a helper slow 3 s a remove takes two off; one hung each time
+    /// takes one, and the turn still ends inside the deadline.
+    #[test]
+    fn a_replace_ends_its_removes_within_one_deadline() {
+        let names = ["glow-a", "glow-b", "glow-c", "glow-d", "glow-e"];
+        for (slow, started) in [(Duration::from_secs(3), 2), (HELPER_WAIT, 1)] {
+            let (root, keeping) = keeping("clash-deadline");
+            let start = Instant::now();
+            let at = Mutex::new(start);
+            let clock = || *at.lock().unwrap();
+            let asked_of: Mutex<Vec<String>> = Mutex::new(Vec::new());
+            let remove = |_: &Keeping, name: &str| {
+                asked_of.lock().unwrap().push(name.to_owned());
+                *at.lock().unwrap() += slow;
+                if slow == HELPER_WAIT {
+                    Err(NotOff::Unsure(
+                        "the lamp didn't say in time whether it is off".to_owned(),
+                    ))
+                } else {
+                    Ok(())
+                }
+            };
+            let put_on = |_: &Keeping, _: &str| Ok("glow-green".to_owned());
+            let hands = Hands {
+                remove: &remove,
+                put_on: &put_on,
+                clock: &clock,
+            };
+            let told = asked(&keeping, &made("glow-green"), &clashes_of(&names), 3, start);
+            said_whole(&told, 3);
+            let id = told[CLASH_ID].as_str().unwrap().to_owned();
+            let replaced = chosen(pick(&id, "replace", 4, true), || true, start, &hands);
+            let asked_of = asked_of.into_inner().unwrap();
+            assert_eq!(asked_of, names[..started], "{replaced}");
+            assert!(
+                *at.lock().unwrap() - start <= REPLACE_WITHIN,
+                "the removes end within the deadline"
+            );
+            assert_eq!(
+                replaced["not_removed"],
+                json!(names[started..]),
+                "not started, not removed: {replaced}"
+            );
+            let next = replaced["next"].as_str().unwrap();
+            let late = spoken_list(
+                &names[started..]
+                    .iter()
+                    .map(|n| (*n).to_owned())
+                    .collect::<Vec<_>>(),
+            );
+            assert!(
+                next.contains(&format!("{late} weren't removed: {NO_TIME}")),
+                "{next}"
+            );
+            assert!(next.contains(&format!("{late} are still on.")), "{next}");
+            if started == 2 {
+                assert_eq!(replaced["replaced"], json!(["glow-a", "glow-b"]));
+                assert!(
+                    next.contains("and I removed glow a and glow b, but"),
+                    "{next}"
+                );
+            } else {
+                // The hung one may be off: never told as still on.
+                assert_eq!(replaced["may_still_be_on"], json!(["glow-a"]));
+                assert!(
+                    next.contains("glow a may still be on: the lamp didn't say in time"),
+                    "{next}"
+                );
+                assert!(!next.contains("glow a is still on"), "{next}");
+            }
+            forget_waiting();
+            let _ = std::fs::remove_dir_all(&root);
+        }
+    }
+
+    /// Heron's P3 on #6976: every remove that failed was told with the
+    /// first one's reason. Now each says its own, and two with the same
+    /// reason are said together.
+    #[test]
+    fn each_failed_remove_says_its_own_reason() {
+        let (root, keeping) = keeping("clash-reasons");
+        let names = ["glow-a", "glow-b", "glow-c", "glow-d"];
+        let remove = |_: &Keeping, name: &str| match name {
+            "glow-a" => Ok(()),
+            "glow-b" => Err(NotOff::Refused(
+                "the lamp didn't let glow b be removed".to_owned(),
+            )),
+            _ => Err(NotOff::Refused(
+                "the lamp's skills couldn't be reached".to_owned(),
+            )),
+        };
+        let put_on = |_: &Keeping, _: &str| Ok("glow-green".to_owned());
+        let hands = Hands {
+            remove: &remove,
+            put_on: &put_on,
+            clock: &Instant::now,
+        };
+        let now = Instant::now();
+        let told = asked(&keeping, &made("glow-green"), &clashes_of(&names), 3, now);
+        said_whole(&told, 3);
+        let id = told[CLASH_ID].as_str().unwrap().to_owned();
+        let replaced = chosen(pick(&id, "replace", 4, true), || true, now, &hands);
+        assert_eq!(
+            replaced["next"].as_str().unwrap().split('"').nth(1),
+            Some(
+                "glow green is on, and I removed glow a, but glow b wasn't removed: the lamp \
+                 didn't let glow b be removed; glow c and glow d weren't removed: the lamp's \
+                 skills couldn't be reached. glow b, glow c and glow d are still on."
+            ),
+            "{replaced}"
+        );
+        assert_eq!(
+            replaced["not_removed"],
+            json!(["glow-b", "glow-c", "glow-d"])
+        );
+        forget_waiting();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P3 on #6976: a choice that is none of the three is asked
+    /// again as the question was: of them all when there are several, of
+    /// the one when there is one. The clash still waits.
+    #[test]
+    fn an_invalid_choice_is_asked_again_in_the_question_s_number() {
+        let (root, keeping) = keeping("clash-again");
+        let none = |_: &Keeping, _: &str| -> Result<(), NotOff> { panic!("nothing removed") };
+        let never = |_: &Keeping, _: &str| -> Result<String, String> { panic!("nothing put on") };
+        let hands = Hands {
+            remove: &none,
+            put_on: &never,
+            clock: &Instant::now,
+        };
+        let now = Instant::now();
+        for (names, again) in [
+            (
+                &["glow-a", "glow-b"][..],
+                "replace them all, keep them all, or cancel.",
+            ),
+            (&["glow-a"][..], "replace it, keep both, or cancel."),
+        ] {
+            let told = asked(&keeping, &made("glow-green"), &clashes_of(names), 3, now);
+            said_whole(&told, 3);
+            let id = told[CLASH_ID].as_str().unwrap().to_owned();
+            let refused = chosen(pick(&id, "maybe", 4, true), || true, now, &hands);
+            let next = refused["next"].as_str().unwrap();
+            assert!(next.ends_with(again), "{next}");
+            assert!(awaited(now), "it still waits");
+        }
+        forget_waiting();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P3 on #6976: two folders with the same spoken words came
+    /// out as "glow a and glow a". Now each of them is told by its folder
+    /// too, in the question and in what a replace says; one that sounds
+    /// like no other is said as before.
+    #[test]
+    fn two_skills_that_sound_the_same_are_told_apart_by_folder() {
+        let names = ["glow-a", "glow_a", "glow-b"];
+        let owned: Vec<String> = names.iter().map(|n| (*n).to_owned()).collect();
+        assert_eq!(
+            spoken_list(&owned),
+            "glow a (folder glow-a), glow_a (folder glow_a) and glow b"
+        );
+        let (root, keeping) = keeping("clash-same-sound");
+        let now = Instant::now();
+        let told = asked(&keeping, &made("glow-green"), &clashes_of(&names), 3, now);
+        let question = told["next"].as_str().unwrap().split('"').nth(1).unwrap();
+        assert!(
+            question.contains("glow a (folder glow-a), glow_a (folder glow_a) and glow b"),
+            "{question}"
+        );
+        said_whole(&told, 3);
+        let remove = |_: &Keeping, name: &str| {
+            if name == "glow_a" {
+                Err(NotOff::Refused(
+                    "the lamp didn't let it be removed".to_owned(),
+                ))
+            } else {
+                Ok(())
+            }
+        };
+        let put_on = |_: &Keeping, _: &str| Ok("glow-green".to_owned());
+        let hands = Hands {
+            remove: &remove,
+            put_on: &put_on,
+            clock: &Instant::now,
+        };
+        let id = told[CLASH_ID].as_str().unwrap().to_owned();
+        let replaced = chosen(pick(&id, "replace", 4, true), || true, now, &hands);
+        let next = replaced["next"].as_str().unwrap();
+        assert!(
+            next.contains("I removed glow a (folder glow-a) and glow b, but glow_a (folder glow_a) wasn't removed"),
+            "{next}"
+        );
+        assert!(
+            next.contains("glow_a (folder glow_a) is still on."),
+            "{next}"
+        );
+        forget_waiting();
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -1131,11 +1905,12 @@ mod tests {
                 .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
                 .collect()
         };
-        let nothing = |_: &Keeping, _: &str| -> Result<(), String> { panic!("nothing removed") };
+        let nothing = |_: &Keeping, _: &str| -> Result<(), NotOff> { panic!("nothing removed") };
         let never = |_: &Keeping, _: &str| -> Result<String, String> { panic!("nothing put on") };
         let hands = Hands {
             remove: &nothing,
             put_on: &never,
+            clock: &Instant::now,
         };
         let clash = Clash {
             name: "rest-glow".to_owned(),
@@ -1144,7 +1919,13 @@ mod tests {
         let now = Instant::now();
 
         keep_it();
-        let told = asked(&keeping, &made("glow-green"), &clash, 3, now);
+        let told = asked(
+            &keeping,
+            &made("glow-green"),
+            std::slice::from_ref(&clash),
+            3,
+            now,
+        );
         said_whole(&told, 3);
         let id = told[CLASH_ID].as_str().unwrap().to_owned();
         let cancelled = chosen(pick(&id, "cancel", 4, true), || true, now, &hands);
@@ -1154,7 +1935,13 @@ mod tests {
 
         // Unanswered: once past its wait, the next heard line drops it.
         keep_it();
-        asked(&keeping, &made("glow-green"), &clash, 3, now);
+        asked(
+            &keeping,
+            &made("glow-green"),
+            std::slice::from_ref(&clash),
+            3,
+            now,
+        );
         assert!(awaited(now));
         assert_eq!(names(), ["glow-green", "rest-glow"]);
         assert!(!awaited(now + CLASH_WITHIN + Duration::from_secs(1)));

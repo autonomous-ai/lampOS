@@ -128,6 +128,7 @@ pub fn saw(request: u64, person: &str, speakers: &[String], known: Option<(Strin
         speakers: speakers.to_vec(),
         known,
         enrollment: None,
+        by_voice: false,
     };
     let seen = crate::remember::speaker_of(Some(&line)).as_deref() == Some(person);
     if let Ok(mut lines) = SEEN.lock() {

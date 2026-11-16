@@ -288,6 +288,11 @@ struct SkillFile {
     /// What a `do.task`'s script may reach through lamp-control, each one
     /// of its grants ([`task::grants_of`], #6305): only beside a `do.task`.
     grants: Option<Vec<String>>,
+    /// The variables' names its `do.task`'s run needs, their values given
+    /// in the app and kept by lamp-services (`LAMP_SKILL_SECRETS`,
+    /// `lamp_services::skill_secrets`): only beside a `do.task`, never a
+    /// value. lamp-tasks reads them through lamp-services, not here.
+    secrets: Option<Vec<String>>,
     #[serde(rename = "do", default)]
     steps: Vec<StepFile>,
 }
@@ -611,6 +616,39 @@ pub const CAMERA_NOT_ALLOWED: &str =
 /// place while the body has no measured gaze (#5766's P2: a factory lamp's
 /// body runs without `--gaze`, and would not turn, saying nothing).
 pub const CANNOT_TURN: &str = "I can't turn toward it: my turn isn't measured yet. Say so in a few words and ask them to move it in front of you; never search for it.";
+
+/// What the model is told, before why, of a call that would move the body
+/// while the body is down (#6834: a customer lamp's body stopped, every
+/// gesture dropped, and the voice still said it was dancing).
+pub const CANNOT_MOVE: &str = "I can't move right now, so I did nothing. Say so in a few words; never say you are moving or dancing. Why:";
+
+/// What the model is told, before why, of a call whose whole run is a
+/// `do.task` the lamp would not hand over now (lamp-9adf, 15 Nov: "Your
+/// study block is running." with the day's runs spent): nothing ran.
+pub const TASK_NOT_RUN: &str = "I didn't start it, so nothing is running. Say so in a few words, and why; never say it is running or done. Why:";
+
+/// Why the body can't move a skill's gesture, move or stand now, if it
+/// can't: the lamp's `health` says its body has stopped, is let go asking
+/// for a hand, has gone quiet or never came up; or the body says on
+/// `body/limits` that it does not stand this run (`stands`), which drops
+/// every gesture. Unknown (no fresh health, no limits) is not down.
+pub fn body_down(health: Option<&lamp_msgs::Health>, stands: Option<bool>) -> Option<String> {
+    use lamp_msgs::Level;
+    if let Some(health) = health {
+        if health.missing.iter().any(|part| part == "body") {
+            return Some("my body has not started.".into());
+        }
+        if let Some(body) = health.items.iter().find(|item| item.name == "body") {
+            match body.level {
+                Level::Error if !body.message.is_empty() => return Some(body.message.clone()),
+                Level::Error => return Some("my body has stopped.".into()),
+                Level::Stale => return Some("my body is not running.".into()),
+                Level::Ok | Level::Warn => {}
+            }
+        }
+    }
+    (stands == Some(false)).then(|| "my arm can't stand this time.".into())
+}
 
 /// The most looks a search may say it takes: a living thing looks at a few
 /// places and lets it go (CLAUDE.md's rule 8).
@@ -4315,6 +4353,22 @@ fn manifest(
         }
         (_, grants) => task::grants_of(&grants.unwrap_or_default())?,
     };
+    if let Some(secrets) = file.secrets.take() {
+        if tasks == 0 {
+            return Err("secrets: what a do.task's run needs, only beside one".into());
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        if secrets.len() > lamp_services::skill_secrets::MOST_NAMES
+            || !secrets.iter().all(|name| {
+                lamp_services::skill_secrets::name_ok(name) && seen.insert(name.as_str())
+            })
+        {
+            return Err(format!(
+                "secrets: at most {} variables' names (A-Z, 0-9 and _, 3 to 64, not the run's own), once each",
+                lamp_services::skill_secrets::MOST_NAMES
+            ));
+        }
+    }
     for step in file.steps {
         if let Some(read) = step.read {
             steps.push(Step::Call(Call::ServiceRead(Box::new(read.step(quiet)?))));
@@ -7736,8 +7790,16 @@ impl Engine {
             ]);
         }
         // A search reads what was heard before its call, to know which
-        // turn asked for it (#2179): the program's own reading too.
-        if self.skills.iter().any(|skill| skill.search.is_some()) {
+        // turn asked for it (#2179): the program's own reading too. So does
+        // a light show, which stops on the same words (#5744): without it,
+        // the asking turn is not known and its own late words stop it.
+        if self.skills.iter().any(|skill| {
+            skill.search.is_some()
+                || skill
+                    .steps
+                    .iter()
+                    .any(|(_, step)| matches!(step, Step::Call(Call::Show { .. })))
+        }) {
             topics.push(Speech::TOPICS[0].to_owned());
         }
         topics.sort();
@@ -9349,6 +9411,77 @@ impl Engine {
             from: None,
         })
     }
+
+    /// The skill `name` run once now, as its owner asked by voice
+    /// (`lamp_voice::made_run`; lamp-9adf, 15 Nov at 15:49 and 15:52: "Run
+    /// my unread mail skill now, please." was read back, since a made skill
+    /// has a trigger and no tool, and nothing ran): its steps as its one
+    /// trigger would make them (all its steps but another trigger's), with
+    /// none of a trigger's own: a person asked, so, as for a tool, the
+    /// Policy is not asked and its `[[while]]`, quiet hours, cooldown, day's
+    /// most and group's hour are neither asked nor spent. What its steps do
+    /// is held to every bound a trigger's run is, where it is made (a
+    /// task's runs a day, one at a time, its owner's yes; a read's once a
+    /// day and its room; a write's yes). Off or snoozed, not loaded, or a
+    /// step held until its trigger ends (which never comes here) is `Err`,
+    /// in words the lamp can say. Nothing is marked: once the run is made,
+    /// [`Engine::ran_now`].
+    pub fn run_now(&mut self, name: &str, now_us: u64) -> Result<Run, String> {
+        let skill = self
+            .skills
+            .iter()
+            .find(|skill| skill.name == name)
+            .ok_or("it isn't on the lamp now")?;
+        if self.stopped(name, now_us) {
+            return Err("it is turned off or snoozed".into());
+        }
+        let trigger = match skill.triggers.as_slice() {
+            [one] => Some(one),
+            _ => None,
+        };
+        let calls = calls(
+            &self.latest,
+            &self.picked,
+            skill,
+            trigger,
+            now_us,
+            &Value::Null,
+            None,
+        );
+        if calls.is_empty() {
+            return Err("it has nothing to do but at its own moment".into());
+        }
+        if calls.iter().any(Call::held_until_ends) {
+            return Err("it lasts only while its moment holds, so it runs only then".into());
+        }
+        let run = Run {
+            generation: skill.scheduled_run(None).then(|| self.generation.clone()),
+            skill: skill.name.clone(),
+            events: vec![event(
+                &skill.name,
+                SkillStage::Triggered,
+                "its owner asked by voice to run it now".into(),
+                None,
+            )],
+            calls,
+            ask: None,
+            queue: false,
+            from: None,
+        };
+        Ok(run)
+    }
+
+    /// [`Engine::run_now`]'s run of `name` made at `now_us`: a read is
+    /// under way from here, as a trigger's is once made.
+    pub fn ran_now(&mut self, name: &str, now_us: u64) {
+        if self
+            .skills
+            .iter()
+            .any(|skill| skill.name == name && skill.reads_a_service())
+        {
+            read_made(&mut self.reads, self.clock, name, now_us);
+        }
+    }
 }
 
 /// What was heard of the newest thing said, joined from its pieces on
@@ -10704,6 +10837,59 @@ mod tests {
     /// modifiedTime desc"`, which the new lamp-skills refused at load. On
     /// the lamp it loads, its read with no query, the latest; made, packed
     /// or installed anew it is refused as before.
+    /// lamp-9adf, 15 Nov at 15:49: a made skill with a trigger and no tool,
+    /// run now as its owner asked: its trigger's steps, the Policy not
+    /// asked, nothing of its trigger spent; turned off, or not loaded, it
+    /// is refused in words the lamp can say.
+    #[test]
+    fn a_made_skill_runs_now_as_its_trigger_would_and_not_when_off() {
+        let dir = tempfile::tempdir().unwrap();
+        let name = "unread-mail";
+        let folder = dir.path().join(name);
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: Reads my unread mail.\nmade: here\n---\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            folder.join("skill.toml"),
+            "version = \"1.0.0\"\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\n\
+             equals = \"resting\"\ncooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n[permissions]\n\
+             topics = [\"voice/state\"]\nspeak = true\nservices = { gmail = \"read\" }\n\
+             [[do]]\nread = { service = \"gmail\", what = \"recent\", count = 3 }\n",
+        )
+        .unwrap();
+        let skill = load(&folder).unwrap();
+        let mut engine = Engine::new(vec![skill], false);
+        let run = engine.run_now(name, 1_000_000).unwrap();
+        assert_eq!(run.skill, name);
+        assert!(run.ask.is_none());
+        assert!(
+            matches!(run.calls.as_slice(), [Call::ServiceRead(_)]),
+            "{:?}",
+            run.calls
+        );
+        assert_eq!(run.events[0].stage, SkillStage::Triggered);
+        // Nothing of its trigger is spent: no cooldown begins.
+        assert!(engine.watches.values().all(|watch| watch.ran_us.is_none()));
+        // Its read is under way only once made.
+        assert!(!engine.reads.contains_key(name));
+        engine.ran_now(name, 1_000_000);
+        assert!(engine.reads[name].under_way);
+        assert_eq!(
+            engine.run_now("evening-dim", 1_000_000).unwrap_err(),
+            "it isn't on the lamp now"
+        );
+        let state = tempfile::tempdir().unwrap();
+        std::fs::write(state.path().join(OFF_FILE), format!("{name}\n")).unwrap();
+        engine.keep_off_in(state.path()).unwrap();
+        assert_eq!(
+            engine.run_now(name, 2_000_000).unwrap_err(),
+            "it is turned off or snoozed"
+        );
+    }
+
     #[test]
     fn a_skill_on_the_lamp_whose_read_asks_an_order_loads_and_a_new_one_is_refused() {
         let dir = tempfile::tempdir().unwrap();
@@ -11241,6 +11427,33 @@ mod tests {
                 "{PHOTO_BOOTH}[[do]]\ntask = {{ task = \"again\", run = \"scripts/main.py\" }}\n"
             ),
             "one do.task step",
+        );
+        // A skill's keys' names (`LAMP_SKILL_SECRETS`): beside its task,
+        // plain names, once each, never the run's own.
+        let named = task_skill(
+            dir.path(),
+            "keys-named",
+            &PHOTO_BOOTH.replace(
+                "tool = ",
+                "secrets = [\"GEMINI_API_KEY\", \"TELEGRAM_BOT_TOKEN\"]\ntool = ",
+            ),
+        );
+        assert!(load(&named).is_ok());
+        for (name, secrets) in [
+            ("keys-reserved", "[\"LAMP_CONTROL_TOKEN\"]"),
+            ("keys-twice", "[\"GOOD_KEY\", \"GOOD_KEY\"]"),
+            ("keys-lower", "[\"good_key\"]"),
+        ] {
+            refused(
+                name,
+                PHOTO_BOOTH.replace("tool = ", &format!("secrets = {secrets}\ntool = ")),
+                "secrets: at most 16",
+            );
+        }
+        refused(
+            "keys-alone",
+            "version = \"1.0.0\"\nsecrets = [\"GOOD_KEY\"]\ntool = \"x_y\"\n[permissions]\nlight = true\n[[do]]\nlight = { colour = \"warm\" }\n".into(),
+            "secrets: what a do.task's run needs, only beside one",
         );
         refused(
             "not-alone",

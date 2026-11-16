@@ -834,7 +834,14 @@ section.
 Off unless `LAMP_STOP_WORDS=heard` in the voice's environment, with
 `--turn-taking duplex` and the second voice's configuration
 (`LAMP_VOICE_SECOND_CONFIG`); built by the fourth builder
-(`crates/voice/src/stop_words.rs`).
+(`crates/voice/src/stop_words.rs`). #5032 (b) proposed it for the product,
+and #5905 `heard-always` in its place; the product leaves both off
+([In the product](#in-the-product-5905-11-november)). Why it was proposed:
+on lamp-06c1 a short "Stop." over the answer read as neither talk nor quiet,
+and the answer went on, 9 of 9. It also hears #5111's case: on lamp-9adf
+"Stop, Lamp" yielded late, on "Lamp", the rest in the lamp's own dying tail,
+and sound alone resumed the answer some 0.74 s on (its candidate dropped as
+`policy`).
 
 The duplex rule stops the lamp when someone is plainly over it, and then
 knows only sound and timing. A short "Stop." is over by the time the lamp
@@ -1095,8 +1102,12 @@ once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 Octo
 
 ### Privacy: what goes where
 
-The first builder accepted this on lamp-4ace on 16 October at 09:49 (#828).
-It is to be decided again before home lamps ship.
+The first builder accepted this on lamp-4ace on 16 October at 09:49 (#828),
+and for the product on 3 November (#5032 (b), two reads for privacy), on the
+condition that a yield's words are used only to judge a stop. `heard-always`
+sends more, everything heard while the lamp speaks, and stays off in the
+product ([In the product](#in-the-product-5905-11-november)); the condition
+holds with it.
 - **What:** the audio of a yield only. That's what was held for it (300 ms
   before its onset, or with `LAMP_FIRST_WORDS=kept` up to 1.6 s), then each
   10 ms block while it is in force, until the words are asked for. Usually
@@ -1152,7 +1163,19 @@ It is to be decided again before home lamps ship.
   (the reviewer's P2 on #970). Words that come for a yield after it was
   forgotten are dropped, never taken for the next yield's.
 - **What is kept on the lamp:** the outcome per yield (`stop_words`, no
-  words). Whatever the relay keeps is the relay's.
+  words). Whatever the relay keeps is the relay's. The product unit sets
+  none of `LAMP_STOP_WORDS_AUDIO`, `LAMP_STOP_WORDS_COUNTS` and
+  `LAMP_BACKCHANNEL_DEBUG`, the only ways the lamp keeps a yield's audio or
+  words.
+- **What a yield's words do:** they only judge a stop. Words that are not a
+  stop resume the answer: no request is made, so nothing of them reaches the
+  model, the thread, memory or a note. A stop commits the yield as talk
+  over the lamp does: the yield's audio, the same that went to the
+  speech-to-text, starts a new request, which the second route hears again
+  with its own speech-to-text. That request is the stop: with
+  `LAMP_SPOKEN_STOP_ENDS` it is answered "Okay, I'll stop there.", the model
+  not asked, and the person's line and that answer are kept in the thread as
+  any answered line is. The stop words' own text goes nowhere.
 - **Not covered: `LAMP_WAIT_KEEPS_ANSWER=words`** (#1123 step 2,
   `group-talk.md`) sends something else to the same relay, through the same
   driver (`RelayEars::for_waits`):
@@ -1188,7 +1211,24 @@ Tests:
   through the production hearing, yield and commit, with scripted words. A
   stop phrase commits at the eleventh still block. Other words resume at the
   same block as without the switch. No words resume at the deadline, 110
-  blocks from the yield.
+  blocks from the yield;
+- `coordinator::tests::duplex::heard_always_hears_a_stop_said_over_its_answer`
+  (#5032 (b)): with `heard-always`, Piper's "Stop." over an answer, Over
+  but not plain, reaches the speech-to-text and stops the answer as the
+  hand does, no request made;
+- `coordinator::tests::duplex::heard_always_hears_a_stop_that_makes_no_yield`
+  (#5905): the same "Stop." explained as the lamp's own voice makes no
+  yield, and still stops the answer;
+- `coordinator::tests::duplex::heard_always_uses_a_lines_words_only_to_judge_a_stop`
+  (the first builder's condition on #5032): a line that is not a stop, with
+  a made-up secret in it, resumes the answer, makes no request and leaves no
+  word of it in the trace;
+- `coordinator::tests::duplex::heard_always_hears_a_stop_in_a_late_yield_over_its_own_tail`
+  (#5111): "Stop, Lamp" yielded late and heard over the lamp's dying tail,
+  never plainly, then quiet, stops the answer with `heard-always`;
+- `coordinator::tests::duplex::the_product_leaves_its_stop_words_off` and
+  `install::the_product_answers_a_stop_and_leaves_its_stop_words_off`
+  (#5905): the product unit sets no `LAMP_STOP_WORDS`.
 
 - through the relay's real thread against a stand-in speech-to-text on an
   in-memory socket: `audio_queued_for_a_yield_never_goes_once_it_is_forgotten_rested_or_dropped`
@@ -1207,7 +1247,8 @@ a failed connection is not tested.
 
 Off unless `LAMP_STOP_WORDS=heard-always` in the voice's environment, with
 `--turn-taking duplex` and the second voice's configuration; built by the
-fourth builder (`crates/voice/src/stop_words.rs`, `Listen::Always`).
+fourth builder (`crates/voice/src/stop_words.rs`, `Listen::Always`). Off in
+the product until the stop keyword ([In the product](#in-the-product-5905-11-november)).
 
 **Why** (the evidence is in
 [verification/stop-yield-20261016](verification/stop-yield-20261016/README.md)):
@@ -1301,7 +1342,8 @@ With the switch:
 speaks goes to the second voice's speech-to-text (the company relay on
 lamp-4ace), the lamp's own voice let through by the canceller with it, not
 only a yield's second or two. That is beyond what the first builder
-accepted for `heard` at 09:49, so it is a separate value, off unless set.
+accepted for `heard` at 09:49, so it is a separate value, off unless set;
+the product leaves it off ([In the product](#in-the-product-5905-11-november)).
 The stream is closed on every way out, as with `heard`.
 
 **Its latency:** about 0.25 s from the end of a phrase to its words
@@ -1525,6 +1567,53 @@ stream's thread adds its own counts when it rests; with
 millisecond.
 Not exercised: the coordinator's loop taking the stop
 (`spoken_stop`), and the relay with a person's voice under the lamp's.
+
+### In the product (#5905, 11 November)
+
+Off in the product. #5905 set it in the product unit, the lead's call on 11
+November, in place of `heard`. The first builder ruled on 15 November that
+#5905 lands with it off in the product: turning it on waits for the stop
+keyword spotted by lamp-name's on-mic model. The unit keeps the line
+commented out, marked `PARKED (#5905)`; uncommenting it turns it on. Why it
+was set: on lamp-52e6 at 17:22 a 0.5 s "Stop." played over a story
+made no yield (the render explained it as the lamp's own voice, heard under
+it or as its own, never over it), so `heard`, which listens only in a
+yield, sent nothing and the story went on. With `heard-always` the same
+audio goes to the stream whether or not the lamp pauses
+(`coordinator::tests::duplex::heard_always_hears_a_stop_that_makes_no_yield`).
+`LAMP_STOP_WORDS_KEYTERM=on` is in the product: with `heard-always` the stop
+words are the stream's key terms.
+
+What it would cost, once on:
+- **Speech-to-text:** every 10 ms block while the lamp's sound reaches the
+  microphone, or while it has stopped for someone, goes to the relay: the
+  answer's whole length, 30 s of audio for a 30 s answer (16 kHz mono
+  16-bit, 32 kB/s up), where `heard` sent a yield's second or two and kept a
+  spare idle stream. One stream an answer, opened at its first sound and
+  closed at its end, asked for its words at each 200 ms pause after speech,
+  the lamp's own pauses among them.
+- **CPU:** not measured on a lamp. The stream's own thread sends each block
+  over the relay's WebSocket; the canceller and the detector run with or
+  without it. The lamp check for #5905 (row-5905t) measures lamp-voice's
+  CPU over a story against the same story with `LAMP_STOP_WORDS` cleared
+  (`LAMP_STOP_WORDS_KEYTERM` only).
+- **False stops:** only a short command stops (at most three words, a whole
+  stop word or pair first or last, #4868), and the lamp's own words of the
+  last 6 s are never one. The product does not set `LAMP_STOP_WORDS_HOLD`,
+  so at a reply's start, with nothing queued, the lamp's own "stop" whose
+  text comes after the speech-to-text's words for it can still stop it
+  (above). A false stop ends the answer as a hand Stop does, the lamp
+  listening. How often on a lamp is not measured; the same row plays a whole
+  story with nobody speaking and fails on any stop.
+- **Privacy:** everything the microphone hears while the lamp speaks goes
+  to the relay, not only a yield's audio ("Its privacy cost", above). The
+  words still only judge a stop: nothing of them reaches the model, the
+  thread, memory or a note, and the product sets none of
+  `LAMP_STOP_WORDS_AUDIO`, `LAMP_STOP_WORDS_COUNTS` and
+  `LAMP_BACKCHANNEL_DEBUG`
+  (`coordinator::tests::duplex::heard_always_uses_a_lines_words_only_to_judge_a_stop`).
+- **What a stop does:** it ends the answer as the hand does (`spoken_stop`):
+  the lamp falls silent and listens, and the model is not asked.
 
 ## Not shown
 

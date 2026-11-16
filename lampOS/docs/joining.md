@@ -846,9 +846,53 @@ runs on the PM's machine, one bot at a time. A pull request is carried when:
   (a plain rebase keeps a read, and TWO READS count the reads on an earlier
   head with the same patch);
 - its ARM64 and clippy runs are green, and a lamp test has passed where one
-  was needed; and
+  was needed;
+- it has its **lamp row** (below); and
 - its branch has **no merge commit**. A pull request rebased onto a merge of
   `lamp-voice`, rather than onto `lamp-voice`, has one: rebase it again.
+
+**A lamp row comes before the train** (the lead, 14 November). Before a
+behaviour pull request rides a train, post its row on the pull request. The
+row names its own pull request, the lamp and the build (its sequence or
+commit), and quotes the journal lines that show the behaviour. A row
+missing any of the three doesn't count. Its first line, then the journal
+lines in a fenced block:
+
+````
+ROW #7031 0a997fa7f3 on lamp-c0a4 build 13031: PASS 3/3
+```
+<the journal lines that show it, as the lamp wrote them>
+```
+````
+
+The bot reads the lamp and the build in the comment's first 400
+characters. The lamp is its hostname: `lamp-` and four hex characters with
+at least one digit (`lamp-c0a4`). A part's name, such as `lamp-body`, is
+not a lamp. The build is five digits right after `build`, `installed` or
+`on` (`build 13031`, `installed **12987**`, `on 13000`), or `build
+<commit>`. The journal is a fenced block with a non-empty line, or a quoted
+line (`> …`) with `lamp-` in it. A row that
+says `FAIL` or `VOID` (or `FAILED`, `VOIDED`), and not `PASS`, is not a
+row. A docs, tests or switched-off change needs no row: then a reader
+writes "no row needed" in the `READ-OK` on this head. A pull request that
+turns a switch on in the product always needs its row, and "no row
+needed" doesn't carry it. That is any new `LAMP_…` line in a product unit
+or a product settings file (`lampOS/deploy/product/settings/*.env`) whose
+value isn't `off`, `0`, `false` or empty: `on`, and words like `checked`
+or `busy-near`, too. The bot enforces it: without a row, the pull request
+sits out, and the log says so once per head, naming any part a row lacks.
+
+The rest of the lead's rule (14 November, 15:40):
+
+- **A bug from a pull request goes back to its builder first.** If it isn't
+  fixed by the next promote window, the pull request is reverted in the
+  next train and its issue is reopened.
+- **A ROW that says PASS when the lamp's journal doesn't match** gets the
+  pull request reverted. The builder is named on the Queue, and that
+  builder's next pull request needs a second person's row.
+- **Spot checks.** Each train, V2 or Fifth reads one builder's ROW against
+  that lamp's journal. A spot check doesn't replace the builder's own
+  testing.
 
 A `HOLD` stands until the same reader's later `READ-OK` (it is keyed by the
 reader's account and signed name). A `HOLD <sha>` as the first line of a

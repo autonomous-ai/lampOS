@@ -33,6 +33,7 @@ mod remove_words;
 mod sent_write;
 mod short_done;
 mod skill_named_words;
+mod task_yes_in_code;
 mod task_yes_words;
 mod unplayed_join;
 mod voice_confirms;
@@ -817,6 +818,70 @@ async fn a_tool_call_is_run_and_its_result_answered() {
             Message::tool("c1", r#"{"ok":true}"#),
         ]
     );
+}
+
+/// lamp-9adf, 14 Nov (#6749): a voice make handed to the agent asked its
+/// waiting line through the say service, which waits for the turn to end,
+/// while the make held the turn: `Some(Expired)` 2 of 2, about 49 s of
+/// silence. Its agent begun (`make_skill_agent::waiting_due`), the line is
+/// said in the make's own turn, after its words so far and before the
+/// make's answer; a make that never begins its agent says none.
+#[tokio::test]
+async fn a_makes_waiting_line_is_said_in_its_own_turn_as_its_agent_begins() {
+    let said = |agent: bool| async move {
+        let asked = call("c1", crate::made_skill::MAKE, json!({"request": "x"}));
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [
+                    vec![
+                        text("I'll make it now."),
+                        Ok(ChatEvent::ToolCalls(vec![asked])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Made."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let tools: ToolRunner = Arc::new(move |request, _, name, _| {
+            Box::pin(async move {
+                if name == crate::made_skill::MAKE {
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                    if agent {
+                        assert!(crate::make_skill_agent::waiting_due(request));
+                    }
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+                json!({"ok": true})
+            })
+        });
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        );
+        engine.submit(written(
+            if agent { 6_749_001 } else { 6_749_002 },
+            "Make me x.",
+        ));
+        turn(&mut engine)
+            .await
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .map(|label| label.replacen("said: ", "said:", 1))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        said(true).await,
+        [
+            "said:I'll make it now.".to_owned(),
+            format!("said:{}", crate::make_skill_agent::WAITING_LINE),
+            "said:Made.".into(),
+        ]
+    );
+    assert_eq!(said(false).await, ["said:I'll make it now.", "said:Made."]);
 }
 
 /// lamp-4ace, 20 Oct 21:31: "Lamp, what's my name?" was answered with
@@ -7081,6 +7146,114 @@ async fn a_known_person_speaking_is_told_how_they_seem_and_no_one_else_is() {
         "asked of the known person's spoken one only"
     );
     assert!(heard_for.lock().unwrap().contains(&1));
+}
+
+/// #6543 (`LAMP_SECOND_DOING`): a spoken request from a known person in view
+/// is told what they were last seen doing; a written turn, a line held only
+/// by the face's gap (no face to read) and one in the room's scope (two
+/// faces, none known) are not, and are never asked of the note (Heron's P3
+/// on #6661). Without the switch no note is ever asked.
+#[tokio::test]
+async fn a_known_person_speaking_is_told_what_they_were_seen_doing_and_no_one_else_is() {
+    use crate::memory_scope::{FaceCache, GAP, ScopeLease};
+    let path = std::env::temp_dir().join(format!("doing-known-{}", std::process::id()));
+    std::fs::write(&path, "Maya").unwrap();
+    for switched_on in [true, false] {
+        let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("Should I have a coffee?".to_owned()),
+                    Ok("And now?".to_owned()),
+                    Ok("And then?".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new(
+                [
+                    vec![text("Maybe later."), Ok(ChatEvent::Done)],
+                    vec![text("Hello."), Ok(ChatEvent::Done)],
+                    vec![text("Still here."), Ok(ChatEvent::Done)],
+                    vec![text("Yes."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let runner: ScopedToolRunner =
+            Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+        let asked_for = Arc::new(Mutex::new(Vec::new()));
+        let noted = asked_for.clone();
+        let heard_for = Arc::new(Mutex::new(Vec::new()));
+        let heard = heard_for.clone();
+        let mut engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            None,
+        );
+        if switched_on {
+            engine = engine.noting_what_they_did(
+                Arc::new(move |request| {
+                    noted.lock().unwrap().push(request);
+                    Some("DOING NOTE".to_owned())
+                }),
+                Arc::new(move |request| heard.lock().unwrap().push(request)),
+            );
+        }
+        engine.memory_camera(true, 1);
+        let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
+        cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        engine.memory_answered(1, Instant::now());
+        engine.submit(written(2, "Say hello."));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        // No face in view, just after the answer: the person held only by
+        // the gap, whose face can't be read.
+        cache.replace_seen(cache.begin_refresh(), None, Some(0));
+        engine.submit(start(3));
+        assert!(engine.memory_lease().unwrap().scope().unwrap().held());
+        engine.submit(audio(3, 1));
+        engine.submit(end(3));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        // Two faces, none known: the room's scope.
+        cache.replace_seen(cache.begin_refresh(), None, Some(2));
+        engine.submit(start(4));
+        assert_eq!(
+            engine.memory_lease().unwrap().scope().unwrap().person(),
+            None
+        );
+        engine.submit(audio(4, 1));
+        engine.submit(end(4));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let told = |messages: &Vec<Message>| {
+            messages.iter().any(|message| {
+                message.role == "system"
+                    && message
+                        .content
+                        .as_ref()
+                        .and_then(Value::as_str)
+                        .is_some_and(|note| note == "DOING NOTE")
+            })
+        };
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), 4);
+        assert_eq!(told(&asked[0]), switched_on, "{:?}", asked[0]);
+        for untold in &asked[1..] {
+            assert!(!told(untold), "{untold:?}");
+        }
+        if switched_on {
+            assert_eq!(*asked_for.lock().unwrap(), [1], "the known person's only");
+            assert!(heard_for.lock().unwrap().contains(&1));
+        } else {
+            assert!(asked_for.lock().unwrap().is_empty(), "off: never asked");
+        }
+    }
+    std::fs::remove_file(&path).unwrap();
 }
 
 /// #1712: what the lamp did is told to the rule, as the Live worker tells its
@@ -14673,6 +14846,88 @@ async fn a_wordless_call_between_a_read_back_and_its_yes_keeps_the_write() {
     crate::services::pending_for_test(Some(waiting(0)));
     let asked = asked_with("What time is it?", |engine| engine, start(1), false, false).await;
     assert_eq!(asked.len(), 1);
+    let refused = sends("It's three.").unwrap_err();
+    assert_eq!(refused["error"], NOTHING_WAITING);
+}
+
+/// #6363, lamp-9adf on 14 Nov (build 12958): an event read back, then "Hey
+/// Lamp", only the lamp's name, waited for the line after it, was answered
+/// as a call, and the one "Yes." after it found the event dropped ("the
+/// lamp answered request 14 after its read-back with no send"). A line that
+/// is only the name, with or without its carry and the coordinator's mark,
+/// is answered as a call, and its answer is no other request: the yes after
+/// it sends. A worded line begun with the name and answered with no send
+/// still drops the write, and so does a call with a word past the name
+/// ("Hey Lamp, no."), or one word asked as the name ("No."), whose decline
+/// a stray "Yes." must not undo.
+#[tokio::test(start_paused = true)]
+async fn a_name_only_line_between_a_read_back_and_its_yes_keeps_the_write() {
+    use crate::services::{NOTHING_WAITING, Pending, Turn, WRITE};
+    let now = std::time::Instant::now();
+    let waiting = || Pending {
+        began_clear: true,
+        service: "google_calendar".to_owned(),
+        ..Pending::new("s1", 0, now, "Add the dentist.", "ann")
+    };
+    let yes = Turn {
+        heard: true,
+        owner: Some("ann"),
+        sends: true,
+        seen_owner: true,
+        ..Turn::default()
+    };
+    let send = lamp_gemini::ToolCall {
+        id: "c1".to_owned(),
+        name: WRITE.to_owned(),
+        args: json!({"service": "google_calendar", "send_id": "s1"}),
+    };
+    let sends = |said: &str| {
+        crate::services::lamp_said(1, said, now);
+        let mut pending = crate::services::pending_for_test_take();
+        crate::services::gate(&mut pending, &send, 2, &yes, now)
+    };
+    // As `asked_with`, with the name's carry, whose wait runs past `turn`'s.
+    let asked = |words: &'static str, carries: bool, marked: bool| async move {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(words.to_owned())].into()),
+            chats: Mutex::new([vec![text("Yes?"), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.carrying_the_name(carries);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        if marked {
+            engine.submit(ProviderInput::Called {
+                request: 1,
+                privacy_generation: 1,
+            });
+        }
+        engine.submit(end(1));
+        turn_within(&mut engine, Duration::from_secs(5)).await;
+        script.asked.lock().unwrap().clone()
+    };
+    let called = Message::system(crate::provider_worker::CALLED_NOTE);
+    for (words, carries, marked) in [
+        ("Hey Lamp", true, true),
+        ("Hey Lamp", true, false),
+        ("Lamp", false, true),
+    ] {
+        crate::services::pending_for_test(Some(waiting()));
+        let asked = asked(words, carries, marked).await;
+        assert!(asked[0].contains(&called), "{words}: {:?}", asked[0]);
+        assert!(sends("Yes?").is_ok(), "{words}: the yes after a call sends");
+    }
+    for (words, carries, marked) in [("Hey Lamp, no.", false, true), ("No.", true, true)] {
+        crate::services::pending_for_test(Some(waiting()));
+        let asked = asked(words, carries, marked).await;
+        assert!(asked[0].contains(&called), "{words}: {:?}", asked[0]);
+        let refused = sends("Yes?").unwrap_err();
+        assert_eq!(refused["error"], NOTHING_WAITING, "{words}");
+    }
+    crate::services::pending_for_test(Some(waiting()));
+    let asked = asked("Hey Lamp, what time is it?", true, false).await;
+    assert!(!asked[0].contains(&called), "{:?}", asked[0]);
     let refused = sends("It's three.").unwrap_err();
     assert_eq!(refused["error"], NOTHING_WAITING);
 }

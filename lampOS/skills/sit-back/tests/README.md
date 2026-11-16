@@ -34,6 +34,9 @@ both in `crates/skills/tests/it/skills.rs`.
 | `no-warm-word-on-coming-back` | 11:00, the word at 13, then away from 16 to 20 and back (a new sitting, its baseline again) | Pass: the word only: no warm word for coming back (the sitting past 12 minutes) |
 | `a-second-lean-within-the-hour-is-let-be` | 11:00, the word at 13 and the warm word at 17, leaned in again from 30 to 45 | Pass: nothing more: the hour since the word not past (`cooldown`, and the group's hour) |
 | `rests-after-two-unnoticed` | 09:00, the word at 13 and at 90, each unnoticed for a minute, leaned in again from 150 | Pass: the two words and their warm words, nothing at 160 (`[rest] after_ignored = 2`) |
+| `a-word-when-the-posture-reads-bad` | As `a-word-after-ten-minutes-leaned-in`, `lamp-seen`'s `humans/posture` `bad_share` 0.7 (#6543) | Pass: the word at 13, as there, the same words |
+| `let-be-when-the-posture-reads-well` | As `a-word-after-ten-minutes-leaned-in`, `bad_share` 0.2 all through (#6543) | Pass: nothing |
+| `a-word-when-lamp-seen-has-no-posture-sample` | As `a-word-after-ten-minutes-leaned-in`, `humans/posture` declared but never said: `lamp-seen` runs with no sample in its window (#6543) | Pass: the word at 13, as there (`holds_stale`) |
 
 Red runs, each against these cases (#3694): with `follows` ignored, the warm
 word comes after a lean that drew no word (`a-short-lean-is-let-be` fails);

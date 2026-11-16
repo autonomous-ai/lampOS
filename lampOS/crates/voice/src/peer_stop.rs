@@ -41,15 +41,32 @@ pub(crate) fn stop_queued(
     Ok(held.iter().any(|control| matches!(control, Control::Stop)))
 }
 
+/// Whether `kind` is what the OS says of a socket whose peer has closed:
+/// ECONNREFUSED on Linux (only that, byte for byte as before), and
+/// ECONNRESET as well off Linux, where macOS answers a send to a closed peer
+/// so (`os error 54`, seen in the sim-macos job on #7137).
+fn closed_peer_kind(kind: io::ErrorKind) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        kind == io::ErrorKind::ConnectionRefused
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        matches!(
+            kind,
+            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
+        )
+    }
+}
+
 /// Whether `error` is the reference link between capture and speaker
-/// refused by the other side (ECONNREFUSED on Linux, on a send or a
-/// receive): its peer has closed its socket. The coordinator's own channel
-/// refused is not this.
+/// refused by the other side (ECONNREFUSED on Linux, ECONNRESET on macOS, on
+/// a send or a receive): its peer has closed its socket. The coordinator's
+/// own channel refused is not this.
 pub(crate) fn refused_by_reference_peer(error: &(dyn std::error::Error + 'static)) -> bool {
     error.downcast_ref::<io::Error>().is_some_and(|error| {
         let said = error.to_string();
-        error.kind() == io::ErrorKind::ConnectionRefused
-            && (said.starts_with("ref.c.") || said.starts_with("ref.d."))
+        closed_peer_kind(error.kind()) && (said.starts_with("ref.c.") || said.starts_with("ref.d."))
     })
 }
 
@@ -174,12 +191,6 @@ mod tests {
             &mut VecDeque::new(),
             &refused("capture.c.w")
         ));
-        let reset = io::Error::new(io::ErrorKind::ConnectionReset, "ref.c.capture: reset");
-        assert!(!stopped_with_peer(
-            &mut capture,
-            &mut VecDeque::new(),
-            &reset
-        ));
         let other = io::Error::other("ref.c.capture: Connection refused");
         assert!(!stopped_with_peer(
             &mut capture,
@@ -232,5 +243,26 @@ mod tests {
         assert!(!stop_queued(&mut capture, &mut full, 1).unwrap());
         assert_eq!(full.len(), 1);
         assert!(stop_queued(&mut capture, &mut VecDeque::new(), STOP_LOOK_BOUND).unwrap());
+    }
+    /// A reset on the reference link is a closed peer only where the OS says
+    /// so: macOS answers a send to a closed peer with ECONNRESET, so there it
+    /// is a clean end at a queued Stop as a refusal is on Linux; on Linux it
+    /// stays a fault. A reset on any other channel is a fault on both.
+    #[test]
+    fn a_reset_reference_link_is_a_closed_peer_only_off_linux() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut coordinator, mut capture, _) = pair(&directory);
+        coordinator.control.send(Control::Stop).unwrap();
+        let other_channel = io::Error::new(io::ErrorKind::ConnectionReset, "capture.c.w: reset");
+        assert!(!stopped_with_peer(
+            &mut capture,
+            &mut VecDeque::new(),
+            &other_channel
+        ));
+        let reset = io::Error::new(io::ErrorKind::ConnectionReset, "ref.c.capture: reset");
+        assert_eq!(
+            stopped_with_peer(&mut capture, &mut VecDeque::new(), &reset),
+            cfg!(not(target_os = "linux")),
+        );
     }
 }

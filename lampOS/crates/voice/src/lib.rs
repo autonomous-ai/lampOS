@@ -74,6 +74,7 @@ pub mod cut_in_told;
 pub mod cut_in_wordless;
 pub mod diagnostic_control;
 pub mod diagnostics;
+pub mod doing_told;
 pub mod dont_know;
 pub mod early_words;
 pub mod expression_out;
@@ -97,7 +98,9 @@ pub mod listen_gaps;
 pub mod local_time;
 pub mod made_clash;
 pub mod made_counts;
+pub mod made_list;
 pub mod made_remove;
+pub mod made_run;
 pub mod made_skill;
 pub mod make_skill_agent;
 pub mod make_skill_local;
@@ -137,7 +140,7 @@ pub mod others_answer;
 pub(crate) mod peer_stop;
 #[cfg(target_os = "linux")]
 pub mod physical_privacy;
-#[cfg(any(target_os = "linux", test))]
+#[cfg(unix)]
 mod playback;
 pub mod policy_holds;
 pub mod privacy;
@@ -230,8 +233,10 @@ pub mod wire;
 pub mod without_a_tool;
 pub mod worker_scheduling;
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 pub mod audio_workers;
+#[cfg(unix)]
+pub mod bus_speaker;
 pub mod coordinator;
 
 mod receipt_history;

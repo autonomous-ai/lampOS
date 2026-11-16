@@ -177,11 +177,35 @@ pub type Force = Arc<dyn Fn(&[Message]) -> Option<Forced> + Send + Sync>;
 /// its string parameters may take, if any: that parameter is then told
 /// only that value and is required (`LAMP_TASKS_NAMED_ASK`: `who` is the
 /// agent the words name, #1722). A function without that parameter is
-/// told as declared.
+/// told as declared. With `fields`, the function is told only those
+/// parameters, all required (the approve round of
+/// `LAMP_SKILL_WRITE_YES`: `approve_id` and `answer`, #6921).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Forced {
     pub name: &'static str,
     pub only: Option<(&'static str, &'static str)>,
+    pub fields: Option<&'static [&'static str]>,
+}
+
+/// `tool`'s parameters cut to `fields`, each required; a field it does
+/// not declare is left out.
+fn kept_fields(tool: &mut lamp_gemini::Tool, fields: &[&str]) {
+    let Some(parameters) = tool.parameters.as_mut() else {
+        return;
+    };
+    let Some(properties) = parameters
+        .get_mut("properties")
+        .and_then(Value::as_object_mut)
+    else {
+        return;
+    };
+    properties.retain(|name, _| fields.contains(&name.as_str()));
+    let kept: Vec<Value> = fields
+        .iter()
+        .filter(|field| properties.contains_key(**field))
+        .map(|field| json!(field))
+        .collect();
+    parameters["required"] = Value::Array(kept);
 }
 
 /// `tool`'s parameters with `parameter` told only `value`, and required,
@@ -482,13 +506,15 @@ impl Chat {
             .then(|| self.force.get().and_then(|force| force(messages)))
             .flatten()
             .filter(|forced| declared.iter().any(|tool| tool.name == forced.name));
-        if let Some(Forced {
-            name,
-            only: Some(only),
-        }) = forced
+        if let Some(Forced { name, only, fields }) = forced
             && let Some(tool) = declared.iter_mut().find(|tool| tool.name == name)
         {
-            pinned(tool, only);
+            if let Some(fields) = fields {
+                kept_fields(tool, fields);
+            }
+            if let Some(only) = only {
+                pinned(tool, only);
+            }
         }
         let tools = functions(&declared);
         if !tools.is_empty() {
@@ -1855,15 +1881,20 @@ data: [DONE]
     /// one; the default client reuses it.
     #[tokio::test]
     async fn a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it() {
-        async fn connections(kept: Option<std::time::Duration>) -> usize {
+        async fn connections(kept: Option<std::time::Duration>) -> u64 {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let address = listener.local_addr().unwrap();
             let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
             let accepted = count.clone();
-            tokio::spawn(async move {
+            let (probe_accepted, probe_seen) = tokio::sync::oneshot::channel();
+            let server = tokio::spawn(async move {
+                let mut probe_accepted = Some(probe_accepted);
                 loop {
                     let (socket, _) = listener.accept().await.unwrap();
                     accepted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    if let Some(told) = probe_accepted.take() {
+                        let _ = told.send(());
+                    }
                     tokio::spawn(kept_fixture_connection(
                         socket,
                         std::time::Duration::ZERO,
@@ -1871,7 +1902,22 @@ data: [DONE]
                     ));
                 }
             });
-            let client = super::super::client_kept(kept).unwrap();
+            // Count this client's openings, not discovery probes accepted by
+            // the shared host's listener. Keep a deliberate foreign socket as
+            // a negative control without changing the pool or its idle timing.
+            let opens = super::super::watch::Opens::default();
+            let client = super::super::kept_builder(kept)
+                .unwrap()
+                .connector_layer(opens.clone())
+                .build()
+                .unwrap();
+            let probe = tokio::net::TcpStream::connect(address).await.unwrap();
+            tokio::time::timeout(std::time::Duration::from_secs(5), probe_seen)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(opens.began(), 0);
+            drop(probe);
             for _ in 0..2 {
                 let answer = client
                     .get(format!("http://{address}/v1/models"))
@@ -1881,7 +1927,14 @@ data: [DONE]
                 answer.bytes().await.unwrap();
                 tokio::time::sleep(std::time::Duration::from_millis(600)).await;
             }
-            count.load(std::sync::atomic::Ordering::SeqCst)
+            let opened = opens.began();
+            let accepted = count.load(std::sync::atomic::Ordering::SeqCst);
+            assert!(
+                accepted as u64 > opened,
+                "accepted={accepted}, opened={opened}"
+            );
+            server.abort();
+            opened
         }
         assert_eq!(
             connections(Some(std::time::Duration::from_millis(200))).await,

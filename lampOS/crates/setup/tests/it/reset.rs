@@ -138,6 +138,9 @@ struct Fake {
     /// How many of Hermes's and OpenClaw's per-person files
     /// [`reset::forget_agents`] removed in the lamp's folders.
     agents: usize,
+    /// `lampos`'s own manager, as [`reset::agent_manager_unit`] reads it
+    /// from `/etc/passwd`; none: no such user.
+    manager: Option<String>,
 }
 impl Effects for Fake {
     fn run(&mut self, argv: &[String]) -> io::Result<()> {
@@ -241,6 +244,9 @@ impl Effects for Fake {
     fn forget_agents(&mut self) -> io::Result<usize> {
         self.calls.borrow_mut().push("agents".into());
         Ok(self.agents)
+    }
+    fn agent_manager(&mut self) -> Option<String> {
+        self.manager.clone()
     }
 }
 
@@ -2791,6 +2797,15 @@ fn a_reset_forgets_hermes_and_openclaw_per_person_files_and_keeps_both_programs(
             false,
         ),
         ("var/lib/lampos-hermes/.hermes/kanban.db", false),
+        // lamp-c0a4's own names, 14 Nov 15:47 (#6343): Hermes 0.22.2's
+        // logins and locks, gone; its dependency record, kept.
+        ("var/lib/lampos-hermes/.hermes/auth.json", false),
+        ("var/lib/lampos-hermes/.hermes/shared/nous_auth.json", false),
+        ("var/lib/lampos-hermes/.hermes/.mcp-discovery.lock", false),
+        (
+            "var/lib/lampos-hermes/.hermes/installs/3ecd8e65a8ac18db/facts.json",
+            true,
+        ),
         // OpenClaw: the program, kept.
         ("var/lib/lampos-openclaw/node/bin/node", true),
         ("var/lib/lampos-openclaw/npm/bin/openclaw", true),
@@ -2824,6 +2839,19 @@ fn a_reset_forgets_hermes_and_openclaw_per_person_files_and_keeps_both_programs(
         ),
         (
             "var/lib/lampos-openclaw/state/config-journal-fingerprint.key",
+            false,
+        ),
+        // lamp-c0a4's own names, 14 Nov 15:47 (#6343): OpenClaw's databases.
+        (
+            "var/lib/lampos-openclaw/state/state/openclaw.sqlite-wal",
+            false,
+        ),
+        (
+            "var/lib/lampos-openclaw/state/state/openclaw-quarantine.sqlite",
+            false,
+        ),
+        (
+            "var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite",
             false,
         ),
     ];
@@ -3309,6 +3337,165 @@ fn a_resumed_reset_stops_the_openclaw_gateway_before_finishing() {
         ["list-units", "stop", "skills", "agents", "sync", "sync"]
     );
     assert!(reset::WRITERS.contains(&reset::OPENCLAW_GATEWAY));
+}
+
+/// `lampos` and another user, each with a running manager, as systemd
+/// lists them.
+const MANAGERS: &str = "user@996.service loaded active running User Manager for UID 996\nuser@1000.service loaded active running User Manager for UID 1000\n";
+
+/// No argv named another user's manager.
+fn others_untouched(fake: &Fake) {
+    for argv in fake.argvs.borrow().iter() {
+        assert!(
+            !argv.iter().any(|unit| unit == "user@1000.service"),
+            "another user's manager named: {argv:?}"
+        );
+    }
+}
+
+/// lamp-c0a4, 13 and 14 Nov (#6343): `lampos`'s own systemd manager,
+/// lingering outside `lampos.target`, runs Harness's daemon and the Hermes
+/// it launched. A reset in place left both running: the old daemon kept the
+/// last owner's connection and computer id, `harness start` failed until a
+/// reboot, and the old Hermes kept writing its state. A product reset stops
+/// that manager, its uid read at the reset, with the lamp, before the wipe,
+/// and starts it again in place, before setup, as a boot would. No other
+/// user's manager is named.
+#[test]
+fn a_product_reset_stops_the_agents_user_manager_and_starts_it_again() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = product_lamp();
+    fake.writers.push_str(MANAGERS);
+    fake.agents = 1;
+    fake.manager = Some("user@996.service".into());
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Started));
+    others_untouched(&fake);
+    let argvs = fake.argvs.borrow();
+    let calls = fake.calls.borrow();
+    let stop = argvs
+        .iter()
+        .position(|argv| argv[1] == "stop" && argv.iter().any(|unit| unit == "lampos.target"))
+        .unwrap();
+    assert!(
+        argvs[stop].iter().any(|unit| unit == "user@996.service"),
+        "stopped with the lamp: {:?}",
+        argvs[stop]
+    );
+    assert!(stop < calls.iter().position(|call| call == "agents").unwrap());
+    assert_eq!(
+        argvs.last().unwrap(),
+        &[
+            "/bin/systemctl",
+            "start",
+            "lamp-skills-manage.socket",
+            "lamp-update-back.timer",
+            "lamp-update.service",
+            "user@996.service",
+            "lamp-setup.service"
+        ]
+        .map(String::from)
+    );
+    drop((argvs, calls));
+    // An inactive manager (Harness off, no linger) is stopped, never started.
+    let mut fake = product_lamp();
+    fake.writers
+        .push_str("user@996.service loaded inactive dead User Manager for UID 996\n");
+    fake.manager = Some("user@996.service".into());
+    let plan = lamp(&root);
+    reset::reset(&plan, &mut fake).unwrap();
+    assert!(
+        !fake
+            .argvs
+            .borrow()
+            .last()
+            .unwrap()
+            .iter()
+            .any(|unit| unit == "user@996.service")
+    );
+    // No `lampos` on the lamp: no manager is stopped, and the reset goes on.
+    let mut fake = product_lamp();
+    fake.writers.push_str(MANAGERS);
+    let plan = lamp(&root);
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Started));
+    others_untouched(&fake);
+    assert!(
+        !fake
+            .argvs
+            .borrow()
+            .iter()
+            .any(|argv| argv.iter().any(|unit| unit == "user@996.service"))
+    );
+}
+
+/// `lampos`'s manager is read from `/etc/passwd` by its uid; no other line
+/// counts, and no such user gives none.
+#[test]
+fn the_agents_manager_is_lampos_own_by_its_uid() {
+    let passwd = "root:x:0:0:root:/root:/bin/bash\nlampos-memory:x:995:995::/nonexistent:/usr/sbin/nologin\nlampos:x:996:996::/nonexistent:/usr/sbin/nologin\norangepi:x:1000:1000::/home/orangepi:/bin/bash\n";
+    assert_eq!(
+        reset::agent_manager_unit(passwd).as_deref(),
+        Some("user@996.service")
+    );
+    assert_eq!(
+        reset::agent_manager_unit("root:x:0:0::/root:/bin/sh\n"),
+        None
+    );
+    assert_eq!(
+        reset::agent_manager_unit("lampos:x::996::/:/bin/sh\n"),
+        None
+    );
+    assert_eq!(
+        reset::agent_manager_unit("lampos:x:9a:996::/:/bin/sh\n"),
+        None
+    );
+    assert_eq!(reset::AGENT_USER, "lampos");
+}
+
+/// A reset finished at boot after a power cut: `lampos`'s manager started
+/// at boot, its Harness daemon with the old owner's sign-in. It is stopped
+/// before the wipe, as OpenClaw's gateway is, and started again after it, so
+/// the daemon starts fresh (#6343). No other user's manager is named.
+#[test]
+fn a_resumed_reset_stops_the_agents_user_manager_and_starts_it_after() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    fs::write(&plan.journal, b"{}").unwrap();
+    let mut fake = Fake {
+        writers: MANAGERS.into(),
+        agents: 1,
+        manager: Some("user@996.service".into()),
+        ..Fake::default()
+    };
+    let steps = reset::resume(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert!(steps.contains(&Step::AgentsForgotten));
+    others_untouched(&fake);
+    let argvs = fake.argvs.borrow();
+    assert_eq!(
+        argvs[1],
+        ["/bin/systemctl", "stop", "user@996.service"].map(String::from)
+    );
+    assert_eq!(
+        argvs.last().unwrap(),
+        &["/bin/systemctl", "start", "user@996.service"].map(String::from)
+    );
+    assert_eq!(
+        *fake.calls.borrow(),
+        [
+            "list-units",
+            "stop",
+            "skills",
+            "agents",
+            "sync",
+            "sync",
+            "start"
+        ]
+    );
 }
 
 /// The agents' files go after the plan's wipes and the skills, said by no

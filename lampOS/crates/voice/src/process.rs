@@ -1342,9 +1342,17 @@ fn worker_command(
             role,
             var(crate::skill_task_yes::NET_ENVIRONMENT).as_deref(),
         ))
+        .envs(skill_secrets_worker_environment(
+            role,
+            var(crate::upload_agent::SECRETS_ENVIRONMENT).as_deref(),
+        ))
         .envs(skill_loose_worker_environment(
             role,
             var(crate::made_skill::LOOSE_ENVIRONMENT).as_deref(),
+        ))
+        .envs(made_said_worker_environment(
+            role,
+            var(crate::made_skill::SAID_ENVIRONMENT).as_deref(),
         ))
         .envs(onboarding_worker_environment(
             role,
@@ -1495,6 +1503,17 @@ fn task_net_worker_environment(
         .then_some((crate::skill_task_yes::NET_ENVIRONMENT, "on"))
 }
 
+// A skill's keys given in the app (`upload_agent::secrets_on`), passed the
+// same narrow way: the exact `on`, to the two routes whose agent skill's
+// tool call checks its keys and whose `make_skill` keeps an upload.
+fn skill_secrets_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::upload_agent::SECRETS_ENVIRONMENT, "on"))
+}
+
 // A made skill loosened (#6059, `made_skill::loose_on`), passed the same
 // narrow way: the exact `on`, to the two routes whose `make_skill` briefs,
 // paces, says and checks the skill.
@@ -1504,6 +1523,17 @@ fn skill_loose_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::made_skill::LOOSE_ENVIRONMENT, "on"))
+}
+
+// A made skill's said start (#6526, `made_skill::said_on`), passed the same
+// narrow way: the exact `on`, to the two routes whose `make_skill` briefs
+// and keeps it.
+fn made_said_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::SAID_ENVIRONMENT, "on"))
 }
 
 // The second route's scoped context (#1675, #1839), passed the same narrow
@@ -2075,15 +2105,16 @@ fn vad_input_worker_environment(
     (role == "capture").then_some((crate::activity::INPUT_ENVIRONMENT, value))
 }
 
-// The bus folder (`LAMP_BUS_ROOT`), to the capture worker only, as set and only
-// when an absolute path: `--microphone-device bus:mic1` opens the bus there, and
-// a worker without it opened `/run/lampos-bus`, never the folder beside lamp-sim.
+// The bus folder (`LAMP_BUS_ROOT`), to the capture and the speaker worker only, as set and only
+// when an absolute path: `--microphone-device bus:mic1` and `--speaker-device bus:speaker1` open
+// the bus there, and a worker without it opened `/run/lampos-bus`, never the folder beside
+// lamp-sim.
 fn bus_root_worker_environment(
     role: &str,
     value: Option<std::ffi::OsString>,
 ) -> Option<(&'static str, std::ffi::OsString)> {
     value
-        .filter(|path| role == "capture" && Path::new(path).is_absolute())
+        .filter(|path| matches!(role, "capture" | "speaker") && Path::new(path).is_absolute())
         .map(|path| (lamp_bus::ROOT_VARIABLE, path))
 }
 
@@ -2316,6 +2347,8 @@ fn second_route_worker_environment(
         crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
         // The exchanges a stored running note holds told in it alone (#6218).
         crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT,
+        // A recent exchange told once, as history, not again (#6218).
+        crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
         // A one-face line read as its person's, forgets refused (#5522).
         crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
@@ -2609,6 +2642,7 @@ mod tests {
             crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT,
             crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
             crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT,
+            crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
             crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
@@ -2744,7 +2778,15 @@ mod tests {
                 ["provider", "second"].as_slice(),
             ),
             (
+                crate::upload_agent::SECRETS_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
                 crate::made_skill::LOOSE_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::SAID_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
         ] {
@@ -3226,9 +3268,9 @@ mod tests {
         }
     }
 
-    /// The bus folder reaches the capture worker only, and only as an absolute path.
+    /// The bus folder reaches the capture and the speaker worker only, and only as an absolute path.
     #[test]
-    fn the_bus_root_reaches_capture_only_as_an_absolute_path() {
+    fn the_bus_root_reaches_capture_and_speaker_only_as_an_absolute_path() {
         use std::ffi::OsString;
         for role in BUS_ROOT_ROLES {
             for (value, passes) in [
@@ -3238,17 +3280,17 @@ mod tests {
                 (None, false),
             ] {
                 let got = bus_root_worker_environment(role, value.map(OsString::from));
-                let expected = (passes && role == "capture")
+                let expected = (passes && matches!(role, "capture" | "speaker"))
                     .then(|| ("LAMP_BUS_ROOT", OsString::from("/x/bus")));
                 assert_eq!(got, expected, "role {role}, value {value:?}");
             }
         }
     }
 
-    /// Started through `worker_command`, the capture worker has `LAMP_BUS_ROOT`
-    /// and no other worker does.
+    /// Started through `worker_command`, the capture and the speaker worker have
+    /// `LAMP_BUS_ROOT` and no other worker does.
     #[test]
-    fn the_bus_root_is_in_the_started_capture_workers_environment_alone() {
+    fn the_bus_root_is_in_the_started_capture_and_speaker_workers_environment_alone() {
         use std::os::unix::fs::PermissionsExt;
         let home = SessionDirectory::create().unwrap();
         let script = home.path.join("worker.sh");
@@ -3271,7 +3313,7 @@ mod tests {
                 std::fs::read_to_string(home.path.join(format!("env-{role}.txt"))).unwrap();
             assert_eq!(
                 written.lines().any(|line| line == "LAMP_BUS_ROOT=/x/bus"),
-                role == "capture",
+                matches!(role, "capture" | "speaker"),
                 "{role}"
             );
         }
@@ -3618,6 +3660,7 @@ mod tests {
                     || name == crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT
                     || name == crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT
                     || name == crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT
+                    || name == crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT
                     || name == crate::second_provider::NAME_ONE_FACE_ENVIRONMENT
@@ -3747,6 +3790,7 @@ mod tests {
                     "LAMP_HELD_WORDS_SEEN=on",
                     "LAMP_HISTORY_AFTER_NOTE=on",
                     "LAMP_HISTORY_KEEPS_CALLS=on",
+                    "LAMP_HISTORY_SAID_ONCE=on",
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KEEP_ANSWERS_AT_ONCE=on",
                     "LAMP_KEEP_QUIETLY=on",

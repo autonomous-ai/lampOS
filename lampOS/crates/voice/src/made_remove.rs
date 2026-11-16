@@ -264,7 +264,7 @@ pub fn question(spoken: &str) -> String {
 }
 
 /// The spoken names `names` as said in a line: "a", "a or b", "a, b or c".
-fn said_or(names: &[String]) -> String {
+pub(crate) fn said_or(names: &[String]) -> String {
     let spoken: Vec<String> = names
         .iter()
         .map(|name| made_skill::spoken_name(name))
@@ -456,23 +456,6 @@ pub fn asked_here(
     )
 }
 
-/// What the folder `name` in the skills folder went on as: the SHA-256 of
-/// its package (`.package.json`, written by the manage helper's install);
-/// `Ok(None)` when no such folder is there, `Err` when it is there but says
-/// no package.
-fn went_on_as(keeping: &Keeping, name: &str) -> Result<Option<String>, ()> {
-    let folder = keeping.installed.join(name);
-    if !folder.is_dir() {
-        return Ok(None);
-    }
-    std::fs::read(folder.join(".package.json"))
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
-        .and_then(|record| record["sha256"].as_str().map(str::to_owned))
-        .map(Some)
-        .ok_or(())
-}
-
 /// The person's yes to the remove `asks` waited for: the made skill of
 /// that name and SHA-256, if the lamp still keeps it, taken off by
 /// `remove` (the manage helper's own remove) when it is on and its folder
@@ -499,7 +482,7 @@ pub fn removed(
     };
     let spoken = made_skill::spoken_name(&asks.skill);
     if entry["on"] == true {
-        match went_on_as(keeping, &asks.skill) {
+        match made_skill::went_on_as(keeping, &asks.skill) {
             Ok(Some(sha256)) if sha256 == asks.sha256 => remove(&asks.skill)?,
             Ok(None) => eprintln!(
                 "lamp-voice: a made skill to remove by voice is no longer on the lamp: only dropped from the made skills"
@@ -541,7 +524,7 @@ pub fn removed_here(asks: &Asks) -> Result<Value, String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::make_skill_local::tests::keeping;
     use crate::skill_write_yes as yes;
@@ -552,7 +535,7 @@ mod tests {
     /// The person's made skills kept in `keeping`'s index, each by its name
     /// and whether it is on (an on one has its folder in the skills folder,
     /// as the manage helper put it there).
-    fn made_here(keeping: &crate::made_skill::Keeping, made: &[(&str, bool)]) {
+    pub(crate) fn made_here(keeping: &crate::made_skill::Keeping, made: &[(&str, bool)]) {
         std::fs::create_dir_all(&keeping.directory).unwrap();
         let entries: Vec<Value> = made
             .iter()

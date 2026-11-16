@@ -2159,6 +2159,48 @@ fn the_first_tries_switch_is_on_in_the_product() {
     }
 }
 
+/// A known face giving another name is asked, and only their yes renames
+/// it (#5485, 9 of 9 on lamp-52e6, 9 Nov): both rename switches are on in
+/// the product. Only `lamp-voice` reads them, which sets each `on` once,
+/// and no product file sets either to anything else.
+#[test]
+fn the_rename_switches_are_on_in_the_product() {
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let voice = fs::read_to_string(product.join("lamp-voice.service")).unwrap();
+    assert!(
+        voice
+            .lines()
+            .any(|line| line == "Environment=LAMP_NAMES=checked")
+    );
+    for (name, want) in [
+        (
+            lamp_voice::known_faces::RENAME_ASKED_ENVIRONMENT,
+            "LAMP_NAMES_RENAME_ASKED",
+        ),
+        (
+            lamp_voice::known_faces::RENAME_YES_ENVIRONMENT,
+            "LAMP_NAMES_RENAME_YES",
+        ),
+    ] {
+        assert_eq!(name, want);
+        let switch = format!("Environment={name}=on");
+        let setting = format!("{name}=");
+        assert_eq!(
+            voice.lines().filter(|line| *line == switch).count(),
+            1,
+            "{name}"
+        );
+        for entry in fs::read_dir(&product).unwrap() {
+            let path = entry.unwrap().path();
+            if let Ok(text) = fs::read_to_string(&path) {
+                for line in text.lines().filter(|line| line.contains(&setting)) {
+                    assert_eq!(line, switch, "{}", path.display());
+                }
+            }
+        }
+    }
+}
+
 /// [`ns_text`] with [`TASKS_SWITCH`] on: each of [`TASKS_EDITS`] found
 /// once in [`NS_TEXT`] (and once with [`SKILLS_EDITS`] made) and made, so
 /// the text names [`CONTROL_SOCKET`], the file alone, and stages it before
@@ -3313,12 +3355,27 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     fs::create_dir_all(&stubs).unwrap();
     let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
                 if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
-                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n";
-    for name in ["mount", "findmnt", "mkdir", "rmdir"] {
+                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n\
+                if [ \"${0##*/}\" = mount ] && [ -f \"$LINK\" ] && [ \"$4\" = \"$(cat \"$LINK\")\" ]; then /bin/mkdir -p \"${4%/*}\" && /bin/ln -s /elsewhere \"$4\" || exit 9; fi\n";
+    // `mount`, for the path named in the `link` file, leaves a link at
+    // that bind target: the target, seen through the `installs` bind, is
+    // the source's directory entry swapped for a link after the `-L`
+    // checks, and a `stat` of it matches the source's (#7043).
+    let link = base.join("link");
+    for name in ["mount", "umount", "findmnt", "mkdir", "rmdir"] {
         let path = stubs.join(name);
         fs::write(&path, stub).unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
     }
+    // `stat` answers one device and inode for every path, but another for
+    // the path named in the `swap` file: a bind target whose mount followed
+    // a link swapped in after the check.
+    let swap = base.join("swap");
+    let stat = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
+                if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
+                if [ -f \"$SWAP\" ] && [ \"$3\" = \"$(cat \"$SWAP\")\" ]; then echo 2:2; else echo 1:1; fi\n";
+    fs::write(stubs.join("stat"), stat).unwrap();
+    fs::set_permissions(stubs.join("stat"), fs::Permissions::from_mode(0o755)).unwrap();
     let script = base.join("make-lines");
     fs::write(
         &script,
@@ -3335,6 +3392,8 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
             .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
             .env("LOG", &log)
             .env("FAIL_ON", fail_on)
+            .env("SWAP", &swap)
+            .env("LINK", &link)
             .env("HOME", "/lasting");
         match home {
             Some(home) => command.env(HOME_ENV, home),
@@ -3372,18 +3431,28 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         // Only Hermes's install lock and a lease-managed generation's
         // leases are bound back read-write, onto the staged `installs`
         // before its read-only remount (`.leases` made first, as Hermes
-        // would); `g2` has no leases, `old` no lock.
+        // would); `g2` has no leases, `old` no lock. Each is checked
+        // again after its bind: the source's device and inode before it,
+        // the target's after (#7011 P3).
+        format!("stat -c %d:%i {h}/.hermes/installs/k/.install.lock"),
         format!("mount -n --bind {h}/.hermes/installs/k/.install.lock {x}/i/k/.install.lock"),
+        format!("stat -c %d:%i {x}/i/k/.install.lock"),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/pm-runtime/.prepare.lock"),
         format!(
             "mount -n --bind {h}/.hermes/installs/k/pm-runtime/.prepare.lock {x}/i/k/pm-runtime/.prepare.lock"
         ),
+        format!("stat -c %d:%i {x}/i/k/pm-runtime/.prepare.lock"),
         format!("mkdir {h}/.hermes/installs/k/environments/g1/.leases"),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/environments/g1/.leases"),
         format!(
             "mount -n --bind {h}/.hermes/installs/k/environments/g1/.leases {x}/i/k/environments/g1/.leases"
         ),
+        format!("stat -c %d:%i {x}/i/k/environments/g1/.leases"),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases"),
         format!(
             "mount -n --bind {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases {x}/i/k/pm-runtime/generations/r1/.leases"
         ),
+        format!("stat -c %d:%i {x}/i/k/pm-runtime/generations/r1/.leases"),
         format!("mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {h}/.hermes"),
         format!("mkdir {h}/.hermes/hermes-agent"),
         format!("mount -n --move {x}/c {h}/.hermes/hermes-agent"),
@@ -3417,6 +3486,14 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         format!("--bind {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases "),
         format!("mkdir {h}/.hermes/installs/k/environments/g1/.leases"),
         format!("--bind {h}/.hermes/installs/k/environments/g1/.leases "),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/.install.lock"),
+        format!("stat -c %d:%i {x}/i/k/.install.lock"),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/pm-runtime/.prepare.lock"),
+        format!("stat -c %d:%i {x}/i/k/pm-runtime/.prepare.lock"),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/environments/g1/.leases"),
+        format!("stat -c %d:%i {x}/i/k/environments/g1/.leases"),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases"),
+        format!("stat -c %d:%i {x}/i/k/pm-runtime/generations/r1/.leases"),
         format!("none {h}/.hermes"),
         format!("mkdir {h}/.hermes/hermes-agent"),
         format!("--move {x}/c "),
@@ -3469,6 +3546,158 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         "{lines:?}"
     );
     fs::write(&prepare, "").unwrap();
+    // Heron's P3 on #6977: nothing is reached through a link, which root
+    // would follow. A generation folder that is a link ends it before the
+    // lasting home is hidden; so does an `installs/<key>` that is a link
+    // (its install lock skipped, its `pm-runtime` refused).
+    let installs = base.join("h/.hermes/installs");
+    let g1 = installs.join("k/environments/g1");
+    fs::rename(&g1, installs.join("k/environments/g1-real")).unwrap();
+    std::os::unix::fs::symlink("g1-real", &g1).unwrap();
+    let (out, lines) = run(Some(&home), "");
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Hermes leases not shown"));
+    assert!(
+        !lines.iter().any(|line| line.contains("tmpfs")),
+        "{lines:?}"
+    );
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains("environments/g1/.leases")),
+        "{lines:?}"
+    );
+    fs::remove_file(&g1).unwrap();
+    fs::rename(installs.join("k/environments/g1-real"), &g1).unwrap();
+    let linked = installs.join("lk");
+    std::os::unix::fs::symlink("k", &linked).unwrap();
+    let (out, lines) = run(Some(&home), "");
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Hermes runtime lock not shown"));
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains("tmpfs") || line.contains("/lk/")),
+        "{lines:?}"
+    );
+    fs::remove_file(&linked).unwrap();
+    // Heron's P3 on #7011: `-L` looks only at the path's last part, so the
+    // folder holding a generation is checked too. An `environments` that
+    // is a link, to a real folder elsewhere with the same generation, ends
+    // it before the lasting home is hidden, and nothing is bound or made
+    // through it.
+    let environments = installs.join("k/environments");
+    let elsewhere = base.join("elsewhere");
+    fs::rename(&environments, &elsewhere).unwrap();
+    std::os::unix::fs::symlink(&elsewhere, &environments).unwrap();
+    let (out, lines) = run(Some(&home), "");
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Hermes leases not shown"));
+    assert!(
+        !lines.iter().any(|line| line.contains("tmpfs")
+            || line.contains("environments/g1/.leases")
+            || line.contains("elsewhere")),
+        "{lines:?}"
+    );
+    fs::remove_file(&environments).unwrap();
+    fs::rename(&elsewhere, &environments).unwrap();
+    // Thirteen's P3 on #7011: the `-L` checks and the bind are two steps,
+    // and `mount --bind` follows a link the lasting Hermes's user swapped
+    // in between. A bind target whose device and inode are not the
+    // source's from before the bind is unmounted at once, and the make
+    // ends the same way, before the lasting home is hidden.
+    for (target, refusal) in [
+        (
+            format!("{x}/i/k/.install.lock"),
+            "Hermes install lock not shown",
+        ),
+        (
+            format!("{x}/i/k/pm-runtime/.prepare.lock"),
+            "Hermes runtime lock not shown",
+        ),
+        (
+            format!("{x}/i/k/environments/g1/.leases"),
+            "Hermes leases not shown",
+        ),
+        (
+            format!("{x}/i/k/pm-runtime/generations/r1/.leases"),
+            "Hermes leases not shown",
+        ),
+    ] {
+        fs::write(&swap, &target).unwrap();
+        let (out, lines) = run(Some(&home), "");
+        assert!(!out.status.success(), "{target}");
+        assert!(out.stdout.is_empty(), "Hermes never runs: {target}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains(refusal),
+            "{target} {out:?}"
+        );
+        let bound = lines
+            .iter()
+            .position(|line| {
+                line.starts_with("mount -n --bind ") && line.ends_with(&format!(" {target}"))
+            })
+            .expect(&target);
+        assert_eq!(
+            lines[bound + 1..],
+            [
+                format!("stat -c %d:%i {target}"),
+                format!("umount -n {target}")
+            ],
+            "{target}"
+        );
+    }
+    fs::remove_file(&swap).unwrap();
+    // Heron's P3 on #7043: a source swapped for a link after the `-L`
+    // checks but before its `stat` gives the link's own device and inode,
+    // and the target, the same directory entry seen through the
+    // `installs` bind, is that link, so the two match. A bind target that
+    // is a link after the mount is unmounted at once all the same, and the
+    // make ends before the lasting home is hidden.
+    for (target, refusal) in [
+        (
+            format!("{x}/i/k/.install.lock"),
+            "Hermes install lock not shown",
+        ),
+        (
+            format!("{x}/i/k/pm-runtime/.prepare.lock"),
+            "Hermes runtime lock not shown",
+        ),
+        (
+            format!("{x}/i/k/environments/g1/.leases"),
+            "Hermes leases not shown",
+        ),
+        (
+            format!("{x}/i/k/pm-runtime/generations/r1/.leases"),
+            "Hermes leases not shown",
+        ),
+    ] {
+        let _ = fs::remove_dir_all(base.join("x"));
+        fs::write(&link, &target).unwrap();
+        let (out, lines) = run(Some(&home), "");
+        assert!(!out.status.success(), "{target}");
+        assert!(out.stdout.is_empty(), "Hermes never runs: {target}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains(refusal),
+            "{target} {out:?}"
+        );
+        let bound = lines
+            .iter()
+            .position(|line| {
+                line.starts_with("mount -n --bind ") && line.ends_with(&format!(" {target}"))
+            })
+            .expect(&target);
+        assert_eq!(
+            lines[bound + 1..],
+            [format!("umount -n {target}")],
+            "{target}"
+        );
+    }
+    fs::remove_file(&link).unwrap();
+    let _ = fs::remove_dir_all(base.join("x"));
     // A home outside the work folder's `lamp`, or missing, is refused
     // before anything is mounted.
     let other = base.join("other/make-task-1/home");
@@ -3591,6 +3820,95 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
     );
 }
 
+/// Thirteen's P3 on #7011, for real in a user and mount namespace of its
+/// own (Linux, where the kernel allows one; skipped otherwise): a
+/// generation's `.leases` swapped for a link to another folder after the
+/// `-L` checks, as the lasting Hermes's user could while a make starts, is
+/// followed by `mount --bind`; the target's device and inode then differ
+/// from the source's, so the target is unmounted, nothing stays bound
+/// there, and the make ends "Hermes leases not shown" before Hermes runs.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_leases_folder_swapped_for_a_link_after_the_check_is_refused() {
+    let folder = tempfile::tempdir().unwrap();
+    let base = fs::canonicalize(folder.path()).unwrap();
+    let probe = base.join("probe");
+    fs::create_dir(&probe).unwrap();
+    let allowed = std::process::Command::new("unshare")
+        .args(["--map-root-user", "--mount", "--propagation", "private"])
+        .args(["mount", "-t", "tmpfs", "none"])
+        .arg(&probe)
+        .output()
+        .is_ok_and(|out| out.status.success());
+    if !allowed {
+        eprintln!("no user and mount namespace here: skipped");
+        return;
+    }
+    let make = a_lamp_with_a_make(&base);
+    let b = base.display();
+    let leases = base.join("h/.hermes/installs/k/environments/g1/.leases");
+    fs::create_dir(&leases).unwrap();
+    let elsewhere = base.join("elsewhere");
+    fs::create_dir(&elsewhere).unwrap();
+    // A `stat` that, right after it reads the source (after the `-L`
+    // checks, before the bind), swaps that source for a link.
+    let stubs = base.join("stubs");
+    fs::create_dir(&stubs).unwrap();
+    fs::write(
+        stubs.join("stat"),
+        format!(
+            "#!/bin/sh\n/usr/bin/stat \"$@\" || exit\n\
+             if [ \"$3\" = {l} ]; then mv {l} {l}-real && ln -s {e} {l}; fi\n",
+            l = leases.display(),
+            e = elsewhere.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(stubs.join("stat"), fs::Permissions::from_mode(0o755)).unwrap();
+    let target = format!("{b}/x/i/k/environments/g1/.leases");
+    let lines = make_lines(&base, "echo HERMES-RAN\n")
+        .replacen(
+            &format!("W={b}/w\n"),
+            &format!(
+                "W={b}/w\nmount --bind {b}/h {b}/h && mount --bind {b}/w {b}/w || exit 1\n\
+                 fail() {{ echo \"hermes-ns: $1\" >&2; grep -qF -e \" {target} \" -e \" {e} \" /proc/self/mountinfo && echo STILL-BOUND; exit 1; }}\n",
+                e = elsewhere.display()
+            ),
+            1,
+        );
+    let script = base.join("make-lines");
+    fs::write(&script, lines).unwrap();
+    let out = std::process::Command::new("unshare")
+        .args([
+            "--map-root-user",
+            "--mount",
+            "--propagation",
+            "private",
+            "/bin/sh",
+        ])
+        .arg(&script)
+        .current_dir(&make)
+        .env(
+            "PATH",
+            format!("{}:/usr/sbin:/usr/bin:/sbin:/bin", stubs.display()),
+        )
+        .env(HOME_ENV, make.join("home"))
+        .output()
+        .unwrap();
+    assert!(!out.status.success(), "{out:?}");
+    assert!(out.stdout.is_empty(), "{out:?}");
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("hermes-ns: Hermes leases not shown"),
+        "{out:?}"
+    );
+    assert!(
+        fs::symlink_metadata(&leases)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+}
+
 /// #6643 with #6685's one run path (`LAMP_SKILL_DEFAULT_AGENT` on): Hermes's
 /// one run path wrapper hands a make's home on ([`ONE_PATH_HOME_LINE`],
 /// [`WRAPPER_HOME_LINE`]'s semantics, as [`MAKE_ENV`]) and the one agent
@@ -3685,8 +4003,8 @@ fn with_the_one_path_a_make_still_runs_in_its_own_home() {
     let stubs = base.join("stubs");
     fs::create_dir_all(&stubs).unwrap();
     let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
-                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n";
-    for name in ["mount", "findmnt", "mkdir", "rmdir"] {
+                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; stat) echo 1:1;; esac\n";
+    for name in ["mount", "findmnt", "mkdir", "rmdir", "stat"] {
         let path = stubs.join(name);
         fs::write(&path, stub).unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();

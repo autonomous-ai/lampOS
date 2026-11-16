@@ -5168,7 +5168,7 @@ fn every_harness_call_says_one_line_with_ids_cut_and_no_words() {
     );
     assert!(
         lines[2].starts_with("tasks: harness show: machine=01234567 agent=11111111 exit=0 ms=")
-            && lines[2].ends_with(" state=idle tools=2 id=11111111"),
+            && lines[2].ends_with(" state=idle tools=2 answer=15 id=11111111"),
         "{}",
         lines[2]
     );
@@ -6793,6 +6793,8 @@ fn skill_run(deadline: Duration) -> SkillRun {
         skill: "photo-booth".into(),
         prompt: "Run `scripts/main.py` for the skill `photo-booth`.".into(),
         folder: PathBuf::from("/var/lib/lampOS/skills/photo-booth"),
+        script: PathBuf::from("/var/lib/lampOS/skills/photo-booth/scripts/main.py"),
+        task: "\"take a photo\"".into(),
         env: vec![
             (skill_task::SOCKET_ENV, skill_task::CONTROL_SOCKET.into()),
             (skill_task::TOKEN_ENV, RUN_SECRET.into()),
@@ -6800,6 +6802,8 @@ fn skill_run(deadline: Duration) -> SkillRun {
         deadline,
         started: Default::default(),
         start_in: None,
+        env_file: None,
+        answer: Default::default(),
     }
 }
 
@@ -7062,6 +7066,78 @@ fn a_run_harness_kept_as_a_shell_never_started_and_is_not_said_done() {
             "{show}"
         );
         nothing_left(&rig);
+    }
+}
+
+/// What the run's agent found is kept for the hand-over's answer from the
+/// one `show` that ends the run: idle, from the end's own `show` (`--chars
+/// 4000`, as an observation reads it); stopped, from the `show` that found
+/// its session bound. A shell's or an unread `show` keeps none.
+#[test]
+fn a_skill_runs_end_keeps_its_agents_last_answer() {
+    let shown = |agent: &str, answer: &str| {
+        json!({"name":"skill-task-1","id":AGENT,"agent":agent,"machine":"lamp","state":"idle",
+            "startedBy":"you","folder":null,"ask":null,"answer":answer,"truncated":false,
+            "tools":3,"next":[]})
+        .to_string()
+    };
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":shown("Hermes", "You have 12 unread messages.")},
+        "close":{"exit":0},
+    }));
+    let run = skill_run(Duration::from_secs(20));
+    assert_eq!(
+        skill_runner(&rig, Some(EngineKind::Hermes)).run(&run, &|| {}),
+        Ok(0)
+    );
+    assert_eq!(
+        run.answer.get().map(String::as_str),
+        Some("You have 12 unread messages.")
+    );
+    let calls = rig.calls();
+    assert_eq!(
+        calls[3]["args"],
+        json!([
+            "show",
+            "--machine",
+            MACHINE,
+            AGENT,
+            "--chars",
+            "4000",
+            "--json"
+        ])
+    );
+    // Stopped with its session bound: the fixture's own `show`.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let run = skill_run(Duration::from_secs(20));
+    assert_eq!(
+        skill_runner(&rig, Some(EngineKind::Hermes)).run(&run, &|| {}),
+        Ok(0)
+    );
+    assert_eq!(
+        run.answer.get().map(String::as_str),
+        Some("Observed answer")
+    );
+    for plan in [json!({"stdout":shown("Hermes", "  ")}), json!({"exit":1})] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":{"default":true},
+            "wait":{"stdout":waited("idle", AGENT)},
+            "show":plan,
+            "close":{"exit":0},
+        }));
+        let run = skill_run(Duration::from_secs(20));
+        assert_eq!(
+            skill_runner(&rig, Some(EngineKind::Hermes)).run(&run, &|| {}),
+            Ok(0)
+        );
+        assert_eq!(run.answer.get(), None, "{plan}");
     }
 }
 
@@ -7431,15 +7507,6 @@ fn a_skill_run_is_refused_in_words_when_the_default_agent_cant_take_it() {
     let ns = ns_with_runs();
     refused(EngineKind::Claude, &[], Some(&ns), "(claude)");
     refused(
-        EngineKind::Hermes,
-        &[(
-            "hermes",
-            "#!/bin/sh\n# lampOS: Hermes on the lamp. Written by lamp-update.\nif [ \"${LAMP_NS_NET-}\" = run ]; then N=--net; else N=; unset LAMP_NS_NET; fi\n",
-        )],
-        Some(&ns),
-        "isn't lamp-update's one run path",
-    );
-    refused(
         EngineKind::Openclaw,
         &[(
             "openclaw",
@@ -7472,6 +7539,77 @@ fn a_skill_run_is_refused_in_words_when_the_default_agent_cant_take_it() {
         Some(&ns),
         "maker's cloud",
     );
+}
+
+/// #6914 (V2's risk, the first builder's 18:44): with the switch on and the
+/// lamp's Hermes the default, a Hermes wrapper lamp-update hasn't rewritten
+/// yet (a round from an older updater, #6898) is no refusal. The run goes
+/// the switch-off way, through the lamp's Hermes as before, while its
+/// wrapper still finds a run by its folder. A wrapper that doesn't find a
+/// run by its folder is still refused, as with the switch off. Any other
+/// default's wrapper that isn't its one-path one is still refused (the
+/// first builder's (b)).
+#[test]
+fn a_hermes_default_whose_wrapper_waits_for_its_round_runs_as_with_the_switch_off() {
+    let ns = ns_with_runs();
+    let off_wrapper = format!(
+        "#!/bin/sh\n# lampOS: Hermes on the lamp. Written by lamp-update.\n{}{}{}",
+        skill_task::WRAPPER_RUN_LINES.join(""),
+        skill_task::WRAPPER_NET_LINES[0],
+        skill_task::WRAPPER_NET_LINES[1],
+    );
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", &off_wrapper)],
+        Some(&ns),
+    );
+    runner.held_by = Some(rig.root.path().join("bin").join("hermes"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    let calls = rig.calls();
+    let new = calls
+        .iter()
+        .find(|call| call["args"][0] == "new")
+        .expect("a new");
+    assert_eq!(new["args"][1], "hermes");
+    nothing_left(&rig);
+
+    // The same, with a wrapper that doesn't find a run by its folder: the
+    // switch-off refusal, nothing asked of Harness.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let old = "#!/bin/sh\n# lampOS: Hermes on the lamp. Written by lamp-update.\nexec /usr/bin/unshare --map-root-user $N --mount \"$@\"\n";
+    let mut runner = one_path_runner(&rig, EngineKind::Hermes, &[("hermes", old)], Some(&ns));
+    runner.held_by = Some(rig.root.path().join("bin").join("hermes"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Err(skill_task::NOT_FOUND_BY_FOLDER.into())
+    );
+    assert!(rig.calls().iter().all(|call| call["args"][0] != "new"));
+
+    // Claude Code the default with Hermes's switch-off wrapper beside it:
+    // still refused, never run on Hermes instead.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Claude,
+        &[("hermes", &off_wrapper), ("claude", &off_wrapper)],
+        Some(&ns),
+    );
+    let said = runner
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert!(
+        said.contains("(claude)") && said.contains("isn't set up"),
+        "{said}"
+    );
+    assert!(rig.calls().is_empty());
 }
 
 /// At its deadline the run's `wait` is cancelled and its session closed

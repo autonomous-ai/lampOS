@@ -221,14 +221,21 @@ kept", below). Off by default; not on any lamp.
 `LAMP_STOP_WORDS=heard` in the voice's environment, with the second voice's
 configuration: the words said in a yield are heard, and a stop phrase
 commits it ([stop-word.md](stop-word.md#a-stop-word-heard-in-a-yield-828-step-2-16-october)).
-Off by default; not on any lamp.
+Off by default; off in the product. #5032 (b) proposed it for the product,
+where a short "Stop." over the answer was lost 9 of 9 on lamp-06c1, and
+#5905 `heard-always` in its place (below): on lamp-52e6 on 11 November a
+0.5 s "Stop." made no yield, so `heard` never heard it.
 
 `LAMP_STOP_WORDS=heard-always`, with the same: everything heard while the
 lamp speaks is heard, and a short stop command (at most three words, a whole
 stop word or pair first or last, #4868) the lamp did not say itself stops the
 reply as a hand Stop does ([stop-word.md](stop-word.md#a-stop-word-heard-over-the-lamps-voice-828-16-october)).
-Off by default; in no lamp's unit (played on lamp-4ace and lamp-52e6, where
-no person's stop came through yet).
+Off by default; off in the product: #5905 set it there (the lead's call, 11
+November), so a short "Stop." would stop the answer whether or not it made a
+yield, and lands with the line parked (`PARKED (#5905)`): turning it on
+waits for the stop keyword spotted by lamp-name's on-mic model (the first
+builder's ruling, 15 November). Its costs, the whole answer's audio to the
+speech-to-text among them, are in [stop-word.md](stop-word.md#in-the-product-5905-11-november).
 
 `LAMP_STOP_WORDS_SOURCE=raw`, with either: the stop words hear the
 microphone's block before the canceller, and the capture worker is given

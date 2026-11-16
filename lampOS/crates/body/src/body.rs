@@ -425,6 +425,41 @@ pub fn strain_guard_from(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// One step of the pose follower: the joint's new velocity, critically
+/// damped toward a goal `gap` counts away, its acceleration at most
+/// `limits.acceleration` and its speed at most `limits.speed`. Under
+/// `limits.energy` (#6893) the acceleration also moves from `pulled`, the
+/// last step's, by at most [`JERK`] times `limits.acceleration` a second,
+/// so it slews instead of stepping (an S-curve); a joint at rest starts from
+/// none, and one held at its speed eases its pull off (the speed cap itself
+/// still cuts sharply). Off, `pulled` is left alone and the step is as before.
+pub fn follow_step(gap: f32, velocity: f32, pulled: &mut f32, limits: &Limits, step: f32) -> f32 {
+    let mut pull = (FOLLOW * FOLLOW * gap - 2.0 * FOLLOW * velocity)
+        .clamp(-limits.acceleration, limits.acceleration);
+    let slew = JERK * limits.acceleration * step;
+    if limits.energy {
+        if velocity == 0.0 {
+            *pulled = 0.0;
+        }
+        pull = pull.clamp(*pulled - slew, *pulled + slew);
+    }
+    let next = (velocity + pull * step).clamp(-limits.speed, limits.speed);
+    if limits.energy {
+        *pulled = if next.abs() >= limits.speed {
+            // Held at its speed it is not speeding up: the pull eases off
+            // rather than winding up, so it can slow down in time.
+            pulled.signum() * (pulled.abs() - slew).max(0.0)
+        } else {
+            pull
+        };
+    }
+    next
+}
+
+/// Under `Limits::energy`, how fast the follower's acceleration may change:
+/// this many times `Limits::acceleration` a second (#6893, design sec. 3).
+const JERK: f32 = 6.0;
+
 /// The strain guard's bounds (`LAMP_BODY_STRAIN_GUARD`, #4501): an arm
 /// joint over `load` for `seconds` while standing sits the lamp down.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -754,6 +789,10 @@ pub struct Asked {
     /// and is refused with [`crate::moves::PERSON_USING`] over anything
     /// higher. Without it, a gesture asked over one playing is as before.
     pub replace: bool,
+    /// The energy level the character keeps (`crate::energy`, #6893), 0 or
+    /// 1 for today. Only with `LAMP_BODY_ENERGY=on`; taken only once the
+    /// lamp is settled (no gesture, the pose and the arm still).
+    pub energy: u8,
 }
 
 /// A holder's aim counted from the found `home` (pitch, roll, yaw counts),
@@ -794,6 +833,7 @@ impl Asked {
         night_woke: false,
         aim_from_home: false,
         replace: false,
+        energy: 0,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -823,6 +863,7 @@ impl Asked {
         night_woke: false,
         aim_from_home: false,
         replace: false,
+        energy: 0,
     };
 }
 
@@ -1157,6 +1198,12 @@ pub struct Limits {
     /// is the body as before.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub strain_guard: Option<StrainGuard>,
+    /// `LAMP_BODY_ENERGY=on` (#6893): gestures stretched to `servo_speed`
+    /// ([`Limits::clip_ceiling`]) and the pose follower jerk-limited
+    /// ([`follow_step`]). Off: as before. Read by the one reader of the
+    /// switch, [`crate::energy_in::enabled`], as the level is.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub energy: bool,
     /// A load above this on `load_steps` steps in a row makes the joint give
     /// way, and ends the run if it stays or comes back too often.
     pub load: [u16; 3],
@@ -1197,6 +1244,9 @@ impl Tuning {
     /// 9 of roll and 22 of yaw.
     pub const REACH_CAP: [u16; 4] = [180, 25, 100, 250];
     pub const SPEED_CAP: u16 = 300;
+    /// The pose's top speed at any level of `crate::energy` (#6893): level
+    /// 5's. Only the energy table goes past `SPEED_CAP`; `--speed` does not.
+    pub const ENERGY_SPEED_CAP: u16 = 800;
     pub const SERVO_SPEED_CAP: u16 = 1_000;
     pub const SERVO_ACCELERATION_CAP: u8 = 150;
 }
@@ -1210,6 +1260,21 @@ impl Limits {
     /// How fast the head and the base wake, counts a second.
     pub fn wake_speed(&self) -> f32 {
         self.recover_speed.unwrap_or(WAKE_SPEED)
+    }
+
+    /// These limits at an energy level (`crate::energy`): level 1 is these,
+    /// above it the pose may move faster, never slower, its acceleration
+    /// six times its speed as `folded_with` sets it.
+    pub fn at(self, level: u8) -> Self {
+        if crate::energy::taken(level) == 1 {
+            return self;
+        }
+        let speed = crate::energy::speed(self.speed, level);
+        Self {
+            speed,
+            acceleration: self.acceleration.max(speed * 6.0),
+            ..self
+        }
     }
 
     /// The folded limits with another reach and speed, each within its cap.
@@ -1241,6 +1306,12 @@ impl Limits {
             start_reach: tuning.reach.into_iter().max().unwrap_or(60).max(60),
             ..Self::FOLDED
         })
+    }
+
+    /// The fastest a gesture's step may ask a joint for, counts a second,
+    /// under `energy`: the servo's own goal speed. `None`: as recorded.
+    pub fn clip_ceiling(&self) -> Option<f32> {
+        self.energy.then_some(f32::from(self.servo_speed))
     }
 
     /// For a lamp folded in its rest pose. On lamp-4ace the head crossed
@@ -1305,6 +1376,7 @@ impl Limits {
         yaw_unset: false,
         app_reach: false,
         strain_guard: None,
+        energy: false,
     };
 }
 
@@ -5021,6 +5093,7 @@ pub(crate) fn run_looking(
         night_woke: false,
         aim_from_home: false,
         replace: false,
+        energy: 0,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -5600,6 +5673,29 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         if !without.is_empty() {
             found = match take_hold(bus, &mut report, &without, &found) {
                 Ok(now) => now,
+                // #6834: an arm joint found limp outside its window is never
+                // given that goal. Ending the run there stopped lamp-body at
+                // every start, silently. With `--refused-let-go` what it took
+                // hold of is let go again, as it was found, and it asks a hand
+                // to fold the arm, starting once it is folded in its window.
+                Err(Stop::Window { joint, goal, .. })
+                    if limits.refused_let_go
+                        && let Some(arm) = ARM.into_iter().find(|arm| arm.id() == joint)
+                        && let Some(up) = standing =>
+                {
+                    report.pose_wait = Some(PoseWait {
+                        ranges: [(0, 4_095); 3],
+                        joints: without,
+                        say: ARM_FOLD,
+                        arm: Some(up.folded),
+                        follow_arm: false,
+                        follow_force: None,
+                    });
+                    report.stop = refused(format!(
+                        "{arm} found without torque at {goal}, outside its window"
+                    ));
+                    return report;
+                }
                 Err(stop) => {
                     report.stop = stop;
                     return report;
@@ -6548,6 +6644,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // and how.
     let mut idle_due: Option<Duration> = None;
     let mut idler = idle::Idler::new(standing.map_or(0, |up| up.idle_seed));
+    // The energy level taken (`crate::energy`, #6893): 1 is the limits and
+    // the stand's pace this body was given, exactly.
+    let base = limits;
+    let mut limits = limits;
+    let stand_base = standing.map(|up| up.seconds);
+    let mut energy = 1u8;
     // Expression's rest offsets of the head (pitch, roll) averaged over a
     // breath, the average a drift last left, and when one last did.
     let mut rest_average: Option<([f32; 2], [f32; 2])> = None;
@@ -6563,6 +6665,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // only bound that applies is that it never moves away from it.
     let mut commanded = found_pose.map(f32::from);
     let mut velocity = [0.0f32; 3];
+    // Under `Limits::energy`, each joint's last acceleration (`follow_step`).
+    let mut pulled = [0.0f32; 3];
+    // Under `Limits::energy`, what a gesture's steps are stretched to.
+    let stretch = limits.clip_ceiling();
     let mut written = found_pose;
     let mut hot = [0u8; 3];
     let mut heard: Option<(Mood, u8, Duration)> = None;
@@ -6760,6 +6866,27 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         // What its eyes saw and a gesture asked of it, since the last step.
         let (mut asked_now, asked_by, asked_source) = asked();
+        // A new energy level only once settled, so that a cap never drops
+        // under a joint still moving: no gesture playing or waiting, the
+        // pose's filter still and the arm up or down.
+        let level = crate::energy::taken(asked_now.energy);
+        if level != energy
+            && playing.is_none()
+            && pending.is_none()
+            && velocity.iter().all(|speed| speed.abs() < 1.0)
+            && stand_velocity == 0.0
+        {
+            energy = level;
+            limits = base.at(level);
+            if let (Some(up), Some(seconds)) = (standing.as_mut(), stand_base) {
+                up.seconds = crate::energy::stand_seconds(seconds, level);
+            }
+            idler.share = crate::energy::of(level).idle_share;
+            eprintln!(
+                "lamp-body: step {}: energy level {level}: {} counts a second",
+                report.steps, limits.speed
+            );
+        }
         // A person or a health check lets a seated lamp stand (#4501).
         if asked_now.unseat
             && let Some((joint, why)) = seated.take()
@@ -7104,9 +7231,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     );
                 }
                 pending_window = None;
-                awake_until = playing
-                    .filter(|(clip, _)| from_outside(clip))
-                    .map(|(clip, began)| began + Duration::from_micros(clip.duration_us()));
+                awake_until =
+                    playing
+                        .filter(|(clip, _)| from_outside(clip))
+                        .map(|(clip, began)| {
+                            began + Duration::from_micros(clip.duration_within_us(stretch))
+                        });
             } else if mood != Mood::Resting || company || asked_now.woken {
                 awake_until = Some(now + up.awake);
             } else if asked_now.held && awake_until.is_some_and(|until| now < until) {
@@ -7133,9 +7263,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 if let Some((before, opened)) = pending_window.take()
                     && awake_until == opened
                 {
-                    let ends = playing
-                        .filter(|(clip, _)| from_outside(clip))
-                        .map(|(clip, began)| began + Duration::from_micros(clip.duration_us()));
+                    let ends =
+                        playing
+                            .filter(|(clip, _)| from_outside(clip))
+                            .map(|(clip, began)| {
+                                began + Duration::from_micros(clip.duration_within_us(stretch))
+                            });
                     awake_until = before.max(ends);
                 }
             }
@@ -7469,7 +7602,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     // It stays up for the whole of it: a window that ran
                     // out mid-clip, or `--awake-seconds` shorter than the
                     // rise, would fold it under the gesture.
-                    let needed = begins + GESTURE_WAIT + Duration::from_micros(clip.duration_us());
+                    let needed = begins
+                        + GESTURE_WAIT
+                        + Duration::from_micros(clip.duration_within_us(stretch));
                     awake_until = awake_until.max(Some(needed));
                     // One asked while an earlier one's window still stands,
                     // played or replaced, keeps the window from before both.
@@ -7606,7 +7741,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         let mut gesture_wanted = [0.0f32; 5];
         if let Some((clip, since)) = playing {
             let elapsed = now.saturating_sub(since).as_micros();
-            match (paused, clip.at(elapsed.try_into().unwrap_or(u64::MAX))) {
+            match (
+                paused,
+                clip.at_within(elapsed.try_into().unwrap_or(u64::MAX), stretch),
+            ) {
                 // Paused (#2602): eased to a hold where it is; its own clock
                 // stands still meanwhile.
                 (Some((at, _, from, speed)), _) if upright => {
@@ -8029,11 +8167,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 }
                 asleep[index] = false;
             }
-            let pull =
-                FOLLOW * FOLLOW * (wanted - commanded[index]) - 2.0 * FOLLOW * velocity[index];
-            velocity[index] = (velocity[index]
-                + pull.clamp(-limits.acceleration, limits.acceleration) * step)
-                .clamp(-limits.speed, limits.speed);
+            velocity[index] = follow_step(
+                wanted - commanded[index],
+                velocity[index],
+                &mut pulled[index],
+                &limits,
+                step,
+            );
             let (floor, ceiling) = (
                 low[index].min(commanded[index]),
                 high[index].max(commanded[index]),

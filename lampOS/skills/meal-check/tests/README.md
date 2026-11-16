@@ -28,6 +28,8 @@ takes no picture is `a_meal_check_names_no_food_and_takes_no_picture` in
 | `quiet-between-meals` | 14:00, four hours at the desk | Pass: nothing, outside both windows |
 | `quiet-at-night` | 22:00, 150 minutes at the desk | Pass: nothing at night. No meal window is open then either, so this does not isolate `[quiet]` (22:00 to 08:00): the windows alone keep it silent, and `[quiet]` is a second guard here, never reached |
 | `off-when-asked` | 11:00, `wellbeing_nudges(how = "off")` at a minute, 150 minutes | Pass: nothing (`[stop]`) |
+| `lunch-when-lamp-seen-saw-no-meal` | As `lunch-after-most-of-lunchtime`, with `lamp-seen`'s `humans/doing` every 30 s and no eating seen (#6543) | Pass: the question at 12:45, as there |
+| `not-when-a-meal-was-seen` | 11:00 to 13:30, eating seen at 12:20 (#6543) | Pass: nothing: `ate_s_ago` 1500 at 12:45, held through the half hour's wait and let go |
 
 Without its `faces_at_most` condition, `held-while-someone-else-is-in-view`
 fails: the question is asked at 105 minutes, with the second face in view.

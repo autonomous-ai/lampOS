@@ -782,6 +782,61 @@ fn config(
     ))
 }
 
+/// A `serve` whose own binary is not `update/current`'s (#6898: a `once`
+/// switched and confirmed beside it) starts that one in its own place, with
+/// the same options, at most once per build ([`own::REEXECED`], and `tried`
+/// for an `exec` that failed). No records' lock is held here, and it is
+/// close-on-exec anyway, as in phase 1. An `exec` that fails is said, and
+/// this build serves on.
+fn onto_current(config: &Config, tried: &mut Option<String>) {
+    let marker = tried.clone().or_else(|| std::env::var(own::REEXECED).ok());
+    match own::reexec(
+        &config.root,
+        &config.on(own::SELF_EXE),
+        &config.on(&config.records),
+        marker.as_deref(),
+    ) {
+        own::Reexec::To { program, build } => {
+            eprintln!(
+                "lamp-update: this program is not {}'s build {}: it starts that one in its place",
+                own::CURRENT,
+                &build[..12]
+            );
+            *tried = Some(build.clone());
+            let error = Command::new(&program)
+                .args(std::env::args_os().skip(1))
+                .env(own::REEXECED, &build)
+                .exec();
+            eprintln!(
+                "lamp-update: {} cannot be started: {error}; this build serves on",
+                program.display()
+            );
+        }
+        own::Reexec::Looped(build) => {
+            if tried.as_deref() != Some(build.as_str()) {
+                eprintln!(
+                    "lamp-update: still runs another build than {}'s {} after starting it in its place: it serves on",
+                    own::CURRENT,
+                    &build[..12]
+                );
+                *tried = Some(build);
+            }
+        }
+        own::Reexec::Outside(running) => {
+            static SAID: std::sync::Once = std::sync::Once::new();
+            SAID.call_once(|| {
+                eprintln!(
+                    "lamp-update: this program ({}) is no build's under {}: it serves on, not {}'s",
+                    running.display(),
+                    own::FOLDER,
+                    own::CURRENT
+                )
+            });
+        }
+        own::Reexec::Same | own::Reexec::Waits => {}
+    }
+}
+
 /// The folder this binary runs from, as the lamp names it under `root`:
 /// `/opt/lampOS/update/<sha256>/` on a product lamp.
 fn running_folder(root: &Path) -> Option<String> {
@@ -897,6 +952,11 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             let _ = ears.listen(Duration::from_secs(30));
         }
     }
+    // At serve's start, after its own confirmation (#6898).
+    let mut reexec_tried = None;
+    if command == "serve" {
+        onto_current(&config, &mut reexec_tried);
+    }
     let mut last = String::new();
     let records = config.on(&config.records);
     // The app's Check for update (#4153): read between rounds only by a
@@ -976,15 +1036,11 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // as read above (#6607). On, Hermes is shown lamp-control's control socket
         // alone, read-only.
         let tasks = switches.tasks;
-        // The one run path (#6685): LAMP_SKILL_DEFAULT_AGENT=on, read only with
-        // LAMP_SKILL_TASKS on. On, Hermes's wrapper is the one every agent has,
-        // with Hermes's data, and runs the one agent namespace.
-        let one_path = tasks
-            && lamp_update::agent_ns::default_agent(
-                std::env::var(lamp_update::agent_ns::DEFAULT_AGENT_SWITCH)
-                    .ok()
-                    .as_deref(),
-            );
+        // The one run path (#6685): LAMP_SKILL_DEFAULT_AGENT, as read above
+        // (#6607), and only with LAMP_SKILL_TASKS on. On, Hermes's wrapper is
+        // the one every agent has, with Hermes's data, and runs the one agent
+        // namespace.
+        let one_path = switches.one_path;
         let shown = hermes::Shown {
             skills,
             tasks,
@@ -1025,12 +1081,13 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             product,
             openclaw::SKILLS_PRODUCT_DEFAULT,
         );
-        // OpenClaw takes no skill's run yet (#6685: its own fenced path per run
-        // is a later step), so its namespace shows lamp-control's socket to none.
-        let shown = lamp_update::hermes_install::Shown {
-            skills,
-            ..Default::default()
-        };
+        // A skill's run on OpenClaw is one turn on its warm gateway (#6685 step 4),
+        // only with the one run path on (LAMP_SKILL_DEFAULT_AGENT=on, read only with
+        // LAMP_SKILL_TASKS on) and a gateway default agent's runs on too
+        // (LAMP_SKILL_GATEWAY_RUNS=on, #6882, as lamp-tasks reads it): then its
+        // wrapper carries its gateway data and its namespace shows lamp-control's
+        // socket alone and the pushed skills. Otherwise, as before: none of these.
+        let shown = openclaw::shown(skills, switches.one_path, switches.gateway_runs);
         if acts && wanted && harness.is_none() {
             say("OpenClaw on the lamp: off, as Harness before the sign-in is off");
         }
@@ -1363,6 +1420,9 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             eprintln!("lamp-update: {text}");
             last = text;
         }
+        // After each round: `update/current` may have moved and been
+        // confirmed by another lamp-update meanwhile (#6898).
+        onto_current(&config, &mut reexec_tried);
         // Between rounds the bus is still read, so that what the voice said
         // meanwhile does not wait in the sockets. A check from the app ends
         // the wait (#4153); one that came during the round is dropped.

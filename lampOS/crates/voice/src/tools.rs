@@ -1053,8 +1053,10 @@ pub enum Route {
     /// Work for an agent elsewhere, through the tasks part.
     Tasks(crate::agent_tasks::Place),
     /// A skill made, or put on, by the lamp's own model
-    /// ([`crate::make_skill_local`]).
-    MakeLocal,
+    /// ([`crate::make_skill_local`]), with lamp-skills' folder when given
+    /// (`--skills-dir`): a made skill run now asks it there
+    /// ([`crate::made_run`]).
+    MakeLocal(Option<PathBuf>),
     /// Remember or forget a face, or say yes or no to being named, through
     /// the eyes on this socket, as switched; with the onboarding file, if
     /// any, which a face saved tells (#3740).
@@ -1163,7 +1165,7 @@ pub fn route(settings: &Settings, name: &str) -> Route {
         );
     }
     if settings.make_skill && name == crate::made_skill::MAKE {
-        return Route::MakeLocal;
+        return Route::MakeLocal(settings.skills.clone());
     }
     if crate::agent_tasks::is_tool(name) {
         return settings.tasks.clone().map_or(Route::Nobody, Route::Tasks);
@@ -1683,6 +1685,12 @@ fn run_spoken_call_inner(
     {
         // An agent skill added from a file (`LAMP_UPLOAD_TO_AGENT`) whose
         // task's yes isn't kept: its first run asks it, and nothing runs.
+        // One that needs a key not yet added in the app
+        // (`LAMP_SKILL_SECRETS`): told so plainly, never asked by voice,
+        // and nothing runs.
+        if let Some(told) = crate::upload_agent::keys_missing(&call.name) {
+            return ("the agent skill's keys", ToolAnswer::plain(told), true);
+        }
         if let Some(told) = crate::upload_agent::first_run(&call.name, request, heard, lease) {
             return ("the agent skill's yes", ToolAnswer::plain(told), true);
         }
@@ -1744,6 +1752,38 @@ pub fn run_call(
     heard: bool,
 ) -> (&'static str, (Value, bool)) {
     run_call_with_scope(route, call, request, heard, None)
+}
+
+/// The Engine's own confirmation cache follows a successful heard deletion.
+/// This is separate from the persisted services enrollment. The runner already
+/// checked authority; the original admitted identity survives face deletion.
+pub(crate) fn forget_confirmation_voice(
+    owner: &crate::same_voice::OwnerVoice,
+    name: &str,
+    face_person: Option<&str>,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    told: &Value,
+) {
+    if !heard || told.get("error").is_some() {
+        return;
+    }
+    if name == crate::remember::FORGET_EVERYTHING {
+        if let Some(lease) = lease
+            && lease.everything_marked()
+            && (told["forgotten"] == true || told["note"] == "I was keeping nothing of them.")
+            && let Some(person) = lease.admitted_person()
+        {
+            owner.forget_person(person);
+        }
+    } else if name == crate::known_faces::FORGET
+        && told["ok"] == true
+        && let Some(person) = face_person
+    {
+        // On a room line the eyes only accept the requested name when its
+        // normalized person matches the face actually seen saying that line.
+        owner.forget_person(person);
+    }
 }
 
 pub fn run_call_scoped(
@@ -2237,10 +2277,10 @@ fn run_call_with_scope(
                 crate::agent_tasks::DEADLINE,
             ),
         ),
-        Route::MakeLocal => (
+        Route::MakeLocal(skills) => (
             "the lamp's own model",
             (
-                crate::make_skill_local::answer(call, request, heard, lease),
+                crate::make_skill_local::answer(call, request, heard, lease, skills.as_deref()),
                 true,
             ),
         ),
@@ -2773,6 +2813,7 @@ mod tests {
                 speakers: vec![speaker.to_owned()],
                 known: crate::speaking_faces::known_with_face(&known),
                 enrollment: None,
+                by_voice: false,
             })
         };
         seen(request, "f2");

@@ -65,6 +65,33 @@ coord_body() {
   gh pr view $1 -R $REPO --json body --jq '{login:"",body:.body,pr_body:true}' > $2.new 2>/dev/null && [[ -s $2.new ]] && mv $2.new $2
 }
 
+# coord_switch_on HEAD: prints "on" when the PR's own diff (from its merge base with origin/lamp-voice) adds a line
+# `Environment=LAMP_…=on` to a product unit (lampOS/deploy/product/, a .service or .conf file), else "off"; fails when
+# the diff can't be read (fail closed). 14 Nov (the readers' P3s on #7034): such a PR needs a real lamp row (rows.py
+# --switch-on), not a reader's "no row needed". A git pathspec's * crosses folders, so units in subfolders count too.
+# 14 Nov (the Reviewer-lead's P3s on #7041): the settings files (lampOS/deploy/product/settings/*.env, lines
+# `LAMP_X=value` with no `Environment=`) count too, and so does any value but off, 0, false or empty, as switches take
+# words ("LAMP_NAMES=checked", "LAMP_ATTENTION=busy-near"). A value may be quoted, the assignment too
+# (`Environment="LAMP_X=on"`); a comment line (`#…`) never counts.
+# 14 Nov (the second reader's P3 on #7041): every assignment on an added line is read, not only the first
+# (`Environment=FOO=1 LAMP_X=on`, `Environment="A=1" "LAMP_X=on"`), up to a `#` word.
+coord_switch_on() {
+  local d
+  d=$(git diff --no-color --no-ext-diff -U0 origin/lamp-voice...$1 -- 'lampOS/deploy/product/*.service' 'lampOS/deploy/product/*.conf' \
+    'lampOS/deploy/product/settings/*.env' 2>/dev/null) || return 1
+  awk -v q="'" '
+    BEGIN { trim = "^[ \t\"" q "]+|[ \t\"" q "]+$"; on = 0 }
+    /^[+]/ { l = substr($0, 2); if (l ~ /^[ \t]*#/) next
+             n = split(l, t, /[ \t]+/)
+             for (i = 1; i <= n; i++) {
+               x = t[i]; if (x ~ /^#/) break
+               sub(/^Environment=/, "", x); gsub(trim, "", x)
+               if (x !~ /^LAMP_[A-Z0-9_]+=/) continue
+               v = x; sub(/^LAMP_[A-Z0-9_]+=/, "", v); gsub(trim, "", v); v = tolower(v)
+               if (v != "off" && v != "0" && v != "false" && v != "") on = 1 } }
+    END { print (on ? "on" : "off") }' <<< "$d"
+}
+
 # patch_of COMMIT: the commit's patch-id from its merge base with origin/lamp-voice. 31 Oct 04:0x (Fourth, 03:23): with
 # no context lines (-U0), so lamp-voice's own edits beside a hunk don't change the id; #4562 sat out trains 425-433 as
 # the same patch by range-diff.
@@ -242,6 +269,65 @@ coord_red_jobs_wait() {
   done
   [[ -n $out ]] && print -r -- $out
   return 0
+}
+# coord_cancelled_jobs_jq: over a run's jobs, "<id> <name>" for each job GitHub ended as cancelled or timed_out. A job
+# cancelled at its own time limit by a hung test ends as cancelled, with no failed step and no failing test to read.
+coord_cancelled_jobs_jq='.jobs[]|select(.conclusion=="cancelled" or .conclusion=="timed_out")|"\(.id) \(.name)"'
+# coord_cancelled_jobs SHA: every cancelled (or timed-out) job of every workflow run on SHA, one "<workflow path> <job
+# name>" a line, as coord_red_jobs prints the failed ones (a timed-out job is in both lists); no log is read.
+# 16 Nov (#7181, train 940): the train bot cuts a train again, once, when these are its only red.
+coord_cancelled_jobs() {
+  local r j
+  for r in ${(f)"$(gh api "repos/$REPO/actions/runs?head_sha=$1&per_page=50" --jq '.workflow_runs[]|"\(.id) \(.path)"' 2>/dev/null)"}; do
+    [[ ${r%% *} == <-> ]] || continue
+    for j in ${(f)"$(gh api "repos/$REPO/actions/runs/${r%% *}/jobs?per_page=100" --paginate --jq $coord_cancelled_jobs_jq 2>/dev/null)"}; do
+      [[ ${j%% *} == <-> ]] && print -r -- "${r#* } ${j#* }"
+    done
+  done
+  return 0
+}
+# coord_first_error LOG: the first compile or lint error line of a failed job's LOG ("error[E0308]: mismatched types",
+# "error: unused variable: 'x'"), without the log's time and colours, its backticks as quotes (so it can sit in a code
+# span) and at most 160 characters; nothing when LOG has none. 16 Nov (#7181): the Queue line for a PR that failed to
+# compile or lint alone quotes it.
+coord_first_error() {
+  sed -E $'s/\x1b\\[[0-9;]*m//g; s/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z ?//' $1 2>/dev/null \
+    | grep -m1 -E '^ *error(\[E[0-9]+\])?: ' | sed -E 's/^ +//' | tr '`' "'" | cut -c1-160
+}
+# coord_lv_runs_jq: over the push runs on a commit (actions/runs?event=push&head_sha=...), "<id> <how it ended>
+# <workflow path>" for the latest run of the ARM64 workflow and of the clippy workflow, the two a train waits for:
+# its conclusion (success, failure, cancelled, ...) once completed, else "running". A promotion (workflow_dispatch) on
+# the same commit is not lamp-voice's own push run.
+coord_lv_runs_jq='[.workflow_runs[]|select(.event=="push" and (.path|test("/lampos-(arm64|clippy)\\.yml$")))]|group_by(.path)|map(max_by(.run_number))|.[]|"\(.id) \(if .status=="completed" then (.conclusion // "unknown") else "running" end) \(.path)"'
+# coord_lv_failed_jq: over a run's jobs, the name of each failed job a train waits for (build and test, clippy, as
+# merge-when-green.sh names them). A failed publish or cache job is not lamp-voice failing to build or lint.
+coord_lv_failed_jq='.jobs[]|select(.conclusion=="failure" and (.name|test("build and test|clippy")))|.name'
+# coord_lv_state SHA: is lamp-voice's own head SHA green for the checks a train needs? Reads the latest push run of
+# lampos-arm64.yml and of lampos-clippy.yml on SHA, as coord_red_jobs reads a train's runs, and prints one line:
+# "red <workflow> (<job>)" when a job a train waits for failed in one (also while that run's other jobs still run);
+# "ok" when both runs are there and ended as success, or as failure in other jobs only (a publish that failed); else
+# "none <what>", naming each run that is missing, still running or ended some other way (cancelled, timed out). Runs
+# that can't be read are missing. 16 Nov (the first read of #7186): with lamp-voice itself broken (a toolchain or a
+# runner change, not a PR), every PR would fail alone and be left out on its head, and a fix to lamp-voice would bring
+# none of them back. The train bot asks this before it leaves a PR out for failing alone.
+coord_lv_state() {
+  local r wf j st; local -a seen lack
+  [[ -n $1 ]] || { print -r -- "none lamp-voice's head can't be read"; return 0; }
+  for r in ${(f)"$(gh api "repos/$REPO/actions/runs?event=push&head_sha=$1&per_page=50" --jq $coord_lv_runs_jq 2>/dev/null)"}; do
+    [[ ${r%% *} == <-> ]] || continue
+    wf=${${r##* }:t}; st=${${r#* }%% *}
+    j=$(gh api "repos/$REPO/actions/runs/${r%% *}/jobs?per_page=100" --paginate --jq $coord_lv_failed_jq 2>/dev/null)
+    [[ -n $j ]] && { print -r -- "red $wf (${j%%$'\n'*})"; return 0; }
+    seen+=$wf
+    if [[ $st == running ]]; then lack+="$wf still running"; elif [[ $st != (success|failure) ]]; then lack+="$wf $st"; fi
+  done
+  for wf in lampos-clippy.yml lampos-arm64.yml; do (( ${seen[(Ie)$wf]} )) || lack+="no push run of $wf"; done
+  if (( ${#lack} )); then print -r -- "none ${(j:, :)lack}"; else print -r -- ok; fi
+}
+# coord_drop_pr FILE PR: FILE ("<PR> ..." lines) without PR's lines.
+coord_drop_pr() {
+  [[ -s $1 ]] || return 0
+  awk -v p=$2 '$1 != p' $1 > $1.new && mv $1.new $1
 }
 # coord_prs_taken REF WORKFLOW PR...: the PRs (of those given) with a file WORKFLOW's pull_request paths at REF take,
 # one a line. 12 Nov (#6556 B): a train red only in that workflow sits them out. Nothing when the paths can't be read.

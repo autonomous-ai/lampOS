@@ -373,8 +373,8 @@ fn form_decoded(value: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-async fn index() -> Html<String> {
-    Html(page::main_page())
+async fn index(State(served): State<Arc<Served>>) -> Html<String> {
+    Html(page::main_page(served.peek.monitor.is_some()))
 }
 
 async fn cam() -> Html<String> {
@@ -526,14 +526,18 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         read(lamp_msgs::Health::TOPIC),
         read(lamp_msgs::JointState::TOPIC),
     );
-    let report = peek
-        .seen
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .body
-        .clone();
+    let (report, entries, words) = {
+        let seen = peek.seen.lock().unwrap_or_else(PoisonError::into_inner);
+        (
+            seen.body.clone(),
+            seen.timeline.newest(),
+            seen.timeline.words(),
+        )
+    };
+    let light = read(lamp_msgs::Light::TOPICS[1]);
     let overview = page::overview(&page::Glance {
         voice: voice.as_ref(),
+        light: light.as_ref(),
         faces: faces.as_ref(),
         body: body.as_ref(),
         presence: presence.as_ref(),
@@ -543,6 +547,11 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         units: &units,
     });
     events.push(Event::default().event("overview").data(overview));
+    events.push(
+        Event::default()
+            .event("timeline")
+            .data(page::timeline(&entries, &turns, words)),
+    );
     events.push(Event::default().event("turns").data(page::turns(&turns)));
     events.push(Event::default().event("body").data(page::body(
         joints.as_ref(),

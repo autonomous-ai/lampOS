@@ -21,7 +21,7 @@ most_a_day = 3
 # short line, worded by the voice.
 [permissions]
 speak = true
-topics = ["room/activity", "humans/faces/tracked", "voice/state"]
+topics = ["room/activity", "humans/faces/tracked", "voice/state", "humans/posture"]
 body = true
 
 # Leaned in for ten minutes: the eyes say `leaning_in` once it has held 10 s
@@ -54,6 +54,11 @@ follows = { trigger = "leaned_in", within = "15m" }
 topic = "room/activity"   # coming back (a gap over 2 minutes is a new sitting, sitting_s from 0); the
 field = "sitting_s"       # word itself can't come sooner (2 minutes' baseline, then ten leaned in)
 above = 720
+[[while]]                 # how they sat reads bad over lamp-seen's window too (#6543): a better
+topic = "humans/posture"  # trigger only, the word as ever never speaks of the body. Without
+field = "bad_share"       # lamp-seen, with it gone quiet, or with no sample in its window, the
+above = 0.5               # topic is never said or has run out, and it runs as before.
+unknown = "holds_stale"
 
 [[while]]                 # nobody else in view: never said in front of others
 topic = "humans/faces/tracked"

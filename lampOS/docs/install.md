@@ -2032,19 +2032,22 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        mount -n --bind "$H/.hermes/installs" "$X/i" || fail "no Hermes installs"
        k=
        for p in "$H/.hermes/installs"/*/.install.lock; do
-         [ -f "$p" ] && [ ! -L "$p" ] || continue
-         mount -n --bind "$p" "$X/i/${p#"$H/.hermes/installs/"}" || fail "Hermes install lock not shown"
+         [ -f "$p" ] && [ ! -L "$p" ] && [ ! -L "${p%/.install.lock}" ] || continue
+         s=$(stat -c %d:%i "$p") && mount -n --bind "$p" "$X/i/${p#"$H/.hermes/installs/"}" || fail "Hermes install lock not shown"
+         [ ! -L "$X/i/${p#"$H/.hermes/installs/"}" ] && [ "$(stat -c %d:%i "$X/i/${p#"$H/.hermes/installs/"}")" = "$s" ] || { umount -n "$X/i/${p#"$H/.hermes/installs/"}"; fail "Hermes install lock not shown"; }
          k=1
        done
        [ -n "$k" ] || fail "no Hermes install lock: the lasting Hermes has not run"
        for p in "$H/.hermes/installs"/*/pm-runtime; do
          [ -d "$p" ] || continue
-         [ -f "$p/.prepare.lock" ] && [ ! -L "$p/.prepare.lock" ] && mount -n --bind "$p/.prepare.lock" "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock" || fail "Hermes runtime lock not shown"
+         [ ! -L "$p" ] && [ ! -L "${p%/pm-runtime}" ] && [ -f "$p/.prepare.lock" ] && [ ! -L "$p/.prepare.lock" ] && s=$(stat -c %d:%i "$p/.prepare.lock") && mount -n --bind "$p/.prepare.lock" "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock" || fail "Hermes runtime lock not shown"
+         [ ! -L "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock" ] && [ "$(stat -c %d:%i "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock")" = "$s" ] || { umount -n "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock"; fail "Hermes runtime lock not shown"; }
        done
        for p in "$H/.hermes/installs"/*/environments/*/.lease-managed "$H/.hermes/installs"/*/pm-runtime/generations/*/.lease-managed; do
          [ -f "$p" ] || continue
-         g=${p%/.lease-managed}
-         { [ -d "$g/.leases" ] || mkdir "$g/.leases"; } && [ ! -L "$g/.leases" ] && mount -n --bind "$g/.leases" "$X/i/${g#"$H/.hermes/installs/"}/.leases" || fail "Hermes leases not shown"
+         g=${p%/.lease-managed} r=${p#"$H/.hermes/installs/"}
+         [ ! -L "$g" ] && [ ! -L "${g%/*}" ] && [ ! -L "$H/.hermes/installs/${r%%/*}" ] && { [ -d "$g/.leases" ] || mkdir "$g/.leases"; } && [ ! -L "$g/.leases" ] && s=$(stat -c %d:%i "$g/.leases") && mount -n --bind "$g/.leases" "$X/i/${g#"$H/.hermes/installs/"}/.leases" || fail "Hermes leases not shown"
+         [ ! -L "$X/i/${g#"$H/.hermes/installs/"}/.leases" ] && [ "$(stat -c %d:%i "$X/i/${g#"$H/.hermes/installs/"}/.leases")" = "$s" ] || { umount -n "$X/i/${g#"$H/.hermes/installs/"}/.leases"; fail "Hermes leases not shown"; }
        done
        mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$H/.hermes" || fail "$H/.hermes not hidden"
        mkdir "$H/.hermes/hermes-agent" && mount -n --move "$X/c" "$H/.hermes/hermes-agent" && ro "$H/.hermes/hermes-agent" || fail "Hermes checkout not shown"
@@ -2058,7 +2061,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        cd "$F" || fail "$F not visible"
        HOME=$LAMP_NS_HOME
      fi
-     unset LAMP_NS_HOME F X k p g
+     unset LAMP_NS_HOME F X k p g r s
      ```
 
      A make keeps the network by default, so Hermes's lasting home
@@ -2095,7 +2098,22 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `facts.json`, `publication.json`, `pm-runtime/selected.json`, the
      environments' contents and `tools` stay read-only. No install lock at
      all (the lasting Hermes has never started), or a `pm-runtime` with no
-     `.prepare.lock`, ends it before Hermes runs. Every mount these lines
+     `.prepare.lock`, ends it before Hermes runs. None of these is ever
+     reached through a link: a lock's `installs/<key>`, a `pm-runtime`
+     folder or its key, or a generation folder, the `environments` or
+     `generations` folder holding it, or its key that is a link
+     (only the lasting Hermes's own user could make one, and root would
+     follow it) skips that lock or ends the make before Hermes runs.
+     The check and the bind are two steps, so each bound lock or
+     `.leases` is checked again after its mount: its `stat -c %d:%i`
+     taken before the bind must match the bind target's after it, and
+     the target must not be a link (a source swapped for a link before
+     its `stat` gives the link's own, which the target, the same entry
+     seen through the `installs` bind, matches), or the bind is
+     unmounted and the make ends the same
+     way ("Hermes install lock not shown", "Hermes runtime lock not
+     shown", "Hermes leases not shown").
+     Every mount these lines
      make is `mount -n`: they run after `/run` is read-only, where
      util-linux cannot write its utab, and a `--move` without `-n` ended
      the script "Hermes checkout not shown" on a lamp.
@@ -2652,8 +2670,11 @@ yet on a lamp.
   while `agent-ns` is there (it is among the namespace scripts Hermes's
   and OpenClaw's removal look for).
 - **The one run path** (#6685, `LAMP_SKILL_DEFAULT_AGENT=on` in
-  lamp-update's own unit, read only with `LAMP_SKILL_TASKS` on; no product
-  unit sets it; lamp-tasks reads the same switch). One way to run a skill
+  lamp-update's own unit or, not set there, its carried switch file
+  `/etc/lampOS/update.env` on a product lamp (`switches::update_switches`,
+  as `LAMP_SKILL_TASKS` is), read only with `LAMP_SKILL_TASKS` on; off in
+  the product: no product unit and not that file sets it; lamp-tasks reads
+  the same switch). One way to run a skill
   for every agent: every agent's wrapper is one text
   (`wrapper::one_path_text`), Hermes's included, and no agent is named in
   its run path. It is, in order:

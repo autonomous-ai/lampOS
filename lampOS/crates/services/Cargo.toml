@@ -47,6 +47,9 @@ flate2 = "=1.1.11"
 # pinned as lamp-control pins them.
 tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 futures-util = { version = "=0.3.34", default-features = false, features = ["std", "sink"] }
+# A skill's `skill.toml`, for the secrets it names (`skill_secrets`), as
+# lamp-skills reads it.
+toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 # The lamp's own UTC offset, for the Calendar time fields' example.
 lamp-local-time = { path = "../local-time" }
 

@@ -43,14 +43,24 @@ use std::{
 /// lamp-tasks reads too: `on` exactly, read only with
 /// [`crate::hermes_install::TASKS_SWITCH`] on, and every agent's wrapper is
 /// [`wrapper::one_path_text`] with its own data, Hermes's too
-/// ([`crate::hermes_install::Shown::one_path`]); otherwise off. No product
-/// unit sets it.
+/// ([`crate::hermes_install::Shown::one_path`]); otherwise off. On in the
+/// product since 13 Nov: in lamp-update's unit and its carried switch file
+/// (`crate::switches::update_switches`, #6607) and in lamp-tasks' unit.
 pub const DEFAULT_AGENT_SWITCH: &str = "LAMP_SKILL_DEFAULT_AGENT";
 
 /// [`DEFAULT_AGENT_SWITCH`] as read: `on` exactly.
 pub fn default_agent(value: Option<&str>) -> bool {
     value == Some("on")
 }
+
+/// A gateway default agent's runs (#6882), the switch lamp-tasks reads
+/// too (`lamp_tasks::skill_task::GATEWAY_RUNS_SWITCH`): `on` exactly, read
+/// by lamp-update as [`crate::hermes_install::TASKS_SWITCH`] is
+/// ([`crate::switches::update_switches`]) and only with it on. Off,
+/// lamp-tasks refuses a gateway default agent's runs, so no gateway
+/// engine's namespace or wrapper shows anything for them
+/// ([`crate::openclaw_install::shown`]). No product unit sets it.
+pub const GATEWAY_RUNS_SWITCH: &str = "LAMP_SKILL_GATEWAY_RUNS";
 
 /// The folder put first on the `PATH` inside the namespace, root's, 0755,
 /// beside lamp-update's own fixed files. Not hidden there: only `/run`,

@@ -91,6 +91,13 @@ pub struct LineSeen {
     pub known: Option<(String, String)>,
     /// Exact audio interval and words for opt-in requested enrollment.
     pub enrollment: Option<crate::remember_speaker::Proof>,
+    /// `speakers` is the known person's face only because their own voice
+    /// confirmed the line (`LAMP_SAME_VOICE_CONFIRMS`,
+    /// `second_provider::confirmed_by_voice_at`), no face having been seen
+    /// speaking it: memory reads it as theirs, but a linked service's
+    /// write, full read or the owner's enrolled print never does
+    /// (`services::seen_saying_owner`).
+    pub by_voice: bool,
 }
 
 /// Far more lines than run at once: an older answer still running keeps

@@ -330,12 +330,53 @@ if [ \"$M\" = on ]; then
 fi
 ";
 
+/// What [`ns_text`] changes with [`Shown::one_path`] and [`Shown::tasks`]
+/// on (the gateway mark's, [`wrapper_text_for`]), after [`ENGINE_EDITS`],
+/// each found exactly once (a test holds it): the pushed skills' folder
+/// (`hermes_install::PUSHED`) is shown read-only whenever it is there, not
+/// only with `LAMP_NS_NET=run`, which the gateway's unit never sets: the
+/// fence agent's `start` runs a pushed skill's script from it inside the
+/// gateway's namespace. Nothing else of `LAMP_NS_NET`'s (no network
+/// namespace, no `model.sock`, no relay) comes with it.
+const RUNS_EDITS: [(&str, &str); 2] = [
+    (
+        "# It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there.\n",
+        "# It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there, for the\n\
+         # gateway's every turn (#6685: a skill's run is one turn on it, its script under that folder).\n",
+    ),
+    (
+        "if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]; then mkdir -m 0700",
+        "if [ -d \"$P\" ]; then mkdir -m 0700",
+    ),
+];
+
+/// What a round shows OpenClaw (#6882): `skills` (its skills switch) as
+/// read; lamp-control's socket, the pushed skills and the gateway mark
+/// ([`Shown::tasks`] and [`Shown::one_path`]) only with the one run path
+/// (`one_path`: `LAMP_SKILL_DEFAULT_AGENT=on` with `LAMP_SKILL_TASKS` on)
+/// and a gateway default agent's runs (`gateway_runs`:
+/// [`agent_ns::GATEWAY_RUNS_SWITCH`]) both on. Without the second,
+/// lamp-tasks refuses the gateway's runs, so OpenClaw is shown what it was
+/// before #6685: [`ns_text`] and [`wrapper_text_for`] byte for byte as with
+/// the one run path off.
+pub fn shown(skills: bool, one_path: bool, gateway_runs: bool) -> Shown {
+    let runs = one_path && gateway_runs;
+    Shown {
+        skills,
+        tasks: runs,
+        one_path: runs,
+    }
+}
+
 /// [`NS`]'s text: Hermes's ([`hermes_install::ns_text`]`(skills, false)`,
 /// the same allow-list, the same steps) for OpenClaw ([`ENGINE_EDITS`]),
 /// with its install mode ([`NPM_CI_MODE`]) before OpenClaw runs. With
 /// `shown.skills`, lamp-skills' socket folder is shown read-only too; with
-/// `shown.tasks`, lamp-control's socket alone, read-only (no round asks
-/// for it: OpenClaw takes no skill's run yet, #6685); neither, as before.
+/// `shown.tasks`, lamp-control's socket alone, read-only (a round asks for
+/// it with the one run path on only: a skill's run on the gateway reaches
+/// the lamp through it, #6685 step 4); neither, as before. With both
+/// `shown.tasks` and `shown.one_path`, the pushed skills' folder too
+/// ([`RUNS_EDITS`]); otherwise byte for byte as before.
 /// A voice make's home lines ([`hermes_install::NS_HOME_LINE`]) are
 /// Hermes's alone: a make runs Hermes only, so they are taken out.
 pub fn ns_text(shown: Shown) -> String {
@@ -345,6 +386,11 @@ pub fn ns_text(shown: Shown) -> String {
     }
     for (from, to) in ENGINE_EDITS {
         text = text.replace(from, to);
+    }
+    if shown.tasks && shown.one_path {
+        for (from, to) in RUNS_EDITS {
+            text = text.replacen(from, to, 1);
+        }
     }
     text.replacen(RUN_LINE, &format!("{NPM_CI_MODE}{RUN_LINE}"), 1)
 }
@@ -356,6 +402,53 @@ pub fn ns_text(shown: Shown) -> String {
 /// [`NS`]; the gateway's own start gets it from [`ns_text`].
 pub fn wrapper_text() -> String {
     agent_ns::with_ns_path(&agent_ns::with_hook_note(WRAPPER_TEXT, "openclaw"))
+}
+
+/// The line after `#!/bin/sh` of OpenClaw's wrapper with the one run path
+/// on ([`Shown::one_path`], #6685 step 4): the same for every gateway
+/// agent, naming none, what lamp-tasks looks for
+/// (`lamp_tasks::gateway_run::GATEWAY_MARK`) before a skill's run goes to
+/// the lamp's default agent as one turn on its warm gateway.
+pub const GATEWAY_MARK: &str = "# lampOS: a gateway agent: a skill's run is one turn on its warm gateway (#6685). Written by lamp-update.\n";
+
+/// OpenClaw's data as a gateway agent, after [`GATEWAY_MARK`]: shell
+/// comments, each `#@<key> <value>`, which lamp-tasks reads
+/// (`lamp_tasks::gateway_run::GatewayAgent::of`) and no shell runs. The
+/// gateway's loopback [`PORT`]; the namespace it runs in ([`NS`], which
+/// shows lamp-control's socket with the one run path on); the agent a
+/// skill's run is one turn of (its fence, lamp-tasks'
+/// `openclaw_config::SKILL_RUN_AGENT`); and the arguments, after the
+/// wrapper, of a turn (`gateway call agent`, the gateway's own RPC, never
+/// `--local`, so no turn runs outside the warm gateway), of its stop
+/// (`chat.abort`) and of its end (`sessions.delete`), as templates; and
+/// the run's fence in the gateway's exec approvals, which live in its own
+/// store, never a file: `approvals get --gateway --json` (`fence-get`),
+/// `approvals set --gateway --stdin` (`fence-set`, which needs
+/// `operator.admin`), and the fence agent's entry (`fence-entry`, its
+/// allow-list the runs' start `{start}` alone, no prompt, a prompt's
+/// fallback denied), which lamp-tasks makes sure of before each run's turn.
+pub const GATEWAY_DATA: &str = r#"#@port 18789
+#@ns /usr/local/lib/lampos/openclaw-ns
+#@agent lamp-skill-run
+#@turn gateway call agent --expect-final --json --timeout {ms} --params {"agentId":"{agent}","sessionKey":"agent:{agent}:{name}","message":{message},"idempotencyKey":"{name}","timeout":{secs},"deliver":false}
+#@stop gateway call chat.abort --json --timeout {ms} --params {"sessionKey":"agent:{agent}:{name}"}
+#@end gateway call sessions.delete --json --timeout {ms} --params {"key":"agent:{agent}:{name}","deleteTranscript":true}
+#@fence-get approvals get --gateway --json --timeout {ms}
+#@fence-set approvals set --gateway --stdin --timeout {ms}
+#@fence-entry {"security":"allowlist","ask":"off","askFallback":"deny","autoAllowSkills":false,"allowlist":[{"pattern":"{start}"}]}
+"#;
+
+/// [`WRAPPER`]'s text for `shown`: with [`Shown::one_path`], OpenClaw a
+/// gateway agent ([`GATEWAY_MARK`] and [`GATEWAY_DATA`] after `#!/bin/sh`,
+/// the rest [`wrapper_text`] as it is); else [`wrapper_text`], byte for
+/// byte.
+pub fn wrapper_text_for(shown: Shown) -> String {
+    let text = wrapper_text();
+    if !shown.one_path {
+        return text;
+    }
+    let rest = text.strip_prefix("#!/bin/sh\n").unwrap_or(&text);
+    format!("#!/bin/sh\n{GATEWAY_MARK}{GATEWAY_DATA}{rest}")
 }
 
 /// [`UNIT`], written by a round (whose sandbox writes
@@ -508,10 +601,14 @@ struct Ask {
     remove: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     skills: bool,
-    /// [`Shown::tasks`]: lamp-control's socket shown (no round asks for it
-    /// yet, #6685).
+    /// [`Shown::tasks`]: lamp-control's socket shown (a round asks for it
+    /// with the one run path on only, #6685 step 4).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     tasks: bool,
+    /// [`Shown::one_path`]: OpenClaw's wrapper a gateway agent's
+    /// ([`wrapper_text_for`]).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    one_path: bool,
 }
 
 /// The install as [`RECORD`] has it, when lamp-update could have written
@@ -550,7 +647,7 @@ pub fn under_way(records: &Path, now_unix_ms: u64) -> bool {
 }
 
 /// Whether Hermes's install is under way and not taken as stuck: what
-/// holds OpenClaw's ask to a later round.
+/// leaves OpenClaw's ask to that one-shot, none started for it.
 fn hermes_under_way(records: &Path, now_unix_ms: u64) -> bool {
     hermes_install::record(records).is_some_and(|said| {
         said.install == "installing"
@@ -633,7 +730,7 @@ pub fn present(root: &Path, shown: Shown) -> bool {
         && package_version(root).as_deref() == Some(VERSION)
         && holds(root, LOCKFILE_AT, LOCKFILE)
         && node_version(root).as_deref() == Some(NODE_VERSION)
-        && holds(root, WRAPPER, &wrapper_text())
+        && holds(root, WRAPPER, &wrapper_text_for(shown))
         && holds(root, NS, &ns_text(shown))
         && agent_ns::hook_shim_there(root)
         && fs::read(unit_path(root)).is_ok_and(|bytes| bytes == UNIT_TEXT.as_bytes())
@@ -659,6 +756,7 @@ fn ask(records: &Path, remove: bool, shown: Shown) -> io::Result<()> {
         remove,
         skills: shown.skills,
         tasks: shown.tasks,
+        one_path: shown.one_path,
     })
     .map_err(io::Error::other)?;
     write_whole(&records.join(ASK), &text, 0o600)
@@ -676,8 +774,8 @@ pub fn withhold(records: &Path) -> bool {
 /// After a round that reached the channel, with the switch on, after
 /// Hermes's own [`hermes_install::after_round`]: as Hermes's, but first
 /// the gateway's unit is written (a round may, the one-shot may not) and
-/// systemd reloaded when it changed, and Hermes's install under way holds
-/// this one to a later round, its turn in the one-shot.
+/// systemd reloaded when it changed, and with Hermes's install under way
+/// only the ask is written: the one-shot installs OpenClaw after Hermes.
 pub fn after_round(
     root: &Path,
     records: &Path,
@@ -737,16 +835,21 @@ pub fn after_round(
             return None;
         }
     };
-    if hermes_under_way(records, now_unix_ms) {
-        say("OpenClaw waits its turn: Hermes's install is under way in Harness's one-shot");
-        return None;
+    let hermes_first = hermes_under_way(records, now_unix_ms);
+    if !hermes_first {
+        say(&format!("OpenClaw may be installed now: {}", window.name()));
     }
-    say(&format!("OpenClaw may be installed now: {}", window.name()));
     if let Err(error) = ask(records, false, shown) {
         say(&format!(
             "OpenClaw is not installed: {ASK} not written: {error}"
         ));
         return Some(write(records, failed(now_unix_ms, "not_started")));
+    }
+    // #7019: the one-shot running Hermes's reads this ask after Hermes's
+    // install (`install_now`), so OpenClaw's follows in it; none is started.
+    if hermes_first {
+        say("OpenClaw's ask is written: it runs after Hermes in Harness's one-shot");
+        return None;
     }
     if !harness_install::present(root) {
         say("OpenClaw waits for Harness: Harness's one-shot installs it after Harness and Hermes");
@@ -1004,7 +1107,7 @@ fn install_with(
             Shown {
                 skills: asked.skills,
                 tasks: asked.tasks,
-                one_path: false,
+                one_path: asked.one_path,
             },
         );
         if said.install == "failed" {
@@ -1492,7 +1595,7 @@ fn write_root_file(root: &Path, path: &str, text: &str, mode: u32) -> Result<(),
 fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
     write_root_file(root, NS, &ns_text(shown), 0o755)?;
     agent_ns::write_hook_shim(root)?;
-    write_root_file(root, WRAPPER, &wrapper_text(), 0o755)
+    write_root_file(root, WRAPPER, &wrapper_text_for(shown), 0o755)
 }
 
 /// An OpenClaw in [`PLACE`] that is not this build's moved out of the

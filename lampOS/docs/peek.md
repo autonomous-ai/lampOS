@@ -14,8 +14,9 @@ writes `monitor` (#5883).
 
 ## The one page
 
-`/` is one page with a sidebar: **Overview, Turns, Camera, Body, Health**
-(the lead's second step on #1711, 20 Oct, after V1's monitor). One event
+`/` is one page with a sidebar: **Overview, Timeline, Turns, Camera, Body,
+Health** (the lead's second step on #1711, 20 Oct, after V1's monitor;
+Timeline is #5883's second piece). One event
 stream (`GET /events`, server-sent events) keeps every section fresh: the
 camera's frame four times a second (`serve::PUSH_EVERY`), the others once a
 second. Each section is HTML made and escaped on the lamp (`crates/peek/src/page.rs`).
@@ -24,11 +25,44 @@ from the address but which section is shown.
 
 | Section | What it shows | Where it comes from |
 |---|---|---|
-| Overview | The voice's state; someone here or not; the camera's state, faces in view and who is followed; the lamp's health level and its worst item; the newest turn's first audio and the median of the last ten; any unit running another build than its release | the kept values below, the turns, `/status`'s rows |
+| Overview | The voice's state; the light shown (`on, blue at 3`, `off`); someone here or not; the camera's state, faces in view and who is followed; the lamp's health level and its worst item; the newest turn's first audio and the median of the last ten; any unit running another build than its release | the kept values below, `light/state`, the turns, `/status`'s rows |
+| Timeline | The newest 30 turns, newest first, step by step as V1's Flow Monitor: **heard**, **understood** (answered or held back, with the record's `admission_basis` and final words' time), **did** (the light asked for, when it changes, and each skill's stage), **said** (with the record's first audio and how it ended). Each step's time from the end of speech, the slowest wait marked, and the clock time in UTC. In monitor mode only, the words heard and said, and on top of the page and the section "Words anyone says to the lamp show here while this is on." | the bus ([below](#the-timeline-from-the-bus-5883-second-piece)), joined with the turns' records |
 | Turns | The newest 20 turns, newest first, as V1's Flow: what took the turn (`local_speech`, or the lamp's own: `skill_says`, `lamp_tells_news`...; `lamp_speaks_first` in records from before #2825), then from the end of speech the final words, the first token and the first audio, each with its own time in brackets and the slowest marked; then how it ended (`played`, `no audio`, `failed`, or why it was cut) and what held it, if anything did | the voice's own session records ([below](#turns-from-the-voices-records)) |
 | Camera | The frame `/cam.svg` draws, faces as boxes | as `/cam` |
 | Body | Each joint where it is against where it was last asked to be (`commanded`), how far off (marked past 0.05 rad) and its effort; the body's own word: its level and sentence, its state (`ready`, `paused`, `stopping`), `standing` from 0 folded to 1 standing, the warmest joint, "met resistance" in the last minute and since it started; its last stop and why, as it said it | `body/joint_states`; the body's diagnostic, sent by the body about the body (`watch::body_of`) |
 | Health | Each part's item as `lamp-health show` gives it: its level, its message as it says it (cut to 160 characters, escaped), and how long ago; the parts never heard from; each unit's build | `lamp/health`; `/status`'s rows |
+
+### The timeline from the bus (#5883, second piece)
+
+`timeline::Timeline` is fed by the same watcher as `/bus`, from the request
+number `voice/heard`, `voice/turn` and `voice/said` share (the records'
+`turn` is the same number):
+
+- **heard**: `voice/heard`, finished, with a request number; the end of
+  speech is its bus time. A turn the lamp began itself has no heard, and
+  its first step stands for the end of speech.
+- **understood**: `voice/turn`'s verdict. Held back ends the turn.
+- **did**: `light/command` when it differs from the light last asked for
+  (it is asked for again each second), and `skills/events`' skill and
+  stage (`triggered`, `asked`, `allowed`, `not allowed`, `done`), never its
+  `why`. Each goes to the newest turn that holds its time: from the turn's
+  first step until it ended, at most 60 s (`timeline::TURN_LASTS_MS`).
+  Outside a turn it is not shown. A function's name is not on the bus, so a
+  tool call shows only by the light or a skill it moved.
+- **said**: `voice/said`, finished. It ends the turn.
+
+A request number seen again more than 60 s after its turn began is another
+turn: the voice counts again from its start. The newest 30 turns are kept,
+in memory only (`timeline::KEPT`). These two topics are read only for the
+timeline: `/bus` neither counts nor lists them.
+
+**Words, in monitor mode only.** `main.rs` makes the timeline with words
+only for `LAMP_PEEK=monitor`. Then it keeps the finished words heard and
+said, each cut to 300 characters (`timeline::WORD_CHARS`), and the page
+shows them escaped. With `LAMP_PEEK=on` the words are never kept, so the
+office page shows the steps and times only. They are everyone's words in
+the room, not only the owner's (the first builder on #5883, 10 Nov), as
+the line on top of the page says.
 
 ### Turns from the voice's records
 
@@ -231,8 +265,11 @@ Tests: `tools/day-stages-test.sh`. Needs `jq`.
   say `closed` (the privacy switch, a mute), `not opening` or `failed`, or say
   nothing, the frame shows just that, with no box, point or presence. The
   faces kept on the bus are not even read.
-- **No words.** Of `voice/heard` and `voice/said` it keeps only whether the
-  piece is finished, the request number and the locale, never `text`. Of a
+- **No words, except monitor mode's timeline.** On `/bus`, and anywhere with
+  `LAMP_PEEK=on`, of `voice/heard` and `voice/said` it keeps only whether the
+  piece is finished, the request number and the locale, never `text`. In
+  monitor mode the Timeline shows the finished words heard and said
+  ([above](#the-timeline-from-the-bus-5883-second-piece)), and nowhere else. Of a
   diagnostic it keeps the part's name and level, and the eyes' `camera`
   value. A diagnostic's message is never shown on `/bus`. The one page
   shows two sentences the lamp makes about itself: the body's own (its
@@ -240,7 +277,7 @@ Tests: `tools/day-stages-test.sh`. Needs `jq`.
   and each part's health item, as the lead asked (#1711, 20 Oct). Both are
   cut to 160 characters and escaped. The turns are numbers and kinds only.
 - **No audio, no recording, and nothing kept.** What `/bus` holds is in memory,
-  60 lines at most.
+  60 lines at most; the timeline, 30 turns.
 
 ## It reads, it never writes
 
@@ -337,8 +374,10 @@ on the same Wi-Fi, by a one-time link from the app. The product installs
 with no `LAMP_PEEK`, so nothing listens; lamp-cloud's `monitor.set` (with
 `LAMP_APP_MONITOR=on`, cloud.md, "The dev monitor") has root's helper write
 the drop-in below and restart it, or stop it and remove the drop-in, and
-`monitor.link` asks the admin socket for the code. The timeline and camera
-frames are later pieces of #5883's plan. **Off by default:** with `LAMP_PEEK` unset, or anything but `on` or
+`monitor.link` asks the admin socket for the code. Its second piece, the
+[timeline](#the-timeline-from-the-bus-5883-second-piece), shows the words
+heard and said in this mode only; camera frames are a later piece of #5883's
+plan. **Off by default:** with `LAMP_PEEK` unset, or anything but `on` or
 `monitor` exactly, the binary ends at once, nothing listens and no admin
 socket is made.
 
@@ -450,7 +489,7 @@ own, and asks for it over HTTP:
   for the network with no token or a short one, and 0, saying it is off,
   without `LAMP_PEEK=on`.
 - `the_one_page_streams_each_section_and_never_a_word`: on a real bus and a
-  session folder of its own, the stream carries all five sections:
+  session folder of its own, the stream carries all six sections:
   - a turn's steps with their own times and the slowest marked;
   - a turn the lamp began itself, and what held it;
   - an elbow 0.2 off where it was asked to be;
@@ -458,7 +497,8 @@ own, and asks for it over HTTP:
   - a health item's `<script>` escaped, and a part never heard from.
 
   A word planted in a `transcript` record, in `voice/heard` and among the
-  body's values is in no section, nor on the page.
+  body's values is in no section, nor on the page; the timeline has the
+  turn heard without its words, and no words line.
 - `the_stream_reads_only_and_asks_for_the_token`: POST, PUT, DELETE and
   PATCH get 405; without the token, 401 and no event; with its cookie, the
   sections.
@@ -496,6 +536,18 @@ own, and asks for it over HTTP:
     12 h; a new gate (a restart) knows no session or code; the LAN and
     `Host` tables.
   - `tests::only_monitor_asks_for_monitor_mode`.
+  - `monitor_mode_the_timeline_shows_a_turn_in_order_with_its_words_escaped`:
+    a turn planted on a real bus (heard, verdict, light, the same light
+    again, a skill, said) and a record of its stages: the timeline shows
+    heard, understood with the final words' time, the light once, the
+    skill, said with the first audio, in that order with rising times from
+    +0 ms and one step marked slowest; `<script>` in the words is escaped;
+    the skill's `why` is not shown; `/bus` has no word; the page carries the
+    words line.
+  - `timeline::tests`: the newest 30 kept; what the lamp did goes to the
+    turn that holds its time, and not before it, after it ended or after a
+    held-back verdict; a number seen again 60 s later is another turn;
+    words cut to 300 characters.
 - `units::tests::a_command_past_its_deadline_is_killed_and_tells_nothing`:
   a command that ends tells its output; `sleep 30` with a 200 ms deadline
   tells nothing, well within 5 s; past the deadline none is started.

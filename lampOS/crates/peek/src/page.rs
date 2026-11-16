@@ -4,29 +4,38 @@
 //! made here, with everything a message, a record or a unit carries
 //! escaped; the page's few lines of script only put it in its place.
 use crate::{
+    timeline::{self, Entry},
     turns::{ReadFailure, ReadStatus, Snapshot, Step, Turn},
     units::UnitRow,
     view::{self, escape},
     watch::{BodyReport, plain},
 };
 use lamp_bus::Message;
-use lamp_msgs::{ExpressionBody, Faces, Health, JointState, Level, RoomPresence, VoiceState};
+use lamp_msgs::{
+    ExpressionBody, Faces, Health, JointState, Level, Light, RoomPresence, TurnVerdict, VoiceState,
+};
 use std::fmt::Write;
 
 /// The sections, in the sidebar's order: each one's id and its name.
-pub const SECTIONS: [(&str, &str); 5] = [
+pub const SECTIONS: [(&str, &str); 6] = [
     ("overview", "Overview"),
+    ("timeline", "Timeline"),
     ("turns", "Turns"),
     ("camera", "Camera"),
     ("body", "Body"),
     ("health", "Health"),
 ];
+/// The line at the top of the page while words show (the first builder on
+/// #5883, 10 Nov: everyone's words in the room, not only the owner's).
+pub const WORDS_SHOWN: &str = "Words anyone says to the lamp show here while this is on.";
 /// The most characters of a health item's message shown.
 pub const MESSAGE_CHARS: usize = 160;
 
 /// What the overview reads.
 pub struct Glance<'a> {
     pub voice: Option<&'a Message>,
+    /// The light shown (`light/state`).
+    pub light: Option<&'a Message>,
     pub faces: Option<&'a Message>,
     pub body: Option<&'a Message>,
     pub presence: Option<&'a Message>,
@@ -38,8 +47,13 @@ pub struct Glance<'a> {
 }
 
 /// The page itself: the sidebar and an empty place for each section, which
-/// the stream fills.
-pub fn main_page() -> String {
+/// the stream fills; with `words`, [`WORDS_SHOWN`] on top.
+pub fn main_page(words: bool) -> String {
+    let top = if words {
+        format!("<p class=\"words\">{WORDS_SHOWN}</p>")
+    } else {
+        String::new()
+    };
     let mut nav = String::new();
     let mut sections = String::new();
     for (id, name) in SECTIONS {
@@ -58,7 +72,7 @@ pub fn main_page() -> String {
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>lamp-peek</title>\
          <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>{STYLE}</style></head>\
          <body><nav><b>lamp-peek</b>{nav}<span class=\"small\">read only</span>\
-         <a href=\"/bus\">bus</a><a href=\"/status\">units</a></nav><main>{sections}</main>\
+         <a href=\"/bus\">bus</a><a href=\"/status\">units</a></nav><main>{top}{sections}</main>\
          <script>(function(){{var ids=[{ids}];var es=new EventSource('/events');\
          ids.forEach(function(id){{es.addEventListener(id,function(e){{\
          document.getElementById(id+'-now').innerHTML=e.data;}});}});\
@@ -76,7 +90,7 @@ nav{width:150px;background:#20242a;color:#e8e8e8;padding:12px;display:flex;flex-
 nav a{color:#e8e8e8;text-decoration:none;padding:4px 6px;border-radius:4px}nav a.on{background:#3a4048}\
 main{flex:1;padding:12px 16px}td,th{padding:2px 8px;text-align:left}.small{font-size:12px;color:#9aa0a6}\
 .ok{color:#1b7f3b}.warn{color:#b26a00}.error{color:#c62828}.stale{color:#6d6d6d}\
-.slow{background:#fde0dc}.differs{background:#fde0dc}svg{max-width:640px;width:100%}";
+.slow{background:#fde0dc}.words{background:#fff4d6;padding:6px 8px}.differs{background:#fde0dc}svg{max-width:640px;width:100%}";
 
 /// A level's name and its colour's class.
 fn level_class(level: Level) -> &'static str {
@@ -115,6 +129,12 @@ pub fn overview(glance: &Glance) -> String {
         |message| view::latest_what(VoiceState::TOPIC, message),
     );
     rows.push(("voice".into(), escape(&voice)));
+    let light = match fresh::<Light>(glance.light) {
+        Some(light) if light.on => format!("on, {} at {}", plain(&light.colour), light.level),
+        Some(_) => "off".to_owned(),
+        None => "not known".to_owned(),
+    };
+    rows.push(("light".into(), escape(&light)));
     let room = match fresh::<RoomPresence>(glance.presence) {
         Some(presence) if presence.someone => "someone here".to_owned(),
         Some(presence) => format!("nobody for {} s", presence.nobody_s),
@@ -278,6 +298,114 @@ pub fn turns(snapshot: &Snapshot) -> String {
     }
     html.push_str("</table>");
     html
+}
+
+/// The timeline, newest turn first: each step with its time from the end
+/// of speech, the slowest marked, and, with words on, [`WORDS_SHOWN`] and
+/// the words heard and said, escaped. The voice's records add the basis and
+/// the final words' time to "understood", and the first audio and how it
+/// ended to "said".
+pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
+    let mut html = String::new();
+    if words {
+        let _ = write!(html, "<p class=\"words\">{WORDS_SHOWN}</p>");
+    }
+    if entries.is_empty() {
+        html.push_str("<p>No turn heard yet.</p>");
+        return html;
+    }
+    html.push_str(
+        "<p class=\"small\">Each step from the end of speech; the slowest step is marked. \
+         Clock times in UTC.</p>",
+    );
+    for entry in entries {
+        let record = records.turns.iter().find(|turn| turn.turn == entry.request);
+        let ended = entry.speech_ended();
+        let mut steps = entry.steps.clone();
+        steps.sort_by_key(|(at, _)| *at);
+        // The slowest: the longest wait after the step before.
+        let waits: Vec<u64> = steps
+            .windows(2)
+            .map(|pair| pair[1].0.saturating_sub(pair[0].0))
+            .collect();
+        let slowest = (waits.len() > 1)
+            .then(|| {
+                waits
+                    .iter()
+                    .enumerate()
+                    .max_by_key(|(_, wait)| **wait)
+                    .map(|(at, _)| at + 1)
+            })
+            .flatten();
+        let _ = write!(
+            html,
+            "<h3>request {} <span class=\"small\">{}</span></h3><table>",
+            entry.request,
+            clock(ended)
+        );
+        for (index, (at, step)) in steps.iter().enumerate() {
+            let (name, what) = match step {
+                timeline::Step::Heard(words) => ("heard", quoted(words.as_deref())),
+                timeline::Step::Understood(verdict) => {
+                    let mut what = match verdict {
+                        TurnVerdict::Answered => "answered".to_owned(),
+                        TurnVerdict::HeldBack => "held back".to_owned(),
+                    };
+                    if let Some(record) = record {
+                        if let Some(basis) = &record.basis {
+                            let _ = write!(what, ", {}", escape(basis));
+                        }
+                        if let Some(words_ms) = record.words_ms {
+                            let _ = write!(what, ", final words {words_ms} ms");
+                        }
+                    }
+                    ("understood", what)
+                }
+                timeline::Step::Did(did) => ("did", escape(did)),
+                timeline::Step::Said(words) => {
+                    let mut what = quoted(words.as_deref());
+                    if let Some(record) = record {
+                        if let Some(audio) = record.first_audio_ms() {
+                            let _ = write!(what, " first audio {audio} ms");
+                        }
+                        if let Some(outcome) = &record.outcome {
+                            let _ = write!(what, ", {}", escape(outcome));
+                        }
+                    }
+                    ("said", what)
+                }
+            };
+            let _ = write!(
+                html,
+                "<tr{}><th>{name}</th><td>+{} ms</td><td>{}</td></tr>",
+                if slowest == Some(index) {
+                    " class=\"slow\""
+                } else {
+                    ""
+                },
+                at.saturating_sub(ended),
+                what.trim()
+            );
+        }
+        html.push_str("</table>");
+    }
+    html
+}
+
+/// Words heard or said, escaped and quoted, when kept.
+fn quoted(words: Option<&str>) -> String {
+    words.map_or_else(String::new, |words| format!("“{}”", escape(words)))
+}
+
+/// A wall clock time as `HH:MM:SS` UTC.
+fn clock(unix_ms: u64) -> String {
+    let seconds = unix_ms / 1000 % 86_400;
+    format!(
+        "{:02}:{:02}:{:02} UTC",
+        seconds / 3600,
+        seconds / 60 % 60,
+        seconds % 60
+    )
 }
 
 /// Fixed wording only: a failed read must never send a private path or

@@ -223,6 +223,44 @@ fn least_say_cooldown_secs() -> u64 {
     }
 }
 
+/// The switch for a made skill that starts on a request said to the lamp
+/// (#6526, the first builder's design): `on` only, off unless set, in no
+/// product unit. Off, the making model is never told of a said start, any
+/// `[said]` in its answer is refused as any part a made skill can't have,
+/// and a trigger on what the microphone hears stays what the lamp can't do
+/// yet ([`topic_cant_yet`]), exactly as before. On, "when I tell you I'm
+/// busy, turn red" is made as a function the voice's model picks through
+/// `use_skill`, by a `when` line in the person's words ([`Said`]), on a
+/// request it already hears after the name, as it picks the product
+/// skills: no trigger on what the room says, no new listening, no phrase
+/// matched and no words kept. A trigger on `voice/heard` or `name/heard`
+/// is refused as before, switch on or off. Read by the two routes, the
+/// app's make and the manage helper ([`put_on_cap`]): set it alike in
+/// `lamp-voice` and `lamp-skills-manage@`.
+pub const SAID_ENVIRONMENT: &str = "LAMP_MADE_SKILL_SAID";
+
+thread_local! {
+    /// [`SAID_ENVIRONMENT`] as a test of this thread sets it.
+    static SAID_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a made skill may start on a request said to the lamp in this
+/// process.
+pub fn said_on() -> bool {
+    if let Some(on) = SAID_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(SAID_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`said_on`] for the calling thread alone, for tests (this crate's and
+/// `lamp-skills`' own against the real check); `None` reads the
+/// environment again. The product never calls it.
+#[doc(hidden)]
+pub fn set_said_here(on: Option<bool>) {
+    SAID_HERE.with(|here| here.set(on));
+}
+
 /// What the lamp can't do yet with [`WRITES_ENVIRONMENT`] off, said as
 /// [`cant_yet`]: "I can't do that yet: sending or writing on its own".
 pub const SENDS_ON_ITS_OWN: &str = "sending or writing on its own";
@@ -608,12 +646,21 @@ pub fn brief_for(request: &str, reads: bool, agent: bool) -> Result<String, &'st
     } else {
         ""
     };
+    // A start said to the lamp as the system prompt says it (#6526), only
+    // with its switch: off, the brief never offers it. On, it stands where
+    // the desk's presence is named, which the system prompt says too, so
+    // the longest brief stays within [`MOST_BRIEF_BYTES`].
+    let trigger = if said_on() {
+        "one [trigger] as listed or [said] as above"
+    } else {
+        "one [trigger] as listed (coming to the desk is room/presence)"
+    };
     Ok(format!(
         "{BRIEF_HEAD} for the request. Reply with two fenced blocks: \
          ```skill.toml, ```SKILL.md. skill.toml: \
          kind = \"installable\", version = \"1.0.0\", no name key; [permissions] \
-         light/body/speak = true, its topic, any other, as used; one [trigger] as listed \
-         (coming to the desk is room/presence), with for, cooldown, rearm = \"ends\", \
+         light/body/speak = true, its topic, any other, as used; {trigger}, \
+         with for, cooldown, rearm = \"ends\", \
          during = {{ from = \"HH:MM\", to = \"HH:MM\" }} if asked; \
          [ask] policy = \"nudge\" or listed; [[do]] only steps asked: light = \
          {{ colour, level 1-5, for }}, body = {{ gesture }}, say = {{ text }} (exact \
@@ -6167,6 +6214,318 @@ fn toml_string(text: &str) -> String {
     quoted
 }
 
+/// A made skill that starts on a request said to the lamp (#6526, with
+/// [`SAID_ENVIRONMENT`] on): "when I tell you I'm busy, turn red". Kept as
+/// a written skill is ([`Written`]): a function for the voice's model
+/// ([`WRITTEN_TOOL_PREFIX`]), described with its `when` line and offered
+/// through `use_skill`, which the model picks on a request it already
+/// hears after the name. It has no trigger, so nothing the room says
+/// starts it. Its one step is a colour, kept as the person's light
+/// (`keep = true`, as Light scenes' are), set by lamp-skills as the call
+/// runs, never given back.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Said {
+    /// What the person tells the lamp, as said back to them: "you're busy".
+    pub told: String,
+    /// When the voice uses it, in the person's words: "when they say
+    /// they're busy or in a meeting".
+    pub when: String,
+    /// Its colour, one of [`lamp_msgs::Light::COLOURS`].
+    pub colour: String,
+    /// Its level, 1 to 5, only when asked.
+    pub level: Option<u8>,
+}
+
+/// The most of what the person tells the lamp, as [`Said::said_back`]
+/// says it: a few words.
+pub const MOST_TOLD_CHARS: usize = 60;
+
+/// What the model is told before the `when` line, each time it calls a
+/// skill with a said start: its light is already set by the call.
+const SAID_FRAME: &str = "The person who owns this lamp asked for this skill, to start when \
+                          they tell you so. This call has set its light as they asked: say in \
+                          a few words that it's done.\n";
+
+/// Why a said start isn't kept, for the journal (the person hears
+/// [`NOT_MADE_TRY`]), and what a repair is told of its form.
+const SAID_NOT_HELD: &str = "a start said to the lamp not in its form";
+const SAID_ONLY: &str = "A start said to the lamp is [said] told = \"what they tell you, said \
+                         back to them\", when = \"when they say ...\", in place of [trigger], \
+                         with no [ask]; and one [[do]] step light = { colour } (level 1-5 only \
+                         if asked), nothing else";
+
+/// What the making model is told of a said start (#6526), with
+/// [`SAID_ENVIRONMENT`] on (`make_skill_local`): its form, as [`said_asked`]
+/// takes it.
+pub const SAID_RULES: &str = "A skill may also start when the person tells the lamp something \
+     (\"when I tell you I'm busy, turn red\"), never on talk in the room: in place of \
+     [trigger], write [said] with told = what they will tell the lamp, said back to them \
+     (\"you're busy\"), and when = when to use it, in their words (\"when they say they're busy \
+     or in a meeting\"); [permissions] light = true; and one [[do]] step light = { colour = \
+     \"red\" } (level 1-5 only if asked). No other step, no [trigger] and no [ask].";
+
+impl Said {
+    /// Its `skill.toml`: an installable skill whose only start is its
+    /// function, with no trigger, that answers the call with a note
+    /// ([`SAID_FRAME`] and the `when` line) and keeps its colour as the
+    /// person's light. `name` is its name, as [`Written::tool`] makes it a
+    /// function's.
+    // TODO(#6526): the quiet hold (no spoken nudges and no reminders said
+    // aloud while it lasts, a timer still ringing) and its end, the
+    // person's "I'm free" picked as a second choice of this function or a
+    // 2 h cap they can change, plug in here once the first builder says
+    // where that hold lives. Until then the skill sets the light alone and
+    // its say-back ([`Said::said_back`]) promises nothing more.
+    pub fn toml(&self, name: &str) -> String {
+        let tool = format!("{WRITTEN_TOOL_PREFIX}{}", name.replace('-', "_"));
+        let level = self
+            .level
+            .map(|level| format!(", level = {level}"))
+            .unwrap_or_default();
+        format!(
+            "kind = \"installable\"\nversion = \"1.0.0\"\ntool = {}\n\n[permissions]\nspeak = \
+             true\nlight = true\n\n[[do]]\nsay = {}\n\n[[do]]\nlight = {{ colour = {}{level}, \
+             keep = true }}\n",
+            toml_string(&tool),
+            toml_string(&self.note()),
+            toml_string(&self.colour),
+        )
+    }
+
+    /// What the model is told when it calls it.
+    fn note(&self) -> String {
+        format!("{SAID_FRAME}{WRITTEN_WHEN}{}", self.when)
+    }
+
+    /// What the lamp says back at make time, exactly what it does: "When
+    /// you tell me you're busy, I'll turn red." Only the light: the quiet
+    /// isn't built yet (TODO(#6526) on [`Said::toml`]).
+    pub fn said_back(&self) -> String {
+        let level = self
+            .level
+            .map(|level| format!(" at level {level}"))
+            .unwrap_or_default();
+        format!(
+            "When you tell me {}, I'll turn {}{level}.",
+            self.told, self.colour
+        )
+    }
+
+    /// Its card's description, what the voice's model reads in its
+    /// `use_skill` line: the `when` line first, so a short line keeps it.
+    fn description(&self) -> String {
+        format!(
+            "Use it {}, a request said to you, never talk in the room: it turns the light {}.",
+            self.when, self.colour
+        )
+    }
+}
+
+/// A said start in the making model's answer (#6526): none when its
+/// `skill.toml` has no `[said]`; else the [`Said`] it asks for, or why
+/// not, with lines for a repair. Only kind, version, needs, format and
+/// permissions beside it (the lamp writes its own permissions), `told` and
+/// `when` in it, and one light step of a colour and maybe a level.
+fn said_asked(text: &str) -> Result<Option<Said>, Refused> {
+    let Ok(table) = toml::from_str::<toml::Table>(text) else {
+        return Ok(None);
+    };
+    let Some(said) = table.get("said") else {
+        return Ok(None);
+    };
+    let refused = |why: &str| {
+        eprintln!("lamp-voice: {SAID_NOT_HELD}: {why}");
+        Refused(
+            SAID_NOT_HELD.into(),
+            Some(format!("The lamp refused it: {why}. {SAID_ONLY}")),
+        )
+    };
+    let beside = [
+        "kind",
+        "version",
+        "needs",
+        "format",
+        "permissions",
+        "said",
+        "do",
+    ];
+    if let Some(key) = table.keys().find(|key| !beside.contains(&key.as_str())) {
+        return Err(refused(&format!("{key} beside [said]")));
+    }
+    let said = said
+        .as_table()
+        .filter(|said| said.len() == 2)
+        .ok_or_else(|| refused("[said] takes told and when"))?;
+    let text_of = |key: &str| {
+        said.get(key)
+            .and_then(toml::Value::as_str)
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .ok_or_else(|| refused(&format!("[said] has no {key}")))
+    };
+    let told = text_of("told")?.trim_end_matches(['.', ',', '!', '?']);
+    if told.chars().count() > MOST_TOLD_CHARS || told.chars().any(char::is_control) {
+        return Err(refused(&format!(
+            "told is one line of at most {MOST_TOLD_CHARS} characters"
+        )));
+    }
+    let when = text_of("when")?;
+    let when = if when.to_lowercase().starts_with("when ") {
+        when.to_owned()
+    } else {
+        format!("when {when}")
+    };
+    // The `when` line held as a written skill's ([`Written::new`]).
+    let when = Written::new("said", &when, "-")
+        .map_err(|why| refused(&why))?
+        .when;
+    let steps = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    let [step] = steps else {
+        return Err(refused("not one [[do]] step"));
+    };
+    let light = step
+        .as_table()
+        .filter(|step| step.len() == 1)
+        .and_then(|step| step.get("light"))
+        .and_then(toml::Value::as_table)
+        .ok_or_else(|| refused("its step is not one light"))?;
+    if light
+        .keys()
+        .any(|key| !["colour", "level"].contains(&key.as_str()))
+    {
+        return Err(refused("its light takes only colour and level"));
+    }
+    let colour = light
+        .get("colour")
+        .and_then(toml::Value::as_str)
+        .filter(|colour| lamp_msgs::Light::COLOURS.contains(colour))
+        .ok_or_else(|| refused(&colour_part()))?;
+    let level = match light.get("level") {
+        None => None,
+        Some(level) => Some(
+            level
+                .as_integer()
+                .filter(|level| (1..=5).contains(level))
+                .ok_or_else(|| refused("its level is 1 to 5"))? as u8,
+        ),
+    };
+    Ok(Some(Said {
+        told: told.to_owned(),
+        when,
+        colour: colour.to_owned(),
+        level,
+    }))
+}
+
+/// A said start's `skill.toml`, read back: its `when` line, if it is
+/// exactly the shape [`Said::toml`] writes (the kind, a version, a
+/// function of [`WRITTEN_TOOL_PREFIX`], `[permissions]` with `speak` and
+/// `light` alone, its note and its kept colour); else none.
+fn said_of(table: &toml::Table) -> Option<String> {
+    let keys = ["kind", "version", "tool", "permissions", "do"];
+    if table.len() != keys.len() || keys.iter().any(|key| !table.contains_key(*key)) {
+        return None;
+    }
+    if table["kind"].as_str() != Some("installable") || table["version"].as_str().is_none() {
+        return None;
+    }
+    table["tool"]
+        .as_str()
+        .filter(|tool| tool.starts_with(WRITTEN_TOOL_PREFIX))?;
+    let permissions = table["permissions"].as_table()?;
+    let granted = |key: &str| permissions.get(key) == Some(&toml::Value::Boolean(true));
+    if permissions.len() != 2 || !granted("speak") || !granted("light") {
+        return None;
+    }
+    let [say, light] = table["do"].as_array()?.as_slice() else {
+        return None;
+    };
+    let say = say.as_table().filter(|step| step.len() == 1)?;
+    let when = say
+        .get("say")?
+        .as_str()?
+        .strip_prefix(SAID_FRAME)?
+        .strip_prefix(WRITTEN_WHEN)?;
+    let light = light
+        .as_table()
+        .filter(|step| step.len() == 1)?
+        .get("light")?
+        .as_table()?;
+    let keys_ok = light
+        .keys()
+        .all(|key| ["colour", "level", "keep"].contains(&key.as_str()));
+    let colour_ok = light
+        .get("colour")
+        .and_then(toml::Value::as_str)
+        .is_some_and(|colour| lamp_msgs::Light::COLOURS.contains(&colour));
+    let level_ok = light.get("level").is_none_or(|level| {
+        level
+            .as_integer()
+            .is_some_and(|level| (1..=5).contains(&level))
+    });
+    if !keys_ok || !colour_ok || !level_ok || light.get("keep") != Some(&toml::Value::Boolean(true))
+    {
+        return None;
+    }
+    // Held to the same bounds as when made: none other is kept.
+    let held = Written::new("x", when, "-").ok()?;
+    (held.when == when).then(|| when.to_owned())
+}
+
+/// Keep the said start `said` (#6526) the model wrote for the ask `from`,
+/// with its `files`' card for its name: its `skill.toml` written here
+/// ([`Said::toml`]), held to [`written_capped`], checked and packed by
+/// `lamp-skills pack`, and kept as a made skill is, said back as
+/// [`Said::said_back`]. Called by [`keep_asked`] once it has looked for one
+/// kept already.
+fn keep_said(said: &Said, files: &Files, from: &str, keeping: &Keeping) -> Result<Made, Refused> {
+    let (name, marked) = card(&files.card, &said.description(), Maker::of(from))?;
+    // Its function's name within lamp-skills' 48 bytes, as a written one's.
+    if name.len() > MOST_WRITTEN_NAME_BYTES
+        || !name.starts_with(|first: char| first.is_ascii_lowercase())
+    {
+        return Err(Refused(
+            SAID_NOT_HELD.into(),
+            Some(format!(
+                "The lamp refused it: its name is a lowercase letter, then lowercase letters, \
+                 digits and '-', at most {MOST_WRITTEN_NAME_BYTES} in all. {SAID_ONLY}"
+            )),
+        ));
+    }
+    let free = free_name(
+        keeping,
+        &keeping.installed,
+        &name,
+        &said.toml(&name),
+        MOST_WRITTEN_NAME_BYTES,
+    )?;
+    let marked = if free == name {
+        marked
+    } else {
+        renamed_card(&marked, &free)
+    };
+    let toml = said.toml(&free);
+    let (version, uses) = written_capped(&toml)?;
+    packed_and_kept(
+        keeping,
+        from,
+        Card {
+            toml: &toml,
+            name: free,
+            marked,
+            version,
+            uses,
+            scripts: &[],
+        },
+        Ok(said.said_back()),
+        false,
+    )
+}
+
 /// A written skill's `skill.toml`, read back: its `when` line and its
 /// instructions, if it is exactly the shape [`Written::toml`] writes
 /// (the kind, a version, a function of [`WRITTEN_TOOL_PREFIX`],
@@ -6203,12 +6562,29 @@ fn written_of(table: &toml::Table) -> Option<(String, String)> {
 }
 
 /// A written skill's `skill.toml` held to what one may use: its version,
-/// and its voice alone. Anything else is refused.
+/// and its voice alone; or, with [`SAID_ENVIRONMENT`] on, a said start's
+/// ([`Said::toml`]), its voice and its light. Anything else is refused.
 pub fn written_capped(text: &str) -> Result<(String, Uses), Refused> {
     let table: toml::Table =
         toml::from_str(text).map_err(|_| Refused::new("its skill.toml can't be read"))?;
+    let version = table
+        .get("version")
+        .and_then(toml::Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    // A said start (#6526), only with its switch: off, refused as any
+    // other function a written skill isn't.
+    if said_on() && said_of(&table).is_some() {
+        return Ok((
+            version,
+            Uses {
+                speak: true,
+                light: true,
+                ..Uses::default()
+            },
+        ));
+    }
     written_of(&table).ok_or_else(|| Refused::new(WRITTEN_UNSAID))?;
-    let version = table["version"].as_str().unwrap_or_default().to_owned();
     Ok((
         version,
         Uses {
@@ -6386,6 +6762,48 @@ pub fn forget_named_checked(directory: &Path, name: &str) -> Result<(), String> 
     forget_others(directory, name, "").map_err(|error| error.to_string())
 }
 
+/// What the folder `name` in the skills folder went on as: the SHA-256 of
+/// its package (`.package.json`, written by the manage helper's install);
+/// `Ok(None)` when no such folder is there, `Err` when it is there but says
+/// no package.
+pub(crate) fn went_on_as(keeping: &Keeping, name: &str) -> Result<Option<String>, ()> {
+    let folder = keeping.installed.join(name);
+    if !folder.is_dir() {
+        return Ok(None);
+    }
+    fs::read(folder.join(".package.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .and_then(|record| record["sha256"].as_str().map(str::to_owned))
+        .map(Some)
+        .ok_or(())
+}
+
+/// The kept skills marked on whose folder is no longer on the lamp
+/// ([`went_on_as`]), dropped from the index with their packages
+/// ([`forget_named_checked`]): `lamp-skills remove` takes a made skill off
+/// and says nothing here, so its name was taken for good and it was still
+/// told as on (#7100). One whose folder holds another package is left: its
+/// read-back says it changed ([`crate::make_skill_local::changed_since_made`]).
+pub fn drop_gone(keeping: &Keeping) {
+    for entry in index(&keeping.directory) {
+        let Some(name) = entry["name"].as_str().filter(|_| entry["on"] == true) else {
+            continue;
+        };
+        if went_on_as(keeping, name) != Ok(None) {
+            continue;
+        }
+        match forget_named_checked(&keeping.directory, name) {
+            Ok(()) => eprintln!(
+                "lamp-voice: a made skill is no longer on the lamp: dropped from the made skills: {name}"
+            ),
+            Err(error) => eprintln!(
+                "lamp-voice: a made skill no longer on the lamp is still listed among the made skills: {error}"
+            ),
+        }
+    }
+}
+
 /// The made skill `sha256`, kept and not on, dropped from the index, its
 /// package with it unless another entry names it (`crate::made_clash`'s
 /// cancel, or a clash never answered): never told as made and off.
@@ -6531,6 +6949,15 @@ pub fn keep_asked(
         return Err(Refused::new(MODEL_CUT_OFF));
     }
     let mut files = files(answer)?;
+    // A start said to the lamp (#6526), only with its switch: kept as a
+    // function the voice picks, never a trigger on what the room says.
+    // Off, a `[said]` goes on below and is refused as any part a made
+    // skill can't have.
+    if said_on()
+        && let Some(said) = said_asked(&files.toml)?
+    {
+        return keep_said(&said, &files, from, keeping);
+    }
     // A getting up's wait, which [`tidied`] takes out: said with what it
     // does, never dropped without a word (App Only's P2 on #6249).
     let waited = dropped_wait(&files.toml);
@@ -7124,6 +7551,7 @@ fn free_name(
     toml: &str,
     most: usize,
 ) -> Result<String, Refused> {
+    drop_gone(keeping);
     if !name_taken(keeping, installed, name) {
         return Ok(name.to_owned());
     }
@@ -7291,6 +7719,10 @@ pub fn keep_agent(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
         if entry["sha256"] == made.sha256.as_str() {
             entry["agent"] = json!(true);
             entry["grants"] = json!(grants);
+            // Its keys' names, for the app (`LAMP_SKILL_SECRETS`).
+            if crate::upload_agent::secrets_on() {
+                entry["secrets"] = json!(crate::upload_agent::secrets_of_toml(&files.toml));
+            }
         }
     }
     write_index(&keeping.directory, &entries).map_err(unkept)?;
@@ -7310,6 +7742,23 @@ pub fn agent_grants(directory: &Path, sha256: &str) -> Option<Vec<String>> {
                 .flatten()
                 .filter_map(|grant| grant.as_str().map(str::to_owned))
                 .collect()
+        })
+}
+
+/// The keys' names the kept agent skill `sha256` in `directory` needs, as
+/// [`keep_agent`] marked its index entry with `LAMP_SKILL_SECRETS` on;
+/// none for another skill or with it off then.
+pub fn agent_secrets(directory: &Path, sha256: &str) -> Option<Vec<String>> {
+    index(directory)
+        .into_iter()
+        .find(|entry| entry["sha256"] == sha256 && entry["agent"] == true)
+        .and_then(|entry| {
+            entry["secrets"].as_array().map(|names| {
+                names
+                    .iter()
+                    .filter_map(|name| name.as_str().map(str::to_owned))
+                    .collect()
+            })
         })
 }
 
@@ -11496,6 +11945,237 @@ light = { colour = "green", level = 3, for = "20s" }
         let _ = fs::remove_dir_all(&root);
     }
 
+    /// A said start as the making model writes it (#6526): "when I'm
+    /// working or in a meeting, I tell the lamp I'm busy, and it turns red".
+    const BUSY: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\nlight = \
+                        true\n\n[said]\ntold = \"you're busy\"\nwhen = \"when they say they're \
+                        busy or in a meeting\"\n\n[[do]]\nlight = { colour = \"red\" }\n";
+    const BUSY_CARD: &str = "---\nname: busy\ndescription: Red when I'm busy.\n---\n\n# Busy\n";
+    const BUSY_ASK: &str =
+        "when I'm working or in a meeting, I tell the lamp I'm busy, and it turns red";
+    /// The same ask written on what the room's words would start: a
+    /// trigger on what the microphone hears.
+    const HEARD: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\nlight = \
+                         true\ntopics = [\"voice/heard\"]\n\n[trigger]\ntopic = \
+                         \"voice/heard\"\nfield = \"text\"\nequals = \"I'm busy\"\ncooldown = \
+                         \"1h\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\nlight = { colour = \
+                         \"red\" }\n";
+
+    fn busy_asked() -> Asked<'static> {
+        Asked {
+            request: BUSY_ASK,
+            ..Asked::default()
+        }
+    }
+
+    /// #6526, its switch off: exactly as before. A start on what is heard
+    /// is what the lamp can't do yet, never repaired; a `[said]` is never
+    /// kept; the brief never offers one; and the put-on cap takes none.
+    #[test]
+    fn with_its_switch_off_a_said_start_is_refused_as_before() {
+        set_said_here(Some(false));
+        let (root, keeping) = crate::make_skill_local::tests::keeping("said-off");
+        let heard = keep_asked(
+            &answer(HEARD, BUSY_CARD),
+            false,
+            "s1:1:1",
+            &keeping,
+            &busy_asked(),
+        )
+        .unwrap_err();
+        assert_eq!(heard, Refused(cant_yet("starting on words it hears"), None));
+        let said = keep_asked(
+            &answer(BUSY, BUSY_CARD),
+            false,
+            "s1:2:1",
+            &keeping,
+            &busy_asked(),
+        );
+        // Refused as today's refusal of a part a made skill can't have:
+        // no trigger, `said` named as such a part, and the trigger lines
+        // for its repair, never a said start's own (`SAID_ONLY`) nor a
+        // written skill's put-on cap.
+        assert_eq!(
+            said,
+            Err(Refused(
+                UNSAID.into(),
+                Some(format!(
+                    "{UNSAID_PART}no [trigger]; parts said. {SAYABLE_TRIGGERS}"
+                ))
+            ))
+        );
+        assert!(index(&keeping.directory).is_empty());
+        let brief = brief(BUSY_ASK).unwrap();
+        assert!(!brief.contains("[said]"), "{brief}");
+        assert!(
+            brief.contains("one [trigger] as listed (coming to the desk is room/presence),"),
+            "{brief}"
+        );
+        let toml = said_asked(BUSY).unwrap().unwrap().toml("busy");
+        assert_eq!(
+            written_capped(&toml).unwrap_err().0,
+            WRITTEN_UNSAID,
+            "never put on with the switch off"
+        );
+        set_said_here(None);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// #6526, its switch on: the ask is made as a function the voice picks
+    /// (no trigger, no topic, nothing heard), kept, and said back exactly
+    /// as what it does, the light alone: the quiet isn't built yet.
+    #[test]
+    fn with_its_switch_on_a_said_start_is_made_and_said_back_as_it_does() {
+        set_said_here(Some(true));
+        let (root, keeping) = crate::make_skill_local::tests::keeping("said-on");
+        let made = keep_asked(
+            &answer(BUSY, BUSY_CARD),
+            false,
+            "local:app:1:1",
+            &keeping,
+            &busy_asked(),
+        )
+        .unwrap();
+        assert_eq!(made.name, "busy");
+        assert_eq!(
+            made.description,
+            "When you tell me you're busy, I'll turn red."
+        );
+        assert!(!made.description.contains("quiet"), "{}", made.description);
+        assert_eq!(made.uses.spoken(), "its voice and its light");
+        assert_eq!(
+            on_line(&made),
+            "I made busy, and it's on: when you tell me you're busy, I'll turn red, using its \
+             voice and its light."
+        );
+        assert_eq!(index(&keeping.directory).len(), 1);
+        // What it is kept as: a function of a written skill's form, its
+        // note the `when` line, its one step the colour kept as the
+        // person's light.
+        let said = said_asked(BUSY).unwrap().unwrap();
+        assert_eq!(
+            said,
+            Said {
+                told: "you're busy".into(),
+                when: "when they say they're busy or in a meeting".into(),
+                colour: "red".into(),
+                level: None,
+            }
+        );
+        let text = said.toml("busy");
+        let table: toml::Table = toml::from_str(&text).unwrap();
+        assert_eq!(table["tool"].as_str(), Some("written_busy"));
+        assert_eq!(
+            table["do"][0]["say"].as_str(),
+            Some(format!("{SAID_FRAME}When they use it: {}", said.when).as_str())
+        );
+        let light = table["do"][1]["light"].as_table().unwrap();
+        assert_eq!(light.len(), 2, "{light:?}");
+        assert_eq!(light["colour"].as_str(), Some("red"));
+        assert_eq!(light["keep"].as_bool(), Some(true));
+        assert_eq!(said_of(&table).as_deref(), Some(said.when.as_str()));
+        let (version, uses) = written_capped(&text).unwrap();
+        assert_eq!(put_on_cap(&text).unwrap(), (version, uses));
+        // A level only when asked, said back with it.
+        let level = said_asked(&BUSY.replace("\"red\" }", "\"red\", level = 2 }"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            level.said_back(),
+            "When you tell me you're busy, I'll turn red at level 2."
+        );
+        assert!(said_of(&toml::from_str(&level.toml("busy")).unwrap()).is_some());
+        // The making model is told the form, the brief points to it, and
+        // the longest brief still fits.
+        let brief = brief(BUSY_ASK).unwrap();
+        assert!(
+            brief.contains("one [trigger] as listed or [said] as above,"),
+            "{brief}"
+        );
+        for writes in [false, true] {
+            set_writes_here(Some(writes));
+            let longest = brief_with(&"x".repeat(MOST_REQUEST_BYTES), true).unwrap();
+            assert!(longest.len() <= MOST_BRIEF_BYTES, "{}", longest.len());
+        }
+        set_writes_here(None);
+        set_said_here(None);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// #6526: a made skill with a said start is offered to the voice as a
+    /// `use_skill` choice, its line beginning with its `when` line, whole
+    /// even when the skills' lines are cut short.
+    #[test]
+    fn a_said_start_is_offered_through_use_skill_with_its_when_line() {
+        let said = said_asked(BUSY).unwrap().unwrap();
+        let tool = lamp_gemini::Tool {
+            name: "written_busy".into(),
+            description: said.description(),
+            parameters: None,
+            silent: false,
+        };
+        let section = crate::use_skill::section(std::slice::from_ref(&tool), &Default::default());
+        assert!(
+            section.contains(
+                "- written_busy: Use it when they say they're busy or in a meeting, a request \
+                 said to you, never talk in the room: it turns the light red.\n"
+            ),
+            "{section}"
+        );
+        assert!(crate::use_skill::function(&[tool]).is_some());
+    }
+
+    /// #6526: nothing starts a said start but a request to the lamp. It
+    /// has no trigger, reads no topic and never listens; with the switch
+    /// on, a trigger on what is heard is still refused, and a `[said]`
+    /// beside a trigger or an `[ask]`, or with any other step, is not
+    /// kept, its lines going to a repair.
+    #[test]
+    fn nothing_starts_a_said_start_without_a_request_to_the_lamp() {
+        set_said_here(Some(true));
+        let text = said_asked(BUSY).unwrap().unwrap().toml("busy");
+        let table: toml::Table = toml::from_str(&text).unwrap();
+        assert!(!table.contains_key("trigger") && !table.contains_key("ask"));
+        let (_, uses) = written_capped(&text).unwrap();
+        assert!(uses.topics.is_empty() && !uses.listens());
+        assert!(capped(&text).unwrap_err().0.contains("runs by itself"));
+        let (root, keeping) = crate::make_skill_local::tests::keeping("said-heard");
+        let heard = keep_asked(
+            &answer(HEARD, BUSY_CARD),
+            false,
+            "s1:3:1",
+            &keeping,
+            &busy_asked(),
+        )
+        .unwrap_err();
+        assert_eq!(heard, Refused(cant_yet("starting on words it hears"), None));
+        let with_trigger = BUSY.replace(
+            "[said]",
+            "[trigger]\ntopic = \"voice/heard\"\nfield = \"text\"\nequals = \"busy\"\n\n[said]",
+        );
+        for wrong in [
+            with_trigger,
+            BUSY.replace("[[do]]", "[ask]\npolicy = \"nudge\"\n\n[[do]]"),
+            format!("{BUSY}\n[[do]]\nbody = {{ gesture = \"nod\" }}\n"),
+            BUSY.replace(
+                "light = { colour = \"red\" }",
+                "body = { gesture = \"nod\" }",
+            ),
+            BUSY.replace("\"red\"", "\"crimson\""),
+            BUSY.replace("told = \"you're busy\"\n", ""),
+        ] {
+            let Err(Refused(why, Some(lines))) = said_asked(&wrong) else {
+                panic!("{wrong}");
+            };
+            assert_eq!(why, SAID_NOT_HELD);
+            assert!(lines.contains(SAID_ONLY), "{lines}");
+            assert_eq!(plain_reason(&why), NOT_MADE_TRY);
+        }
+        assert!(index(&keeping.directory).is_empty());
+        set_said_here(None);
+        let _ = fs::remove_dir_all(&root);
+    }
+
     /// A name any skill on the lamp has, installed or pushed, gets the first
     /// free one. A kept one of that name not on, marked to go on or
     /// not, is replaced by the new one, its package and its mark with it,
@@ -12683,10 +13363,17 @@ light = { colour = "green", level = 3, for = "20s" }
         fs::create_dir_all(&keeping.directory).unwrap();
         let sha = hex(&Sha256::digest(other.as_bytes()));
         let entries = vec![
-            json!({"name": "bedtime", "on": true, "toml_sha256": sha}),
+            json!({"name": "bedtime", "sha256": "c".repeat(64), "on": true, "toml_sha256": sha}),
             json!({"name": "unused", "on": false, "toml_sha256": sha}),
         ];
         write_index(&keeping.directory, &entries).unwrap();
+        // On the lamp as it went on (#7100), a folder with no card.
+        fs::create_dir_all(installed.join("bedtime")).unwrap();
+        fs::write(
+            installed.join("bedtime").join(".package.json"),
+            json!({"sha256": "c".repeat(64)}).to_string(),
+        )
+        .unwrap();
         let Err(Refused(why, None)) = free_name(&keeping, installed, "bedtime", &other, 64) else {
             panic!("already had");
         };
@@ -12699,6 +13386,49 @@ light = { colour = "green", level = 3, for = "20s" }
             free_name(&keeping, installed, "unused", TOML, 64).unwrap(),
             "unused"
         );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #7100: `lamp-skills remove` takes a made skill's folder off the
+    /// lamp and says nothing to the index. A new make of its name keeps
+    /// the name, and read-back no longer names it; one still in its folder
+    /// as it went on stays on, its name taken.
+    #[test]
+    fn a_made_skill_removed_by_lamp_skills_frees_its_name_and_is_not_read_back() {
+        let dir = scratch("made-name-removed");
+        let keeping = name_keeping(&dir);
+        let installed = &keeping.installed;
+        let went_on = |name: &str, sha256: &str| {
+            fs::create_dir_all(installed.join(name)).unwrap();
+            fs::write(
+                installed.join(name).join(".package.json"),
+                json!({"sha256": sha256}).to_string(),
+            )
+            .unwrap();
+        };
+        let (dim, out) = ("a".repeat(64), "b".repeat(64));
+        fs::create_dir_all(&keeping.directory).unwrap();
+        let entries = vec![
+            json!({"name": "evening-dim", "sha256": dim, "on": true}),
+            json!({"name": "light-out", "sha256": out, "on": true}),
+        ];
+        write_index(&keeping.directory, &entries).unwrap();
+        went_on("evening-dim", &dim);
+        went_on("light-out", &out);
+        let free = |name: &str| free_name(&keeping, installed, name, TOML, 64).unwrap();
+        assert_eq!(free("evening-dim"), "evening-dim-2");
+        // `lamp-skills remove evening-dim`.
+        fs::remove_dir_all(installed.join("evening-dim")).unwrap();
+        assert_eq!(free("evening-dim"), "evening-dim");
+        assert_eq!(free("light-out"), "light-out-2");
+        assert_eq!(kept_on_names(&keeping.directory), ["light-out"]);
+        // Read-back, the index as it was before any make.
+        write_index(&keeping.directory, &entries).unwrap();
+        assert_eq!(
+            crate::make_skill_local::read_back_names(&keeping),
+            ["light-out"]
+        );
+        assert_eq!(names(&keeping.directory), ["light-out"]);
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -13189,6 +13919,14 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         );
         let asked: Value = serde_json::from_str(&asked.join().unwrap()).unwrap();
         assert_eq!(asked["install_made"], made.sha256.as_str());
+        // Installed as the helper installs it (#7100: one whose folder is
+        // gone is no longer on).
+        fs::create_dir_all(keeping.installed.join("photo-booth")).unwrap();
+        fs::write(
+            keeping.installed.join("photo-booth").join(".package.json"),
+            json!({"sha256": made.sha256}).to_string(),
+        )
+        .unwrap();
         // A changed script is another package, not on, asked again.
         let changed = keep(
             &code_answer(CODE_TOML, &[("scripts/main.py", "print('other')\n")]),

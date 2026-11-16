@@ -612,11 +612,16 @@ fn light_now(bus: &Bus) -> Option<Light> {
 /// The newest value of `topic`, if it was said within 3 s: on the host's
 /// wall clock, as its publisher stamped it, never the program's own.
 fn said_lately<T: serde::de::DeserializeOwned>(bus: &Bus, topic: &str) -> Option<T> {
+    said_within(bus, topic, 3_000)
+}
+
+/// The same, said within `most_ms`.
+fn said_within<T: serde::de::DeserializeOwned>(bus: &Bus, topic: &str, most_ms: u64) -> Option<T> {
     let message = bus.latest(topic).ok()??;
     let now_ms = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map_or(0, |since| since.as_millis() as u64);
-    (now_ms.saturating_sub(message.header.at_unix_ms) <= 3_000)
+    (now_ms.saturating_sub(message.header.at_unix_ms) <= most_ms)
         .then(|| message.parse().ok())
         .flatten()
 }
@@ -1143,6 +1148,21 @@ fn serve(
         waiting: HashMap::new(),
         last: 0,
     };
+    // A told answer a restart dropped while it waited for the read gate:
+    // said once, at this start (#7180).
+    if let Some(state) = &options.state {
+        match lamp_skills::task::telling_dropped(state) {
+            Ok(dropped) => {
+                for (skill, began) in dropped {
+                    eprintln!(
+                        "lamp-skills: skill:{skill}: do.task: what its agent found: dropped unsaid, lamp-skills restarted while it waited (it began to wait {} s before this start)",
+                        unix_ms().saturating_sub(began) / 1000
+                    );
+                }
+            }
+            Err(error) => eprintln!("lamp-skills: the told answers waiting not read: {error}"),
+        }
+    }
     let runner = Runner {
         sockets: sockets.clone(),
         finished,
@@ -1610,7 +1630,11 @@ fn serve(
                     );
                 }
             }
-            tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner, &audio);
+            if call.0 == RUN_NOW {
+                run_now_call(call, &mut engine, &mut runs, &mut out, &runner);
+            } else {
+                tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner, &audio);
+            }
         }
         if let Some((_, answers)) = &mut asking.gate {
             answer_asks(
@@ -2593,6 +2617,17 @@ fn start(
         );
         return made_rx;
     }
+    // A run that is only tasks the lamp would not hand over now makes
+    // nothing, and says so, rather than "goes on on its own".
+    if let Some(why) = tasks_refused(&skill, &calls, &runner.tasks.borrow()) {
+        let _ = runner.finished.send(SkillEvent {
+            skill,
+            stage: SkillStage::Done,
+            why: format!("not made: {why}"),
+            allowed: None,
+        });
+        return made_rx;
+    }
     // Counted once it is under way, for the opt-in health report's skill
     // runs (`lamp_skills::usage`): one atomic add, nothing waited on.
     if let Some(runs) = runner.runs.borrow().get(&skill) {
@@ -2608,7 +2643,16 @@ fn start(
     let handed = !tasks.is_empty();
     for call in tasks {
         let Call::Task(step) = call else { continue };
-        hand_task(&skill, *step, &runner.tasks.borrow());
+        // Where what its agent found is told, if it finds any.
+        let room = lamp_room(
+            &skill,
+            &runner.sockets_for(&skill),
+            runner.bus.clone(),
+            runner.watching.borrow().known_file.clone(),
+            runner.local_time.clone(),
+            None,
+        );
+        hand_task(&skill, *step, &runner.tasks.borrow(), room);
     }
     if handed && calls.is_empty() {
         let _ = made.send(());
@@ -2954,6 +2998,137 @@ type ToolAsk = (
     Admission,
 );
 
+/// The name a made skill's run now is asked by on the main loop, from the
+/// call socket's `run` op alone ([`listen`]): no tool's call can name it.
+const RUN_NOW: &str = "skills.run_now";
+
+/// Why a run now of `skill`, its steps `calls`, would make nothing, in
+/// words the lamp can say, or none: its last run under way (`busy`); a
+/// task with no folder known, while another hand-over to lamp-tasks is
+/// under way (`handing`, [`HANDING`]: it runs one at a time), or that
+/// [`lamp_skills::task::would_refuse`]
+/// says the hand-over would refuse (its runs in 24 hours spent, every
+/// skill's spent, its last task under way, the switch off); a read with
+/// its switch off or that came due on `read_day` already (once a local
+/// day, as `read_service` holds it); a write with its switch off or
+/// stopped. Read only: what passes is still held to the real gates where
+/// it is made (`hand_task`, `read_service`, `write_service`).
+fn run_now_refused(
+    skill: &str,
+    calls: &[Call],
+    busy: bool,
+    handing: bool,
+    tasks: &Tasks,
+    read_day: Option<i64>,
+    now_ms: u64,
+) -> Option<String> {
+    use lamp_skills::{service_read, service_write, task};
+    if busy {
+        return Some("its last run is still under way".into());
+    }
+    for call in calls {
+        let why = match call {
+            Call::Task(_) if !tasks.of.contains_key(skill) => {
+                Some("its folder is not known".to_owned())
+            }
+            Call::Task(_) if handing => Some(HANDING_BUSY.to_owned()),
+            Call::Task(_) => task::would_refuse(skill, tasks.state.as_deref(), now_ms).map(|why| {
+                why.strip_prefix(task::NOT_HANDED)
+                    .unwrap_or(&why)
+                    .to_owned()
+            }),
+            Call::ServiceRead(_) if !service_read::on() => Some(format!(
+                "a skill's reads are off on this lamp ({} is not on)",
+                service_read::ENVIRONMENT
+            )),
+            Call::ServiceRead(_)
+                if read_day.is_some()
+                    && READ_DAYS
+                        .lock()
+                        .unwrap_or_else(|poison| poison.into_inner())
+                        .get(skill)
+                        == read_day.as_ref() =>
+            {
+                Some("its read runs once a day, and it ran today already".to_owned())
+            }
+            Call::ServiceWrite(_) if !service_write::on() => Some(format!(
+                "a skill's writes are off on this lamp ({} is not on)",
+                service_write::ENVIRONMENT
+            )),
+            Call::ServiceWrite(_) if service_write::stopped(skill) => {
+                Some("its writes are stopped: its link changed or is gone".to_owned())
+            }
+            _ => None,
+        };
+        if why.is_some() {
+            return why;
+        }
+    }
+    None
+}
+
+/// A skill made on this lamp run once now, as its owner asked by voice
+/// (the call socket's `run` op, the voice's alone, which asked whose line
+/// it was: `lamp_voice::made_run`). Only a made skill's (`made: here`),
+/// loaded, on, not under way, its steps as its trigger would make them
+/// ([`lamp_skills::Engine::run_now`]) and nothing [`run_now_refused`]
+/// refuses; then started as a trigger's run is ([`start`]), so every bound
+/// of its steps holds where it is made, and the voice is told it began,
+/// never what it found. Refused, the voice is told why and nothing is
+/// made, counted or said.
+fn run_now_call(
+    (_, args, _, reply, admission): ToolAsk,
+    engine: &mut Engine,
+    runs: &mut Runs,
+    out: &mut Publisher,
+    runner: &Runner,
+) {
+    let refuse = |why: &str| {
+        if admission.commit() {
+            let _ = reply.send(json!({ "error": why }));
+        }
+    };
+    let Some(skill) = args["skill"].as_str().map(str::to_owned) else {
+        return refuse("no skill was named");
+    };
+    if !runner.made.borrow().contains(&skill) {
+        eprintln!("lamp-skills: a run now refused: no skill made here is loaded by that name");
+        return refuse("it isn't a skill made on this lamp, or it isn't on the lamp now");
+    }
+    let now_us = clock::now_us();
+    let run = match engine.run_now(&skill, now_us) {
+        Ok(run) => run,
+        Err(why) => {
+            eprintln!("lamp-skills: skill:{skill}: not run now: {why}");
+            return refuse(&why);
+        }
+    };
+    let now_ms = unix_ms();
+    let read_day = runner.local_time.as_ref().map(|local| local.day(now_ms));
+    if let Some(why) = run_now_refused(
+        &skill,
+        &run.calls,
+        runs.busy.contains(&skill),
+        HANDING.load(std::sync::atomic::Ordering::SeqCst) > 0,
+        &runner.tasks.borrow(),
+        read_day,
+        now_ms,
+    ) {
+        eprintln!("lamp-skills: skill:{skill}: not run now: {why}");
+        return refuse(&why);
+    }
+    if !admission.commit() {
+        return;
+    }
+    engine.ran_now(&skill, now_us);
+    eprintln!("lamp-skills: skill:{skill}: run now, as its owner asked by voice");
+    let _ = reply.send(json!({ "ran": skill }));
+    for event in run.events {
+        publish(out, event);
+    }
+    let _ = start(run.skill, run.calls, &mut runs.busy, out, runner);
+}
+
 /// The model called a skill's tool: its steps run, and the voice is told
 /// what the model is to say: at once, or, with a look, once the body and
 /// the light are made (#1146). The say is the model's and the look the
@@ -3151,6 +3326,24 @@ fn tool_call(
         );
         return refuse(lamp_skills::CANNOT_TURN);
     }
+    // #6834: a gesture, a move or a stand the body would drop is never told
+    // to the model as done. Read without waiting: the health the bus keeps
+    // (it means nothing after 15 s) and the body's limits, said every 10 s.
+    if run
+        .calls
+        .iter()
+        .any(|call| matches!(call, Call::Gesture(_) | Call::Move(_) | Call::Stand(_)))
+    {
+        let health =
+            said_within::<lamp_msgs::Health>(&runner.bus, lamp_msgs::Health::TOPIC, 15_000);
+        let stands =
+            said_within::<lamp_msgs::BodyLimits>(&runner.bus, lamp_msgs::BodyLimits::TOPIC, 30_000)
+                .map(|limits| limits.stands);
+        if let Some(why) = lamp_skills::body_down(health.as_ref(), stands) {
+            eprintln!("lamp-skills: {name} with {args} not run: the body can't move: {why}");
+            return refuse(&format!("{} {why}", lamp_skills::CANNOT_MOVE));
+        }
+    }
     let made: Vec<Call> = run
         .calls
         .iter()
@@ -3172,6 +3365,28 @@ fn tool_call(
     let under_way = !nothing && busy.contains(&run.skill);
     if under_way && made.len() == run.calls.len() {
         return refuse("I'm still doing that.");
+    }
+    // A run that is only tasks the lamp would not hand over now: the model
+    // is told nothing runs, and why, never "Done." (lamp-9adf, 15 Nov).
+    if let Some(why) = tasks_refused(&run.skill, &made, &runner.tasks.borrow()) {
+        eprintln!("lamp-skills: {name} with {args} not run: {why}");
+        if !admission.commit() {
+            return;
+        }
+        let _ = reply.send(json!({ "error": format!("{} {why}", lamp_skills::TASK_NOT_RUN) }));
+        for event in run.events {
+            publish(out, event);
+        }
+        publish(
+            out,
+            SkillEvent {
+                skill: run.skill,
+                stage: SkillStage::Done,
+                why: format!("not made: {why}"),
+                allowed: None,
+            },
+        );
+        return;
     }
     // The caller told it timed out: nothing is done.
     if !admission.commit() {
@@ -3518,9 +3733,28 @@ fn listen(
                             return writeln!(&stream, "{}", json!({"ok": false, "error": why}));
                         }
                     },
+                    // A made skill run now, as its owner asked by voice
+                    // (`lamp_voice::made_run`): only the voice's, which
+                    // asked whose line it was.
+                    Some(lamp_voice::made_run::OP) => {
+                        if !voice {
+                            eprintln!(
+                                "lamp-skills: a run asked by a peer that is not the voice refused"
+                            );
+                            return writeln!(
+                                &stream,
+                                "{}",
+                                json!({"ok": false, "error": lamp_voice::made_run::NOT_THE_VOICE})
+                            );
+                        }
+                        args = json!({ "skill": call["skill"] });
+                        Some(RUN_NOW.to_owned())
+                    }
                     Some("call") => call["name"]
                         .as_str()
-                        .filter(|name| *name != watch::APP_ON && *name != watch::APP_OFF)
+                        .filter(|name| {
+                            *name != watch::APP_ON && *name != watch::APP_OFF && *name != RUN_NOW
+                        })
                         .map(str::to_owned),
                     _ => None,
                 };
@@ -4629,9 +4863,12 @@ fn act(
 
 /// A light show (#1679): each frame's light in turn, asked of the ring with
 /// `LAMP_LIGHT_REQUESTS=on` or set through the actions part, held its while.
-/// It stops before a frame once the body was pushed, the lamp paused, or the
-/// voice took a turn (someone spoke: the lamp stops and listens); what it
-/// showed is given back with the run's light.
+/// It stops before a frame once the body was pushed, the lamp paused, or
+/// words of a later turn were heard (someone spoke: the lamp stops and
+/// listens), as a search does ([`SearchStop`]). The voice listening alone
+/// does not stop it: on lamp-52e6 a line of room sound, 0 words heard,
+/// stopped a show in its third frame (#5744). What it showed is given back
+/// with the run's light.
 fn show(
     name: &str,
     frames: &[lamp_skills::Frame],
@@ -4639,9 +4876,11 @@ fn show(
     bus: &Bus,
     glow: &mut Option<Glow>,
 ) -> String {
+    // Subscribed before the first frame: words heard during it are kept.
+    let mut stop = SearchStop::new(bus);
     let mut shown = 0;
     for frame in frames {
-        if let Some(why) = show_stopped(bus) {
+        if let Some(why) = stop.why(bus) {
             return format!(
                 "show {name}: stopped after {shown} of {} frames, {why}",
                 frames.len()
@@ -4671,7 +4910,7 @@ fn show(
         // speaks stops the show within that, not at the frame's end.
         let until = clock::now() + Duration::from_micros(frame.lasting_us);
         while clock::now() < until {
-            if let Some(why) = show_stopped(bus) {
+            if let Some(why) = stop.why(bus) {
                 return format!(
                     "show {name}: stopped in frame {shown} of {}, {why}",
                     frames.len()
@@ -4729,8 +4968,8 @@ static NEWEST_HEARD: Mutex<Option<(String, u64)>> = Mutex::new(None);
 /// #1871). Words of the turn that asked for the search, or an earlier one,
 /// do not end it: on Live the last pieces of the asking line can come after
 /// the call. A turn of another voice boot is always later: a voice that
-/// started again numbers from 1. Without `voice/heard` it ends as a show
-/// does, on the voice listening.
+/// started again numbers from 1. Without `voice/heard` it ends on the voice
+/// listening. A light show stops on the same (#5744).
 struct SearchStop {
     heard: Option<Subscriber>,
     /// The turn of the newest words heard as the search began, and the
@@ -4801,13 +5040,6 @@ impl SearchStop {
         }
         Some(false)
     }
-}
-
-/// Why a show goes no further, if it should not: the body pushed, the lamp
-/// paused, or the voice listening to someone.
-fn show_stopped(bus: &Bus) -> Option<String> {
-    body_stopped(bus)
-        .or_else(|| voice_listening(bus).then(|| "the voice is listening to someone".into()))
 }
 
 /// The body pushed or the lamp paused.
@@ -5311,13 +5543,28 @@ fn read_service(
             days.insert(skill.to_owned(), day);
         }
     }
+    let mut room = lamp_room(skill, sockets, bus, known_file, local_time, read.quiet);
+    service_read::run(read, &mut room)
+}
+
+/// The room a skill's read is said in, and what a skill's task's agent
+/// found ([`hand_task`]): its gate's eyes, ears and clock, and the say
+/// service; `quiet`, the skill's own `[quiet]`.
+fn lamp_room(
+    skill: &str,
+    sockets: &Sockets,
+    bus: Bus,
+    known_file: Option<PathBuf>,
+    local_time: Option<Arc<lamp_local_time::LocalTime>>,
+    quiet: Option<(u16, u16)>,
+) -> LampRoom {
     let owner = std::env::var_os(OWNER_FILE_ENVIRONMENT)
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
         .and_then(|path| lamp_voice::person::read(&path).ok().flatten());
     let services = std::env::var_os(SERVICES_SOCKET_ENVIRONMENT)
         .map_or_else(|| PathBuf::from(SERVICES_SOCKET), PathBuf::from);
-    let mut room = LampRoom {
+    LampRoom {
         skill: skill.to_owned(),
         say: sockets.say.clone(),
         services,
@@ -5325,9 +5572,29 @@ fn read_service(
         known_file,
         owner,
         local_time,
-        quiet: read.quiet,
-    };
-    service_read::run(read, &mut room)
+        quiet,
+    }
+}
+
+/// Why a run of `calls`, every one a `do.task`, makes nothing now, in the
+/// words after "not made: ": its folder not known, or what
+/// [`lamp_skills::task::would_refuse`] says [`lamp_skills::task::hand`]
+/// would refuse. `None` for a run with any other call, which is made as
+/// it is; the hand-over still holds each task to the real gate.
+fn tasks_refused(skill: &str, calls: &[Call], tasks: &Tasks) -> Option<String> {
+    use lamp_skills::task;
+    if calls.is_empty() || !calls.iter().all(|call| matches!(call, Call::Task(_))) {
+        return None;
+    }
+    if !tasks.of.contains_key(skill) {
+        return Some("its folder is not known".into());
+    }
+    let why = task::would_refuse(skill, tasks.state.as_deref(), unix_ms())?;
+    Some(
+        why.strip_prefix(task::NOT_HANDED)
+            .unwrap_or(&why)
+            .to_owned(),
+    )
 }
 
 /// A skill's `do.task` that came due (#6305, [`lamp_skills::task`]),
@@ -5336,8 +5603,12 @@ fn read_service(
 /// its grants, one at a time a skill, within the day's bounds; with no yes,
 /// the voice is asked to say the read-back and ask for it (`task_yes`,
 /// [`lamp_skills::task::ask_yes`]). The journal says what became of it,
-/// never the task's words.
-fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
+/// never the task's words. What its agent found, when lamp-tasks' answer
+/// carries it (a run granted a linked service's read,
+/// [`lamp_skills::task::told`]), is said to the owner in `room`, behind a
+/// read's gate ([`lamp_skills::service_read::tell`]); the journal says only
+/// how many sentences.
+fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut room: LampRoom) {
     let Some((folder, grants)) = tasks.of.get(skill).cloned() else {
         eprintln!("lamp-skills: skill:{skill}: do.task: not handed over: its folder is not known");
         return;
@@ -5359,6 +5630,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
             "expires_in_ms": lamp_skills::task::ASK_EXPIRES_MS,
         });
         let say_yes = || say(&say_socket, "say", &skill, ask, &[], || {});
+        let mut found = None;
         let said = lamp_skills::task::hand(
             &skill,
             &step,
@@ -5366,27 +5638,91 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
             &grants,
             place,
             unix_ms(),
-            hand_over,
+            |socket, line| {
+                let answer = hand_over(socket, line)?;
+                // What lamp-tasks' answer carries of its agent's: its length
+                // only, never its words (#7180).
+                let carried = serde_json::from_str::<serde_json::Value>(answer.trim())
+                    .ok()
+                    .and_then(|answer| answer["answer"].as_str().map(str::len));
+                eprintln!(
+                    "lamp-skills: skill:{skill}: do.task: lamp-tasks' answer carries {}",
+                    carried.map_or_else(
+                        || "no agent's answer".to_owned(),
+                        |bytes| format!("{bytes} bytes of its agent's answer")
+                    )
+                );
+                found = lamp_skills::task::told(&answer);
+                lamp_skills::service_write::agent_answered(&answer)
+            },
             say_yes,
         );
         eprintln!("lamp-skills: skill:{skill}: {said}");
+        if let Some(lines) = found {
+            // Kept as waiting till its end, so a restart that drops it
+            // unsaid leaves a line at the next start (#7180).
+            let began = unix_ms();
+            if let Some(state) = &state
+                && let Err(error) = lamp_skills::task::telling_begins(state, &skill, began)
+            {
+                eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {error}");
+            }
+            let told = lamp_skills::service_read::tell(&lines, &mut room);
+            eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {told}");
+            if let Some(state) = &state
+                && let Err(error) = lamp_skills::task::telling_ends(state, &skill, began)
+            {
+                eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {error}");
+            }
+        }
     });
 }
 
-/// One hand-over line to lamp-tasks at `socket`, and its answer, read when
-/// the run ends, at most [`lamp_skills::task::RUN_MOST`] later.
-fn hand_over(socket: &Path, line: &str) -> Result<String, String> {
+/// lamp-skills' hand-overs to lamp-tasks under way, a task's or a fixed
+/// write's ([`Handing`]). lamp-tasks runs one at a time, so a run now's
+/// task is refused while one is ([`run_now_refused`]): on lamp-9adf, 15
+/// Nov at 21:40, a run now was said to be running while another skill's
+/// write held lamp-tasks, which then refused it as busy.
+static HANDING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// What a run now's refusal says while another hand-over is under way.
+const HANDING_BUSY: &str =
+    "another skill's task is running on the lamp now, and one runs at a time";
+
+/// One hand-over to lamp-tasks counted in [`HANDING`] while it lives.
+struct Handing;
+
+impl Handing {
+    fn begin() -> Self {
+        HANDING.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Self
+    }
+}
+
+impl Drop for Handing {
+    fn drop(&mut self) {
+        HANDING.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+/// One hand-over line to lamp-tasks at `socket`, and its answer line, read
+/// when the run ends, at most [`lamp_skills::task::RUN_MOST`] later. Not
+/// connected, nothing was taken; a line written and no answer read, the
+/// run may have begun.
+fn hand_over(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
+    use lamp_skills::service_write::Unrun;
+    let _handing = Handing::begin();
+    let stream = UnixStream::connect(socket)
+        .map_err(|error| Unrun::NotTaken(format!("lamp-tasks couldn't be reached: {error}")))?;
     let exchange = || -> io::Result<String> {
-        let mut stream = UnixStream::connect(socket)?;
         stream.set_write_timeout(Some(Duration::from_secs(5)))?;
         stream.set_read_timeout(Some(lamp_skills::task::RUN_MOST))?;
-        stream.write_all(format!("{line}\n").as_bytes())?;
+        (&stream).write_all(format!("{line}\n").as_bytes())?;
         let mut answer = String::new();
-        BufReader::new(stream.take(8_192)).read_line(&mut answer)?;
+        BufReader::new((&stream).take(8_192)).read_line(&mut answer)?;
         Ok(answer)
     };
-    let answer = exchange().map_err(|error| format!("lamp-tasks couldn't be reached: {error}"))?;
-    lamp_skills::task::answered(&answer)
+    exchange().map_err(|error| Unrun::Unknown(format!("lamp-tasks' answer never came: {error}")))
 }
 
 /// A skill's write to a linked service that came due (#6066,
@@ -5438,20 +5774,7 @@ fn write_service(
 /// connected, nothing was taken; a line written and no answer read, the
 /// run may have begun.
 fn hand_write_over(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
-    use lamp_skills::service_write::Unrun;
-    let stream = UnixStream::connect(socket)
-        .map_err(|error| Unrun::NotTaken(format!("lamp-tasks couldn't be reached: {error}")))?;
-    let exchange = || -> io::Result<String> {
-        stream.set_write_timeout(Some(Duration::from_secs(5)))?;
-        stream.set_read_timeout(Some(lamp_skills::task::RUN_MOST))?;
-        (&stream).write_all(format!("{line}\n").as_bytes())?;
-        let mut answer = String::new();
-        BufReader::new((&stream).take(8_192)).read_line(&mut answer)?;
-        Ok(answer)
-    };
-    let answer = exchange()
-        .map_err(|error| Unrun::Unknown(format!("lamp-tasks' answer never came: {error}")))?;
-    lamp_skills::service_write::agent_answered(&answer)
+    lamp_skills::service_write::agent_answered(&hand_over(socket, line)?)
 }
 
 /// `skill`'s fixed write sent straight on `lamp-services`' tools socket
@@ -5553,6 +5876,8 @@ impl lamp_skills::service_read::Room for LampRoom {
             private,
             paused,
             quiet,
+            // The voice's own switch, read the same way (`on` only).
+            private_room: lamp_voice::person::private_room(),
         }
     }
 
@@ -5649,6 +5974,13 @@ impl lamp_skills::service_read::Room for LampRoom {
     // One read at a time on the lamp, every skill's (#5618).
     fn turns(&self) -> Option<&'static lamp_skills::service_read::Turns> {
         Some(&lamp_skills::service_read::TURNS)
+    }
+
+    fn waits(&mut self, why: &str) {
+        eprintln!(
+            "lamp-skills: skill:{}: waits for its gate: {why}",
+            self.skill
+        );
     }
 }
 
@@ -7319,6 +7651,166 @@ mod tests {
                 assert_eq!(say.accept().unwrap_err().kind(), io::ErrorKind::WouldBlock);
             }
         }
+    }
+
+    /// lamp-9adf, 15 Nov: a made skill run now by its owner is refused,
+    /// in words the lamp can say and before anything is made, as its
+    /// trigger's run would be where it is made: its last run under way, its
+    /// folder not known, another hand-over to lamp-tasks under way, its
+    /// tasks off or past the day's bounds; a run of no task, read or write
+    /// passes.
+    #[test]
+    fn a_run_now_is_refused_as_its_trigger_s_run_would_be() {
+        // The switch is read from this process's environment here.
+        if lamp_skills::task::on() {
+            return;
+        }
+        let root = tempfile::Builder::new()
+            .prefix("run-now-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let tasks = Tasks {
+            of: HashMap::from([("study".to_owned(), (root.path().join("study"), Vec::new()))]),
+            state: Some(root.path().to_owned()),
+            socket: None,
+            say: root.path().join("say.sock"),
+        };
+        let task = || {
+            Call::Task(Box::new(lamp_skills::task::TaskStep {
+                task: "Read my unread mail.".into(),
+                run: "scripts/mail.sh".into(),
+            }))
+        };
+        assert_eq!(
+            run_now_refused("dim", &[light("warm")], false, false, &tasks, None, 1_000),
+            None
+        );
+        assert_eq!(
+            run_now_refused("dim", &[light("warm")], true, false, &tasks, None, 1_000).as_deref(),
+            Some("its last run is still under way")
+        );
+        assert_eq!(
+            run_now_refused("other", &[task()], false, false, &tasks, None, 1_000).as_deref(),
+            Some("its folder is not known")
+        );
+        // Another skill's hand-over under way: lamp-tasks would say busy.
+        assert_eq!(
+            run_now_refused("study", &[task()], false, true, &tasks, None, 1_000).as_deref(),
+            Some(HANDING_BUSY)
+        );
+        // A run of no task isn't held by it.
+        assert_eq!(
+            run_now_refused("dim", &[light("warm")], false, true, &tasks, None, 1_000),
+            None
+        );
+        let off = lamp_skills::task::OFF
+            .strip_prefix(lamp_skills::task::NOT_HANDED)
+            .unwrap();
+        assert_eq!(
+            run_now_refused(
+                "study",
+                &[light("warm"), task()],
+                false,
+                false,
+                &tasks,
+                None,
+                1_000
+            )
+            .as_deref(),
+            Some(off)
+        );
+        // Nothing is counted by the check.
+        assert!(!root.path().join(lamp_skills::task::RUNS_FILE).exists());
+    }
+
+    /// A run that is only a `do.task` the lamp would not hand over makes
+    /// nothing and says "not made:", never "goes on on its own"; a run with
+    /// another call is made as it is, its task held to the hand-over.
+    #[test]
+    fn a_run_of_only_a_task_refused_says_it_is_not_made() {
+        // The switch is read from this process's environment here.
+        if lamp_skills::task::on() {
+            return;
+        }
+        let root = tempfile::Builder::new()
+            .prefix("task-refused-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(root.path().join("bus")).unwrap();
+        let mut out = bus
+            .publisher_declared(SkillEvent::TOPIC, &SkillEvent::declaration(), "skills")
+            .unwrap();
+        let (_woken, waker) = wake_pipe().unwrap();
+        let (finished, done) = waking(&Arc::new(waker));
+        let tasks = Tasks {
+            of: HashMap::from([("study".to_owned(), (root.path().join("study"), Vec::new()))]),
+            state: Some(root.path().to_owned()),
+            socket: None,
+            say: root.path().join("say.sock"),
+        };
+        let task = || {
+            Call::Task(Box::new(lamp_skills::task::TaskStep {
+                task: "Start a study block.".into(),
+                run: "scripts/study.sh".into(),
+            }))
+        };
+        assert_eq!(
+            tasks_refused("study", &[task(), light("warm")], &tasks),
+            None
+        );
+        assert_eq!(tasks_refused("study", &[], &tasks), None);
+        assert_eq!(
+            tasks_refused("other", &[task()], &tasks).as_deref(),
+            Some("its folder is not known")
+        );
+        let runner = Runner {
+            sockets: nowhere(root.path(), Permissions::default()),
+            finished,
+            bus,
+            glows: None,
+            body_requests: false,
+            ends: RefCell::default(),
+            unplug: RefCell::default(),
+            made: RefCell::default(),
+            tasks: RefCell::new(tasks),
+            local_time: None,
+            trust_clock: false,
+            clock_waiting: Cell::new(false),
+            rest_client: None,
+            runs: RefCell::default(),
+            permissions: RefCell::default(),
+            looks: RefCell::default(),
+            watching: RefCell::new(Watching {
+                watches: Watches::default(),
+                marks: HashMap::new(),
+                texts: None,
+                known_file: None,
+                signs: None,
+                retaken: HashMap::new(),
+            }),
+            proposals: None,
+        };
+        let told = start(
+            "study".into(),
+            vec![task()],
+            &mut HashSet::new(),
+            &mut out,
+            &runner,
+        );
+        let event = done.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(event.stage, SkillStage::Done);
+        assert_eq!(
+            event.why,
+            format!(
+                "not made: {}",
+                lamp_skills::task::OFF
+                    .strip_prefix(lamp_skills::task::NOT_HANDED)
+                    .unwrap()
+            )
+        );
+        // Nothing was made, so nothing tells it began.
+        assert!(told.recv().is_err());
+        assert!(!root.path().join(lamp_skills::task::RUNS_FILE).exists());
     }
 
     /// A run's sockets carry its own skill's permissions, as of the last

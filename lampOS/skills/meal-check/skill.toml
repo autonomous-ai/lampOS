@@ -12,7 +12,9 @@ needs = ["eyes", "body", "voice"]
 kind = "installable"
 # 1.0.1: the `[present.budget]` below (#5207, first in build 10147), so the
 # Store's package lets an installed lamp see it; 1.0.0 had none.
-version = "1.0.1"
+# 1.1.0: the `[[while]]` on humans/doing below (#6543), a new topic read and
+# the `seen` use, so the Store's package reaches a lamp with 1.0.1.
+version = "1.1.0"
 # Once at lunch and once at dinner, counted from the local midnight.
 most_a_day = 2
 
@@ -21,7 +23,7 @@ most_a_day = 2
 # question, worded by the voice.
 [permissions]
 speak = true
-topics = ["humans/faces/tracked", "voice/state", "room/activity"]
+topics = ["humans/faces/tracked", "voice/state", "room/activity", "humans/doing"]
 body = true
 
 # Lunchtime, 11:30 to 13:30: held only inside it, so its 75 minutes are
@@ -73,6 +75,11 @@ topic = "room/activity"   # it waits for them to look up. Without the eyes' room
 field = "state"           # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
 not_equals = "head_down"
 unknown = "holds"
+[[while]]                 # eating not seen in the last 75 minutes (#6543; the PM: what is seen only
+topic = "humans/doing"    # holds the nudge, never a word of its own). lamp-seen counts ate_s_ago
+field = "ate_s_ago"       # from the desk arrival when it saw nothing, so it holds as the sitting
+above = 4499              # does. Without lamp-seen, or with it gone quiet, the topic is never said
+unknown = "holds_stale"   # or has run out, and it runs as before.
 
 [quiet]                   # never at night
 from = "22:00"

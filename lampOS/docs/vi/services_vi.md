@@ -56,13 +56,15 @@ của nó. Một câu vẫn phải được nói ra (`NOT_HEARD`), và một l�
 nói ra (chủ đèn, 10/11: mô hình quyết định xác nhận hay huỷ; đèn chỉ kiểm tra
 send_id, một yêu cầu sau, hai phút và phần đọc lại không bị cắt). Lệnh ghi vẫn chỉ ở trên tuyến thứ hai.
 
-**Cái giá đã chấp nhận (chủ đèn, 6/11):** không hề cần khuôn mặt nào, kể cả
+**Cái giá đã chấp nhận (chủ dự án, 6/11, 18:08: "no more checking ownership"):** không hề cần khuôn mặt nào, kể cả
 khi không có ai trong tầm nhìn. Nên một TV, một cuộc gọi video hay một bản ghi
-âm nói "read my mail" có thể khiến thư được đọc to đầy đủ. Chủ đèn chọn điều
-này thay vì bất kỳ luật cần-thấy-mặt nào, để đèn không từ chối.
+âm nói "read my mail" có thể khiến thư được đọc to đầy đủ; một lần gửi vẫn cần
+phần đọc lại và một câu trả lời nói ra sau đó. Chủ dự án chọn điều này thay vì
+bất kỳ luật cần-thấy-mặt nào, để đèn không từ chối.
 
-Các luật dưới đây là những gì áp dụng khi tắt công tắc; chúng ở lại trong mã
-cho một tính năng sau này.
+Khi công tắc bật, không câu nào được so với một giọng: một lần đọc được nói đầy đủ mà không hỏi giọng nào ở tuyến thứ hai và không chờ dấu giọng (`services::run`), và tuyến thứ hai không tạo dấu giọng nào cho các dịch vụ, nên `LAMP_SAME_VOICE_FOR=services` không khởi động tiến trình con cùng giọng nào ở đó (`checking_the_voice_for`). Trên tuyến Live một lần đọc cũng được nói đầy đủ, nên chữ "không bao giờ đầy đủ" của nó bên dưới không còn đúng khi công tắc bật; tuyến này vẫn không bao giờ chuẩn bị hay gửi một lần ghi (`NO_SEND_HERE`), dù công tắc bật hay tắt. Một lần đọc của kỹ năng tự tạo cũng ở trong căn phòng riêng: `lamp-skills.service` đặt `LAMP_PRIVATE_ROOM=on`, và khi đó cổng của nó không cần tên chủ đèn hay khuôn mặt quen, còn hai khuôn mặt trong tầm nhìn vẫn giữ nó lại ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới).
+
+Các quy tắc bên dưới là những gì áp dụng khi công tắc tắt; chúng vẫn nằm trong mã cho một tính năng sau này.
 
 Chỉ chủ của đèn: người có khuôn mặt quen được giữ dưới tên gõ lúc setup
 (`LAMP_PERSON_NAME`) hoặc dưới tên mà `who_you_are` lưu cùng khuôn mặt của họ
@@ -1659,9 +1661,21 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   as a call"): trên đèn của một người thử ngày 13/11, một câu không có từ
   nào vào đúng giây của động tác chào khi có người đến của chính đèn đã được
   trả lời như tên, và câu "Yes." duy nhất sau đó thấy thư đã bị bỏ (#6363).
-  Một câu có lời riêng được trả lời thay cho một câu bị giữ (một câu hỏi thật
-  bị cắt ngang) vẫn tính là một yêu cầu khác (P3 của Reviewer-lead trên
-  #6367).
+  Một câu chỉ có tên của đèn ("Hey Lamp", được báo cho mô hình là chỉ có tên
+  và được trả lời như một lời gọi, có hay không có
+  `LAMP_SECOND_NAME_CARRIES`) cũng vậy, trừ khi nó được nói bởi cái tên ngay
+  trước đó: nó được trả lời, và câu đồng ý sau nó vẫn gửi. Chỉ tính khi
+  câu chỉ có tên: một lời gọi có thêm một từ sau tên ("Hey Lamp, no.") hoặc
+  một từ được hỏi như cái tên ("No.") vẫn bỏ lệnh ghi, để một câu "Yes."
+  lạc không bao giờ gửi điều vừa bị từ chối. Trên đèn của một
+  người thử ngày 14/11, câu "Hey Lamp" giữa phần đọc lại một sự kiện và câu
+  "Yes." của nó đã được trả lời như một lời gọi, và câu đồng ý thấy sự kiện
+  đã bị bỏ (#6363). Kiểm thử:
+  `a_name_only_line_between_a_read_back_and_its_yes_keeps_the_write`. Một
+  câu có lời riêng được trả lời thay cho một câu bị giữ (một câu hỏi thật bị
+  cắt ngang), hoặc bắt đầu bằng tên và được trả lời mà không gửi ("Hey Lamp,
+  what time is it?"), vẫn tính là một yêu cầu khác (P3 của Reviewer-lead
+  trên #6367).
 - **Tiếng vọng của chính đèn không phải câu của người nói** (#5846). Một câu
   mà tuyến thứ hai giữ lại là lời của chính đèn vọng lại (`own_echo`,
   `Echo::Held`) được báo qua thread (`Thread::own_echo_held` →
@@ -1966,6 +1980,19 @@ hai lần bị mô hình trả về thành thêm một khóa bên trong, bị t�
 | Khuôn mặt đó là khuôn mặt quen của chủ đèn | Tệp known của mắt (mới trong 2 s), tên là tên chủ đèn, không phân biệt hoa thường | "not the owner" / "the owner not in view" |
 | Không nghe giọng nào trong một phút qua | Mỗi dòng trên `voice/heard`, được một luồng riêng của `lamp-skills` đánh dấu khi đến (topic này là event: bus không giữ bản mới nhất, nên trước bản sửa này dòng này chưa từng giữ lại lần đọc nào; lamp-9adf, 5/11) | "a voice heard" |
 
+Trong căn phòng riêng (`LAMP_PRIVATE_ROOM=on`, đặt trong `lamp-skills.service`
+của sản phẩm và được đọc như giọng nói đọc nó,
+`lamp_voice::person::private_room`, vào `Seen::private_room`) không có kiểm
+tra quyền sở hữu nào chạy: các dòng về khuôn mặt chủ đèn đã đăng ký và khuôn
+mặt quen của chủ đèn không áp dụng, nên chỉ cần một khuôn mặt một mình trong
+tầm nhìn, quen hay không, kể cả khi không có tên gõ lúc cài đặt. Dòng tối đa
+một khuôn mặt vẫn giữ ("not alone"): đếm khuôn mặt không phải là kiểm tra
+quyền sở hữu, và một kỹ năng đọc khi không ai hỏi, nên người thứ hai trong
+tầm nhìn không nghe được thư hay lịch của chủ đèn. Không thấy ai vẫn giữ cổng
+đóng ("the owner not in view"), và các dòng còn lại vẫn áp dụng như trên. Cái
+giá chủ sản phẩm đã chấp nhận: một người lạ ở một mình trong tầm nhìn vẫn
+nghe được.
+
 Tất cả phải đạt liên tục trong 5 s. Trước đó lượt chạy chờ, tối đa 60 phút,
 rồi bỏ qua ngày đó mà không nói gì ("skipped: <why>").
 Khung giờ của trigger quy định khi nào lượt đọc đến hạn, không phải giờ
@@ -2010,7 +2037,9 @@ Một tiêu đề, người gửi hay chủ đề bị cắt còn 100 ký tự. 
 trước mỗi dòng. Nếu có người đến (khuôn mặt thứ hai, một khuôn mặt khác, một
 giọng nói), đèn dừng sau dòng đang nói và chỉ nói "I'll tell you the rest
 later."; nếu cổng đóng vì lý do khác (riêng tư, tạm dừng, giờ yên lặng, chủ
-đèn rời đi), nó dừng mà không nói gì. Khi không nhận ra chủ đèn, hoặc không
+đèn rời đi), nó dừng mà không nói gì. Trong căn phòng riêng, một khuôn mặt
+thứ hai đến và một giọng nói nghe được đều làm nó dừng như vậy, với cùng câu
+đó. Khi không nhận ra chủ đèn, hoặc không
 thấy ai, cổng được xem lại trong tối đa 5 s (`BLINK`) mà không nói gì, vì mắt
 làm mới dấu khuôn mặt quen mỗi 2 s và dấu chỉ được coi là mới trong 2 s: trên
 lamp-9adf một lần làm mới cách 2,1 s đã dừng một lần đọc trước khi nói chữ
@@ -2336,14 +2365,16 @@ toàn bộ):
 - Một người liên hệ được nêu tên mà không có địa chỉ: đèn không giữ danh
   bạ, nên mô hình tạo kỹ năng xin địa chỉ.
 
-### Qua tác tử của đèn (`LAMP_SKILL_WRITE_AGENT`, tắt)
+### Qua tác tử của đèn (`LAMP_SKILL_WRITE_AGENT`, bật trong sản phẩm)
 
 Quyết định của chủ đèn (13/11, trong cuộc trò chuyện này; việc do first
 builder mở, hỏi trên Queue #6809): mọi thứ chạm vào một dịch vụ đã liên kết
-đều chạy qua tác tử của đèn. Khi `LAMP_SKILL_WRITE_AGENT=on` (đúng `on`,
-không bật trong unit sản phẩm nào) và `LAMP_AGENT_SERVICES=on`, lệnh ghi cố
-định của một kỹ năng tự tạo được gửi bởi một lượt chạy của kỹ năng trên
-Hermes của đèn, không phải bởi `lamp-skills`:
+đều chạy qua tác tử của đèn. Khi `LAMP_SKILL_WRITE_AGENT=on` (đúng `on`;
+bật trong các unit `lamp-skills`, `lamp-tasks`, `lamp-control` và
+`lamp-services` của sản phẩm, mỗi unit một lần) và
+`LAMP_AGENT_SERVICES=on`, lệnh ghi cố định của một kỹ năng tự tạo được gửi
+bởi một lượt chạy của kỹ năng trên Hermes của đèn, không phải bởi
+`lamp-skills`:
 
 - **lamp-skills** không bao giờ gọi chương trình này cho lệnh ghi đó. Nó
   trao lệnh ghi cho lamp-tasks qua socket của `do.task` dưới dạng
@@ -2491,7 +2522,25 @@ lẫn lượt chạy đều không giữ token nào.
   (chương trình này cũng vậy). Một lần ghi của lượt chạy trong khi một lần
   ghi khác đang chờ lời đồng ý bị từ chối ("another write waits for the
   person's yes"), nên nó không bao giờ làm rơi lần ghi của chính người
-  dùng. Lần ghi chỉ được gửi bằng đường gửi hiện có, lời đồng ý nói ra qua
+  dùng. **Một lần ghi của lượt chạy có lời đọc lại không vừa một ghi chú
+  của giọng nói bị từ chối trước khi được giữ**
+  (`serve::run_read_back_room`): chỗ trống là `serve::RUN_NOTE_ROOM` (591
+  byte: 1.024 byte của ghi chú, `lamp_gemini::wire::MAX_NOTE_BYTES`, trừ
+  các chữ cố định, send id và thời gian còn lại của nó) trừ hai lần tên kỹ
+  năng và mã của dịch vụ, đếm như ghi chú viết nó, số byte của một chuỗi
+  JSON (một dòng mới hay một dấu ngoặc kép là hai, một chữ có dấu là hai
+  hoặc ba; `serve::run_read_back_bytes`). Vượt quá thì không gì được giữ,
+  và lượt chạy được báo chỗ trống tính bằng ký tự, độ dài của lời đọc lại
+  và cần rút ngắn ít nhất bao nhiêu ("nothing was prepared: the lamp reads
+  a write back to the owner in one go, and this read-back is 600
+  characters, over the 546 it can read out ... Shorten the text by at
+  least 54 characters and call service_write again", `serve::run_too_long`),
+  để tác tử rút ngắn nó và gọi lại. Công cụ `service_write` của nó nói
+  trước điều này, nêu 448 ký tự, chỗ trống cho tên kỹ năng và mã dịch vụ
+  dài nhất (`mcp_server::write_short`). Trước đây (lamp-9adf, bản dựng
+  13135), một thư liệt kê 10 tiêu đề thư chưa đọc đã được giữ, rồi chỉ bị
+  nói là quá dài, và lượt chạy kết thúc mà không gửi gì. Lần ghi chỉ được
+  gửi bằng đường gửi hiện có, lời đồng ý nói ra qua
   cổng của giọng nói, và khi đó tính vào giới hạn của kỹ năng như lần ghi
   của kỹ năng tự tạo (10 lần một ngày mỗi kỹ năng, 30 lần cho mọi kỹ năng,
   `skill_writes::Ledger`): vượt quá thì "not sent".
@@ -2523,7 +2572,10 @@ lẫn lượt chạy đều không giữ token nào.
   giữ trong bộ nhớ: khởi động lại không bao giờ kể lại.
   Một lời đọc lại quá dài cho một ghi chú (1 024 byte) không bao giờ bị cắt:
   đèn chỉ nói rằng kỹ năng muốn gửi một thứ quá dài để đọc ra, không gì chờ,
-  và việc giữ tự hết hạn.
+  và việc giữ tự hết hạn. Đây chỉ là lớp chặn cuối: chương trình này từ
+  chối lần ghi như vậy trước khi giữ (ở trên), và bài kiểm thử của giọng
+  nói giữ `serve::run_read_back_room` khớp đúng ghi chú của nó
+  (`lamp_services_room_for_a_read_back_is_one_note_exactly`).
 - **Lời đồng ý.** Worker của giọng nói đọc lại chính xác ghi chú đó và giữ
   lần ghi chờ được gửi như một lần ghi do chính mô hình của nó chuẩn bị
   (`services::wait_for_run_yes`), request của ghi chú là request đọc lại,
@@ -2634,9 +2686,9 @@ qua một socket mở.
   nói rõ của chủ (cơ chế chờ của #6558); chỉ khi đó chương trình này mới gửi,
   tính vào giới hạn của kỹ năng (3 lần một ngày mỗi kỹ năng, 10 cho tất cả).
   Lệnh ghi cố định của một kỹ năng tự tạo chạy qua tác tử
-  (`LAMP_SKILL_WRITE_AGENT`, tắt) là lệnh ghi duy nhất được gửi theo lệnh gọi
-  của một lượt chạy, và chỉ như lời đồng ý đã giữ của chủ, một lần ("Một kỹ
-  năng tự tạo ghi vào dịch vụ", "Qua tác tử của đèn").
+  (`LAMP_SKILL_WRITE_AGENT`, bật trong sản phẩm) là lệnh ghi duy nhất được
+  gửi theo lệnh gọi của một lượt chạy, và chỉ như lời đồng ý đã giữ của chủ,
+  một lần ("Một kỹ năng tự tạo ghi vào dịch vụ", "Qua tác tử của đèn").
 - **Nhật ký** từ máy chủ chỉ ghi độ dài của lời từ chối; các phần nó gọi ghi
   dịch vụ và `what` hay `action`, không bao giờ ghi nội dung, địa chỉ hay
   tiêu đề.
@@ -3078,11 +3130,22 @@ kết, và phần tính cách dặn nó đừng giả vờ làm được việc 
 `LAMP_SERVICES_TOLD=on` (chỉ truyền cho worker của hai tuyến), ở tuyến thứ hai một câu nói
 được nhận là của chủ đèn (`services::owner_of`) được báo, cạnh lời của nó, các dịch vụ đang liên kết theo tên,
 mỗi cái một lần, và rằng đèn tự dùng chúng: "(For you to know, not to answer:
-the lamp's owner linked these services to you in the app's Connectors:
+the lamp's owner linked these services to you in the app's Linked accounts:
 Notion, Gmail. They are yours to use for the owner: read from one with
 service_read, and send, post or create with service_write, when they ask.
 Asked about one, use it, or say plainly what you can do with it; never say
-it is the app's job or that you don't know it.)" (`services_told::note`). Các
+it is the app's job or that you don't know it. A service the lamp can link
+(Gmail, Google Calendar, Google Drive, Figma, GitHub, Linear, Asana, Ahrefs, Facebook Page, Slack, monday.com, HubSpot, Amplitude, Notion) but not in this list isn't linked to this lamp yet. It can be linked
+in the app: open this lamp, then Settings, then Linked accounts. Any other
+service the lamp can't link yet: say so. The services it can link are in
+the app: open this lamp, then Settings, then Linked accounts.)"
+(`services_told::note`). Các tên liên kết được là tên trong danh mục
+(`services_told::linkable`: mỗi dịch vụ một lần, theo tên người nghe), và
+hai câu sau chúng chính là `NOT_LINKED` và `CANT_LINK` của `lamp-services`,
+nên một dịch vụ trong danh mục mà không có trong danh sách được trả lời kèm
+chỗ liên kết nó (#5867), còn một dịch vụ ngoài danh mục, như Outlook, được
+trả lời là "đèn chưa liên kết được", không bao giờ bị chỉ tới một màn hình
+không có Outlook (P2 của Thirteen trên #7013). Các
 tên là những gì `lamp-services` nói lần gần nhất qua `services_connected`
 (`name` của nó, không có thì mã; cả liên kết đã hết hạn, vì một lần đọc sẽ
 làm mới nó), được hỏi ngoài đường đi của câu khi mỗi câu bắt đầu
@@ -3109,7 +3172,9 @@ phiên của nó giữ những gì đã được báo, nên khi tắt căn phòn
 khách nói sau trong phiên sẽ nghe được các tên (#5598), vì vậy khi đó tuyến
 Live không được báo gì. Nó được báo lại khi có liên kết được thêm hay gỡ, hoặc
 ở một phiên mới; khi mọi thứ đã báo đều bị gỡ, nó được báo một lần rằng giờ
-không có gì liên kết (`services_told::UNLINKED_NOTE`). Mọi lời gọi từ một câu
+không có gì liên kết, và chỗ có các dịch vụ nó liên kết được: open this
+lamp, then Settings, then Linked accounts (`services_told::UNLINKED_NOTE`,
+bằng lời của `CANT_LINK`). Mọi lời gọi từ một câu
 không phải của chủ đèn vẫn bị từ chối (`OWNER_ONLY`).
 
 ## Những gì chưa làm

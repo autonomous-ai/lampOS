@@ -379,15 +379,26 @@ fn lamp_default_of(side: &LampSide, order: &[EngineKind]) -> Option<EngineKind> 
 }
 
 /// The lamp's default engine now (#6492): the first of [`lamp_order`].
-/// Before Harness has reported the lamp's engines, only the app's choice
-/// (the targets file's engine otherwise, as before).
+/// Before Harness has reported the lamp's engines (a start's first look
+/// not back yet, or timed out), the same when the owner chose nothing
+/// (the build's order, Hermes first): the targets file's engine, possibly
+/// left from an app choice since gone, never wins then (#7019). A choice
+/// (the app's, else [`LAMP_ENGINE`]'s) of an engine outside the switched-on
+/// order, such as a third engine Harness reports on the lamp, can't be
+/// checked before a look, so it gives None and the targets file's engine
+/// (which the last look wrote from that choice) is kept (the
+/// Reviewer-lead's P2 on #7036). None also when the lamp has no engine.
 pub fn lamp_default(side: &LampSide) -> Option<EngineKind> {
     let order = lamp_order(side);
-    if side.reported().is_some() {
-        order.first().copied()
-    } else {
-        side.app_choice().filter(|app| order.contains(app))
+    if side.reported().is_none()
+        && side
+            .app_choice()
+            .or(side.chosen)
+            .is_some_and(|choice| !order.contains(&choice))
+    {
+        return None;
     }
+    order.first().copied()
 }
 
 /// Whether the lamp may offer `engine` as one of its own (#6492): any
@@ -426,6 +437,106 @@ fn refresh_lamp_reported(side: &LampSide, known: &Known, listed: &[AccountMachin
             eprintln!("tasks: the lamp's own engines, as Harness reports them: {names:?}");
         }
         *kept = reported;
+    }
+}
+
+/// Whether the app's choice went while the part runs (#7019): the side
+/// holds one, and its file ([`ENGINE_DEFAULT_FILE`]) is no longer there.
+/// The choice is then dropped from the side, with one journal line, and
+/// the lamp's default is the build's again ([`lamp_default`]). Only a file
+/// not found drops it: a file there that can't be read now keeps the
+/// choice, so a passing read error never moves the lamp's work.
+pub fn app_choice_dropped(side: &LampSide, engine_default: &Path) -> bool {
+    if side.app_choice().is_none() {
+        return false;
+    }
+    match fs::metadata(engine_default) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        _ => return false,
+    }
+    let Ok(mut app) = side.app.lock() else {
+        return false;
+    };
+    *app = None;
+    eprintln!("tasks: the app's choice of the lamp's default engine is gone");
+    true
+}
+
+/// With no app choice (#7019: none kept at start, or one gone,
+/// [`app_choice_dropped`]), the lamp target's `engine` in the targets file
+/// written as the lamp's default ([`lamp_default`]), so a stale engine left
+/// from a choice since gone is not kept until the next machines' look.
+/// Only a file this part wrote from the machines
+/// ([`write_targets_from_machines`], its mark beside it) is written, the
+/// mark first as there; a file written by hand or a pairing is left as it
+/// is, as are the other targets and the lamp target's machine. Nothing is
+/// written with no targets file, no lamp target, no engine of the lamp's,
+/// or the engine already the default. A change writes the lamp's folder
+/// guidance for the default too.
+pub fn lamp_target_to_default(targets: &Path, side: &LampSide) -> io::Result<Written> {
+    let said = |changed: bool, said: &str| {
+        Ok(Written {
+            changed,
+            said: said.into(),
+        })
+    };
+    let Some(default) = lamp_default(side) else {
+        return said(false, "the lamp has no engine: its target is left as it is");
+    };
+    let present = match fs::read(targets) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return said(false, "no task targets: the lamp's target is not written");
+        }
+        Err(error) => return Err(error),
+    };
+    let mark = written_mark(targets);
+    let marked = match fs::read_to_string(&mark) {
+        Ok(text) => text.lines().map(str::to_owned).collect::<Vec<_>>(),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(error),
+    };
+    if !marked.contains(&sha256_hex(&present)) {
+        return said(
+            false,
+            "the targets file was not written from the machines; the lamp's target is left as it is",
+        );
+    }
+    let mut current = read_targets(targets)?;
+    match current.get_mut(LAMP_TARGET) {
+        None => return said(false, "no lamp target: nothing to write"),
+        Some(lamp) if lamp.engine == default => {
+            return said(false, "the lamp's target is on its default engine already");
+        }
+        Some(lamp) => lamp.engine = default,
+    }
+    let mut bytes =
+        serde_json::to_vec(&json!({"version":1,"targets":current})).map_err(io::Error::other)?;
+    bytes.push(b'\n');
+    let new = sha256_hex(&bytes);
+    write_atomically(
+        &mark,
+        format!("{}\n{new}\n", sha256_hex(&present)).as_bytes(),
+    )?;
+    write_atomically(targets, &bytes)?;
+    write_atomically(&mark, format!("{new}\n").as_bytes())?;
+    make_lamp_folder(&side.home, default);
+    Ok(Written {
+        changed: true,
+        said: format!(
+            "no app choice: the lamp's target written on its default engine, {}",
+            default.argument()
+        ),
+    })
+}
+
+/// [`lamp_target_to_default`], with one journal line when it wrote or
+/// failed.
+fn lamp_target_defaulted(targets: &Path, side: &LampSide) {
+    match lamp_target_to_default(targets, side) {
+        Ok(written) if written.changed => eprintln!("tasks: {}", written.said),
+        Ok(_) => {}
+        Err(error) => eprintln!("tasks: the lamp's target not written on its default: {error}"),
     }
 }
 
@@ -1667,6 +1778,15 @@ fn owner<C: Clock>(
         );
         *app = Some(chosen);
     }
+    // No app choice kept (#7019: none made, or its file removed before
+    // this start): the lamp's target is written on the lamp's default now,
+    // not left on an engine from a choice since gone until the first
+    // machines' look, which may be late or time out.
+    if let (Some(later), Some(side)) = (set_up_later.as_ref(), lamp.as_ref())
+        && side.app_choice().is_none()
+    {
+        lamp_target_defaulted(&later.targets, side);
+    }
     let mut requests = 0u64;
     let mut busy = false;
     // Declared before `waits`, so dropped after it, but still before the
@@ -1762,6 +1882,13 @@ fn owner<C: Clock>(
             && Instant::now() >= targets_due
         {
             targets_due = Instant::now() + later.every;
+            // The app's choice gone while running (#7019, its file
+            // removed): the lamp's target on the default before it is read.
+            if let Some(side) = later.lamp.as_ref()
+                && app_choice_dropped(side, &engine_default)
+            {
+                lamp_target_defaulted(&later.targets, side);
+            }
             look_at_targets(&mut engine, &later.targets, &mut targets_seen, found);
             found.here = engine
                 .targets()
@@ -2896,6 +3023,50 @@ pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool) -> String {
             }
         ),
         Err(error) => format!("tasks: OpenClaw's settings not written: {error}"),
+    }
+}
+
+/// Whether the lamp's default agent `engine` is a gateway agent by its
+/// wrapper in `wrappers` ([`crate::skill_task::wrapper_is_gateway`]): the
+/// same data-driven check a run's hand-over makes, naming no engine. No
+/// default, or no wrapper there, is not.
+pub fn default_is_gateway_agent(engine: Option<EngineKind>, wrappers: &Path) -> bool {
+    engine
+        .and_then(|engine| std::fs::read_to_string(wrappers.join(engine.argument())).ok())
+        .is_some_and(|text| crate::skill_task::wrapper_is_gateway(&text))
+}
+
+/// At lamp-tasks' start: the fence ([`set_up_skill_run_fence`]) with
+/// `default_agent` (`LAMP_SKILL_DEFAULT_AGENT` and
+/// `LAMP_SKILL_GATEWAY_RUNS` both on) and the lamp's default
+/// agent `engine` a gateway agent ([`default_is_gateway_agent`]), its
+/// journal line; else nothing is written and `None`.
+pub fn skill_run_fence_at_start(
+    default_agent: bool,
+    engine: Option<EngineKind>,
+    wrappers: &Path,
+    state_dir: &Path,
+    home: &Path,
+) -> Option<String> {
+    (default_agent && default_is_gateway_agent(engine, wrappers))
+        .then(|| set_up_skill_run_fence(state_dir, home))
+}
+
+/// The fence of a skill's run on OpenClaw's gateway
+/// ([`crate::openclaw_config::write_skill_run_fence`]): the fence agent in
+/// `state_dir`'s config, its workspace in lamp-tasks' Harness project
+/// under `home`. Its approvals are set through the gateway before each
+/// run's turn (`crate::gateway_run`), never written here. One journal
+/// line.
+pub fn set_up_skill_run_fence(state_dir: &Path, home: &Path) -> String {
+    let project = home.join(MACHINES_PROJECT.trim_start_matches("~/"));
+    match crate::openclaw_config::write_skill_run_fence(state_dir, &project) {
+        Ok(changed) => format!(
+            "tasks: OpenClaw's fence for a skill's run ({}): {}",
+            crate::openclaw_config::SKILL_RUN_AGENT,
+            if changed { "written" } else { "unchanged" }
+        ),
+        Err(error) => format!("tasks: OpenClaw's fence for a skill's run not written: {error}"),
     }
 }
 
@@ -4194,6 +4365,22 @@ pub fn serve<C: Clock>(
             "{}",
             set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &side.home, skills)
         );
+        // #6685 step 4: with LAMP_SKILL_DEFAULT_AGENT and
+        // LAMP_SKILL_GATEWAY_RUNS on and the lamp's
+        // default agent a gateway agent (its wrapper's own data), the
+        // fence a skill's run on its warm gateway is held to. Otherwise
+        // (Hermes the default, say) nothing here is written; a default
+        // changed later is fenced at lamp-tasks' next start.
+        if let Some(line) = skill_run_fence_at_start(
+            std::env::var(crate::skill_task::DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on")
+                && crate::skill_task::gateway_runs_on(),
+            lamp_default(side),
+            Path::new(crate::skill_task::AGENT_WRAPPERS),
+            Path::new(OPENCLAW_STATE_DIR),
+            &side.home,
+        ) {
+            eprintln!("{line}");
+        }
     }
     let served = serve_with_adapter(config, clock, stop, move |session| {
         // The update hold (#5229), off unless set: held, or lifted on a
@@ -4836,6 +5023,60 @@ fn with_sign_in(
 #[cfg(test)]
 mod tests {
     use super::code_handed;
+
+    /// #6882 P2-3: the fence is written at start only with the switch on
+    /// and the lamp's default agent a gateway agent by its wrapper's data;
+    /// a Hermes (per-run) default, no wrapper, or no default writes none.
+    #[test]
+    fn the_fence_is_written_only_for_a_gateway_default_agent() {
+        use super::{EngineKind, skill_run_fence_at_start};
+        let dir = tempfile::tempdir().unwrap();
+        let wrappers = dir.path().join("bin");
+        let state = dir.path().join("state");
+        let home = dir.path().join("home");
+        std::fs::create_dir_all(&wrappers).unwrap();
+        let openclaw_rs = include_str!("../../update/src/openclaw_install.rs");
+        let between = |from: &str| {
+            openclaw_rs
+                .split_once(from)
+                .and_then(|(_, rest)| rest.split_once("\"#;"))
+                .unwrap()
+                .0
+                .to_owned()
+        };
+        let own = between("pub const WRAPPER_TEXT: &str = r#\"");
+        let data = between("pub const GATEWAY_DATA: &str = r#\"");
+        let gateway = format!(
+            "#!/bin/sh\n{}{data}{}",
+            crate::gateway_run::GATEWAY_MARK,
+            own.strip_prefix("#!/bin/sh\n").unwrap()
+        );
+        std::fs::write(wrappers.join("openclaw"), &gateway).unwrap();
+        let hermes = format!(
+            "#!/bin/sh\n{}E=hermes\n{}",
+            crate::skill_task::ONE_PATH_MARK,
+            crate::skill_task::WRAPPER_RUN_LINES.concat()
+        );
+        std::fs::write(wrappers.join("hermes"), hermes).unwrap();
+        let config = state.join(crate::openclaw_config::CONFIG_FILE);
+        let at = |on, engine| skill_run_fence_at_start(on, engine, &wrappers, &state, &home);
+        for (on, engine) in [
+            (true, Some(EngineKind::Hermes)),
+            (true, Some(EngineKind::Claude)),
+            (true, None),
+            (false, Some(EngineKind::Openclaw)),
+        ] {
+            assert_eq!(at(on, engine), None, "{on} {engine:?}");
+            assert!(!config.exists(), "{on} {engine:?}");
+        }
+        let said = at(true, Some(EngineKind::Openclaw)).unwrap();
+        assert!(said.contains("written"), "{said}");
+        let text = std::fs::read_to_string(&config).unwrap();
+        assert!(
+            text.contains(crate::openclaw_config::SKILL_RUN_AGENT),
+            "{text}"
+        );
+    }
 
     /// #5488: `status` says Harness's sign-in once it was read, and nothing
     /// else changes.
@@ -5927,7 +6168,9 @@ mod tests {
         // The build's default (the switches' order) first, then Harness's.
         let side = LampSide::with_order(PathBuf::new(), vec![Openclaw, Hermes]);
         assert_eq!(lamp_order(&side), [Openclaw, Hermes], "before a look");
-        assert_eq!(lamp_default(&side), None, "the targets file's, as before");
+        // #7019: the build's default before a look, never the targets
+        // file's.
+        assert_eq!(lamp_default(&side), Some(Openclaw), "before a look");
         *side.reported.lock().unwrap() = Some(reported.clone());
         assert_eq!(lamp_order(&side), [Openclaw, Codex, Hermes, Claude]);
         assert_eq!(lamp_default(&side), Some(Openclaw));
@@ -6053,6 +6296,77 @@ mod tests {
         );
         assert!(targets["lamp"].validate().is_ok());
         assert_eq!(targets["office"].engine, EngineKind::Claude);
+    }
+
+    /// #7019 (lamp-52e6, 10:35): the first look at the machines timed
+    /// out, so nothing is known of the lamp's engines and nothing is
+    /// reported. The default is still the build's, Hermes, never the
+    /// targets file's OpenClaw.
+    #[test]
+    fn a_first_look_that_times_out_leaves_the_builds_default_hermes() {
+        let side = LampSide::new(PathBuf::new());
+        assert_eq!(side.app_choice(), None);
+        let listed = [
+            machine('a', "lamp", true),
+            machine('b', "Office iMac", false),
+        ];
+        // The look timed out: no engines known for any computer.
+        refresh_lamp_reported(&side, &Known::default(), &listed);
+        assert_eq!(side.reported(), None);
+        assert_eq!(lamp_default(&side), Some(EngineKind::Hermes));
+        assert_eq!(lamp_order(&side).first(), Some(&EngineKind::Hermes));
+    }
+
+    /// #7019 (b): when the app's choice goes (its file removed), the lamp
+    /// target's engine in the targets file is written as the lamp's
+    /// default, Hermes; the other targets are kept, the file stays this
+    /// part's own, and a file someone wrote by hand is left as it is.
+    #[test]
+    fn when_the_apps_choice_goes_the_lamp_targets_engine_is_rewritten_to_the_default() {
+        use EngineKind::{Claude, Hermes, Openclaw};
+        let dir = tempfile::tempdir().unwrap();
+        let targets = dir.path().join("targets.json");
+        let file = dir.path().join(ENGINE_DEFAULT_FILE);
+        let listed = [
+            machine('a', "lamp", true),
+            machine('b', "Office iMac", false),
+        ];
+        let lamp = "a".repeat(32);
+        let on = |engine| BTreeMap::from([(lamp.clone(), engine)]);
+        // The app chose OpenClaw, and the machines' look wrote the lamp on it.
+        let side = LampSide::new(dir.path().join("home"));
+        let openclaw = Request::AppEngineDefault {
+            engine: "openclaw".into(),
+        };
+        app_engine_default_operation(&openclaw, Some(&side), &file).unwrap();
+        write_targets_from_machines(&targets, &listed, Claude, &on(Openclaw)).unwrap();
+        assert_eq!(read_targets(&targets).unwrap()["lamp"].engine, Openclaw);
+        // Kept: nothing goes.
+        assert!(!app_choice_dropped(&side, &file));
+        assert_eq!(side.app_choice(), Some(Openclaw));
+        // The file removed: the choice goes, and the lamp's target is the
+        // default's.
+        fs::remove_file(&file).unwrap();
+        assert!(app_choice_dropped(&side, &file));
+        assert_eq!(side.app_choice(), None);
+        assert!(!app_choice_dropped(&side, &file), "gone once");
+        let written = lamp_target_to_default(&targets, &side).unwrap();
+        assert!(written.changed, "{}", written.said);
+        let now = read_targets(&targets).unwrap();
+        assert_eq!(now["lamp"].engine, Hermes);
+        assert_eq!(now["lamp"].machine_id, lamp);
+        assert_eq!(now["office"].engine, Claude);
+        // Again: unchanged.
+        assert!(!lamp_target_to_default(&targets, &side).unwrap().changed);
+        // Still this part's own: the machines write it again.
+        let again = write_targets_from_machines(&targets, &listed, Claude, &on(Openclaw)).unwrap();
+        assert!(again.changed, "{}", again.said);
+        // A targets file written by hand is never touched.
+        let hand = fs::read(&targets).unwrap();
+        let _ = fs::remove_file(written_mark(&targets));
+        let left = lamp_target_to_default(&targets, &side).unwrap();
+        assert!(!left.changed, "{}", left.said);
+        assert_eq!(fs::read(&targets).unwrap(), hand);
     }
 
     /// #6226: OpenClaw's settings at the part's start: merged into

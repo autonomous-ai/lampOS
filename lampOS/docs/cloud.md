@@ -21,6 +21,19 @@ against lamp-06c1.
   then the broker's TLS port; if TLS cannot be set up it does not connect,
   never falling back to a plain connection. Off unless set, until the
   backend's broker is shown taking it on a lamp.
+  **With it off, the broker's TLS port is never connected to**
+  (`online::port_for`): an account naming 8883 is reached on the plain port,
+  1883, and the account is kept as the backend gave it, with one line,
+  `the account names the broker's TLS port 8883 with LAMP_CLOUD_TLS off:
+  connecting to its plain port 1883, the account kept as it is`. On a test
+  lamp, 14 Nov, a rotated account named 8883 with TLS off: lamp-cloud spoke
+  plain MQTT to it, read the broker's TLS alert (`15 03 03 00 02 02 0a`) as
+  "Promised boundary crossed, contains 768 bytes", and never came back online
+  after a restart. A reply that can't be read as MQTT also has its first
+  bytes said once a start (`online::first_bytes`): an anonymous MQTT 5
+  CONNECT, no login, to the same plain port, and at most 8 bytes of its
+  answer as hex within 3 s, `the broker's HOST:PORT answers an anonymous
+  CONNECT with N bytes: …`, so the packet that tripped it is known.
   The keepalive is 60 s (V1 asks 65,535 s, which never notices a dead link).
   One connection, TCP to CONNACK, may take 10 s (`wss::CONNECT`).
   **Over WSS when TCP keeps failing (#6256, F9).** After 3 failed
@@ -146,7 +159,7 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` and `engines.default` with `LAMP_APP_ENGINES=on` too (#6240, #6492), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there, `monitor.set`/`monitor.get`/`monitor.link` with `LAMP_APP_MONITOR=on` and `LAMP_SETTINGS_CHANGE=on`, #5883), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `skills.secrets`/`skills.secret_set`/`skills.secret_unset` with `LAMP_SKILL_SECRETS=on` while `lamp-services`' admin socket is there, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` and `engines.default` with `LAMP_APP_ENGINES=on` too (#6240, #6492), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there, `monitor.set`/`monitor.get`/`monitor.link` with `LAMP_APP_MONITOR=on` and `LAMP_SETTINGS_CHANGE=on`, #5883), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `developer` | `{"camera": bool, "microphone": bool, "speaker": bool}` while lamp-control's admin socket is there (developer access on), else no field: whether a camera, microphone or speaker stream is usable on this lamp (wired, and for the microphone and the speaker the owner's `--microphone on` and `--speaker on`), asked of lamp-control (`{"features": true}`, "The developer door"). `true` means a stream is allowed, not that one starts now (the ears share their sound on demand). The app offers its grants screen only when the field is there and shows the `microphone` tick disabled while it is `false` (and, once it offers the `speaker` tick, that one while `speaker` is `false`); a lamp-control too old to say reads as all `false`, and one from before the speaker reads `speaker` as `false` (App Only's C, 11 Nov 2026) |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `onboarding_done_at` | when the lamp's setup walk ended, in Unix ms (#5812): the voice's `onboarding/pending` heartbeat's `done_at_unix_ms`, said whenever it is known, so an app that missed `onboarding.done` opens Skills on its page's open if it hasn't for that `at`. No field while unknown: a walk not ended, a lamp set up before it was dated, or the voice not running ("Setup done, told to the app" below) |
@@ -924,7 +937,10 @@ voice tells it.
 - **`skills.made`** (`{"request_id"}`, or `{}` for the newest): the app's
   own ask only, never a skill made by voice. `state` is `making`, `on` or
   `not_kept`, with `why` in plain words (the maker's, or "it couldn't be
-  put on: …"); `left_off` only for an ask from before #5977. Once kept:
+  put on: …"); `left_off` only for an ask from before #5977. A made skill
+  with code of its own said back at the lamp, whose spoken yes is awaited
+  now (#6307), is `not_kept` with `"awaits_yes": true` too, and turns `on`
+  once that yes puts it on; the field is absent when it wasn't said back. Once kept:
   `name`, `description`, `version`, `sha256` (what the helper put on) and
   `may_use`, the skills page's rows (`skills::may_use`). With no ask,
   `{"state": "none"}`. A skill made here is also told with `needs_link`,
@@ -1581,7 +1597,12 @@ is Backend3's.
    code), and so is one with any file but `skill.toml` and `SKILL.md`, or
    either longer than 8 KiB. A skill by its name on the lamp
    (`/var/lib/lampOS/skills`, core, from the Store or made) or pushed
-   (`/var/lib/lampOS/skills-dev`) is refused, never replaced.
+   (`/var/lib/lampOS/skills-dev`) is refused, never replaced. A made or
+   added skill removed since (by the app or `lamp-skills remove`) is
+   dropped from the kept ones first (`made_skill::drop_gone`, as a voice
+   make's name is), so the same file can be added again at once (lamp-9adf,
+   15 Nov 16:14: refused as "already on this lamp" 3 minutes after the app
+   removed it, until its record was dropped at 16:23).
 5. **Handed to the voice** on `/run/lampos-app-make/make.sock`:
    `{"upload": {"skill_md", "skill_toml"?}}`, waited for at most 25 s.
    `lamp-voice` holds it to a made skill's checks and its own, keeps it,
@@ -1634,11 +1655,13 @@ handed over once it is; the state file never naming the skill
 or holding its words, 0600), and
 `online::tests::a_skill_from_a_file_is_acked_starting_and_its_result_follows`.
 
-### Run by the lamp's agent (`LAMP_UPLOAD_TO_AGENT`, off)
+### Run by the lamp's agent (`LAMP_UPLOAD_TO_AGENT`, on in the product)
 
 The owner's ask (12 Nov): a `SKILL.md` uploaded from the app runs through
-the lamp's agent, as V1's did; the first builder's yes at 19:44, behind
-two switches, both off and set in no unit. With `LAMP_UPLOAD_TO_AGENT=on`
+the lamp's agent, as V1's did; the first builder's yes at 19:44. On in the
+product since 13 Nov (the owner's ruling: the upload flow goes via the
+agent), set in `lamp-cloud`, `lamp-voice`, `lamp-skills` and
+`lamp-skills-manage@`; `LAMP_TASK_NET` stays off. With `LAMP_UPLOAD_TO_AGENT=on`
 in `lamp-cloud`'s unit (`upload::AGENT_ENVIRONMENT`, `Uploads::to_agent`),
 a bare `SKILL.md` may be up to 64 KiB (`MOST_AGENT_BYTES`; past it,
 `failure` with "its SKILL.md is longer than 64 KiB") and goes to
@@ -1647,6 +1670,41 @@ the lamp's agent"). Its `success` carries `grants`, the task grants read
 from the file (`["light", "speak", "camera", "net"]` for a photo booth),
 null for any other skill. Off, a bare `SKILL.md` past 8 KiB is refused
 for its length as before. The file's words never reach the journal.
+
+### A skill's keys (`skills.secrets`, `skills.secret_set`, `skills.secret_unset`, `LAMP_SKILL_SECRETS`, on in the product)
+
+The first builder's ruling (12 Nov 19:44 on #6059): a file's keys go in
+through the app, never by voice (docs/skills.md, "Its keys, given in the
+app"). With `LAMP_SKILL_SECRETS=on` in `lamp-cloud`'s unit
+(`skill_secrets::product`; on in the product's), with the skills page,
+three kinds are taken over the lamp's own account channel and answered inline (`success` with
+the data, or `failure` with the `error` below); `can` names them only
+while `lamp-services`' admin socket is there. An agent skill's upload
+`success` carries `secrets`, the names its file needs, when lamp-voice
+says them.
+
+| Kind | `data` | `success` data |
+|---|---|---|
+| `skills.secrets` | `{"skill"}` | `{"skill", "needed", "set"}`: the names the skill's `skill.toml` needs, and which of them have a value kept, in that order; never a value |
+| `skills.secret_set` | `{"skill", "name", "value"}` | the same, after: `name` one of `needed`, `value` 1 to 4096 bytes with no control character; set again replaces it |
+| `skills.secret_unset` | `{"skill", "name"}` | the same, after; a name not set is no failure |
+
+The errors, exact: `the request has fields it doesn't take`; `skill must
+be a skill's name: 1 to 64 lowercase letters, digits and hyphens`; `no
+skill of that name is on this lamp`; `that skill doesn't need a key of
+that name`; `the value must be 1 to 4096 bytes on one line`; `the key
+could not be kept`; `the key could not be removed`; `the lamp's services
+are not running`; `the lamp's services did not answer in time` (5 s);
+and, off, `not on this lamp: <kind>`. The app polls `skills.secrets`
+after an upload (whose own answer it sees only as pending) and reads `no
+skill of that name is on this lamp` as not there yet, so those words stay
+exactly as they are. `lamp-cloud` keeps nothing: each
+kind is one line to `lamp-services`' admin socket (`op` `skill_secrets`,
+`skill_secret_set`, `skill_secret_unset`), the value in that line alone,
+never a reply, an error or a journal line. `skills.remove` drops the
+removed skill's keys there too (`skill_secrets_drop`), and the services'
+wipe takes them all. Tests: `skill_secrets::tests`,
+`answer::tests::a_skills_keys_are_kinds_only_with_their_switch_and_the_page`.
 
 ## Health and crash reports (#1683, step 1)
 
