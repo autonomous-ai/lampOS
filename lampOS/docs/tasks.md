@@ -7074,13 +7074,19 @@ it is a 3 × 140-character summary with no tool names, read every 30 s.
     once a second.
   - Nothing at or before that `seq` is read for it, even for a task handed
     over in an earlier boot.
-  - When a newer task starts on the same session, the older task reads no
-    further than the newer one's start, so a step goes out under one task
-    only.
+  - Each task is kept with its Harness agent id. When a newer task starts
+    on the same agent, the older task reads no further than the newer
+    one's start, so a step goes out under one task only.
+    - This holds even when the older task began before OpenClaw made the
+      session: it is bounded at the session's last event when the newer
+      one starts, or at nothing (-1) if there is still no session.
+    - An older task on another session of that agent keeps reading its
+      own session, and never follows the agent to a new one.
   - A session that first appears after the task is watched is the task's
-    own, and is read from its first event.
-  - If the session moves to another id while the task is watched, the new
-    id is read only after its last event at that moment.
+    own, and is read from its first event, up to a newer task's start.
+  - If the session moves to another id while the task is the newest on its
+    agent, the new id is read only after its last event at that moment.
+    Its bound is cleared only then.
   - The cost: events written before the task is first watched (within a
     turn of the hand-over) are not shown.
 - **What becomes a step:** `event_json` is read as OpenClaw writes it
@@ -7111,19 +7117,22 @@ it is a 3 × 140-character summary with no tool names, read every 30 s.
   C build, so the ARM64 cross-build is unchanged).
   - It is decoded as it streams and stops at 64 KiB + 1 byte, so it never
     decodes more.
+  - Its frame header is read first. A frame that asks for a window past
+    1 MiB is skipped and counted, because the decoder would reserve the
+    whole window (up to 100 MiB) before decoding a byte.
   - A row that would decode past 64 KiB, or a corrupt one, is skipped and
     counted. A compressed blob over 256 KiB is skipped and counted without
     being decoded.
   - The journal says so once, and gives the count when the task leaves the
     watch.
-- **Never a skill's:** `tasks/step` is in `lamp-skills`' `NEVER_READ`. A
+- **Never a skill's:** `tasks/step` (with `voice/decision`) is in `lamp-skills`' `NEVER_READ`. A
   skill that lists it in `[permissions] topics` is refused at load,
   whatever else it may do ([skills.md](skills.md)).
 - **Bounds:**
   - Each task puts at most 50 step numbers on the bus. Later steps are
     dropped and counted, and the journal gives the count when the task
     leaves the watch.
-  - Each read (once a second) takes at most 200 events and 256 KiB of event text, decoded or not, for every task together; the rest wait for the next read. The first event of a read is taken whatever its size.
+  - Each read (once a second) takes at most 200 events and 256 KiB of event text, decoded or not, for every task together. The rest wait for the next read, and the first event of a read is taken whatever its size. Sizes are read first; an event's text is fetched from SQLite only once it fits.
   - An event over 256 KiB is skipped unparsed.
   - At most 64 calls are kept waiting for their result.
 - **Nothing kept:** nothing is written, and the database is never opened
@@ -7166,6 +7175,9 @@ Tests (`crates/tasks/src/steps/tests.rs`):
 - `a_busy_database_mid_task_reads_nothing_and_resets_nothing`
 - `a_read_takes_at_most_200_events`
 - `a_read_takes_at_most_256_kib`
+- `a_task_begun_before_its_session_is_bounded_by_the_next`
+- `two_tasks_begun_before_their_session_give_it_to_the_newer`
+- `a_compressed_event_asking_a_large_window_is_skipped`
 - `the_session_is_harness_named_one`
 - `a_link_or_another_schema_is_never_read`
 - `the_root_is_the_wrappers_state_unless_set`
