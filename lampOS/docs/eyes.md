@@ -1473,7 +1473,9 @@ With the switch:
   first letter capital ("Jane"; `known_faces::letters_as_word`), so the
   eyes keep, and the lamp says back and greets them by, a name, never its
   letters (lamp-3e83, #5564: "Jane or J-A-N-E?"). Two letters ("A J",
-  "T.J.") may be initials and stay as given. The model's words say a
+  "T.J.") may be initials and stay as given, except on a rename right
+  after the lamp asked for a spelling with `LAMP_NAME_LEARN_FIX=on` (#7331),
+  where "A l" is "Al". The model's words say a
   spelled name back as a name only, never as letters nor as a choice
   between the name and its spelling (`SAY_IT_BACK`, `NOT_HEARD`,
   `NOT_HEARD_SPELLED`, `NEAR_TO`); `NOT_HEARD_SAY_AGAIN` says no name back.
@@ -1603,7 +1605,13 @@ With the switch:
     There must be as many spelled runs as the model's name has words.
     Letters said without that ask ("I work at I B M", "I'm from the U S")
     are no name, and the name goes through the read-back above (El's HOLD
-    on #5159). Letters that disagree with a count
+    on #5159). With `LAMP_NAME_LEARN_FIX=on` (off unless set, #7331) a
+    rename (`replace`) takes the letters the same way: spelled in the turn
+    in hand right after the lamp asked for a spelling, they are the name
+    and its yes, two letters joined as a word ("A d a", "A, d, a" and
+    "A l" send `{"remember":"Ada","replace":true}` and "Al"); on lamp-52e6
+    such a rename was refused as not heard or not agreed
+    (`known_faces::tests::a_spelled_short_name_is_heard_on_a_rename`). Letters that disagree with a count
     they gave ("four letters", five spelled) are refused, as above.
 
   Past setup, and on the speaker's own line (`LAMP_REMEMBER_SPEAKER`), the
@@ -1706,7 +1714,17 @@ With the switch:
     model call, so every name and owner check still applies, and the
     model is told the result. Any other turn drops it: a no, another name,
     another face seen saying the yes (told), a carried line not read as
-    the asker's, another session, a new save call. A line carried into the
+    the asker's, another session, a new save call. With
+    `LAMP_NAME_LEARN_FIX=on` (off unless set, #7331), one turn that is no
+    yes only because the question was cut before its name was heard (the
+    thread holds the question's answer as the one cut last, and what played
+    of it does not say A, `LAMP_SAID_AS_HEARD`; `Thread::cut_played`) keeps
+    the hold instead, once, and the model is told the question was not
+    heard and to ask it again (`held_rename::ask_again_note`); the 60 s and
+    every other guard stand, and nothing is renamed without the yes to the
+    question asked again. On lamp-52e6 a line began over the question,
+    none of it played, and the rename was dropped in silence
+    (`a_rename_question_cut_before_its_name_keeps_the_hold`). A line carried into the
     asker's conversation going on and read as theirs
     (`LAMP_CONVERSATION_CARRIED_MEMORY`, `ScopeLease::read_carried`: their
     own face the one face in view, none seen saying it, no other voice

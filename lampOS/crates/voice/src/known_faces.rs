@@ -55,6 +55,10 @@ pub struct FaceSwitches {
     /// ([`rename_agreed`]), not by [`agreed_to`]'s word list
     /// ([`RENAME_YES_ENVIRONMENT`], #5485).
     pub rename_yes: bool,
+    /// With names checked, a name spelled after the lamp asked for it is
+    /// taken on a rename as at setup, two letters joined as a word
+    /// ([`NAME_LEARN_FIX_ENVIRONMENT`], #7331).
+    pub name_learn_fix: bool,
 }
 
 /// A refused face request tells the model the face record as it stands
@@ -81,6 +85,19 @@ pub const RENAME_YES_ENVIRONMENT: &str = "LAMP_NAMES_RENAME_YES";
 /// Whether [`RENAME_YES_ENVIRONMENT`] is on.
 pub fn rename_yes_on() -> bool {
     std::env::var(RENAME_YES_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// The owner's name learned on the paths that lost it on lamp-52e6 (#7331):
+/// a rename question cut before its name was heard is asked again
+/// (`second_provider::held_rename`), a name given while nobody is known
+/// goes to the face save (`remember::needs_face`), and a name spelled after
+/// the lamp asked for it is taken on a rename too, two letters joined
+/// ([`run_switched`]). `on` only; off unless set.
+pub const NAME_LEARN_FIX_ENVIRONMENT: &str = "LAMP_NAME_LEARN_FIX";
+
+/// Whether [`NAME_LEARN_FIX_ENVIRONMENT`] is exactly `on`.
+pub fn name_learn_fix_on() -> bool {
+    std::env::var(NAME_LEARN_FIX_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
 /// The exchanges before the turn in hand that a name may have been said
@@ -1111,6 +1128,13 @@ fn spelled_name(said: &str) -> Option<String> {
 /// "T.J."). Nobody calls a person by the spelling of their name: on
 /// lamp-3e83 a spelled name came back as "Jane or J-A-N-E?" (#5564).
 pub(crate) fn letters_as_word(name: &str) -> Option<String> {
+    letters_as_word_of(name, 3)
+}
+
+/// [`letters_as_word`] of `least` letters or more: two once the lamp asked
+/// for a spelling (`LAMP_NAME_LEARN_FIX`, #7331: "A l" is "Al" then, never
+/// initials).
+fn letters_as_word_of(name: &str, least: usize) -> Option<String> {
     let words = folded_words(name);
     let only_letters = !words.is_empty()
         && words
@@ -1120,7 +1144,7 @@ pub(crate) fn letters_as_word(name: &str) -> Option<String> {
         .iter()
         .map(|run| run.chars().count())
         .sum();
-    (only_letters && letters >= 3)
+    (only_letters && letters >= least)
         .then(|| spelled_name(name))
         .flatten()
 }
@@ -1876,6 +1900,7 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
         at_setup: false,
         record: false,
         rename_yes: false,
+        name_learn_fix: false,
     })
 }
 
@@ -1989,6 +2014,7 @@ pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
             at_setup: false,
             record: false,
             rename_yes: false,
+            name_learn_fix: false,
         },
         None,
         None,
@@ -2435,6 +2461,7 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
             at_setup: false,
             record: false,
             rename_yes: false,
+            name_learn_fix: false,
         },
         said,
         None,
@@ -2483,16 +2510,22 @@ fn run_switched(
     // A name written as its letters is kept, and so said back, as the word
     // they make: nobody calls a person by the spelling of their name
     // (lamp-3e83, #5564: "Jane or J-A-N-E?").
+    // With `LAMP_NAME_LEARN_FIX` (#7331), two letters too once the lamp
+    // asked for a spelling.
+    let replacing = call.args.get("replace").and_then(Value::as_bool) == Some(true);
+    let spelled_rename = checked && switches.name_learn_fix && replacing && spelling_asked(said);
+    let least = if spelled_rename { 2 } else { 3 };
     let joined = (checked && call.name == REMEMBER)
-        .then(|| letters_as_word(name))
+        .then(|| letters_as_word_of(name, least))
         .flatten();
     let name = joined.as_deref().unwrap_or(name);
     let setup = checked && switches.at_setup && call.name == REMEMBER;
     // At setup, a name not heard is taken as they spelled it in the turn in
     // hand: the letters are their own words, not the model's guess (#5140
     // row 6, lamp-0c4e: a misheard name never passed this check).
+    // With `LAMP_NAME_LEARN_FIX`, so is a rename's (#7331): on lamp-52e6 a
+    // rename spelled after the lamp asked for it was NOT_HEARD.
     let spelled;
-    let replacing = call.args.get("replace").and_then(Value::as_bool) == Some(true);
     let heard = if checked && switches.rename_yes && replacing {
         heard_for_rename(name, said)
     } else {
@@ -2503,7 +2536,7 @@ fn run_switched(
         // as the model's name has words: "L O R E N, and I'm at I B M" is
         // no one name (El's P2 on #5159).
         let words = folded_words(name).len();
-        match (setup && spelling_asked(said))
+        match ((setup && spelling_asked(said)) || spelled_rename)
             .then(|| spelled_name(&said.this))
             .flatten()
             .filter(|letters| letters.split_whitespace().count() == words)
@@ -2535,11 +2568,15 @@ fn run_switched(
     // the person was still correcting it).
     // With `LAMP_NAMES_RENAME_YES` the yes is judged by its guards, not a
     // word list (#5485, lamp-29e7).
-    let agreed = if switches.rename_yes {
-        rename_agreed(name, said)
-    } else {
-        agreed_to(name, said)
-    };
+    // With `LAMP_NAME_LEARN_FIX`, a rename spelled by them in the turn in
+    // hand after the lamp asked for a spelling is their yes, as at setup:
+    // spelling is how a person fixes a misheard name (#7331).
+    let agreed = (spelled_rename && spelled_by_them(name, &said.this))
+        || if switches.rename_yes {
+            rename_agreed(name, said)
+        } else {
+            agreed_to(name, said)
+        };
     if checked && call.name == REMEMBER && replace && !agreed {
         return (json!({"error": NOT_AGREED}), true);
     }
@@ -4085,6 +4122,7 @@ mod tests {
                 at_setup: false,
                 record: false,
                 rename_yes: false,
+                name_learn_fix: false,
             })
             .into_iter()
             .map(|tool| tool.name)
@@ -5168,6 +5206,7 @@ mod tests {
             at_setup: false,
             record: false,
             rename_yes: false,
+            name_learn_fix: false,
         };
         let (told, _) = run_switched(
             &socket,
@@ -5789,6 +5828,81 @@ mod tests {
         assert_eq!(
             asked.join().unwrap(),
             [json!({"remember": "Loren", "one_face": true, "replace": false})]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// #7331 (lamp-52e6, 15 Nov): a rename spelled after the lamp asked for
+    /// a spelling was refused, and a name of two letters reached the eyes
+    /// as its letters. With `LAMP_NAME_LEARN_FIX`, the letters spelled in
+    /// the turn in hand after a spell ask are the name and its yes, as at
+    /// setup, two letters joined as a word; off, refused here as before.
+    #[test]
+    fn a_spelled_short_name_is_heard_on_a_rename() {
+        let switches = |name_learn_fix: bool| FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix,
+            ..FaceSwitches::default()
+        };
+        let rename = |name: &str| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": name, "replace": true}),
+        };
+        let spelled = |asked: &str, this: &str| Said {
+            this: this.into(),
+            before: vec![("Please call me something else.".into(), asked.into())],
+        };
+        let cases = [
+            ("How do you spell it?", "A d a", "A d a", "Ada"),
+            ("How do you spell it?", "A, d, a", "Ada", "Ada"),
+            ("Could you spell it for me?", "A l", "A l", "Al"),
+            ("Could you spell it for me?", "A, l.", "Al", "Al"),
+        ];
+        let (socket, asked) = eyes(
+            cases
+                .iter()
+                .map(|(_, _, _, word)| json!({"remembered": word, "replaced": ["Tove"]}))
+                .collect(),
+        );
+        for (ask, this, name, _) in cases {
+            let said = spelled(ask, this);
+            let (off, _) = run_switched(
+                &socket,
+                &rename(name),
+                switches(false),
+                &said,
+                None,
+                &mut None,
+            );
+            assert!(refused_here(&off), "off, {this}: {off}");
+            let (on, _) = run_switched(
+                &socket,
+                &rename(name),
+                switches(true),
+                &said,
+                None,
+                &mut None,
+            );
+            assert_eq!(on["ok"], true, "on, {this}: {on}");
+        }
+        // Two letters with no spell ask stay initials, and no yes.
+        let (initials, _) = run_switched(
+            &socket,
+            &rename("A l"),
+            switches(true),
+            &spelled("Sure, what should I call you?", "A l"),
+            None,
+            &mut None,
+        );
+        assert!(refused_here(&initials), "{initials}");
+        assert_eq!(
+            asked.join().unwrap(),
+            cases
+                .iter()
+                .map(|(_, _, _, word)| json!({"remember": word, "one_face": true, "replace": true}))
+                .collect::<Vec<_>>()
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
