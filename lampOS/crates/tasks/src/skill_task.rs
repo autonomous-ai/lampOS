@@ -2952,11 +2952,11 @@ impl Runner for HarnessRunner {
         // No Harness daemon here (`harness_not_running`, #7275): started,
         // after any start lamp-tasks already has under way, and the run
         // handed over once more; never a third `new` ([`DaemonOnce`]).
-        let mut outcome = DaemonOnce::run(
+        let (mut outcome, mut named) = DaemonOnce::run(
             DaemonGate::shared(),
             &launch.name,
-            || cli.launch(&launch),
-            |outcome| matches!(outcome, LaunchOutcome::NotSent { code } if code == HARNESS_NOT_RUNNING),
+            || cli.launch_naming(&launch),
+            |(outcome, _)| matches!(outcome, LaunchOutcome::NotSent { code } if code == HARNESS_NOT_RUNNING),
             || cli.start_daemon(),
         );
         // Asked of Harness: from here the agent may have begun, unless
@@ -2980,7 +2980,7 @@ impl Runner for HarnessRunner {
                         "[lamp-tasks] skill task {}: Harness didn't make the fixed write's run (new_failed); it answers now with nothing in the run's folder, so it is asked once more",
                         run.run
                     );
-                    outcome = cli.launch(&launch);
+                    (outcome, named) = cli.launch_naming(&launch);
                     if unmade(&outcome) || matches!(outcome, LaunchOutcome::NotSent { .. }) {
                         run.not_made.store(true, Ordering::Release);
                     }
@@ -3012,6 +3012,11 @@ impl Runner for HarnessRunner {
                 return Err("Harness didn't start the run at once, so it was given up".into());
             }
             LaunchOutcome::NotSent { code } | LaunchOutcome::Uncertain { code } => {
+                // #7171: an uncertain `new` whose reply still named the
+                // run's agent (a `machineId` not the lamp's, an `existing`
+                // one) may have started it, so the guard closes it as on
+                // every other end: the token ended, then `close --now`.
+                started.agent = named;
                 return Err(format!("Harness didn't start the run ({code})"));
             }
         };
@@ -5632,7 +5637,7 @@ mod tests {
             .and_then(|(_, rest)| rest.split_once("\n}\n"))
             .unwrap()
             .0;
-        assert!(run.contains("cli.launch(&launch)"));
+        assert!(run.contains("cli.launch_naming(&launch)"));
         for named in [
             "GatewayRunner",
             "gateway_run",
