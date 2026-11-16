@@ -1146,6 +1146,26 @@ pub fn kept_asleep(bus: &Bus) -> Option<&'static str> {
         .then_some("the privacy switch is closed")
 }
 
+/// Why news refused while muted is not held for the lamp to be free
+/// ([`crate::say_held`]), or `None`: the person's privacy, the voice muted
+/// by them (or put to sleep) or the privacy switch read closed on
+/// `voice/privacy`, the newest word on each, however old. Unlike
+/// [`kept_asleep`], a reading not known (none yet, or a voice starting with
+/// the switch unread) is not privacy: a restart's wait holds the news.
+pub fn private_for_news(bus: &Bus) -> Option<&'static str> {
+    let latest = |topic| bus.latest(topic).ok().flatten();
+    if latest(VoiceMute::TOPIC)
+        .and_then(|message| message.parse::<VoiceMute>().ok())
+        .is_some_and(|mute| mute.check().is_ok() && mute.muted)
+    {
+        return Some("the voice is muted");
+    }
+    latest(MicrophonePrivacy::TOPIC)
+        .and_then(|message| message.parse::<serde_json::Value>().ok())
+        .is_some_and(|privacy| privacy["physical_muted"] == serde_json::json!(true))
+        .then_some("the privacy switch is closed")
+}
+
 /// Why another program's call is not served now (#6128), or `None`: only a
 /// fresh lease that permits capture with the switch read open (or a lamp
 /// with no slide), and the voice neither muted nor put to sleep. Unlike
