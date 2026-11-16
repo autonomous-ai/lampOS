@@ -19,8 +19,16 @@ against lamp-06c1.
   With `LAMP_CLOUD_TLS=on` the connection is TLS (1.2 and 1.3, the webpki
   roots, as the backend's ping already is), on the account's port, which is
   then the broker's TLS port; if TLS cannot be set up it does not connect,
-  never falling back to a plain connection. Off unless set, until the
-  backend's broker is shown taking it on a lamp.
+  never falling back to a plain connection. On in the product since #6854.
+  **With it on, the broker's plain port is never connected to**
+  (`online::port_for`, #7304): an account still naming 1883 is reached on
+  the TLS port, 8883, on the same host, and the account is kept as the
+  backend gave it, with one line, `the account names the broker's plain
+  port 1883 with LAMP_CLOUD_TLS on: connecting to its TLS port 8883, the
+  account kept as it is`. The backend hands an account 8883 only past a
+  release gate (Backend2, #7304, 16 Nov); the gate decides only what the
+  ping's reply offers, not who may sign in on 8883, so a lamp that moves by
+  itself never waits on it.
   **With it off, the broker's TLS port is never connected to**
   (`online::port_for`): an account naming 8883 is reached on the plain port,
   1883, and the account is kept as the backend gave it, with one line,

@@ -232,7 +232,7 @@ holds = ["let's redo the setup"]
 [[ask]]
 said = "How do I connect you to a new Wi-Fi?"
 topic = "setup"
-holds = ["Add Lamp", "Changing my Wi-Fi from the app isn't there yet"]
+holds = ["Add Lamp", "You can change my Wi-Fi from the app", "I go back to the old one"]
 
 [[ask]]
 said = "Which website sells you?"

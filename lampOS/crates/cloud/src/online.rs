@@ -113,26 +113,38 @@ pub const PLAIN_PORT: u16 = 1883;
 pub const TLS_PORT: u16 = 8883;
 
 /// The port the lamp connects to for an account's `port`: with TLS off,
-/// never the broker's TLS port but its plain one; else as given. On
+/// never the broker's TLS port but its plain one; with TLS on, never the
+/// plain port but the TLS one, on the same host; else as given. On
 /// Fourteen's lamp, 14 Nov, a rotated account named 8883 with TLS off: the
 /// lamp spoke plain MQTT to it, read the broker's TLS alert as "Promised
-/// boundary crossed, contains 768 bytes" and never came back online.
+/// boundary crossed, contains 768 bytes" and never came back online. The
+/// mirror (#7304, 16 Nov): with TLS on, an account still naming 1883 got
+/// TLS on 1883 and no link, and the backend hands 8883 out only past a
+/// release gate, which a lamp that moves by itself never passes.
 pub fn port_for(port: u16, tls: bool) -> u16 {
-    if !tls && port == TLS_PORT {
-        PLAIN_PORT
-    } else {
-        port
+    match (tls, port) {
+        (false, TLS_PORT) => PLAIN_PORT,
+        (true, PLAIN_PORT) => TLS_PORT,
+        _ => port,
     }
 }
 
 /// The one line said when [`port_for`] moves `account` off its port: the
 /// account itself is kept as the backend gave it.
 pub fn plain_port_line(account: &Account, tls: bool) -> Option<String> {
-    (port_for(account.mqtt_port, tls) != account.mqtt_port).then(|| {
-        format!(
-            "the account names the broker's TLS port {TLS_PORT} with {TLS_ENVIRONMENT} off: \
-             connecting to its plain port {PLAIN_PORT}, the account kept as it is"
-        )
+    let port = port_for(account.mqtt_port, tls);
+    (port != account.mqtt_port).then(|| {
+        if tls {
+            format!(
+                "the account names the broker's plain port {PLAIN_PORT} with {TLS_ENVIRONMENT} on: \
+                 connecting to its TLS port {TLS_PORT}, the account kept as it is"
+            )
+        } else {
+            format!(
+                "the account names the broker's TLS port {TLS_PORT} with {TLS_ENVIRONMENT} off: \
+                 connecting to its plain port {PLAIN_PORT}, the account kept as it is"
+            )
+        }
     })
 }
 
@@ -1968,7 +1980,7 @@ mod tests {
     /// Fourteen's lamp, and the broker's TLS alert (`15 03 03 00 02 02 0a`) was
     /// read as "Promised boundary crossed, contains 768 bytes"; it never came
     /// back online. With TLS off it never connects to the TLS port: the plain
-    /// one, the account as it is. With TLS on, or any other port, as given.
+    /// one, the account as it is. With TLS on, the TLS port; any other, as given.
     #[test]
     fn with_tls_off_the_broker_s_tls_port_is_never_connected_to() {
         assert_eq!(port_for(TLS_PORT, false), PLAIN_PORT);
@@ -1991,6 +2003,34 @@ mod tests {
         );
         assert_eq!(plain_port_line(&rotated, true), None);
         assert_eq!(plain_port_line(&account(PLAIN_PORT), false), None);
+    }
+
+    /// The first builder and Reviewer-lead on #7304, 16 Nov: with
+    /// `LAMP_CLOUD_TLS` on, an account still naming the plain port would get
+    /// TLS on 1883 and no link, and the backend hands 8883 out only past a
+    /// release gate. With TLS on it is reached on the broker's TLS port, the
+    /// same host, the account kept; with TLS off, or any other port, as given.
+    #[test]
+    fn with_tls_on_the_broker_s_plain_port_is_never_connected_to() {
+        assert_eq!(port_for(PLAIN_PORT, true), TLS_PORT);
+        assert_eq!(port_for(PLAIN_PORT, false), PLAIN_PORT);
+        assert_eq!(port_for(1884, true), 1884);
+        let old = account(PLAIN_PORT);
+        let tls = options_with(&old, true).unwrap();
+        assert_eq!(tls.broker_address(), ("127.0.0.1".to_owned(), TLS_PORT));
+        assert!(matches!(tls.transport(), rumqttc::Transport::Tls(_)));
+        assert_eq!(old.mqtt_port, PLAIN_PORT, "the account is kept");
+        let plain = options_with(&old, false).unwrap();
+        assert_eq!(plain.broker_address(), ("127.0.0.1".to_owned(), PLAIN_PORT));
+        assert_eq!(
+            plain_port_line(&old, true).as_deref(),
+            Some(
+                "the account names the broker's plain port 1883 with LAMP_CLOUD_TLS on: \
+                 connecting to its TLS port 8883, the account kept as it is"
+            )
+        );
+        assert_eq!(plain_port_line(&old, false), None);
+        assert_eq!(plain_port_line(&account(TLS_PORT), true), None);
     }
 
     /// Backend, 14 Nov 13:5x: before a reply that can't be read as MQTT, the
