@@ -889,6 +889,10 @@ mod tests {
     /// counts its runs in `<dir>/runs` and exits 0 from run `ok_from` on
     /// (never with `None`), as a Gateway that serves `exec.approvals.get`
     /// only once its startup has finished.
+    ///
+    /// The count is written to a side file and renamed over `runs`: a read
+    /// killed at the bound mid-write (between `>`'s truncation and the
+    /// echo) would otherwise leave `runs` empty for good.
     fn read_script(dir: &Path, ok_from: Option<u32>) -> (Vec<String>, PathBuf) {
         let runs = dir.join("runs");
         let script = dir.join("approvals");
@@ -896,7 +900,7 @@ mod tests {
         std::fs::write(
             &script,
             format!(
-                "#!/bin/sh\nn=$(($(cat {runs} 2>/dev/null || echo 0) + 1))\necho $n > {runs}\n[ $n -ge {from} ]\n",
+                "#!/bin/sh\nn=$(($(cat {runs} 2>/dev/null || echo 0) + 1))\necho $n > {runs}.new && mv -f {runs}.new {runs}\n[ $n -ge {from} ]\n",
                 runs = runs.display()
             ),
         )
