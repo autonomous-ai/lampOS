@@ -3063,8 +3063,8 @@ app that asks anyway is told `developer access is off on this lamp`.
   the code is shown, checks the pin outside the broker; it does not protect
   the pairing code itself. Only the lamp's own account channel may ask
   (`online::commanded`), and that channel is plain too. Broker TLS
-  (`LAMP_CLOUD_TLS`) closes the rest. Until it is on this is an accepted risk,
-  and the pairing is never described as end to end.
+  (`LAMP_CLOUD_TLS`, on in the product since #6854) closes the rest; with it
+  off this is an accepted risk, and the pairing is never described as end to end.
 
 ## The dev monitor (#5883, `monitor.set`, `monitor.get`, `monitor.link`)
 
