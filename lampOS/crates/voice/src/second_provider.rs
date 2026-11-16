@@ -1926,6 +1926,9 @@ struct Shared {
     /// work, whose round 1 answered in words alone is asked again once
     /// ([`Engine::catching_named_agents`], #6547 (1b)).
     named_agent: Option<NamedAgent>,
+    /// Whether such a line is handed to that agent in code as round 1
+    /// ([`Engine::handing_named_agents_the_line`], #7269).
+    named_agent_takes_line: bool,
     /// The requests so asked again: once each, never a loop.
     named_asked_again: crate::agent_tasks::AskedAgain,
     /// A test's copy of each named-ask journal line ([`Shared::named_ask_said`]).
@@ -4767,6 +4770,7 @@ impl Engine {
                 skill_named: None,
                 skill_asks: None,
                 named_agent: None,
+                named_agent_takes_line: false,
                 named_asked_again: crate::agent_tasks::AskedAgain::default(),
                 #[cfg(test)]
                 named_ask_journal: None,
@@ -6562,6 +6566,23 @@ impl Engine {
     pub fn catching_named_agents(mut self, named: NamedAgent) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.named_agent = Some(named);
+        }
+        self
+    }
+
+    /// With [`Engine::catching_named_agents`] (`LAMP_NAMED_AGENT_TAKES_LINE`,
+    /// #7269): a spoken line whose own words name an agent for the work has
+    /// round 1 called in code, asked of no chat: `start_agent_task` with the
+    /// heard words as the task and nothing else, as the code's hand-over
+    /// after an ask again makes it (#6547 cause 3). The model never gets a
+    /// round 1 to answer it with the voice's own tools ("Hey Lamp, OpenClaw,
+    /// look up the weather in Hanoi this weekend" answered by `weather` on
+    /// lamp-9b34); round 2 says the prepared task back for a yes. Never on a
+    /// line that named a skill, whose round 1 is that skill's call. Before
+    /// any turn only.
+    pub fn handing_named_agents_the_line(mut self) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.named_agent_takes_line = true;
         }
         self
     }
@@ -16588,6 +16609,27 @@ async fn answer(
                     eprintln!("lamp-voice second: request {request}: {error}");
                 }
             }));
+        }
+        // `LAMP_NAMED_AGENT_TAKES_LINE` (#7269): the line's own words named
+        // an agent for the work, and no skill: round 1 hands the heard words
+        // to it in code, asked of no chat, so the voice's own tools (the
+        // weather) never answer it. Round 2 says the prepared task back.
+        if shared.named_agent_takes_line
+            && named_call.is_none()
+            && catching
+            && !forgot_before_question
+            && let Some(agent) = named_agent.as_deref()
+            && let Some(words) = named_words.as_deref()
+        {
+            eprintln!(
+                "lamp-voice second: request {request}: the heard words named {agent} for the work: round 1 hands them over in code (LAMP_NAMED_AGENT_TAKES_LINE)"
+            );
+            named_call = Some(net::ToolCall {
+                id: format!("handed-{request}"),
+                name: crate::agent_tasks::START.to_owned(),
+                args: serde_json::json!({ "task": words }),
+                extra: None,
+            });
         }
         // Their yes did not count (#2377): told once, beside the request.
         if let Some(told) = unseen_yes {

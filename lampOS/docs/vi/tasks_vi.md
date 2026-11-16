@@ -2110,7 +2110,16 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   nói, lượt được hỏi lại một lần với cùng ghi chú, và journal ghi `request
   N: named agent, called <tên> not start_agent_task: none run, asked again`
   (`agent_tasks_named::named_answered_by_an_own_tool_runs_none_and_is_asked_again_once`;
-  khi không nêu agent nào, công cụ riêng chạy như trước). Các công cụ việc
+  khi không nêu agent nào, công cụ riêng chạy như trước). Với
+  `LAMP_NAMED_AGENT_TAKES_LINE=on` (tắt nếu không đặt, #7269; lamp-9b34:
+  "Hey Lamp, OpenClaw, look up the weather in Hanoi this weekend" được trả
+  lời bằng `weather` hai lần, không có task) model không bao giờ được hỏi
+  vòng 1 của câu như vậy: code gọi `start_agent_task` với nhiệm vụ là lời
+  đã nghe, như việc giao bằng code bên dưới, và vòng 2 đọc lại để chờ
+  đồng ý; câu đã nêu một skill vẫn gọi skill đó
+  (`agent_tasks_named::a_named_agent_takes_the_line_before_the_weather_tool`,
+  `agent_tasks_named::with_the_switch_on_an_unnamed_ask_still_goes_to_the_model`).
+  Các công cụ việc
   của agent (`confirm_agent_task`, `check_agent_task`, `tasks_now`, đọc trạng
   thái) không phải công cụ riêng: "Hermes, go ahead and run it" được trả lời
   bằng `confirm_agent_task` thì chạy như đã gọi, không hỏi lại (P1 của
