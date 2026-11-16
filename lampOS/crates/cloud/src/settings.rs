@@ -171,8 +171,14 @@ pub fn chosen_now(dir: &std::path::Path) -> Value {
 /// every time it is said, so a `character.set` or a reset is said within
 /// five seconds. None kept, or one that does not read, is level 1. Inert
 /// data, so no switch: the body reads it only with its own. Without a bus,
-/// or a topic it can publish, it only waits.
-pub async fn tell_energy(dir: PathBuf, bus: Option<lamp_bus::Bus>) {
+/// or a topic it can publish, it only waits. With a `rater`
+/// (`LAMP_ENERGY_FROM_MODEL=on`, #7314) a level not chosen in the app is
+/// the model's for the kept words, asked once per new words.
+pub async fn tell_energy(
+    dir: PathBuf,
+    bus: Option<lamp_bus::Bus>,
+    mut rater: Option<crate::energy_rate::Rater>,
+) {
     use lamp_msgs::Energy;
     let publisher = bus.and_then(|bus| {
         bus.publisher_declared(Energy::TOPIC, &Energy::declaration(), crate::lamp::SOURCE)
@@ -182,7 +188,12 @@ pub async fn tell_energy(dir: PathBuf, bus: Option<lamp_bus::Bus>) {
         return std::future::pending().await;
     };
     loop {
-        let now = lamp_msgs::chosen_voice::energy_kept(&dir.join("energy"));
+        let mut now = lamp_msgs::chosen_voice::energy_kept(&dir.join("energy"));
+        if let Some(rater) = rater.as_mut().filter(|_| !now.chosen)
+            && let Some(words) = chosen_now(&dir)["text"].as_str().filter(|w| !w.is_empty())
+        {
+            now.level = rater.level(words).await;
+        }
         let _ = publisher.publish_json(lamp_ipc::monotonic_us(), &now);
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
