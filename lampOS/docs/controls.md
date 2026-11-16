@@ -1826,6 +1826,13 @@ taken unsaved, checked from the look through the save as a release is; a
 press that comes meanwhile puts the guard back. Tests:
 `a_clean_stop_ends_a_mute_the_restart_guard_restored` and
 `a_clean_stop_keeps_a_chosen_mute_and_a_guard_with_a_press_in_flight`.
+A stop that keeps the guard's mute says which gate kept it, in one journal
+line (#7368): "lamp-voice: the mute the restart guard restored is kept at this
+stop: <why>", where why is "the run did not end clean", "no stop was asked
+for", "the mute record could not be saved earlier", "a control was in flight"
+or "a control was taken and not yet saved" (`HandControls::kept_on_stop_why`).
+It is said only for the guard's mute, never a person's, and changes nothing
+the stop does. Test: `a_kept_guard_mute_names_its_gate`.
 **A head tap wakes such a mute, as it wakes sleep** (`Receiver::request_wake_after_fault`):
 on lamp-4ace on 2026-10-16 a crash at 12:20 brought the voice up muted, and
 with no main button and the base strip off nothing at the lamp could open it.

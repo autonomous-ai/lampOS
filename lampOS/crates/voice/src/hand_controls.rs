@@ -2174,6 +2174,26 @@ impl HandControls {
         Ok(true)
     }
 
+    /// Why a mute the restart guard restored would be kept at a stop
+    /// ([`Self::release_restored_on_stop`]'s own gates), for its one
+    /// journal line (#7368): a save that failed earlier, a control in
+    /// flight, or one taken and not saved. None when the mute is not the
+    /// guard's, or when nothing keeps it. Looked at before the release, so
+    /// a press that comes during its save is said by the release instead.
+    pub fn kept_on_stop_why(&self) -> Option<&'static str> {
+        if !self.restored_after_fault() {
+            None
+        } else if self.persistence_failed {
+            Some("the mute record could not be saved earlier")
+        } else if !self.nothing_in_flight() {
+            Some("a control was in flight")
+        } else if self.dirty {
+            Some("a control was taken and not yet saved")
+        } else {
+            None
+        }
+    }
+
     /// The guard released after a clean stop's cleanup (#960), as
     /// [`Self::disarm_after_cleanup`], with the record's time set to the
     /// conversation's last read of the press queue ([`Self::poll`]): the
