@@ -1172,7 +1172,13 @@ sau:
      22:00 là `clock/local`, `known`, `true`, `rearm = "ends"`,
      `during = { from = "22:00", to = "22:01" }`; bên cạnh chỉ có `for`,
      `cooldown`, `rearm`, `during` và `days`. Phần được nêu tên bị cắt
-     ở 110 byte. Trên lamp-74ff, 17:39 ngày
+     ở 110 byte. Trước đó, một `[trigger]`, `sooner` của nó hay một
+     `[[while]]` đọc một topic đèn không có, hoặc một field mà message của
+     nó không mang, bị từ chối và sửa với các topic đèn có cùng các field
+     của chúng (`made_skill::unread`, `READABLE`, #7357: lamp-c0a4, 16/11,
+     một trigger `device/temperature` không gì gửi); system prompt liệt kê
+     đúng các topic đó (`readable_named`), và khi hết lượt sửa, người dùng
+     nghe "the lamp has nothing that reads that" (`NOTHING_READS`). Trên lamp-74ff, 17:39 ngày
      10/11, một lần tạo từ ứng dụng "glow green when I come back to my
      desk" được viết trên khuôn mặt như kỹ năng chào mừng có sẵn, và bị từ
      chối hai lần vì lần sửa chỉ được nói các khóa được phép. System prompt
