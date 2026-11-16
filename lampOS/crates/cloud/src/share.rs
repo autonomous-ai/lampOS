@@ -28,7 +28,24 @@ use crate::account::Account;
 pub const ENVIRONMENT: &str = "LAMP_SKILLS_SHARE";
 
 /// The kinds this answers, in `can`'s order.
-pub const KINDS: [&str; 3] = ["skills.share", "skills.shared", "skills.unshare"];
+pub const KINDS: [&str; 4] = [
+    "skills.share",
+    "skills.shared",
+    "skills.unshare",
+    "skills.visibility",
+];
+
+/// Who can see a shared skill, as the owner chooses it (#5209): everyone,
+/// only people with its link, or only the owner. Never defaulted here: with
+/// none named the lamp sends none, and the Store keeps a skill's mode for a
+/// new version and uses `public` for a first share (Backend3, 6913614429).
+pub const VISIBILITIES: [&str; 3] = ["public", "unlisted", "private"];
+
+/// What a mode that is none of [`VISIBILITIES`] is told.
+pub const BAD_VISIBILITY: &str = "who can see it is public, unlisted or private";
+
+/// What a change of mode with no mode named is told.
+pub const NO_VISIBILITY: &str = "say who can see it: public, unlisted or private";
 
 /// The longest `author`, in characters: a first name, never more.
 pub const AUTHOR_MOST: usize = 32;
@@ -128,6 +145,71 @@ pub fn author(data: &Value) -> Result<Option<String>, String> {
         return Err(BAD_AUTHOR.to_owned());
     }
     Ok(Some(author.to_owned()))
+}
+
+/// `data`'s `visibility`: one of [`VISIBILITIES`], none when it is missing
+/// or null, else [`BAD_VISIBILITY`]. Exactly as written, in lower case.
+pub fn visibility(data: &Value) -> Result<Option<&'static str>, String> {
+    match data.get("visibility") {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(mode)) => VISIBILITIES
+            .into_iter()
+            .find(|known| known == mode)
+            .map(Some)
+            .ok_or_else(|| BAD_VISIBILITY.to_owned()),
+        Some(_) => Err(BAD_VISIBILITY.to_owned()),
+    }
+}
+
+/// The line the owner reads before the yes, for `mode` in the owner's
+/// `language` (`en`, `vi`, `ja`, `zh` or `ko`; English for any other): where
+/// the skill goes, that it is checked, and who can see it. The lamp's own
+/// words, because the Store's note (`visibility_note`) only comes with the
+/// answer to the upload, after the yes (the first builder on #5209, 6913784919:
+/// the lamp's wording is the lamp's to own). The other four languages are
+/// machine-written until a reader has read them.
+pub fn visibility_note(mode: &str, language: &str) -> &'static str {
+    match (language, mode) {
+        ("vi", "private") => {
+            "Riêng tư: kỹ năng được gửi lên Store và được kiểm duyệt như mọi kỹ năng khác; chỉ bạn xem được và cài được trên các đèn của bạn."
+        }
+        ("vi", "unlisted") => {
+            "Chỉ qua liên kết: kỹ năng được gửi lên Store và được kiểm duyệt như mọi kỹ năng khác; không hiện trong danh sách, ai có liên kết đều cài được."
+        }
+        ("vi", _) => {
+            "Công khai: kỹ năng được gửi lên Store và được kiểm duyệt, sau đó mọi người đều xem và cài được."
+        }
+        ("ja", "private") => {
+            "非公開：スキルはストアに送られ、他のスキルと同じように審査されます。見られるのも、あなたのランプにインストールできるのも、あなただけです。"
+        }
+        ("ja", "unlisted") => {
+            "限定公開：スキルはストアに送られ、他のスキルと同じように審査されます。一覧には表示されず、リンクを知っている人なら誰でもインストールできます。"
+        }
+        ("ja", _) => {
+            "公開：スキルはストアに送られて審査され、その後は誰でも見てインストールできます。"
+        }
+        ("zh", "private") => {
+            "私密：技能会发送到商店，并像其他技能一样接受审核；只有你能查看，也只能安装到你自己的灯上。"
+        }
+        ("zh", "unlisted") => {
+            "仅限链接：技能会发送到商店，并像其他技能一样接受审核；它不会出现在列表中，任何拿到链接的人都能安装。"
+        }
+        ("zh", _) => "公开：技能会发送到商店并接受审核，之后所有人都能查看和安装。",
+        ("ko", "private") => {
+            "비공개: 스킬이 스토어로 전송되어 다른 스킬과 똑같이 검토됩니다. 나만 볼 수 있고, 내 램프에만 설치할 수 있습니다."
+        }
+        ("ko", "unlisted") => {
+            "링크 공개: 스킬이 스토어로 전송되어 다른 스킬과 똑같이 검토됩니다. 목록에는 나오지 않고, 링크를 가진 사람은 누구나 설치할 수 있습니다."
+        }
+        ("ko", _) => "공개: 스킬이 스토어로 전송되어 검토된 뒤, 누구나 보고 설치할 수 있습니다.",
+        (_, "private") => {
+            "Private: it goes to the Store and is checked like any other skill; only you can see it and install it on your lamps."
+        }
+        (_, "unlisted") => {
+            "Unlisted: it goes to the Store and is checked like any other skill; it is not listed, and anyone with its link can install it."
+        }
+        _ => "Public: it goes to the Store and is checked, then everyone can see and install it.",
+    }
 }
 
 /// The folder of `name` when it is a skill made on this lamp and on, as
@@ -339,13 +421,14 @@ pub(crate) fn seen(
     read
 }
 
-/// A `multipart/form-data` body: `file` (the package), then `author` and
-/// `made_with` when given. The boundary and the body.
+/// A `multipart/form-data` body: `file` (the package), then `author`,
+/// `made_with` and `visibility` when given. The boundary and the body.
 pub fn multipart(
     file_name: &str,
     tar: &[u8],
     author: Option<&str>,
     made_with: Option<&str>,
+    visibility: Option<&str>,
 ) -> (String, Vec<u8>) {
     let boundary = format!("lamp-share-{:016x}", seed(tar));
     let mut body = Vec::with_capacity(tar.len() + 512);
@@ -369,6 +452,14 @@ pub fn multipart(
         body.extend_from_slice(
             format!(
                 "--{boundary}\r\nContent-Disposition: form-data; name=\"made_with\"\r\n\r\n{made_with}\r\n"
+            )
+            .as_bytes(),
+        );
+    }
+    if let Some(visibility) = visibility {
+        body.extend_from_slice(
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"visibility\"\r\n\r\n{visibility}\r\n"
             )
             .as_bytes(),
         );
@@ -420,7 +511,8 @@ pub fn reason(status: u16, body: &[u8]) -> String {
 }
 
 /// One shared skill as the app reads it: its id, name, version, the Store's
-/// `review_status` and, when there is one, its `review_note`.
+/// `review_status` and, when there is one, its `review_note`, `visibility`
+/// and `visibility_note` (#5209).
 pub fn row(entry: &Value) -> Option<Value> {
     let text = |key: &str| {
         entry
@@ -442,7 +534,22 @@ pub fn row(entry: &Value) -> Option<Value> {
     if let Some(note) = text("review_note") {
         row["review_note"] = json!(note.chars().take(REASON_MOST).collect::<String>());
     }
+    keep_visibility(&mut row, entry);
     Some(row)
+}
+
+/// `row`'s `visibility` and `visibility_note` from `from`, when it has them:
+/// the Store's words, as it said them.
+fn keep_visibility(row: &mut Value, from: &Value) {
+    for key in ["visibility", "visibility_note"] {
+        if let Some(text) = from
+            .get(key)
+            .and_then(Value::as_str)
+            .filter(|text| !text.is_empty())
+        {
+            row[key] = json!(text.chars().take(REASON_MOST).collect::<String>());
+        }
+    }
 }
 
 /// The rows in `GET /skills/mine`'s answer, once [`answered`] has taken
@@ -558,13 +665,26 @@ pub fn share(
     places: &crate::skills::Places,
     data: &Value,
     scratch: &Path,
+    language: &str,
 ) -> Result<Value, String> {
     let name = name(data)?;
     let author = author(data)?;
+    let visibility = visibility(data)?;
     let folder = shareable(places, &name)?;
     if data.get("preview").and_then(Value::as_bool) == Some(true) {
         let (sha256, files) = seen(&folder, scratch, || {})?;
-        return Ok(json!({ "preview": {"name": name, "sha256": sha256, "files": files} }));
+        let mut preview = json!({"name": name, "sha256": sha256, "files": files});
+        // The mode the owner named, and the lamp's line for it in the
+        // owner's language, to be read before the yes; none named, none
+        // said and none picked for the owner (#5209).
+        match visibility {
+            Some(mode) => {
+                preview["visibility"] = json!(mode);
+                preview["visibility_note"] = json!(visibility_note(mode, language));
+            }
+            None => preview["visibility"] = Value::Null,
+        }
+        return Ok(json!({ "preview": preview }));
     }
     let seen = data
         .get("sha256")
@@ -580,7 +700,7 @@ pub fn share(
     let made_with = fs::symlink_metadata(folder.join(lamp_skills::PUSHED_FROM))
         .is_ok_and(|file| file.is_file())
         .then_some(MADE_WITH_SDK);
-    let (boundary, body) = multipart(&file_name, &tar, author.as_deref(), made_with);
+    let (boundary, body) = multipart(&file_name, &tar, author.as_deref(), made_with, visibility);
     let (status, reply) = exchange(
         store,
         (
@@ -592,11 +712,15 @@ pub fn share(
     let answer = answered(status, &reply)?;
     let sent = answer.get("skill").unwrap_or(&answer);
     // Sent, but with no id the app could never take it back: say so.
-    let mut sent = row(sent).ok_or_else(|| UNREAD.to_owned())?;
-    if sent["name"] != json!(name) {
-        sent["name"] = json!(name);
+    let mut sent_row = row(sent).ok_or_else(|| UNREAD.to_owned())?;
+    // The Store says the mode and its line inside the skill or beside it.
+    if sent_row.get("visibility").is_none() {
+        keep_visibility(&mut sent_row, &answer);
     }
-    Ok(json!({ "sent": sent }))
+    if sent_row["name"] != json!(name) {
+        sent_row["name"] = json!(name);
+    }
+    Ok(json!({ "sent": sent_row }))
 }
 
 /// `skills.shared {}`: `{"shares": [...]}`, this lamp's sent skills.
@@ -607,6 +731,30 @@ pub fn shared(store: &Store) -> Result<Value, String> {
         (reqwest::Method::GET, store.url("mine?limit=100"), None),
     )?;
     Ok(json!({ "shares": rows(&answered(status, &reply)?) }))
+}
+
+/// `skills.visibility {"id", "visibility"}`: who can see a sent skill, changed
+/// later (`PUT /api/v1/skills/<id>/visibility`, every version of it, no new
+/// review). `{"visibility": {"id", "visibility", "visibility_note"?}}`, or
+/// why not: the Store's `skill_not_found` for an id that is not this
+/// lamp's, told as [`reason`] says it.
+pub fn set_visibility(store: &Store, data: &Value) -> Result<Value, String> {
+    let id = id(data)?;
+    let mode = visibility(data)?.ok_or_else(|| NO_VISIBILITY.to_owned())?;
+    let body = json!({ "visibility": mode }).to_string().into_bytes();
+    let (status, reply) = exchange(
+        store,
+        (
+            reqwest::Method::PUT,
+            store.url(&format!("{id}/visibility")),
+            Some(("application/json".to_owned(), body)),
+        ),
+    )?;
+    let answer = answered(status, &reply)?;
+    let mut said = json!({ "id": id, "visibility": mode });
+    keep_visibility(&mut said, &answer);
+    // The mode told is the one the Store holds, when it says one.
+    Ok(json!({ "visibility": said }))
 }
 
 /// `skills.unshare {"id"}`: the sent skill taken back from the Store.
