@@ -1250,11 +1250,13 @@ năng tự tạo (`do.write`, docs/skills.md) như một lượt chạy
   `issue_7092_a_fixed_write_that_may_have_begun_is_never_asked_again`,
   `issue_7092_a_fixed_write_unmade_twice_or_unanswered_is_not_made`.
 
-### Lần chạy của kỹ năng agent và quyền `net` (`LAMP_UPLOAD_TO_AGENT` bật, `LAMP_TASK_NET` tắt)
+### Lần chạy của kỹ năng agent và quyền `net` (`LAMP_UPLOAD_TO_AGENT` bật, `LAMP_TASK_NET` bật)
 
 Người xây dựng đầu tiên đồng ý lúc 19:44 (12/11). `LAMP_UPLOAD_TO_AGENT` bật
 trong sản phẩm từ 13/11 (phán quyết của chủ: luồng tải lên đi qua agent);
-`LAMP_TASK_NET` vẫn tắt và không đặt trong unit nào; xây trên đường `skill_make` của #6643, để chuyển
+`LAMP_TASK_NET` cũng bật trong sản phẩm (lamp-tasks, lamp-skills và manage helper,
+lamp-control và lamp-voice), nên lần chạy được cấp `net` với lời đồng ý bằng giọng
+nói của chủ giữ mạng của đèn; xây trên đường `skill_make` của #6643, để chuyển
 sang runner chung của #6510 bước 2 mà không cần luật mới.
 
 - **`net`** (`skill_task::NET_SWITCH`): một quyền của lần chạy, không phải

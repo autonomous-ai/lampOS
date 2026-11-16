@@ -3757,12 +3757,13 @@ lamp-tasks, the hand-over socket also takes a made skill's fixed write
   `issue_7092_a_fixed_write_that_may_have_begun_is_never_asked_again`,
   `issue_7092_a_fixed_write_unmade_twice_or_unanswered_is_not_made`.
 
-### An agent skill's run and the `net` grant (`LAMP_UPLOAD_TO_AGENT` on, `LAMP_TASK_NET` off)
+### An agent skill's run and the `net` grant (`LAMP_UPLOAD_TO_AGENT` on, `LAMP_TASK_NET` on)
 
 The first builder's yes at 19:44 (12 Nov). `LAMP_UPLOAD_TO_AGENT` is on in
 the product since 13 Nov (the owner's ruling: the upload flow goes via the
-agent; docs/skills.md, "Run by the lamp's agent"); `LAMP_TASK_NET` stays
-off and set in no unit. Built on #6643's `skill_make` path, so it moves onto #6510 step 2's
+agent; docs/skills.md, "Run by the lamp's agent"); `LAMP_TASK_NET` is on
+in the product too, in the five units below, so a run granted `net` with the
+owner's spoken yes keeps the lamp's network. Built on #6643's `skill_make` path, so it moves onto #6510 step 2's
 one runner (a fresh home per run, the token as a file) with no new rules:
 
 - **`net`** (`skill_task::NET_SWITCH`, `LAMP_TASK_NET=on` in lamp-tasks,
