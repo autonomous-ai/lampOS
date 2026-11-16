@@ -5678,7 +5678,11 @@ fn tasks_refused(skill: &str, calls: &[Call], tasks: &Tasks) -> Option<String> {
 /// carries it (a run granted a linked service's read,
 /// [`lamp_skills::task::told`]), is said to the owner in `room`, behind a
 /// read's gate ([`lamp_skills::service_read::tell`]); the journal says only
-/// how many sentences.
+/// how many sentences. With `LAMP_SKILL_TASK_SURE` on
+/// ([`lamp_skills::task_sure`]), a run lamp-tasks says failed is told as
+/// one fixed line behind the same gate, and one refused `busy` waits its
+/// turn in the lamp's one line ([`lamp_skills::task_sure::LAMP`]), on this
+/// thread; off, as before.
 fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut room: LampRoom) {
     // This run's own: a run now asked by voice, never a trigger's after it.
     let asked = lamp_skills::task::take_asked_by_voice(skill);
@@ -5702,43 +5706,80 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             "priority": lamp_voice::say::NORMAL_PRIORITY,
             "expires_in_ms": lamp_skills::task::ASK_EXPIRES_MS,
         });
-        let say_yes = || say(&say_socket, "say", &skill, ask, &[], || {});
-        let mut found = None;
-        let said = lamp_skills::task::hand(
+        let say_yes = || say(&say_socket, "say", &skill, ask.clone(), &[], || {});
+        // With `LAMP_SKILL_TASK_SURE` on: a failed run's told line, and
+        // whether lamp-tasks said `busy`, so it waits its turn
+        // (`lamp_skills::task_sure`). Off, neither is ever set.
+        let sure = lamp_skills::task_sure::on();
+        let found = std::cell::Cell::new(None);
+        let tried = lamp_skills::task_sure::Tried::default();
+        let send = |socket: &Path, line: &str| {
+            let sent = hand_over(socket, line);
+            if sure {
+                tried.sent(&skill, &sent);
+            }
+            let answer = sent?;
+            // What lamp-tasks' answer carries of its agent's: its length
+            // only, never its words (#7180).
+            let carried = serde_json::from_str::<serde_json::Value>(answer.trim())
+                .ok()
+                .and_then(|answer| answer["answer"].as_str().map(str::len));
+            eprintln!(
+                "lamp-skills: skill:{skill}: do.task: lamp-tasks' answer carries {}",
+                carried.map_or_else(
+                    || "no agent's answer".to_owned(),
+                    |bytes| format!("{bytes} bytes of its agent's answer")
+                )
+            );
+            found.set(lamp_skills::task::told(&answer));
+            lamp_skills::service_write::agent_answered(&answer)
+        };
+        // Each try afresh: one that returns before `send` keeps nothing of
+        // the try before it.
+        let try_hand = || {
+            found.set(None);
+            tried.once(|| {
+                lamp_skills::task::hand(
+                    &skill,
+                    &step,
+                    &folder,
+                    &grants,
+                    place,
+                    unix_ms(),
+                    send,
+                    say_yes,
+                )
+            })
+        };
+        let said = lamp_skills::task_sure::hand_in_turn(
+            sure,
+            &lamp_skills::task_sure::LAMP,
             &skill,
-            &step,
-            &folder,
-            &grants,
-            place,
-            unix_ms(),
-            |socket, line| {
-                let answer = hand_over(socket, line)?;
-                // What lamp-tasks' answer carries of its agent's: its length
-                // only, never its words (#7180).
-                let carried = serde_json::from_str::<serde_json::Value>(answer.trim())
-                    .ok()
-                    .and_then(|answer| answer["answer"].as_str().map(str::len));
-                eprintln!(
-                    "lamp-skills: skill:{skill}: do.task: lamp-tasks' answer carries {}",
-                    carried.map_or_else(
-                        || "no agent's answer".to_owned(),
-                        |bytes| format!("{bytes} bytes of its agent's answer")
-                    )
-                );
-                found = lamp_skills::task::told(&answer);
-                lamp_skills::service_write::agent_answered(&answer)
-            },
-            say_yes,
-        );
+            || HANDING.load(std::sync::atomic::Ordering::SeqCst) == 0,
+            try_hand,
+            |line| eprintln!("lamp-skills: skill:{skill}: {line}"),
+        )
+        .unwrap_or_else(|dropped| {
+            if dropped.tells() {
+                tried.tell(lamp_skills::task_sure::dropped_line(&skill));
+            }
+            dropped.words()
+        });
         eprintln!("lamp-skills: skill:{skill}: {said}");
-        if let Some(lines) = found {
+        // What its agent found, or with the switch on, why it didn't run.
+        let told = match (found.take(), tried.failed()) {
+            (Some(lines), _) => Some((lines, "what its agent found")),
+            (None, Some(line)) => Some((vec![line], "what became of its run")),
+            (None, None) => None,
+        };
+        if let Some((lines, what)) = told {
             // Kept as waiting till its end, so a restart that drops it
             // unsaid leaves a line at the next start (#7180).
             let began = unix_ms();
             if let Some(state) = &state
                 && let Err(error) = lamp_skills::task::telling_begins(state, &skill, began)
             {
-                eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {error}");
+                eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {error}");
             }
             // Asked by the owner's voice and ready within five minutes: the
             // quiet lifted for it, for five minutes more (#7180).
@@ -5749,21 +5790,21 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
                     Some(until) => {
                         room.quiet_lifted = Some(until);
                         eprintln!(
-                            "lamp-skills: skill:{skill}: do.task: what its agent found: told in quiet hours too, its owner asked by voice {after} s before ({})",
+                            "lamp-skills: skill:{skill}: do.task: {what}: told in quiet hours too, its owner asked by voice {after} s before ({})",
                             lamp_voice::told_when_asked::ENVIRONMENT
                         );
                     }
                     None => eprintln!(
-                        "lamp-skills: skill:{skill}: do.task: what its agent found: its quiet holds, ready {after} s after its owner's ask, past five minutes"
+                        "lamp-skills: skill:{skill}: do.task: {what}: its quiet holds, ready {after} s after its owner's ask, past five minutes"
                     ),
                 }
             }
             let told = lamp_skills::service_read::tell(&lines, &mut room);
-            eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {told}");
+            eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {told}");
             if let Some(state) = &state
                 && let Err(error) = lamp_skills::task::telling_ends(state, &skill, began)
             {
-                eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {error}");
+                eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {error}");
             }
         }
     });
@@ -5793,6 +5834,10 @@ impl Handing {
 impl Drop for Handing {
     fn drop(&mut self) {
         HANDING.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        // A task waiting its turn tries now (`LAMP_SKILL_TASK_SURE`).
+        if lamp_skills::task_sure::on() {
+            lamp_skills::task_sure::LAMP.ended();
+        }
     }
 }
 

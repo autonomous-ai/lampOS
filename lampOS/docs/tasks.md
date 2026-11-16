@@ -2847,7 +2847,15 @@ for each run, and is answered once the run ends
   `{"ok":false,"error","message"}`: `off` (the switch is not `on`),
   `bad_request`, `too_long` (over 8192 bytes), `no_token` (lamp-control gave
   no one-run token), `run_failed`, or `busy` (another skill's task is
-  running: one runs at a time).
+  running: one runs at a time). With `LAMP_SKILL_TASK_SURE=on` in
+  lamp-skills (off unless set, in no product unit; docs/skills.md, "A
+  skill's task"), lamp-skills says a refusal or a failed run to the owner
+  as one fixed line behind a told answer's gate, never the task's words
+  nor this message, and a run refused `busy` waits its turn in lamp-skills'
+  one line (at most 4 in it, one being handed over among them, first in
+  first out, each at most 15 minutes from when it began to wait) and is handed over again when the run going ends, so two
+  skills due at one minute both run, one after the other. Nothing here
+  changes for it.
 - **What its agent found** (`tells_answer`): with `LAMP_AGENT_SERVICES=on`
   here, a run granted a linked service's read (`gmail-read`) that ended
   well answers `{"ok":true,"id":N,"answer":"..."}`, the agent's last

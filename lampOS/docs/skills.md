@@ -1897,6 +1897,49 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   stays counted. On lamp-9adf on 15 Nov, a presence skill refused `busy`
   spent the day's last run, and the skill that came due 4 s later found
   none.
+  With `LAMP_SKILL_TASK_SURE=on` (`lamp-skills` alone, off unless set, in
+  no product unit; `task_sure`), two more things. **A failed run is told**
+  (`task_sure::failed_line`): when lamp-tasks answers `ok:false`, or no
+  answer comes, one short fixed line is said to the owner behind a told
+  answer's gate (below: the owner alone, quiet hours, the lamp's one read
+  turn; `LAMP_TOLD_WHEN_ASKED` lifts the quiet as for a told answer), never
+  the task's words nor lamp-tasks' message: `missing_secret` "<Skill>
+  couldn't run: it needs a key added
+  in the app, on its page."; any other refusal before its agent began, or
+  lamp-tasks not reached, "<Skill> couldn't run this time."; `run_failed`,
+  no answer or anything else "<Skill> didn't finish this time.". The
+  journal says `do.task: what became of its run: told 1` (or the gate's
+  outcome). Before, only the journal had it, even after the voice said
+  "<skill> is running now". **A run refused `busy` waits its turn**
+  (`task_sure::Line`, `task_sure::LAMP`): lamp-tasks runs one skill's task
+  at a time, so of two due at one minute (a morning's mail and its
+  calendar, both at 8:00) one was lost. It waits in the lamp's one line, at
+  most 4 in it (one being handed over from it among them, so never more
+  than 4 wait), first in first out, each at most 15 minutes from when it
+  began to wait, and is handed
+  over again as soon as lamp-skills' hand-over under way ends (`Handing`),
+  or every 10 s when lamp-tasks says `busy` with none of lamp-skills'
+  under way. A task due while one waits goes behind it. A retry that
+  returns before it is sent (its yes changed while it waited, its folder
+  gone, its bounds spent) is no `busy`: it leaves the line at once with
+  its own reason (`task_sure::Tried`). Each `busy` try is
+  journalled and taken back off the ledger as above, so the count is as
+  before; the run is counted only on the try lamp-tasks takes. Past the
+  bound or the 15 minutes it is let go and told "<Skill> didn't run this
+  time: the lamp was busy with other skills." (journal: `do.task: not
+  handed over: lamp-tasks is busy and 4 tasks wait already` or `its turn
+  didn't come in 15 minutes`); a skill whose last task waits already is
+  only journalled (`its last task waits its turn already`). It waits on its
+  own hand-over thread, never the program's loop, and holds no token or
+  file, so a stop of lamp-skills just ends it. Off: one try, nothing said
+  of a failure, as before. Tests (`task_sure::tests`):
+  `a_failed_run_is_one_fixed_line_a_reason`,
+  `a_busy_task_is_handed_over_after_the_first_ends`,
+  `the_line_holds_at_most_its_bound`, `a_wait_past_its_longest_is_let_go`,
+  `a_busy_try_is_tried_again_after_every`, `the_line_is_first_in_first_out`,
+  `a_task_past_the_bound_is_let_go_and_none_jumps_the_line`,
+  `a_try_refused_before_its_send_is_no_busy`,
+  `off_it_is_one_try_as_before`; `service_read::tests::a_failed_runs_line_is_told_only_through_the_gate`.
   A run that is only `do.task`s is checked first, read only
   (its folder known, then `task::would_refuse`: the switch, `--state-dir`,
   its last under way, the bounds): refused, nothing is handed over, the run's `Done` says "not

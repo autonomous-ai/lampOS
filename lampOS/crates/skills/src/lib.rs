@@ -34,6 +34,7 @@ pub mod routine;
 pub mod service_read;
 pub mod service_write;
 pub mod task;
+pub mod task_sure;
 pub mod unplug;
 pub mod usage;
 pub mod visits;
