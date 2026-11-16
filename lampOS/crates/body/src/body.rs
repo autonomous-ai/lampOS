@@ -2186,6 +2186,13 @@ struct Bus<'a, P, R> {
     /// last good one (#5693): taken only once a second read agrees, so one
     /// junk 4,095 from a joint near 0 is not a crossing.
     seam_seen: [bool; 5],
+    /// The last read of each joint was the one that confirmed a crossing
+    /// (#5693): the read is two agreeing reads across the seam, so a hold
+    /// where the joint reads is trusted at once (`range_refused`), though
+    /// it is nowhere near the last goal and not `steady` against the last
+    /// good read, which is from before the seam (the Reviewer-lead on
+    /// #6836).
+    crossed: [bool; 5],
     /// Each joint's last good temperature and its bad temperature reads
     /// (`judge_temperatures`).
     warm: [Option<u8>; 5],
@@ -2243,6 +2250,7 @@ impl<'a, P: PortIo, R: Runtime> Bus<'a, P, R> {
             bad_reads: [0; 5],
             bad_in_row: [0; 5],
             seam_seen: [false; 5],
+            crossed: [false; 5],
             warm: [None; 5],
             bad_temperatures: [0; 5],
             temperature_flaps: [0; 5],
@@ -2381,10 +2389,18 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
         for (index, sample) in samples.iter_mut().enumerate() {
             let read = sample.position;
             // A jump of nearly a whole turn is the joint carried across the
-            // 0/4095 seam by a hand (#5693), not a bad read.
-            let seam = |from: u16| u128::from(read.abs_diff(from)) >= u128::from(4_096 - READ_JUMP);
+            // 0/4095 seam by a hand (#5693), not a bad read: the short way
+            // round the seam is within the same reach a read is judged by,
+            // so a joint that has moved on from the seam at speed since
+            // the last read (a servo let go of, driving at full force) is
+            // still a crossing, not a bad read.
+            let seam = |from: u16| {
+                let apart = read.abs_diff(from);
+                apart > 2_048 && u128::from(4_096 - apart) <= reach
+            };
             // A crossing is taken only when two reads in a row say so.
             let crossing = read <= 4_095 && self.good[index].is_some_and(seam);
+            self.crossed[index] = false;
             if crossing && !self.seam_seen[index] {
                 self.seam_seen[index] = true;
                 if let Some(good) = self.good[index] {
@@ -2393,6 +2409,9 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
                 continue;
             }
             self.seam_seen[index] = false;
+            // The second read across agrees: the crossing is confirmed, and
+            // this read is let in below (`off` is false across the seam).
+            self.crossed[index] = crossing;
             let off = |from: u16| u128::from(read.abs_diff(from)) > reach && !seam(from);
             let bad = read > 4_095
                 || self.good[index]
@@ -2684,8 +2703,9 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
     /// stopped (#5693): nothing moves, so each goal is judged by its servo's
     /// own stored range, never by the arm's window; a raised arm that sank
     /// past its window is held there, not let go. An arm goal is still one
-    /// the servo can be trusted with: a step from its last goal, or a
-    /// reading it has held still (`steady`), never one bad read.
+    /// the servo can be trusted with: a step from its last goal, a reading
+    /// it has held still (`steady`), or the reading that confirmed a seam
+    /// crossing (`crossed`, two agreeing reads), never one bad read.
     fn send_holds_where_they_are(&mut self, goals: [u16; 3], arm: [u16; 2]) -> Result<(), String> {
         self.write_goals(goals, Some(arm), Self::range_refused)
     }
@@ -2694,10 +2714,11 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
     fn range_refused(&self, joint: Joint, goal: u16) -> Option<Stop> {
         let (low, high) = self.ranges[joint.index()];
         let trusted = !ARM.contains(&joint) || {
-            let read = self.good[joint.index()];
-            let from = self.goals[joint.index()].or(read);
+            let index = joint.index();
+            let read = self.good[index];
+            let from = self.goals[index].or(read);
             from.is_none_or(|from| goal.abs_diff(from) <= ARM_GOAL_STEP)
-                || (self.steady[joint.index()] && read == Some(goal))
+                || ((self.steady[index] || self.crossed[index]) && read == Some(goal))
         };
         (!((low..=high).contains(&goal) && trusted)).then(|| Stop::Window {
             joint: joint.id(),
@@ -4455,10 +4476,11 @@ fn follow_hand<P: PortIo, R: Runtime>(
                 // Across the seam (the hand carried a wrapped joint back
                 // through 0/4095): the short way is one position mode
                 // cannot take, so no step is written toward it. The read is
-                // already two agreeing reads (`judge_positions`), so the
-                // joint is held where it reads at once: a goal left across
-                // the seam would drive it the long way the moment the hand
-                // let go (the Reviewer-lead on #6836).
+                // already two agreeing reads (`judge_positions`, `crossed`),
+                // so the joint is held where it reads at once, and
+                // `range_refused` takes that hold: a goal left across the
+                // seam would drive it the long way the moment the hand let
+                // go (the Reviewer-lead on #6836).
                 Some(goal) if goal.abs_diff(at) > 2_048 => at,
                 // A step toward a reading the joint has held still: one
                 // read off is not a hand.
@@ -4494,8 +4516,16 @@ fn follow_hand<P: PortIo, R: Runtime>(
         // A first read across the seam (not yet a crossing, `seam_seen`):
         // the joint's force drops at once, so that if the hand has let go
         // the servo cannot drive toward its old goal the long way in the
-        // 100 ms before the read that confirms the crossing.
-        let crossing = bus.seam_seen[joint.index()];
+        // 100 ms before the read that confirms the crossing. It stays down
+        // for as long as the goal in the register is across the seam from
+        // the read (a hold not yet landed), and for `GIVE_WAY_EASED_READS`
+        // reads after that, not for one read (the Reviewer-lead on #6836).
+        let at = now[joint.index()].position;
+        let crossing = bus.seam_seen[joint.index()]
+            || bus.goals[joint.index()].is_some_and(|goal| goal.abs_diff(at) > 2_048);
+        if crossing {
+            eased[index] = 0;
+        }
         let want = if yielding[index] {
             eased[index] < GIVE_WAY_EASED_READS || crossing
         } else {
@@ -4553,6 +4583,8 @@ fn wait_in_range<P: PortIo, R: Runtime>(
     // Steps in a row a commanded joint still held (a head tipped up,
     // #2938) has read over its load bound, and at its temperature bound.
     let (mut held_over, mut held_hot) = ([0u8; 3], [0u8; 3]);
+    // Head joints let go for heat while the arm is held (`follow_arm`).
+    let mut let_go: Vec<Joint> = Vec::new();
     loop {
         let late = bus.runtime.now() >= asked_since + WAIT_ASKING;
         let (every, say) = if late {
@@ -4578,7 +4610,14 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                 // (El's P2 on #2940). Over either, the wait ends as the
                 // run's check would.
                 for (slot, joint) in COMMANDED.iter().enumerate() {
-                    if wait.joints.contains(joint) || holding.contains(joint) {
+                    // A joint let go for heat below stays out of the check
+                    // once its torque off is acknowledged (`torque_off`
+                    // drops it from `holding`): it is not let go again,
+                    // read after read, for as long as it stays hot.
+                    if wait.joints.contains(joint)
+                        || holding.contains(joint)
+                        || let_go.contains(joint)
+                    {
                         continue;
                     }
                     let is = now[joint.index()];
@@ -4623,6 +4662,7 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                         // stays held and the wait goes on.
                         if wait.follow_arm {
                             holding.push(*joint);
+                            let_go.push(*joint);
                             held_hot[slot] = 0;
                             eprintln!(
                                 "lamp-body: {joint} at {} while the arm is held: let go",
@@ -4641,16 +4681,12 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                 // its force drops to `GIVE_WAY_FORCE` and stays there, so it
                 // sinks under its own weight instead of holding on hot or
                 // for good (the Reviewer-lead on #6836).
-                if wait.follow_arm
-                    && let Some(force) = wait.follow_force
-                    && !let_down
-                {
+                if wait.follow_arm && wait.follow_force.is_some() && !let_down {
                     let hot = ARM
                         .iter()
                         .any(|joint| now[joint.index()].temperature >= Standing::TEMPERATURE);
                     arm_hot = if hot { arm_hot.saturating_add(1) } else { 0 };
                     if arm_hot >= limits.temperature_steps.max(1) || late {
-                        let _ = force;
                         for joint in ARM {
                             if bus
                                 .write_acknowledged(

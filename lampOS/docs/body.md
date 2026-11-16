@@ -961,7 +961,7 @@ rest by itself and then stands as ever:
    `ARM_LET_GO_NEAR` (150) of folded; raised, let go, it would fall. The load
    stop while folding is `--recover-load` (the standing load unless given).
 6. **A joint round past the end of its range.** An arm joint read more than
-   `WRAP_UNDER_FOLD` (600) under its folded count is round past 4,095 and
+   `WRAP_UNDER_FOLD` (300) under its folded count is round past 4,095 and
    counting on from 0 (lamp-dbda, 13 Nov: the elbow read 196–668 with the
    shoulder pushed far back; the shoulder 167 with the arm back past its
    stand). A position-mode goal across that seam would drive it the long way
@@ -970,8 +970,16 @@ rest by itself and then stands as ever:
    off its goal is held again where it is (`WRAP_FOLLOW`, a goal step at a
    time); one pushed over `GIVE_WAY_LOAD` for two reads without moving has its
    force lowered to `GIVE_WAY_FORCE` so the hand can move it, put back once the
-   load eases. A read that jumps nearly a whole turn is the seam crossed, not a
-   bad read. Folded and still for a second, it takes hold and starts; the
+   load eases. A read that jumps the short way round the seam, within the
+   same reach a read is judged by, is the seam crossed, not a bad read; it
+   is taken once a second read agrees. On the first read across, the
+   joint's force drops to `GIVE_WAY_FORCE` at once and stays there while
+   the goal in the register is across the seam from the read, and for
+   `GIVE_WAY_EASED_READS` reads after; on the read that confirms the
+   crossing the joint is held where it reads, and that hold is trusted at
+   once (`crossed`): a goal left across the seam would drive the joint the
+   long way the moment the hand let go. A head joint let go for heat while
+   the arm is held is let go once. Folded and still for a second, it takes hold and starts; the
    head and the base then wake home from anywhere, as after a fold.
    Multi-turn self-recovery (angle limits 0/0) is not done: a later
    `--recover-wrap` may add it after a bench proof.
