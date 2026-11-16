@@ -4571,10 +4571,17 @@ fn run_for_asked(
                     (member.alias.as_str(), member.kind.name)
                 })
             };
-            // Who does it, for `voice/decision` (#7267): the lamp's engine
-            // only when named; a computer's, Claude when none is chosen.
+            // Who does it, for `voice/decision` (#7267): on the lamp, the
+            // engine named or else the lamp's default as last read (Hermes
+            // until read, as [`lamp_name`] says it); a computer's, Claude
+            // when none is chosen.
             let handed_engine = if on_the_lamp {
-                engine.clone()
+                Some(engine.clone().unwrap_or_else(|| {
+                    lamp_engines()
+                        .into_iter()
+                        .next()
+                        .unwrap_or_else(|| "hermes".to_owned())
+                }))
             } else {
                 Some(
                     member
@@ -13645,6 +13652,7 @@ pub(crate) mod tests {
         };
         LAMP_THERE_HERE.with(|here| here.set(Some(true)));
         lamp_engines_here(Some(&["openclaw"]));
+        decided_here();
         let lamp = run(
             &at,
             &call(json!({"task":"Write a poem"})),
@@ -13671,6 +13679,17 @@ pub(crate) mod tests {
             .map(|line| line["target"].clone())
             .collect();
         assert_eq!(targets, [json!("lamp"), json!("lamp")]);
+        // #7267: each hand-over's decision names the engine it goes to,
+        // the lamp's default when none was named.
+        let engines: Vec<Option<String>> = decided_here()
+            .into_iter()
+            .filter(|decision| decision.stage == Some(lamp_msgs::HandStage::Prepared))
+            .map(|decision| decision.engine)
+            .collect();
+        assert_eq!(
+            engines,
+            [Some("openclaw".to_owned()), Some("openclaw".to_owned())]
+        );
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
     }
