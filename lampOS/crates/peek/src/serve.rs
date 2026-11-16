@@ -578,7 +578,11 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         words,
         Some(now_unix_ms()),
     )));
-    events.push(Event::default().event("turns").data(page::turns(&turns)));
+    events.push(
+        Event::default()
+            .event("turns")
+            .data(page::turns(&turns, &entries, words)),
+    );
     let tasks_html = match (&tasks_kept, &tasks) {
         (Some(_), None) => "<p class=\"warn\">The tasks' progress can't be read.</p>".to_owned(),
         _ => page::tasks(tasks.as_ref(), now_unix_ms()),
