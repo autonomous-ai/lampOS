@@ -54,6 +54,10 @@ Environment=LAMP_SKILL_DEFAULT_AGENT=on
 # OpenClaw, and either falls back to the other when it is not installed. Its Gateway runs always under
 # lamp-update's unit; lamp-tasks only waits for it to answer before a launch.
 Environment=LAMP_OPENCLAW_ON_LAMP=on
+# An OpenClaw task's own steps on the bus (#7267, docs/tasks.md "An agent's steps"): each tool call, its result's first
+# 120 bytes, the agent's reply and an error, read from its session in OpenClaw's SQLite every second (read-only),
+# nothing written. Words on the bus, so off in the product until its lamp check; a dev lamp turns it on with
+#   Environment=LAMP_TASKS_STEPS=on
 # --reply-named (#5535) types the work into the session the person names (lamp-voice.service's LAMP_TASKS_REPLY_NAMED),
 # never a new one.
 # A follow-up for a session --close-told already closed (#5978): it is found by its last ask with `harness show`

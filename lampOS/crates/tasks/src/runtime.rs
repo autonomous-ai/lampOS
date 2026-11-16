@@ -19,7 +19,7 @@ use crate::{
 };
 use lamp_bus::{Bus, Publisher};
 use lamp_ipc::caller::Caller;
-use lamp_msgs::{Diagnostic, Level, TaskStatus};
+use lamp_msgs::{Diagnostic, Level, TaskStatus, TaskStep};
 use rustix::event::{PollFd, PollFlags, Timespec, poll};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -1507,6 +1507,9 @@ struct Report {
     reads: Option<Reads>,
     /// With `serve --set-up-later`: what was last found.
     set_up: Option<SetUp>,
+    /// The tasks watched now, for their steps (`LAMP_TASKS_STEPS`,
+    /// [`crate::steps`]).
+    watched: Vec<Watched>,
 }
 /// What `serve --set-up-later` last found.
 #[derive(Clone, Copy, Default)]
@@ -2760,6 +2763,11 @@ fn owner<C: Clock>(
             status: status.clone(),
             reads: tracker.as_ref().map(Tracker::reads),
             set_up,
+            watched: if crate::steps::on() {
+                engine.watched(&clock.sample()?)
+            } else {
+                Vec::new()
+            },
         };
     }
     Ok(())
@@ -4835,6 +4843,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         status: None,
         reads: None,
         set_up: None,
+        watched: Vec::new(),
     }));
     let (public, _public_binding) = bind(&config.socket)?;
     let (trusted, _trusted_binding) = bind(&config.voice_socket)?;
@@ -4860,6 +4869,19 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         None
     };
     let mut status_published = 0u64;
+    // An OpenClaw task's own steps (#7267): with `LAMP_TASKS_STEPS=on` only;
+    // off, no reader and the topic is not touched.
+    let mut steps = match crate::steps::switched(
+        std::env::var(crate::steps::SWITCH).ok().as_deref(),
+        crate::steps::roots(std::env::var(crate::steps::STATE_SETTING).ok().as_deref()),
+    ) {
+        Some(reader) => Some((
+            reader,
+            bus.publisher_declared(TaskStep::TOPIC, &TaskStep::declaration(), "tasks")?,
+            Instant::now(),
+        )),
+        None => None,
+    };
     let _stopping = StopOnDrop(stop.clone());
     let (jobs_tx, jobs_rx) = mpsc::sync_channel(1);
     let (outcomes_tx, outcomes_rx) = mpsc::sync_channel(1);
@@ -5025,6 +5047,12 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
             {
                 publish(out, status.as_ref(), &mut errors);
                 status_published = *number;
+            }
+            if let Some((reader, out, began)) = steps.as_mut() {
+                let now_ms = u64::try_from(began.elapsed().as_millis()).unwrap_or(u64::MAX);
+                for step in reader.tick(&report.watched, now_ms, unix_ms()) {
+                    publish(out, &step, &mut errors);
+                }
             }
             let ready = report.updated.elapsed() <= STALE_AFTER
                 && !owner.is_finished()

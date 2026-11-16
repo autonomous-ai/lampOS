@@ -18,6 +18,9 @@ rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint"] }
 rustix = { version = "1", features = ["fs", "process", "time", "net", "event", "pipe", "stdio"] }
 getrandom = "0.4"
 signal-hook = "0.4"
+# OpenClaw keeps some transcript events zstd-compressed (`event_zstd`; 27 of 115 rows on lamp-52e6,
+# the large tool results): decoded by a pure-Rust decoder, no C build (#7267, `steps`).
+ruzstd = { version = "=0.7.3", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 tempfile = "3"
