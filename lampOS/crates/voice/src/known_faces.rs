@@ -87,7 +87,7 @@ pub fn rename_yes_on() -> bool {
     std::env::var(RENAME_YES_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// The owner's name learned on the paths that lost it on lamp-52e6 (#7331):
+/// The owner's name learned on the paths that lost it on lamp-74ff (#7331):
 /// a rename question cut before its name was heard is asked again
 /// (`second_provider::held_rename`), a name given while nobody is known
 /// goes to the face save (`remember::needs_face`), and a name spelled after
@@ -2721,7 +2721,7 @@ fn run_switched(
     // At setup, a name not heard is taken as they spelled it in the turn in
     // hand: the letters are their own words, not the model's guess (#5140
     // row 6, lamp-0c4e: a misheard name never passed this check).
-    // With `LAMP_NAME_LEARN_FIX`, so is a rename's (#7331): on lamp-52e6 a
+    // With `LAMP_NAME_LEARN_FIX`, so is a rename's (#7331): on lamp-74ff a
     // rename spelled after the lamp asked for it was NOT_HEARD.
     let spelled;
     // With `LAMP_NAME_LEARN_FIX`, a name heard as its letter is the same
@@ -6055,7 +6055,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
 
-    /// #7331 (lamp-52e6, 15 Nov): a rename spelled after the lamp asked for
+    /// #7331 (lamp-74ff, 16 Nov): a rename spelled after the lamp asked for
     /// a spelling was refused, and a name of two letters reached the eyes
     /// as its letters. With `LAMP_NAME_LEARN_FIX`, the letters spelled in
     /// the turn in hand after a spell ask are the name and its yes, as at

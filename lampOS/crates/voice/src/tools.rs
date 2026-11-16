@@ -1131,7 +1131,7 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
         // A rename's yes judged by its guards (`LAMP_NAMES_RENAME_YES`,
         // #5485): only with names checked.
         rename_yes: settings.names_checked && crate::known_faces::rename_yes_on(),
-        // A name the face paths lost on lamp-52e6 kept (`LAMP_NAME_LEARN_FIX`,
+        // A name the face paths lost on lamp-74ff kept (`LAMP_NAME_LEARN_FIX`,
         // #7331): only with names checked.
         name_learn_fix: settings.names_checked && crate::known_faces::name_learn_fix_on(),
     }

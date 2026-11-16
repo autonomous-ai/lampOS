@@ -1609,7 +1609,7 @@ With the switch:
     rename (`replace`) takes the letters the same way: spelled in the turn
     in hand right after the lamp asked for a spelling, they are the name
     and its yes, two letters joined as a word ("A d a", "A, d, a" and
-    "A l" send `{"remember":"Ada","replace":true}` and "Al"); on lamp-52e6
+    "A l" send `{"remember":"Ada","replace":true}` and "Al"); on lamp-74ff
     such a rename was refused as not heard or not agreed
     (`known_faces::tests::a_spelled_short_name_is_heard_on_a_rename`).
     With the same switch, a name that sounds like a letter is one name
@@ -1765,7 +1765,7 @@ With the switch:
     the hold instead, once, and the model is told the question was not
     heard and to ask it again (`held_rename::ask_again_note`); the 60 s and
     every other guard stand, and nothing is renamed without the yes to the
-    question asked again. On lamp-52e6 a line began over the question,
+    question asked again. On lamp-74ff a line began over the question,
     none of it played, and the rename was dropped in silence
     (`a_rename_question_cut_before_its_name_keeps_the_hold`). A line carried into the
     asker's conversation going on and read as theirs
