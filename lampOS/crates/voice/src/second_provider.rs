@@ -14662,7 +14662,10 @@ fn ask_once_forget(
     let held = net::ToolCall {
         id: call.id.clone(),
         name: crate::remember::FORGET.to_owned(),
-        args: serde_json::json!({ "source_id": id }),
+        // The words it is about go with it: their yes takes that
+        // person's exchanges about them too, as a forget about does (C128,
+        // lamp-06c1 build 13523).
+        args: serde_json::json!({ "source_id": id, "about": subject }),
         extra: None,
     };
     match hold_forget_as(shared, request, &held, asker, (shared.clock)(), true) {
