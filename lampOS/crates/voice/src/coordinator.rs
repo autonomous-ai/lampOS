@@ -3035,6 +3035,8 @@ pub fn run_fixture(
     output: &Path,
     options: FixtureOptions,
 ) -> Result<()> {
+    // Off Linux: no host sound, refused by name before the signal handler or any worker.
+    options.refuse_host_sound_off_linux()?;
     let termination = Termination::install()?;
     if !options.directed.diagnostics {
         return Err(io::Error::other("fixture experiments require explicit --diagnostics").into());
@@ -3058,7 +3060,7 @@ pub fn run_fixture(
         None,
         None,
         Some(info),
-        &ControlsOptions::default(),
+        &options.controls,
         cues,
         &termination,
     )

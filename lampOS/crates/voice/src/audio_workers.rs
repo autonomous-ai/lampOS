@@ -385,6 +385,23 @@ pub fn capture_with_options(
     device: &str,
     options: &AudioWorkerOptions,
 ) -> Result<()> {
+    // `--microphone-device silent` (only `directed-fixture` can ask for it): no sound at all.
+    if crate::silent_capture::is_silent_device(device) {
+        return capture_on::<crate::silent_capture::SilentCapture>(
+            channels,
+            controller,
+            worker,
+            directory,
+            device,
+            options.diagnostic_directory.as_deref(),
+            options.noise_suppression,
+            options.reference_clock,
+            options.reference_recovery,
+            options.echo_reference.reference(),
+            options.stop_words,
+            capture_wait_from_environment(),
+        );
+    }
     if crate::bus_capture::is_bus_device(device) {
         return capture_on::<crate::bus_capture::BusCapture>(
             channels,
