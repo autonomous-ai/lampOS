@@ -14,7 +14,7 @@ use std::sync::{Mutex, Once};
 use std::time::{Duration, Instant};
 
 /// How long the cached known face stays proof after the provider's loop
-/// noted it (it notes every 500 ms; the cache drops a face over 3 s old
+/// noted it (it notes every 500 ms; the cache drops a face over 4 s old
 /// before noting it, so the two windows add up to little more than 1 s
 /// past the cache's own).
 pub const KNOWN_FRESH: Duration = Duration::from_secs(1);
