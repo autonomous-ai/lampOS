@@ -109,7 +109,7 @@ impl Line {
     }
 }
 
-fn request_of(command: &ProviderInput) -> u64 {
+pub(super) fn request_of(command: &ProviderInput) -> u64 {
     match command {
         ProviderInput::Start { request, .. }
         | ProviderInput::Audio { request, .. }

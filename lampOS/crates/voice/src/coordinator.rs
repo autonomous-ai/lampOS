@@ -1313,6 +1313,15 @@ struct Reply {
     down_line_said: bool,
 }
 impl Reply {
+    /// Whether a mark for this turn can still be sent: its input still
+    /// open to the provider, no End queued or sent. A lamp's own written
+    /// line is its start and end at once, and a local-only turn (#830) or
+    /// an abandoned one is closed: a mark queued for one could never be
+    /// sent and would outlive its turn (#7219).
+    fn takes_marks(&self) -> bool {
+        !self.local_input_ended && self.cloud.input_open()
+    }
+
     fn settled(&self, speaker_pending: &Option<PendingSpeaker>) -> bool {
         self.output_settled(speaker_pending) && !self.requested_audio_waiting()
     }
@@ -10022,7 +10031,7 @@ fn conversation_with_gate_inner(
             // reads the mark only once the line's words are in.
             if matches!(step, AdmissionStep::Audio(_) | AdmissionStep::End(_))
                 && let Some(current) = reply.as_ref()
-                && !current.local_input_ended
+                && current.takes_marks()
                 && current.owner.turn() > step_call_told
                 && sentence_turn != Some(current.owner.turn())
                 // Its End sent early: nothing more goes for it.
@@ -11922,6 +11931,16 @@ fn conversation_with_gate_inner(
                     trace,
                     json!({"kind":"second_look_due","turn":turn,"at_us":monotonic_us(),"name_score":score}),
                 )?;
+            }
+            // Whatever is still queued for the settled turn can never be
+            // sent (its input is closed) and would outlive it, as the cancel
+            // paths' `provider_queue.clear()` keeps from happening (#7219):
+            // dropped with it. Another turn's input still fails as unowned.
+            let dropped = drop_settled_input(&mut provider_queue, turn);
+            if dropped > 0 {
+                eprintln!(
+                    "lamp-voice: request {turn}: {dropped} queued input it could no longer send dropped as it settled"
+                );
             }
             *reply = None;
         }
@@ -16881,14 +16900,17 @@ fn after_start(
 }
 
 /// The turn in hand marked as begun while the walk is under way, once,
-/// if [`after_start`] did not mark it as it began.
+/// if [`after_start`] did not mark it as it began, and only while it
+/// [takes marks](Reply::takes_marks).
 fn mark_onboarding(
     queue: &mut VecDeque<ProviderInput>,
     marked: &mut Option<u64>,
     reply: Option<&Reply>,
     privacy_generation: u64,
 ) {
-    let Some(current) = reply.filter(|current| *marked != Some(current.owner.turn())) else {
+    let Some(current) =
+        reply.filter(|current| *marked != Some(current.owner.turn()) && current.takes_marks())
+    else {
         return;
     };
     *marked = Some(current.owner.turn());
@@ -16896,6 +16918,13 @@ fn mark_onboarding(
         request: current.owner.turn(),
         privacy_generation,
     });
+}
+
+/// Drops what is queued for `turn` as its reply settles, and says how much.
+fn drop_settled_input(queue: &mut VecDeque<ProviderInput>, turn: u64) -> usize {
+    let before = queue.len();
+    queue.retain(|command| second::request_of(command) != turn);
+    before - queue.len()
 }
 
 /// Whether the provider worker is told the walk's state `now` (its turn in
@@ -20830,6 +20859,26 @@ mod tests {
         flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
         reply = None;
         flush_provider_input_with(&cloud, &mut reply, &mut queue, |_| Ok(())).unwrap();
+        assert!(queue.is_empty());
+    }
+
+    /// A settled turn's queued input goes with it; another turn's stays,
+    /// so the flush still fails loud on it.
+    #[test]
+    fn a_settled_turn_drops_only_its_own_queued_input() {
+        let mut queue = VecDeque::from([
+            ProviderInput::Onboarding {
+                request: 4,
+                privacy_generation: 1,
+            },
+            ProviderInput::Onboarding {
+                request: 5,
+                privacy_generation: 1,
+            },
+        ]);
+        assert_eq!(drop_settled_input(&mut queue, 4), 1);
+        assert_eq!(queue.len(), 1);
+        assert_eq!(drop_settled_input(&mut queue, 5), 1);
         assert!(queue.is_empty());
     }
 
