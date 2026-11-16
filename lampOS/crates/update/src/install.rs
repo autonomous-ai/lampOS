@@ -44,6 +44,10 @@ pub const PRODUCT: &[(&str, &str)] = &[
         include_str!("../../../deploy/product/lampos.target"),
     ),
     (
+        "lampos.slice",
+        include_str!("../../../deploy/product/lampos.slice"),
+    ),
+    (
         "lampos-voice.slice",
         include_str!("../../../deploy/product/lampos-voice.slice"),
     ),
