@@ -2773,6 +2773,40 @@ fn a_hand_over_harness_answers_not_running_twice_is_refused_once_with_no_loop() 
     assert!(s.counts.daemon_starts.load(Ordering::SeqCst) <= 3);
 }
 
+/// The first builder's P2 on #7282: a daemon that never starts. The start
+/// made due by the not-running answer gets one try, never the sign-in's
+/// four (10, 20 and 40 s apart on a lamp); when it fails, the task goes at
+/// once to its final `new` and ends `not_sent` with `harness_not_running`,
+/// which the person is told, never left queued until it expires.
+#[test]
+fn a_hand_over_whose_daemon_never_starts_ends_not_sent_after_one_try() {
+    let (s, _home, _bin) = signed_out_lamp(10);
+    s.counts.daemon_fails.store(100, Ordering::SeqCst);
+    let prepared = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    let id = prepared["id"].clone();
+    let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+    let start = Instant::now();
+    assert_eq!(s.trusted(confirm)["ok"], true);
+    let task = s.wait(&id, |v| v["task"]["dispatch"]["state"] == "not_sent");
+    assert!(
+        start.elapsed() < Duration::from_secs(5),
+        "{:?}",
+        start.elapsed()
+    );
+    assert_eq!(
+        task["task"]["dispatch"]["code"], "harness_not_running",
+        "{task}"
+    );
+    // Past the retries' 50, 100 and 200 ms here: no second start.
+    thread::sleep(Duration::from_millis(600));
+    assert_eq!(
+        *s.counts.order.lock().unwrap(),
+        ["launch", "daemon", "launch"]
+    );
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 2);
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 2);
+}
+
 /// #5978, the PM: with `LAMP_HERMES_ON_LAMP` off (unset, `off`, or any
 /// value but `on`), routing is as on stable. The lamp is listed as a
 /// Harness machine with Hermes installed, yet it is no target: the targets
