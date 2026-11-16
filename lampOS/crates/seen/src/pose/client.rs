@@ -25,7 +25,7 @@
 //! over TLS, or to this computer (the simulator and the tests) in the
 //! clear: [`Address::parse`].
 use crate::crypto::{self, Session, public_key_from_pem};
-use crate::wire::{ANSWER_WITHIN_S, Ergo, PoseAnswer, Task};
+use crate::wire::{ANSWER_WITHIN_S, Ergo, Joint, PoseAnswer, Task};
 use rsa::RsaPublicKey;
 use serde::Serialize;
 use std::io::{self, Read, Write};
@@ -203,8 +203,13 @@ impl Failure {
 /// How one request ended.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Outcome {
-    /// Answered: the score, or none when no body was found.
-    Answered(Option<Ergo>),
+    /// Answered: the score, or none when no body was found, and the two
+    /// shoulders of `pose_2d` when it carries them ([`PoseAnswer::shoulders`],
+    /// read only by the held sitting, [`crate::hold`]).
+    Answered {
+        ergo: Option<Ergo>,
+        shoulders: Option<[Joint; 2]>,
+    },
     /// `{"error":"busy"}`: the frame was dropped by the server.
     Busy,
     Failed(Failure),
@@ -599,7 +604,10 @@ impl Socket {
         Ok(match answer.error.as_deref() {
             Some("busy") => Outcome::Busy,
             Some(_) => Outcome::Failed(Failure::Server),
-            None => Outcome::Answered(answer.ergo),
+            None => Outcome::Answered {
+                shoulders: answer.shoulders(),
+                ergo: answer.ergo,
+            },
         })
     }
 

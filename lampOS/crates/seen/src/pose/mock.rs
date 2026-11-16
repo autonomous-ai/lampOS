@@ -47,6 +47,8 @@ pub(crate) fn public() -> RsaPublicKey {
 pub(crate) enum Reply {
     /// Answer the frame with this `ergo` (none: no body found).
     Ergo(Option<Value>),
+    /// Answer the frame with this whole answer (`pose_2d`, `ergo`).
+    Answer(Value),
     Busy,
     /// `{"error":"Processing failed"}`.
     Failed,
@@ -260,6 +262,7 @@ fn serve(stream: TcpStream, reply: Reply, log: Arc<Mutex<Vec<Seen>>>) {
                     Reply::Ergo(None) => {
                         json!({"pose_2d": {"graph_type": "coco", "joints": [], "confs": []}})
                     }
+                    Reply::Answer(answer) => answer.clone(),
                     Reply::Busy => json!({"error": "busy"}),
                     Reply::Failed => json!({"error": "Processing failed"}),
                     Reply::Silent => continue,
