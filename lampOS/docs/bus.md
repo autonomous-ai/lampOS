@@ -671,7 +671,7 @@ are unchanged.
 | Topic | Kind | Published by | Intended reader |
 |---|---|---|---|
 | `tasks/status` | latest, no period, no lifespan | `lamp-tasks serve --progress` | The policy's progress question (`lamp-policy --progress`); the voice's task news, for a task newly settled (#560, [tasks.md](tasks.md), "Telling") and, with `LAMP_PROGRESS_NEWS=on`, for progress; `lamp-peek`'s Tasks section and overview, read as the kept value ([peek.md](peek.md), #7208) |
-| `tasks/step` | event, no period, no lifespan | Nothing yet: declared ahead of its publisher, `lamp-tasks` reading the engine's own transcript behind a switch, off unless set (#7267 PR 2) | `lamp-peek`, in monitor mode only (#7267 PR 3) |
+| `tasks/step` | event, no period, no lifespan | Nothing yet: declared ahead of its publisher, `lamp-tasks` reading the engine's own transcript behind a switch, off unless set (#7267 PR 2) | `lamp-peek`, in every mode; only a step's arguments and result need monitor mode (#7267 PR 3) |
 
 The [`TaskStatus` message](msgs.md#the-tasks-contract) says, as typed state,
 how each piece of work the lamp handed over is going; the agent's words stay
