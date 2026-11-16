@@ -19384,6 +19384,53 @@ fn a_wrapped_arm_let_go_just_after_the_seam_is_not_driven_the_long_way() {
     }
 }
 
+/// The same repro past `WAIT_ASKING` (Migrate's P1 on #6836): nobody has
+/// set the arm straight for ten minutes, so the arm is let down slowly and
+/// the lamp no longer asks, and a hand then carries the elbow back across
+/// the seam at 640 s. A held arm is still read every `WAIT_READ`, so the
+/// crossing is caught at once and the elbow is never driven the long way
+/// toward 218, whatever the simulator's models.
+#[test]
+fn a_wrapped_arm_carried_across_the_seam_after_ten_minutes_is_not_driven_the_long_way() {
+    for (hand_is_load, weak_is_slow) in [(true, true), (false, true), (true, false), (false, false)]
+    {
+        for held_for in [0.30f32, 0.40, 0.6, 1.0] {
+            let found = [2_035, 3_441, 218, 2_035, 2_478];
+            let powered = powered_up_on(
+                &LAMP_52E6,
+                found,
+                |lamp| {
+                    lamp.hand_is_load = hand_is_load;
+                    lamp.weak_is_slow = weak_is_slow;
+                    lamp.servos[Joint::ElbowPitch.index()].position += 4_096.0;
+                    lamp.hands.push((
+                        Duration::from_secs(640),
+                        Duration::from_secs_f32(640.0 + held_for),
+                        2,
+                        3_950.0,
+                    ));
+                },
+                Duration::from_secs(680),
+            );
+            let lamp = &powered.lamp;
+            let elbow = lamp.servos[Joint::ElbowPitch.index()].position;
+            let case = format!(
+                "hand as load {hand_is_load}, weak slow {weak_is_slow}, let go {held_for} s in, at 640 s"
+            );
+            assert!(
+                (3_300.0..=4_050.0).contains(&elbow),
+                "{case}: the elbow ended at true {elbow}; stop {:?}",
+                powered.report.stop
+            );
+            assert!(
+                !matches!(powered.report.stop, Stop::BadRead { .. }),
+                "{case}: {:?}",
+                powered.report.stop
+            );
+        }
+    }
+}
+
 /// A lamp found folded whose head cannot rise (the pitch pinned) stops its
 /// wake and ends held, as before #5693: it does not take the held wait,
 /// whose arm condition it already meets, and loop into the same wake.
