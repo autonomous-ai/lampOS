@@ -485,6 +485,10 @@ fn read(
 /// skipped and counted, never decoded further.
 const MOST_DECODED: u64 = 64 * 1024;
 
+/// Why a compressed event whose frame asks for a window past
+/// [`MOST_WINDOW`] is skipped.
+const WINDOW_TOO_LARGE: &str = "a compressed event asks for a window past 1 MiB";
+
 /// A compressed event (`event_zstd`, one zstd frame) decoded as it streams,
 /// stopping at [`MOST_DECODED`] + 1 bytes: never more is decoded.
 fn decoded(blob: &[u8]) -> Result<String, &'static str> {

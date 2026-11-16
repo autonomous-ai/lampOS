@@ -612,3 +612,82 @@ fn a_read_takes_at_most_256_kib() {
     reader.tick(&watched(None), 3 * EVERY_MS, WALL);
     assert_eq!(reader.tails[&TASK].after, 4);
 }
+
+/// Every step of two tasks, as (task, tool), in order.
+fn by_task(steps: &[TaskStep]) -> Vec<(u64, String)> {
+    let mut seen: Vec<(u64, String)> = steps
+        .iter()
+        .map(|step| (step.task, step.tool.clone()))
+        .collect();
+    seen.dedup();
+    seen
+}
+
+/// The Reviewer-lead's race (#7286, 17:00): task A begins before OpenClaw
+/// made its session, B begins (on the same agent) before A's next read.
+/// Each step still goes out under one task only.
+#[test]
+fn a_task_begun_before_its_session_is_bounded_by_the_next() {
+    let lamp = Lamp::with("");
+    let key = format!("agent:main:harness-{AGENT}");
+    lamp.db
+        .execute("DELETE FROM session_nodes WHERE session_key = ?1", params![key])
+        .unwrap();
+    let mut reader = lamp.steps();
+    let first = [task(7, None)];
+    let both = [task(7, None), task(8, None)];
+    assert!(reader.tick(&first, 0, WALL).is_empty());
+    // OpenClaw makes the session for A's ask, then B is handed over.
+    lamp.db
+        .execute(
+            "INSERT INTO session_nodes VALUES (?1, 's1', '{}', 1)",
+            params![key],
+        )
+        .unwrap();
+    lamp.append(&(call("a1", "first_tool", 10) + &result("a1", "first words", 11)));
+    assert!(reader.tick(&both, EVERY_MS / 2, WALL).is_empty());
+    lamp.append(&(call("b1", "second_tool", 20) + &result("b1", "second words", 21)));
+    let steps = reader.tick(&both, EVERY_MS, WALL);
+    assert_eq!(
+        by_task(&steps),
+        [(7, "first_tool".to_owned()), (8, "second_tool".to_owned())]
+    );
+}
+
+/// Both tasks begun before OpenClaw made the session: it is the newer one's.
+#[test]
+fn two_tasks_begun_before_their_session_give_it_to_the_newer() {
+    let lamp = Lamp::with("");
+    let key = format!("agent:main:harness-{AGENT}");
+    lamp.db
+        .execute("DELETE FROM session_nodes WHERE session_key = ?1", params![key])
+        .unwrap();
+    let mut reader = lamp.steps();
+    assert!(reader.tick(&[task(7, None)], 0, WALL).is_empty());
+    let both = [task(7, None), task(8, None)];
+    assert!(reader.tick(&both, EVERY_MS / 2, WALL).is_empty());
+    lamp.db
+        .execute(
+            "INSERT INTO session_nodes VALUES (?1, 's1', '{}', 1)",
+            params![key],
+        )
+        .unwrap();
+    lamp.append(&call("b1", "second_tool", 20));
+    let steps = reader.tick(&both, EVERY_MS, WALL);
+    assert_eq!(by_task(&steps), [(8, "second_tool".to_owned())]);
+}
+
+/// A frame whose header asks for a window past 1 MiB is never decoded: the
+/// decoder would reserve that window (up to 100 MiB) first.
+#[test]
+fn a_compressed_event_asking_a_large_window_is_skipped() {
+    // Magic, descriptor 0x00 (no single segment, no checksum, no size),
+    // window descriptor 0x80: exponent 16, a 64 MiB window.
+    let header = [0x28, 0xb5, 0x2f, 0xfd, 0x00, 0x80];
+    assert_eq!(decoded(&header), Err(WINDOW_TOO_LARGE));
+    let (steps, undecoded) = compressed(&header);
+    assert_eq!(undecoded, 1);
+    assert_eq!(steps.len(), 3);
+    // The fixture's own frames ask for small windows and decode.
+    assert!(decoded(TOOL_RESULT_ZST).is_ok());
+}
