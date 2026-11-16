@@ -112,6 +112,9 @@ const MOST_ANSWER_BYTES: usize = 20 * 1024;
 /// `no_namespace`: the wrapper or the namespace script has no make-home
 /// line yet (an older lamp-update round).
 const NOT_HELD_OFF_CODES: [&str; 3] = ["off", "not_held_off", "no_namespace"];
+/// lamp-tasks' refusal of a make that can't start because Harness or the
+/// gateway isn't ready yet (#7245, `lamp_tasks::skill_make::NOT_READY`).
+const NOT_READY_CODE: &str = "not_ready";
 /// The one engine a make is handed to: only Hermes has a namespace runner
 /// for a make today (lamp-tasks' `MakeHermes`, #6643's 19:14 ruling).
 pub const MAKE_ENGINE: &str = "Hermes";
@@ -475,6 +478,11 @@ impl Agent {
         if NOT_HELD_OFF_CODES.contains(&code.as_str()) {
             return Err(NotWritten::NoMakeRun);
         }
+        // Harness or the gateway not ready yet (#7245): the lamp's own
+        // short line, said to the person at once.
+        if code == NOT_READY_CODE {
+            return Err(NotWritten::Failed(crate::made_skill::NOT_READY_LINE.into()));
+        }
         Err(NotWritten::Failed(format!(
             "lamp-tasks didn't make it ({code})"
         )))
@@ -679,7 +687,7 @@ pub(crate) mod tests {
                             Some(engine) => {
                                 let engine = match engine {
                                     "old" | "not_held_off" | "no_namespace" | "busy"
-                                    | "run_failed" => "hermes",
+                                    | "run_failed" | "not_ready" => "hermes",
                                     engine => engine,
                                 };
                                 json!({"ok":true,"targets":[{"alias":"lamp","engine":engine}]})
@@ -689,7 +697,13 @@ pub(crate) mod tests {
                         "skill_make"
                             if matches!(
                                 engine,
-                                Some("not_held_off" | "no_namespace" | "busy" | "run_failed")
+                                Some(
+                                    "not_held_off"
+                                        | "no_namespace"
+                                        | "busy"
+                                        | "run_failed"
+                                        | "not_ready"
+                                )
                             ) =>
                         {
                             json!({"ok":false,"error":engine.unwrap(),"message":"no"})
