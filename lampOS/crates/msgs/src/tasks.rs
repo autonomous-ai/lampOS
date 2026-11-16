@@ -290,7 +290,7 @@ pub const TASK_STEP_MOST_RESULT_BYTES: usize = 120;
 /// the engine's own session transcript: the tool it called and the start
 /// of its result. It carries the result's words, so its publisher is
 /// switched (off unless set) and peek shows it only in monitor mode.
-/// Declared ahead of its publisher (#7267's PR 2): nothing publishes it yet.
+/// Published by `lamp-tasks` with `LAMP_TASKS_STEPS=on` (#7267, `docs/tasks.md`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskStep {
     /// The task's number, as `tasks/status` and `voice/decision` give it.
