@@ -7226,6 +7226,15 @@ pub(crate) struct Heeding {
     name_stays: bool,
     /// `LAMP_WINDOW_FROM_START=on` ([`Self::measuring_windows_from_start`]).
     from_start: bool,
+    /// `LAMP_BUSY_FOLLOW_UP_RENEWS=on` ([`Self::renewing_busy_follow_ups`]).
+    follow_up_renews: bool,
+    /// With it, the request let out as the caller's own follow-up
+    /// ([`FOLLOW_UP_NOTE`]).
+    follow_up_line: Option<u64>,
+    /// With it, the speakers seen in the line judged last and whether it
+    /// was in the conversation's voice: a held question of the same
+    /// speaker's is no question to someone else.
+    last_speakers: Option<(crate::speaking_faces::Speakers, bool)>,
     said_lately: std::collections::VecDeque<(u64, (u64, u64), bool, u64)>,
     /// The requests of [`Self::said_lately`] the rule let out, newest last:
     /// a let-out line the lamp didn't answer (`not_for_me`) holds nothing
@@ -7969,6 +7978,12 @@ pub(crate) const NAME_THEN_HELD: &str = "(For you to know, not to answer: right 
 /// a big saving."), where Live answered it once (#1712).
 pub(crate) const CONVERSATION_ALONE: &str = "(For you to know, not to answer: nobody said your name or turned to you. This reached you only because you were just talking with someone, and people near you may be talking to each other. If it is plainly said to someone else, or a remark to the room, call not_for_me and say nothing. A follow-up to what you were just talking about is for you.)";
 
+/// With `LAMP_BUSY_FOLLOW_UP_RENEWS=on`, told in the place of
+/// [`CONVERSATION_ALONE`] beside a line let out only as the conversation
+/// going on and spoken by the one the lamp was talking with (#7332): told
+/// the other note, the owner's follow-ups on lamp-74ff got `not_for_me`.
+pub(crate) const FOLLOW_UP_NOTE: &str = "(For you to know, not to answer: nobody said your name this time, but this is the person you were just talking with, speaking again. Take it as a follow-up to your conversation and answer it. Only if it is plainly said to someone else, call not_for_me and say nothing.)";
+
 /// How the rule saw a line when it judged it, kept for a verdict given
 /// once the Policy decides ([`Heeding::policy_now`]).
 struct Seen {
@@ -8289,6 +8304,9 @@ impl Heeding {
             faces_held: None,
             name_stays: false,
             from_start: false,
+            follow_up_renews: false,
+            follow_up_line: None,
+            last_speakers: None,
             said_lately: std::collections::VecDeque::new(),
             let_out_lately: std::collections::VecDeque::new(),
             spoke: std::collections::VecDeque::new(),
@@ -8845,6 +8863,12 @@ impl Heeding {
     /// (`LAMP_WINDOW_FROM_START=on`).
     pub(crate) fn measuring_windows_from_start(&mut self) {
         self.from_start = true;
+    }
+
+    /// `LAMP_BUSY_FOLLOW_UP_RENEWS=on` (#7332): inside a live back-and-forth
+    /// the doubt goes to the person.
+    pub(crate) fn renewing_busy_follow_ups(&mut self) {
+        self.follow_up_renews = true;
     }
 
     /// With [`Self::needing_name_or_follow_up`], whether the line in hand,
@@ -32104,3 +32128,7 @@ mod kept_name_callback;
 #[cfg(test)]
 #[path = "worker/held_keeps_caller_tests.rs"]
 mod held_keeps_caller;
+
+#[cfg(test)]
+#[path = "worker/busy_follow_up_tests.rs"]
+mod busy_follow_up;
