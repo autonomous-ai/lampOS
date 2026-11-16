@@ -176,6 +176,7 @@ jobs:
           cargo test --locked -p lamp-voice --lib bus_capture::
           cargo test --locked -p lamp-voice --lib audio_workers::
           cargo test --locked -p lamp-voice --lib peer_stop::
+          cargo test --locked -p lamp-voice --lib process::ring_startup_tests::
           cargo test --locked -p lamp-voice --lib transport::tests::a_receive_from_a_peer_that_has_gone
       - name: lamp-sim's tests
         working-directory: lampOS
