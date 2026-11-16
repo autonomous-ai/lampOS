@@ -875,9 +875,13 @@ impl MakeGateway {
         let looks = runner.clone();
         Self {
             pick: Box::new(move || match looks.make_agent()? {
-                (engine, true) => Ok(MakeAgent::Gateway(engine)),
-                (crate::harness::EngineKind::Hermes, false) => Ok(MakeAgent::Hermes),
-                (engine, false) => Err(format!(
+                Some((engine, true)) => Ok(MakeAgent::Gateway(engine)),
+                // Hermes lamps unchanged (#7245's done-when): the lamp's
+                // Hermes, and with Harness not set up (no gateway agent
+                // can be reached), as without the field, with no Harness
+                // check.
+                Some((crate::harness::EngineKind::Hermes, false)) | None => Ok(MakeAgent::Hermes),
+                Some((engine, false)) => Err(format!(
                     "the lamp's default agent ({}) is neither a gateway agent nor the lamp's Hermes, so a make is not handed to it and nothing was started",
                     engine.argument()
                 )),
