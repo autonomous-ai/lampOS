@@ -3259,7 +3259,10 @@ Yêu cầu của chủ (12/11): một `SKILL.md` tải lên từ app chạy qua 
 13/11 (phán quyết của chủ: luồng tải lên đi qua agent), đặt trong
 `lamp-voice`, `lamp-cloud`, `lamp-skills` và `lamp-skills-manage@`;
 `LAMP_TASK_NET` cũng bật trong sản phẩm, nên tệp cần tới internet được cấp `net` (chỉ web công khai trên cổng 80 và 443, không bao giờ mạng trong nhà),
-hỏi lời đồng ý bằng giọng nói của chủ ở lần chạy đầu. Khi bật (trong `lamp-voice`, `lamp-cloud`,
+hỏi lời đồng ý bằng giọng nói của chủ ở lần chạy đầu. Khi đường chạy chung của lamp-update bật
+(`LAMP_SKILL_DEFAULT_AGENT`, bật trong sản phẩm), lần chạy đó, như mọi lần chạy của kỹ năng
+agent, hiện bị từ chối (`run_failed`, `NOT_HELD_OFF`; docs/vi/tasks_vi.md, "Trên đường chạy
+chung"). Khi bật (trong `lamp-voice`, `lamp-cloud`,
 `lamp-skills` và manage helper), một `SKILL.md` trần tối đa 64 KiB thành một
 kỹ năng agent thay vì kỹ năng viết (tắt: như trước, ghi chú tối đa 900 byte):
 tệp được giữ nguyên là `scripts/SKILL.md`; kỹ năng là một công cụ giọng nói
@@ -3714,7 +3717,14 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
 - **`grants = [...]`:** ở đầu `skill.toml`, chỉ đi cùng `do.task`: mỗi mục là
   một grant của lamp-control (`body`, `light`, `speak`, `look`, `hear`,
   `sound`, `air`, `device`, `camera`, `microphone`, `notes`, `speech`), mỗi
-  mục một lần, không bao giờ `skills`; grant lạ làm kỹ năng bị từ chối.
+  mục một lần, không bao giờ `skills`. Với `LAMP_TASK_NET=on` (bật trong sản
+  phẩm) thêm một mục, `net` ("reaches the internet"): lần chạy, bị giữ như mọi
+  lần chạy, tới được web công khai trên cổng 80 và 443 qua socket lối ra riêng,
+  không bao giờ tới mạng của đèn, router trong nhà hay các cổng cục bộ của đèn
+  (docs/vi/tasks_vi.md); khi đường chạy chung bật (`LAMP_SKILL_DEFAULT_AGENT`,
+  bật trong sản phẩm) lần chạy đó hiện bị từ chối. `net` không bao giờ là grant
+  của lamp-control, nên lời đồng ý giữ nó và token không bao giờ nêu nó. Grant
+  lạ làm kỹ năng bị từ chối.
 - **Chỉ loại đầu tiên:** kỹ năng có `do.task` chỉ nạp khi script đến từ
   Skills Store (`.package.json` có `from_store`) hoặc được máy tính đã ghép
   đôi của chủ đèn đẩy lên (thư mục developer; đọc lại là đến từ "your
