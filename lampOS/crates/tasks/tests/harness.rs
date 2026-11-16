@@ -9466,6 +9466,46 @@ fn a_gateway_make_with_a_slow_hand_over_still_gets_its_whole_time() {
     );
 }
 
+/// #7278 (lamp-c0a4, 16 Nov 19:03): OpenClaw replied its `cannot:` line in
+/// chat and wrote no `answer.md`. With no file, a chat answer that is a
+/// make's answer (a `cannot:` line or the fenced blocks) is taken; any
+/// other chat is still `no_answer`.
+#[test]
+fn a_gateway_make_with_no_answer_file_takes_a_cannot_chat_answer() {
+    let cannot = "cannot: I can't do that yet: reading your calendar when you pat my head.";
+    for (chat, taken) in [(cannot, true), ("Done, I wrote it.", false)] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":{"default":true},
+            "wait":{"stdout":waited("stopped", AGENT)},
+            "show":step(json!({"id":AGENT,"state":"idle","ask":"make","answer":chat,"truncated":false,"tools":1})),
+            "close":{"exit":0},
+        }));
+        let work = make_work(&rig);
+        let gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+        let hermes = MakeHermesStandIn::default();
+        let answered = lamp_tasks::skill_make::answer_with(
+            &make_line(Some(true), 20_000),
+            true,
+            &work,
+            &hermes,
+            Some(&gateway),
+            &mut || {},
+        );
+        if taken {
+            assert_eq!(answered, json!({"ok": true, "answer": cannot}));
+        } else {
+            assert_eq!(answered["error"], "no_answer", "{answered}");
+        }
+        assert_eq!(
+            fs::read_dir(&work).unwrap().count(),
+            0,
+            "the folder is gone"
+        );
+    }
+}
+
 /// #7245: a make line with `"one_path":true` on a lamp whose default agent
 /// is an OpenClaw gateway agent is exactly one `harness new openclaw` in a
 /// fresh make folder in the work folder, with no token, no token file and

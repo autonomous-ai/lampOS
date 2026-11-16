@@ -339,7 +339,7 @@ pub fn gateway_prompt(folder: &Path, guide: bool) -> String {
          in this folder. Write no file outside this folder, install nothing and run no command.",
         guide = GUIDE_FILE,
         rules = RULES_FILE,
-        answer = ANSWER_FILE,
+        answer = folder.join(ANSWER_FILE).display(),
         folder = folder.display(),
     )
 }
@@ -690,6 +690,17 @@ fn not_started(why: &str) -> &'static str {
         NO_NAMESPACE => "no_namespace",
         _ => "run_failed",
     }
+}
+
+/// Whether an agent's chat answer, read when it wrote no [`ANSWER_FILE`],
+/// is a make's answer itself (#7278): a `cannot:` line, or the fenced
+/// blocks, of at most [`MOST_ANSWER_BYTES`]. Any other chat ("done", "I
+/// wrote it") is not.
+pub fn chat_is_answer(chat: &str) -> bool {
+    let text = chat.trim();
+    !text.is_empty()
+        && text.len() as u64 <= MOST_ANSWER_BYTES
+        && (text.starts_with("cannot:") || text.contains("```"))
 }
 
 /// lamp-tasks' answer to one make `line`: with the switch `on`, the line

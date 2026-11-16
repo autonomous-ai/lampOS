@@ -3654,7 +3654,10 @@ path, with no second runner:
 - **The gateway make:** a fresh `make-<run id>` folder in the work folder,
   the rules in `rules.md`, sent as one turn through Harness's
   `harness new <engine>` in that folder (#7133's `HarnessRunner`, "A
-  skill's run on OpenClaw" below). `answer.md` is read back as above. No
+  skill's run on OpenClaw" below), told `answer.md` by its full path.
+  `answer.md` is read back as above; with none, the agent's chat answer is
+  taken when it is a make's answer itself, a `cannot:` line or the fenced
+  blocks, at most 20 KiB (`skill_make::chat_is_answer`, #7278). No
   token is minted and no skill-start run is opened (`gateway::open_start`
   is not called): a make has no grants. The Harness session and the folder
   are removed however the make ends: an answer, `cannot:`, past its

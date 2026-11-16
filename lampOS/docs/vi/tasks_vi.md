@@ -1143,8 +1143,11 @@ OpenClaw, qua đường chạy chung, không có runner thứ hai:
 - **Lần tạo qua gateway:** một thư mục `make-<run id>` mới trong thư mục
   làm việc, luật trong `rules.md`, gửi thành một lượt qua
   `harness new <engine>` của Harness trong thư mục đó (`HarnessRunner` của
-  #7133, "Lần chạy kỹ năng trên OpenClaw" bên dưới). `answer.md` được đọc
-  lại như trên. Không token nào được tạo và không lần chạy skill-start nào
+  #7133, "Lần chạy kỹ năng trên OpenClaw" bên dưới), được bảo `answer.md`
+  bằng đường dẫn đầy đủ. `answer.md` được đọc lại như trên; không có tệp,
+  câu trả lời chat của agent được lấy khi chính nó là câu trả lời của lần
+  tạo, một dòng `cannot:` hoặc các khối fenced, tối đa 20 KiB
+  (`skill_make::chat_is_answer`, #7278). Không token nào được tạo và không lần chạy skill-start nào
   được mở (không gọi `gateway::open_start`): lần tạo không có quyền nào.
   Phiên Harness và thư mục bị xoá dù lần tạo kết thúc thế nào: có câu trả
   lời, `cannot:`, quá hạn hay lỗi.
