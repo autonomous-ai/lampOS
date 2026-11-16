@@ -140,6 +140,12 @@ pub struct MakeLine {
     /// its namespace ([`MakeHermes`]) as before, byte for byte.
     #[serde(default)]
     pub one_path: bool,
+    /// #7245: the lamp's agent as the voice saw it (`"Hermes"`,
+    /// `"OpenClaw"`), sent beside `"one_path":true`. A make that would
+    /// fall back to Hermes on a lamp whose agent isn't Hermes is told
+    /// [`NOT_READY_LINE`] instead (Harness hasn't looked yet).
+    #[serde(default)]
+    pub engine: Option<String>,
 }
 
 /// The line's `switches` when given: an object, never `null`.
@@ -724,6 +730,11 @@ pub fn answer_with(
     };
     let runner = match gateway {
         Some(gateway) if make.one_path => match (gateway.pick)() {
+            // The lamp's agent isn't Hermes, but its Harness target isn't
+            // known yet (right after boot): said at once, never a Hermes make.
+            Ok(MakeAgent::Hermes) if make.engine.as_deref().is_some_and(|e| e != "Hermes") => {
+                return refusal(NOT_READY, NOT_READY_LINE);
+            }
             Ok(MakeAgent::Hermes) => hermes,
             Ok(MakeAgent::Gateway(_)) => {
                 return answer_on_gateway(&make, work, gateway, started);
