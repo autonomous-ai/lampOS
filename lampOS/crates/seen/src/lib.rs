@@ -43,6 +43,9 @@
 //!   stale) keeps the posture window and the doing timers, unsaid, for up
 //!   to 120 s; standing up, a forget, the opt-in off, the privacy, sleep and
 //!   a stranger still wipe at once.
+//! - [`hold`]: with `LAMP_SEEN_HOLDS_SITTING=on`, the owner's recognised
+//!   sitting goes on without the face while the newest pose answer sees a
+//!   close person, for at most 10 min since the face was last recognised.
 //! - [`pose`]: posture (phase 3): one frame every 30 s to the pose model,
 //!   one socket each, its RULA score kept as this sitting's rolling window
 //!   and said on `humans/posture`; off unless `LAMP_SEEN_POSTURE=on`, and
@@ -55,6 +58,7 @@ pub mod crypto;
 pub mod endpoint;
 pub mod frames;
 pub mod gate;
+pub mod hold;
 pub mod keep;
 pub mod link;
 pub mod mark;

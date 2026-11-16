@@ -692,6 +692,90 @@ up to 120 s (`keep.rs`, `KEEP_US`), around the 5 s pause:
 No new switch: it is in memory only, sends nothing, and runs only with
 `LAMP_SEEN_ACTIVITY=on`.
 
+## The held sitting
+
+The owner's rule (#6543, c6908160252), behind its own switch,
+`LAMP_SEEN_HOLDS_SITTING` (`on` exactly, off unless set; [switches.md](switches.md)),
+and waiting for the lead's ruling and a lamp row. In run 3 the face left
+view while the owner slumped, so posture was said once in seven and a half
+minutes. Held, the owner's sitting goes on without the face while the pose
+model sees a close person (`hold.rs`):
+
+- **Begins** only when the gate opens as it always does: the opt-in on and
+  said, the privacy open, the lamp awake, and the owner's face, the one
+  face in view, recognised.
+- **Goes on without the face:** while held, nobody in view, the face lost
+  or misread, a new face not yet recognised, a stranger reading or a
+  second face do not close the gate, as long as the newest pose answer
+  shows a close person: both shoulders (COCO-17's 5 and 6 in the answer's
+  `pose_2d`, pixels of the frame as sent) at or above the model's own
+  confidence threshold, 0.3 (`hold::CONFIDENCE`, as the lamp configures
+  it), and at least 15% of the frame's width apart (`hold::CLOSE_SHARE`, to
+  be tuned on a lamp). Posture keeps its frame every 30 s and activity its
+  bursts, each behind the ring's mark; the pause and the short-closing keep
+  see the gate open meanwhile. The opt-in, its line, the privacy and sleep
+  still hold every step: a privacy lease or a state not known closes that
+  step, and the hold stays.
+- **Ends**, the gate closed as it would be, then the short-closing keep
+  above applies: two answers in a row with no close person (one is forgiven,
+  so at most about a minute of frames with none); the face lost and no close
+  person's answer within 45 s of the hold's beginning, below;
+  `room/stood_up`; the privacy slide or capture muted; sleep; the opt-in off
+  or its line withdrawn; a forget; 10 minutes since the owner's face was
+  last recognised (`hold::MOST_US`, the gate last open on it); or another
+  person alone in the seat, below.
+- **The first answer** (lamp-06c1, run 4: the face lost seconds after
+  every beginning, while the first answer was ~30 s away): a hold begins
+  with the newest pose answer when its frame went under 30 s ago
+  (`Pose::recent_answer`, forgotten with the window), since the 30 s rate
+  lets no new frame go yet; otherwise posture's next frame is already due
+  and goes at the ring's next mark. Until a close person's answer comes, a
+  lost face keeps the hold for at most 45 s since it began
+  (`hold::FIRST_ANSWER_US`), with no frames beyond posture's and activity's
+  own rates; with none by then (no answer, or only a far one), it ends.
+- **Another person alone in the seat** (the first builder's change, which
+  the owner accepted): one face alone in view, close, on a passing id that
+  is not the owner's (the id of the face the gate was last open on), and
+  read as not the owner on every reading for 10 s
+  (`hold::STRANGER_ALONE_US`) ends the hold at once, and the gate closes as
+  a stranger's, so the short-closing keep wipes. Close is the hold's own
+  nearness: the newest pose answer shows a close person (`hold::close`, the
+  15% above). The eyes say only remembered or not (`humans/familiar` is a
+  level and names no one), so not the owner is a stranger reading on that
+  face, said after it came into view alone; someone else the lamp remembers
+  reads as the owner. An owner reading, the face gone or a new id, a second
+  face, or no close person starts the 10 s again, so a 1 to 3 s misread of
+  the owner does not end it. A second face beside the seated person never
+  ends the hold. A stranger reading on the owner's own id (the owner slumped
+  or turned; in lamp-06c1's run 4 it ended the hold and wiped posture at
+  once) is a misread: it counts nothing toward the 10 s, and while held the
+  pause and the short-closing keep never see it, so it wipes nothing at
+  once.
+- **Nothing kept:** an answer's two shoulders are read as a share of the
+  width and dropped; no frame, point or id is kept, and the rates are
+  unchanged.
+- **What it agrees to:** for up to 10 minutes after the owner was last
+  recognised, pictures may go while no face is visible, as long as someone
+  is close to the lamp. That includes someone else taking the seat without
+  showing their face, and a second person nearby (the owner's call). Shown,
+  another person's face ends it within 10 s; hidden, it ends at the
+  10-minute re-check at the latest.
+- **Without posture** (`LAMP_SEEN_POSTURE` off) no pose answer ever comes,
+  so a hold ends as soon as the face is lost, with no 45 s wait: nothing
+  changes.
+- **The journal:** `held sitting began: the gate open on the owner's face`;
+  `held sitting goes on (close person, shoulders 23% of width)` when it
+  first holds the gate open and with each close answer then; `held sitting
+  goes on (no close person in 1 answer of 2, shoulders 8% of width)`; `held
+  sitting ended (no close person in 2 answers in a row)`, or `(stood_up)`,
+  `(privacy_closed)`, `(asleep)`, `(no_opt_in)`, `(not_said_yet)`,
+  `(forgot)`, `(the face lost and no close posture answer within 45 s)`,
+  `(10 min since the owner's face was recognised)`, `(another person alone
+  in the seat for 10 s)`.
+
+Off, `serve` is as without it: the shoulders are read from each answer and
+dropped, and nothing else changes.
+
 ## The journal
 
 With activity on, `lamp-seen`'s journal says each burst and each posture

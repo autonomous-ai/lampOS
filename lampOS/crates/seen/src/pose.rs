@@ -117,7 +117,13 @@ struct Job {
     done: mpsc::Receiver<Outcome>,
     started_us: u64,
     started: Instant,
+    /// The frame's width as sent, for the shoulders' share of it.
+    width: u32,
 }
+
+/// The most pose answers' shoulder shares kept for [`Pose::answers`]
+/// between two reads: the newest.
+pub const ANSWERS_MOST: usize = 8;
 
 /// One line for the journal about a posture sample ([`Note::line`]).
 #[derive(Clone, Debug, PartialEq)]
@@ -229,6 +235,12 @@ pub struct Pose {
     counts: Counts,
     jitter: Jitter,
     notes: Vec<Note>,
+    /// Each answer's shoulders as a share of the width
+    /// ([`crate::hold::share`]), until [`Pose::answers`] takes them.
+    answers: Vec<Option<f32>>,
+    /// The newest answer's share and when its frame went, for
+    /// [`Pose::recent_answer`].
+    recent: Option<(u64, Option<f32>)>,
 }
 
 impl Pose {
@@ -250,12 +262,32 @@ impl Pose {
             counts: Counts::default(),
             jitter,
             notes: Vec::new(),
+            answers: Vec::new(),
+            recent: None,
         }
     }
 
     /// The journal's notes since the last call, oldest first.
     pub fn notes(&mut self) -> Vec<Note> {
         std::mem::take(&mut self.notes)
+    }
+
+    /// Each answer's shoulders as a share of the frame's width since the
+    /// last call, oldest first, at most [`ANSWERS_MOST`]: none for an
+    /// answer without both shoulders confident. Read by the held sitting
+    /// ([`crate::hold`]); nothing else of the answer is kept.
+    pub fn answers(&mut self) -> Vec<Option<f32>> {
+        std::mem::take(&mut self.answers)
+    }
+
+    /// The newest answer's shoulders as a share of the width, when its
+    /// frame went under [`EVERY_US`] ago: what a held sitting beginning
+    /// now begins with ([`crate::hold`]), as the 30 s rate lets no new
+    /// frame go yet. Forgotten with the window.
+    pub fn recent_answer(&self, now_us: u64) -> Option<Option<f32>> {
+        self.recent
+            .filter(|(sent_us, _)| now_us.saturating_sub(*sent_us) < EVERY_US)
+            .map(|(_, share)| share)
     }
 
     /// Whether a sitting's window is being watched (begun and not
@@ -317,6 +349,7 @@ impl Pose {
         let cancelled = job.cancel.load(Ordering::Relaxed);
         let started_us = job.started_us;
         let took = job.started.elapsed();
+        let width = job.width;
         self.job = None;
         if cancelled || matches!(outcome, Outcome::Cancelled { .. }) {
             self.counts.cancelled = self.counts.cancelled.saturating_add(1);
@@ -325,8 +358,14 @@ impl Pose {
         }
         let jitter = (self.jitter)();
         match outcome {
-            Outcome::Answered(ergo) => {
+            Outcome::Answered { ergo, shoulders } => {
                 self.counts.answered = self.counts.answered.saturating_add(1);
+                if self.answers.len() >= ANSWERS_MOST {
+                    self.answers.remove(0);
+                }
+                let share = crate::hold::share(shoulders.as_ref(), width);
+                self.answers.push(share);
+                self.recent = Some((started_us, share));
                 self.retreat.take(Ended::Answered, now_us, jitter);
                 self.last_failure = None;
                 match ergo {
@@ -426,6 +465,7 @@ impl Pose {
         }
         self.window.reset();
         self.open_at_us = None;
+        self.recent = None;
     }
 
     /// One step at `now_us` while the gate is paused on a misread
@@ -477,6 +517,7 @@ impl Sink for Pose {
             return;
         };
         let bytes = sent.len();
+        let width = crate::scale::sent_size(meta.width, meta.height).0;
         let frame_b64 = Zeroizing::new(STANDARD.encode(&*sent));
         drop(sent);
         let cancel = Arc::new(AtomicBool::new(false));
@@ -500,6 +541,7 @@ impl Sink for Pose {
                     done,
                     started_us: now_us,
                     started: Instant::now(),
+                    width,
                 });
             }
             Err(_) => self.counts.dropped = self.counts.dropped.saturating_add(1),
