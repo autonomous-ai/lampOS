@@ -18696,6 +18696,71 @@ fn at_every_level_the_lamp_folds_no_sooner_than_at_level_one() {
     }
 }
 
+/// #7314, lamp-52e6 at 16:37:43: the fold was `--awake-seconds 90` after
+/// the last Speaking step. At level 5, with `--awake-seconds 90`, spoken to
+/// until 7 s and then only at rest, a shift at rest plays inside the window
+/// and does not renew it: the lamp stays up until 90 s after its last talk
+/// and starts to fold then, not sooner and not 90 s after the shift.
+#[test]
+fn an_idle_shift_does_not_renew_the_awake_window() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(110));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits::folded_with(Tuning {
+        reach: [150, 15, 1, 250],
+        speed: 120,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .unwrap();
+    let news = spoken_to(&clock.time);
+    let seen_at = clock.time.clone();
+    let mut seen: Vec<(Duration, f32, bool)> = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 90).idling(true).seeded(5)),
+        None,
+        news,
+        || Asked {
+            energy: 5,
+            ..Asked::default()
+        },
+        |glimpse| {
+            let shifting = glimpse.gesture.is_some_and(idle::is_move_name);
+            seen.push((seen_at.get(), glimpse.stand, shifting));
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let last_talk = Duration::from_secs(7);
+    let window_ends = last_talk + Duration::from_secs(90);
+    // A shift at rest played inside the window, after the talk.
+    let shift = seen
+        .iter()
+        .find(|step| step.2 && step.0 > last_talk)
+        .map(|step| step.0)
+        .expect("a shift at rest");
+    assert!(shift < window_ends - Duration::from_secs(10), "{shift:?}");
+    // Up through the window, folding from its end.
+    for step in seen
+        .iter()
+        .filter(|step| step.0 >= Duration::from_secs(12) && step.0 < window_ends - TICK)
+    {
+        assert_eq!(step.1, 1.0, "{step:?}");
+    }
+    let fold = seen
+        .iter()
+        .find(|step| step.0 > last_talk && step.1 < 1.0)
+        .map(|step| step.0)
+        .expect("it folded");
+    assert!(
+        fold >= window_ends - TICK && fold <= window_ends + TICK,
+        "{fold:?}, shift at {shift:?}"
+    );
+}
+
 /// What each mood leans toward: speaking and reading `LEAN` at every
 /// level, listening only from level 3, resting and thinking never.
 #[test]
