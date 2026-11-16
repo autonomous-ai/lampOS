@@ -54,6 +54,21 @@ recording yet"). To fill one, record it with `lampOS/tools/air-trace.sh`
 or combustion rule are decided from those replays, and the skill is
 installed disabled (`install::PRODUCT_SKILLS_OFF`) until then.
 
+**Four synthetic traces (#1684).** The project lead ruled on 16 Nov 2026
+that real smoke is not made for this skill. Smoke, dust, a cooking spike
+and a slow rise, made by hand inside the sensor's range, are in
+`lampOS/crates/skills/tests/fixtures/air-traces/` (its README has their
+numbers), and `cargo test -p lamp-skills air_traces` replays them through
+this skill as it ships: the smoke speaks once at 230 s; the dust and the
+slow rise say nothing; and **the cooking spike speaks once at 255 s**, the
+one line the design allows for a pan (up to 300 in 90 s, a minute there,
+over 150 for 165 s: this skill's rule lets a spike go only when it is over
+150 for under 30 s, and a hold long enough to pass a pan over would pass
+the `toast` case over too).
+`lampOS/tools/air-replay.sh` replays the smoke or the cooking spike on a
+real lamp (`lampOS/docs/air.md`). The four placeholders below are other
+events and stay as they are.
+
 What no case shows: the say service's own gates (a line in the first pause,
 never over speech, spent after 2 minutes), the sleeping lamp saying
 nothing, and whether the lift and the breath read as a lamp noticing
