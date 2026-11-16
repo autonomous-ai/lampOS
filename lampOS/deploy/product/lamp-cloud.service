@@ -129,6 +129,9 @@ Environment=LAMP_APP_UPDATE_EVENTS=on
 Environment=LAMP_PHOTO_FACES=on
 Environment=LAMP_EYES_PHOTO_DIR=/run/lampos-photos
 Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
+# The owner's dev monitor from the app (#5883, #6401; cloud.md "The dev monitor"): monitor.set/get/link in `can`, so the
+# app shows its switch. The monitor itself stays off until the owner turns it on in the app. On for every lamp: the lead's call (16 Nov).
+Environment=LAMP_APP_MONITOR=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos

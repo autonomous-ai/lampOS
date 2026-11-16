@@ -2952,9 +2952,10 @@ A developer who owns the lamp turns on a live page of its turns in the app
 and opens it from a browser on the same Wi-Fi ([peek.md](peek.md), "Monitor
 mode"). Off unless `LAMP_APP_MONITOR=on`, with `LAMP_CLOUD=on` and
 `LAMP_SETTINGS_CHANGE=on` (root's helper); the product's `lamp-cloud.service`
-does not set it until the first builder's default-on read, the owner's word
-on words and frames, the app's switch and #5883's lamp row. Without it the
-three kinds are not in `can` and each is "not on this lamp".
+sets it on every lamp (the lead's call, 16 Nov, #6401). That only lets the
+app show its switch: the monitor stays off until the owner turns it on in the
+app. Without it the three kinds are not in `can` and each is "not on this
+lamp".
 
 - **`monitor.set`** (`{"on": bool}`) goes to root's helper as `control.set`
   does (`{"monitor": bool}`, setup.md, "Changed after setup"). On writes
