@@ -1316,16 +1316,20 @@ trong sản phẩm từ 13/11 (phán quyết của chủ: luồng tải lên đi
 lamp-control, lamp-voice và lamp-cloud), nên lần chạy được cấp `net` với lời đồng ý bằng giọng
 nói của chủ tới được web công khai trên cổng 80 và 443, bị giữ như mọi lần chạy
 (quyết định của người xây dựng đầu tiên trên #7200: không bao giờ tới mạng của
-đèn hay các cổng cục bộ của nó). Điều đó đúng khi đường chạy chung (one run
-path) của lamp-update tắt; khi nó bật (`LAMP_SKILL_DEFAULT_AGENT`, cũng bật
-trong sản phẩm) lần chạy có `net` hiện bị từ chối ("Trên đường chạy chung", ở
-dưới). Xây trên đường `skill_make` của #6643, để chuyển
+đèn hay các cổng cục bộ của nó). Khi đường chạy chung (one run path) của
+lamp-update bật (`LAMP_SKILL_DEFAULT_AGENT`, cũng bật trong sản phẩm), lần
+chạy đó đi qua Harness như mọi lần chạy của kỹ năng, và wrapper tìm lối ra
+cùng home mới của nó theo run id ("Trên đường chạy chung", ở dưới); lần chạy
+không thể được cho lối ra bị từ chối `no_net` và đèn nói lý do thành lời.
+Xây trên đường `skill_make` của #6643, để chuyển
 sang runner chung của #6510 bước 2 mà không cần luật mới.
 
 - **`net`** (`skill_task::NET_SWITCH`): một quyền của lần chạy, không phải
-  của lamp-control. Lần chạy có `net` đi qua runner `net` của lần tạo
-  (`skill_make::net_runner`: bị giữ, `LAMP_NS_NET=run`, có lối ra riêng ở
-  dưới); lần khác bị giữ, không có lối ra.
+  của lamp-control. Lần chạy có `net` đi qua `skill_make::NetRunner`: khi
+  đường chạy chung tắt, runner `net` của lần tạo (`skill_make::net_runner`:
+  bị giữ, `LAMP_NS_NET=run`, có lối ra riêng ở dưới); khi bật, runner Harness
+  của lamp-tasks ("Trên đường chạy chung", ở dưới). Lần khác bị giữ, không có
+  lối ra.
   lamp-control giữ `net` trong lời đồng ý nhưng không bao giờ đặt nó vào
   token, nên sau khi tạo token lamp-tasks hỏi lamp-control
   (`task_yes_check` với SHA-256 thư mục và các quyền của dòng): chỉ khi
@@ -1379,28 +1383,60 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
     requests/httpx/urllib của Python, Node với `NODE_USE_ENV_PROXY`. TCP,
     UDP và ICMP thô đều bị chặn.
 - **Trên đường chạy chung (`LAMP_SKILL_DEFAULT_AGENT` bật trong lamp-update
-  và lamp-tasks, như trong sản phẩm): lần chạy có `net` hiện bị từ chối.**
-  Home mới và socket lối ra của nó chỉ tới được wrapper của Hermes qua môi
-  trường mà lamp-tasks dùng để chạy nó (`LAMP_NS_HOME`, `LAMP_NS_EGRESS`).
-  Ở đó `/usr/local/bin/hermes` là wrapper của đường chạy chung: nó bỏ
-  `LAMP_NS_NET` của bên gọi và chỉ cho `--net` với lần chạy trong thư mục
-  `skill-<run-id>` riêng có tệp token, do Harness chạy (`harness new`) với
-  môi trường của chính Harness, không bao giờ của lamp-tasks. Vì vậy runner
-  `net` của lần tạo không giữ được lần chạy (`HermesRunner::ready`: wrapper
-  không có `WRAPPER_NET_LINES`), và lần chạy bị từ chối `run_failed` với
-  `NOT_HELD_OFF` sau khi token được tạo (rồi kết thúc), trước khi có socket
-  lối ra nào: không gì chạy. Lần chạy của kỹ năng agent và lần chạy có khóa
-  cũng đi qua runner của lần tạo, nên ở đó cũng bị từ chối như vậy. Không
-  nói gì với người dùng: lamp-skills chỉ ghi vào journal (`do.task:
-  lamp-tasks did not take it`). Cho lần chạy như vậy home mới và lối ra ở
-  đó là một lựa chọn thiết kế chưa có: wrapper của đường chạy chung lấy cả
-  hai từ thư mục riêng của lần chạy, hoặc lamp-tasks tự chạy những lần đó
-  không qua Harness (lối `--lamp-task` của wrapper). Test:
-  `skill_make::tests::with_the_one_run_path_a_make_is_ready`.
-- **Không bao giờ của agent gateway (OpenClaw).** Lần chạy có `net` đi qua
-  runner của lần tạo, chỉ chạy Hermes của đèn; lượt của agent gateway chạy
-  trong các namespace của gateway, chung cho mọi lượt, nên không giữ riêng
-  được một lần chạy nào.
+  và lamp-tasks, như trong sản phẩm): wrapper tìm lối ra của lần chạy có
+  `net` theo run id** (cách (a) của #7200). Harness chạy agent của lần chạy
+  (`harness new` trong `skill-<run-id>`) với môi trường của chính Harness,
+  nên không biến nào của lamp-tasks đi qua được; wrapper của đường chạy
+  chung vốn đã tìm tệp token theo run id, giờ tìm cả socket lối ra và home
+  mới theo cách đó:
+  - **lamp-tasks** (`HarnessRunner::way_out`, với `LAMP_TASK_NET=on`:
+    `HarnessRunner::egress`) tạo home mới `<work>/lamp/make-<run-id>/home`
+    (`skill_make::fresh_home_for_run`) và socket lối ra
+    `/run/lampos-tasks/egress/skill-<run-id>.sock` trước tệp token và
+    `harness new` (hoặc lối `--lamp-task` của wrapper khi không có Harness),
+    chỉ cho lần chạy có `net` với lời đồng ý của chủ, và xóa cả hai khi lần
+    chạy kết thúc hoặc hết hạn, sau khi phiên đã đóng.
+  - **Wrapper** (`one-path-<agent>.sh`,
+    `agent_ns::wrapper::ONE_PATH_EGRESS_LINES`): bỏ `LAMP_NS_EGRESS` của
+    bên gọi; trong pane `skill-<run-id>` có socket đó (là socket, không bao
+    giờ là link: thứ khác ở đó làm lần chạy kết thúc) nó đặt
+    `LAMP_NS_EGRESS=skill-<run-id>` và `LAMP_NS_HOME` là home mới đó (thiếu,
+    hoặc là link, lần chạy kết thúc). Dữ liệu của Hermes lấy nó làm home của
+    lần tạo (`LAMP_NS_MAKE`, `HERMES_HOME` bên dưới), nên agent namespace
+    che home lâu dài của Hermes như với lần tạo, và `ONE_PATH_EGRESS_GUARD`
+    kết thúc lần chạy có lối ra mà agent không lấy home như vậy: không bao
+    giờ có internet trong home lâu dài (P1 #6643). Lần chạy có `--net` như
+    mọi lần.
+  - **Agent namespace** nhận `skill-<run-id>` cũng như `make-<run-id>`
+    (`egress::NS_SKILL_LINE`) và làm đúng các bước lối ra: chỉ socket đó,
+    chỉ đọc, proxy và DNS bên trong lần chạy.
+  - **Kiểm tra trước khi tạo gì** (`skill_task::takes_net_runs`): wrapper
+    của agent mặc định có `ONE_PATH_EGRESS_LINES` và dòng make-home của
+    Hermes, agent namespace có các dòng lối ra và dòng make của Hermes. Nếu
+    không, agent gateway mặc định (OpenClaw: lượt của nó chạy trong các
+    namespace của gateway, chung cho mọi lượt, không giữ riêng được một lần
+    chạy), `LAMP_TASK_NET` tắt trong lamp-tasks, hoặc Hermes của đèn chưa ở
+    wrapper của đường chạy chung (vòng của #6898): bị từ chối bằng lời của
+    `skill_task::NET_REFUSED`, không tạo, hỏi hay chạy gì.
+  - **Mọi lần từ chối đều được nói.** Lần chạy có `net` bị từ chối trước
+    khi chạy gì (mọi lý do ở trên, `NOT_HELD_OFF`, `NOT_HELD_OFF_ONE_PATH`
+    hoặc `egress::NO_EGRESS`) được trả `no_net` (`skill_task::NO_NET`);
+    lamp-skills không tính nó vào số lần chạy trong ngày
+    (`service_write::NOT_TAKEN`) và nói `task::NO_NET_SAID` thành lời, sau
+    cùng cổng như câu trả lời được kể: "I can't run that one: it needs the
+    internet, and this lamp's agent can't reach it yet." Journal giữ lời
+    của lamp-tasks.
+  - Runner của lần tạo, mà lần chạy của kỹ năng agent và lần chạy có khóa
+    vẫn đi qua, không được wrapper của đường chạy chung giữ (nó chỉ giữ lần
+    chạy bắt đầu trong thư mục `skill-<run-id>` riêng): bị từ chối
+    `NOT_HELD_OFF_ONE_PATH`, không còn đổ lỗi cho `LAMP_SKILL_TASKS` hay
+    vòng của lamp-update.
+  - Test: `harness::a_net_run_by_the_one_run_path_gets_its_egress_socket_before_harness_new`,
+    `skill_task::tests::a_net_run_is_marked_its_home_named_by_its_id_and_refused_as_no_net`,
+    `the_one_path_wrappers_carry_the_egress_lines_once`,
+    `skill_make::tests::with_the_one_run_path_a_make_is_ready`; của
+    lamp-update `agent_ns::wrapper::tests::a_run_with_its_egress_socket_is_named_its_way_out_and_one_without_is_not`;
+    của lamp-skills `task::tests::a_net_run_lamp_tasks_refused_is_said_in_plain_words`.
 - **Lần chạy của kỹ năng agent** (`run` = `scripts/SKILL.md`) chỉ làm theo
   tệp trong phạm vi các quyền và mạng của nó: token chỉ mang quyền của
   lamp-control, và mạng bị giữ trừ khi lời đồng ý của lamp-control có `net`. Hermes được

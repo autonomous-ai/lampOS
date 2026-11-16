@@ -234,7 +234,11 @@ pub const MODEL_SOCKET: &str = "/run/lampos-tasks/model.sock";
 /// The variable a run granted `net` is started with too (with [`NET_ENV`]
 /// `run`, set by lamp-tasks' `skill_make::net_runner`,
 /// `lamp_tasks::egress::EGRESS_ENV`): its own folder's name, `make-<run
-/// id>` (plain, at most 80 bytes, else the run ends). [`NS`] then shows
+/// id>`; or, on the one run path, `skill-<run id>`, set by the wrapper
+/// itself for a run whose egress socket lamp-tasks made
+/// ([`agent_ns::wrapper::ONE_PATH_EGRESS_LINES`]), as Harness passes the
+/// wrapper none of lamp-tasks' variables (plain, at most 80 bytes, else
+/// the run ends). [`NS`] then shows
 /// [`EGRESS_DIR`]`/<name>.sock` alone, read-only (missing, the run ends),
 /// lowers `net.ipv4.ip_unprivileged_port_start` to 53 in the run's own
 /// network namespace (refused, the run ends: never a fallback to the
@@ -749,9 +753,9 @@ const TASKS_EDITS: [(&str, &str); 7] = [
          # so a skill's run reaches the lamp with its one-run token; nothing else of lamp-control's folder is shown.\n\
          # With LAMP_NS_NET=run (a skill's run, its own network namespace) it shows lamp-tasks' model.sock alone, read-only,\n\
          # brings lo up and starts lamp-tasks net-relay on 127.0.0.1:7741 to it: the run's only other way out.\n\
-         # With LAMP_NS_EGRESS=make-<run> too (a run granted net), it shows that run's egress socket alone, read-only, opens\n\
-         # port 53 in the run's own network, names 127.0.0.1 in resolv.conf and starts the relay with a web proxy on\n\
-         # 127.0.0.1:3128 and DNS on 127.0.0.1:53 through it: lamp-tasks lets out only the public web on 80 and 443.\n\
+         # With LAMP_NS_EGRESS=make-<run> or skill-<run> too (a run granted net), it shows that run's egress socket alone,\n\
+         # read-only, opens port 53 in the run's own network, names 127.0.0.1 in resolv.conf and starts the relay with a web\n\
+         # proxy on 127.0.0.1:3128 and DNS on 127.0.0.1:53 through it: lamp-tasks lets out only the public web on 80 and 443.\n\
          # It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there.\n",
     ),
     (
@@ -765,7 +769,7 @@ const TASKS_EDITS: [(&str, &str); 7] = [
          if [ \"${LAMP_NS_NET-}\" = run ]; then [ -S \"$B\" ] && touch \"$S/b\" && mount --bind \"$B\" \"$S/b\" || fail \"no $B\"; fi\n\
          V=\n\
          if [ \"${LAMP_NS_NET-}\" = run ] && [ -n \"${LAMP_NS_EGRESS-}\" ]; then\n\
-         \x20 case $LAMP_NS_EGRESS in make-?*) ;; *) fail \"LAMP_NS_EGRESS is not a run's folder\" ;; esac\n\
+         \x20 case $LAMP_NS_EGRESS in make-?*|skill-?*) ;; *) fail \"LAMP_NS_EGRESS is not a run's folder\" ;; esac\n\
          \x20 case $LAMP_NS_EGRESS in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) fail \"LAMP_NS_EGRESS is not a run's folder\" ;; esac\n\
          \x20 [ ${#LAMP_NS_EGRESS} -le 80 ] || fail \"LAMP_NS_EGRESS is not a run's folder\"\n\
          \x20 V=/run/lampos-tasks/egress/$LAMP_NS_EGRESS.sock\n\

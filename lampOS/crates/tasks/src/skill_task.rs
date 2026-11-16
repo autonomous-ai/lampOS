@@ -791,6 +791,10 @@ pub struct SkillRun {
     /// well: set by the Harness runner, read only for a run that tells it
     /// ([`tells_answer`]), never journaled.
     pub answer: std::sync::OnceLock<String>,
+    /// Granted [`NET_GRANT`] with the owner's yes for it (#7200): on the
+    /// one run path the Harness runner gives it its own egress socket,
+    /// `skill-<run id>`, or refuses it ([`HarnessRunner::egress`]).
+    pub net: bool,
 }
 
 /// What a run that tells its answer ([`tells_answer`]) is asked of its
@@ -839,6 +843,7 @@ impl std::fmt::Debug for SkillRun {
             .field("env_file", &self.env_file)
             // Never the answer, only its length.
             .field("answer", &self.answer.get().map(|answer| answer.len()))
+            .field("net", &self.net)
             .finish()
     }
 }
@@ -873,6 +878,7 @@ impl SkillRun {
             start_in: None,
             env_file: None,
             answer: std::sync::OnceLock::new(),
+            net: false,
         }
     }
 
@@ -1296,11 +1302,15 @@ pub fn answer_for(
             run,
             token,
         );
-        // Its own folder and fresh home, removed however it ends, as a make's.
+        made.net = keeps_net;
+        // Its own folder and fresh home, removed however it ends, as a
+        // make's: `make-<run id>`, by which the one run path's wrapper finds
+        // it for a run granted `net` (#7200).
         let fresh = match agent.work {
-            Some(work) if fresh_home => match crate::skill_make::fresh_home_for(
+            Some(work) if fresh_home => match crate::skill_make::fresh_home_for_run(
                 work,
                 agent.services && hand.grants.iter().any(|grant| is_service_grant(grant)),
+                run,
             ) {
                 Ok(folder) => Some(folder),
                 Err(error) => {
@@ -1345,6 +1355,21 @@ pub fn answer_for(
                 && why == crate::skill_make::NO_NAMESPACE =>
         {
             refusal("run_failed", NO_RUN_NAMESPACE)
+        }
+        // A run granted `net` refused before anything of it ran, whatever
+        // the reason: told `no_net`, which lamp-skills says aloud (#7200).
+        Some(why)
+            if keeps_net
+                && told["error"] == "run_failed"
+                && (why.starts_with(NET_REFUSED)
+                    || [
+                        NOT_HELD_OFF,
+                        NOT_HELD_OFF_ONE_PATH,
+                        crate::egress::NO_EGRESS,
+                    ]
+                    .contains(&why)) =>
+        {
+            refusal(NO_NET, why)
         }
         _ => told,
     }
@@ -1498,6 +1523,14 @@ pub const WRAPPER_NET_LINES: [&str; 2] = [
 /// Said when the wrapper lacks [`WRAPPER_NET_LINES`]: nothing is started.
 pub const NOT_HELD_OFF: &str = "the lamp's Hermes can't be held off the network yet (its wrapper has no skill-task network line: lamp-update's LAMP_SKILL_TASKS is off or its round hasn't run), so nothing was started";
 
+/// Said instead of [`NOT_HELD_OFF`] when the wrapper is lamp-update's one
+/// run path's ([`ONE_PATH_MARK`]): its switches and round are in place, but
+/// it holds only a run Harness or its task entry starts in the run's own
+/// `skill-<run id>` folder, never one lamp-tasks starts itself (an agent
+/// skill's run, a run with keys, a held make). A run granted `net` goes
+/// by the one run path instead (`crate::skill_make::NetRunner`).
+pub const NOT_HELD_OFF_ONE_PATH: &str = "the lamp's Hermes can't be held off the network for a run lamp-tasks starts itself (lamp-update's one run path holds only a run started in its own skill-<run-id> folder), so nothing was started";
+
 /// Whether `wrapper` (a wrapper's text) carries [`WRAPPER_NET_LINES`].
 pub fn holds_off_network(wrapper: &str) -> bool {
     WRAPPER_NET_LINES.iter().all(|line| wrapper.contains(line))
@@ -1532,13 +1565,21 @@ impl HermesRunner {
 
 impl Runner for HermesRunner {
     fn ready(&self) -> Result<(), String> {
-        match &self.held_by {
-            Some(wrapper)
-                if !std::fs::read_to_string(wrapper).is_ok_and(|text| holds_off_network(&text)) =>
+        let Some(wrapper) = &self.held_by else {
+            return Ok(());
+        };
+        match std::fs::read_to_string(wrapper) {
+            Ok(text) if holds_off_network(&text) => Ok(()),
+            // The one run path's wrapper: in place, but it holds only a run
+            // it finds by its own folder, never one started here (#7200).
+            Ok(text)
+                if text
+                    .strip_prefix("#!/bin/sh\n")
+                    .is_some_and(|rest| rest.starts_with(ONE_PATH_MARK)) =>
             {
-                Err(NOT_HELD_OFF.into())
+                Err(NOT_HELD_OFF_ONE_PATH.into())
             }
-            _ => Ok(()),
+            _ => Err(NOT_HELD_OFF.into()),
         }
     }
 
@@ -2386,6 +2427,15 @@ pub struct HarnessRunner {
     /// --now`) and removes the folder, however the make ends. Off for every
     /// skill's run.
     pub makes: bool,
+    /// With [`NET_SWITCH`] on, the way out a run granted `net`
+    /// ([`SkillRun::net`]) is given on the one run path (#7200): its own
+    /// egress socket, [`crate::egress::EGRESS_DIR`]`/skill-<run id>.sock`,
+    /// made before the agent starts (`harness new`, or its task entry with
+    /// no Harness) and removed when the run ends, which its wrapper finds by
+    /// the run's id ([`takes_net_runs`]). None, or a default agent that
+    /// can't take it: such a run is refused in words ([`net_refused`]),
+    /// nothing made or started.
+    pub egress: Option<crate::egress::Grant>,
 }
 
 /// lamp-tasks' Harness project in `home`, `~/harnesses/lamp-tasks`
@@ -2397,7 +2447,109 @@ pub fn lamp_project(home: &Path) -> PathBuf {
     home.join(project)
 }
 
+/// The one run path wrapper's lines that give a run granted `net` its way
+/// out and its fresh home by its run id
+/// (`lamp_update::agent_ns::wrapper::ONE_PATH_EGRESS_LINES` and
+/// `ONE_PATH_EGRESS_GUARD`, held in them by a test): Harness passes the
+/// wrapper none of lamp-tasks' variables (#7200).
+pub const ONE_PATH_EGRESS_LINES: [&str; 3] = [
+    "unset LAMP_NS_EGRESS\nV=/run/lampos-tasks/egress/skill-$R.sock\n",
+    "  LAMP_NS_EGRESS=skill-$R LAMP_NS_HOME=$D/home\n",
+    "[ -z \"${LAMP_NS_EGRESS-}\" ] || [ -n \"${LAMP_NS_MAKE-}\" ] || fail \"a run granted the internet never runs in the agent's lasting home\"\n",
+];
+
+/// Whether the lamp's default agent can be given a run granted `net` by
+/// the one run path (#7200), from its wrapper's text and its namespace
+/// script's: the wrapper finds the run's egress socket and fresh home by
+/// its id ([`ONE_PATH_EGRESS_LINES`]) and its data takes a make's home
+/// ([`crate::skill_make::ONE_PATH_HOME_LINE`], Hermes's alone), and the
+/// namespace shows a `skill-<run id>` egress socket
+/// ([`crate::egress::NS_LINE`], [`crate::egress::NS_SKILL_LINE`]) and that
+/// home with the lasting one hidden
+/// ([`crate::skill_make::ONE_PATH_NS_MAKE_LINES`]).
+pub fn takes_net_runs(wrapper: &str, script: &str) -> bool {
+    ONE_PATH_EGRESS_LINES
+        .iter()
+        .all(|line| wrapper.contains(line))
+        && wrapper.contains(crate::skill_make::ONE_PATH_HOME_LINE)
+        && script.contains(crate::egress::NS_LINE)
+        && script.contains(crate::egress::NS_SKILL_LINE)
+        && script.contains(crate::skill_make::ONE_PATH_NS_MAKE_LINES)
+}
+
+/// How every refusal of a run granted `net` begins (#7200): an answer
+/// whose words begin so is told [`NO_NET`], which lamp-skills says aloud
+/// in plain words.
+pub const NET_REFUSED: &str =
+    "a run granted the internet can't be given its way out on this lamp yet";
+
+/// The code a run granted `net` is refused with, before anything of it
+/// ran, whatever the reason (lamp-skills' `NOT_TAKEN`, said aloud).
+pub const NO_NET: &str = "no_net";
+
+/// A run granted `net` refused for `why`: [`NET_REFUSED`], then why.
+pub fn net_refused(why: &str) -> String {
+    format!("{NET_REFUSED} ({why}), so nothing was started")
+}
+
 impl HarnessRunner {
+    /// The way out of a run granted `net` on the one run path, made before
+    /// the agent starts: refused for a gateway agent (`gateway`: its turns
+    /// run in its gateway's namespaces, shared by every turn, which no one
+    /// run can be held in), with no [`HarnessRunner::egress`], or for a
+    /// wrapper or namespace script that can't take it ([`takes_net_runs`]);
+    /// else its socket `skill-<run id>`, served until `until` and removed
+    /// when dropped. None for a run not granted `net`.
+    fn way_out(
+        &self,
+        run: &SkillRun,
+        engine: crate::harness::EngineKind,
+        gateway: bool,
+        until: std::time::Instant,
+    ) -> Result<Option<crate::egress::Served>, String> {
+        if !run.net {
+            return Ok(None);
+        }
+        let name = engine.argument();
+        let refused = |why: String| {
+            let why = net_refused(&why);
+            eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
+            Err(why)
+        };
+        if gateway {
+            return refused(format!(
+                "the lamp's default agent ({name}) runs its turns in its gateway's namespaces, which no one run can be held in"
+            ));
+        }
+        let Some(grant) = &self.egress else {
+            return refused(format!("{NET_SWITCH} is off in lamp-tasks"));
+        };
+        let read = |path: &Path| std::fs::read_to_string(path).ok();
+        let wrapper = self
+            .wrappers
+            .as_ref()
+            .and_then(|wrappers| read(&wrappers.join(name)));
+        let script = self.agent_ns.as_deref().and_then(read);
+        if !wrapper
+            .as_deref()
+            .zip(script.as_deref())
+            .is_some_and(|(wrapper, script)| takes_net_runs(wrapper, script))
+        {
+            return refused(format!(
+                "the lamp's default agent ({name}) has no wrapper or namespace line that finds a run's egress socket and fresh home by its id: lamp-update's round hasn't run, or this agent takes no fresh home"
+            ));
+        }
+        let socket = format!("{RUN_FOLDER_PREFIX}{}", run.run);
+        let served = grant
+            .open(&socket, until)
+            .map_err(|error| format!("the run's way out was not made: {}", error.kind()))?;
+        eprintln!(
+            "[lamp-tasks] skill task {}: granted net: its egress socket {socket}.sock made for the lamp's default agent ({name})",
+            run.run
+        );
+        Ok(Some(served))
+    }
+
     /// The lamp's: runs in `home`'s `~/harnesses/lamp-tasks`
     /// (`runtime::MACHINES_PROJECT`), token files in
     /// [`crate::run_token_file::RUNS_DIR`], held by [`HERMES`].
@@ -2420,6 +2572,7 @@ impl HarnessRunner {
             one_session: None,
             skill_start_allowed: crate::gateway::SkillStartAllowed::lamp(),
             makes: false,
+            egress: None,
         }
     }
 
@@ -2557,6 +2710,10 @@ impl HarnessRunner {
             eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
             return Err(why);
         }
+        // A run granted `net` (#7200): its way out before anything of it is
+        // written, found by the wrapper's task entry by the run's id, and
+        // removed after the run's guard.
+        let _way_out = self.way_out(run, engine, false, began + run.deadline)?;
         let token = run
             .env
             .iter()
@@ -3045,6 +3202,7 @@ impl Runner for HarnessRunner {
         } else {
             None
         };
+        let by_one_path = one_path.is_some();
         let (engine, agent, by_start) = match one_path {
             // A make goes only to a gateway agent here: the lamp's Hermes
             // takes its makes in its own namespace (`MakeHermes`).
@@ -3067,6 +3225,22 @@ impl Runner for HarnessRunner {
                 }
                 (EngineKind::Hermes, "the lamp's Hermes", false)
             }
+        };
+        // A run granted `net` (#7200): its way out made before its token
+        // file and the launch, which the one run path's wrapper finds by
+        // the run's id (Harness passes it no variable of lamp-tasks'), and
+        // removed after the run's guard closed its session. Only by the
+        // one run path; refused in words otherwise.
+        let _way_out = if by_one_path {
+            self.way_out(run, engine, by_start, began + run.deadline)?
+        } else if run.net {
+            let why = net_refused(
+                "the lamp's Hermes isn't on lamp-update's one run path yet, whose wrapper finds a run's way out by its id",
+            );
+            eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
+            return Err(why);
+        } else {
+            None
         };
         // A make has no token (#7245): it has no grants.
         let token = if self.makes {
@@ -3822,6 +3996,12 @@ impl HandOvers {
         runner.no_harness = no_harness;
         runner.starts = starts;
         runner.one_session = one_session;
+        // A run granted `net` by the one run path gets its way out from this
+        // runner (#7200); with the path off, from the make's net runner.
+        if net {
+            runner.egress = Some(crate::egress::Grant::lamp());
+        }
+        let runner = std::sync::Arc::new(runner);
         let keys = crate::skill_keys::on(std::env::var(crate::skill_keys::SWITCH).ok().as_deref());
         if keys {
             eprintln!(
@@ -3832,14 +4012,16 @@ impl HandOvers {
             socket: PathBuf::from(HAND_OVER_SOCKET),
             skills: PathBuf::from(SKILLS),
             tokens: std::sync::Arc::new(ControlTokens::default()),
-            runner: std::sync::Arc::new(runner),
+            runner: runner.clone(),
             // The lamp's Hermes work folder, where an agent skill's run gets
             // its fresh folder.
             work: Some(HermesRunner::lamp(home).folder),
             caller: caller_is_lamp_skills,
             net: net.then(|| {
-                std::sync::Arc::new(crate::skill_make::net_runner(home))
-                    as std::sync::Arc<dyn Runner + Send + Sync>
+                std::sync::Arc::new(crate::skill_make::NetRunner {
+                    make: crate::skill_make::net_runner(home),
+                    one_path: Some(runner.clone()),
+                }) as std::sync::Arc<dyn Runner + Send + Sync>
             }),
             held: Some(std::sync::Arc::new(crate::skill_make::lamp_runner(
                 home, true,
@@ -6367,6 +6549,7 @@ mod tests {
             one_session: None,
             skill_start_allowed: allowed_read(true),
             makes: false,
+            egress: None,
         }
     }
 
@@ -6812,6 +6995,133 @@ mod tests {
         ]
     }
 
+    /// A runner that keeps whether each run was granted `net` and the name
+    /// of its own folder, and answers `answer`.
+    struct NetSeen {
+        seen: RefCell<Vec<(bool, Option<String>, String)>>,
+        answer: Result<u64, String>,
+    }
+
+    impl Runner for NetSeen {
+        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+            let folder = run
+                .start_in
+                .as_deref()
+                .and_then(Path::file_name)
+                .map(|name| name.to_string_lossy().into_owned());
+            self.seen
+                .borrow_mut()
+                .push((run.net, folder, run.run.clone()));
+            self.answer.clone()
+        }
+    }
+
+    /// #7200 fix (a): a run granted `net` is marked so for its runner, and
+    /// its fresh folder is `make-<its run id>`, by which the one run path's
+    /// wrapper finds its home; a run without `net` is not marked. Refused
+    /// for its way out (a gateway default such as OpenClaw, a wrapper with
+    /// no egress lines, or the one run path's or older wrapper that can't
+    /// hold it), it is told `no_net`, which lamp-skills says aloud; any
+    /// other failure keeps `run_failed`.
+    #[test]
+    fn a_net_run_is_marked_its_home_named_by_its_id_and_refused_as_no_net() {
+        let work = tempfile::tempdir().unwrap();
+        let with_net = line(|value| value["grants"] = json!(["light", NET_GRANT]));
+        let tokens = FakeTokens {
+            yes: Some(vec!["light".into()]),
+            net_yes: true,
+            ..FakeTokens::default()
+        };
+        let gateway = net_refused(
+            "the lamp's default agent (openclaw) runs its turns in its gateway's namespaces, which no one run can be held in",
+        );
+        for (answer, code) in [
+            (Ok(0), None),
+            (Err(gateway.clone()), Some(NO_NET)),
+            (Err(NOT_HELD_OFF.to_owned()), Some(NO_NET)),
+            (Err(NOT_HELD_OFF_ONE_PATH.to_owned()), Some(NO_NET)),
+            (Err(crate::egress::NO_EGRESS.to_owned()), Some(NO_NET)),
+            (Err("Harness failed".to_owned()), Some("run_failed")),
+        ] {
+            let net = NetSeen {
+                seen: RefCell::default(),
+                answer: answer.clone(),
+            };
+            let held = where_runner();
+            let agent = Agent {
+                net: Some(&net),
+                held: Some(&held),
+                work: Some(work.path()),
+                services: false,
+                keys: None,
+            };
+            let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
+            match code {
+                None => assert_eq!(told["ok"], true, "{told}"),
+                Some(code) => {
+                    assert_eq!(told["error"], code, "{told}");
+                    assert_eq!(told["message"], answer.clone().unwrap_err().as_str());
+                }
+            }
+            let seen = net.seen.borrow();
+            assert_eq!(seen.len(), 1);
+            let (marked, folder, run) = &seen[0];
+            assert!(*marked);
+            assert_eq!(folder.as_deref(), Some(format!("make-{run}").as_str()));
+            assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
+        }
+        // Without `net`: not marked.
+        let held = NetSeen {
+            seen: RefCell::default(),
+            answer: Ok(0),
+        };
+        let agent_line = line(|value| {
+            value["run"] = json!(AGENT_INSTRUCTIONS);
+            value["grants"] = json!(["light"]);
+        });
+        let agent = Agent {
+            net: None,
+            held: Some(&held),
+            work: Some(work.path()),
+            services: false,
+            keys: None,
+        };
+        let told = answer_agent(&agent_line, true, skills(), &tokens, &held, &agent);
+        assert_eq!(told["ok"], true, "{told}");
+        assert!(!held.seen.borrow()[0].0);
+        assert!(gateway.starts_with(NET_REFUSED));
+    }
+
+    /// lamp-update's one run path wrappers carry the egress lines lamp-tasks
+    /// looks for once each, Hermes's with its make-home line (so it takes a
+    /// run granted `net`), Claude Code's without (so it never does).
+    #[test]
+    fn the_one_path_wrappers_carry_the_egress_lines_once() {
+        let source = include_str!("../../update/src/agent_ns/wrapper.rs");
+        for line in ONE_PATH_EGRESS_LINES {
+            for text in [ONE_PATH_HERMES, ONE_PATH_CLAUDE] {
+                assert_eq!(text.matches(line).count(), 1, "{line:?}");
+            }
+        }
+        // The guard is lamp-update's own constant, as it writes it.
+        assert!(source.contains(&format!(
+            "pub const ONE_PATH_EGRESS_GUARD: &str = {:?};",
+            ONE_PATH_EGRESS_LINES[2]
+        )));
+        let ns = format!(
+            "{}\n{}\n{}",
+            crate::egress::NS_LINE,
+            crate::egress::NS_SKILL_LINE,
+            crate::skill_make::ONE_PATH_NS_MAKE_LINES
+        );
+        assert!(takes_net_runs(ONE_PATH_HERMES, &ns));
+        assert!(!takes_net_runs(ONE_PATH_CLAUDE, &ns));
+        assert!(!takes_net_runs(
+            ONE_PATH_HERMES,
+            &ns.replace(crate::egress::NS_SKILL_LINE, "")
+        ));
+    }
+
     /// LAMP_TASK_NET: a run granted `net` goes through the make's net
     /// runner, held as every run with its own egress socket; one with no
     /// `net` goes through the skill's. With the switch off, `net` is no
@@ -6994,7 +7304,7 @@ mod tests {
         reset();
         ns_with("");
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
-        assert_eq!(told["error"], "run_failed", "{told}");
+        assert_eq!(told["error"], NO_NET, "{told}");
         assert_eq!(told["message"], crate::egress::NO_EGRESS);
         assert!(!ran());
         assert_eq!(sockets(), 0);

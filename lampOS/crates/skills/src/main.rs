@@ -5720,6 +5720,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
         // (`lamp_skills::task_sure`). Off, neither is ever set.
         let sure = lamp_skills::task_sure::on();
         let found = std::cell::Cell::new(None);
+        let refused = std::cell::Cell::new(None);
         let tried = lamp_skills::task_sure::Tried::default();
         let send = |socket: &Path, line: &str| {
             let sent = hand_over(socket, line);
@@ -5740,12 +5741,14 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
                 )
             );
             found.set(lamp_skills::task::told(&answer));
+            refused.set(lamp_skills::task::refusal_said(&answer));
             lamp_skills::service_write::agent_answered(&answer)
         };
         // Each try afresh: one that returns before `send` keeps nothing of
         // the try before it.
         let try_hand = || {
             found.set(None);
+            refused.set(None);
             tried.once(|| {
                 lamp_skills::task::hand(
                     &skill,
@@ -5774,11 +5777,20 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             dropped.words()
         });
         eprintln!("lamp-skills: skill:{skill}: {said}");
-        // What its agent found, or with the switch on, why it didn't run.
+        // A refusal the person must hear (a run granted the internet the
+        // lamp's agent can't be given, #7200): said in plain words, behind
+        // the same gate as a told answer, never the journal's words.
+        let refused = refused.take();
+        if let Some(line) = refused {
+            let told = lamp_skills::service_read::tell(&[line.to_owned()], &mut room);
+            eprintln!("lamp-skills: skill:{skill}: do.task: its refusal said aloud: {told}");
+        }
+        // What its agent found, or with the switch on, why it didn't run
+        // (once: a refusal said above is that).
         let told = match (found.take(), tried.failed()) {
             (Some(lines), _) => Some((lines, "what its agent found")),
-            (None, Some(line)) => Some((vec![line], "what became of its run")),
-            (None, None) => None,
+            (None, Some(line)) if refused.is_none() => Some((vec![line], "what became of its run")),
+            (None, _) => None,
         };
         if let Some((lines, what)) = told {
             // Kept as waiting till its end, so a restart that drops it

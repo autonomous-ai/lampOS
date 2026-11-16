@@ -291,15 +291,18 @@ pub const NOT_SENT_LINE: &str =
 /// lamp-tasks' refusals that come before a run's agent begins: off, a line
 /// it doesn't take, no token, another run going, or its agent not started
 /// (`lamp_tasks::skill_task::NOT_STARTED`: Harness signed out or not set
-/// up, no Hermes target, a launch Harness never sent). `run_failed` is
-/// none of them: the run had begun.
-pub const NOT_TAKEN: [&str; 6] = [
+/// up, no Hermes target, a launch Harness never sent), or a run granted
+/// `net` that can't be given its way out (`no_net`,
+/// `lamp_tasks::skill_task::NO_NET`, said aloud: [`crate::task::refusal_said`]).
+/// `run_failed` is none of them: the run had begun.
+pub const NOT_TAKEN: [&str; 7] = [
     "off",
     "bad_request",
     "too_long",
     "no_token",
     "busy",
     "not_started",
+    crate::task::NO_NET,
 ];
 
 /// lamp-tasks' answer to a fixed write's line, read when its run ended:

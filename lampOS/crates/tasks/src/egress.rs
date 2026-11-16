@@ -3,8 +3,10 @@
 //! ([`crate::skill_task::NET_ENV`] `run`: its own network namespace with
 //! only `lo`, the model through [`crate::net_bridge::MODEL_SOCKET`]), and is
 //! given one more socket, [`EGRESS_DIR`]`/make-<run>.sock`, for that run
-//! alone. lamp-tasks serves it ([`Grant::open`]) and removes it when the
-//! run ends.
+//! alone (on the one run path `skill-<run>.sock`, which the wrapper finds
+//! by the run's id, [`crate::skill_task::ONE_PATH_EGRESS_LINES`]).
+//! lamp-tasks serves it ([`Grant::open`]) and removes it when the run
+//! ends.
 //!
 //! - **Inside the run** ([`Inside`], `lamp-tasks net-relay --egress`,
 //!   started by its namespace script): an HTTP proxy on [`PROXY_LISTEN`]
@@ -52,6 +54,11 @@ pub const EGRESS_ENV: &str = "LAMP_NS_EGRESS";
 /// The line lamp-update's namespace script carries when it shows a run's
 /// egress socket: without it a `net` run is refused ([`NO_EGRESS`]).
 pub const NS_LINE: &str = "V=/run/lampos-tasks/egress/$LAMP_NS_EGRESS.sock";
+/// The line lamp-update's namespace script carries when it takes a run's
+/// egress socket by the one run path's name too, `skill-<run id>`
+/// ([`crate::skill_task::RUN_FOLDER_PREFIX`]): without it such a run is
+/// refused ([`crate::skill_task::NET_NO_WAY_OUT`]).
+pub const NS_SKILL_LINE: &str = "case $LAMP_NS_EGRESS in make-?*|skill-?*) ;;";
 /// Said when the namespace script has no [`NS_LINE`]: nothing is started.
 pub const NO_EGRESS: &str = "the lamp's agent can't be given the internet yet (its namespace script has no egress line: lamp-update's round hasn't run), so nothing was started";
 /// The ports a run granted `net` reaches (Heron's answer 1): the web.
@@ -822,11 +829,16 @@ pub struct Grant {
     pub say: Say,
 }
 
-/// Whether `name` is a run's folder's, `make-<run id>`: plain, at most 80
-/// bytes, as the namespace script takes it.
+/// Whether `name` is a run's folder's, `make-<run id>`, or a one run path
+/// run's, `skill-<run id>`: plain, at most 80 bytes, as the namespace
+/// script takes it.
 pub fn plain_name(name: &str) -> bool {
-    name.strip_prefix(crate::skill_make::FOLDER_HEAD)
-        .is_some_and(|id| !id.is_empty())
+    [
+        crate::skill_make::FOLDER_HEAD,
+        crate::skill_task::RUN_FOLDER_PREFIX,
+    ]
+    .iter()
+    .any(|head| name.strip_prefix(head).is_some_and(|id| !id.is_empty()))
         && name.len() <= 80
         && name
             .bytes()

@@ -582,7 +582,15 @@ fn names_resolve_through_the_egress_and_refusals_never_leave() {
 fn the_egress_socket_lives_only_while_its_run_does() {
     let dir = private();
     let grant = grant(dir.path(), policy(80, vec![]), heard().0);
-    for bad in ["model", "make-", "make-A", "make-../x", "skill-1"] {
+    for bad in [
+        "model",
+        "make-",
+        "make-A",
+        "make-../x",
+        "skill-",
+        "skill-A",
+        "run-1",
+    ] {
         assert!(
             grant
                 .open(bad, Instant::now() + Duration::from_secs(5))
@@ -648,7 +656,10 @@ fn the_names_agree_with_the_namespace_script() {
     assert!(source.contains(&format!("pub const EGRESS_ENV: &str = \"{EGRESS_ENV}\";")));
     assert!(source.contains(&format!("pub const EGRESS_DIR: &str = \"{EGRESS_DIR}\";")));
     assert!(source.contains(NS_LINE), "{NS_LINE}");
+    assert!(source.contains(NS_SKILL_LINE), "{NS_SKILL_LINE}");
     assert!(source.contains("--egress \\\"$V\\\""));
+    assert!(plain_name("make-task-1") && plain_name("skill-task-1"));
+    assert!(!plain_name("skill-") && !plain_name("other-task-1") && !plain_name("skill-A"));
     assert_eq!(PROXY_LISTEN.to_string(), "127.0.0.1:3128");
     assert_eq!(DNS_LISTEN.to_string(), "127.0.0.1:53");
     assert!(source.contains("http_proxy=http://127.0.0.1:3128"));
