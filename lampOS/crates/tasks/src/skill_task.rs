@@ -5845,6 +5845,28 @@ mod tests {
         assert!(!dir.path().join("project").exists());
     }
 
+    /// #7190: runs the wrapper in `dir/bin` once, before a run's clock
+    /// starts, with [`WARM_ARG`], which the body given to [`warmable`]
+    /// exits on at once. macOS checks a just-written executable at its
+    /// first exec, which takes seconds on a busy Mac (16 test threads);
+    /// a second exec of the same file is not checked again.
+    fn warm(dir: &Path) {
+        let status = std::process::Command::new(dir.join("bin/hermes"))
+            .arg(WARM_ARG)
+            .status()
+            .unwrap();
+        assert!(status.success(), "the wrapper warmed: {status}");
+    }
+
+    /// What [`warm`] passes; never [`TASK_ARG`], a run's own argument.
+    const WARM_ARG: &str = "--warm";
+
+    /// A wrapper body run as `body`, or that exits 0 at once when given
+    /// [`WARM_ARG`].
+    fn warmable(body: &str) -> String {
+        format!("[ \"$1\" = {WARM_ARG} ] && exit 0\n{body}")
+    }
+
     /// Whether process `pid` is gone, waited for up to two seconds.
     fn gone(pid: &str) -> bool {
         let began = std::time::Instant::now();
@@ -5872,8 +5894,10 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let top = std::fs::canonicalize(dir.path()).unwrap();
             let child = top.join("child");
-            let body = format!("sleep 30 &\necho $! > {}\nwait", child.display());
+            let body = warmable(&format!("sleep 30 &\necho $! > {}\nwait", child.display()));
             let runner = local_runner(&top, HarnessHere::Absent, true, Some(&local_wrapper(&body)));
+            // The deadline's clock starts once the wrapper can start.
+            warm(&top);
             let flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             runner.stop_on(flag.clone());
             let deadline = if stop {
@@ -5919,8 +5943,9 @@ mod tests {
             dir.path(),
             HarnessHere::Absent,
             true,
-            Some(&local_wrapper("exit 3")),
+            Some(&local_wrapper(&warmable("exit 3"))),
         );
+        warm(dir.path());
         let said = runner
             .run(&skill_run("tok", Duration::from_secs(10)), &|| {})
             .unwrap_err();
