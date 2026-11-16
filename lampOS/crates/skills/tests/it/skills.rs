@@ -2780,6 +2780,191 @@ fn a_list_of_sooners_brings_the_trigger_to_the_shortest_holding() {
     }
 }
 
+/// #6543: a `[[while]]`'s `sooner` lowers its own `above` while another
+/// topic's field is past a line, the lowest of those holding; off, or none
+/// holding, its own `above`. The journal says it once as it is lowered and
+/// once as it goes back, and the loader refuses a sooner on anything but an
+/// `above` without `for`, one not lower, an unpermitted topic, an empty list.
+#[test]
+fn a_whiles_sooner_lowers_its_own_above_to_the_lowest_holding() {
+    let dir = tempfile::tempdir().unwrap();
+    let all = r#""room/activity", "humans/doing_more""#;
+    let with = |condition: &str, topics: &str| {
+        format!(
+            "needs = [\"light\"]\ntool = \"break_now\"\n[[while]]\ntopic = \"room/activity\"\n\
+             field = \"sitting_s\"\n{condition}\n[[do]]\nlight = {{ colour = \"warm\" }}\n\
+             [permissions]\ntopics = [{topics}]\nlight = true\n"
+        )
+    };
+    let drank =
+        r#"{ topic = "humans/doing_more", field = "drank_seen", above = 1, above_to = 3599 }"#;
+    let ate = r#"{ topic = "humans/doing_more", field = "ate_seen", above = 0, above_to = 5399 }"#;
+    // The higher first: the lowest holding wins, not the first.
+    let condition = format!("above = 7199\nsooner = [{ate}, {drank}]");
+    let skill = load(&skill_with(
+        &dir.path().join("list"),
+        "comfort",
+        &with(&condition, all),
+    ))
+    .unwrap();
+    let runs = |on: bool, sitting_s: u32, drank_seen: u32, ate_seen: u32| {
+        let engine = Engine::new(vec![skill.clone()], true);
+        let mut engine = if on { engine.sooner() } else { engine };
+        engine.observe(
+            "humans/doing_more",
+            1_000_000,
+            format!(r#"{{"drank_seen":{drank_seen},"ate_seen":{ate_seen}}}"#).as_bytes(),
+            None,
+        );
+        engine.observe(
+            "room/activity",
+            2_000_000,
+            format!(r#"{{"sitting_s":{sitting_s}}}"#).as_bytes(),
+            None,
+        );
+        engine
+            .tool("break_now", &serde_json::json!({}), 3_000_000)
+            .is_ok()
+    };
+    assert!(!runs(true, 4000, 0, 0), "none holding: its own 7199");
+    assert!(runs(true, 7200, 0, 0), "past its own above");
+    assert!(runs(true, 4000, 2, 0), "two drinks: lowered to 3599");
+    assert!(!runs(true, 3500, 2, 0), "lowered, not gone");
+    assert!(!runs(true, 4000, 1, 0), "one drink is not above 1");
+    assert!(runs(true, 5400, 0, 1), "a meal alone: 5399");
+    assert!(!runs(true, 4000, 0, 1), "a meal alone: 5399");
+    assert!(runs(true, 4000, 2, 1), "both: the lowest");
+    assert!(!runs(false, 4000, 2, 1), "switch off: its own above");
+    assert!(runs(false, 7200, 2, 1), "switch off: its own above");
+
+    // The journal: once lowered, nothing on the same, once back.
+    let mut engine = Engine::new(vec![skill.clone()], true).sooner();
+    engine.observe("room/activity", 0, br#"{"sitting_s":100}"#, None);
+    assert!(engine.take_dropped().is_empty());
+    engine.observe("humans/doing_more", 1_000_000, br#"{"drank_seen":2}"#, None);
+    assert_eq!(
+        engine.take_dropped(),
+        [
+            "comfort while room/activity sitting_s above 7199 lowered to 3599 \
+             (sooner humans/doing_more drank_seen above 1)"
+        ]
+    );
+    engine.observe("room/activity", 2_000_000, br#"{"sitting_s":200}"#, None);
+    engine.observe("humans/doing_more", 3_000_000, br#"{"drank_seen":3}"#, None);
+    engine.tick(4_000_000);
+    assert!(engine.take_dropped().is_empty(), "said once");
+    engine.observe("humans/doing_more", 5_000_000, br#"{"drank_seen":0}"#, None);
+    assert_eq!(
+        engine.take_dropped(),
+        ["comfort while room/activity sitting_s above 7199 again, from 3599: no sooner holds"]
+    );
+    // A value that runs out lets it go back too, on a tick.
+    engine.observe(
+        "humans/doing_more",
+        6_000_000,
+        br#"{"drank_seen":2,"ate_seen":1}"#,
+        Some(10_000),
+    );
+    assert_eq!(engine.take_dropped().len(), 1);
+    engine.tick(17_000_000);
+    assert_eq!(
+        engine.take_dropped(),
+        ["comfort while room/activity sitting_s above 7199 again, from 3599: no sooner holds"]
+    );
+    // Off: no line.
+    let mut off = Engine::new(vec![skill.clone()], true);
+    off.observe("humans/doing_more", 1_000_000, br#"{"drank_seen":2}"#, None);
+    assert!(off.take_dropped().is_empty());
+
+    // One table is a list of that one table.
+    let single = load(&skill_with(
+        &dir.path().join("single"),
+        "comfort",
+        &with(&format!("above = 7199\nsooner = {drank}"), all),
+    ))
+    .unwrap();
+    let one = load(&skill_with(
+        &dir.path().join("one"),
+        "comfort",
+        &with(&format!("above = 7199\nsooner = [{drank}]"), all),
+    ))
+    .unwrap();
+    let allowed = |skill: &lamp_skills::Skill, drank_seen: u32| {
+        let mut engine = Engine::new(vec![skill.clone()], true).sooner();
+        engine.observe(
+            "humans/doing_more",
+            0,
+            format!(r#"{{"drank_seen":{drank_seen}}}"#).as_bytes(),
+            None,
+        );
+        engine.observe("room/activity", 0, br#"{"sitting_s":4000}"#, None);
+        engine.tool("break_now", &serde_json::json!({}), 1).is_ok()
+    };
+    for drank_seen in [0, 2] {
+        assert_eq!(allowed(&single, drank_seen), allowed(&one, drank_seen));
+    }
+    assert!(allowed(&one, 2) && !allowed(&one, 0));
+
+    // Refused when it loads.
+    for (condition, topics, why) in [
+        (
+            format!("equals = 7199\nsooner = {drank}"),
+            all,
+            "give it an above",
+        ),
+        (
+            format!("below = 7199\nsooner = {drank}"),
+            all,
+            "give it an above",
+        ),
+        (
+            format!("above = 7199\nfor = \"1m\"\nsooner = {drank}"),
+            all,
+            "not with its for",
+        ),
+        (
+            format!("above = 3599\nsooner = {drank}"),
+            all,
+            "below the [[while]]'s above",
+        ),
+        (
+            format!("above = 3000\nsooner = {drank}"),
+            all,
+            "below the [[while]]'s above",
+        ),
+        (
+            "above = 7199\nsooner = []".to_owned(),
+            all,
+            "not an empty list",
+        ),
+        (
+            "above = 7199\nsooner = { topic = \"humans/doing_more\", field = \"drank_seen\", above = 1 }"
+                .to_owned(),
+            all,
+            "missing field `above_to`",
+        ),
+        (
+            "above = 7199\nsooner = { topic = \"humans/doing_more\", field = \"drank_seen\", above = 1, above_to = 3599, equals = 2 }"
+                .to_owned(),
+            all,
+            "unknown field `equals`",
+        ),
+        (
+            condition.clone(),
+            r#""room/activity""#,
+            "a [[while]]'s sooner reads humans/doing_more",
+        ),
+    ] {
+        let error = load(&skill_with(
+            &dir.path().join("bad"),
+            "comfort",
+            &with(&condition, topics),
+        ))
+        .unwrap_err();
+        assert!(error.contains(why), "{condition}: {error}");
+    }
+}
+
 /// #6543: Stretch break's `[[while]]` on `humans/doing` waits for 30
 /// minutes of no stretch seen, its yawn sooner's, not its own 50: with
 /// lamp-seen saying nothing seen, a yawn still brings the stretch to 30
