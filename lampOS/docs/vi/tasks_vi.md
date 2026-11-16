@@ -1901,7 +1901,10 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   được: `uncertain` với cùng các mã, được giữ), và không có gì thì harness
   thứ hai cũng được đóng và việc là `not_sent`, `openclaw_not_taken`, để
   giọng nói báo người dùng rằng việc chưa đến được agent, không bao giờ báo là
-  đã bắt đầu. Harness không đóng được thì lần giao là `uncertain`
+  đã bắt đầu. Lệnh đóng bị từ chối với exit 1 `WORKING` là bằng chứng
+  harness đã nhận prompt (Gateway chậm, vừa quá giới hạn 45 s, lamp-c0a4):
+  harness đó, đầu hay thứ hai, được giữ và lần giao là `accepted` trên nó.
+  Harness không đóng được vì lý do khác thì lần giao là `uncertain`
   (`openclaw_not_closed` với harness đầu, `openclaw_not_taken` với harness
   thứ hai) và không khởi động thêm gì: một harness còn chạy vẫn có thể nhận
   việc cùng lúc với harness khác. `new` lần hai lỗi, hoặc không còn thời gian
