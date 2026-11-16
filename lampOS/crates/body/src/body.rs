@@ -456,6 +456,29 @@ impl StrainGuard {
     pub const CLIMB_EVERY: Duration = Duration::from_secs(10);
 }
 
+/// The stand ease (#7289): an arm joint fully stood up, asked its stand goal
+/// and nothing else, held more than [`STAND_EASE_SHORT`] counts short of it
+/// at a load over [`STAND_EASE_LOAD`] for [`STAND_EASE_STEPS`], has that goal
+/// eased to where it holds plus [`STAND_EASE_MARGIN`] for the rest of the
+/// run. lamp-74ff's elbow held 41 to 47 short at 176 to 200 and heated to
+/// 62 degrees in 40 min; lamp-52e6's held 3 short at 24.
+/// ponytail: tuned on two lamps; retune from journals of more arms.
+pub const STAND_EASE_SHORT: u16 = 20;
+/// Over this a joint is pushing at its goal, not just carrying the lamp:
+/// 74ff's elbow read 176 to 200, 52e6's 24. ponytail: unmeasured on others.
+pub const STAND_EASE_LOAD: u16 = 150;
+/// Sixty seconds of steps short and loaded: well past a rise settling and
+/// a gesture easing back, long before 74ff's 30 to 40 min to heat.
+/// ponytail: unmeasured; time counts only while it is asked its stand goal.
+pub const STAND_EASE_STEPS: u32 = 3_000;
+/// Left this far toward the goal from where it holds, so it still presses
+/// the lamp up a little. ponytail: unmeasured.
+pub const STAND_EASE_MARGIN: u16 = 5;
+/// Never eased more than this under its measured stand: farther short is a
+/// hand pushing it down, not the arm's own reach, and is said once instead.
+/// 74ff's worst was 47. ponytail: unmeasured.
+pub const STAND_EASE_FLOOR: u16 = 80;
+
 /// Each joint's temperature every [`StrainGuard::CLIMB_EVERY`] over the last
 /// [`StrainGuard::CLIMB_WINDOW`] (#4501): a joint warming fast is said
 /// before it is warm. It never moves the body.
@@ -5503,6 +5526,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // inside `StrainGuard::SEAT_WINDOW`; what `Glimpse` says of them; and
     // each joint's temperatures, for a fast warming.
     let mut strain_since: [Option<Duration>; 2] = [None; 2];
+    // #7289: the stand as measured, the steps each arm joint has been held
+    // short of its stand goal under load, and whether one too far short to
+    // ease has been said.
+    let stand_measured = standing.map(|up| [up.pose[3], up.pose[4]]);
+    let mut stand_short_steps = [0u32; 2];
+    let mut too_short_said = [false; 2];
     let mut seat_retreats: std::collections::VecDeque<Duration> = std::collections::VecDeque::new();
     let mut unlifted_said: Option<&'static str> = None;
     let mut strained_by: Option<(&'static str, u16)> = None;
@@ -7818,6 +7847,50 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 report.arm_peak_load[index] = report.arm_peak_load[index].max(is.load);
                 report.arm_peak_temperature[index] =
                     report.arm_peak_temperature[index].max(is.temperature);
+                // #7289: fully stood and asked its stand goal and nothing
+                // else (a gesture, a lean, a hold or the anti-tip cut writes
+                // another goal, and pauses the count), held short of it
+                // under load: that goal is eased to where it holds. The
+                // strain guard below still judges every step as before.
+                let goal = up.pose[3 + index];
+                if stand >= 1.0 && arm_written[index] == goal {
+                    let rising = goal > up.folded[index];
+                    let short = if rising {
+                        goal.saturating_sub(is.position)
+                    } else {
+                        is.position.saturating_sub(goal)
+                    };
+                    stand_short_steps[index] =
+                        if short > STAND_EASE_SHORT && is.load > STAND_EASE_LOAD {
+                            stand_short_steps[index] + 1
+                        } else {
+                            0
+                        };
+                    if stand_short_steps[index] >= STAND_EASE_STEPS {
+                        stand_short_steps[index] = 0;
+                        let measured = stand_measured.map_or(goal, |stood| stood[index]);
+                        let eased = if rising {
+                            is.position + STAND_EASE_MARGIN
+                        } else {
+                            is.position - STAND_EASE_MARGIN
+                        };
+                        if eased.abs_diff(measured) <= STAND_EASE_FLOOR {
+                            if let Some(up) = standing.as_mut() {
+                                up.pose[3 + index] = eased;
+                            }
+                            eprintln!(
+                                "lamp-body: step {}: {joint} held short of its stand: goal {measured} eased to {eased}, held at {}, load {}",
+                                report.steps, is.position, is.load
+                            );
+                        } else if !too_short_said[index] {
+                            too_short_said[index] = true;
+                            eprintln!(
+                                "lamp-body: step {}: {joint} held {short} short of its stand goal {goal}, load {}: past {STAND_EASE_FLOOR}, not eased",
+                                report.steps, is.load
+                            );
+                        }
+                    }
+                }
                 arm_over[index] = if is.load > up.load[index] {
                     arm_over[index].saturating_add(1)
                 } else {
