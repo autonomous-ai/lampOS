@@ -1691,7 +1691,15 @@ fn run_spoken_call_inner(
             && context.call_id == call.id
             && context.check().is_ok()
     });
-    let result = if let Route::UseSkill(settings) = route {
+    let result = if let Route::UseSkill(settings) = route
+        && let Some(asked) = crate::skill_about::asked(call)
+    {
+        // A question about a skill on the lamp (`LAMP_SKILL_STATE_TOLD`,
+        // #7335): told from the lamp's own records, no skill run.
+        let told =
+            crate::skill_about::told_here(asked, request, heard, lease, settings.skills.as_deref());
+        (crate::skill_about::WHOM, ToolAnswer::plain(told), true)
+    } else if let Route::UseSkill(settings) = route {
         let skills = skill_tools(settings);
         match crate::use_skill::translate(call, crate::use_skill::offered(&skills)) {
             Ok(skill) => match self::route(settings, &skill.name) {
@@ -2456,6 +2464,21 @@ fn run_call_with_scope(
                 heard,
                 *held,
                 crate::reports_stop::ANSWER_WITHIN,
+            ),
+        ),
+        // A question about a skill on the lamp (`LAMP_SKILL_STATE_TOLD`,
+        // #7335): told from the lamp's own records, no skill run.
+        Route::UseSkill(settings) if crate::skill_about::asked(call).is_some() => (
+            crate::skill_about::WHOM,
+            (
+                crate::skill_about::told_here(
+                    crate::skill_about::asked(call).unwrap_or_default(),
+                    request,
+                    heard,
+                    lease,
+                    settings.skills.as_deref(),
+                ),
+                true,
             ),
         ),
         Route::UseSkill(settings) => {
@@ -4957,6 +4980,76 @@ mod tests {
             assert!(!told.iter().any(|name| name == cut), "{cut}: {told:?}");
         }
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A `use_skill` call with `about` is answered from the skills'
+    /// records on both paths, the spoken route's and the generic one, and
+    /// runs no skill: here, with no skills folder at the product's place,
+    /// the lamp can't check, and never guesses; a turn nobody spoke is told
+    /// nothing. Off, it is a `use_skill` call naming no skill, as before.
+    #[test]
+    fn a_question_about_a_skill_is_answered_through_use_skill() {
+        let (dir, mut settings) = many_skills("skill-state-route");
+        settings.use_skill = true;
+        let call = ToolCall {
+            id: "c1".into(),
+            name: crate::use_skill::NAME.into(),
+            args: json!({"about": "water reminder"}),
+        };
+        let route = route(&settings, &call.name);
+        crate::skill_about::set_on_here(Some(true));
+        let (whom, answer, answered) = run_spoken_call(&settings, &route, &call, 1, true, None);
+        assert_eq!(whom, crate::skill_about::WHOM);
+        assert!(answered);
+        assert_eq!(
+            answer.told,
+            json!({"error": crate::skill_about::CANT_CHECK})
+        );
+        let (whom, (told, answered)) = run_call_with_scope(&route, &call, 2, true, None);
+        assert_eq!(whom, crate::skill_about::WHOM);
+        assert!(answered);
+        assert_eq!(told, json!({"error": crate::skill_about::CANT_CHECK}));
+        let (_, (told, _)) = run_call_with_scope(&route, &call, 3, false, None);
+        assert_eq!(told, json!({"error": crate::skill_about::NOT_ASKED_ALOUD}));
+        crate::skill_about::set_on_here(Some(false));
+        let (whom, answer, _) = run_spoken_call(&settings, &route, &call, 4, true, None);
+        crate::skill_about::set_on_here(None);
+        assert_eq!(whom, crate::use_skill::NAME);
+        assert!(
+            answer.told["error"]
+                .as_str()
+                .is_some_and(|error| error.starts_with("There is no skill named that")),
+            "{}",
+            answer.told
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The first builder's condition on #7335: no new function. With
+    /// `LAMP_SKILL_STATE_TOLD` a session's functions are the same by name
+    /// and count, and its setup line is the same, as without it.
+    #[test]
+    fn a_question_about_a_skill_adds_no_function() {
+        let (dir, mut settings) = many_skills("skill-state-told");
+        settings.use_skill = true;
+        settings.make_skill = true;
+        let names_and_line = || {
+            let tools = declared(&settings);
+            let line = crate::session_tools::setup_line(&tools, &settings);
+            let names: Vec<String> = tools.into_iter().map(|tool| tool.name).collect();
+            (names, line)
+        };
+        crate::skill_about::set_on_here(Some(false));
+        let off = names_and_line();
+        crate::skill_about::set_on_here(Some(true));
+        let on = names_and_line();
+        crate::skill_about::set_on_here(None);
+        assert!(
+            off.0.iter().any(|name| name == crate::use_skill::NAME),
+            "{off:?}"
+        );
+        assert_eq!(on, off);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// #1668: past the 32, one skill was dropped without a word. With

@@ -196,6 +196,7 @@ pub mod session_fact;
 pub mod session_tools;
 pub mod short_turns;
 pub mod sight;
+pub mod skill_about;
 pub mod skill_named;
 pub mod skill_task_yes;
 pub mod skill_words;

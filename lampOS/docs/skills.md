@@ -4371,6 +4371,80 @@ Test: `made_list::tests::the_skills_they_made_are_told_from_the_lamp_newest_firs
 and `make_skill_local::tests::a_made_script_is_offered_to_the_voice_with_its_switch_alone`
 (named with every switch on, within the bounds).
 
+**Asked about by voice** (`LAMP_SKILL_STATE_TOLD`, #7335; off unless set,
+in no product unit yet; the owner, 16 Nov: "is my water reminder on or
+off?" was answered "I don't know if it's on or off"). With the switch,
+`use_skill` (`LAMP_USE_SKILL`, "A lamp with many skills") takes `about`,
+the skill as the person said it, its name or what it does, given alone
+(`skill_about::ABOUT`), on both routes: a parameter of the function the
+voice already uses for its skills, never a new function (#7335), so a
+session's functions and its setup line are the same by name and count
+(`tools::tests::a_question_about_a_skill_adds_no_function`). It is a free
+string, not `skill`'s list of names, since that list names only the skills
+with a function (Welcome back, a nudge or a made skill with a trigger has
+none); with it `skill` is no longer required, and the function's
+description adds " To answer a question about any skill on the lamp, call
+it with about alone." (`skill_about::USE_SKILL_TOLD`). As many skills are
+offered within the link's bound as without it. Such a call runs no skill:
+it is answered before `use_skill::translate`, in the spoken route and the
+generic one (`tools::run_spoken_call_inner`, `tools::run_call_with_scope`), and its
+words are never kept in a later turn's history (a kept `use_skill` call
+needs its `skill`). Whether a line asks about a skill (on, off or resting,
+what it does or starts it, when it last ran, whether it waits for a yes) is
+the model's judgment, told in the parameter's description, never a list of
+words. Then, in code (`skill_about::told`), one local read, no agent and
+no network:
+- **Every skill on the lamp, from its own files.** Each folder of the
+  skills folder and the pushed folder (`skills-dev`) with a `SKILL.md`,
+  core, Store, pushed, made or added from a file alike, at most 80, by
+  name: its `SKILL.md` `description`; its `skill.toml`'s top-level
+  `enabled`, or its `[present]`'s with `LAMP_NUDGES_PRESENT=on` in the
+  voice's own environment, as `lamp-skills` loads it (a `skill.toml`
+  missing or not TOML is told off: its files don't load); its name in
+  `--state-dir`'s `off` (turned off by voice or in the app); and, from
+  `holds.json` in `lamp-skills`' tools folder (`/run/lampos-skills`), its
+  snooze (until the next morning), its `[rest]` (how many more minutes)
+  and its last run by itself (the latest of a kept hold's, its group's and
+  its rest's, on the monotonic clock: kept only since the boot, and only
+  for the skills `lamp-skills` keeps them for).
+- **What the model is told.** Every skill's line, its spoken name and its
+  state in a word (`sip of water: on`, `stretch break: off`, `reminders:
+  snoozed until tomorrow morning`); the three whose words come nearest to
+  what was asked (`skill_about::nearest`: a word in its name counts twice
+  one in its description, each weighed by how few skills have it) in full,
+  with what it does (its description, cut at 400 bytes), when it last ran
+  by itself when that is kept, and, for a skill whose `[[do]]` hands a task
+  over, whether that task waits for the owner's yes (asked of lamp-control
+  through the manage helper once, for the first such skill, with
+  `LAMP_SKILL_TASKS` on); and to answer from these alone, never guess, say
+  what isn't given isn't kept, and say no skill on the lamp is that one when
+  none is (a reminder they set is not a skill). Which skill they mean is the
+  model's. The answer is about 3 to 5 KB with 65 skills on the lamp.
+- **Never a guess.** A record there and unreadable (the skills folder, the
+  `off` file, `holds.json`, a skill's `SKILL.md` or `skill.toml`) tells the
+  model only that the lamp can't check its skills right now. A missing
+  `off`, `holds.json` or pushed folder is nothing turned off, held or
+  pushed.
+- **Names to the owner.** A skill made here (`made: here`) is named only
+  when the owner hears (`services::owner_hears`, asked only when there is
+  one), as a list's names are; to anyone else it is left out and counted
+  (`made_here_not_named`). A turn nobody spoke is told nothing. The journal
+  holds the counts alone.
+
+For "is my water reminder on or off?" with Sip of water on, the model is
+told, among the nearest, `{"name": "sip of water", "state": "on", "does":
+"After someone has sat at the desk an hour and a half, ...",
+"last_ran_by_itself": "42 minutes ago"}`; with Stretch break in `off`,
+`{"name": "stretch break", "state": "off: turned off by voice or in the
+app, until it is turned on"}`. Off, `use_skill` is exactly as before,
+byte for byte, and a call with `about` is refused by `translate` as any
+call naming no skill. Tests: `skill_about::tests` (on, off, snoozed, resting,
+`[present]`, a skill named by what it does, one not on the lamp, records
+that can't be read, the owner's names, the bounds, `use_skill`'s parameters with the switch and without),
+`tools::tests::a_question_about_a_skill_adds_no_function`,
+`tools::tests::a_question_about_a_skill_is_answered_through_use_skill`, and
+`process::tests::the_memory_switches_alone_reach_the_started_routes`.
+
 **Run now by voice** (lamp-9adf, 15 Nov at 15:49 and 15:52: "Run my unread
 mail skill now, please." and "Run my read newest email when sitting skill
 now." each went to a read-back, and the lamp said only "unread mail
