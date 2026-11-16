@@ -396,6 +396,8 @@ struct StopFile {
     when: Option<String>,
     #[serde(default)]
     done: Option<StopDoneFile>,
+    #[serde(default)]
+    group: Option<String>,
 }
 
 /// `[stop.done]`: a way of the `[stop]` function that says the person just
@@ -421,6 +423,10 @@ pub struct Stop {
     pub when: Option<String>,
     /// `[stop.done]`: its own way, beside [`STOP_WAYS`].
     pub done: Option<StopDone>,
+    /// `[stop] group` (#7401): the skills under the skills folder that name
+    /// it share the function as a `[budget]` group's do, in a skill with no
+    /// `[budget]` (the seen reactions, with no limit of their own).
+    pub group: Option<String>,
 }
 
 /// `[stop.done]` as loaded: a value of the function's `how` that rests only
@@ -1117,6 +1123,19 @@ pub const SAY_TABLE_KEYS: [&str; 6] = [
 /// How the voice's `unsaid` outcome is written in a run's outcome
 /// ([`ended_unsaid`]).
 pub const UNSAID: &str = "say: unsaid";
+
+/// Before a `[stop] group`'s name where the loader keeps what a function is
+/// shared by: never in a `[budget]` group's name, so the two never meet.
+const STOP_GROUP_MARK: &str = "[stop] ";
+
+/// The `[stop] group` of `skill`, in no `[budget]` group (#7401).
+fn stop_group(skill: &Skill) -> Option<&str> {
+    skill
+        .stop
+        .as_ref()
+        .and_then(|stop| stop.group.as_deref())
+        .filter(|_| skill.budget.is_none())
+}
 
 /// Whether a run's outcome, as lamp-skills writes it, holds its note let go
 /// unsaid by the voice, never begun, as the moment for it passed
@@ -4895,11 +4914,25 @@ fn manifest(
                     })
                 }
             };
+            if let Some(group) = &stop.group {
+                if budget.is_some() {
+                    return Err(
+                        "[stop] group is for a skill in no [budget] group: its group shares it already"
+                            .into(),
+                    );
+                }
+                if !plain_name(group) || group.contains('_') {
+                    return Err(format!(
+                        "[stop] group {group:?}: lowercase letters, digits and hyphens"
+                    ));
+                }
+            }
             Some(Stop {
                 tool: stop.tool,
                 about: stop.about,
                 when: checked_when(stop.when, "[stop]"),
                 done,
+                group: stop.group,
             })
         }
     };
@@ -6650,6 +6683,15 @@ pub fn load_each_with(
                 continue;
             }
             let group = skill.budget.as_ref().map(|(group, _)| group.clone());
+            // Or a `[stop] group`'s (#7401), apart from the `[budget]`
+            // groups' names; a pushed skill's never, so it shares nothing.
+            let stop_shared = match skill.stop.as_ref().and_then(|stop| stop.group.as_ref()) {
+                Some(named) => skill
+                    .pushed_by
+                    .is_none()
+                    .then(|| format!("{STOP_GROUP_MARK}{named}")),
+                None => group.clone(),
+            };
             let functions: Vec<(String, Option<String>)> = skill
                 .tool
                 .iter()
@@ -6658,7 +6700,7 @@ pub fn load_each_with(
                     skill
                         .stop
                         .as_ref()
-                        .map(|stop| (stop.tool.clone(), group.clone())),
+                        .map(|stop| (stop.tool.clone(), stop_shared.clone())),
                 )
                 .collect();
             if let Some((tool, mine, (owner, owner_kind, theirs))) =
@@ -6673,7 +6715,7 @@ pub fn load_each_with(
                 })
             {
                 let stops = if mine.is_some() || theirs.is_some() {
-                    "; a `[stop]` is shared only by the skills of one `[budget]` group"
+                    "; a `[stop]` is shared only by the skills of one `[budget]` group or one `[stop] group`"
                 } else {
                     ""
                 };
@@ -8052,8 +8094,14 @@ impl Engine {
             .skills
             .iter()
             .find(|skill| skill.name == sharing[0])
-            .and_then(|skill| skill.budget.as_ref())
-            .map(|(group, _)| group.clone());
+            .and_then(|skill| {
+                skill
+                    .budget
+                    .as_ref()
+                    .map(|(group, _)| group.as_str())
+                    .or_else(|| stop_group(skill))
+            })
+            .map(str::to_owned);
         let last = sharing
             .iter()
             .filter_map(|skill| self.group_ran.get(skill).map(|at| (*at, skill)))
@@ -8331,15 +8379,23 @@ impl Engine {
     /// hold back the next (#5207, Fourteen's finding on #5208). The day's
     /// `most_a_day` and `[rest]` count it as before. The group's name when
     /// given back.
+    ///
+    /// A skill in no `[budget]` group with a `[stop] group` (#7401, the
+    /// seen reactions) has nothing to give back but that: a run never heard is
+    /// no longer the one that came last for its `[stop]`, so a "stop that"
+    /// stops the remark they heard. None is said.
     pub fn unsaid(&mut self, skill: &str, now_us: u64) -> Option<String> {
-        let group = self
-            .skills
-            .iter()
-            .find(|known| known.name == skill)?
-            .budget
-            .as_ref()?
-            .0
-            .clone();
+        let known = self.skills.iter().find(|known| known.name == skill)?;
+        let Some((group, _)) = known.budget.as_ref() else {
+            if stop_group(known).is_some()
+                && let Some(ran) = self.unsaid_from.remove(skill)
+                && self.group_ran.get(skill) == Some(&ran)
+            {
+                self.group_ran.remove(skill);
+            }
+            return None;
+        };
+        let group = group.clone();
         let gives_back = self.skills.iter().any(|other| {
             other.budget_gives_back
                 && other
@@ -9535,6 +9591,17 @@ impl Engine {
                         continue;
                     };
                     rose = watch.readings.rose(reading, now_us, rise);
+                    // A rise kept waiting for its `[[while]]` (the lamp
+                    // talking, #7401) is still that rise until it is taken
+                    // or its `wait` runs out: a count that rose mid-turn
+                    // reacts once the turn ends, though the readings since
+                    // no longer rise. Only with a `wait`.
+                    rose = rose
+                        || (trigger.wait_us > 0
+                            && !watch.spent
+                            && watch.waiting_us.is_some_and(|since| {
+                                now_us.saturating_sub(since) < trigger.wait_us
+                            }));
                 }
                 watch.unknown_us = None;
                 if let Some(line) = rearm_line {
@@ -10445,6 +10512,12 @@ impl Engine {
                                 now_us.saturating_sub(*last) < BUDGET_WAIT_LIVE_US
                             });
                         }
+                    } else if nudge && stop_group(skill).is_some() {
+                        // A `[stop] group`'s function (#7401) still stops
+                        // the one that came last, and a run never heard is
+                        // not that one ([`Engine::unsaid`]).
+                        self.group_ran.insert(skill.name.clone(), now_us);
+                        self.unsaid_from.insert(skill.name.clone(), now_us);
                     }
                     // Asked of the Policy, a run is watched for once it is
                     // made ([`Engine::made`]): a no shows nothing to ignore.
@@ -11673,7 +11746,14 @@ fn replay_skill(
             stop.as_deref().unwrap_or("none")
         ));
     }
+    // A recorded case shows what the skill does when on, so it is replayed
+    // with the owner's seen_more yes too (#6543), as with `enabled` above.
+    // Only the replay assumes it: on a lamp, `humans/doing_more` still
+    // reaches the skill only with the live grant kept in `SEEN_MORE_FILE`
+    // (#7529, [`Engine::reread_seen_more`]).
+    let name = skill.name.clone();
     let mut engine = Engine::new(vec![skill], true);
+    engine.seen_more.insert(name);
     engine.set_energy(energy);
     let messages = read_recordings(recording)?;
     let first_us = messages.first().map_or(0, |message| message.header.at_us);

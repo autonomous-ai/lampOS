@@ -384,6 +384,15 @@ def _permissions(rules: dict[str, Any], report: Report) -> None:
         )
 
 
+def _stop(rules: dict[str, Any], report: Report) -> None:
+    """As lamp-skills holds `[stop] group` (#7401): only in a skill with no
+    `[budget]`, whose group shares the stop already; its shape (lowercase
+    letters, digits and hyphens) is the format schema's."""
+    stop = rules.get("stop")
+    if isinstance(stop, dict) and "group" in stop and "budget" in rules:
+        report.errors.append("skill.toml: [stop] group is for a skill in no [budget] group: its group shares it already")
+
+
 def is_service_grant(grant: object) -> bool:
     """A linked service's grant: `<code>-read` or `<code>-write` for a catalog code."""
     if not isinstance(grant, str):
@@ -479,4 +488,5 @@ def check(folder: str | Path, *, shape_required: bool = True) -> Report:
     _files(folder, report, _referenced_moves(rules), task)
     if isinstance(rules, dict):
         _permissions(rules, report)
+        _stop(rules, report)
     return report

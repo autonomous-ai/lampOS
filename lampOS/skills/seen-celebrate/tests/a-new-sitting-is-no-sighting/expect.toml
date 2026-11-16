@@ -1,0 +1,14 @@
+# 15:00, celebrating seen at 10, away from 20 to 25, back till 60: one line, at 10; the count beginning again at 0 is nothing seen.
+clock = "15:00"
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them celebrate at the desk: clapping or cheering. Say one warm line, the way a friend would, at most twenty words: share the moment, and maybe ask what the good news is. Say only what you saw; nothing about their body or looks, and never mention a camera." }

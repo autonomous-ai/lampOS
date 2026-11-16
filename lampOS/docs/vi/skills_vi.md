@@ -5664,8 +5664,8 @@ trong hai chủ đề này trong `[permissions] topics` đều bị từ chối 
 và ăn mừng, `lamp-seen` chỉ phát khi `LAMP_SEEN_MORE_DOINGS=on`, bật trong
 sản phẩm) là một chủ
 đề riêng: kỹ năng ghi nó hiện quyền dùng `seen_more`, riêng tư và tách khỏi
-`seen`, nên kỹ năng được `humans/doing` không bao giờ nhận nó. Chưa kỹ năng
-nào đọc nó. **Lời đồng ý seen_more của chủ đèn** (#6543): kỹ năng ghi chủ
+`seen`, nên kỹ năng được `humans/doing` không bao giờ nhận nó. Bốn kỹ năng
+phản ứng với điều thấy được đọc nó, đang tắt (bên dưới). **Lời đồng ý seen_more của chủ đèn** (#6543): kỹ năng ghi chủ
 đề này không nhận được gì từ nó cho tới khi chủ đèn đồng ý cho chính kỹ năng
 đó trong app (`skills.seen_more`, [cloud.md](../cloud.md)), giữ theo tên
 trong tệp `seen_more` của `--state-dir`, như lời đồng ý camera (tệp
@@ -5757,6 +5757,59 @@ như một lần tạm hoãn). Kiểm thử
 `a_just_drank_rest_keeps_its_chance_across_a_restart`
 (`crates/skills/tests/it/holds.rs`). Mô tả đầy đủ của `[stop.done]` ở
 [skills.md](../skills.md), hàng `[stop]`.
+
+### Bốn phản ứng với điều thấy được (#6543, tắt)
+
+`seen-drink`, `seen-eat`, `seen-tired` và `seen-celebrate`: phản ứng của
+kỹ năng wellbeing V1 với điều nó thấy, mỗi loại một kỹ năng để mỗi loại có
+lệnh tắt riêng. Đều là `installable`, `enabled = false`, nằm trong
+`install::NOT_PRODUCT_SKILLS` cho tới buổi thử cả ngày của chủ đèn tại
+lamp-06c1 (nhiều nhất một lời sai trong một ngày làm việc, qua lead). Quyết
+định của chủ đèn trên #7401 (19/11): mỗi lần thấy là một phản ứng. Mỗi kỹ
+năng đọc `humans/doing_more` (quyền dùng `seen_more` của chủ đèn,
+`LAMP_SEEN_MORE_DOINGS=on`) và phản ứng khi bộ đếm của nó tăng một:
+`drank_seen`, `ate_seen`, `tired_seen` hoặc `celebrate_seen` (`rise = { by =
+1, within = "45s" }`, một giá trị 30 s của lamp-seen và một khoảng dư,
+`rearm = "leaves"`: một lần tăng, một phản ứng; bộ đếm về 0 ở lần ngồi mới
+không là gì). lamp-seen đếm một động tác được hai clip liên tiếp bắt được là
+một lần (seen.md). Mỗi kỹ năng quay về khuôn mặt và nói một câu do giọng nói
+đặt lời, nhiều nhất hai mươi từ, chỉ về điều đã thấy: không khuyên, không số
+đếm, không chẩn đoán, không nói về sức khỏe, cơ thể hay ngoại hình, không
+nhắc camera; câu của `seen-tired` không bao giờ nói tới ngủ. Chỉ bị giữ lại
+khi đèn đang nói hoặc đang nghe (`[[while]]` `voice/state` là `resting`,
+không có `for`) và khi đèn ngủ (`asleep` của Expression là false); một lần
+tăng bị giữ giữa lượt nói được giữ lại (`wait = "1h"`, mức lớn nhất `wait`
+nhận, trên một `rise`) và được nói khi giọng nói nghỉ, ở giá trị kế tiếp của
+lamp-seen. Không có cooldown, `most_a_day`, `[budget]`, `[quiet]`, `[rest]`
+hay `[[while]]` nào khác. Một hàm `[stop]`, `seen_remarks`, dùng chung nhờ
+`[stop] group = "seen-remarks"`; một câu không ai nghe thấy không phải là
+câu gần nhất, và không lấy gì của lần sau. Của ai: lamp-seen chỉ gửi ảnh khi
+có đúng một khuôn mặt đã nhớ, nên điều thấy là của người đang ngồi đó; chưa
+có quy tắc chủ đèn riêng cho tới khi `humans/familiar` nói ai là chủ. Chưa
+thể diễn đạt: kết quả "không nói gì" (một ghi chú luôn được nói), số đếm
+trong lời (ghi chú không có chỗ cho số), tắt theo loại (hàm chung tắt cái
+gần nhất hoặc tất cả). Các ca trong `tests/` của mỗi thư mục; bốn kỹ năng
+cùng nhau, một lần tăng giữa lượt nói và một câu không ai nghe:
+`crates/skills/tests/it/seen.rs`. Hai điều lamp-skills thêm cho chúng
+(#7401): trên một trigger `rise` có `wait`, cơ hội được giữ vẫn là lần tăng
+đó cho tới khi được dùng hoặc hết `wait`, dù các giá trị sau không còn tăng
+(phép thử của trường, `above = 0`, vẫn phải đúng); và `[stop] group`, trong
+kỹ năng không có `[budget]`, để các kỹ năng dưới thư mục skills ghi cùng một
+`group` dùng chung hàm `[stop]` mà không có giới hạn nào (không được đặt cạnh
+`[budget]`; kỹ năng được đẩy lên không dùng chung). Nhịp clip: mặc định
+một burst mỗi phút; với `LAMP_SEEN_BURST_15S=on` (tối, không unit nào đặt),
+cloud có thể đặt nhịp từ 15 s tới 60 s qua `seen_clip` trong phản hồi
+`/ping` (`{"every_s": N, "until_unix_s": T}`, số giây nguyên). lamp-cloud
+giữ nó ở `/var/lib/lampos-cloud/seen-clip.json` như cách giữ `region` (ghi
+trọn khi đổi, xóa khi phản hồi bỏ nó đi), và lamp-seen đọc lại mỗi 2 s
+(`lamp_seen::clip`). Là 60 s khi không có tệp, tệp không đọc được hoặc quá
+4096 byte, không đúng hai số nguyên đó, `every_s` ngoài 15–60 s, hoặc đã tới
+`until_unix_s`; tắt công tắc thì 60 s dù cloud nói gì. Nhịp nhiệt
+(`LAMP_HEAT_BACKOFF`) nhân nhịp đang dùng (×2 khi ấm, ×4 khi nóng). Một ca
+ghi sẵn là điều kỹ năng làm khi bật, nên `lamp-skills test` phát lại nó đã
+bật và có sẵn lời đồng ý `seen_more` của chủ đèn; chỉ lần phát lại giả định
+điều đó: trên đèn, `humans/doing_more` vẫn chỉ tới kỹ năng khi có lời đồng
+ý thật (#7529). Không có lời đồng ý, không phản ứng nào gọi gì (`seen.rs`).
 
 ## Một con số từ lần đọc trong ghi chú (#6543, B3)
 

@@ -130,7 +130,7 @@ against lamp-06c1.
   the same folder (`/var/lib/lampos-cloud/region`, 0644, written whole and
   renamed into place) and the journal says `the backend places the lamp in
   region "CN"`. It is kept across boots and read at start, so only a change
-  is written; the voice reads it (`second-voice.md`), and on a change root's `lamp-region.service` gives a lamp in `CN`, and only it, China's name and time servers (`install.md`, #6256). A failing ping is said once, and
+  is written; the voice reads it (`second-voice.md`), and on a change root's `lamp-region.service` gives a lamp in `CN`, and only it, China's name and time servers (`install.md`, #6256). The reply's `seen_clip` (#7401), `{"every_s": N, "until_unix_s": T}` in whole seconds, the burst period the cloud asks of lamp-seen, is kept the same way as `/var/lib/lampos-cloud/seen-clip.json` (0644, written whole on a change, `ping::SeenClipKept`) and removed when a reply leaves it out; anything not exactly those two whole numbers reads as left out, and the rest of the reply is read as before. The cloud moves `until_unix_s` on with each reply, so while it sends one the file is written again on most pings; the journal says only a new `every_s` (`the backend asks a burst every 30 s (seen_clip)`) or its end (`the backend leaves out seen_clip`). lamp-seen (the same `lampos` user) reads it and holds it to its own range and switch (seen.md, "One burst a minute"). A failing ping is said once, and
   once when it answers again. When the lamp's address moves, the HTTP
   client is made afresh, as V1 drops its idle connections.
 

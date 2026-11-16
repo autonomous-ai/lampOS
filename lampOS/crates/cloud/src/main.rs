@@ -457,6 +457,10 @@ fn main() -> ExitCode {
         // login for the voice to read; said once each time it changes.
         let mut region_kept = std::env::var_os("STATE_DIRECTORY")
             .map(|dir| ping::Region::at(PathBuf::from(dir).join("region")));
+        // The burst period the cloud asks of lamp-seen (#7401), kept the same
+        // way for it to read; said once each time it is kept or let go.
+        let mut seen_clip_kept = std::env::var_os("STATE_DIRECTORY")
+            .map(|dir| ping::SeenClipKept::at(PathBuf::from(dir).join(ping::SEEN_CLIP_FILE)));
         // The broker's WSS address (#6256 F9), for when its TCP port keeps
         // failing; a new one alone never moves a working connection.
         let (ws_url_tx, ws_url) = watch::channel(String::new());
@@ -473,6 +477,22 @@ fn main() -> ExitCode {
                     Err(_) => say(&format!(
                         "the backend places the lamp in region {region:?}, which could not be kept"
                     )),
+                }
+            }
+            if let Some(kept) = seen_clip_kept.as_mut() {
+                let every_before = kept.kept().map(|clip| clip.every_s);
+                let every_now = reply.seen_clip.map(|clip| clip.every_s);
+                if let Some(result) = kept.take(reply.seen_clip)
+                    && every_now != every_before
+                {
+                    let what = every_now.map_or_else(
+                        || "the backend leaves out seen_clip".to_owned(),
+                        |every_s| format!("the backend asks a burst every {every_s} s (seen_clip)"),
+                    );
+                    match result {
+                        Ok(()) => say(&what),
+                        Err(_) => say(&format!("{what}, which could not be kept")),
+                    }
                 }
             }
         };

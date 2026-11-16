@@ -18,6 +18,7 @@ mod package;
 mod pushed;
 mod remind;
 mod routine_service;
+mod seen;
 mod shared;
 mod skills;
 mod stands_in;
