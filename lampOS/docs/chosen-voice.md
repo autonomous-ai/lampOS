@@ -66,7 +66,9 @@ model and key as `crate::hermes_llm`), one short English prompt ("Rate this
 character's energy from 1 (calm) to 5 (very lively). Answer with one digit
 only.", the words quoted after it), within 10 s with one retry. An answer that
 is not one digit from 1 to 5, or any failure, is level 1. Words already rated
-are not asked again, though a restart of `lamp-cloud` asks once more.
+are not asked again, though a restart of `lamp-cloud` asks once more. A failure
+is not kept: the same words are asked again after 60 s, the wait doubling after
+each failure up to 30 min, and level 1 is said meanwhile.
 `voice.get` still answers the kept file's level (the table's for derived
 words). No word is logged.
 
