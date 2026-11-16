@@ -69,6 +69,12 @@ type Judged = (Option<&'static str>, Option<&'static str>);
 
 /// Plays `steps` in a busy room: each line's verdict and note, in order.
 fn play(renews: bool, steps: &[Step]) -> Vec<Judged> {
+    play_with(renews, false, steps)
+}
+
+/// [`play`], with `LAMP_DECLINE_SILENT` when `decline_silent`: a decline
+/// then rolls back what letting its line out began.
+fn play_with(renews: bool, decline_silent: bool, steps: &[Step]) -> Vec<Judged> {
     let _one = crate::provider_worker::tests::one_thread();
     let _clock =
         crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
@@ -80,6 +86,9 @@ fn play(renews: bool, steps: &[Step]) -> Vec<Judged> {
     heeding.measuring_windows_from_start();
     if renews {
         heeding.renewing_busy_follow_ups();
+    }
+    if decline_silent {
+        heeding.declining_silently();
     }
     let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
     heeding.seeing_speaking_faces(eyes.clone(), None);
@@ -104,6 +113,7 @@ fn play(renews: bool, steps: &[Step]) -> Vec<Judged> {
         let passed = ms(judged.saturating_sub(was));
         was = judged;
         heeding.called_at = heeding.called_at.map(|at| at - passed);
+        heeding.call_renewed_at = heeding.call_renewed_at.map(|at| at - passed);
         let now = Instant::now();
         let now_us = monotonic_us();
         // The lamp's words so far, by the clocks the rule reads.
@@ -149,8 +159,10 @@ fn play(renews: bool, steps: &[Step]) -> Vec<Judged> {
         );
         let held = heeding.heed(request, window, heard, None);
         let note = heeding.conversation_note_for(request);
-        // Let out, the model declines it: nothing is said.
-        if held.is_none() {
+        // Let out, the model declines it: nothing is said. With
+        // `LAMP_DECLINE_SILENT` the call itself is taken as answered (its
+        // words aside), since its decline would roll the call back.
+        if held.is_none() && !(decline_silent && request == 1) {
             heeding.lamp_did(crate::second_provider::Did::Declined(request));
         }
         out.push((held, note));
@@ -281,4 +293,59 @@ fn own_held_question_is_no_reply_to_another() {
         let_out(&play(true, &steps(COLLEAGUE))),
         [true, false, false]
     );
+}
+
+/// Sixth's P2 1 on #7349: with `LAMP_DECLINE_SILENT` too, the follow-up's
+/// decline rolls back to the call before it, but keeps the caller's
+/// renewal, so lamp-74ff's r45 and r46 are still let out; with it alone
+/// they are held as before.
+#[test]
+fn a_silent_decline_keeps_the_callers_renewal() {
+    let steps = [
+        line(0, 2_000, "Lamp, can you remember my face?", OWNER),
+        line(
+            8_000,
+            3_000,
+            "And what was the name I told you yesterday?",
+            OWNER,
+        ),
+        line(17_000, 2_000, "Did you get that?", OWNER),
+        line(26_000, 2_000, "Hello, are you listening to me?", OWNER),
+    ];
+    assert_eq!(
+        let_out(&play_with(false, true, &steps)),
+        [true, true, false, false]
+    );
+    assert_eq!(let_out(&play_with(true, true, &steps)), [true; 4]);
+}
+
+/// The Reviewer-lead's P2 on #7349, #7297's half on the owner's lamp: the
+/// owner's declined follow-up renews the call for the owner alone. A
+/// colleague's line 20 s after the call, their own face seen speaking it,
+/// is held as without the switch, while the owner's line there is let out.
+#[test]
+fn the_renewed_call_carries_only_the_caller() {
+    let steps = |face: &'static str| {
+        [
+            line(0, 2_000, "Lamp, can you remember my face?", OWNER),
+            line(
+                8_000,
+                3_000,
+                "And what was the name I told you yesterday?",
+                OWNER,
+            ),
+            line(
+                20_000,
+                2_000,
+                "Did you send the slides to the client?",
+                face,
+            ),
+        ]
+    };
+    assert_eq!(
+        let_out(&play(false, &steps(COLLEAGUE))),
+        [true, true, false]
+    );
+    assert_eq!(let_out(&play(true, &steps(COLLEAGUE))), [true, true, false]);
+    assert_eq!(let_out(&play(true, &steps(OWNER))), [true, true, true]);
 }
