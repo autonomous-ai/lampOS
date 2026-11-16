@@ -551,6 +551,35 @@ fn the_product_serves_the_fast_camera_stream_from_the_eyes() {
     );
 }
 
+/// The voice's memory kept from reclaim (#7383): `MemoryMin` on lamp-voice's
+/// unit holds only with the same on every ancestor slice but the root, so
+/// its cgroup `/lampos.slice/lampos-voice.slice/lamp-voice.service` has it
+/// at each level, and install writes the top slice too.
+#[test]
+fn the_voice_and_its_slices_keep_its_memory_from_reclaim() {
+    for (unit, kind) in [
+        ("lamp-voice.service", "Service"),
+        ("lampos-voice.slice", "Slice"),
+        ("lampos.slice", "Slice"),
+    ] {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(name, _)| *name == unit)
+            .unwrap_or_else(|| panic!("{unit} is not installed"))
+            .1;
+        assert!(
+            section(text, kind).contains(&"MemoryMin=256M"),
+            "{unit} lacks MemoryMin=256M in [{kind}]"
+        );
+    }
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-voice.service")
+        .unwrap()
+        .1;
+    assert!(section(voice, "Service").contains(&"Slice=lampos-voice.slice"));
+}
+
 /// The lines install said about the lamp-update running it (#3733).
 fn updater_said(lamp: &Lamp) -> Vec<&str> {
     lamp.said
