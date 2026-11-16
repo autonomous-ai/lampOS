@@ -1,0 +1,146 @@
+use super::*;
+use crate::harness_install::product::{Source, built_in};
+use std::{fs, os::unix::fs::PermissionsExt, path::PathBuf};
+
+fn none(_: &str) -> Option<String> {
+    None
+}
+
+fn folder(name: &str) -> PathBuf {
+    let path = std::env::temp_dir().join(format!(
+        "lamp-update-preinstall-{name}-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&path);
+    fs::create_dir_all(path.join("records")).unwrap();
+    path
+}
+
+fn json(path: &Path) -> serde_json::Value {
+    let mode = fs::metadata(path).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "{}", path.display());
+    serde_json::from_slice(&fs::read(path).unwrap()).unwrap()
+}
+
+/// A product lamp with nothing set: Harness on by this build's default and
+/// pinned to this build's manifest, Hermes and OpenClaw on, each shown the
+/// skills, and the tasks and the one run path as lamp-update's switches
+/// read them, exactly as `serve` asks for them.
+#[test]
+fn a_product_lamp_wants_all_three_by_the_builds_defaults() {
+    for (tasks, one_path) in [(false, false), (true, false), (true, true)] {
+        let switches = UpdateSwitches {
+            engines: true,
+            tasks,
+            one_path,
+        };
+        let wanted = wanted(true, switches, &none);
+        assert!(wanted.harness.on);
+        assert_eq!(wanted.harness.source, Source::Build);
+        assert_eq!(wanted.harness.pin, Ok(Some(built_in())));
+        assert_eq!(
+            wanted.hermes,
+            (
+                true,
+                hermes_install::Shown {
+                    skills: true,
+                    tasks,
+                    one_path,
+                }
+            )
+        );
+        assert_eq!(
+            wanted.openclaw,
+            (true, openclaw_install::shown(true, one_path))
+        );
+    }
+}
+
+/// Each switch set to `off` in lamp-update's environment turns its part
+/// off; a lamp that is not the product's wants none.
+#[test]
+fn a_switch_off_or_a_lamp_not_the_products_wants_less() {
+    let switches = UpdateSwitches::default();
+    let off = |name: &'static str| move |asked: &str| (asked == name).then(|| "off".to_owned());
+    assert!(!wanted(true, switches, &off(harness_install::SWITCH)).harness.on);
+    assert!(!wanted(true, switches, &off(hermes_install::SWITCH)).hermes.0);
+    assert!(!wanted(true, switches, &off(openclaw_install::SWITCH)).openclaw.0);
+    let skills_off = wanted(true, switches, &off(hermes_install::SKILLS_SWITCH));
+    assert!(skills_off.hermes.0 && !skills_off.hermes.1.skills);
+    let elsewhere = wanted(false, switches, &none);
+    assert!(!elsewhere.harness.on && !elsewhere.hermes.0 && !elsewhere.openclaw.0);
+}
+
+/// On an image with none of them, each part gets the ask its installer
+/// writes, as a round would hand it over: Harness's with the pin, Hermes's
+/// and OpenClaw's with what their namespace shows. 0600, in the one-shot's
+/// order.
+#[test]
+fn an_image_with_none_asks_for_all_three_with_the_rounds_asks() {
+    let root = folder("none");
+    let records = root.join("records");
+    let switches = UpdateSwitches {
+        engines: true,
+        tasks: true,
+        one_path: true,
+    };
+    let wanted = wanted(true, switches, &none);
+    let asked = ask_missing(&root, &records, &wanted).unwrap();
+    assert_eq!(asked, ["Harness", "Hermes", "OpenClaw"]);
+
+    let harness = json(&records.join(harness_install::ASK));
+    assert_eq!(harness["version"], 1);
+    assert_eq!(
+        harness["pin"],
+        serde_json::to_value(built_in()).unwrap(),
+        "{harness}"
+    );
+    let hermes = json(&records.join(hermes_install::ASK));
+    assert_eq!(
+        (hermes["version"].clone(), hermes["skills"].clone(), hermes["tasks"].clone()),
+        (1.into(), true.into(), true.into()),
+        "{hermes}"
+    );
+    assert_eq!(hermes["one_path"], true, "{hermes}");
+    assert_eq!(hermes.get("remove"), None, "{hermes}");
+    let openclaw = json(&records.join(openclaw_install::ASK));
+    assert_eq!(
+        (openclaw["version"].clone(), openclaw["skills"].clone(), openclaw["one_path"].clone()),
+        (1.into(), true.into(), true.into()),
+        "{openclaw}"
+    );
+    assert_eq!(openclaw.get("remove"), None, "{openclaw}");
+    // Nothing is there yet, so the check names the first part missing.
+    assert_eq!(check(&root, &wanted), Err("Harness is not there".into()));
+    fs::remove_dir_all(&root).unwrap();
+}
+
+/// Harness already on the image is not asked for again; Hermes and
+/// OpenClaw still are.
+#[test]
+fn a_part_already_there_is_not_asked_for() {
+    let root = folder("harness");
+    let records = root.join("records");
+    let harness = root.join(crate::install::HARNESS.trim_start_matches('/'));
+    fs::create_dir_all(harness.parent().unwrap()).unwrap();
+    fs::write(&harness, b"").unwrap();
+    let wanted = wanted(true, UpdateSwitches::default(), &none);
+    let asked = ask_missing(&root, &records, &wanted).unwrap();
+    assert_eq!(asked, ["Hermes", "OpenClaw"]);
+    assert!(!records.join(harness_install::ASK).exists());
+    assert_eq!(check(&root, &wanted), Err("Hermes is not there".into()));
+    fs::remove_dir_all(&root).unwrap();
+}
+
+/// Harness off asks for nothing at all: Hermes and OpenClaw ride on its
+/// one-shot.
+#[test]
+fn harness_off_asks_for_nothing() {
+    let root = folder("off");
+    let records = root.join("records");
+    let off = |asked: &str| (asked == harness_install::SWITCH).then(|| "off".to_owned());
+    let wanted = wanted(true, UpdateSwitches::default(), &off);
+    assert!(ask_missing(&root, &records, &wanted).is_err());
+    assert_eq!(fs::read_dir(&records).unwrap().count(), 0);
+    fs::remove_dir_all(&root).unwrap();
+}
