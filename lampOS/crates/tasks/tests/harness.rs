@@ -472,20 +472,35 @@ fn openclaw_seen(state: &str, ask: Value) -> Value {
     step(json!({"id":AGENT,"state":state,"ask":ask,"answer":"","truncated":false,"tools":0}))
 }
 
-/// #6499: OpenClaw's `show` on the lamp can read idle with no ask seconds
-/// after a `new` whose `--message` it did take (12139 on lamp-52e6, 9adf's
-/// runs on #6504). Idle with no ask counts as handed over: one `new`, and
-/// nothing closed, started again or replied.
-#[test]
-fn openclaw_idle_with_no_ask_after_new_is_taken_as_handed_over() {
+/// An OpenClaw `show` reading of `agent` with a tool used: proof it took
+/// its first prompt.
+fn openclaw_used(agent: &str) -> Value {
+    step(json!({"id":agent,"state":"idle","ask":null,"answer":"","truncated":false,"tools":1}))
+}
+
+/// An OpenClaw launch to the lamp's own engine, with a short launch bound
+/// so a proof wait that runs out ends soon.
+fn openclaw_rig(launch_timeout: Duration) -> (Rig, Launch) {
     let mut request = launch();
     request.target.engine = EngineKind::Openclaw;
-    let rig = Rig::new();
+    let mut rig = Rig::new();
+    rig.config.launch_timeout = launch_timeout;
+    (rig, request)
+}
+
+/// #7277 (a): idle with no ask after `new` is no proof; a tool used within
+/// the bound is, and the launch is Created with one `new` and nothing
+/// closed, started again or replied. The #6499 case, a run that read idle
+/// with no ask and still wrote its file, is this one.
+#[test]
+fn openclaw_idle_with_no_ask_then_a_tool_within_the_bound_is_created() {
+    let (rig, request) = openclaw_rig(Duration::from_secs(10));
     rig.plan(json!({
         "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
         "show":{"each":[
             openclaw_seen("starting", Value::Null),
-            openclaw_seen("idle", Value::Null)
+            openclaw_seen("idle", Value::Null),
+            openclaw_used(AGENT)
         ]},
         "reply":{"default":true}
     }));
@@ -495,9 +510,83 @@ fn openclaw_idle_with_no_ask_after_new_is_taken_as_handed_over() {
             agent_id: AGENT.into()
         }
     );
-    assert_eq!(openclaw_verbs(&rig), ["machines", "new", "show", "show"]);
+    assert_eq!(
+        openclaw_verbs(&rig),
+        ["machines", "new", "show", "show", "show"]
+    );
     let new = rig.calls()[1]["args"].as_array().unwrap().clone();
     assert!(new.iter().any(|arg| arg == "--task"), "{new:?}");
+}
+
+/// #7277 (b): idle with no ask through the whole bound, after `new` and
+/// after the one `new` more, is never taken as handed over: each harness
+/// is closed, and the task is not sent, `openclaw_not_taken`.
+#[test]
+fn openclaw_idle_with_no_ask_throughout_is_closed_started_once_more_and_not_sent() {
+    let (rig, request) = openclaw_rig(Duration::from_millis(1500));
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
+        "show":{"each":[openclaw_seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(rig.cli().launch(&request), not_sent("openclaw_not_taken"));
+    let verbs = openclaw_verbs(&rig);
+    let count = |verb: &str| verbs.iter().filter(|v| *v == verb).count();
+    assert_eq!(
+        (count("new"), count("close"), count("reply")),
+        (2, 2, 0),
+        "{verbs:?}"
+    );
+    let first_close = verbs.iter().position(|v| v == "close").unwrap();
+    let second_new = verbs.iter().rposition(|v| v == "new").unwrap();
+    assert!(first_close < second_new, "{verbs:?}");
+    assert_eq!(verbs.last().map(String::as_str), Some("close"), "{verbs:?}");
+}
+
+/// #7277: no proof from the first harness, which is closed; the one `new`
+/// more proves it (a tool used), and is the launch.
+#[test]
+fn openclaw_not_taken_then_taken_on_the_second_new_is_created_on_it() {
+    let (rig, request) = openclaw_rig(Duration::from_millis(1500));
+    let second = step(
+        json!({"ok":true,"machineId":MACHINE,"agent":{"id":OTHER,"name":"lamp-task-001","engine":"openclaw"}}),
+    );
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"each":[{"default":true}, second]},
+        "close":{"exit":0},
+        "show":{"each":[openclaw_seen("idle", Value::Null)],"by_arg":{OTHER: openclaw_used(OTHER)}},
+        "reply":{"default":true}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: OTHER.into()
+        }
+    );
+    let verbs = openclaw_verbs(&rig);
+    assert_eq!(
+        verbs.iter().filter(|v| *v == "close").count(),
+        1,
+        "{verbs:?}"
+    );
+    assert_eq!(verbs.last().map(String::as_str), Some("show"), "{verbs:?}");
+}
+
+/// #7277: a first harness with no proof that can't be closed ends the
+/// launch uncertain, with nothing more started: one left running could
+/// still take its prompt beside a second.
+#[test]
+fn openclaw_not_taken_and_not_closed_is_uncertain_with_nothing_more_started() {
+    let (rig, request) = openclaw_rig(Duration::from_millis(1500));
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":1},
+        "show":{"each":[openclaw_seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(rig.cli().launch(&request), uncertain("openclaw_not_closed"));
+    let verbs = openclaw_verbs(&rig);
+    assert_eq!(verbs.iter().filter(|v| *v == "new").count(), 1, "{verbs:?}");
+    assert_eq!(verbs.last().map(String::as_str), Some("close"), "{verbs:?}");
 }
 
 /// An OpenClaw read asked (`ask` set) after `new` is under way, as
