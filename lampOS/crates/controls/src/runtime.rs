@@ -45,12 +45,47 @@ fn invalid(why: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, why.into())
 }
 
+/// This machine's boot identity, the clock id every part of a lamp shares: Linux's
+/// `/proc/sys/kernel/random/boot_id`.
+#[cfg(target_os = "linux")]
+fn boot_identity() -> io::Result<String> {
+    const PATH: &str = "/proc/sys/kernel/random/boot_id";
+    // Named, so a start that dies on it says which file: a bare "No such file or directory" is not
+    // enough to find it (#7262, the first Mac run of the voice).
+    let text = fs::read_to_string(PATH)
+        .map_err(|error| io::Error::new(error.kind(), format!("the boot id {PATH}: {error}")))?;
+    Ok(text.trim().to_owned())
+}
+
+/// Off Linux there is no `/proc`: the boot session uuid (`kern.bootsessionuuid`), which changes at
+/// every boot too and is the id lamp-body and lamp-sim already use on macOS, so a voice and the
+/// lamp-sim beside it judge each other's stamps by the same clock. Asked once.
+#[cfg(not(target_os = "linux"))]
+fn boot_identity() -> io::Result<String> {
+    use std::sync::OnceLock;
+    static ASKED: OnceLock<Result<String, String>> = OnceLock::new();
+    ASKED
+        .get_or_init(|| {
+            let out = std::process::Command::new("/usr/sbin/sysctl")
+                .args(["-n", "kern.bootsessionuuid"])
+                .output()
+                .map_err(|error| format!("the boot session id could not be asked: {error}"))?;
+            let text = String::from_utf8(out.stdout)
+                .map_err(|_| "the boot session id is not text".to_owned())?;
+            let text = text.trim();
+            if !out.status.success() || text.is_empty() {
+                return Err("the boot session id is unavailable".to_owned());
+            }
+            Ok(text.to_owned())
+        })
+        .clone()
+        .map_err(io::Error::other)
+}
+
 pub fn clock_id(given: Option<&str>) -> io::Result<String> {
     let id = match given {
         Some(id) => id.to_owned(),
-        None => fs::read_to_string("/proc/sys/kernel/random/boot_id")?
-            .trim()
-            .to_owned(),
+        None => boot_identity()?,
     };
     if id.is_empty()
         || id.len() > 128
@@ -484,5 +519,28 @@ fn account(counts: &mut Counts, result: io::Result<Published>) {
             counts.dropped += result.dropped as u64;
         }
         Err(_) => counts.publish_errors += 1,
+    }
+}
+
+#[cfg(test)]
+mod clock_id_tests {
+    use super::clock_id;
+
+    #[test]
+    fn a_given_id_is_judged_and_kept() {
+        assert_eq!(clock_id(Some("boot-1234")).unwrap(), "boot-1234");
+        for bad in ["", "has space", "slash/ed", &"x".repeat(129)] {
+            assert!(clock_id(Some(bad)).is_err(), "{bad:?}");
+        }
+    }
+
+    /// This machine has a boot identity on Linux (`/proc`) and on macOS (`kern.bootsessionuuid`,
+    /// the id lamp-body and lamp-sim use there), a valid clock id that is the same every time.
+    #[test]
+    fn this_machines_boot_identity_is_a_valid_clock_id_and_stable() {
+        let first = clock_id(None).unwrap();
+        assert!(!first.is_empty() && first.len() <= 128, "{first:?}");
+        assert_eq!(clock_id(Some(&first)).unwrap(), first);
+        assert_eq!(clock_id(None).unwrap(), first);
     }
 }
