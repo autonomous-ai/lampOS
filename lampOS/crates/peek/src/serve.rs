@@ -169,7 +169,7 @@ fn monitor_refuses(monitor: &Monitor, request: &Request) -> Option<Response> {
         .get::<ConnectInfo<Conn>>()
         .map(|info| info.0)
         .or_else(|| extensions.get::<MockConnectInfo<Conn>>().map(|info| info.0));
-    let Some(conn) = conn.filter(|conn| monitor::lan_peer(conn.peer.ip())) else {
+    let Some(conn) = conn.filter(monitor::peer_answered) else {
         return Some(
             (
                 StatusCode::FORBIDDEN,

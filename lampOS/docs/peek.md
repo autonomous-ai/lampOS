@@ -391,8 +391,11 @@ Environment=LAMP_PEEK=monitor
   page is `http://lamp-xxxx.local/`. The static token is not read: no
   `/token` form or `Authorization` header opens it.
 - **Local network only.** A request from a peer outside 10/8, 172.16/12,
-  192.168/16, 169.254/16, fe80::/10, fc00::/7 or loopback (IPv4 mapped in
-  IPv6 read as IPv4) gets 403 and nothing of the lamp. `Host` must be the
+  192.168/16, 169.254/16, fe80::/10, fc00::/7, loopback, or the subnet of
+  the lamp's own interface the request came to (its address and prefix, read
+  with `getifaddrs`; never a /0; #7208: the office LAN, 172.168.20.0/24, is
+  no RFC1918 range), IPv4 mapped in IPv6 read as IPv4, gets 403 and nothing
+  of the lamp. `Host` must be the
   lamp's host name, its `.local` name (`/proc/sys/kernel/hostname`), or the
   address the request came to, with or without a port; any other name gets
   403 (DNS rebinding). Both checks come before anything else, on every path.
@@ -520,6 +523,11 @@ own, and asks for it over HTTP:
     203.0.113.9 gets 403 on every view, `/in` and the stream; from the
     LAN, `Host` other than the lamp's names or address gets 403, and the
     lamp's own gets the way in, the views 401 without a session.
+  - `monitor::tests::a_peer_on_the_lamps_own_subnet_is_answered` (#7208):
+    172.168.20.239 to a lamp at 172.168.20.21/24 is answered, 172.168.21.5
+    and 8.8.8.8 are not, a /0 answers nobody; and
+    `monitor::tests::loopback_is_its_own_interface`: the interface's prefix
+    is read for 127.0.0.1, none for an address no interface holds.
   - `monitor_mode_a_code_opens_once_and_its_cookie_dies_with_a_restart`:
     the binary on a real socket; the admin socket is 0600; `?code=` is 400;
     the code posted once sets the cookie, which opens every view; posted
