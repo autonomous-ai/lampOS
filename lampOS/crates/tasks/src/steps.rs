@@ -65,7 +65,7 @@ const MOST_EVENTS: i64 = 200;
 const MOST_READ_BYTES: usize = 256 * 1024;
 /// An event (or a compressed one) longer than this is skipped unparsed (a
 /// whole file read back).
-const MOST_EVENT_BYTES: i64 = 256 * 1024;
+const MOST_EVENT_BYTES: usize = 256 * 1024;
 /// The most calls kept waiting for their result, per task.
 const MOST_RUNNING: usize = 64;
 
@@ -96,6 +96,8 @@ pub fn roots(override_dir: Option<&str>) -> Vec<PathBuf> {
 /// One watched task's session, as far as it was read.
 #[derive(Debug, Default)]
 struct Tail {
+    /// Harness's agent id: every task on one agent shares its session.
+    agent: String,
     /// The database and session id, once found.
     session: Option<(PathBuf, String)>,
     /// The highest `seq` read or passed: the task's own start at first.
@@ -203,21 +205,34 @@ impl Steps {
     /// the task is not read until a later one gives it.
     fn begin(&mut self, task: &Watched, wall_ms: u64) -> bool {
         let mut tail = Tail {
+            agent: task.agent_id.clone(),
             since_unix_ms: task.accepted_ago_ms.map(|ago| wall_ms.saturating_sub(ago)),
             ..Tail::default()
         };
         let Ok(found) = session(&self.roots, &task.agent_id) else {
             return false;
         };
-        if let Some(found) = found {
-            let Some(last) = last_seq(&found) else {
-                return false;
-            };
-            for earlier in self.tails.values_mut() {
-                if earlier.session.as_ref() == Some(&found) && earlier.until.is_none() {
-                    earlier.until = Some(last);
-                }
+        // The newest task on an agent has what comes after its start. An
+        // earlier one reads no further: up to this start on the session it
+        // shares (or will, once OpenClaw makes it: -1, nothing, when there
+        // is none yet), and never into another session it moves to.
+        let last = match &found {
+            Some(found) => match last_seq(found) {
+                Some(last) => last,
+                None => return false,
+            },
+            None => -1,
+        };
+        for earlier in self.tails.values_mut() {
+            if earlier.agent == task.agent_id && earlier.until.is_none() {
+                earlier.until = Some(if earlier.session.is_none() || earlier.session == found {
+                    last
+                } else {
+                    i64::MAX
+                });
             }
+        }
+        if let Some(found) = found {
             tail.session = Some(found);
             tail.after = last;
         }
@@ -400,17 +415,22 @@ fn read(
     if let Some(found) = found
         && tail.session.as_ref() != Some(&found)
     {
-        let after = if tail.session.is_none() {
-            Some(-1)
+        if tail.session.is_none() {
+            // The task's own session, made after it began: from its first
+            // event, up to a newer task's start if one came meanwhile.
+            tail.after = -1;
+        } else if tail.until.is_some() {
+            // A newer task has this agent: this one never follows it.
         } else {
-            last_seq(&found)
-        };
-        let Some(after) = after else {
-            return;
-        };
-        tail.session = Some(found);
-        tail.after = after;
-        tail.until = None;
+            // The session moved: only what comes after its last event now.
+            let Some(after) = last_seq(&found) else {
+                return;
+            };
+            tail.after = after;
+        }
+        if tail.session.is_none() || tail.until.is_none() {
+            tail.session = Some(found);
+        }
     }
     let Some((path, id)) = tail.session.clone() else {
         return;
@@ -418,38 +438,68 @@ fn read(
     let Some(db) = open(&path) else {
         return;
     };
+    // Sizes first; an event's text is fetched only once it fits this read.
     let Ok(mut events) = db.prepare(
-        "SELECT seq, CASE WHEN length(event_json) <= ?4 THEN event_json END, \
-         event_json IS NULL AND event_zstd IS NOT NULL, \
-         CASE WHEN event_json IS NULL AND length(event_zstd) <= ?4 THEN event_zstd END, \
-         created_at \
+        "SELECT seq, event_json IS NULL AND event_zstd IS NOT NULL, \
+         COALESCE(length(event_json), length(event_zstd), 0), created_at \
          FROM transcript_events WHERE session_id = ?1 AND seq > ?2 AND seq <= ?3 \
-         ORDER BY seq LIMIT ?5",
+         ORDER BY seq LIMIT ?4",
     ) else {
         return;
     };
-    let rows = events.query_map(
-        params![
-            id,
-            tail.after,
-            tail.until.unwrap_or(i64::MAX),
-            MOST_EVENT_BYTES,
-            budget.events
-        ],
-        |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, Option<String>>(1)?,
-                row.get::<_, bool>(2)?,
-                row.get::<_, Option<Vec<u8>>>(3)?,
-                row.get::<_, Option<i64>>(4)?,
-            ))
-        },
-    );
-    let Ok(rows) = rows.and_then(|rows| rows.collect::<Result<Vec<_>, _>>()) else {
+    let Ok(mut rows) = events.query(params![
+        id,
+        tail.after,
+        tail.until.unwrap_or(i64::MAX),
+        budget.events
+    ]) else {
         return;
     };
-    for (seq, json, compressed, blob, created_at) in rows {
+    let text = |seq: i64, compressed: bool| -> Option<(Option<String>, Option<Vec<u8>>)> {
+        let column = if compressed {
+            "event_zstd"
+        } else {
+            "event_json"
+        };
+        db.query_row(
+            &format!("SELECT {column} FROM transcript_events WHERE session_id = ?1 AND seq = ?2"),
+            params![id, seq],
+            |row| {
+                Ok(if compressed {
+                    (None, row.get::<_, Option<Vec<u8>>>(0)?)
+                } else {
+                    (row.get::<_, Option<String>>(0)?, None)
+                })
+            },
+        )
+        .ok()
+    };
+    loop {
+        let row = match rows.next() {
+            Ok(Some(row)) => row,
+            Ok(None) | Err(_) => return,
+        };
+        let (Ok(seq), Ok(compressed), Ok(stored), Ok(created_at)) = (
+            row.get::<_, i64>(0),
+            row.get::<_, bool>(1),
+            row.get::<_, i64>(2),
+            row.get::<_, Option<i64>>(3),
+        ) else {
+            return;
+        };
+        let stored = usize::try_from(stored).unwrap_or(usize::MAX);
+        if stored > budget.bytes && !budget.fresh {
+            // Past this read's bytes: this event waits for the next read.
+            return;
+        }
+        let (json, blob) = if stored > MOST_EVENT_BYTES {
+            (None, None)
+        } else {
+            match text(seq, compressed) {
+                Some(found) => found,
+                None => return,
+            }
+        };
         let (json, skipped) = if compressed {
             match blob.as_deref().map(decoded) {
                 Some(Ok(json)) => (Some(json), None),
@@ -485,6 +535,11 @@ fn read(
 /// skipped and counted, never decoded further.
 const MOST_DECODED: u64 = 64 * 1024;
 
+/// The largest window a compressed event's frame may ask for. A frame made
+/// for at most 64 KiB needs far less; OpenClaw's own small rows ask for
+/// their size.
+const MOST_WINDOW: u64 = 1024 * 1024;
+
 /// Why a compressed event whose frame asks for a window past
 /// [`MOST_WINDOW`] is skipped.
 const WINDOW_TOO_LARGE: &str = "a compressed event asks for a window past 1 MiB";
@@ -494,6 +549,12 @@ const WINDOW_TOO_LARGE: &str = "a compressed event asks for a window past 1 MiB"
 fn decoded(blob: &[u8]) -> Result<String, &'static str> {
     use std::io::Read;
     const CORRUPT: &str = "a compressed event could not be decoded";
+    // The header first: the decoder reserves the frame's whole window (up to
+    // 100 MiB in ruzstd) before it decodes a byte.
+    let (frame, _) = ruzstd::frame::read_frame_header(blob).map_err(|_| CORRUPT)?;
+    if frame.header.window_size().map_err(|_| CORRUPT)? > MOST_WINDOW {
+        return Err(WINDOW_TOO_LARGE);
+    }
     let mut source = blob;
     let decoder = ruzstd::StreamingDecoder::new(&mut source).map_err(|_| CORRUPT)?;
     let mut bytes = Vec::new();
