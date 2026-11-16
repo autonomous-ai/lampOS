@@ -4227,10 +4227,11 @@ file:
   an active approvals subprocess and its process group. No hand-over is
   sent after cancellation or expiry. A spoken task still waits only for
   the port, up to 60 s. A run the person asked for by voice that is refused
-  so, or as Harness hasn't looked for the lamp's target yet (or
-  `harness_not_running`, #7282), is said once in exact words, "I'm still
-  getting ready. Give me a minute and ask me again." (lamp-skills'
-  `task::not_ready_line`); a trigger's run says nothing. Test:
+  so (`openclaw_gateway_not_ready`), or as `harness_not_running` (#7282), is
+  said once in exact words, "I'm still getting ready. Give me a minute and
+  ask me again." (lamp-skills' `task::not_ready_line`); a trigger's run says
+  nothing. A refusal for no lamp target of its own is not told so, as it
+  also stands for Hermes on the lamp being off. Test:
   `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`.
 - **A fixed write is refused.** A task with no script (a fixed write) is
   refused before anything is made live: "a fixed write is not taken by a
