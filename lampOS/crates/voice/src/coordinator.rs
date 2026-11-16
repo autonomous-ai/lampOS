@@ -5199,8 +5199,10 @@ fn released_restored_on_stop(
             return Ok(());
         }
     };
+    let restored = controls.restored_after_fault();
     let why = controls.kept_on_stop_why();
-    if controls.release_restored_on_stop()? {
+    let released = controls.release_restored_on_stop()?;
+    if released {
         eprintln!(
             "lamp-voice: {signal} ended the mute the restart guard restored; the next start listens"
         );
@@ -5209,7 +5211,7 @@ fn released_restored_on_stop(
             trace,
             json!({"kind":"guard_mute_ended_on_stop","at_us":monotonic_us(),"signal":signal}),
         );
-    } else if let Some(why) = why {
+    } else if let Some(why) = HandControls::kept_after_release(restored, why, released) {
         eprintln!("{}", guard_mute_kept_line(why));
     }
     Ok(())

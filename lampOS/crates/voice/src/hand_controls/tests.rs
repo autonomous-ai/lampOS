@@ -976,6 +976,18 @@ fn a_kept_guard_mute_names_its_gate() {
     let (unmarked, _sender) = fixture(options(false, Some(&directory.file())));
     assert!(!unmarked.restored_after_fault());
     assert_eq!(unmarked.kept_on_stop_why(), None);
+    // After the release: a press during its save is named; a release, or
+    // a mute not the guard's, says nothing.
+    assert_eq!(
+        HandControls::kept_after_release(true, None, false),
+        Some(HandControls::PRESSED_AS_SAVED)
+    );
+    assert_eq!(
+        HandControls::kept_after_release(true, Some("a control was in flight"), false),
+        Some("a control was in flight")
+    );
+    assert_eq!(HandControls::kept_after_release(true, None, true), None);
+    assert_eq!(HandControls::kept_after_release(false, None, false), None);
 }
 
 /// #4332: the person's own mute survives a fault and a clean restart after
