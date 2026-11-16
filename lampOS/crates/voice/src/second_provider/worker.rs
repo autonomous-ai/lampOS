@@ -4281,6 +4281,15 @@ pub fn serve(
         );
     }
     engine = engine.checking_worded_claims(action_claims && worded_claims);
+    // A made skill with code not on after its say-back is never said to be
+    // on (`LAMP_MADE_NOT_ON_TOLD=on`, #7270).
+    let made_not_on = crate::made_not_on::on();
+    if made_not_on {
+        eprintln!(
+            "lamp-voice second: while a made skill with code is not on after its say-back, the model is told so and a reply saying it is on is said not on yet (LAMP_MADE_NOT_ON_TOLD)"
+        );
+    }
+    engine = engine.telling_made_not_on(made_not_on);
     // A line said to the lamp by name never ends in silence from an empty
     // answer (`LAMP_NO_WORDS_AGAIN=on`, #3704).
     let no_words_again = std::env::var(crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT)
