@@ -35,6 +35,13 @@ mention more than a week back. Forgotten facts are skipped. The persona, events,
 answer key and the bytes of q001–q200 are unchanged. The month runs from 1 to
 30 April, so no question crosses a calendar-month edge.
 
+Registration version 7 makes the two day-30 "last week" probes, q203 and
+q204, exact, before any score. Day 30 is a Tuesday, so with the one-day
+tolerance the Monday of this week (29 April) passed for a Sunday in the
+previous Monday-to-Sunday week. Only the expected date now scores. Their
+wording, query times and expected dates are unchanged, as are the persona,
+events, answer key and every other question.
+
 Files are deliberately separated:
 
 - `persona.json`: evaluator input to the generator; never passed to an arm.
@@ -68,7 +75,8 @@ The appointment probes name the plan in their spoken question; they receive
 no supplied topic cue.
 
 Exact scorers compare the whole normalized answer, dates use a registered
-one-day tolerance, and abstention requires a complete registered form.
+tolerance of at most one day (zero for the "last week" probes q203 and q204),
+and abstention requires a complete registered form.
 A rubric's `forbidden` list is only for literal confidential disclosures,
 including beside punctuation. Semantic prohibitions and negation are rubric
 criteria, so "do not interrupt the call" is not itself penalized. Rubric
