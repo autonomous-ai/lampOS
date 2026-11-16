@@ -1722,8 +1722,17 @@ a skill on the lamp uses, saying nothing first."). Sau đó, trong code
   phòng của nó, và các dịch vụ dùng token riêng của chúng. Như lần chạy
   của một tool, Policy không được hỏi và `[[while]]`, giờ yên tĩnh,
   cooldown, số lần tối đa mỗi ngày và giờ của nhóm của trigger không được
-  hỏi cũng không bị tiêu: người dùng đã xin. Journal ghi "run now, as its
-  owner asked by voice", hoặc lý do không chạy.
+  hỏi cũng không bị tiêu: người dùng đã xin. Lời của chính nó (của một
+  bước say) xin mức ưu tiên 8 của dịch vụ say
+  (`lamp_skills::MOST_SAY_PRIORITY`, mức của một lời nhắc đến hạn), nên
+  được nói sau một giây yên lặng, không phải 15 s (`say::QUIET_US`) mà một
+  lời nói ở mức thường 5 chờ sau một lượt (lamp-9adf, 16/11 15:36: "Lamp,
+  moon time." có câu của kỹ năng 20 s sau lời gọi). lamp-skills trả lời
+  `{"ran": NAME, "says": BOOL}`, `says` là true khi lần chạy có một bước
+  say bằng chính văn bản của nó (kiểu say duy nhất giọng nói nhận từ kỹ
+  năng tự tạo), báo cho model dưới dạng `says`
+  (`made_run::speaks_itself`). Journal ghi "run now, as its owner asked by
+  voice", hoặc lý do không chạy.
 - **Nói rõ ràng.** Đã chạy, mô hình chỉ nói NAME đang chạy, không bao giờ
   nói nó tìm thấy, gửi hay làm gì, hay nó đã xong; những gì read hay agent
   của task tìm thấy được nói như một lần trigger nói. Bị từ chối, "NAME
@@ -2577,9 +2586,11 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    không bị `skill_named::ask_refused` từ chối, mỗi cụm có ít nhất hai từ
    của riêng nó ngoài những từ nói quanh một yêu cầu
    (`skill_named::own_words_of`: "yes please" chỉ có một), không lặp lại;
-   nếu không, model sửa lại với `made_skill::MADE_ASKS_FORM`. Không bao giờ
-   có trong kỹ năng thêm từ file (`capped_added`). Bước dọn giữ nguyên
-   chúng.
+   nếu không, model sửa lại với `made_skill::MADE_ASKS_FORM`. Kỹ năng
+   thêm từ file (`capped_added`) chỉ có thể có chúng bên cạnh tool của nó,
+   tối đa 8 (`made_skill::MOST_ADDED_ASKS`, các trigger phrase của nó, mục
+   7), giữ cùng hình dạng; không có tool, hoặc khi công tắc tắt, chúng bị
+   từ chối. Bước dọn giữ nguyên chúng.
 3. **Không bao giờ là của kỹ năng khác** (`made_skill::asks_taken`, lúc
    tạo, sau khi tên đã trống): một cụm trùng với ask của kỹ năng khác, hoặc
    chứa tên hay function của kỹ năng khác (đã cài, đẩy lên hoặc trong file
@@ -2615,7 +2626,14 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    lần ghi chỉ theo lời đồng ý đã giữ, một lần mỗi lượt chạy, trong giới hạn
    của ngày, task giữ lời đồng ý, token một lần chạy và grant. Câu phủ
    định, câu hỏi, cụm hai kỹ năng cùng có, chỉ tên kỹ năng, hay khi đèn đang
-   chờ câu trả lời: không bắt đầu gì. Một cụm mà hai kỹ năng trở lên cùng
+   chờ câu trả lời: không bắt đầu gì. Một lần chạy tự nói lời của nó
+   (`says` của lamp-skills, `made_run::speaks_itself`) kết thúc lượt ở đó,
+   không có vòng 2 và không có câu nào của riêng đèn, nên câu say của kỹ
+   năng, ở mức ưu tiên 8, là điều đầu tiên được nghe, khoảng một giây sau
+   khi người dùng ngừng nói (lamp-9adf, 16/11 15:36: "Moon time is running
+   now." đến trước và câu của kỹ năng 20 s sau lời gọi). Ngoài ra, một lần
+   chạy không tự nói gì hay bị từ chối thì model nói câu trả lời ở vòng 2,
+   lời từ chối kèm lý do. Một cụm mà hai kỹ năng trở lên cùng
    có, trong đó có một kỹ năng tự tạo ở đây, là lời gọi `skill_named::SHARED`
    kèm các từ và từng kỹ năng: không chạy gì, và luồng second bảo model
    (`skill_named::shared_note`) nói ra điều đó, nêu tên từng kỹ năng, để
@@ -2636,7 +2654,14 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    (`upload_agent::asks_checked`) và kiểm tra trùng
    (`made_skill::ask_taken`); cụm bị từ chối bị bỏ ra và app được báo cụm
    nào, vì sao, trong `kept.asks_left_out = [{phrase, why}]`
-   (`upload_skill::take_telling`), phần còn lại vẫn được cài.
+   (`upload_skill::take_telling`), phần còn lại vẫn được cài. `lamp-cloud`
+   chép `asks_left_out` vào câu trả lời cho app chỉ khi nó là một danh
+   sách, như chép `secrets` ([cloud.md](../cloud.md), "A skill added from a
+   file"). `skill.toml` riêng của file tải lên có `asks` cũng qua cùng bước
+   kiểm tra trùng (`made_skill::added_asks_taken`, trong `take_telling`):
+   một cụm sẽ bắt đầu kỹ năng khác trên đèn làm lần tải lên bị từ chối kèm
+   lý do, nêu tên cả hai kỹ năng, vì file là của chính người dùng và được
+   giữ nguyên vẹn hoặc không giữ gì.
 
 Đặt giống nhau trong `lamp-voice` (truyền đúng `on` cho worker `provider`
 và `second`), `lamp-skills`, `lamp-skills-manage@`, `lamp-cloud` (nạp trong

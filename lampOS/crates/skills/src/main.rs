@@ -3156,7 +3156,14 @@ fn run_now_call(
         lamp_skills::task::asked_by_voice(&skill, now_ms);
     }
     eprintln!("lamp-skills: skill:{skill}: run now, as its owner asked by voice");
-    let _ = reply.send(json!({ "ran": skill }));
+    // Whether it speaks its own words (a made skill's exact text, the only
+    // say the voice takes of one): the voice then adds no line of its own
+    // when the heard words started it (`lamp_voice::made_run::speaks_itself`).
+    let says = run
+        .calls
+        .iter()
+        .any(|call| matches!(call, Call::Words(words) if words.exact));
+    let _ = reply.send(json!({ "ran": skill, "says": says }));
     for event in run.events {
         publish(out, event);
     }

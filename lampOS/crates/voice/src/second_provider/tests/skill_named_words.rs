@@ -1069,3 +1069,61 @@ fn words_two_skills_give_run_neither_and_the_model_is_told_both() {
         }
     }
 }
+
+/// lamp-9adf, 16 Nov 15:36 (`LAMP_MADE_SKILL_ASKS`): "Lamp, moon time."
+/// started its made skill in code, and the lamp said "Moon time is running
+/// now." first; the skill's own line came 20 s after the call. A made
+/// skill its heard words start, run now, that speaks its own words
+/// (`made_run::speaks_itself`) ends the turn with no chat asked and no
+/// line of the lamp's own, so its say is the first thing heard. A run that
+/// says nothing itself, or is refused, still has round 2 say what
+/// happened, the refusal with why.
+#[test]
+fn a_made_skill_its_words_start_is_heard_first_with_no_line_of_the_lamps() {
+    let by_words = |told: Value, rounds| {
+        went_with("Lamp, moon time.", rounds, told, |engine| {
+            engine.calling_skills_named(Arc::new(|_: &str| {
+                Some(crate::skill_named::call(true, "made:photo_booth"))
+            }))
+        })
+    };
+    let ran = |says: bool| {
+        json!({
+            crate::made_run::RUN: "photo_booth",
+            "ran": true,
+            "says": says,
+            "next": "Say only, in a few words, that photo booth is running now."
+        })
+    };
+    let went = by_words(ran(true), vec![said("Photo booth is running now.")]);
+    assert_eq!(
+        went.ran,
+        [(
+            crate::made_skill::MAKE.to_owned(),
+            json!({ crate::made_run::RUN: "photo_booth" })
+        )]
+    );
+    assert_eq!(went.chats, 0, "no round 2: {:?}", went.results);
+    assert!(
+        went.said.is_empty(),
+        "no line of the lamp's: {:?}",
+        went.said
+    );
+    let went = by_words(ran(false), vec![said("Photo booth is running now.")]);
+    assert_eq!(went.chats, 1);
+    assert_eq!(went.said, ["Photo booth is running now."]);
+    let refused = json!({
+        "error": "its 3 runs in 24 hours are spent",
+        "next": "Say plainly that photo booth didn't run now, and why."
+    });
+    let went = by_words(refused, vec![said("Photo booth didn't run today.")]);
+    assert_eq!(went.chats, 1);
+    assert!(
+        went.results
+            .iter()
+            .any(|told| told.contains("runs in 24 hours are spent")),
+        "{:?}",
+        went.results
+    );
+    assert_eq!(went.said, ["Photo booth didn't run today."]);
+}

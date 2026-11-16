@@ -62,6 +62,16 @@ pub const NOT_MADE: &str = "only a skill the person made is run this way";
 /// What the model is told when lamp-skills didn't answer.
 pub const NOT_ANSWERED: &str = "my skills didn't answer, so it may not have started";
 
+/// Whether a run's answer `told` says the skill ran now and speaks its
+/// own words ([`ran_by`]'s `says`): a run its heard words started in code
+/// then ends with no line of the lamp's own, so the skill's say is the
+/// first thing heard (lamp-9adf, 16 Nov 15:36: "Lamp, moon time." was
+/// answered "Moon time is running now." first, and the skill's own line
+/// came 20 s after the call, the say service's quiet after that turn).
+pub fn speaks_itself(told: &Value) -> bool {
+    told["ran"] == true && told["says"] == true
+}
+
 /// The most of their skills' names said when none is near.
 const NAMED_MOST: usize = 3;
 
@@ -91,14 +101,15 @@ fn not_run(spoken: &str, why: &str) -> Value {
 /// (`writes_approved`, `services::skill_writes_approved`: `(on, approved)`)
 /// and its task's yes given (`task_agreed`: none for a skill with no task,
 /// else whether lamp-control keeps its yes), is run by `run`
-/// (lamp-skills' [`OP`]: why not, in its words). What the model is told.
+/// (lamp-skills' [`OP`]: whether it speaks its own words, or why not, in
+/// its words). What the model is told.
 pub fn asked(
     ask: Ask<'_>,
     keeping: &Keeping,
     owner_hears: impl FnOnce() -> bool,
     task_agreed: impl FnOnce(&str) -> Result<Option<bool>, String>,
     writes_approved: impl FnOnce(&Asks) -> Option<(bool, bool)>,
-    run: impl FnOnce(&str) -> Result<(), String>,
+    run: impl FnOnce(&str) -> Result<bool, String>,
 ) -> Value {
     let Ask {
         name,
@@ -197,11 +208,13 @@ pub fn asked(
         Err(_) => return not_run(&spoken, "I can't tell now whether what it uses is agreed"),
     }
     match run(&made) {
-        Ok(()) => {
+        Ok(says) => {
             eprintln!("lamp-voice: request {request}: a made skill run now, as its owner asked");
             json!({
                 RUN: made,
                 "ran": true,
+                // It speaks its own words ([`speaks_itself`]).
+                "says": says,
                 "next": format!(
                     "Say only, in a few words, in the conversation's language, that {spoken} is \
                      running now. Never say what it found, sent or did, nor that it is done. \
@@ -217,8 +230,9 @@ pub fn asked(
 }
 
 /// The made skill `name` run now by lamp-skills, on its call socket in
-/// `folder` ([`OP`]): why not, in its words, or [`NOT_ANSWERED`].
-pub fn ran_by(folder: &Path, name: &str) -> Result<(), String> {
+/// `folder` ([`OP`]): whether its run speaks its own words (`says`), or why
+/// not, in its words, or [`NOT_ANSWERED`].
+pub fn ran_by(folder: &Path, name: &str) -> Result<bool, String> {
     let answer = crate::tools::exchange(
         &folder.join(crate::tools::CALL_SOCKET),
         &json!({ "op": OP, "skill": name }),
@@ -226,7 +240,7 @@ pub fn ran_by(folder: &Path, name: &str) -> Result<(), String> {
     )
     .ok_or(NOT_ANSWERED)?;
     match answer.get("ok").and_then(Value::as_bool) {
-        Some(true) => Ok(()),
+        Some(true) => Ok(answer["result"]["says"] == true),
         _ => Err(answer
             .get("error")
             .and_then(Value::as_str)
@@ -322,7 +336,7 @@ mod tests {
         Some((true, true))
     }
 
-    fn never(_: &str) -> Result<(), String> {
+    fn never(_: &str) -> Result<bool, String> {
         panic!("run")
     }
 
@@ -363,15 +377,43 @@ mod tests {
             let mut ran = Vec::new();
             let told = asked(ask(heard), &keeping, owner, no_task, approved, |skill| {
                 ran.push(skill.to_owned());
-                Ok(())
+                Ok(false)
             });
             assert_eq!(ran, [name], "{heard}: {told}");
             assert_eq!(told[RUN], name, "{told}");
             assert_eq!(told["ran"], true, "{told}");
+            assert!(!speaks_itself(&told), "{told}");
             let next = told["next"].as_str().unwrap();
             assert!(next.contains("is running now"), "{next}");
             assert!(next.contains("Never say what it found"), "{next}");
         }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A run whose skill speaks its own words (lamp-skills' `says`) is
+    /// told so, for the second route to add no line of its own when the
+    /// heard words started it ([`speaks_itself`]); a refusal never is.
+    #[test]
+    fn a_run_that_speaks_itself_is_told_so() {
+        let (root, keeping) = nines_lamp("run-says");
+        let told = asked(
+            ask("unread mail"),
+            &keeping,
+            owner,
+            no_task,
+            approved,
+            |_| Ok(true),
+        );
+        assert!(speaks_itself(&told), "{told}");
+        let refused = asked(
+            ask("unread mail"),
+            &keeping,
+            owner,
+            no_task,
+            approved,
+            |_| Err("its last task is still under way".to_owned()),
+        );
+        assert!(!speaks_itself(&refused), "{refused}");
         let _ = std::fs::remove_dir_all(&root);
     }
 

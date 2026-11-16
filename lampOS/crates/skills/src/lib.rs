@@ -9534,6 +9534,21 @@ impl Engine {
         if calls.iter().any(Call::held_until_ends) {
             return Err("it lasts only while its moment holds, so it runs only then".into());
         }
+        // Its own words answer the person who asked: said after a second
+        // of quiet, as a due reminder's ([`MOST_SAY_PRIORITY`]), never the
+        // say service's 15 s after a turn at the normal priority (lamp-9adf,
+        // 16 Nov 15:36: "Lamp, moon time." had its skill's line 20 s after
+        // the call).
+        let calls = calls
+            .into_iter()
+            .map(|call| match call {
+                Call::Words(mut words) => {
+                    words.priority = words.priority.max(MOST_SAY_PRIORITY);
+                    Call::Words(words)
+                }
+                call => call,
+            })
+            .collect();
         let run = Run {
             generation: skill.scheduled_run(None).then(|| self.generation.clone()),
             skill: skill.name.clone(),
@@ -11097,6 +11112,48 @@ mod tests {
         )
         .unwrap();
         folder
+    }
+
+    /// lamp-9adf, 16 Nov 15:36: "Lamp, moon time." ran a made skill whose
+    /// own line came 20 s after the call, at the normal priority, which
+    /// waits out the say service's 15 s quiet after a turn. Run now, its
+    /// say asks [`MOST_SAY_PRIORITY`], said after a second of quiet as a
+    /// due reminder's; one that already asks more keeps it, and its other
+    /// steps are as they were.
+    #[test]
+    fn a_made_skill_run_now_says_its_words_at_a_due_reminders_priority() {
+        let dir = tempfile::tempdir().unwrap();
+        lamp_voice::made_skill::set_asks_here(Some(true));
+        let moon = made_here(
+            dir.path(),
+            "moon-time",
+            "asks = [\"moon time\"]\nversion = \"1.0.0\"\n[permissions]\nspeak = true\n\
+             light = true\n[[do]]\nlight = { colour = \"blue\" }\n\
+             [[do]]\nsay = { text = \"The moon is up.\" }\n",
+        );
+        let skill = load(&moon).unwrap();
+        let mut engine = Engine::new(vec![skill], false);
+        let run = engine.run_now("moon-time", 1_000_000).unwrap();
+        let said: Vec<&Words> = run
+            .calls
+            .iter()
+            .filter_map(|call| match call {
+                Call::Words(words) => Some(words),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(said.len(), 1, "{:?}", run.calls);
+        assert_eq!(said[0].words, "The moon is up.");
+        assert!(said[0].exact);
+        assert_eq!(said[0].priority, MOST_SAY_PRIORITY);
+        assert!(
+            run.calls
+                .iter()
+                .any(|call| matches!(call, Call::Light { .. })),
+            "{:?}",
+            run.calls
+        );
+        lamp_voice::made_skill::set_asks_here(None);
     }
 
     /// A made skill started by its own words alone (`LAMP_MADE_SKILL_ASKS`):
