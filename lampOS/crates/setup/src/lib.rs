@@ -14,6 +14,7 @@ pub mod shutdown;
 pub mod wake;
 pub mod wifi;
 pub mod wifi_change;
+pub mod wifi_counts;
 
 /// The bus name `lamp-setup` subscribes under for touch.
 pub const SUBSCRIBER: &str = "setup";
