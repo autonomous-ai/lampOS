@@ -876,10 +876,15 @@ pub fn forget_by(control: &Path, name: &str) -> Result<(), String> {
 }
 
 /// Whether the skill `name`, as the manage helper at `manage` reads it, is
-/// an agent skill added from a file ([`crate::upload_agent::FROM`]).
+/// an agent skill added from a file ([`crate::upload_agent::FROM`]) or one
+/// asked for by voice in its form ([`crate::make_no_cannot::FROM`]): run as
+/// asked once agreed.
 fn read_from_file(manage: &Path, name: &str) -> bool {
-    read_by(manage, name)
-        .is_ok_and(|asks| asks.is_some_and(|asks| asks.from == crate::upload_agent::FROM))
+    read_by(manage, name).is_ok_and(|asks| {
+        asks.is_some_and(|asks| {
+            [crate::upload_agent::FROM, crate::make_no_cannot::FROM].contains(&asks.from.as_str())
+        })
+    })
 }
 
 /// The person's yes to `asks` recorded by lamp-control at `control`

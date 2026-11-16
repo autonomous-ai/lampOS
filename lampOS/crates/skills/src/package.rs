@@ -3120,7 +3120,17 @@ pub fn task_asks(
     } else if crate::task::made_with_code(&folder, pushed) {
         crate::task::FROM_MADE.to_owned()
     } else if crate::task::agent_from_file(&folder, pushed) {
-        lamp_voice::upload_agent::FROM.to_owned()
+        // One the person asked the voice for (`LAMP_MAKE_NO_CANNOT`, its
+        // card marked so), never said to come from a file.
+        let card = fs::read_to_string(folder.join("SKILL.md")).unwrap_or_default();
+        if card
+            .lines()
+            .any(|line| line.trim() == lamp_voice::make_no_cannot::ASKED_MARK)
+        {
+            lamp_voice::make_no_cannot::FROM.to_owned()
+        } else {
+            lamp_voice::upload_agent::FROM.to_owned()
+        }
     } else {
         "the Skills Store".to_owned()
     };

@@ -782,6 +782,7 @@ pub fn code_goes_on_at_once(made: &Made) -> bool {
         && !made.uses.listens()
         && !made.uses.who
         && !made.uses.known_faces
+        && !made.uses.agent_task
         && grants_go_on_at_once(&made.uses.grants)
 }
 
@@ -1221,6 +1222,7 @@ pub fn plain_reason(why: &str) -> String {
         || [NOT_MADE_TRY, NOT_KEPT_TRY].contains(&why)
         || AGENT_TRIES.contains(&why)
         || PLAIN_REASONS.contains(&why)
+        || crate::make_no_cannot::said_as_is(why)
     {
         return why.to_owned();
     }
@@ -1247,6 +1249,7 @@ pub fn not_made_line(why: &str) -> String {
         || why.starts_with(ALREADY_HAVE)
         || [NOT_MADE_TRY, NOT_KEPT_TRY, NOT_READY_LINE].contains(&why)
         || AGENT_TRIES.contains(&why)
+        || crate::make_no_cannot::said_as_is(why)
     {
         return match why.ends_with(['.', '!', '?']) {
             true => why.to_owned(),
@@ -1594,6 +1597,11 @@ pub struct Uses {
     /// What its code may use on the lamp, its `grants` ([`GRANTS`]), each
     /// named when it is said back.
     pub grants: Vec<String>,
+    /// Its one task is the lamp's agent's to do itself, its `run` the
+    /// lamp's own ([`crate::make_no_cannot::RUN`], with
+    /// `LAMP_MAKE_NO_CANNOT` on): said back as a task for the agent
+    /// ([`agent_said`]), and never on at once.
+    pub agent_task: bool,
 }
 
 /// The topics that are what the microphone hears: words, its name, the
@@ -1644,7 +1652,12 @@ impl Uses {
         if self.output_limits {
             parts.push("limits on its light and volume".to_owned());
         }
-        if self.code {
+        if self.code && self.agent_task {
+            parts.push(match grants_plainly(&self.grants) {
+                Some(grants) => format!("a task for the lamp's agent that may use {grants}"),
+                None => "a task for the lamp's agent".to_owned(),
+            });
+        } else if self.code {
             parts.push(match grants_plainly(&self.grants) {
                 Some(grants) => format!("code of its own that may use {grants}"),
                 None => "code of its own".to_owned(),
@@ -1715,6 +1728,10 @@ impl Uses {
             uses["code"] = json!(true);
             uses["grants"] = json!(self.grants);
         }
+        // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`), only then.
+        if self.agent_task {
+            uses["agent_task"] = json!(true);
+        }
         uses
     }
 
@@ -1747,6 +1764,7 @@ impl Uses {
             sends_to: strings("sends_to"),
             code: uses["code"] == true,
             grants: strings("grants"),
+            agent_task: uses["agent_task"] == true,
         }
     }
 }
@@ -1792,8 +1810,76 @@ pub fn code_said_as(grants: &[String], at_once: bool) -> String {
     format!(" The lamp's model wrote its code, and that code may use {uses}.{waits}")
 }
 
+/// How the say-back of a task for the lamp's agent ends, as a skill's
+/// `do.task` read back does (`crate::skill_task_yes::line`).
+pub const RUNS_ONCE_AGREED: &str = " It runs only once you agree.";
+
+/// What the say-back of a made task for the lamp's agent
+/// (`LAMP_MAKE_NO_CANNOT`, [`Uses::agent_task`]) says after what it does,
+/// in place of [`code_said`]: that the agent does it, every grant in plain
+/// words (`crate::skill_task_yes::uses_said`), and [`RUNS_ONCE_AGREED`].
+/// What must be heard whole before the person's yes; never on at once.
+pub fn agent_said(grants: &[String]) -> String {
+    format!(
+        " The lamp's agent does it, and {}.{RUNS_ONCE_AGREED}",
+        crate::skill_task_yes::uses_said(grants)
+    )
+}
+
+/// Whether the made `table` is a task for the lamp's agent: with
+/// `LAMP_MAKE_NO_CANNOT` on, a `do.task` step whose `run` is the lamp's
+/// own [`crate::make_no_cannot::RUN`]. Off, never.
+fn agent_task(table: &toml::Table) -> bool {
+    crate::make_no_cannot::on()
+        && AGENT_SCRIPT.with(|ours| ours.get()).unwrap_or(true)
+        && table
+            .get("do")
+            .and_then(toml::Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|step| step.get("task"))
+            .any(|task| {
+                task.get("run").and_then(toml::Value::as_str) == Some(crate::make_no_cannot::RUN)
+            })
+}
+
+thread_local! {
+    /// While [`keep_asked`] keeps a model's answer: whether its code is the
+    /// lamp's own agent script alone ([`agent_script_only`]). None outside
+    /// it, where a table alone is read as before.
+    static AGENT_SCRIPT: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a made skill's `scripts` are exactly the lamp's own
+/// [`crate::make_no_cannot::RUN`], byte for byte its
+/// [`crate::make_no_cannot::SCRIPT`]: only then is a `do.task` running it a
+/// task for the lamp's agent; real code the model wrote at that path is
+/// the model's code (El's P2 on #7261).
+pub(crate) fn agent_script_only(scripts: &[(String, String)]) -> bool {
+    matches!(
+        scripts,
+        [(path, text)] if path == crate::make_no_cannot::RUN
+            && text == crate::make_no_cannot::SCRIPT
+    )
+}
+
+/// [`AGENT_SCRIPT`] set for as long as it lives, then as it was.
+struct AgentScript(Option<bool>);
+
+impl AgentScript {
+    fn set(ours: bool) -> Self {
+        Self(AGENT_SCRIPT.with(|kept| kept.replace(Some(ours))))
+    }
+}
+
+impl Drop for AgentScript {
+    fn drop(&mut self) {
+        AGENT_SCRIPT.with(|kept| kept.set(self.0));
+    }
+}
+
 /// A linked service a made skill may read, as the person hears it.
-fn service_name(code: &str) -> &str {
+pub(crate) fn service_name(code: &str) -> &str {
     lamp_services::spoken::name(code)
 }
 
@@ -1805,13 +1891,22 @@ fn service_name(code: &str) -> &str {
 /// reads it. Empty when nothing is missing; `None` when it can't be told,
 /// and nothing is said of it.
 pub fn needs_link(uses: &Uses, linked: impl FnOnce() -> Option<Vec<String>>) -> Option<Vec<Value>> {
-    if uses.reads.is_empty() {
+    // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`) reads and sends
+    // with its service grants: each one's service is asked for too.
+    let mut reads = uses.reads.clone();
+    if uses.agent_task {
+        for (code, _) in uses.grants.iter().filter_map(|grant| service_grant(grant)) {
+            if !reads.iter().any(|read| read == code) {
+                reads.push(code.to_owned());
+            }
+        }
+    }
+    if reads.is_empty() {
         return Some(Vec::new());
     }
     let linked = linked()?;
     // Every read not linked now, each asked for (Thirteen's P3 on #6103).
-    let needs = uses
-        .reads
+    let needs = reads
         .iter()
         .filter(|code| {
             let alike = |linked: &str| {
@@ -1929,7 +2024,7 @@ const SAY_NOT_TEXT: &str = "what it would say isn't its exact words; try saying 
 /// A Unicode format character (general category Cf): zero-width marks,
 /// bidirectional controls and the like (U+200B, U+202E), which
 /// [`char::is_control`] doesn't cover (App Only's P2b on #6062).
-fn is_format(c: char) -> bool {
+pub(crate) fn is_format(c: char) -> bool {
     matches!(
         c as u32,
         0x00AD
@@ -3792,6 +3887,7 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
             }
             uses.grants = code_held(table, &tasks, &uses)?;
             uses.code = true;
+            uses.agent_task = agent_task(table);
         }
         // A step the lamp can't do yet in a made skill, said so before the
         // check refuses it (#6066): a send or a write, a move of its own, a
@@ -4985,7 +5081,13 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
         // [`CODE_AT_ONCE_GRANTS`] and nothing it reaches beside them
         // (the camera, the microphone, who is in view, a message).
         let at_once = grants_go_on_at_once(&grants) && !writes && reaches_plainly(table).is_empty();
-        said.push_str(&code_said_as(&grants, at_once));
+        // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`): said as one,
+        // and it always waits for the yes.
+        if agent_task(table) {
+            said.push_str(&agent_said(&grants));
+        } else {
+            said.push_str(&code_said_as(&grants, at_once));
+        }
     }
     Ok(said)
 }
@@ -4999,10 +5101,20 @@ fn task_plainly(step: &toml::Value) -> Option<String> {
     let words = task.get("task")?.as_str()?.trim();
     task.get("run")?.as_str()?;
     let words = words.trim_end_matches(['.', '!', '?']);
+    // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`), as a skill's
+    // `do.task` is read back.
+    let agents = crate::make_no_cannot::on()
+        && task.get("run").and_then(toml::Value::as_str) == Some(crate::make_no_cannot::RUN);
     (!words.is_empty()
         && words.chars().count() <= MOST_TASK_CHARS
         && words.chars().all(|c| !c.is_control() && !is_format(c)))
-    .then(|| format!("runs its own code to “{words}”"))
+    .then(|| {
+        if agents {
+            format!("hands one task to the lamp's agent: “{words}”")
+        } else {
+            format!("runs its own code to “{words}”")
+        }
+    })
 }
 
 /// The most [`manners_plainly`] says: each part at its longest.
@@ -7361,6 +7473,9 @@ pub fn keep_asked(
         return Err(Refused::new(MODEL_CUT_OFF));
     }
     let mut files = files(answer)?;
+    // A `do.task` running the agent's path is the agent's only with the
+    // lamp's own script there, byte for byte (El's P2 on #7261).
+    let _agent_script = AgentScript::set(agent_script_only(&files.scripts));
     // A start said to the lamp (#6526), only with its switch: kept as a
     // function the voice picks, never a trigger on what the room says.
     // Off, a `[said]` goes on below and is refused as any part a made
@@ -8141,6 +8256,75 @@ pub fn keep_agent(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
             if crate::upload_agent::secrets_on() {
                 entry["secrets"] = json!(crate::upload_agent::secrets_of_toml(&files.toml));
             }
+        }
+    }
+    write_index(&keeping.directory, &entries).map_err(unkept)?;
+    Ok(made)
+}
+
+/// A task for the lamp's agent only asked for (`LAMP_MAKE_NO_CANNOT`,
+/// `crate::make_no_cannot::asked_files`): kept as an agent skill added from
+/// a file is ([`keep_agent`]: its cap, its card's marks, so the manage
+/// helper holds it to the same cap), its card also marked
+/// [`crate::make_no_cannot::ASKED_MARK`] and made by whoever asked
+/// ([`Maker::of`] `from`), what it does said as the task the agent will do
+/// (`words`) and when, never as made, and its uses marked
+/// [`Uses::agent_task`]. On, its task waits for the spoken yes at its first
+/// ask (`crate::upload_agent::first_run`).
+pub fn keep_agent_asked(
+    files: &Files,
+    from: &str,
+    keeping: &Keeping,
+    words: &str,
+) -> Result<Made, Refused> {
+    let unkept = |why: io::Error| {
+        eprintln!("lamp-voice: a task for the lamp's agent was not kept: {why}");
+        Refused::new(NOT_KEPT_HERE)
+    };
+    ensure_private(&keeping.directory).map_err(unkept)?;
+    drop_unfinished(&keeping.directory);
+    if let Some(made) = kept(&keeping.directory, from) {
+        return Ok(made);
+    }
+    let (version, mut uses) = crate::upload_agent::capped(&files.toml)?;
+    uses.agent_task = true;
+    let grants = crate::upload_agent::grants_of_toml(&files.toml);
+    let does = format!(
+        "only when you ask for it, it hands one task to the lamp's agent: “{words}”.{} The first \
+         time you ask, I'll read it back and wait for your yes.",
+        agent_said(&grants)
+            .strip_suffix(RUNS_ONCE_AGREED)
+            .unwrap_or_default()
+    );
+    let (name, marked) = card_marked(
+        &files.card,
+        &written_description(&files.card).unwrap_or_default(),
+        &format!(
+            "made: here\n{MADE_BY}: {}\n{ADDED_FROM_FILE}\n{}\n{}",
+            Maker::of(from).key(),
+            crate::upload_agent::MARK,
+            crate::make_no_cannot::ASKED_MARK
+        ),
+    )?;
+    let made = packed_and_kept(
+        keeping,
+        from,
+        Card {
+            toml: &files.toml,
+            name,
+            marked,
+            version,
+            uses,
+            scripts: &files.scripts,
+        },
+        Ok(does),
+        true,
+    )?;
+    let mut entries = index(&keeping.directory);
+    for entry in &mut entries {
+        if entry["sha256"] == made.sha256.as_str() {
+            entry["agent"] = json!(true);
+            entry["grants"] = json!(grants);
         }
     }
     write_index(&keeping.directory, &entries).map_err(unkept)?;
@@ -8936,6 +9120,8 @@ fn check_said(said: &str) -> Option<String> {
 /// removes it in the app when they want).
 pub fn on_line(made: &Made) -> String {
     let name = spoken_name(&made.name);
+    // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`, #7234): what the
+    // agent will do and when, never said as made, its description whole.
     let does = made.description.trim().trim_end_matches(['.', '!', '?']);
     let mut letters = does.chars();
     let does: String = match (letters.next(), letters.clone().next()) {
@@ -8946,6 +9132,11 @@ pub fn on_line(made: &Made) -> String {
         }
         _ => does.to_owned(),
     };
+    // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`, #7234): what the
+    // agent will do and when, never said as made.
+    if made.uses.agent_task {
+        return format!("I can have the lamp's agent do that, as {name}: {does}.");
+    }
     // One that sends or writes is said whole, its every recipient and word
     // in its description, and ends as that does: it waits for the
     // person's yes (#6066), never on a word for them to repeat.
@@ -9026,11 +9217,54 @@ pub const CUT_WRITE_UNSAID: &str =
 /// it was made in was cut (#6307), as [`cut_write_line`] for a write: its
 /// say-back never reached the person with its `approve_id`, so no yes can
 /// put it on. Its name, [`RUNS_AFTER_YES`], then [`CUT_CODE_UNSAID`].
-pub fn cut_code_line(made: &Made) -> String {
-    format!(
-        "I made {}.{RUNS_AFTER_YES} {CUT_CODE_UNSAID}",
-        spoken_name(&made.name)
-    )
+///
+/// With `LAMP_MAKE_NO_CANNOT` on (lamp-9adf, 16 Nov: "I couldn't tell you
+/// just now what its code may use, so it isn't on." was a dead end, the
+/// grants known all along): what its code may use, or what the lamp's agent
+/// does, every grant said, then [`CUT_ASK_AGAIN`] (asked again, the make's
+/// one ask reads it back and waits for the yes again,
+/// `make_skill_local::OneAsk`), and each service in `needs` not linked
+/// yet ([`needs_link`]) named with where to link it ([`unlinked_said`]).
+pub fn cut_code_line(made: &Made, needs: Option<&[Value]>) -> String {
+    let name = spoken_name(&made.name);
+    if crate::make_no_cannot::on() {
+        let uses = if made.uses.agent_task {
+            format!(
+                "I can have the lamp's agent do {name}.{}",
+                agent_said(&made.uses.grants)
+            )
+        } else {
+            format!("I made {name}.{}", code_said_as(&made.uses.grants, false))
+        };
+        return format!(
+            "{uses} {CUT_ASK_AGAIN}{}",
+            unlinked_said(needs.unwrap_or_default())
+        );
+    }
+    format!("I made {name}.{RUNS_AFTER_YES} {CUT_CODE_UNSAID}")
+}
+
+/// How [`cut_code_line`] ends with `LAMP_MAKE_NO_CANNOT` on, before any
+/// service to link.
+pub const CUT_ASK_AGAIN: &str =
+    "It isn't on yet: ask me for it again, and I'll read it back for your yes.";
+
+/// Each service of `needs` ([`needs_link`]) not linked yet, named, and
+/// where to link it: " Linear isn't linked yet; link it in the app." None
+/// with none.
+pub fn unlinked_said(needs: &[Value]) -> String {
+    let names: Vec<&str> = needs
+        .iter()
+        .filter_map(|need| need["name"].as_str())
+        .collect();
+    if names.is_empty() {
+        return String::new();
+    }
+    let (names, are) = (
+        names.join(" and "),
+        if names.len() == 1 { "isn't" } else { "aren't" },
+    );
+    format!(" {names} {are} linked yet; link it in the app.")
 }
 
 /// How [`cut_code_line`] ends.
@@ -9158,6 +9392,12 @@ pub fn tells_made(note: &str) -> bool {
 /// plain words [`put_on`] gives.
 pub fn not_on_line(why: &str) -> String {
     format!("I made it but couldn't put it on: {why}.")
+}
+
+/// [`not_on_line`] for a task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`,
+/// #7234), never said as made.
+pub fn agent_not_on_line(why: &str) -> String {
+    format!("I couldn't set that up for the lamp's agent: {why}.")
 }
 
 /// A skill's name as it is said: its dashes as spaces.
@@ -14574,10 +14814,32 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         assert!(line.ends_with(RUNS_AFTER_YES.trim()), "{line}");
         assert!(line.contains(code_said(&made.uses.grants).trim()), "{line}");
         assert_eq!(
-            cut_code_line(&made),
+            cut_code_line(&made, None),
             "I made photo booth. It waits for you to agree before it runs any code. I couldn't \
              tell you just now what its code may use, so it isn't on."
         );
+        // LAMP_MAKE_NO_CANNOT (lamp-9adf, 16 Nov): never a dead end. What
+        // its code may use, asked again for the yes, and a service to link.
+        crate::make_no_cannot::set_on_here(Some(true));
+        let needs = [json!({"code": "linear", "name": "Linear"})];
+        let line = cut_code_line(&made, Some(&needs));
+        assert_eq!(
+            line,
+            format!(
+                "I made photo booth.{} It isn't on yet: ask me for it again, and I'll read it \
+                 back for your yes. Linear isn't linked yet; link it in the app.",
+                code_said_as(&made.uses.grants, false)
+            )
+        );
+        assert!(!line.contains("couldn't"), "{line}");
+        assert_eq!(
+            unlinked_said(&[
+                json!({"code": "linear", "name": "Linear"}),
+                json!({"code": "notion", "name": "Notion"})
+            ]),
+            " Linear and Notion aren't linked yet; link it in the app."
+        );
+        crate::make_no_cannot::set_on_here(None);
         // The brief offers it, still within its bound.
         let longest = brief(&"x".repeat(MOST_REQUEST_BYTES)).unwrap();
         assert!(longest.contains("Or code, as above."), "{longest}");
