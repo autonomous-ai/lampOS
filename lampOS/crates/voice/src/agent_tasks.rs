@@ -181,6 +181,12 @@ const LOOK_AGAIN: Duration = Duration::from_millis(250);
 /// first chat round made to call [`START`] ([`named_ask`], #1722). `on`
 /// only.
 pub const NAMED_ASK_ENVIRONMENT: &str = "LAMP_TASKS_NAMED_ASK";
+/// Where the second route reads whether a spoken line whose own words name
+/// an agent for the work ([`named_for_work`]: "Hey Lamp, OpenClaw, look up
+/// the weather in Hanoi this weekend") is handed to that agent in code as
+/// round 1, before the model may answer it with the voice's own tools
+/// (#7269). `on` only; off unless set.
+pub const NAMED_AGENT_TAKES_LINE_ENVIRONMENT: &str = "LAMP_NAMED_AGENT_TAKES_LINE";
 /// Signing the lamp's Harness in by voice (#1676, [`crate::sign_in`]):
 /// `on`, and nothing else. Needs `lamp-tasks serve --sign-in-by-code`.
 pub const SIGN_IN_ENVIRONMENT: &str = "LAMP_TASKS_SIGN_IN";
@@ -1445,6 +1451,11 @@ fn staff_now(place: &Place) -> Vec<Member> {
 /// Whether [`NAMED_ASK_ENVIRONMENT`] is `on`.
 pub fn named_ask_on() -> bool {
     std::env::var(NAMED_ASK_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
+/// Whether [`NAMED_AGENT_TAKES_LINE_ENVIRONMENT`] is `on`.
+pub fn named_agent_takes_line_on() -> bool {
+    std::env::var(NAMED_AGENT_TAKES_LINE_ENVIRONMENT).is_ok_and(|value| value == "on")
 }
 
 /// The asking words that need no "to" after the name when the person asks
@@ -12768,6 +12779,41 @@ pub(crate) mod tests {
         assert_eq!(rest.as_deref(), Some("look up the weather in hanoi"));
         let (_, rest) = named_in_with_rest("Hey Lamp, Open Claw make a file", &engines, &staff);
         assert_eq!(rest.as_deref(), Some("make a file"));
+    }
+
+    /// #7269 (lamp-9b34, 13373): a lamp engine named first in the line for
+    /// something the voice has its own function for (the weather) is the
+    /// doer, as said and as "Open Claw"; the lamp's name alone, an unnamed
+    /// ask and a question about an agent name none.
+    #[test]
+    fn a_named_agent_asked_about_the_weather_is_the_doer() {
+        let engines = ["openclaw".to_owned(), "hermes".to_owned()];
+        let staff = ["Claude Code"];
+        let mut wrong: Vec<String> = Vec::new();
+        for (heard, agent) in [
+            (
+                "Hey Lamp, OpenClaw, look up the weather in Hanoi this weekend",
+                Some("OpenClaw"),
+            ),
+            (
+                "Hey Lamp. Hey Lamp, Open Claw, look up the weather in Hanoi this weekend.",
+                Some("OpenClaw"),
+            ),
+            ("Ask OpenClaw to look up the weather", Some("OpenClaw")),
+            // Named none.
+            ("Hey Lamp, what's the weather tomorrow?", None),
+            ("Look up the weather in Hanoi this weekend", None),
+            ("What is OpenClaw?", None),
+            ("Is Hermes running?", None),
+            ("Hermes, what time is it?", None),
+            ("Hey Lamp, how are you?", None),
+        ] {
+            let got = named_for_work_in(heard, &engines, &staff);
+            if got.as_deref() != agent {
+                wrong.push(format!("{heard}: {got:?}"));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
     /// #6492: the lamp's engines are whatever the tasks part reports there,
