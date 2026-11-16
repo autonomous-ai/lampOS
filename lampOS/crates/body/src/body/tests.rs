@@ -18332,7 +18332,7 @@ fn energy_level_one_is_the_unit_exactly() {
     let lively = unit.at(5);
     assert_eq!((lively.speed, lively.acceleration), (800.0, 4_800.0));
     assert_eq!(lively.stand_roll, 200.0);
-    assert_eq!(unit.at(3).stand_roll, 120.0);
+    assert_eq!(unit.at(3).stand_roll, 106.0);
     assert_eq!(unit.at(2).stand_roll, unit.stand_roll);
     // Only the speed, its acceleration and the roll standing change.
     assert_eq!(

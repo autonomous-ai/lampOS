@@ -23,7 +23,10 @@ pub struct Energy {
     /// Seconds a stand or a fold takes.
     pub stand_seconds: f32,
     /// The head's roll reach standing, counts; 0 is none (the unit's reach).
-    /// Only for a body with a stand.
+    /// Only for a body with a stand. Listening tilts 0.85 of it to a side
+    /// that alternates (`gesture::LISTENING_ROLL`), so a standing head
+    /// swings 2 x 0.85 x this, peak to peak: level 3's sits midway between
+    /// levels 1 and 5 as measured (#7314).
     pub stand_roll: u16,
     /// The shoulder and the elbow leant toward a listener, counts.
     pub listen_lean: [i16; 2],
@@ -55,7 +58,7 @@ pub const TABLE: [Energy; 5] = [
     Energy {
         speed: 550,
         stand_seconds: 5.0,
-        stand_roll: 120,
+        stand_roll: 106,
         listen_lean: [-10, -15],
         nod_share: 1.2,
         idle_share: 0.7,
@@ -63,7 +66,7 @@ pub const TABLE: [Energy; 5] = [
     Energy {
         speed: 675,
         stand_seconds: 4.5,
-        stand_roll: 160,
+        stand_roll: 153,
         listen_lean: [-20, -25],
         nod_share: 1.3,
         idle_share: 0.6,
@@ -210,6 +213,25 @@ mod tests {
         let mut words = line.split_whitespace();
         words.find(|word| *word == flag).unwrap();
         words.next().unwrap().parse().unwrap()
+    }
+
+    /// Levels 1, 3 and 5 are evenly spaced in the head's standing swing as
+    /// lamp-52e6 measured it (row-7153L2, 16 Nov, peak to peak of any head
+    /// joint while stood: 7.7, 17.9 and 23.9 degrees with level 3 at 120
+    /// counts, its roll then 2 x 0.85 x 120 = 204 counts, 17.9 degrees). The
+    /// swing is linear in `stand_roll`, so level 3 is scaled to the midpoint;
+    /// level 4 stays midway between 3 and 5 (each level's no less than the
+    /// one under it: `levels_only_go_livelier`).
+    #[test]
+    fn level_three_swings_midway_between_one_and_five() {
+        let (one, three_at_120, five) = (7.7_f32, 17.9_f32, 23.9_f32);
+        let midway = (one + five) / 2.0;
+        let roll = |level: usize| f32::from(TABLE[level - 1].stand_roll);
+        let three = three_at_120 * roll(3) / 120.0;
+        assert!((three - midway).abs() < 0.1, "level 3 swings {three} deg");
+        assert!((2.0 * 0.85 * roll(3) * 360.0 / 4096.0 - midway).abs() < 0.1);
+        assert!((roll(4) - (roll(3) + roll(5)) / 2.0).abs() <= 0.5);
+        assert!(TABLE[4].stand_roll == 200 && TABLE[..2].iter().all(|row| row.stand_roll == 0));
     }
 
     /// Level 1 is what the product unit runs today, and is applied as the

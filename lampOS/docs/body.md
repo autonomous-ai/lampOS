@@ -1088,8 +1088,8 @@ while it speaks (`energy.rs` `TABLE`):
 |---|---|---|---|
 | 1 | the unit's (`--stand-roll`, none in the product) | none | 1.0 |
 | 2 | the unit's | none | 1.1 |
-| 3 | 120 | -10/-15 | 1.2 |
-| 4 | 160 | -20/-25 | 1.3 |
+| 3 | 106 | -10/-15 | 1.2 |
+| 4 | 153 | -20/-25 | 1.3 |
 | 5 | 200 | -25/-30 | 1.4 |
 
 - **Roll.** `Limits::at` raises `stand_roll` to the level's, never under the unit's. It is the head's
@@ -1103,6 +1103,11 @@ while it speaks (`energy.rs` `TABLE`):
   tilt that swapped sides (about 340 counts) left the servo about 95 counts behind at a load of about
   210, and the head met resistance on its roll 1 and 3 times in two level-5 windows against 0 at level 1
   (lamp-52e6, row-6893g, 15 Nov).
+  Levels 1, 3 and 5 are evenly spaced in the standing head's swing: listening tilts 0.85 of the
+  roll reach to alternating sides, 2 x 0.85 x `stand_roll` peak to peak, so at 120 counts level 3 swung
+  204 counts, 17.9 degrees, against 7.7 at level 1 and 23.9 at level 5 (lamp-52e6, row-7153L2, 16 Nov).
+  Level 3 is 106 counts, about 15.8 degrees, the midpoint; level 4 is 153, midway between 3 and 5
+  (#7314, `level_three_swings_midway_between_one_and_five`).
 - **Nod.** Speaking, what Expression asks of the head (its nods as speech pauses) is scaled by the
   level's share before `EXPRESSION_REACH` cuts it, so a nod never goes past that reach (60 counts of
   pitch): on the host Expression's 30 counts nod 30 at level 1 and 42 at level 5.
