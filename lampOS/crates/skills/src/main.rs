@@ -7889,6 +7889,8 @@ mod tests {
             ends: RefCell::default(),
             unplug: RefCell::default(),
             made: RefCell::default(),
+            lively: RefCell::default(),
+            energy: Cell::new(1),
             tasks: RefCell::new(tasks),
             local_time: None,
             trust_clock: false,
