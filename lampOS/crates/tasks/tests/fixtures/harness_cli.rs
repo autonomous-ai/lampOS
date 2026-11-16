@@ -176,6 +176,17 @@ pub fn main() -> io::Result<()> {
             }
         );
     }
+    // `{"write_answer": "TEXT"}`: as a voice make's agent would (#7245),
+    // TEXT written to `answer.md` in the folder the call names (its first
+    // argument that is an absolute folder).
+    if let Some(text) = step["write_answer"].as_str()
+        && let Some(folder) = args
+            .iter()
+            .map(PathBuf::from)
+            .find(|path| path.is_absolute() && path.is_dir())
+    {
+        private_write(folder.join("answer.md"), text.as_bytes())?;
+    }
     if let Some(ms) = step["delay_ms"].as_u64() {
         thread::sleep(Duration::from_millis(ms.min(5000)));
     }
