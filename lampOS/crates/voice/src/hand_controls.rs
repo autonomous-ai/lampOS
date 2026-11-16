@@ -2174,12 +2174,31 @@ impl HandControls {
         Ok(true)
     }
 
+    /// Why a guard's mute [`Self::kept_on_stop_why`] found nothing keeping
+    /// was kept all the same: a press came while the release saved, and put
+    /// the guard back (#7368, El's P3).
+    pub const PRESSED_AS_SAVED: &'static str = "a press came as it was saved";
+
+    /// What a stop's line names (#7368) once the release ran: none when it
+    /// `released`, or the mute was not the guard's (`restored`, looked at
+    /// before it); else `why` ([`Self::kept_on_stop_why`], before it), or
+    /// with none, [`Self::PRESSED_AS_SAVED`].
+    pub fn kept_after_release(
+        restored: bool,
+        why: Option<&'static str>,
+        released: bool,
+    ) -> Option<&'static str> {
+        (restored && !released).then(|| why.unwrap_or(Self::PRESSED_AS_SAVED))
+    }
+
     /// Why a mute the restart guard restored would be kept at a stop
     /// ([`Self::release_restored_on_stop`]'s own gates), for its one
     /// journal line (#7368): a save that failed earlier, a control in
-    /// flight, or one taken and not saved. None when the mute is not the
-    /// guard's, or when nothing keeps it. Looked at before the release, so
-    /// a press that comes during its save is said by the release instead.
+    /// flight, or one taken and not saved. (With no mute record the lamp is
+    /// never muted, so no guard's mute is.) None when
+    /// the mute is not the guard's, or when nothing keeps it. Looked at
+    /// before the release, so a press that comes during its save is not one
+    /// of these: the stop says it apart ([`Self::PRESSED_AS_SAVED`]).
     pub fn kept_on_stop_why(&self) -> Option<&'static str> {
         if !self.restored_after_fault() {
             None
