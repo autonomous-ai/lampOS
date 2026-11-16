@@ -2161,7 +2161,8 @@ order is kept. A written turn is the same from the chat on.
   of the last ten minutes as "Person: …"/"You: …" lines after a note
   ("A moment ago…", `Thread::recall_for`), so without more each exchange
   in the history is told twice (#6218: a long talk's prompt near 14k
-  tokens). With `LAMP_HISTORY_SAID_ONCE=on` (off unless set) the thread
+  tokens). With `LAMP_HISTORY_SAID_ONCE=on` (off unless set, on in the product
+  unit, C131) the thread
   text leaves out every exchange the history of the same request tells,
   matched by its place in the thread as the history picked it
   (`Thread::recent_picks_for`, `Thread::recent_picks_with_room_lines`,
@@ -2174,7 +2175,7 @@ order is kept. A written turn is the same from the chat on.
   places. Scopes, the withheld name and the byte budget are as with it
   off; off, the thread text is told whole, byte for byte as before.
 - **What a stored running note holds is not told again as history**
-  (`LAMP_HISTORY_AFTER_NOTE=on`, off in the product; #6218). With
+  (`LAMP_HISTORY_AFTER_NOTE=on`, on in the product unit; #6218, C131). With
   `LAMP_CONVERSATION_SUMMARY` on, a turn's system message tells its scope's
   running note ("Earlier in this conversation"), then the thread's lines,
   and the chat is given the newest exchanges as history; off, the
