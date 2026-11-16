@@ -4190,8 +4190,9 @@ then use that person's scope:
     gets the same note: to have it kept, the person says it again at the
     lamp, known. With `LAMP_NAME_LEARN_FIX=on` (off unless set, second
     route only, #7331), a `remember` whose text gives the speaker's own name
-    (`known_faces::gives_a_name`, or `named::name_in` for the model's "The
-    user's name is Ada.") is told instead to call `remember_my_face` with
+    (`known_faces::gives_a_name`, or `named::own_name_in` for the model's
+    "The user's name is Ada.", never "Her name is Linh.", which is someone
+    else's) is told instead to call `remember_my_face` with
     that name, so the eyes take a fresh look and judge the face
     (`needs_face::withheld`, journal `TO_FACE_SAVE`, no words): on
     lamp-52e6 the owner's "my name is ..." came back not kept while a
