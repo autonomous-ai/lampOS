@@ -19474,7 +19474,8 @@ fn a_seam_hold_lost_on_the_wire_lands_on_the_next_read() {
                 Duration::from_secs(60),
             );
             let elbow = powered.lamp.servos[Joint::ElbowPitch.index()].position;
-            let case = format!("hand as load {hand_is_load}, let go {held_for} s in, the hold lost");
+            let case =
+                format!("hand as load {hand_is_load}, let go {held_for} s in, the hold lost");
             assert!(
                 (3_300.0..=4_050.0).contains(&elbow),
                 "{case}: the elbow ended at true {elbow}; stop {:?}",

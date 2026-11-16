@@ -4538,9 +4538,13 @@ fn follow_hand<P: PortIo, R: Runtime>(
         let arm = ARM.map(|joint| {
             let at = now[joint.index()].position;
             // A joint whose status is flagged is not followed: its reading
-            // is not trusted, and it holds its last goal.
+            // is not trusted, and it holds its last goal, unless that goal
+            // is across the seam from where it reads, which would drive it
+            // the long way: then it is held where it reads (Migrate's P2 on
+            // #6836).
             if now[joint.index()].status != 0
                 && let Some(goal) = bus.goals[joint.index()]
+                && goal.abs_diff(at) <= 2_048
             {
                 return goal;
             }
