@@ -101,10 +101,16 @@ pub enum MicrophoneDevice {
     #[default]
     Board,
     Bus,
+    /// A microphone that hears nothing (`silent_capture`). Never parsed from `--microphone-device`
+    /// by `serve` or `directed`: only `directed-fixture`'s parser sets it
+    /// (`fixture_provider::FixtureOptions::parse`).
+    Silent,
 }
 impl MicrophoneDevice {
     /// The one spelling `--microphone-device` takes.
     pub const BUS_MIC1: &'static str = "bus:mic1";
+    /// What `directed-fixture` alone takes for no sound at all.
+    pub const SILENT: &'static str = "silent";
 }
 impl FromStr for MicrophoneDevice {
     type Err = io::Error;
@@ -467,6 +473,7 @@ impl DirectedOptions {
         match self.microphone_device {
             MicrophoneDevice::Board => self.microphone.device(),
             MicrophoneDevice::Bus => MicrophoneDevice::BUS_MIC1,
+            MicrophoneDevice::Silent => MicrophoneDevice::SILENT,
         }
     }
 

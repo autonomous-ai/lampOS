@@ -352,6 +352,36 @@ thread, wait or copy beyond the one into the message. The sound the
 subscriber hears is the voice's pace plus its own buffering; the queue adds at
 most its 40 ms of depth.
 
+## `directed-fixture` on a Mac takes no host sound (C5a)
+
+`lamp-voice directed-fixture` is the one voice entry a Mac has (`main.rs`, `cfg(unix)`; `serve`,
+`directed`, `camera-inspect` and the camera and sleep workers stay Linux only). Off Linux it takes **no
+host sound**, refused by name before any worker starts (`FixtureOptions::refuse_host_sound_off_linux`,
+called first in `run_fixture`): the microphone is `--microphone-device silent` (`silent_capture.rs`:
+zeros at the 16 kHz real-time pace, no bus, no card; not even `bus:mic1`, which a host microphone
+could be published on) and the speaker is `--speaker-device bus:speaker1`. Only `directed-fixture`'s
+parser takes the word `silent`; `serve` and `directed` refuse it, and on Linux nothing is refused.
+
+The privacy gate is not skipped: a finite run spawns the `privacy` worker too, and on a Mac it is the
+bus one. `LAMP_PRIVACY_CONTROLS=no-slide` with `LAMP_BUS_ROOT` is the route a lamp with no slide runs;
+`refuse_no_slide_without_mute` then needs the software mute's record, so `FixtureOptions::parse` takes
+`--controls-mute RECORD` and no other hand-controls flag (`--controls-stop`, `--controls-bus-root` and
+the head pads are still refused). That route needs lamp-controls' no-slide `controls/state` fresh on
+the bus; with no publisher the privacy worker reports its source expired and the run ends closed (run
+on a Linux laptop: "privacy switch unreadable: physical privacy source expired", exit 1). Off Linux
+`lamp_controls::runtime::clock_id(None)` is the macOS boot session uuid (`kern.bootsessionuuid`, the
+id lamp-sim and lamp-body use there), where it read `/proc` before and ended the start with a bare
+"No such file or directory".
+
+**A Mac start is not proven yet.** The `sim-macos` job's step proves the four refusals (a host
+microphone, the bus microphone, a missing speaker, a host card are each refused by name, with no
+output folder made). A full start was tried four times on a Mac: the fourth run reached
+`listening_ready` with lamp-sim `--controls` beside it and then ended on a reference fault
+(`ReferenceLate` after 17 capture blocks), and its cleanup read ECONNRESET (os error 54) from the
+gone workers as failures (`coordinator.rs`, the cleanup's control receive). Those are C5b's. Until
+then a Mac fixture run ends with exit 1 after `listening_ready`, and the real voice with a host
+microphone on a Mac waits for the Mac privacy rule (#6811).
+
 ## Not done
 
 - **The speaker worker on a non-Linux host.** `pcm.rs` is still Linux only
