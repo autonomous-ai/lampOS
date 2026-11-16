@@ -3650,7 +3650,14 @@ default agent is, never by its name (`skill_task::AgentRun`):
   plain, the turn must carry `{message}` and `fence-entry` must be a JSON
   object with `{start}`; else the run is refused in words ("is a gateway agent's,
   but ..."). The gateway's namespace must show lamp-control's socket
-  (`AGENT_NS_TASKS_LINE`): else refused, naming lamp-update's
+  (`AGENT_NS_TASKS_LINE`). With the one run path on, the gateway starts after
+  and wants lamp-control, then waits for the actual socket before capturing
+  its mount view (up to 60 one-second waits). Still missing, it logs one line
+  and starts without it (a lamp before setup has no lamp-control); the off
+  path and install/version calls do not wait. A later socket replacement
+  still needs a gateway restart. The first round after this update rewrites
+  the namespace script and the unit and restarts the gateway once. Otherwise refused,
+  naming lamp-update's
   `LAMP_SKILL_DEFAULT_AGENT` or `LAMP_SKILL_TASKS`. No login-shell lookup
   is made: Harness starts nothing; lamp-tasks runs the wrapper itself, by
   its full path. OpenClaw is the one gateway agent today: lamp-update
