@@ -110,6 +110,23 @@ fn an_unbooked_conditional_plan_accepts_no_not_undecided() {
     assert_eq!(q.score(&a).unwrap().fraction, Some(1.0));
 }
 #[test]
+fn last_week_probes_refuse_this_weeks_monday() {
+    let c = corpus::generate(persona()).unwrap();
+    let say = |text: &str| Answer {
+        answer: text.into(),
+        evidence_ids: vec![],
+        abstain: false,
+    };
+    for id in ["q203", "q204"] {
+        let q = c.questions.iter().find(|q| q.id == id).unwrap();
+        assert!(q.query.heard.starts_with("Last week,"));
+        assert_eq!(q.score(&say("2030-04-28")).unwrap().fraction, Some(1.0));
+        for wrong in ["2030-04-29", "2030-04-27"] {
+            assert_eq!(q.score(&say(wrong)).unwrap().fraction, Some(0.0));
+        }
+    }
+}
+#[test]
 fn rejecting_a_bad_recommendation_is_not_a_literal_disclosure() {
     let c = corpus::generate(persona()).unwrap();
     let q = c
