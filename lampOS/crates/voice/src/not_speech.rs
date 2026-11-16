@@ -293,6 +293,149 @@ pub fn was_a_sound(speech_blocks: usize, took_over: bool, since_own_words_us: Op
         && since_own_words_us.is_none_or(|since| since >= AFTER_OWN_WORDS_US)
 }
 
+/// Where the voice reads whether a short line is let through while the
+/// lamp awaits an answer ([`ANSWER_AWAITED_FILE`], #6840). `on` only: off
+/// until it is played on a lamp. On lamp-9adf a held calendar move's
+/// "Yes.", said 4 s or more after its long read-back ended and under
+/// [`SCRAP_BLOCKS`], was thrown out here as a sound in a busy room, for the
+/// gate never knew the lamp had asked for it.
+pub const SHORT_YES_AWAITED_ENVIRONMENT: &str = "LAMP_SHORT_YES_AWAITED";
+
+/// Where a worker tells the coordinator, a process apart, that an answer
+/// is awaited: a services write waits for its yes after its read-back
+/// (`services::awaits_an_answer`), or a made skill's writes wait for theirs
+/// (`skill_write_yes::awaited`). Its `until_unix_ms` is the wall-clock time
+/// the wait ends. Written whole, 0600, in the voice's own runtime folder,
+/// as `skill_write_yes::CODE_AWAITED_FILE`, and removed once none waits.
+pub const ANSWER_AWAITED_FILE: &str = "/run/lampos-voice/answer-awaited.json";
+
+/// Whether the environment lets a short line through while an answer is
+/// awaited.
+pub fn short_yes_awaited_from_environment() -> bool {
+    short_yes_awaited(std::env::var(SHORT_YES_AWAITED_ENVIRONMENT).ok().as_deref())
+}
+
+fn short_yes_awaited(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// The switch, as the voice has it, for `worker_command`: a worker starts
+/// with a cleared environment, and it is the worker that writes the file.
+pub fn short_yes_awaited_passed_on() -> Vec<(&'static str, std::ffi::OsString)> {
+    std::env::var_os(SHORT_YES_AWAITED_ENVIRONMENT)
+        .map(|value| (SHORT_YES_AWAITED_ENVIRONMENT, value))
+        .into_iter()
+        .collect()
+}
+
+/// Whether the file at `path` says an answer is awaited at `now_unix_ms`:
+/// none when it is missing, unreadable or past its `until_unix_ms`.
+pub fn answer_awaited_in(path: &std::path::Path, now_unix_ms: u64) -> bool {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|told| told.get("until_unix_ms")?.as_u64())
+        .is_some_and(|until| now_unix_ms < until)
+}
+
+/// Whether an utterance that has just ended is excused from being judged a
+/// sound, as [`was_a_sound`]'s `took_over`: it took over a turn, or it is
+/// short and an answer is awaited (`awaited_file`, only with
+/// [`SHORT_YES_AWAITED_ENVIRONMENT`] on). The file is read only for a short
+/// one, at its end.
+pub fn excused(
+    took_over: bool,
+    speech_blocks: usize,
+    awaited_file: Option<&std::path::Path>,
+    now_unix_ms: u64,
+) -> bool {
+    took_over
+        || (speech_blocks < SCRAP_BLOCKS
+            && awaited_file.is_some_and(|path| answer_awaited_in(path, now_unix_ms)))
+}
+
+/// Which wait is told in [`ANSWER_AWAITED_FILE`]: each worker's wait is
+/// kept apart, and the file says the later of them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Awaits {
+    /// A services write's yes after its read-back.
+    Write = 0,
+    /// A made skill's writes' yes.
+    SkillYes = 1,
+}
+
+#[cfg(not(test))]
+mod told {
+    use std::{path::PathBuf, sync::Mutex};
+    static UNTIL: Mutex<[Option<u64>; 2]> = Mutex::new([None; 2]);
+    static FILE: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+    pub fn until<R>(f: impl FnOnce(&mut [Option<u64>; 2]) -> R) -> R {
+        f(&mut UNTIL
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()))
+    }
+    pub fn file() -> Option<PathBuf> {
+        FILE.get_or_init(|| {
+            super::short_yes_awaited_from_environment()
+                .then(|| PathBuf::from(super::ANSWER_AWAITED_FILE))
+        })
+        .clone()
+    }
+}
+
+/// Tests: each test thread has its own, and none is written unless a test
+/// names where.
+#[cfg(test)]
+mod told {
+    use std::{cell::RefCell, path::PathBuf};
+    thread_local! {
+        static UNTIL: RefCell<[Option<u64>; 2]> = const { RefCell::new([None; 2]) };
+        static FILE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+    }
+    pub fn until<R>(f: impl FnOnce(&mut [Option<u64>; 2]) -> R) -> R {
+        UNTIL.with(|cell| f(&mut cell.borrow_mut()))
+    }
+    pub fn file() -> Option<PathBuf> {
+        FILE.with(|cell| cell.borrow().clone())
+    }
+    pub fn set_file(path: Option<PathBuf>) {
+        FILE.with(|cell| *cell.borrow_mut() = path);
+        UNTIL.with(|cell| *cell.borrow_mut() = [None; 2]);
+    }
+}
+
+/// Tests: where this thread's awaited answer is told; none, nowhere.
+#[cfg(test)]
+pub fn set_answer_awaited_file_here(path: Option<std::path::PathBuf>) {
+    told::set_file(path);
+}
+
+/// A worker's wait `source` changed: it ends at `until_unix_ms`, or none
+/// waits. [`ANSWER_AWAITED_FILE`] is written whole with the later of the
+/// waits, or removed once none is left. Only with
+/// [`SHORT_YES_AWAITED_ENVIRONMENT`] on; one not written leaves a short line
+/// judged as before, never an answer awaited that isn't.
+pub fn awaited_told(source: Awaits, until_unix_ms: Option<u64>) {
+    let Some(path) = told::file() else {
+        return;
+    };
+    let until = told::until(|until| {
+        until[source as usize] = until_unix_ms;
+        until.iter().flatten().max().copied()
+    });
+    match until {
+        Some(until) => {
+            let told = serde_json::json!({ "until_unix_ms": until });
+            if let Err(error) = crate::thread::write_file(&path, &told.to_string()) {
+                eprintln!("lamp-voice: an awaited answer isn't told to the coordinator: {error}");
+            }
+        }
+        None => {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+}
+
 /// A block this loud or louder (about -31 dBFS, on the face's scale) counts
 /// as speech-like in an utterance said close to the lamp, whatever the
 /// detector scored it.
@@ -1139,6 +1282,81 @@ fn unclear_in(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn awaited_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("lamp-awaited-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// #6840 on lamp-9adf: a held move's "Yes." of 25 blocks, 6 s after the
+    /// read-back ended, in a busy room with short sounds checked, was
+    /// dropped as a sound. While the worker tells an answer awaited it is
+    /// sent; with no file, an expired one, or the switch off it is dropped
+    /// as before.
+    #[test]
+    fn a_short_yes_awaited_is_sent_not_dropped() {
+        let dir = awaited_dir("gate");
+        let file = dir.join("answer-awaited.json");
+        let now = 1_000_000_000;
+        let ended = |awaited: Option<&std::path::Path>| {
+            dropped(
+                25,
+                excused(false, 25, awaited, now),
+                Some(6_000_000),
+                None,
+                true,
+                true,
+                false,
+            )
+        };
+        // No file: dropped.
+        assert!(ended(Some(&file)));
+        std::fs::write(&file, r#"{"until_unix_ms":1000060000}"#).unwrap();
+        // Awaited: sent.
+        assert!(!ended(Some(&file)));
+        // Switch off: the file is never read, and it is dropped.
+        assert!(ended(None));
+        // Expired: dropped.
+        std::fs::write(&file, r#"{"until_unix_ms":1000000000}"#).unwrap();
+        assert!(ended(Some(&file)));
+        // Unreadable: dropped.
+        std::fs::write(&file, "not json").unwrap();
+        assert!(ended(Some(&file)));
+        // A long utterance is never excused by it: it needs no excuse.
+        std::fs::write(&file, r#"{"until_unix_ms":1000060000}"#).unwrap();
+        assert!(!excused(false, SCRAP_BLOCKS, Some(&file), now));
+        assert!(excused(true, 25, None, now));
+        assert!(short_yes_awaited(Some("on")));
+        assert!(!short_yes_awaited(None));
+        assert!(!short_yes_awaited(Some("1")));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The file says the later of the two waits, and goes once neither
+    /// waits; with no file named (the switch off) nothing is written.
+    #[test]
+    fn the_awaited_file_is_written_and_removed() {
+        let dir = awaited_dir("told");
+        let file = dir.join("answer-awaited.json");
+        set_answer_awaited_file_here(None);
+        awaited_told(Awaits::Write, Some(5_000));
+        assert!(!file.exists());
+        set_answer_awaited_file_here(Some(file.clone()));
+        awaited_told(Awaits::Write, Some(5_000));
+        assert!(answer_awaited_in(&file, 4_999));
+        assert!(!answer_awaited_in(&file, 5_000));
+        awaited_told(Awaits::SkillYes, Some(9_000));
+        assert!(answer_awaited_in(&file, 8_000));
+        awaited_told(Awaits::SkillYes, None);
+        assert!(!answer_awaited_in(&file, 8_000));
+        assert!(answer_awaited_in(&file, 4_000));
+        awaited_told(Awaits::Write, None);
+        assert!(!file.exists());
+        set_answer_awaited_file_here(None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     /// The owner's language (#4473): a Vietnamese lamp still asks again for
     /// a turn in another script, and takes a Vietnamese cut-in as said;

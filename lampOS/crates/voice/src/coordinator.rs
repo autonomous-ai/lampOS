@@ -6622,6 +6622,10 @@ fn conversation_with_gate_inner(
     // Short utterances in a room that is not busy go to the model after all
     // (`LAMP_SHORT_SOUNDS=quiet-room`, off unless set).
     let short_sounds = crate::not_speech::short_sounds_from_environment();
+    // A short line while a worker awaits an answer (#6840), read only with
+    // `LAMP_SHORT_YES_AWAITED=on`.
+    let answer_awaited_file = crate::not_speech::short_yes_awaited_from_environment()
+        .then(|| std::path::PathBuf::from(crate::not_speech::ANSWER_AWAITED_FILE));
     // A new sound waits while an answer is awaited unheard
     // (`LAMP_WAIT_KEEPS_ANSWER=on`, #1123), and the candidate it was last
     // recorded for, so that the record says so once. With `words`, its
@@ -11359,7 +11363,12 @@ fn conversation_with_gate_inner(
                             && early.due(turn, detector.pause_blocks())
                             && !crate::not_speech::was_a_sound(
                                 speech_levels.len(),
-                                took_over_turn == Some(turn),
+                                crate::not_speech::excused(
+                                    took_over_turn == Some(turn),
+                                    speech_levels.len(),
+                                    answer_awaited_file.as_deref(),
+                                    crate::app_make::now_unix_ms(),
+                                ),
                                 crate::not_speech::own_words_ago(
                                     last_spoke_us,
                                     stopped_at_us,
@@ -11545,7 +11554,12 @@ fn conversation_with_gate_inner(
                         near_call_turn == Some(current.owner.turn())
                             || crate::not_speech::dropped(
                                 speech_levels.len(),
-                                took_over_turn == Some(current.owner.turn()),
+                                crate::not_speech::excused(
+                                    took_over_turn == Some(current.owner.turn()),
+                                    speech_levels.len(),
+                                    answer_awaited_file.as_deref(),
+                                    crate::app_make::now_unix_ms(),
+                                ),
                                 crate::not_speech::own_words_ago(
                                     last_spoke_us,
                                     stopped_at_us,
@@ -11698,7 +11712,12 @@ fn conversation_with_gate_inner(
                             said_at_us = Some(monotonic_us());
                         } else if crate::not_speech::was_a_sound(
                             speech_levels.len(),
-                            took_over_turn == Some(current.owner.turn()),
+                            crate::not_speech::excused(
+                                took_over_turn == Some(current.owner.turn()),
+                                speech_levels.len(),
+                                answer_awaited_file.as_deref(),
+                                crate::app_make::now_unix_ms(),
+                            ),
                             crate::not_speech::own_words_ago(
                                 last_spoke_us,
                                 stopped_at_us,

@@ -1589,6 +1589,18 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   nothing changes. On lamp-9adf
   on 13 Nov the owner's "Yes." to a calendar move came back as 0 words and
   the write was dropped at the next line.
+- **A short yes said late isn't a sound** (#6840, `LAMP_SHORT_YES_AWAITED=on`,
+  off unless set). The coordinator's not-speech gate runs in another
+  process and never knew a write waits: a "Yes." under 30 speech blocks,
+  4 s or more after the read-back ended, in a busy room, was thrown out as
+  a sound before any words were heard (lamp-9adf, 13 Nov). With the
+  switch, while a write waits for the reply its read-back asked for
+  (`awaits_an_answer`), or a made skill's writes wait for their yes
+  (`skill_write_yes::awaited`), the worker keeps
+  `/run/lampos-voice/answer-awaited.json` with the wait's end
+  (`until_unix_ms`), written whole and removed once none waits, and a short
+  line heard while it says so is excused from the gate as a take-over is
+  (`not_speech::excused`, docs/not-speech.md).
 - **No nudge, no lamp-said cancel.** The lamp's own "Say 'send it' to send
   it." nudge (`SAY_SEND_IT`, `nudge_waiting`; a draft's "Say 'save it' to
   save the draft.", `SAY_SAVE_IT`) and its own "Okay, cancelled. Nothing was

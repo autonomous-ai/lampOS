@@ -73,6 +73,17 @@ treated so:
   another was let through, and so was a sound that followed a sound: two
   of 25 and 26 blocks, a second apart, got "I'm here if you need
   anything." Taking over from a sound now excuses nothing.
+- with `LAMP_SHORT_YES_AWAITED=on` (off unless set, #6840), one heard
+  while a worker awaits an answer: a services write's read-back waiting
+  for its reply (`services::awaits_an_answer`) or a made skill's writes
+  waiting for their yes (`skill_write_yes::awaited`). The worker, a
+  process apart, writes `/run/lampos-voice/answer-awaited.json` with the
+  wait's end (`until_unix_ms`), whole, and removes it once none waits; at
+  a short utterance's end, early or sure, the coordinator reads it and
+  excuses the utterance as a take-over (`not_speech::excused`). One gone,
+  past its end or unreadable excuses nothing. On lamp-9adf on 13 Nov a
+  held calendar move's "Yes.", 4 s or more after its long read-back and
+  under 30 blocks, was thrown out here in a busy room.
 
 What it does not catch: sounds of 30 blocks and more (two of the fourteen
 had 31 and 33; the real "How you doing?" had 34, so there is little room
