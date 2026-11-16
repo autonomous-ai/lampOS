@@ -70,7 +70,7 @@ own: a skill naming it shows the `seen_more` use, private and apart from
 yet.
 `humans/doing`'s three timers are always said, counted from the desk
 arrival when nothing was seen, so `[[while]] topic = "humans/doing" field =
-"drank_s_ago" above = 5399 unknown = "holds_stale"` holds for someone the
+"drank_s_ago" above = 1799 unknown = "holds_stale"` holds for someone the
 lamp has not seen drink, as the clock alone would; each `humans/posture`
 said has `window_s` (0 at its start), and it is not said while lamp-seen's
 window holds no sample (frames not going out, the server busy, a wipe), so it
@@ -80,8 +80,8 @@ no `[[while]]` with `unknown = "holds"`, which covers only a topic never said;
 
 Five shipped skills read them so (#6543, the skill side), each with
 `unknown = "holds_stale"`, so without `lamp-seen`, or with it gone quiet,
-each runs exactly as before: A sip of water (`drank_s_ago` above 5399, and
-2999 in its `[present]`), Stand up (`break_s_ago` above 5999), Stretch break
+each runs exactly as before: A sip of water (`drank_s_ago` above 1799, its
+triggers' 30 minutes, in both blocks), Stand up (`break_s_ago` above 5999), Stretch break
 (`break_s_ago` above 1799: its yawn `sooner`'s 30 minutes, not its own 50, so
 a yawn still brings it forward), A meal check (`ate_s_ago` above 4499, its
 triggers' 75 minutes; version 1.1.0) and Sit back (`humans/posture`'s
