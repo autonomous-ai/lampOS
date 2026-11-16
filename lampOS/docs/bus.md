@@ -671,7 +671,7 @@ are unchanged.
 | Topic | Kind | Published by | Intended reader |
 |---|---|---|---|
 | `tasks/status` | latest, no period, no lifespan | `lamp-tasks serve --progress` | The policy's progress question (`lamp-policy --progress`); the voice's task news, for a task newly settled (#560, [tasks.md](tasks.md), "Telling") and, with `LAMP_PROGRESS_NEWS=on`, for progress; `lamp-peek`'s Tasks section and overview, read as the kept value ([peek.md](peek.md), #7208) |
-| `tasks/step` | event, no period, no lifespan | Nothing yet: declared ahead of its publisher, `lamp-tasks` reading the engine's own transcript behind a switch, off unless set (#7267 PR 2) | `lamp-peek`, in every mode; only a step's arguments and result need monitor mode (#7267 PR 3) |
+| `tasks/step` | event, no period, no lifespan | `lamp-tasks serve` with `LAMP_TASKS_STEPS=on` (off unless set, off in the product): a watched OpenClaw task's steps read from its session in OpenClaw's SQLite (read-only) every second, from its own `seq` on; a call twice, running then with its result, the latest per `(task, n)` winning; at most 50 a task; never a skill's to read ([tasks.md](tasks.md), "An agent's steps", #7267) | `lamp-peek`, in every mode; only a step's arguments and result need monitor mode (#7267 PR 3) |
 
 The [`TaskStatus` message](msgs.md#the-tasks-contract) says, as typed state,
 how each piece of work the lamp handed over is going; the agent's words stay
