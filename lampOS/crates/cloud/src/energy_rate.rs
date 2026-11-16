@@ -5,14 +5,21 @@
 //! are new: once per save, never per turn. A level the owner picked in the
 //! app (`chosen`) is never asked about. Any failure, a timeout
 //! ([`WITHIN`]) or an answer that is not one digit from 1 to 5 is level 1,
-//! as the lamp always moved. No word of the owner's is ever logged.
+//! as the lamp always moved, but not kept: the same words are asked again
+//! after [`RETRY_FIRST`], the wait doubling up to [`RETRY_CAP`]. No word of
+//! the owner's is ever logged.
 use serde_json::{Value, json};
 use std::time::Duration;
+use tokio::time::Instant;
 
 /// The switch.
 pub const SWITCH: &str = "LAMP_ENERGY_FROM_MODEL";
 /// The longest one rating is waited for, its one retry included.
 pub const WITHIN: Duration = Duration::from_secs(10);
+/// The wait after a failed rating before the same words are asked again.
+pub const RETRY_FIRST: Duration = Duration::from_secs(60);
+/// The longest that wait grows to, doubling after each failure.
+pub const RETRY_CAP: Duration = Duration::from_secs(30 * 60);
 
 /// Whether the switch is exactly `on`.
 pub fn on_from(value: Option<&str>) -> bool {
@@ -62,7 +69,8 @@ fn text_of(body: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Asks the model, and remembers the last words it rated and their level.
+/// Asks the model, and remembers the last words it rated and their level,
+/// or when a failed rating of them may be asked again.
 pub struct Rater {
     base: String,
     key: String,
@@ -70,6 +78,11 @@ pub struct Rater {
     // ponytail: in memory only, so a restart of lamp-cloud asks once more
     // for the same words; keep it in the state folder if that matters.
     last: Option<(String, u8)>,
+    // The words that failed, when they may be asked again, and the wait
+    // after the next failure.
+    // ponytail: a dead relay is still asked every 30 min (RETRY_CAP) for as
+    // long as lamp-cloud runs; stop asking if that ever costs.
+    failed: Option<(String, Instant, Duration)>,
 }
 
 impl Rater {
@@ -91,18 +104,28 @@ impl Rater {
             key: key.trim().to_owned(),
             client,
             last: None,
+            failed: None,
         })
     }
 
     /// The level for `words`: the one rated last when they are the same
     /// words, else asked once (one retry, the relay's 404s come and go),
-    /// 1 on any failure.
+    /// 1 on any failure, and 1 without asking while a failure's wait runs.
     pub async fn level(&mut self, words: &str) -> u8 {
+        self.level_at(words, Instant::now()).await
+    }
+
+    async fn level_at(&mut self, words: &str, now: Instant) -> u8 {
         if let Some((rated, level)) = &self.last
             && rated == words
         {
             return *level;
         }
+        let wait = match &self.failed {
+            Some((failed, again, _)) if failed == words && now < *again => return 1,
+            Some((failed, _, wait)) if failed == words => *wait,
+            _ => RETRY_FIRST,
+        };
         let level = tokio::time::timeout(WITHIN, async {
             for _ in 0..2 {
                 if let Some(level) = self.ask(words).await {
@@ -113,10 +136,18 @@ impl Rater {
         })
         .await
         .ok()
-        .flatten()
-        .unwrap_or(1);
-        self.last = Some((words.to_owned(), level));
-        level
+        .flatten();
+        match level {
+            Some(level) => {
+                self.last = Some((words.to_owned(), level));
+                self.failed = None;
+                level
+            }
+            None => {
+                self.failed = Some((words.to_owned(), now + wait, (wait * 2).min(RETRY_CAP)));
+                1
+            }
+        }
     }
 
     async fn ask(&self, words: &str) -> Option<u8> {
@@ -207,5 +238,37 @@ mod tests {
         let mut gone = Rater::new("http://127.0.0.1:9/v1/deepseek", "key").unwrap();
         assert_eq!(gone.level("joyful").await, 1);
         assert!(Rater::new(&base, " ").is_err());
+    }
+
+    /// #7314: a failed rating is level 1 for now but not kept: the same words
+    /// are asked again only after the wait, which doubles; a success is kept.
+    #[tokio::test]
+    async fn a_failure_is_asked_again_after_a_wait_and_a_success_is_kept() {
+        use std::sync::atomic::Ordering;
+        let (base, asked) =
+            relay("data: {\"choices\":[{\"delta\":{\"content\":\"oops\"}}]}\n\n").await;
+        let mut rater = Rater::new(&base, "key").unwrap();
+        let start = Instant::now();
+        assert_eq!(rater.level_at("joyful", start).await, 1);
+        assert_eq!(asked.load(Ordering::SeqCst), 2, "one ask, one retry");
+        assert_eq!(rater.level_at("joyful", start + RETRY_FIRST / 2).await, 1);
+        assert_eq!(asked.load(Ordering::SeqCst), 2, "not asked before the wait");
+        let later = start + RETRY_FIRST;
+        assert_eq!(rater.level_at("joyful", later).await, 1);
+        assert_eq!(
+            asked.load(Ordering::SeqCst),
+            4,
+            "asked again after the wait"
+        );
+        assert_eq!(rater.level_at("joyful", later + RETRY_FIRST).await, 1);
+        assert_eq!(asked.load(Ordering::SeqCst), 4, "the wait doubled");
+
+        // The relay comes back: the model's level, then kept.
+        let (good, asked) =
+            relay("data: {\"choices\":[{\"delta\":{\"content\":\"4\"}}]}\n\n").await;
+        rater.base = good.trim_end_matches('/').to_owned();
+        assert_eq!(rater.level_at("joyful", later + RETRY_FIRST * 2).await, 4);
+        assert_eq!(rater.level_at("joyful", later + RETRY_CAP * 9).await, 4);
+        assert_eq!(asked.load(Ordering::SeqCst), 1, "a success is kept");
     }
 }
