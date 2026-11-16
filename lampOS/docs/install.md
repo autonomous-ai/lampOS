@@ -680,8 +680,14 @@ reads itself:
   a user namespace to a chrooted process, and the Hermes and OpenClaw
   installs try theirs as `lampos` first (`no_userns`). The factory reset
   keeps the programs and wipes only the person's state (`forget_agents`).
-  Their size: Hermes about 2.4 GB, Harness about 0.4 GB; the image is built
-  at 12G (OpenClaw's install wants 2 GiB free in `/var/lib`). A lamp-update
+  Their size: Hermes about 2.4 GB, OpenClaw about 1.1 GB, Harness about
+  0.4 GB; the image is built at 12G (OpenClaw's install wants 2 GiB free in
+  `/var/lib`), so the card must hold 12 GB, and resize-once grows the root to
+  it at first boot. A set-up lamp has the same parts either way (they install
+  in its first hour otherwise): lamp-e82d on 13373 used 7.6 GB. On the 16 GB
+  card the lamps ship with, about 14.5 GB is usable, so about 7.5 GB stays
+  free; an update keeping the old build beside the new needs under 0.7 GB
+  more (all of `/opt/lampOS`, both builds, was 655 MB). A lamp-update
   from before #7274 has no `agents-preinstall`, and the imager makes the
   image without the agents, as before.
 
