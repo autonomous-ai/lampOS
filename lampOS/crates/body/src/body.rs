@@ -7872,7 +7872,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         let eased = if rising {
                             is.position + STAND_EASE_MARGIN
                         } else {
-                            is.position - STAND_EASE_MARGIN
+                            is.position.saturating_sub(STAND_EASE_MARGIN)
                         };
                         if eased.abs_diff(measured) <= STAND_EASE_FLOOR {
                             if let Some(up) = standing.as_mut() {
