@@ -9594,6 +9594,50 @@ fn an_uncertain_make_new_is_closed_in_its_folder_and_never_made_twice() {
     assert_eq!(hermes.0.load(Ordering::Acquire), 0);
 }
 
+/// #7245: a make whose `harness new` is uncertain, with nothing live in its
+/// folder at first, is looked for again: the session Harness makes there a
+/// little later is closed `--now`, then the folder removed.
+#[test]
+fn an_uncertain_make_new_made_after_the_first_look_is_still_closed() {
+    let late = "44444444-4444-4444-8444-444444444444";
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"stdout":json!({"ok":true,"machineId":MACHINE,"agent":{
+            "id":AGENT,"name":"make","engine":"openclaw","permissionMode":"auto","bypassPermission":true}}).to_string()},
+        "ps":{"each":[
+            {"stdout":json!({"harnesses":[]}).to_string()},
+            {"live_in_new_folder":late},
+        ]},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered["ok"], false, "{answered}");
+    assert_eq!(calls_of_verb(&rig, "new").len(), 1, "never made twice");
+    assert_eq!(calls_of_verb(&rig, "ps").len(), 2, "looked again once");
+    let closes = calls_of_verb(&rig, "close");
+    assert_eq!(closes.len(), 1, "{closes:?}");
+    assert_eq!(
+        closes[0]["args"],
+        json!(["close", "--machine", MACHINE, late, "--now", "--json"])
+    );
+    assert_eq!(
+        fs::read_dir(&work).unwrap().count(),
+        0,
+        "the folder is gone"
+    );
+}
+
 /// #7245: a gateway make that can't start because the gateway isn't ready
 /// is told to the person at once, `not_ready` with the lamp's short words,
 /// never a silent failure: no `new`, and its folder gone.
