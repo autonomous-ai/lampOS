@@ -6707,8 +6707,8 @@ async fn a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one(
 /// #7346 (lamp-74ff, 16 Nov 18:00-19:07): the relay out of its usage limit
 /// answered 429 for over an hour and the lamp kept promising "a moment".
 /// 429s with no answer between, spanning [`LIMIT_AFTER`], say
-/// [`DOWN_LINE_LIMIT`] instead of the slow line: at most once in
-/// [`DOWN_LINE_EVERY`], never twice in a row; an answered turn ends the
+/// [`DOWN_LINE_LIMIT`] instead of the slow line: once a run of 429s,
+/// then nothing; an answered turn ends the
 /// streak; 503s that last as long keep the slow line; a written turn never
 /// says it; with the down line off, nothing.
 #[tokio::test(start_paused = true)]
@@ -6785,15 +6785,15 @@ async fn a_429_that_lasts_says_the_usage_limit_line_not_the_slow_one() {
     );
     assert!(
         !on[4].contains(&limit) && !slow(&on[4]),
-        "never twice in a row within the minute, nor the slow line: {on:?}"
+        "never twice in a run, nor the slow line: {on:?}"
     );
     assert!(
         !on[5].contains(&limit) && !slow(&on[5]),
         "a written turn: {on:?}"
     );
     assert!(
-        on[6].contains(&limit) && !slow(&on[6]),
-        "past the minute: {on:?}"
+        !on[6].contains(&limit) && !slow(&on[6]),
+        "once a run, past the minute too: {on:?}"
     );
     assert!(!on[7].contains(&limit), "answered: {on:?}");
     assert!(
