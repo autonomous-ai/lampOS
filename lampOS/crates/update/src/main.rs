@@ -510,9 +510,24 @@ fn agents_preinstall(options: &BTreeMap<String, String>) -> Result<(), String> {
     if !product::product_lamp(root, Path::new(lamp_update::install::UNITS)) {
         return Err("not a product lamp: run `lamp-update install --setup on` first".into());
     }
-    let switches =
-        lamp_update::switches::update_switches(root, true, |name| std::env::var_os(name));
-    let wanted = preinstall::wanted(true, switches, &|name| std::env::var(name).ok());
+    // lamp-update's own unit's environment, as a round on this image will
+    // run with it; one set here wins, as for a round started by hand.
+    let unit = preinstall::unit_environment(root);
+    let env = |name: &str| {
+        std::env::var(name).ok().or_else(|| {
+            unit.iter()
+                .find(|(set, _)| set == name)
+                .map(|(_, value)| value.clone())
+        })
+    };
+    let switches = lamp_update::switches::update_switches(root, true, |name| {
+        env(name).map(std::ffi::OsString::from)
+    });
+    let wanted = preinstall::wanted(true, switches, &env);
+    say(&format!(
+        "the agents pre-install: Hermes shows {:?}, OpenClaw {:?}",
+        wanted.hermes.1, wanted.openclaw.1
+    ));
     if preinstall::write_units(root, &wanted)? {
         say("the agents pre-install: OpenClaw's gateway unit written, as a round writes it");
     }
