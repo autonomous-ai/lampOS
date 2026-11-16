@@ -2857,13 +2857,18 @@ for each run, and is answered once the run ends
   skills due at one minute both run, one after the other. Nothing here
   changes for it.
 - **What its agent found** (`tells_answer`): with `LAMP_AGENT_SERVICES=on`
-  here, a run granted a linked service's read (`gmail-read`) that ended
-  well answers `{"ok":true,"id":N,"answer":"..."}`, the agent's last
+  here, a run granted a linked service's read (`gmail-read`) through a
+  runner that keeps its agent's answer (`Runner::answers`: Harness's, not
+  for a run it starts with no Harness) that ended well answers
+  `{"ok":true,"id":N,"answer":"..."}`, the agent's last
   answer as the run's end `show` gave it (`--chars 4000`, `Cli::shown_end`;
   for a `stopped` end, the `show` that found its session bound), every run
   of whitespace or control characters one space, at most 3,000 bytes
-  (`told_answer`, `MOST_TOLD_BYTES`). Its words end with `TELL_LINE`, so
-  the agent ends with a few plain sentences for the owner. lamp-skills says
+  (`told_answer`, `MOST_TOLD_BYTES`). Its words, and only such a run's
+  (`SkillRun::prompt_telling`), end with `TELL_LINE`, so the agent ends
+  with a few plain sentences for the owner; a run in a fresh home through
+  the make's runner (an agent skill's, a `net` one's or one given keys),
+  which keeps no answer, is never told its answer is said. lamp-skills says
   them to the owner (docs/skills.md, "A linked service as a task for the
   lamp's agent"). On lamp-9adf, 15 Nov (build 13135), a voice-made
   `morning-unread-mail` ran 19 Gmail reads and ended idle, and nothing was
@@ -2879,7 +2884,8 @@ for each run, and is answered once the run ends
   lamp-9adf, 16 Nov, a run's end `show` gave 360 bytes and nothing was
   said (#7180), which these lines place. Tests:
   `a_service_reads_ended_answer_carries_what_its_agent_found`,
-  `a_skill_runs_end_keeps_its_agents_last_answer`.
+  `a_skill_runs_end_keeps_its_agents_last_answer`,
+  `an_agent_run_granted_a_service_has_the_lamps_connectors_in_its_fresh_home`.
 - **A one-run token** (the first builder's 12:45 conditions on #6071): for
   each run lamp-tasks asks lamp-control (#6304, PR #6408) for a token on
   its admin socket, `/run/lampos-control/admin.sock` (`ControlTokens`, the

@@ -4826,11 +4826,15 @@ as the lamp's task news" had no path: on lamp-9adf, 15 Nov, build 13135,
 `morning-unread-mail` read Gmail 19 times, ended idle, and nothing was
 said). A run granted a linked service's read ends with the agent's last
 answer in lamp-tasks' answer (docs/tasks.md, "What its agent found";
-`LAMP_AGENT_SERVICES=on` in lamp-tasks, as in the product), and
+`LAMP_AGENT_SERVICES=on` in lamp-tasks, as in the product), only through a
+runner that keeps it (Harness's: a run started with no Harness or in a
+fresh home keeps none, so it is never told its answer is said), and
 `lamp-skills` says it to the owner as a `do.read`'s lines are said
 (`service_read::tell`): behind the same gate (the owner's known face alone
-in view and steady 5 s, no voice for a minute, not private, paused or in
-quiet hours, waited for up to 60 minutes, then skipped unsaid), in the
+in view and steady 5 s, no voice for a minute, not private or paused, not
+in the lamp's quiet hours or the skill's own `[quiet]`, as a `do.read`'s
+(`task::TaskStep::quiet`), waited for up to 60 minutes, then skipped
+unsaid), in the
 lamp's one read turn, one sentence a line as exact words (never a turn for
 the model, so what a mail says is never an instruction), the gate judged
 again before each, someone coming stopping it with "I'll tell you the rest
@@ -4889,7 +4893,10 @@ with no read grant (a send, a script's task) tells nothing, as before.
 Tests: `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
 `service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,
 `service_read::tests::a_wait_for_the_gate_says_why_once`,
-`task::tests::a_told_answer_a_restart_dropped_is_found_at_the_next_start`.
+`task::tests::a_told_answer_a_restart_dropped_is_found_at_the_next_start`,
+`tests::a_task_step_loads_with_its_skills_own_quiet`, and
+`a_tasks_told_answer_is_held_to_its_skills_own_quiet` in lamp-skills'
+main.
 With the same switch in `lamp-skills`, its manage helper, `lamp-voice` and
 `lamp-control` (which reads a skill's grants through lamp-skills at each
 token's mint), a `do.task`'s `grants` may name a linked service's grant
