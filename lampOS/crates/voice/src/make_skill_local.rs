@@ -2540,6 +2540,14 @@ fn handed_to_agent(
             );
             return deepseek.stands();
         }
+        // Harness or the gateway not ready yet (#7245): the person is told
+        // at once in the lamp's short words, never DeepSeek's answer.
+        Err(why) if why == made_skill::NOT_READY_LINE => {
+            eprintln!(
+                "lamp-voice: a skill made here: the agent ({engine}) isn't ready yet: told to wait a minute"
+            );
+            return Err(Refused(made_skill::NOT_READY_LINE.to_owned(), None));
+        }
         Err(why) => {
             eprintln!(
                 "lamp-voice: a skill made here: the agent ({engine}) made none ({why}): {}",
@@ -5219,6 +5227,33 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             assert!(made_skill::entries(&keeping.directory).is_empty());
             let _ = std::fs::remove_dir_all(&root);
         }
+    }
+
+    /// #7245: a make lamp-tasks refuses `not_ready` (Harness or the gateway
+    /// not ready yet) is told to the person at once in the lamp's short
+    /// words, never DeepSeek's answer, and nothing is kept.
+    #[test]
+    fn a_make_not_ready_is_said_at_once_in_short_words() {
+        let (root, keeping) = keeping("agent-not-ready");
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("not_ready"),
+            std::sync::Arc::new(|_: &str| Some(good())),
+        );
+        let (url, served) = service(vec![(200, faces())]);
+        let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::NOT_READY_LINE)
+        );
+        assert_eq!(
+            made_skill::not_made_line(made_skill::NOT_READY_LINE),
+            made_skill::NOT_READY_LINE
+        );
+        assert_eq!(tasks.hand_overs(), 1);
+        assert_eq!(served.join().unwrap(), 1);
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// #6643's 19:14 ruling: a make is handed to Hermes alone, the one
