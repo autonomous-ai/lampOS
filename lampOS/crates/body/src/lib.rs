@@ -57,6 +57,7 @@ pub mod poses;
 pub mod protocol;
 pub mod readback;
 pub mod runtime;
+pub mod seat_say;
 pub mod trajectory;
 pub mod units;
 pub mod unplug;
