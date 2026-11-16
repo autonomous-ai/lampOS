@@ -173,17 +173,30 @@ lamp also says once when the opt-in is turned off.
   > you're sitting, so I can remind you to sit back. I keep none of the
   > pictures.
 
+  > On, with `LAMP_SEEN_MORE_DOINGS` on: I'll look now and then to see if
+  > you're eating, drinking, taking a break or slouching, if you yawn or
+  > stretch, what you're working on at the desk, and if you're
+  > celebrating. I keep none of the pictures.
+  >
+  > On, with both: the same, then "…and now and then how you're sitting,
+  > so I can remind you to sit back. I keep none of the pictures."
+
   The posture line is **awaiting the PM's wording**: the proposed clause
   is "…and now and then how you're sitting, so I can remind you to sit
-  back." It is one constant, `said_back::POSTURE_ON_LINE`.
+  back." It is one constant, `said_back::POSTURE_ON_LINE`. The more
+  doings' lines (`said_back::MORE_ON_LINE`, `POSTURE_MORE_ON_LINE`) name
+  everything the lamp then reads, the first builder's condition on #6543,
+  and await the PM's wording too.
 
   - Once the voice has begun a line (`{"event":"begun"}`) it counts as
     said, and what it said is kept in `lamp-seen`'s own state folder
     (`--state-folder`, `/var/lib/lampos-seen` by default), in
     `said-back.json`: `{"said":"on","for_at_unix_s":N}` for the yes it
-    was for, with `"posture":true` when the line said was the posture
-    line, or `{"said":"off"}`. A record with no `posture` (one kept before
-    posture) is the plain line. Never under `consent/`. A restart says
+    was for, with `"posture":true` when the line said named posture and
+    `"more":true` when it named tiredness, desk work and celebrating, or
+    `{"said":"off"}`. A record with no `posture` (one kept before posture)
+    is the plain line, and the same for `more`: a yes whose line did not
+    name them is owed the line that does, once. Never under `consent/`. A restart says
     neither again. If the record can't be written, the line is still not
     said again while the process runs. A record left over after the yes
     was removed means nothing, because the gate reads the yes.
@@ -426,7 +439,11 @@ that one too, aborts a burst under way.
     every burst and would push a drink out of the second voice's note.
     V1's `emotional` group (laughing, crying, singing) is never said. Its
     own topic, so a skill given drinking, eating and breaks never receives
-    these; off, it is not even declared.
+    these; off, it is not even declared. Nothing of it is timed or said
+    until a line naming it (`said_back::MORE_ON_LINE`, above) has begun for
+    the kept yes, nor while the opt-in is off: then what was seen is
+    forgotten at once, each timer counting from the arrival again, so the
+    opt-in off stops all of it (the first builder's condition on #6543).
 - **Health**: with activity on, `diagnostics` also says `sends: activity`,
   its bursts (`bursts`, `answered`, `busy`, `failed`, `aborted`),
   `frames_sent`, `frames_wiped`, `wrong_frame` and `last_failure`.
@@ -943,6 +960,7 @@ product is unchanged.
 |---|---|---|
 | Giving the yes | Built in #6912 (onboarding.md "Seen activity"): the voice's offer naming the server, counted only when played whole and uncut, then only the owner's spoken yes in the very next turn writes `seen-activity.json`; the key in `lamp_msgs::consent::FILES` and `lamp-cloud`'s `consent.set`; removal on every forget and "stop looking" (Fourteen's design on #6543; the PM's wording). Owed: the backend's written retention confirmation behind "deleted once they're checked" | before the switch goes on, with #6912's reads and that confirmation |
 | Posture's on line wording | The posture line (`said_back::POSTURE_ON_LINE`, above) is gated in code but awaits the PM's wording | before `LAMP_SEEN_POSTURE` is on anywhere |
+| The more doings' on line wording | `said_back::MORE_ON_LINE` and `POSTURE_MORE_ON_LINE` (above) are gated in code but await the PM's wording | before `LAMP_SEEN_MORE_DOINGS` is on anywhere |
 | Posture at 320×240 | A slump read on `humans/posture` from frames sent at 320×240 (every frame is, above) against V1's 640×480, to see whether the 3D lifter's scale changes RULA (above) | with the lamp rows |
 | The frame size | Every frame is sent at 320×240, scaled down from the eyes' link at any larger size (`--full-look` included). Measure the labels at 320×240 on a lamp against V1's 640×480 before the switch goes on | before the switch goes on |
 | `humans/doing` when lamp-seen stops | A topic that has run out holds a skill's `[[while]]` closed until lamp-skills restarts (`unknown = "holds"` covers only a topic never said). lamp-seen now runs under the keeper (above); the skills change (`unknown = "holds_stale"`) is still owed before a skill reads it | before a skill reads it |
