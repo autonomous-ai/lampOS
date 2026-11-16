@@ -455,6 +455,9 @@ Environment=LAMP_TASK_NEWS=skill
 Environment=LAMP_MAKE_SKILL=on
 # A voice make the lamp's own model can't keep goes to the lamp's own agent when it is Hermes (#6059, docs/skills.md); on again 15 Nov, a code make passed 3 of 3 on 9adf.
 Environment=LAMP_MAKE_SKILL_AGENT=on
+# On the one run path too (#7245): a make DeepSeek fails goes to the lamp's agent when lamp-tasks says it takes
+# runs, OpenClaw as well as Hermes, through `harness new <engine>` (docs/tasks.md). Off: Hermes only, as before.
+Environment=LAMP_MAKE_AGENT_ONE_PATH=on
 Environment=LAMP_APP_MAKE_SKILL=on
 # A skill added from a file in the app, on a spoken yes (#5080): lamp-cloud hands it over the app-make socket,
 # the same line in lamp-cloud.service; it never starts on its own.

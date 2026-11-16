@@ -5179,7 +5179,7 @@ the same code for both writers.
   `admin.sock`. Its terminal and tools work only inside that namespace,
   and no token is minted.
 - **On OpenClaw too, through the one run path
-  (`LAMP_MAKE_AGENT_ONE_PATH=on`, off unless set, in no unit; #7245).**
+  (`LAMP_MAKE_AGENT_ONE_PATH=on`, on in the product's lamp-voice; #7245).**
   With it, the make is handed to the lamp's agent whenever lamp-tasks says
   it takes runs, Hermes or OpenClaw (`make_skill_agent::ONE_PATH_ENGINES`),
   and its line carries `"one_path":true`. lamp-tasks keeps Hermes's

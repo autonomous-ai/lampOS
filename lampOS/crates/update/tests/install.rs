@@ -2279,7 +2279,8 @@ fn the_product_tells_the_app_a_skill_needs_a_connector() {
 /// A voice make the lamp's own model can't keep goes to the lamp's own agent
 /// (#6059's proposal, `make_skill_agent`): on in lamp-voice alone, once,
 /// whose second route's worker reads it, beside the maker and the tasks part
-/// it hands the make over.
+/// it hands the make over; with the one run path on there too (#7245), so
+/// an OpenClaw lamp's agent takes it as a Hermes lamp's does.
 #[test]
 fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
     for (unit, text) in install::PRODUCT {
@@ -2298,6 +2299,7 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
         }
         for line in [
             "Environment=LAMP_MAKE_SKILL_AGENT=on",
+            "Environment=LAMP_MAKE_AGENT_ONE_PATH=on",
             "Environment=LAMP_MAKE_SKILL=on",
             "Environment=LAMP_TASKS_DIR=/run/lampos-tasks",
         ] {
