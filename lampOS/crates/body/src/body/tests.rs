@@ -2489,7 +2489,7 @@ fn warms(from: Duration) -> impl Iterator<Item = (Duration, usize, u8)> {
 }
 
 /// The elbow cooled from 62 to 45 a degree each second from `from`: under
-/// [`StrainGuard::COOL`] (49) 13 s on.
+/// [`StrainGuard::COOL`] (50) from 13 s on, when it reads 49.
 fn cools(from: Duration) -> impl Iterator<Item = (Duration, usize, u8)> {
     (45..=62u8)
         .rev()
@@ -2634,18 +2634,250 @@ fn a_hot_seat_cool_for_under_five_minutes_stays_seated() {
     );
 }
 
-/// #7281: once it stood by itself, a hot seat again within the hour waits
-/// for a person, however cool it gets, and says so.
+/// lamp-74ff's arm warmth on 16 Nov (its journal, `warmth [shoulder, elbow]`
+/// on the step lines), from step 95122 (16:13:18, standing, the elbow at
+/// 61) to step 159640 (16:34:49, the journal's last): standing at 61 to 62,
+/// it sat down hot at 16:15:23, stood again at 16:16:32, and was seated hot
+/// at step 122133 (16:22:19, offset 27011, "elbow_pitch sat down hot for
+/// the second time in an hour"), then cooled to 51 by the file's end. Each
+/// entry is a change: steps after 95122, shoulder, elbow.
+const LAMP_74FF_WARMTH: &[(u64, u8, u8)] = &[
+    (0, 52, 61),
+    (3500, 52, 62),
+    (5000, 52, 61),
+    (5066, 52, 62),
+    (5141, 52, 61),
+    (5166, 52, 62),
+    (6318, 52, 61),
+    (6343, 52, 62),
+    (7696, 52, 61),
+    (7721, 52, 62),
+    (7769, 52, 61),
+    (7844, 52, 62),
+    (7870, 52, 61),
+    (8007, 52, 62),
+    (8032, 52, 61),
+    (8170, 52, 62),
+    (8419, 52, 61),
+    (9933, 52, 62),
+    (9958, 52, 61),
+    (10216, 51, 61),
+    (10241, 52, 61),
+    (10527, 51, 61),
+    (10552, 52, 61),
+    (10602, 51, 61),
+    (10614, 52, 61),
+    (10664, 51, 61),
+    (10788, 51, 63),
+    (10810, 52, 61),
+    (11118, 51, 61),
+    (11143, 52, 61),
+    (11219, 51, 61),
+    (11719, 52, 61),
+    (12219, 51, 61),
+    (12595, 52, 61),
+    (12620, 52, 60),
+    (13120, 52, 61),
+    (13620, 51, 61),
+    (13819, 52, 61),
+    (18025, 50, 61),
+    (18050, 52, 61),
+    (26542, 52, 62),
+    (29878, 52, 61),
+    (31692, 51, 61),
+    (33192, 51, 60),
+    (35912, 50, 60),
+    (37412, 50, 59),
+    (38912, 50, 58),
+    (41561, 50, 57),
+    (44561, 49, 56),
+    (49061, 49, 55),
+    (52908, 49, 54),
+    (53193, 48, 54),
+    (53218, 49, 54),
+    (53644, 48, 54),
+    (53658, 49, 54),
+    (53758, 48, 54),
+    (53772, 49, 54),
+    (53922, 48, 54),
+    (53947, 49, 54),
+    (54237, 48, 54),
+    (54262, 49, 54),
+    (54374, 48, 54),
+    (54399, 49, 54),
+    (54458, 48, 54),
+    (54483, 49, 54),
+    (54508, 48, 54),
+    (54553, 49, 54),
+    (54654, 49, 53),
+    (54679, 48, 54),
+    (54692, 49, 54),
+    (54717, 48, 54),
+    (54742, 48, 53),
+    (54767, 48, 54),
+    (54792, 49, 54),
+    (54817, 49, 53),
+    (54842, 49, 54),
+    (54867, 48, 54),
+    (54892, 49, 53),
+    (54942, 49, 54),
+    (54992, 48, 53),
+    (55067, 49, 53),
+    (55092, 49, 54),
+    (55095, 49, 53),
+    (55311, 48, 53),
+    (55336, 49, 53),
+    (55386, 48, 54),
+    (55411, 48, 53),
+    (55461, 49, 53),
+    (55745, 48, 53),
+    (55889, 49, 53),
+    (57389, 48, 53),
+    (58998, 48, 52),
+    (59016, 48, 53),
+    (59509, 48, 52),
+    (59522, 48, 53),
+    (59885, 48, 52),
+    (59910, 48, 53),
+    (59935, 48, 52),
+    (59985, 48, 54),
+    (61485, 48, 52),
+    (63394, 49, 52),
+    (63419, 48, 52),
+    (64386, 47, 52),
+    (64411, 48, 52),
+    (64461, 48, 51),
+    (64468, 48, 52),
+    (64518, 48, 51),
+];
+
+/// [`LAMP_74FF_WARMTH`] played from `from` (a step is 20 ms), shoulder and
+/// elbow. Its last read, 51, never gets under [`StrainGuard::COOL`] (50):
+/// SYNTHETIC from there, the elbow cools a degree a minute as 74ff's did
+/// (62 to 51 in 12 min), 50 one minute on and 49 two minutes on, then 48.
+/// The heats, and when the elbow first reads under 50.
+fn lamp_74ff_replay(from: Duration) -> (Vec<(Duration, usize, u8)>, Duration) {
+    let mut heats: Vec<_> = LAMP_74FF_WARMTH
+        .iter()
+        .flat_map(|(step, shoulder, elbow)| {
+            let at = from + TICK * *step as u32;
+            [(at, 1, *shoulder), (at, 2, *elbow)]
+        })
+        .collect();
+    let last = from + TICK * LAMP_74FF_WARMTH.last().unwrap().0 as u32;
+    // Synthetic cooling tail, past the journal's end.
+    for (minutes, to) in [(1, 50), (2, 49), (3, 48)] {
+        heats.push((last + Duration::from_secs(60 * minutes), 2, to));
+    }
+    (heats, last + Duration::from_secs(120))
+}
+
+/// lamp-74ff's elbow standing as it did on 16 Nov (`LAMP_74FF_WARMTH` from
+/// 6 s on, and `then`), under the strain guard with `LAMP_BODY_SEAT_COOLS`:
+/// what each step said, and each line its seat would say (`SeatSay`, out
+/// of the quiet hours).
+fn lamp_74ff(
+    then: Vec<(Duration, usize, u8)>,
+    ends: Duration,
+) -> (BodyReport, SeatSeen, Vec<&'static str>) {
+    let (mut lamp, mut clock) = folded(ends);
+    lamp.arm_moves = true;
+    lamp.overload_clears = 3;
+    let (first, second) = (LAMP_74FF_WARMTH[0].1, LAMP_74FF_WARMTH[0].2);
+    (lamp.servos[1].temperature, lamp.servos[2].temperature) = (first, second);
+    lamp.heats = lamp_74ff_replay(Duration::from_secs(6))
+        .0
+        .into_iter()
+        .chain(then)
+        .collect();
+    let time = clock.time.clone();
+    let news = move || Some((Mood::Listening, 100));
+    let mut seen = Vec::new();
+    let mut say = crate::seat_say::SeatSay::default();
+    let mut lines = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            strain_guard: Some(StrainGuard {
+                load: StrainGuard::LOAD,
+                seconds: StrainGuard::SECONDS,
+                cools: true,
+            }),
+            ..Limits::FOLDED
+        },
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        news,
+        Asked::default,
+        |glimpse| {
+            seen.push((
+                time.get(),
+                glimpse.stand,
+                glimpse.seated,
+                glimpse.seat_rests,
+            ));
+            lines.extend(say.step(glimpse.seated.is_some(), glimpse.seat_rests, || false));
+        },
+    );
+    (report, seen, lines)
+}
+
+/// #7281, lamp-74ff's seat at 16:22:19 replayed: seated hot, it says it
+/// will rest, once, stays down through the journal's whole cooling (62 to
+/// 51 in 12 min), and stands again by itself five minutes after the elbow
+/// reads under 50 (the synthetic tail). Before #7281 it stayed seated.
+#[test]
+fn lamp_74ff_hot_seat_at_16_22_stands_again_after_five_cool_minutes() {
+    let (_, under) = lamp_74ff_replay(Duration::from_secs(6));
+    let ends = under + StrainGuard::COOL_FOR + Duration::from_secs(30);
+    let (report, seen, lines) = lamp_74ff(Vec::new(), ends);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(
+        report
+            .retreats
+            .iter()
+            .all(|why| why.contains("elbow_pitch at 62 degrees")),
+        "{:?}",
+        report.retreats
+    );
+    let (seated_at, stood) = seated_then_stood(&seen);
+    // Seated hot, saying it rests, and down until five cool minutes are up.
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at > seated_at + Duration::from_secs(10)
+                && *at < under + StrainGuard::COOL_FOR)
+            .all(|(_, stand, seated, rests)| *stand == 0.0
+                && *seated == Some(("elbow_pitch", "hot"))
+                && *rests)
+    );
+    let stood = stood.expect("stood again by itself");
+    assert!(
+        (under + StrainGuard::COOL_FOR..under + StrainGuard::COOL_FOR + Duration::from_secs(10))
+            .contains(&stood),
+        "{stood:?}, under 50 from {under:?}"
+    );
+    assert_eq!(lines, [crate::seat_say::RESTS]);
+}
+
+/// #7281, 74ff's numbers: stood by itself after its seat, its elbow warms
+/// back to 74ff's standing 61 to 62 (a degree each 10 s from 48, then the
+/// journal again), and the hot seat that follows within the hour waits for
+/// a person through the same cooling and five minutes more; its line says
+/// so, once.
 #[test]
 fn a_hot_seat_after_standing_by_itself_within_the_hour_stays_seated() {
-    let ends = Duration::from_secs(820);
-    // Cool from 113 s, it stands by itself at about 413 s; hot again from
-    // 430 s, it is seated again; cool again from 470 s.
-    let heats = cools(Duration::from_secs(100))
-        .chain(warms(Duration::from_secs(430)))
-        .chain(cools(Duration::from_secs(470)))
+    let (_, under) = lamp_74ff_replay(Duration::from_secs(6));
+    let stands = under + StrainGuard::COOL_FOR;
+    let warm: Vec<_> = (49..=61u8)
+        .zip(1u32..)
+        .map(|(to, n)| (stands + Duration::from_secs(10) * n, 2, to))
         .collect();
-    let (report, seen) = hot_elbow(true, heats, ends);
+    let again_from = stands + Duration::from_secs(140);
+    let (replay, under_again) = lamp_74ff_replay(again_from);
+    let ends = under_again + StrainGuard::COOL_FOR + Duration::from_secs(30);
+    let (report, seen, lines) = lamp_74ff(warm.into_iter().chain(replay).collect(), ends);
     assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
     let (_, stood) = seated_then_stood(&seen);
     let stood = stood.expect("stood by itself");
@@ -2654,7 +2886,7 @@ fn a_hot_seat_after_standing_by_itself_within_the_hour_stays_seated() {
         .find(|(at, _, seated, _)| *at > stood && seated.is_some())
         .expect("seated again")
         .0;
-    assert!(again < Duration::from_secs(440), "{again:?}");
+    assert!(again < stood + Duration::from_secs(60 * 60), "{again:?}");
     let after: Vec<_> = seen
         .iter()
         .filter(|(at, ..)| *at > again + Duration::from_secs(10))
@@ -2667,6 +2899,7 @@ fn a_hot_seat_after_standing_by_itself_within_the_hour_stays_seated() {
         "{:?}",
         after.last()
     );
+    assert_eq!(lines, [crate::seat_say::RESTS, crate::seat_say::WAITS]);
 }
 
 /// #7281: a seat for a strain never stands by itself, cool as it is.
