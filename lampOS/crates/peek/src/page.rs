@@ -84,7 +84,7 @@ pub fn main_page(words: bool, name: &str, build: &str) -> String {
     let build = escape(&build.chars().take(12).collect::<String>());
     format!(
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>lamp-peek · {name}</title>\
-         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>{STYLE}</style></head>\
+         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>{STYLE}{TURN_STYLE}</style></head>\
          <body><nav><b class=\"brand\">lamp-peek</b>{nav}<span class=\"grow\"></span>\
          <a href=\"/bus\"><span class=\"icon\">≡</span>bus</a><a href=\"/status\"><span class=\"icon\">▤</span>units</a></nav>\
          <div class=\"page\"><header><span id=\"live\" class=\"dot\" title=\"live while the lamp streams\"></span>\
@@ -301,7 +301,75 @@ fn step_name(step: Step) -> &'static str {
     }
 }
 
-/// The turns, newest first: each one's steps from the end of speech, the
+/// A gap between two turns longer than this draws a break, as V1's
+/// session grouping does (`docs/flow-monitor.md`, "Session breaks").
+pub const BREAK_MS: u64 = 60_000;
+
+/// The turn cards' own look (#7208): the header line, the IN, DID and OUT
+/// lines, the step chips, the break between sessions and ACTIVE's pulse.
+const TURN_STYLE: &str = ".turn{padding:10px 12px}\
+.turn-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:6px}\
+.ticon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;\
+border-radius:5px;background:var(--surface)}.lat{font-size:12px;font-variant-numeric:tabular-nums}\
+.io{margin:3px 0;overflow-wrap:anywhere}.lbl{display:inline-block;width:3.2em;font-size:11px;\
+font-weight:600;letter-spacing:.06em;color:var(--muted)}.steps{margin-top:6px}\
+.chip.slow{border-color:var(--red)}\
+.break{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px;margin:2px 0 12px}\
+.break::before,.break::after{content:'';flex:1;border-top:1px dashed var(--border-hi)}\
+.pulse{animation:pulse 1.4s ease-in-out infinite}@keyframes pulse{50%{opacity:.4}}\
+@media(prefers-reduced-motion:reduce){.pulse{animation:none}}";
+
+/// `ms` with V1's colour: green to `green` ms, amber to `amber`, red past.
+fn latency(mark: &str, ms: u64, green: u64, amber: u64) -> String {
+    let class = if ms <= green {
+        "ok"
+    } else if ms <= amber {
+        "warn"
+    } else {
+        "error"
+    };
+    format!("<span class=\"lat {class}\">{mark} {ms} ms</span>")
+}
+
+/// ⏱, the whole turn: green to 5 s, amber to 15 s.
+fn total(ms: u64) -> String {
+    latency("⏱", ms, 5_000, 15_000)
+}
+
+/// ⚡, to the first token: green to 3 s, amber to 8 s.
+fn first_token(ms: u64) -> String {
+    latency("⚡", ms, 3_000, 8_000)
+}
+
+/// Whether the voice's record says the answer failed.
+fn failed(record: Option<&Turn>) -> bool {
+    record.is_some_and(|turn| {
+        turn.outcome.as_deref() == Some("failed")
+            || turn.held.as_deref() == Some("the answer failed")
+    })
+}
+
+/// V1's status badge. A turn with no end that is not the newest is not
+/// going on any more: it says so, in grey.
+fn status(failed: bool, ended: bool, newest: bool) -> &'static str {
+    if failed {
+        "<span class=\"badge badge-red\">ERROR</span>"
+    } else if ended {
+        "<span class=\"badge badge-green\">DONE</span>"
+    } else if newest {
+        "<span class=\"badge badge-amber pulse\">ACTIVE</span>"
+    } else {
+        "<span class=\"badge badge-grey\">NO END</span>"
+    }
+}
+
+/// The type icon: someone's words, or the lamp's own.
+fn type_icon(spoken: bool) -> &'static str {
+    if spoken { "🎙" } else { "✦" }
+}
+
+/// The turns, newest first, as V1's cards: why it was taken, its status,
+/// ⚡ to the first token, each step from the end of speech with the
 /// slowest marked, and how it ended or what held it. Numbers and kinds
 /// only.
 pub fn turns(snapshot: &Snapshot) -> String {
@@ -314,12 +382,21 @@ pub fn turns(snapshot: &Snapshot) -> String {
     }
     html.push_str(
         "<p class=\"small\">Each from the end of speech; a step's own time in brackets. \
-         The slowest step is marked.</p><table><tr><th>turn</th><th>taken as</th>\
-         <th>final words</th><th>first token</th><th>first audio</th><th>ended</th></tr>",
+         The slowest step is marked.</p>",
     );
-    for turn in &snapshot.turns {
+    for (index, turn) in snapshot.turns.iter().enumerate() {
+        let basis = turn.basis.as_deref().unwrap_or("?");
+        let _ = write!(
+            html,
+            "<div class=\"turn card\"><div class=\"turn-head\"><span class=\"ticon\">{}</span>\
+             <b>{}</b>{}{}<span class=\"small\">turn {}</span></div><div class=\"steps\">",
+            type_icon(basis == "local_speech"),
+            escape(basis),
+            status(failed(Some(turn)), turn.outcome.is_some(), index == 0),
+            turn.chat_ms.map(first_token).unwrap_or_default(),
+            turn.turn,
+        );
         let slowest = turn.slowest();
-        let mut cells = String::new();
         for ((step, own), at) in
             turn.steps()
                 .into_iter()
@@ -331,13 +408,10 @@ pub fn turns(snapshot: &Snapshot) -> String {
             };
             let own = own.map_or_else(String::new, |own| format!(" ({own})"));
             let _ = write!(
-                cells,
-                "<td{} title=\"{}\">{}{own}</td>",
-                if slowest == Some(step) {
-                    " class=\"slow\""
-                } else {
-                    ""
-                },
+                html,
+                "<span class=\"chip{}\" title=\"{}\">{} {}{own}</span>",
+                if slowest == Some(step) { " slow" } else { "" },
+                step_name(step),
                 step_name(step),
                 ms(at)
             );
@@ -350,21 +424,19 @@ pub fn turns(snapshot: &Snapshot) -> String {
         };
         let _ = write!(
             html,
-            "<tr><td>{}</td><td>{}</td>{cells}<td>{}</td></tr>",
-            turn.turn,
-            escape(turn.basis.as_deref().unwrap_or("?")),
+            "</div><div class=\"io\"><span class=\"lbl\">END</span> {}</div></div>",
             escape(&ended)
         );
     }
-    html.push_str("</table>");
     html
 }
 
-/// The timeline, newest turn first: each step with its time from the end
-/// of speech, the slowest marked, and, with words on, [`WORDS_SHOWN`] and
-/// the words heard and said, escaped. The voice's records add the basis and
-/// the final words' time to "understood", and the first audio and how it
-/// ended to "said".
+/// The timeline, newest turn first, as V1's turn cards: the header line
+/// (type icon, path, status, ⏱ total and ⚡ first token), then IN, DID and
+/// OUT, then each step from the end of speech with the slowest marked. The
+/// words heard and said show, escaped, only with `words` (monitor mode,
+/// with [`WORDS_SHOWN`] on top); otherwise the card says they are hidden,
+/// whatever an entry carries. A gap over [`BREAK_MS`] draws a break.
 pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
     let mut html = String::new();
     if words {
@@ -378,11 +450,106 @@ pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
         "<p class=\"small\">Each step from the end of speech; the slowest step is marked. \
          Clock times in UTC.</p>",
     );
-    for entry in entries {
-        let record = records.turns.iter().find(|turn| turn.turn == entry.request);
-        let ended = entry.speech_ended();
+    let shown = |kept: &Option<String>| match kept {
+        Some(kept) if words => quoted(Some(kept)),
+        _ => "<span class=\"small\">words hidden</span>".to_owned(),
+    };
+    for (index, entry) in entries.iter().enumerate() {
         let mut steps = entry.steps.clone();
         steps.sort_by_key(|(at, _)| *at);
+        let last = steps.last().map_or(0, |(at, _)| *at);
+        if let Some(newer) = index.checked_sub(1).map(|at| &entries[at]) {
+            let gap = newer.start().saturating_sub(entry.ended_at.unwrap_or(last));
+            if gap > BREAK_MS {
+                let _ = write!(
+                    html,
+                    "<div class=\"break\">{} min quiet</div>",
+                    gap / 60_000
+                );
+            }
+        }
+        let record = records.turns.iter().find(|turn| turn.turn == entry.request);
+        let ended = entry.speech_ended();
+        let heard = steps.iter().find_map(|(_, step)| match step {
+            timeline::Step::Heard(kept) => Some(kept),
+            _ => None,
+        });
+        let said = steps.iter().find_map(|(_, step)| match step {
+            timeline::Step::Said(kept) => Some(kept),
+            _ => None,
+        });
+        let did: Vec<&String> = steps
+            .iter()
+            .filter_map(|(_, step)| match step {
+                timeline::Step::Did(did) => Some(did),
+                _ => None,
+            })
+            .collect();
+        // ponytail: the path from the bus alone: a skill's stage makes it
+        // SKILL, words said or a first token AGENT, else LOCAL.
+        let path = if did.iter().any(|did| did.starts_with("skill ")) {
+            "<span class=\"badge badge-teal\">SKILL</span>"
+        } else if said.is_some() || record.is_some_and(|turn| turn.chat_ms.is_some()) {
+            "<span class=\"badge badge-blue\">AGENT</span>"
+        } else {
+            "<span class=\"badge badge-green\">LOCAL</span>"
+        };
+        let kind = record
+            .and_then(|turn| turn.basis.as_deref())
+            .unwrap_or(if heard.is_some() { "voice" } else { "lamp" });
+        let _ = write!(
+            html,
+            "<div class=\"turn card\"><div class=\"turn-head\"><span class=\"ticon\">{}</span>\
+             <b>{}</b>{path}{}{}{}<span class=\"small\">request {} · {}</span></div>",
+            type_icon(heard.is_some()),
+            escape(kind),
+            status(failed(record), entry.ended_at.is_some(), index == 0),
+            entry
+                .ended_at
+                .map(|at| total(at.saturating_sub(entry.start())))
+                .unwrap_or_default(),
+            record
+                .and_then(|turn| turn.chat_ms)
+                .map(first_token)
+                .unwrap_or_default(),
+            entry.request,
+            clock(ended)
+        );
+        let _ = write!(
+            html,
+            "<div class=\"io\"><span class=\"lbl\">IN</span> {}</div>",
+            heard.map_or_else(
+                || "<span class=\"small\">the lamp began it</span>".to_owned(),
+                shown
+            )
+        );
+        if !did.is_empty() {
+            html.push_str("<div class=\"io\"><span class=\"lbl\">DID</span> ");
+            for did in did {
+                let _ = write!(html, "<span class=\"chip\">{}</span>", escape(did));
+            }
+            html.push_str("</div>");
+        }
+        let mut out = said.map_or_else(
+            || "<span class=\"small\">nothing said</span>".to_owned(),
+            shown,
+        );
+        if let Some(record) = record {
+            let mut about = Vec::new();
+            if let Some(audio) = record.first_audio_ms() {
+                about.push(format!("first audio {audio} ms"));
+            }
+            if let Some(outcome) = &record.outcome {
+                about.push(escape(outcome));
+            }
+            if !about.is_empty() {
+                let _ = write!(out, " <span class=\"small\">· {}</span>", about.join(", "));
+            }
+        }
+        let _ = write!(
+            html,
+            "<div class=\"io\"><span class=\"lbl\">OUT</span> {out}</div><div class=\"steps small\">"
+        );
         // The slowest: the longest wait after the step before.
         let waits: Vec<u64> = steps
             .windows(2)
@@ -397,19 +564,13 @@ pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
                     .map(|(at, _)| at + 1)
             })
             .flatten();
-        let _ = write!(
-            html,
-            "<h3>request {} <span class=\"small\">{}</span></h3><table>",
-            entry.request,
-            clock(ended)
-        );
         for (index, (at, step)) in steps.iter().enumerate() {
             let (name, what) = match step {
-                timeline::Step::Heard(words) => ("heard", quoted(words.as_deref())),
+                timeline::Step::Heard(_) => ("heard", String::new()),
                 timeline::Step::Understood(verdict) => {
                     let mut what = match verdict {
-                        TurnVerdict::Answered => "answered".to_owned(),
-                        TurnVerdict::HeldBack => "held back".to_owned(),
+                        TurnVerdict::Answered => " answered".to_owned(),
+                        TurnVerdict::HeldBack => " held back".to_owned(),
                     };
                     if let Some(record) = record {
                         if let Some(basis) = &record.basis {
@@ -421,33 +582,17 @@ pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
                     }
                     ("understood", what)
                 }
-                timeline::Step::Did(did) => ("did", escape(did)),
-                timeline::Step::Said(words) => {
-                    let mut what = quoted(words.as_deref());
-                    if let Some(record) = record {
-                        if let Some(audio) = record.first_audio_ms() {
-                            let _ = write!(what, " first audio {audio} ms");
-                        }
-                        if let Some(outcome) = &record.outcome {
-                            let _ = write!(what, ", {}", escape(outcome));
-                        }
-                    }
-                    ("said", what)
-                }
+                timeline::Step::Did(_) => ("did", String::new()),
+                timeline::Step::Said(_) => ("said", String::new()),
             };
             let _ = write!(
                 html,
-                "<tr{}><th>{name}</th><td>+{} ms</td><td>{}</td></tr>",
-                if slowest == Some(index) {
-                    " class=\"slow\""
-                } else {
-                    ""
-                },
+                "<span class=\"chip{}\">{name} +{} ms{what}</span>",
+                if slowest == Some(index) { " slow" } else { "" },
                 at.saturating_sub(ended),
-                what.trim()
             );
         }
-        html.push_str("</table>");
+        html.push_str("</div></div>");
     }
     html
 }
