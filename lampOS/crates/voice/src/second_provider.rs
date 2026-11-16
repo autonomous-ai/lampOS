@@ -15629,6 +15629,13 @@ async fn answer(
     // ruling on #5215, [`crate::action_claim::stands`]). The strict lines
     // judge every turn.
     let worded_turn = shared.worded_claims && !crate::action_claim::asked_as_a_question(&said);
+    // The spoken line a short reply may echo as done (#7285,
+    // [`crate::action_claim::echoed_claim`]): never one asked as a
+    // question, whose short answer may tell the state ("Blue."). It
+    // judges only a turn with no call yet: beside a call the other runs
+    // judge as before.
+    let echo_line =
+        (heard && !crate::action_claim::asked_as_a_question(&said)).then(|| said.clone());
     // Whether the line asks to read something back: then a `list_reminders`
     // may back a time a worded claim says (the Reviewer-lead's P2 on #5737).
     let read_asked = crate::action_claim::worded_as_a_question(&said);
@@ -16849,6 +16856,7 @@ async fn answer(
                                     false,
                                     worded_turn,
                                     forget_turn,
+                                    echo_line.as_deref().filter(|_| turn_called.is_empty()),
                                 ) {
                                     Some(None) => action_held.take().unwrap_or_default(),
                                     Some(Some(kind))
@@ -17484,17 +17492,25 @@ async fn answer(
                         .map(|(name, args)| (name.as_str(), args))
                         .chain(calls.iter().map(|call| (call.name.as_str(), &call.args)))
                 };
-                let unmade = crate::action_claim::claim_on(&held, true, worded_turn, forget_turn)
-                    .flatten()
-                    .filter(|kind| {
-                        !crate::action_claim::stands_on(
-                            *kind,
-                            &held,
-                            read_asked,
-                            called(),
-                            &call_statuses,
-                        )
-                    });
+                let unmade = crate::action_claim::claim_on(
+                    &held,
+                    true,
+                    worded_turn,
+                    forget_turn,
+                    echo_line
+                        .as_deref()
+                        .filter(|_| turn_called.is_empty() && calls.is_empty()),
+                )
+                .flatten()
+                .filter(|kind| {
+                    !crate::action_claim::stands_on(
+                        *kind,
+                        &held,
+                        read_asked,
+                        called(),
+                        &call_statuses,
+                    )
+                });
                 // An unplug's act said (#6457): while the skill's turn-off
                 // ask is open its answer is the skill's own line, so the
                 // words are dropped with no ask again; said in the round
@@ -17538,6 +17554,13 @@ async fn answer(
                 // Whether only the worded claims found it: the journal says so.
                 let worded = if limited {
                     ", in other words: LAMP_ACTION_CLAIM_WORDED, a said limit no call carried"
+                } else if !forget_said
+                    && crate::action_claim::claim_as(&held, true, worded_turn)
+                        .flatten()
+                        .is_none()
+                {
+                    // Only the echo of the line's ask found it (#7285).
+                    ", the reply echoing the line's ask"
                 } else if worded_turn
                     && !forget_said
                     && crate::action_claim::claim(&held, true).flatten().is_none()

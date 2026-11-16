@@ -389,6 +389,61 @@ fn a_change_promised_with_no_call_is_held_and_asked_again() {
     assert!(!told_claim(&went), "{went:?}");
 }
 
+/// #7285, lamp-52e6 core w2 on 13417 (request 21): a story's answer cut
+/// after 5 words, then "Hold on. Hey, Lamp. Make the light a little warmer."
+/// heard whole, answered in 3 words (16 characters) with `calls=none`, and
+/// said: no phrase run lists that wording. The reply echoes the ask, so it
+/// is held, the model asked once more, and the retry's `light_warmer` call
+/// answers with its own line. A second echo with no call is the line that
+/// it wasn't done.
+#[test]
+fn a_cut_in_warm_ask_answered_in_words_alone_gets_its_call() {
+    let heard = "Hold on. Hey, Lamp. Make the light a little warmer.";
+    for reply in [
+        "Warming that up.",
+        "Sure, warming it up.",
+        "Okay. A little warmer now!",
+        "A touch warmer, coming up.",
+    ] {
+        // After the call's own line, a round for anything else asked.
+        let rounds = vec![calling("light_warmer"), vec![Ok(ChatEvent::Done)]];
+        let went = claimed(true, heard, saying(reply), rounds);
+        assert_eq!(went.ran, ["light_warmer"], "{reply}: {went:?}");
+        assert_eq!(went.said, said(&["Warmer."]), "{reply}: {went:?}");
+        assert!(told_claim(&went), "{reply}: {went:?}");
+    }
+    let went = claimed(
+        true,
+        heard,
+        saying("Warming that up."),
+        vec![saying("Warming that up.")],
+    );
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+    // The light row on 13495: a colour asked, answered in words alone.
+    let went = claimed(
+        true,
+        "Hey Lamp, make your light blue.",
+        saying("Blue it is."),
+        vec![calling("light_colour"), vec![Ok(ChatEvent::Done)]],
+    );
+    assert_eq!(went.ran, ["light_colour"], "{went:?}");
+    // Not echoes: a refusal, an offer, a question asked, talk.
+    for (line, reply) in [
+        (heard, "I can't change my light right now."),
+        (heard, "Want it a little warmer?"),
+        ("What colour is your light?", "Blue."),
+        ("Lamp, tell me a story.", "A fox sat by a warm fire."),
+    ] {
+        let went = claimed(true, line, saying(reply), vec![saying("Okay.")]);
+        assert_eq!(went.said, said(&[reply]), "{line} / {reply}: {went:?}");
+        assert!(!told_claim(&went), "{line} / {reply}: {went:?}");
+    }
+}
+
 /// The Reviewer-lead's P3 on #6467: "I'll turn it off." about an alarm,
 /// beside the `cancel_reminder` that stopped it, is said as it came; with
 /// no call it is asked again.
