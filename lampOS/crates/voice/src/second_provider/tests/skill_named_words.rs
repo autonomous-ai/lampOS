@@ -1025,3 +1025,34 @@ async fn after_the_lamp_asks_a_vietnamese_yes_goes_to_the_model() {
         }
     }
 }
+
+/// The first builder's answer 2 on #7249 (`LAMP_MADE_SKILL_ASKS`): words
+/// two skills give, one made on the lamp ([`crate::skill_named::SHARED`]),
+/// run nothing in code, and the model is asked once, told the words and
+/// each skill by name, to say so.
+#[test]
+fn words_two_skills_give_run_neither_and_the_model_is_told_both() {
+    let shared = json!({ "words": "cozy reading time", "skills": ["desk glow", "evening read"] });
+    let told = shared.clone();
+    let went = went_with(
+        "cozy reading time",
+        vec![said(
+            "Both desk glow and evening read start on those words.",
+        )],
+        booth_told(),
+        move |engine| {
+            engine.calling_skills_named(Arc::new(move |_: &str| {
+                Some((crate::skill_named::SHARED.to_owned(), told.clone()))
+            }))
+        },
+    );
+    assert!(went.ran.is_empty(), "nothing runs: {:?}", went.ran);
+    assert_eq!(went.chats, 1);
+    assert_eq!(went.notes, [crate::skill_named::shared_note(&shared)]);
+    assert!(
+        went.notes[0].contains("“cozy reading time”")
+            && went.notes[0].contains("desk glow and evening read"),
+        "{:?}",
+        went.notes
+    );
+}
