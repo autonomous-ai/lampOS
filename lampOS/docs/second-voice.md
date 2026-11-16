@@ -845,7 +845,9 @@ order is kept. A written turn is the same from the chat on.
     `speak_fresh`, the Gemini speech's `speak`), under a short lock. Sound
     is counted where each block goes onto the speech-to-text socket, a
     hundred times a second, so that takes no lock: one flag read and one
-    add. A thread of its own adds the counts to the
+    add. Both ways of listening count it (`stt.rs`'s `run` and Flux's),
+    the stop words' lines with them, and so does the quiet Flux sends to
+    keep a line. A thread of its own adds the counts to the
     file at most once a minute, under a file lock, written whole beside
     it and moved over it. The voice and its second-route worker are two
     processes and each adds its own.
