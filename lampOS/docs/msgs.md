@@ -640,10 +640,14 @@ and are re-exported at the crate root; `reports_topics()` and
 | `AccountState` | `account/state` | latest | 5 s / 15 s | Whether this lamp's login is no longer accepted (`signed_out`) and how long that has lasted (`for_s`), said by `lamp-cloud` with `LAMP_SIGNED_OUT=on` or `LAMP_SERVICES=on` and read by the voice (held turns with `LAMP_SIGNED_OUT=on`; the owner's kept voice print removed) ([cloud.md](cloud.md), "Signed out"). Past its lifespan or absent means signed in |
 | `Energy` | `character/energy` | latest | 5 s / none | How lively the lamp moves, 1 (as it always moved) to 5 (`level`), and whether the owner picked it or it was worked out from the character words (`chosen`), said by `lamp-cloud` from `/etc/lampOS/setup/energy` whatever switch is set, for the body ([chosen-voice.md](chosen-voice.md), "Energy", #6893). A setting, not a reading: no lifespan, a reader keeps the last it heard; none heard is level 1 |
 | `ReportsState` | `reports/state` | latest | 5 s / 15 s | Whether reports are being sent (`share`: the switch on and the person's yes), how many wait (`queued`), and how the newest choice was made: `by` (`voice`, `app`, `setup` or null), `held`, and `at_s` (wall seconds) |
+| `VoiceTurnTime` | `voice/turn_time` | event | none / none | One answer's wait, end of speech decided to its first audio, in whole milliseconds (`after_ms`), for the report counters' `voice_turn_ms` ([cloud.md](cloud.md), "Report counters") |
 
 Published by the voice's `reports_stop` (`reports/request`) and
 `lamp-cloud` (`reports/state`), only with `LAMP_REPORTS=on`; the voice's
 `reports_state` reads `reports/state`.
+`voice/turn_time` is the voice's (`turn_time_out`), only with
+`LAMP_REPORT_COUNTERS=on`; `lamp-cloud` takes it under `cloud_turn_times`
+and counts it only with the person's yes (#6256 F8).
 
 ## The owner's place (not a topic)
 
