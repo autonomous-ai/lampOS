@@ -2763,9 +2763,9 @@ fn run_switched(
     // or spelled by them now (#5140 row 5, lamp-0c4e: the first name heard
     // was kept, misheard, without being said back).
     if setup
-        && !(spelling_asked(said) && spelled_by_them(name, &said.this))
-        && !said_back_and_agreed(name, said)
-        && !corrected
+        && !(spelling_asked(said) && spelled_by_them(name, &said.this)
+            || said_back_and_agreed(name, said)
+            || corrected)
     {
         return (json!({"error": SAY_IT_BACK}), true);
     }
@@ -6211,9 +6211,15 @@ mod tests {
         };
         let cases = [
             // Heard as the letter, read back as the word, then a yes.
-            ("Jay", said("Call me J.", "Shall I call you Jay instead?", "Yes.")),
+            (
+                "Jay",
+                said("Call me J.", "Shall I call you Jay instead?", "Yes."),
+            ),
             // The model kept the letter; the yes spells the word.
-            ("J", said("Call me Jay.", "Shall I call you J instead?", "Yes, J a y.")),
+            (
+                "J",
+                said("Call me Jay.", "Shall I call you J instead?", "Yes, J a y."),
+            ),
         ];
         let (socket, sent) = eyes(
             cases
@@ -6222,20 +6228,48 @@ mod tests {
                 .collect(),
         );
         for (name, said) in &cases {
-            let (off, _) =
-                run_switched(&socket, &rename(name), switches(false), said, None, &mut None);
+            let (off, _) = run_switched(
+                &socket,
+                &rename(name),
+                switches(false),
+                said,
+                None,
+                &mut None,
+            );
             assert!(refused_here(&off), "off, {name}, {said:?}: {off}");
-            let (on, _) =
-                run_switched(&socket, &rename(name), switches(true), said, None, &mut None);
+            let (on, _) = run_switched(
+                &socket,
+                &rename(name),
+                switches(true),
+                said,
+                None,
+                &mut None,
+            );
             assert_eq!(on["ok"], true, "on, {name}, {said:?}: {on}");
         }
         // Another letter, or a name not said, stays refused.
         for (name, said) in [
-            ("Jay", said("Call me K.", "Shall I call you Jay instead?", "Yes.")),
-            ("Jay", said("Call me Jay.", "Shall I call you Jay instead?", "Yes, K a y.")),
+            (
+                "Jay",
+                said("Call me K.", "Shall I call you Jay instead?", "Yes."),
+            ),
+            (
+                "Jay",
+                said(
+                    "Call me Jay.",
+                    "Shall I call you Jay instead?",
+                    "Yes, K a y.",
+                ),
+            ),
         ] {
-            let (on, _) =
-                run_switched(&socket, &rename(name), switches(true), &said, None, &mut None);
+            let (on, _) = run_switched(
+                &socket,
+                &rename(name),
+                switches(true),
+                &said,
+                None,
+                &mut None,
+            );
             assert!(refused_here(&on), "{said:?}: {on}");
         }
         // The eyes keep the name as the model gave it.
@@ -6319,7 +6353,11 @@ mod tests {
             ("Linh", "No, N as in nose."),
             ("Ana", "Nice, thanks."),
         ] {
-            let on = run(&call(name, true), switches(true, false), &after(read_back, this));
+            let on = run(
+                &call(name, true),
+                switches(true, false),
+                &after(read_back, this),
+            );
             assert!(refused_here(&on), "{name}, {this}: {on}");
         }
         assert_eq!(sent.join().unwrap().len(), 6);

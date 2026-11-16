@@ -77,10 +77,7 @@ fn face_save_note(name: Option<&str>) -> String {
     let (ask, call) = match name {
         Some(name) => (
             format!("\"Shall I remember your face as {name}?\""),
-            format!(
-                "call {} with name \"{name}\"",
-                crate::known_faces::REMEMBER
-            ),
+            format!("call {} with name \"{name}\"", crate::known_faces::REMEMBER),
         ),
         None => (
             "\"Shall I remember your face as\" and their name".to_owned(),
