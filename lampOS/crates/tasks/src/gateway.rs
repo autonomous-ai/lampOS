@@ -123,6 +123,10 @@ pub const ALLOWLIST_ADD: [&str; 8] = [
 /// One approvals read's bound: OpenClaw's CLI is Node, slow to start on a
 /// lamp; past it the read is killed and counts as not served yet.
 const READ_WITHIN: Duration = Duration::from_secs(20);
+/// One allow-list add's bound (#7280): a just-restarted Gateway answered
+/// lamp-c0a4's approvals RPCs in up to 12 s each (16 Nov) and an add ran
+/// past 20 s, so the add has its own, longer bound.
+const ADD_WITHIN: Duration = Duration::from_secs(60);
 /// What the read asks the Gateway to answer within (`{ms}`).
 const READ_RPC_MS: u64 = 10_000;
 /// Between two approvals reads, at least: each starts a Node process, so
@@ -203,8 +207,9 @@ impl Serving {
         )
         .with_add(Box::new(ApprovalsRead::new(
             ALLOWLIST_ADD.map(str::to_owned).to_vec(),
-            READ_WITHIN,
-            READ_EVERY,
+            ADD_WITHIN,
+            // No spacing: a failed add is tried once more at once.
+            Duration::ZERO,
         )))
     }
 
@@ -258,12 +263,22 @@ impl Probe for Serving {
         // A read from the old process does not qualify its replacement.
         let same_listener = listener == (self.listener)();
         let read = read && same_listener && !cancelled() && Instant::now() < until;
-        // A failed add does not hold the run (the entry may be there): the
-        // start is just not kept, so the next run reads and adds again.
+        // A failed add is tried once more at once; failing again, it does
+        // not hold the run (the entry may be there): the start is just not
+        // kept, so the next run reads and adds again.
         let added = !read
             || self.add.as_mut().is_none_or(|add| {
+                if add.ready_until(until, cancelled) {
+                    return true;
+                }
+                let first = add.not_ready();
                 let added = add.ready_until(until, cancelled);
-                if !added {
+                if added {
+                    eprintln!(
+                        "tasks: the OpenClaw Gateway's allow-list add for {} succeeded on its second try (the first: {first})",
+                        crate::skill_start::LAUNCHER
+                    );
+                } else {
                     eprintln!(
                         "tasks: the OpenClaw Gateway's allow-list add for {} did not succeed; the next run tries again",
                         crate::skill_start::LAUNCHER
@@ -301,6 +316,8 @@ pub struct ApprovalsRead {
     within: Duration,
     every: Duration,
     last: Option<Instant>,
+    /// How the last run ended, in words: its exit, or why it was stopped.
+    outcome: String,
 }
 
 impl ApprovalsRead {
@@ -310,15 +327,17 @@ impl ApprovalsRead {
             within,
             every,
             last: None,
+            outcome: "not run".into(),
         }
     }
 
     /// One read, killed with its process group past `within`.
-    fn read(&self, until: Instant, cancelled: &dyn Fn() -> bool) -> bool {
+    fn read(&mut self, until: Instant, cancelled: &dyn Fn() -> bool) -> bool {
         use rustix::process::{Pid, Signal, WaitId, WaitIdOptions, kill_process_group, waitid};
         use std::os::unix::process::CommandExt;
         use std::process::{Command, Stdio};
         if cancelled() || Instant::now() >= until {
+            self.outcome = "past the run's bound".into();
             return false;
         }
         let ms = READ_RPC_MS.to_string();
@@ -336,6 +355,7 @@ impl ApprovalsRead {
             .process_group(0)
             .spawn()
         else {
+            self.outcome = "not started".into();
             return false;
         };
         let pid = Pid::from_child(&child);
@@ -360,6 +380,13 @@ impl ApprovalsRead {
         let _ = kill_process_group(pid, Signal::KILL);
         let _ = child.kill();
         let _ = child.wait();
+        self.outcome = match code {
+            Some(code) => format!("exit {code}"),
+            None if began.elapsed() >= self.within => {
+                format!("killed at its {} s bound", self.within.as_secs())
+            }
+            None => "stopped".into(),
+        };
         code == Some(0) && !cancelled() && Instant::now() < until
     }
 }
@@ -375,6 +402,10 @@ impl Probe for ApprovalsRead {
         }
         self.last = Some(Instant::now());
         self.read(until, cancelled)
+    }
+
+    fn not_ready(&self) -> String {
+        self.outcome.clone()
     }
 }
 
@@ -1218,17 +1249,52 @@ mod tests {
         );
     }
 
-    /// #7280: an add that fails does not hold the run, but the start is not
-    /// kept, so the next run adds again.
+    /// #7280: an add that fails both its tries does not hold the run, but
+    /// the start is not kept, so the next run adds again.
     #[test]
     fn a_failed_add_is_tried_again_by_the_next_run() {
         let dir = tempfile::tempdir().unwrap();
         let served = Arc::new(Mutex::new(None));
         let (add, _) = add_script(dir.path(), 1);
         assert_eq!(look_with_add(7, &served, add), (true, None));
+        assert_eq!(lines(&dir.path().join("runs")), 2, "not tried twice");
         let (add, _) = add_script(dir.path(), 0);
         assert_eq!(look_with_add(7, &served, add), (true, Some(7)));
-        assert_eq!(lines(&dir.path().join("runs")), 2);
+        assert_eq!(lines(&dir.path().join("runs")), 3);
+    }
+
+    /// #7280, lamp-c0a4 16 Nov: a just-restarted Gateway let an add run
+    /// past its bound. A first add that fails is tried once more on the
+    /// same start; once that succeeds, the start is kept and the next run
+    /// on it adds nothing.
+    #[test]
+    fn a_first_add_that_fails_is_tried_once_more_on_the_same_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let served = Arc::new(Mutex::new(None));
+        let (mut add, _) = add_script(dir.path(), 0);
+        // Fails on its first call only: exits 1 while `runs` has one line.
+        add.argv[1] = {
+            let script = dir.path().join("first-fails");
+            std::fs::write(
+                &script,
+                format!(
+                    "#!/bin/sh\n/bin/sh {add} \"$@\"\n[ \"$(wc -l < {d}/runs)\" -ge 2 ]\n",
+                    add = add.argv[1],
+                    d = dir.path().display()
+                ),
+            )
+            .unwrap();
+            script.display().to_string()
+        };
+        assert_eq!(look_with_add(7, &served, add), (true, Some(7)));
+        assert_eq!(lines(&dir.path().join("runs")), 2, "not tried twice");
+        let (add, _) = add_script(dir.path(), 0);
+        assert_eq!(look_with_add(7, &served, add), (true, Some(7)));
+        assert_eq!(
+            lines(&dir.path().join("runs")),
+            2,
+            "added again, same start"
+        );
     }
 
     /// The add is lamp-update's own `exec_allowlist_args` add, word for

@@ -4025,9 +4025,17 @@ file:
   above), before the first run's hand-over, lamp-tasks runs the same add
   (`openclaw approvals allowlist add --gateway --agent main
   /usr/local/lib/lampos/skill-start`, `gateway::ALLOWLIST_ADD`, as
-  `lampos` with the read's environment, bounded at 20 s). A start whose
+  `lampos` with the read's environment, bounded at 60 s: on lamp-c0a4 a
+  just-restarted gateway answered approvals RPCs in up to 12 s each and
+  an add ran past an earlier 20 s bound). A start whose
   list has the entry writes nothing, and later runs on the same start
-  run no add. A failed add is journaled ("tasks: the OpenClaw Gateway's
+  run no add. An add that fails or reaches its bound is tried once more
+  at once, on the same start, with the same bound; a second try that
+  succeeds is journaled ("tasks: the OpenClaw Gateway's allow-list add
+  for /usr/local/lib/lampos/skill-start succeeded on its second try (the
+  first: exit 1)", or "killed at its 60 s bound") and the start is kept.
+  Both bounded by the run's own gateway wait. An add that fails both
+  tries is journaled ("tasks: the OpenClaw Gateway's
   allow-list add for /usr/local/lib/lampos/skill-start did not succeed;
   the next run tries again") and does not hold the run, but the start
   is not kept, so the next run reads and adds again. With
