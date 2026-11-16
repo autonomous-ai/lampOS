@@ -376,6 +376,16 @@ impl Agent {
     /// a make) is journaled with its name and not handed over, so
     /// DeepSeek's answer stands. With [`Agent::one_path`], the lamp's agent
     /// when the one run path takes it ([`ONE_PATH_ENGINES`]).
+    /// How long the make's answer is waited for: [`Agent::within`] and a
+    /// grace; with the one run path, the hand-over's own [`Agent::within`]
+    /// too, as lamp-tasks counts a gateway make's deadline from it (#7245).
+    pub fn read_within(&self, grace: Duration) -> Duration {
+        match self.one_path {
+            true => self.within * 2 + grace,
+            false => self.within + grace,
+        }
+    }
+
     pub fn hermes(&self) -> Option<&'static str> {
         let engine = self.engine()?;
         if engine == MAKE_ENGINE {
@@ -443,7 +453,7 @@ impl Agent {
         }
         stream
             .set_write_timeout(Some(SEND_WITHIN))
-            .and_then(|()| stream.set_read_timeout(Some(self.within + grace)))
+            .and_then(|()| stream.set_read_timeout(Some(self.read_within(grace))))
             .and_then(|()| writeln!(stream, "{line}"))
             .map_err(|error| NotWritten::Failed(format!("the make was not sent: {error}")))?;
         let mut lines = BufReader::new(std::io::Read::take(stream, 2 * MOST_ANSWER_BYTES as u64));
