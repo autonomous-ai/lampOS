@@ -4946,6 +4946,37 @@ An ask that names its task (`"task":10`) is given that task's news only,
 so the skill's look and light go with its own task (the reviewer on #1042).
 Progress is the Policy's to time already and is told as before.
 
+**Held while the lamp is muted or listening** (lamp-c0a4, 16 Nov 15:35): a
+task settled while the voice was restarting; its say service refused the
+skill's ask with "the lamp is muted", and the news waited 12 minutes for the
+person's next line. Now lamp-skills holds a `from: tasks` say the voice
+refuses because the lamp is muted or listening, and asks it again every 2 s
+(`lamp_skills::NEWS_HELD_RETRY_MS`) until the lamp is free, so it is told
+then, once (the voice tells each piece once, whoever asks). The skill's later
+runs queue behind the held one, so held news is told in order. With the lamp
+private (the privacy switch read closed on `voice/privacy`, or the voice
+muted by the person: `lamp_skills::routine::private_for_news`) it is not
+held and waits for the next reply, as before; a switch not yet read, as a
+restarting voice has it, is not privacy. Held past 5 min
+(`NEWS_HELD_MOST_MS`) from the first refusal, it is dropped. Any other
+refusal is not held. The journal has one line when it is held, and one when
+it is told, let go to privacy or dropped, with the task's number, counts and
+codes, never the news's words:
+
+```
+lamp-skills: skill:task-news: news held (task 62): say: refused (the lamp is muted); asked again each 2 s, at most 300 s
+lamp-skills: skill:task-news: news asked again after 6 s held (task 62, 4 asks): say: spoken
+lamp-skills: skill:task-news: news dropped: held 300 s (151 asks) for the lamp to be free, past its 300 s bound (task 62)
+```
+
+Tests: `news_refused_while_muted_or_listening_is_held_then_told_once`,
+`two_held_news_items_are_told_in_order`,
+`news_held_past_its_bound_is_dropped_with_its_line`,
+`news_refused_with_privacy_on_waits_for_the_next_reply_as_before`
+(lamp-skills' lib), and
+`task_news_refused_while_muted_is_held_and_told_once_the_lamp_is_free`,
+`task_news_refused_with_the_privacy_switch_closed_is_not_held` (its bin).
+
 ### Given with a text (#1673, off unless `LAMP_MESSAGES=on`)
 
 News of work asked for by text that the lamp hasn't told aloud is given

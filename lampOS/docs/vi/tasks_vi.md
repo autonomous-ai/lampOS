@@ -2421,6 +2421,37 @@ nghe trọn chỉ quyết định có kể lại hay không (`LAMP_TASK_NEWS_RET
   `news_begun_closes_its_harness_at_once_and_is_still_told_once_more`
   (`task_news`).
 
+**Giữ lại khi đèn đang tắt mic hoặc đang nghe** (lamp-c0a4, 16/11 15:35):
+một việc xong đúng lúc voice đang khởi động lại; say service của voice từ
+chối lời hỏi của kỹ năng với "the lamp is muted", và tin phải chờ 12 phút đến
+câu nói tiếp theo của người dùng. Giờ lamp-skills giữ một lời say
+`from: tasks` mà voice từ chối vì đèn tắt mic hoặc đang nghe, và hỏi lại mỗi
+2 s (`lamp_skills::NEWS_HELD_RETRY_MS`) cho đến khi đèn rảnh, nên tin được kể
+lúc đó, một lần (voice kể mỗi tin một lần, dù ai hỏi). Các lần chạy sau của
+kỹ năng xếp hàng sau lần đang giữ, nên các tin được giữ được kể đúng thứ tự.
+Khi đèn ở chế độ riêng tư (công tắc riêng tư đọc là đóng trên
+`voice/privacy`, hoặc voice bị người dùng tắt mic:
+`lamp_skills::routine::private_for_news`) thì tin không được giữ và chờ câu
+trả lời tiếp theo, như trước; công tắc chưa đọc được, như lúc voice khởi động
+lại, không tính là riêng tư. Giữ quá 5 phút (`NEWS_HELD_MOST_MS`) kể từ lần
+từ chối đầu thì tin bị bỏ. Từ chối vì lý do khác thì không giữ. Journal có
+một dòng khi giữ, và một dòng khi kể, khi nhường cho chế độ riêng tư hoặc khi
+bỏ, chỉ có số việc, số đếm và mã, không bao giờ có lời của tin:
+
+```
+lamp-skills: skill:task-news: news held (task 62): say: refused (the lamp is muted); asked again each 2 s, at most 300 s
+lamp-skills: skill:task-news: news asked again after 6 s held (task 62, 4 asks): say: spoken
+lamp-skills: skill:task-news: news dropped: held 300 s (151 asks) for the lamp to be free, past its 300 s bound (task 62)
+```
+
+Test: `news_refused_while_muted_or_listening_is_held_then_told_once`,
+`two_held_news_items_are_told_in_order`,
+`news_held_past_its_bound_is_dropped_with_its_line`,
+`news_refused_with_privacy_on_waits_for_the_next_reply_as_before`
+(lib của lamp-skills), và
+`task_news_refused_while_muted_is_held_and_told_once_the_lamp_is_free`,
+`task_news_refused_with_the_privacy_switch_closed_is_not_held` (bin).
+
 ## Việc giao là toàn bộ lời nhờ (#6527)
 
 Trên 52e6 ngày 12/11 (row-6361c), câu "have your agent list five fruits that

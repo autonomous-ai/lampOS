@@ -967,6 +967,88 @@ const MOST_SAY_EXPIRES_MS: u64 = 3_600_000;
 /// (`lamp_voice::say::MOST_WORDS_BYTES`).
 pub const MOST_WORDS_BYTES: usize = 900;
 
+/// The longest a news say (`say = { from = "tasks" }`) refused because the
+/// lamp is muted or listening is held, and asked again, before it is
+/// dropped (lamp-c0a4, 16 Nov 15:35: a task settled while the voice was
+/// restarting, its say service refused "the lamp is muted", and the news
+/// waited 12 minutes for the person's next line).
+pub const NEWS_HELD_MOST_MS: u64 = 5 * 60_000;
+/// How often held news is asked of the voice again ([`say_held`]).
+pub const NEWS_HELD_RETRY_MS: u64 = 2_000;
+/// The say outcomes, as lamp-skills writes them, that hold news for later:
+/// the voice's own refusals while the microphones are closed (its privacy
+/// wait, a restart's included) or someone is heard (`lamp_voice::say`),
+/// never one for any other reason.
+const NEWS_HELD_FOR: [&str; 2] = [
+    "say: refused (the lamp is muted)",
+    "say: refused (the lamp is listening)",
+];
+
+/// Asks `ask` (one say of the voice for `task`'s news, its outcome as
+/// lamp-skills writes it) and, while the voice refuses it because the lamp
+/// is muted or listening, holds it and asks again each
+/// [`NEWS_HELD_RETRY_MS`], so the news is told once the lamp is free. The
+/// skill's runs queue behind this one, so held news is told in order.
+/// Told once: each ask is the voice's one piece of news, which it tells
+/// once whoever asks. With the lamp private (`private`, the privacy switch
+/// closed or the voice muted by the person) it is not held, and waits for
+/// the next reply as before. Bounded: past [`NEWS_HELD_MOST_MS`] from the
+/// first refusal it is dropped, and the outcome says so. `journal` is
+/// given one line when it is held and one when it is told, let go or
+/// dropped: the task's number, counts and codes, never the news's words.
+pub fn say_held(
+    task: Option<u64>,
+    mut ask: impl FnMut() -> String,
+    mut private: impl FnMut() -> Option<&'static str>,
+    mut now_ms: impl FnMut() -> u64,
+    mut wait: impl FnMut(std::time::Duration),
+    mut journal: impl FnMut(String),
+) -> String {
+    let mut outcome = ask();
+    if !NEWS_HELD_FOR.contains(&outcome.as_str()) || private().is_some() {
+        return outcome;
+    }
+    let task = task.map_or_else(|| "no task named".to_owned(), |task| format!("task {task}"));
+    let first_ms = now_ms();
+    let mut asks = 1_u64;
+    journal(format!(
+        "news held ({task}): {outcome}; asked again each {} s, at most {} s",
+        NEWS_HELD_RETRY_MS / 1_000,
+        NEWS_HELD_MOST_MS / 1_000
+    ));
+    loop {
+        let held_ms = now_ms().saturating_sub(first_ms);
+        if held_ms >= NEWS_HELD_MOST_MS {
+            let dropped = format!(
+                "dropped: held {} s ({asks} asks) for the lamp to be free, past its {} s bound",
+                held_ms / 1_000,
+                NEWS_HELD_MOST_MS / 1_000
+            );
+            journal(format!("news {dropped} ({task})"));
+            return format!("{outcome}; {dropped}");
+        }
+        wait(std::time::Duration::from_millis(
+            NEWS_HELD_RETRY_MS.min(NEWS_HELD_MOST_MS - held_ms),
+        ));
+        if let Some(why) = private() {
+            journal(format!(
+                "news let go after {} s held ({task}, {asks} asks): {why}, so it waits for the next reply",
+                now_ms().saturating_sub(first_ms) / 1_000
+            ));
+            return outcome;
+        }
+        outcome = ask();
+        asks += 1;
+        if !NEWS_HELD_FOR.contains(&outcome.as_str()) {
+            journal(format!(
+                "news asked again after {} s held ({task}, {asks} asks): {outcome}",
+                now_ms().saturating_sub(first_ms) / 1_000
+            ));
+            return outcome;
+        }
+    }
+}
+
 /// What a skill granted `prepare_unplug` says at each of the operation's
 /// outcomes, in its own `skill.toml`'s `[unplug]` (#940: the first move of
 /// "Everything is a skill"). The fold, its readiness check and the voice's
@@ -12073,5 +12155,167 @@ mod tests {
         package::remove(&root, Some(&state), "photo-booth").unwrap();
         assert!(!folder.exists());
         task::set_on_here(None);
+    }
+
+    /// A voice for [`say_held`]'s tests on a driven clock: muted until
+    /// `free_ms`, then each ask tells its task's news, once.
+    struct HeldVoice {
+        now: std::cell::Cell<u64>,
+        free_ms: u64,
+        told: std::cell::RefCell<Vec<u64>>,
+        asked: std::cell::Cell<u32>,
+        lines: std::cell::RefCell<Vec<String>>,
+    }
+
+    impl HeldVoice {
+        fn new(free_ms: u64) -> Self {
+            Self {
+                now: std::cell::Cell::new(1_000),
+                free_ms,
+                told: Default::default(),
+                asked: Default::default(),
+                lines: Default::default(),
+            }
+        }
+
+        /// `task`'s news asked as task-news's run asks it, `refused` while
+        /// the lamp is not free.
+        fn news(&self, task: u64, refused: &str) -> String {
+            say_held(
+                Some(task),
+                || {
+                    self.asked.set(self.asked.get() + 1);
+                    if self.now.get() < self.free_ms {
+                        return format!("say: refused ({refused})");
+                    }
+                    let mut told = self.told.borrow_mut();
+                    if told.contains(&task) {
+                        return "say: expired".into();
+                    }
+                    told.push(task);
+                    "say: spoken".into()
+                },
+                || None,
+                || self.now.get(),
+                |wait| self.now.set(self.now.get() + wait.as_millis() as u64),
+                |line| self.lines.borrow_mut().push(line),
+            )
+        }
+    }
+
+    /// News asked while the lamp is muted, or while it listens, is held, not
+    /// told; once the lamp is free it is told, exactly once, and nothing is
+    /// asked after it (lamp-c0a4, 16 Nov 15:35). One line when held, one
+    /// when told, with no words of the news.
+    #[test]
+    fn news_refused_while_muted_or_listening_is_held_then_told_once() {
+        for refused in ["the lamp is muted", "the lamp is listening"] {
+            let voice = HeldVoice::new(1_000 + 3 * NEWS_HELD_RETRY_MS);
+            assert_eq!(voice.news(62, refused), "say: spoken");
+            assert_eq!(*voice.told.borrow(), [62], "told exactly once");
+            assert_eq!(voice.asked.get(), 4, "nothing asked after it was told");
+            assert_eq!(voice.now.get(), voice.free_ms);
+            assert_eq!(
+                *voice.lines.borrow(),
+                [
+                    format!(
+                        "news held (task 62): say: refused ({refused}); asked again each 2 s, at most 300 s"
+                    ),
+                    "news asked again after 6 s held (task 62, 4 asks): say: spoken".to_owned(),
+                ]
+            );
+        }
+        // Any other refusal is not held: asked once, its outcome as it was.
+        let voice = HeldVoice::new(u64::MAX);
+        assert_eq!(
+            voice.news(62, "the lamp is paused"),
+            "say: refused (the lamp is paused)"
+        );
+        assert_eq!((voice.asked.get(), voice.now.get()), (1, 1_000));
+        assert!(voice.lines.borrow().is_empty());
+    }
+
+    /// Two pieces of news held while the lamp is muted are told in order,
+    /// each once, as the skill's runs queue one behind the other.
+    #[test]
+    fn two_held_news_items_are_told_in_order() {
+        let voice = HeldVoice::new(1_000 + 5 * NEWS_HELD_RETRY_MS);
+        assert_eq!(voice.news(62, "the lamp is muted"), "say: spoken");
+        assert_eq!(voice.news(63, "the lamp is muted"), "say: spoken");
+        assert_eq!(*voice.told.borrow(), [62, 63]);
+        assert_eq!(
+            voice.lines.borrow().len(),
+            2,
+            "62 held and told; 63 told at once"
+        );
+    }
+
+    /// News the lamp stays muted for past [`NEWS_HELD_MOST_MS`] is dropped,
+    /// never told, and one line says so, as does its run's Done line.
+    #[test]
+    fn news_held_past_its_bound_is_dropped_with_its_line() {
+        let voice = HeldVoice::new(u64::MAX);
+        let outcome = voice.news(62, "the lamp is muted");
+        assert_eq!(voice.now.get(), 1_000 + NEWS_HELD_MOST_MS);
+        assert_eq!(
+            u64::from(voice.asked.get()),
+            NEWS_HELD_MOST_MS / NEWS_HELD_RETRY_MS + 1
+        );
+        assert!(voice.told.borrow().is_empty());
+        assert_eq!(
+            outcome,
+            "say: refused (the lamp is muted); dropped: held 300 s (151 asks) for the lamp to be free, past its 300 s bound"
+        );
+        assert_eq!(
+            voice.lines.borrow().last().map(String::as_str),
+            Some(
+                "news dropped: held 300 s (151 asks) for the lamp to be free, past its 300 s bound (task 62)"
+            )
+        );
+        assert_eq!(voice.lines.borrow().len(), 2);
+    }
+
+    /// With the lamp private, news refused is not held: asked once, its
+    /// outcome as before, no line; it waits for the next reply. Private
+    /// while held, it is let go to that, with its line.
+    #[test]
+    fn news_refused_with_privacy_on_waits_for_the_next_reply_as_before() {
+        let mut asked = 0;
+        let outcome = say_held(
+            Some(62),
+            || {
+                asked += 1;
+                "say: refused (the lamp is muted)".to_owned()
+            },
+            || Some("the privacy switch is closed"),
+            || 0,
+            |_| panic!("held"),
+            |line| panic!("a line: {line}"),
+        );
+        assert_eq!(
+            (outcome.as_str(), asked),
+            ("say: refused (the lamp is muted)", 1)
+        );
+        let looks = std::cell::Cell::new(0);
+        let mut lines = Vec::new();
+        let outcome = say_held(
+            Some(62),
+            || "say: refused (the lamp is muted)".to_owned(),
+            || {
+                looks.set(looks.get() + 1);
+                (looks.get() > 1).then_some("the privacy switch is closed")
+            },
+            || 0,
+            |_| {},
+            |line| lines.push(line),
+        );
+        assert_eq!(outcome, "say: refused (the lamp is muted)");
+        assert_eq!(lines.len(), 2);
+        assert!(
+            lines[1].starts_with(
+                "news let go after 0 s held (task 62, 1 asks): the privacy switch is closed"
+            ),
+            "{lines:?}"
+        );
     }
 }
