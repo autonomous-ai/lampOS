@@ -444,6 +444,7 @@ of each, and its kind and period as a declaration, are in
 | `voice/heard`, `voice/said` | What was heard and what was said, as text | stream | Voice | With each thing said |
 | `voice/state` | Resting, listening, thinking or speaking | latched | Voice | When it changes, and once a second |
 | `voice/turn` | A turn's verdict: its request, and whether it was `answered` or its answer `held_back` as not said to the lamp, as the voice's journal says it (#1155, [policy.md](policy.md#the-quiet-counts-talk-to-the-lamp-1155)) | stream | Voice, on the bus as `room/state` is | Once for each turn the rule judged, as its answer is let out or held back; again, `held_back`, when the model declines the line (`not_for_me`) |
+| `voice/decision` | What the lamp decided on a turn (#7267, `VoiceDecision`): `answered` with the functions it called (names only, at most 8, each at most 40 bytes); `handed` with the task's number, the engine it goes to (always named, 1..32 lowercase letters, digits or `_`), and its stage (`prepared`, `started`, `declined`); `held_back`; or `error` with a short code name. With `first_reply_ms` (words heard to first answer audio) and `host_request` (the earlier request it steers or joins) when known; a request may have several, the latest per request wins. Names and numbers only, never words | stream | The second voice, on the bus as `voice/turn` is | `answered` once a turn its model finished (or declined after a tool ran), with that turn's tools; `held_back` as `voice/turn` says it; `handed` once at each step of a hand-over: prepared, started (the yes taken in code, or the model's confirm), declined (the person's no, or a corrected ask replacing it) |
 | `voice/tone` | How a line sounded against the person's own way of speaking: its request, its arousal (calm -1 to lively +1, from its prosody), how sure, and its valence (down -1 to glad +1, from its words, when a word says it). Numbers only ([voice-tone.md](voice-tone.md)) | stream | Voice, with `LAMP_VOICE_TONE=on` | Once a line, when its words come |
 | `memory/forgot` | Memory has forgotten everything under a person, asked by the app or by voice: their id only, or none for every person ([memory.md](memory.md#forgets-told-on-the-bus-memoryforgot)) | event | Memory, with `--bus-root` | Once a forget |
 | `voice/link` | Whether the provider can be reached | latched | Voice, with `LAMP_BUS=on` and `LAMP_VOICE_LINK=on` (#830): unavailable once down for 5 s, reason `transport` | Once a second |
@@ -670,6 +671,7 @@ are unchanged.
 | Topic | Kind | Published by | Intended reader |
 |---|---|---|---|
 | `tasks/status` | latest, no period, no lifespan | `lamp-tasks serve --progress` | The policy's progress question (`lamp-policy --progress`); the voice's task news, for a task newly settled (#560, [tasks.md](tasks.md), "Telling") and, with `LAMP_PROGRESS_NEWS=on`, for progress; `lamp-peek`'s Tasks section and overview, read as the kept value ([peek.md](peek.md), #7208) |
+| `tasks/step` | event, no period, no lifespan | Nothing yet: declared ahead of its publisher, `lamp-tasks` reading the engine's own transcript behind a switch, off unless set (#7267 PR 2) | `lamp-peek`, in monitor mode only (#7267 PR 3) |
 
 The [`TaskStatus` message](msgs.md#the-tasks-contract) says, as typed state,
 how each piece of work the lamp handed over is going; the agent's words stay
@@ -677,6 +679,14 @@ in the tasks part and are read from its socket only when the lamp will speak
 ([tasks.md](tasks.md#progress-on-the-bus-serve---progress-732)). One value
 holds every task, so a subscriber that starts late has them all. Without
 `--progress` the topic is never made.
+
+The [`TaskStep` message](msgs.md#the-tasks-contract) (#7267) is one step an
+agent took: the task's number, its engine, the step's number, when, its kind
+(`call`, `reply`, `error`), the tool called (at most 40 bytes), the start of
+its arguments and of its result (each at most 120 bytes, cut on a whole
+character), and whether it succeeded when the transcript says. It carries words, so its publisher will be
+switched and off unless set. The task's number is the same one
+`tasks/status` and `voice/decision` give.
 
 ## Optional skills topic (seventh builder, 2026-10-16)
 
