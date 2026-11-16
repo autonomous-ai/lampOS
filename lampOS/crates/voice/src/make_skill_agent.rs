@@ -435,6 +435,11 @@ impl Agent {
         // is as above, byte for byte.
         if self.one_path {
             line["one_path"] = json!(true);
+            // The lamp's agent as seen here, so lamp-tasks never makes an
+            // OpenClaw lamp's skill as a Hermes make (#7245).
+            if let Some(engine) = self.engine() {
+                line["engine"] = json!(engine);
+            }
         }
         stream
             .set_write_timeout(Some(SEND_WITHIN))
@@ -1059,7 +1064,8 @@ pub(crate) mod tests {
         assert_eq!(make["one_path"], json!(true));
         let mut keys = make.as_object().unwrap().keys().collect::<Vec<_>>();
         keys.sort();
-        assert_eq!(keys, ["one_path", "op", "rules", "within_ms"]);
+        assert_eq!(keys, ["engine", "one_path", "op", "rules", "within_ms"]);
+        assert_eq!(make["engine"], json!("OpenClaw"));
     }
 
     /// #7245: the switch off, an OpenClaw lamp is as today: not handed
