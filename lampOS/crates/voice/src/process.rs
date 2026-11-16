@@ -2292,6 +2292,8 @@ fn second_route_worker_environment(
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
         crate::second_provider::CHAT_WARM_ENVIRONMENT,
         crate::second_provider::net::CHAT_KEPT_ENVIRONMENT,
+        // The day's thinking counted in this worker (#7347): numbers only.
+        crate::day_tally::SWITCH,
         crate::second_provider::CHAT_SECOND_TRY_ENVIRONMENT,
         crate::second_provider::SPEECH_WARM_ENVIRONMENT,
         crate::second_provider::SPEECH_SOCKET_ENVIRONMENT,
@@ -3640,6 +3642,7 @@ mod tests {
                     || name == crate::second_provider::net::QUIET_HELD_ENVIRONMENT
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
                     || name == crate::second_provider::net::CHAT_KEPT_ENVIRONMENT
+                    || name == crate::day_tally::SWITCH
                     || name == crate::second_provider::CHAT_SECOND_TRY_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_SOCKET_ENVIRONMENT
@@ -3976,6 +3979,7 @@ mod tests {
                     "LAMP_UNTIED_ANSWER_GRACE=on",
                     "LAMP_UNTIED_CALLER_SPEAKING=on",
                     "LAMP_UNTIED_GOING_ON=on",
+                    "LAMP_VOICE_DAY_TALLY=on",
                     "LAMP_VOICE_LOOPBACK_SERVICES=on",
                     "LAMP_WINDOW_FROM_START=on",
                 ],
