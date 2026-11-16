@@ -836,11 +836,10 @@ order is kept. A written turn is the same from the chat on.
     is days since 1970. At the first write of a
     new UTC day the day before becomes `yesterday`, whole, so a morning's
     read shows what a day cost; a day older than that is let go. Only a
-    later day turns it over: a clock that has gone back, by a correction
-    across midnight or because it is not set yet, goes on counting into
-    the day the file is on. A file that is there and cannot be read as a
-    tally is begun again, with one journal line saying so. At most eight
-    models are kept apart, the rest as `other`.
+    later day turns it over: a clock that has gone back across midnight
+    goes on counting into the day the file is on. A file that is there
+    and cannot be read as a tally is begun again, with one journal line
+    saying so. At most eight models are kept apart, the rest as `other`.
   - **A turn never waits on it.** An answer is counted in memory where it
     ends, and a line where it is sent to be spoken (`Tts::speak_in`,
     `speak_fresh`, the Gemini speech's `speak`), under a short lock. Sound
@@ -861,6 +860,14 @@ order is kept. A written turn is the same from the chat on.
     4%. A lamp in a busy room spends its day on hearing, even when it
     says little. The relay counts a token its cache held as far less than
     a fresh one, which the two token counts here keep apart.
+  - **The lamp's clock is not always right, and the day must not be lost
+    to it.** Until the clock is set, which is when it reads 1 Nov 2026 or
+    later, nothing is written: the counts wait in memory, and the journal
+    says once that the tally waits for the clock. So a boot before the
+    clock is set neither loses the day nor moves it. A file more than a
+    day ahead of a set clock was written under a clock set ahead and since
+    put right: it is brought back to today with its counts, and the day
+    before it is let go unless it is the day before today.
   - **These are the lamp's own counts, not the bill.** Seconds of sound
     and characters of speech are what the lamp sent. What each costs is
     the relay's to say, and the relay's count of the day stays the true
@@ -877,8 +884,9 @@ order is kept. A written turn is the same from the chat on.
   - Tests: `day_tally::tests` (an answer's usage is read in both services'
     forms, nothing is counted until counting begins, two writers add up
     by model, a new UTC day keeps the day before and begins again, a clock
-    gone back keeps today's counts, sound and spoken lines add up and are
-    told, a bad file begins again and many models are bounded, names are
+    gone back keeps today's counts, a file from a clock set ahead is
+    brought back with its counts, until the clock is set nothing is
+    written, sound and spoken lines add up and are told, a bad file begins again and many models are bounded, names are
     bounded and
     an answer without usage is still counted), and the workers' census
     (`process::switch_census_tests`), which fails if the switch does not
