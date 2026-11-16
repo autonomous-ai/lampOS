@@ -2922,8 +2922,8 @@ bao giờ có lời của nó), nên câu trả lời bị bỏ dở vì lamp-sk
 lại được ghi ở lần khởi động sau (`what its agent found: dropped unsaid,
 lamp-skills restarted while it waited`, `task::telling_dropped`).
 
-Với `LAMP_TOLD_WHEN_ASKED=on` (`lamp-skills` và `lamp-voice`, tắt nếu không
-đặt; #7180, quyết định của first builder): lần chạy chủ đèn nhờ bằng giọng
+Với `LAMP_TOLD_WHEN_ASKED=on` (`lamp-skills` và `lamp-voice`, bật trong các
+unit sản phẩm, tắt nếu không đặt; #7180, quyết định của first builder): lần chạy chủ đèn nhờ bằng giọng
 nói giữ lời trong giờ yên lặng. Trên lamp-9adf lúc 02:28 ngày 16/11, một
 lần chạy ngay được trả lời "Running … now", rồi câu trả lời của agent chờ
 sau giờ yên lặng, không nói gì, đến khi bị bỏ qua sau một giờ. Chỉ lần chạy
@@ -5628,9 +5628,9 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   việc bỏ nằm ngay trong lần nhìn của cổng (`LampRoom::seen`,
   `told_when_asked::quiet_holds`), nên những phút đó không phải giờ yên
   lặng ở đó, và cả câu trả lời tìm thấy lẫn tin tức đều không bị giữ hay
-  bỏ vì chúng. Sản phẩm đặt công tắc này mà không đặt
-  `LAMP_TOLD_WHEN_ASKED`: trên lamp-9adf (18/11, 00:11) "Lamp, use my
-  bitcoin price skill." có câu trả lời của agent được giữ rồi bị giờ yên
+  bỏ vì chúng. Sản phẩm đặt công tắc này, và cả
+  `LAMP_TOLD_WHEN_ASKED` (#7237); trước khi cái nào bỏ giờ yên lặng, trên
+  lamp-9adf (18/11, 00:11) "Lamp, use my bitcoin price skill." có câu trả lời của agent được giữ rồi bị giờ yên
   lặng giữ lại không nói. Câu trả lời trong cuộc trò chuyện đã yêu cầu
   (`answers`) chỉ dành cho câu thất bại; điều agent tìm thấy được nói ngay,
   không qua cổng của lần đọc, khi chủ vừa hỏi (#7894, dưới). Trước đây câu chờ tới một giờ để có đúng
