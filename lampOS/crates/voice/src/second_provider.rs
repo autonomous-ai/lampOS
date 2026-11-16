@@ -19357,7 +19357,7 @@ async fn answer(
         },
         Err(Stop::Declined) => {
             // Counted for the day, with LAMP_VOICE_DAY_TALLY=on (#7347).
-            crate::day_tally::declined();
+            crate::day_tally::declined(request);
             // A line the model declines is told held back, as a line the
             // rule holds is, unless a tool ran for it first (#1155, the
             // first builder on #1817).

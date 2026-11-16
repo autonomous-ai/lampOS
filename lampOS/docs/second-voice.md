@@ -832,8 +832,10 @@ order is kept. A written turn is the same from the chat on.
   - **Where it is kept:** `/var/lib/lampOS/voice/day-tally/tally.json`,
     root's: `{"today": {"day", "models": {NAME: {"answers", "uncounted",
     "prompt_tokens", "cached_tokens", "completion_tokens"}}, "declined",
-    "heard_ms", "spoken_lines", "spoken_chars"}, "yesterday": …}`. `day`
-    is days since 1970. At the first write of a
+    "heard_ms", "heard_lines", "heard_no_words_lines",
+    "heard_no_words_ms", "heard_declined_ms", "spoken_lines",
+    "spoken_chars"}, "yesterday": …}`. `day` is days since 1970. At the
+    first write of a
     new UTC day the day before becomes `yesterday`, whole, so a morning's
     read shows what a day cost; a day older than that is let go. Only a
     later day turns it over: a clock that has gone back across midnight
@@ -854,7 +856,8 @@ order is kept. A written turn is the same from the chat on.
   - **The journal** has one line in each hour in which the process counted
     something: `thinking today (UTC): N chat answers, P prompt tokens (H
     from the cache), C completion tokens; D turns declined; S s of sound
-    sent to be heard; L lines sent to be spoken (K characters)`, and by
+    sent to be heard, of N lines ended M had no words (W s) and X s was in
+    declined turns; L lines sent to be spoken (K characters)`, and by
     model when there is more than one.
   - **Why sound and lines are counted too:** by the relay's own count of
     that lamp's day (Backend on #7347, 16 Nov), thinking was about 38% of
@@ -870,6 +873,26 @@ order is kept. A written turn is the same from the chat on.
     day ahead of a set clock was written under a clock set ahead and since
     put right: it is brought back to today with its counts, and the day
     before it is let go unless it is the day before today.
+  - **What the listening came to** (#7347: which listening can be cut).
+    When a line ends with its words asked for (`SttStream::finish` for a
+    request, `finished` for a stop word), it is counted (`heard_lines`).
+    If no words came back it is counted as that too
+    (`heard_no_words_lines`), with the sound queued on it
+    (`heard_no_words_ms`). When the model declines a
+    turn as not said to the lamp, the sound queued on that request's
+    lines is counted (`heard_declined_ms`); the newest 32 requests are
+    remembered for that, in memory only. So of a day's sound, three parts
+    can be told apart: sound that held no words, words not said to the
+    lamp, and the rest, which is what was answered, failed or given up.
+    The parts are the sound as queued on a line, and `heard_ms` is the
+    sound as sent, so they are close and not equal; a line given up
+    before its end is in `heard_ms` only, and a line nothing was queued
+    on is not counted at all.
+  - **Only the second route's listening and speaking are counted.** The
+    voice and its second-route worker both count, but only the second
+    route's speech-to-text and speech call these. On a lamp whose Live
+    route carries the day, the tally's sound and lines show only the
+    second route's share.
   - **These are the lamp's own counts, not the bill.** Seconds of sound
     and characters of speech are what the lamp sent. What each costs is
     the relay's to say, and the relay's count of the day stays the true
@@ -888,9 +911,10 @@ order is kept. A written turn is the same from the chat on.
     by model, a new UTC day keeps the day before and begins again, a clock
     gone back keeps today's counts, a file from a clock set ahead is
     brought back with its counts, until the clock is set nothing is
-    written, sound and spoken lines add up and are told, a bad file begins again and many models are bounded, names are
-    bounded and
-    an answer without usage is still counted), and the workers' census
+    written, a line's sound is told by what it came to, sound and spoken
+    lines add up and are told with the part of a millisecond carried, a
+    bad file begins again and many models are bounded, names are bounded
+    and an answer without usage is still counted), and the workers' census
     (`process::switch_census_tests`), which fails if the switch does not
     reach the second worker.
 - **With `LAMP_SECOND_STEADY_FIRST=on` a spoken turn's request begins with
