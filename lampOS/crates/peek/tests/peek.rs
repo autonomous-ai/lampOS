@@ -806,6 +806,7 @@ fn the_stream_reports_denied_sessions_and_recovers_without_words_or_paths() {
     const WORD: &str = "Ossifrage";
     const PERMISSION: &str = "Can't read the voice's sessions: permission.";
     const STALE: &str = "Last read is stale.";
+    const FIRST_AUDIO_FROM_BUS: &str = "not known from the bus";
     let rig = Rig::new("read-status", Some(TOKEN));
     let metadata = rig.root.join("sessions/private-session-name/metadata");
     fs::create_dir_all(&metadata).unwrap();
@@ -836,15 +837,16 @@ fn the_stream_reports_denied_sessions_and_recovers_without_words_or_paths() {
     };
     let started = Instant::now();
     let mut stream = EventStream::open(&rig);
-    // Turns falls back to the bus (#7208): no bus turn yet, an empty state,
-    // never the permission error. Overview still marks its summary.
+    // Both fall back to the bus (#7208): Turns, no bus turn yet, an empty
+    // state; Overview's first audio, not known. Never the permission error.
     let sections = stream.until(|sections| {
         sections["turns"].contains("No turn heard yet.")
-            && sections["overview"].contains(PERMISSION)
+            && sections["overview"].contains(FIRST_AUDIO_FROM_BUS)
     });
     let first = started.elapsed();
     safe(&sections);
     assert!(!sections["turns"].contains(PERMISSION));
+    assert!(!sections["overview"].contains(PERMISSION));
     assert!(!sections["turns"].contains(STALE));
     assert!(!sections["turns"].contains("117 ms"));
 
@@ -935,6 +937,11 @@ fn with_the_voices_sessions_private_turns_shows_the_bus_turns() {
     assert!(turns.contains("from the bus"), "{turns}");
     assert!(!turns.contains(PERMISSION), "{turns}");
     assert!(!turns.contains("Ossifrage"), "{turns}");
+    // Overview's first audio: the bus carries no timing peek joins to a
+    // turn, so it says so quietly, never the permission error.
+    let overview = &sections["overview"];
+    assert!(overview.contains("not known from the bus"), "{overview}");
+    assert!(!overview.contains(PERMISSION), "{overview}");
 }
 
 /// #2141's second step (the lead on #1711, 20 Oct): the one page's stream
