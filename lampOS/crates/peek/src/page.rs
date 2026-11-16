@@ -4,7 +4,7 @@
 //! made here, with everything a message, a record or a unit carries
 //! escaped; the page's few lines of script only put it in its place.
 use crate::{
-    timeline::{self, Entry},
+    timeline::{self, Agent, Decision, DecisionKind, Entry, StepKind},
     turns::{ReadFailure, ReadStatus, Snapshot, Step, Turn},
     units::UnitRow,
     view::{self, escape},
@@ -12,8 +12,8 @@ use crate::{
 };
 use lamp_bus::Message;
 use lamp_msgs::{
-    AgentState, ExpressionBody, Faces, Health, JointState, Level, Light, RoomPresence, Sign,
-    TaskStatus, TurnVerdict, VoiceState,
+    AgentState, ExpressionBody, Faces, HandStage, Health, JointState, Level, Light, RoomPresence,
+    Sign, TaskStatus, TurnVerdict, VoiceState,
 };
 use std::fmt::Write;
 
@@ -93,7 +93,10 @@ pub fn main_page(words: bool, name: &str, build: &str) -> String {
          <script>(function(){{var ids=[{ids}];var es=new EventSource('/events');\
          var dot=document.getElementById('live');var last=0;\
          ids.forEach(function(id){{es.addEventListener(id,function(e){{last=Date.now();\
-         document.getElementById(id+'-now').innerHTML=e.data;}});}});\
+         var el=document.getElementById(id+'-now');\
+         var open=[].map.call(el.querySelectorAll('details[open]'),function(d){{return d.id;}});\
+         el.innerHTML=e.data;open.forEach(function(o){{var d=document.getElementById(o);\
+         if(d){{d.open=true;}}}});}});}});\
          es.onerror=function(){{last=0;}};\
          setInterval(function(){{dot.className=Date.now()-last<3000?'dot live':'dot';}},500);\
          function show(){{var at=(location.hash||'#overview').slice(1);\
@@ -313,7 +316,8 @@ const TURN_STYLE: &str = ".turn{padding:10px 12px}\
 border-radius:5px;background:var(--surface)}.lat{font-size:12px;font-variant-numeric:tabular-nums}\
 .io{margin:3px 0;overflow-wrap:anywhere}.lbl{display:inline-block;width:3.2em;font-size:11px;\
 font-weight:600;letter-spacing:.06em;color:var(--muted)}.steps{margin-top:6px}\
-.chip.slow{border-color:var(--red)}\
+.chip.slow{border-color:var(--red)}summary{cursor:pointer;margin-top:4px}\
+.follow{margin:8px 0 0 14px;padding-left:10px;border-left:2px solid var(--border-hi)}\
 .break{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px;margin:2px 0 12px}\
 .break::before,.break::after{content:'';flex:1;border-top:1px dashed var(--border-hi)}\
 .pulse{animation:pulse 1.4s ease-in-out infinite}@keyframes pulse{50%{opacity:.4}}\
@@ -438,6 +442,13 @@ pub fn turns(snapshot: &Snapshot) -> String {
 /// whose [`WORDS_SHOWN`] banner is the page's own, shown once on top by
 /// [`main_page`]); otherwise the card says they are hidden, whatever an
 /// entry carries. A gap over [`BREAK_MS`] draws a break.
+///
+/// #7267: the path is the voice's decision (LOCAL with its tools, AGENT
+/// with the engine and task, HELD BACK, or an error's code), or `PATH ?`
+/// where the bus has none (an older lamp). Clicking a card opens its
+/// events: the step chips, then each step of the task's agent (the tool,
+/// and with `words` its arguments and result), its reply or error. A
+/// steered follow-up shows inside its host's card.
 pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
     let mut html = String::new();
     if entries.is_empty() {
@@ -446,17 +457,15 @@ pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
     }
     html.push_str(
         "<p class=\"small\">Each step from the end of speech; the slowest step is marked. \
-         Clock times in UTC.</p>",
+         Clock times in UTC. Click a turn for its events.</p>",
     );
-    let shown = |kept: &Option<String>| match kept {
-        Some(kept) if words => quoted(Some(kept)),
-        _ => "<span class=\"small\">words hidden</span>".to_owned(),
-    };
+    let mut newer: Option<&Entry> = None;
     for (index, entry) in entries.iter().enumerate() {
-        let mut steps = entry.steps.clone();
-        steps.sort_by_key(|(at, _)| *at);
-        let last = steps.last().map_or(0, |(at, _)| *at);
-        if let Some(newer) = index.checked_sub(1).map(|at| &entries[at]) {
+        if host_of(entries, index).is_some() {
+            continue;
+        }
+        if let Some(newer) = newer {
+            let last = entry.steps.iter().map(|(at, _)| *at).max().unwrap_or(0);
             let gap = newer.start().saturating_sub(entry.ended_at.unwrap_or(last));
             if gap > BREAK_MS {
                 let _ = write!(
@@ -466,6 +475,86 @@ pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
                 );
             }
         }
+        newer = Some(entry);
+        card(&mut html, entries, index, records, words);
+    }
+    html
+}
+
+/// Where the follow-up at `index` shows: the index of its host, when the
+/// host is kept and older (so a card never holds itself).
+fn host_of(entries: &[Entry], index: usize) -> Option<usize> {
+    let host = entries[index].decision()?.host_request?;
+    (index + 1..entries.len()).find(|at| entries[*at].request == host)
+}
+
+/// The path badge: what the voice decided.
+fn path(decision: Option<&Decision>) -> String {
+    let Some(decision) = decision else {
+        return "<span class=\"badge badge-grey\">PATH ?</span>".to_owned();
+    };
+    match decision.kind {
+        DecisionKind::Answered if decision.tools.is_empty() => {
+            "<span class=\"badge badge-green\">LOCAL</span>".to_owned()
+        }
+        DecisionKind::Answered => format!(
+            "<span class=\"badge badge-green\">LOCAL · {}</span>",
+            escape(&decision.tools.join(", "))
+        ),
+        DecisionKind::Handed => {
+            let mut text = format!(
+                "AGENT · {}",
+                engine_name(decision.engine.as_deref().unwrap_or("?"))
+            );
+            if let Some(task) = decision.task {
+                let _ = write!(text, " · task {task}");
+            }
+            if let Some(stage) = decision.stage {
+                text.push_str(match stage {
+                    HandStage::Prepared => " · prepared",
+                    HandStage::Started => " · started",
+                    HandStage::Declined => " · declined",
+                });
+            }
+            format!("<span class=\"badge badge-blue\">{}</span>", escape(&text))
+        }
+        DecisionKind::HeldBack => "<span class=\"badge badge-grey\">HELD BACK</span>".to_owned(),
+        DecisionKind::Error => format!(
+            "<span class=\"badge badge-red\">{}</span>",
+            escape(decision.error_code.as_deref().unwrap_or("error"))
+        ),
+    }
+}
+
+/// An engine as people know it.
+fn engine_name(engine: &str) -> &str {
+    match engine {
+        "openclaw" => "OpenClaw",
+        "hermes" => "Hermes",
+        other => other,
+    }
+}
+
+/// `words` escaped, or a dash when there are none.
+fn or_dash(words: &str) -> String {
+    if words.is_empty() {
+        "–".to_owned()
+    } else {
+        escape(words)
+    }
+}
+
+/// The card of `entries[index]`, with the follow-ups steered under it.
+fn card(html: &mut String, entries: &[Entry], index: usize, records: &Snapshot, words: bool) {
+    let shown = |kept: &Option<String>| match kept {
+        Some(kept) if words => quoted(Some(kept)),
+        _ => "<span class=\"small\">words hidden</span>".to_owned(),
+    };
+    let hidden = "<span class=\"small\">words hidden</span>";
+    let entry = &entries[index];
+    {
+        let mut steps = entry.steps.clone();
+        steps.sort_by_key(|(at, _)| *at);
         let record = records.turns.iter().find(|turn| turn.turn == entry.request);
         let ended = entry.speech_ended();
         let heard = steps.iter().find_map(|(_, step)| match step {
@@ -483,31 +572,38 @@ pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
                 _ => None,
             })
             .collect();
-        // ponytail: the path from the bus alone: a skill's stage makes it
-        // SKILL, words said or a first token AGENT, else LOCAL.
-        let path = if did.iter().any(|did| did.starts_with("skill ")) {
-            "<span class=\"badge badge-teal\">SKILL</span>"
-        } else if said.is_some() || record.is_some_and(|turn| turn.chat_ms.is_some()) {
-            "<span class=\"badge badge-blue\">AGENT</span>"
-        } else {
-            "<span class=\"badge badge-green\">LOCAL</span>"
-        };
+        let decision = entry.decision();
+        let agent = entry.agent.as_ref();
+        let failed = failed(record)
+            || decision.is_some_and(|decision| decision.kind == DecisionKind::Error)
+            || agent.is_some_and(Agent::failed);
+        // A task handed over keeps the turn going until its agent ends.
+        let handed = decision.is_some_and(|decision| {
+            decision.kind == DecisionKind::Handed && decision.stage != Some(HandStage::Declined)
+        });
+        let working = handed && !agent.is_some_and(Agent::ended);
         let kind = record
             .and_then(|turn| turn.basis.as_deref())
             .unwrap_or(if heard.is_some() { "voice" } else { "lamp" });
         let _ = write!(
             html,
             "<div class=\"turn card\"><div class=\"turn-head\"><span class=\"ticon\">{}</span>\
-             <b>{}</b>{path}{}{}{}<span class=\"small\">request {} · {}</span></div>",
+             <b>{}</b>{}{}{}{}<span class=\"small\">request {} · {}</span></div>",
             type_icon(heard.is_some()),
             escape(kind),
-            status(failed(record), entry.ended_at.is_some(), index == 0),
+            path(decision),
+            status(
+                failed,
+                entry.ended_at.is_some() && !working,
+                index == 0 || working
+            ),
             entry
                 .ended_at
                 .map(|at| total(at.saturating_sub(entry.start())))
                 .unwrap_or_default(),
-            record
-                .and_then(|turn| turn.chat_ms)
+            decision
+                .and_then(|decision| decision.first_reply_ms)
+                .or_else(|| record.and_then(|turn| turn.chat_ms))
                 .map(first_token)
                 .unwrap_or_default(),
             entry.request,
@@ -546,7 +642,12 @@ pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
         }
         let _ = write!(
             html,
-            "<div class=\"io\"><span class=\"lbl\">OUT</span> {out}</div><div class=\"steps small\">"
+            "<div class=\"io\"><span class=\"lbl\">OUT</span> {out}</div>\
+             <details id=\"turn-{}-{}\"><summary class=\"small\">{} events</summary>\
+             <div class=\"steps small\">",
+            entry.request,
+            entry.start(),
+            steps.len() + agent.map_or(0, |agent| agent.steps.len()),
         );
         // The slowest: the longest wait after the step before.
         let waits: Vec<u64> = steps
@@ -580,6 +681,16 @@ pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
                     }
                     ("understood", what)
                 }
+                timeline::Step::Decided(decision) => (
+                    "decided",
+                    match decision.kind {
+                        DecisionKind::Answered => " answered",
+                        DecisionKind::Handed => " handed",
+                        DecisionKind::HeldBack => " held back",
+                        DecisionKind::Error => " error",
+                    }
+                    .to_owned(),
+                ),
                 timeline::Step::Did(_) => ("did", String::new()),
                 timeline::Step::Said(_) => ("said", String::new()),
             };
@@ -590,9 +701,67 @@ pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
                 at.saturating_sub(ended),
             );
         }
-        html.push_str("</div></div>");
+        html.push_str("</div>");
+        // The agent's steps: names and numbers always, words with `words`.
+        for step in agent.map_or(&[][..], |agent| &agent.steps) {
+            let (label, text) = match step.kind {
+                StepKind::Call => (
+                    "CALL",
+                    format!(
+                        "{} · {} · {}",
+                        step.n,
+                        or_dash(&step.tool),
+                        if words {
+                            format!("{} → {}", or_dash(&step.args), or_dash(&step.result))
+                        } else {
+                            hidden.to_owned()
+                        }
+                    ),
+                ),
+                StepKind::Reply if words => ("REPLY", or_dash(&step.result)),
+                StepKind::Reply => ("REPLY", hidden.to_owned()),
+                StepKind::Error => (
+                    "ERROR",
+                    format!(
+                        "{} · {} · {}",
+                        step.n,
+                        or_dash(&step.tool),
+                        if words {
+                            or_dash(&step.result)
+                        } else {
+                            hidden.to_owned()
+                        }
+                    ),
+                ),
+            };
+            let _ = write!(
+                html,
+                "<div class=\"io small\"><span class=\"lbl\">{label}</span> {text}</div>"
+            );
+        }
+        match agent {
+            Some(agent) if agent.more > 0 => {
+                let _ = write!(html, "<div class=\"small\">{} more</div>", agent.more);
+            }
+            None if handed => html.push_str(
+                "<div class=\"io small\"><span class=\"lbl\">AGENT</span> \
+                 no step on the bus yet</div>",
+            ),
+            _ => {}
+        }
+        html.push_str("</details>");
+        let follows: Vec<usize> = (0..index)
+            .filter(|at| host_of(entries, *at) == Some(index))
+            .collect();
+        if !follows.is_empty() {
+            html.push_str("<div class=\"follow\">");
+            for at in follows {
+                card(html, entries, at, records, words);
+            }
+            html.push_str("</div>");
+        }
+        html.push_str("</div>");
     }
-    html
 }
 
 /// Words heard or said, escaped and quoted, when kept.
