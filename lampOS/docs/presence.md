@@ -131,6 +131,13 @@ who came and went while the eyes were shut is not known. A gap of under 5 s
   out of view); a value with no `by` (an older eyes') counts as a face.
 - Messages (#1673): "nobody for 5 minutes" is `someone` false and
   `nobody_s` at least 300, on a value that has not run out.
+- The body (#7301, `LAMP_BODY_PRESENCE=on`, `crates/body/src/presence_in.rs`):
+  a standing lamp stays up while someone is there, or was within 120 s
+  (someone reading face down), on a value that has not run out; for at
+  most 15 quiet minutes after the last talk or arrival, never once an arm
+  joint is warm and never in its night rest. A value run out is nobody, so
+  with the camera closed the lamp folds 90 s after talk, as before. It
+  never stands a folded lamp ([body.md](body.md), "Someone at the lamp").
 
 ## Light out when you leave
 
