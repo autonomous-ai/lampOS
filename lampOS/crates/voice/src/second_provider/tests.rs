@@ -3734,10 +3734,42 @@ async fn a_weather_turn_says_it_was_answered_with_weather() {
     engine.submit(audio(1, 1));
     engine.submit(end(1));
     turn(&mut engine).await;
+    let decided = decided.lock().unwrap().clone();
+    assert_eq!(decided.len(), 1, "{decided:?}");
+    // With its first answer audio's time, as the journal says it.
+    assert!(decided[0].first_reply_ms.is_some(), "{decided:?}");
     assert_eq!(
-        *decided.lock().unwrap(),
-        [lamp_msgs::VoiceDecision::answered(1, ["weather"])]
+        lamp_msgs::VoiceDecision {
+            first_reply_ms: None,
+            ..decided[0].clone()
+        },
+        lamp_msgs::VoiceDecision::answered(1, ["weather"])
     );
+}
+
+/// #7267: a turn whose chat failed says `error` with the fault's
+/// category, never its text.
+#[tokio::test(start_paused = true)]
+async fn a_failed_turn_says_its_fault_as_an_error_code() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What's the weather?".to_owned())].into()),
+        chats: Mutex::new([vec![Err(net::Error::Status(429))]].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let decided = Arc::new(Mutex::new(Vec::new()));
+    let kept = decided.clone();
+    let mut engine = engine.telling_decisions(Arc::new(move |decision| {
+        kept.lock().unwrap().push(decision);
+    }));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    let decided = decided.lock().unwrap().clone();
+    assert_eq!(decided.len(), 1, "{decided:?}");
+    assert_eq!(decided[0].kind, lamp_msgs::DecisionKind::Error);
+    assert!(decided[0].check().is_ok(), "{decided:?}");
 }
 
 /// #1712: Flux's `TurnResumed` (`net::Early::Resumed`) takes the early words

@@ -5258,6 +5258,27 @@ pub fn serve(
     // and a line held as a remark about the lamp for Expression's glance
     // (`voice/remarked`, #4175, with `LAMP_REMARK_ABOUT_IT=on` only).
     if let Some(root) = files.bus_root.as_deref() {
+        // Each turn's decision (`voice/decision`, #7267): answered with its
+        // tools, a hand-over's steps, and held back as `voice/turn` says.
+        let decisions = match crate::bus_out::DecisionOut::on(root) {
+            Ok(out) => {
+                let out = Arc::new(Mutex::new(out));
+                let told: crate::second_provider::Decisions = Arc::new(move |decision| {
+                    if let Ok(mut out) = out.lock() {
+                        out.tell(&decision, lamp_ipc::monotonic_us());
+                    }
+                });
+                engine = engine.telling_decisions(told.clone());
+                crate::agent_tasks::telling_decisions(told.clone());
+                Some(told)
+            }
+            Err(error) => {
+                eprintln!(
+                    "lamp-voice second: turns' decisions are not published on the bus: {error}"
+                );
+                None
+            }
+        };
         match crate::bus_out::TurnOut::on(root) {
             Ok(out) => {
                 let out = Mutex::new(out);
@@ -5277,6 +5298,11 @@ pub fn serve(
                     let now_us = lamp_ipc::monotonic_us();
                     if let Ok(mut out) = out.lock() {
                         out.tell(request, verdict, now_us);
+                    }
+                    if verdict == lamp_msgs::TurnVerdict::HeldBack
+                        && let Some(decided) = decisions.as_ref()
+                    {
+                        decided(lamp_msgs::VoiceDecision::held_back(request));
                     }
                     let remarked = verdict == lamp_msgs::TurnVerdict::HeldBack
                         && heeding.as_ref().is_some_and(|heeding| {

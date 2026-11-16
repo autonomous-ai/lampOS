@@ -4218,6 +4218,12 @@ fn declined_with(
         "lamp-voice: tasks: request {request}: task {} dropped: the person said no to its read-back, the no taken in code; this voice no longer confirms it and asks the tasks part to cancel it (#6582, #7027)",
         dropped.id
     );
+    decided(
+        request,
+        dropped.id,
+        dropped.engine.as_deref(),
+        lamp_msgs::HandStage::Declined,
+    );
     cancel(dropped.id);
     Some(DECLINED_NOTE.to_owned())
 }
@@ -4682,7 +4688,7 @@ fn run_for_asked(
                                         || waiting.session.as_deref() != session)
                                     && may_confirm(waiting, request, heard, Instant::now())
                             })
-                            .map(|waiting| waiting.id);
+                            .map(|waiting| (waiting.id, waiting.engine.clone()));
                         *pending = Some(Pending {
                             id,
                             digest: digest.to_owned(),
@@ -4695,19 +4701,31 @@ fn run_for_asked(
                             engine: handed_engine.clone(),
                         });
                     }
-                    if let Some(old) = replaced {
+                    if let Some((old, old_engine)) = &replaced {
                         eprintln!(
                             "lamp-voice: tasks: request {request}: a corrected or new ask replaces task {old}, which this voice no longer confirms"
+                        );
+                        decided(
+                            request,
+                            *old,
+                            old_engine.as_deref(),
+                            lamp_msgs::HandStage::Declined,
                         );
                         cancel_replaced(
                             place,
                             request,
-                            old,
+                            *old,
                             status.get("store_id").and_then(Value::as_str),
                             answer.get("revision").and_then(Value::as_u64),
                             left(),
                         );
                     }
+                    decided(
+                        request,
+                        id,
+                        handed_engine.as_deref(),
+                        lamp_msgs::HandStage::Prepared,
+                    );
                     // Devin Cloud works in Devin's cloud, not on a computer.
                     let cloud = member.is_some_and(|member| {
                         member.alias == sent_to && member.kind.engine == "devin-cloud"
@@ -4863,6 +4881,14 @@ fn run_for_asked(
                     if let Ok(mut waiting) = PENDING.lock() {
                         *waiting = None;
                     }
+                    // Started, on the model's confirm or the yes taken in
+                    // code, which confirms through here (#7267).
+                    decided(
+                        request,
+                        pending.id,
+                        pending.engine.as_deref(),
+                        lamp_msgs::HandStage::Started,
+                    );
                     if same_turn {
                         eprintln!(
                             "lamp-voice: tasks: request {request}: task {} started on a yes in the turn that prepared it, after its read-back in words",
