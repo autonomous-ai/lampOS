@@ -320,6 +320,17 @@ enum Extra {
         links: Vec<String>,
         #[serde(default)]
         replaced_by: String,
+        /// The linked-service memory plan, slice 1: each optional, so a
+        /// voice that sends none of them puts a `voice` record as before
+        /// (`service_records::RecordIn`).
+        #[serde(default)]
+        source_kind: Option<String>,
+        #[serde(default)]
+        source_ref: Option<Value>,
+        #[serde(default)]
+        summary: Option<String>,
+        #[serde(default)]
+        deed_unix_ms: Option<u64>,
     },
     /// `LAMP_SERVICE_RECORDS`: a known person's records, the latest change
     /// first (`Days::service_records`); with `about` (the voice's
@@ -1188,6 +1199,10 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             changed_unix_ms,
             links,
             replaced_by,
+            source_kind,
+            source_ref,
+            summary,
+            deed_unix_ms,
         } => {
             let kept = store.service_record_put(
                 &one(person)?,
@@ -1203,6 +1218,10 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                     changed_unix_ms,
                     links,
                     replaced_by,
+                    source_kind,
+                    source_ref,
+                    summary,
+                    deed_unix_ms,
                 },
             )?;
             json!({"ok":true,"status":kept})

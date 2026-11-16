@@ -659,8 +659,8 @@ The voice's `LAMP_SERVICE_RECORDS` (off by default, on in the product by the own
 plan, PR 1a, 10 Nov) keeps one record for each thing a known person asked of
 a linked service, in `service_records(person, key, service, action, status,
 reason, detail, result_id, asked_unix_ms, changed_unix_ms, links,
-replaced_by)`, keyed `(person, key)`, created `IF NOT EXISTS`, `user_version`
-unchanged.
+replaced_by)`, plus the linked columns below, keyed `(person, key)`,
+created `IF NOT EXISTS`, `user_version` unchanged.
 
 - `service_record {person, key, service, action, status, reason?, detail?,
   result_id?, asked_unix_ms, changed_unix_ms, links?, replaced_by?}` puts
@@ -713,6 +713,62 @@ person; past it the record changed longest ago goes. What a read found is
 stored by the voice as metadata and a masked excerpt only; the store keeps
 what it is given. An older memory answers `unknown_op` to the three
 operations, so the voice sends them only with its switch on.
+
+### Source kinds, pointers, summaries and deed times (linked records, slice 1)
+
+The linked-service memory plan (16 Nov; the first builder's call of 16:57 on
+#6811, under the owner's connector-records call of 11 Nov) lets a record name
+where its thing lives, so later slices can keep Harness tasks, agent calls
+and reminders as records. This slice is the schema only: no writer sends the
+new fields yet, and a put that names none of them behaves as before.
+
+- **Columns.** At each open, after `days.sql`, `service_records::migrate`
+  adds each of these the table lacks (read by `pragma table_info`, so it is
+  idempotent), in one transaction: the first `ALTER` of these tables.
+  `user_version` stays 1.
+
+  | Column | Type | Default | Bound |
+  |---|---|---|---|
+  | `source_kind` | `TEXT NOT NULL`, `CHECK` in `voice`, `task`, `agent`, `reminder` | `'voice'` | one of the four |
+  | `source_ref` | `TEXT NOT NULL`, a JSON object | `'{}'` | at most 512 bytes |
+  | `summary` | `TEXT NOT NULL` | `''` | at most 160 bytes |
+  | `deed_unix_ms` | `INTEGER`, null on an older row | null | a time in ms |
+
+  Plus the index `service_records_kind(person, source_kind, changed_unix_ms)`.
+- **`service_record`** takes four more optional fields: `source_kind`,
+  `source_ref`, `summary` and `deed_unix_ms`. With none of them (an older
+  voice), the record is `voice`, as every record before. An unknown kind is
+  refused `bad_kind`, and so is a put that would change a kept record's
+  kind. A linked kind (`task`, `agent`, `reminder`) must give `source_ref`
+  on every put; a `voice` record may. `source_ref` is
+  `{service, id, session?, computer?}`: an object of those fields only,
+  each a text without control characters, `service` and `id` not empty, at
+  most 512 bytes as JSON; anything else is refused `bad_source_ref`. The
+  session is an opaque reference: agent sessions stay in the agent.
+  `summary` is tidied (control characters and runs of spaces become one
+  space) and cut at a whole character to 160 bytes. An update in place
+  that leaves out `source_ref`, `summary` or `deed_unix_ms` keeps what is
+  held. Lists give all four fields.
+- **Per-kind cap.** Each linked kind keeps at most 2,000 records a person,
+  inside the 10,000: past it, that kind's record changed longest ago goes,
+  and no other kind's. A `voice` record is bounded by the 10,000 alone.
+- **A forget wins by the deed's time** (the first builder's condition 2). A
+  put is refused `forgotten` when the earlier of its `asked_unix_ms` and
+  its `deed_unix_ms` is before the person's latest forget everything, or
+  before a forget about a thing it matches, or before a contact forget of
+  an address it was sent to. So a deed done before a forget, written after
+  it, is never kept.
+- **Recall and forget read the summary.** A recall's `about` and
+  `service_records_forget {about}` match a record's summary as they match
+  its service, action, reason, result id and detail. Forget everything and
+  forgetting the person delete whole rows, so a record's pointer and
+  summary go with it. Nothing at the source service is touched.
+- **Rollback.** An older build names its columns on every insert and
+  select, so it passes the four over: a record it writes is `voice`, and its
+  forget everything still deletes whole rows. An older build's forget about
+  a thing does not read `summary`. An older memory refuses a `service_record`
+  that carries the new fields (its request fields are closed), so a writer
+  sends them only with its own switch on.
 
 ## Service contacts (`service_contact`, the voice's `LAMP_SERVICE_CONTACTS`)
 

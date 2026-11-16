@@ -235,6 +235,16 @@ CREATE TABLE IF NOT EXISTS service_records (
     PRIMARY KEY(person,key)
 );
 CREATE INDEX IF NOT EXISTS service_records_by ON service_records(person,changed_unix_ms);
+-- The linked-service memory plan, slice 1: `service_records::migrate` adds,
+-- after this file, each column the table lacks (`pragma table_info`), the
+-- first ALTER of these tables (SQLite has no ADD COLUMN IF NOT EXISTS):
+--   source_kind TEXT NOT NULL DEFAULT 'voice'
+--     CHECK(source_kind IN ('voice','task','agent','reminder'))
+--   source_ref TEXT NOT NULL DEFAULT '{}'  (at most 512 bytes, checked JSON)
+--   summary TEXT NOT NULL DEFAULT ''       (at most 160 bytes)
+--   deed_unix_ms INTEGER                   (none on an older row)
+-- and the index service_records_kind(person,source_kind,changed_unix_ms).
+-- The table above stays as older builds made it; `user_version` stays 1.
 -- When each known person's everything was last forgotten (forget everything,
 -- forget the person; '' for everyone's): a service record asked before it is
 -- refused, so a change the voice sent before the forget and the memory took
