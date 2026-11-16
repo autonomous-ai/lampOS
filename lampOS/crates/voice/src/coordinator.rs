@@ -6833,6 +6833,9 @@ fn conversation_with_gate_inner(
         // The memory's night through the relay, with LAMP_MEMORY_TIERS
         // (`tiers_night`): idle, at night, with the slide open; never said.
         crate::tiers_night::start_from_environment();
+        // What those two cost is counted for the day, with
+        // LAMP_VOICE_DAY_TALLY=on (`day_tally`, #7347): numbers only.
+        crate::day_tally::start_from_environment();
     }
     leases.keep(rig, owner, &mut stalls)?;
     // The level under which sound is not speech, which may follow the room;

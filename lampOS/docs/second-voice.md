@@ -817,6 +817,47 @@ order is kept. A written turn is the same from the chat on.
   send it, else `no usage given` (#1712, the first builder at 18:56: the
   request was 31 KB with 31 tools, and its first event came in 976 to
   1296 ms).
+- **With `LAMP_VOICE_DAY_TALLY=on` those counts are added up for the day**
+  (off unless set; #7347, `day_tally.rs`). On 16 November a lamp at home
+  used up its day's allowance before six in the evening and answered
+  nothing for over an hour; the journal's lines above were gone within
+  minutes (#7254), and nothing on the lamp said what the day had cost.
+  With the switch on, each chat answer that ends is counted by its model:
+  answers, prompt tokens, those the cache held, completion tokens, and
+  answers whose service gave no count; and each turn the model declined as
+  not said to the lamp. The day is a UTC day, as the allowance is counted.
+  Numbers only: no word, name or request is kept.
+  - **Where it is kept:** `/var/lib/lampOS/voice/day-tally/tally.json`,
+    root's: `{"today": {"day", "models": {NAME: {"answers", "uncounted",
+    "prompt_tokens", "cached_tokens", "completion_tokens"}}, "declined"},
+    "yesterday": …}`. `day` is days since 1970. At the first write of a
+    new UTC day the day before becomes `yesterday`, whole, so a morning's
+    read shows what a day cost; a day older than that is let go. At most
+    eight models are kept apart, the rest as `other`.
+  - **A turn never waits on it.** An answer is counted in memory where it
+    ends, under a short lock. A thread of its own adds the counts to the
+    file at most once a minute, under a file lock, written whole beside
+    it and moved over it. The voice and its second-route worker are two
+    processes and each adds its own.
+  - **The journal** has one line in each hour in which the process counted
+    something: `thinking today (UTC): N chat answers, P prompt tokens (H
+    from the cache), C completion tokens; D turns declined`, and by model
+    when there is more than one.
+  - **Not counted:** an answer cut before it ends (the service still
+    counts its prompt), and speech in either direction. Counts made in
+    the last minute before 00:00 UTC may be written into the new day,
+    and those of the last minute before the voice or its worker stops
+    are lost.
+  - **Not yet:** the lamp does not read how much of its day the relay says
+    is used, warn, or shed anything near the limit. Those are #7347's
+    next parts. A reset does not wipe the file yet.
+  - Tests: `day_tally::tests` (an answer's usage is read in both services'
+    forms, nothing is counted until counting begins, two writers add up
+    by model, a new UTC day keeps the day before and begins again, a bad
+    file begins again and many models are bounded, names are bounded and
+    an answer without usage is still counted), and the workers' census
+    (`process::switch_census_tests`), which fails if the switch does not
+    reach the second worker.
 - **With `LAMP_SECOND_STEADY_FIRST=on` a spoken turn's request begins with
   what stays** (off unless set; #1712, the first builder at 18:56). The
   system message keeps only the character and the skills. The memory note,
