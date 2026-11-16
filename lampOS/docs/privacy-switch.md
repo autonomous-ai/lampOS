@@ -271,6 +271,13 @@ switch on:
   controller has been silent under 1.5 s (`STALLED_CONTROL_US`): it takes no
   input, drops what was queued under the lapsed authority, sends nothing and
   stops listening. The controller's next fresh authority ends the hold.
+  Whether the switch is on or off, input of a turn already retired (by a
+  newer owner or an ownerless snapshot, such as the gap snapshot queued
+  during a stall of the whole board) is dropped unread before any
+  listening or generation check, so a line queued before the stall no
+  longer ends the route; the journal says `lamp-voice second: input of
+  retired turn <N> dropped unread` once per turn (#7224). Input of a live
+  turn keeps every check.
 - The coordinator treats a freshness loss seen in a pass held up by its own
   stall as a ridden privacy gap (`privacy_gap::GapRide`, as
   `LAMP_PRIVACY_GAP_RIDE` rides one): a pass more than 20 ms after the one
