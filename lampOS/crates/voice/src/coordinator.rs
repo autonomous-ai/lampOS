@@ -5184,9 +5184,22 @@ fn released_restored_on_stop(
     trace: &mut SessionState,
     controls: &mut Option<HandControls>,
 ) -> io::Result<()> {
-    let (true, Some(signal), Some(controls)) = (clean, signal, controls.as_mut()) else {
+    let Some(controls) = controls.as_mut() else {
         return Ok(());
     };
+    let signal = match (clean, signal) {
+        (true, Some(signal)) => signal,
+        // Kept, and the journal says which gate (#7368).
+        (false, _) => {
+            guard_mute_kept(controls, "the run did not end clean");
+            return Ok(());
+        }
+        (true, None) => {
+            guard_mute_kept(controls, "no stop was asked for");
+            return Ok(());
+        }
+    };
+    let why = controls.kept_on_stop_why();
     if controls.release_restored_on_stop()? {
         eprintln!(
             "lamp-voice: {signal} ended the mute the restart guard restored; the next start listens"
@@ -5196,8 +5209,24 @@ fn released_restored_on_stop(
             trace,
             json!({"kind":"guard_mute_ended_on_stop","at_us":monotonic_us(),"signal":signal}),
         );
+    } else if let Some(why) = why {
+        eprintln!("{}", guard_mute_kept_line(why));
     }
     Ok(())
+}
+
+/// The one journal line for a stop that keeps a mute the restart guard
+/// restored (#7368): which gate kept it, so a lamp left deaf after a clean
+/// restart says why. Said only for the guard's mute, never a person's.
+fn guard_mute_kept(controls: &HandControls, why: &str) {
+    if controls.restored_after_fault() {
+        eprintln!("{}", guard_mute_kept_line(why));
+    }
+}
+
+/// [`guard_mute_kept`]'s words.
+fn guard_mute_kept_line(why: &str) -> String {
+    format!("lamp-voice: the mute the restart guard restored is kept at this stop: {why}")
 }
 
 /// With `LAMP_GUARD_NEVER_LISTENED=on` (#1567, B): a run that ended in a
