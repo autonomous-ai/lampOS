@@ -1651,10 +1651,12 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   shutdown, subprocess đọc approvals và nhóm tiến trình của nó bị hủy.
   Không giao việc sau khi đã hủy hoặc hết hạn. Tác vụ nói vẫn chỉ chờ
   cổng, tối đa 60 s. Một lần chạy người dùng nhờ bằng giọng nói mà bị từ
-  chối như vậy, hoặc vì Harness chưa tìm target của đèn (hay
-  `harness_not_running`, #7282), được nói một lần đúng nguyên văn "I'm still
-  getting ready. Give me a minute and ask me again." (`task::not_ready_line`
-  của lamp-skills); lần chạy do trigger thì không nói gì. Test:
+  chối như vậy (`openclaw_gateway_not_ready`), hoặc vì `harness_not_running`
+  (#7282), được nói một lần đúng nguyên văn "I'm still getting ready. Give me
+  a minute and ask me again." (`task::not_ready_line` của lamp-skills); lần
+  chạy do trigger thì không nói gì. Lời từ chối vì đèn chưa có target riêng
+  thì không được nói như vậy, vì nó cũng có nghĩa là Hermes trên đèn đang
+  tắt. Test:
   `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`.
 - **Ghi cố định bị từ chối.** Task không có script (một ghi cố định) bị
   từ chối trước khi bất cứ gì được đặt sống: "a fixed write is not taken
