@@ -5628,6 +5628,114 @@ and lamp-skills'
 it loads as a function with no trigger, its light and voice alone, its
 description beginning with the `when` line).
 
+#### A start by the person's own words (`LAMP_MADE_SKILL_ASKS=on`, off)
+
+Off unless `LAMP_MADE_SKILL_ASKS=on`, and in no product unit yet (#7233;
+the owner, 16 Nov: "Every task must be doable; no 'couldn't' here"). A
+skill made here, by voice or in the app, may be started by words the
+person names for it, for any step a made skill may have: a fixed write
+(`do.write`, a Gmail send), a `do.task` for the lamp's agent with its
+grants, its code, or the lamp's own steps (the light, the head, a say).
+"When I say send my test note, email me ..." is one.
+
+1. **Told to the making model** (`make_skill_local`, the lamp's model and
+   the agent make alike, `made_skill::ASKS_RULES`): at the top, before any
+   table, `asks = ["send my test note"]`, the person's words as said, at
+   most 3 (`made_skill::MOST_MADE_ASKS`), 2 to 8 plain words each, never a
+   yes, a no, a question or a stop; started only by them, no `[trigger]`,
+   no `[ask]` and no topics; its steps as the rules above give them. The
+   prompt says a skill can't yet hear what is said in the room "other than
+   the words the person names to start it", and the agent's service rules
+   name them beside the lamp's own triggers. They stand in place of a
+   `[said]` start (`LAMP_MADE_SKILL_SAID`), which is not told with this
+   switch on. The brief says "one [trigger] as listed, or asks as above".
+2. **Held by the cap** (`made_skill::made_asks`, in `held`): an array of 1
+   to 3 strings, each at most 60 characters, 2 to 8 words of letters,
+   digits and apostrophes with one space between (as lamp-skills takes any
+   skill's), none refused by `skill_named::ask_refused` (a no, a question,
+   a stop, the lamp's own words), each with at least two words of its own
+   past those said around an ask (`skill_named::own_words_of`: "yes
+   please" is one), none twice; otherwise a repair with
+   `made_skill::MADE_ASKS_FORM`. Never in a skill added from a file
+   (`capped_added`). The tidy keeps them.
+3. **Never another skill's** (`made_skill::asks_taken`, at the make, after
+   its name is free): a phrase that is another skill's ask, or holds
+   another skill's name or function, installed, pushed or in the tools
+   file (core skills and other made skills' `made_asks` among them),
+   matched as the voice matches them (`skill_named::same_ask`,
+   `ask_holds_name`), is refused with why, said to the person: "the words
+   “take a photo” would start another skill, photo booth; say other words
+   for it". The same skill made again is no other.
+4. **Said back with the words** (`made_skill::plainly`): "When you say
+   “send my test note”, it mails me@example.com from your Gmail, subject
+   “Test note”, saying “This is my test note.”. It starts only when you say
+   it, never on its own. It waits for you to agree before it sends
+   anything." Beside a trigger: "When someone sitting at the desk gets up,
+   or when you say “...”, it ...". A write keeps its read-back and the
+   owner's spoken yes on its exact content (`skill_write_yes`), as any
+   made write does.
+5. **Loaded by lamp-skills** (`lamp_skills::started_by_words`): a skill
+   made on this lamp (`made_on_the_lamp`: installable, never pushed,
+   `made: here` and neither `added: file` nor `written: app` on its card,
+   and once put on a package record not from the Store; read as it loads,
+   so `lamp-skills pack` takes it before it has a record) with `asks`, no
+   tool and no trigger loads (a read or a write may be its one step: the
+   trigger rule takes its own words as its start). A Store, pushed, core
+   or file-added skill with asks and no tool is refused as before (sim-2's
+   and Heron's P2 on #7249: its words would reach a run now that runs only
+   the person's own made skill), and
+   `tools.json` lists its asks as `made_asks`, by the skill's name, one
+   holding another skill's name left out. Off, it is refused as before
+   ("skill.toml needs a trigger or a tool") and `tools.json` is byte for
+   byte as before.
+6. **Started by the words** (`skill_named`, `LAMP_SKILL_NAMED=on`, the
+   second route): a heard line that is one of a made skill's asks, said
+   plainly ("send my test note", "Lamp, send my test note please."),
+   matched as a Store skill's asks are, makes round 1's call in code
+   `make_skill` with `run` = the skill's name (`skill_named::MADE`), the
+   run now by voice ("Run now by voice" above, `made_run`): the owner's alone (under `LAMP_PRIVATE_ROOM` whoever
+   speaks; no new identity gate), its writes only as the owner's kept yes
+   has them, once a run, within the day's bounds, a task with its yes, its
+   one-run token and grants, each step held where it is made. A no, a
+   question, a phrase two skills give, the skill's name alone, or a line
+   while the lamp waits for an answer starts nothing. The model words the
+   answer in round 2.
+7. **An uploaded `SKILL.md`** (`upload_agent::files`,
+   `LAMP_UPLOAD_TO_AGENT`): its trigger phrases are also its tool's
+   `asks = [...]` (`upload_agent::asks_of`: lower case, the marks around
+   its words taken out, as lamp-skills takes asks; a question or one word
+   stays in the note alone), so `LAMP_SKILL_NAMED` calls its tool in code
+   when one is heard, as a Store skill's. The cap
+   (`upload_agent::capped_with`) takes them only as written so, and only
+   with the switch. A bare `SKILL.md` with `LAMP_UPLOAD_TO_AGENT` off, a
+   written skill (`upload_skill::written_with`), gets them the same way,
+   at most 8, held by `capped_added` with its tool. Each phrase goes
+   through the same check as a made skill's (`upload_agent::asks_checked`:
+   plain words, `ask_refused`, two words of its own) and the clash check
+   (`made_skill::ask_taken`); one refused is left out and the app is told
+   which and why in the upload's answer, `kept.asks_left_out =
+   [{phrase, why}]` (`upload_skill::take_telling`), while the rest still
+   go in and the skill is kept. None left out, the answer is as before.
+
+Set it alike in `lamp-voice` (which passes the exact `on` to its
+`provider` and `second` workers), `lamp-skills`, `lamp-skills-manage@`,
+`lamp-cloud` (its in-process loading, `load_each`) and `lamp-control` (its
+task yes loads the skill): otherwise a made skill with asks is refused at
+install, not loaded, or listed as not loaded. Off, a made skill's `asks`
+are tidied out or refused (`made_skill::MADE_ASKS`) and the prompt, the
+brief, an upload's `skill.toml` and `tools.json` are byte for byte as
+before.
+
+Tests: `made_skill::tests::a_made_skill_started_by_its_words_carries_its_asks_only_with_its_switch`,
+`a_made_skills_words_that_start_another_skill_are_refused_at_the_make`;
+`make_skill_local::tests::a_made_skills_own_words_are_told_to_the_maker_only_with_their_switch`,
+`a_skill_started_by_its_words_is_made_with_its_asks_and_its_write`;
+`skill_named::tests::a_made_skills_own_words_run_it_now_only_with_its_switch`;
+`upload_agent::tests::an_uploaded_files_trigger_phrases_are_its_asks_only_with_their_switch`;
+`upload_skill::tests::a_bare_files_trigger_phrases_are_its_asks_and_the_app_is_told_those_left_out`;
+lamp-skills' `a_skill_started_by_its_own_words_loads_and_runs_now_only_with_its_switch`
+and `an_uploaded_files_trigger_phrases_load_as_its_tools_asks`.
+
 ## V1's moves and emotions: what we take
 
 The owner, 08:00: "evaluate carefully to pick the good stuff from V1, not

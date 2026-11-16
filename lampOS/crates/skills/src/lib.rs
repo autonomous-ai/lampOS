@@ -3084,11 +3084,16 @@ pub const ASK_WORDS: std::ops::RangeInclusive<usize> = 2..=8;
 /// refused by the voice's own check, which matches it
 /// (`lamp_voice::skill_named::ask_refused`). One that holds another
 /// skill's name is left out of the tools file ([`tools_file_summary`]).
-fn checked_asks(asks: &[String], plain_tool: bool) -> Result<(), String> {
+///
+/// With `LAMP_MADE_SKILL_ASKS` on (`by_words`, [`started_by_words`]) a
+/// skill with no tool may give them too: its own words, which start its
+/// steps through the voice's run now (`lamp_voice::made_run`, the call
+/// socket's `run`), as a skill made on the lamp (`made: here`) alone.
+fn checked_asks(asks: &[String], plain_tool: bool, by_words: bool) -> Result<(), String> {
     if asks.is_empty() {
         return Ok(());
     }
-    if !plain_tool {
+    if !plain_tool && !by_words {
         return Err(
             "asks are the phrases that call the skill's tool with nothing: a skill with a tool and no choice or flag"
                 .into(),
@@ -3120,6 +3125,45 @@ fn checked_asks(asks: &[String], plain_tool: bool) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// Whether a skill with `asks` and no tool is started by its own words
+/// (`LAMP_MADE_SKILL_ASKS`, `lamp_voice::made_skill::asks_on`): only one
+/// made on this lamp ([`made_on_the_lamp`]), whose words the voice runs now
+/// (`lamp_voice::made_run`, which runs only the person's own made skill).
+/// Off, or any other skill (core, Store, pushed, added from a file), it is
+/// refused as before (sim-2's P2 on #7249: a Store skill's words would
+/// reach "isn't a skill they made").
+fn started_by_words(asks: &[String], tool: Option<&String>, made: bool) -> bool {
+    !asks.is_empty() && tool.is_none() && made && lamp_voice::made_skill::asks_on()
+}
+
+/// Whether the skill in `dir` (of `kind`, its `SKILL.md` `card`) was made
+/// on this lamp, by voice or in the app: installable, never pushed (no
+/// [`PUSHED_FROM`] record, not under [`PUSHED_DIR`]), its front matter
+/// `made: here` (the lamp's own line, inside the package its SHA-256 binds)
+/// and neither added from a file nor written in the app, and, once put on,
+/// a [`package::INSTALLED_FROM`] record not from the Store. As
+/// [`made_by_ask`] holds it, but read as it loads, so `lamp-skills pack`
+/// checks a made skill before it has a record.
+fn made_on_the_lamp(dir: &Path, kind: SkillKind, card: &str) -> bool {
+    if kind != SkillKind::Installable
+        || dir.starts_with(PUSHED_DIR)
+        || dir.join(PUSHED_FROM).exists()
+    {
+        return false;
+    }
+    let Some((front, _)) = card
+        .strip_prefix("---\n")
+        .and_then(|rest| rest.split_once("\n---"))
+    else {
+        return false;
+    };
+    let marks: Vec<&str> = front.lines().map(str::trim).collect();
+    marks.contains(&"made: here")
+        && !marks.contains(&lamp_voice::made_skill::ADDED_FROM_FILE)
+        && !marks.contains(&lamp_voice::made_skill::WRITTEN_MARK)
+        && package::installed_from(dir).is_none_or(|installed| !installed.from_store)
 }
 
 fn plain_name(name: &str) -> bool {
@@ -3720,6 +3764,13 @@ fn manifest(
             return Err("requested_audio needs a tool alone, one short say confirmation then one requested_audio with after = \"say\", and no other actions, limits, triggers, conditions, arguments, history, search or watch behavior".into());
         }
     }
+    // Started by its own words (`LAMP_MADE_SKILL_ASKS`): its `asks` and no
+    // tool, with or without a trigger beside them ([`started_by_words`]).
+    let by_words = started_by_words(
+        &file.asks,
+        file.tool.as_ref(),
+        made_on_the_lamp(dir, kind, description_text),
+    );
     let triggers = match file.trigger {
         None => Vec::new(),
         Some(toml::Value::Array(many)) => many,
@@ -3797,7 +3848,7 @@ fn manifest(
         }
     } else if file.startle.is_some() {
         return Err("[startle] belongs only to a skill granted core = [\"startle\"]".into());
-    } else if (triggers.is_empty() && file.tool.is_none()) || file.steps.is_empty() {
+    } else if (triggers.is_empty() && file.tool.is_none() && !by_words) || file.steps.is_empty() {
         return Err("skill.toml needs a trigger or a tool, and at least one [[do]]".into());
     }
     let watch = file.watch.map(watch::spec).transpose()?;
@@ -3842,6 +3893,7 @@ fn manifest(
     checked_asks(
         &file.asks,
         file.tool.is_some() && file.choice.is_none() && file.flag.is_none(),
+        by_words,
     )?;
     let argument = |name: &str, about: &str| -> Result<(), String> {
         if file.tool.is_none() {
@@ -4326,7 +4378,7 @@ fn manifest(
         };
         if !matches!(file.steps.as_slice(), [step] if alone(step))
             || file.tool.is_some()
-            || triggers.is_empty()
+            || (triggers.is_empty() && !by_words)
             || triggers.iter().any(|trigger| trigger.each.is_some())
         {
             return Err(format!(
@@ -9864,6 +9916,7 @@ pub fn tools_file_summary(
 ) -> Value {
     let mut whens = serde_json::Map::new();
     let mut asks = serde_json::Map::new();
+    let mut made_asks = serde_json::Map::new();
     let mut tools: Vec<Value> = Vec::new();
     let mut moving: Vec<&str> = Vec::new();
     let mut core: Vec<&str> = Vec::new();
@@ -9946,6 +9999,34 @@ pub fn tools_file_summary(
                 asks.insert(name.clone(), json!(kept));
             }
             tools.push(tool);
+        }
+        // A skill made on the lamp started by its own words
+        // (`LAMP_MADE_SKILL_ASKS`, [`started_by_words`]): its asks by its
+        // name, which the voice matches a heard line against and runs it
+        // now by (`lamp_voice::skill_named::MADE`). Never one that holds
+        // another skill's name, as above.
+        if skill.tool.is_none()
+            && !skill.asks.is_empty()
+            && skill.kind == SkillKind::Installable
+            && skill.pushed_by.is_none()
+        {
+            let kept: Vec<&String> = skill
+                .asks
+                .iter()
+                .filter(|ask| {
+                    !skills
+                        .iter()
+                        .filter(|other| other.name != skill.name)
+                        .any(|other| {
+                            std::iter::once(&other.name)
+                                .chain(&other.tool)
+                                .any(|theirs| lamp_voice::skill_named::ask_holds_name(ask, theirs))
+                        })
+                })
+                .collect();
+            if !kept.is_empty() {
+                made_asks.insert(skill.name.clone(), json!(kept));
+            }
         }
         // One function a skill to snooze it or turn it off (#1685): counted
         // as any skill's against a session's 32, and reached through
@@ -10045,6 +10126,12 @@ pub fn tools_file_summary(
     // is as before, byte for byte.
     if !asks.is_empty() {
         file["asks"] = json!(asks.into_iter().collect::<BTreeMap<_, _>>());
+    }
+    // Each made skill's own words (`LAMP_MADE_SKILL_ASKS`), by its name:
+    // none, and the file is as before, byte for byte.
+    if !made_asks.is_empty() {
+        file[lamp_voice::tools::MADE_ASKS] =
+            json!(made_asks.into_iter().collect::<BTreeMap<_, _>>());
     }
     file
 }
@@ -10962,6 +11049,177 @@ mod tests {
         topics = [\"room/presence\"]\nservices = { gmail = \"write\" }\n[[do]]\n\
         write = { service = \"gmail\", action = \"send_mail\", to = [\"boss@work.test\"], \
         subject = \"In\", text = \"I'm at my desk.\" }\n";
+
+    /// A skill folder `name` in `dir` made on this lamp (`made: here`), with
+    /// `toml` as its skill.toml.
+    fn made_here(dir: &std::path::Path, name: &str, toml: &str) -> std::path::PathBuf {
+        let folder = write_skill(dir, name, toml);
+        std::fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: Made here.\nmade: here\n---\n"),
+        )
+        .unwrap();
+        folder
+    }
+
+    /// A made skill started by its own words alone (`LAMP_MADE_SKILL_ASKS`):
+    /// "when I say send my test note, email me ...".
+    const SAID_WRITE: &str = "asks = [\"send my test note\"]\nversion = \"1.0.0\"\n\
+        [permissions]\nservices = { gmail = \"write\" }\n[[do]]\n\
+        write = { service = \"gmail\", action = \"send_mail\", to = [\"me@example.com\"], \
+        subject = \"Test note\", text = \"This is my test note.\" }\n";
+
+    /// The owner, 16 Nov ("Every task must be doable; no 'couldn't' here"):
+    /// with `LAMP_MADE_SKILL_ASKS` on a skill with `asks`, no tool and no
+    /// trigger loads, a write as its one step; its asks are in the tools file
+    /// under `made_asks` by its name, which the voice matches heard words
+    /// against; and the run now its words ask (`lamp_voice::made_run`) makes
+    /// its write as a trigger's run would, the owner's yes, the day's bounds
+    /// and the agent's hand-over held where it is sent. A light step alone
+    /// the same. Off, such a skill is refused as before and the tools file
+    /// has no `made_asks`.
+    #[test]
+    fn a_skill_started_by_its_own_words_loads_and_runs_now_only_with_its_switch() {
+        let dir = tempfile::tempdir().unwrap();
+        service_write::set_on_here(Some(true));
+        let folder = made_here(dir.path(), "test-note", SAID_WRITE);
+        let light = made_here(
+            dir.path(),
+            "desk-glow",
+            "asks = [\"desk glow on\"]\nversion = \"1.0.0\"\n[permissions]\nlight = true\n\
+             [[do]]\nlight = { colour = \"warm\" }\n",
+        );
+        lamp_voice::made_skill::set_asks_here(Some(false));
+        let off = load(&folder).unwrap_err();
+        assert!(off.contains("needs a trigger or a tool"), "{off}");
+        assert!(load(&light).is_err());
+        lamp_voice::made_skill::set_asks_here(Some(true));
+        let skill = load(&folder).unwrap();
+        assert!(skill.triggers.is_empty() && skill.tool.is_none());
+        assert_eq!(skill.asks, ["send my test note"]);
+        let glow = load(&light).unwrap();
+        let file = tools_file(&[skill.clone(), glow.clone()]);
+        assert_eq!(
+            file[lamp_voice::tools::MADE_ASKS],
+            json!({"desk-glow": ["desk glow on"], "test-note": ["send my test note"]})
+        );
+        assert!(file["tools"].as_array().unwrap().is_empty(), "{file}");
+        let mut engine = Engine::new(vec![skill, glow], false);
+        let run = engine.run_now("test-note", 1_000_000).unwrap();
+        assert!(
+            matches!(run.calls.as_slice(), [Call::ServiceWrite(_)]),
+            "{:?}",
+            run.calls
+        );
+        assert!(run.ask.is_none(), "the Policy is not asked: they asked");
+        let run = engine.run_now("desk-glow", 1_000_000).unwrap();
+        assert!(!run.calls.is_empty());
+        // A task for the lamp's agent, started by words: handed over as a
+        // trigger's would be, its grants and its token held there.
+        let task = made_here(
+            dir.path(),
+            "mail-photo",
+            "asks = [\"take my desk photo\"]\nkind = \"installable\"\nversion = \"1.0.0\"\n\
+             grants = [\"camera\"]\n[[do]]\n\
+             task = { task = \"take a photo\", run = \"scripts/main.py\" }\n",
+        );
+        std::fs::create_dir_all(task.join("scripts")).unwrap();
+        std::fs::write(task.join("scripts/main.py"), "print('photo')\n").unwrap();
+        let mut engine = Engine::new(vec![load(&task).unwrap()], false);
+        let run = engine.run_now("mail-photo", 1_000_000).unwrap();
+        assert!(
+            matches!(run.calls.as_slice(), [Call::Task(_)]),
+            "{:?}",
+            run.calls
+        );
+        // A tool's asks are as before; a write beside a tool still refused.
+        let tooled = made_here(
+            dir.path(),
+            "tooled",
+            &format!("tool = \"tooled\"\n{SAID_WRITE}"),
+        );
+        assert!(
+            load(&tooled)
+                .unwrap_err()
+                .contains("write is its skill's only step")
+        );
+        // sim-2's P2 on #7249: with the switch on, a skill not made on
+        // this lamp with asks and no tool is refused as before, so its
+        // words never reach a run now that can't run it: one from the
+        // Store, one pushed from a computer, one added from a file, one
+        // whose card doesn't say it was made here.
+        let store = made_here(dir.path(), "store-note", SAID_WRITE);
+        let installed = package::Installed {
+            sha256: "ab".repeat(32),
+            manifest: package::Manifest {
+                format: 1,
+                name: "store-note".into(),
+                version: "1.0.0".into(),
+                files: Vec::new(),
+            },
+            from_store: true,
+        };
+        std::fs::write(
+            store.join(package::INSTALLED_FROM),
+            serde_json::to_vec(&installed).unwrap(),
+        )
+        .unwrap();
+        let pushed = made_here(dir.path(), "pushed-note", SAID_WRITE);
+        std::fs::write(pushed.join(PUSHED_FROM), "{}").unwrap();
+        let added = made_here(dir.path(), "added-note", SAID_WRITE);
+        std::fs::write(
+            added.join("SKILL.md"),
+            "---\nname: added-note\ndescription: x\nmade: here\nadded: file\n---\n",
+        )
+        .unwrap();
+        let plain = write_skill(dir.path(), "plain-note", SAID_WRITE);
+        for folder in [&store, &pushed, &added, &plain] {
+            let why = load(folder).unwrap_err();
+            assert!(
+                why.contains("needs a trigger or a tool"),
+                "{folder:?}: {why}"
+            );
+        }
+        // The same made skill once put on, its record not the Store's: on.
+        let mut ours = installed.clone();
+        ours.from_store = false;
+        ours.manifest.name = "test-note".into();
+        std::fs::write(
+            folder.join(package::INSTALLED_FROM),
+            serde_json::to_vec(&ours).unwrap(),
+        )
+        .unwrap();
+        assert!(load(&folder).is_ok());
+        // Off, the tools file is as before.
+        lamp_voice::made_skill::set_asks_here(Some(false));
+        assert!(tools_file(&[]).get(lamp_voice::tools::MADE_ASKS).is_none());
+        lamp_voice::made_skill::set_asks_here(None);
+        service_write::set_on_here(None);
+    }
+
+    /// An uploaded `SKILL.md`'s trigger phrases (`LAMP_MADE_SKILL_ASKS`)
+    /// are its tool's asks as lamp-skills loads it, in its tools file beside
+    /// its tool, as a Store skill's are, so `LAMP_SKILL_NAMED` calls it.
+    #[test]
+    fn an_uploaded_files_trigger_phrases_load_as_its_tools_asks() {
+        lamp_voice::upload_agent::set_on_here(Some(true));
+        lamp_voice::made_skill::set_asks_here(Some(true));
+        let card = "---\nname: focus-mode\ndescription: Starts a focus session.\n---\n\n\
+                    ## Trigger phrases\n- \"Start focus mode\"\n\nDim the light.\n";
+        let (files, _) = lamp_voice::upload_agent::files(card).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("focus-mode");
+        std::fs::create_dir_all(folder.join("scripts")).unwrap();
+        std::fs::write(folder.join("skill.toml"), &files.toml).unwrap();
+        std::fs::write(folder.join("SKILL.md"), &files.card).unwrap();
+        std::fs::write(folder.join(&files.scripts[0].0), &files.scripts[0].1).unwrap();
+        let skill = load(&folder).unwrap();
+        assert_eq!(skill.asks, ["start focus mode"]);
+        let file = tools_file(&[skill]);
+        assert_eq!(file["asks"], json!({"focus_mode": ["start focus mode"]}));
+        lamp_voice::made_skill::set_asks_here(None);
+        lamp_voice::upload_agent::set_on_here(None);
+    }
 
     /// #6066: a write step loads only with `LAMP_SKILL_WRITES` on and its
     /// service listed as a write, every field fixed and checked as it loads,

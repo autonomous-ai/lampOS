@@ -388,6 +388,106 @@ pub fn triggers(card: &str) -> Vec<String> {
     found
 }
 
+/// A trigger phrase as one of its tool's `asks` (with
+/// `LAMP_MADE_SKILL_ASKS` on, [`made_skill::asks_on`]): lower case, a
+/// curly apostrophe made plain and the marks around its words (commas, a
+/// full stop, an exclamation) taken out, its words one space apart; then
+/// only as lamp-skills takes a skill's asks (`lamp_skills::checked_asks`:
+/// 2 to 8 words of letters, digits and apostrophes, never ordinary speech,
+/// `crate::skill_named::ask_refused`). None for a question (a `?`) or any
+/// other: it stays in the tool's note alone, for the model.
+pub fn ask_phrase(phrase: &str) -> Option<String> {
+    ask_checked(phrase).ok()
+}
+
+/// [`ask_phrase`], or why not, in plain words for the app: a question, not
+/// 2 to 8 plain words, ordinary speech
+/// (`crate::skill_named::ask_refused`), or one word of its own past a
+/// greeting or a "please" (`crate::skill_named::own_words_of`), as a made
+/// skill's asks are held (`made_skill::made_asks`).
+pub fn ask_checked(phrase: &str) -> Result<String, String> {
+    if phrase.contains('?') {
+        return Err("it is a question".into());
+    }
+    let plain: String = phrase
+        .to_lowercase()
+        .replace(['’', '‘'], "'")
+        .chars()
+        .map(|c| match c {
+            ',' | '.' | '!' | ';' | ':' | '"' | '“' | '”' => ' ',
+            c => c,
+        })
+        .collect();
+    let words: Vec<&str> = plain.split_whitespace().collect();
+    let ask = words.join(" ");
+    if !(2..=8).contains(&words.len())
+        || ask.chars().count() > made_skill::MOST_MADE_ASK_CHARS
+        || !words.iter().all(|word| {
+            word.chars()
+                .all(|letter| letter.is_alphanumeric() || letter == '\'')
+        })
+    {
+        return Err(format!(
+            "it isn't 2 to 8 plain words of at most {} characters",
+            made_skill::MOST_MADE_ASK_CHARS
+        ));
+    }
+    if let Some(why) = crate::skill_named::ask_refused(&ask) {
+        return Err(why.into());
+    }
+    if crate::skill_named::own_words_of(&ask) < 2 {
+        return Err("it has only one word of its own".into());
+    }
+    Ok(ask)
+}
+
+/// A trigger phrase left out of a tool's asks, and why, told to the app
+/// (`crate::upload_skill::line`'s `asks_left_out`).
+pub type LeftOut = (String, String);
+
+/// The trigger phrases that are its tool's asks ([`ask_checked`]), once
+/// each, at most [`MOST_TRIGGERS`], and those left out with why; none of
+/// either with `LAMP_MADE_SKILL_ASKS` off. A phrase that would start
+/// another skill (`taken`, [`made_skill::ask_taken`]) is left out too.
+pub fn asks_checked(
+    triggers: &[String],
+    taken: impl Fn(&str) -> Option<String>,
+) -> (Vec<String>, Vec<LeftOut>) {
+    let (mut asks, mut left_out) = (Vec::new(), Vec::new());
+    if !made_skill::asks_on() {
+        return (asks, left_out);
+    }
+    for phrase in triggers {
+        match ask_checked(phrase).and_then(|ask| match taken(&ask) {
+            Some(why) => Err(why),
+            None => Ok(ask),
+        }) {
+            Ok(ask) if asks.contains(&ask) => {}
+            Ok(_) if asks.len() == MOST_TRIGGERS => {
+                left_out.push((phrase.clone(), format!("more than {MOST_TRIGGERS} phrases")));
+            }
+            Ok(ask) => asks.push(ask),
+            Err(why) => left_out.push((phrase.clone(), why)),
+        }
+    }
+    (asks, left_out)
+}
+
+/// A tool's `asks = [...]` line for `asks`, or nothing for none.
+pub fn asks_line(asks: &[String]) -> String {
+    if asks.is_empty() {
+        return String::new();
+    }
+    let quoted: Vec<String> = asks.iter().map(|ask| toml_string(ask)).collect();
+    format!("asks = [{}]\n", quoted.join(", "))
+}
+
+/// The trigger phrases that are its tool's `asks` ([`ask_phrase`]), once
+/// each, at most [`MOST_TRIGGERS`]: none with `LAMP_MADE_SKILL_ASKS` off.
+pub fn asks_of(triggers: &[String]) -> Vec<String> {
+    asks_checked(triggers, |_| None).0
+}
+
 /// `text`'s first `most` bytes, cut on a character.
 fn cut(text: &str, most: usize) -> &str {
     if text.len() <= most {
@@ -424,6 +524,12 @@ pub fn note(description: &str, triggers: &[String]) -> String {
 /// [`INSTRUCTIONS`]), a card of the lamp's own words whose description is
 /// [`note`], and the file whole as [`INSTRUCTIONS`]. Its grants with it.
 pub fn files(card: &str) -> Result<(Files, Vec<String>), Refused> {
+    files_with(card, &asks_of(&triggers(card)))
+}
+
+/// [`files`], with its tool's `asks` given ([`asks_checked`], with what
+/// would start another skill left out: `crate::upload_skill::take`).
+pub fn files_with(card: &str, asks: &[String]) -> Result<(Files, Vec<String>), Refused> {
     let card = card.replace("\r\n", "\n");
     if card.len() > MOST_BYTES {
         return Err(Refused::new(format!(
@@ -491,13 +597,18 @@ pub fn files(card: &str) -> Result<(Files, Vec<String>), Refused> {
         let quoted: Vec<String> = secrets.iter().map(|name| format!("\"{name}\"")).collect();
         format!("secrets = [{}]\n", quoted.join(", "))
     };
+    // Its trigger phrases as its tool's asks (`LAMP_MADE_SKILL_ASKS`), so
+    // a heard line that is one runs it in code (`LAMP_SKILL_NAMED`); off,
+    // none, and the file is as before.
+    let triggers = triggers(&card);
+    let asks_line = asks_line(asks);
     let toml = format!(
         "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"voice\"]\ntool = \"{tool}\"\n\
-         grants = [{}]\n{secrets_line}\n[[do]]\ntask = {{ task = {}, run = \"{INSTRUCTIONS}\" }}\n",
+         grants = [{}]\n{secrets_line}{asks_line}\n[[do]]\ntask = {{ task = {}, run = \"{INSTRUCTIONS}\" }}\n",
         quoted_grants.join(", "),
         toml_string(task.trim()),
     );
-    let mut note = note(&description, &triggers(&card));
+    let mut note = note(&description, &triggers);
     if !secrets.is_empty() {
         note = format!(
             "{}{NEVER_BY_VOICE}",
@@ -556,7 +667,11 @@ pub fn capped_with(text: &str, services: bool) -> Result<(String, made_skill::Us
     let allowed = [
         "kind", "version", "needs", "tool", "grants", "secrets", "do",
     ];
-    if table.keys().any(|key| !allowed.contains(&key.as_str())) {
+    // Its trigger phrases as asks, only with their switch, and only as
+    // [`files`] writes them ([`ask_phrase`]).
+    let asks = made_skill::asks_on() && table.contains_key("asks");
+    let held = |key: &String| allowed.contains(&key.as_str()) || (asks && key == "asks");
+    if !table.keys().all(held) {
         return Err(Refused::new(
             "an agent skill added from a file is a tool and one task, nothing more",
         ));
@@ -642,6 +757,24 @@ pub fn capped_with(text: &str, services: bool) -> Result<(String, made_skill::Us
         }
         if !secrets.is_array() || seen.len() > lamp_services::skill_secrets::MOST_NAMES {
             return Err(Refused::new(TOO_MANY_SECRETS));
+        }
+    }
+    if asks {
+        let listed = table
+            .get("asks")
+            .and_then(toml::Value::as_array)
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        let phrases: Vec<&str> = listed.iter().filter_map(toml::Value::as_str).collect();
+        let plain = phrases.len() == listed.len()
+            && (1..=MOST_TRIGGERS).contains(&phrases.len())
+            && phrases.iter().enumerate().all(|(at, phrase)| {
+                ask_phrase(phrase).as_deref() == Some(*phrase) && !phrases[..at].contains(phrase)
+            });
+        if !plain {
+            return Err(Refused::new(
+                "an agent skill's asks are its trigger phrases, plain words, once each",
+            ));
         }
     }
     let version = table
