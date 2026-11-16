@@ -34,6 +34,11 @@ Type=exec
 User=root
 Group=root
 Slice=lampos-voice.slice
+# Kept from reclaim (#7383): under an agent's work the board swaps, and the voice's pages went out with the rest.
+# With MemoryMin they are reclaimed last. Measured: lamp-voice MemoryCurrent 105-119 MB on lamp-c0a4 (17 Nov), so
+# 256M covers it with room. The OpenClaw gateway keeps no MemoryHigh (#6226), so the voice protects itself. The
+# protection takes effect only with the same on each ancestor slice: lampos-voice.slice and lampos.slice.
+MemoryMin=256M
 WorkingDirectory=/
 UMask=0077
 ExecStart=/opt/lampOS/voice/current/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery bounded --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast --call-wait-ms 2000 --controls-mute /var/lib/lampOS/voice/mute/record.json --failure-notice-dir /opt/lampOS/voice/notices --failure-notice-language en-US

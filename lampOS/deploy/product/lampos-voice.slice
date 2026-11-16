@@ -10,3 +10,7 @@ Description=lampOS voice slice
 [Slice]
 CPUWeight=1000
 IOWeight=1000
+# The voice's memory kept from reclaim (#7383): lamp-voice.service's MemoryMin holds only with the
+# same on each ancestor slice, this one and lampos.slice. Under an agent's work the board swaps; the
+# voice (105-119 MB on lamp-c0a4, 17 Nov) is reclaimed last. The gateway keeps no MemoryHigh (#6226).
+MemoryMin=256M
