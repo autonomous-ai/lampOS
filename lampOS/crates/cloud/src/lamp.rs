@@ -871,6 +871,10 @@ impl Lamp for Real {
         self.share.clone()
     }
 
+    fn owner_language(&self) -> &'static str {
+        self.language()
+    }
+
     fn upload(&self) -> Option<std::sync::Arc<crate::upload::Uploads>> {
         self.upload.clone()
     }
