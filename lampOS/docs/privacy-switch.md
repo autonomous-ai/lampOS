@@ -303,6 +303,13 @@ switch on:
   last keep (`GapRide::last_pass_us`) was proposed and dropped: no stall
   position (0, 2, 6, 10, 20, 40, 60, 100, 200, 400 ms) was misjudged with
   the switch on.
+- A ridden gap that ends read closed (the slide moved to mute in it) ends
+  the speaker on its denied authority, and it closes the reference link.
+  Capture, held through the gap, may then find its next send on that link
+  refused; that is a clean end, not a fault, when the speaker's own
+  `Stopped` or a denied authority is queued for capture, as it is at the
+  voice's Stop (`peer_stop.rs`, #7224). A refused link with neither queued
+  (the speaker crashed) still ends the voice as a fault.
 
 Past that bound (a stall over about 1.44 s, whose open reading is not
 steady within 1.5 s of its start) everything ends exactly as without the
