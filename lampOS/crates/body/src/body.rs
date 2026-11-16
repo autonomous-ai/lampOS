@@ -396,6 +396,17 @@ pub fn strain_guard_from(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// `LAMP_BODY_SEAT_COOLS=on` (#7281), under the strain guard: a lamp seated
+/// for heat stands again by itself once the joint that seated it has read
+/// under [`StrainGuard::COOL`] for [`StrainGuard::COOL_FOR`], once an hour
+/// (`StrainGuard::cools`). Off: a hot seat waits for a person, as before.
+pub const SEAT_COOLS: &str = "LAMP_BODY_SEAT_COOLS";
+
+/// Whether a value of [`SEAT_COOLS`] turns it on.
+pub fn seat_cools_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
 /// One step of the pose follower: the joint's new velocity, critically
 /// damped toward a goal `gap` counts away, its acceleration at most
 /// `limits.acceleration` and its speed at most `limits.speed`. Under
@@ -437,6 +448,9 @@ const JERK: f32 = 6.0;
 pub struct StrainGuard {
     pub load: u16,
     pub seconds: u16,
+    /// [`SEAT_COOLS`] (#7281): a hot seat stands again by itself once cool.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub cools: bool,
 }
 
 impl StrainGuard {
@@ -454,6 +468,13 @@ impl StrainGuard {
     pub const CLIMB: u8 = 8;
     pub const CLIMB_WINDOW: Duration = Duration::from_secs(5 * 60);
     pub const CLIMB_EVERY: Duration = Duration::from_secs(10);
+    /// Under [`Self::cools`] (#7281): the joint that seated the lamp hot
+    /// reads under this, 12 under the 62 it sat down at and over a healthy
+    /// standing elbow's 46 to 49 (lamp-4ace, lamp-52e6), for
+    /// [`Self::COOL_FOR`] back to back, and the lamp stands again by
+    /// itself. A held or missing read starts the count again.
+    pub const COOL: u8 = crate::bus_out::WARM - 5;
+    pub const COOL_FOR: Duration = Self::CLIMB_WINDOW;
 }
 
 /// The stand ease (#7289): an arm joint fully stood up, asked its stand goal
@@ -1490,6 +1511,8 @@ pub struct Glimpse {
     /// runs.
     pub bad_reads: [u16; 5],
     pub retreats: u16,
+    /// Of `retreats`, those for heat (#7281), for the fold line.
+    pub hot_retreats: u16,
     /// Seconds left of the long rest after three strains inside
     /// `Standing::RETREAT_WINDOW`; 0 when it is not resting so. Said on its
     /// health, so a body sat down for half an hour is seen, not only felt
@@ -1510,6 +1533,10 @@ pub struct Glimpse {
     pub strained: Option<(&'static str, u16)>,
     pub warming: Option<(&'static str, u8, u8)>,
     pub seated: Option<(&'static str, &'static str)>,
+    /// Under `StrainGuard::cools` (#7281): the seat ends by itself once its
+    /// joint is cool (a hot seat, the first self-stand within the hour).
+    /// `false` while it waits for a person or a health check.
+    pub seat_rests: bool,
     /// Under `Limits::refused_let_go`: the lamp is let go because a joint
     /// is found out of where it may start, and this is what it asks of a
     /// person, in words the voice can say. `None` on every other step.
@@ -7736,6 +7763,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             toward_refused,
             bad_reads: bus.bad_reads,
             retreats: retreats.into(),
+            hot_retreats: 0,
             resting_s: match tired_until {
                 Some(until)
                     if until > now
@@ -7756,6 +7784,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 .strain_guard
                 .and_then(|_| climb.observe(now, samples.map(|sample| sample.temperature))),
             seated,
+            seat_rests: false,
             waiting: None,
             home: Some(home),
         };

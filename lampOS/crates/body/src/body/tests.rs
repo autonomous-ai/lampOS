@@ -2334,6 +2334,7 @@ fn a_long_strain_twice_in_an_hour_seats_the_lamp_until_a_person_lets_it_stand() 
     let guard = StrainGuard {
         load: 450,
         seconds: 10,
+        cools: false,
     };
     let unseat_at = Duration::from_secs(200);
     let (report, seen) = strained_twice(Some(guard), unseat_at, Duration::from_secs(280));
@@ -2435,6 +2436,7 @@ fn under_the_strain_guard_an_elbow_that_cannot_lift_is_said_at_once_and_seats_on
             strain_guard: Some(StrainGuard {
                 load: StrainGuard::LOAD,
                 seconds: StrainGuard::SECONDS,
+                cools: false,
             }),
             ..Limits::FOLDED
         },
@@ -2473,6 +2475,221 @@ fn under_the_strain_guard_an_elbow_that_cannot_lift_is_said_at_once_and_seats_on
     // Each sit-down let the folded arm go, and it rests pushing at nothing.
     assert_eq!(report.arm_releases, 2);
     assert_eq!(lamp.servos[2].load, 20);
+}
+
+/// What each step of [`hot_elbow`] said: when, how far it stood, the seat
+/// and whether it ends by itself.
+type SeatSeen = Vec<(Duration, f32, Option<(&'static str, &'static str)>, bool)>;
+
+/// The elbow warmed from 45 to 63 a degree each 0.1 s from `from`.
+fn warms(from: Duration) -> impl Iterator<Item = (Duration, usize, u8)> {
+    (46..=63u8)
+        .zip(0u64..)
+        .map(move |(to, n)| (from + Duration::from_millis(100 * n), 2, to))
+}
+
+/// The elbow cooled from 62 to 45 a degree each second from `from`: under
+/// [`StrainGuard::COOL`] (49) 13 s on.
+fn cools(from: Duration) -> impl Iterator<Item = (Duration, usize, u8)> {
+    (45..=62u8)
+        .rev()
+        .zip(0u64..)
+        .map(move |(to, n)| (from + Duration::from_secs(n), 2, to))
+}
+
+/// Under the strain guard (#7281), standing with the elbow at 63 from 6 s:
+/// it sits down hot, cools from 12 s and stands again after its minute,
+/// and hot again from 80 s, the second sit-down seats it at about 83 s.
+/// `heats` follow; it is never touched.
+fn hot_elbow(
+    seat_cools: bool,
+    heats: Vec<(Duration, usize, u8)>,
+    ends: Duration,
+) -> (BodyReport, SeatSeen) {
+    let (mut lamp, mut clock) = folded(ends);
+    lamp.arm_moves = true;
+    lamp.overload_clears = 3;
+    lamp.heats = warms(Duration::from_secs(6))
+        .chain(cools(Duration::from_secs(12)))
+        .chain(warms(Duration::from_secs(80)))
+        .chain(heats)
+        .collect();
+    let time = clock.time.clone();
+    let news = move || Some((Mood::Listening, 100));
+    let mut seen = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            strain_guard: Some(StrainGuard {
+                load: StrainGuard::LOAD,
+                seconds: StrainGuard::SECONDS,
+                cools: seat_cools,
+            }),
+            ..Limits::FOLDED
+        },
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        news,
+        Asked::default,
+        |glimpse| {
+            seen.push((
+                time.get(),
+                glimpse.stand,
+                glimpse.seated,
+                glimpse.seat_rests,
+            ))
+        },
+    );
+    (report, seen)
+}
+
+/// When it was first seated, and when it first stood fully once down.
+fn seated_then_stood(seen: &SeatSeen) -> (Duration, Option<Duration>) {
+    let seated_at = seen
+        .iter()
+        .find(|(_, _, seated, _)| seated.is_some())
+        .expect("seated")
+        .0;
+    let down = seen
+        .iter()
+        .find(|(at, stand, ..)| *at > seated_at && *stand == 0.0)
+        .map_or(Duration::MAX, |(at, ..)| *at);
+    let stood = seen
+        .iter()
+        .find(|(at, stand, ..)| *at > down && *stand > 0.99)
+        .map(|(at, ..)| *at);
+    (seated_at, stood)
+}
+
+/// #7281: a lamp seated hot stands again by itself once the elbow has read
+/// under 50 for five minutes, and says that it will from the seat on. Off,
+/// the same lamp waits for a person.
+#[test]
+fn a_hot_seat_stands_again_after_five_cool_minutes() {
+    let ends = Duration::from_secs(480);
+    let heats: Vec<_> = cools(Duration::from_secs(100)).collect();
+    let (report, seen) = hot_elbow(true, heats.clone(), ends);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(
+        report
+            .retreats
+            .iter()
+            .all(|why| why.contains("elbow_pitch at 63 degrees")),
+        "{:?}",
+        report.retreats
+    );
+    let (seated_at, stood) = seated_then_stood(&seen);
+    assert!(
+        (Duration::from_secs(80)..Duration::from_secs(90)).contains(&seated_at),
+        "{seated_at:?}"
+    );
+    // Under 50 from 113 s: five minutes on, at 413 s, it stands again.
+    let cool_from = Duration::from_secs(113);
+    let stood = stood.expect("stood again");
+    assert!(
+        (cool_from + StrainGuard::COOL_FOR
+            ..cool_from + StrainGuard::COOL_FOR + Duration::from_secs(10))
+            .contains(&stood),
+        "{stood:?}"
+    );
+    // Seated hot and saying it will rest, down, until then.
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at > seated_at + Duration::from_secs(10)
+                && *at < cool_from + StrainGuard::COOL_FOR)
+            .all(|(_, stand, seated, rests)| *stand == 0.0
+                && *seated == Some(("elbow_pitch", "hot"))
+                && *rests),
+    );
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at >= stood)
+            .all(|(_, _, seated, _)| seated.is_none())
+    );
+    // Off, it waits for a person, and never says it will rest.
+    let (_, seen) = hot_elbow(false, heats, ends);
+    let (seated_at, stood) = seated_then_stood(&seen);
+    assert_eq!(stood, None);
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at > seated_at)
+            .all(|(_, _, seated, rests)| seated.is_some() && !rests)
+    );
+}
+
+/// #7281: cool for a second under its five minutes, it stays seated.
+#[test]
+fn a_hot_seat_cool_for_under_five_minutes_stays_seated() {
+    // Under 50 from 113 s; it ends a second short of 413 s.
+    let ends = Duration::from_secs(412);
+    let (_, seen) = hot_elbow(true, cools(Duration::from_secs(100)).collect(), ends);
+    let (seated_at, stood) = seated_then_stood(&seen);
+    assert_eq!(stood, None);
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at > seated_at + Duration::from_secs(10))
+            .all(|(_, stand, seated, _)| *stand == 0.0 && seated.is_some())
+    );
+}
+
+/// #7281: once it stood by itself, a hot seat again within the hour waits
+/// for a person, however cool it gets, and says so.
+#[test]
+fn a_hot_seat_after_standing_by_itself_within_the_hour_stays_seated() {
+    let ends = Duration::from_secs(820);
+    // Cool from 113 s, it stands by itself at about 413 s; hot again from
+    // 430 s, it is seated again; cool again from 470 s.
+    let heats = cools(Duration::from_secs(100))
+        .chain(warms(Duration::from_secs(430)))
+        .chain(cools(Duration::from_secs(470)))
+        .collect();
+    let (report, seen) = hot_elbow(true, heats, ends);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let (_, stood) = seated_then_stood(&seen);
+    let stood = stood.expect("stood by itself");
+    let again = seen
+        .iter()
+        .find(|(at, _, seated, _)| *at > stood && seated.is_some())
+        .expect("seated again")
+        .0;
+    assert!(again < Duration::from_secs(440), "{again:?}");
+    let after: Vec<_> = seen
+        .iter()
+        .filter(|(at, ..)| *at > again + Duration::from_secs(10))
+        .collect();
+    assert!(
+        !after.is_empty()
+            && after.iter().all(|(_, stand, seated, rests)| *stand == 0.0
+                && *seated == Some(("elbow_pitch", "hot"))
+                && !rests),
+        "{:?}",
+        after.last()
+    );
+}
+
+/// #7281: a seat for a strain never stands by itself, cool as it is.
+#[test]
+fn a_strained_seat_stays_seated_however_cool() {
+    let guard = StrainGuard {
+        load: 450,
+        seconds: 10,
+        cools: true,
+    };
+    let (report, seen) = strained_twice(Some(guard), Duration::MAX, Duration::from_secs(480));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let seated_at = seen
+        .iter()
+        .find(|(.., seated)| seated.is_some())
+        .expect("seated")
+        .0;
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at > seated_at + Duration::from_secs(20))
+            .all(|(_, stand, _, seated)| *stand == 0.0
+                && *seated == Some(("elbow_pitch", "strained")))
+    );
 }
 
 /// #4501: a joint rising 8 degrees within five minutes, while under 55, is

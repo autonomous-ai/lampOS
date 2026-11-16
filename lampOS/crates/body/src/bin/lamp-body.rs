@@ -2007,6 +2007,9 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
             seconds: arguments
                 .arm_strain_seconds
                 .unwrap_or(lamp_body::body::StrainGuard::SECONDS),
+            cools: lamp_body::body::seat_cools_from(
+                std::env::var(lamp_body::body::SEAT_COOLS).ok().as_deref(),
+            ),
         }),
         ..limits
     };

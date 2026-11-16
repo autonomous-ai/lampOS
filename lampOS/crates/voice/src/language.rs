@@ -1008,6 +1008,9 @@ mod tests {
             "The air reads like smoke. If something's burning, please check it."
         ));
         assert!(is_fixed("Hehe, that tickles."));
+        // A seated lamp's lines (#7281).
+        assert!(is_fixed(lamp_body::seat_say::RESTS));
+        assert!(is_fixed(lamp_body::seat_say::WAITS));
         assert!(!is_fixed("My pairing check is 3 F 9 A, 0 B 2 C."));
         assert!(!is_fixed("Two new mails, from the bakery."));
     }
@@ -1016,7 +1019,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 46);
+        assert_eq!(FIXED_LINES.len(), 48);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
