@@ -203,6 +203,90 @@ jobs:
             [ ! -e "$root/refused" ] || { echo "a refused run made its output folder: $flags"; exit 1; }
             echo "refused: $flags: $(cat "$root/refused.err")"
           done
+      # lamp-voice STARTS on a Mac (step 3, C5b): the C5a step above proves the refusals; this one runs the start the
+      # first attempt's run 4 made: lamp-sim --controls (the bus and lamp-controls' no-slide state), then
+      # `directed-fixture` with the silent microphone and `bus:speaker1`, the real privacy gate
+      # (`LAMP_PRIVACY_CONTROLS=no-slide`) and the software mute's record. It passes on `listening_ready` AND exit 0.
+      # Run 4 reached `listening_ready` and then ended on a reference fault (F1), which is not yet fixed, so this step
+      # is `continue-on-error` until C5b ends it: it must not turn the job red, and it prints what the fault was
+      # (the journal's `reference_fault` row with every timestamp turned into an age before the fault) so the fix is
+      # chosen from the ages. Cleanup (F3): only the pids this step started; the sim's children (lamp-controls) outlive
+      # `kill` by about a second and still write, so wait for the sim, poll up to 5 s for its sockets to go, and retry
+      # the `rm -rf`; the step's exit is the voice's result, never the `rm`'s.
+      - name: lamp-voice starts on a Mac with no host sound and the no-slide gate
+        working-directory: lampOS
+        continue-on-error: true
+        run: |
+          cargo build --locked -p lamp-voice -p lamp-controls
+          # Under $HOME/.lampsim, as the whole-lamp step puts its folder: lamp-body refuses a lock folder under /tmp
+          # on macOS (mode 1777, writable by others), and the runner's home is short enough for a socket's path.
+          mkdir -p -m 700 "$HOME/.lampsim"
+          root="$HOME/.lampsim/c5-$$"; mkdir -p -m 700 "$root" "$root/priv"
+          sim=""; voice=""
+          cleanup() {
+            status=$?
+            trap - EXIT
+            if [ -n "$voice" ]; then kill "$voice" 2>/dev/null || true; fi
+            if [ -n "$sim" ]; then
+              kill "$sim" 2>/dev/null || true; wait "$sim" 2>/dev/null || true
+              # The sim's children may still hold sockets in its folder: wait for them to go, 5 s at most.
+              for i in $(seq 1 50); do
+                [ -z "$(find "$root/sim" -name '*.sock' 2>/dev/null | head -n 1)" ] && break
+                sleep 0.1
+              done
+            fi
+            for i in 1 2 3 4 5; do
+              rm -rf "$root" 2>/dev/null && break
+              sleep 1
+            done
+            [ ! -e "$root" ] || echo "could not remove $root (left for the runner; the step's result is the voice's)"
+            exit "$status"
+          }
+          trap cleanup EXIT
+          python3 - "$root/reply.wav" <<'PY'
+          import math, struct, sys, wave
+          w = wave.open(sys.argv[1], "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000)
+          w.writeframes(b"".join(struct.pack("<h", int(3000 * math.sin(i * 0.05))) for i in range(24000))); w.close()
+          PY
+          sha=$(shasum -a 256 "$root/reply.wav" | cut -d' ' -f1)
+          LAMP_SIM_SPEAKER=silent target/debug/lamp-sim run "$root/sim" --bin-dir target/debug --controls --listen 127.0.0.1:7798 > "$root/sim.log" 2>&1 &
+          sim=$!
+          for i in $(seq 1 60); do grep -q 'lamp-sim: up on' "$root/sim.log" && break; sleep 0.5; done
+          grep -q 'lamp-sim: up on' "$root/sim.log" || { cat "$root/sim.log"; exit 1; }
+          sleep 3
+          # No LAMP_BUS=on: with the bus on the fixture provider's argv gets the bus's flags, which its worker's one
+          # fixture form refuses ("invalid camera context arguments", run 3).
+          LAMP_BUS_ROOT="$root/sim/bus" LAMP_PRIVACY_CONTROLS=no-slide \
+            target/debug/lamp-voice directed-fixture "$root/reply.wav" "$sha" 8 "$root/out" --diagnostics \
+            --microphone-device silent --speaker-device bus:speaker1 --controls-mute "$root/priv/mute" \
+            > "$root/voice.out" 2> "$root/voice.err" &
+          voice=$!
+          for i in $(seq 1 120); do kill -0 "$voice" 2>/dev/null || break; sleep 0.5; done
+          if kill -0 "$voice" 2>/dev/null; then echo "the voice did not end in 60 s"; kill "$voice"; fi
+          code=0; wait "$voice" || code=$?; voice=""
+          cat "$root/voice.out"; cat "$root/voice.err"
+          if [ "$code" != 0 ] || ! grep -q '"status":"listening_ready"' "$root/voice.out"; then
+            echo "exit $code; the sim said:"; tail -n 30 "$root/sim.log"
+            grep -o '"kind":"[a-z_]*"' "$root/out/events.jsonl" 2>/dev/null | sort | uniq -c | sort -rn | head -20
+            # F1: the fault's own row, each timestamp as an age (ms) before the fault's at_us; None stays None.
+            python3 - "$root/out/events.jsonl" <<'PY'
+          import json, sys
+          try:
+              rows = [json.loads(line) for line in open(sys.argv[1]) if line.strip()]
+          except OSError as error:
+              print("no events.jsonl:", error); sys.exit(0)
+          for row in rows:
+              if row.get("kind") != "reference_fault":
+                  continue
+              fault = row["details"]; timing = fault["timing"]; at = fault["at_us"]
+              ages = {k: (None if v is None else round((at - v) / 1000, 1)) for k, v in timing.items() if k.endswith("_at_us")}
+              print("reference_fault from the", row.get("worker"), "worker:", fault["reason"], "at_us", at)
+              print("  ages in ms before the fault:", json.dumps(ages, sort_keys=True))
+              print("  the rest:", json.dumps({k: v for k, v in timing.items() if not k.endswith("_at_us")}, sort_keys=True))
+              print("  the row:", json.dumps(row))
+          PY
+            exit 1
+          fi
       # The whole lamp on macOS, the real lamp-body on lamp-sim's pty (ten's portable body, #6965; the bus's
       # buffers, #6933): up within 30 s, the body read its servos and may stand, and still up 20 s later
       # with no body restart. No tour yet (the SDKs are not installed in this job).
