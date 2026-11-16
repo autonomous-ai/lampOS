@@ -1176,8 +1176,14 @@ sau:
      `[[while]]` đọc một topic đèn không có, hoặc một field mà message của
      nó không mang, bị từ chối và sửa với các topic đèn có cùng các field
      của chúng (`made_skill::unread`, `READABLE`, #7357: lamp-c0a4, 16/11,
-     một trigger `device/temperature` không gì gửi); system prompt liệt kê
-     đúng các topic đó (`readable_named`), và khi hết lượt sửa, người dùng
+     một trigger `device/temperature` không gì gửi). Một topic đèn có là
+     topic mà `lamp_msgs` khai báo (`lamp_msgs::declaration_of`, cùng 12
+     topic nó bỏ sót, được một test giữ khớp với mọi `TOPIC` trong
+     `lamp_msgs`) hoặc `clock/local` (`made_skill::lamp_has`), không phải
+     một danh sách thứ hai viết tay; field chỉ được kiểm trên các topic của
+     `READABLE`, và một topic đã khai báo nằm ngoài đó (`body/hand`,
+     `expression/state`) giữ đường nới lỏng, được nói bằng lời chung.
+     System prompt liệt kê `READABLE` (`readable_named`), và khi hết lượt sửa, người dùng
      nghe "the lamp has nothing that reads that" (`NOTHING_READS`). Trên lamp-74ff, 17:39 ngày
      10/11, một lần tạo từ ứng dụng "glow green when I come back to my
      desk" được viết trên khuôn mặt như kỹ năng chào mừng có sẵn, và bị từ

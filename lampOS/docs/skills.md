@@ -3773,7 +3773,14 @@ gone ([switches.md](switches.md)). What happens:
      field its message doesn't carry, is refused and repaired with the
      topics it has and their fields (`made_skill::unread`, `READABLE`,
      #7357: lamp-c0a4, 16 Nov, a `device/temperature` trigger nothing
-     sends); the system prompt lists the same (`readable_named`), and the
+     sends). A topic the lamp has is one `lamp_msgs` declares
+     (`lamp_msgs::declaration_of`, and the 12 it leaves out, held by a test
+     to every `TOPIC` in `lamp_msgs`) or `clock/local`
+     (`made_skill::lamp_has`), not a second list by hand; the fields are
+     checked only on `READABLE`'s topics, and a declared topic outside
+     them (`body/hand`, `expression/state`) keeps its loosened path, said
+     in general words. The system prompt lists `READABLE`
+     (`readable_named`), and the
      repairs used up, the person hears "the lamp has nothing that reads
      that" (`NOTHING_READS`). On lamp-74ff, 10 Nov 17:39, an app make of "glow green
      when I come back to my desk" was written on the faces, as the built-in
