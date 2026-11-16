@@ -9280,6 +9280,41 @@ fn a_one_path_make_with_no_harness_set_up_goes_to_the_lamps_hermes() {
     assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
 }
 
+/// #7245 (Heron's P2): on an OpenClaw lamp whose Harness target isn't
+/// known yet, a one_path make is told "still getting ready" at once,
+/// never made as a Hermes make.
+#[test]
+fn a_one_path_make_on_openclaw_with_no_lamp_target_yet_is_not_ready() {
+    let rig = Rig::new();
+    let work = make_work(&rig);
+    let mut runner = one_path_runner(&rig, EngineKind::Hermes, &[], None);
+    runner.harness = SkillHarnessSlot::default();
+    runner.default_agent = false;
+    runner.makes = true;
+    let gateway = lamp_tasks::skill_make::MakeGateway::of(Arc::new(runner));
+    let hermes = MakeHermesStandIn::default();
+    let mut line: serde_json::Value =
+        serde_json::from_slice(&make_line(Some(true), 20_000)).unwrap();
+    line["engine"] = json!("OpenClaw");
+    let answered = lamp_tasks::skill_make::answer_with(
+        &serde_json::to_vec(&line).unwrap(),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered["ok"], json!(false));
+    assert_eq!(answered["error"], json!(lamp_tasks::skill_make::NOT_READY));
+    assert_eq!(
+        answered["message"],
+        json!(lamp_tasks::skill_make::NOT_READY_LINE)
+    );
+    assert_eq!(hermes.0.load(Ordering::Acquire), 0, "never a Hermes make");
+    assert!(rig.calls().is_empty(), "Harness never asked");
+    assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+}
+
 /// #7245: a make whose `harness new` is uncertain (a receipt Harness never
 /// gives) is refused, and at its end the agent Harness made late in the
 /// make's own folder is closed `--now`, then the folder removed: one
