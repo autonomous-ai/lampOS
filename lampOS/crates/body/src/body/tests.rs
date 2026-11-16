@@ -1960,6 +1960,66 @@ fn an_arm_that_strains_goes_back_down_and_stays_down_for_a_while() {
     assert_eq!((lamp.servos[1].goal, lamp.servos[2].goal), (2_050, 2_047));
 }
 
+/// A lamp standing for 75 s, its elbow reading `load` throughout and
+/// otherwise as `set` makes it: the arm goals and positions of the last
+/// step it was fully stood up.
+fn elbow_standing(load: u16, set: impl FnOnce(&mut Lamp)) -> ([u16; 2], [u16; 2]) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(75));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    lamp.strains = vec![(Duration::ZERO, Duration::from_secs(75), 2, load)];
+    set(&mut lamp);
+    // Listened to throughout: awake, and at energy level 1 no lean moves
+    // the arm off its stand goal.
+    let news = || Some((Mood::Listening, 100));
+    let mut last = None;
+    let report = run_standing(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        Some(standing(100, 600)),
+        news,
+        |glimpse| {
+            if glimpse.stand == 1.0 {
+                last = Some((glimpse.arm_goals, glimpse.arm_positions));
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.stood && report.retreats.is_empty(), "{report:?}");
+    last.unwrap()
+}
+
+/// lamp-74ff on 13373 (#7289): standing, its elbow held 41 to 47 counts
+/// short of its stand goal (2,600 here) at a load of 176 to 200 and heated
+/// until the lamp sat down. Held 45 short at 190 past `STAND_EASE_STEPS`,
+/// its stand goal is eased to where it holds plus `STAND_EASE_MARGIN`.
+#[test]
+fn a_standing_elbow_held_45_short_at_load_190_has_its_stand_goal_eased() {
+    let (goals, at) = elbow_standing(190, |lamp| lamp.short = Some((2, 45.0)));
+    assert_eq!(at[1], 2_555);
+    assert_eq!(goals, [2_650, 2_555 + STAND_EASE_MARGIN], "at {at:?}");
+}
+
+/// lamp-52e6 on the same build: 3 short at a load of 24. Nothing changes.
+#[test]
+fn a_standing_elbow_3_short_at_load_24_keeps_its_stand_goal() {
+    let (goals, _) = elbow_standing(24, |lamp| lamp.short = Some((2, 3.0)));
+    assert_eq!(goals, [2_650, 2_600]);
+}
+
+/// A hand pushing the stood elbow 120 down, past `STAND_EASE_FLOOR`: not
+/// where the arm can hold. It is not eased.
+#[test]
+fn a_standing_elbow_pushed_120_down_by_a_hand_is_not_eased() {
+    let (goals, at) = elbow_standing(190, |lamp| {
+        lamp.hand = Some((Duration::from_secs(8), Duration::from_secs(75), 2, 2_480.0));
+    });
+    assert_eq!(at[1], 2_480);
+    assert_eq!(goals, [2_650, 2_600]);
+}
+
 /// lamp-4ace, 20 to 24 Oct: three strains of the elbow in half an hour sat
 /// the lamp down for the rest of a five-day run, and it never stood again
 /// until restarted. Three inside `Standing::RETREAT_WINDOW` rest it
