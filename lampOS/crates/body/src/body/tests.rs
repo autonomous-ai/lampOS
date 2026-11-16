@@ -2041,10 +2041,21 @@ fn an_arm_that_strains_goes_back_down_and_stays_down_for_a_while() {
 /// otherwise as `set` makes it: the arm goals and positions of the last
 /// step it was fully stood up.
 fn elbow_standing(load: u16, set: impl FnOnce(&mut Lamp)) -> ([u16; 2], [u16; 2]) {
-    let (mut lamp, mut clock) = folded(Duration::from_secs(75));
+    elbow_standing_for(Duration::from_secs(75), load, Duration::from_secs(75), set)
+}
+
+/// As [`elbow_standing`], standing for `ends`, the elbow reading `load`
+/// until `loaded` only.
+fn elbow_standing_for(
+    ends: Duration,
+    load: u16,
+    loaded: Duration,
+    set: impl FnOnce(&mut Lamp),
+) -> ([u16; 2], [u16; 2]) {
+    let (mut lamp, mut clock) = folded(ends);
     lamp.arm_moves = true;
     lamp.overload_clears = 1;
-    lamp.strains = vec![(Duration::ZERO, Duration::from_secs(75), 2, load)];
+    lamp.strains = vec![(Duration::ZERO, loaded, 2, load)];
     set(&mut lamp);
     // Listened to throughout: awake, and at energy level 1 no lean moves
     // the arm off its stand goal.
@@ -2076,6 +2087,36 @@ fn elbow_standing(load: u16, set: impl FnOnce(&mut Lamp)) -> ([u16; 2], [u16; 2]
 fn a_standing_elbow_held_45_short_at_load_190_has_its_stand_goal_eased() {
     let (goals, at) = elbow_standing(190, |lamp| lamp.short = Some((2, 45.0)));
     assert_eq!(at[1], 2_555);
+    assert_eq!(goals, [2_650, 2_555 + STAND_EASE_MARGIN], "at {at:?}");
+}
+
+/// lamp-74ff on 13508 with #7294 (#7289, 19:57 to 20:05): goal 2,562
+/// eased to 2,527, held at 2,522, load 172; then eased to 2,494, held at
+/// 2,489, load 164; then 40 short at 172, past the floor. Each ease only
+/// lowered the lamp: the elbow drooped ~40 under the new goal at the same
+/// load. Eased once and still loaded, it goes back to its measured stand
+/// and is not eased again this run.
+#[test]
+fn a_standing_elbow_still_loaded_after_its_ease_goes_back_to_its_stand_and_eases_no_more() {
+    let (goals, at) = elbow_standing_for(
+        Duration::from_secs(200),
+        172,
+        Duration::from_secs(200),
+        |lamp| lamp.short = Some((2, 40.0)),
+    );
+    assert_eq!(goals, [2_650, 2_600], "at {at:?}");
+    assert_eq!(at[1], 2_560);
+}
+
+/// An ease after which the load comes under `STAND_EASE_LOAD` is kept.
+#[test]
+fn a_standing_elbow_whose_load_drops_after_its_ease_keeps_it() {
+    let (goals, at) = elbow_standing_for(
+        Duration::from_secs(200),
+        190,
+        Duration::from_secs(80),
+        |lamp| lamp.short = Some((2, 45.0)),
+    );
     assert_eq!(goals, [2_650, 2_555 + STAND_EASE_MARGIN], "at {at:?}");
 }
 
