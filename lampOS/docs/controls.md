@@ -118,7 +118,10 @@ to hold the head. The voice declines that hold and plays no sigh, and
 Expression follows the voice's word. The ring's countdown doesn't know about
 onboarding: it dims under the hand and brightens at the letting go. A hand
 kept a second also clears the restart guard's mute (#960), as a tap did,
-since that mute wakes as sleep does. A pad that drifts high on a level read
+since that mute wakes as sleep does. With `LAMP_GUARD_SIGN=on` (#7224, off unless on), the
+asleep face of a lamp the guard muted pulses amber once a minute until that
+tap, so it doesn't look like a mute the person chose (ring-choreography.md,
+"The asleep face"); nothing is said aloud. A pad that drifts high on a level read
 (#1764), or something resting on the head, now wakes a sleeping lamp after a
 second. Before, a drift held 3 s would have put an awake one to sleep.
 
