@@ -1979,6 +1979,22 @@ cả hai người viết.
   mục làm việc và các kỹ năng, và `control.sock` của lamp-control nhưng
   không bao giờ `admin.sock`. Terminal và công cụ của nó chỉ chạy trong
   namespace đó, và không token nào được tạo.
+- **Cả trên OpenClaw, qua đường chạy chung
+  (`LAMP_MAKE_AGENT_ONE_PATH=on`, tắt trừ khi đặt, không unit nào đặt;
+  #7245).** Khi bật, lần tạo được giao cho agent của đèn mỗi khi lamp-tasks
+  báo agent đó nhận lần chạy, Hermes hay OpenClaw
+  (`make_skill_agent::ONE_PATH_ENGINES`), và dòng của nó mang
+  `"one_path":true`. lamp-tasks giữ runner namespace của Hermes cho Hermes;
+  với OpenClaw nó gửi luật thành một lượt qua `harness new <engine>` trong
+  một thư mục tạo mới (đường chạy chung của #7133), đọc lại `answer.md`,
+  không tạo token và không mở lần chạy skill-start nào, và xoá phiên cùng
+  thư mục dù lần tạo kết thúc thế nào ([tasks_vi.md](tasks_vi.md), "Một lần
+  tạo bằng giọng nói trên OpenClaw, qua đường chạy chung"). OpenClaw chỉ
+  chạy được skill-start, nên lần chạy của nó bỏ `lamp-skills pack` của
+  hướng dẫn; kiểm tra và sửa của giọng nói vẫn như cũ. Một `cannot:` được
+  chuyển nguyên văn tới phương án dự phòng của #7234. Nhật ký ghi "the
+  lamp's agent is OpenClaw: handed over on the one run path". Khi tắt, chỉ
+  Hermes được giao lần tạo, như trên.
 - **Mạng của nó: `LAMP_MAKE_AGENT_NET`** (không unit nào đặt; yêu cầu của
   chủ sở hữu, 12/11, quyết định của first builder,
   12/11 19:14). Mặc định lần chạy giữ mạng, như agent của V1, và gọi mô hình qua

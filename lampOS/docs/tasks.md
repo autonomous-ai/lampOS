@@ -3526,6 +3526,54 @@ engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
 line that stays true round after round is logged once. Skill runs still go
 to Hermes alone (`HarnessRunner`, above).
 
+### A voice make on OpenClaw, through the one run path (`LAMP_MAKE_AGENT_ONE_PATH`, off, #7245)
+
+On lamp-c0a4 (build 13333, OpenClaw the default, 16 Nov 11:46) a make
+DeepSeek didn't keep was never handed over: "the lamp's agent is OpenClaw:
+only Hermes has a namespace runner for a make today". After #7133 an
+OpenClaw lamp could run a skill's job but not make one. With lamp-voice's
+`LAMP_MAKE_AGENT_ONE_PATH=on` (off unless set, in no unit;
+[switches.md](switches.md)), the make goes to the lamp's agent whenever
+lamp-tasks says it takes runs, Hermes or OpenClaw, through the one run
+path, with no second runner:
+
+- **The line:** `{"op":"skill_make","rules","within_ms","one_path":true}`.
+  `one_path` is a boolean, `false` by default; without it the make socket
+  runs `MakeHermes`, unchanged, byte for byte.
+- **The runner, from the agent's data:** for a line that carries it, the
+  make socket picks its runner as a skill's run does
+  (`skill_task::default_agent_takes_runs`). Hermes keeps `MakeHermes`
+  (above). A gateway agent (OpenClaw) gets `skill_make::MakeGateway`, a
+  `Runner`.
+- **The gateway make:** a fresh `make-<run id>` folder in the work folder,
+  the rules in `rules.md`, sent as one turn through Harness's
+  `harness new <engine>` in that folder (#7133's `HarnessRunner`, "A
+  skill's run on OpenClaw" below). `answer.md` is read back as above. No
+  token is minted and no skill-start run is opened (`gateway::open_start`
+  is not called): a make has no grants. The Harness session and the folder
+  are removed however the make ends: an answer, `cannot:`, past its
+  deadline or an error.
+- **No `lamp-skills pack` in the run:** OpenClaw's exec allow-list holds
+  only skill-start, so a gateway make skips the guide's check step; the
+  voice still puts the answer through its whole check and repairs.
+- **A `cannot:` answer** goes back to the voice as written, for #7234's
+  fallback.
+- **One session (`LAMP_TASKS_ONE_SESSION`, #7258):** with it on, the make
+  is to go into the one session as a message instead of a session of its
+  own. The choice is one seam function, so #7258 takes it over there; a
+  session per make is the fallback while that switch is off.
+- **The journal:** `tasks: make: handed to <engine> on the one run path in
+  <ms> ms`, then `tasks: make: <engine> session closed, folder removed`.
+  lamp-voice says `a skill made here: the lamp's agent is OpenClaw: handed
+  over on the one run path`.
+
+**The lamp rows (not yet run):** on lamp-c0a4 with the switch on, from
+played clips: "make me a skill that, when I say apple file, has an agent
+write three apple facts into a file for me" is made by the agent, kept,
+said back, yes; "apple file" runs it on OpenClaw, the file holding three
+facts; afterwards no `make-*` folder, no Harness session and no
+skill-start run is left; on a Hermes lamp today's make rows still pass.
+
 ### A made skill's fixed write on the lamp's Hermes (`LAMP_SKILL_WRITE_AGENT`, on in the product)
 
 The owner's ruling (13 Nov): everything that touches a linked service runs
