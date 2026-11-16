@@ -53,6 +53,10 @@ pub fn on() -> bool {
 /// lamp-9adf, is still answering it.
 pub const TOLD_FOR: Duration = Duration::from_secs(15 * 60);
 
+/// How many heard turns past a skill's wait are guarded: those that may
+/// answer its say-back late. After them the note alone carries it.
+pub const LATE_TURNS_GUARDED: u8 = 2;
+
 /// The longest the model's yes or no on a held reply is waited for.
 pub const JUDGE_WITHIN: Duration = Duration::from_millis(1_500);
 
@@ -156,12 +160,15 @@ pub enum Round {
 impl Guard {
     /// The guard of the heard line `request` (`heard`) at `now`: with the
     /// switch `on`, while a made skill with code of its own is not on and its
-    /// yes was asked before it.
+    /// wait ran out before it, for the first [`LATE_TURNS_GUARDED`] such
+    /// turns only. A turn within the wait streams as before: a yes there is
+    /// its `approve_id` call's (Heron's latency P2 on #7284).
     pub fn for_turn(on: bool, heard: bool, request: u64, now: Instant) -> Option<Self> {
         if !on || !heard {
             return None;
         }
-        let (skill, _) = crate::skill_write_yes::code_not_on(request, now, TOLD_FOR)?;
+        let skill =
+            crate::skill_write_yes::late_guarded(request, now, TOLD_FOR, LATE_TURNS_GUARDED)?;
         Some(Self {
             request,
             skill,
@@ -297,17 +304,30 @@ mod tests {
             Guard::for_turn(true, true, 1, now).is_none(),
             "its own request"
         );
-        let mut guard = Guard::for_turn(true, true, 2, now).unwrap();
-        assert_eq!(guard.judge("All set!", now), Judged::Held);
+        assert!(
+            Guard::for_turn(true, true, 2, now).is_none(),
+            "within its wait: streamed"
+        );
+        let late = now + Duration::from_secs(200);
+        let mut guard = Guard::for_turn(true, true, 2, late).unwrap();
+        assert_eq!(guard.judge("All set!", late), Judged::Held);
         assert_eq!(
             guard.round_ended(false),
             Round::Judge(vec!["All set!".into()])
         );
-        assert_eq!(guard.judge("It's on now.", now), Judged::Held);
+        assert_eq!(guard.judge("It's on now.", late), Judged::Held);
         assert_eq!(guard.round_ended(true), Round::Nothing);
         assert_eq!(guard.round_ended(false), Round::Nothing);
-        assert_eq!(guard.line_once(now), Some(NOT_ON_YET));
-        assert_eq!(guard.line_once(now), None, "once a turn");
+        assert_eq!(guard.line_once(late), Some(NOT_ON_LATE));
+        assert_eq!(guard.line_once(late), None, "once a turn");
+        assert!(
+            Guard::for_turn(true, true, 3, late).is_some(),
+            "the second late turn"
+        );
+        assert!(
+            Guard::for_turn(true, true, 4, late).is_none(),
+            "a third late turn"
+        );
         assert!(note(false, 2, now + Duration::from_secs(200)).is_none());
         assert!(note(true, 2, now).is_none(), "within its wait");
         assert!(note(true, 2, now + Duration::from_secs(200)).is_some());
