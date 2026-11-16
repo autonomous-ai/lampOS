@@ -2313,6 +2313,8 @@ fn second_route_worker_environment(
         crate::action_claim::ENVIRONMENT,
         // And one worded its own way (#5215).
         crate::action_claim::WORDED_ENVIRONMENT,
+        // A made skill with code not on is never said to be on (#7270).
+        crate::made_not_on::ENVIRONMENT,
         crate::second_provider::CHECKING_LINE_ENVIRONMENT,
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
@@ -2626,6 +2628,7 @@ mod tests {
             crate::keep_at_once::ENVIRONMENT,
             crate::action_claim::ENVIRONMENT,
             crate::action_claim::WORDED_ENVIRONMENT,
+            crate::made_not_on::ENVIRONMENT,
             crate::second_provider::CHECKING_LINE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
@@ -3657,6 +3660,7 @@ mod tests {
                     || name == crate::keep_at_once::ENVIRONMENT
                     || name == crate::action_claim::ENVIRONMENT
                     || name == crate::action_claim::WORDED_ENVIRONMENT
+                    || name == crate::made_not_on::ENVIRONMENT
                     || name == crate::second_provider::CHECKING_LINE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
@@ -3850,6 +3854,7 @@ mod tests {
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
+                    "LAMP_MADE_NOT_ON_TOLD=on",
                     "LAMP_MAKE_AGENT_GUIDE=on",
                     "LAMP_MAKE_AGENT_ONE_PATH=on",
                     "LAMP_MAKE_SKILL=on",
