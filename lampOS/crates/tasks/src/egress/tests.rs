@@ -55,7 +55,7 @@ fn every_closed_class_is_closed_and_a_public_address_is_open() {
         ("::ffff:10.0.0.1", "private"),
         ("::ffff:172.168.20.9", LAMP_NETWORK),
         ("64:ff9b::a00:1", "private"),
-        ("64:ff9b:1::c0a8:101", "private"),
+        ("64:ff9b:1::c0a8:101", "local-translation"),
         ("64:ff9b::7f00:1", "loopback"),
         ("2002:c0a8:0101::1", "private"),
     ] {
@@ -100,16 +100,111 @@ fn the_routes_give_each_gateway_and_each_network_but_the_default() {
     assert_eq!(route_networks("Iface\nbad line\n"), vec![]);
 }
 
-/// The lamp's own interfaces are read: loopback is among them on any
-/// machine, so a run never reaches it even with no fixed range.
+/// A lamp on 2001:67c:1234:1::/64, the home's delegated /48 routed via
+/// the router's link-local address, its default route via the router's
+/// global one, as the kernel prints `/proc/net/ipv6_route`.
+const ROUTE6: &str = "\
+2001067c123400010000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000100 00000001 00000000 00000001 wlan0
+2001067c123400000000000000000000 30 00000000000000000000000000000000 00 fe800000000000000000000000000001 00000400 00000001 00000000 00000003 wlan0
+00000000000000000000000000000000 00 00000000000000000000000000000000 00 2001067c123400010000000000000001 00000400 00000001 00000000 00000003 wlan0
+00000000000000000000000000000001 80 00000000000000000000000000000000 00 00000000000000000000000000000000 00000000 00000002 00000000 80200001 lo
+00000000000000000000000000000000 00 00000000000000000000000000000000 00 00000000000000000000000000000000 ffffffff 00000001 00000000 00200200 lo
+";
+
+/// The IPv4 table of `the_routes_give_each_gateway_and_each_network_but_the_default`:
+/// its default route via 172.168.20.1.
+const ROUTE: &str = "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n\
+                     eth0\t00000000\t0114A8AC\t0003\t0\t0\t100\t00000000\t0\t0\t0\n\
+                     eth0\t0014A8AC\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0\n";
+
+/// The IPv6 routes are read as the IPv4 ones: each destination's prefix
+/// closed (so a NAS on another /64 of the home's /48 is), each next hop
+/// alone, never `::/0`.
+#[test]
+fn the_ipv6_routes_give_each_next_hop_and_each_network_but_the_default() {
+    let nets = route6_networks(ROUTE6);
+    for net in [
+        Net::new(ip("2001:67c:1234:1::"), 64),
+        Net::new(ip("2001:67c:1234::"), 48),
+        Net::new(ip("fe80::1"), 128),
+        Net::new(ip("2001:67c:1234:1::1"), 128),
+        Net::new(ip("::1"), 128),
+    ] {
+        assert!(nets.contains(&net), "{net:?} in {nets:?}");
+    }
+    assert!(nets.iter().all(|net| net.prefix != 0), "never the default");
+    assert_eq!(class(ip("2001:67c:1234:7::5"), &nets), Some(LAMP_NETWORK));
+    assert_eq!(class(ip("2606:4700:4700::1111"), &nets), None);
+    assert_eq!(route6_networks(""), vec![]);
+    assert_eq!(route6_networks("bad line\n2001 40 x\n"), vec![]);
+}
+
+/// The default routes' gateways, IPv4 and IPv6, are the lamp's own
+/// networks, whatever their range.
+#[test]
+fn the_default_gateways_are_closed() {
+    let own = networks_from(vec![], Ok(ROUTE.into()), Ok(ROUTE6.into())).unwrap();
+    if cfg!(target_endian = "little") {
+        assert_eq!(class(ip("172.168.20.1"), &own), Some(LAMP_NETWORK));
+    }
+    assert_eq!(class(ip("2001:67c:1234:1::1"), &own), Some(LAMP_NETWORK));
+    // A gateway outside the lamp's own prefix is still closed, alone.
+    let far = "\
+00000000000000000000000000000000 00 00000000000000000000000000000000 00 2001067c99990000000000000000000a 00000400 00000001 00000000 00000003 wlan0
+";
+    let own = networks_from(vec![], Ok(String::new()), Ok(far.into())).unwrap();
+    assert_eq!(class(ip("2001:67c:9999::a"), &own), Some(LAMP_NETWORK));
+    assert_eq!(class(ip("2001:67c:9999::b"), &own), None);
+}
+
+/// A route table that can't be read fails closed: IPv4's, nothing is
+/// known, so nothing passes; IPv6's, every IPv6 address is closed and
+/// IPv4 is checked still.
+#[test]
+fn an_unread_route_table_fails_closed() {
+    let unread = || Err(io::Error::from(io::ErrorKind::NotFound));
+    assert!(networks_from(vec![], unread(), Ok(ROUTE6.into())).is_err());
+    assert!(networks_from(vec![], unread(), unread()).is_err());
+    let own = networks_from(vec![], Ok(ROUTE.into()), unread()).unwrap();
+    assert_eq!(class(ip("2606:4700:4700::1111"), &own), Some(LAMP_NETWORK));
+    assert_eq!(class(ip("2001:67c:1234:7::5"), &own), Some(LAMP_NETWORK));
+    assert_eq!(class(ip("1.1.1.1"), &own), None);
+    assert_eq!(class(ip("::ffff:1.1.1.1"), &own), None);
+}
+
+/// The local-use NAT64 prefix is closed whole, whatever IPv4 address its
+/// last bits look like; the well-known `/96` is still checked as IPv4.
+#[test]
+fn the_local_use_nat64_prefix_is_closed_whole() {
+    for addr in [
+        "64:ff9b:1::101:101",
+        "64:ff9b:1::808:808",
+        "64:ff9b:1:ffff:ffff:ffff:ffff:ffff",
+        "64:ff9b:1:a::",
+    ] {
+        assert_eq!(class(ip(addr), &[]), Some("local-translation"), "{addr}");
+        assert_eq!(as_v4(ip(addr)), ip(addr), "{addr}");
+    }
+    assert_eq!(class(ip("64:ff9b::808:808"), &[]), None);
+    assert_eq!(class(ip("64:ff9b:2::808:808"), &[]), None);
+}
+
+/// The lamp's own interfaces and routes are read: loopback is among them
+/// on any Linux, so a run never reaches it even with no fixed range.
+/// Elsewhere there is no `/proc/net/route`, so nothing passes.
 #[test]
 fn the_lamps_interfaces_are_read() {
-    let own = own_networks().unwrap();
-    assert!(
-        own.iter().any(|net| net.contains(ip("127.0.0.1"))),
-        "{own:?}"
-    );
-    assert_eq!(lamp_closed(ip("127.0.0.1")), Some(LAMP_NETWORK));
+    if cfg!(target_os = "linux") {
+        let own = own_networks().unwrap();
+        assert!(
+            own.iter().any(|net| net.contains(ip("127.0.0.1"))),
+            "{own:?}"
+        );
+        assert_eq!(lamp_closed(ip("127.0.0.1")), Some(LAMP_NETWORK));
+    } else {
+        assert!(own_networks().is_err());
+        assert_eq!(lamp_closed(ip("1.1.1.1")), Some("unknown-lamp-network"));
+    }
     assert!(lamp_closed(ip("10.1.2.3")).is_some());
 }
 

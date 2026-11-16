@@ -1258,7 +1258,8 @@ trong sản phẩm từ 13/11 (phán quyết của chủ: luồng tải lên đi
 lamp-control, lamp-voice và lamp-cloud), nên lần chạy được cấp `net` với lời đồng ý bằng giọng
 nói của chủ tới được web công khai trên cổng 80 và 443, bị giữ như mọi lần chạy
 (quyết định của người xây dựng đầu tiên trên #7200: không bao giờ tới mạng của
-đèn hay các cổng cục bộ của nó). Khi đường chạy chung (one run path) của
+đèn hay các cổng cục bộ của nó; địa chỉ công khai của router trong nhà không bị
+đóng, ở dưới). Khi đường chạy chung (one run path) của
 lamp-update bật (`LAMP_SKILL_DEFAULT_AGENT`, cũng bật trong sản phẩm), lần
 chạy đó đi qua Harness như mọi lần chạy của kỹ năng, và wrapper tìm lối ra
 cùng home mới của nó theo run id ("Trên đường chạy chung", ở dưới); lần chạy
@@ -1305,16 +1306,29 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
     đúng địa chỉ đã kiểm tra, nên tên trỏ về địa chỉ riêng không được gì.
     Đóng: các mạng của chính đèn (địa chỉ, prefix và điểm đầu kia của mọi
     interface qua `getifaddrs`, gateway và đích của mọi route trong
-    `/proc/net/route`, đọc lại ở mỗi lần kết nối, nên `172.168.20.0/24` bị
-    đóng dù thuộc dải nào); IPv4 `0/8`, `10/8`, `100.64/10`, `127/8`,
+    `/proc/net/route` và `/proc/net/ipv6_route`, có cả gateway của các route
+    mặc định nhưng không bao giờ `0.0.0.0/0` hay `::/0` như một mạng, đọc lại
+    ở mỗi lần kết nối, nên `172.168.20.0/24` và `/48` IPv6 được route của
+    nhà bị đóng dù thuộc dải nào; không đọc được `/proc/net/route` thì không
+    gì qua được, không đọc được `/proc/net/ipv6_route` thì mọi địa chỉ IPv6
+    bị đóng); IPv4 `0/8`, `10/8`, `100.64/10`, `127/8`,
     `169.254/16`, `172.16/12`, `192.0.0/24`, ba dải /24 tài liệu,
     `192.168/16`, `198.18/15`, `224/4`, `240/4`; IPv6 `::`, `::1`, `::/96`,
-    `fc00::/7`, `fe80::/10`, `fec0::/10`, `ff00::/8`, `2001:db8::/32`; và
-    địa chỉ IPv4 nằm trong IPv6 (mapped, NAT64, 6to4) được kiểm như IPv4.
+    `fc00::/7`, `fe80::/10`, `fec0::/10`, `ff00::/8`, `2001:db8::/32`, cả
+    dải NAT64 dùng cục bộ `64:ff9b:1::/48`; và địa chỉ IPv4 nằm trong IPv6
+    (mapped, NAT64 `64:ff9b::/96`, 6to4) được kiểm như IPv4.
     Kết nối bị đóng thì đóng luôn, không trả lời (`curl` báo `000`).
+  - **Không bị đóng** (P2 của Heron trên #7200), vì không gì trên đèn nêu
+    chúng: địa chỉ công khai (WAN) của router trong nhà, mà lần chạy có thể
+    biết qua bất kỳ trang what's-my-IP nào và nhiều router trả lời từ bên
+    trong (trang quản trị, hoặc port forward vòng lại một máy trong nhà),
+    và một mạng IPv6 của nhà mà không route nào của đèn nêu. Nên lời hứa là
+    web công khai trên 80 và 443, các mạng của chính đèn bị đóng, địa chỉ
+    công khai của router không bị chặn.
   - **Tên**: mỗi truy vấn được chuyển nguyên vẹn tới máy chủ tên của đèn
     (`/etc/resolv.conf`, tối đa ba: UDP cho datagram, TCP cho stream), nên
-    chỉ lamp-tasks nói với router, chỉ trên cổng 53. Tên một nhãn
+    chỉ lamp-tasks nói với router, chỉ trên cổng 53. Câu hỏi DNS của lần
+    chạy, loại nào cũng vậy, đi tới resolver của đèn, thường là router. Tên một nhãn
     (`printer`, `nas`) và mọi tên dưới `in-addr.arpa`/`ip6.arpa` không phải
     một địa chỉ công khai trọn vẹn được trả `REFUSED` và không ra ngoài.
   - **Giới hạn và lời ghi**: tối đa 16 đường nối mỗi bên, 10 s để kết nối,

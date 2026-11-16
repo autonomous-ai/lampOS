@@ -3768,7 +3768,8 @@ agent; docs/skills.md, "Run by the lamp's agent"); `LAMP_TASK_NET` is on
 in the product too, in the six units below, so a run granted `net` with the
 owner's spoken yes reaches the public web on ports 80 and 443, held like
 every run (the first builder's decision on #7200: never the lamp's
-networks or its local ports). With lamp-update's one run path on
+networks or its local ports; the home router's public address isn't
+closed, below). With lamp-update's one run path on
 (`LAMP_SKILL_DEFAULT_AGENT`, on in the product too) such a run goes through
 Harness as every skill's run, and its wrapper finds its way out and its
 fresh home by its run id ("On the one run path", below); a run that can't
@@ -3825,18 +3826,31 @@ one runner (a fresh home per run, the token as a file) with no new rules:
     an address it checked, so a name that resolves somewhere private gets
     nothing. Closed: the lamp's own networks (every interface's address
     and prefix and point-to-point peer by `getifaddrs`, every route's
-    gateway and destination from `/proc/net/route`, read again at each
-    connect, so `172.168.20.0/24` is closed whatever its range); IPv4
+    gateway and destination from `/proc/net/route` and
+    `/proc/net/ipv6_route`, the default routes' gateways among them but
+    never `0.0.0.0/0` or `::/0` as a network, read again at each connect,
+    so `172.168.20.0/24` and a home's routed IPv6 `/48` are closed whatever
+    their range; `/proc/net/route` unread, nothing passes, and
+    `/proc/net/ipv6_route` unread, every IPv6 address is closed); IPv4
     `0/8`, `10/8`, `100.64/10`, `127/8`, `169.254/16`, `172.16/12`,
     `192.0.0/24`, the three documentation /24s, `192.168/16`,
     `198.18/15`, `224/4`, `240/4`; IPv6 `::`, `::1`, `::/96`, `fc00::/7`,
-    `fe80::/10`, `fec0::/10`, `ff00::/8`, `2001:db8::/32`; and an IPv4
-    address inside IPv6 (mapped, NAT64, 6to4) checked as IPv4. A closed
+    `fe80::/10`, `fec0::/10`, `ff00::/8`, `2001:db8::/32`, the local-use
+    NAT64 `64:ff9b:1::/48` whole; and an IPv4 address inside IPv6
+    (mapped, NAT64 `64:ff9b::/96`, 6to4) checked as IPv4. A closed
     connection is closed with no answer (`curl` shows `000`).
+  - **Not closed** (Heron's P2 on #7200), as nothing on the lamp names
+    them: the home router's public (WAN) address, which a run can learn
+    from any what's-my-IP site and which many routers answer from inside
+    (their admin page, or a port forward looped back to a home host), and
+    an IPv6 network of the home that no route of the lamp's names. So the
+    promise is the public web on 80 and 443, the lamp's own networks
+    closed, the router's public address not blocked.
   - **Names**: each query is forwarded as it came to the lamp's own name
     servers (`/etc/resolv.conf`, at most three: over UDP for a datagram,
     TCP for a stream), so only lamp-tasks talks to the router, only on
-    port 53. A single-label name (`printer`, `nas`) and any name under
+    port 53. A run's DNS question, of any type, goes to the lamp's
+    resolver, usually the router. A single-label name (`printer`, `nas`) and any name under
     `in-addr.arpa`/`ip6.arpa` that isn't a whole public address are
     answered `REFUSED` and never leave.
   - **Bounds and words**: at most 16 pipes at once each side, 10 s to

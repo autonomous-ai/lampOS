@@ -1645,7 +1645,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   ("reaches the internet"): the run, held like every run, reaches the
   public web on ports 80 and 443 through its own egress socket (a proxy
   and DNS inside the run, every address checked by lamp-tasks: never the
-  lamp's networks, the home router or the lamp's local ports; docs/tasks.md,
+  lamp's own networks (the router's home address among them) or the
+  lamp's local ports, though the router's public address isn't blocked
+  and a run's DNS questions go to the lamp's resolver; docs/tasks.md,
   "An agent skill's run and the `net` grant"). With lamp-update's one run
   path on (`LAMP_SKILL_DEFAULT_AGENT`, on in the product) the run goes
   through Harness as every skill's run, and its wrapper finds its egress

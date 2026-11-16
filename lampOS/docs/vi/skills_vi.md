@@ -3180,7 +3180,7 @@ Yêu cầu của chủ (12/11): một `SKILL.md` tải lên từ app chạy qua 
 đèn, như V1; người xây dựng đầu tiên đồng ý lúc 19:44. Bật trong sản phẩm từ
 13/11 (phán quyết của chủ: luồng tải lên đi qua agent), đặt trong
 `lamp-voice`, `lamp-cloud`, `lamp-skills` và `lamp-skills-manage@`;
-`LAMP_TASK_NET` cũng bật trong sản phẩm, nên tệp cần tới internet được cấp `net` (chỉ web công khai trên cổng 80 và 443, không bao giờ mạng trong nhà),
+`LAMP_TASK_NET` cũng bật trong sản phẩm, nên tệp cần tới internet được cấp `net` (chỉ web công khai trên cổng 80 và 443; các mạng của chính đèn bị đóng, còn địa chỉ công khai của router thì không bị chặn),
 hỏi lời đồng ý bằng giọng nói của chủ ở lần chạy đầu. Khi đường chạy chung của lamp-update bật
 (`LAMP_SKILL_DEFAULT_AGENT`, bật trong sản phẩm), lần chạy có `net` đi qua Harness, lối ra
 và home mới được tìm theo run id, hoặc bị từ chối `no_net` và được nói thành lời; lần chạy
@@ -3634,8 +3634,9 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   mục một lần, không bao giờ `skills`. Với `LAMP_TASK_NET=on` (bật trong sản
   phẩm) thêm một mục, `net` ("reaches the internet"): lần chạy, bị giữ như mọi
   lần chạy, tới được web công khai trên cổng 80 và 443 qua socket lối ra riêng,
-  không bao giờ tới mạng của đèn, router trong nhà hay các cổng cục bộ của đèn
-  (docs/vi/tasks_vi.md); khi đường chạy chung bật (`LAMP_SKILL_DEFAULT_AGENT`,
+  không bao giờ tới các mạng của chính đèn (có cả địa chỉ trong nhà của router)
+  hay các cổng cục bộ của đèn, dù địa chỉ công khai của router không bị chặn và
+  câu hỏi DNS của lần chạy đi tới resolver của đèn (docs/vi/tasks_vi.md); khi đường chạy chung bật (`LAMP_SKILL_DEFAULT_AGENT`,
   bật trong sản phẩm) lần chạy đó đi qua Harness, wrapper tìm socket lối ra và
   home mới của nó theo run id; lần chạy mà agent của đèn không thể được cho lối
   ra (OpenClaw là mặc định, hoặc wrapper chưa qua vòng của lamp-update) bị từ
