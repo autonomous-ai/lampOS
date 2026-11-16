@@ -164,9 +164,48 @@ pub fn on_image<'a>(
     }
 }
 
-/// lamp-update's own unit's `Environment=` on the image at `root`.
-pub fn unit_environment(_root: &Path) -> Vec<(String, String)> {
-    Vec::new()
+/// lamp-update's own unit's `Environment=` on the image at `root`, as
+/// systemd would give it to a round there: the unit file, then its drop-ins
+/// in name order, each later value of a variable winning and an empty
+/// `Environment=` clearing what came before. On an image there is no
+/// systemd to have read it, and a switch the product's unit sets
+/// (`LAMP_SKILL_TASKS`, `LAMP_SKILL_DEFAULT_AGENT`) changes what Hermes's and
+/// OpenClaw's namespaces show. `EnvironmentFile=` is not read: the product's
+/// unit names none (the carried `/etc/lampOS/update.env` is read by
+/// crate::switches itself).
+pub fn unit_environment(root: &Path) -> Vec<(String, String)> {
+    use std::fs;
+    let units = root.join(crate::install::UNITS.trim_start_matches('/'));
+    let unit = crate::round::OWN_UNIT;
+    let mut texts: Vec<String> = fs::read_to_string(units.join(unit)).into_iter().collect();
+    let mut drop_ins: Vec<_> = fs::read_dir(units.join(format!("{unit}.d")))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "conf")
+        })
+        .collect();
+    drop_ins.sort();
+    texts.extend(
+        drop_ins
+            .iter()
+            .filter_map(|path| fs::read_to_string(path).ok()),
+    );
+    let mut set: Vec<(String, String)> = Vec::new();
+    for text in &texts {
+        let found = crate::switches::environment(text);
+        if found.cleared {
+            set.clear();
+        }
+        for (name, value) in found.set {
+            set.retain(|(was, _)| *was != name);
+            set.push((name, value));
+        }
+    }
+    set
 }
 
 /// Every part the switches want there after the one-shot, or the first one
