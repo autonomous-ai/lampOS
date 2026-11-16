@@ -4,8 +4,11 @@
 //! person's "Yeah." came over 200 s after those words, with no conversation
 //! going on. The model was shown no skill waiting, made no call, and said
 //! "The skill is on the lamp. …": nothing was on. With the switch, past the
-//! wait the model is told the skill is not on, and a reply that says it is
-//! on is said as the fixed line. A yes that ran, a turn with nothing
+//! wait the model is told the skill is not on, each round's reply is held
+//! and judged by the chat model (a fake judge here: the script's next chat,
+//! asked with no function), and one judged to say it is on is said as the
+//! fixed line. A reply judged not to is said as it came; no judge in time
+//! says it, then the fixed line. A yes that ran, a turn with nothing
 //! waiting, and the switch off are as before.
 use super::*;
 
@@ -14,6 +17,21 @@ const SKILL: &str = "newest-email-subject";
 
 /// The reply on lamp-9adf.
 const CLAIM: &str = "The skill is on the lamp. Next time you sit at your desk, the lamp will read your newest email and tell you its subject.";
+
+/// Heron's replies on #7284 that a word list let through, each a claim
+/// the judge holds.
+const CLAIMS: [&str; 10] = [
+    "I've switched it on.",
+    "Got it, it's turned on.",
+    "It's on now.",
+    "Turned it on for you.",
+    "All set!",
+    "Your skill is good to go.",
+    "It's working now.",
+    "Done, newest email subject will now run when you sit down.",
+    "Your skill is set up and will run once you're at the desk.",
+    "Kỹ năng đã bật rồi.",
+];
 
 /// What the skill's say-back must have said whole.
 const SAY_BACK: &str = " The lamp's model wrote its code, and that code may use your Gmail. It \
@@ -52,15 +70,24 @@ struct Went {
     notes: Vec<String>,
     /// The calls run, by name.
     ran: Vec<String>,
+    /// The replies the judge was asked of, each told no function.
+    judged: Vec<String>,
 }
 
-/// `heard` in request 1, answered with the model's `rounds`, the switch
-/// `on`. A `make_skill` with an `approve_id` takes the wait, as a yes that
-/// puts the skill on does.
-fn went(on: bool, heard: &str, rounds: Vec<Vec<net::Result<ChatEvent>>>) -> Went {
+/// `heard` in request 1, answered with the model's `rounds` (the judge's
+/// answers among them, in the order asked), each chat begun after its
+/// `delays` entry, the switch `on`. A `make_skill` with an `approve_id`
+/// takes the wait, as a yes that puts the skill on does.
+fn went(
+    on: bool,
+    heard: &str,
+    rounds: Vec<Vec<net::Result<ChatEvent>>>,
+    delays: Vec<Duration>,
+) -> Went {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(rounds.into()),
+        round_after: Mutex::new(delays.into()),
         ..Script::default()
     });
     let ran: Calls = Arc::default();
@@ -92,15 +119,31 @@ fn went(on: bool, heard: &str, rounds: Vec<Vec<net::Result<ChatEvent>>>) -> Went
             engine.submit(start(1));
             engine.submit(audio(1, 1));
             engine.submit(end(1));
-            turn(&mut engine).await
+            turn_within(&mut engine, Duration::from_secs(5)).await
         });
     let asked = script.asked.lock().unwrap();
+    let words = |message: &Message| {
+        message
+            .content
+            .as_ref()
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    };
     let notes = asked
         .iter()
         .flatten()
-        .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+        .filter_map(words)
         .filter(|content| content.starts_with("(For you to know"))
-        .map(str::to_owned)
+        .collect();
+    let judged = asked
+        .iter()
+        .filter(|messages| {
+            messages
+                .first()
+                .and_then(words)
+                .is_some_and(|system| system.starts_with("You check one reply"))
+        })
+        .filter_map(|messages| messages.get(1).and_then(words))
         .collect();
     let went = Went {
         said: labels
@@ -114,7 +157,17 @@ fn went(on: bool, heard: &str, rounds: Vec<Vec<net::Result<ChatEvent>>>) -> Went
             .iter()
             .map(|(name, ..)| name.clone())
             .collect(),
+        judged,
     };
+    assert!(
+        script
+            .told_only
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|only| only.is_empty()),
+        "the judge is told no function"
+    );
     crate::skill_write_yes::clear_for_test();
     went
 }
@@ -128,32 +181,30 @@ fn said(lines: &[&str]) -> Vec<String> {
 }
 
 fn told_not_on(went: &Went) -> bool {
-    went.notes.iter().any(|note| {
-        note.contains(&format!(
-            "{} that the lamp made is NOT on",
-            "newest email subject"
-        ))
-    })
+    went.notes
+        .iter()
+        .any(|note| note.contains("newest email subject that the lamp made is NOT on"))
 }
 
 /// lamp-9adf, 16 Nov 13:17: "Yeah." long after the say-back, no
 /// conversation going on, `calls=none`, and "The skill is on the lamp. …".
-/// With the switch the model is told the skill is not on, and its claim is
-/// said as the fixed line, the rest of its reply with it. Off, as on the
-/// lamp: no note, and the claim said.
+/// With the switch the model is told the skill is not on, the judge asked
+/// of the whole reply says yes, and the fixed line is said in its place.
+/// Off, as on the lamp: no note, no judge, and the claim said.
 #[test]
 fn a_late_yes_with_no_call_is_told_not_on_and_its_claim_is_replaced() {
     waits(Duration::from_secs(220));
-    let went_on = went(true, "Yeah.", vec![saying(CLAIM)]);
+    let went_on = went(true, "Yeah.", vec![saying(CLAIM), saying("yes")], vec![]);
     assert_eq!(
         went_on.said,
         said(&[crate::made_not_on::NOT_ON_LATE]),
         "{went_on:?}"
     );
     assert!(told_not_on(&went_on), "{:?}", went_on.notes);
+    assert_eq!(went_on.judged, [CLAIM]);
     assert!(went_on.ran.is_empty());
     waits(Duration::from_secs(220));
-    let went_off = went(false, "Yeah.", vec![saying(CLAIM)]);
+    let went_off = went(false, "Yeah.", vec![saying(CLAIM)], vec![]);
     assert_eq!(
         went_off.said,
         said(&[
@@ -162,29 +213,67 @@ fn a_late_yes_with_no_call_is_told_not_on_and_its_claim_is_replaced() {
         ])
     );
     assert!(went_off.notes.is_empty(), "{:?}", went_off.notes);
+    assert!(went_off.judged.is_empty());
 }
 
-/// Within the wait, a yes the model answered with words alone ("It's on
-/// now!", no call) is said as the line asking for the yes again; the wait
-/// goes on, its note as before.
+/// Heron's HOLD on #7284: every way of saying it, Vietnamese too, and on a
+/// line that is more than a plain yes, goes to the judge whole; each the
+/// judge calls a claim is said as the fixed line, within the wait.
 #[test]
-fn a_yes_in_the_wait_answered_with_no_call_is_said_not_on_yet() {
-    let id = waits(Duration::from_secs(10));
-    let went = went(true, "Yes.", vec![saying("It's on now!")]);
-    assert_eq!(went.said, said(&[crate::made_not_on::NOT_ON_YET]));
-    assert!(
-        went.notes.iter().any(|note| note.contains(&id)),
-        "{:?}",
-        went.notes
+fn every_claim_the_judge_holds_is_said_not_on_yet() {
+    for heard in ["Yes.", "Yes, turn it on."] {
+        for claim in CLAIMS {
+            waits(Duration::from_secs(10));
+            let went = went(true, heard, vec![saying(claim), saying("Yes.")], vec![]);
+            assert_eq!(
+                went.said,
+                said(&[crate::made_not_on::NOT_ON_YET]),
+                "{claim}"
+            );
+            assert_eq!(went.judged, [claim]);
+            assert!(!told_not_on(&went));
+        }
+    }
+}
+
+/// A reply the judge calls no claim is said as it came.
+#[test]
+fn a_reply_judged_no_claim_is_said() {
+    waits(Duration::from_secs(10));
+    let reply = "Sure. Before it goes on, I need your yes to what its code may use.";
+    let went = went(true, "Okay.", vec![saying(reply), saying("No")], vec![]);
+    assert_eq!(went.said, said(&[reply]));
+    assert_eq!(went.judged, [reply]);
+}
+
+/// No judge in time (its chat begins past `JUDGE_WITHIN`): the reply is
+/// said, then the fixed line, which is true, since the skill isn't on.
+#[test]
+fn a_judge_past_its_time_says_the_reply_then_the_fixed_line() {
+    waits(Duration::from_secs(10));
+    let went = went(
+        true,
+        "Yes.",
+        vec![saying("It's on now!"), saying("yes")],
+        vec![
+            Duration::ZERO,
+            crate::made_not_on::JUDGE_WITHIN + Duration::from_millis(500),
+        ],
     );
-    assert!(!told_not_on(&went));
+    assert_eq!(
+        went.said,
+        said(&[
+            "It's on now!",
+            &format!(" {}", crate::made_not_on::NOT_ON_YET)
+        ])
+    );
 }
 
 /// A yes that ran: "It's on now." said before its call, in the same round,
 /// is let go unsaid, and the next round's, after the yes put it on, is said
-/// as it came. No not-on note, no fixed line.
+/// as it came. No judge, no not-on note, no fixed line.
 #[test]
-fn a_real_yes_still_puts_it_on_with_no_note() {
+fn a_real_yes_still_puts_it_on_with_no_line() {
     let id = waits(Duration::from_secs(10));
     let went = went(
         true,
@@ -201,21 +290,24 @@ fn a_real_yes_still_puts_it_on_with_no_note() {
             ],
             saying("It's on now, and it runs the next time you sit at your desk."),
         ],
+        vec![],
     );
     assert_eq!(
         went.said,
         said(&["It's on now, and it runs the next time you sit at your desk."])
     );
     assert_eq!(went.ran, [crate::made_skill::MAKE.to_owned()]);
+    assert!(went.judged.is_empty());
     assert!(!told_not_on(&went));
 }
 
-/// With nothing waiting, "It's on." to a yes is said as it came, and no note
-/// is told.
+/// With nothing waiting, "It's on." to a yes is said as it came: no judge,
+/// no note.
 #[test]
 fn with_no_skill_waiting_nothing_changes() {
     crate::skill_write_yes::clear_for_test();
-    let went = went(true, "Yes.", vec![saying("It's on.")]);
+    let went = went(true, "Yes.", vec![saying("It's on.")], vec![]);
     assert_eq!(went.said, said(&["It's on."]));
     assert!(went.notes.is_empty(), "{:?}", went.notes);
+    assert!(went.judged.is_empty());
 }
