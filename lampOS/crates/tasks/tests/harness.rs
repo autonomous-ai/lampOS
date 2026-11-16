@@ -478,14 +478,43 @@ fn openclaw_used(agent: &str) -> Value {
     step(json!({"id":agent,"state":"idle","ask":null,"answer":"","truncated":false,"tools":1}))
 }
 
-/// An OpenClaw launch to the lamp's own engine, with a short launch bound
-/// so a proof wait that runs out ends soon.
-fn openclaw_rig(launch_timeout: Duration) -> (Rig, Launch) {
+/// An OpenClaw launch to the lamp's own engine with `launch_timeout`, and
+/// the Gateway's record (`OPENCLAW_STATE_DIR`) an agent database with
+/// OpenClaw 2026.11.2's tables that holds `rows` (SQL inserts, may be
+/// empty). With `rows` `None`, no record is there at all.
+fn openclaw_rig(launch_timeout: Duration, rows: Option<&str>) -> (Rig, Launch) {
     let mut request = launch();
     request.target.engine = EngineKind::Openclaw;
     let mut rig = Rig::new();
     rig.config.launch_timeout = launch_timeout;
+    let state = rig.root.path().join("openclaw-state");
+    if let Some(rows) = rows {
+        let db = lamp_tasks::harness::openclaw_record_path(&state);
+        fs::create_dir_all(db.parent().unwrap()).unwrap();
+        let connection = rusqlite::Connection::open(&db).unwrap();
+        connection
+            .execute_batch(&format!(
+                "CREATE TABLE session_nodes (session_key TEXT NOT NULL PRIMARY KEY, current_session_id TEXT NOT NULL, status TEXT);\n\
+                 CREATE TABLE session_windows (session_id TEXT NOT NULL PRIMARY KEY, session_key TEXT NOT NULL);\n\
+                 CREATE TABLE transcript_events (session_id TEXT NOT NULL, seq INTEGER NOT NULL, message_role TEXT, PRIMARY KEY (session_id, seq));\n\
+                 {rows}"
+            ))
+            .unwrap();
+    }
+    rig.config
+        .environment
+        .insert("OPENCLAW_STATE_DIR".into(), state.into_os_string());
     (rig, request)
+}
+
+/// The record's rows for a session of Harness's `agent` the Gateway took
+/// the first prompt in: its header and the user's message, no run status.
+fn openclaw_user_row(agent: &str) -> String {
+    format!(
+        "INSERT INTO session_nodes VALUES ('agent:main:harness-{agent}', 'w1', NULL);\n\
+         INSERT INTO session_windows VALUES ('w1', 'agent:main:harness-{agent}');\n\
+         INSERT INTO transcript_events VALUES ('w1', 0, NULL), ('w1', 1, 'user');"
+    )
 }
 
 /// #7277 (a): idle with no ask after `new` is no proof; a tool used within
@@ -494,7 +523,7 @@ fn openclaw_rig(launch_timeout: Duration) -> (Rig, Launch) {
 /// with no ask and still wrote its file, is this one.
 #[test]
 fn openclaw_idle_with_no_ask_then_a_tool_within_the_bound_is_created() {
-    let (rig, request) = openclaw_rig(Duration::from_secs(10));
+    let (rig, request) = openclaw_rig(Duration::from_secs(10), Some(""));
     rig.plan(json!({
         "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
         "show":{"each":[
@@ -518,12 +547,13 @@ fn openclaw_idle_with_no_ask_then_a_tool_within_the_bound_is_created() {
     assert!(new.iter().any(|arg| arg == "--task"), "{new:?}");
 }
 
-/// #7277 (b): idle with no ask through the whole bound, after `new` and
-/// after the one `new` more, is never taken as handed over: each harness
-/// is closed, and the task is not sent, `openclaw_not_taken`.
+/// #7277 (b): idle with no ask through the bound, after `new` and after
+/// the one `new` more, with the Gateway's record holding nothing of
+/// either, is never taken as handed over: each harness is closed, and the
+/// task is not sent, `openclaw_not_taken`, all within one launch bound.
 #[test]
 fn openclaw_idle_with_no_ask_throughout_is_closed_started_once_more_and_not_sent() {
-    let (rig, request) = openclaw_rig(Duration::from_millis(1500));
+    let (rig, request) = openclaw_rig(Duration::from_secs(10), Some(""));
     rig.plan(json!({
         "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
         "show":{"each":[openclaw_seen("idle", Value::Null)]},
@@ -543,11 +573,12 @@ fn openclaw_idle_with_no_ask_throughout_is_closed_started_once_more_and_not_sent
     assert_eq!(verbs.last().map(String::as_str), Some("close"), "{verbs:?}");
 }
 
-/// #7277: no proof from the first harness, which is closed; the one `new`
-/// more proves it (a tool used), and is the launch.
+/// #7277: no proof from the first harness and nothing of it in the
+/// Gateway's record, so it is closed; the one `new` more proves it (a tool
+/// used), and is the launch.
 #[test]
 fn openclaw_not_taken_then_taken_on_the_second_new_is_created_on_it() {
-    let (rig, request) = openclaw_rig(Duration::from_millis(1500));
+    let (rig, request) = openclaw_rig(Duration::from_secs(10), Some(""));
     let second = step(
         json!({"ok":true,"machineId":MACHINE,"agent":{"id":OTHER,"name":"lamp-task-001","engine":"openclaw"}}),
     );
@@ -572,12 +603,12 @@ fn openclaw_not_taken_then_taken_on_the_second_new_is_created_on_it() {
     assert_eq!(verbs.last().map(String::as_str), Some("show"), "{verbs:?}");
 }
 
-/// #7277: a first harness with no proof that can't be closed ends the
-/// launch uncertain, with nothing more started: one left running could
-/// still take its prompt beside a second.
+/// #7277: a first harness with no proof and nothing in the record that
+/// can't be closed ends the launch uncertain, with nothing more started:
+/// one left running could still take its prompt beside a second.
 #[test]
 fn openclaw_not_taken_and_not_closed_is_uncertain_with_nothing_more_started() {
-    let (rig, request) = openclaw_rig(Duration::from_millis(1500));
+    let (rig, request) = openclaw_rig(Duration::from_secs(10), Some(""));
     rig.plan(json!({
         "machines":{"default":true},"new":{"default":true},"close":{"exit":1},
         "show":{"each":[openclaw_seen("idle", Value::Null)]},
@@ -587,6 +618,89 @@ fn openclaw_not_taken_and_not_closed_is_uncertain_with_nothing_more_started() {
     let verbs = openclaw_verbs(&rig);
     assert_eq!(verbs.iter().filter(|v| *v == "new").count(), 1, "{verbs:?}");
     assert_eq!(verbs.last().map(String::as_str), Some("close"), "{verbs:?}");
+}
+
+/// #7287 (the Reviewer-lead's P2): `show` shows no proof, but the
+/// Gateway's own record holds the user's message for this harness's
+/// session: the send already reached it. Nothing is closed and `new` is
+/// never asked again (the ask would run twice); the harness is kept and
+/// looked at to the launch's bound, then the launch is uncertain,
+/// `openclaw_taken_unseen`.
+#[test]
+fn openclaw_taken_in_the_gateway_record_but_unseen_is_kept_never_started_twice() {
+    let rows = openclaw_user_row(AGENT);
+    let (rig, request) = openclaw_rig(Duration::from_secs(10), Some(&rows));
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
+        "show":{"each":[openclaw_seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        uncertain("openclaw_taken_unseen")
+    );
+    let verbs = openclaw_verbs(&rig);
+    let count = |verb: &str| verbs.iter().filter(|v| *v == verb).count();
+    assert_eq!(
+        (count("new"), count("close"), count("reply")),
+        (1, 0, 0),
+        "{verbs:?}"
+    );
+}
+
+/// #7287: no record the lamp can read (no agent database there) is never
+/// taken as "nothing was sent": the harness is kept, never closed or
+/// started again, and the launch is uncertain, `openclaw_record_unread`.
+#[test]
+fn openclaw_with_no_readable_gateway_record_is_never_started_twice() {
+    let (rig, request) = openclaw_rig(Duration::from_secs(4), None);
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
+        "show":{"each":[openclaw_seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        uncertain("openclaw_record_unread")
+    );
+    let verbs = openclaw_verbs(&rig);
+    assert_eq!(verbs.iter().filter(|v| *v == "new").count(), 1, "{verbs:?}");
+    assert_eq!(
+        verbs.iter().filter(|v| *v == "close").count(),
+        0,
+        "{verbs:?}"
+    );
+}
+
+/// #7287 (Heron's P2): the whole no-proof path, two proof waits, two
+/// closes and the one `new` more, ends within the launch's own bound
+/// (`launch_timeout` from its start), never a full bound per step: the
+/// tasks-harness lane serves every other task's reads and closes.
+#[test]
+fn openclaw_no_proof_path_ends_within_one_launch_bound() {
+    let bound = Duration::from_secs(4);
+    let (rig, request) = openclaw_rig(bound, Some(""));
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
+        "show":{"each":[openclaw_seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    let began = std::time::Instant::now();
+    let outcome = rig.cli().launch(&request);
+    let took = began.elapsed();
+    assert!(
+        matches!(
+            &outcome,
+            LaunchOutcome::NotSent { .. } | LaunchOutcome::Uncertain { .. }
+        ),
+        "{outcome:?}"
+    );
+    // The bound, and the one fixture call that may be under way at it.
+    assert!(took < bound + Duration::from_millis(1500), "{took:?}");
+    assert_eq!(
+        openclaw_verbs(&rig).iter().filter(|v| *v == "new").count(),
+        2
+    );
 }
 
 /// An OpenClaw read asked (`ask` set) after `new` is under way, as
