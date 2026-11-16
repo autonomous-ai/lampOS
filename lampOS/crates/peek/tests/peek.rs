@@ -1650,6 +1650,7 @@ fn card_turn(request: u64, start: u64, total: u64, words: bool) -> timeline::Ent
             (start + total, timeline::Step::Said(said)),
         ],
         ended_at: Some(start + total),
+        agent: None,
     }
 }
 
@@ -1704,8 +1705,9 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
             html.contains("<span class=\"badge badge-green\">DONE</span>"),
             "{html}"
         );
+        // No decision on the bus: the neutral path, not a guess (#7267).
         assert!(
-            html.contains("<span class=\"badge badge-blue\">AGENT</span>"),
+            html.contains("<span class=\"badge badge-grey\">PATH ?</span>"),
             "{html}"
         );
         // The Turns section's cards carry the same ⚡ class.
@@ -1718,12 +1720,13 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
             "{ttft}: {turns}"
         );
     }
-    // Still going: ACTIVE, pulsing. Failed: ERROR. A skill's: SKILL. Held
-    // back without a word said: LOCAL.
+    // Still going: ACTIVE, pulsing. Failed: ERROR. A skill's, or held back
+    // without a word said, with no decision on the bus: the neutral path.
     let going = timeline::Entry {
         request: 7,
         steps: vec![(1_000, timeline::Step::Heard(None))],
         ended_at: None,
+        agent: None,
     };
     let html = page::timeline(&[going], &current(Vec::new()), false);
     assert!(
@@ -1748,10 +1751,11 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
             (1_500, timeline::Step::Said(None)),
         ],
         ended_at: Some(1_500),
+        agent: None,
     };
     let html = page::timeline(&[skill], &current(Vec::new()), false);
     assert!(
-        html.contains("<span class=\"badge badge-teal\">SKILL</span>"),
+        html.contains("<span class=\"badge badge-grey\">PATH ?</span>"),
         "{html}"
     );
     assert!(
@@ -1765,10 +1769,11 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
             (1_100, timeline::Step::Understood(TurnVerdict::HeldBack)),
         ],
         ended_at: Some(1_100),
+        agent: None,
     };
     let html = page::timeline(&[held], &current(Vec::new()), false);
     assert!(
-        html.contains("<span class=\"badge badge-green\">LOCAL</span>"),
+        html.contains("<span class=\"badge badge-grey\">PATH ?</span>"),
         "{html}"
     );
 }
@@ -1833,6 +1838,7 @@ fn monitor_mode_hostile_words_stay_escaped_in_a_card() {
             ),
         ],
         ended_at: Some(1_900),
+        agent: None,
     }];
     let mut record = card_record(3, 500, "<i>played</i>");
     record.basis = Some("<u>basis</u>".into());
@@ -1884,11 +1890,7 @@ fn monitor_rig(name: &str) -> (Rig, String) {
             other => panic!("{other:?}"),
         }
     };
-    let rig = Rig::monitor(
-        name,
-        monitor,
-        conn("192.168.1.20:50000", "192.168.1.5:80"),
-    );
+    let rig = Rig::monitor(name, monitor, conn("192.168.1.20:50000", "192.168.1.5:80"));
     (rig, format!("Cookie: peek_session={session}\r\n"))
 }
 
@@ -1924,8 +1926,13 @@ fn agent_turns(rig: &Rig, headers: &str, host: &str, wanted: &str) -> String {
             "kind": kind, "tool": tool, "args": args, "result": result, "ok": kind != "error",
         })
     };
+    // Paced: the bus promises no subscriber every message, and a burst can
+    // overrun the watcher's socket while other tests run; a new publisher
+    // also takes a rescan to find the watcher.
+    thread::sleep(Duration::from_millis(100));
     let mut seq = 0;
     let mut next = || {
+        thread::sleep(Duration::from_millis(3));
         seq += 1;
         seq
     };
@@ -1983,9 +1990,17 @@ fn agent_turns(rig: &Rig, headers: &str, host: &str, wanted: &str) -> String {
                 &step(4, n, "call", "look", "", &format!("seen {n}")),
             )
             .unwrap();
-        thread::sleep(Duration::from_millis(2));
     }
-    stream_until_as(rig, host, headers, wanted)["timeline"].clone()
+    // The stream is read in pieces, so its newest timeline may be cut
+    // mid-event: read again until a whole one holds `wanted`.
+    let started = Instant::now();
+    loop {
+        let timeline = stream_until_as(rig, host, headers, wanted)["timeline"].clone();
+        if timeline.contains(wanted) && timeline.ends_with("</div>") {
+            return timeline;
+        }
+        assert!(started.elapsed() < WAIT, "never whole: {timeline}");
+    }
 }
 
 /// `text` holds each of `wanted`, in order.
