@@ -1032,7 +1032,36 @@ after lamp-52e6's runs on #4501); off unless the unit sets
   (`lamp/selftest`'s `started`), or a restart lets it stand again
   (`src/unseat_in.rs`). This takes the place of the three-in-half-an-hour
   long rest and of the two long rests' give-up, which do not happen with
-  the guard on.
+  the guard on. A seated lamp is said seated on its health before any warm
+  joint (#7281).
+- **A hot seat stands again once cool** (`LAMP_BODY_SEAT_COOLS=on`, #7281,
+  on in the product unit; `StrainGuard::cools`). A seat for heat ends by
+  itself once the joint that seated it has read under 50 °C
+  (`StrainGuard::COOL`, `bus_out::WARM` less 5: 12 under the 62 it sat
+  down at, over a healthy standing elbow's 46 to 49 on lamp-4ace and
+  lamp-52e6) for 5 min back to back (`StrainGuard::COOL_FOR`, the
+  `CLIMB_WINDOW`); a held or missing read starts the count again. The
+  journal says `elbow_pitch read under 50 for 5 min: stands again by
+  itself`, and the hour's sit-downs are kept. Only once an hour: a hot seat
+  within `SEAT_WINDOW` of standing by itself, and any strained seat, wait
+  for a person or a health check as above, so a servo is never cycled hot.
+  A touch still lifts any seat at once. While a seat will end by itself its
+  health says `seated: the elbow sat down hot twice in an hour; it stands
+  again by itself once it reads under 50 for 5 min, or when its head is
+  held a second` (`Glimpse::seat_rests`).
+- **A seat says one line** (`LAMP_BODY_SEAT_COOLS=on`, `src/seat_say.rs`).
+  As a seat begins, lamp-body asks the voice's say service
+  (`/run/lampos-say/say.sock`, `"exact": true`, the first stand's way) for
+  one fixed line, said in the owner's language (`language::FIXED_LINES`):
+  "I'm a bit warm, so I'll rest a few minutes." only when it will stand by
+  itself, and "I need a rest. Hold my head a second when you'd like me
+  up." otherwise. Never in the quiet hours (`lamp_local_time::quiet_hours`),
+  where the seated pose says it; the say service refuses it while muted or
+  paused. Asked on a thread of its own, so the body's step never waits;
+  the outcome goes to the journal. Nothing more is said until it stands.
+- **Each sit-down says why** (#7281). The journal says `sat down: {why}`
+  (e.g. `elbow_pitch at 62 degrees`) as it happens, not only in the exit
+  report, and the fold line says `it sat down hot` when one was for heat.
 - **The day's peaks are kept.** Each joint's highest load and temperature
   in each local day go to `/var/lib/lampos-body/peaks/YYYY-MM-DD.json`
   (`{"day":…,"joints":{"elbow":{"load":…,"temperature":…},…}}`,
@@ -2765,8 +2794,9 @@ The report is `ok` with no message, or a warning:
 
 | Level | Message | When |
 | --- | --- | --- |
+| `warn` | `seated: the elbow retreated twice in an hour (strained); hold its head a second, or run a health check, to let it stand again` | With the strain guard, until a person or a self-test lets it stand (above, "The strain guard"). Said before a warm joint (#7281) |
+| `warn` | `seated: the elbow sat down hot twice in an hour; it stands again by itself once it reads under 50 for 5 min, or when its head is held a second` | With `LAMP_BODY_SEAT_COOLS=on`, a hot seat that will end by itself (#7281) |
 | `warn` | `shoulder is warm: it reads 55, and the body stops at 62` | Any of the five joints reads 55 or more. The body ends its run, or sends the arm down, at 62 |
-| `warn` | `seated: the elbow retreated twice in an hour (strained); hold its head a second, or run a health check, to let it stand again` | With the strain guard, until a person or a self-test lets it stand (above, "The strain guard") |
 | `warn` | `its elbow pushed as hard as it may and did not move, in two long rests' tries: …` | Without the strain guard, after two long rests begun by a stand that never lifted (#4390) |
 | `warn` | `the elbow strained: it read a load of 500 too long while standing, and the lamp sat down to rest` | With the strain guard, while it rests from a long strain |
 | `warn` | `the elbow pushed as hard as it may and didn't move` | With the strain guard, from a stand that never lifted until it is let stand again |
