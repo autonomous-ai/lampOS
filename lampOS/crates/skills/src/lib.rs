@@ -83,6 +83,12 @@ pub const PRESENCE_TOPICS: [&str; 2] = ["humans/faces/tracked", "room/stood_up"]
 /// break forward). Off unless set: `sooner` is read, checked and ignored.
 pub const SOONER_ENVIRONMENT: &str = "LAMP_YAWN_SOONER";
 
+/// Topics no skill may read, whatever it lists: an agent's steps carry its
+/// tool's arguments and the start of its results (`tasks/step`, #7267),
+/// which only the owner's dev monitor shows. A skill that lists one is
+/// refused at load, and [`Permissions::refuses_reading`] refuses it too.
+pub const NEVER_READ: [&str; 1] = ["tasks/step"];
+
 /// The topics a `[[while]]`'s `broken_by` may name, each with its rule
 /// ([`breaks`]): words heard, the lamp's name heard, a new push on the
 /// lamp, and a touch.
@@ -1764,6 +1770,9 @@ impl Permissions {
 
     /// Why a skill with these permissions may not read `topic`, if not.
     pub fn refuses_reading(&self, topic: &str) -> Option<String> {
+        if NEVER_READ.contains(&topic) {
+            return Some(format!("{topic} is never a skill's to read"));
+        }
         // Format 2's `look` is the protocol's: the presence topics with it.
         if self.format_2 && self.look && PRESENCE_TOPICS.contains(&topic) {
             return None;
@@ -1878,6 +1887,15 @@ impl Permissions {
             if (1..list.len()).any(|at| list[..at].contains(&list[at])) {
                 return Err(format!("[permissions] {what} lists one twice"));
             }
+        }
+        if let Some(never) = self
+            .topics
+            .iter()
+            .find(|topic| NEVER_READ.contains(&topic.as_str()))
+        {
+            return Err(format!(
+                "[permissions] topics: {never} is never a skill's to read"
+            ));
         }
         if let Some(wrong) = self
             .propose
