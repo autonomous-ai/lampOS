@@ -963,10 +963,14 @@ impl Tts {
     /// never the speech socket or a pooled connection that may have held the
     /// first try. In the turn's model, so the answer keeps one voice.
     pub async fn speak_fresh(&self, text: &str, turn: Turn) -> Result<TtsStream> {
+        // Asked again, so counted again (#7347).
+        crate::day_tally::spoken(text);
         self.speak_http(&self.fresh, text, Some(turn)).await
     }
 
     async fn speak_in(&self, text: &str, turn: Option<Turn>) -> Result<TtsStream> {
+        // Counted for the day, with LAMP_VOICE_DAY_TALLY=on (#7347).
+        crate::day_tally::spoken(text);
         if let Some(turn) = turn
             && let Some(spoken) = self.on_socket(text, turn).await
         {
