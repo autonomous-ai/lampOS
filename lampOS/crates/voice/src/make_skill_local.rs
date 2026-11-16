@@ -220,6 +220,7 @@ fn system_for(reads: bool, agent: bool) -> String {
         )
     };
     let triggers = made_skill::TRIGGER_MEANINGS;
+    let topics = made_skill::readable_named();
     let gestures = made_skill::gesture_names();
     let (more, cant_yet) = (made_skill::MORE_STEPS, made_skill::CANT_YET);
     // Code of its own (#6307), told only with its switch: off, the model
@@ -264,7 +265,9 @@ fn system_for(reads: bool, agent: bool) -> String {
          step cue = \"hum\", paced as a say, in place of a say; it has no other sound and no \
          sound file. When it runs is one \
          [trigger] table (never [[trigger]]; coming to the desk is room/presence, never the \
-         faces): {triggers} A body step is one gesture, one of: {gestures}. Set none of \
+         faces): {triggers} A [trigger], its sooner or a [[while]] reads one of these \
+         topics alone, and only the fields it carries: {topics}; the lamp sends no other. \
+         A body step is one gesture, one of: {gestures}. Set none of \
          most_a_day, [quiet], [budget] or [rest] unless the request asks {limits} A skill can't yet \
          {hear}, know who someone is, {cant_send}: a \
          request that needs one, or anything else no step or trigger here or below does, is \
@@ -5853,9 +5856,12 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             assert!(
                 system.contains(&format!(
                     "When it runs is one [trigger] table (never [[trigger]]; coming to the \
-                     desk is room/presence, never the faces): {} A body step is one gesture, \
-                     one of: nod, headshake, ",
-                    made_skill::TRIGGER_MEANINGS
+                     desk is room/presence, never the faces): {} A [trigger], its sooner or a \
+                     [[while]] reads one of these topics alone, and only the fields it carries: \
+                     {}; the lamp sends no other. A body step is one gesture, one of: nod, \
+                     headshake, ",
+                    made_skill::TRIGGER_MEANINGS,
+                    made_skill::readable_named()
                 )),
                 "{system}"
             );

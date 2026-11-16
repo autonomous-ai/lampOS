@@ -60,8 +60,8 @@ pub const PROGRAM: &str = "/opt/lampOS/skills/current/lamp-skills";
 /// lamp-skills takes, and [`plainly`] says the triggers it knows
 /// (`SAYABLE_TOPICS`).
 pub const TOPICS: [&str; 5] = [
-    "voice/state",
-    "room/presence",
+    lamp_msgs::VoiceState::TOPIC,
+    lamp_msgs::RoomPresence::TOPIC,
     FACES_TOPIC,
     STOOD_UP_TOPIC,
     CLOCK_TOPIC,
@@ -876,7 +876,7 @@ const AGENT_TRIES: [&str; 4] = [
 
 /// The reasons [`plain_reason`] gives as they are: the model's silence or
 /// cut, said plainly with what to try.
-const PLAIN_REASONS: [&str; 3] = [MODEL_CUT_OFF, MODEL_SILENT, NOT_READY_LINE];
+const PLAIN_REASONS: [&str; 4] = [MODEL_CUT_OFF, MODEL_SILENT, NOT_READY_LINE, NOTHING_READS];
 
 /// What the person is told, at once, when lamp-tasks says a make on the
 /// lamp's agent can't start because Harness or the gateway isn't ready yet
@@ -3997,6 +3997,12 @@ pub fn plainly_with(text: &str, reads: bool) -> Result<String, Refused> {
 /// refused; what the lamp can't do yet, and a read or a write, still are.
 pub fn plainly_as(text: &str, reads: bool, general: bool) -> Result<String, Refused> {
     let table: toml::Table = toml::from_str(text).map_err(unreadable)?;
+    // A read of a topic or a field the lamp doesn't have (#7357): refused
+    // first, loosened or not, and repaired with the ones it has.
+    if let Some((part, lines)) = unread(&table) {
+        eprintln!("lamp-voice: a made skill reads what the lamp doesn't have: {part}");
+        return Err(Refused(NOTHING_READS.into(), Some(lines)));
+    }
     said_plainly(&table, reads, general).map_err(|unsaid| {
         // The part's keys and topic, never a value nor the model's words.
         eprintln!(
@@ -4728,26 +4734,160 @@ fn manners_plainly(table: &toml::Table) -> Result<String, Unsaid> {
     Ok(said)
 }
 
-/// The trigger topics [`plainly`] can say (#6066): [`TOPICS`], a pat on
-/// the head (`controls/pet`), the air (`air/state`) and what someone at the
-/// desk is doing (`room/activity`). A trigger on any other is what the lamp
-/// can't start a made skill on yet ([`topic_cant_yet`]).
-const SAYABLE_TOPICS: [&str; 8] = [
-    "voice/state",
-    "room/presence",
-    FACES_TOPIC,
-    STOOD_UP_TOPIC,
-    CLOCK_TOPIC,
-    PET_TOPIC,
-    AIR_TOPIC,
-    ACTIVITY_TOPIC,
+/// The topics a made skill may read, in its `[trigger]`, a trigger's
+/// `sooner` or a `[[while]]`, each with the fields its message carries
+/// (#7357): every topic is its `lamp_msgs` declaration's own `TOPIC` (and
+/// lamp-skills' own clock, [`CLOCK_TOPIC`]), and every field a field of
+/// that message as it is serialized, held to it by
+/// `the_readable_fields_are_the_messages_own`. The clock's are what
+/// lamp-skills makes it (`known`, `day`, `minute`).
+const READABLE: [(&str, &[&str]); 8] = [
+    (lamp_msgs::VoiceState::TOPIC, &["state"]),
+    (
+        lamp_msgs::RoomPresence::TOPIC,
+        &["someone", "nobody_s", "by"],
+    ),
+    (FACES_TOPIC, &["faces"]),
+    (STOOD_UP_TOPIC, &["sitting_s", "side"]),
+    (CLOCK_TOPIC, &["known", "day", "minute"]),
+    (
+        PET_TOPIC,
+        &[
+            "stamp",
+            "session_id",
+            "reader_session_id",
+            "enabled",
+            "contact_id",
+            "began_us",
+            "petted_us",
+            "observed_us",
+            "swaps",
+            "swaps_per_second",
+            "resting",
+            "ended",
+        ],
+    ),
+    (
+        AIR_TOPIC,
+        &[
+            "pm1_0",
+            "pm2_5",
+            "pm4_0",
+            "pm10",
+            "humidity",
+            "temperature",
+            "co2_ppm",
+            "feel",
+        ],
+    ),
+    (
+        ACTIVITY_TOPIC,
+        &["state", "for_s", "sitting_s", "baseline", "yawns"],
+    ),
 ];
-/// A hand on the head's pads (`lamp_msgs` `controls/pet`).
-const PET_TOPIC: &str = "controls/pet";
+
+/// The trigger topics [`plainly`] can say (#6066): [`READABLE`]'s,
+/// [`TOPICS`] and a pat on the head (`controls/pet`), the air
+/// (`air/state`) and what someone at the desk is doing (`room/activity`).
+/// A trigger on any other is what the lamp can't start a made skill on
+/// yet ([`topic_cant_yet`]), or one it doesn't have ([`unread`]).
+const SAYABLE_TOPICS: [&str; 8] = [
+    READABLE[0].0,
+    READABLE[1].0,
+    READABLE[2].0,
+    READABLE[3].0,
+    READABLE[4].0,
+    READABLE[5].0,
+    READABLE[6].0,
+    READABLE[7].0,
+];
+
+/// [`READABLE`] named in a line, "voice/state (state); …": what the
+/// making model is told (`make_skill_local`) and a repair names.
+pub fn readable_named() -> String {
+    READABLE
+        .iter()
+        .map(|(topic, fields)| format!("{topic} ({})", fields.join(", ")))
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+/// Why a make reading a topic or a field the lamp doesn't have was
+/// refused (#7357), the person's line when its repairs are used up
+/// ([`plain_reason`] gives it as it is): one true line, never a made one.
+pub const NOTHING_READS: &str = "the lamp has nothing that reads that";
+
+/// What a made skill reads that the lamp doesn't have (#7357, lamp-c0a4,
+/// 16 Nov: "over 28 degrees turn the light blue" was made on a
+/// `device/temperature` trigger, field `max_c`, that nothing on the lamp
+/// sends, and kept in general words though it could never start): a
+/// topic not in [`READABLE`], or a field its message doesn't carry (its
+/// first part, for a dotted one), in its `[trigger]` (a table or a list),
+/// a trigger's `sooner` or a `[[while]]`. The part, for the journal, and
+/// the repair's lines, naming it and the topics there are with their
+/// fields. A topic the lamp has but can't start a made skill on yet
+/// ([`topic_cant_yet`]) is none here: it is said so, never repaired. The
+/// faces' field is left to [`plainly`], which says why a face has none.
+fn unread(table: &toml::Table) -> Option<(String, String)> {
+    let tables = |value: Option<&toml::Value>| -> Vec<toml::Table> {
+        match value {
+            Some(toml::Value::Table(one)) => vec![one.clone()],
+            Some(toml::Value::Array(many)) => many
+                .iter()
+                .filter_map(|one| one.as_table().cloned())
+                .collect(),
+            _ => Vec::new(),
+        }
+    };
+    let mut reads: Vec<(&str, toml::Table)> = Vec::new();
+    for trigger in tables(table.get("trigger")) {
+        for sooner in tables(trigger.get("sooner")) {
+            reads.push(("the trigger's sooner", sooner));
+        }
+        reads.push(("the trigger", trigger));
+    }
+    for part in tables(table.get("while")) {
+        reads.push(("a [[while]]", part));
+    }
+    // The trigger first, then its sooner, then a while.
+    reads.sort_by_key(|(what, _)| match *what {
+        "the trigger" => 0,
+        "the trigger's sooner" => 1,
+        _ => 2,
+    });
+    let part = reads.iter().find_map(|(what, read)| {
+        let topic = read.get("topic")?.as_str()?;
+        if topic_cant_yet(topic).is_some() {
+            return None;
+        }
+        let Some((_, fields)) = READABLE.iter().find(|(known, _)| *known == topic) else {
+            return Some(format!(
+                "{what}'s topic {} is not one the lamp has",
+                named(topic)
+            ));
+        };
+        let field = read.get("field")?.as_str()?;
+        let head = field.split('.').next().unwrap_or(field);
+        (topic != FACES_TOPIC && !fields.contains(&head))
+            .then(|| format!("{what}'s field {} is not one {topic} carries", named(field)))
+    })?;
+    let lines = format!(
+        "{NOTHING_READS_HEAD}{part}. Read only one of these topics, each with the fields it \
+         carries: {}.",
+        readable_named()
+    );
+    Some((part, lines))
+}
+
+/// How a repair of a read the lamp doesn't have begins ([`unread`]).
+const NOTHING_READS_HEAD: &str = "The lamp has nothing that reads that: ";
+
+/// A hand on the head's pads (`controls/pet`).
+const PET_TOPIC: &str = lamp_msgs::HeadPet::TOPIC;
 /// The air at the desk.
-const AIR_TOPIC: &str = "air/state";
+const AIR_TOPIC: &str = lamp_msgs::AirState::TOPIC;
 /// What someone at the desk is doing, as the eyes see it.
-const ACTIVITY_TOPIC: &str = "room/activity";
+const ACTIVITY_TOPIC: &str = lamp_msgs::RoomActivity::TOPIC;
 
 /// What the lamp can't start a made skill on yet, by a real topic of the
 /// lamp's that no saying here knows, in plain words: "starting on words it
@@ -10391,6 +10531,209 @@ light = { colour = "green", level = 3, for = "20s" }
              \"clock/local\"]\n\n[trigger]\n{trigger}\n[ask]\npolicy = \"nudge\"\n\n\
              [[do]]\n{step}\n"
         )
+    }
+
+    /// #7357, lamp-c0a4, 16 Nov: "over 28 degrees turn the light blue"
+    /// was made on a `device/temperature` trigger, field `max_c`, that
+    /// nothing on the lamp sends, and kept in general words though it could
+    /// never start. A read of a topic the lamp doesn't have, or of a field
+    /// its message doesn't carry, in the trigger, its sooner or a while, is
+    /// refused, loosened or not, its repair naming it and the topics there
+    /// are with their fields; the person, the repairs used up, hears one
+    /// true line. The same skill on the air's temperature is kept.
+    #[test]
+    fn a_read_of_a_topic_or_field_the_lamp_doesnt_have_is_refused_and_repaired() {
+        let light = "light = { colour = \"blue\" }";
+        let refused = |made: &str, part: &str| {
+            for (reads, general) in [(false, false), (false, true), (true, true)] {
+                match plainly_as(made, reads, general) {
+                    Err(Refused(why, Some(lines))) => {
+                        assert_eq!(why, NOTHING_READS);
+                        assert!(
+                            lines.starts_with(&format!(
+                                "The lamp has nothing that reads that: {part}. Read only one \
+                                 of these topics, each with the fields it carries: \
+                                 voice/state (state); room/presence (someone, nobody_s, by); \
+                                 humans/faces/tracked (faces); "
+                            )),
+                            "{lines}"
+                        );
+                        assert!(
+                            lines.contains(
+                                "air/state (pm1_0, pm2_5, pm4_0, pm10, humidity, \
+                                            temperature, co2_ppm, feel)"
+                            ),
+                            "{lines}"
+                        );
+                        assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
+                    }
+                    other => panic!("{part}, reads {reads}, general {general}: {other:?}"),
+                }
+            }
+        };
+        let tonight = made_with(
+            "topic = \"device/temperature\"\nfield = \"max_c\"\nabove = 28\n",
+            light,
+        );
+        refused(
+            &tonight,
+            "the trigger's topic device/temperature is not one the lamp has",
+        );
+        refused(
+            &made_with(
+                "topic = \"air/state\"\nfield = \"max_c\"\nabove = 28\n",
+                light,
+            ),
+            "the trigger's field max_c is not one air/state carries",
+        );
+        refused(
+            &made_with(
+                "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                 sooner = { topic = \"room/activity\", field = \"sneezes\", above = 0, \
+                 for = \"1m\" }\n",
+                light,
+            ),
+            "the trigger's sooner's field sneezes is not one room/activity carries",
+        );
+        refused(
+            &format!(
+                "{}\n[[while]]\ntopic = \"device/temperature\"\nfield = \"max_c\"\nabove = 28\n",
+                made_with(
+                    "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n",
+                    light
+                )
+            ),
+            "a [[while]]'s topic device/temperature is not one the lamp has",
+        );
+        // The person hears one true line when the repairs are used up.
+        assert_eq!(plain_reason(NOTHING_READS), NOTHING_READS);
+        assert_eq!(
+            not_made_line(&plain_reason(NOTHING_READS)),
+            "I couldn't make that: the lamp has nothing that reads that."
+        );
+        // The same skill on the air's own temperature is kept, loosened as
+        // the lamp makes it, and never refused as a read it doesn't have.
+        let real = topic_granted(&made_with(
+            "topic = \"air/state\"\nfield = \"temperature\"\nabove = 28\n",
+            light,
+        ));
+        assert!(capped_with(&real, false).is_ok(), "{real}");
+        assert!(plainly_as(&real, false, true).is_ok(), "{real}");
+        assert!(
+            !matches!(plainly_as(&real, false, false), Err(Refused(why, _)) if why == NOTHING_READS)
+        );
+        // A dotted field is read by its first part; a topic the lamp can't
+        // start on yet is still said so, never repaired.
+        let dotted = made_with(
+            "topic = \"humans/faces/tracked\"\nfield = \"faces.0\"\nwhen = \"appears\"\n",
+            light,
+        );
+        assert!(unread(&toml::from_str(&dotted).unwrap()).is_none());
+        let heard = made_with("topic = \"voice/heard\"\nfield = \"text\"\n", light);
+        assert!(unread(&toml::from_str(&heard).unwrap()).is_none());
+        // The making model is told the same list.
+        assert_eq!(readable_named().split("; ").count(), SAYABLE_TOPICS.len());
+    }
+
+    /// #7357: [`READABLE`]'s fields are each message's own, as it is
+    /// serialized: a field added to or taken from one fails here.
+    #[test]
+    fn the_readable_fields_are_the_messages_own() {
+        let fields = |value: serde_json::Value| -> Vec<String> {
+            let mut keys: Vec<String> = value.as_object().unwrap().keys().cloned().collect();
+            keys.sort();
+            keys
+        };
+        let readable = |topic: &str| -> Vec<String> {
+            let mut keys: Vec<String> = READABLE
+                .iter()
+                .find(|(known, _)| *known == topic)
+                .unwrap()
+                .1
+                .iter()
+                .map(|field| field.to_string())
+                .collect();
+            keys.sort();
+            keys
+        };
+        let json = |value: Result<serde_json::Value, _>| value.unwrap();
+        let messages: [(&str, serde_json::Value); 7] = [
+            (
+                lamp_msgs::VoiceState::TOPIC,
+                json(serde_json::to_value(lamp_msgs::VoiceState {
+                    state: lamp_msgs::Voice::Resting,
+                })),
+            ),
+            (
+                lamp_msgs::RoomPresence::TOPIC,
+                json(serde_json::to_value(lamp_msgs::RoomPresence {
+                    someone: true,
+                    nobody_s: 0,
+                    by: Some(lamp_msgs::SeenBy::Face),
+                })),
+            ),
+            (
+                lamp_msgs::Faces::TOPIC,
+                json(serde_json::to_value(lamp_msgs::Faces { faces: Vec::new() })),
+            ),
+            (
+                lamp_msgs::StoodUp::TOPIC,
+                json(serde_json::to_value(lamp_msgs::StoodUp {
+                    sitting_s: 60,
+                    side: Some(lamp_msgs::Side::Left),
+                })),
+            ),
+            (
+                lamp_msgs::HeadPet::TOPIC,
+                json(serde_json::to_value(lamp_msgs::HeadPet {
+                    stamp: lamp_msgs::ClockStamp {
+                        clock_id: "c".into(),
+                        at_us: 1,
+                        sequence: 1,
+                    },
+                    session_id: "s".into(),
+                    reader_session_id: "r".into(),
+                    enabled: true,
+                    contact_id: 1,
+                    began_us: 1,
+                    petted_us: 1,
+                    observed_us: 1,
+                    swaps: 1,
+                    swaps_per_second: 1.0,
+                    resting: false,
+                    ended: false,
+                })),
+            ),
+            (
+                lamp_msgs::AirState::TOPIC,
+                json(serde_json::to_value(lamp_msgs::AirState {
+                    pm1_0: None,
+                    pm2_5: None,
+                    pm4_0: None,
+                    pm10: None,
+                    humidity: None,
+                    temperature: Some(28.0),
+                    co2_ppm: None,
+                    feel: lamp_msgs::AirFeel::Unknown,
+                })),
+            ),
+            (
+                lamp_msgs::RoomActivity::TOPIC,
+                json(serde_json::to_value(lamp_msgs::RoomActivity {
+                    state: lamp_msgs::Activity::Away,
+                    for_s: 0,
+                    sitting_s: 0,
+                    baseline: false,
+                    yawns: 1,
+                })),
+            ),
+        ];
+        for (topic, message) in messages {
+            assert_eq!(readable(topic), fields(message), "{topic}");
+        }
+        // The clock is lamp-skills' own, held to it there.
+        assert_eq!(readable(CLOCK_TOPIC), ["day", "known", "minute"]);
+        assert_eq!(READABLE.len(), 8);
     }
 
     /// #6066: each step and trigger kind a skill can declare is kept and
