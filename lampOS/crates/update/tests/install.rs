@@ -1822,6 +1822,33 @@ fn the_product_recalls_before_a_dont_know() {
     );
 }
 
+/// After ten quiet minutes the next turn asks the memory's note again
+/// (`LAMP_MEMORY_REOPEN_QUIET`, #1693 (1), C20): the owner's yes on 16 Nov,
+/// so the same person back the next morning can be asked after an open
+/// thread. It does anything only with Days, the second route and threads,
+/// which the unit sets too.
+#[test]
+fn the_product_asks_the_note_again_after_a_quiet() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_REOPEN_QUIET=on",
+        "Environment=LAMP_MEMORY_DAYS=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+        "Environment=LAMP_MEMORY_THREADS=on",
+    ] {
+        assert_eq!(
+            service.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice lacks {line}"
+        );
+    }
+}
+
 /// A keep the round right after it doubts is taken back in the product
 /// and held for the person's yes (`LAMP_MEMORY_DOUBT_UNDOES`, C37): the
 /// memory owner's call A on 11 Nov, after lamp-06c1 kept "renunctinus"
