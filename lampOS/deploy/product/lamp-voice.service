@@ -309,6 +309,10 @@ Environment=LAMP_NAMES=checked
 # only a face already known, and the new name is said back. Both need LAMP_NAMES=checked and the eyes' who socket.
 Environment=LAMP_NAMES_RENAME_ASKED=on
 Environment=LAMP_NAMES_RENAME_YES=on
+# The owner can teach the lamp their name (#7331, docs/eyes.md): a rename question cut before its name is asked again,
+# a name given with nobody known asks before a face is kept, a spelled name is said back and one line corrects it.
+# Second route only; needs LAMP_NAMES=checked and the eyes' who socket. row-7331b and the fresh-lamp walk on lamp-52e6.
+Environment=LAMP_NAME_LEARN_FIX=on
 Environment=LAMP_STAFF_NOTE=on
 Environment=LAMP_TASK_NEWS_AT_PAUSE=on
 Environment=LAMP_MEMORY_RULES=on
