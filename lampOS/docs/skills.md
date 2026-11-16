@@ -4433,7 +4433,7 @@ first."). Then, in code (`made_run::asked`):
   services use their own tokens. As for a tool's run, the Policy is not
   asked and its trigger's `[[while]]`, quiet hours, cooldown, day's most
   and group's hour are neither asked nor spent: a person asked. Its own
-  words (a say step's) ask the say service's priority 8
+  words (a say step's) ask, with `LAMP_MADE_SKILL_ASKS` on (off, their own as before), the say service's priority 8
   (`lamp_skills::MOST_SAY_PRIORITY`, a due reminder's), so they are said
   after a second of quiet, never the 15 s (`say::QUIET_US`) a say at the
   normal priority 5 waits after a turn (lamp-9adf, 16 Nov 15:36: "Lamp,

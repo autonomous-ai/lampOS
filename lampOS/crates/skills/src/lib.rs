@@ -9538,11 +9538,13 @@ impl Engine {
         // of quiet, as a due reminder's ([`MOST_SAY_PRIORITY`]), never the
         // say service's 15 s after a turn at the normal priority (lamp-9adf,
         // 16 Nov 15:36: "Lamp, moon time." had its skill's line 20 s after
-        // the call).
+        // the call). Only with `LAMP_MADE_SKILL_ASKS` on: off, its steps
+        // keep their own priority, as before.
+        let raised = lamp_voice::made_skill::asks_on();
         let calls = calls
             .into_iter()
             .map(|call| match call {
-                Call::Words(mut words) => {
+                Call::Words(mut words) if raised => {
                     words.priority = words.priority.max(MOST_SAY_PRIORITY);
                     Call::Words(words)
                 }
@@ -11150,6 +11152,24 @@ mod tests {
             run.calls
                 .iter()
                 .any(|call| matches!(call, Call::Light { .. })),
+            "{:?}",
+            run.calls
+        );
+        // sim-2's P2 on #7249: off, a run now keeps its step's own priority,
+        // as before.
+        let plain = made_here(
+            dir.path(),
+            "moon-glow",
+            "version = \"1.0.0\"\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\n\
+             equals = \"resting\"\ncooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n\
+             [permissions]\ntopics = [\"voice/state\"]\nspeak = true\n\
+             [[do]]\nsay = { text = \"The moon is up.\" }\n",
+        );
+        lamp_voice::made_skill::set_asks_here(Some(false));
+        let mut engine = Engine::new(vec![load(&plain).unwrap()], false);
+        let run = engine.run_now("moon-glow", 1_000_000).unwrap();
+        assert!(
+            matches!(run.calls.as_slice(), [Call::Words(words)] if words.priority == SAY_PRIORITY),
             "{:?}",
             run.calls
         );

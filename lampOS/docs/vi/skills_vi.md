@@ -1723,7 +1723,7 @@ a skill on the lamp uses, saying nothing first."). Sau đó, trong code
   của một tool, Policy không được hỏi và `[[while]]`, giờ yên tĩnh,
   cooldown, số lần tối đa mỗi ngày và giờ của nhóm của trigger không được
   hỏi cũng không bị tiêu: người dùng đã xin. Lời của chính nó (của một
-  bước say) xin mức ưu tiên 8 của dịch vụ say
+  bước say), khi bật `LAMP_MADE_SKILL_ASKS` (tắt thì giữ mức riêng như trước), xin mức ưu tiên 8 của dịch vụ say
   (`lamp_skills::MOST_SAY_PRIORITY`, mức của một lời nhắc đến hạn), nên
   được nói sau một giây yên lặng, không phải 15 s (`say::QUIET_US`) mà một
   lời nói ở mức thường 5 chờ sau một lượt (lamp-9adf, 16/11 15:36: "Lamp,
