@@ -99,6 +99,7 @@ pub mod local_time;
 pub mod made_clash;
 pub mod made_counts;
 pub mod made_list;
+pub mod made_not_on;
 pub mod made_remove;
 pub mod made_run;
 pub mod made_skill;

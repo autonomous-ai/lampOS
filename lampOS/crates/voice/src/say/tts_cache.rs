@@ -537,8 +537,8 @@ mod tests {
             let (cache, calls) = counted(&dir, "Rachel");
             let cache = cache.speaking(Some(language));
             let lines = cache.warm_lines();
-            assert_eq!(lines.len(), 46 + WARM.len(), "{language:?}");
-            assert_eq!(&lines[46..], WARM);
+            assert_eq!(lines.len(), 48 + WARM.len(), "{language:?}");
+            assert_eq!(&lines[48..], WARM);
             let words = language.fixed(lamp_msgs::SLEEP_LINE).unwrap();
             assert_eq!(lines[1], words);
             assert_ne!(cache.key(words), cache.key(lamp_msgs::SLEEP_LINE));
@@ -574,7 +574,7 @@ mod tests {
         let (off, _) = counted(&dir, "Rachel");
         let off = off.speaking(Some(Language::Vietnamese));
         assert!(!off.warm_lines().contains(&"Dạ?"));
-        assert_eq!(off.warm_lines().len(), 46 + WARM.len());
+        assert_eq!(off.warm_lines().len(), 48 + WARM.len());
         let (vietnamese, calls) = counted(&dir, "Rachel");
         let vietnamese = vietnamese
             .speaking(Some(Language::Vietnamese))

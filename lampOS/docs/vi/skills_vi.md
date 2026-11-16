@@ -1519,6 +1519,47 @@ lại. Kiểm thử:
 `second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`,
 `a_not_made_notes_made_claim_is_held`.
 
+Một kỹ năng tự tạo có code riêng mà chưa bật thì không bao giờ được nói là đã
+bật (`LAMP_MADE_NOT_ON_TOLD=on`, #7270; tắt trừ khi được đặt, không có trong
+unit nào; `crate::made_not_on`). Trên lamp-9adf (16/11, bản 13383) một lần tạo
+bằng giọng nói do agent của đèn viết mất khoảng bốn phút; câu đọc lại kết thúc
+bằng "It waits for you to agree before it runs any code.", và câu "Yeah." của
+người dùng đến hơn 200 s sau những lời đó, quá 120 s chờ
+(`skill_write_yes::YES_WITHIN`), khi không có cuộc trò chuyện nào đang diễn ra.
+Mô hình không được cho thấy kỹ năng nào đang chờ, không gọi gì (`calls=none`)
+và nói "The skill is on the lamp. Next time you sit at your desk, the lamp will
+read your newest email …": không có gì được bật. Khi bật công tắc, ở một dòng
+nghe được sau câu đọc lại như vậy, trong khi lần chờ của kỹ năng đó chưa được
+trả lời, chưa bị bỏ, chưa bị lời đồng ý lấy đi và bắt đầu không quá 15 phút
+trước (`made_not_on::TOLD_FOR`; `skill_write_yes::code_not_on`; không bao giờ
+là lần chờ của một lần ghi, vì kỹ năng có ghi đã bật rồi, của một lần gỡ hay
+của task của một kỹ năng):
+- quá 120 s, mô hình được báo trong một ghi chú "For you to know" rằng kỹ năng
+  chưa bật và giờ không lời đồng ý nào bật được nó, nên người dùng có thể nhờ
+  tạo lại (trong 120 s nó đã được báo kỹ năng đang chờ, cùng `approve_id`,
+  như trước);
+- một câu trả lời có chủ ngữ là kỹ năng ("the skill", "your skill", tên đọc
+  của nó, hoặc "it" ở một dòng chỉ là lời đồng ý) và nói nó đã bật, sẵn sàng,
+  đã cài, đang chạy hay đã tạo, hoặc "I've turned it on" và tương tự, không có
+  "not", "n't", "never", "yet", điều kiện ("once", "when", "if", "after",
+  "until") hay lời xin đồng ý, và không có '?' (`made_not_on::claims_on`), thì
+  không được nói, cả phần còn lại của vòng đó cũng vậy. Cuối vòng, một vòng có
+  gọi `make_skill` với `approve_id` bỏ những lời đó không nói (vòng sau nói từ
+  câu trả lời của lời gọi đó); vòng khác nói "It isn't on yet: say yes to me
+  while you're at the lamp, and I'll turn it on." trong 120 s, hoặc "It isn't
+  on yet: your yes didn't come in time, so ask me to make it again." khi đã
+  quá, một lần mỗi lượt, bằng ngôn ngữ của chủ đèn. Khi bộ chặn đang giữ, những
+  từ đầu của một vòng chờ đến hết câu (không nói sớm một mệnh đề), nên một lời
+  nói đã bật không bao giờ bị nói dở.
+Khi lời đồng ý đã được nhận (lần chờ không còn), không gì bị giữ: "It's on
+now." sau một lời đồng ý đã chạy được nói. Tắt, hoặc không có kỹ năng như vậy,
+một lượt giữ nguyên từng byte như trước. Cửa sổ của lời đồng ý không đổi: một
+lời đồng ý sau 120 s vẫn không được nhận. Kiểm thử: `made_not_on::tests::*`,
+`second_provider::tests::made_not_on::a_late_yes_with_no_call_is_told_not_on_and_its_claim_is_replaced`,
+`a_yes_in_the_wait_answered_with_no_call_is_said_not_on_yet`,
+`a_real_yes_still_puts_it_on_with_no_note`,
+`with_no_skill_waiting_nothing_changes`.
+
 **Gỡ bằng giọng nói** (#6960, ba lần thử của Twelve trên lamp-c0a4, 12843:
 "delete the skill called moon fact" đi tới `lamp_help`, mà ghi chú của nó
 nói đèn không gỡ kỹ năng bằng giọng nói được, còn "remove the moon fact
