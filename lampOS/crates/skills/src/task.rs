@@ -264,7 +264,7 @@ pub fn grants_of(grants: &[String]) -> Result<Vec<String>, String> {
     Ok(kept)
 }
 
-/// The task grant that keeps a run's network (`LAMP_TASK_NET`,
+/// The task grant that gives a run the public web (`LAMP_TASK_NET`,
 /// `lamp_voice::skill_task_yes::NET`): a grant here, in the manage helper
 /// and lamp-control while [`net_on`], never one of lamp-control's own.
 pub const NET_GRANT: &str = lamp_voice::skill_task_yes::NET.0;

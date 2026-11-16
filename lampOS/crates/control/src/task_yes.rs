@@ -316,7 +316,7 @@ impl crate::runs::SkillYes for KeptYes {
         let yes = yes_for_token(&self.state, skill, &sha256, &declared)
             .ok_or_else(|| CHANGED.to_owned())?;
         grants_ok(&yes.grants)?;
-        // `net` is lamp-tasks' (its run keeps the network), never a token's.
+        // `net` is lamp-tasks' (its run's way out to the public web), never a token's.
         yes.grants
             .iter()
             .filter(|grant| *grant != lamp_skills::task::NET_GRANT)

@@ -95,6 +95,10 @@ Environment=LAMP_SKILL_UPLOAD=on
 # the file kept whole and followed by Hermes in a fresh home, its grants read from it and said back. The same line
 # in lamp-cloud, lamp-voice, lamp-skills and lamp-skills-manage@.
 Environment=LAMP_UPLOAD_TO_AGENT=on
+# A skill's task that reaches the internet (docs/tasks.md, "An agent skill's run and the `net` grant"): the skills page
+# loads each skill with lamp-skills' own loader, so `net` reads as a task grant there too, not "is not a grant". The
+# same line in lamp-tasks, lamp-skills, lamp-skills-manage@, lamp-control and lamp-voice.
+Environment=LAMP_TASK_NET=on
 # A skill's keys given in the app (#6686, docs/skills.md "Its keys, given in the app"): skills.secrets, skills.secret_set
 # and skills.secret_unset, handed to lamp-services' admin socket; the same line there, in lamp-voice and lamp-tasks.
 Environment=LAMP_SKILL_SECRETS=on

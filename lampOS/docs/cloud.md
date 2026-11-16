@@ -1725,7 +1725,9 @@ The owner's ask (12 Nov): a `SKILL.md` uploaded from the app runs through
 the lamp's agent, as V1's did; the first builder's yes at 19:44. On in the
 product since 13 Nov (the owner's ruling: the upload flow goes via the
 agent), set in `lamp-cloud`, `lamp-voice`, `lamp-skills` and
-`lamp-skills-manage@`; `LAMP_TASK_NET` is on in the product too. With `LAMP_UPLOAD_TO_AGENT=on`
+`lamp-skills-manage@`; `LAMP_TASK_NET` is on in the product too, lamp-cloud's own unit among
+them (its skills page loads each skill with lamp-skills' loader, so a skill granted `net` loads
+there, not "net is not a grant"; a `net` run reaches the public web on 80 and 443 alone, docs/tasks.md). With `LAMP_UPLOAD_TO_AGENT=on`
 in `lamp-cloud`'s unit (`upload::AGENT_ENVIRONMENT`, `Uploads::to_agent`),
 a bare `SKILL.md` may be up to 64 KiB (`MOST_AGENT_BYTES`; past it,
 `failure` with "its SKILL.md is longer than 64 KiB") and goes to

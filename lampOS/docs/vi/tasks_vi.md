@@ -1255,19 +1255,68 @@ năng tự tạo (`do.write`, docs/skills.md) như một lượt chạy
 Người xây dựng đầu tiên đồng ý lúc 19:44 (12/11). `LAMP_UPLOAD_TO_AGENT` bật
 trong sản phẩm từ 13/11 (phán quyết của chủ: luồng tải lên đi qua agent);
 `LAMP_TASK_NET` cũng bật trong sản phẩm (lamp-tasks, lamp-skills và manage helper,
-lamp-control và lamp-voice), nên lần chạy được cấp `net` với lời đồng ý bằng giọng
-nói của chủ giữ mạng của đèn; xây trên đường `skill_make` của #6643, để chuyển
+lamp-control, lamp-voice và lamp-cloud), nên lần chạy được cấp `net` với lời đồng ý bằng giọng
+nói của chủ tới được web công khai trên cổng 80 và 443, bị giữ như mọi lần chạy
+(quyết định của người xây dựng đầu tiên trên #7200: không bao giờ tới mạng của
+đèn hay các cổng cục bộ của nó); xây trên đường `skill_make` của #6643, để chuyển
 sang runner chung của #6510 bước 2 mà không cần luật mới.
 
 - **`net`** (`skill_task::NET_SWITCH`): một quyền của lần chạy, không phải
-  của lamp-control. Lần chạy có `net` đi qua runner của lần tạo, giữ mạng
-  (`skill_make::lamp_runner(home, false)`); lần khác vẫn `LAMP_NS_NET=run`.
+  của lamp-control. Lần chạy có `net` đi qua runner `net` của lần tạo
+  (`skill_make::net_runner`: bị giữ, `LAMP_NS_NET=run`, có lối ra riêng ở
+  dưới); lần khác bị giữ, không có lối ra.
   lamp-control giữ `net` trong lời đồng ý nhưng không bao giờ đặt nó vào
   token, nên sau khi tạo token lamp-tasks hỏi lamp-control
   (`task_yes_check` với SHA-256 thư mục và các quyền của dòng): chỉ khi
-  lời đồng ý có `net` cho thư mục đúng như hiện tại thì lần chạy mới giữ
-  mạng, nếu không thì `no_token` và không chạy gì. Tắt: `net` bị từ chối
+  lời đồng ý có `net` cho thư mục đúng như hiện tại thì lần chạy mới có
+  lối ra, nếu không thì `no_token` và không chạy gì. Tắt: `net` bị từ chối
   trước khi có token.
+- **Lối ra của lần chạy có `net`** (`crate::egress`, ghi chú thiết kế trên
+  #7200, câu trả lời của Heron): mọi lần chạy đều bị giữ, có `net` hay không.
+  Lần chạy có `net` đi qua `skill_make::net_runner(home)`: runner bị giữ
+  (`LAMP_NS_NET=run`, nên có `--net`, chỉ `lo` và relay của model trên
+  `127.0.0.1:7741`), thêm một socket lối ra riêng,
+  `/run/lampos-tasks/egress/make-<run id>.sock` (0600 trong thư mục 0700),
+  lamp-tasks chỉ tạo sau khi lời đồng ý của lamp-control có `net`, và xóa
+  khi lần chạy kết thúc (hoặc khi hết hạn); socket do lamp-tasks đã dừng để
+  lại bị dọn ở lần sau. `LAMP_NS_EGRESS` báo tên nó cho script namespace,
+  script chỉ hiện đúng tệp đó, chỉ đọc (thiếu, hoặc tên không phải `make-*`
+  trơn, lần chạy kết thúc), hạ `net.ipv4.ip_unprivileged_port_start` xuống
+  53 trong network namespace riêng của lần chạy (bị từ chối thì lần chạy
+  kết thúc: không bao giờ quay về mạng của đèn), gắn một `resolv.conf`
+  `nameserver 127.0.0.1` chỉ đọc lên trên tệp của đèn, và chạy
+  `net-relay --egress`: ngoài `127.0.0.1:7741`, một proxy HTTP trên
+  `127.0.0.1:3128` (`CONNECT` và `http://` dạng tuyệt đối) và DNS trên
+  `127.0.0.1:53` (UDP và TCP), mỗi kết nối nối tới socket lối ra; một cái
+  không bind được thì không có `ready` và lần chạy kết thúc. Lần chạy có
+  `HTTPS_PROXY`/`HTTP_PROXY` (cả hai kiểu chữ) `http://127.0.0.1:3128`,
+  `NO_PROXY=127.0.0.1,localhost` (model vẫn đi relay của nó) và
+  `NODE_USE_ENV_PROXY=1`. Cổng 53 vì `resolv.conf` không ghi được cổng.
+  - **Bên ngoài, lamp-tasks kiểm tra tất cả** (relay không kiểm tra gì).
+    Yêu cầu proxy được đọc trọn (tối đa 8 KiB), cổng phải là 80 hoặc 443,
+    tên một nhãn bị đóng, và tên do lamp-tasks phân giải, chỉ kết nối tới
+    đúng địa chỉ đã kiểm tra, nên tên trỏ về địa chỉ riêng không được gì.
+    Đóng: các mạng của chính đèn (địa chỉ, prefix và điểm đầu kia của mọi
+    interface qua `getifaddrs`, gateway và đích của mọi route trong
+    `/proc/net/route`, đọc lại ở mỗi lần kết nối, nên `172.168.20.0/24` bị
+    đóng dù thuộc dải nào); IPv4 `0/8`, `10/8`, `100.64/10`, `127/8`,
+    `169.254/16`, `172.16/12`, `192.0.0/24`, ba dải /24 tài liệu,
+    `192.168/16`, `198.18/15`, `224/4`, `240/4`; IPv6 `::`, `::1`, `::/96`,
+    `fc00::/7`, `fe80::/10`, `fec0::/10`, `ff00::/8`, `2001:db8::/32`; và
+    địa chỉ IPv4 nằm trong IPv6 (mapped, NAT64, 6to4) được kiểm như IPv4.
+    Kết nối bị đóng thì đóng luôn, không trả lời (`curl` báo `000`).
+  - **Tên**: mỗi truy vấn được chuyển nguyên vẹn tới máy chủ tên của đèn
+    (`/etc/resolv.conf`, tối đa ba: UDP cho datagram, TCP cho stream), nên
+    chỉ lamp-tasks nói với router, chỉ trên cổng 53. Tên một nhãn
+    (`printer`, `nas`) và mọi tên dưới `in-addr.arpa`/`ip6.arpa` không phải
+    một địa chỉ công khai trọn vẹn được trả `REFUSED` và không ra ngoài.
+  - **Giới hạn và lời ghi**: tối đa 16 đường nối mỗi bên, 10 s để kết nối,
+    60 s không có byte, không gì quá hạn của lần chạy. Không bao giờ ghi
+    byte; một dòng log là chữ cố định và loại địa chỉ, không bao giờ là
+    địa chỉ hay tên.
+  - **Cái gì ra được**: chỉ thứ dùng proxy: curl, pip, git qua https,
+    requests/httpx/urllib của Python, Node với `NODE_USE_ENV_PROXY`. TCP,
+    UDP và ICMP thô đều bị chặn.
 - **Lần chạy của kỹ năng agent** (`run` = `scripts/SKILL.md`) chỉ làm theo
   tệp trong phạm vi các quyền và mạng của nó: token chỉ mang quyền của
   lamp-control, và mạng bị giữ trừ khi lời đồng ý của lamp-control có `net`. Hermes được
