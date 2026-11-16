@@ -3724,6 +3724,15 @@ file:
   build natively, it also runs the static copy once as `skill-start` with
   no run id, which must exit 2. So the launcher runs no `ld.so` and no
   preloaded code before `main()`.
+- **lamp-control's socket in the gateway (#7135).** OpenClaw's namespace
+  shows lamp-control's socket (`AGENT_NS_TASKS_LINE`). With the one run path
+  on, the gateway starts after and wants lamp-control, then waits for the
+  actual socket before capturing its mount view (up to 60 one-second waits).
+  Still missing, it logs one line and starts without it (a lamp before setup
+  has no lamp-control); the off path and install/version calls do not wait.
+  A later socket replacement still needs a gateway restart. The first round
+  after this update rewrites the namespace script and the unit and restarts
+  the gateway once.
 - **The socket.** The launcher sends the run id to
   `/run/lampos-skill-start/start.sock` (0600). lamp-update owns the folder
   `/run/lampos-skill-start` (0755, `lampos`'s): the OpenClaw gateway's
