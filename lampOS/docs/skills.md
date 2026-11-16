@@ -4248,26 +4248,30 @@ skill's task's):
   skill is not on and no yes turns it on now, so the person can ask for it to
   be made again (within the 120 s it is already told the skill waits, with
   its `approve_id`, as before);
-- a reply sentence whose subject is the skill ("the skill", "your skill", its
-  spoken name, or "it" on a line that is only a yes) and that says it is on,
-  turned on, ready, set up, active, running, installed or made, or "I've
-  turned it on" and the like, with no "not", "n't", "never", "yet", condition
-  ("once", "when", "if", "after", "until") or ask for the yes in it, and no
-  '?' (`made_not_on::claims_on`), is not said, nor the rest of its round. At
-  the round's end, a round that calls `make_skill` with an `approve_id` lets
-  those words go unsaid (the next round speaks from that call's answer);
-  any other says "It isn't on yet: say yes to me while you're at the lamp,
-  and I'll turn it on." within the 120 s, or "It isn't on yet: your yes
-  didn't come in time, so ask me to make it again." past it, once a turn, in
-  the owner's language. While the guard holds, a round's first words wait for
-  their sentence's end (no early clause), so a claim is never half said.
+- each round's reply is held to the round's end. Beside a `make_skill` call
+  with an `approve_id` it goes unsaid (the next round speaks from that call's
+  answer). Otherwise the same chat model the route uses, asked with no
+  function in one short call bounded at 1.5 s (`made_not_on::JUDGE_WITHIN`,
+  `judge_messages`), judges it in any language, never a word list (the
+  owner's rule of 13 Nov): "Does this reply tell the person that the skill
+  <name> is on now, or that it will run? Answer only yes or no." Yes: "It
+  isn't on yet: say yes to me while you're at the lamp, and I'll turn it on."
+  is said in its place within the 120 s, or "It isn't on yet: your yes didn't
+  come in time, so ask me to make it again." past it. No: it is said as it
+  came. No plain answer in time: it is said, then the fixed line, which is
+  true, since the skill isn't on. The fixed line is said at most once a turn,
+  in the owner's language. These turns alone wait for the round's end and the
+  check (its ms in the journal); their first words wait for the sentence's
+  end.
 Once the yes is taken (the wait gone), nothing is held: "It's on now." after
 a yes that ran is said. Off, or with no such skill, a turn is byte for byte as
 before. The yes's own window is unchanged: a yes after its 120 s is still not
 taken. Tests: `made_not_on::tests::*`,
 `second_provider::tests::made_not_on::a_late_yes_with_no_call_is_told_not_on_and_its_claim_is_replaced`,
-`a_yes_in_the_wait_answered_with_no_call_is_said_not_on_yet`,
-`a_real_yes_still_puts_it_on_with_no_note`,
+`every_claim_the_judge_holds_is_said_not_on_yet`,
+`a_reply_judged_no_claim_is_said`,
+`a_judge_past_its_time_says_the_reply_then_the_fixed_line`,
+`a_real_yes_still_puts_it_on_with_no_line`,
 `with_no_skill_waiting_nothing_changes`.
 
 **Removed by voice** (#6960, Twelve's three tries on lamp-c0a4, 12843:
