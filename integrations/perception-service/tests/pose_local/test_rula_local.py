@@ -299,3 +299,128 @@ class TestSignedFlexion2D:
         assert result is not None
         legacy_angle = int(np.degrees(np.arctan2(40, 50)))
         assert abs(result.left.body_scores.neck_angle) == legacy_angle
+
+
+# --- Upper-body partial score (hips hidden at a desk) ---
+
+
+def _desk_frontal_coco() -> tuple[np.ndarray, np.ndarray]:
+    """Frontal desk frame in COCO-17 (320x240): face, shoulders, arms; hips hidden."""
+    kps = np.zeros((17, 2), dtype=np.float32)
+    kps[0] = [160, 95]  # nose
+    kps[1] = [152, 88]  # L eye
+    kps[2] = [168, 88]  # R eye
+    kps[3] = [140, 90]  # L ear
+    kps[4] = [180, 90]  # R ear
+    kps[5] = [110, 150]  # L shoulder
+    kps[6] = [210, 150]  # R shoulder
+    kps[7] = [105, 200]  # L elbow
+    kps[8] = [215, 200]  # R elbow
+    kps[9] = [140, 225]  # L wrist (on the desk)
+    kps[10] = [180, 225]  # R wrist
+    kps[11] = [125, 235]  # L hip (behind the desk)
+    kps[12] = [195, 235]  # R hip
+    scores = np.full(17, 0.9, dtype=np.float32)
+    scores[11:] = 0.1  # hips, knees, ankles hidden
+    return kps, scores
+
+
+def _to_h36m(kps: np.ndarray, scores: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    from core.perception.pose.graph.convert import coco_to_h36m
+
+    h_kps, h_scores = coco_to_h36m(kps[None], scores[None])
+    return h_kps[0], h_scores[0]
+
+
+class TestUpperBodyPartial:
+    def test_hips_hidden_flag_off_returns_none(self):
+        result = RULAAssessor().predict([_to_h36m(*_desk_frontal_coco())])[0]
+        assert result is None
+
+    def test_hips_hidden_flag_on_returns_partial(self):
+        assessor = RULAAssessor(upper_body_partial=True)
+        result = assessor.predict([_to_h36m(*_desk_frontal_coco())])[0]
+        assert result is not None
+        assert result.partial is True
+        for side in (result.left, result.right):
+            assert side.body_scores.trunk == 1
+            assert side.body_scores.legs == 1
+            assert side.body_scores.trunk_angle == 0
+            assert side.body_scores.neck == 1  # upright, frontal
+            assert "spine" in side.skipped_joints
+            assert 1 <= side.score <= 7
+        assert result.score == max(result.left.score, result.right.score)
+
+    def test_partial_arms_and_neck_match_full_body(self):
+        """Same frame with hips visible: arm and neck subscores do not change."""
+        kps, scores = _desk_frontal_coco()
+        part = RULAAssessor(upper_body_partial=True).predict([_to_h36m(kps, scores)])[0]
+        scores[11:13] = 0.9
+        full = RULAAssessor().predict([_to_h36m(kps, scores)])[0]
+        assert part is not None and full is not None
+        for p_side, f_side in ((part.left, full.left), (part.right, full.right)):
+            for name in ("upper_arm", "lower_arm", "wrist", "neck"):
+                assert getattr(p_side.body_scores, name) == getattr(f_side.body_scores, name)
+
+    def test_partial_shoulder_line_cancels_roll(self):
+        """Whole upper body rolled 15° in the image: neck stays neutral."""
+        kps, scores = _desk_frontal_coco()
+        center = np.array([160, 150], dtype=np.float32)
+        rad = np.radians(15)
+        rot = np.array([[np.cos(rad), -np.sin(rad)], [np.sin(rad), np.cos(rad)]], dtype=np.float32)
+        kps = ((kps - center) @ rot.T + center).astype(np.float32)
+        result = RULAAssessor(upper_body_partial=True).predict([_to_h36m(kps, scores)])[0]
+        assert result is not None and result.partial
+        assert result.left.body_scores.neck == 1
+        assert abs(result.left.body_scores.neck_angle) <= 1
+
+    def test_partial_needs_face(self):
+        kps, scores = _desk_frontal_coco()
+        scores[3] = 0.1  # L ear hidden -> HEAD low
+        result = RULAAssessor(upper_body_partial=True).predict([_to_h36m(kps, scores)])[0]
+        assert result is None
+
+    def test_partial_needs_shoulders(self):
+        kps, scores = _desk_frontal_coco()
+        scores[6] = 0.1  # R shoulder hidden -> THORAX low
+        result = RULAAssessor(upper_body_partial=True).predict([_to_h36m(kps, scores)])[0]
+        assert result is None
+
+    def test_full_body_unchanged_and_not_partial(self):
+        kps, scores = _desk_frontal_coco()
+        scores[11:13] = 0.9  # hips visible
+        h = _to_h36m(kps, scores)
+        off = RULAAssessor().predict([h])[0]
+        on = RULAAssessor(upper_body_partial=True).predict([h])[0]
+        assert off is not None and on is not None
+        assert off == on
+        assert on.partial is False
+
+    def test_partial_in_wire_dict(self):
+        from dataclasses import asdict
+
+        full = RULAAssessor().predict([(_upright_skeleton_2d(), _all_confident())])[0]
+        assert full is not None
+        assert asdict(full)["partial"] is False
+        part = RULAAssessor(upper_body_partial=True).predict([_to_h36m(*_desk_frontal_coco())])[0]
+        assert part is not None
+        assert asdict(part)["partial"] is True
+
+
+class TestUpperBodyPartialConfig:
+    def test_env_flag_default_off_and_parsed(self, monkeypatch):
+        from config import PoseSetting, Settings
+
+        assert PoseSetting().ergo_upper_body_partial is False
+        monkeypatch.setenv("POSE__ERGO_UPPER_BODY_PARTIAL", "true")
+        assert Settings().pose.ergo_upper_body_partial is True
+
+    def test_factory_passes_flag(self):
+        from core.enums.pose import ErgoAssessorEnum
+        from core.perception.pose.utils import ErgoAssessorFactory
+
+        on = ErgoAssessorFactory(ErgoAssessorEnum.RULA, upper_body_partial=True).create()
+        result = on.predict([_to_h36m(*_desk_frontal_coco())])[0]
+        assert result is not None and result.partial
+        off = ErgoAssessorFactory(ErgoAssessorEnum.RULA).create()
+        assert off.predict([_to_h36m(*_desk_frontal_coco())])[0] is None

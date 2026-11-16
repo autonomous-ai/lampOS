@@ -86,6 +86,9 @@ class ErgoAssessment:
     right: SideAssessment
     score: int
     risk_level: RiskLevel
+    # True when the hips were hidden and only the upper body was scored
+    # (trunk and legs assumed neutral); False for a full-body answer.
+    partial: bool = False
 
 
 @dataclass

@@ -99,6 +99,11 @@ A 3-stage pipeline: 2D keypoints → optional 3D lift → optional RULA ergonomi
   flexion (neck 1–3), behind the trunk by 5° or more is extension (neck 4). A
   frontal view gives an unsigned angle (`rula/utils.py` `signed_flexion_angle`,
   `facing_direction_2d`). See [known-issues.md](known-issues.md#pose-estimation-rtmpose--rula).
+- RULA needs the hips (H36M `SPINE`) to define the trunk. With
+  `POSE__ERGO_UPPER_BODY_PARTIAL=true` (default off), hidden hips with confident
+  shoulders, nose and ears give an upper-body score instead of no `ergo`: the
+  shoulder line stands in for the trunk, trunk and legs score 1, and
+  `ErgoAssessment.partial` is `true` (`false` on full answers).
 
 ## 4. Speech emotion (SER)
 

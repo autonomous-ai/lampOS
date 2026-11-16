@@ -48,6 +48,11 @@ class RULAAssessor(ErgoAssessor):
 
     Sides are assessed independently after aligning spine->thorax to vertical;
     the overall score is the worse side. Low-confidence joints are skipped.
+
+    With *upper_body_partial*, a frame whose hips are hidden (spine below the
+    threshold) but whose shoulders, nose and ears are confident is still scored:
+    the shoulder line stands in for the trunk, trunk and legs are assumed neutral
+    (score 1) and the result carries ``partial=True``.
     """
 
     GRAPH_TYPE: GraphEnum = GraphEnum.H36M
@@ -62,8 +67,10 @@ class RULAAssessor(ErgoAssessor):
         muscle_use_score: int | None = None,
         force_load_score: int | None = None,
         batch_size: int | None = None,
+        upper_body_partial: bool | None = None,
     ) -> None:
         super().__init__(batch_size=batch_size)
+        self._upper_body_partial: bool = bool(get_or_default(upper_body_partial, False))
         self._confidence_threshold: float = get_or_default(
             confidence_threshold, self.DEFAULT_CONFIDENCE_THRESHOLD
         )
@@ -80,11 +87,14 @@ class RULAAssessor(ErgoAssessor):
         confs: npt.NDArray[np.float32],
         side: str,
         planar: bool = False,
+        partial: bool = False,
     ) -> SideAssessment:
         """Assess one side. All keypoints must be 3D and already aligned.
 
         *planar* marks 2D input (z padded with 0): the neck is then measured as
         thorax -> ear midpoint and signed by the facing side of the face.
+        *partial* marks an upper-body answer: the trunk is assumed neutral and
+        the spine is reported as skipped.
         """
         if side == "right":
             shoulder_idx = _H36M.joint("R_SHOULDER")
@@ -160,8 +170,14 @@ class RULAAssessor(ErgoAssessor):
             neck_score = 1
 
         true_vertical: npt.NDArray[np.float32] = np.array([0.0, -1.0, 0.0], dtype=np.float32)
-        trunk_angle: float = signed_flexion_angle(trunk_up, true_vertical)
-        trunk_score: int = score_trunk(trunk_angle)
+        if partial:
+            # The trunk reference was built from the shoulder line, not the hips.
+            trunk_angle: float = 0.0
+            trunk_score: int = 1
+            skipped_set.add(joint_name(_H36M.joint("SPINE")))
+        else:
+            trunk_angle = signed_flexion_angle(trunk_up, true_vertical)
+            trunk_score = score_trunk(trunk_angle)
 
         leg_score: int = 1
 
@@ -198,6 +214,40 @@ class RULAAssessor(ErgoAssessor):
             skipped_joints=sorted(skipped_set),
         )
 
+    def _upper_body_visible(self, scores: npt.NDArray[np.float32]) -> bool:
+        """Shoulders, nose and ear midpoint all confident: enough for an upper-body score."""
+        needed: tuple[str, ...] = ("THORAX", "L_SHOULDER", "R_SHOULDER", "NECK", "HEAD")
+        return all(scores[_H36M.joint(name)] >= self._confidence_threshold for name in needed)
+
+    @staticmethod
+    def _with_shoulder_trunk(kps: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+        """Replace SPINE (built from the hidden hips) with a point below the thorax.
+
+        The trunk direction becomes the perpendicular of the shoulder line pointing
+        up in the image, which cancels a sideways lean or camera roll in a frontal
+        view. When the shoulders overlap (side view: shoulder width under half the
+        thorax -> ear midpoint distance) that line has no stable direction and the
+        image vertical is used instead. Either way the trunk is then scored neutral.
+        """
+        out: npt.NDArray[np.float32] = kps.copy()
+        thorax: npt.NDArray[np.float32] = kps[_H36M.joint("THORAX")]
+        shoulders: npt.NDArray[np.float32] = (
+            kps[_H36M.joint("L_SHOULDER")] - kps[_H36M.joint("R_SHOULDER")]
+        )
+        head_len: float = float(np.linalg.norm(kps[_H36M.joint("HEAD")] - thorax))
+        width: float = float(np.linalg.norm(shoulders[:2]))
+
+        up: npt.NDArray[np.float32] = np.array([0.0, -1.0, 0.0], dtype=np.float32)
+        if width > 1e-6 and width >= 0.5 * head_len:
+            perp = np.array([shoulders[1], -shoulders[0], 0.0], dtype=np.float32)
+            if perp[1] > 0:
+                perp = -perp
+            up = perp / float(np.linalg.norm(perp))
+
+        length: float = max(head_len, width, 1.0)
+        out[_H36M.joint("SPINE")] = thorax - up * length
+        return out
+
     def _assess_single(
         self,
         keypoints: npt.NDArray[np.float32],
@@ -211,24 +261,30 @@ class RULAAssessor(ErgoAssessor):
 
         Returns:
             ErgoAssessment with left/right results, or None if spine/thorax
-            are not confident enough to define the trunk.
+            are not confident enough to define the trunk. With upper-body partial
+            scoring on, hidden hips alone give a ``partial`` result instead of None.
         """
         spine_idx: int = _H36M.joint("SPINE")
         thorax_idx: int = _H36M.joint("THORAX")
 
-        if (
-            scores[spine_idx] < self._confidence_threshold
-            or scores[thorax_idx] < self._confidence_threshold
-        ):
+        if scores[thorax_idx] < self._confidence_threshold:
             return None
 
+        partial: bool = False
+        if scores[spine_idx] < self._confidence_threshold:
+            if not (self._upper_body_partial and self._upper_body_visible(scores)):
+                return None
+            partial = True
+
         kps_3d: npt.NDArray[np.float32] = ensure_3d(keypoints)
+        if partial:
+            kps_3d = self._with_shoulder_trunk(kps_3d)
         aligned: npt.NDArray[np.float32] = align_to_vertical(kps_3d)
 
         planar: bool = is_planar(*kps_3d)
 
-        left: SideAssessment = self._assess_side(aligned, scores, "left", planar)
-        right: SideAssessment = self._assess_side(aligned, scores, "right", planar)
+        left: SideAssessment = self._assess_side(aligned, scores, "left", planar, partial)
+        right: SideAssessment = self._assess_side(aligned, scores, "right", planar, partial)
 
         overall_score: int = max(left.score, right.score)
 
@@ -237,6 +293,7 @@ class RULAAssessor(ErgoAssessor):
             right=right,
             score=overall_score,
             risk_level=risk_level_from_score(overall_score),
+            partial=partial,
         )
 
     @override
@@ -255,11 +312,12 @@ class RULAAssessor(ErgoAssessor):
         for result in results:
             if result is not None:
                 self._logger.info(
-                    "RULA score=%d (L=%d, R=%d), risk=%s",
+                    "RULA score=%d (L=%d, R=%d), risk=%s, partial=%s",
                     result.score,
                     result.left.score,
                     result.right.score,
                     result.risk_level.name,
+                    result.partial,
                 )
 
         return results

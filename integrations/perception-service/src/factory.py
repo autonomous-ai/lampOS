@@ -151,6 +151,7 @@ def build_pose_perception() -> PosePerception:
         ergo_factory = ErgoAssessorFactory(
             model_name=settings.pose.ergo_assessor,
             confidence_threshold=settings.pose.ergo_confidence_threshold,
+            upper_body_partial=settings.pose.ergo_upper_body_partial,
         )
 
     default_config: PosePerceptionSessionConfig = PosePerceptionSessionConfig()

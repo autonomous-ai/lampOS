@@ -66,8 +66,10 @@ class ErgoAssessorFactory(PredictorFactory[ErgoAssessor]):
         muscle_use_score: int | None = None,
         force_load_score: int | None = None,
         batch_size: int | None = None,
+        upper_body_partial: bool = False,
     ) -> None:
         self._model_name: ErgoAssessorEnum = model_name
+        self._upper_body_partial: bool = upper_body_partial
         self._confidence_threshold: float | None = confidence_threshold
         self._muscle_use_score: int | None = muscle_use_score
         self._force_load_score: int | None = force_load_score
@@ -80,6 +82,7 @@ class ErgoAssessorFactory(PredictorFactory[ErgoAssessor]):
             muscle_use_score=self._muscle_use_score,
             force_load_score=self._force_load_score,
             batch_size=self._batch_size,
+            upper_body_partial=self._upper_body_partial,
         )
 
 
@@ -121,6 +124,7 @@ def create_ergo_assessor(
     muscle_use_score: int | None = None,
     force_load_score: int | None = None,
     batch_size: int | None = None,
+    upper_body_partial: bool = False,
 ) -> ErgoAssessor:
     """Instantiate the correct ergonomic assessor."""
     if model_name == ErgoAssessorEnum.RULA:
@@ -133,4 +137,5 @@ def create_ergo_assessor(
         muscle_use_score=muscle_use_score,
         force_load_score=force_load_score,
         batch_size=batch_size,
+        upper_body_partial=upper_body_partial,
     )

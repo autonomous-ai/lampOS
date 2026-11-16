@@ -214,6 +214,13 @@ Server → client (`PoseResponse`):
 `pose_3d` (TCPFormer lift) and `ergo` (RULA ergonomics) are present only when those
 stages are enabled. See [perceptions.md](perceptions.md#3-pose-estimation).
 
+`ergo` carries `left`, `right`, `score`, `risk_level` and `partial` (bool). `partial`
+is `false` on a full-body score. It is `true` only when `POSE__ERGO_UPPER_BODY_PARTIAL`
+is on and the hips were hidden: neck and arms are scored, trunk and legs are assumed
+neutral (1, `trunk_angle` 0, `"spine"` in `skipped_joints`), so `score` and
+`risk_level` are capped low and the neck subscore carries the signal. Older servers
+omit the field; read a missing `partial` as `false`.
+
 ---
 
 ## Object detection — WebSocket + HTTP

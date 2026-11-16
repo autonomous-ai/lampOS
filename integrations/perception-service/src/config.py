@@ -68,6 +68,8 @@ class PoseSetting(BaseModel):
     lifter_3d_frame_h: int | None = None
     ergo_assessor: ErgoAssessorEnum | None = ErgoAssessorEnum.RULA
     ergo_confidence_threshold: float | None = None
+    # Score the upper body when only the hips are hidden (answer has partial=true).
+    ergo_upper_body_partial: bool = False
     batch_size: int | None = None
     batch_timeout: float | None = None
 

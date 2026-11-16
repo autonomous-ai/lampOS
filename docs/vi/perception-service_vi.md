@@ -66,6 +66,10 @@ RULA của pose chạy trên keypoint 2D. Với đầu vào 2D, góc cổ là đ
 hai vai tới trung điểm hai tai, lấy dấu theo phía khuôn mặt hướng tới (độ lệch x của
 mũi so với trung điểm hai tai), nên đầu thẳng hoặc cúi về trước được điểm cổ 1–3 và chỉ
 khi đầu ngả ra sau từ 5° trở lên mới được 4; góc nhìn chính diện cho góc không dấu.
+RULA cần hông; khi bật `POSE__ERGO_UPPER_BODY_PARTIAL=true` (mặc định tắt), khung hình
+ở bàn làm việc bị che hông nhưng thấy rõ vai, mũi và hai tai được chấm điểm phần thân
+trên (thân và chân coi như trung tính) và câu trả lời `ergo` có `partial: true`; câu trả
+lời đủ thân có `partial: false`, server cũ không gửi field này.
 Phát hiện vật thể OWLv2 chạy bằng hai graph ONNX: graph text biến prompt thành query
 embedding, graph ảnh dùng các embedding đó để phát hiện. Các preset prompt có tên (hiện chỉ
 có `fire_hazard_v1`, 46 prompt nguy cơ cháy mà HAL dùng) được encode một lần khi dlserver

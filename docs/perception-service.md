@@ -64,6 +64,10 @@ Pose RULA runs on the 2D keypoints. For 2D input the neck angle is the shoulder
 midpoint -> ear midpoint line, signed by the side the face points to (the nose's x
 offset from the ear midpoint), so an upright or forward head scores neck 1–3 and only
 a head carried back 5° or more scores 4; a frontal view gives an unsigned angle.
+RULA needs the hips; with `POSE__ERGO_UPPER_BODY_PARTIAL=true` (default off) a desk
+frame with hidden hips but visible shoulders, nose and ears is scored on the upper body
+(trunk and legs assumed neutral) and the `ergo` answer has `partial: true`; full answers
+have `partial: false`, and older servers omit it.
 OWLv2 object detection runs as two ONNX graphs: a text graph turns prompts into query
 embeddings and an image graph detects with them. Named prompt presets (today only
 `fire_hazard_v1`, the 46 fire-hazard prompts HAL uses) are encoded once when dlserver
