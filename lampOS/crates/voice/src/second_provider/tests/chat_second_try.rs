@@ -466,7 +466,11 @@ impl Lamp {
     fn answered(&self) -> Vec<String> {
         self.spoken()
             .into_iter()
-            .filter(|words| !words.contains("slow") && !words.contains("can't answer"))
+            .filter(|words| {
+                !words.contains("slow")
+                    && !words.contains("can't answer")
+                    && !words.contains("usage limit")
+            })
             .collect()
     }
 
