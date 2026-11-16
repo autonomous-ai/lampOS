@@ -266,18 +266,29 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
             ],
         };
     }
-    let (level, message) = if reading >= WARM {
+    // A seated lamp is said seated before any warmth (#7281): a lamp that
+    // seated itself hot shows as that, not as a warm joint.
+    let (level, message) = if let Some((joint, why)) = glimpse.seated {
+        (
+            Level::Warn,
+            if glimpse.seat_rests {
+                format!(
+                    "seated: the {} sat down hot twice in an hour; it stands again by itself once it reads under {} for {} min, or when its head is held a second",
+                    said_as(joint),
+                    crate::body::StrainGuard::COOL,
+                    crate::body::StrainGuard::COOL_FOR.as_secs() / 60
+                )
+            } else {
+                format!(
+                    "seated: the {} retreated twice in an hour ({why}); hold its head a second, or run a health check, to let it stand again",
+                    said_as(joint)
+                )
+            },
+        )
+    } else if reading >= WARM {
         (
             Level::Warn,
             format!("{warmest} is warm: it reads {reading}, and the body stops at 62"),
-        )
-    } else if let Some((joint, why)) = glimpse.seated {
-        (
-            Level::Warn,
-            format!(
-                "seated: the {} retreated twice in an hour ({why}); hold its head a second, or run a health check, to let it stand again",
-                said_as(joint)
-            ),
         )
     } else if let Some(joint) = glimpse.cannot_lift {
         (
@@ -529,6 +540,8 @@ pub struct FoldSaid {
     began: Option<u64>,
     /// The retreats counted when it was last folded (none at the start).
     folded_retreats: u16,
+    /// Of them, those for heat (#7281).
+    folded_hot: u16,
 }
 
 impl FoldSaid {
@@ -551,6 +564,10 @@ impl FoldSaid {
         }
         let retreats = glimpse.retreats.saturating_sub(self.folded_retreats);
         self.folded_retreats = glimpse.retreats;
+        // #7281: heat is said as heat.
+        let hot = glimpse.hot_retreats > self.folded_hot;
+        self.folded_hot = glimpse.hot_retreats;
+        let cause = if hot { "hot" } else { "for a strain" };
         let began = self.began.take()?;
         Some(format!(
             "lamp-body: step {} folded in {:.1} s; arm goals {:?} ended at {:?}; head and base goals {:?} at {:?}; {}",
@@ -562,8 +579,8 @@ impl FoldSaid {
             glimpse.positions,
             match retreats {
                 0 => "nothing retreated since it was last folded".to_owned(),
-                1 => "it sat down for a strain once since it was last folded".to_owned(),
-                sat => format!("it sat down for a strain {sat} times since it was last folded"),
+                1 => format!("it sat down {cause} once since it was last folded"),
+                sat => format!("it sat down {cause} {sat} times since it was last folded"),
             }
         ))
     }
