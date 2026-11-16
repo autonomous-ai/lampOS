@@ -2983,7 +2983,7 @@ mod tests {
     /// (`renew_known`), and may rewrite the same bytes through a temporary
     /// file and a rename; neither is a change, so neither makes the cache
     /// cold. The file removed (nobody known near) is one. Pins the
-    /// journal's reading on lamp-52e6; no switch.
+    /// journal's reading on lamp-74ff; no switch.
     #[test]
     fn a_known_file_renewed_or_rewritten_same_is_no_change() {
         let directory = std::env::temp_dir().join(format!(

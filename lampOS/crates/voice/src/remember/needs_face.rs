@@ -41,7 +41,7 @@ pub const TO_FACE_SAVE: &str = "lamp-voice provider: a remember of the speaker's
 /// (`LAMP_NAME_LEARN_FIX`, #7331), a text that gives the speaker's own name
 /// ([`crate::known_faces::gives_a_name`], or `named::own_name_in` for the
 /// model's "The user's name is ...", never "her/his/your name is") is told to go to the face save
-/// ([`face_save_note`]) in place of [`NOT_KEPT`]: on lamp-52e6 the owner's
+/// ([`face_save_note`]) in place of [`NOT_KEPT`]: on lamp-74ff the owner's
 /// "my name is ..." came back NOT_KEPT while the eyes held their face as
 /// nobody's. The face save takes a fresh look and the eyes judge the face.
 pub(crate) fn withheld(
@@ -205,7 +205,7 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
-    /// #7331 (lamp-52e6, 15 Nov): the owner's "my name is ..." on a line the
+    /// #7331 (lamp-74ff, 16 Nov): the owner's "my name is ..." on a line the
     /// eyes held as nobody's came back NOT_KEPT. With `LAMP_NAME_LEARN_FIX`
     /// a name given while nobody is known goes to the face save, which takes
     /// a fresh look and judges the face; any other personal line is still
