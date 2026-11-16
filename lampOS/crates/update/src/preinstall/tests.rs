@@ -62,9 +62,21 @@ fn a_product_lamp_wants_all_three_by_the_builds_defaults() {
 fn a_switch_off_or_a_lamp_not_the_products_wants_less() {
     let switches = UpdateSwitches::default();
     let off = |name: &'static str| move |asked: &str| (asked == name).then(|| "off".to_owned());
-    assert!(!wanted(true, switches, &off(harness_install::SWITCH)).harness.on);
-    assert!(!wanted(true, switches, &off(hermes_install::SWITCH)).hermes.0);
-    assert!(!wanted(true, switches, &off(openclaw_install::SWITCH)).openclaw.0);
+    assert!(
+        !wanted(true, switches, &off(harness_install::SWITCH))
+            .harness
+            .on
+    );
+    assert!(
+        !wanted(true, switches, &off(hermes_install::SWITCH))
+            .hermes
+            .0
+    );
+    assert!(
+        !wanted(true, switches, &off(openclaw_install::SWITCH))
+            .openclaw
+            .0
+    );
     let skills_off = wanted(true, switches, &off(hermes_install::SKILLS_SWITCH));
     assert!(skills_off.hermes.0 && !skills_off.hermes.1.skills);
     let elsewhere = wanted(false, switches, &none);
@@ -97,7 +109,11 @@ fn an_image_with_none_asks_for_all_three_with_the_rounds_asks() {
     );
     let hermes = json(&records.join(hermes_install::ASK));
     assert_eq!(
-        (hermes["version"].clone(), hermes["skills"].clone(), hermes["tasks"].clone()),
+        (
+            hermes["version"].clone(),
+            hermes["skills"].clone(),
+            hermes["tasks"].clone()
+        ),
         (1.into(), true.into(), true.into()),
         "{hermes}"
     );
@@ -105,7 +121,11 @@ fn an_image_with_none_asks_for_all_three_with_the_rounds_asks() {
     assert_eq!(hermes.get("remove"), None, "{hermes}");
     let openclaw = json(&records.join(openclaw_install::ASK));
     assert_eq!(
-        (openclaw["version"].clone(), openclaw["skills"].clone(), openclaw["one_path"].clone()),
+        (
+            openclaw["version"].clone(),
+            openclaw["skills"].clone(),
+            openclaw["one_path"].clone()
+        ),
         (1.into(), true.into(), true.into()),
         "{openclaw}"
     );
@@ -143,4 +163,67 @@ fn harness_off_asks_for_nothing() {
     assert!(ask_missing(&root, &records, &wanted).is_err());
     assert_eq!(fs::read_dir(&records).unwrap().count(), 0);
     fs::remove_dir_all(&root).unwrap();
+}
+
+/// OpenClaw's gateway unit is written as a round writes it, so its install
+/// finds the unit this build's; written once, it is not written again. With
+/// OpenClaw off, no unit.
+#[test]
+fn openclaw_s_gateway_unit_is_written_as_a_round_writes_it() {
+    let root = folder("unit");
+    // An image's root has systemd's folder, as every lamp's does.
+    fs::create_dir_all(root.join("etc/systemd/system")).unwrap();
+    let switches = UpdateSwitches {
+        engines: true,
+        tasks: true,
+        one_path: true,
+    };
+    let wanted = wanted(true, switches, &none);
+    assert_eq!(write_units(&root, &wanted), Ok(true));
+    let unit = root.join("etc/systemd/system").join(openclaw_install::UNIT);
+    assert_eq!(
+        fs::read_to_string(&unit).unwrap(),
+        openclaw_install::unit_text_for(wanted.openclaw.1)
+    );
+    assert_eq!(write_units(&root, &wanted), Ok(false));
+    fs::remove_dir_all(&root).unwrap();
+
+    let root = folder("unit-off");
+    fs::create_dir_all(root.join("etc/systemd/system")).unwrap();
+    let off = |asked: &str| (asked == openclaw_install::SWITCH).then(|| "off".to_owned());
+    let wanted = super::wanted(true, switches, &off);
+    assert_eq!(write_units(&root, &wanted), Ok(false));
+    assert!(
+        !root
+            .join("etc/systemd/system")
+            .join(openclaw_install::UNIT)
+            .exists()
+    );
+    fs::remove_dir_all(&root).unwrap();
+}
+
+/// On an image, a `systemctl` command is said and skipped as done; every
+/// other command runs as given.
+#[test]
+fn on_an_image_systemctl_is_skipped_and_the_rest_runs() {
+    let mut ran = Vec::new();
+    let mut run = |args: &[String]| {
+        ran.push(args.join(" "));
+        Ok::<_, String>("out".to_owned())
+    };
+    let mut skipped = Vec::new();
+    {
+        let mut image = on_image(&mut run, &mut skipped);
+        let args = |text: &str| text.split(' ').map(str::to_owned).collect::<Vec<_>>();
+        assert_eq!(
+            image(&args("systemctl restart lamp-openclaw-gateway.service")),
+            Ok(String::new())
+        );
+        assert_eq!(
+            image(&args("runuser -u lampos -- true")),
+            Ok("out".to_owned())
+        );
+    }
+    assert_eq!(skipped, ["systemctl restart lamp-openclaw-gateway.service"]);
+    assert_eq!(ran, ["runuser -u lampos -- true"]);
 }
