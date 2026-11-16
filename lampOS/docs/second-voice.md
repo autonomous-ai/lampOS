@@ -4007,6 +4007,22 @@ after a take-over, but now for every turn:
   function. Only English replies can match: in another language the
   model's words are never the acting part's English lines. Tests:
   `second_provider::tests::action_claim::*` and `action_claim::tests::*`.
+  **A short reply that echoes the ask** (#7285, `action_claim::echoed_claim`:
+  lamp-52e6 core w2 on 13333, 13417 and 13495, "Hold on, hey Lamp, make the
+  light a little warmer." answered in three words with `calls=none`, and
+  the light row's colour ask answered in four): the phrase runs read a
+  reply by its wording, so a wording they don't list went out unchecked.
+  On a spoken line not asked as a question that names an action
+  (`action_claim::ECHOED`: warm, cool, dim, bright, loud, quiet, soft, a
+  colour by name, a timer, alarm, reminder or snooze), a reply whose first
+  sentence past lead words ("Okay.") has at most six words, names an action
+  of the same kind, has no hedge ("can't", "not", "if", "want", …) and no
+  '?' is a claim of that kind ("Warming that up.", "Blue it is."), held and
+  asked again as above. It judges only a turn with no call: beside a call
+  the other runs judge as before. A line that names no
+  action is decided at once, so its reply is not held; a short reply on one
+  that does waits only for its first sentence's end. The journal adds
+  `, the reply echoing the line's ask`.
   **The unplug's acts** (#6457, `Claim::Unplug`): a reply opening with the
   unplug's own acts in the model's words (`action_claim::UNPLUGGED`:
   "I'm preparing to fold — please wait …", "Still preparing …",

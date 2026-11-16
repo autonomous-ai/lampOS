@@ -607,18 +607,159 @@ pub fn claim_as(reply: &str, ended: bool, worded: bool) -> Option<Option<Claim>>
     }
 }
 
-/// [`claim_as`], and with `forget` (the line asks to forget) a forget said
-/// done ([`forget_claim`], [`Claim::Forgot`]) too. Without `forget` this is
+/// [`claim_as`], with `forget` (the line asks to forget) a forget said
+/// done ([`forget_claim`], [`Claim::Forgot`]) too, and with `line` (the
+/// person's spoken line, not asked as a question) a short reply that echoes
+/// the action it asks for ([`echoed_claim`], #7285). Without either this is
 /// [`claim_as`] exactly.
-pub fn claim_on(reply: &str, ended: bool, worded: bool, forget: bool) -> Option<Option<Claim>> {
-    let found = claim_as(reply, ended, worded);
-    if !forget || matches!(found, Some(Some(_))) {
+pub fn claim_on(
+    reply: &str,
+    ended: bool,
+    worded: bool,
+    forget: bool,
+    line: Option<&str>,
+) -> Option<Option<Claim>> {
+    let mut found = claim_as(reply, ended, worded);
+    if forget && !matches!(found, Some(Some(_))) {
+        found = match (found, forget_claim(reply, ended)) {
+            (_, Some(true)) => Some(Some(Claim::Forgot)),
+            (Some(None), Some(false)) => Some(None),
+            _ => None,
+        };
+    }
+    let Some(line) = line else {
+        return found;
+    };
+    if matches!(found, Some(Some(_))) {
         return found;
     }
-    match (found, forget_claim(reply, ended)) {
-        (_, Some(true)) => Some(Some(Claim::Forgot)),
-        (Some(None), Some(false)) => Some(None),
+    match (found, echoed_claim(reply, line, ended)) {
+        (_, Some(Some(kind))) => Some(Some(kind)),
+        (Some(None), Some(None)) => Some(None),
         _ => None,
+    }
+}
+
+/// The words that name an action a person asks for and a reply may echo
+/// ([`echoed_claim`]): a stem any word opening with it matches ("warm":
+/// warmer, warming), or a whole word (`false`: "red" is not "ready"), and
+/// the kind of call that backs it.
+const ECHOED: [(&str, bool, Claim); 21] = [
+    ("warm", true, Claim::LightOrVolume),
+    ("cool", true, Claim::LightOrVolume),
+    ("dim", true, Claim::LightOrVolume),
+    ("bright", true, Claim::LightOrVolume),
+    ("loud", true, Claim::LightOrVolume),
+    ("quiet", true, Claim::LightOrVolume),
+    ("soft", true, Claim::LightOrVolume),
+    ("white", false, Claim::LightOrVolume),
+    ("orange", false, Claim::LightOrVolume),
+    ("yellow", false, Claim::LightOrVolume),
+    ("red", false, Claim::LightOrVolume),
+    ("pink", false, Claim::LightOrVolume),
+    ("purple", false, Claim::LightOrVolume),
+    ("violet", false, Claim::LightOrVolume),
+    ("blue", false, Claim::LightOrVolume),
+    ("cyan", false, Claim::LightOrVolume),
+    ("green", false, Claim::LightOrVolume),
+    ("timer", true, Claim::ReminderTime),
+    ("alarm", true, Claim::ReminderTime),
+    ("remind", true, Claim::ReminderTime),
+    ("snooz", true, Claim::Snoozed),
+];
+
+/// The most words an echoing sentence has: a longer one is talk, a story
+/// or an explanation, never a bare "Warming that up." (3 words on 13417,
+/// 4 on 13495's light row).
+// ponytail: a word count, not a parse; a story asked about "a blue fox"
+// that opens in six words or fewer naming blue is held once. Read the
+// line's verb if a journal shows that.
+const ECHO_WORDS: usize = 6;
+
+/// Words that make a sentence no claim: a refusal, a condition or an offer
+/// ("I can't make it warmer.", "If you want, warmer.", "Want it warmer?").
+/// Any word ending in "n't" counts too.
+const HEDGES: [&str; 11] = [
+    "not", "cannot", "sorry", "unable", "if", "when", "want", "should", "would", "could", "maybe",
+];
+
+/// The kind of the action `word` names, if it names one ([`ECHOED`]).
+fn echoed_kind(word: &str) -> Option<Claim> {
+    ECHOED
+        .iter()
+        .find(|(stem, prefix, _)| {
+            if *prefix {
+                word.starts_with(stem)
+            } else {
+                word == *stem
+            }
+        })
+        .map(|(_, _, kind)| *kind)
+}
+
+/// A text's words, apostrophes kept ("can't").
+fn words_in(text: &str) -> Vec<&str> {
+    text.split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .collect()
+}
+
+/// Whether `reply` echoes the action the person's `line` asked for (#7285,
+/// lamp-52e6 core w2 on 13333, 13417 and 13495: "Hold on, hey Lamp, make
+/// the light a little warmer." answered in three words, 16 characters, with
+/// `calls=none`; and the light row's six-word ask answered in four words,
+/// no call). The phrase runs above ([`PROMISED`], [`WORDED`]) read a reply
+/// by its wording, so any wording they don't list ("Warming that up.",
+/// "Blue it is.") went out unchecked. This reads it by what it is about: the
+/// line names an action ([`ECHOED`]: a step, a colour, a timer, a reminder,
+/// a snooze), and the reply's first sentence with more than lead words
+/// ([`LEAD_WORDS`]) is short ([`ECHO_WORDS`]), names an action of the same
+/// kind, does not end in a '?' and has no hedge ([`HEDGES`]). Such a reply
+/// is a claim of that kind: with no call in the turn it is held and asked
+/// again, as the phrase runs' claims are. The caller gives only a spoken
+/// line not asked as a question ([`asked_as_a_question`]), so "What colour
+/// is your light?" answered "Blue." is said. `None` until that sentence
+/// ends (`ended`: no more text comes) or is too long to be one.
+pub fn echoed_claim(reply: &str, line: &str, ended: bool) -> Option<Option<Claim>> {
+    let line = normalised(line);
+    let asked: Vec<Claim> = words_in(&line)
+        .into_iter()
+        .filter_map(echoed_kind)
+        .collect();
+    if asked.is_empty() {
+        return Some(None);
+    }
+    let text = normalised(reply);
+    let mut rest = text.as_str();
+    loop {
+        let (sentence, mark, after) = match rest.find(['.', '!', '?']) {
+            Some(at) => (&rest[..at], rest[at..].chars().next(), &rest[at + 1..]),
+            None if ended => (rest, None, ""),
+            // Too long already to be a short claim: said as it streams.
+            None if words_in(rest).len() > ECHO_WORDS => return Some(None),
+            None => return None,
+        };
+        let all = words_in(sentence);
+        if all.iter().all(|word| LEAD_WORDS.contains(word)) {
+            if after.trim().is_empty() {
+                return ended.then_some(None);
+            }
+            rest = after;
+            continue;
+        }
+        if mark == Some('?')
+            || all.len() > ECHO_WORDS
+            || all
+                .iter()
+                .any(|word| HEDGES.contains(word) || word.ends_with("n't"))
+        {
+            return Some(None);
+        }
+        return Some(
+            all.iter()
+                .filter_map(|word| echoed_kind(word))
+                .find(|kind| asked.contains(kind)),
+        );
     }
 }
 
@@ -2567,6 +2708,44 @@ pub(crate) mod tests {
     }
 
     /// C88: a forget said done, and what says nothing went.
+    /// #7285: a short reply echoing the action the line asked for is a
+    /// claim of that kind, whatever its wording; waits for its sentence's
+    /// end; never on a refusal, an offer, a long sentence or a line that
+    /// names no action.
+    #[test]
+    fn a_short_reply_echoing_the_ask_is_a_claim() {
+        let warm = "Hold on. Hey, Lamp. Make the light a little warmer.";
+        let light = Some(Some(Claim::LightOrVolume));
+        for reply in ["Warming that up.", "Okay. Warmer it is!", "Bright and warm"] {
+            assert_eq!(echoed_claim(reply, warm, true), light, "{reply}");
+            assert_eq!(claim_on(reply, true, false, false, Some(warm)), light);
+            assert_eq!(claim_on(reply, true, false, false, None), Some(None));
+        }
+        assert_eq!(echoed_claim("Warming", warm, false), None);
+        assert_eq!(echoed_claim("Okay.", warm, false), None);
+        assert_eq!(
+            echoed_claim("Set a timer.", "Lamp, set a timer for ten minutes.", true),
+            Some(Some(Claim::ReminderTime))
+        );
+        for reply in [
+            "I can't make it warmer.",
+            "Want it warmer?",
+            "If you like, warmer.",
+            "Okay.",
+            "The story goes on, and the fire grew warm and bright.",
+            "Sure, one moment.",
+        ] {
+            assert_eq!(echoed_claim(reply, warm, true), Some(None), "{reply}");
+        }
+        // A line that names no action: decided at once.
+        assert_eq!(echoed_claim("Warm", "Tell me a story.", false), Some(None));
+        // Another kind than the line's: a timer asked, the light said.
+        assert_eq!(
+            echoed_claim("Warmer.", "Set a timer for one minute.", true),
+            Some(None)
+        );
+    }
+
     #[test]
     fn a_forget_said_done_is_read_from_its_first_sentence() {
         for reply in [
@@ -2579,13 +2758,13 @@ pub(crate) mod tests {
         ] {
             assert_eq!(forget_claim(reply, true), Some(true), "{reply}");
             assert_eq!(
-                claim_on(reply, true, false, true),
+                claim_on(reply, true, false, true, None),
                 Some(Some(Claim::Forgot)),
                 "{reply}"
             );
             // Not on a line that does not ask to forget.
             assert_ne!(
-                claim_on(reply, true, false, false),
+                claim_on(reply, true, false, false, None),
                 Some(Some(Claim::Forgot))
             );
         }
