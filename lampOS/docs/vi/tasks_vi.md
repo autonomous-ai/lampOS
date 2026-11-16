@@ -2392,3 +2392,69 @@ khi hỏi phần tasks:
   said that is not part of it." Các từ bị bỏ không bao giờ được nêu lại. Mỗi request chỉ từ chối một lần:
   lần gọi thứ hai trong cùng request được cho qua, nên người dùng không bao
   giờ bị kẹt.
+
+## Các bước của agent (`tasks/step`, #7267, tắt trừ khi `LAMP_TASKS_STEPS=on`)
+
+Khi một việc do lamp-tasks giao cho OpenClaw của chính đèn đang được theo
+dõi, lamp-tasks đọc transcript của phiên đó mỗi giây một lần và đưa từng
+bước lên bus thành `tasks/step` (`TaskStep`, `crates/tasks/src/steps.rs`).
+
+- **Công tắc:** `LAMP_TASKS_STEPS`, đúng chữ `on`. Tắt nếu không đặt, và
+  tắt trong unit sản phẩm (dòng trong `deploy/product/lamp-tasks.service`
+  để ở dạng comment). Khi tắt, không đọc gì, topic không được khai báo, và
+  phần lưu trữ không chuyển danh sách việc đang theo dõi sang.
+- **Transcript ở đâu:** OpenClaw 2026.11 lưu transcript trong SQLite, không
+  phải trong file (đã đọc trên 52e6 ngày 16/11).
+  - Database là `<state>/agents/<agent>/agent/openclaw-agent.sqlite`.
+    `<state>` là `/var/lib/lampos-openclaw/state`, hoặc
+    `LAMP_TASKS_STEPS_STATE` (đường dẫn tuyệt đối) nếu có đặt.
+  - Database được mở chỉ đọc (`mode=ro`, không dùng `immutable` vì
+    OpenClaw ghi ở chế độ WAL), không đi qua link, và chờ tối đa 100 ms khi
+    database đang bận.
+- **Phiên nào:** là dòng `session_nodes` có `session_key` kết thúc bằng
+  `:harness-<agentId>`. Trên 52e6, key có đúng dạng
+  `agent:main:harness-<uuid>`. Các sự kiện là những dòng `transcript_events`
+  có `current_session_id` của dòng đó, đọc theo `seq`.
+- **Khi không đọc được database:** nếu database bị khóa, không có, hoặc
+  thiếu bảng hay cột cần đọc, thì không đăng gì, và journal ghi một dòng.
+  Một lần đọc lỗi không bao giờ được hiểu là "không có phiên". Nếu không
+  đọc được điểm bắt đầu của việc lúc việc được theo dõi lần đầu, việc đó
+  chưa có điểm bắt đầu: không đọc gì cho nó, và một giây sau đọc lại điểm
+  bắt đầu. Điểm bắt đầu không bao giờ được lấy là 0 hay cả phiên. Một lần
+  đọc lỗi về sau thì không đăng gì, và không đặt lại hay dời vị trí đã đọc.
+- **Chỉ lời của chính việc đó:** mỗi việc bắt đầu sau `seq` lớn nhất của
+  phiên vào lúc việc được theo dõi lần đầu. Không đọc gì tới `seq` đó, kể
+  cả với việc giao từ lần khởi động trước. Khi một việc mới bắt đầu trên
+  cùng phiên, việc cũ chỉ đọc tới chỗ việc mới bắt đầu.
+- **Cái gì thành một bước:**
+  - Mỗi `toolCall` thành `call`, được đăng ngay với `ok` trống (đang
+    chạy). `args` là `arguments.command`, hoặc JSON gọn của các tham số.
+  - Khi đọc thấy `toolResult`, cùng số bước đó được đăng lại với `result`
+    và `ok`. Bản mới nhất của mỗi `(task, n)` là bản có hiệu lực.
+  - Lời trả lời của agent thành `reply`, với `tool` trống.
+  - `stopReason: "error"` hoặc `errorMessage` thành `error`.
+  - Lời nhờ của người dùng (role `user`) không bao giờ được đăng.
+  - Bỏ qua các loại sự kiện khác.
+  - Thời gian là `timestamp` dạng số của message, nếu không có thì là
+    `created_at` của dòng. Sự kiện không có thời gian nào thì bỏ qua.
+- **Sự kiện nén:** dòng có `event_json` trống và dữ liệu trong
+  `event_zstd` (27 trên 115 dòng ở 52e6, là các kết quả tool lớn) được giải
+  nén bằng `ruzstd` 0.7.3, thư viện thuần Rust, không cần build C. Việc
+  giải nén chạy theo luồng và dừng ở 64 KiB + 1 byte, không bao giờ giải
+  nén thêm. Dòng giải nén ra quá 64 KiB, hoặc bị hỏng, thì bị bỏ qua và
+  được đếm.
+- **Không kỹ năng nào được đọc:** `tasks/step` nằm trong `NEVER_READ` của
+  `lamp-skills`.
+- **Giới hạn:**
+  - Tối đa 50 bước một việc; các bước sau bị bỏ và được đếm.
+  - Mỗi lần đọc (mỗi giây) lấy tối đa 200 sự kiện và 256 KiB chữ, cho mọi việc cộng lại; phần còn lại chờ lần đọc sau.
+  - Sự kiện dài quá 256 KiB thì bị bỏ qua.
+- **Không lưu gì:** không ghi gì, và database không bao giờ được mở để
+  ghi. Vị trí chỉ nằm trong bộ nhớ; sự kiện trên bus là bản duy nhất.
+- **Độ trễ:** bước lên bus trong vòng 1 s, và lên trang peek trong khoảng
+  2 s. Peek chỉ hiện bước ở chế độ monitor.
+
+Fixture `crates/tasks/tests/fixtures/openclaw-session-research.jsonl` có
+mỗi dòng là một `event_json`, mọi chữ đều là chữ bịa ra. Test nạp nó vào một
+database SQLite có các bảng của OpenClaw. Đây là bản tạm (placeholder) cho
+tới khi có dòng thật đã lược bớt. Chưa thử trên đèn.

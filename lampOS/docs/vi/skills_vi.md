@@ -3559,7 +3559,10 @@ thấy, một sự kiện) và `humans/posture` (độ dài cửa sổ, tỉ l�
 và vùng xấu nhiều nhất) ([msgs.md](../msgs.md)). `lamp-seen` sẽ phát chúng,
 đến cùng giai đoạn 2 và 3 của #6543. Kỹ năng ghi một chủ đề này trong
 `[permissions] topics` hiện quyền dùng `seen`, riêng tư
-([cloud.md](../cloud.md)). Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
+([cloud.md](../cloud.md)). Riêng `tasks/step` (các bước của agent, mang lời
+của tool, #7267) nằm trong `NEVER_READ`: không kỹ năng nào được đọc, và kỹ
+năng nào ghi nó trong `[permissions] topics` đều bị từ chối lúc nạp
+(`[permissions] topics: tasks/step is never a skill's to read`). Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
 lúc đến bàn khi chưa thấy gì, nên `[[while]] topic = "humans/doing" field =
 "drank_s_ago" above = 5399 unknown = "holds_stale"` vẫn đúng với người đèn
 chưa thấy uống, như khi chỉ có đồng hồ; mỗi giá trị `humans/posture` được
