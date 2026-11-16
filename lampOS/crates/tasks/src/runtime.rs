@@ -4869,17 +4869,30 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         None
     };
     let mut status_published = 0u64;
-    // An OpenClaw task's own steps (#7267): with `LAMP_TASKS_STEPS=on` only;
-    // off, no reader and the topic is not touched.
-    let mut steps = match crate::steps::switched(
+    // An OpenClaw task's own steps (#7267): with `LAMP_TASKS_STEPS=on` only,
+    // on a thread of their own, never on this accept loop; off, no reader
+    // and the topic is not touched.
+    let _steps = match crate::steps::switched(
         std::env::var(crate::steps::SWITCH).ok().as_deref(),
         crate::steps::roots(std::env::var(crate::steps::STATE_SETTING).ok().as_deref()),
     ) {
-        Some(reader) => Some((
-            reader,
-            bus.publisher_declared(TaskStep::TOPIC, &TaskStep::declaration(), "tasks")?,
-            Instant::now(),
-        )),
+        Some(reader) => {
+            let mut out =
+                bus.publisher_declared(TaskStep::TOPIC, &TaskStep::declaration(), "tasks")?;
+            let report = current.clone();
+            let mut errors = 0u64;
+            Some(crate::steps::spawn(
+                reader,
+                move || {
+                    report
+                        .lock()
+                        .map(|report| report.watched.clone())
+                        .unwrap_or_default()
+                },
+                move |step| publish(&mut out, step, &mut errors),
+                stop.clone(),
+            )?)
+        }
         None => None,
     };
     let _stopping = StopOnDrop(stop.clone());
@@ -5047,12 +5060,6 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
             {
                 publish(out, status.as_ref(), &mut errors);
                 status_published = *number;
-            }
-            if let Some((reader, out, began)) = steps.as_mut() {
-                let now_ms = u64::try_from(began.elapsed().as_millis()).unwrap_or(u64::MAX);
-                for step in reader.tick(&report.watched, now_ms, unix_ms()) {
-                    publish(out, &step, &mut errors);
-                }
             }
             let ready = report.updated.elapsed() <= STALE_AFTER
                 && !owner.is_finished()

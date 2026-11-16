@@ -712,6 +712,33 @@ fn the_serve_loop_never_reads_steps() {
     assert!(runtime.contains("crate::steps::spawn("));
 }
 
+/// The steps' own thread publishes a step within 2 s of its event, and
+/// ends when asked to stop.
+#[test]
+fn the_steps_thread_publishes_and_stops() {
+    use std::sync::{Arc, atomic::AtomicBool, mpsc};
+    let lamp = Lamp::with("");
+    let stop = Arc::new(AtomicBool::new(false));
+    let (sent, got) = mpsc::channel();
+    let thread = spawn(
+        lamp.steps(),
+        || watched(None),
+        move |step| {
+            let _ = sent.send(step.clone());
+        },
+        stop.clone(),
+    )
+    .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    let written = std::time::Instant::now();
+    lamp.append(&call("c1", "exec", 5));
+    let step = got.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
+    assert!(written.elapsed() <= std::time::Duration::from_secs(2));
+    assert_eq!(step.tool, "exec");
+    stop.store(true, std::sync::atomic::Ordering::Release);
+    thread.join().unwrap();
+}
+
 /// Thirteen's HOLD: SQLite's NOFOLLOW refuses a link anywhere in the path,
 /// so a state folder reached through a link (a data partition) must still
 /// be read; only what lies under it must not be a link.
@@ -740,7 +767,10 @@ fn secrets_in_args_and_results_are_redacted() {
             r#"{"command":"export X_API_KEY=hunter2 && run"}"#,
             "hunter2",
         ),
-        (r#"{"url":"https://example.org","api_key":"hunter3"}"#, "hunter3"),
+        (
+            r#"{"url":"https://example.org","api_key":"hunter3"}"#,
+            "hunter3",
+        ),
         (
             r#"{"command":"echo sk-proj-AbCdEf0123456789xyz"}"#,
             "sk-proj-AbCdEf0123456789xyz",

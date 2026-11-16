@@ -75,6 +75,41 @@ pub fn switched(value: Option<&str>, roots: Vec<PathBuf>) -> Option<Steps> {
     (value == Some("on")).then(|| Steps::new(roots))
 }
 
+/// How often the steps' own thread looks at the watch: a task new to it is
+/// marked at most this long after the store's owner lists it.
+const LOOK_EVERY: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// `steps` run on a thread of their own (`tasks-steps`), never on the
+/// accept loop that serves the voice's socket: every [`LOOK_EVERY`] it takes
+/// the tasks watched now from `watched` and hands each step read, checked
+/// against its type's caps, to `publish`. Ends once `stop` is set.
+pub fn spawn(
+    mut steps: Steps,
+    watched: impl Fn() -> Vec<Watched> + Send + 'static,
+    mut publish: impl FnMut(&TaskStep) + Send + 'static,
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> std::io::Result<std::thread::JoinHandle<()>> {
+    std::thread::Builder::new()
+        .name("tasks-steps".into())
+        .spawn(move || {
+            let began = std::time::Instant::now();
+            while !stop.load(std::sync::atomic::Ordering::Acquire) {
+                let now_ms = u64::try_from(began.elapsed().as_millis()).unwrap_or(u64::MAX);
+                let wall_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |since| {
+                        u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
+                    });
+                for step in steps.tick(&watched(), now_ms, wall_ms) {
+                    if step.check().is_ok() {
+                        publish(&step);
+                    }
+                }
+                std::thread::sleep(LOOK_EVERY);
+            }
+        })
+}
+
 /// Whether [`SWITCH`] is on in this process's environment, read once: the
 /// store's owner hands the watched tasks over only then.
 pub fn on() -> bool {
@@ -340,6 +375,12 @@ pub fn session(roots: &[PathBuf], agent: &str) -> Result<Option<(PathBuf, String
     let wanted = format!(":harness-{}", agent.to_ascii_lowercase());
     let mut unread = false;
     for state in roots {
+        // SQLite's NOFOLLOW refuses a link anywhere in the path: the state
+        // folder is taken as it really is (a data partition, a moved
+        // folder), and only what lies under it must not be a link.
+        let Ok(state) = fs::canonicalize(state) else {
+            continue;
+        };
         let folder = state.join("agents");
         if fs::symlink_metadata(&folder).is_err() {
             continue;
@@ -568,10 +609,99 @@ fn decoded(blob: &[u8]) -> Result<String, &'static str> {
     String::from_utf8(bytes).map_err(|_| CORRUPT)
 }
 
-/// Whitespace runs as one space, then cut on a whole character.
+/// Whitespace runs as one space, secrets redacted ([`redacted`]), then cut
+/// on a whole character.
 fn short(text: &str, most: usize) -> String {
-    let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    cut_whole_chars(&flat, most).to_owned()
+    cut_whole_chars(&redacted(text), most).to_owned()
+}
+
+/// Whether a name (`API_KEY`, `"token"`) says its value is a secret.
+fn secret_name(name: &str) -> bool {
+    let name = name.to_ascii_uppercase();
+    [
+        "KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "AUTH", "COOKIE",
+    ]
+    .iter()
+    .any(|part| name.contains(part))
+}
+
+/// A call's arguments with the value of every key named like a secret
+/// ([`secret_name`]) replaced by `***`, at any depth.
+fn redact_json(value: &Value) -> Value {
+    match value {
+        Value::Object(fields) => Value::Object(
+            fields
+                .iter()
+                .map(|(name, inner)| {
+                    let inner = if secret_name(name) && !inner.is_object() && !inner.is_array() {
+                        Value::String("***".into())
+                    } else {
+                        redact_json(inner)
+                    };
+                    (name.clone(), inner)
+                })
+                .collect(),
+        ),
+        Value::Array(items) => Value::Array(items.iter().map(redact_json).collect()),
+        other => other.clone(),
+    }
+}
+
+/// `text` with whitespace runs as one space and what looks like a secret
+/// replaced by `***` (Heron's read on #7286): the word after `Bearer` or
+/// `Basic`, the value of `NAME=value` or `NAME: value` whose name says
+/// secret, and a token-shaped word (24 or more letters, digits, `-` or `_`
+/// with both a letter and a digit, or a known key prefix). Words matched,
+/// not understood: a long hash or id is hidden too.
+fn redacted(text: &str) -> String {
+    let mut out: Vec<String> = Vec::new();
+    let mut hide_next = false;
+    for word in text.split_whitespace() {
+        let bare =
+            word.trim_matches(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '-'));
+        let shown = if hide_next && !bare.is_empty() {
+            "***".to_owned()
+        } else if let Some((name, value)) = word.split_once('=')
+            && secret_name(name)
+            && !value.is_empty()
+        {
+            format!("{name}=***")
+        } else if token_shaped(bare) {
+            word.replacen(bare, "***", 1)
+        } else {
+            word.to_owned()
+        };
+        hide_next = bare.eq_ignore_ascii_case("bearer")
+            || bare.eq_ignore_ascii_case("basic")
+            || (word.ends_with(':') && secret_name(bare));
+        out.push(shown);
+    }
+    out.join(" ")
+}
+
+/// A word that looks like a key or token.
+fn token_shaped(word: &str) -> bool {
+    let known = [
+        "sk-",
+        "sk_",
+        "ghp_",
+        "gho_",
+        "ghs_",
+        "github_pat_",
+        "xoxb-",
+        "xoxp-",
+        "AKIA",
+        "AIza",
+    ]
+    .iter()
+    .any(|prefix| word.starts_with(prefix) && word.len() >= 16);
+    let long = word.len() >= 24
+        && word
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        && word.chars().any(|c| c.is_ascii_digit())
+        && word.chars().any(|c| c.is_ascii_alphabetic());
+    known || long
 }
 
 /// The text parts of a message's `content`, joined.
@@ -669,7 +799,7 @@ fn steps_of(
                 let args = match arguments["command"].as_str() {
                     Some(command) => command.to_owned(),
                     None if arguments.is_null() => String::new(),
-                    None => arguments.to_string(),
+                    None => redact_json(arguments).to_string(),
                 };
                 if let Some(n) = push(tail, None, StepKind::Call, tool, &args, "", None)
                     && let Some(id) = call["id"].as_str()
