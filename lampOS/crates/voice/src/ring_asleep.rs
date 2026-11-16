@@ -47,6 +47,15 @@ pub const TAP_FADE: Duration = Duration::from_millis(250);
 /// with `LAMP_REMINDER_PULSE=on`, and only where the asleep face is shown.
 pub const PULSE_SWITCH: &str = "LAMP_REMINDER_PULSE";
 
+/// The switch for the restart guard's sign on the asleep face (#7224): only
+/// with `LAMP_GUARD_SIGN=on`, and only where the asleep face is shown.
+pub const GUARD_SWITCH: &str = "LAMP_GUARD_SIGN";
+
+/// How long after the muted wait first finds the guard's mute its first
+/// pulse comes: once the face has waited and faded in ([`AFTER`],
+/// [`FADE_IN`]), so the first is seen whole.
+pub const GUARD_FIRST_AFTER: Duration = AFTER.saturating_add(FADE_IN);
+
 /// How a reminder owed while the microphones are off shows on the asleep
 /// face (#1545): one soft arc around the ring, taking `takes`, the first
 /// when it became owed and then one each `every`, and none once it has
@@ -87,12 +96,24 @@ pub fn pulse_enabled_from_environment() -> bool {
     enabled(std::env::var(PULSE_SWITCH).ok().as_deref())
 }
 
+/// Whether the guard's sign is on in this process's environment (#7224).
+pub fn guard_enabled_from_environment() -> bool {
+    guard_enabled(std::env::var(GUARD_SWITCH).ok().as_deref())
+}
+
+/// Whether the guard sign's switch's value turns it on: only `on`.
+pub fn guard_enabled(value: Option<&str>) -> bool {
+    enabled(value)
+}
+
 /// What the muted wait tells the asleep face at each look (#1545): since
 /// when the reminder owed has been owed, while its pulse may show now, and
 /// nothing otherwise; and whether its sleep still hears its name
-/// (migrate-P2, [`Owed::hear_name`]). The painter reads it each frame.
+/// (migrate-P2, [`Owed::hear_name`]); and since when the restart guard's
+/// mute has held, for its pulse (#7224, [`Owed::guard`]). The painter reads
+/// it each frame.
 #[derive(Debug, Default)]
-pub struct Owed(Mutex<Option<Instant>>, AtomicBool);
+pub struct Owed(Mutex<Option<Instant>>, AtomicBool, Mutex<Option<Instant>>);
 
 /// One breath of the ember a sleep that hears its name shows (migrate-P2):
 /// slower than nothing else on the ring, so it reads as resting.
@@ -125,6 +146,52 @@ impl Owed {
     pub fn showing(&self) -> Option<Instant> {
         self.0.lock().ok().and_then(|owed| *owed)
     }
+
+    /// The restart guard's mute holds, its pulses from `since` on, or no
+    /// longer (none): the face then pulses as [`guard_around`] says (#7224).
+    pub fn guard(&self, since: Option<Instant>) {
+        if let Ok(mut guard) = self.2.lock() {
+            *guard = since;
+        }
+    }
+
+    /// From when the guard's pulses come, while its mute holds.
+    pub fn guarded(&self) -> Option<Instant> {
+        self.2.lock().ok().and_then(|guard| *guard)
+    }
+}
+
+/// How far through a pulse of the guard's (0 to 1) the face is at `now`,
+/// if one is showing (#7224): as `pulses` say ([`Pulses::OWED`]'s look on a
+/// lamp, 4 s once a minute), from the time `owed` was told, with no end
+/// while the guard's mute holds, and none before that time.
+pub fn guard_around(owed: &Owed, pulses: Pulses, now: Instant) -> Option<f32> {
+    let since = owed.guarded().filter(|since| *since <= now)?;
+    Pulses {
+        for_at_most: Duration::MAX,
+        ..pulses
+    }
+    .around(since, now)
+}
+
+/// The asleep face `breath` of the way up a breath, with the restart guard's
+/// pulse `around` of the way through (#7224): the whole ring swells in the
+/// offline breath's amber ([`crate::ring_face::OFFLINE_TINT`]) and back,
+/// eased, its red at most the face's own [`PEAK`]; where it and the face
+/// meet the brighter shows. Slow and dim, so it reads as a sleeper stirring,
+/// not an alarm.
+pub fn guard_pixels(breath: f32, around: f32) -> [lamp_ring::Rgb; lamp_ring::PIXEL_COUNT] {
+    let swell = (std::f32::consts::PI * around.clamp(0.0, 1.0)).sin();
+    let top = f32::from(PEAK.red);
+    let [red, green, blue] =
+        crate::ring_face::OFFLINE_TINT.map(|share| (top * share * swell).round() as u8);
+    lamp_ring::asleep::asleep_pixels(breath).map(|pixel| {
+        lamp_ring::Rgb::new(
+            pixel.red.max(red),
+            pixel.green.max(green),
+            pixel.blue.max(blue),
+        )
+    })
 }
 
 /// Whether the switch is on in this process's environment.
@@ -412,11 +479,14 @@ fn paint<S: FrameSink>(
     while !stop.load(Ordering::SeqCst) {
         let since = began.elapsed();
         let (breath, under) = (breath_at(since), ceiling_at(since, ceiling));
-        let around = owed
-            .showing()
-            .and_then(|since| pulses.around(since, Instant::now()));
+        let now = Instant::now();
+        let around = owed.showing().and_then(|since| pulses.around(since, now));
         let shown = match around {
             Some(around) => ring.show_owed(breath, around, under),
+            // The restart guard's mute (#7224, `LAMP_GUARD_SIGN=on`).
+            None if let Some(guard) = guard_around(owed, pulses, now) => {
+                ring.show_light(&guard_pixels(breath, guard), under)
+            }
             // A sleep that hears its name keeps an ember lit (migrate-P2).
             None if owed.hearing_name() => ring.show_hearing_name(breath, ember_at(since), under),
             None => ring.show(breath, under),
@@ -988,6 +1058,93 @@ mod tests {
             "no longer owed or held: none"
         );
         assert_eq!(*frames.last().unwrap(), EncodedFrame::black());
+    }
+
+    /// #7224: the guard's sign is off unless its switch is set to `on`.
+    #[test]
+    fn the_guard_sign_is_off_unless_set_to_on() {
+        assert!(guard_enabled(Some("on")));
+        for value in [None, Some(""), Some("off"), Some("ON"), Some("1")] {
+            assert!(!guard_enabled(value), "{value:?}");
+        }
+    }
+
+    /// #7224: the guard's pulse is the asleep face with the whole ring
+    /// swelling in the offline amber and back, never above the face's own
+    /// peak in red, and nothing more at its two ends.
+    #[test]
+    fn the_guards_pulse_swells_the_whole_ring_amber_and_back() {
+        let face = lamp_ring::asleep::asleep_pixels(0.5);
+        assert_eq!(guard_pixels(0.5, 0.0), face, "at its start");
+        assert_eq!(guard_pixels(0.5, 1.0), face, "at its end");
+        let middle = guard_pixels(0.5, 0.5);
+        let top = lamp_ring::asleep::PEAK;
+        for pixel in middle {
+            assert!(pixel.red > 0 && pixel.red <= top.red, "{pixel:?}");
+            assert!(
+                pixel.green < pixel.red && pixel.blue < pixel.green,
+                "{pixel:?}"
+            );
+        }
+        let quarter = guard_pixels(0.5, 0.25)[0];
+        assert!(quarter.red < middle[0].red, "slower at its edges");
+    }
+
+    /// #7224: told the guard's mute, the face pulses, the first at the time
+    /// it was told, with no half-hour bound, and none once it is told the
+    /// mute is no longer the guard's.
+    #[test]
+    fn the_asleep_face_pulses_amber_only_while_the_guard_holds_the_mute() {
+        let frames = Frames::default();
+        let sink = frames.clone();
+        let pulses = Pulses {
+            takes: Duration::from_secs(2),
+            every: Duration::from_secs(60),
+            for_at_most: Duration::from_millis(1),
+        };
+        let asleep = Asleep::start_timed(move || AsleepRing::new(sink), ceiling(48), pulses, QUICK);
+        painted_until(&frames, |frames| frames.len() >= 6);
+        let before = frames.0.lock().unwrap().len();
+        // Told from a while ago: a reminder's half-hour would be over.
+        asleep
+            .owed()
+            .guard(Some(Instant::now() - Duration::from_secs(120)));
+        painted_until(&frames, |frames| frames[before..].iter().any(pulsing));
+        let guarded = frames.0.lock().unwrap().len();
+        asleep.owed().guard(None);
+        painted_until(&frames, |frames| frames.len() >= guarded + 8);
+        asleep.stop();
+        let frames = frames.0.lock().unwrap();
+        assert!(!frames[..before].iter().any(pulsing), "no guard: no pulse");
+        assert!(
+            frames[before..guarded].iter().any(pulsing),
+            "the guard's: a pulse"
+        );
+        assert!(
+            !frames[guarded + 2..].iter().any(pulsing),
+            "the mute no longer the guard's: none"
+        );
+        assert_eq!(*frames.last().unwrap(), EncodedFrame::black());
+    }
+
+    /// #7224: a guard's time still to come shows no pulse yet.
+    #[test]
+    fn a_guards_pulse_waits_for_its_time() {
+        let owed = Owed::default();
+        assert_eq!(owed.guarded(), None);
+        let later = Instant::now() + Duration::from_secs(5);
+        owed.guard(Some(later));
+        assert_eq!(owed.guarded(), Some(later));
+        assert_eq!(guard_around(&owed, Pulses::OWED, Instant::now()), None);
+        assert_eq!(guard_around(&owed, Pulses::OWED, later), Some(0.0));
+        let hour = later + Duration::from_secs(3600);
+        assert_eq!(
+            guard_around(&owed, Pulses::OWED, hour),
+            Some(0.0),
+            "no bound"
+        );
+        owed.guard(None);
+        assert_eq!(guard_around(&owed, Pulses::OWED, hour), None);
     }
 
     /// A ring that says whether it is open: set when the face opens it,

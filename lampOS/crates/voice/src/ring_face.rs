@@ -113,6 +113,10 @@ const LEVEL_GLOW: [(f32, f32); LEVELS as usize] = [
     (0.68, 0.08),
     (0.90, 0.10),
 ];
+/// The offline breath's warm amber (#830), also the restart guard's pulse
+/// on the asleep face (#7224, [`crate::ring_asleep::guard_pixels`]).
+pub const OFFLINE_TINT: [f32; 3] = [1.0, 0.55, 0.12];
+
 /// A light that is off still shows an ember, in amber: the ring at rest
 /// is also the sign that the lamp can hear, and that sign is not the
 /// lamp's to switch off because it was asked for darkness.
@@ -1030,7 +1034,7 @@ fn look(
             // never more than a third of listening's least: no red, no
             // flashing, the same all round (#830).
             let breath = wave(seconds, 2.5, 0.0, 0.0);
-            ([1.0, 0.55, 0.12], 0.04 + 0.10 * breath)
+            (OFFLINE_TINT, 0.04 + 0.10 * breath)
         }
         Mood::Thinking => {
             // An amber point circling the ring with a fading tail behind it.
