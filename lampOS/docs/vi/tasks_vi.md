@@ -1404,9 +1404,17 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   việc của lần chạy đầu tiên, lamp-tasks chạy đúng lệnh thêm đó
   (`openclaw approvals allowlist add --gateway --agent main
   /usr/local/lib/lampos/skill-start`, `gateway::ALLOWLIST_ADD`, dưới
-  quyền `lampos` với môi trường của lần đọc, giới hạn 20 s). Lần khởi
+  quyền `lampos` với môi trường của lần đọc, giới hạn 60 s: trên
+  lamp-c0a4 một gateway vừa khởi động lại trả lời các RPC approvals mất
+  tới 12 s mỗi lần và một lệnh thêm đã vượt giới hạn 20 s trước đây). Lần khởi
   động mà danh sách đã có mục thì không ghi gì, và các lần chạy sau trên
-  cùng lần khởi động không chạy lệnh thêm. Lệnh thêm thất bại được ghi
+  cùng lần khởi động không chạy lệnh thêm. Lệnh thêm thất bại hoặc chạm
+  giới hạn được thử lại một lần ngay, trên cùng lần khởi động, với cùng
+  giới hạn; lần thử thứ hai thành công được ghi journal ("tasks: the
+  OpenClaw Gateway's allow-list add for /usr/local/lib/lampos/skill-start
+  succeeded on its second try (the first: exit 1)", hoặc "killed at its
+  60 s bound") và lần khởi động được giữ. Cả hai lần đều nằm trong giới
+  hạn chờ gateway của chính lần chạy. Lệnh thêm thất bại cả hai lần được ghi
   journal ("tasks: the OpenClaw Gateway's allow-list add for
   /usr/local/lib/lampos/skill-start did not succeed; the next run tries
   again") và không giữ lần chạy lại, nhưng lần khởi động không được giữ,
