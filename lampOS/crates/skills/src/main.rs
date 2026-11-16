@@ -4660,7 +4660,7 @@ fn perform(
         Some((what, asking)) => {
             let mut begun = Vec::new();
             let mut was_begun = false;
-            let outcome = say(&sockets.say, what, skill, asking, rest_permits, || {
+            let mut on_begun = || {
                 was_begun = true;
                 act(
                     &first,
@@ -4673,7 +4673,36 @@ fn perform(
                     &mut begun,
                 );
                 let _ = made.send(());
+            };
+            // News of work handed over is held while the voice refuses it
+            // because the lamp is muted or listening, and asked again until
+            // the lamp is free, at most `NEWS_HELD_MOST_MS`; with the lamp
+            // private it waits for the next reply, as before
+            // (`lamp_skills::say_held`). Any other say is asked once.
+            let news = calls.iter().find_map(|call| match call {
+                Call::SayFrom(lamp_skills::Source::Tasks, task) => Some(*task),
+                _ => None,
             });
+            let outcome = match news {
+                Some(task) => lamp_skills::say_held(
+                    task,
+                    || {
+                        say(
+                            &sockets.say,
+                            what,
+                            skill,
+                            asking.clone(),
+                            rest_permits,
+                            &mut on_begun,
+                        )
+                    },
+                    || lamp_skills::routine::private_for_news(bus),
+                    || clock::now_us() / 1_000,
+                    clock::sleep,
+                    |line| eprintln!("lamp-skills: skill:{skill}: {line}"),
+                ),
+                None => say(&sockets.say, what, skill, asking, rest_permits, on_begun),
+            };
             said.extend(begun);
             said.push(outcome);
             // Nothing after a say never begun, as nothing with it.
@@ -6878,6 +6907,122 @@ mod tests {
             heard
         });
         Voice { stop, thread }
+    }
+
+    /// A say service that refuses the first `refusals` asks with "the lamp
+    /// is muted", then answers `begun` and `spoken` and stops; it gives the
+    /// asks it heard, also once a connection says nothing.
+    fn muted_voice(
+        listener: UnixListener,
+        refusals: usize,
+    ) -> std::thread::JoinHandle<Vec<serde_json::Value>> {
+        listener.set_nonblocking(true).unwrap();
+        std::thread::spawn(move || {
+            let mut heard = Vec::new();
+            let until = Instant::now() + Duration::from_secs(10);
+            while Instant::now() < until {
+                let Ok((stream, _)) = listener.accept() else {
+                    std::thread::sleep(Duration::from_millis(10));
+                    continue;
+                };
+                stream.set_nonblocking(false).unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                // An empty connection: the test is done with it.
+                if line.trim().is_empty() {
+                    break;
+                }
+                heard.push(serde_json::from_str(&line).unwrap());
+                let mut stream = &stream;
+                if heard.len() <= refusals {
+                    writeln!(
+                        stream,
+                        "{}",
+                        json!({"outcome": "refused", "why": "the lamp is muted"})
+                    )
+                    .unwrap();
+                } else {
+                    writeln!(stream, "{}", json!({"event": "begun"})).unwrap();
+                    writeln!(stream, "{}", json!({"outcome": "spoken"})).unwrap();
+                    break;
+                }
+            }
+            heard
+        })
+    }
+
+    /// Task news's run, its say asked of `dir`'s say socket.
+    fn tell_news(dir: &Path, bus: &Bus) -> String {
+        let sockets = nowhere(
+            dir,
+            Permissions {
+                speak: true,
+                ..Permissions::default()
+            },
+        );
+        let (made, _) = mpsc::channel();
+        perform(
+            "task-news",
+            (
+                &[Call::SayFrom(lamp_skills::Source::Tasks, Some(62))],
+                &[],
+                &[],
+            ),
+            &sockets,
+            bus,
+            None,
+            (None, false),
+            (made, None),
+        )
+    }
+
+    /// lamp-c0a4, 16 Nov 15:35: news refused while the voice restarted ("the
+    /// lamp is muted") is held, asked again, and told once the lamp is free.
+    #[test]
+    fn task_news_refused_while_muted_is_held_and_told_once_the_lamp_is_free() {
+        let dir = tempfile::Builder::new()
+            .prefix("nh")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let voice = muted_voice(UnixListener::bind(dir.path().join("say.sock")).unwrap(), 1);
+        let outcome = tell_news(dir.path(), &bus);
+        assert_eq!(outcome, "say: spoken");
+        let heard = voice.join().unwrap();
+        assert_eq!(heard.len(), 2, "asked again once, and told: {heard:?}");
+        assert!(
+            heard
+                .iter()
+                .all(|ask| ask["from"] == "tasks" && ask["task"] == 62),
+            "{heard:?}"
+        );
+    }
+
+    /// With the privacy switch closed, news refused is not held: asked once,
+    /// and it waits for the next reply, as before.
+    #[test]
+    fn task_news_refused_with_the_privacy_switch_closed_is_not_held() {
+        let dir = tempfile::Builder::new()
+            .prefix("np")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        bus.publisher_declared(
+            lamp_msgs::MicrophonePrivacy::TOPIC,
+            &lamp_msgs::MicrophonePrivacy::declaration(),
+            "voice",
+        )
+        .unwrap()
+        .publish_json(clock::now_us(), &json!({"physical_muted": true}))
+        .unwrap();
+        let voice = muted_voice(UnixListener::bind(dir.path().join("say.sock")).unwrap(), 1);
+        let began = Instant::now();
+        let outcome = tell_news(dir.path(), &bus);
+        assert_eq!(outcome, "say: refused (the lamp is muted)");
+        assert!(began.elapsed() < Duration::from_millis(lamp_skills::NEWS_HELD_RETRY_MS));
+        drop(UnixStream::connect(dir.path().join("say.sock")));
+        let heard = voice.join().unwrap();
+        assert_eq!(heard.len(), 1, "{heard:?}");
     }
 
     /// The say service [`voice`] runs.
