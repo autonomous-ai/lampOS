@@ -524,6 +524,11 @@ itself hot shows as that, not as a warm lamp sitting (#7281). With
 so: `seated: the elbow sat down hot twice in an hour; it stands again by
 itself once it reads under 50 for 5 min, or when its head is held a
 second`.
+With `LAMP_BODY_STRAIN_REST_COOLS=on` (#7344) a lamp that sat down says at
+once that it rests folded and what brings it up, before a warm joint:
+`resting: the elbow sat down hot; it stays folded until it reads under 50
+for 5 min, and then someone speaks to it, holds its head a second or runs
+a health check`.
 
 What its first minutes on the lamp showed:
 

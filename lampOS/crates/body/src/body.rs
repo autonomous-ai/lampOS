@@ -1579,6 +1579,10 @@ pub struct Glimpse {
     /// joint is cool (a hot seat, the first self-stand within the hour).
     /// `false` while it waits for a person or a health check.
     pub seat_rests: bool,
+    /// Under `StrainGuard::rest_cools` (#7344): the arm joint whose sit-down
+    /// keeps the lamp folded until a person asks it up, and whether it must
+    /// still cool first. `None` otherwise.
+    pub rest_waits: Option<(&'static str, bool)>,
     /// Under `Limits::refused_let_go`: the lamp is let go because a joint
     /// is found out of where it may start, and this is what it asks of a
     /// person, in words the voice can say. `None` on every other step.
@@ -5615,6 +5619,15 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut seat_cooled = false;
     let mut self_stood_at: Option<Duration> = None;
     let mut hot_retreats = 0u16;
+    // #7344, under `StrainGuard::rest_cools`: a sit-down's rest that ends
+    // folded, the joint that sat it down and, for a hot one, its index in
+    // servo order; since when that joint has read cool, back to back, and
+    // whether it has for `StrainGuard::COOL_FOR`. The mood of the last step,
+    // so that only a new line is an ask.
+    let mut rest_waits: Option<(&'static str, Option<usize>)> = None;
+    let mut rest_cool_since: Option<Duration> = None;
+    let mut rest_cooled = false;
+    let mut mood_before = Mood::Resting;
     let mut climb = Climb::default();
     let mut arm_over = [0u8; 2];
     let mut arm_off = [0u8; 2];
@@ -6300,11 +6313,40 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         let mut window_before_ask = awake_until;
         // A lamp that is folded, or folding, looks at nobody.
         let mut awake_now = leaving.is_none() && !slumped;
-        // Folded for a reason of its own whatever its window says: resting
-        // after a load, heat or tracking retreat, unplugged, unable to lift
-        // or seated. Presence never stands such a lamp (#7313).
+        // #7344: a rest that ends folded ends on a person's ask once its
+        // minute is over and, for a hot joint, once it has cooled: a new
+        // line (the voice listening again, or its name heard), a tap's
+        // wake, a head held a second or a health check, or a gesture under
+        // lamp-control's lease. A window still open, someone in front of it
+        // or a lease only held are not asks. An ask made earlier is spent.
+        let new_line = mood == Mood::Listening && mood_before != Mood::Listening;
+        mood_before = mood;
         let tired = tired_until.is_some_and(|until| now < until);
-        let kept_down = tired || unplug_latched || cannot_lift.is_some() || seated.is_some();
+        if let Some((joint, hot)) = rest_waits
+            && !tired
+            && (hot.is_none() || rest_cooled)
+            && (new_line
+                || asked_now.woken
+                || asked_now.unseat
+                || (asked_now.held && asked_now.gesture.is_some()))
+        {
+            (rest_waits, rest_cool_since, rest_cooled) = (None, None, false);
+            if let Some(up) = standing {
+                awake_until = Some(now + up.awake);
+            }
+            eprintln!(
+                "lamp-body: step {}: asked up after its {joint}'s rest: let stand again",
+                report.steps
+            );
+        }
+        // Folded for a reason of its own whatever its window says: resting
+        // after a load, heat or tracking retreat, unplugged, unable to lift,
+        // seated, or a rest that ends folded (#7313's predicate, #7344).
+        let kept_down = tired
+            || unplug_latched
+            || cannot_lift.is_some()
+            || seated.is_some()
+            || rest_waits.is_some();
         if let Some(up) = standing.filter(|_| !slumped) {
             // Spoken to, or with somebody sitting in front of it: awake.
             // It does not fold away from a person who is still there.
@@ -7842,6 +7884,26 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 seat_cooled = true;
             }
         }
+        // #7344: a hot rest counts its joint's cool reads, back to back; a
+        // held or missing read starts the count again.
+        if let Some((joint, Some(index))) = rest_waits
+            && !rest_cooled
+        {
+            let read = samples[index].temperature;
+            if bus.temperature_held[index] || read == 0 || read >= StrainGuard::COOL {
+                rest_cool_since = None;
+            } else if now.saturating_sub(*rest_cool_since.get_or_insert(now))
+                >= StrainGuard::COOL_FOR
+            {
+                rest_cooled = true;
+                eprintln!(
+                    "lamp-body: step {}: {joint} read under {} for {} min: a person may stand it again",
+                    report.steps,
+                    StrainGuard::COOL,
+                    StrainGuard::COOL_FOR.as_secs() / 60
+                );
+            }
+        }
         let mut glimpse = Glimpse {
             unplug_safe: false,
             unplug_unsafe: None,
@@ -7938,6 +8000,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 .and_then(|_| climb.observe(now, samples.map(|sample| sample.temperature))),
             seated,
             seat_rests: seat_rests.is_some(),
+            rest_waits: rest_waits.map(|(joint, hot)| (joint, hot.is_some() && !rest_cooled)),
             waiting: None,
             home: Some(home),
         };
@@ -8229,6 +8292,34 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     }
                 }
                 tired_until = Some(tired_until.map_or(now + rest, |until| until.max(now + rest)));
+                // #7344: under `rest_cools` a new sit-down's rest ends folded,
+                // until a person asks it up; a hot one cools first. A seat
+                // takes its place, with its own way up.
+                if limits.strain_guard.is_some_and(|guard| guard.rest_cools)
+                    && !tired
+                    && stand > 0.0
+                {
+                    rest_waits = seated
+                        .is_none()
+                        .then_some((joint.name(), hot.then_some(joint.index())));
+                    (rest_cool_since, rest_cooled) = (None, false);
+                    if rest_waits.is_some() {
+                        eprintln!(
+                            "lamp-body: step {}: {joint} sat down{}: it rests folded{} until a person asks it up",
+                            report.steps,
+                            if hot { " hot" } else { "" },
+                            if hot {
+                                format!(
+                                    " until it reads under {} for {} min, then",
+                                    StrainGuard::COOL,
+                                    StrainGuard::COOL_FOR.as_secs() / 60
+                                )
+                            } else {
+                                String::new()
+                            }
+                        );
+                    }
+                }
                 if arm_over[index] >= Standing::STUCK_STEPS {
                     surprise.get_or_insert(Stop::Load {
                         joint: joint.id(),
