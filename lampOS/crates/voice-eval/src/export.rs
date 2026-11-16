@@ -775,6 +775,7 @@ const BUS_TOPICS: &[&str] = &[
     "voice/timing",
     "voice/tone",
     "voice/turn",
+    "voice/turn_time",
 ];
 
 /// Standard base64, as `lamp-bus record` writes payloads.
