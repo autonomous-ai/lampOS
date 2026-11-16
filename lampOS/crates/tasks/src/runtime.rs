@@ -704,6 +704,147 @@ pub fn app_engine_default_operation(
     }))
 }
 
+/// The one session's turn for the store (#7246): the spoken task holding
+/// the pane released once the store has its answer; then [`pane_turn`].
+fn one_session_holds(
+    one: &crate::one_session::OneSession,
+    engine: &Engine<Store>,
+    launching: Option<&str>,
+    backing_off: bool,
+    now: &ClockSample,
+) -> bool {
+    // Held until its answer is told, not only read (#7258's P1-a): the
+    // next turn joined to the pane takes the store's place of this one.
+    if let Some(id) = one.spoken_holder()
+        && engine.launch_told(&id, now)
+    {
+        one.count_answer(engine.launch_answer(&id).unwrap_or_default());
+        if engine.launch_answered(&id) {
+            one.release(&id);
+        } else {
+            // Cancelled, or an ask no one answered: the pane closed and
+            // its conversation deleted before the next turn.
+            one.release_unanswered(&id);
+        }
+    } else if let Some(id) = one.spoken_holder()
+        && engine.launch_asking_past(&id, now)
+    {
+        // Asking past the bound (Heron's P1 on #7258): closed `--now` and
+        // its conversation deleted, as one ended unanswered.
+        one.release_unanswered(&id);
+    }
+    pane_turn(one, &engine.queued_launches(), launching, backing_off)
+}
+
+/// How long a spoken task waits for the lamp's pane on the tasks-harness
+/// worker, which serves every hand-over and read (#7246, the
+/// Reviewer-lead's #5 on #7258); past it, it is put back ([`put_back`]).
+const SPOKEN_PANE_WAIT: Duration = Duration::from_secs(5);
+/// How long a spoken task put back waits before the pane is tried again.
+const PANE_RETRY: Duration = Duration::from_secs(2);
+
+/// Whether a spoken task's launch into the lamp's pane, answered `busy`
+/// (the pane not free within [`SPOKEN_PANE_WAIT`], lamp-tasks' stop, or no
+/// fresh pane, which the one-session thread opens or rotates), is put back
+/// in the queue rather than failed: nothing was typed. A spoken task is
+/// never refused for a full queue. One already queued for the pane's whole
+/// wait ([`crate::one_session::QUEUE_WAIT`]) fails as before.
+fn put_back(result: &LaunchOutcome, queued_for: Duration) -> bool {
+    matches!(result, LaunchOutcome::NotSent { code } if code == "busy")
+        && queued_for < crate::one_session::QUEUE_WAIT
+}
+
+/// The spoken tasks for the pane told to it, in order: `launching`, the one
+/// handed to the tasks-harness worker and not answered yet, first, then the
+/// store's queued ones. Whether the next launch is one of them and must
+/// wait: one is launching, one was put back a moment ago (`backing_off`),
+/// the pane is held, or no fresh pane is open (the one-session thread
+/// opens or rotates it). A spoken task waits for the pane here, queued in the store and
+/// told its place, never on the worker, which serves every hand-over and
+/// read (the Reviewer-lead's #5 on #7258): it is handed over only with the
+/// pane free, and stays first in the pane's queue until its launch is
+/// answered, so no skill run takes the pane before the worker types its
+/// words, and the worker's turn is had at once.
+fn pane_turn(
+    one: &crate::one_session::OneSession,
+    queued: &[&Launch],
+    launching: Option<&str>,
+    backing_off: bool,
+) -> bool {
+    let next_is_spoken = queued
+        .first()
+        .is_some_and(|launch| crate::one_session::for_the_pane(one, launch).is_some());
+    one.set_spoken_queue(
+        launching
+            .map(str::to_owned)
+            .into_iter()
+            .chain(
+                queued
+                    .iter()
+                    .filter(|launch| crate::one_session::for_the_pane(one, launch).is_some())
+                    .map(|launch| launch.name.clone()),
+            )
+            .collect(),
+    );
+    next_is_spoken && (launching.is_some() || backing_off || !one.free() || !one.has_fresh_pane())
+}
+
+/// [`place_wait`]'s answer for the next launch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PlaceWait {
+    /// Not one for the lamp's pane whose place is unknown: on as usual.
+    Go,
+    /// Held in the queue until the lamp's place is known.
+    Hold,
+    /// Held for `cap` already: fails `busy`, with no `harness new`.
+    GiveUp,
+}
+
+/// Whether the next launch waits for the lamp's place (H5 on #7258):
+/// one that may be for the lamp's pane while its place is not known yet
+/// (just after start, or Harness's daemon down; signed in or out alike,
+/// as Harness gives a signed-out lamp its own machine, #6407) is held in
+/// the queue, never sent the per-run way, a second session. Journaled once
+/// a task; held for `cap` (the queue's wait), it gives up. `held` is the
+/// task held and since when.
+fn place_wait(
+    one: &crate::one_session::OneSession,
+    next: Option<&Launch>,
+    held: &mut Option<(String, Instant)>,
+    now: Instant,
+    cap: Duration,
+) -> PlaceWait {
+    let Some(next) = next.filter(|next| one.waits_for_place(next)) else {
+        if let Some((name, _)) = held.take() {
+            eprintln!("tasks: {name}: the lamp's place is known; held no longer");
+        }
+        return PlaceWait::Go;
+    };
+    match held {
+        Some((name, since)) if *name == next.name => {
+            if now.saturating_duration_since(*since) < cap {
+                return PlaceWait::Hold;
+            }
+            eprintln!(
+                "tasks: {}: the lamp's place not known in {} min; busy",
+                next.name,
+                cap.as_secs() / 60
+            );
+            *held = None;
+            PlaceWait::GiveUp
+        }
+        _ => {
+            eprintln!(
+                "tasks: {}: held until the lamp's place is known (at most {} min)",
+                next.name,
+                cap.as_secs() / 60
+            );
+            *held = Some((next.name.clone(), now));
+            PlaceWait::Hold
+        }
+    }
+}
+
 fn engine_default_unsaved() -> EngineError {
     EngineError {
         code: "engine_default_unsaved",
@@ -1295,7 +1436,12 @@ impl Adapter for Production {
     }
     fn launch(&self, launch: &Launch) -> LaunchOutcome {
         match self {
-            Self::Cli(cli) => cli.launch(launch),
+            // A spoken task for the lamp's one session (#7246) into its
+            // pane; else, or when the pane can't take it, its own `new`.
+            Self::Cli(cli) => crate::one_session::LAMP
+                .get()
+                .and_then(|one| crate::one_session::spoken_launch(one, &**cli, launch))
+                .unwrap_or_else(|| cli.launch(launch)),
             Self::Absent => LaunchOutcome::NotSent {
                 code: "no_harness".into(),
             },
@@ -1899,6 +2045,18 @@ fn owner<C: Clock>(
     }
     let mut requests = 0u64;
     let mut busy = false;
+    // The spoken task for the lamp's pane handed to the worker (#7246):
+    // its id and launch name, until its launch is answered.
+    let mut pane_launch: Option<(u64, String, Instant)> = None;
+    // A spoken task the pane could not take within its short wait on the
+    // worker is put back in the queue (#7246): when it was first handed
+    // over (its whole wait stays within the queue's), and when the pane is
+    // tried again.
+    let mut pane_first: Option<(u64, Instant)> = None;
+    let mut pane_retry_at: Option<Instant> = None;
+    // The hand-over held for the lamp's place (H5 on #7258): its name and
+    // since when, bounded by the queue's wait.
+    let mut place_held: Option<(String, Instant)> = None;
     // Declared before `waits`, so dropped after it, but still before the
     // engine: every `watch` child is killed and reaped when the owner ends,
     // however it ends.
@@ -2110,6 +2268,11 @@ fn owner<C: Clock>(
                 // Once a task: a second such answer is final.
                 Outcome::Launch(id, label, result) if relaunched.again(id, &result) => {
                     eprintln!("{}", DaemonOnce::line(&label));
+                    // Its pane wait (#7246) is over: the task is queued
+                    // again and starts a new one when it is next handed on.
+                    if pane_launch.as_ref().is_some_and(|(task, ..)| *task == id) {
+                        pane_launch = None;
+                    }
                     if start_daemon_due.is_none() {
                         start_daemon_due = Some(Instant::now());
                         daemon_tries = 0;
@@ -2118,10 +2281,32 @@ fn owner<C: Clock>(
                     }
                     engine.launch_again(id, &now)
                 }
-                Outcome::Launch(id, _, result) => {
-                    relaunched.done(id);
-                    engine.finish_launch(id, result, &now)
-                }
+                Outcome::Launch(id, _, result) => match pane_launch.take() {
+                    Some((task, name, handed)) if task == id => {
+                        let first = match pane_first {
+                            Some((first_task, at)) if first_task == id => at,
+                            _ => handed,
+                        };
+                        if put_back(&result, first.elapsed()) {
+                            eprintln!(
+                                "tasks: {name}: the lamp's pane could not take it within {} s; queued again",
+                                SPOKEN_PANE_WAIT.as_secs()
+                            );
+                            pane_first = Some((id, first));
+                            pane_retry_at = Some(Instant::now() + PANE_RETRY);
+                            engine.put_back_launch(id, &now)
+                        } else {
+                            pane_first = None;
+                            relaunched.done(id);
+                            engine.finish_launch(id, result, &now)
+                        }
+                    }
+                    other => {
+                        pane_launch = other;
+                        relaunched.done(id);
+                        engine.finish_launch(id, result, &now)
+                    }
+                },
                 Outcome::Observe(job, Ok(value)) => engine.finish_observation(&job, value, &now),
                 Outcome::Observe(job, Err(code)) => engine.observation_failed(&job, &code, &now),
                 Outcome::Close(job, result) => {
@@ -2232,12 +2417,17 @@ fn owner<C: Clock>(
                     daemon_tries += 1;
                     let one_try = std::mem::take(&mut daemon_one_try);
                     match started {
-                        Ok(()) if restart => eprintln!(
-                            "tasks: Harness's daemon started again after the sign-in (#7019)"
-                        ),
-                        Ok(()) => eprintln!(
-                            "tasks: Harness's daemon started (openharness#1463)"
-                        ),
+                        Ok(()) => {
+                            if restart {
+                                eprintln!(
+                                    "tasks: Harness's daemon started again after the sign-in (#7019)"
+                                );
+                            } else {
+                                eprintln!("tasks: Harness's daemon started (openharness#1463)");
+                            }
+                            // Its panes went with the daemon before it.
+                            crate::one_session::forget_lamp("Harness's daemon started");
+                        }
                         Err(code) if one_try => eprintln!(
                             "tasks: Harness's daemon not started: {code}; \
                              one try, as a hand-over waits on it"
@@ -2260,9 +2450,12 @@ fn owner<C: Clock>(
                 }
                 Outcome::RestartDaemon(restarted) => {
                     match restarted {
-                        Ok(()) => eprintln!(
-                            "tasks: Harness's daemon started again: its env file changed while it ran (#5978)"
-                        ),
+                        Ok(()) => {
+                            eprintln!(
+                                "tasks: Harness's daemon started again: its env file changed while it ran (#5978)"
+                            );
+                            crate::one_session::forget_lamp("Harness's daemon restarted");
+                        }
                         Err(code) => eprintln!(
                             "tasks: Harness's daemon not started again: {code}; its env file changed while it ran (#5978)"
                         ),
@@ -2650,9 +2843,52 @@ fn owner<C: Clock>(
                 }
                 None => None,
             };
+            // `LAMP_TASKS_ONE_SESSION` on (#7246): a hand-over for the
+            // lamp's pane whose place is not known yet waits for it, at most
+            // the queue's wait, then fails `busy`; never the per-run way.
+            let place_wait = crate::one_session::LAMP.get().map_or(PlaceWait::Go, |one| {
+                place_wait(
+                    one,
+                    engine.queued_launches().first().copied(),
+                    &mut place_held,
+                    Instant::now(),
+                    crate::one_session::QUEUE_WAIT,
+                )
+            });
+            if daemon.is_none()
+                && start_daemon_due.is_none()
+                && place_wait == PlaceWait::GiveUp
+                && let Some(job) = engine.begin_launch(&now).map_err(io::Error::other)?
+            {
+                engine
+                    .finish_launch(
+                        job.task_id,
+                        LaunchOutcome::NotSent {
+                            code: "busy".into(),
+                        },
+                        &now,
+                    )
+                    .map_err(io::Error::other)?;
+            }
             let launch = match daemon {
                 Some(job) => Some(job),
                 None if start_daemon_due.is_some() => None,
+                None if place_wait != PlaceWait::Go => None,
+                // `LAMP_TASKS_ONE_SESSION` on (#7246): a spoken task for
+                // the lamp's pane waits queued while the pane is held, and
+                // the spoken task holding it lets go once its answer is read.
+                None if crate::one_session::LAMP.get().is_some_and(|one| {
+                    one_session_holds(
+                        one,
+                        &engine,
+                        pane_launch.as_ref().map(|(_, name, _)| name.as_str()),
+                        pane_retry_at.is_some_and(|at| Instant::now() < at),
+                        &now,
+                    )
+                }) =>
+                {
+                    None
+                }
                 None => engine
                     .begin_launch(&now)
                     .map_err(io::Error::other)?
@@ -2721,6 +2957,15 @@ fn owner<C: Clock>(
                 }
             };
             if let Some(job) = next {
+                // A spoken task for the lamp's pane (#7246) keeps the pane's
+                // queue until its launch is answered ([`pane_turn`]).
+                if let Job::Launch(job) = &job
+                    && crate::one_session::LAMP.get().is_some_and(|one| {
+                        crate::one_session::for_the_pane(one, &job.launch).is_some()
+                    })
+                {
+                    pane_launch = Some((job.task_id, job.launch.name.clone(), Instant::now()));
+                }
                 if matches!(job, Job::StartDaemon(_)) {
                     // Shown before the job is handed on, so no other
                     // `harness new` caller fires its own start meanwhile.
@@ -4441,6 +4686,47 @@ pub fn serve<C: Clock>(
     // Joined at the stop, so a skill's run is ended before the process exits.
     let mut skill_served: Option<thread::JoinHandle<()>> = None;
     let skill_stop = stop.clone();
+    // `LAMP_TASKS_ONE_SESSION` on (#7246): the lamp's one standing pane,
+    // opened as soon as it can be, on a thread of its own as the start's
+    // sweep is (a pane's open waits on Harness, which the owner loop's one
+    // worker must not). Off, nothing is made.
+    let one_session = (skill_tasks
+        && crate::one_session::on(std::env::var(crate::one_session::SWITCH).ok().as_deref()))
+    .then(|| {
+        Arc::new(
+            crate::one_session::OneSession::lamp(&config.dir)
+                .with_spoken_bound(SPOKEN_PANE_WAIT, stop.clone()),
+        )
+    });
+    if one_session.is_some() && std::env::var_os("HOME").is_none() {
+        eprintln!("tasks: one session: not opened: lamp-tasks has no HOME for its folder");
+    }
+    if let (Some(one), Some(home)) = (one_session.as_ref(), std::env::var_os("HOME")) {
+        let _ = crate::one_session::LAMP.set(one.clone());
+        let project = crate::skill_task::lamp_project(Path::new(&home));
+        let slot = skill_harness.clone();
+        let (one, stop) = (one.clone(), stop.clone());
+        eprintln!("tasks: one session: on ({}=on)", crate::one_session::SWITCH);
+        if let Err(error) = thread::Builder::new()
+            .name("one-session".into())
+            .spawn(move || {
+                let key_slot = slot.clone();
+                let cli_slot = slot.clone();
+                one.keep_open(
+                    Box::new(move || crate::one_session::lamp_place(&slot, &project)),
+                    Box::new(move || crate::one_session::lamp_key(&key_slot)),
+                    Box::new(move || {
+                        let harness = cli_slot.get()?;
+                        crate::harness::Cli::new(harness.config.clone(), harness.session.clone())
+                            .ok()
+                    }),
+                    stop,
+                )
+            })
+        {
+            eprintln!("tasks: one session: its open not started: {error}");
+        }
+    }
     match std::env::var_os("HOME").map(PathBuf::from) {
         Some(home) if skill_tasks => {
             // A gateway agent's skill run is claimed by the launcher on
@@ -4459,6 +4745,7 @@ pub fn serve<C: Clock>(
                 skill_harness.clone(),
                 no_harness.clone(),
                 starts,
+                one_session.clone(),
             )
             .start(true, stop.clone())
             {
@@ -6866,6 +7153,649 @@ mod tests {
         fs::write(&path, theirs).unwrap();
         assert!(!write(&[machine('b', "Office iMac", false)]).changed);
         assert!(!names.exists());
+    }
+
+    /// The lamp's pane for the one-session tests: every open is agent `a`,
+    /// idle at once, its last words taken and its ask the last typed.
+    #[derive(Default)]
+    struct Pane {
+        asked: Mutex<String>,
+        /// The pane works, with nothing holding it.
+        busy: AtomicBool,
+        /// Words typed are never seen taken (set at the next words typed
+        /// with `loses_typed`).
+        untaken: AtomicBool,
+        loses_typed: AtomicBool,
+        /// How long each `type_into` takes, in ms (a slow send).
+        type_ms: AtomicU64,
+        /// `harness new` and `close` calls.
+        opens: AtomicU64,
+        closes: AtomicU64,
+    }
+    impl crate::one_session::PaneHarness for Pane {
+        fn open(&self, launch: &Launch) -> LaunchOutcome {
+            self.opens.fetch_add(1, Ordering::AcqRel);
+            *self.asked.lock().unwrap() = launch.prompt.clone();
+            LaunchOutcome::Created {
+                agent_id: "a".into(),
+            }
+        }
+        fn type_into(&self, _: &str, _: &str, words: &str) -> crate::harness::Typed {
+            thread::sleep(Duration::from_millis(self.type_ms.load(Ordering::Acquire)));
+            self.untaken
+                .store(self.loses_typed.load(Ordering::Acquire), Ordering::Release);
+            *self.asked.lock().unwrap() = words.to_owned();
+            crate::harness::Typed::Typed
+        }
+        fn wait_end(&self, _: &str, _: &str, _: &AtomicBool) -> Result<Option<String>, String> {
+            Ok(Some("idle".into()))
+        }
+        fn observe(&self, _: &str, agent: &str) -> Result<crate::harness::PaneSeen, String> {
+            Ok(crate::harness::PaneSeen {
+                seen: Observation {
+                    agent_id: agent.into(),
+                    state: if self.busy.load(Ordering::Acquire) {
+                        "working".into()
+                    } else {
+                        "idle".into()
+                    },
+                    ask: Some(self.asked.lock().unwrap().clone()),
+                    answer: String::new(),
+                    truncated: false,
+                    tools: 0,
+                },
+                taken: !self.untaken.load(Ordering::Acquire),
+            })
+        }
+        fn close_now(&self, _: &str, _: &str) -> Result<Closed, String> {
+            self.closes.fetch_add(1, Ordering::AcqRel);
+            Err("unsupported".into())
+        }
+        fn resume(&self, _: &str, _: &str) -> Result<String, String> {
+            Err("unsupported".into())
+        }
+        fn live_in(&self, _: &str, _: &str) -> Result<Vec<String>, String> {
+            Ok(Vec::new())
+        }
+    }
+
+    /// The Reviewer-lead's #5 on #7258 (#7246): a spoken task handed to the
+    /// tasks-harness worker (which serves every hand-over and read) has its
+    /// pane turn at once, even with a skill run waiting for the pane: the
+    /// spoken task stays first in the pane's queue until its launch is
+    /// answered, so the skill run can't take the pane between the store's
+    /// hand-over and the worker's typing, and the worker is free again
+    /// within a second, not after the skill run (up to 15 min).
+    #[test]
+    fn a_spoken_task_handed_to_the_worker_is_answered_at_once_with_a_skill_run_waiting() {
+        use crate::one_session::{Kind, OneSession, Place, spoken_launch};
+        let machine = "0123456789abcdef0123456789abcdef";
+        let one = Arc::new(OneSession::new(
+            Duration::from_secs(60),
+            Duration::from_millis(10),
+            Duration::from_secs(1),
+        ));
+        let pane = Arc::new(Pane::default());
+        let place = Place {
+            machine: machine.into(),
+            engine: EngineKind::Openclaw,
+            folder: "/nonexistent/one-session".into(),
+        };
+        one.open_if_due(&*pane, &place);
+        assert!(one.agent().is_some(), "the pane is open");
+        let spoken = Launch {
+            name: "task-1".into(),
+            prompt: "What's on my calendar?".into(),
+            target: Target {
+                machine_id: machine.into(),
+                project: "lamp".into(),
+                engine: EngineKind::Openclaw,
+            },
+            session: None,
+        };
+        // The store's turn with the spoken task queued: the pane is free,
+        // so it is handed over, and a skill run arriving now waits behind it.
+        assert!(!pane_turn(&one, &[&spoken], None, false));
+        let skill = {
+            let (one, pane, place) = (one.clone(), pane.clone(), place.clone());
+            thread::spawn(move || {
+                let until = Instant::now() + Duration::from_secs(10);
+                let turn = one
+                    .enter("skill-run", Kind::Skill, until, &|| false)
+                    .unwrap();
+                let _ = turn.send(&*pane, &place, "a skill's words", until, &|| false);
+                // The skill run holds the pane a while (in truth up to 15 min).
+                thread::sleep(Duration::from_secs(3));
+            })
+        };
+        thread::sleep(Duration::from_millis(100));
+        // The store's next turns while the worker has the launch: no longer
+        // queued in the store, it is the one launching.
+        let next = Launch {
+            name: "task-2".into(),
+            ..spoken.clone()
+        };
+        for _ in 0..5 {
+            assert!(!pane_turn(&one, &[], Some(&spoken.name), false));
+            // Another spoken task queued meanwhile is held, the pane free.
+            assert!(
+                pane_turn(&one, &[&next], Some(&spoken.name), false),
+                "the next spoken task was handed over while one is launching"
+            );
+            thread::sleep(Duration::from_millis(20));
+        }
+        let began = Instant::now();
+        let outcome = spoken_launch(&one, &*pane, &spoken);
+        let took = began.elapsed();
+        assert!(
+            matches!(outcome, Some(LaunchOutcome::Joined { .. })),
+            "{outcome:?}"
+        );
+        assert!(
+            took < Duration::from_secs(1),
+            "the worker waited {took:?} for the pane"
+        );
+        // Its launch answered and then its answer read: the skill run next.
+        assert!(!pane_turn(&one, &[], None, false));
+        one.release(&spoken.name);
+        skill.join().unwrap();
+        // Put back a moment ago: held a while, the pane free.
+        assert!(
+            pane_turn(&one, &[&next], None, true),
+            "a put-back task tried again at once"
+        );
+        assert!(!pane_turn(&one, &[&next], None, false));
+    }
+
+    /// The Reviewer-lead's #5 on #7258 (#7246): a spoken task whose pane is
+    /// busy with nothing holding it (the person typing into it, its last
+    /// words untaken) is answered `busy` within its short wait on the
+    /// worker, or at once at lamp-tasks' stop, and the store puts it back
+    /// rather than failing it; a full queue, or a task queued for the whole
+    /// wait, still fails.
+    #[test]
+    fn a_spoken_task_the_pane_cant_take_soon_frees_the_worker_and_is_put_back() {
+        use crate::one_session::{OneSession, Place, QUEUE_WAIT, spoken_launch};
+        let machine = "0123456789abcdef0123456789abcdef";
+        let stop = Arc::new(AtomicBool::new(false));
+        let one = OneSession::new(
+            Duration::from_secs(60),
+            Duration::from_millis(10),
+            Duration::from_secs(1),
+        )
+        .with_spoken_bound(Duration::from_millis(300), stop.clone());
+        let pane = Pane::default();
+        let place = Place {
+            machine: machine.into(),
+            engine: EngineKind::Openclaw,
+            folder: "/nonexistent/one-session".into(),
+        };
+        one.open_if_due(&pane, &place);
+        pane.busy.store(true, Ordering::Release);
+        let spoken = Launch {
+            name: "task-1".into(),
+            prompt: "What's on my calendar?".into(),
+            target: Target {
+                machine_id: machine.into(),
+                project: "lamp".into(),
+                engine: EngineKind::Openclaw,
+            },
+            session: None,
+        };
+        let began = Instant::now();
+        let outcome = spoken_launch(&one, &pane, &spoken).unwrap();
+        let took = began.elapsed();
+        assert!(
+            took < Duration::from_secs(2),
+            "the worker waited {took:?} for a busy pane"
+        );
+        assert_eq!(
+            outcome,
+            LaunchOutcome::NotSent {
+                code: "busy".into()
+            }
+        );
+        assert!(one.free(), "nothing holds the pane after");
+        stop.store(true, Ordering::Release);
+        let began = Instant::now();
+        assert!(spoken_launch(&one, &pane, &spoken).is_some());
+        assert!(
+            began.elapsed() < Duration::from_millis(200),
+            "the stop is honoured"
+        );
+        let busy = LaunchOutcome::NotSent {
+            code: "busy".into(),
+        };
+        let second = Duration::from_secs(1);
+        assert!(put_back(&busy, second));
+        assert!(!put_back(&busy, QUEUE_WAIT));
+        let not_ready = LaunchOutcome::NotSent {
+            code: "not_ready".into(),
+        };
+        assert!(!put_back(&not_ready, second));
+    }
+
+    const PANE_MACHINE: &str = "0123456789abcdef0123456789abcdef";
+
+    fn pane_place() -> crate::one_session::Place {
+        crate::one_session::Place {
+            machine: PANE_MACHINE.into(),
+            engine: EngineKind::Openclaw,
+            folder: "/nonexistent/one-session".into(),
+        }
+    }
+
+    fn spoken_to_the_lamp(name: &str) -> Launch {
+        Launch {
+            name: name.into(),
+            prompt: "What's on my calendar?".into(),
+            target: Target {
+                machine_id: PANE_MACHINE.into(),
+                project: "lamp".into(),
+                engine: EngineKind::Openclaw,
+            },
+            session: None,
+        }
+    }
+
+    fn lamp_one() -> crate::one_session::OneSession {
+        crate::one_session::OneSession::new(
+            Duration::from_secs(60),
+            Duration::from_millis(10),
+            Duration::from_millis(500),
+        )
+        .with_session_delete(Box::new(|_| Ok(())))
+        .with_spoken_bound(Duration::from_millis(300), Arc::new(AtomicBool::new(false)))
+    }
+
+    /// Heron's P1 on #7258 (#7246): a spoken task holding the pane whose
+    /// agent asks something (`needs-input`) is never told nor spent; past
+    /// [`crate::engine::UNTOLD_CLOSE_MS`] `one_session_holds` lets it go
+    /// unanswered, and the pane is closed `--now` and its conversation
+    /// deleted. Sooner, it is still held.
+    #[test]
+    fn a_spoken_holder_asking_past_the_bound_is_let_go_closed_and_deleted() {
+        use crate::protocol::Guard;
+        let root = tempfile::tempdir().unwrap();
+        let clock = |monotonic_ms| ClockSample {
+            boot_id: "test-boot".into(),
+            monotonic_ms,
+        };
+        let targets = BTreeMap::from([(
+            LAMP_TARGET.to_owned(),
+            Target {
+                machine_id: PANE_MACHINE.into(),
+                project: "lamp".into(),
+                engine: EngineKind::Openclaw,
+            },
+        )]);
+        let mut engine = Engine::open(
+            Store::open(&root.path().join("private")).unwrap(),
+            targets,
+            &"1".repeat(32),
+            &"2".repeat(32),
+            &clock(0),
+        )
+        .unwrap();
+        let guard = |engine: &Engine<Store>, what: &str| Guard {
+            store_id: engine.store_id().into(),
+            revision: engine.revision(),
+            request_id: format!("{what}-{}", engine.revision()),
+        };
+        let prepared = engine
+            .handle(
+                &Request::Prepare {
+                    guard: guard(&engine, "prepare"),
+                    text: "What's on my calendar?".into(),
+                    target: LAMP_TARGET.into(),
+                    session: None,
+                    engine: None,
+                },
+                &clock(0),
+                false,
+            )
+            .unwrap();
+        let id = prepared["id"].as_u64().unwrap();
+        let confirm = Request::Confirm {
+            guard: guard(&engine, "confirm"),
+            id,
+            prepared_digest: prepared["prepared_digest"].as_str().unwrap().into(),
+            session_id: engine.session_id().into(),
+        };
+        engine.handle(&confirm, &clock(0), true).unwrap();
+        let job = engine.begin_launch(&clock(0)).unwrap().unwrap();
+        let deleted = Arc::new(AtomicU64::new(0));
+        let seen = deleted.clone();
+        let one = lamp_one().with_session_delete(Box::new(move |_| {
+            seen.fetch_add(1, Ordering::AcqRel);
+            Ok(())
+        }));
+        let pane = Pane::default();
+        one.open_if_due(&pane, &pane_place());
+        let mut launch = job.launch.clone();
+        launch.target.machine_id = PANE_MACHINE.into();
+        let outcome = crate::one_session::spoken_launch(&one, &pane, &launch).unwrap();
+        assert!(
+            matches!(outcome, LaunchOutcome::Joined { .. }),
+            "{outcome:?}"
+        );
+        // The store's own record of the join, with an id it can observe
+        // (the fake pane's is `a`).
+        const AGENT: &str = "00000001-1111-4111-8111-111111111111";
+        let joined = LaunchOutcome::Joined {
+            agent_id: AGENT.into(),
+            session: None,
+        };
+        engine.finish_launch(id, joined, &clock(1)).unwrap();
+        assert_eq!(
+            one.spoken_holder().as_deref(),
+            Some(job.launch.name.as_str())
+        );
+        let observe = Request::Observe {
+            guard: guard(&engine, "observe"),
+            id,
+        };
+        engine.handle(&observe, &clock(10), false).unwrap();
+        let read = engine.begin_observation(&clock(10)).unwrap().unwrap();
+        let asking = Observation {
+            agent_id: AGENT.into(),
+            state: "needs-input".into(),
+            ask: Some("Allow the command?".into()),
+            answer: String::new(),
+            truncated: false,
+            tools: 1,
+        };
+        engine
+            .finish_observation(&read, asking, &clock(10))
+            .unwrap();
+        one_session_holds(&one, &engine, None, false, &clock(11));
+        assert!(!one.drop_if_due(&pane), "just asked: still held");
+        one_session_holds(
+            &one,
+            &engine,
+            None,
+            false,
+            &clock(10 + crate::engine::UNTOLD_CLOSE_MS),
+        );
+        assert!(one.drop_if_due(&pane), "asking past the bound: let go");
+        assert_eq!(pane.closes.load(Ordering::Acquire), 1);
+        assert_eq!(deleted.load(Ordering::Acquire), 1);
+        assert_eq!(one.spoken_holder(), None);
+    }
+
+    /// The Reviewer-lead's #3 on #7258 (#7246): with no pane open, a spoken
+    /// task on the tasks-harness worker makes no `harness new`: it is
+    /// `busy` at once (put back), the store holds the next one, and the
+    /// one-session thread's open makes the pane.
+    #[test]
+    fn with_no_pane_a_spoken_task_makes_no_new_and_the_thread_opens_it() {
+        let one = lamp_one();
+        let pane = Pane::default();
+        one.knows(&pane_place());
+        let spoken = spoken_to_the_lamp("task-1");
+        assert!(
+            pane_turn(&one, &[&spoken], None, false),
+            "held in the store with no pane"
+        );
+        let began = Instant::now();
+        let outcome = crate::one_session::spoken_launch(&one, &pane, &spoken);
+        assert_eq!(
+            outcome,
+            Some(LaunchOutcome::NotSent {
+                code: "busy".into()
+            })
+        );
+        assert!(began.elapsed() < Duration::from_millis(200));
+        assert_eq!(
+            pane.opens.load(Ordering::Acquire),
+            0,
+            "no new on the worker"
+        );
+        assert!(put_back(&outcome.unwrap(), Duration::from_secs(1)));
+        one.open_if_due(&pane, &pane_place());
+        assert_eq!(
+            pane.opens.load(Ordering::Acquire),
+            1,
+            "the thread opened it"
+        );
+        assert!(!pane_turn(&one, &[&spoken], None, false));
+        assert!(matches!(
+            crate::one_session::spoken_launch(&one, &pane, &spoken),
+            Some(LaunchOutcome::Joined { .. })
+        ));
+        assert_eq!(pane.opens.load(Ordering::Acquire), 1);
+    }
+
+    /// The Reviewer-lead's #3 on #7258 (#7246): with the pane's rotation
+    /// due, a spoken task neither closes nor opens a pane on the worker;
+    /// the one-session thread rotates it.
+    #[test]
+    fn with_a_rotation_due_the_spoken_path_neither_closes_nor_opens() {
+        let one = lamp_one();
+        let pane = Pane::default();
+        one.open_if_due(&pane, &pane_place());
+        assert_eq!(pane.opens.load(Ordering::Acquire), 1);
+        // Past the rotation's token bound.
+        one.count_answer(&"x".repeat(4 * crate::one_session::ROTATE_TOKENS as usize));
+        let spoken = spoken_to_the_lamp("task-1");
+        assert!(
+            pane_turn(&one, &[&spoken], None, false),
+            "held for the rotation"
+        );
+        let outcome = crate::one_session::spoken_launch(&one, &pane, &spoken);
+        assert_eq!(
+            outcome,
+            Some(LaunchOutcome::NotSent {
+                code: "busy".into()
+            })
+        );
+        assert_eq!(
+            pane.opens.load(Ordering::Acquire),
+            1,
+            "no new on the worker"
+        );
+        assert_eq!(
+            pane.closes.load(Ordering::Acquire),
+            0,
+            "no close on the worker"
+        );
+        one.open_if_due(&pane, &pane_place());
+        assert_eq!(
+            pane.closes.load(Ordering::Acquire),
+            1,
+            "the thread rotated it"
+        );
+        assert_eq!(pane.opens.load(Ordering::Acquire), 2);
+        assert!(!pane_turn(&one, &[&spoken], None, false));
+    }
+
+    /// Heron's H4 on #7258 (#7246): a spoken task whose words are never
+    /// seen taken is `Uncertain`, never `Joined` (the store's next idle
+    /// read could be the last turn's answer), and never typed again.
+    #[test]
+    fn a_spoken_task_whose_words_are_not_seen_taken_is_uncertain() {
+        // The open's first-turn bound far past the spoken one (300 ms):
+        // the worker's wait ends at the spoken bound (Heron's P2).
+        let one = crate::one_session::OneSession::new(
+            Duration::from_secs(60),
+            Duration::from_millis(10),
+            Duration::from_secs(10),
+        )
+        .with_session_delete(Box::new(|_| Ok(())))
+        .with_spoken_bound(Duration::from_millis(300), Arc::new(AtomicBool::new(false)));
+        let pane = Pane::default();
+        one.open_if_due(&pane, &pane_place());
+        pane.loses_typed.store(true, Ordering::Release);
+        let began = Instant::now();
+        let outcome = crate::one_session::spoken_launch(&one, &pane, &spoken_to_the_lamp("task-1"));
+        assert!(
+            began.elapsed() < Duration::from_secs(3),
+            "{:?}",
+            began.elapsed()
+        );
+        assert_eq!(
+            outcome,
+            Some(LaunchOutcome::Uncertain {
+                code: "one_session_not_taken".into()
+            })
+        );
+    }
+
+    /// c0a4, 16 Nov 16:56 (#7258): a send slower than the spoken bound
+    /// (on the lamp a `show` and the `reply` take 5-7 s, the bound is 5 s)
+    /// still has its words looked for, and the turn joins; the taken-wait
+    /// is bounded from the send, not from the launch's start.
+    #[test]
+    fn a_spoken_task_whose_send_outlasts_the_spoken_bound_still_joins() {
+        let one = crate::one_session::OneSession::new(
+            Duration::from_secs(60),
+            Duration::from_millis(10),
+            Duration::from_secs(10),
+        )
+        .with_session_delete(Box::new(|_| Ok(())))
+        .with_spoken_bound(Duration::from_millis(300), Arc::new(AtomicBool::new(false)));
+        let pane = Pane::default();
+        one.open_if_due(&pane, &pane_place());
+        pane.type_ms.store(400, Ordering::Release);
+        let outcome = crate::one_session::spoken_launch(&one, &pane, &spoken_to_the_lamp("task-1"));
+        assert!(
+            matches!(outcome, Some(LaunchOutcome::Joined { .. })),
+            "{outcome:?}"
+        );
+    }
+
+    /// Heron's H2 on #7258 (#7246): with four skill runs waiting, a spoken
+    /// task is not refused busy for them: only skill runs count toward the
+    /// queue's cap, and a fifth skill run is still refused.
+    #[test]
+    fn four_skill_runs_waiting_never_refuse_a_spoken_task() {
+        use crate::one_session::{Kind, Refused};
+        let one = Arc::new(lamp_one());
+        let holder = one
+            .enter(
+                "skill-0",
+                Kind::Skill,
+                Instant::now() + Duration::from_secs(5),
+                &|| false,
+            )
+            .unwrap();
+        let waiters: Vec<_> = (1..=4)
+            .map(|n| {
+                let one = one.clone();
+                thread::spawn(move || {
+                    let until = Instant::now() + Duration::from_secs(5);
+                    drop(one.enter(&format!("skill-{n}"), Kind::Skill, until, &|| false));
+                })
+            })
+            .collect();
+        let until = Instant::now() + Duration::from_secs(5);
+        while one.waiting() < 4 && Instant::now() < until {
+            thread::sleep(Duration::from_millis(5));
+        }
+        assert_eq!(one.waiting(), 4);
+        let soon = Instant::now() + Duration::from_millis(100);
+        assert_eq!(
+            one.enter("skill-5", Kind::Skill, soon, &|| false).err(),
+            Some(Refused::Busy)
+        );
+        assert_eq!(
+            one.enter("task-1", Kind::Spoken, soon, &|| false).err(),
+            Some(Refused::Ended),
+            "the spoken task waited its turn, not refused busy"
+        );
+        drop(holder);
+        for waiter in waiters {
+            waiter.join().unwrap();
+        }
+    }
+
+    /// Heron's H5 on #7258 (#7246), as the coordinator ruled: before the
+    /// lamp's place is known, a hand-over that may be for its pane is held
+    /// in the queue, never the per-run way. Once the place is known (and
+    /// the thread opened the pane) it goes into the pane; held past the
+    /// queue's wait it fails `busy`, with no `harness new`. One to another
+    /// engine, named for a session, or to another machine once the lamp's
+    /// is looked at, goes on.
+    #[test]
+    fn before_the_lamps_place_is_known_a_hand_over_for_it_waits() {
+        let one = lamp_one();
+        let pane = Pane::default();
+        let spoken = spoken_to_the_lamp("task-1");
+        let cap = Duration::from_secs(60);
+        let start = Instant::now();
+        let mut held = None;
+        assert_eq!(
+            place_wait(&one, Some(&spoken), &mut held, start, cap),
+            PlaceWait::Hold
+        );
+        assert_eq!(
+            place_wait(&one, Some(&spoken), &mut held, start + cap / 2, cap),
+            PlaceWait::Hold
+        );
+        assert_eq!(
+            crate::one_session::for_the_pane(&one, &spoken),
+            None,
+            "the per-run way, were it sent now"
+        );
+        let hermes = Launch {
+            target: Target {
+                engine: EngineKind::Hermes,
+                ..spoken.target.clone()
+            },
+            ..spoken.clone()
+        };
+        assert_eq!(
+            place_wait(&one, Some(&hermes), &mut None, start, cap),
+            PlaceWait::Go
+        );
+        let named = Launch {
+            session: Some("docs".into()),
+            ..spoken.clone()
+        };
+        assert_eq!(
+            place_wait(&one, Some(&named), &mut None, start, cap),
+            PlaceWait::Go
+        );
+        one.look(
+            &mut crate::one_session::Looks::default(),
+            Instant::now(),
+            Some(format!("{PANE_MACHINE} openclaw")),
+            &|| Err::<(Pane, crate::one_session::Place), _>("the daemon is down".to_owned()),
+        );
+        let elsewhere = Launch {
+            target: Target {
+                machine_id: "fedcba9876543210fedcba9876543210".into(),
+                ..spoken.target.clone()
+            },
+            ..spoken.clone()
+        };
+        assert_eq!(
+            place_wait(&one, Some(&elsewhere), &mut None, start, cap),
+            PlaceWait::Go
+        );
+        // Held past the queue's wait: it gives up, with no `new`.
+        let mut late = None;
+        assert_eq!(
+            place_wait(&one, Some(&spoken), &mut late, start, cap),
+            PlaceWait::Hold
+        );
+        assert_eq!(
+            place_wait(&one, Some(&spoken), &mut late, start + cap, cap),
+            PlaceWait::GiveUp
+        );
+        assert_eq!(pane.opens.load(Ordering::Acquire), 0);
+        // The place known and the pane opened: the held task goes in.
+        one.open_if_due(&pane, &pane_place());
+        assert_eq!(
+            place_wait(&one, Some(&spoken), &mut held, start + cap / 2, cap),
+            PlaceWait::Go
+        );
+        assert!(!pane_turn(&one, &[&spoken], None, false));
+        assert!(matches!(
+            crate::one_session::spoken_launch(&one, &pane, &spoken),
+            Some(LaunchOutcome::Joined { .. })
+        ));
+        assert_eq!(pane.opens.load(Ordering::Acquire), 1);
     }
 
     /// #7275: the owner's mark on the daemon gate follows its start due or
