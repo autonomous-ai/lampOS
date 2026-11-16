@@ -3520,9 +3520,9 @@ struct DownLine {
     /// [`DOWN_LINE_LIMIT`].
     limit: Mutex<Option<Vec<i16>>>,
     /// When the first of the 429s before any word came, with no chat round
-    /// begun and no other refusal since, and whether this run has said
+    /// begun and no other refusal since, and when this run last said
     /// [`DOWN_LINE_LIMIT`] (#7346).
-    refused_since: Mutex<Option<(tokio::time::Instant, bool)>>,
+    refused_since: Mutex<Option<(tokio::time::Instant, Option<tokio::time::Instant>)>>,
     rendering: AtomicBool,
     /// When the last was said, and whether it was [`DOWN_LINE_AGAIN`].
     said_at: Mutex<Option<(tokio::time::Instant, bool)>>,
@@ -3629,7 +3629,7 @@ impl DownLine {
             return None;
         }
         let now = tokio::time::Instant::now();
-        let lasted = now.duration_since(since.get_or_insert((now, false)).0);
+        let lasted = now.duration_since(since.get_or_insert((now, None)).0);
         (word || lasted >= LIMIT_AFTER).then_some(lasted)
     }
 
@@ -3641,23 +3641,27 @@ impl DownLine {
     }
 
     /// [`DOWN_LINE_LIMIT`]: `None` when not rendered yet (the slow line
-    /// then, as before), `Some(None)` when this run of 429s has said it
-    /// (once a run, V2's ruling on #7362's row: nothing then), else its clip.
-    fn limit_due(&self) -> Option<Option<Vec<i16>>> {
+    /// then, as before); else its clip for the run's first line, and after
+    /// that only for a line that names the lamp (`named`), at most once in
+    /// [`LIMIT_AGAIN_NAMED`]; `Some(None)`, no words, for every other (the
+    /// first builder's ruling on #7362, 23:56).
+    fn limit_due(&self, named: bool) -> Option<Option<Vec<i16>>> {
         let clip = self.limit.lock().ok()?.clone()?;
-        let said = self
-            .refused_since
-            .lock()
-            .ok()?
-            .is_some_and(|(_, said)| said);
-        Some((!said).then_some(clip))
+        let said_at = self.refused_since.lock().ok()?.and_then(|(_, at)| at);
+        let due = match said_at {
+            None => true,
+            Some(at) => {
+                named && tokio::time::Instant::now().duration_since(at) >= LIMIT_AGAIN_NAMED
+            }
+        };
+        Some(due.then_some(clip))
     }
 
     fn limit_said(&self) {
         if let Ok(mut since) = self.refused_since.lock()
-            && let Some((_, said)) = since.as_mut()
+            && let Some((_, at)) = since.as_mut()
         {
-            *said = true;
+            *at = Some(tokio::time::Instant::now());
         }
     }
 
@@ -8249,20 +8253,22 @@ const LIMIT_RENDER_WITHIN: Duration = Duration::from_secs(3);
 /// ahead; one that can't be rendered in [`LIMIT_RENDER_WITHIN`] (the voice
 /// may be at the same limit) says the plain line rendered ahead. The slow
 /// line ([`say_down`]) while the plain one isn't rendered. Tells the
-/// coordinator as [`say_down`] does, so no `turn_lost` follows it; a later
-/// ask in the same run hears nothing and tells it too, so no `turn_lost`
-/// is said over it either (the Reviewer-lead's question on #7362).
+/// coordinator as [`say_down`] does, so no `turn_lost` follows it. After
+/// the run's first, only a line that names the lamp (`named`) hears it
+/// again, once in [`LIMIT_AGAIN_NAMED`]; every other ask hears nothing and
+/// tells the coordinator too, so no `turn_lost` or other line is said over
+/// it (the Reviewer-lead's question and the first builder's ruling on
+/// #7362).
 async fn say_limit(
     shared: &Shared,
-    request: u64,
-    heard: bool,
+    (request, heard, named): (u64, bool, bool),
     lasted: Duration,
     reset: Option<i64>,
 ) -> Result<(), Stop> {
     let Some(down) = shared.down.as_ref().filter(|_| heard) else {
         return Ok(());
     };
-    let Some(due) = down.limit_due() else {
+    let Some(due) = down.limit_due(named) else {
         return say_down(shared, request, heard).await;
     };
     if let Some(plain) = due {
@@ -8303,7 +8309,12 @@ async fn say_limit(
         );
     } else {
         eprintln!(
-            "lamp-voice second: request {request} heard nothing: its usage limit was said earlier in this run"
+            "lamp-voice second: request {request} heard nothing: its usage limit was said earlier in this run ({})",
+            if named {
+                "named within 5 min of it"
+            } else {
+                "not named"
+            }
         );
     }
     if !shared.emit(ProviderOutput::DownLineSaid { request }).await {
@@ -15662,6 +15673,15 @@ async fn answer(
 ) {
     let (request, scope) = context;
     let heard = asked == Asker::Spoken;
+    // Whether the line names the lamp, known without the model: the name
+    // in its words, its name detector's note, or a wake by name before it
+    // (#7346: after the first usage-limit line, only such a line hears it).
+    let named = heard
+        && (crate::attention::called_by_name_on(&said, true)
+            || notes.iter().any(|note| {
+                [crate::called::NOTE, crate::called::NOTE_HEARD_AS].contains(&note.as_str())
+            })
+            || crate::attention::marked_woken_by_name(request).is_some());
     // Each round's prompt journaled for a cut-in (`LAMP_CUT_IN_PROMPT_LOG`).
     let logs_prompt = heard && shared.logs_prompt_of(request);
     let looking = matches!(asked, Asker::Written { looking: true, .. });
@@ -17060,7 +17080,8 @@ async fn answer(
                                 .as_ref()
                                 .and_then(|down| down.refused(status, word.is_some()));
                             if let Some(lasted) = limited {
-                                say_limit(shared, request, heard, lasted, word.flatten()).await?;
+                                say_limit(shared, (request, heard, named), lasted, word.flatten())
+                                    .await?;
                             } else if passing(status) {
                                 say_down(shared, request, heard).await?;
                             } else {

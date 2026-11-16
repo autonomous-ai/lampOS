@@ -599,17 +599,26 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   3 s (`LIMIT_RENDER_WITHIN`); if the voice can't render it (it may be at
   the same limit), the plain line rendered ahead with the other down lines
   is said instead, and with no local time known, the plain line too. It is
-  said once a run of 429s: every later ask in the same run hears nothing,
-  however long the run lasts (V2's ruling on #7362's row: on lamp-52e6 at
-  23:21 and again at 23:24 it was said twice in one run), and still sends
-  `DownLineSaid`, so the coordinator says no `turn_lost` over it either
-  (the Reviewer-lead's question on #7362: `turn_lost` is an audible
-  recording). Any chat round that begins, or a refusal with another status,
-  ends the run, and a later run says it once again. Until the plain line is
-  rendered the slow line is said as before. Its journal: `said it has hit
-  its usage limit (429s for N s)`, `, with when it comes back` when timed,
-  and `heard nothing: its usage limit was said earlier in this run` for the
-  quiet asks. The journal: `said its thoughts are slow`,
+  said to the first line heard in a run of 429s. After that, only a line
+  that names the lamp hears it again, at most once in five minutes
+  (`LIMIT_AGAIN_NAMED`); every other line hears no words at all, not the
+  limit line, the slow line nor the no-answer line (the first builder's
+  ruling on #7362, 23:56: a line to every heard line announces the limit to
+  a busy room all evening, and silence to every ask leaves an owner who
+  asks twenty minutes on thinking it broke; on lamp-52e6 at 23:21 and 23:24
+  it was said twice in one run). A line names the lamp when the model isn't
+  needed to tell: the name in its words (`attention::called_by_name_on`),
+  the name detector's note beside it (`called::NOTE`, `NOTE_HEARD_AS`), or
+  a wake by name just before it (`attention::marked_woken_by_name`). A
+  quiet ask still sends `DownLineSaid`, so the coordinator says no
+  `turn_lost` over it (the Reviewer-lead's question on #7362: `turn_lost`
+  is an audible recording). Any chat round that begins, or a refusal with
+  another status, ends the run, and the next run's first line hears it
+  again. Until the plain line is rendered the slow line is said as before.
+  Its journal: `said it has hit its usage limit (429s for N s)`, `, with
+  when it comes back` when timed, and `heard nothing: its usage limit was
+  said earlier in this run (not named)` or `(named within 5 min of it)` for
+  the quiet asks. The journal: `said its thoughts are slow`,
   and `(again, the shorter line)` for the second. Once the slow line (either
   one) or the usage-limit line has been handed over, or a quiet ask in a
   limit run has ended, the route sends `DownLineSaid` for the request,
