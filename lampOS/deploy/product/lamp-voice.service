@@ -359,6 +359,9 @@ Environment=LAMP_NAME_IN_PASSING=ignored
 # about its own work and its name heard with no face are played: without it a busy room holds every line nobody calls it in, and a held line
 # starts no conversation (lamp-4ace, 17 Oct 19:08: 6 of 12 day lines without it, 11 of 12 with it; #828).
 Environment=LAMP_SPOKEN_TO=on
+# Inside a live back-and-forth a follow-up the model lets pass still renews the call for the caller's next line, and the
+# next line is told it is theirs (#7332: lamp-74ff, 16 Nov, three of the owner's lines in 26 s held). Caller's face only.
+Environment=LAMP_BUSY_FOLLOW_UP_RENEWS=on
 # "Lamp," that Deepgram writes "One," calls the lamp, "Wang," and "Lung," too with one person in a conversation,
 # and a retry of a line held as said to someone by name is no reply to them (#4710, lamp-3e83 2 Nov). On after the
 # tester's check on lamp-3e83 (3 Nov, 9680: "One, …" and its retry answered, held on 2 Nov) and lamp-06c1's played
