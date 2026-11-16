@@ -2380,6 +2380,7 @@ dependencies = [
  "lamp-bus",
  "lamp-keeper",
  "lamp-msgs",
+ "libc",
  "serde",
  "serde_json",
  "tokio",
