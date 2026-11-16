@@ -8,7 +8,7 @@ use serde::Deserialize;
 use std::{
     sync::{
         Arc, OnceLock,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -574,6 +574,9 @@ pub struct SttStream {
     on_flux: bool,
     /// [`QUIET_HELD_ENVIRONMENT`]: a pause's quiet is held back.
     holds_quiet: bool,
+    /// The samples queued on this line, for the day's tally of what its
+    /// sound came to (`crate::day_tally::line_ended`, #7347).
+    queued_samples: AtomicU64,
 }
 
 /// Words a stream has before they are final, for a chat begun on them
@@ -733,6 +736,7 @@ impl SttStream {
             quiet_end,
             on_flux,
             holds_quiet: quiet_held(),
+            queued_samples: AtomicU64::new(0),
         }
     }
 
@@ -779,7 +783,10 @@ impl SttStream {
     /// queue is full (the service stopped reading); nothing waits.
     pub fn send(&self, samples: &[i16]) -> Result<()> {
         let bytes = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
-        self.queue(Outgoing::Audio(bytes))
+        self.queue(Outgoing::Audio(bytes))?;
+        self.queued_samples
+            .fetch_add(samples.len() as u64, Ordering::Relaxed);
+        Ok(())
     }
 
     /// Ask for the words of everything sent so far, and keep the stream
@@ -819,7 +826,10 @@ impl SttStream {
     /// Dropping the stream instead abandons it at once. Journals, for
     /// `request`, what the words' state was when the line ended.
     pub async fn finish(self, request: u64) -> Result<String> {
+        let queued = self.queued_samples.load(Ordering::Relaxed);
         let (words, at_end) = self.finish_told(true).await?;
+        // What this line's sound came to, for the day (#7347).
+        crate::day_tally::line_ended(Some(request), queued, words.trim().is_empty());
         if let Some(at_end) = at_end {
             eprintln!("lamp-voice second: request {request} at the line's end: {at_end}");
         }
@@ -830,7 +840,11 @@ impl SttStream {
     /// ([`crate::stop_words`], #828), which are not a request. They wait for
     /// `CloseStream` when `Finalize`'s answer is short ([`Self::quiet_end`]).
     pub async fn finished(self) -> Result<String> {
-        self.finish_told(false).await.map(|(words, _)| words)
+        let queued = self.queued_samples.load(Ordering::Relaxed);
+        let (words, _) = self.finish_told(false).await?;
+        // A stop word's line is no request's (#7347).
+        crate::day_tally::line_ended(None, queued, words.trim().is_empty());
+        Ok(words)
     }
 
     /// The words, and the journal's account of the end of the line;
