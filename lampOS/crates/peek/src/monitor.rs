@@ -175,6 +175,12 @@ pub fn lan_peer(peer: IpAddr) -> bool {
     }
 }
 
+/// Whether `peer` is inside the lamp's own interface subnet, `local` (the
+/// address the request came to) with that interface's `prefix` length.
+pub fn on_the_lamps_subnet(_local: IpAddr, _prefix: u32, _peer: IpAddr) -> bool {
+    false
+}
+
 /// Whether `host` (a `Host` header) is one of `names` or the address the
 /// request came to, with or without a port: no other name, so that a page
 /// elsewhere cannot reach the lamp under a name of its own (DNS rebinding).
@@ -307,6 +313,27 @@ mod tests {
         ] {
             assert!(!lan_peer(far.parse().unwrap()), "{far}");
         }
+    }
+
+    /// #7208: the office LAN is 172.168.20.0/24, not RFC1918; lamp-52e6 at
+    /// 172.168.20.21 refused a Mac at 172.168.20.239.
+    #[test]
+    fn a_peer_on_the_lamps_own_subnet_is_answered() {
+        let ip = |text: &str| text.parse::<IpAddr>().unwrap();
+        let local = ip("172.168.20.21");
+        assert!(!lan_peer(ip("172.168.20.239")), "172.168 is not RFC1918");
+        assert!(on_the_lamps_subnet(local, 24, ip("172.168.20.239")));
+        assert!(on_the_lamps_subnet(local, 24, ip("::ffff:172.168.20.239")));
+        assert!(on_the_lamps_subnet(local, 16, ip("172.168.21.5")));
+        assert!(!on_the_lamps_subnet(local, 24, ip("172.168.21.5")));
+        assert!(!on_the_lamps_subnet(local, 24, ip("8.8.8.8")));
+        assert!(!lan_peer(ip("8.8.8.8")));
+        assert!(!on_the_lamps_subnet(local, 0, ip("8.8.8.8")), "no /0");
+        assert!(!on_the_lamps_subnet(local, 33, ip("172.168.20.21")));
+        assert!(!on_the_lamps_subnet(local, 24, ip("fe80::1")));
+        let v6 = ip("2001:db8:1::5");
+        assert!(on_the_lamps_subnet(v6, 64, ip("2001:db8:1::9")));
+        assert!(!on_the_lamps_subnet(v6, 64, ip("2001:db8:2::9")));
     }
 
     #[test]
