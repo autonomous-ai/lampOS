@@ -1538,26 +1538,29 @@ của task của một kỹ năng):
   chưa bật và giờ không lời đồng ý nào bật được nó, nên người dùng có thể nhờ
   tạo lại (trong 120 s nó đã được báo kỹ năng đang chờ, cùng `approve_id`,
   như trước);
-- một câu trả lời có chủ ngữ là kỹ năng ("the skill", "your skill", tên đọc
-  của nó, hoặc "it" ở một dòng chỉ là lời đồng ý) và nói nó đã bật, sẵn sàng,
-  đã cài, đang chạy hay đã tạo, hoặc "I've turned it on" và tương tự, không có
-  "not", "n't", "never", "yet", điều kiện ("once", "when", "if", "after",
-  "until") hay lời xin đồng ý, và không có '?' (`made_not_on::claims_on`), thì
-  không được nói, cả phần còn lại của vòng đó cũng vậy. Cuối vòng, một vòng có
-  gọi `make_skill` với `approve_id` bỏ những lời đó không nói (vòng sau nói từ
-  câu trả lời của lời gọi đó); vòng khác nói "It isn't on yet: say yes to me
-  while you're at the lamp, and I'll turn it on." trong 120 s, hoặc "It isn't
-  on yet: your yes didn't come in time, so ask me to make it again." khi đã
-  quá, một lần mỗi lượt, bằng ngôn ngữ của chủ đèn. Khi bộ chặn đang giữ, những
-  từ đầu của một vòng chờ đến hết câu (không nói sớm một mệnh đề), nên một lời
-  nói đã bật không bao giờ bị nói dở.
+- câu trả lời của mỗi vòng được giữ đến cuối vòng. Bên cạnh một lời gọi
+  `make_skill` có `approve_id` nó không được nói (vòng sau nói từ câu trả lời
+  của lời gọi đó). Nếu không, chính mô hình chat của route, được hỏi không kèm
+  hàm nào trong một lời gọi ngắn giới hạn 1,5 s (`made_not_on::JUDGE_WITHIN`,
+  `judge_messages`), phán đoán nó ở mọi ngôn ngữ, không bao giờ bằng danh sách
+  từ (quy tắc của chủ đèn ngày 13/11): "Does this reply tell the person that
+  the skill <name> is on now, or that it will run? Answer only yes or no." Có:
+  "It isn't on yet: say yes to me while you're at the lamp, and I'll turn it
+  on." được nói thay trong 120 s, hoặc "It isn't on yet: your yes didn't come
+  in time, so ask me to make it again." khi đã quá. Không: nó được nói như nó
+  đến. Không có câu trả lời rõ kịp lúc: nó được nói, rồi câu cố định, vốn đúng
+  vì kỹ năng chưa bật. Câu cố định được nói nhiều nhất một lần mỗi lượt, bằng
+  ngôn ngữ của chủ đèn. Chỉ những lượt này chờ đến cuối vòng và lần kiểm tra
+  (số ms ghi trong journal); những từ đầu của chúng chờ đến hết câu.
 Khi lời đồng ý đã được nhận (lần chờ không còn), không gì bị giữ: "It's on
 now." sau một lời đồng ý đã chạy được nói. Tắt, hoặc không có kỹ năng như vậy,
 một lượt giữ nguyên từng byte như trước. Cửa sổ của lời đồng ý không đổi: một
 lời đồng ý sau 120 s vẫn không được nhận. Kiểm thử: `made_not_on::tests::*`,
 `second_provider::tests::made_not_on::a_late_yes_with_no_call_is_told_not_on_and_its_claim_is_replaced`,
-`a_yes_in_the_wait_answered_with_no_call_is_said_not_on_yet`,
-`a_real_yes_still_puts_it_on_with_no_note`,
+`every_claim_the_judge_holds_is_said_not_on_yet`,
+`a_reply_judged_no_claim_is_said`,
+`a_judge_past_its_time_says_the_reply_then_the_fixed_line`,
+`a_real_yes_still_puts_it_on_with_no_line`,
 `with_no_skill_waiting_nothing_changes`.
 
 **Gỡ bằng giọng nói** (#6960, ba lần thử của Twelve trên lamp-c0a4, 12843:
