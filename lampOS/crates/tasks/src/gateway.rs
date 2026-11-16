@@ -1755,6 +1755,7 @@ mod tests {
             answer: std::sync::OnceLock::new(),
             write: false,
             not_made: Default::default(),
+            net: false,
         }
     }
 

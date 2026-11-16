@@ -2449,8 +2449,9 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
 /// grants (`task::grants_of`), a made skill's own code and an uploaded
 /// agent skill (`task::origin_refuses`), a write step, a made skill's
 /// lamp-written limits left out (`shed_made_manners`) and a skill's
-/// `[present]` values. Each is set `on` once in both units, and the
-/// network grant (`LAMP_TASK_NET`, read by `grants_of` too) in neither.
+/// `[present]` values. Each is set `on` once in both units, and so is the
+/// network grant (`LAMP_TASK_NET`, read by `grants_of` too; on in the
+/// product with #7200, so a `net` skill loads on the page as it runs).
 #[test]
 fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
     let loading = [
@@ -2490,9 +2491,14 @@ fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
             );
         }
         let net = lamp_voice::skill_task_yes::NET_ENVIRONMENT;
+        assert_eq!(
+            lines.iter().filter(|line| line.contains(net)).count(),
+            1,
+            "{unit} names {net} but once"
+        );
         assert!(
-            !lines.iter().any(|line| line.contains(net)),
-            "{unit} sets {net}"
+            lines.contains(&format!("Environment={net}=on").as_str()),
+            "{unit} lacks {net}=on"
         );
     }
 }

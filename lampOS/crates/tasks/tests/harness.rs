@@ -7452,6 +7452,7 @@ fn skill_runner_with(
             Box::new(|| Some(1)),
         ),
         makes: false,
+        egress: None,
     }
 }
 
@@ -7476,6 +7477,7 @@ fn skill_run(deadline: Duration) -> SkillRun {
         start_in: None,
         env_file: None,
         answer: Default::default(),
+        net: false,
     }
 }
 
@@ -8670,6 +8672,171 @@ fn a_gateway_default_whose_start_never_ran_fails_and_hermes_is_as_before() {
     assert!(!new.to_string().contains("skill-start"), "{new}");
     assert!(!runner.starts.is_live("task-1"));
     nothing_left(&rig);
+}
+
+/// An agent namespace script that takes a run granted `net` by the one
+/// run path: [`ns_with_runs`] with the egress lines (a `skill-` name too)
+/// and Hermes's make lines.
+fn ns_with_net_runs() -> String {
+    format!(
+        "{}{}\n  {} fail ;; esac\n{}",
+        ns_with_runs(),
+        lamp_tasks::egress::NS_LINE,
+        lamp_tasks::egress::NS_SKILL_LINE,
+        lamp_tasks::skill_make::ONE_PATH_NS_MAKE_LINES
+    )
+}
+
+/// #7200 fix (a): a run granted `net` by the one run path goes through
+/// Harness as every run, and its egress socket `skill-<run id>.sock` is
+/// made before `harness new` (there while Harness starts it, for the
+/// wrapper to find by the run's id) and gone after the run. A wrapper or
+/// namespace script without the lines that find it, a gateway default
+/// (OpenClaw), or no egress at all in lamp-tasks: refused in
+/// [`skill_task::NET_REFUSED`]'s words, nothing asked of Harness, no
+/// socket and no token file.
+#[test]
+fn a_net_run_by_the_one_run_path_gets_its_egress_socket_before_harness_new() {
+    let egress_of = |rig: &Rig| lamp_tasks::egress::Grant {
+        dir: rig.root.path().join("egress"),
+        ..lamp_tasks::egress::Grant::lamp()
+    };
+    let net_run = || {
+        let mut run = skill_run(Duration::from_secs(20));
+        run.net = true;
+        run
+    };
+    assert!(skill_task::takes_net_runs(
+        ONE_PATH_HERMES,
+        &ns_with_net_runs()
+    ));
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        // Slow enough to look for the socket while Harness starts the run.
+        "new":{"default":true,"delay_ms":600},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_net_runs()),
+    );
+    runner.egress = Some(egress_of(&rig));
+    let socket = rig.root.path().join("egress/skill-task-1.sock");
+    let seen = std::sync::atomic::AtomicBool::new(false);
+    let done = std::sync::atomic::AtomicBool::new(false);
+    let ran = std::thread::scope(|scope| {
+        scope.spawn(|| {
+            use std::os::unix::fs::FileTypeExt;
+            while !done.load(std::sync::atomic::Ordering::Acquire) {
+                let asked_new = rig.calls().iter().any(|call| call["args"][0] == "new");
+                if fs::symlink_metadata(&socket).is_ok_and(|meta| meta.file_type().is_socket())
+                    && !asked_new
+                {
+                    seen.store(true, std::sync::atomic::Ordering::Release);
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        });
+        let ran = runner.run(&net_run(), &|| {});
+        done.store(true, std::sync::atomic::Ordering::Release);
+        ran
+    });
+    assert_eq!(ran, Ok(0));
+    assert!(
+        seen.load(std::sync::atomic::Ordering::Acquire),
+        "made before harness new"
+    );
+    assert!(!socket.exists(), "gone after the run");
+    let verbs: Vec<String> = rig
+        .calls()
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert!(verbs.contains(&"new".to_owned()), "{verbs:?}");
+    nothing_left(&rig);
+
+    let refused = |runner: HarnessRunner, rig: &Rig, why: &str| {
+        let said = runner.run(&net_run(), &|| {}).unwrap_err();
+        assert!(said.starts_with(skill_task::NET_REFUSED), "{said}");
+        assert!(said.contains(why), "{why}: {said}");
+        assert!(rig.calls().iter().all(|call| call["args"][0] != "new"));
+        assert!(!rig.root.path().join("egress").exists(), "no socket");
+        assert!(!rig.root.path().join("runs").exists(), "no token file");
+    };
+    // The namespace script takes no `skill-` egress socket.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_runs()),
+    );
+    runner.egress = Some(egress_of(&rig));
+    refused(
+        runner,
+        &rig,
+        "the lamp's default agent (hermes) has no wrapper",
+    );
+    // A wrapper without the lines that find it by the run's id.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let older = ONE_PATH_HERMES.replacen(skill_task::ONE_PATH_EGRESS_LINES[1], "", 1);
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", &older)],
+        Some(&ns_with_net_runs()),
+    );
+    runner.egress = Some(egress_of(&rig));
+    refused(runner, &rig, "has no wrapper or namespace line");
+    // Claude Code's data takes no fresh home: never its lasting one.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Claude,
+        &[("claude", ONE_PATH_CLAUDE)],
+        Some(&ns_with_net_runs()),
+    );
+    runner.egress = Some(egress_of(&rig));
+    refused(runner, &rig, "this agent takes no fresh home");
+    // A gateway default (OpenClaw): its turns run in its gateway's.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+        Some("#!/bin/sh\n"),
+    );
+    runner.egress = Some(egress_of(&rig));
+    refused(
+        runner,
+        &rig,
+        "the lamp's default agent (openclaw) runs its turns in its gateway's namespaces",
+    );
+    // No egress in lamp-tasks (LAMP_TASK_NET off there).
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_net_runs()),
+    );
+    refused(runner, &rig, "LAMP_TASK_NET is off in lamp-tasks");
 }
 
 /// A Gateway probe for a skill's run: ready from look `ready_from` (never
