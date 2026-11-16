@@ -303,6 +303,25 @@ impl Sitting {
         more.any()
     }
 
+    /// Forget the tiredness, desk work and celebrating seen: their timers
+    /// count from the arrival again, as if none was seen. `serve` does this
+    /// while the opt-in is off or the line naming them has not begun for
+    /// the kept yes, so nothing seen before is said after (the first
+    /// builder's condition on #6543: the opt-in off stops all of it).
+    pub fn forget_more(&mut self) {
+        self.tired_us = None;
+        self.tired_seen = 0;
+        self.tired_last_burst = false;
+        self.desk_work_us = None;
+        self.desk_work = DeskWork::Nothing;
+        self.desk_run_us = None;
+        self.desk_total_us = 0;
+        self.celebrate_us = None;
+        // Said on `humans/doing_more` too, so forgotten with it.
+        self.drank_seen = 0;
+        self.ate_seen = 0;
+    }
+
     /// With [`BREAK_IS_STANDING`] on, for a sitting begun at `now_us`: a
     /// stretch is no longer a break ([`Sitting::takes`]), and if
     /// `room/stood_up` came at `stood_up_us`, at or after the arrival this
@@ -719,6 +738,37 @@ mod tests {
         ]);
         assert!(run.tired);
         assert_eq!(run.desk_work, Some(DeskWork::Reading));
+    }
+
+    #[test]
+    fn forgetting_more_doings_counts_them_from_the_arrival_again() {
+        let mut sitting = Sitting::with_more(100 * S, true);
+        let seen = More {
+            tired: true,
+            desk_work: Some(DeskWork::Phone),
+            celebrate: true,
+        };
+        sitting.saw(
+            &[DoingSeen {
+                what: Doing::Eating,
+                confidence: 0.7,
+            }],
+            150 * S,
+        );
+        assert!(sitting.saw_more(&seen, 150 * S));
+        let doing = sitting.doing(200 * S);
+        sitting.forget_more();
+        assert_eq!(
+            sitting.doing_more(200 * S),
+            Sitting::with_more(100 * S, true).doing_more(200 * S),
+            "as if none was seen"
+        );
+        assert_eq!(sitting.doing(200 * S), doing, "humans/doing untouched");
+        // Seen again afterwards, counted once more.
+        assert!(sitting.saw_more(&seen, 210 * S));
+        let more_now = sitting.doing_more(220 * S).unwrap();
+        assert_eq!((more_now.tired_s_ago, more_now.tired_seen), (10, 1));
+        assert_eq!(more_now.desk_work, DeskWork::Phone);
     }
 
     #[test]

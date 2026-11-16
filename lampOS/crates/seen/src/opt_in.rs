@@ -45,7 +45,7 @@ pub const STATE_FOLDER: &str = "/var/lib/lampos-seen";
 
 /// The said-back record's file in the state folder: on, with the yes's
 /// `at_unix_s` (`null` for a yes with no time) and whether the line said
-/// named posture, or off.
+/// named posture and tiredness, desk work and celebrating, or off.
 pub const SAID_FILE: &str = "said-back.json";
 
 /// Where the opt-in is kept.
@@ -61,21 +61,26 @@ pub enum Said {
     /// That it is on, for the kept yes with this `at_unix_s` (`None` for a
     /// yes with no time), and whether the line said named posture
     /// ([`crate::said_back::POSTURE_ON_LINE`]): posture sends no frame for
-    /// a yes whose line did not name it.
+    /// a yes whose line did not name it; and whether it named tiredness,
+    /// desk work and celebrating ([`crate::said_back::MORE_ON_LINE`]):
+    /// `humans/doing_more` is said for no yes whose line did not name them.
     On {
         for_at_unix_s: Option<u64>,
         posture: bool,
+        more: bool,
     },
     /// That it is off.
     Off,
 }
 
 impl Said {
-    /// The on said back for `kept`, naming posture or not.
-    pub fn on_for(kept: &Kept, posture: bool) -> Self {
+    /// The on said back for `kept`, naming posture or not, and tiredness,
+    /// desk work and celebrating or not.
+    pub fn on_for(kept: &Kept, posture: bool, more: bool) -> Self {
         Self::On {
             for_at_unix_s: kept.at_unix_s,
             posture,
+            more,
         }
     }
 
@@ -89,6 +94,12 @@ impl Said {
     /// posture.
     pub fn names_posture_for(&self, kept: &Kept) -> bool {
         self.is_on_for(kept) && matches!(self, Self::On { posture: true, .. })
+    }
+
+    /// Whether this is the on said back for `kept` with a line that named
+    /// tiredness, desk work and celebrating.
+    pub fn names_more_for(&self, kept: &Kept) -> bool {
+        self.is_on_for(kept) && matches!(self, Self::On { more: true, .. })
     }
 }
 
@@ -156,22 +167,26 @@ impl Record {
 }
 
 /// The said-back file's bytes: `{"version":1,"said":"on","for_at_unix_s":N|null}`,
-/// with `"posture":true` when the line named posture, or
+/// with `"posture":true` when the line named posture and `"more":true`
+/// when it named tiredness, desk work and celebrating, or
 /// `{"version":1,"said":"off"}`. A record with no `posture` (one kept
-/// before posture) is a line that did not name it.
+/// before posture) is a line that did not name it, and the same for
+/// `more`.
 pub fn said_bytes(said: Said) -> Vec<u8> {
     let value = match said {
         Said::On {
             for_at_unix_s,
-            posture: false,
+            posture,
+            more,
         } => {
-            json!({"version": 1, "said": "on", "for_at_unix_s": for_at_unix_s})
-        }
-        Said::On {
-            for_at_unix_s,
-            posture: true,
-        } => {
-            json!({"version": 1, "said": "on", "for_at_unix_s": for_at_unix_s, "posture": true})
+            let mut value = json!({"version": 1, "said": "on", "for_at_unix_s": for_at_unix_s});
+            if posture {
+                value["posture"] = json!(true);
+            }
+            if more {
+                value["more"] = json!(true);
+            }
+            value
         }
         Said::Off => json!({"version": 1, "said": "off"}),
     };
@@ -193,16 +208,19 @@ impl Store for Record {
         };
         // Only `true` names posture: anything else is the plain line.
         let posture = value.get("posture").and_then(Value::as_bool) == Some(true);
+        let more = value.get("more").and_then(Value::as_bool) == Some(true);
         match value.get("said")?.as_str()? {
             "off" => Some(Said::Off),
             "on" => match value.get("for_at_unix_s")? {
                 Value::Null => Some(Said::On {
                     for_at_unix_s: None,
                     posture,
+                    more,
                 }),
                 at => at.as_u64().map(|at| Said::On {
                     for_at_unix_s: Some(at),
                     posture,
+                    more,
                 }),
             },
             _ => None,
@@ -365,14 +383,27 @@ mod tests {
             Said::On {
                 for_at_unix_s: Some(7),
                 posture: false,
+                more: false,
             },
             Said::On {
                 for_at_unix_s: None,
                 posture: false,
+                more: false,
             },
             Said::On {
                 for_at_unix_s: Some(7),
                 posture: true,
+                more: false,
+            },
+            Said::On {
+                for_at_unix_s: Some(7),
+                posture: false,
+                more: true,
+            },
+            Said::On {
+                for_at_unix_s: None,
+                posture: true,
+                more: true,
             },
             Said::Off,
         ] {
@@ -405,22 +436,43 @@ mod tests {
             record.said(),
             Some(Said::On {
                 for_at_unix_s: Some(7),
-                posture: false
+                posture: false,
+                more: false
             })
         );
         let said = Said::On {
             for_at_unix_s: Some(7),
             posture: false,
+            more: false,
         };
         assert!(said.is_on_for(&yes(Some(7))));
         assert!(!said.names_posture_for(&yes(Some(7))), "the plain line");
         let posture = Said::On {
             for_at_unix_s: Some(7),
             posture: true,
+            more: false,
         };
         assert!(posture.is_on_for(&yes(Some(7))));
         assert!(posture.names_posture_for(&yes(Some(7))));
         assert!(!posture.names_posture_for(&yes(Some(8))), "another yes");
+        // Tiredness, desk work and celebrating: only a line that named them.
+        assert!(!said.names_more_for(&yes(Some(7))), "the plain line");
+        assert!(!posture.names_more_for(&yes(Some(7))), "posture's line");
+        let more = Said::on_for(&yes(Some(7)), false, true);
+        assert!(more.is_on_for(&yes(Some(7))));
+        assert!(more.names_more_for(&yes(Some(7))));
+        assert!(!more.names_posture_for(&yes(Some(7))));
+        assert!(!more.names_more_for(&yes(Some(8))), "another yes");
+        assert!(!Said::Off.names_more_for(&yes(Some(7))));
+        assert_eq!(
+            String::from_utf8(said_bytes(more)).unwrap(),
+            r#"{"for_at_unix_s":7,"more":true,"said":"on","version":1}"#
+        );
+        assert_eq!(
+            String::from_utf8(said_bytes(said)).unwrap(),
+            r#"{"for_at_unix_s":7,"said":"on","version":1}"#,
+            "a record kept before more reads the same"
+        );
         assert!(!said.is_on_for(&yes(Some(8))), "another yes");
         assert!(!said.is_on_for(&yes(None)));
         assert!(!said.is_on_for(&Kept::default()), "no yes");
@@ -437,6 +489,7 @@ mod tests {
             .set_said(Said::On {
                 for_at_unix_s: Some(7),
                 posture: false,
+                more: false,
             })
             .unwrap();
         assert!(!OptIn::default().on(&file.read()));
