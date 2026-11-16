@@ -7151,6 +7151,81 @@ fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothin
     nothing_left(&rig);
 }
 
+/// #7171: a `new` that Harness answered naming the run's agent, which
+/// lamp-tasks then refused as `Uncertain` (a `machineId` not the lamp's,
+/// R5 on lamp-c0a4; an `existing` agent of the run's name), still closes
+/// that agent with `close --now` on the launch's machine, after the run's
+/// token is ended, and leaves nothing. A refusal whose reply names no
+/// agent, or another name's, closes nothing.
+#[test]
+fn issue_7171_a_skill_run_refused_as_uncertain_closes_the_agent_harness_named() {
+    let mismatched = json!({"ok":true,"machineId":"ffffffffffffffffffffffffffffffff",
+        "agent":{"id":AGENT,"name":"skill-task-1","engine":"hermes"}});
+    let existing = json!({"ok":true,"existing":true,"machineId":MACHINE,
+        "name":"skill-task-1","state":"running","agentId":AGENT});
+    for (reply, code) in [
+        (mismatched, "machine_mismatch"),
+        (existing, "existing_unbound"),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":step(reply),
+            "close":{"exit":0},
+        }));
+        let ended_at = std::cell::Cell::new(None);
+        let end_token = || ended_at.set(Some(rig.calls().len()));
+        let why = skill_runner(&rig, Some(EngineKind::Hermes))
+            .run(&skill_run(Duration::from_secs(20)), &end_token)
+            .unwrap_err();
+        assert!(why.contains(code), "{code}: {why}");
+        // The sign-in look the refusal's words come from aside.
+        let calls: Vec<Value> = rig
+            .calls()
+            .into_iter()
+            .filter(|call| call["args"][0] != "auth")
+            .collect();
+        let verbs: Vec<&str> = calls
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap())
+            .collect();
+        assert_eq!(verbs, ["machines", "new", "close"], "{code}");
+        assert_eq!(
+            calls[2]["args"],
+            json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"]),
+            "{code}"
+        );
+        // The token ended just before the close, as on every other end.
+        assert_eq!(
+            ended_at.get(),
+            Some(rig.calls().len() - 1),
+            "{code}: token ended before close"
+        );
+        nothing_left(&rig);
+    }
+    // No agent named, or one of another name: nothing to close.
+    for reply in [
+        json!({"ok":true,"machineId":MACHINE}),
+        json!({"ok":true,"machineId":"ffffffffffffffffffffffffffffffff",
+            "agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes"}}),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":step(reply.clone()),
+            "close":{"exit":0},
+        }));
+        skill_runner(&rig, Some(EngineKind::Hermes))
+            .run(&skill_run(Duration::from_secs(20)), &|| {})
+            .unwrap_err();
+        assert!(
+            rig.calls().iter().all(|call| call["args"][0] != "close"),
+            "{reply}"
+        );
+        nothing_left(&rig);
+    }
+}
+
 /// The real Hermes, as Harness lists it apart from the wrapper's agent.
 const LIVE_HERMES: &str = "33333333-3333-4333-8333-333333333333";
 
