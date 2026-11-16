@@ -130,13 +130,18 @@ impl Monitor {
     }
 }
 
-/// The lamp's host name and its `.local` name, as avahi gives it.
-pub fn own_names() -> Vec<String> {
-    let name = ["/proc/sys/kernel/hostname", "/etc/hostname"]
+/// The lamp's host name, lower case, or empty when it can't be read.
+pub fn host_name() -> String {
+    ["/proc/sys/kernel/hostname", "/etc/hostname"]
         .iter()
         .find_map(|path| fs::read_to_string(path).ok())
         .map(|name| name.trim().to_ascii_lowercase())
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
+
+/// The lamp's host name and its `.local` name, as avahi gives it.
+pub fn own_names() -> Vec<String> {
+    let name = host_name();
     if name.is_empty() {
         return Vec::new();
     }

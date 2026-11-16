@@ -373,8 +373,18 @@ fn form_decoded(value: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// The one page, with the lamp's name and this binary's build (its
+/// release folder, as `/status` reads a unit's) in its top bar.
 async fn index(State(served): State<Arc<Served>>) -> Html<String> {
-    Html(page::main_page(served.peek.monitor.is_some()))
+    let build = std::env::current_exe()
+        .ok()
+        .and_then(|program| units::build_of(&program))
+        .unwrap_or_else(|| "unreleased".to_owned());
+    Html(page::main_page(
+        served.peek.monitor.is_some(),
+        &monitor::host_name(),
+        &build,
+    ))
 }
 
 async fn cam() -> Html<String> {
