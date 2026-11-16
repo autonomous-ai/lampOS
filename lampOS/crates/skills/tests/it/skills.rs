@@ -13343,8 +13343,8 @@ fn a_groups_hour_goes_to_the_member_waiting_longest_while_it_waits() {
 /// with someone moving now and then (each nudge noticed): one nudge an hour
 /// between them, each in the order it came due, each with one short line
 /// (the owner, 25 Oct: "talk to the user").
-/// Rest your eyes at 45 minutes; Stretch break due at 50, waiting to 105; A
-/// sip of water due at 90, to 165; Stand up due at 100, to 225; then Rest
+/// A sip of water at 30 minutes; Rest your eyes due at 45, waiting to 90;
+/// Stretch break due at 50, to 150; Stand up due at 100, to 210; then Rest
 /// your eyes again. Wind down is outside its hours. The four share one
 /// `[stop]`, `wellbeing_nudges`: one function in the tools file, which
 /// stops the one that came last, or with `all` every one of them.
@@ -13426,6 +13426,49 @@ fn with_the_switch_the_wellbeing_skills_share_two_an_hour_never_within_30_minute
     }
 }
 
+/// The lead's call (16 Nov: the owner's lamp reminded no water all day):
+/// with `LAMP_NUDGES_PRESENT=on`, as the product runs, A sip of water comes
+/// at 30 minutes at the desk, not at 29, and again 45 minutes later, not
+/// sooner, with the eyes' `sitting_s` and lamp-seen's `drank_s_ago` (no drink
+/// seen) counting the same sitting.
+#[test]
+fn with_the_switch_a_sip_comes_at_30_minutes_and_again_45_minutes_later() {
+    let sip = lamp_skills::load_with(&skills_root().join("sip-of-water"), true).unwrap();
+    let mut engine = Engine::new(vec![sip], true);
+    // 10:00 local at 0 s.
+    engine.clock(0, 0, 36_000_000);
+    engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+    let mut said = Vec::new();
+    for second in 0..=80 * 60u64 {
+        let now = second * 1_000_000;
+        let mut runs = Vec::new();
+        if second % 30 == 0 {
+            let doing = format!(
+                r#"{{"drank_s_ago":{second},"ate_s_ago":{second},"break_s_ago":{second},"last":"none","confidence":0.9}}"#
+            );
+            runs.extend(engine.observe("humans/doing", now, doing.as_bytes(), Some(90_000)));
+            let activity = format!(r#"{{"state":"at_desk","baseline":true,"sitting_s":{second}}}"#);
+            runs.extend(engine.observe("room/activity", now, activity.as_bytes(), None));
+        }
+        let left = if (second / 30) % 2 == 0 { 0.3 } else { 0.5 };
+        let faces = format!(
+            r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
+            left + 0.3
+        );
+        runs.extend(engine.observe("humans/faces/tracked", now, faces.as_bytes(), None));
+        if runs
+            .iter()
+            .any(|run| run.calls.iter().any(|call| matches!(call, Call::Say(_))))
+        {
+            said.push(second);
+        }
+    }
+    assert_eq!(said.len(), 2, "{said:?}");
+    assert!((30 * 60..31 * 60).contains(&said[0]), "{said:?}");
+    let again = said[1] - said[0];
+    assert!((45 * 60..46 * 60).contains(&again), "{said:?}");
+}
+
 /// With `LAMP_NUDGES_PRESENT=on` (#5207, Fourteen's finding on #5208): a
 /// wellbeing nudge that said nothing (its say expired unheard) gives its
 /// place in the group's hour, and its gap, back, so the next nudge due is
@@ -13463,33 +13506,33 @@ fn with_the_switch_an_unsaid_nudge_gives_its_place_in_the_hour_back() {
         }
         (nudged, given_back)
     };
-    // Heard: Rest your eyes at 45, and Sip of water held to the gap, at 75.
+    // Heard: Sip of water at 30, and Rest your eyes held to the gap, at 60.
     let (heard, _) = sitting(true, false);
     assert_eq!(
         heard[..2],
         [
-            (45, "rest-your-eyes".to_owned()),
-            (75, "sip-of-water".to_owned())
+            (30, "sip-of-water".to_owned()),
+            (60, "rest-your-eyes".to_owned())
         ]
     );
-    // Unheard: its place is given back, and Sip of water comes when due, at 50.
+    // Unheard: its place is given back, and Rest your eyes comes when due, at 45.
     let (unheard, given_back) = sitting(true, true);
     assert_eq!(given_back.as_deref(), Some("wellbeing"));
     assert_eq!(
         unheard[..2],
         [
-            (45, "rest-your-eyes".to_owned()),
-            (50, "sip-of-water".to_owned())
+            (30, "sip-of-water".to_owned()),
+            (45, "rest-your-eyes".to_owned())
         ]
     );
     // Without the switch nothing is given back: one an hour as before.
     let (before, given_back) = sitting(false, true);
     assert_eq!(given_back, None);
-    assert_eq!(before[..1], [(45, "rest-your-eyes".to_owned())]);
+    assert_eq!(before[..1], [(30, "sip-of-water".to_owned())]);
     assert!(
         before
             .iter()
-            .all(|(minute, _)| *minute == 45 || *minute >= 105),
+            .all(|(minute, _)| *minute == 30 || *minute >= 90),
         "{before:?}"
     );
 }
@@ -13668,11 +13711,11 @@ fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
     assert_eq!(
         nudged,
         [
-            (45, "rest-your-eyes"),
-            (105, "stretch-break"),
-            (165, "sip-of-water"),
-            (225, "stand-up"),
-            (285, "rest-your-eyes")
+            (30, "sip-of-water"),
+            (90, "rest-your-eyes"),
+            (150, "stretch-break"),
+            (210, "stand-up"),
+            (270, "rest-your-eyes")
         ]
     );
     // "Not today": the one that came last of the four, by its name.
