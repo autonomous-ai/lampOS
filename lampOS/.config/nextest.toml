@@ -44,6 +44,19 @@ priority = 100
 # turns a run red (the reviewer on #1299).
 success-output = "final"
 
+# On 2026-11-16 two merge trains in a row ended on a `capture_hold_worker`
+# test, with nothing of theirs changed (#7295). In train 968 the worker ended
+# after 28 quiet blocks where 4 to 10 are allowed; in train 969 a control
+# message was read 136 ms after it was sent, past the channel's 100 ms. The
+# rig pushes each block at a wall-clock due time, so a test thread held up on
+# a busy runner pushes the ones it fell behind on back to back. Until the rig
+# is paced on the worker's own reads (#7295), a failed test of this file is
+# tried twice more. One that needed another try is printed as FLAKY in the
+# run's summary, so it still shows; three failures in a row fail the run.
+[[profile.default.overrides]]
+filter = 'binary_id(lamp-voice::it) & test(/^capture_hold_worker::/)'
+retries = 2
+
 # speaker_lapse_worker's two tests start a speaker worker, which ends when a
 # control message reaches it more than 100 ms after it was sent (the
 # channel's bound). On ARM64, beside the rest of a pull request's tests, its
