@@ -632,6 +632,26 @@ async fn relink_wanted(changes: &Option<Arc<crate::settings::Changes>>) {
 
 /// Ends when, on WSS, the broker's TCP port took a connection again; never
 /// on TCP. Cancel-safe: a notice not waited for is kept.
+/// The connection's news for the report counters (#6256 F8), when reports
+/// are on; the counters' own switch and the person's yes are theirs.
+fn link(
+    reports: &Option<std::sync::Arc<crate::reports::Shared>>,
+    link: crate::reports::counters::Link,
+) {
+    if let Some(reports) = reports {
+        reports.with(|reports| reports.link(link));
+    }
+}
+
+/// The transport the connection is over: WSS while the bridge lives.
+fn transport(bridge: &Option<crate::wss::Bridge>) -> crate::reports::counters::Transport {
+    if bridge.is_some() {
+        crate::reports::counters::Transport::Wss
+    } else {
+        crate::reports::counters::Transport::Tcp
+    }
+}
+
 async fn tcp_again(bridge: &Option<crate::wss::Bridge>) {
     match bridge {
         Some(bridge) => bridge.tcp_back.notified().await,
@@ -1031,6 +1051,10 @@ async fn session(
                 if bridge.is_none() {
                     tcp_failures = 0;
                 }
+                link(
+                    &reports,
+                    crate::reports::counters::Link::Connected(transport(&bridge)),
+                );
                 if let Some(changes) = &changes {
                     // The port connected to (`port_for`), so a Wi-Fi change's own
                     // check never opens TCP to the TLS port with TLS off.
@@ -1134,6 +1158,9 @@ async fn session(
                 }
                 if bridge.is_none() {
                     tcp_failures = if failed { tcp_failures + 1 } else { 0 };
+                    if failed {
+                        link(&reports, crate::reports::counters::Link::TcpFailed);
+                    }
                     let url = ws_url.borrow().clone();
                     if crate::wss::over(tcp_failures, &url) == crate::wss::Over::Wss {
                         let tcp = (
@@ -1151,6 +1178,7 @@ async fn session(
                                     drop(events);
                                     (client, events) = AsyncClient::new(options, 64);
                                     bridge = Some(opened);
+                                    link(&reports, crate::reports::counters::Link::ToWss);
                                     wait = first;
                                     continue;
                                 }
