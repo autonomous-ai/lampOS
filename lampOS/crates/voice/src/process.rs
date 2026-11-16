@@ -3659,6 +3659,7 @@ mod tests {
                     || name == crate::made_skill::ENVIRONMENT
                     || name == crate::make_skill_agent::ENVIRONMENT
                     || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
+                    || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
                     || name == crate::opens_further::ENVIRONMENT
@@ -3830,6 +3831,7 @@ mod tests {
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
                     "LAMP_MAKE_AGENT_GUIDE=on",
+                    "LAMP_MAKE_AGENT_ONE_PATH=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MAKE_SKILL_AGENT=on",
                     "LAMP_MAKE_SKILL_ASKED=on",
