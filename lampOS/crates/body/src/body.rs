@@ -5673,6 +5673,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // and how much a shift's arm offsets are scaled (`energy::idle_size`).
     let mut stirred_at: Option<Duration> = None;
     let mut was_present = false;
+    // The window presence last renewed, if it still is the lamp's (#7313).
+    let mut presence_until: Option<Duration> = None;
     let mut idle_size = 1.0f32;
     // The energy level taken (`crate::energy`, #6893): 1 is the limits and
     // the stand's pace this body was given, exactly.
@@ -6282,6 +6284,11 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         let mut window_before_ask = awake_until;
         // A lamp that is folded, or folding, looks at nobody.
         let mut awake_now = leaving.is_none() && !slumped;
+        // Folded for a reason of its own whatever its window says: resting
+        // after a load, heat or tracking retreat, unplugged, unable to lift
+        // or seated. Presence never stands such a lamp (#7313).
+        let tired = tired_until.is_some_and(|until| now < until);
+        let kept_down = tired || unplug_latched || cannot_lift.is_some() || seated.is_some();
         if let Some(up) = standing.filter(|_| !slumped) {
             // Spoken to, or with somebody sitting in front of it: awake.
             // It does not fold away from a person who is still there.
@@ -6314,6 +6321,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // stood up by a hold alone.
                 awake_until = Some(now + up.awake);
             } else if present
+                && stand > 0.0
+                && !kept_down
                 && !asked_now.night
                 && stirred_at.is_some_and(|at| now.saturating_sub(at) < QUIET_STAND)
                 && report.last.is_none_or(|last| {
@@ -6329,6 +6338,15 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // joint is warm: it folds calmly at the window's end,
                 // before the strain guard's hot sit-down.
                 awake_until = Some(now + up.awake);
+                presence_until = awake_until;
+            }
+            // Kept down by a retreat, the plug, a failed lift or its seat
+            // while the window is presence's (Sixth's P1 on #7313): that
+            // window ends, so the lamp is not stood again once the reason
+            // passes. A window from talk, a gesture or company is kept.
+            if kept_down && presence_until.is_some() && awake_until == presence_until {
+                awake_until = None;
+                presence_until = None;
             }
             // Paused after a gesture was taken: one still waiting is
             // dropped, and the window it opened is given back (keeper.md: a
@@ -6368,15 +6386,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 awake_until = Some(now + up.awake);
                 woke_for_gesture = true;
             }
-            let tired = tired_until.is_some_and(|until| now < until);
             let awake = awake_until.is_some_and(|until| now < until);
-            let wanted = if leaving.is_none()
-                && awake
-                && !tired
-                && !unplug_latched
-                && cannot_lift.is_none()
-                && seated.is_none()
-            {
+            let wanted = if leaving.is_none() && awake && !kept_down {
                 asked_now
                     .stand_share
                     .map_or(up.share, |asked| asked.min(up.share))
@@ -6546,7 +6557,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             && easing == [0; 3]
             && in_hand == [0; 3]
             && !test_held
-            && !asked_now.held;
+            && !(limits.presence && asked_now.held);
         if !quiet {
             idle_due = None;
             if idling {

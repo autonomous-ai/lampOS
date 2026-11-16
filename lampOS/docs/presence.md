@@ -137,7 +137,8 @@ who came and went while the eyes were shut is not known. A gap of under 5 s
   most 15 quiet minutes after the last talk or arrival, never once an arm
   joint is warm and never in its night rest. A value run out is nobody, so
   with the camera closed the lamp folds 90 s after talk, as before. It
-  never stands a folded lamp ([body.md](body.md), "Someone at the lamp").
+  never stands a folded lamp, nor stands again one folded for a load or
+  heat retreat or its seat ([body.md](body.md), "Someone at the lamp").
 
 ## Light out when you leave
 
