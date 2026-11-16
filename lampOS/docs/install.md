@@ -2517,7 +2517,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      a boot) is asked again the same way, 40 times 3 s apart; still not
      ready, the entry is unknown, not refused: nothing is marked or asked,
      and the next round checks again (#7135, lamp-c0a4's reboot at
-     22:59:00, where it had started a reinstall). With the switch off
+     22:59:00, where it had started a reinstall). Between rounds,
+     lamp-tasks runs the same add once per gateway start, before that
+     start's first skill run (#7280; tasks.md, "One exec approval").
+     With the switch off
      and the gateway not active, nothing is run and `exec_allowlist`
      stays true (carried through the `installing` record too), so each
      round asks the one-shot again until `main`'s removes have run with
