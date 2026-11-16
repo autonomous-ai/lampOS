@@ -27,7 +27,8 @@ the linked services alone, and no conversation rule reads them.
 | File | What |
 |---|---|
 | `lampos.target` | The lamp. Starts only once setup's marker `/var/lib/lampos-setup/done` is there (#806) |
-| `lampos-voice.slice`, `lampos-parts.slice` | As in `deploy/units/` |
+| `lampos-voice.slice`, `lampos-parts.slice` | As in `deploy/units/`, and `MemoryMin=256M` on `lampos-voice.slice` |
+| `lampos.slice` | Only `MemoryMin=256M`: with lamp-voice's and its slice's, the voice's memory is kept from reclaim (#7383, `docs/keeper.md`, "Slices and priorities") |
 | `lampos.conf` | `/etc/tmpfiles.d/lampos.conf`: the bus root and the servo and camera locks |
 | `settings/` | What every lamp shares, from `install` (`install::SETTINGS`, and the voice's `PROVIDER` and `SECOND`): Expression's catalogue `expression.json` (from lamp-4ace's `expression-alive-name-speech`) and the controls' two files `controls.json` and `controls-pins.json`, in `/etc/lampOS/<part>/`; records' bound `records.json`, in `/etc/lampOS/records.json`; the voice's two services `voice-provider.json` and `second.json`, in `/etc/lampOS/voice/provider.json` and `second.json`, private and kept up to date while they are install's own. The Store's files have their own row below, and `var/lib/lampOS/skills/store-key.pub` is the Store's key a build carries (`install::STORE_KEY_SOURCE`) |
 | `models.json` | Not a unit: the models no build carries (#811), each a path, a release URL, a size and a SHA-256. `install` fetches each one missing and checks it before placing it ([install.md](../../docs/install.md), "What was not shown") |
