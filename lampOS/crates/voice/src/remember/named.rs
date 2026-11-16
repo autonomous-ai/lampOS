@@ -64,6 +64,24 @@ const THEIRS: &[&str] = &[
 /// other text, and for "Their friend's name is Connie.", which is about
 /// someone else. `Some("")` for a name sentence whose name can't be read.
 pub fn name_in(text: &str) -> Option<String> {
+    name_in_whose(text, THEIRS)
+}
+
+/// The speaker's own words of whose name it is, read as [`THEIRS`] is:
+/// "my", "I", and the model's "the user's" for the speaker, never "his",
+/// "her", "your" or "their" (the Reviewer-lead's P2-2 on #7343: "Her name is
+/// Linh" is someone else's).
+const SPEAKERS: &[&str] = &["my", "i", "user's", "user", "toi"];
+
+/// [`name_in`] of the speaker's own name only ([`SPEAKERS`]): what a name
+/// given while nobody is known is sent to the face save by
+/// (`needs_face::withheld`, `LAMP_NAME_LEARN_FIX`, #7331).
+pub fn own_name_in(text: &str) -> Option<String> {
+    name_in_whose(text, SPEAKERS)
+}
+
+/// [`name_in`] with `whose` the words before its phrase that make it theirs.
+fn name_in_whose(text: &str, whose: &[&str]) -> Option<String> {
     for sentence in text.split_inclusive(['.', '!', '?', ';']) {
         let words: Vec<&str> = sentence
             .split(|c: char| !(c.is_alphanumeric() || c == '\'' || c == '\u{2019}'))
@@ -100,7 +118,7 @@ pub fn name_in(text: &str) -> Option<String> {
                 };
                 let theirs = match before {
                     None => true,
-                    Some(word) => THEIRS.contains(&word),
+                    Some(word) => whose.contains(&word),
                 };
                 if !theirs {
                     continue;

@@ -39,8 +39,8 @@ pub const TO_FACE_SAVE: &str = "lamp-voice provider: a remember of the speaker's
 /// is known (`person` is `None`, the room's scope) and the `remember`'s text
 /// is about a person. `None`: ask the memory as before. With `to_face`
 /// (`LAMP_NAME_LEARN_FIX`, #7331), a text that gives the speaker's own name
-/// ([`crate::known_faces::gives_a_name`], or `named::name_in` for the
-/// model's "The user's name is ...") is told to go to the face save
+/// ([`crate::known_faces::gives_a_name`], or `named::own_name_in` for the
+/// model's "The user's name is ...", never "her/his/your name is") is told to go to the face save
 /// ([`face_save_note`]) in place of [`NOT_KEPT`]: on lamp-52e6 the owner's
 /// "my name is ..." came back NOT_KEPT while the eyes held their face as
 /// nobody's. The face save takes a fresh look and the eyes judge the face.
@@ -54,7 +54,9 @@ pub(crate) fn withheld(
     let personal = call.name == super::REMEMBER && text.is_some_and(super::about_someone);
     (on && person.is_none() && personal).then(|| {
         let text = text.unwrap_or_default();
-        let name = super::named::name_in(text)
+        // The speaker's own name only: "Her name is Linh" is someone
+        // else's, never a face save of the speaker's under it (#7343).
+        let name = super::named::own_name_in(text)
             .map(|name| name.trim().to_owned())
             .filter(|name| !name.is_empty());
         if to_face && (name.is_some() || crate::known_faces::gives_a_name(text)) {
@@ -214,6 +216,17 @@ mod tests {
         }
         let told = withheld(&remember(PERSONAL), None, true, true).unwrap();
         assert_eq!(told["note"], NOT_KEPT);
+        // Someone else's name is no name of the speaker's: never a face save
+        // under it (the Reviewer-lead's P2-2 on #7343).
+        for text in [
+            "Her name is Linh.",
+            "His name is Linh.",
+            "Your name is Linh.",
+            "Their name is Linh.",
+        ] {
+            let told = withheld(&remember(text), None, true, true).expect(text);
+            assert_eq!(told["note"], NOT_KEPT, "{text}");
+        }
         let told = withheld(&remember("my favourite colour is blue"), None, true, true).unwrap();
         assert_eq!(told["note"], NOT_KEPT);
         // Switch off: not kept, as before.
