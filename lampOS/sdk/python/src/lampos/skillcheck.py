@@ -55,7 +55,7 @@ SOUND_RATE = 24_000
 MOVE_MOST_BYTES = 256 * 1024
 MOVE_NAME = re.compile(r"^[a-z0-9_-]{1,32}$")
 # The body's own clips besides the protocol's gestures (clips.rs, idle.rs).
-BODY_OWN = ("idle", "scanning", "called", "dip", "look_up", "tilt_left", "tilt_right", "two")
+BODY_OWN = ("idle", "scanning", "called", "dip", "look_up", "settle", "tilt_left", "tilt_right", "two")
 
 
 @dataclass
