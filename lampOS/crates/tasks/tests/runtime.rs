@@ -2619,8 +2619,9 @@ fn signed_out_lamp(not_running: usize) -> (Running, tempfile::TempDir, tempfile:
 /// sign-in does (openharness#1463), and lamp-tasks started it only after a
 /// sign-in and at its start, so every hand-over to the lamp's own target
 /// then said "Harness is not running here". Signed in, the daemon starts at
-/// boot; the read turning signed out starts it again; a hand-over to the
-/// lamp's own target then goes, with no not-running answer to retry.
+/// boot; the read turning signed out starts it again with a plain `harness
+/// start`; a hand-over to the lamp's own target then goes, with no
+/// not-running answer to retry.
 #[test]
 fn a_sign_out_starts_the_daemon_again_for_the_lamps_own_target() {
     let (s, _home, _bin) = lamp_started(false, false);
@@ -2636,7 +2637,7 @@ fn a_sign_out_starts_the_daemon_again_for_the_lamps_own_target() {
     assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 0);
     s.counts.signed_out.store(true, Ordering::SeqCst);
     let start = Instant::now();
-    while s.counts.daemon_restarts.load(Ordering::SeqCst) < 1 {
+    while s.counts.daemon_starts.load(Ordering::SeqCst) < 2 {
         assert!(
             start.elapsed() < Duration::from_secs(5),
             "not started again after the sign-out"
@@ -2652,9 +2653,10 @@ fn a_sign_out_starts_the_daemon_again_for_the_lamps_own_target() {
     let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
     assert_eq!(s.trusted(confirm)["ok"], true);
     s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
-    // Once: later reads, still signed out, start nothing more.
-    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 1);
-    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 1);
+    // Once, a plain `harness start` (never `--restart`, which waits for
+    // no busy task): later reads, still signed out, start nothing more.
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 2);
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 0);
     assert_eq!(
         s.counts.launched_on.lock().unwrap().last(),
         Some(&(COMPUTER.to_owned(), EngineKind::Hermes))

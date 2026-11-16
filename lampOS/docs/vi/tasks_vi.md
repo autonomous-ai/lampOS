@@ -1996,16 +1996,18 @@ và có `--targets-from-machines`:
   như đăng nhập, và trước đây không gì khởi động lại nó, nên mọi lần giao việc
   cho target của đèn đều bị trả lời "Harness is not running here". Khi một
   lần đọc sign-in chuyển từ đã đăng nhập sang chưa đăng nhập trong lúc target
-  của đèn có thể bật, phần tasks chạy `harness start --restart`
-  (`daemon_restart`, cùng số lần thử và cùng việc chờ không còn việc bận) và
-  journal ghi `Harness signed out: its daemon is started again for the lamp's
+  của đèn có thể bật, phần tasks chạy `harness start` thường (không
+  `--restart`: nó khởi động daemon đã dừng và để yên daemon đang chạy, nên
+  không bao giờ chờ các việc bận trong lúc mọi lần giao việc đều thất bại;
+  cùng số lần thử) và journal ghi `Harness signed out: its daemon is started again for the lamp's
   own target (#7275)`.
 - **Trả lời "not running here" (#7275).** Lưới an toàn khi daemon vẫn mất (chết,
   hoặc lần khởi động trên thất bại): `new` bị Harness từ chối với "Harness is
   not running here. Start it with `harness start`." (`NOT_RUNNING` của CLI,
   trên stderr hoặc stdout) kết thúc `not_sent` với `harness_not_running`, vì
-  chưa có gì được khởi động; dòng dispatch mang nguyên stderr của Harness trên
-  một dòng. Phần tasks đặt lần khởi động daemon đến hạn ngay (`harness start`,
+  chưa có gì được khởi động; dòng dispatch mang nguyên dòng "not running" của
+  stderr; mọi dòng stderr khác vẫn bị cắt như thường, và cả stderr cũng vậy khi
+  câu trả lời chỉ nằm trên stdout. Phần tasks đặt lần khởi động daemon đến hạn ngay (`harness start`,
   đếm lại số lần thử; lần đã đến hạn thì giữ nguyên) và đưa việc đó về đầu
   hàng đợi, nên cổng daemon khởi động daemon trước khi giao lại. Mỗi việc chỉ
   một lần: lần trả lời "not running" thứ hai kết thúc `not_sent` với
