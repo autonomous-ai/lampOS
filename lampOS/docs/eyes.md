@@ -1650,7 +1650,7 @@ With the switch:
   room's: another voice's "Yes." or spelling counts the same as theirs
   ([onboarding.md](onboarding.md), step 2).
 - **A new face only on a yes to keeping it** (`LAMP_NAME_LEARN_FIX=on`,
-  off unless set, #7331). Past setup, a `remember_my_face` with no
+  on in the product unit, #7331). Past setup, a `remember_my_face` with no
   `replace` is sent to the eyes only when the turn in hand asks for their
   own face ("remember my face") or agrees to the lamp's face question in
   its last answer ("Shall I remember your face as Ada?"; both
