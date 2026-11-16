@@ -143,6 +143,12 @@ pub struct FixtureOptions {
     /// fixture starts N ms after `listening_ready`, with no admitted turn.
     /// None, the default: it answers the first admitted turn, as always.
     pub at_ms: Option<u64>,
+    /// `--controls-mute RECORD`, the only hand-controls flag a reply fixture takes: the software
+    /// mute's persisted record, which the no-slide privacy route needs before it will start
+    /// (`privacy_bus::refuse_no_slide_without_mute`). A fixture on a Mac runs that gate. Every
+    /// other hand-controls flag is refused, and without the flag the fixture has no controls,
+    /// as before.
+    pub controls: crate::hand_controls::ControlsOptions,
 }
 
 /// The longest `--fixture-at-ms`.
@@ -152,11 +158,57 @@ pub const MAX_AT_MS: u64 = 60_000;
 pub const TIMED_FLAG: &str = "--timed";
 
 impl FixtureOptions {
+    /// Off Linux a fixture run takes no host sound: the microphone is `--microphone-device silent`
+    /// (not even the bus microphone, which a host microphone could be published on) and the
+    /// speaker is `--speaker-device bus:speaker1`. Refused by name before any worker starts
+    /// (`coordinator::run_fixture` calls it first). On Linux it refuses nothing, as before.
+    pub fn refuse_host_sound_off_linux(&self) -> io::Result<()> {
+        #[cfg(not(target_os = "linux"))]
+        {
+            use crate::options::{MicrophoneDevice, SpeakerDevice};
+            if self.directed.microphone_device != MicrophoneDevice::Silent {
+                return Err(invalid(
+                    "off Linux, directed-fixture takes only --microphone-device silent: no host microphone, no host card and no bus microphone",
+                ));
+            }
+            if self
+                .directed
+                .speaker_device
+                .is_none_or(|speaker| speaker.as_str() != SpeakerDevice::BUS_SPEAKER1)
+            {
+                return Err(invalid(
+                    "off Linux, directed-fixture takes only --speaker-device bus:speaker1: no host sound card",
+                ));
+            }
+        }
+        Ok(())
+    }
+
     pub fn parse(arguments: &[String]) -> io::Result<Self> {
         let mut at_ms = None;
+        let mut silent_microphone = false;
         let mut rest = Vec::with_capacity(arguments.len());
         let mut arguments = arguments.iter();
         while let Some(argument) = arguments.next() {
+            // `--microphone-device silent`: a microphone that hears nothing, which only this
+            // parser takes (`serve` and `directed` refuse the word), so no product entry can
+            // pick it. Taken out here, before the shared parser sees the rest.
+            if argument == "--microphone-device" {
+                match arguments.next() {
+                    Some(value) if value == crate::options::MicrophoneDevice::SILENT => {
+                        if silent_microphone {
+                            return Err(invalid("--microphone-device given twice"));
+                        }
+                        silent_microphone = true;
+                    }
+                    Some(value) => {
+                        rest.push(argument.clone());
+                        rest.push(value.clone());
+                    }
+                    None => rest.push(argument.clone()),
+                }
+                continue;
+            }
             if argument != "--fixture-at-ms" {
                 rest.push(argument.clone());
                 continue;
@@ -174,18 +226,31 @@ impl FixtureOptions {
             at_ms = value;
         }
         let SessionOptions {
-            directed,
+            mut directed,
             cue_socket,
             camera_config,
             failure_notices,
             motor,
             controls,
         } = SessionOptions::parse(&rest)?;
-        if controls.enabled() {
+        if silent_microphone {
+            if directed.microphone_device != crate::options::MicrophoneDevice::Board {
+                return Err(invalid("--microphone-device given twice"));
+            }
+            directed.microphone_device = crate::options::MicrophoneDevice::Silent;
+        }
+        // Only the mute record is a fixture's: the stop request, the head pads and the bus root
+        // stay for Gemini voice sessions.
+        if controls.stop || controls.head_touch || controls.bus_root.is_some() {
             return Err(invalid(
-                "hand controls are for Gemini voice sessions, never reply fixtures",
+                "hand controls are for Gemini voice sessions, never reply fixtures, except --controls-mute",
             ));
         }
+        controls.validate()?;
+        let controls = crate::hand_controls::ControlsOptions {
+            mute_record: controls.mute_record,
+            ..Default::default()
+        };
         if failure_notices.is_some() {
             return Err(invalid(
                 "local failure notices are only for Gemini chat, never reply fixtures",
@@ -212,6 +277,7 @@ impl FixtureOptions {
             directed,
             cue_socket,
             at_ms,
+            controls,
         })
     }
 
@@ -940,6 +1006,161 @@ mod timed_tests {
 
     fn args(flags: &[&str]) -> Vec<String> {
         flags.iter().map(|flag| (*flag).to_owned()).collect()
+    }
+
+    #[test]
+    fn the_silent_microphone_is_taken_by_the_fixture_parser_and_by_no_other() {
+        use crate::options::MicrophoneDevice;
+        let fixture =
+            FixtureOptions::parse(&args(&["--diagnostics", "--microphone-device", "silent"]))
+                .unwrap();
+        assert_eq!(fixture.directed.microphone_device, MicrophoneDevice::Silent);
+        assert_eq!(fixture.directed.capture_device(), "silent");
+        // `serve` and `directed` (the shared session parser) refuse the word.
+        for flags in [
+            vec!["--microphone-device", "silent"],
+            vec!["--diagnostics", "--microphone-device", "silent"],
+        ] {
+            assert!(
+                crate::options::SessionOptions::parse(&args(&flags)).is_err(),
+                "{flags:?}"
+            );
+            assert!(
+                crate::options::DirectedOptions::parse(&args(&flags)).is_err(),
+                "{flags:?}"
+            );
+        }
+        // Given twice, or beside the bus one, it is refused.
+        for bad in [
+            vec![
+                "--diagnostics",
+                "--microphone-device",
+                "silent",
+                "--microphone-device",
+                "silent",
+            ],
+            vec![
+                "--diagnostics",
+                "--microphone-device",
+                "silent",
+                "--microphone-device",
+                "bus:mic1",
+            ],
+            vec![
+                "--diagnostics",
+                "--microphone-device",
+                "bus:mic1",
+                "--microphone-device",
+                "silent",
+            ],
+        ] {
+            assert!(FixtureOptions::parse(&args(&bad)).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn a_fixture_takes_the_mute_record_and_no_other_hand_control() {
+        let none = FixtureOptions::parse(&args(&["--diagnostics"])).unwrap();
+        assert!(none.controls.mute_record.is_none() && !none.controls.enabled());
+        let muted = FixtureOptions::parse(&args(&[
+            "--diagnostics",
+            "--controls-mute",
+            "/tmp/lcs-private/mute",
+        ]))
+        .unwrap();
+        assert_eq!(
+            muted.controls.mute_record.as_deref(),
+            Some(std::path::Path::new("/tmp/lcs-private/mute"))
+        );
+        // Nothing else of the hand controls rides with it.
+        assert!(!muted.controls.stop && !muted.controls.head_touch);
+        assert!(muted.controls.bus_root.is_none());
+        for bad in [
+            vec!["--diagnostics", "--controls-stop"],
+            vec!["--diagnostics", "--controls-bus-root", "/tmp/lcs-bus"],
+            vec![
+                "--diagnostics",
+                "--controls-mute",
+                "/tmp/lcs-private/mute",
+                "--controls-stop",
+            ],
+            vec![
+                "--diagnostics",
+                "--controls-mute",
+                "/tmp/lcs-private/mute",
+                "--controls-bus-root",
+                "/tmp/lcs-bus",
+            ],
+            // A record is an absolute filename, given once.
+            vec!["--diagnostics", "--controls-mute", "mute"],
+            vec!["--diagnostics", "--controls-mute", "/"],
+            vec![
+                "--diagnostics",
+                "--controls-mute",
+                "/tmp/a",
+                "--controls-mute",
+                "/tmp/b",
+            ],
+        ] {
+            assert!(FixtureOptions::parse(&args(&bad)).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn the_bus_microphone_and_the_default_still_parse_for_a_fixture() {
+        use crate::options::MicrophoneDevice;
+        let bus =
+            FixtureOptions::parse(&args(&["--diagnostics", "--microphone-device", "bus:mic1"]))
+                .unwrap();
+        assert_eq!(bus.directed.microphone_device, MicrophoneDevice::Bus);
+        let board = FixtureOptions::parse(&args(&["--diagnostics"])).unwrap();
+        assert_eq!(board.directed.microphone_device, MicrophoneDevice::Board);
+    }
+
+    /// Where no host sound may open, every microphone but the silent one is refused by name,
+    /// and so is every speaker but the bus one. On Linux nothing is refused.
+    #[test]
+    fn off_linux_a_fixture_takes_no_host_sound() {
+        let parse = |flags: &[&str]| FixtureOptions::parse(&args(flags)).unwrap();
+        let refused = |flags: &[&str]| parse(flags).refuse_host_sound_off_linux();
+        let silent_and_bus = [
+            "--diagnostics",
+            "--microphone-device",
+            "silent",
+            "--speaker-device",
+            "bus:speaker1",
+        ];
+        assert!(refused(&silent_and_bus).is_ok());
+        let others: [&[&str]; 4] = [
+            &["--diagnostics"],
+            &[
+                "--diagnostics",
+                "--microphone-device",
+                "bus:mic1",
+                "--speaker-device",
+                "bus:speaker1",
+            ],
+            &["--diagnostics", "--microphone-device", "silent"],
+            &[
+                "--diagnostics",
+                "--microphone-device",
+                "silent",
+                "--speaker-device",
+                "default",
+            ],
+        ];
+        for flags in others {
+            let result = refused(flags);
+            if cfg!(target_os = "linux") {
+                assert!(result.is_ok(), "{flags:?}");
+            } else {
+                let error = result.unwrap_err().to_string();
+                assert!(
+                    error.contains("off Linux, directed-fixture takes only"),
+                    "{flags:?}: {error}"
+                );
+            }
+        }
     }
 
     #[test]

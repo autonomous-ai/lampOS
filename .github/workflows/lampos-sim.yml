@@ -182,6 +182,27 @@ jobs:
         working-directory: lampOS
         run: |
           cargo test --locked -p lamp-sim
+      # lamp-voice on a Mac (step 3, C5a): `directed-fixture` is the one voice entry a Mac has, and off Linux it takes
+      # NO host sound: the microphone must be `silent` (zeros, no bus, no card) and the speaker `bus:speaker1`; any
+      # other microphone or speaker is refused by name before a worker, a folder or a signal handler exists. This
+      # step proves exactly that, four ways, with no lamp and no sockets. It does NOT prove a start: run 4 of the
+      # first attempt reached `listening_ready` on a Mac and then ended on a reference fault (C5b).
+      - name: lamp-voice's directed-fixture takes no host sound on a Mac
+        working-directory: lampOS
+        run: |
+          cargo build --locked -p lamp-voice
+          root=$(mktemp -d /tmp/lcs.XXXXXX)
+          trap 'rm -rf "$root"' EXIT
+          zeros=0000000000000000000000000000000000000000000000000000000000000000
+          for flags in "--microphone-device bus:mic1 --speaker-device bus:speaker1" "--speaker-device bus:speaker1" "--microphone-device silent" "--microphone-device silent --speaker-device default"; do
+            # shellcheck disable=SC2086
+            if target/debug/lamp-voice directed-fixture "$root/reply.wav" "$zeros" 3 "$root/refused" --diagnostics $flags > "$root/refused.out" 2> "$root/refused.err"; then
+              echo "a host sound was not refused: $flags"; cat "$root/refused.err"; exit 1
+            fi
+            grep -q "off Linux, directed-fixture takes only" "$root/refused.err" || { echo "wrong refusal for: $flags"; cat "$root/refused.err"; exit 1; }
+            [ ! -e "$root/refused" ] || { echo "a refused run made its output folder: $flags"; exit 1; }
+            echo "refused: $flags: $(cat "$root/refused.err")"
+          done
       # The whole lamp on macOS, the real lamp-body on lamp-sim's pty (ten's portable body, #6965; the bus's
       # buffers, #6933): up within 30 s, the body read its servos and may stand, and still up 20 s later
       # with no body restart. No tour yet (the SDKs are not installed in this job).

@@ -680,7 +680,9 @@ fn run() -> Result<()> {
             let consumers = lamp_voice::camera_worker::parse_frame_consumers(flags)?;
             lamp_voice::camera_worker::run(channels, parent, worker, Path::new(config), digest, Path::new(dir), &consumers)?;
         }
-        #[cfg(target_os = "linux")]
+        // Off Linux this takes only the silent microphone and the bus speaker
+        // (`FixtureOptions::parse`): the one way a Mac starts the voice's workers.
+        #[cfg(unix)]
         [command, wav, sha256, seconds, output, flags @ ..] if command == "directed-fixture" => {
             let options = lamp_voice::fixture_provider::FixtureOptions::parse(flags)?;
             let seconds = seconds.parse()?;
