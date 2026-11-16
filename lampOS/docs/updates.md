@@ -1530,6 +1530,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `waiting for a quiet moment: …` | once per wait, with why it isn't quiet yet |
 | `switching to build N` | the parts' switch begins |
 | `wrote …: the exit note install writes, which its unit was without` | a switch on a managed updater, before the reload: one of Cloud's fixed services, on the lamp or written by the round, had no `UNIT.d/exit-note.conf`, so `install`'s note is written (0644); one there is kept (#7135, "A part added over the air") |
+| `… is not written: …; the round goes on` | that exit note could not be written (its folder is a file, say); it is skipped, not listed as written, and the switch goes on (#7166) |
 | `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
 | `lamp-body's restart was refused (…); tried once more after 3 s, its let-go` | lamp-body's restart in the switch was refused; it is tried once more after 3 s (#7067, "lamp-body's one retry") |
 | `lamp-body's start count is not reset: …` | before its one retry, lamp-body's start count (`systemctl reset-failed`) could not be reset; the retry is still made, and may then meet systemd's start limit (#7067) |
@@ -2327,7 +2328,8 @@ for each of Cloud's fixed services whose unit is on the lamp or written by
 the round and which has none, says `wrote …` for each, and reloads systemd
 with the units; a note already there is the lamp's and never rewritten,
 and a build put back removes the notes it wrote (#7135: before this, a unit a round added, such as `lamp-tasks.service`, had
-none).
+none). A note that cannot be written is said (`… is not written: …; the
+round goes on`) and skipped, and the update goes on.
 
 A service of a part already installed here is added beside it, through the
 same link. A unit of lamp-update's own that starts through `update/current`
