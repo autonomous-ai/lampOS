@@ -6391,6 +6391,11 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             assert!(next.contains(part), "{part}: {next}");
         }
         asked.join().unwrap();
+        assert_eq!(
+            made_skill::entries(&keeping.directory)[0]["asks"],
+            serde_json::json!(["send my test note"]),
+            "its words kept beside it, for a later make's check while not on"
+        );
         made_skill::set_asks_here(None);
         made_skill::set_writes_here(None);
         let _ = std::fs::remove_dir_all(&root);

@@ -379,13 +379,15 @@ fn made_asks_of(table: &toml::Table, most: usize) -> Result<Vec<String>, Refused
 /// [`ASKS_ENVIRONMENT`] on, at the make, said to the person): one of its
 /// phrases is another skill's ask, or holds another skill's name or
 /// function (installed in `installed`, pushed beside it, or in its tools
-/// file, the lamp's core skills' among them), so the heard words would
+/// file, the lamp's core skills' among them, or a made skill kept in
+/// `kept`'s index and not on, [`note_asks`]), so the heard words would
 /// start that one, or neither (`crate::skill_named`'s `wanted`). Matched
 /// as the voice matches them ([`crate::skill_named::same_ask`],
 /// [`crate::skill_named::ask_holds_name`]), never by a list of words. The
-/// skill `name` itself, made again, is no other. None when it gives no
-/// asks, or the switch is off.
-pub fn asks_taken(installed: &Path, name: &str, toml: &str) -> Option<String> {
+/// skill `name` itself, made again, is no other. Said naming both skills
+/// (the first builder's answer 2 on #7249). None when it gives no asks,
+/// or the switch is off.
+pub fn asks_taken(installed: &Path, kept: &Path, name: &str, toml: &str) -> Option<String> {
     if !asks_on() {
         return None;
     }
@@ -394,25 +396,26 @@ pub fn asks_taken(installed: &Path, name: &str, toml: &str) -> Option<String> {
     if asks.is_empty() {
         return None;
     }
-    let others = other_skills(installed, name);
-    asks.iter().find_map(|ask| taken_among(ask, &others))
+    let others = other_skills(installed, kept, name);
+    asks.iter().find_map(|ask| taken_among(ask, name, &others))
 }
 
 /// [`asks_taken`] for one phrase: why `ask` can't start the skill `name`
 /// on this lamp, or none. With the switch off, none.
-pub fn ask_taken(installed: &Path, name: &str, ask: &str) -> Option<String> {
+pub fn ask_taken(installed: &Path, kept: &Path, name: &str, ask: &str) -> Option<String> {
     if !asks_on() {
         return None;
     }
-    taken_among(ask, &other_skills(installed, name))
+    taken_among(ask, name, &other_skills(installed, kept, name))
 }
 
 /// Each skill but `name` on the lamp ([`asks_taken`]): its name, its
 /// function's, and its asks.
 type Others = Vec<(String, Vec<String>, Vec<String>)>;
 
-/// Why `ask` would start one of `others`, or none.
-fn taken_among(ask: &str, others: &Others) -> Option<String> {
+/// Why `ask`, given the skill `name`, would start one of `others` too,
+/// naming both, or none.
+fn taken_among(ask: &str, name: &str, others: &Others) -> Option<String> {
     for (skill, names, theirs) in others {
         if theirs
             .iter()
@@ -421,8 +424,10 @@ fn taken_among(ask: &str, others: &Others) -> Option<String> {
                 .iter()
                 .any(|other| crate::skill_named::ask_holds_name(ask, other))
         {
+            let this = spoken_name(&name.replace('_', "-"));
             return Some(format!(
-                "the words “{ask}” would start another skill, {}; say other words for it",
+                "the words “{ask}” would start both {this} and another skill, {}, so neither \
+                 would start; say other words for {this}",
                 spoken_name(&skill.replace('_', "-"))
             ));
         }
@@ -431,8 +436,9 @@ fn taken_among(ask: &str, others: &Others) -> Option<String> {
 }
 
 /// The skills on the lamp but `name` ([`Others`]): installed in
-/// `installed`, pushed beside it, and in its tools file.
-fn other_skills(installed: &Path, name: &str) -> Others {
+/// `installed`, pushed beside it, in its tools file, and the made skills
+/// kept in `kept`'s index and not on, with their asks ([`note_asks`]).
+fn other_skills(installed: &Path, kept: &Path, name: &str) -> Others {
     let strings = |value: Option<&toml::Value>| -> Vec<String> {
         value
             .and_then(toml::Value::as_array)
@@ -505,6 +511,23 @@ fn other_skills(installed: &Path, name: &str) -> Others {
                 listed(crate::tools::MADE_ASKS, skill),
             ));
         }
+    }
+    // A made skill kept and not on (not put on yet, or its put-on
+    // refused): its words would start it once it is on.
+    for entry in index(kept) {
+        let Some(skill) = entry["name"].as_str() else {
+            continue;
+        };
+        let asks: Vec<String> = entry["asks"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|ask| ask.as_str().map(str::to_owned))
+            .collect();
+        if entry["on"] == true || skill == name || asks.is_empty() {
+            continue;
+        }
+        others.push((skill.to_owned(), vec![skill.to_owned()], asks));
     }
     others
 }
@@ -7438,7 +7461,7 @@ impl Ending<'_> {
         )?;
         // Its own words, never another skill's (`LAMP_MADE_SKILL_ASKS`):
         // said to the person, never repaired, the words being theirs.
-        if let Some(why) = asks_taken(&keeping.installed, &free, toml) {
+        if let Some(why) = asks_taken(&keeping.installed, &keeping.directory, &free, toml) {
             eprintln!("lamp-voice: a made skill was not made: its words start another skill");
             return Err(Refused::new(why));
         }
@@ -8233,6 +8256,9 @@ fn packed_and_kept(
             crate::made_clash::signature(toml),
         )
         .map_err(unkept)?;
+        // Its own words (`LAMP_MADE_SKILL_ASKS`), for a later make's check
+        // while it is kept and not on ([`asks_taken`]).
+        note_asks(&keeping.directory, &made.sha256, toml).map_err(unkept)?;
         fs::rename(&new, &made.package).map_err(unkept)?;
         Ok(made)
     });
@@ -8684,6 +8710,34 @@ fn note_clash(directory: &Path, sha256: &str, signature: Value) -> io::Result<()
     for entry in &mut entries {
         if entry["sha256"] == sha256 {
             entry["clash"] = signature.clone();
+        }
+    }
+    write_index(directory, &entries)
+}
+
+/// Keep the made skill `sha256`'s own words (`asks`, with
+/// [`ASKS_ENVIRONMENT`] on) beside it in the index, for [`asks_taken`]
+/// while it is kept and not on. With the switch off, or no asks, the
+/// index is untouched.
+fn note_asks(directory: &Path, sha256: &str, toml: &str) -> io::Result<()> {
+    if !asks_on() {
+        return Ok(());
+    }
+    let asks: Vec<String> = toml::from_str::<toml::Table>(toml)
+        .ok()
+        .and_then(|table| table.get("asks").cloned())
+        .and_then(|asks| asks.as_array().cloned())
+        .into_iter()
+        .flatten()
+        .filter_map(|ask| ask.as_str().map(str::to_owned))
+        .collect();
+    if asks.is_empty() {
+        return Ok(());
+    }
+    let mut entries = index(directory);
+    for entry in &mut entries {
+        if entry["sha256"] == sha256 {
+            entry["asks"] = json!(asks);
         }
     }
     write_index(directory, &entries)
@@ -13348,10 +13402,34 @@ light = { colour = "green", level = 3, for = "20s" }
             .to_string(),
         )
         .unwrap();
+        // The made skills' index: one kept and not on, one on (its folder
+        // gives its words), one with no words.
+        let kept = installed.join("made");
+        fs::create_dir_all(&kept).unwrap();
+        fs::write(
+            kept.join(INDEX),
+            json!([
+                {"name": "evening-read", "sha256": "a", "asks": ["my evening read"], "not_on": "why"},
+                {"name": "night-read", "sha256": "b", "asks": ["my night read"]},
+                {"name": "old-glow", "sha256": "c", "asks": ["an old glow now"], "on": true},
+                {"name": "quiet-glow", "sha256": "d"},
+            ])
+            .to_string(),
+        )
+        .unwrap();
         let with = |asks: &str| ASKS_WRITE_TOML.replace("[\"send my test note\"]", asks);
         set_asks_here(Some(false));
         assert_eq!(
-            asks_taken(&installed, "test-note", &with("[\"take a photo\"]")),
+            asks_taken(&installed, &kept, "test-note", &with("[\"take a photo\"]")),
+            None
+        );
+        assert_eq!(
+            asks_taken(
+                &installed,
+                &kept,
+                "test-note",
+                &with("[\"my evening read\"]")
+            ),
             None
         );
         set_asks_here(Some(true));
@@ -13360,18 +13438,46 @@ light = { colour = "green", level = 3, for = "20s" }
             ("[\"start the photo booth\"]", "photo booth"),
             ("[\"my paint studio please\"]", "paint studio"),
             ("[\"cozy reading time\"]", "desk glow"),
+            ("[\"my evening read\"]", "evening read"),
+            ("[\"My night read\"]", "night read"),
         ] {
-            let why = asks_taken(&installed, "test-note", &with(asks)).expect(asks);
+            let why = asks_taken(&installed, &kept, "test-note", &with(asks)).expect(asks);
             assert!(
-                why.contains(&format!("start another skill, {other}")),
+                why.contains(&format!("start both test note and another skill, {other}"))
+                    && why.ends_with("say other words for test note"),
                 "{why}"
             );
         }
-        assert_eq!(asks_taken(&installed, "test-note", ASKS_WRITE_TOML), None);
         assert_eq!(
-            asks_taken(&installed, "desk-glow", &with("[\"cozy reading time\"]")),
+            asks_taken(
+                &installed,
+                &kept,
+                "test-note",
+                &with("[\"an old glow now\"]")
+            ),
             None,
-            "the same skill made again"
+            "an entry on is read from its folder"
+        );
+        assert_eq!(
+            asks_taken(&installed, &kept, "test-note", ASKS_WRITE_TOML),
+            None
+        );
+        for (name, asks) in [
+            ("desk-glow", "[\"cozy reading time\"]"),
+            ("evening-read", "[\"my evening read\"]"),
+        ] {
+            assert_eq!(
+                asks_taken(&installed, &kept, name, &with(asks)),
+                None,
+                "{name}: the same skill made again"
+            );
+        }
+        assert_eq!(
+            ask_taken(&installed, &kept, "tea-tip", "my evening read").as_deref(),
+            Some(
+                "the words “my evening read” would start both tea tip and another skill, \
+                 evening read, so neither would start; say other words for tea tip"
+            )
         );
         set_asks_here(None);
         let _ = fs::remove_dir_all(&installed);
