@@ -876,7 +876,12 @@ const AGENT_TRIES: [&str; 4] = [
 
 /// The reasons [`plain_reason`] gives as they are: the model's silence or
 /// cut, said plainly with what to try.
-const PLAIN_REASONS: [&str; 2] = [MODEL_CUT_OFF, MODEL_SILENT];
+const PLAIN_REASONS: [&str; 3] = [MODEL_CUT_OFF, MODEL_SILENT, NOT_READY_LINE];
+
+/// What the person is told, at once, when lamp-tasks says a make on the
+/// lamp's agent can't start because Harness or the gateway isn't ready yet
+/// (`not_ready`, #7245): never a silent failure.
+pub const NOT_READY_LINE: &str = "I'm still getting ready. Give me a minute and ask me again.";
 
 /// Why a make failed, as the person hears it and the app shows it: the
 /// lamp's own reason `why` (never the model's `cannot:` sentence, which
@@ -920,7 +925,7 @@ pub fn not_made_line(why: &str) -> String {
     // whole already.
     if why.starts_with(CANT_YET)
         || why.starts_with(ALREADY_HAVE)
-        || [NOT_MADE_TRY, NOT_KEPT_TRY].contains(&why)
+        || [NOT_MADE_TRY, NOT_KEPT_TRY, NOT_READY_LINE].contains(&why)
         || AGENT_TRIES.contains(&why)
     {
         return match why.ends_with(['.', '!', '?']) {
