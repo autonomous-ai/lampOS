@@ -199,7 +199,10 @@ coordinator marks every turn in hand while it is
 request begun in the walk is marked right after its Start, before any of
 its sound, so the mark reaches the worker before the model can call
 (Sixth's P3 on #3835); a turn begun before the walk is marked at the next
-poll. Only with head sleep (`LAMP_HEAD_TOUCH=on` and the durable
+poll while its input is still open. A turn whose End is already queued or
+sent, as a lamp's own written line is from its start, takes no mark: it
+could never be sent, and outliving its turn it ended the voice (#7219).
+Only with head sleep (`LAMP_HEAD_TOUCH=on` and the durable
 mute), since a tap on the head is how it wakes: without it the function is
 not declared at all, and the journal says so once. A held line's call is
 refused, as every action's is.
