@@ -597,9 +597,66 @@ const FIRST_MESSAGE_LOOK: Duration = Duration::from_millis(500);
 /// 14:20:43. Harness types the prompt in only once the pane is ready, and
 /// waits up to 30 s for the Gateway to write it (`sessionInput.ts`). 45 s
 /// from `new` covers that wait, the slow first send and the preparation
-/// after it; a send later still costs one close and one more
-/// `new`, never a prompt typed in twice.
+/// after it. A send later still is caught by the Gateway's own record
+/// ([`openclaw_record`], #7287) before any close or second `new`, so the
+/// prompt is never run twice.
 pub const OPENCLAW_PROOF_WITHIN: Duration = Duration::from_secs(45);
+
+/// Where the Gateway keeps agent `main`'s sessions under its state folder
+/// `state` (`OPENCLAW_STATE_DIR`, `/var/lib/lampos-openclaw/state` on the
+/// lamp): OpenClaw 2026.11.2's agent database, schema 27, as Harness reads
+/// it (openharness `engines/openclaw/contract.ts`, `openclawAgentDb`;
+/// lamp-c0a4's own file list on #6343). lamp-tasks runs as `lampos`, the
+/// Gateway's own user, and the Gateway's namespace shows this folder at
+/// the same path, so it is read here directly: no OpenClaw CLI call (a
+/// Node start of about 10 s on the lamp) is made.
+pub fn openclaw_record_path(state: &Path) -> PathBuf {
+    state.join("agents/main/agent/openclaw-agent.sqlite")
+}
+
+/// Whether the Gateway's record at `db` holds anything of the session of
+/// Harness's `agent_id` (`agent:main:harness-<agentId>`, matched by the
+/// key's first 8 characters of the id, so a shortened key is found too):
+/// a transcript row with a role (the user's message, an answer, a tool
+/// result) in any of its windows, or a run status (`running`, `done`, ...).
+/// Read only, never written; `Err` with why when it can't be read (no
+/// file, another schema, busy past one second), which a caller takes as
+/// "may be under way" (#7287).
+pub fn openclaw_record(db: &Path, agent_id: &str) -> Result<bool, String> {
+    use rusqlite::{Connection, OpenFlags};
+    let id8: String = agent_id.chars().take(8).collect();
+    if id8.len() < 8 {
+        return Err("agent id too short".into());
+    }
+    let prefix = format!("agent:main:harness-{id8}");
+    let connection = Connection::open_with_flags(
+        db,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| format!("open: {}", error_kind(&error)))?;
+    connection
+        .busy_timeout(Duration::from_secs(1))
+        .map_err(|error| format!("busy timeout: {}", error_kind(&error)))?;
+    connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM session_nodes n WHERE substr(n.session_key, 1, ?2) = ?1 AND n.status IS NOT NULL) \
+             OR EXISTS(SELECT 1 FROM transcript_events t WHERE t.message_role IS NOT NULL AND t.session_id IN \
+               (SELECT w.session_id FROM session_windows w WHERE substr(w.session_key, 1, ?2) = ?1 \
+                UNION SELECT n.current_session_id FROM session_nodes n WHERE substr(n.session_key, 1, ?2) = ?1))",
+            rusqlite::params![prefix, prefix.len() as i64],
+            |row| row.get::<_, bool>(0),
+        )
+        .map_err(|error| format!("read: {}", error_kind(&error)))
+}
+
+/// A short name for a record read's error, never its message (which can
+/// quote a path or a row).
+fn error_kind(error: &rusqlite::Error) -> String {
+    match error {
+        rusqlite::Error::SqliteFailure(code, _) => format!("{:?}", code.code),
+        _ => "other".into(),
+    }
+}
 
 /// What `show` read of a harness just started ([`Cli::look_until_idle`]).
 enum Looked {
@@ -2460,13 +2517,25 @@ impl Cli {
     }
 
     /// OpenClaw's launch once `new` answered (#7277): Created only once
-    /// `show` proves its first prompt taken ([`Cli::openclaw_taken`]). With
-    /// no proof the harness is closed and `new` asked once more, proved the
-    /// same way; still none, that one is closed too and the task not sent,
-    /// `openclaw_not_taken`, so the person hears it failed. A harness that
-    /// can't be closed ends it uncertain, with nothing more started: one
-    /// left running could still take its prompt beside a second (Heron's
-    /// P2 on #6504). Nothing is ever started a third time or replied.
+    /// `show` proves its first prompt taken ([`Cli::openclaw_taken`]). The
+    /// whole of it, every proof wait, close and the one `new` more, runs
+    /// within the launch's own `until` (`began + launch_timeout`), so the
+    /// tasks-harness lane is never held longer than one launch (Heron's P2
+    /// on #7287); the owner's stop ends it `cancelled` at the next call.
+    /// With no proof, the Gateway's own record of that harness's session is
+    /// read first ([`openclaw_record`]): a user message or a run there, or a
+    /// record that can't be read, means the prompt may already be under
+    /// way, so nothing is closed or started again (the Reviewer-lead's P2 on
+    /// #7287): the first harness is kept and looked at until `until`, and
+    /// with still no proof the launch is uncertain, `openclaw_taken_unseen`
+    /// or `openclaw_record_unread`. Only a record read that holds nothing
+    /// of it has the harness closed and `new` asked once more, proved the
+    /// same way; still none, its record is read too, and only with nothing
+    /// there is it closed and the task not sent, `openclaw_not_taken`, so
+    /// the person hears it failed. A harness that can't be closed ends it
+    /// uncertain, with nothing more started: one left running could still
+    /// take its prompt beside a second (Heron's P2 on #6504). Nothing is
+    /// ever started a third time or replied.
     fn openclaw_first_prompt(
         &self,
         launch: &Launch,
@@ -2479,20 +2548,51 @@ impl Cli {
         let LaunchOutcome::Created { agent_id } = outcome else {
             return self.first_message_unless_asked(launch, outcome, until, seen, true);
         };
-        match self.openclaw_taken(launch, &agent_id, seen) {
+        // Looks and the second `new` end an eighth of `launch_timeout`
+        // before `until` (7.5 s of 60 s), so a close after them still fits.
+        let looks_until = until
+            .checked_sub(self.config.launch_timeout / 8)
+            .unwrap_or(until);
+        match self.openclaw_taken(launch, &agent_id, looks_until, seen) {
             Ok(true) => return LaunchOutcome::Created { agent_id },
             Ok(false) => {}
             Err(code) => return uncertain(code),
         }
-        if !self.openclaw_closed(launch, &agent_id, seen) {
+        if let Some(code) = self.openclaw_maybe_taken(launch, &agent_id) {
+            // Kept: no close, no second `new`. Looked at until `until`.
+            return match self.openclaw_taken(launch, &agent_id, until, seen) {
+                Ok(true) => LaunchOutcome::Created { agent_id },
+                Ok(false) => {
+                    eprintln!(
+                        "tasks: {}: OpenClaw's harness still shows no sign by the launch's bound: uncertain ({code}), never started again",
+                        launch.name
+                    );
+                    uncertain(code)
+                }
+                Err(code) => uncertain(code),
+            };
+        }
+        if self.cancelled(None) {
+            return uncertain("cancelled");
+        }
+        if !self.openclaw_closed(launch, &agent_id, until, seen) {
             return uncertain("openclaw_not_closed");
         }
         eprintln!(
-            "tasks: {}: OpenClaw showed no sign it took its prompt within {} s of new: the harness is closed, and it is started once more",
+            "tasks: {}: OpenClaw showed no sign it took its prompt within {} s of new, and its Gateway's record holds none: the harness is closed, and it is started once more",
             launch.name,
             self.openclaw_proof_within().as_secs()
         );
-        let reply = self.run(again, self.config.launch_timeout);
+        if self.cancelled(None) {
+            return uncertain("cancelled");
+        }
+        let left = looks_until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            // The first is closed and no time is left for a second: nothing
+            // runs this task.
+            return uncertain("openclaw_new_again_failed");
+        }
+        let reply = self.run(again, left);
         seen.took(&reply);
         let agent_id = match reply {
             Ok(reply) if reply.success => {
@@ -2506,16 +2606,23 @@ impl Cli {
             Ok(_) => return uncertain("openclaw_new_again_failed"),
             Err(error) => return uncertain(error.code),
         };
-        match self.openclaw_taken(launch, &agent_id, seen) {
+        match self.openclaw_taken(launch, &agent_id, looks_until, seen) {
             Ok(true) => return LaunchOutcome::Created { agent_id },
             Ok(false) => {}
             Err(code) => return uncertain(code),
+        }
+        if let Some(code) = self.openclaw_maybe_taken(launch, &agent_id) {
+            eprintln!(
+                "tasks: {}: OpenClaw's second harness shows no sign by the launch's bound: uncertain ({code}), kept, never closed or started again",
+                launch.name
+            );
+            return uncertain(code);
         }
         eprintln!(
             "tasks: {}: OpenClaw took no prompt on its second new either: not sent (openclaw_not_taken)",
             launch.name
         );
-        if !self.openclaw_closed(launch, &agent_id, seen) {
+        if !self.openclaw_closed(launch, &agent_id, until, seen) {
             return uncertain("openclaw_not_taken");
         }
         LaunchOutcome::NotSent {
@@ -2523,25 +2630,64 @@ impl Cli {
         }
     }
 
+    /// Whether the Gateway's own record says the prompt of `agent_id`'s
+    /// harness may be under way ([`openclaw_record`], read where
+    /// `OPENCLAW_STATE_DIR` in Harness's environment says): `Some` with
+    /// the uncertain code the launch ends with if nothing more proves it,
+    /// journaled once; `None` only for a record read that holds nothing of
+    /// it.
+    fn openclaw_maybe_taken(&self, launch: &Launch, agent_id: &str) -> Option<&'static str> {
+        let state = self
+            .config
+            .environment
+            .get(crate::hold::OPENCLAW_STATE_DIR)
+            .map(PathBuf::from);
+        let read = match &state {
+            Some(state) => openclaw_record(&openclaw_record_path(state), agent_id),
+            None => Err(format!("no {}", crate::hold::OPENCLAW_STATE_DIR)),
+        };
+        match read {
+            Ok(false) => None,
+            Ok(true) => {
+                eprintln!(
+                    "tasks: {}: OpenClaw's Gateway record holds a user message or run for this harness though show shows none: it is kept, never closed or started again",
+                    launch.name
+                );
+                Some("openclaw_taken_unseen")
+            }
+            Err(why) => {
+                eprintln!(
+                    "tasks: {}: OpenClaw's Gateway record could not be read ({why}): the harness is kept, never closed or started again",
+                    launch.name
+                );
+                Some("openclaw_record_unread")
+            }
+        }
+    }
+
     /// How long after its `new` OpenClaw is given to prove its prompt
-    /// taken: [`OPENCLAW_PROOF_WITHIN`], never more than one
-    /// `launch_timeout`.
+    /// taken: [`OPENCLAW_PROOF_WITHIN`], never more than three quarters of
+    /// one `launch_timeout` (45 s of the lamp's 60 s), so a close and one
+    /// `new` more still fit in the launch's own bound.
     fn openclaw_proof_within(&self) -> Duration {
-        OPENCLAW_PROOF_WITHIN.min(self.config.launch_timeout)
+        OPENCLAW_PROOF_WITHIN.min(self.config.launch_timeout * 3 / 4)
     }
 
     /// `show` read from just after `new` until it proves OpenClaw took its
     /// prompt (`Ok(true)`): asked (`ask` set), a tool used, an answer, or
     /// `working`. Idle with none of them is no proof. `Ok(false)`: no proof
-    /// within [`Cli::openclaw_proof_within`]. `Err` is the uncertain code
-    /// it ends with: a stopped harness, or a `show` that failed to run.
+    /// within [`Cli::openclaw_proof_within`] or by the launch's `until`,
+    /// whichever is first. `Err` is the uncertain code it ends with: a
+    /// stopped harness, the owner's stop (`cancelled`), or a `show` that
+    /// failed to run.
     fn openclaw_taken(
         &self,
         launch: &Launch,
         agent_id: &str,
+        until: Instant,
         seen: &mut Seen,
     ) -> Result<bool, &'static str> {
-        let until = Instant::now() + self.openclaw_proof_within();
+        let until = until.min(Instant::now() + self.openclaw_proof_within());
         let show: Vec<OsString> = vec![
             "show".into(),
             "--machine".into(),
@@ -2576,28 +2722,40 @@ impl Cli {
         }
     }
 
-    /// `harness close` of an OpenClaw harness that took no prompt, within
-    /// one `launch_timeout`: whether it is closed (or gone). Not closed is
-    /// journaled with why.
-    fn openclaw_closed(&self, launch: &Launch, agent_id: &str, seen: &mut Seen) -> bool {
-        let closed = self.run(
-            &[
-                "close".into(),
-                "--machine".into(),
-                launch.target.machine_id.clone().into(),
-                agent_id.into(),
-                "--json".into(),
-            ],
-            self.config.launch_timeout,
-        );
-        seen.took(&closed);
+    /// `harness close` of an OpenClaw harness that took no prompt, by the
+    /// launch's `until`: whether it is closed (or gone). Not closed (no
+    /// time left included) is journaled with why.
+    fn openclaw_closed(
+        &self,
+        launch: &Launch,
+        agent_id: &str,
+        until: Instant,
+        seen: &mut Seen,
+    ) -> bool {
+        let left = until.saturating_duration_since(Instant::now());
+        let closed = (!left.is_zero()).then(|| {
+            self.run(
+                &[
+                    "close".into(),
+                    "--machine".into(),
+                    launch.target.machine_id.clone().into(),
+                    agent_id.into(),
+                    "--json".into(),
+                ],
+                left,
+            )
+        });
+        if let Some(closed) = &closed {
+            seen.took(closed);
+        }
         let why = match &closed {
-            Ok(reply) => match self::closed(reply.code) {
+            None => "no_time_left".to_owned(),
+            Some(Ok(reply)) => match self::closed(reply.code) {
                 Ok(Closed::Closed | Closed::Gone) => return true,
                 Ok(Closed::Refused | Closed::Left) => "refused".to_owned(),
                 Err(code) => code,
             },
-            Err(error) => error.code.to_owned(),
+            Some(Err(error)) => error.code.to_owned(),
         };
         eprintln!(
             "tasks: {}: OpenClaw's harness took no prompt and wasn't closed ({why}), so nothing more is started",

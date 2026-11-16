@@ -2314,21 +2314,57 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     30 s Harness waits for the Gateway, the slow first send and the
     preparation after it. Proven, the task is `Created` as before, so a
     run that reads idle with no ask and then uses a tool (#6499's case)
-    still counts. No proof: that harness is closed and `new` asked once
-    more (`harness reply` is off on product lamps), proved the same way.
-    Still none: the second harness is closed too and the task is
-    `not_sent`, `openclaw_not_taken`, so the voice tells the person it did
-    not reach the agent, never that it started. A harness that can't be
-    closed ends the launch `uncertain` (`openclaw_not_closed` for the
+    still counts. No proof: before anything is closed, lamp-tasks reads the
+    Gateway's own record of that harness's session (#7287, the
+    Reviewer-lead's P2: on fc4b a first ask came 65 s after `new`, so a
+    close and a second `new` could run the ask twice). The record is
+    OpenClaw 2026.11.2's agent database,
+    `/var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite`
+    (under `OPENCLAW_STATE_DIR`, as Harness reads it), opened read-only:
+    lamp-tasks runs as `lampos`, the Gateway's user, and the Gateway's
+    namespace shows that folder at the same path, so no OpenClaw CLI call
+    is made. It counts as taken when session `agent:main:harness-<agentId>`
+    (matched by the id's first 8 characters) has a transcript row with a
+    role (the user's message, an answer, a tool result) or a run status.
+    Taken, or a record that can't be read (no file, another schema, busy
+    past 1 s): the harness is kept, nothing is closed and `new` is never
+    asked again; it is looked at to the launch's bound, and with still no
+    proof the launch is `uncertain`, `openclaw_taken_unseen` or
+    `openclaw_record_unread`. Only a record read that holds nothing of it
+    has the harness closed and `new` asked once more (`harness reply` is
+    off on product lamps), proved the same way. Still none: its record is
+    read too (taken or unreadable: `uncertain` with the same codes, kept),
+    and with nothing there the second harness is closed too and the task
+    is `not_sent`, `openclaw_not_taken`, so the voice tells the person it
+    did not reach the agent, never that it started. A harness that can't
+    be closed ends the launch `uncertain` (`openclaw_not_closed` for the
     first, `openclaw_not_taken` for the second) with nothing more started:
     one left running could still take its task beside another. A second
-    `new` that fails is `openclaw_new_again_failed`; a stopped harness is
-    `stopped_before_message`, and a `show` that fails is uncertain with its
-    code. Nothing is started a third time. Tested by
+    `new` that fails, or that no time is left for, is
+    `openclaw_new_again_failed`; a stopped harness is
+    `stopped_before_message`, the owner's stop is `cancelled`, and a
+    `show` that fails is uncertain with its code. Nothing is started a
+    third time.
+  - **One launch bound for all of it** (#7287, Heron's P2): every proof
+    wait, the record reads, the closes and the second `new` run within
+    the launch's own `until` (its start plus `launch_timeout`, 60 s on the
+    lamp), each call bounded by what is left of it. Each proof wait is
+    `OPENCLAW_PROOF_WITHIN` (45 s), never more than three quarters of
+    `launch_timeout`, and the looks and the second `new` end an eighth of
+    `launch_timeout` (7.5 s) before `until`, so the last close still fits.
+    So the worst case the `tasks-harness` lane (the one worker that also
+    serves every other task's `show`, close, status and sign-in) is held
+    by an OpenClaw hand-over is the Gateway wait before it
+    (`READY_WITHIN`, at most 60 s) plus 60 s for the hand-over itself,
+    120 s in all, where the close-and-start-again path alone could take
+    about 330 s before. The owner's stop is checked at every call. Tested by
     `openclaw_idle_with_no_ask_then_a_tool_within_the_bound_is_created`,
     `openclaw_idle_with_no_ask_throughout_is_closed_started_once_more_and_not_sent`,
     `openclaw_not_taken_then_taken_on_the_second_new_is_created_on_it`,
-    `openclaw_not_taken_and_not_closed_is_uncertain_with_nothing_more_started`
+    `openclaw_not_taken_and_not_closed_is_uncertain_with_nothing_more_started`,
+    `openclaw_taken_in_the_gateway_record_but_unseen_is_kept_never_started_twice`,
+    `openclaw_with_no_readable_gateway_record_is_never_started_twice`,
+    `openclaw_no_proof_path_ends_within_one_launch_bound`
     and `openclaw_asked_after_new_is_created_with_nothing_more_called`
     (`tests/harness.rs`).
   - **Never begun, told and closed** (#6577): the lamp's own OpenClaw
