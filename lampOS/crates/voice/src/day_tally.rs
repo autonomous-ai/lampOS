@@ -22,7 +22,9 @@
 //!   `yesterday` and today begins from nothing, so a morning's read shows
 //!   what a whole day cost. Counts made in the last [`FLUSH_EVERY`] before
 //!   midnight may be written into the new day, and those of the last
-//!   [`FLUSH_EVERY`] before the process stops are lost.
+//!   [`FLUSH_EVERY`] before the process stops are lost. Only a later day
+//!   turns the day over: a clock that has gone back goes on counting into
+//!   the day the file is on.
 //! - Once an hour in which this process counted something, the journal
 //!   has today's totals in one line ([`told`]).
 
@@ -281,13 +283,26 @@ fn add(directory: &Path, now_s: u64, counts: &Day) -> io::Result<Option<Tally>> 
         .write(true)
         .open(directory.join(LOCK))?;
     rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockExclusive)?;
-    let mut tally: Tally = fs::read(directory.join(FILE))
-        .ok()
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        .unwrap_or_default();
+    let path = directory.join(FILE);
+    let mut tally: Tally = match fs::read(&path) {
+        Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_else(|_| {
+            // Said, so a lost day is not a silent one (Heron on #7355). The
+            // next write makes the file whole again, so it is said once.
+            eprintln!(
+                "lamp-voice: the day's tally in {} is not one this build reads: begun again",
+                path.display()
+            );
+            Tally::default()
+        }),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Tally::default(),
+        Err(error) => return Err(error),
+    };
     let before = tally.clone();
     let day = now_s / DAY_S;
-    if tally.today.day != day {
+    // Only a later day turns the day over. A clock that has gone back, by a
+    // correction across midnight or because it is not set yet, goes on
+    // counting into the day the file is on (Heron on #7355).
+    if day > tally.today.day {
         let ended = std::mem::take(&mut tally.today);
         // Only the day just before is yesterday; an older one is let go.
         tally.yesterday = (ended.day + 1 == day && !ended.is_empty()).then_some(ended);
@@ -301,7 +316,7 @@ fn add(directory: &Path, now_s: u64, counts: &Day) -> io::Result<Option<Tally>> 
     let mut file = fs::File::create(&new)?;
     file.write_all(&serde_json::to_vec(&tally).map_err(io::Error::other)?)?;
     file.sync_all()?;
-    fs::rename(&new, directory.join(FILE))?;
+    fs::rename(&new, path)?;
     Ok(Some(tally))
 }
 
@@ -476,6 +491,27 @@ mod tests {
         assert_eq!(later.today.day, 20_004);
         assert_eq!(later.today.all().answers, 1);
         assert_eq!(later.yesterday, None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A clock that goes back, across midnight or to before it was set,
+    /// turns nothing over: today's counts stay, and the new ones join them.
+    #[test]
+    fn a_clock_gone_back_keeps_todays_counts() {
+        let dir = folder("back");
+        let early = 20_000 * DAY_S + 30;
+        let usage = json!({"prompt_tokens": 100, "completion_tokens": 10});
+        add(&dir, early - DAY_S, &one("m", usage.clone())).unwrap();
+        let today = add(&dir, early, &one("m", usage.clone())).unwrap().unwrap();
+        assert_eq!(today.today.day, 20_000);
+        assert_eq!(today.yesterday.as_ref().unwrap().day, 19_999);
+        // Back across midnight, and then to a clock not yet set.
+        for now_s in [early - 60, 1_000] {
+            let kept = add(&dir, now_s, &one("m", usage.clone())).unwrap().unwrap();
+            assert_eq!(kept.today.day, 20_000, "{now_s}");
+            assert_eq!(kept.yesterday, today.yesterday, "{now_s}");
+        }
+        assert_eq!(read(&dir).unwrap().today.all().answers, 3);
         let _ = fs::remove_dir_all(&dir);
     }
 

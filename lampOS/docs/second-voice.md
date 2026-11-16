@@ -832,8 +832,12 @@ order is kept. A written turn is the same from the chat on.
     "prompt_tokens", "cached_tokens", "completion_tokens"}}, "declined"},
     "yesterday": …}`. `day` is days since 1970. At the first write of a
     new UTC day the day before becomes `yesterday`, whole, so a morning's
-    read shows what a day cost; a day older than that is let go. At most
-    eight models are kept apart, the rest as `other`.
+    read shows what a day cost; a day older than that is let go. Only a
+    later day turns it over: a clock that has gone back, by a correction
+    across midnight or because it is not set yet, goes on counting into
+    the day the file is on. A file that is there and cannot be read as a
+    tally is begun again, with one journal line saying so. At most eight
+    models are kept apart, the rest as `other`.
   - **A turn never waits on it.** An answer is counted in memory where it
     ends, under a short lock. A thread of its own adds the counts to the
     file at most once a minute, under a file lock, written whole beside
@@ -860,8 +864,9 @@ order is kept. A written turn is the same from the chat on.
     next parts. A reset does not wipe the file yet.
   - Tests: `day_tally::tests` (an answer's usage is read in both services'
     forms, nothing is counted until counting begins, two writers add up
-    by model, a new UTC day keeps the day before and begins again, a bad
-    file begins again and many models are bounded, names are bounded and
+    by model, a new UTC day keeps the day before and begins again, a clock
+    gone back keeps today's counts, a bad file begins again and many
+    models are bounded, names are bounded and
     an answer without usage is still counted), and the workers' census
     (`process::switch_census_tests`), which fails if the switch does not
     reach the second worker.
