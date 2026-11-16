@@ -622,6 +622,24 @@ fn nowhere() -> Store {
     }
 }
 
+/// The SHA-256 a preview of `name` gives with `mode` named (none: as
+/// [`previewed`]), as the app sends it with Send.
+fn previewed_as(
+    places: &crate::skills::Places,
+    name: &str,
+    at: &str,
+    mode: Option<&str>,
+) -> String {
+    let mut data = json!({"name": name, "preview": true});
+    if let Some(mode) = mode {
+        data["visibility"] = json!(mode);
+    }
+    share(&nowhere(), places, &data, &scratch(at), "en").unwrap()["preview"]["sha256"]
+        .as_str()
+        .unwrap()
+        .to_owned()
+}
+
 #[test]
 fn a_mode_is_one_of_the_three_exactly_or_none_or_refused() {
     assert_eq!(visibility(&json!({})), Ok(None));
@@ -738,7 +756,7 @@ fn every_mode_has_a_line_in_every_language_and_english_for_any_other() {
 fn a_send_names_the_mode_only_when_one_was_named_and_passes_the_stores_words_on() {
     let places = places("share-vis-send");
     skill(&places, "water", "Water", "made: here\n", MADE);
-    let seen_sha = previewed(&places, "water", "vis-send-seen");
+    let seen_sha = previewed_as(&places, "water", "vis-send-seen", Some("private"));
 
     // A mode named: it is uploaded, and the Store's line comes back with it
     // (beside the skill, as `data` carries it).
@@ -770,7 +788,7 @@ fn a_send_names_the_mode_only_when_one_was_named_and_passes_the_stores_words_on(
     let sent = share(
         &store,
         &places,
-        &json!({"name": "water", "sha256": previewed(&places, "water", "vis-send-seen2"), "visibility": "unlisted"}),
+        &json!({"name": "water", "sha256": previewed_as(&places, "water", "vis-send-seen2", Some("unlisted")), "visibility": "unlisted"}),
         &scratch("vis-send2"),
         "en",
     )
@@ -888,5 +906,89 @@ fn the_share_kinds_are_the_four_and_visibility_is_the_one_that_says_the_field_is
             "skills.unshare",
             "skills.visibility"
         ]
+    );
+}
+
+#[test]
+fn a_send_must_name_the_mode_its_preview_showed_and_none_is_a_mode_too() {
+    let places = places("share-bind");
+    skill(&places, "water", "Water", "made: here\n", MADE);
+    let none = previewed(&places, "water", "bind-none");
+    let private = previewed_as(&places, "water", "bind-private", Some("private"));
+    let public = previewed_as(&places, "water", "bind-public", Some("public"));
+    // A preview that names no mode keeps the package's own SHA-256, as it
+    // always did; each mode gives its own, the same every time.
+    assert_eq!(none.len(), 64);
+    assert_ne!(none, private);
+    assert_ne!(private, public);
+    assert_eq!(
+        private,
+        previewed_as(&places, "water", "bind-private2", Some("private"))
+    );
+    assert_eq!(bound(&none, None), none);
+    assert_eq!(bound(&none, Some("private")), private);
+
+    // Every other pairing is refused, in plain words, before anything is
+    // sent: a store nothing listens to would answer "unreachable" instead.
+    for (seen, sent) in [
+        (&none, Some("private")),
+        (&private, None),
+        (&private, Some("public")),
+        (&public, Some("private")),
+        (&private, Some("unlisted")),
+    ] {
+        let mut data = json!({"name": "water", "sha256": seen});
+        if let Some(mode) = sent {
+            data["visibility"] = json!(mode);
+        }
+        assert_eq!(
+            share(&nowhere(), &places, &data, &scratch("bind-refused"), "en"),
+            Err(MODE_CHANGED.into()),
+            "{seen} then {sent:?}"
+        );
+    }
+
+    // The pairings that agree reach the Store.
+    for (seen, sent) in [(&none, None), (&private, Some("private"))] {
+        let (store, got) = stored(
+            201,
+            r#"{"status":1,"data":{"id":"s1","name":"water","version":"1.0.0","review_status":"pending"}}"#,
+        );
+        let mut data = json!({"name": "water", "sha256": seen});
+        if let Some(mode) = sent {
+            data["visibility"] = json!(mode);
+        }
+        assert!(share(&store, &places, &data, &scratch("bind-ok"), "en").is_ok());
+        assert!(got.recv().is_ok());
+    }
+
+    // A skill made again since is still told as before, with or without a mode.
+    let folder = places.folder.join("water");
+    let toml = fs::read_to_string(folder.join("skill.toml")).unwrap();
+    fs::write(folder.join("skill.toml"), format!("{toml}\n# changed\n")).unwrap();
+    for (seen, sent) in [(&none, None), (&private, Some("private"))] {
+        let mut data = json!({"name": "water", "sha256": seen});
+        if let Some(mode) = sent {
+            data["visibility"] = json!(mode);
+        }
+        assert_eq!(
+            share(&nowhere(), &places, &data, &scratch("bind-changed"), "en"),
+            Err(CHANGED.into()),
+            "{sent:?}"
+        );
+    }
+}
+
+#[test]
+fn a_mode_changed_later_reads_the_stores_words_from_the_skill_inside_data_too() {
+    let (store, _) = stored(
+        200,
+        r#"{"status":1,"data":{"skill":{"id":"s1","visibility":"unlisted","visibility_note":"Unlisted: by link."}}}"#,
+    );
+    assert_eq!(
+        set_visibility(&store, &json!({"id": "s1", "visibility": "private"})),
+        Ok(
+            json!({"visibility": {"id": "s1", "visibility": "unlisted", "visibility_note": "Unlisted: by link."}})
+        )
     );
 }

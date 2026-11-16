@@ -648,18 +648,40 @@ fn answered(status: u16, body: &[u8]) -> Result<Value, String> {
 pub const NOT_SEEN: &str = "show what would be sent first, then send that";
 /// What a share is told when the skill changed after the owner saw it.
 pub const CHANGED: &str = "the skill changed since you looked: look again before sending";
+/// What a share is told when the mode it names is not the one the owner saw.
+pub const MODE_CHANGED: &str =
+    "the choice of who can see it changed since you looked: look again before sending";
 
-/// `skills.share {"name", "author"?, "sha256"}`: `{"sent": {"id", "name",
-/// "version", "review_status"}}`, or why not. With `"preview": true`,
-/// nothing is sent: `{"preview": {"name", "sha256", "files": [{"path",
-/// "text"}]}}`, the text exactly as it would leave and the SHA-256 of the
-/// package it would be, both from one copy of the skill, for the app to
-/// show before Send. A send must name
-/// that same SHA-256, so the lamp sends only the bytes the owner saw: none,
-/// [`NOT_SEEN`]; another, as when the skill was made again since,
-/// [`CHANGED`] (the Reviewer-lead's P2 on #4948). The package carries no
-/// time (`lamp_skills::package`), so packing the same files again gives the
-/// same bytes.
+/// What a preview's `sha256` and a Send's must agree on: the package's
+/// SHA-256 alone when no mode is named (so an app that names none sees what it
+/// always did), else the SHA-256 of that and the mode, so a Send of another
+/// mode than the one previewed is not the one the owner said yes to
+/// (#5209, Heron and Fourteen on #7353). It holds no state: the lamp
+/// computes it again from the skill and the mode the Send names.
+pub fn bound(package_sha256: &str, visibility: Option<&str>) -> String {
+    match visibility {
+        None => package_sha256.to_owned(),
+        Some(mode) => lamp_skills::package::sha256_hex(
+            format!("{package_sha256}\nvisibility={mode}").as_bytes(),
+        ),
+    }
+}
+
+/// `skills.share {"name", "author"?, "visibility"?, "sha256"}`: `{"sent":
+/// {"id", "name", "version", "review_status", "visibility"?,
+/// "visibility_note"?}}`, or why not. With `"preview": true`, nothing is
+/// sent: `{"preview": {"name", "sha256", "files": [{"path", "text"}],
+/// "visibility", "visibility_note"?}}`, the text exactly as it would leave,
+/// the mode named (`null` when none) with the lamp's line for it in the
+/// owner's language, and the `sha256` of the package it would be bound to that
+/// mode ([`bound`]), all from one copy of the skill, for the app to show
+/// before Send. A send must name that same `sha256` and the same mode, so the
+/// lamp sends only the bytes and the choice the owner saw: no `sha256`,
+/// [`NOT_SEEN`]; another because the skill was made again since,
+/// [`CHANGED`] (the Reviewer-lead's P2 on #4948); another because the mode
+/// differs from the preview's, [`MODE_CHANGED`]. The package carries no time
+/// (`lamp_skills::package`), so packing the same files again gives the same
+/// bytes.
 pub fn share(
     store: &Store,
     places: &crate::skills::Places,
@@ -673,6 +695,7 @@ pub fn share(
     let folder = shareable(places, &name)?;
     if data.get("preview").and_then(Value::as_bool) == Some(true) {
         let (sha256, files) = seen(&folder, scratch, || {})?;
+        let sha256 = bound(&sha256, visibility);
         let mut preview = json!({"name": name, "sha256": sha256, "files": files});
         // The mode the owner named, and the lamp's line for it in the
         // owner's language, to be read before the yes; none named, none
@@ -691,8 +714,15 @@ pub fn share(
         .and_then(Value::as_str)
         .ok_or_else(|| NOT_SEEN.to_owned())?;
     let (file_name, tar) = pack(&folder, scratch)?;
-    if lamp_skills::package::sha256_hex(&tar) != seen {
-        return Err(CHANGED.to_owned());
+    let package = lamp_skills::package::sha256_hex(&tar);
+    if bound(&package, visibility) != seen {
+        // The files are the ones seen, with another mode (or none), or the
+        // skill was made again since.
+        let same_files = package == seen
+            || VISIBILITIES
+                .into_iter()
+                .any(|mode| bound(&package, Some(mode)) == seen);
+        return Err(if same_files { MODE_CHANGED } else { CHANGED }.to_owned());
     }
     // A folder a computer pushed holds `.pushed.json` (a dot file: never in
     // the package); the upload says so beside `author`, in a field of its
@@ -752,7 +782,11 @@ pub fn set_visibility(store: &Store, data: &Value) -> Result<Value, String> {
     )?;
     let answer = answered(status, &reply)?;
     let mut said = json!({ "id": id, "visibility": mode });
+    // The Store's words, from `data` or from the skill inside it.
     keep_visibility(&mut said, &answer);
+    if let Some(skill) = answer.get("skill") {
+        keep_visibility(&mut said, skill);
+    }
     // The mode told is the one the Store holds, when it says one.
     Ok(json!({ "visibility": said }))
 }
