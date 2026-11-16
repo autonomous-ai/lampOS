@@ -4029,15 +4029,17 @@ file:
   just-restarted gateway answered approvals RPCs in up to 12 s each and
   an add ran past an earlier 20 s bound). A start whose
   list has the entry writes nothing, and later runs on the same start
-  run no add. An add that fails or reaches its bound is tried once more
+  run no add. Every add is journaled with its outcome and how long it
+  took ("tasks: the OpenClaw Gateway's allow-list add for
+  /usr/local/lib/lampos/skill-start succeeded in 840 ms"). An add that fails or reaches its bound is tried once more
   at once, on the same start, with the same bound; a second try that
   succeeds is journaled ("tasks: the OpenClaw Gateway's allow-list add
-  for /usr/local/lib/lampos/skill-start succeeded on its second try (the
-  first: exit 1)", or "killed at its 60 s bound") and the start is kept.
+  for /usr/local/lib/lampos/skill-start succeeded on its second try in
+  61200 ms (the first: exit 1)", or "killed at its 60 s bound") and the start is kept.
   Both bounded by the run's own gateway wait. An add that fails both
   tries is journaled ("tasks: the OpenClaw Gateway's
-  allow-list add for /usr/local/lib/lampos/skill-start did not succeed;
-  the next run tries again") and does not hold the run, but the start
+  allow-list add for /usr/local/lib/lampos/skill-start did not succeed in
+  120000 ms (the first: …, the second: …); the next run tries again") and does not hold the run, but the start
   is not kept, so the next run reads and adds again. With
   OpenClaw's stock `tools.exec.mode: "ask"`, a headless
   turn's exec is denied without this entry. A denied exec still ends the turn as

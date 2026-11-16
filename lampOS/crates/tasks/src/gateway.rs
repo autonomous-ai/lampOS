@@ -268,20 +268,31 @@ impl Probe for Serving {
         // kept, so the next run reads and adds again.
         let added = !read
             || self.add.as_mut().is_none_or(|add| {
+                // Each add says its outcome and how long it took, so a slow
+                // gateway's wait is in the journal (the first builder, #7307).
+                let began = Instant::now();
                 if add.ready_until(until, cancelled) {
+                    eprintln!(
+                        "tasks: the OpenClaw Gateway's allow-list add for {} succeeded in {} ms",
+                        crate::skill_start::LAUNCHER,
+                        began.elapsed().as_millis()
+                    );
                     return true;
                 }
                 let first = add.not_ready();
                 let added = add.ready_until(until, cancelled);
                 if added {
                     eprintln!(
-                        "tasks: the OpenClaw Gateway's allow-list add for {} succeeded on its second try (the first: {first})",
-                        crate::skill_start::LAUNCHER
+                        "tasks: the OpenClaw Gateway's allow-list add for {} succeeded on its second try in {} ms (the first: {first})",
+                        crate::skill_start::LAUNCHER,
+                        began.elapsed().as_millis()
                     );
                 } else {
                     eprintln!(
-                        "tasks: the OpenClaw Gateway's allow-list add for {} did not succeed; the next run tries again",
-                        crate::skill_start::LAUNCHER
+                        "tasks: the OpenClaw Gateway's allow-list add for {} did not succeed in {} ms (the first: {first}, the second: {}); the next run tries again",
+                        crate::skill_start::LAUNCHER,
+                        began.elapsed().as_millis(),
+                        add.not_ready()
                     );
                 }
                 added
