@@ -62,6 +62,10 @@ việc build lại engine trong lúc xử lý request.
 Tương tự, đầu vào speaker embedding bị cắt còn 3000 frame (30 giây) trước khi
 suy luận, thấp hơn giới hạn 5546 frame của engine đã cache, nên clip dài được
 embed từ 30 giây đầu thay vì phải build lại engine (#555).
+RULA của pose chạy trên keypoint 2D. Với đầu vào 2D, góc cổ là đường từ trung điểm
+hai vai tới trung điểm hai tai, lấy dấu theo phía khuôn mặt hướng tới (độ lệch x của
+mũi so với trung điểm hai tai), nên đầu thẳng hoặc cúi về trước được điểm cổ 1–3 và chỉ
+khi đầu ngả ra sau từ 5° trở lên mới được 4; góc nhìn chính diện cho góc không dấu.
 Phát hiện vật thể OWLv2 chạy bằng hai graph ONNX: graph text biến prompt thành query
 embedding, graph ảnh dùng các embedding đó để phát hiện. Các preset prompt có tên (hiện chỉ
 có `fire_hazard_v1`, 46 prompt nguy cơ cháy mà HAL dùng) được encode một lần khi dlserver

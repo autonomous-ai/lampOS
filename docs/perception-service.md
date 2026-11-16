@@ -60,6 +60,10 @@ range, so no clip length can trigger an engine rebuild during a request.
 Speaker-embedding input is likewise cropped to 3000 frames (30 s) before
 inference, below the cached engine's 5546-frame limit, so a long clip is
 embedded from its first 30 s instead of rebuilding the engine (#555).
+Pose RULA runs on the 2D keypoints. For 2D input the neck angle is the shoulder
+midpoint -> ear midpoint line, signed by the side the face points to (the nose's x
+offset from the ear midpoint), so an upright or forward head scores neck 1–3 and only
+a head carried back 5° or more scores 4; a frontal view gives an unsigned angle.
 OWLv2 object detection runs as two ONNX graphs: a text graph turns prompts into query
 embeddings and an image graph detects with them. Named prompt presets (today only
 `fire_hazard_v1`, the 46 fire-hazard prompts HAL uses) are encoded once when dlserver

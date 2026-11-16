@@ -45,3 +45,18 @@ Tracked model accuracy and architecture limitations that affect production quali
   close-up framing), the assessor returns None and no ergo score is produced
   for that frame. This is common in seated desk setups where the camera is
   at monitor height.
+
+- **Neck flexion in 2D** (fixed): RULA is fed 2D keypoints (z = 0), where the
+  old sign rule (`cross(trunk_up, v)[0]`) is always 0, so every neck angle came
+  out negative and scored 4 ("extension"). For 2D input the neck is now the
+  shoulder midpoint -> ear midpoint line, and its sign comes from the face: the
+  nose's x offset from the ear midpoint gives the side the person faces, and a
+  lean towards that side is flexion. Leans behind the trunk line under 5° count
+  as neutral. In a frontal view (nose straight below the ears) the facing side
+  is unknown and the angle is unsigned, so no extension is reported; forward
+  head flexion lies along depth there and is barely visible, so a frontal
+  camera mostly reads neck 1. 3D input (real z) keeps the old rule.
+
+- **Upper-arm angle reference**: the upper arm is measured against trunk-up,
+  so an arm hanging down reads about 180° and scores 2 instead of 1. Not
+  changed yet.

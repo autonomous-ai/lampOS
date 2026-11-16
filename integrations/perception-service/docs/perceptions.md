@@ -93,6 +93,12 @@ A 3-stage pipeline: 2D keypoints → optional 3D lift → optional RULA ergonomi
   maps to a `RiskLevel` (`models/pose.py`): `NEGLIGIBLE(1)`, `LOW(2)`, `MEDIUM(3)`,
   `HIGH(4)` — the standard ergonomics escalation for "how urgently should this
   posture change". The 3D lift and ergo stages only run when enabled in config.
+- RULA is fed the 2D keypoints (z = 0) even when the 3D lift runs. For 2D input
+  the neck angle is shoulder midpoint -> ear midpoint against the trunk, signed by
+  the facing side (nose x offset from the ear midpoint): towards the face is
+  flexion (neck 1–3), behind the trunk by 5° or more is extension (neck 4). A
+  frontal view gives an unsigned angle (`rula/utils.py` `signed_flexion_angle`,
+  `facing_direction_2d`). See [known-issues.md](known-issues.md#pose-estimation-rtmpose--rula).
 
 ## 4. Speech emotion (SER)
 

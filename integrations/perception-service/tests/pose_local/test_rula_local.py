@@ -211,3 +211,91 @@ class TestConfidenceFiltering:
         assert result is not None
         assert len(result.left.skipped_joints) > 0
         assert len(result.right.skipped_joints) > 0
+
+
+# --- 2D neck sign (COCO-mapped: H36M NECK = nose, HEAD = ear midpoint) ---
+
+_THORAX_2D = np.array([160.0, 200.0], dtype=np.float32)
+_NECK_LEN = 60.0
+
+
+def _desk_side_view_2d(neck_deg: float, facing: int = 1, chin_up: bool = False) -> np.ndarray:
+    """Side-view 2D skeleton facing +x (facing=1) or -x (facing=-1).
+
+    *neck_deg* tilts the shoulder-midpoint -> ear-midpoint line towards the face
+    (positive) or behind the shoulders (negative). The nose sits in front of the
+    ears, a little below them, or above them when *chin_up*.
+    """
+    kps = _upright_skeleton_2d()
+    rad = np.radians(neck_deg)
+    ear_mid = _THORAX_2D + _NECK_LEN * np.array([facing * np.sin(rad), -np.cos(rad)])
+    nose = ear_mid + np.array([facing * 15.0, -6.0 if chin_up else 5.0])
+    kps[H36MJoint.THORAX] = _THORAX_2D
+    kps[H36MJoint.L_SHOULDER] = _THORAX_2D + [3, 0]
+    kps[H36MJoint.R_SHOULDER] = _THORAX_2D - [3, 0]
+    kps[H36MJoint.HEAD] = ear_mid
+    kps[H36MJoint.NECK] = nose
+    return kps
+
+
+def _neck(kps: np.ndarray) -> tuple[int, int]:
+    result = RULAAssessor().predict([(kps, _all_confident())])[0]
+    assert result is not None
+    return result.left.body_scores.neck, result.left.body_scores.neck_angle
+
+
+class TestSignedFlexion2D:
+    def test_upright_scores_1(self):
+        assert _neck(_desk_side_view_2d(0))[0] == 1
+
+    def test_forward_15_scores_2(self):
+        score, angle = _neck(_desk_side_view_2d(15))
+        assert score == 2
+        assert angle > 0
+
+    def test_forward_25_scores_3(self):
+        assert _neck(_desk_side_view_2d(25))[0] == 3
+
+    def test_forward_mirrored_scores_3(self):
+        """Facing -x: the same forward head must not read as extension."""
+        assert _neck(_desk_side_view_2d(25, facing=-1))[0] == 3
+
+    def test_chin_up_head_back_scores_4(self):
+        score, angle = _neck(_desk_side_view_2d(-20, chin_up=True))
+        assert score == 4
+        assert angle < 0
+
+    def test_chin_up_mirrored_scores_4(self):
+        assert _neck(_desk_side_view_2d(-20, facing=-1, chin_up=True))[0] == 4
+
+    def test_small_backward_jitter_is_neutral(self):
+        assert _neck(_desk_side_view_2d(-3))[0] == 1
+
+    def test_frontal_view_never_extension(self):
+        """Nose straight below the ears: facing unknown, so no extension (4)."""
+        kps = _upright_skeleton_2d()
+        kps[H36MJoint.HEAD] = [165, 140]  # head tilted sideways a little
+        kps[H36MJoint.NECK] = [165, 150]  # nose below the ear midpoint
+        assert _neck(kps)[0] in (1, 2)
+
+    def test_3d_rule_unchanged(self):
+        """With real z, the sign still comes from cross(trunk_up, v)[0]."""
+        from core.perception.pose.predictors.ergo.rula.utils import signed_flexion_angle
+
+        rng = np.random.default_rng(0)
+        for _ in range(50):
+            v = rng.normal(size=3).astype(np.float32)
+            up = rng.normal(size=3).astype(np.float32)
+            fwd = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+            legacy = signed_flexion_angle(v, up)
+            assert signed_flexion_angle(v, up, fwd) == legacy
+            assert (legacy > 0) == (np.cross(up, v)[0] > 0)
+
+    def test_3d_neck_uses_head_minus_neck(self):
+        """3D input keeps the head - neck vector: head forward in depth is flexion."""
+        kps = _upright_skeleton_3d()
+        kps[10] = [0, 100, -40]  # head forward in depth
+        result = RULAAssessor().predict([(kps, _all_confident())])[0]
+        assert result is not None
+        legacy_angle = int(np.degrees(np.arctan2(40, 50)))
+        assert abs(result.left.body_scores.neck_angle) == legacy_angle

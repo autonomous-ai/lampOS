@@ -28,9 +28,19 @@ from .scores import (
     score_trunk,
     score_upper_arm,
 )
-from .utils import align_to_vertical, joint_name, signed_flexion_angle
+from .utils import (
+    align_to_vertical,
+    facing_direction_2d,
+    is_planar,
+    joint_name,
+    signed_flexion_angle,
+)
 
 _H36M = H36MSkeleton()
+
+# In 2D, a neck lean behind the trunk line smaller than this is keypoint jitter,
+# not extension; it scores as neutral instead of the RULA extension score 4.
+NECK_EXTENSION_TOLERANCE_2D_DEG: float = 5.0
 
 
 class RULAAssessor(ErgoAssessor):
@@ -69,8 +79,13 @@ class RULAAssessor(ErgoAssessor):
         kps: npt.NDArray[np.float32],
         confs: npt.NDArray[np.float32],
         side: str,
+        planar: bool = False,
     ) -> SideAssessment:
-        """Assess one side. All keypoints must be 3D and already aligned."""
+        """Assess one side. All keypoints must be 3D and already aligned.
+
+        *planar* marks 2D input (z padded with 0): the neck is then measured as
+        thorax -> ear midpoint and signed by the facing side of the face.
+        """
         if side == "right":
             shoulder_idx = _H36M.joint("R_SHOULDER")
             elbow_idx = _H36M.joint("R_ELBOW")
@@ -123,7 +138,20 @@ class RULAAssessor(ErgoAssessor):
         wrist_score: int = 1
         wrist_twist_score: int = 1
 
-        if neck_ok and head_ok:
+        if neck_ok and head_ok and planar:
+            # COCO gives H36M NECK = nose and HEAD = ear midpoint. In the image
+            # plane the nose -> ears line is near horizontal in a side view, so
+            # the neck is taken as thorax (shoulder midpoint) -> ear midpoint,
+            # and the nose only tells which side the face points to.
+            neck_vec = kps[head_idx] - kps[_H36M.joint("THORAX")]
+            forward: npt.NDArray[np.float32] = facing_direction_2d(
+                kps[neck_idx], kps[head_idx]
+            )
+            neck_angle = signed_flexion_angle(neck_vec, trunk_up, forward)
+            if -NECK_EXTENSION_TOLERANCE_2D_DEG < neck_angle < 0:
+                neck_angle = 0.0
+            neck_score = score_neck(neck_angle)
+        elif neck_ok and head_ok:
             neck_vec: npt.NDArray[np.float32] = kps[head_idx] - kps[neck_idx]
             neck_angle: float = signed_flexion_angle(neck_vec, trunk_up)
             neck_score: int = score_neck(neck_angle)
@@ -197,8 +225,10 @@ class RULAAssessor(ErgoAssessor):
         kps_3d: npt.NDArray[np.float32] = ensure_3d(keypoints)
         aligned: npt.NDArray[np.float32] = align_to_vertical(kps_3d)
 
-        left: SideAssessment = self._assess_side(aligned, scores, "left")
-        right: SideAssessment = self._assess_side(aligned, scores, "right")
+        planar: bool = is_planar(*kps_3d)
+
+        left: SideAssessment = self._assess_side(aligned, scores, "left", planar)
+        right: SideAssessment = self._assess_side(aligned, scores, "right", planar)
 
         overall_score: int = max(left.score, right.score)
 
