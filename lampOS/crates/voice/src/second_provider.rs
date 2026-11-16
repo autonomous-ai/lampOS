@@ -321,6 +321,9 @@ pub const DOWN_LINE_AGAIN: &str = "Still slow, sorry.";
 /// nothing, so it isn't repeated.
 pub const DOWN_LINE_CANNOT: &str = "Sorry, I can't answer just now.";
 
+/// The down lines, in the order [`DownLine`] renders them at the start.
+pub(crate) const DOWN_LINES: [&str; 3] = [DOWN_LINE, DOWN_LINE_AGAIN, DOWN_LINE_CANNOT];
+
 /// Whether a refusal before any word is passing (429, a 5xx), which the slow
 /// line suits, or one asking again won't mend.
 fn passing(status: u16) -> bool {
@@ -3518,11 +3521,10 @@ impl DownLine {
             // the ones kept are not rendered again (Third's P2 on #3771).
             let missing =
                 |slot: &Mutex<Option<Vec<i16>>>| slot.lock().is_ok_and(|kept| kept.is_none());
-            for (slot, text) in [
-                (&line.clip, DOWN_LINE),
-                (&line.again, DOWN_LINE_AGAIN),
-                (&line.cannot, DOWN_LINE_CANNOT),
-            ] {
+            for (slot, text) in [&line.clip, &line.again, &line.cannot]
+                .into_iter()
+                .zip(DOWN_LINES)
+            {
                 if !missing(slot) {
                     continue;
                 }
