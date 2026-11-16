@@ -2045,6 +2045,7 @@ fn the_product_lets_a_made_skill_write_after_its_owners_yes() {
         "lamp-skills-manage@.service",
         "lamp-voice.service",
         "lamp-cloud.service",
+        "lamp-control.service",
     ];
     for (unit, text) in install::PRODUCT {
         let service = section(text, "Service");
