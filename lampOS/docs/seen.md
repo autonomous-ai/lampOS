@@ -496,10 +496,15 @@ either's). One frame and one blink can serve both.
      `<base>/crypto/public-key` with `X-API-Key`, as V1 fetches it,
      and kept; it is read again after a refused key exchange;
   3. V1's pose config, its values exactly:
-     `{"type":"config","task":"pose","frame_interval":1.0,"confidence_threshold_2d":0.3,"min_valid_keypoints":5}`.
+     `{"type":"config","task":"pose","frame_interval":1.0,"confidence_threshold_2d":0.3,"min_valid_keypoints":5,"ergo_mode":"desk"}`.
      V1 sent none, so these are the server's defaults. The server's
      sessions share one config object, so any other value would change
-     every V1 lamp's results. The answer must be `config_updated`;
+     every V1 lamp's results. It adds `"ergo_mode":"desk"`, which the
+     server keeps for this session alone: the 2D neck signed by the facing
+     side and, with the hips hidden, the upper body scored alone
+     (`ergo.partial`, below). A server without it ignores the field (its
+     config model forbids no extra field), so no switch holds it. The
+     answer must be `config_updated`;
   4. the frame, and its answer: `ergo` (RULA), or `{"error":"busy"}`;
   5. the socket closed, so the server drops its session and the keypoints
      it kept.
@@ -535,7 +540,14 @@ either's). One frame and one blink can serve both.
     ties going to neck, trunk, upper arm, then lower arm. Wrist counts
     toward a bad sample, as in V1, but is never the region: the server
     fixes it at 1;
-  - `window_s` is how long this sitting has been watched, at most 600 s.
+  - `window_s` is how long this sitting has been watched, at most 600 s;
+  - a partial answer (`ergo.partial: true`: the hips hidden, the upper body
+    scored alone) is bad only when the neck subscore on either side is 4
+    or more, and its region can only be neck. The server fixes trunk and
+    legs at 1 and caps `risk_level` low, and it measures the upper arm
+    against a trunk made from the shoulder line, so neither `risk_level`
+    nor trunk, the arms or wrist count. An answer with no `partial` field
+    (an older server) is full and judged as above, so no switch holds this.
 
   An answer with no body found counts no sample. A sample is its time, one
   flag and four bits: nothing of the frame or the answer is kept. The
@@ -696,7 +708,7 @@ lines a minute.
 | Failed | `burst failed (refused, HTTP 503); 1 of 8 frames, 7650 bytes, 80 ms in all; bursts held back 60 s` (or `no_answer`, `connect`, …) |
 | Stopped | `burst aborted (gate nobody) after 2 frames, 15300 bytes: its answers dropped` |
 | A posture frame handed to its socket | `posture sample sent: 7650 bytes` |
-| Its answer | `posture sample answered: score 5, risk 3, bad, region neck, 640 ms`, or `no body found`, `busy`, `failed (handshake_5xx)`, `cancelled: the gate closed` |
+| Its answer | `posture sample answered: score 5, risk 3, bad, region neck, 640 ms` (`score 3, risk 2, partial, bad, …` on a partial answer), or `no body found`, `busy`, `failed (handshake_5xx)`, `cancelled: the gate closed` |
 | `humans/posture` said | `posture said: window 93 s, 4 samples, bad_share 0.75, region neck` |
 
 `top` is the surest label any frame's answer gave; `counted` is what the

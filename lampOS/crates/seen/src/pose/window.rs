@@ -8,6 +8,12 @@
 //! - the **region** is the one most often high among the bad samples, ties
 //!   to the first of neck, trunk, upper arm, lower arm (V1's order; wrist is
 //!   left out, the server fixes it at 1);
+//! - a **partial** answer (`ergo.partial`, the hips hidden) is judged by the
+//!   neck alone: the server fixes trunk and legs at 1 and caps `risk_level`
+//!   low, and it measures the upper arm against a trunk it made up from the
+//!   shoulder line, so neither `risk_level` nor any other region makes it
+//!   bad, and its only region is neck. An answer with no `partial` field
+//!   (an older server) is full, judged as before;
 //! - under [`MIN_SAMPLES`] samples the window says nothing at all: no
 //!   value, so a `bad_share` of 0 is said only over at least three samples
 //!   (V1 said a share of 0 there; `humans/posture` holds back instead).
@@ -39,6 +45,8 @@ const REGIONS: [(&str, PostureRegion); 4] = [
 /// V1 counts `wrist` toward a bad sample too (the server fixes it at 1, so
 /// it never does in practice).
 const WRIST: &str = "wrist";
+/// Neck's bit in [`judge`]'s `high`: the first of [`REGIONS`].
+const NECK_BIT: u8 = 1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Sample {
@@ -78,6 +86,10 @@ pub fn judge(ergo: &Ergo) -> (bool, u8) {
         if high_on(name) {
             high |= 1 << bit;
         }
+    }
+    if ergo.partial {
+        let neck = high & NECK_BIT;
+        return (neck != 0, neck);
     }
     let bad = ergo.risk_level >= BAD_RISK_LEVEL || high != 0 || high_on(WRIST);
     (bad, high)
@@ -195,6 +207,14 @@ mod tests {
             risk_level,
             left: Some(left),
             right: Some(right),
+            partial: false,
+        }
+    }
+
+    fn partial(left: serde_json::Value) -> Ergo {
+        Ergo {
+            partial: true,
+            ..ergo(2, left, json!({}))
         }
     }
 
@@ -233,6 +253,58 @@ mod tests {
         );
         let none = Ergo::default();
         assert_eq!(judge(&none), (false, 0));
+    }
+
+    #[test]
+    fn a_partial_sample_is_judged_by_the_neck_alone() {
+        // Neck 4 is bad, on the neck, with the capped risk level aside.
+        assert_eq!(
+            judge(&partial(
+                json!({"body_scores": {"neck": 4, "upper_arm": 2}})
+            )),
+            (true, 0b0001)
+        );
+        // Neck 3 with risk 2 is not bad: the risk level does not count.
+        assert_eq!(
+            judge(&partial(json!({"body_scores": {"neck": 3}}))),
+            (false, 0)
+        );
+        // Trunk, the arms or wrist high never make it bad.
+        assert_eq!(
+            judge(&partial(json!({"body_scores": {
+                "trunk": 4, "upper_arm": 4, "lower_arm": 4, "wrist": 4
+            }}))),
+            (false, 0)
+        );
+        // Neck high with trunk high: bad, and the region is neck only.
+        assert_eq!(
+            judge(&partial(json!({"body_scores": {"neck": 5, "trunk": 4}}))),
+            (true, 0b0001)
+        );
+        // The same full answer is judged as before.
+        let full = ergo(
+            2,
+            json!({"body_scores": {"neck": 3, "trunk": 4}}),
+            json!({}),
+        );
+        assert_eq!(judge(&full), (true, 0b0010));
+    }
+
+    #[test]
+    fn a_partial_window_says_neck_or_nothing() {
+        let mut window = Window::default();
+        let slumped = partial(json!({"body_scores": {"neck": 4, "upper_arm": 4}}));
+        let arms = partial(json!({"body_scores": {"upper_arm": 4, "trunk": 4}}));
+        window.add(0, &arms);
+        window.add(S, &arms);
+        window.add(2 * S, &arms);
+        let none = window.summary(2 * S).unwrap();
+        assert_eq!(none.bad_share, 0.0);
+        assert_eq!(none.region, PostureRegion::Nothing);
+        window.add(3 * S, &slumped);
+        let neck = window.summary(3 * S).unwrap();
+        assert!((neck.bad_share - 0.25).abs() < 1e-6);
+        assert_eq!(neck.region, PostureRegion::Neck);
     }
 
     #[test]

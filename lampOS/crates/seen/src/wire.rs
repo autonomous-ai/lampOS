@@ -167,7 +167,9 @@ impl ActionAnswer {
 
 /// Pose's RULA score for the frame (`ergo`). Each side's detail is kept as
 /// sent; V1 read `score` and `risk_level`, and each side's `score` and
-/// `body_scores`.
+/// `body_scores`. `partial` is true when the hips were hidden and only the
+/// upper body was scored (trunk and legs fixed at 1, `risk_level` capped
+/// low); an older server sends no field, read as a full answer.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Ergo {
     #[serde(default)]
@@ -178,6 +180,8 @@ pub struct Ergo {
     pub left: Option<Value>,
     #[serde(default)]
     pub right: Option<Value>,
+    #[serde(default)]
+    pub partial: bool,
 }
 
 /// Pose's answer to a frame: the points and the score, or an error.
@@ -268,8 +272,13 @@ mod tests {
         .unwrap();
         let ergo = pose.ergo.unwrap();
         assert_eq!((ergo.score, ergo.risk_level), (5, 3));
+        assert!(!ergo.partial, "no field: a full answer");
         assert_eq!(ergo.right.unwrap()["score"], 4);
         assert!(pose.error.is_none());
+        let partial: PoseAnswer =
+            serde_json::from_str(r#"{"ergo": {"score": 3, "risk_level": 1, "partial": true}}"#)
+                .unwrap();
+        assert!(partial.ergo.unwrap().partial);
         let failed: PoseAnswer = serde_json::from_str(r#"{"error": "no person"}"#).unwrap();
         assert_eq!(failed.error.as_deref(), Some("no person"));
         assert!(failed.ergo.is_none());

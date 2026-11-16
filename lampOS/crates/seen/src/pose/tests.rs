@@ -104,7 +104,7 @@ fn one_frame_every_30_s_each_on_its_own_socket_closed_after() {
         },
         Seen::KeyExchange,
         Seen::Config(
-            json!({"type": "config", "task": "pose", "frame_interval": 1.0, "confidence_threshold_2d": 0.3, "min_valid_keypoints": 5}),
+            json!({"type": "config", "task": "pose", "frame_interval": 1.0, "confidence_threshold_2d": 0.3, "min_valid_keypoints": 5, "ergo_mode": "desk"}),
         ),
         Seen::Frame(jpeg()),
         Seen::Closed,
@@ -878,5 +878,26 @@ fn the_journal_says_each_sample_sent_and_its_answer() {
         }
         .line(),
         "posture sample answered: no body found, 300 ms"
+    );
+}
+
+#[test]
+fn a_partial_answer_is_judged_by_the_neck_and_says_so() {
+    let hunched = json!({"score": 3, "risk_level": 2, "partial": true, "left": {"score": 3, "body_scores": {"neck": 4, "trunk": 1, "upper_arm": 2}}, "right": {"score": 2, "body_scores": {"neck": 2, "trunk": 4}}});
+    let mock = Mock::start(vec![Reply::Ergo(Some(hunched))]);
+    let mut pose = pose(&mock);
+    pose.step(0, Ok(()), false);
+    send(&mut pose, 0);
+    settle(&mut pose, 0, Ok(()));
+    let notes = pose.notes();
+    let Note::Answered { took, .. } = notes[1] else {
+        panic!("{notes:?}")
+    };
+    assert_eq!(
+        notes[1].line(),
+        format!(
+            "posture sample answered: score 3, risk 2, partial, bad, region neck, {} ms",
+            took.as_millis()
+        )
     );
 }
