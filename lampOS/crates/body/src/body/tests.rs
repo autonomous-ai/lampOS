@@ -18640,6 +18640,62 @@ fn at_level_five_the_heads_roll_swaps_sides_no_faster_than_level_one() {
     }
 }
 
+/// When a standing lamp at an energy `level`, idle shifts on, spoken to from
+/// one second to seven and then left alone with `--awake-seconds 20`, starts
+/// to fold: the first step after its last talk that its stand goes under 1.
+fn folds_at(level: u8) -> Duration {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(45));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits::folded_with(Tuning {
+        reach: [150, 15, 1, 250],
+        speed: 120,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .unwrap();
+    let news = spoken_to(&clock.time);
+    let seen_at = clock.time.clone();
+    let mut fold = None;
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 20).idling(true).seeded(5)),
+        None,
+        news,
+        move || Asked {
+            energy: level,
+            ..Asked::default()
+        },
+        |glimpse| {
+            let at = seen_at.get();
+            if fold.is_none() && at > Duration::from_secs(8) && glimpse.stand < 1.0 {
+                fold = Some(at);
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    fold.expect("it folded")
+}
+
+/// #7314, row-7153L2 on lamp-52e6: a livelier character never sits down
+/// sooner. At every level the lamp stays up for the whole of
+/// `--awake-seconds` after its last talk, as level 1 does.
+#[test]
+fn at_every_level_the_lamp_folds_no_sooner_than_at_level_one() {
+    let today = folds_at(1);
+    assert!(today >= Duration::from_millis(26_900), "{today:?}");
+    for level in 2..=5 {
+        let lively = folds_at(level);
+        assert!(
+            lively >= today,
+            "level {level}: {lively:?} against {today:?}"
+        );
+    }
+}
+
 /// What each mood leans toward: speaking and reading `LEAN` at every
 /// level, listening only from level 3, resting and thinking never.
 #[test]

@@ -1040,6 +1040,10 @@ under what the unit gives:
 | 4 | 675 | 4.5 | 0.6 |
 | 5 | 800 | 4 | 0.5 (20 to 90 s) |
 
+The idle wait is only the wait between shifts at rest (`Idler::share`). The awake time, the fold
+`--awake-seconds` after the last mood, face or gesture, is the unit's at every level: a livelier lamp
+never sits down sooner (#7314, `at_every_level_the_lamp_folds_no_sooner_than_at_level_one`).
+
 A new level is taken only once the lamp is settled: no gesture playing or waiting, the pose's filter
 still (every joint under 1 count a second) and the arm not rising or folding, so a speed cap never drops
 under a joint still moving. On the host, a 480-count turn of the base lands in 1.12 s at level 5 and
