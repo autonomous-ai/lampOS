@@ -4957,7 +4957,8 @@ runs queue behind the held one, so held news is told in order. With the lamp
 private (the privacy switch read closed on `voice/privacy`, or the voice
 muted by the person: `lamp_skills::routine::private_for_news`) it is not
 held and waits for the next reply, as before; a switch not yet read, as a
-restarting voice has it, is not privacy. Held past 5 min
+restarting voice has it, is not privacy, nor is the restart guard's mute
+after a fault (`muted_by: restart_guard`), so its news is held. Held past 5 min
 (`NEWS_HELD_MOST_MS`) from the first refusal, it is dropped. Any other
 refusal is not held. The journal has one line when it is held, and one when
 it is told, let go to privacy or dropped, with the task's number, counts and
@@ -4975,7 +4976,9 @@ Tests: `news_refused_while_muted_or_listening_is_held_then_told_once`,
 `news_refused_with_privacy_on_waits_for_the_next_reply_as_before`
 (lamp-skills' lib), and
 `task_news_refused_while_muted_is_held_and_told_once_the_lamp_is_free`,
-`task_news_refused_with_the_privacy_switch_closed_is_not_held` (its bin).
+`task_news_refused_with_the_privacy_switch_closed_is_not_held`,
+`task_news_refused_under_the_restart_guards_mute_is_held_and_told_once`,
+`task_news_refused_muted_by_the_button_is_not_held` (its bin).
 
 ### Given with a text (#1673, off unless `LAMP_MESSAGES=on`)
 
