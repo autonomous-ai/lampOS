@@ -23,6 +23,18 @@ second. Each section is HTML made and escaped on the lamp (`crates/peek/src/page
 The page's few lines of script only put it in its place, and read nothing
 from the address but which section is shown.
 
+It looks like V1's Flow Monitor (#7208): V1's dark tokens
+(`system/web/src/index.css`, `.lm-root`) copied as CSS variables, a left nav
+with an icon per section and the shown one highlighted, and a top bar with
+the lamp's host name, lamp-peek's build (its release folder), `read only`,
+and a live dot that turns grey within 3 s of the stream stopping. Each
+section sits in a card. Under 640 px the nav is a strip on top. Everything is
+inline: no font, script, stylesheet or picture comes from anywhere else, so
+the page works with the lamp offline. The shared classes for the sections
+are `card`, `badge` with `badge-amber` (the device), `badge-teal` (the lamp's
+parts), `badge-blue` (the agent), `badge-green`, `badge-red`, `badge-grey`,
+and `chip`.
+
 | Section | What it shows | Where it comes from |
 |---|---|---|
 | Overview | The voice's state; the light shown (`on, blue at 3`, `off`); someone here or not; the camera's state, faces in view and who is followed; the lamp's health level and its worst item; the newest turn's first audio and the median of the last ten; any unit running another build than its release | the kept values below, `light/state`, the turns, `/status`'s rows |
@@ -505,6 +517,12 @@ own, and asks for it over HTTP:
 - `the_stream_reads_only_and_asks_for_the_token`: POST, PUT, DELETE and
   PATCH get 405; without the token, 401 and no event; with its cookie, the
   sections.
+- `the_page_looks_like_v1_and_loads_nothing_from_outside`: the page carries
+  V1's token values, the shared classes and the phone layout, keeps every
+  section's id, place and nav link, and has no `src=`, `href="http`,
+  `@import`, `url(` or `@font-face`.
+- `a_hostile_lamp_name_and_build_stay_escaped`: a `<script>` host name and an
+  `<img>` build show as text in the top bar, never as markup.
 - `turns::tests::a_turns_steps_and_end_are_read_from_its_records_and_nothing_else`
   and `turns::tests::the_records_are_read_on_from_where_the_last_read_ended`:
   - only new lines are taken, and half a line waits for its end;
