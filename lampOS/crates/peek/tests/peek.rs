@@ -11,6 +11,7 @@ use lamp_peek::{
     page,
     serve::{self, Peek},
     timeline::{self, Timeline},
+    turns::{ReadStatus, Snapshot, Turn},
     units::UnitRow,
     watch::{self, Seen},
 };
@@ -1623,4 +1624,227 @@ fn a_hostile_lamp_name_and_build_stay_escaped() {
     assert!(!html.contains("<img"), "{html}");
     assert!(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;&quot;&#39;&amp;"));
     assert!(html.contains(page::WORDS_SHOWN));
+}
+
+/// One turn for the cards: heard at `start`, said `total` ms later, with
+/// the voice's record giving `ttft` ms to the first token.
+fn card_turn(request: u64, start: u64, total: u64, words: bool) -> timeline::Entry {
+    let (heard, said) = if words {
+        (
+            Some("heard words".to_owned()),
+            Some("said words".to_owned()),
+        )
+    } else {
+        (None, None)
+    };
+    timeline::Entry {
+        request,
+        steps: vec![
+            (start, timeline::Step::Heard(heard)),
+            (start + total, timeline::Step::Said(said)),
+        ],
+        ended_at: Some(start + total),
+    }
+}
+
+fn card_record(request: u64, ttft: u64, outcome: &str) -> Turn {
+    Turn {
+        turn: request,
+        basis: Some("local_speech".into()),
+        chat_ms: Some(ttft),
+        outcome: Some(outcome.into()),
+        ..Turn::default()
+    }
+}
+
+fn current(turns: Vec<Turn>) -> Snapshot {
+    Snapshot {
+        turns,
+        status: ReadStatus::Current,
+    }
+}
+
+/// V1's thresholds (#7208 step 2, `docs/flow-monitor.md`): ⏱ green to
+/// 5 s, amber to 15 s, red past it; ⚡ green to 3 s, amber to 8 s, red
+/// past it. At each edge and one millisecond over.
+#[test]
+fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
+    for (total, ttft, total_class, ttft_class) in [
+        (5_000, 3_000, "ok", "ok"),
+        (5_001, 3_001, "warn", "warn"),
+        (15_000, 8_000, "warn", "warn"),
+        (15_001, 8_001, "error", "error"),
+    ] {
+        let entries = [card_turn(4, 1_000_000, total, false)];
+        let html = page::timeline(
+            &entries,
+            &current(vec![card_record(4, ttft, "played")]),
+            false,
+        );
+        assert!(html.contains("class=\"turn card\""), "{html}");
+        assert!(
+            html.contains(&format!(
+                "<span class=\"lat {total_class}\">⏱ {total} ms</span>"
+            )),
+            "{total}: {html}"
+        );
+        assert!(
+            html.contains(&format!(
+                "<span class=\"lat {ttft_class}\">⚡ {ttft} ms</span>"
+            )),
+            "{ttft}: {html}"
+        );
+        assert!(
+            html.contains("<span class=\"badge badge-green\">DONE</span>"),
+            "{html}"
+        );
+        assert!(
+            html.contains("<span class=\"badge badge-blue\">AGENT</span>"),
+            "{html}"
+        );
+        // The Turns section's cards carry the same ⚡ class.
+        let turns = page::turns(&current(vec![card_record(4, ttft, "played")]));
+        assert!(turns.contains("class=\"turn card\""), "{turns}");
+        assert!(
+            turns.contains(&format!(
+                "<span class=\"lat {ttft_class}\">⚡ {ttft} ms</span>"
+            )),
+            "{ttft}: {turns}"
+        );
+    }
+    // Still going: ACTIVE, pulsing. Failed: ERROR. A skill's: SKILL. Held
+    // back without a word said: LOCAL.
+    let going = timeline::Entry {
+        request: 7,
+        steps: vec![(1_000, timeline::Step::Heard(None))],
+        ended_at: None,
+    };
+    let html = page::timeline(&[going], &current(Vec::new()), false);
+    assert!(
+        html.contains("<span class=\"badge badge-amber pulse\">ACTIVE</span>"),
+        "{html}"
+    );
+    let entries = [card_turn(5, 1_000, 900, false)];
+    let html = page::timeline(
+        &entries,
+        &current(vec![card_record(5, 400, "failed")]),
+        false,
+    );
+    assert!(
+        html.contains("<span class=\"badge badge-red\">ERROR</span>"),
+        "{html}"
+    );
+    let skill = timeline::Entry {
+        request: 6,
+        steps: vec![
+            (1_000, timeline::Step::Heard(None)),
+            (1_200, timeline::Step::Did("skill wave done".into())),
+            (1_500, timeline::Step::Said(None)),
+        ],
+        ended_at: Some(1_500),
+    };
+    let html = page::timeline(&[skill], &current(Vec::new()), false);
+    assert!(
+        html.contains("<span class=\"badge badge-teal\">SKILL</span>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"chip\">skill wave done</span>"),
+        "{html}"
+    );
+    let held = timeline::Entry {
+        request: 8,
+        steps: vec![
+            (1_000, timeline::Step::Heard(None)),
+            (1_100, timeline::Step::Understood(TurnVerdict::HeldBack)),
+        ],
+        ended_at: Some(1_100),
+    };
+    let html = page::timeline(&[held], &current(Vec::new()), false);
+    assert!(
+        html.contains("<span class=\"badge badge-green\">LOCAL</span>"),
+        "{html}"
+    );
+}
+
+/// Words a turn somehow carries never show outside monitor mode: the card
+/// says they are hidden.
+#[test]
+fn without_monitor_mode_no_words_heard_or_said_show() {
+    let entries = [card_turn(4, 1_000, 2_000, true)];
+    let records = current(vec![card_record(4, 900, "played")]);
+    let html = page::timeline(&entries, &records, false);
+    assert!(!html.contains("heard words"), "{html}");
+    assert!(!html.contains("said words"), "{html}");
+    assert!(!html.contains(page::WORDS_SHOWN), "{html}");
+    assert_eq!(html.matches("words hidden").count(), 2, "{html}");
+    let shown = page::timeline(&entries, &records, true);
+    assert!(
+        shown.contains("<span class=\"lbl\">IN</span> “heard words”"),
+        "{shown}"
+    );
+    assert!(
+        shown.contains("<span class=\"lbl\">OUT</span> “said words”"),
+        "{shown}"
+    );
+}
+
+/// More than 60 s between one turn's end and the next one's start draws a
+/// break, as V1's session grouping does; 60 s exactly does not.
+#[test]
+fn a_gap_over_a_minute_between_turns_draws_a_break() {
+    let records = current(Vec::new());
+    // Newest first: the older ends at 11_000.
+    let apart = [
+        card_turn(2, 71_001, 1_000, false),
+        card_turn(1, 10_000, 1_000, false),
+    ];
+    let html = page::timeline(&apart, &records, false);
+    assert_eq!(html.matches("class=\"break\"").count(), 1, "{html}");
+    let close = [
+        card_turn(2, 71_000, 1_000, false),
+        card_turn(1, 10_000, 1_000, false),
+    ];
+    let html = page::timeline(&close, &records, false);
+    assert_eq!(html.matches("class=\"break\"").count(), 0, "{html}");
+    assert_eq!(html.matches("class=\"turn card\"").count(), 2, "{html}");
+}
+
+/// In monitor mode the words show, escaped, in the card's IN and OUT lines.
+#[test]
+fn monitor_mode_hostile_words_stay_escaped_in_a_card() {
+    let entries = [timeline::Entry {
+        request: 3,
+        steps: vec![
+            (
+                1_000,
+                timeline::Step::Heard(Some("<script>alert(1)</script>".into())),
+            ),
+            (1_100, timeline::Step::Did("<b>light</b>".into())),
+            (
+                1_900,
+                timeline::Step::Said(Some("\"><img src=x onerror=alert(2)>".into())),
+            ),
+        ],
+        ended_at: Some(1_900),
+    }];
+    let mut record = card_record(3, 500, "<i>played</i>");
+    record.basis = Some("<u>basis</u>".into());
+    let html = page::timeline(&entries, &current(vec![record]), true);
+    assert!(!html.contains("<script>"), "{html}");
+    assert!(!html.contains("<img"), "{html}");
+    assert!(
+        !html.contains("<b>") && !html.contains("<i>") && !html.contains("<u>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"lbl\">IN</span> “&lt;script&gt;alert(1)&lt;/script&gt;”"),
+        "{html}"
+    );
+    assert!(
+        html.contains(
+            "<span class=\"lbl\">OUT</span> “&quot;&gt;&lt;img src=x onerror=alert(2)&gt;”"
+        ),
+        "{html}"
+    );
 }
