@@ -2684,29 +2684,58 @@ fn a_new_harness_answers_not_running_here_is_not_sent_and_said_whole() {
             );
         }
     }
-    // Only stderr's not-running line is said whole: any other line, and
-    // all of stderr when the answer came on stdout only, keeps
-    // `said_of_stderr`'s cut, with nothing of the person's words.
+    // Only stderr's not-running line is said whole: any other line keeps
+    // `said_of_stderr`'s cut, with nothing of the person's words. The
+    // words on stdout only are no not-running answer.
     let mut request = launch();
     request.prompt = "Summarise Quarterly Payroll for Bob".into();
-    for (step, said) in [
+    for (step, outcome, said) in [
         (
             json!({"exit": 1, "stderr": format!("{NOT_RUNNING}Summarise Quarterly Payroll for Bob\n")}),
+            not_sent("harness_not_running"),
             ", stderr: Harness is not running here. Start it with `harness start`.)",
         ),
         (
-            json!({"exit": 1, "stdout": "Harness is not running here.\n", "stderr": "Summarise Quarterly Payroll for Bob\n"}),
+            json!({"exit": 1, "stdout": "Harness is not running here. Start it with `harness start`.\n", "stderr": "Summarise Quarterly Payroll for Bob\n"}),
+            uncertain("new_failed"),
             "",
         ),
     ] {
         let mut rig = Rig::new();
         rig.new_step(step.clone());
-        let (outcome, lines) = journal_of(&mut rig, &request);
-        assert_eq!(outcome, not_sent("harness_not_running"), "{step}");
+        let (said_outcome, lines) = journal_of(&mut rig, &request);
+        assert_eq!(said_outcome, outcome, "{step}");
         assert_eq!(lines.len(), 1, "{lines:?}");
         if !said.is_empty() {
             assert!(lines[0].ends_with(said), "{}", lines[0]);
         }
+        assert_said_nothing_private(&lines[0], &request);
+    }
+}
+
+/// The first builder's P2 on #7282: the person's ask, "find out why the
+/// printer is not running here", echoed on the one stderr line of a `new`
+/// that failed another way. Only a line that is Harness's fixed sentence
+/// itself counts: this one is `uncertain` (`new_failed`), never sent again,
+/// and its journal line never holds the line whole, nor the ask's words.
+/// Harness's sentence beside other words on one line is not it either.
+#[test]
+fn a_new_whose_stderr_line_holds_not_running_words_among_others_is_not_that_answer() {
+    let mut request = launch();
+    request.prompt = "Find out why Bob's printer is not running here".into();
+    for stderr in [
+        "error: Find out why Bob's printer is not running here\n",
+        "Harness is not running here. Start it with `harness start`. Bob's printer\n",
+    ] {
+        let mut rig = Rig::new();
+        rig.new_step(json!({"exit": 1, "stderr": stderr}));
+        let (outcome, lines) = journal_of(&mut rig, &request);
+        assert_eq!(outcome, uncertain("new_failed"), "{stderr}");
+        assert_eq!(news(&rig), 1, "{stderr}");
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(!lines[0].contains(stderr.trim()), "{}", lines[0]);
+        assert!(!lines[0].contains("Bob"), "{}", lines[0]);
+        assert!(!lines[0].contains("printer"), "{}", lines[0]);
         assert_said_nothing_private(&lines[0], &request);
     }
 }
