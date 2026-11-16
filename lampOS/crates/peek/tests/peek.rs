@@ -3,7 +3,7 @@
 use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{
     BodyOffsets, Diagnostic, ExpressionBody, ExpressionGaze, ExpressionLease, Face, Faces, Health,
-    HealthItem, JointState, Level, Light, RoomPresence, SkillEvent, SkillStage, Speech,
+    HealthItem, JointState, Level, Light, RoomPresence, SkillEvent, SkillStage, Speech, TaskStatus,
     TurnVerdict, VoiceState, VoiceTurn,
 };
 use lamp_peek::{
@@ -1037,6 +1037,38 @@ fn the_one_page_streams_each_section_and_never_a_word() {
     assert!(page.contains("new EventSource('/events')"), "{page}");
     assert!(!page.contains(WORD), "{page}");
     assert!(!page.contains(page::WORDS_SHOWN), "{page}");
+}
+
+/// The Tasks section (#7208): `tasks/status`, the kept value lamp-tasks
+/// publishes, is read and streamed live; a value that does not read as a
+/// `TaskStatus` (a hostile state) is said to be unreadable, never shown.
+#[test]
+fn the_stream_shows_the_lamps_harness_tasks_from_tasks_status() {
+    let rig = Rig::new("tasks", None);
+    let mut tasks = rig.publisher(TaskStatus::TOPIC, &TaskStatus::declaration(), "tasks");
+    let mut working = serde_json::json!({
+        "store_id": "0123456789abcdef0123456789abcdef",
+        "run": 1,
+        "tasks": [{"task": 1, "engine": "openclaw", "state": "working", "working_s": 120,
+                   "read_unix_ms": 1, "changes": 0, "changed": false, "new_share": 0.0,
+                   "signs": [], "signs_seen": []}],
+    });
+    tasks.publish_json(1, &working).unwrap();
+    let sections = stream_until(&rig, "", "OpenClaw");
+    let shown = &sections["tasks"];
+    assert!(shown.contains("badge-blue\">working"), "{shown}");
+    assert!(
+        sections["overview"].contains("1 working (OpenClaw 1)"),
+        "{:?}",
+        sections["overview"]
+    );
+    working["tasks"][0]["state"] = "<script>alert(1)</script>".into();
+    tasks.publish_json(2, &working).unwrap();
+    let sections = stream_until(&rig, "", "can't be read");
+    assert!(
+        !format!("{sections:?}").contains("<script>"),
+        "{sections:?}"
+    );
 }
 
 /// Monitor mode's timeline (#5883, second piece): a turn planted on a real
