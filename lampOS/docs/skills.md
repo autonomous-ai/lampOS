@@ -4224,6 +4224,46 @@ and put on. Any other turn claiming a make with no call is still held. Test:
 `second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`,
 `a_not_made_notes_made_claim_is_held`.
 
+A made skill with code of its own that is not on is never said to be on
+(`LAMP_MADE_NOT_ON_TOLD=on`, #7270; off unless set, in no unit;
+`crate::made_not_on`). On lamp-9adf (16 Nov, build 13383) a voice make the
+lamp's agent wrote took about four minutes; its say-back ended "It waits for
+you to agree before it runs any code.", and the person's "Yeah." came over
+200 s after those words, past the wait's 120 s (`skill_write_yes::YES_WITHIN`),
+with no conversation going on. The model was shown no skill waiting, made no
+call (`calls=none`) and said "The skill is on the lamp. Next time you sit at
+your desk, the lamp will read your newest email …": nothing was on. With the
+switch, on a heard line after such a say-back, while that skill's wait is
+neither answered, dropped nor taken by its yes and began at most 15 minutes
+before (`made_not_on::TOLD_FOR`; `skill_write_yes::code_not_on`; never a
+write's wait, since a skill that writes is on already, a remove's or a
+skill's task's):
+- past its 120 s the model is told, in a "For you to know" note, that the
+  skill is not on and no yes turns it on now, so the person can ask for it to
+  be made again (within the 120 s it is already told the skill waits, with
+  its `approve_id`, as before);
+- a reply sentence whose subject is the skill ("the skill", "your skill", its
+  spoken name, or "it" on a line that is only a yes) and that says it is on,
+  turned on, ready, set up, active, running, installed or made, or "I've
+  turned it on" and the like, with no "not", "n't", "never", "yet", condition
+  ("once", "when", "if", "after", "until") or ask for the yes in it, and no
+  '?' (`made_not_on::claims_on`), is not said, nor the rest of its round. At
+  the round's end, a round that calls `make_skill` with an `approve_id` lets
+  those words go unsaid (the next round speaks from that call's answer);
+  any other says "It isn't on yet: say yes to me while you're at the lamp,
+  and I'll turn it on." within the 120 s, or "It isn't on yet: your yes
+  didn't come in time, so ask me to make it again." past it, once a turn, in
+  the owner's language. While the guard holds, a round's first words wait for
+  their sentence's end (no early clause), so a claim is never half said.
+Once the yes is taken (the wait gone), nothing is held: "It's on now." after
+a yes that ran is said. Off, or with no such skill, a turn is byte for byte as
+before. The yes's own window is unchanged: a yes after its 120 s is still not
+taken. Tests: `made_not_on::tests::*`,
+`second_provider::tests::made_not_on::a_late_yes_with_no_call_is_told_not_on_and_its_claim_is_replaced`,
+`a_yes_in_the_wait_answered_with_no_call_is_said_not_on_yet`,
+`a_real_yes_still_puts_it_on_with_no_note`,
+`with_no_skill_waiting_nothing_changes`.
+
 **Removed by voice** (#6960, Twelve's three tries on lamp-c0a4, 12843:
 "delete the skill called moon fact" went to `lamp_help`, whose notes said
 the lamp can't remove a skill by voice, and "remove the moon fact skill" to

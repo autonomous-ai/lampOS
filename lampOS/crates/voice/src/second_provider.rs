@@ -1710,6 +1710,8 @@ struct Shared {
     action_claims: bool,
     /// [`Engine::checking_worded_claims`] (#5215).
     worded_claims: bool,
+    /// [`Engine::telling_made_not_on`] (#7270).
+    made_not_on: bool,
     /// [`Engine::asking_again_for_no_words`] (#3704).
     no_words_again: bool,
     /// [`Engine::asking_again_for_answers`] (Queue #4710, item 3).
@@ -4592,6 +4594,7 @@ impl Engine {
                 keep_at_once: false,
                 action_claims: false,
                 worded_claims: false,
+                made_not_on: false,
                 no_words_again: false,
                 answer_again: false,
                 cut_ask_answered: false,
@@ -5841,6 +5844,18 @@ impl Engine {
     pub fn checking_worded_claims(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.worded_claims = on;
+        }
+        self
+    }
+
+    /// `LAMP_MADE_NOT_ON_TOLD=on` ([`crate::made_not_on`], #7270): while a
+    /// made skill with code of its own is not on after its say-back, a
+    /// heard line's model is told so, and a reply that says it is on is
+    /// said as [`crate::made_not_on::NOT_ON_YET`] (or, its yes too late,
+    /// [`crate::made_not_on::NOT_ON_LATE`]). Before any turn only.
+    pub fn telling_made_not_on(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.made_not_on = on;
         }
         self
     }
@@ -10602,6 +10617,13 @@ async fn spoken(
             request,
             Instant::now(),
         ))
+        // A made skill with code still not on after its say-back (#7270):
+        // the model is told it isn't on.
+        .chain(crate::made_not_on::note(
+            shared.made_not_on,
+            request,
+            Instant::now(),
+        ))
         // A made skill that clashes with one on the lamp, waiting for the
         // person's choice (#6593): its clash_id and question, for the same
         // reason (the Reviewer-lead's P1 on #6614).
@@ -15266,6 +15288,13 @@ async fn answer(
         line: std::iter::once(&said)
             .chain(&notes)
             .fold(String::new(), |all, part| all + part),
+        made_not_on: crate::made_not_on::Guard::for_turn(
+            shared.made_not_on,
+            heard,
+            request,
+            &said,
+            Instant::now(),
+        ),
     };
     let began = Instant::now();
     // The bounds below are on the runtime's clock, which a test can step.
@@ -16292,6 +16321,9 @@ async fn answer(
             let mut split = Sentences::default();
             let mut text = String::new();
             let mut calls = Vec::new();
+            if let Some(guard) = queue.made_not_on.as_mut() {
+                guard.round_begun();
+            }
             let mut reasoning = None;
             let mut called_us = 0;
             let mut silent_after = answered_at_once.then(SilentAfter::default);
@@ -16670,8 +16702,11 @@ async fn answer(
                         // would be said before its offer is known.
                         // So does a step word in the walk (#5890): its ask
                         // is read whole before it is said or dropped.
+                        // Nor while a made skill not on is guarded (#7270):
+                        // its claim is judged whole.
                         if sentences.is_empty()
                             && !queue.started
+                            && queue.made_not_on.is_none()
                             && !crate::remember::may_offer_a_keep(split.pending())
                             && !crate::onboarding::may_open_a_step(split.pending())
                         {
@@ -17586,6 +17621,19 @@ async fn answer(
             }
             for sentence in offered(&mut offer_hold, remembers, request, round) {
                 queue.push(sentence).await?;
+            }
+            // A claim held that a made skill not on is on (#7270): unsaid
+            // beside its yes's call, whose answer the next round speaks
+            // from; else the fixed line in its place.
+            let approves = calls
+                .iter()
+                .any(|call| crate::made_not_on::approves(&call.name, &call.args));
+            if let Some(line) = queue
+                .made_not_on
+                .as_mut()
+                .and_then(|guard| guard.round_ended(approves, Instant::now()))
+            {
+                queue.push(shared.fixed(line).to_owned()).await?;
             }
             // The round after a turn's calls were all answered short
             // (`LAMP_SHORT_DONE`, #2877): with no words and no calls, the
@@ -19032,6 +19080,9 @@ struct Queue<'a> {
     /// The turn's line and notes: while the walk is under way, the step
     /// words they do not say are not said ([`crate::onboarding::model_words`]).
     line: String,
+    /// A made skill with code not on, whose claim to be on is never said
+    /// (`LAMP_MADE_NOT_ON_TOLD`, #7270).
+    made_not_on: Option<crate::made_not_on::Guard>,
 }
 impl Drop for Queue<'_> {
     /// The reply's tags in the journal, counts only, once it said something.
@@ -19056,6 +19107,13 @@ impl Queue<'_> {
     }
 
     async fn push(&mut self, text: String) -> Result<(), Stop> {
+        // `LAMP_MADE_NOT_ON_TOLD` (#7270): a claim that a made skill not on
+        // is on, and the rest of its round, wait for the round's end.
+        if let Some(guard) = self.made_not_on.as_mut()
+            && guard.judge(&text, Instant::now()) == crate::made_not_on::Judged::Held
+        {
+            return Ok(());
+        }
         let text =
             crate::onboarding::model_words(text, &self.line, crate::onboarding::under_way_now());
         // With tags (`LAMP_SECOND_SPEECH_TAGS`), the voice is given `spoken`
