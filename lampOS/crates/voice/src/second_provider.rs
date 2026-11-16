@@ -331,6 +331,9 @@ pub const DOWN_LINE_LIMIT: &str = "I've hit my usage limit.";
 /// How long 429s must keep coming, with no answer between, before they are
 /// taken for a usage limit: a rate burst's per-minute window passes in one.
 pub const LIMIT_AFTER: Duration = Duration::from_secs(120);
+/// After a run's first [`DOWN_LINE_LIMIT`], how long before a line that
+/// names the lamp hears it again (the first builder's ruling on #7362).
+pub const LIMIT_AGAIN_NAMED: Duration = Duration::from_secs(300);
 
 /// The down lines, in the order [`DownLine`] renders them at the start.
 pub(crate) const DOWN_LINES: [&str; 4] = [
