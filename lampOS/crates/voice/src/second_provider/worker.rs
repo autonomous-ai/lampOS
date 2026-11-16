@@ -2817,6 +2817,9 @@ pub fn serve(
     let scoped_settings = tools.clone();
     let skill_settings = tools.clone();
     let days = crate::remember::days_from_environment();
+    // A recall's weekly chapters (`LAMP_MEMORY_WEEKLY_CHAPTERS`): the
+    // recall runs here, so this worker reads the switch itself.
+    crate::nightly::chapters_from_environment();
     // For what memory holds that fits a turn's words (#2176 row 5c).
     let (hits_socket, hits_who) = (socket.clone(), who.clone());
     // For a reply's don't-know, the person's own kept things

@@ -1698,6 +1698,9 @@ pub async fn run_with_continuation(
     if let Some(path) = files.look {
         let _ = LOOK_FILE.set(path);
     }
+    // A recall's weekly chapters (`LAMP_MEMORY_WEEKLY_CHAPTERS`): the
+    // recall runs here, so this worker reads the switch itself.
+    crate::nightly::chapters_from_environment();
     LOOK_FULL.store(files.look_full, std::sync::atomic::Ordering::Relaxed);
     SESSION_FACT.store(files.session_fact, std::sync::atomic::Ordering::Relaxed);
     ROOM_FACTS.store(files.room_facts, std::sync::atomic::Ordering::Relaxed);
