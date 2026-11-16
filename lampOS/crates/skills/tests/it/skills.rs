@@ -763,6 +763,13 @@ fn a_skill_reads_and_does_only_what_its_permissions_declare() {
             "\"voice/state\", \"tasks/step\"]",
             "[permissions] topics: tasks/step is never a skill's to read",
         ),
+        // A turn's decision names the tools it called: the same (#7267).
+        (
+            "welcome-back",
+            "\"voice/state\"]",
+            "\"voice/state\", \"voice/decision\"]",
+            "[permissions] topics: voice/decision is never a skill's to read",
+        ),
         (
             "welcome-back",
             "speak = true\n",
