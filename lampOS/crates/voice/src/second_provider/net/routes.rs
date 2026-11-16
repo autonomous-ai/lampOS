@@ -123,6 +123,7 @@ fn usable(url: &str) -> bool {
 fn why(error: &Error) -> String {
     match error {
         Error::Status(status) => status.to_string(),
+        Error::UsageLimit(_) => "429".to_owned(),
         Error::Transport(_) => "transport".to_owned(),
         Error::Timeout(_) => "timeout".to_owned(),
         Error::Url | Error::Protocol(_) => "answer".to_owned(),

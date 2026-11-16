@@ -6864,6 +6864,99 @@ async fn the_usage_limit_line_is_said_once_a_run_until_an_answer() {
     assert!(heard[9].contains(&limit), "{heard:?}");
 }
 
+/// One spoken turn's audio, `down` for its `DownLineSaid`, and how it ended.
+async fn sent_with_down(engine: &mut Engine, request: u64) -> Vec<String> {
+    engine.submit(start(request));
+    engine.submit(audio(request, 1));
+    engine.submit(end(request));
+    let mut sent = Vec::new();
+    loop {
+        match engine.next().await {
+            ProviderOutput::Audio { samples, .. } => sent.push(format!("audio:{}", samples[0])),
+            ProviderOutput::DownLineSaid { request: of } if of == request => {
+                sent.push("down".into());
+            }
+            ProviderOutput::TurnFailed { .. } => {
+                sent.push("failed".into());
+                return sent;
+            }
+            ProviderOutput::TurnComplete { .. } => {
+                sent.push("complete".into());
+                return sent;
+            }
+            _ => {}
+        }
+    }
+}
+
+/// #7346, Backend's relay (#1711): a 429 whose body names `usage_limit`
+/// is a usage limit at once, by the relay's own word, not after 2 min; the
+/// line says when it comes back, in the lamp's local time, rendered then.
+/// Without a time it is the plain line. Later asks in the same run hear
+/// nothing, and still send `DownLineSaid`, so the coordinator says no
+/// `turn_lost` over them (the Reviewer-lead's question on #7362).
+#[tokio::test(start_paused = true)]
+async fn a_usage_limit_in_the_relays_word_says_the_line_at_once_with_the_time() {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let reset = now + 3 * 3_600;
+    let answered = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+    let limited = |reset| vec![Err(net::Error::UsageLimit(reset))];
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(3)
+                .collect(),
+        ),
+        chats: Mutex::new([answered(), limited(Some(reset)), limited(Some(reset))].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    let first = sent_with_down(&mut engine, 1).await;
+    assert!(first.contains(&"complete".to_owned()), "{first:?}");
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let timed = crate::local_time::offset_here()
+        .and_then(|offset| usage_limit::line_at(None, reset, now, offset))
+        .unwrap_or_else(|| DOWN_LINE_LIMIT.to_owned());
+    let said = sent_with_down(&mut engine, 2).await;
+    assert!(
+        said.contains(&format!("audio:{}", timed.len()))
+            && said.ends_with(&["down".to_owned(), "failed".to_owned()])
+            && !said.contains(&format!("audio:{}", DOWN_LINE.len())),
+        "at once, with the time ({timed}): {said:?}"
+    );
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let again = sent_with_down(&mut engine, 3).await;
+    assert_eq!(
+        again,
+        ["down", "failed"],
+        "quiet, and no turn_lost: {again:?}"
+    );
+
+    // No time in the refusal: the plain line, at once.
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(2)
+                .collect(),
+        ),
+        chats: Mutex::new([answered(), limited(None)].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    sent_with_down(&mut engine, 1).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let plain = sent_with_down(&mut engine, 2).await;
+    assert!(
+        plain.contains(&format!("audio:{}", DOWN_LINE_LIMIT.len())),
+        "{plain:?}"
+    );
+}
+
 /// #7346: the usage-limit line is said in each of the owner's languages,
 /// as the other down lines are.
 #[test]

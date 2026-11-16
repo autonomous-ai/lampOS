@@ -67,6 +67,11 @@ pub enum Error {
     Timeout(&'static str),
     /// The service answered with this HTTP status.
     Status(u16),
+    /// The service answered 429 and named it its usage limit in its own
+    /// word (`error.code` `usage_limit`, #7346), with when it comes back
+    /// (seconds since 1970 UTC: its `reset_at`, else `retry-after` from
+    /// now), if it said.
+    UsageLimit(Option<i64>),
     /// The service said something this client does not read.
     Protocol(&'static str),
 }
@@ -78,6 +83,7 @@ impl fmt::Display for Error {
             Error::Transport(step) => write!(f, "{step} failed"),
             Error::Timeout(step) => write!(f, "{step} timed out"),
             Error::Status(code) => write!(f, "service answered HTTP {code}"),
+            Error::UsageLimit(_) => f.write_str("service answered HTTP 429 (usage limit)"),
             Error::Protocol(what) => write!(f, "unexpected {what}"),
         }
     }
@@ -248,6 +254,25 @@ async fn post(
         return Err(Error::Status(status));
     }
     Ok(response)
+}
+
+/// An RFC 3339 time (`2026-11-17T00:00:00Z`, `…+07:00`, with or without
+/// fractions of a second) as seconds since 1970 UTC; nothing for anything
+/// else.
+pub(crate) fn unix_of(_text: &str) -> Option<i64> {
+    None
+}
+
+/// Whether a refusal is the relay's usage limit (#7346): a 429 whose body
+/// names `usage_limit`, and when it comes back (`reset_at`, else
+/// `retry_after` seconds from `now`), if it said. `None` for any other.
+fn usage_limit(
+    _status: u16,
+    _head: &[u8],
+    _retry_after: Option<u64>,
+    _now: i64,
+) -> Option<Option<i64>> {
+    None
 }
 
 /// The most of a refusal's body [`refusal_head`] reads, and how long it waits.
@@ -492,6 +517,58 @@ mod tests {
         // Not JSON, or JSON without an error.
         assert!(refusal_codes(b"<html>Bad Gateway</html>").is_empty());
         assert!(refusal_codes(br#"{"status":0,"message":"no"}"#).is_empty());
+    }
+
+    /// #7346: the relay's usage-limit 429 (Backend, #1711), its reset read
+    /// from `reset_at`, else `retry-after` from now; any other refusal,
+    /// or a body that isn't the relay's, is no usage limit.
+    #[test]
+    fn a_429_naming_usage_limit_is_a_usage_limit_with_its_reset() {
+        let relay = br#"{"error":{"code":"usage_limit","message":"Usage limit reached.","reset_at":"2026-11-17T00:00:00Z","type":"service_error"}}"#;
+        let now = 1_794_800_000;
+        assert_eq!(
+            usage_limit(429, relay, None, now),
+            Some(Some(1_794_873_600))
+        );
+        assert_eq!(
+            usage_limit(429, relay, Some(60), now),
+            Some(Some(1_794_873_600)),
+            "reset_at first"
+        );
+        let no_reset = br#"{"error":{"code":"usage_limit","type":"service_error"}}"#;
+        assert_eq!(
+            usage_limit(429, no_reset, Some(3_600), now),
+            Some(Some(now + 3_600))
+        );
+        assert_eq!(usage_limit(429, no_reset, None, now), Some(None));
+        let bad_reset = br#"{"error":{"code":"usage_limit","reset_at":"tomorrow"}}"#;
+        assert_eq!(usage_limit(429, bad_reset, None, now), Some(None));
+        assert_eq!(usage_limit(503, relay, None, now), None);
+        assert_eq!(usage_limit(429, b"", Some(60), now), None);
+        assert_eq!(usage_limit(429, b"<html>Too Many</html>", None, now), None);
+        let burst = br#"{"error":{"code":"rate_limit_exceeded"}}"#;
+        assert_eq!(usage_limit(429, burst, Some(1), now), None);
+    }
+
+    #[test]
+    fn rfc_3339_times_are_read_and_anything_else_is_not() {
+        for text in [
+            "2026-11-17T00:00:00Z",
+            "2026-11-17T00:00:00.123Z",
+            "2026-11-17T07:00:00+07:00",
+            "2026-11-16T19:00:00-05:00",
+        ] {
+            assert_eq!(unix_of(text), Some(1_794_873_600), "{text}");
+        }
+        for text in [
+            "",
+            "tomorrow",
+            "2026-11-17",
+            "2026-11-17T25:00:00Z",
+            "2026-11-17T00:00:00",
+        ] {
+            assert_eq!(unix_of(text), None, "{text}");
+        }
     }
 
     #[test]
