@@ -620,6 +620,39 @@ fn openclaw_not_taken_and_not_closed_is_uncertain_with_nothing_more_started() {
     assert_eq!(verbs.last().map(String::as_str), Some("close"), "{verbs:?}");
 }
 
+/// #7287 follow-up (lamp-c0a4, 16:27): `show` never proves within the
+/// bound and the Gateway's record holds nothing yet (read a moment before
+/// it was written), but `harness close` is refused with exit 1 `WORKING`:
+/// the harness took its prompt after all. The launch is Created on it,
+/// with one `new` and no second.
+#[test]
+fn openclaw_close_refused_as_working_is_created_with_no_second_new() {
+    let (rig, request) = openclaw_rig(Duration::from_secs(10), Some(""));
+    let working = json!({
+        "stdout":format!("{}\n", json!({"error":"WORKING","detail":"…","code":"WORKING","next":[]})),
+        "exit":1
+    });
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":working,
+        "show":{"each":[openclaw_seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    let verbs = openclaw_verbs(&rig);
+    let count = |verb: &str| verbs.iter().filter(|v| *v == verb).count();
+    assert_eq!(
+        (count("new"), count("close"), count("reply")),
+        (1, 1, 0),
+        "{verbs:?}"
+    );
+    assert_eq!(verbs.last().map(String::as_str), Some("close"), "{verbs:?}");
+}
+
 /// #7287 (the Reviewer-lead's P2): `show` shows no proof, but the
 /// Gateway's own record holds the user's message for this harness's
 /// session: the send already reached it. Nothing is closed and `new` is
