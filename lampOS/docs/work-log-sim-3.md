@@ -3,6 +3,35 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-16 11:1x GMT+7: the virtual lamp's macOS test on Apple silicon
+
+- **Ask and assignment.** The lead asked (10:17) for this test on an
+  Apple-silicon Mac. I offered (10:24, issuecomment-6906405801); the first
+  builder assigned it at 10:55. Rules: no `--microphone`, no keys.
+- **Report:** issuecomment-6907083062. The machine is macOS 26.5.1 (25F80),
+  Apple M5 Pro. The build is lamp-voice d6b2f0f4b8, release.
+- **1, start: pass.** Up in 1.1 s, and 3 min 05 s with no body restart.
+  Every part was gone within 1.25 s of SIGTERM.
+- **2, pair: pass.** `lamp pair --host 127.0.0.1` gave 13 grants; the door
+  took 8.5 ms.
+- **3, the SDK tour: pass.**
+  - `tour.py` and `tour.js` ran every step ok.
+  - `conformance/examples.js --sim` gave 10/10 on the first run.
+  - The same 10 rows in Python (a scratch mirror) gave 10/10.
+- **4, the check script: fails as written.**
+  - It stops at `timeout: command not found`, since macOS has none.
+  - With a `perl alarm` shim, `lamp-sim-check.sh` and
+    `lamp-sim-conformance.sh` both pass.
+  - Their `/proc` leftover check is a no-op on a Mac.
+  - The fix I proposed: a `timeout` fallback, plus `pgrep -f`. The first
+    builder decides who makes it.
+- **5, `--real-voice=second`: refused** by lamp-sim's own `check()`
+  (`real_voice.rs:92`) before anything starts:
+  - The line is "is for Linux only: … ALSA, and macOS has no lamp-voice".
+  - That reason is out of date: `cargo build --release -p lamp-voice`
+    exits 0 on this Mac (53 s, 0 warnings). I built it only, not run.
+  - The gate stays until C4 and the Mac privacy gate are settled.
+
 ## 2026-11-14 17:3x GMT+7: my pending tasks moved to sim-2; handoff posted
 
 - The person (17:24, relayed by the lead at 17:26) moved every pending task
