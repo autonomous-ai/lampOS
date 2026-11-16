@@ -2673,6 +2673,7 @@ dependencies = [
  "lamp-bus",
  "lamp-ipc",
  "lamp-msgs",
+ "nix 0.29.0",
  "rusqlite",
  "rustix",
  "ruzstd",
@@ -3124,6 +3125,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases 0.2.2",
  "libc",
+ "memoffset",
 ]
 
 [[package]]

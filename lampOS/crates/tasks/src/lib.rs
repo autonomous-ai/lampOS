@@ -2,6 +2,7 @@
 //! Tasks never opens an output device or implements Harness authentication:
 //! it only runs Harness's own sign-in, and passes the person's answer on
 //! ([`sign_in`]).
+pub mod egress;
 pub mod engine;
 pub mod follow;
 pub mod gateway;
