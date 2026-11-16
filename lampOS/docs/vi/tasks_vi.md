@@ -1864,22 +1864,39 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   `agent_tasks::tests::no_computer_paired_a_computer_asked_for_is_refused_never_the_lamps`,
   `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
 - **Khởi động** như Harness khởi động OpenClaw:
-  `openclaw tui --session harness-<agentId> --message "<prompt>"`, không có
-  chế độ quyền và không định tuyến model (OpenClaw tự chọn model, theo phần
-  cài đặt bên dưới).
-- **Rảnh mà chưa được hỏi vẫn tính là đã giao** (#6499): sau một `new`
-  thành công, lamp-tasks đọc `show` cho đến khi harness được hỏi hoặc rảnh,
-  trong cùng `launch_timeout`. Cả hai trường hợp, việc đều là `Created`, như
-  Harness đã trả lời: trên đèn, `show` của OpenClaw có thể báo rảnh và chưa
-  có `ask` vài giây sau một `new` mà TUI thật ra đã nhận `--message`. Rảnh mà
-  chưa được hỏi chỉ ghi một dòng journal, ngoài ra không làm gì: không đóng
-  harness, không gọi `new` lần nữa, không gõ vào bằng `harness reply`.
-  `show` lỗi thì kết quả là uncertain, kèm mã lỗi. Lỗi mất câu hỏi thật sự,
-  khi OpenClaw bỏ mất `--message` lúc TUI ghép đôi với một Gateway còn
-  nguội, đã được sửa trong Harness 0.6.23 (autonomous-ai/openharness#4172:
-  Harness khởi động OpenClaw không kèm `--message` và gõ task vào khi pane
-  đã sẵn sàng); đèn có bản sửa này khi pin Harness được dời lên (#5957). (Cách
-  tạm thời của #6504, đóng rồi khởi động lại, đã bỏ.)
+  `openclaw tui --session harness-<agentId>`, không có chế độ quyền và không
+  định tuyến model (OpenClaw tự chọn model, theo phần cài đặt bên dưới).
+  Harness 0.6.52 khởi động nó không kèm `--message` và gõ task vào khi pane
+  đã sẵn sàng, chờ tối đa 30 s để Gateway ghi nó thành tin nhắn của người
+  dùng (`sessionInput.ts`); trước đó là `--message "<prompt>"`.
+- **Chỉ tính là đã giao khi có bằng chứng đã nhận** (#7277, thay cho quy tắc
+  "rảnh mà chưa được hỏi vẫn tính là đã giao" của #6499): sau một `new`
+  thành công, lamp-tasks đọc `show` cho đến khi có bằng chứng OpenClaw đã
+  nhận việc: có `ask`, đã dùng công cụ, có câu trả lời, hoặc `working`. Rảnh
+  mà chưa được hỏi không phải bằng chứng: trên c0a4 (build 13373, Harness
+  0.6.52) lần đọc đó là TUI trước lần gửi đầu tiên, lần gửi này ghi khởi động
+  chậm 17,5 s, và ở các lần chạy khác lần gửi không bao giờ đến. Giới hạn là
+  `OPENCLAW_PROOF_WITHIN`, 45 s từ khi `new` trả lời (không quá một
+  `launch_timeout`): 30 s Harness chờ Gateway, lần gửi đầu chậm và phần chuẩn
+  bị sau đó. Có bằng chứng thì việc là `Created` như trước, nên một lần chạy
+  đọc rảnh chưa được hỏi rồi dùng công cụ (trường hợp của #6499) vẫn được
+  tính. Không có bằng chứng: harness đó được đóng và gọi `new` thêm một lần
+  (`harness reply` tắt trên đèn bán ra), kiểm tra bằng chứng như trên. Vẫn
+  không có: harness thứ hai cũng được đóng và việc là `not_sent`,
+  `openclaw_not_taken`, để giọng nói báo người dùng rằng việc chưa đến được
+  agent, không bao giờ báo là đã bắt đầu. Harness không đóng được thì lần
+  giao là `uncertain` (`openclaw_not_closed` với harness đầu,
+  `openclaw_not_taken` với harness thứ hai) và không khởi động thêm gì: một
+  harness còn chạy vẫn có thể nhận việc cùng lúc với harness khác. `new` lần
+  hai lỗi là `openclaw_new_again_failed`; harness đã dừng là
+  `stopped_before_message`, và `show` lỗi là uncertain kèm mã lỗi. Không bao
+  giờ khởi động lần thứ ba. Kiểm thử:
+  `openclaw_idle_with_no_ask_then_a_tool_within_the_bound_is_created`,
+  `openclaw_idle_with_no_ask_throughout_is_closed_started_once_more_and_not_sent`,
+  `openclaw_not_taken_then_taken_on_the_second_new_is_created_on_it`,
+  `openclaw_not_taken_and_not_closed_is_uncertain_with_nothing_more_started`
+  và `openclaw_asked_after_new_is_created_with_nothing_more_called`
+  (`tests/harness.rs`).
 - **Chưa bao giờ bắt đầu: báo và đóng** (#6577): một việc giao cho OpenClaw
   của chính đèn, trong lần khởi động này, mà sau khi được nhận
   `OPENCLAW_BEGIN_WITHIN_MS` (130 s: lần câu hỏi đầu chậm nhất thật đã thấy,

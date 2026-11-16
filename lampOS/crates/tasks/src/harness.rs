@@ -129,9 +129,12 @@ pub enum EngineKind {
     /// handed to them and none is a target.
     Hermes,
     /// OpenClaw (#6226), which Harness launches as `openclaw tui --session
-    /// harness-<agentId> --message "<prompt>"` through OpenClaw's own
-    /// Gateway, with a first prompt and no permission modes (Harness CLI
-    /// 0.6.11 and up). Like Hermes, a target only on the lamp itself.
+    /// harness-<agentId>` through OpenClaw's own Gateway, with no permission
+    /// modes. Harness 0.6.52 starts it with no `--message` and types the
+    /// first prompt in once the pane is ready, waiting up to 30 s for the
+    /// Gateway to write it as the user's message (`sessionInput.ts`); before
+    /// 0.6.52 it was `--message "<prompt>"` (Harness CLI 0.6.11 and up).
+    /// Like Hermes, a target only on the lamp itself.
     Openclaw,
 }
 
@@ -585,6 +588,18 @@ pub const MOST_SESSION_BYTES: usize = 128;
 /// How often a Devin just started is looked at until it is idle, for its
 /// first message ([`Cli::first_message`]).
 const FIRST_MESSAGE_LOOK: Duration = Duration::from_millis(500);
+/// How long after `new` the lamp's OpenClaw is given to prove it took its
+/// first prompt (#7277): asked, a tool used, an answer, or `working`.
+/// Idle with no ask is no proof: on c0a4 (build 13373, Harness 0.6.52)
+/// such a read was taken as handed over at 14:20:02, and the Gateway's
+/// first chat send then logged a 17.5 s startup (`slow chat send 17467ms
+/// stage=startup`, 14:20:15), its model call at 14:20:36 and tools at
+/// 14:20:43. Harness types the prompt in only once the pane is ready, and
+/// waits up to 30 s for the Gateway to write it (`sessionInput.ts`). 45 s
+/// from `new` covers that wait, the slow first send and the preparation
+/// after it; a send later still costs one close and one more
+/// `new`, never a prompt typed in twice.
+pub const OPENCLAW_PROOF_WITHIN: Duration = Duration::from_secs(45);
 
 /// What `show` read of a harness just started ([`Cli::look_until_idle`]).
 enum Looked {
@@ -1366,16 +1381,27 @@ impl Cli {
                 let outcome = parse_launch(&reply.stdout, launch, self.daemon_here().as_deref());
                 self.first_message(launch, outcome, until, seen)
             }
-            // OpenClaw's first prompt is its TUI's `--message` (#6226). On
-            // the lamp, `show` may read it idle with no `ask` (and no tool)
-            // seconds after a `new` that it did take: 12139 on lamp-52e6 and
-            // 9adf's runs on #6504 both wrote their file. So idle with no ask
-            // counts as handed over: no close, no second `new`, no `reply`
-            // (#6499). A truly lost prompt ("initial message not sent") is
-            // Harness's to type in: fixed in Harness 0.6.23 (openharness#4172).
+            // OpenClaw's first prompt is typed in by Harness once its pane
+            // is ready (#6226, Harness 0.6.52). Idle with no `ask` is no
+            // proof it was taken: on c0a4 (#7277) it was the TUI before its
+            // first send, and on other runs the send never came. So the launch counts only once `show`
+            // proves the prompt taken ([`Cli::openclaw_taken`]); with no
+            // proof the harness is closed and `new` asked once more
+            // (`harness reply` is off on product lamps).
             Ok(reply) if reply.success && launch.target.engine == EngineKind::Openclaw => {
                 let outcome = parse_launch(&reply.stdout, launch, self.daemon_here().as_deref());
-                self.openclaw_first_prompt(launch, outcome, until, seen)
+                // A `new` that made its folder (`--new <name>`) is asked
+                // again in that folder: `--new` again is refused, the
+                // project being there (Thirteen's P3 on #6504).
+                let mut again = args.clone();
+                if let Some(at) = again.iter().position(|arg| arg == "--new") {
+                    let plain = folder.as_ref().map_or_else(
+                        || launch.target.project.clone(),
+                        |folder| folder.sent.clone(),
+                    );
+                    again.splice(at..at + 2, [plain.into()]);
+                }
+                self.openclaw_first_prompt(launch, &again, outcome, until, seen)
             }
             Ok(reply) if reply.success => {
                 parse_launch(&reply.stdout, launch, self.daemon_here().as_deref())
@@ -2433,32 +2459,151 @@ impl Cli {
         self.type_first_message(launch, agent_id, until, seen)
     }
 
-    /// OpenClaw's launch once `new` answered (#6499): `show` read until it
-    /// is asked or idle, within `until`, and either way it is as Harness
-    /// answered it. Idle with no ask is journaled once and still counts as
-    /// handed over: on the lamp that reading came after a `--message` the
-    /// TUI did take (12139, 9adf), and closing or typing it in again told
-    /// the person a done task was uncertain. Nothing is closed, started
-    /// again or replied.
+    /// OpenClaw's launch once `new` answered (#7277): Created only once
+    /// `show` proves its first prompt taken ([`Cli::openclaw_taken`]). With
+    /// no proof the harness is closed and `new` asked once more, proved the
+    /// same way; still none, that one is closed too and the task not sent,
+    /// `openclaw_not_taken`, so the person hears it failed. A harness that
+    /// can't be closed ends it uncertain, with nothing more started: one
+    /// left running could still take its prompt beside a second (Heron's
+    /// P2 on #6504). Nothing is ever started a third time or replied.
     fn openclaw_first_prompt(
         &self,
         launch: &Launch,
+        again: &[OsString],
         outcome: LaunchOutcome,
         until: Instant,
         seen: &mut Seen,
     ) -> LaunchOutcome {
+        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         let LaunchOutcome::Created { agent_id } = outcome else {
             return self.first_message_unless_asked(launch, outcome, until, seen, true);
         };
-        match self.look_until_idle(launch, &agent_id, until, seen, true) {
-            Ok(Looked::Asked) => {}
-            Ok(Looked::Idle) => eprintln!(
-                "tasks: {}: OpenClaw's harness reads idle with no ask yet; its --message is taken as handed over, as Harness answered the new",
-                launch.name
-            ),
-            Err(code) => return LaunchOutcome::Uncertain { code: code.into() },
+        match self.openclaw_taken(launch, &agent_id, seen) {
+            Ok(true) => return LaunchOutcome::Created { agent_id },
+            Ok(false) => {}
+            Err(code) => return uncertain(code),
         }
-        LaunchOutcome::Created { agent_id }
+        if !self.openclaw_closed(launch, &agent_id, seen) {
+            return uncertain("openclaw_not_closed");
+        }
+        eprintln!(
+            "tasks: {}: OpenClaw showed no sign it took its prompt within {} s of new: the harness is closed, and it is started once more",
+            launch.name,
+            self.openclaw_proof_within().as_secs()
+        );
+        let reply = self.run(again, self.config.launch_timeout);
+        seen.took(&reply);
+        let agent_id = match reply {
+            Ok(reply) if reply.success => {
+                match parse_launch(&reply.stdout, launch, self.daemon_here().as_deref()) {
+                    LaunchOutcome::Created { agent_id } => agent_id,
+                    other => return other,
+                }
+            }
+            // The first is closed and the second wasn't made: nothing runs
+            // this task.
+            Ok(_) => return uncertain("openclaw_new_again_failed"),
+            Err(error) => return uncertain(error.code),
+        };
+        match self.openclaw_taken(launch, &agent_id, seen) {
+            Ok(true) => return LaunchOutcome::Created { agent_id },
+            Ok(false) => {}
+            Err(code) => return uncertain(code),
+        }
+        eprintln!(
+            "tasks: {}: OpenClaw took no prompt on its second new either: not sent (openclaw_not_taken)",
+            launch.name
+        );
+        if !self.openclaw_closed(launch, &agent_id, seen) {
+            return uncertain("openclaw_not_taken");
+        }
+        LaunchOutcome::NotSent {
+            code: "openclaw_not_taken".into(),
+        }
+    }
+
+    /// How long after its `new` OpenClaw is given to prove its prompt
+    /// taken: [`OPENCLAW_PROOF_WITHIN`], never more than one
+    /// `launch_timeout`.
+    fn openclaw_proof_within(&self) -> Duration {
+        OPENCLAW_PROOF_WITHIN.min(self.config.launch_timeout)
+    }
+
+    /// `show` read from just after `new` until it proves OpenClaw took its
+    /// prompt (`Ok(true)`): asked (`ask` set), a tool used, an answer, or
+    /// `working`. Idle with none of them is no proof. `Ok(false)`: no proof
+    /// within [`Cli::openclaw_proof_within`]. `Err` is the uncertain code
+    /// it ends with: a stopped harness, or a `show` that failed to run.
+    fn openclaw_taken(
+        &self,
+        launch: &Launch,
+        agent_id: &str,
+        seen: &mut Seen,
+    ) -> Result<bool, &'static str> {
+        let until = Instant::now() + self.openclaw_proof_within();
+        let show: Vec<OsString> = vec![
+            "show".into(),
+            "--machine".into(),
+            launch.target.machine_id.clone().into(),
+            agent_id.into(),
+            "--json".into(),
+        ];
+        loop {
+            let left = until.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return Ok(false);
+            }
+            let shown = self.run(&show, left.min(self.config.read_timeout));
+            seen.took(&shown);
+            let observation = match &shown {
+                Ok(reply) if reply.success => parse_observation(&reply.stdout, agent_id).ok(),
+                // A read cut short by the bound itself is no proof.
+                Err(_) if Instant::now() >= until => return Ok(false),
+                Err(error) => return Err(error.code),
+                _ => None,
+            };
+            if let Some(observation) = &observation {
+                if !fresh(observation) || observation.state == "working" {
+                    return Ok(true);
+                }
+                if matches!(observation.state.as_str(), "stopped" | "failed" | "offline") {
+                    return Err("stopped_before_message");
+                }
+            }
+            let left = until.saturating_duration_since(Instant::now());
+            std::thread::sleep(FIRST_MESSAGE_LOOK.min(left));
+        }
+    }
+
+    /// `harness close` of an OpenClaw harness that took no prompt, within
+    /// one `launch_timeout`: whether it is closed (or gone). Not closed is
+    /// journaled with why.
+    fn openclaw_closed(&self, launch: &Launch, agent_id: &str, seen: &mut Seen) -> bool {
+        let closed = self.run(
+            &[
+                "close".into(),
+                "--machine".into(),
+                launch.target.machine_id.clone().into(),
+                agent_id.into(),
+                "--json".into(),
+            ],
+            self.config.launch_timeout,
+        );
+        seen.took(&closed);
+        let why = match &closed {
+            Ok(reply) => match self::closed(reply.code) {
+                Ok(Closed::Closed | Closed::Gone) => return true,
+                Ok(Closed::Refused | Closed::Left) => "refused".to_owned(),
+                Err(code) => code,
+            },
+            Err(error) => error.code.to_owned(),
+        };
+        eprintln!(
+            "tasks: {}: OpenClaw's harness took no prompt and wasn't closed ({why}), so nothing more is started",
+            launch.name
+        );
+        false
     }
 
     /// `show` read until the harness just started is idle (or, with
