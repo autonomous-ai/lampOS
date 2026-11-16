@@ -28,6 +28,8 @@ axum = { version = "=0.8.9", default-features = false, features = ["http1", "tok
 tokio = { version = "1", features = ["rt", "net", "time", "signal", "macros", "sync"] }
 # The one page's event stream (axum's `Sse` takes a stream), as the voice has it.
 futures-util = { version = "=0.3.34", default-features = false, features = ["std"] }
+# The interface subnet the monitor answers on (#7208): getifaddrs.
+libc = "0.2"
 
 [lints]
 workspace = true
