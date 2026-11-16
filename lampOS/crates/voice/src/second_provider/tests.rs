@@ -6810,6 +6810,60 @@ async fn a_429_that_lasts_says_the_usage_limit_line_not_the_slow_one() {
     assert!(off.iter().all(|turn| !turn.contains(&limit)), "{off:?}");
 }
 
+/// #7346's row on lamp-52e6 (23:21, then 23:24): the limit line came again
+/// 3.5 min later with no answer between. V2's ruling: it is said once a
+/// run of 429s, however long the run; only an answered round ends the run,
+/// and a later run says it once again.
+#[tokio::test(start_paused = true)]
+async fn the_usage_limit_line_is_said_once_a_run_until_an_answer() {
+    let refused = || vec![Err(net::Error::Status(429))];
+    let answered = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+    // Two runs of 429s, each spanning more than LIMIT_AFTER and two
+    // DOWN_LINE_EVERY, an answer between them.
+    let run = [1, 1, 130, 61, 61];
+    let chats: Vec<_> = std::iter::once(answered())
+        .chain(run.iter().map(|_| refused()))
+        .chain(std::iter::once(answered()))
+        .chain(run.iter().map(|_| refused()))
+        .collect();
+    let waits: Vec<u64> = std::iter::once(0)
+        .chain(run)
+        .chain(std::iter::once(1))
+        .chain(run)
+        .collect();
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(waits.len())
+                .collect(),
+        ),
+        chats: Mutex::new(chats.into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    let mut heard = Vec::new();
+    for (request, wait) in (1..).zip(waits) {
+        tokio::time::sleep(Duration::from_secs(wait)).await;
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        heard.push(sent(&mut engine).await);
+    }
+    assert!(LIMIT_AFTER + 2 * DOWN_LINE_EVERY < Duration::from_secs(run.iter().skip(1).sum()));
+    let limit = format!("audio:{}", DOWN_LINE_LIMIT.len());
+    let said = |turns: &[Vec<String>]| turns.iter().filter(|t| t.contains(&limit)).count();
+    assert_eq!(said(&heard[1..6]), 1, "once in the first run: {heard:?}");
+    assert!(heard[3].contains(&limit), "{heard:?}");
+    assert_eq!(said(&heard[6..7]), 0, "answered: {heard:?}");
+    assert_eq!(
+        said(&heard[7..]),
+        1,
+        "once again after an answer: {heard:?}"
+    );
+    assert!(heard[9].contains(&limit), "{heard:?}");
+}
+
 /// #7346: the usage-limit line is said in each of the owner's languages,
 /// as the other down lines are.
 #[test]
