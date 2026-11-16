@@ -444,8 +444,8 @@ chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/point-light"
       IN="lamp-skills.service"
       WAIT=240 ;;
     sip-of-water)
-      # #1957 (on lamp-voice, installable): a slow blue breath of light and a look at the face after 90 minutes at the desk. The trial's copy waits
-      # 30 s in place of 90m and has no [active] and [quiet] hours, so it
+      # #1957 (on lamp-voice, installable): a slow blue breath of light and a look at the face after 30 minutes at the desk. The trial's copy waits
+      # 30 s in place of 30m and has no [active] and [quiet] hours, so it
       # can be tried now. The face is said near the lamp by the trial. With
       # the eyes' room/activity off its two conditions hold (unknown =
       # "holds"). Its line: lamp-skills main.rs, the skill's Done.
@@ -453,7 +453,7 @@ chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/point-light"
       NOTE="a build with #1957, the voice resting, nobody at the lamp (the trial says a face near the lamp itself), and the eyes' LAMP_ACTIVITY off. It MOVES: the head looks at the face once and the light breathes blue for 6 s; keep the arm clear"
       SETASIDE="copy @SKILLS_DIR@/sip-of-water"
       SETUP="rm -rf @SKILLS_DIR@/sip-of-water && cp -a @SRC@/sip-of-water @SKILLS_DIR@/sip-of-water
-sed -e 's/^for = \"90m\"/for = \"30s\"/' -e '/^\[active\]/,/^to = /d' -e '/^\[quiet\]/,/^to = /d' @SRC@/sip-of-water/skill.toml >@SKILLS_DIR@/sip-of-water/skill.toml
+sed -e 's/^for = \"30m\"/for = \"30s\"/' -e '/^\[active\]/,/^to = /d' -e '/^\[quiet\]/,/^to = /d' @SRC@/sip-of-water/skill.toml >@SKILLS_DIR@/sip-of-water/skill.toml
 chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/sip-of-water"
       SWITCHES="lamp-skills.service|+--zone system"
       CAUSE='keep humans/faces/tracked latest {"faces":[{"id":"trial","xmin":0.35,"ymin":0.2,"xmax":0.65,"ymax":0.6,"confidence":0.9}]} lamp_msgs/Faces'

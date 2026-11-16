@@ -1,76 +1,94 @@
 # LAMP_NUDGES_PRESENT=on (#5207): 10:00, four hours without getting up:
-# a sip at 50 minutes and again each 50 minutes while they stay.
+# a sip at 30 minutes and again each 45 minutes while they stay.
 clock = "10:00"
 present = true
 
 [[expect]]
-at = "50m"
+at = "30m"
 within = "1m"
 call = "body.gaze"
 args = { look_at = "face" }
 
 [[expect]]
-at = "50m"
+at = "30m"
 within = "1m"
 call = "light"
 args = { colour = "blue", level = 2 }
 
 [[expect]]
-at = "50m"
+at = "30m"
 within = "1m"
 call = "say"
 args = { note = "They have been at the desk a while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }
 
 [[expect]]
-at = "100m"
+at = "75m"
 within = "1m"
 call = "body.gaze"
 args = { look_at = "face" }
 
 [[expect]]
-at = "100m"
+at = "75m"
 within = "1m"
 call = "light"
 args = { colour = "blue", level = 2 }
 
 [[expect]]
-at = "100m"
+at = "75m"
 within = "1m"
 call = "say"
 args = { note = "They have been at the desk a while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }
 
 [[expect]]
-at = "150m"
+at = "120m"
 within = "1m"
 call = "body.gaze"
 args = { look_at = "face" }
 
 [[expect]]
-at = "150m"
+at = "120m"
 within = "1m"
 call = "light"
 args = { colour = "blue", level = 2 }
 
 [[expect]]
-at = "150m"
+at = "120m"
 within = "1m"
 call = "say"
 args = { note = "They have been at the desk a while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }
 
 [[expect]]
-at = "200m"
+at = "165m"
 within = "1m"
 call = "body.gaze"
 args = { look_at = "face" }
 
 [[expect]]
-at = "200m"
+at = "165m"
 within = "1m"
 call = "light"
 args = { colour = "blue", level = 2 }
 
 [[expect]]
-at = "200m"
+at = "165m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk a while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }
+
+[[expect]]
+at = "210m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "210m"
+within = "1m"
+call = "light"
+args = { colour = "blue", level = 2 }
+
+[[expect]]
+at = "210m"
 within = "1m"
 call = "say"
 args = { note = "They have been at the desk a while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }

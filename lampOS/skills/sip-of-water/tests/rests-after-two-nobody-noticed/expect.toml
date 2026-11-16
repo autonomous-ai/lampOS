@@ -1,39 +1,39 @@
 # 10:00, three sittings of 100 minutes, never moving, never turning to it:
-# at 90 and 195 minutes, then nothing until the morning ([rest]).
+# at 30 and 135 minutes, then nothing until the morning ([rest]).
 clock = "10:00"
 
 [[expect]]
-at = "90m"
+at = "30m"
 within = "1m"
 call = "body.gaze"
 args = { look_at = "face" }
 
 [[expect]]
-at = "90m"
+at = "30m"
 within = "1m"
 call = "light"
 args = { colour = "blue" }
 
 [[expect]]
-at = "90m"
+at = "30m"
 within = "1m"
 call = "say"
-args = { note = "They have sat at the desk for about an hour and a half. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }
+args = { note = "They have sat at the desk for about half an hour. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }
 
 [[expect]]
-at = "195m"
+at = "135m"
 within = "1m"
 call = "body.gaze"
 args = { look_at = "face" }
 
 [[expect]]
-at = "195m"
+at = "135m"
 within = "1m"
 call = "light"
 args = { colour = "blue" }
 
 [[expect]]
-at = "195m"
+at = "135m"
 within = "1m"
 call = "say"
-args = { note = "They have sat at the desk for about an hour and a half. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }
+args = { note = "They have sat at the desk for about half an hour. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }

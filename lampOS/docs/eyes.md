@@ -2843,7 +2843,7 @@ apart is its scripted sitting.
 `sitting_s` is counted in the eyes' memory from the sitting's first face,
 so before this every restart of lamp-eyes (an update restarts it, several
 times a day) began it at 0, and every nudge that waits on it (a sip of
-water after 50 minutes, rest your eyes after 45, stand up after 100, a
+water after 30 minutes, rest your eyes after 45, stand up after 100, a
 comfort break after 90) waited its whole time again. Now, while activity is
 said, the eyes keep the sitting in `/run/lampos-eyes-kept/sitting.json`
 (`crates/eyes/src/sitting.rs`): written at once when a sitting begins, ends
