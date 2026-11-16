@@ -7032,7 +7032,8 @@ it is a 3 × 140-character summary with no tool names, read every 30 s.
   event. A read that fails publishes nothing and is tried at the next one.
 - **Latency:** a step is on the bus within 1 s of its event, and on peek's
   page within about 2 s once the bus and peek's push are added. Peek shows
-  steps only in monitor mode (#7267 PR 3).
+  steps in every mode; only a step's arguments and result need monitor mode
+  ([peek.md](peek.md), #7267 PR 3).
 - **The link to the turn:** `tasks/step.task` is the same number as
   `TaskProgress.task` and `voice/decision.task`.
 
