@@ -1287,6 +1287,8 @@ mod tests {
             start_in: None,
             env_file: None,
             answer: std::sync::OnceLock::new(),
+            write: false,
+            not_made: Default::default(),
         }
     }
 
