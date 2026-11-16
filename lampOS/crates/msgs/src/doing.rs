@@ -97,10 +97,10 @@ pub enum DeskWork {
 
 /// The sitting's other timers (#6543): how long the person has not been
 /// seen tired, at desk work or celebrating, the desk work last seen, and
-/// how often tiredness was. A topic of its own, apart from `humans/doing`,
-/// so a skill given drinking, eating and breaks does not receive these:
-/// one reads them only by naming `humans/doing_more`, which the owner
-/// agrees to as a use of its own. Said by `lamp-seen` only with
+/// how often tiredness, a drink and eating were newly seen. A topic of its
+/// own, apart from `humans/doing`, so a skill given drinking, eating and
+/// breaks does not receive these: one reads them only by naming
+/// `humans/doing_more`, which the owner agrees to as a use of its own. Said by `lamp-seen` only with
 /// `LAMP_SEEN_MORE_DOINGS=on`.
 ///
 /// Every field is always present, and each timer counts from the desk
@@ -114,6 +114,12 @@ pub struct HumanDoingMore {
     /// How many times tiredness was newly seen this sitting (not seen in
     /// the burst before), as a sighting is counted for `humans/doing_seen`.
     pub tired_seen: u32,
+    /// How many times a drink was newly seen this sitting: each sighting
+    /// `humans/doing_seen` said, and nothing else (#6543: a count only of
+    /// what was seen). 0 before any.
+    pub drank_seen: u32,
+    /// The same for eating.
+    pub ate_seen: u32,
     /// Seconds since desk work was seen, or since the desk arrival.
     pub desk_work_s_ago: u32,
     /// The desk work last seen this sitting; `none` before any.
@@ -334,19 +340,23 @@ mod tests {
     }
 
     #[test]
-    fn doing_more_is_three_timers_a_count_and_a_coarse_desk_work() {
+    fn doing_more_is_three_timers_three_counts_and_a_coarse_desk_work() {
         let more = HumanDoingMore {
             tired_s_ago: 60,
             tired_seen: 2,
+            drank_seen: 3,
+            ate_seen: 1,
             desk_work_s_ago: 0,
             desk_work: DeskWork::Computer,
             celebrate_s_ago: 600,
         };
-        let text = r#"{"tired_s_ago":60,"tired_seen":2,"desk_work_s_ago":0,"desk_work":"computer","celebrate_s_ago":600}"#;
+        let text = r#"{"tired_s_ago":60,"tired_seen":2,"drank_seen":3,"ate_seen":1,"desk_work_s_ago":0,"desk_work":"computer","celebrate_s_ago":600}"#;
         round_trip(&more, text);
         for field in [
             "tired_s_ago",
             "tired_seen",
+            "drank_seen",
+            "ate_seen",
             "desk_work_s_ago",
             "desk_work",
             "celebrate_s_ago",

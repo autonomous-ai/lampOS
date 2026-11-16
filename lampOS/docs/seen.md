@@ -395,7 +395,11 @@ that one too, aborts a burst under way.
     "using computer" and "playing controller" are `computer`, "texting"
     `phone`, "reading", "reading book" and "reading newspaper" `reading`,
     "writing" and "drawing" `writing`; the kind of the surest such label)
-    and `celebrate_s_ago` (V1's `celebrate` group). Every field always
+    and `celebrate_s_ago` (V1's `celebrate` group), and `drank_seen` and
+    `ate_seen`, how many drinks and how much eating were newly seen this
+    sitting: exactly the sightings `humans/doing_seen` says, so a count is
+    only of what was seen (the first builder's fourth change on #6543),
+    for A comfort break's "after 2 drinks". Every field always
     there, each timer counting from the desk arrival; the same sureness
     rule, the same bursts, no more pictures, wiped with the sitting. They
     never set `last` or say `humans/doing_seen`: desk work shows in almost
