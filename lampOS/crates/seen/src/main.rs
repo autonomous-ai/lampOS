@@ -33,7 +33,7 @@ use lamp_seen::{
     pause::{self, Pause},
     pose::{self, Pose},
     said_back::{self, SaidBack, SayService},
-    sitting::Sitting,
+    sitting::{BREAK_IS_STANDING, Sitting},
     switched_on,
     watch::Readings,
 };
@@ -514,6 +514,14 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         )),
     };
     let mut sitting: Option<Sitting> = None;
+    // A break is a stand-up, not a stretch (#6543 step 2): with the switch
+    // on, `stood_up_us` keeps when the last room/stood_up came, so the
+    // sitting begun on their return counts its break from then.
+    let break_is_standing = switched_on(std::env::var(BREAK_IS_STANDING).ok().as_deref());
+    if break_is_standing {
+        eprintln!("lamp-seen: a break is a stand-up, not a stretch");
+    }
+    let mut stood_up_us: Option<u64> = None;
     let mut pause = Pause::default();
     let mut doing_said: Option<Instant> = None;
     let started = Instant::now();
@@ -559,6 +567,9 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             said_back::Step::Idle | said_back::Step::Waiting => {}
         }
         let now = monotonic_us();
+        if came.stood_up {
+            stood_up_us = Some(now);
+        }
         // No frame before the lamp has begun saying it will look.
         let said_on = said_back.said_on(&kept, &record);
         let now_inputs = readings.inputs(opted_in, said_on, now);
@@ -613,7 +624,12 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             doing_said = None;
         }
         if desk.is_ok() && sitting.is_none() {
-            sitting = Some(Sitting::new(inputs.arrived_us(now)));
+            let begun = Sitting::new(inputs.arrived_us(now));
+            sitting = Some(if break_is_standing {
+                begun.break_is_standing(now, stood_up_us)
+            } else {
+                begun
+            });
         }
         if let Some((taker, marked)) = frames.as_mut() {
             // Posture's own gate: closed `not_said_yet` until a line naming
@@ -648,7 +664,7 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
                             let _ = seen_out.publish_json(now, &newly);
                         }
                     }
-                    if !finished.seen.is_empty() {
+                    if finished.seen.iter().any(|seen| sitting.takes(seen.what)) {
                         // Said at once, not at the next 30 s.
                         doing_said = None;
                     }
