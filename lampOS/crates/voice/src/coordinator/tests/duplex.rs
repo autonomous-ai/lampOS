@@ -2225,9 +2225,12 @@ fn heard_always_uses_a_lines_words_only_to_judge_a_stop() {
         "a request: {:?}",
         h.provider_queue
     );
+    // The trace's words, not its times: a time in microseconds can hold the
+    // digits "4321" by itself (#7311).
     let trace = serde_json::to_string(&h.trace.iter().collect::<Vec<_>>()).unwrap();
+    let words = crate::test_words::strings_of(&trace);
     for word in ["4321", "code", "Remember"] {
-        assert!(!trace.contains(word), "{word} in the trace");
+        assert!(!words.contains(word), "{word} in the trace");
     }
     for kept in [
         crate::stop_words::AUDIO_ENVIRONMENT,
