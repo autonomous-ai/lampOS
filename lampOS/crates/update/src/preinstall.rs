@@ -164,6 +164,11 @@ pub fn on_image<'a>(
     }
 }
 
+/// lamp-update's own unit's `Environment=` on the image at `root`.
+pub fn unit_environment(_root: &Path) -> Vec<(String, String)> {
+    Vec::new()
+}
+
 /// Every part the switches want there after the one-shot, or the first one
 /// missing.
 pub fn check(root: &Path, wanted: &Wanted) -> Result<(), String> {
