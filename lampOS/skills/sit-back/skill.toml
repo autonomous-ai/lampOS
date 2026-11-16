@@ -21,7 +21,7 @@ most_a_day = 3
 # short line, worded by the voice.
 [permissions]
 speak = true
-topics = ["room/activity", "humans/faces/tracked", "voice/state", "humans/posture"]
+topics = ["room/activity", "humans/faces/tracked", "voice/state", "humans/posture", "humans/doing_more"]
 body = true
 
 # Leaned in for ten minutes: the eyes say `leaning_in` once it has held 10 s
@@ -38,6 +38,12 @@ gap = "20s"
 rearm = "leaves"          # once each time they lean in; again only after they sat back
 cooldown = "60m"
 wait = "10m"              # someone else in view, or a talk: once they go, while still leaned in
+# After 45 minutes of desk work seen this sitting (lamp-seen's `desk_s` on
+# `humans/doing_more`, the `seen_more` use, #6543), five minutes leaned in
+# are enough, not ten: the same kind word, which never mentions the desk
+# work. Only with LAMP_YAWN_SOONER=on and lamp-seen's
+# LAMP_SEEN_MORE_DOINGS=on; without the topic, or with it run out, ten as before.
+sooner = { topic = "humans/doing_more", field = "desk_s", above = 2700, for = "5m" }
 
 # Sat back a minute within a quarter of an hour of a nudge: one short warm word.
 [[trigger]]

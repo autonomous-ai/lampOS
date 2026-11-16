@@ -412,7 +412,9 @@ that one too, aborts a burst under way.
     every burst and would push a drink out of the second voice's note.
     V1's `emotional` group (laughing, crying, singing) is never said. Its
     own topic, so a skill given drinking, eating and breaks never receives
-    these; off, it is not even declared.
+    these; off, it is not even declared. Sit back reads `desk_s` (above
+    2700, its `sooner`: five minutes leaned in, not ten, with
+    `LAMP_YAWN_SOONER=on`).
 - **Health**: with activity on, `diagnostics` also says `sends: activity`,
   its bursts (`bursts`, `answered`, `busy`, `failed`, `aborted`),
   `frames_sent`, `frames_wiped`, `wrong_frame` and `last_failure`.

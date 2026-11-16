@@ -66,8 +66,10 @@ publishes them, coming with #6543 phases 2 and 3. A skill that names one in
 `humans/doing_more` (tiredness, desk work as a coarse kind and celebrating,
 said by `lamp-seen` only with `LAMP_SEEN_MORE_DOINGS=on`) is a topic of its
 own: a skill naming it shows the `seen_more` use, private and apart from
-`seen`, so a skill given `humans/doing` never receives it. No skill reads it
-yet.
+`seen`, so a skill given `humans/doing` never receives it. Sit back reads
+its `desk_s`: a `sooner` on its leaned-in trigger, five minutes leaned in,
+not ten, after 45 minutes of desk work seen this sitting (`above = 2700`,
+only with `LAMP_YAWN_SOONER=on`); without the topic it runs as before.
 `humans/doing`'s three timers are always said, counted from the desk
 arrival when nothing was seen, so `[[while]] topic = "humans/doing" field =
 "drank_s_ago" above = 1799 unknown = "holds_stale"` holds for someone the
