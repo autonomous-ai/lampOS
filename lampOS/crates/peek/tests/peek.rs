@@ -1757,7 +1757,7 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
             "{html}"
         );
         // The Turns section's cards carry the same ⚡ class.
-        let turns = page::turns(&current(vec![card_record(4, ttft, "played")]));
+        let turns = page::turns(&current(vec![card_record(4, ttft, "played")]), &[], false);
         assert!(turns.contains("class=\"turn card\""), "{turns}");
         assert!(
             turns.contains(&format!(

@@ -81,7 +81,7 @@ and an **END** line.
 |---|---|---|
 | Overview | The voice's state; the light shown (`on, blue at 3`, `off`); someone here or not; the camera's state, faces in view and who is followed; the lamp's health level and its worst item; the newest turn's first audio and the median of the last ten; any unit running another build than its release; the Harness tasks working, per engine, and how many were just handed over (`1 working (OpenClaw 1, Hermes 0)`, `none working, 1 just handed over`, `none working`) | the kept values below, `light/state`, the turns, `/status`'s rows, `tasks/status` |
 | Timeline | The newest 30 turns, newest first, step by step as V1's Flow Monitor: **heard**, **understood** (answered or held back, with the record's `admission_basis` and final words' time), **decided** (the path: the tools, or the engine and task handed to), **did** (the light asked for, when it changes, and each skill's stage), **said** (with the record's first audio and how it ended); in the card's events, each step of the task's agent (its number and tool; in monitor mode its arguments and result), its reply or error, at most 50 a task. Each step's time from the end of speech, the slowest wait marked, and the clock time in UTC. In monitor mode only, the words heard and said and the agent's words, and once, on top of the page, "Words anyone says to the lamp show here while this is on." | the bus ([below](#the-timeline-from-the-bus-5883-second-piece)): `voice/decision`, `tasks/step`, `tasks/status` too, joined with the turns' records |
-| Turns | The newest 20 turns, newest first, as V1's Flow: what took the turn (`local_speech`, or the lamp's own: `skill_says`, `lamp_tells_news`...; `lamp_speaks_first` in records from before #2825), then from the end of speech the final words, the first token and the first audio, each with its own time in brackets and the slowest marked; then how it ended (`played`, `no audio`, `failed`, or why it was cut) and what held it, if anything did | the voice's own session records ([below](#turns-from-the-voices-records)) |
+| Turns | The newest 20 turns, newest first, as V1's Flow: what took the turn (`local_speech`, or the lamp's own: `skill_says`, `lamp_tells_news`...; `lamp_speaks_first` in records from before #2825), then from the end of speech the final words, the first token and the first audio, each with its own time in brackets and the slowest marked; then how it ended (`played`, `no audio`, `failed`, or why it was cut) and what held it, if anything did | the voice's own session records ([below](#turns-from-the-voices-records)) where peek can read them; otherwise the bus's turns, as the Timeline's cards |
 | Tasks | A card for each Harness task the lamp handed over: its number, its engine (OpenClaw, Hermes, Claude, Codex, OpenCode, Devin, Devin Cloud, else the bus name escaped), its state as a badge (working blue; starting, installing, needs input amber; idle green; failed red; stopped, offline, unknown, missing grey), "started N min ago" (`working_s`), "last active N ago" (`last_active_unix_ms`), its progress line's changes and new signs as chips (tests pass, fixed, pull request ...). A task not read yet is "just handed over". Under **Ended**, greyed, each that settled: done (idle), needs input, stopped or failed, with the UTC time and how long ago. No status on the bus says "No word from lamp-tasks"; an empty one "Nothing is being worked on."; one that does not read, that it can't be read. Never a task's words, prompt, folder or answer: `tasks/status` carries none, and nothing else about tasks is read | `tasks/status`, the kept value `lamp-tasks serve --progress` publishes, read each push like the others (no subscriber) |
 | Camera | The frame `/cam.svg` draws, faces as boxes | as `/cam` |
 | Body | Each joint where it is against where it was last asked to be (`commanded`), how far off (marked past 0.05 rad) and its effort; the body's own word: its level and sentence, its state (`ready`, `paused`, `stopping`), `standing` from 0 folded to 1 standing, the warmest joint, "met resistance" in the last minute and since it started; its last stop and why, as it said it | `body/joint_states`; the body's diagnostic, sent by the body about the body (`watch::body_of`) |
@@ -179,11 +179,18 @@ release, the first read of a 63 MB session took 7.5 ms, a read of one more
 turn 0.26 ms, a read with nothing new 0.08 ms, and making the section of 20
 turns 0.03 ms. Not yet timed on a lamp.
 
-The rows carry a read status (#2789, piece 1). If the sessions root,
-newest session's metadata folder, or an event file refuses access, Turns
-says **"Can't read the voice's sessions: permission."** A missing path
-says the sessions are not available yet; another I/O failure says the read
-failed. These are fixed messages: no path, OS error text, or record's words
+The rows carry a read status (#2789, piece 1). On a product lamp the
+records are never readable: lamp-voice keeps `/var/lib/lampOS/voice` and
+its `sessions` folder `root:root 0700` by design, and peek runs as
+`User=lampos` (#7208, seen on lamp-52e6 13309). No permission is added for
+peek. So when the sessions root, the newest session's metadata folder, or
+an event file refuses access, or the sessions are missing, and no row was
+read before, Turns shows the bus's turns instead, as the Timeline's cards
+under a dim **"Turns from the bus."**, words only in monitor mode; with no
+bus turn either, **"No turn heard yet."** The records stay a source only
+where readable, which is dev. Overview's first-audio summary still says
+**"Can't read the voice's sessions: permission."** (or not available yet);
+another I/O failure says the read failed, in Turns too. These are fixed messages: no path, OS error text, or record's words
 are sent to the browser. A readable empty session still says there is no
 turn yet, so emptiness is distinct from a failed read.
 
@@ -709,4 +716,9 @@ own, and asks for it over HTTP:
   status. Synthetic words and paths stay out, old metrics are marked stale,
   and unread bytes appear once after recovery. It prints the first denied
   read and each permission-change-to-event duration and checks the host's
-  under-2-second target with a fast synthetic unit-status reader.
+  under-2-second target with a fast synthetic unit-status reader. While
+  denied with no row read, Turns is the empty bus state, never the error.
+- `with_the_voices_sessions_private_turns_shows_the_bus_turns` (#7208): with
+  the sessions folder at mode 0, Turns says "No turn heard yet.", then, once
+  a turn is heard and said on the bus, shows its card "from the bus", with
+  no permission error and no words outside monitor mode.
