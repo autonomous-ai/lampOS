@@ -609,7 +609,13 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     `harness close --machine <lamp> <agent> --now --json`
     (`Cli::close_now`) và là `run_failed` "the run was ended at its
     deadline, 840 s". `new` không khởi động được (`not_sent`, `uncertain`,
-    hay một lần tạo `pending`) cũng là `run_failed`.
+    hay một lần tạo `pending`) cũng là `run_failed`. Một `new` `uncertain`
+    mà câu trả lời vẫn nêu agent của lần chạy theo đúng tên của nó (một
+    `machineId` không phải của đèn, một agent `existing`) thì agent đó được
+    guard đóng: kết thúc token trước, rồi `close --now`
+    (`Cli::launch_naming`, #7171); câu trả lời không nêu agent nào thì không
+    đóng gì. Test:
+    `issue_7171_a_skill_run_refused_as_uncertain_closes_the_agent_harness_named`.
   - **Lần chạy không tới được agent của nó** (#6835 gap 1). Khi engine
     thoát trước khi sẵn sàng, Harness giữ pane của lần chạy làm một shell:
     cùng agent id, agent "Terminal", và `wait` đọc nó là `idle` trong vài
