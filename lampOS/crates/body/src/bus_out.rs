@@ -1075,12 +1075,14 @@ mod tests {
             toward_refused: None,
             bad_reads: [0; 5],
             retreats: 0,
+            hot_retreats: 0,
             resting_s: 0,
             cannot_lift: None,
             unlifted: None,
             strained: None,
             warming: None,
             seated: None,
+            seat_rests: false,
             home: None,
             waiting: None,
             stand_ask: None,
@@ -1239,6 +1241,21 @@ mod tests {
             lines[0].ends_with("it sat down for a strain once since it was last folded"),
             "{}",
             lines[0]
+        );
+        // #7281: one for heat says so.
+        let mut said = FoldSaid::default();
+        let mut lines = Vec::new();
+        for g in stands(600, 1.0, 0.0, 200) {
+            let g = Glimpse {
+                retreats: u16::from(g.step >= 700),
+                hot_retreats: u16::from(g.step >= 700),
+                ..g
+            };
+            lines.extend(said.step(&g));
+        }
+        assert!(
+            lines[0].ends_with("it sat down hot once since it was last folded"),
+            "{lines:?}"
         );
         // A body that never stands says no fold.
         let mut said = FoldSaid::default();
@@ -1412,7 +1429,7 @@ mod tests {
 
     /// The strain guard's warnings (#4390, #4501): seated first, then a
     /// long strain, an arm that did not lift, and a fast warming. Warmth is
-    /// said before them all.
+    /// said before them all but the seat (#7281).
     #[test]
     fn the_strain_guards_warnings_name_the_joint_and_what_it_did() {
         let said = |glimpse: &Glimpse| {
@@ -1444,8 +1461,15 @@ mod tests {
             said(&seated),
             "seated: the shoulder retreated twice in an hour (hot); hold its head a second, or run a health check, to let it stand again"
         );
-        seated.arm_temperatures = [WARM, 40];
-        assert!(said(&seated).starts_with("shoulder is warm"));
+        // #7281: seated is said before a joint's warmth, as it is what the
+        // lamp does about it; one that rests says it stands by itself.
+        seated.arm_temperatures = [WARM + 7, 40];
+        assert!(said(&seated).starts_with("seated: the shoulder"));
+        seated.seat_rests = true;
+        assert_eq!(
+            said(&seated),
+            "seated: the shoulder sat down hot twice in an hour; it stands again by itself once it reads under 50 for 5 min, or when its head is held a second"
+        );
     }
 
     #[test]

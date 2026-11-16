@@ -1028,6 +1028,9 @@ mod tests {
             "The air reads like smoke. If something's burning, please check it."
         ));
         assert!(is_fixed("Hehe, that tickles."));
+        // A seated lamp's lines (#7281).
+        assert!(is_fixed(lamp_body::seat_say::RESTS));
+        assert!(is_fixed(lamp_body::seat_say::WAITS));
         assert!(!is_fixed("My pairing check is 3 F 9 A, 0 B 2 C."));
         assert!(!is_fixed("Two new mails, from the bakery."));
     }
