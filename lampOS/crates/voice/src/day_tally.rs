@@ -42,7 +42,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, VecDeque},
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -114,6 +114,17 @@ pub struct Day {
     pub declined: u64,
     /// Sound sent to be heard, in milliseconds.
     pub heard_ms: u64,
+    /// Lines that ended with their words asked for ([`line_ended`]): a
+    /// request's own and a stop word's. One given up before its end is in
+    /// [`Self::heard_ms`] and in none of these.
+    pub heard_lines: u64,
+    /// Of those, the lines that came back with no words.
+    pub heard_no_words_lines: u64,
+    /// The sound queued on them, in milliseconds.
+    pub heard_no_words_ms: u64,
+    /// The sound queued on the lines of turns the model declined as not
+    /// said to the lamp, in milliseconds.
+    pub heard_declined_ms: u64,
     /// Lines sent to be spoken; one asked again is counted again.
     pub spoken_lines: u64,
     /// Their characters.
@@ -132,6 +143,16 @@ impl Day {
         }
         self.declined = self.declined.saturating_add(more.declined);
         self.heard_ms = self.heard_ms.saturating_add(more.heard_ms);
+        self.heard_lines = self.heard_lines.saturating_add(more.heard_lines);
+        self.heard_no_words_lines = self
+            .heard_no_words_lines
+            .saturating_add(more.heard_no_words_lines);
+        self.heard_no_words_ms = self
+            .heard_no_words_ms
+            .saturating_add(more.heard_no_words_ms);
+        self.heard_declined_ms = self
+            .heard_declined_ms
+            .saturating_add(more.heard_declined_ms);
         self.spoken_lines = self.spoken_lines.saturating_add(more.spoken_lines);
         self.spoken_chars = self.spoken_chars.saturating_add(more.spoken_chars);
     }
@@ -140,6 +161,8 @@ impl Day {
         self.models.is_empty()
             && self.declined == 0
             && self.heard_ms == 0
+            && self.heard_lines == 0
+            && self.heard_declined_ms == 0
             && self.spoken_lines == 0
             && self.spoken_chars == 0
     }
@@ -169,6 +192,50 @@ struct Pending {
     /// The folder, once counting has begun.
     directory: Option<PathBuf>,
     counts: Day,
+    /// The newest requests whose lines came back with words, and the sound
+    /// queued on each in milliseconds: [`MOST_RECENT`] at most, so a turn
+    /// declined a moment later finds its own. Never written.
+    recent: VecDeque<(u64, u64)>,
+}
+
+/// The most requests whose sound is remembered for [`declined`].
+const MOST_RECENT: usize = 32;
+
+impl Pending {
+    /// A line has ended with its words asked for: `samples` of sound were
+    /// queued on it, and it came back with words or with none. `request`
+    /// is its request, or `None` for a stop word's line. A line nothing was
+    /// queued on was never heard, and is not counted.
+    fn line_ended(&mut self, request: Option<u64>, samples: u64, no_words: bool) {
+        if samples == 0 {
+            return;
+        }
+        let ms = samples / SAMPLES_A_MS;
+        self.counts.heard_lines = self.counts.heard_lines.saturating_add(1);
+        if no_words {
+            self.counts.heard_no_words_lines = self.counts.heard_no_words_lines.saturating_add(1);
+            self.counts.heard_no_words_ms = self.counts.heard_no_words_ms.saturating_add(ms);
+        } else if let Some(request) = request {
+            if self.recent.len() >= MOST_RECENT {
+                self.recent.pop_front();
+            }
+            self.recent.push_back((request, ms));
+        }
+    }
+
+    /// `request`'s turn was declined: counted, with the sound of its own
+    /// lines if they are still remembered.
+    fn declined(&mut self, request: u64) {
+        self.counts.declined = self.counts.declined.saturating_add(1);
+        let mut ms = 0u64;
+        self.recent.retain(|(of, line_ms)| {
+            if *of == request {
+                ms = ms.saturating_add(*line_ms);
+            }
+            *of != request
+        });
+        self.counts.heard_declined_ms = self.counts.heard_declined_ms.saturating_add(ms);
+    }
 }
 
 static PENDING: OnceLock<Mutex<Pending>> = OnceLock::new();
@@ -273,12 +340,22 @@ fn one_answer(model: &str, usage: Option<&Value>) -> Day {
     day
 }
 
-/// One turn the model declined as not said to the lamp. Nothing unless
-/// counting has begun.
-pub fn declined() {
+/// `request`'s turn was declined by the model as not said to the lamp:
+/// counted, with the sound of its lines. Nothing unless counting has begun.
+pub fn declined(request: u64) {
     let mut pending = pending();
     if pending.directory.is_some() {
-        pending.counts.declined = pending.counts.declined.saturating_add(1);
+        pending.declined(request);
+    }
+}
+
+/// A line has ended with its words asked for: `samples` of 16 kHz sound
+/// were queued on it, for `request` or for a stop word (`None`), and it
+/// came back with no words or with some. Nothing unless counting has begun.
+pub fn line_ended(request: Option<u64>, samples: u64, no_words: bool) {
+    let mut pending = pending();
+    if pending.directory.is_some() {
+        pending.line_ended(request, samples, no_words);
     }
 }
 
@@ -330,6 +407,14 @@ fn unix_s() -> u64 {
         .map_or(0, |since| since.as_secs())
 }
 
+/// The whole milliseconds in `samples`, taken out of it; what is left of
+/// a millisecond stays there for the next time.
+fn whole_ms_taken(samples: &AtomicU64) -> u64 {
+    let (ms, left) = ms_of(samples.swap(0, Ordering::Relaxed));
+    samples.fetch_add(left, Ordering::Relaxed);
+    ms
+}
+
 /// Whether the clock reads a day it can truly be.
 fn clock_is_set(now_s: u64) -> bool {
     now_s / DAY_S >= CLOCK_SET_FROM_DAY
@@ -348,8 +433,7 @@ fn flush(directory: &Path, now_s: u64) -> io::Result<Option<Tally>> {
     }
     // The sound counted since the last time, as whole milliseconds; what is
     // left of a millisecond waits for the next.
-    let (heard_ms, left) = ms_of(HEARD_SAMPLES.swap(0, Ordering::Relaxed));
-    HEARD_SAMPLES.fetch_add(left, Ordering::Relaxed);
+    let heard_ms = whole_ms_taken(&HEARD_SAMPLES);
     let counts = {
         let mut pending = pending();
         pending.counts.heard_ms = pending.counts.heard_ms.saturating_add(heard_ms);
@@ -426,13 +510,17 @@ pub fn read(directory: &Path) -> Option<Tally> {
 pub fn told(day: &Day) -> String {
     let all = day.all();
     let mut told = format!(
-        "{} chat answers, {} prompt tokens ({} from the cache), {} completion tokens; {} turns declined; {} s of sound sent to be heard; {} lines sent to be spoken ({} characters)",
+        "{} chat answers, {} prompt tokens ({} from the cache), {} completion tokens; {} turns declined; {} s of sound sent to be heard, of {} lines ended {} had no words ({} s) and {} s was in declined turns; {} lines sent to be spoken ({} characters)",
         all.answers,
         all.prompt_tokens,
         all.cached_tokens,
         all.completion_tokens,
         day.declined,
         day.heard_ms / 1_000,
+        day.heard_lines,
+        day.heard_no_words_lines,
+        day.heard_no_words_ms / 1_000,
+        day.heard_declined_ms / 1_000,
         day.spoken_lines,
         day.spoken_chars
     );
@@ -527,13 +615,55 @@ mod tests {
             "m",
             Some(&json!({"prompt_tokens": 5, "completion_tokens": 1})),
         );
-        declined();
+        declined(1);
         heard(1_600);
+        line_ended(Some(1), 1_600, true);
         spoken("Hello there.");
         assert_eq!(HEARD_SAMPLES.load(Ordering::Relaxed), 0);
         let pending = pending();
         assert!(pending.directory.is_none());
         assert!(pending.counts.is_empty());
+    }
+
+    /// A line's sound is told by what it came to: no words, or words in a
+    /// turn the model then declined. A stop word's line is no request's,
+    /// and only the newest requests are remembered.
+    #[test]
+    fn a_lines_sound_is_told_by_what_it_came_to() {
+        let mut pending = Pending::default();
+        // 3 s with no words: a request's line and a stop word's.
+        pending.line_ended(Some(1), 32_000, true);
+        pending.line_ended(None, 16_000, true);
+        // 3 s with words, in two lines of one request, then declined.
+        pending.line_ended(Some(2), 16_000, false);
+        pending.line_ended(Some(2), 32_000, false);
+        // 1 s with words, never declined: it is in neither count.
+        pending.line_ended(Some(3), 16_000, false);
+        // A stop word's words are no request's.
+        pending.line_ended(None, 16_000, false);
+        // A line nothing was queued on was never heard.
+        pending.line_ended(Some(4), 0, true);
+        pending.line_ended(None, 0, false);
+        pending.declined(2);
+        // Declined again, or a request never heard: a turn, with no sound.
+        pending.declined(2);
+        pending.declined(9);
+        assert_eq!(pending.counts.heard_lines, 6);
+        assert_eq!(pending.counts.heard_no_words_lines, 2);
+        assert_eq!(pending.counts.heard_no_words_ms, 3_000);
+        assert_eq!(pending.counts.heard_declined_ms, 3_000);
+        assert_eq!(pending.counts.declined, 3);
+        assert_eq!(pending.recent.len(), 1);
+        // Only the newest requests are remembered.
+        let many = 2 * MOST_RECENT as u64;
+        for request in 10..10 + many {
+            pending.line_ended(Some(request), 16_000, false);
+        }
+        assert_eq!(pending.recent.len(), MOST_RECENT);
+        pending.declined(10);
+        assert_eq!(pending.counts.heard_declined_ms, 3_000);
+        pending.declined(10 + many - 1);
+        assert_eq!(pending.counts.heard_declined_ms, 4_000);
     }
 
     /// Sound is kept as whole milliseconds, with what is left of one waiting
@@ -548,6 +678,10 @@ mod tests {
         let noon = 20_000 * DAY_S + 12 * 3_600;
         let first = Day {
             heard_ms: 61_500,
+            heard_lines: 4,
+            heard_no_words_lines: 1,
+            heard_no_words_ms: 20_000,
+            heard_declined_ms: 30_500,
             spoken_lines: 2,
             spoken_chars: 80,
             ..Day::default()
@@ -567,8 +701,16 @@ mod tests {
         assert_eq!(
             told(&tally.today),
             "0 chat answers, 0 prompt tokens (0 from the cache), 0 completion tokens; 0 turns \
-             declined; 75 s of sound sent to be heard; 3 lines sent to be spoken (120 characters)"
+             declined; 75 s of sound sent to be heard, of 4 lines ended 1 had no words (20 s) \
+             and 30 s was in declined turns; 3 lines sent to be spoken (120 characters)"
         );
+        // What is left of a millisecond is carried, never lost.
+        let samples = AtomicU64::new(16_015);
+        assert_eq!(whole_ms_taken(&samples), 1_000);
+        assert_eq!(samples.load(Ordering::Relaxed), 15);
+        samples.fetch_add(1, Ordering::Relaxed);
+        assert_eq!(whole_ms_taken(&samples), 1);
+        assert_eq!(samples.load(Ordering::Relaxed), 0);
         // A file written before these counts reads with them at nothing.
         let old: Tally =
             serde_json::from_str(r#"{"today":{"day":20000,"models":{},"declined":4}}"#).unwrap();
@@ -610,7 +752,8 @@ mod tests {
         assert_eq!(
             told(&tally.today),
             "2 chat answers, 11600 prompt tokens (9000 from the cache), 45 completion tokens; \
-             2 turns declined; 0 s of sound sent to be heard; 0 lines sent to be spoken (0 \
+             2 turns declined; 0 s of sound sent to be heard, of 0 lines ended 0 had no \
+             words (0 s) and 0 s was in declined turns; 0 lines sent to be spoken (0 \
              characters); by model: deepseek-chat 1 answers, 11040 tokens, small-model 1 \
              answers, 605 tokens"
         );
@@ -747,7 +890,8 @@ mod tests {
         assert_eq!(
             told(&day),
             "1 chat answers, 0 prompt tokens (0 from the cache), 0 completion tokens; 0 turns \
-             declined; 0 s of sound sent to be heard; 0 lines sent to be spoken (0 characters); \
+             declined; 0 s of sound sent to be heard, of 0 lines ended 0 had no words (0 s) \
+             and 0 s was in declined turns; 0 lines sent to be spoken (0 characters); \
              1 answers gave no count"
         );
     }
