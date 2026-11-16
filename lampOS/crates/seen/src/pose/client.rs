@@ -7,7 +7,9 @@
 //! 2. the key exchange ([`crate::crypto`]): no plaintext path;
 //! 3. V1's pose config, its values exactly ([`PoseConfig::v1`]): the
 //!    server's sessions share one config object, so another value would
-//!    change every V1 lamp's results;
+//!    change every V1 lamp's results. It adds `ergo_mode: "desk"`, which the
+//!    server keeps for this session alone (the 2D neck sign and the
+//!    upper-body `partial` score); an older server ignores the field;
 //! 4. one frame, its answer read (`ergo`, or `{"error":"busy"}`);
 //! 5. the socket closed, so the server drops the session and whatever it
 //!    kept of the frame.
@@ -55,7 +57,8 @@ pub const PUBLIC_KEY_WITHIN: Duration = Duration::from_secs(5);
 const PUBLIC_KEY_MOST_BYTES: usize = 64 * 1024;
 
 /// V1's pose config, the server's own defaults (V1 sent none:
-/// `PS/core/models/pose.py` `PosePerceptionSessionConfig`).
+/// `PS/core/models/pose.py` `PosePerceptionSessionConfig`), with this
+/// session's opt-in to the desk RULA ([`ERGO_MODE`]).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct PoseConfig {
     #[serde(rename = "type")]
@@ -64,7 +67,14 @@ pub struct PoseConfig {
     pub frame_interval: f64,
     pub confidence_threshold_2d: f64,
     pub min_valid_keypoints: u32,
+    pub ergo_mode: &'static str,
 }
+
+/// The desk RULA, per session on the server: the 2D neck signed by the
+/// facing side and, with the hips hidden, the upper body scored alone
+/// (`ergo.partial`). A server without it ignores the field (its config
+/// model forbids no extra field), so no switch holds it.
+pub const ERGO_MODE: &str = "desk";
 
 impl PoseConfig {
     pub fn v1() -> Self {
@@ -74,6 +84,7 @@ impl PoseConfig {
             frame_interval: 1.0,
             confidence_threshold_2d: 0.3,
             min_valid_keypoints: 5,
+            ergo_mode: ERGO_MODE,
         }
     }
 }
@@ -704,7 +715,7 @@ mod tests {
     fn the_config_is_v1s_server_defaults() {
         assert_eq!(
             serde_json::to_string(&PoseConfig::v1()).unwrap(),
-            r#"{"type":"config","task":"pose","frame_interval":1.0,"confidence_threshold_2d":0.3,"min_valid_keypoints":5}"#
+            r#"{"type":"config","task":"pose","frame_interval":1.0,"confidence_threshold_2d":0.3,"min_valid_keypoints":5,"ergo_mode":"desk"}"#
         );
     }
 

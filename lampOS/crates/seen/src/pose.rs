@@ -130,6 +130,8 @@ pub enum Note {
     Answered {
         score: i64,
         risk_level: i64,
+        /// The server scored the upper body only (the hips hidden).
+        partial: bool,
         bad: bool,
         region: &'static str,
         took: Duration,
@@ -163,12 +165,14 @@ impl Note {
             Note::Answered {
                 score,
                 risk_level,
+                partial,
                 bad,
                 region,
                 took,
                 kept,
             } => format!(
-                "posture sample answered: score {score}, risk {risk_level}, {}, region {region}, {} ms{}",
+                "posture sample answered: score {score}, risk {risk_level}, {}{}, region {region}, {} ms{}",
+                if *partial { "partial, " } else { "" },
                 if *bad { "bad" } else { "good" },
                 took.as_millis(),
                 if *kept { "" } else { "; not kept (no sitting)" }
@@ -335,6 +339,7 @@ impl Pose {
                         self.notes.push(Note::Answered {
                             score: ergo.score,
                             risk_level: ergo.risk_level,
+                            partial: ergo.partial,
                             bad,
                             region: window::region_name(high),
                             took,
