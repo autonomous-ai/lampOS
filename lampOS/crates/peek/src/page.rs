@@ -435,13 +435,11 @@ pub fn turns(snapshot: &Snapshot) -> String {
 /// (type icon, path, status, ⏱ total and ⚡ first token), then IN, DID and
 /// OUT, then each step from the end of speech with the slowest marked. The
 /// words heard and said show, escaped, only with `words` (monitor mode,
-/// with [`WORDS_SHOWN`] on top); otherwise the card says they are hidden,
-/// whatever an entry carries. A gap over [`BREAK_MS`] draws a break.
+/// whose [`WORDS_SHOWN`] banner is the page's own, shown once on top by
+/// [`main_page`]); otherwise the card says they are hidden, whatever an
+/// entry carries. A gap over [`BREAK_MS`] draws a break.
 pub fn timeline(entries: &[Entry], records: &Snapshot, words: bool) -> String {
     let mut html = String::new();
-    if words {
-        let _ = write!(html, "<p class=\"words\">{WORDS_SHOWN}</p>");
-    }
     if entries.is_empty() {
         html.push_str("<p>No turn heard yet.</p>");
         return html;
