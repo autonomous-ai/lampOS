@@ -1144,7 +1144,8 @@ fn monitor_mode_the_timeline_shows_a_turn_in_order_with_its_words_escaped() {
     let with = format!("Cookie: peek_session={session}\r\n");
     let sections = stream_until_as(&rig, "lamp-test.local", &with, "It&#39;s blue now.");
     let timeline = &sections["timeline"];
-    assert!(timeline.contains(page::WORDS_SHOWN), "{timeline}");
+    // The banner is the page's, once, not the section's.
+    assert!(!timeline.contains(page::WORDS_SHOWN), "{timeline}");
     let order = [
         "<span class=\"lbl\">IN</span> “turn the light &lt;script&gt;blue&lt;/script&gt;”",
         "<span class=\"lbl\">DID</span>",
@@ -1188,7 +1189,7 @@ fn monitor_mode_the_timeline_shows_a_turn_in_order_with_its_words_escaped() {
     assert!(!body.contains("blue"), "{body}");
     let (status, _, page) = rig.ask_as("lamp-test.local", "GET", "/", &with, "");
     assert_eq!(status, 200);
-    assert!(page.contains(page::WORDS_SHOWN), "{page}");
+    assert_eq!(page.matches(page::WORDS_SHOWN).count(), 1, "{page}");
     assert_eq!(timeline::KEPT, 30);
 }
 
@@ -1852,4 +1853,22 @@ fn monitor_mode_hostile_words_stay_escaped_in_a_card() {
         ),
         "{html}"
     );
+}
+
+/// The monitor banner shows once, on top of the page, and never outside
+/// monitor mode: the Timeline section does not repeat it.
+#[test]
+fn the_monitor_banner_shows_once_and_only_in_monitor_mode() {
+    let entries = [card_turn(4, 1_000, 2_000, true)];
+    let records = current(vec![card_record(4, 900, "played")]);
+    for words in [true, false] {
+        let section = page::timeline(&entries, &records, words);
+        let html = page::main_page(words, "lamp-52e6", "0123456789abcdef")
+            .replace("waiting for the lamp...", &section);
+        assert_eq!(
+            html.matches(page::WORDS_SHOWN).count(),
+            usize::from(words),
+            "{html}"
+        );
+    }
 }
