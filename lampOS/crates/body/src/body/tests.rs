@@ -105,6 +105,9 @@ struct Lamp {
     /// One servo acknowledges the next goal written to it by itself and
     /// keeps the goal it had.
     drops_goal: Option<usize>,
+    /// Sync goal writes sent in this time (from, until) are lost on the
+    /// wire whole: no servo takes them (#6836's P2, a confirming hold lost).
+    lost_syncs: Option<(Duration, Duration)>,
     /// One servo neither takes nor answers this many register writes, as
     /// one just given power does.
     deaf: Option<(usize, u8)>,
@@ -214,6 +217,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             may_take_hold: false,
             goal_turns_torque_on: false,
             drops_goal: None,
+            lost_syncs: None,
             deaf: None,
             mute: None,
             hand: None,
@@ -501,6 +505,12 @@ impl Lamp {
                 0x83 => {
                     assert_eq!(id, 0xfe);
                     assert_eq!((parameters[0], parameters[1]), (42, 2));
+                    if self
+                        .lost_syncs
+                        .is_some_and(|(from, until)| (from..until).contains(&self.time.get()))
+                    {
+                        continue;
+                    }
                     let mut written = Vec::new();
                     for entry in parameters[2..].chunks(3) {
                         let goal = u16::from_le_bytes([entry[1], entry[2]]);
@@ -19425,6 +19435,89 @@ fn a_wrapped_arm_carried_across_the_seam_after_ten_minutes_is_not_driven_the_lon
             assert!(
                 !matches!(powered.report.stop, Stop::BadRead { .. }),
                 "{case}: {:?}",
+                powered.report.stop
+            );
+        }
+    }
+}
+
+/// The same repro with the hold that the confirming read writes lost on
+/// the wire (Migrate's P2 on #6836), the slowdown model off: the next read
+/// still trusts a hold where the elbow reads while the goal in its register
+/// is across the seam from it, so the hold lands a read later and the elbow
+/// is never driven the long way toward 218.
+#[test]
+fn a_seam_hold_lost_on_the_wire_lands_on_the_next_read() {
+    for hand_is_load in [true, false] {
+        for held_for in [0.30f32, 0.35, 0.40, 0.45, 0.6] {
+            let found = [2_035, 3_441, 218, 2_035, 2_478];
+            let powered = powered_up_on(
+                &LAMP_52E6,
+                found,
+                |lamp| {
+                    lamp.hand_is_load = hand_is_load;
+                    lamp.weak_is_slow = false;
+                    lamp.servos[Joint::ElbowPitch.index()].position += 4_096.0;
+                    lamp.hands.push((
+                        Duration::from_secs(20),
+                        Duration::from_secs_f32(20.0 + held_for),
+                        2,
+                        3_950.0,
+                    ));
+                    // Every sync goal sent from just before the crossing
+                    // until after the hand has let go is lost.
+                    lamp.lost_syncs = Some((
+                        Duration::from_secs_f32(20.2),
+                        Duration::from_secs_f32(20.0 + held_for + 0.05),
+                    ));
+                },
+                Duration::from_secs(60),
+            );
+            let elbow = powered.lamp.servos[Joint::ElbowPitch.index()].position;
+            let case = format!("hand as load {hand_is_load}, let go {held_for} s in, the hold lost");
+            assert!(
+                (3_300.0..=4_050.0).contains(&elbow),
+                "{case}: the elbow ended at true {elbow}; stop {:?}",
+                powered.report.stop
+            );
+        }
+    }
+}
+
+/// The same repro with the elbow's status byte flagged from just after it
+/// crosses the seam (Migrate's P2 on #6836), the slowdown model off: a
+/// flagged joint is not followed, but its last goal, across the seam from
+/// where it reads, is never written again; it is held where it reads.
+#[test]
+fn a_flagged_elbow_across_the_seam_is_not_held_at_its_old_goal() {
+    for at in [20.25f32, 20.30, 20.35] {
+        for held_for in [0.40f32, 0.6] {
+            let found = [2_035, 3_441, 218, 2_035, 2_478];
+            let powered = powered_up_on(
+                &LAMP_52E6,
+                found,
+                |lamp| {
+                    lamp.weak_is_slow = false;
+                    lamp.servos[Joint::ElbowPitch.index()].position += 4_096.0;
+                    lamp.hands.push((
+                        Duration::from_secs(20),
+                        Duration::from_secs_f32(20.0 + held_for),
+                        2,
+                        3_950.0,
+                    ));
+                    lamp.event = Some((
+                        Duration::from_secs_f32(at),
+                        Joint::ElbowPitch.index(),
+                        Event::Flag(0x20),
+                    ));
+                },
+                Duration::from_secs(60),
+            );
+            let elbow = powered.lamp.servos[Joint::ElbowPitch.index()].position;
+            let case = format!("flagged at {at} s, let go {held_for} s in");
+            assert!(
+                (3_300.0..=4_050.0).contains(&elbow),
+                "{case}: the elbow ended at true {elbow}; stop {:?}",
                 powered.report.stop
             );
         }
