@@ -3953,22 +3953,22 @@ after a take-over, but now for every turn:
   function. Only English replies can match: in another language the
   model's words are never the acting part's English lines. Tests:
   `second_provider::tests::action_claim::*` and `action_claim::tests::*`.
-  **A short reply that echoes the ask** (#7285, `action_claim::echoed_claim`:
-  lamp-52e6 core w2 on 13333, 13417 and 13495, "Hold on, hey Lamp, make the
-  light a little warmer." answered in three words with `calls=none`, and
-  the light row's colour ask answered in four): the phrase runs read a
-  reply by its wording, so a wording they don't list went out unchecked.
-  On a spoken line not asked as a question that names an action
-  (`action_claim::ECHOED`: warm, cool, dim, bright, loud, quiet, soft, a
-  colour by name, a timer, alarm, reminder or snooze), a reply whose first
-  sentence past lead words ("Okay.") has at most six words, names an action
-  of the same kind, has no hedge ("can't", "not", "if", "want", …) and no
-  '?' is a claim of that kind ("Warming that up.", "Blue it is."), held and
-  asked again as above. It judges only a turn with no call: beside a call
-  the other runs judge as before. A line that names no
-  action is decided at once, so its reply is not held; a short reply on one
-  that does waits only for its first sentence's end. The journal adds
-  `, the reply echoing the line's ask`.
+  **A light act told as under way** (`LAMP_ACTION_CLAIM_DOING=on`, off by
+  default, only beside `LAMP_ACTION_CLAIM_CHECKED`; #7285: lamp-52e6 core w2
+  on 13333, 13417 and 13495, "Hold on, hey Lamp, make the light a little
+  warmer." answered in three words with `calls=none`): the phrase runs
+  read only what was done or promised, and `LAMP_ACTION_CLAIM_WORDED` is
+  off in the product. With this switch a reply whose first sentence past
+  lead words opens with a verb in "-ing" (bare or after "I'm"), has at
+  most six words, names one of the light's acts as `lamp_actions::catalog`
+  declares them (a step function's name past `light_`, or a colour
+  `light_colour` takes), and has no '?', "not" or "n't" is a light claim
+  (`action_claim::doing_claim`: "Warming that up.", "Switching to
+  blue."), held and asked again as above. Only the reply is read, never
+  the person's line: "A red fox lived alone." and "Cool, glad you like
+  it." are said as they came. A reply whose first word is no "-ing" verb
+  is decided at that word, so it is not held. The journal adds
+  `, an act told as under way: LAMP_ACTION_CLAIM_DOING`.
   **The unplug's acts** (#6457, `Claim::Unplug`): a reply opening with the
   unplug's own acts in the model's words (`action_claim::UNPLUGGED`:
   "I'm preparing to fold — please wait …", "Still preparing …",
