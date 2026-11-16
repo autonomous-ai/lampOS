@@ -3433,3 +3433,9 @@ của trigger, không có khoảng dư: nếu lúc đến bàn của lamp-seen (
 khi có `room/stood_up`) muộn hơn lần ngồi mà trigger đếm (lần ngồi này vẫn
 giữ qua các khoảng trống tới 2 phút), lời nhắc phải chờ bộ đếm, và chờ quá
 `wait` của trigger thì mất lời nhắc của lần ngồi đó.
+Khi `LAMP_SEEN_BREAK_IS_STANDING=on` (#6543 bước 2, [seen.md](../seen.md)),
+nghỉ giải lao là đứng dậy, không phải vươn vai: `break_s_ago` đếm từ lúc
+người đó quay lại sau `room/stood_up`, và thấy vươn vai không còn đặt lại nó.
+Vì vậy Đứng dậy và Vươn vai giữ lời nhắc sau một lần thật sự đứng dậy, kể cả
+khi quay lại trong khoảng trống 2 phút của trigger, và không còn giữ sau một
+lần vươn vai tại bàn. Ca: `quiet-after-a-stand-up` của Vươn vai.
