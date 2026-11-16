@@ -428,6 +428,30 @@ pub fn shown(skills: bool, one_path: bool) -> Shown {
     }
 }
 
+/// A long-lived gateway must not keep a mount view made before control's
+/// socket exists. Type=simple ordering alone only waits for its process.
+/// Not there after 60 s, it logs one line and starts without it, never
+/// failing: a lamp before setup has no lamp-control (its unit's
+/// ConditionPathExists), and a failed start would also run into the
+/// unit's start limit, keeping the gateway down after setup too.
+/// The wrapper clears GATEWAY_ENV before exec, so use the unit's exact
+/// `gateway run` arguments. Install/version calls keep their old behaviour.
+const WAIT_FOR_CONTROL: &str = r#"# Wait before the gateway captures control's socket in its mount view.
+if [ "${1-}" = gateway ] && [ "${2-}" = run ]; then
+  control_wait=0
+  while [ ! -S "$L" ]; do
+    if [ "$control_wait" -ge 60 ]; then
+      echo "lampos ns: lamp-control's socket not there after 60 s; the gateway starts without it" >&2
+      break
+    fi
+    sleep 1 || { echo "lampos ns: lamp-control's socket wait interrupted; the gateway starts without it" >&2; break; }
+    control_wait=$((control_wait + 1))
+  done
+  unset control_wait
+fi
+# The bind below shows the socket when it is there; else L= as before.
+"#;
+
 /// [`NS`]'s text: Hermes's ([`hermes_install::ns_text`]`(skills, false)`,
 /// the same allow-list, the same steps) for OpenClaw ([`ENGINE_EDITS`]),
 /// with its install mode ([`NPM_CI_MODE`]) before OpenClaw runs. With
@@ -451,6 +475,8 @@ pub fn ns_text(shown: Shown) -> String {
         for (from, to) in RUNS_EDITS {
             text = text.replacen(from, to, 1);
         }
+        let bind = "if [ -S \"$L\" ]; then";
+        text = text.replacen(bind, &format!("{WAIT_FOR_CONTROL}{bind}"), 1);
     }
     text.replacen(RUN_LINE, &format!("{NPM_CI_MODE}{RUN_LINE}"), 1)
 }
@@ -575,7 +601,16 @@ pub fn unit_text_for(shown: Shown) -> String {
     if !shown.one_path {
         return UNIT_TEXT.to_owned();
     }
-    UNIT_TEXT.replacen(anchor, &format!("{anchor}{START_DIR_LINES}"), 1)
+    let text = UNIT_TEXT.replacen(anchor, &format!("{anchor}{START_DIR_LINES}"), 1);
+    if shown.tasks {
+        text.replacen(
+            "After=network-online.target lamp-cloud.service\n",
+            "After=network-online.target lamp-cloud.service lamp-control.service\nWants=lamp-control.service\n",
+            1,
+        )
+    } else {
+        text
+    }
 }
 
 /// What `systemctl enable` makes of [`UNIT_TEXT`]'s `WantedBy`: a link in

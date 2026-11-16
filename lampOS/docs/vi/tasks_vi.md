@@ -1208,7 +1208,15 @@ theo agent mặc định của đèn *là gì*, không bao giờ theo tên của
   đều trơn, lượt phải có `{message}` và `fence-entry` phải là một object
   JSON có `{start}`; nếu không, lần chạy bị từ chối bằng lời ("is a gateway agent's, but
   ..."). Namespace của gateway phải cho thấy socket của lamp-control
-  (`AGENT_NS_TASKS_LINE`): nếu không, bị từ chối, nêu
+  (`AGENT_NS_TASKS_LINE`). Khi bật one run path, gateway yêu cầu khởi động
+  lamp-control và chạy sau service đó, rồi chờ socket thực sự tồn tại trước
+  khi tạo mount view (tối đa 60 lần chờ một giây). Vẫn chưa có socket thì
+  ghi một dòng log và khởi động không có nó (đèn chưa setup thì chưa có
+  lamp-control); khi tắt switch và khi cài đặt/đọc version thì không chờ.
+  Nếu socket bị thay thế sau đó, vẫn cần khởi động lại gateway. Vòng đầu
+  tiên sau bản cập nhật này ghi lại script namespace và unit, rồi khởi động
+  lại gateway một lần.
+  Nếu namespace không cho thấy socket thì bị từ chối, nêu
   `LAMP_SKILL_DEFAULT_AGENT` hoặc `LAMP_SKILL_TASKS` của lamp-update. Không
   tra login shell: Harness không khởi động gì; lamp-tasks tự chạy wrapper
   theo đường dẫn đầy đủ. Hiện OpenClaw là gateway agent duy nhất:
