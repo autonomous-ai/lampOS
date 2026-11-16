@@ -560,13 +560,16 @@ if chroot "${MNT}" "${UPDATE_BIN}" --help 2>&1 | grep -q 'agents-preinstall'; th
     || err "the lamp's agents were not put on the image (/work/agents.log)"
   for f in /usr/local/bin/harness /usr/local/bin/hermes /usr/local/bin/openclaw \
            /etc/systemd/system/lamp-openclaw-gateway.service; do
-    [ -e "${MNT}${f}" ] || err "missing after the agents' install: ${f}"
+    # Inside the image's root: harness is a link to an absolute path there.
+    chroot "${MNT}" test -e "$f" || err "missing after the agents' install: ${f}"
   done
   # Installed, never signed in: nothing of a person's is on the image.
   for f in /var/lib/lampos-tasks/.harness/auth /var/lib/lampos-tasks/.harness/connections; do
     [ ! -e "${MNT}${f}" ] || err "a sign-in is on the image: ${f}"
   done
-  for f in harness-ask.json hermes-ask.json openclaw-ask.json; do
+  # Harness's ask stays, as on every lamp: a round reads its pin from it. Hermes's and
+  # OpenClaw's are taken away once answered.
+  for f in hermes-ask.json openclaw-ask.json; do
     [ ! -e "${MNT}/var/lib/lampos-update/${f}" ] || err "an install ask is left on the image: ${f}"
   done
   log "The lamp's agents: $(du -sh "${MNT}/var/lib/lampos-tasks" "${MNT}/var/lib/lampos-hermes" \
