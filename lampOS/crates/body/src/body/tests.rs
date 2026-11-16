@@ -2335,6 +2335,7 @@ fn a_long_strain_twice_in_an_hour_seats_the_lamp_until_a_person_lets_it_stand() 
         load: 450,
         seconds: 10,
         cools: false,
+        rest_cools: false,
     };
     let unseat_at = Duration::from_secs(200);
     let (report, seen) = strained_twice(Some(guard), unseat_at, Duration::from_secs(280));
@@ -2437,6 +2438,7 @@ fn under_the_strain_guard_an_elbow_that_cannot_lift_is_said_at_once_and_seats_on
                 load: StrainGuard::LOAD,
                 seconds: StrainGuard::SECONDS,
                 cools: false,
+                rest_cools: false,
             }),
             ..Limits::FOLDED
         },
@@ -2525,6 +2527,7 @@ fn hot_elbow(
                 load: StrainGuard::LOAD,
                 seconds: StrainGuard::SECONDS,
                 cools: seat_cools,
+                rest_cools: false,
             }),
             ..Limits::FOLDED
         },
@@ -2803,6 +2806,7 @@ fn lamp_74ff(
                 load: StrainGuard::LOAD,
                 seconds: StrainGuard::SECONDS,
                 cools: true,
+                rest_cools: false,
             }),
             ..Limits::FOLDED
         },
@@ -2909,6 +2913,7 @@ fn a_strained_seat_stays_seated_however_cool() {
         load: 450,
         seconds: 10,
         cools: true,
+        rest_cools: false,
     };
     let (report, seen) = strained_twice(Some(guard), Duration::MAX, Duration::from_secs(480));
     assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
@@ -19996,4 +20001,231 @@ fn a_lively_gesture_is_dropped_under_the_lease_and_a_plain_one_plays() {
             assert_eq!(report.gestures, 1, "{report:?} {fates:?}");
         }
     }
+}
+
+/// What renews the window around a strain fold in [`strain_rest`].
+#[derive(Clone, Copy)]
+enum RestScene {
+    /// Talk at 0 to 2 s and 60 to 62 s, a 120 s window (Sixth's trace on
+    /// #7344), and a new line at 200 s.
+    Talk,
+    /// lamp-control's lease held all run, talk at 0 to 2 s, a 5 s window.
+    Lease,
+    /// A face in front of it all run, nobody speaking.
+    Company,
+}
+
+/// #7344: standing, the shoulder reads 990 from 30 s to 31 s and the lamp
+/// sits down for the load, under the strain guard with
+/// `LAMP_BODY_STRAIN_REST_COOLS` as `rest_cools` says. When it was seen and
+/// how far it stood, each step, to 240 s.
+fn strain_rest(rest_cools: bool, scene: RestScene) -> (BodyReport, Vec<(Duration, f32)>) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(240));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    lamp.strains = vec![(Duration::from_secs(30), Duration::from_secs(31), 1, 990)];
+    let heard = clock.time.clone();
+    let time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut last = Duration::ZERO;
+    let mut seen = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            strain_guard: Some(StrainGuard {
+                load: StrainGuard::LOAD,
+                seconds: StrainGuard::SECONDS,
+                cools: false,
+                rest_cools,
+            }),
+            ..Limits::FOLDED
+        },
+        Some(HOME),
+        Some(standing(
+            100,
+            if matches!(scene, RestScene::Talk) {
+                120
+            } else {
+                5
+            },
+        )),
+        Some(Looking::new([342, 200], [250, 120]).unwrap()),
+        move || {
+            let at = heard.get().as_secs();
+            let talk = match scene {
+                RestScene::Talk => matches!(at, 0..2 | 60..62 | 200..202),
+                RestScene::Lease => at < 2,
+                RestScene::Company => false,
+            };
+            Some(if talk {
+                (Mood::Listening, 100)
+            } else {
+                (Mood::Resting, 0)
+            })
+        },
+        move || {
+            let now = time.get();
+            let face = matches!(scene, RestScene::Company)
+                && now.saturating_sub(last) >= Duration::from_millis(150);
+            if face {
+                last = now;
+            }
+            Asked {
+                held: matches!(scene, RestScene::Lease),
+                seen: face.then_some(Seen {
+                    face: Some(crate::gaze::Sight {
+                        x: 0.0,
+                        y: 0.0,
+                        size: 0.2,
+                        turned: 0.0,
+                    }),
+                }),
+                ..Asked::default()
+            }
+        },
+        |glimpse| seen.push((seen_at.get(), glimpse.stand)),
+    );
+    (report, seen)
+}
+
+/// Whether it stood fully at any step inside `from..to` seconds.
+fn stood_within(seen: &[(Duration, f32)], from: u64, to: u64) -> bool {
+    seen.iter().any(|(at, stand)| {
+        (Duration::from_secs(from)..Duration::from_secs(to)).contains(at) && *stand > 0.99
+    })
+}
+
+/// Whether it was folded at every step inside `from..to` seconds.
+fn folded_within(seen: &[(Duration, f32)], from: u64, to: u64) -> bool {
+    let steps: Vec<_> = seen
+        .iter()
+        .filter(|(at, _)| (Duration::from_secs(from)..Duration::from_secs(to)).contains(at))
+        .collect();
+    !steps.is_empty() && steps.iter().all(|(_, stand)| *stand == 0.0)
+}
+
+/// Sixth's trace on #7344: talked to at 0 s, it sits down for the load at
+/// 30 s and, with the talk's window still open, stands again at about 91 s
+/// with nobody asking. With `LAMP_BODY_STRAIN_REST_COOLS` the rest ends
+/// folded: a line in its minute (60 s) is not taken, the window running out
+/// on its own is not either, and the next new line (200 s) stands it.
+#[test]
+fn a_lamp_folded_for_a_strain_stays_down_on_an_old_talk_window_until_a_new_line() {
+    let (report, seen) = strain_rest(false, RestScene::Talk);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.retreats.len(), 1, "{:?}", report.retreats);
+    assert!(stood_within(&seen, 10, 30), "stood first");
+    assert!(
+        stood_within(&seen, 90, 125),
+        "off: up again on the old window"
+    );
+
+    let (report, seen) = strain_rest(true, RestScene::Talk);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.retreats.len(), 1, "{:?}", report.retreats);
+    assert!(stood_within(&seen, 10, 30), "stood first");
+    assert!(folded_within(&seen, 36, 200), "on: rests folded");
+    assert!(stood_within(&seen, 200, 215), "on: a new line stands it");
+}
+
+/// The lease's branch renews the window of a lamp up while it is held:
+/// held through a sit-down, off it stands again after the minute; on it
+/// stays down, as a hold alone never stands a folded lamp.
+#[test]
+fn a_lamp_folded_for_a_strain_under_a_held_lease_stays_down() {
+    let (_, seen) = strain_rest(false, RestScene::Lease);
+    assert!(stood_within(&seen, 10, 30), "stood first");
+    assert!(
+        stood_within(&seen, 90, 125),
+        "off: up again under the lease"
+    );
+    let (_, seen) = strain_rest(true, RestScene::Lease);
+    assert!(stood_within(&seen, 10, 30), "stood first");
+    assert!(folded_within(&seen, 36, 240), "on: rests folded");
+}
+
+/// The company branch renews the window of a lamp with a face in front of
+/// it: someone in the room is never an ask.
+#[test]
+fn a_lamp_folded_for_a_strain_with_someone_in_front_of_it_stays_down() {
+    let (_, seen) = strain_rest(false, RestScene::Company);
+    assert!(stood_within(&seen, 10, 30), "stood first");
+    assert!(stood_within(&seen, 90, 125), "off: up again for the face");
+    let (_, seen) = strain_rest(true, RestScene::Company);
+    assert!(stood_within(&seen, 10, 30), "stood first");
+    assert!(folded_within(&seen, 36, 240), "on: rests folded");
+}
+
+/// #7344, the first builder's rule: a lamp that sat down hot cools first,
+/// then a person. The elbow reads 63 from about 8 s and sits it down (down
+/// by 15 s), then cools from 12 s to 45 at 29 s (under 50 from 25 s). With
+/// a 600 s window from talk at 0 s, off it stands again after its minute;
+/// on, a line at 120 s, still in its five cool minutes, leaves it down, and
+/// a line at 340 s, after them, stands it.
+#[test]
+fn a_lamp_folded_hot_stays_down_until_cool_and_then_a_new_line() {
+    let run = |rest_cools: bool| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(360));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 3;
+        lamp.heats = (46..=63u8)
+            .zip(0u64..)
+            .map(|(to, n)| (Duration::from_millis(6_000 + 100 * n), 2, to))
+            .chain(
+                (45..=62u8)
+                    .rev()
+                    .zip(0u64..)
+                    .map(|(to, n)| (Duration::from_secs(12 + n), 2, to)),
+            )
+            .collect();
+        let heard = clock.time.clone();
+        let seen_at = clock.time.clone();
+        let mut seen = Vec::new();
+        let report = run_alive(
+            &mut lamp,
+            &mut clock,
+            Limits {
+                strain_guard: Some(StrainGuard {
+                    load: StrainGuard::LOAD,
+                    seconds: StrainGuard::SECONDS,
+                    cools: false,
+                    rest_cools,
+                }),
+                ..Limits::FOLDED
+            },
+            Some(HOME),
+            Some(standing(100, 600)),
+            None,
+            move || {
+                Some(
+                    if matches!(heard.get().as_secs(), 0..2 | 120..122 | 340..342) {
+                        (Mood::Listening, 100)
+                    } else {
+                        (Mood::Resting, 0)
+                    },
+                )
+            },
+            Asked::default,
+            |glimpse| seen.push((seen_at.get(), glimpse.stand)),
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        assert!(
+            report.retreats.len() == 1 && report.retreats[0].contains("elbow_pitch at 63"),
+            "{:?}",
+            report.retreats
+        );
+        seen
+    };
+    let seen = run(false);
+    assert!(
+        stood_within(&seen, 60, 120),
+        "off: up again after its minute"
+    );
+    let seen = run(true);
+    assert!(folded_within(&seen, 15, 340), "on: down while it cools");
+    assert!(
+        stood_within(&seen, 340, 355),
+        "on: cool, a new line stands it"
+    );
 }
