@@ -631,7 +631,10 @@ fn a_task_begun_before_its_session_is_bounded_by_the_next() {
     let lamp = Lamp::with("");
     let key = format!("agent:main:harness-{AGENT}");
     lamp.db
-        .execute("DELETE FROM session_nodes WHERE session_key = ?1", params![key])
+        .execute(
+            "DELETE FROM session_nodes WHERE session_key = ?1",
+            params![key],
+        )
         .unwrap();
     let mut reader = lamp.steps();
     let first = [task(7, None)];
@@ -660,7 +663,10 @@ fn two_tasks_begun_before_their_session_give_it_to_the_newer() {
     let lamp = Lamp::with("");
     let key = format!("agent:main:harness-{AGENT}");
     lamp.db
-        .execute("DELETE FROM session_nodes WHERE session_key = ?1", params![key])
+        .execute(
+            "DELETE FROM session_nodes WHERE session_key = ?1",
+            params![key],
+        )
         .unwrap();
     let mut reader = lamp.steps();
     assert!(reader.tick(&[task(7, None)], 0, WALL).is_empty());
