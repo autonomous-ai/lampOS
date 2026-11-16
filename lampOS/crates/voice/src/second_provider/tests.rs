@@ -885,6 +885,77 @@ async fn a_makes_waiting_line_is_said_in_its_own_turn_as_its_agent_begins() {
     assert_eq!(said(false).await, ["said:I'll make it now.", "said:Made."]);
 }
 
+/// lamp-c0a4, 16 Nov (#7371): a make on the one run path waited about 63 s
+/// after its waiting line in silence. With the one run path the waiting
+/// line says how long, and a make still with no answer past its wait says
+/// one long-wait line, once; a make that answers first says none.
+#[tokio::test]
+async fn a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more() {
+    let said = |after: Duration| async move {
+        let asked = call("c1", crate::made_skill::MAKE, json!({"request": "x"}));
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [
+                    vec![
+                        text("I'll make it now."),
+                        Ok(ChatEvent::ToolCalls(vec![asked])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Made."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let tools: ToolRunner = Arc::new(move |request, _, name, _| {
+            Box::pin(async move {
+                if name == crate::made_skill::MAKE {
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                    assert!(crate::make_skill_agent::waiting_due(request));
+                    tokio::time::sleep(Duration::from_millis(400)).await;
+                }
+                json!({"ok": true})
+            })
+        });
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .waiting_on_one_path(Some(after));
+        engine.submit(written(
+            7_371_000 + after.as_millis() as u64 % 1_000,
+            "Make me x.",
+        ));
+        turn(&mut engine)
+            .await
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .map(|label| label.replacen("said: ", "said:", 1))
+            .collect::<Vec<_>>()
+    };
+    let waiting = format!("said:{}", crate::make_skill_agent::ONE_PATH_WAITING_LINE);
+    let long = format!("said:{}", crate::make_skill_agent::LONG_WAIT_LINE);
+    assert_eq!(
+        said(Duration::from_millis(30)).await,
+        [
+            "said:I'll make it now.".to_owned(),
+            waiting.clone(),
+            long,
+            "said:Made.".into()
+        ]
+    );
+    assert_eq!(
+        said(Duration::from_secs(60)).await,
+        [
+            "said:I'll make it now.".to_owned(),
+            waiting,
+            "said:Made.".into()
+        ]
+    );
+}
+
 /// lamp-4ace, 20 Oct 21:31: "Lamp, what's my name?" was answered with
 /// `recall`, then `forget_my_face` and `forget`. A forget of any kind the
 /// person's spoken words don't ask for is not run, and the model is told

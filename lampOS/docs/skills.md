@@ -5224,6 +5224,21 @@ the same code for both writers.
   second after the lamp's last turn (`app_make::say_waiting_at`, once, not
   begun after 15 s). Never when the hand-over failed at once, nor when the
   turn was cut already. The made line is the same either way.
+- **With `LAMP_MAKE_AGENT_ONE_PATH` on (#7371).** An agent's make takes
+  about a minute (lamp-c0a4, 16 Nov: 63 s from the waiting line to the
+  result), so the waiting line says how long: "This takes about a minute.
+  I'm on it." (`make_skill_agent::ONE_PATH_WAITING_LINE`, in the turn and
+  through the say service alike). In the turn, a make still with no answer
+  85 s after its waiting line (`make_skill_agent::LONG_WAIT_AFTER`, about
+  90 s from the ask) says "It's taking a bit longer, but I'm still on it."
+  (`make_skill_agent::LONG_WAIT_LINE`) once, never again; the journal says
+  "the make has no answer 85 s after its waiting line: its one long-wait
+  line is said". No line repeats. The ring shows the thinking look for the
+  whole wait with no change here: the turn stays open while the make runs,
+  and with no audio playing its phase is Waiting (`ring_wire::RingPhase`),
+  the thinking look. Off: today's line, and no second. Tests:
+  `the_one_path_waiting_line_says_how_long` and
+  `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`.
 - **The journal.** "made by DeepSeek", "it asks for a linked service
   (gmail): straight to the agent (Hermes), DeepSeek not asked" (the
   service's code, never the person's words), "the agent (Hermes) made none

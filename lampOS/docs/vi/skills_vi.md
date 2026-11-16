@@ -2345,6 +2345,21 @@ cả hai người viết.
   giây sau lượt cuối của đèn (`app_make::say_waiting_at`, một lần, không
   bắt đầu sau 15 giây). Không bao giờ khi lần giao thất bại ngay, hay khi
   lượt đã bị cắt. Câu báo đã tạo không đổi.
+- **Khi bật `LAMP_MAKE_AGENT_ONE_PATH` (#7371).** Một lần tạo của agent mất
+  khoảng một phút (lamp-c0a4, 16/11: 63 giây từ câu chờ tới kết quả), nên
+  câu chờ nói luôn là bao lâu: "This takes about a minute. I'm on it."
+  (`make_skill_agent::ONE_PATH_WAITING_LINE`, trong lượt cũng như qua dịch
+  vụ nói). Trong lượt, một lần tạo vẫn chưa có câu trả lời 85 giây sau câu
+  chờ (`make_skill_agent::LONG_WAIT_AFTER`, khoảng 90 giây từ lúc hỏi) nói
+  "It's taking a bit longer, but I'm still on it."
+  (`make_skill_agent::LONG_WAIT_LINE`) một lần, không bao giờ lặp lại; nhật
+  ký ghi "the make has no answer 85 s after its waiting line: its one
+  long-wait line is said". Không câu nào lặp lại. Vòng đèn giữ dáng suy
+  nghĩ suốt thời gian chờ mà không cần đổi gì ở đây: lượt vẫn mở trong lúc
+  lần tạo chạy, và khi không có âm thanh đang phát thì pha của nó là Waiting
+  (`ring_wire::RingPhase`), tức dáng suy nghĩ. Tắt: câu chờ như hôm nay, và
+  không có câu thứ hai. Test: `the_one_path_waiting_line_says_how_long` và
+  `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`.
 - **Nhật ký.** "made by DeepSeek", "it asks for a linked service (gmail):
   straight to the agent (Hermes), DeepSeek not asked" (mã của dịch vụ,
   không bao giờ là lời của người dùng), "the agent (Hermes) made none
