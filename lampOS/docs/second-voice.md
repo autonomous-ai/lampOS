@@ -4226,10 +4226,16 @@ after a take-over, but now for every turn:
   mattering in a busy one:
   - a line let out only as the conversation going on and spoken by the
     caller (the caller's face alone seen speaking it,
-    `spoken_by_the_caller_alone`, or the conversation's voice) renews the
-    call as a call does (`Heeding::called_at`), whatever the model makes
-    of it; with `LAMP_DECLINE_SILENT` too, its decline keeps that renewal.
-    Another face, or two, renew nothing. Journal: `the caller's own
+    `spoken_by_the_caller_alone`) renews the call (`Heeding::call_renewed_at`),
+    whatever the model makes of it; with `LAMP_DECLINE_SILENT` too, its
+    decline keeps that renewal. The renewed call carries only the caller's
+    own lines (`Heeding::call_for`, the same face check): a colleague's
+    line 20 s after the call is judged by the call alone, as off, and held
+    (the Reviewer-lead's P2 on #7349, #7297's half). A line in the
+    conversation's voice alone, with no face, renews nothing: the prints
+    come after the windows are read, and are for the services alone in the
+    product. Another face, or two, renew nothing, nor does a line untied to the lamp
+    (`LAMP_UNTIED_GOING_ON`) or whose words open nothing. Journal: `the caller's own
     follow-up: it renews the call, and the model is told it is theirs
     (LAMP_BUSY_FOLLOW_UP_RENEWS)`;
   - such a line is told `worker::FOLLOW_UP_NOTE` in the place of
@@ -4251,8 +4257,11 @@ after a take-over, but now for every turn:
   - with the wait sound, any tool a heard line calls makes it past
     `cue_after` (1.5 s), not only a connected service's, and the chat round
     after a call is timed for it too; one sound a round (a tool's sound
-    stands for the round after it), and none once a newer line began, so
-    never over the person's own words. Journal: `made a sound while chat
+    stands for the round after it, a round's own sound for its tools;
+    only a sound that played counts), none
+    once a newer line began, so never over the person's own words, and none
+    for a held line's calls (`attention::DONE_THOUGH_HELD`), whose line the
+    lamp won't answer. Journal: `made a sound while chat
     round N had not begun in 1500 ms (LAMP_BUSY_FOLLOW_UP_RENEWS)`.
   Latency: nothing waits for it. The renewal, the note and the question
   check are bookkeeping at the verdict; the sound is raced against work
@@ -4265,7 +4274,8 @@ after a take-over, but now for every turn:
   colleague's line renews nothing), `busy_follow_up_is_told_it_is_the_callers`,
   `busy_window_is_measured_to_the_line_start`,
   `own_held_question_is_no_reply_to_another` (the owner's line let out, a
-  colleague's still held). Not yet shown on a lamp: the first builder's
+  colleague's still held), `a_silent_decline_keeps_the_callers_renewal`,
+  `the_renewed_call_carries_only_the_caller`. Not yet shown on a lamp: the first builder's
   row (the person's follow-ups answered three of three, the colleague
   track's lines answered none, first audio on tool turns before and after).
 - **A decline says nothing and starts no conversation, with

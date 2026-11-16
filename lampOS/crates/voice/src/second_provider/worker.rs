@@ -7206,6 +7206,9 @@ pub(crate) struct Heeding {
     /// With it, the request let out as the caller's own follow-up
     /// ([`FOLLOW_UP_NOTE`]).
     follow_up_line: Option<u64>,
+    /// With it, when the caller's own follow-up was last let out: the call
+    /// renewed, for the caller's lines alone ([`Self::call_for`]).
+    call_renewed_at: Option<Instant>,
     /// With it, the speakers seen in the line judged last and whether it
     /// was in the conversation's voice: a held question of the same
     /// speaker's is no question to someone else.
@@ -8281,6 +8284,7 @@ impl Heeding {
             from_start: false,
             follow_up_renews: false,
             follow_up_line: None,
+            call_renewed_at: None,
             last_speakers: None,
             said_lately: std::collections::VecDeque::new(),
             let_out_lately: std::collections::VecDeque::new(),
@@ -8844,6 +8848,30 @@ impl Heeding {
     /// the doubt goes to the person.
     pub(crate) fn renewing_busy_follow_ups(&mut self) {
         self.follow_up_renews = true;
+    }
+
+    /// The call a line said in `window` goes on from: the person's last
+    /// call let out, or with `LAMP_BUSY_FOLLOW_UP_RENEWS` the caller's
+    /// follow-up since (`call_renewed_at`), for a line the caller's face alone
+    /// was seen speaking. Anyone else's line is judged by the call alone, as
+    /// without the switch (the Reviewer-lead's P2 on #7349: a colleague's
+    /// line 20 s after the call was let out by the owner's renewal, #7297).
+    fn call_for(&self, request: u64, (began, ended): (u64, u64)) -> Option<Instant> {
+        let Some(renewed) = self
+            .call_renewed_at
+            .filter(|at| self.called_at.is_none_or(|called| *at > called))
+        else {
+            return self.called_at;
+        };
+        let (speakers, _) = speakers_between(self.eyes.as_ref(), began, ended);
+        if spoken_by_the_caller_alone(&speakers, &self.caller_faces) {
+            Some(renewed)
+        } else {
+            eprintln!(
+                "lamp-voice second: request {request}: not the caller's face alone: the call renewed by the caller's follow-up carries it not (LAMP_BUSY_FOLLOW_UP_RENEWS)"
+            );
+            self.called_at
+        }
     }
 
     /// With [`Self::needing_name_or_follow_up`], whether the line in hand,
@@ -10084,11 +10112,10 @@ impl Heeding {
                     eprintln!(
                         "lamp-voice second: request {request}: declined by the model: no conversation going on from it (LAMP_DECLINE_SILENT)"
                     );
-                    // `LAMP_BUSY_FOLLOW_UP_RENEWS` (#7332): the caller's own
-                    // follow-up, declined, still renews the call.
-                    if self.follow_up_line != Some(request) {
-                        self.called_at = before.called_at;
-                    }
+                    // The caller's renewed call (`call_renewed_at`,
+                    // `LAMP_BUSY_FOLLOW_UP_RENEWS`) is not rolled back: their
+                    // own follow-up, declined, still renews it (#7332).
+                    self.called_at = before.called_at;
                     self.caller_faces = before.caller_faces;
                     self.caller_faces_from_call = before.caller_faces_from_call;
                     self.chain = before.chain;
@@ -10542,8 +10569,8 @@ impl Heeding {
         // let out (#1712: on lamp-4ace on 19 Oct the owner's next lines came
         // before the lamp's answers were said, and were held as no
         // conversation).
-        let called_ago =
-            carried_call(self.called_at, closed_at).map(|at| now.saturating_duration_since(at));
+        let called_ago = carried_call(self.call_for(request, (began, ended)), closed_at)
+            .map(|at| now.saturating_duration_since(at));
         // From the end of what the lamp said, not from when its answer began,
         // which the thread keeps (#1712, the first builder at 19:21: "And what
         // about tomorrow?" 18 s after the weather line, a long answer, was
@@ -11765,18 +11792,26 @@ impl Heeding {
         // the model makes of it: on lamp-74ff the owner's follow-up got
         // `not_for_me`, neither clock moved, and the next lines were held.
         // Its note says it is the caller's follow-up ([`FOLLOW_UP_NOTE`]).
+        // A line untied to the lamp (`LAMP_UNTIED_GOING_ON`), or whose
+        // words open nothing, renews nothing (Sixth's P2 2 on #7349).
         let callers_follow_up = self.follow_up_renews
             && played
             && alone
+            && !untied
+            && !opens_nothing
             && !called
             && !someone_else
-            && (spoken_by_the_caller_alone(&seen.speakers, &self.caller_faces) || seen.same_voice);
+            && spoken_by_the_caller_alone(&seen.speakers, &self.caller_faces);
         if callers_follow_up {
             eprintln!(
-                "lamp-voice second: request {request}: the caller's own follow-up: it renews the call, and the model is told it is theirs (LAMP_BUSY_FOLLOW_UP_RENEWS)"
+                "lamp-voice second: request {request}: the caller's own follow-up: it renews the call for the caller's lines, and the model is told it is theirs (LAMP_BUSY_FOLLOW_UP_RENEWS)"
             );
-            self.called_at = Some(Instant::now());
+            self.call_renewed_at = Some(Instant::now());
             self.follow_up_line = Some(request);
+        }
+        if called {
+            // A new call is the call; the renewal is the old caller's.
+            self.call_renewed_at = None;
         }
         // A call let out: the conversation goes on from it, with the face
         // seen speaking it.

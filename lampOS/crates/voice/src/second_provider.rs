@@ -13050,6 +13050,12 @@ async fn done_though_held(
             }
         }
         let mut done = Vec::new();
+        // `LAMP_BUSY_FOLLOW_UP_RENEWS` (#7332): a held line's calls make no
+        // wait sound; its round is marked as sounded already, so no "Hm."
+        // comes for a line the lamp won't answer (Sixth's P2 3 on #7349).
+        if shared.every_tool_cued {
+            shared.mark_tool_cued(request);
+        }
         for call in calls
             .iter()
             .filter(|call| crate::attention::done_though_held(&call.name))
@@ -14983,13 +14989,16 @@ async fn run_tool_in_context(
     match tokio::time::timeout(shared.cue_after, &mut running).await {
         Ok(told) => told,
         Err(_) => {
-            // With the switch: once a round, never over a newer line.
+            // With the switch: once a round, never over a newer line. A
+            // round is marked only by a sound that played, so one with no
+            // clip ready leaves the round after it its own.
             let cue_now = !shared.every_tool_cued
                 || !shared.tool_cued_for(request) && !shared.newer_line_began(request);
-            if shared.every_tool_cued && cue_now {
+            let clip = cue_now.then(|| cues.next()).flatten();
+            if shared.every_tool_cued && clip.is_some() {
                 shared.mark_tool_cued(request);
             }
-            if let Some(clip) = cues.next().filter(|_| cue_now) {
+            if let Some(clip) = clip {
                 eprintln!(
                     "lamp-voice second: request {request} made a sound while {} had not answered",
                     call.name
@@ -16531,6 +16540,10 @@ async fn answer(
                                 );
                                 reached(&writing_times, |times| &mut times.cue);
                                 cue(shared, request, clip).await?;
+                                // `LAMP_BUSY_FOLLOW_UP_RENEWS`: one a round.
+                                if shared.every_tool_cued {
+                                    shared.mark_tool_cued(request);
+                                }
                                 shared.cue_after + shared.begin.1
                             }
                             // No sound ready yet (the first turn after a
@@ -16592,6 +16605,9 @@ async fn answer(
                                     shared.cue_after.as_millis()
                                 );
                                 cue(shared, request, clip).await?;
+                                // A slow tool later in this round makes none
+                                // (the Reviewer-lead's P3 on #7349).
+                                shared.mark_tool_cued(request);
                             }
                             stream.next().await
                         }
