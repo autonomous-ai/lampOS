@@ -299,6 +299,17 @@ const LAMP_NOT_SET_UP: &str = "Work can't be done here on the lamp itself: that 
 /// engine asked for is there: never that a computer needs setting up.
 const LAMP_INSTALLING: &str = "The lamp's own helper is still being installed (it sets itself up in a quiet moment), so nothing was handed over. Say so plainly in a few words.";
 
+/// What the model is told when the tasks part answers `"lamp":"starting"`
+/// (just after a start or a sign-in, before its first targets look
+/// settled) and no target of the engine asked for is there yet: the lamp is
+/// still getting ready, never that something needs setting up.
+fn lamp_starting() -> Value {
+    json!({"error": format!(
+        "The lamp is still getting ready, so nothing was handed over. Tell them in these words, and nothing more: \"{}\"",
+        crate::skill_words::NOT_READY_LINE
+    )})
+}
+
 /// The task prepared and not yet started.
 #[derive(Clone, Debug)]
 struct Pending {
@@ -2564,6 +2575,9 @@ enum Missing {
     /// None of that engine, and the lamp's own Hermes still installing
     /// (`"lamp":"installing"`, #5978).
     LampInstalling,
+    /// None of that engine yet, as the tasks part is still starting
+    /// (`"lamp":"starting"`): its first targets look hasn't settled.
+    Starting,
     /// Who is there couldn't be read: answered as any other refusal.
     Unread,
 }
@@ -2584,7 +2598,7 @@ fn missing_target(
     engine: &str,
     deadline: Duration,
 ) -> Missing {
-    let mut installing = false;
+    let (mut installing, mut starting) = (false, false);
     let Some(there) = ask(
         &place.directory.join("request.sock"),
         &json!({"op":"targets"}),
@@ -2593,6 +2607,7 @@ fn missing_target(
     .as_ref()
     .and_then(|answer| {
         installing = answer.get("lamp") == Some(&json!("installing"));
+        starting = answer.get("lamp") == Some(&json!("starting"));
         // Kept as the staff only where the staff are used ([`WHO_FLAG`]).
         if place.machine_names
             && let Some(names) = names_from(answer)
@@ -2625,6 +2640,7 @@ fn missing_target(
             );
             Missing::Use((*one).clone())
         }
+        [] if starting => Missing::Starting,
         [] if installing => Missing::LampInstalling,
         _ => Missing::NotSetUp,
     }
@@ -4683,6 +4699,7 @@ fn run_for_asked(
                     }
                     Missing::NotSetUp => return (not_set_up(who), true),
                     Missing::LampInstalling => return (json!({"error": LAMP_INSTALLING}), true),
+                    Missing::Starting => return (lamp_starting(), true),
                     Missing::Unread => {}
                 }
             }
@@ -13691,6 +13708,19 @@ pub(crate) mod tests {
         );
         assert_ne!(used, json!({"error": LAMP_INSTALLING}), "{used}");
         assert_eq!(prepares.last(), Some(&json!("office-claude")), "{used}");
+        // Just after a start, before the tasks part's first targets look:
+        // the lamp is still getting ready, never "not set up".
+        let (starting, prepares) = told(json!({"ok":true,"targets":[],"lamp":"starting"}), false);
+        assert_eq!(starting, lamp_starting());
+        assert!(
+            starting["error"]
+                .as_str()
+                .unwrap()
+                .contains(crate::skill_words::NOT_READY_LINE),
+            "{starting}"
+        );
+        assert_ne!(starting, not_set_up("Claude Code"));
+        assert_eq!(prepares.len(), 1, "nothing prepared after: {prepares:?}");
         let _ = std::fs::remove_dir_all(&directory);
     }
 
