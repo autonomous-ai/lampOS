@@ -321,7 +321,7 @@ pub(super) enum Taken {
 
 /// Whether the held rename's question, `held`'s answer, was cut before its
 /// name was heard: the thread holds it as the answer cut last, and what
-/// was played of it does not say `name` (`LAMP_SAID_AS_HEARD`). The lamp-52e6
+/// was played of it does not say `name` (`LAMP_SAID_AS_HEARD`). The lamp-74ff
 /// trace on #7331: a line began over the question, none of it played, and
 /// the hold was dropped as "not a yes to the new name".
 fn question_cut(shared: &Shared, held: u64, name: &str) -> bool {

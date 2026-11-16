@@ -782,7 +782,7 @@ async fn face_forget_context_drops_a_pending_rename_from_the_same_turn() {
     }
 }
 
-/// #7331 (lamp-52e6, 15 Nov): the rename question was cut by the person's
+/// #7331 (lamp-74ff, 16 Nov): the rename question was cut by the person's
 /// next line before any of it played, so that line read no read-back and
 /// the hold was dropped as "not a yes". With `LAMP_NAME_LEARN_FIX` the hold
 /// is kept, the model is told to ask again, and the yes to the question

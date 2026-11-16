@@ -4197,7 +4197,7 @@ then use that person's scope:
     name only after their yes (a new face is kept only on that yes,
     `known_faces::ASK_FACE_FIRST`), so the eyes take a fresh look and judge the face
     (`needs_face::withheld`, journal `TO_FACE_SAVE`, no words): on
-    lamp-52e6 the owner's "my name is ..." came back not kept while a
+    lamp-74ff the owner's "my name is ..." came back not kept while a
     recognition flicker held their face as nobody's. Any other personal
     line is still not kept. Set it only with `LAMP_NAMES=checked` and the
     eyes' who socket, which give the model that function.
