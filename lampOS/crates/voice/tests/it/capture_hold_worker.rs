@@ -39,10 +39,24 @@ use std::{
 };
 
 const TICK: Duration = Duration::from_millis(10);
+/// How long past its time [`Rig::speaker_quiet`] waits for the worker to
+/// read a block before it holds the next one anyway: a worker that stops
+/// reading still meets the microphone's backlog bound.
+const READ_WAIT: Duration = Duration::from_millis(500);
 /// The speaker's sound reaches the microphone this many ticks after the
 /// speaker accepted it; the reference ring gives it to the canceller after
 /// five.
 const ECHO_TICKS: usize = 3;
+/// How old the speaker's last packet may grow before the worker's next
+/// microphone block faults `ReferenceLate`: `MAX_REFERENCE_AGE_US` in
+/// `crates/voice/src/reference.rs`, private to the crate, so stated here.
+const REFERENCE_AGE: Duration = Duration::from_millis(40);
+/// The soonest after the speaker's last packet that a good worker, its
+/// recovery off, reads the block it ends on: [`REFERENCE_AGE`] less the one
+/// [`TICK`] that packet can sit before the quiet starts (it is sent with the
+/// last streamed block, up to a tick before the first quiet block is due).
+/// A worker or a rig held up only makes the time longer (#7295).
+const EARLIEST_END: Duration = REFERENCE_AGE.saturating_sub(TICK);
 /// Blocks a run streams when its checks read the last 100 frames (the
 /// canceller's output, its linear part, what the render explains). The
 /// canceller settles within about 100 blocks (#823: the linear part fell
@@ -157,6 +171,8 @@ struct Rig {
     origin: Instant,
     authority_at: Option<Instant>,
     pushed_at: Vec<u64>,
+    /// When the speaker's last packet was stamped, just before its send.
+    accepted_at: Option<Instant>,
     /// Blocks the speaker has accepted, in the stream and in a hold-up.
     references: u64,
     frames: Vec<Heard>,
@@ -384,6 +400,7 @@ impl Rig {
             origin: Instant::now(),
             authority_at: None,
             pushed_at: Vec::new(),
+            accepted_at: None,
             references: 0,
             frames: Vec::new(),
             ready: false,
@@ -401,6 +418,17 @@ impl Rig {
             gone: None,
             _alone: alone,
         };
+        // Nothing is sent before the worker says it is ready, as the
+        // supervisor sends nothing before it (`process.rs`): sent at once,
+        // the start's messages waited out the worker's own set-up, and on a
+        // loaded ARM64 shard the third was read 136 ms after it was sent,
+        // past the channel's 100 ms (#7295, train 969).
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !rig.ready && rig.worker_running() {
+            assert!(Instant::now() < deadline, "the worker was not ready");
+            rig.take();
+            sleep(Duration::from_micros(500));
+        }
         rig.service();
         rig.parent
             .control
@@ -483,6 +511,11 @@ impl Rig {
             }
             self.authority_at = Some(Instant::now());
         }
+        self.take();
+    }
+
+    /// Take whatever the worker has sent, sending nothing.
+    fn take(&mut self) {
         loop {
             let event = match self.parent.control.receive::<WorkerEvent>() {
                 // Once the worker has gone, the receive itself can be
@@ -615,6 +648,9 @@ impl Rig {
 
     /// The same, saying whether the reference reached the worker's socket.
     fn try_accept(&mut self, samples: Vec<i16>) -> std::io::Result<()> {
+        // Stamped where the packet's own time is, before the send, so a
+        // send held up only makes the early side's time longer (#7295).
+        let sent = Instant::now();
         let at = monotonic_us();
         self.speaker.data.send(RenderReference {
             playback_epoch: 1,
@@ -629,6 +665,7 @@ impl Rig {
                 samples,
             },
         })?;
+        self.accepted_at = Some(sent);
         self.references += 1;
         Ok(())
     }
@@ -636,19 +673,47 @@ impl Rig {
     /// The microphone holds a block every 10 ms for `ticks`, and the speaker
     /// accepts nothing, as a speaker held up does (#1178): its last packet,
     /// and the 40 ms its queue held, grow old.
+    ///
+    /// Paced on the worker's own reads (#7295): a block is held once its
+    /// time has come and the worker has read the one before, or has ended,
+    /// or has left it unread [`READ_WAIT`] past its time. A rig that falls
+    /// behind (its own thread or the worker held up on a loaded runner)
+    /// moves its schedule on from now instead of holding the blocks it fell
+    /// behind on back to back, which no lamp's microphone does.
     fn speaker_quiet(&mut self, signal: &Signal, ticks: usize) {
         let from = self.pushed_at.len();
         for tick in from..from + ticks {
             let due = self.origin + TICK * tick as u32;
-            while Instant::now() < due {
+            while Instant::now() < due
+                || (self.blocks_read() < self.pushed_at.len()
+                    && self.worker_running()
+                    && Instant::now() < due + READ_WAIT)
+            {
                 self.service();
                 sleep(Duration::from_micros(300));
+            }
+            let behind = Instant::now().saturating_duration_since(due);
+            if behind > TICK {
+                self.origin += behind;
             }
             let at = monotonic_us();
             self.device.push(&signal.microphone(tick));
             self.pushed_at.push(at);
             self.service();
         }
+    }
+
+    /// The worker's thread has not returned.
+    fn worker_running(&self) -> bool {
+        self.worker
+            .as_ref()
+            .is_some_and(|worker| !worker.is_finished())
+    }
+
+    /// Blocks the worker has read from the microphone: what it took, not
+    /// what was pushed, and not undone by the discard at its end.
+    fn blocks_read(&self) -> usize {
+        (self.device.taken() / CAPTURE_SAMPLES as u64) as usize
     }
 
     /// No authority from the controller and nothing in the microphone for
@@ -1197,6 +1262,7 @@ fn a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded() {
     let mut rig = Rig::start_with("scripted held-up speaker, off", 0, ReferenceRecovery::Off);
     rig.tolerate_fault = true;
     rig.stream(&signal, 100);
+    let last_packet = rig.accepted_at.expect("the speaker's last packet");
     let deadline = Instant::now() + Duration::from_secs(2);
     while !rig.worker.as_ref().unwrap().is_finished() {
         assert!(
@@ -1216,14 +1282,34 @@ fn a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded() {
         rig.fault
     );
     // Not before the 40 ms queued that the speaker's last packet reported
-    // have run out (on cb94 it was 19 ms); the worker ends a block or two
-    // after the block it found that on. And within the 10 quiet blocks the
-    // bounded half below goes through (the reviewer on #1298).
-    let quiet_for = rig.pushed_at.len() - 100;
-    eprintln!("off: ended after {quiet_for} quiet blocks");
+    // have run out (on cb94 it was 19 ms): the worker ends on the clock, so
+    // that side is a time, from the speaker's last packet to the worker's
+    // last microphone read, the block it ended on ([`EARLIEST_END`]). A
+    // held-up block only makes it longer (#7295: counted in blocks read,
+    // one 10 ms hold-up in the first three quiet blocks failed a good
+    // worker). And within the 10 quiet blocks the bounded half below goes
+    // through (the reviewer on #1298), counted as the quiet blocks the
+    // worker read, the one it ended on included, not as the blocks this
+    // thread pushed before it saw the worker had gone (#7295: 28 pushed on
+    // a loaded ARM64 shard).
+    let read = rig.blocks_read();
+    let quiet_for = read
+        .checked_sub(100)
+        .unwrap_or_else(|| panic!("ended before the quiet blocks: {read} of 100 blocks read"));
+    let pushed = rig.pushed_at.len() - 100;
+    let last_read = rig.device.taken_at().expect("the worker's last read");
+    let ended_after = last_read.saturating_duration_since(last_packet);
+    eprintln!(
+        "off: last read {} ms after the speaker's last packet; ended after {quiet_for} quiet \
+         blocks read, {pushed} pushed",
+        ended_after.as_millis()
+    );
     assert!(
-        (4..=10).contains(&quiet_for),
-        "ended after {quiet_for} quiet blocks"
+        ended_after >= EARLIEST_END && quiet_for <= 10,
+        "last read {} ms after the speaker's last packet (at least {} ms), ended after \
+         {quiet_for} quiet blocks read (at most 10), {pushed} pushed",
+        ended_after.as_millis(),
+        EARLIEST_END.as_millis()
     );
     let ended = rig.worker.take().unwrap().join().unwrap();
     assert!(

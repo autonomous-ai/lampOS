@@ -12,7 +12,7 @@ use std::{
     collections::{BTreeMap, VecDeque},
     os::fd::{BorrowedFd, OwnedFd},
     sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 struct CaptureScript {
@@ -31,6 +31,12 @@ struct CaptureScript {
     starts: u32,
     discards: u32,
     reads: u64,
+    /// Samples the reads have handed over, all told: a discard does not
+    /// take them back.
+    taken: u64,
+    /// When a read last handed samples over: the worker's last read of
+    /// the microphone, which a discard does not change.
+    taken_at: Option<Instant>,
     /// A pipe readable while `avail_min` samples are queued, as a PCM's
     /// descriptor is: what [`CaptureDevice::wait`] polls.
     readable: (OwnedFd, OwnedFd),
@@ -84,6 +90,8 @@ impl CaptureControl {
             starts: 0,
             discards: 0,
             reads: 0,
+            taken: 0,
+            taken_at: None,
             readable: rustix::pipe::pipe().expect("a pipe for the scripted microphone"),
             signalled: false,
             avail_min: 1,
@@ -138,6 +146,15 @@ impl CaptureControl {
     /// How often the device was waited on ([`CaptureDevice::wait`]).
     pub fn waits(&self) -> u64 {
         self.script().waits
+    }
+    /// Samples the reads have handed over since the device was registered:
+    /// what the worker took, which a discard at its end does not change.
+    pub fn taken(&self) -> u64 {
+        self.script().taken
+    }
+    /// When a read last handed samples over, if one has.
+    pub fn taken_at(&self) -> Option<Instant> {
+        self.script().taken_at
     }
 }
 
@@ -239,6 +256,8 @@ impl CaptureDevice for ScriptedCapture {
         for (target, sample) in into.iter_mut().zip(script.queued.drain(..frames)) {
             *target = sample;
         }
+        script.taken += frames as u64;
+        script.taken_at = Some(Instant::now());
         script.signal();
         Ok(frames)
     }
