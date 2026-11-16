@@ -2986,6 +2986,24 @@ là phần của một coder khác trong #6226; thiết kế:
   skill-start vẫn được giữ. Lần chạy kỹ năng vẫn exec nó, và `security:
   "full"` cũng cho phép exec đó, nên lần chạy không cần quyền riêng nào.
 
+**OpenClaw kiểm tra văn bản trước khi nó vào chỗ** (#7108; ngày 15/11 một
+lần merge mà OpenClaw 2026.11.2 từ chối, 78/CONFIG, đã làm gateway của
+lamp-52e6 chết): văn bản đã đổi được ghi vào một file mới 0600 cạnh
+`openclaw.json`, và `config validate --json` của chính OpenClaw chạy trên
+file đó qua wrapper `/usr/local/bin/openclaw` của lamp-update
+(`openclaw_config::validate`), trỏ tới file đó bằng `OPENCLAW_CONFIG_PATH`,
+không bao giờ file đang dùng, với `LAMP_OPENCLAW_GATEWAY=on` nên nó chạy
+trong namespace riêng và chạy được khi gateway chết, trong môi trường riêng
+của OpenClaw, tối đa 60 s. Chỉ status 0 mới rename nó vào chỗ
+(`hermes_config::replace_checked`). Bị từ chối (hoặc quá 60 s) thì file mới
+bị xóa, `openclaw.json` giữ nguyên từng byte, và dòng nhật ký nói
+"OpenClaw's settings not written: ... OpenClaw's own config check refused
+it (status 1): <lời của OpenClaw>". Không có wrapper ở
+`/usr/local/bin/openclaw` (OpenClaw chưa cài) thì văn bản được ghi như
+trước, kèm dòng nhật ký "written unchecked". Wrapper không chạy được
+OpenClaw (không có token của forwarder, không có Node) thì từ chối, nên
+không ghi gì cho tới lần lamp-tasks khởi động sau.
+
 ## Hook của Harness bên trong namespace agent của đèn (#6530)
 
 Hook của Harness cho một engine (`harness hook hermes session-start`,

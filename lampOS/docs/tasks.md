@@ -2863,6 +2863,23 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   below) stays. A skill's run still execs it, and `security: "full"` allows
   that exec too, so a run needs no grant of its own.
 
+**OpenClaw checks the text before it lands** (#7108; on 15 Nov a merge
+OpenClaw 2026.11.2 refused, 78/CONFIG, took lamp-52e6's gateway down): a
+changed text goes to a new 0600 file beside `openclaw.json`, and OpenClaw's
+own `config validate --json` runs on it through lamp-update's wrapper
+`/usr/local/bin/openclaw` (`openclaw_config::validate`), pointed at that
+file by `OPENCLAW_CONFIG_PATH`, never the live one, with
+`LAMP_OPENCLAW_GATEWAY=on` so it starts in namespaces of its own and runs
+with the gateway down, in OpenClaw's own environment, at most 60 s. Only
+status 0 renames it into place (`hermes_config::replace_checked`).
+Refused (or past 60 s), the new file is removed, `openclaw.json` stays byte
+for byte, and the journal line says "OpenClaw's settings not written: ...
+OpenClaw's own config check refused it (status 1): <OpenClaw's words>".
+With no wrapper at `/usr/local/bin/openclaw` (OpenClaw not installed) the
+text is written as before, with a journal line "written unchecked". A
+wrapper that can't run OpenClaw (no forwarder token, no Node) refuses, so
+nothing is written until lamp-tasks' next start.
+
 ## Harness's hooks inside the lamp's agent namespace (#6530)
 
 Harness's hooks for an engine (`harness hook hermes session-start`,

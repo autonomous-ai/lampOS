@@ -54,16 +54,37 @@
 //! key of ours that holds something else than what is set, is refused and
 //! left as it is, never rewritten. A file already right is not written.
 //!
+//! A new text is checked by OpenClaw itself before it is renamed into
+//! place (#7108; on 15 Nov a merge OpenClaw 2026.11.2 refused took
+//! lamp-52e6's gateway down, 78/CONFIG): [`validate`] runs `config
+//! validate --json` through lamp-update's wrapper ([`VALIDATOR`]) on the
+//! new file beside `openclaw.json`, never the live one. Refused, the file
+//! is left byte for byte and [`write`] fails with OpenClaw's words. With
+//! no wrapper there (OpenClaw not installed) the text is written as
+//! before.
+//!
 //! [`write`] must run as OpenClaw's own user (`lampos`), so the file it
 //! writes is OpenClaw's and no one else's; never through a link.
 use std::fs;
-use std::io;
+use std::io::{self, Read};
 use std::path::Path;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use serde_json::{Map, Value, json};
 
 pub use crate::hermes_config::{MODEL, Refused, SKILLS_DIR, TOKEN_ENV};
-use crate::hermes_config::{read_or_empty, replace};
+use crate::hermes_config::{read_or_empty, replace_checked};
+
+/// OpenClaw's wrapper lamp-update installs
+/// (`lamp_update::openclaw_install::WRAPPER`), the one way OpenClaw runs
+/// on the lamp; [`validate`] runs its own config check through it.
+pub const VALIDATOR: &str = "/usr/local/bin/openclaw";
+/// The longest OpenClaw's config check runs before it counts as a
+/// refusal: a cold start of its Node CLI on a lamp.
+// ponytail: a fixed bound, unmeasured on a lamp; tune once a lamp's check
+// is timed.
+pub const VALIDATE_WITHIN: Duration = Duration::from_secs(60);
 
 /// OpenClaw's settings file, in its state folder.
 pub const CONFIG_FILE: &str = "openclaw.json";
@@ -304,10 +325,12 @@ pub fn merge_config(
 
 /// `openclaw.json` under `state_dir` merged ([`merge_config`]); `true`
 /// when it was written, `false` when it was right already. Nothing is
-/// written when it can't be merged. Run at every lamp-tasks start, so an
-/// existing lamp's file gets V1's tools (or loses them) on its next start
-/// or update, its model, workspace and every other key kept; the gateway
-/// takes `tools` hot and reads `agents` per turn, with no restart.
+/// written when it can't be merged, or when OpenClaw's own check
+/// ([`validate`] through [`VALIDATOR`]) refuses it. Run at every
+/// lamp-tasks start, so an existing lamp's file gets V1's tools (or loses
+/// them) on its next start or update, its model, workspace and every other
+/// key kept; the gateway takes `tools` hot and reads `agents` per turn,
+/// with no restart.
 pub fn write(
     state_dir: &Path,
     port: u16,
@@ -315,24 +338,17 @@ pub fn write(
     skills: bool,
     v1: bool,
 ) -> io::Result<bool> {
-    write_checked(
-        state_dir,
-        port,
-        workspace,
-        skills,
-        v1,
-        Path::new("/usr/local/bin/openclaw"),
-    )
+    write_checked(state_dir, port, workspace, skills, v1, Path::new(VALIDATOR))
 }
 
-/// [`write`], with `validator` as OpenClaw's command.
+/// [`write`], with `validator` as OpenClaw's wrapper.
 pub fn write_checked(
     state_dir: &Path,
     port: u16,
     workspace: &Path,
     skills: bool,
     v1: bool,
-    _validator: &Path,
+    validator: &Path,
 ) -> io::Result<bool> {
     let path = state_dir.join(CONFIG_FILE);
     let text = read_or_empty(&path)?;
@@ -346,8 +362,91 @@ pub fn write_checked(
         return Ok(false);
     }
     fs::create_dir_all(state_dir)?;
-    replace(&path, &merged)?;
+    if validator.exists() {
+        replace_checked(&path, &merged, &|file| validate(validator, file))?;
+    } else {
+        eprintln!(
+            "[lamp-tasks] OpenClaw's {CONFIG_FILE} written unchecked: no OpenClaw at {}",
+            validator.display()
+        );
+        replace_checked(&path, &merged, &|_| Ok(()))?;
+    }
     Ok(true)
+}
+
+/// OpenClaw's own check of the config text in `file`: `config validate
+/// --json` run through its wrapper `validator`, pointed at `file` by
+/// `OPENCLAW_CONFIG_PATH` (never the live `openclaw.json`), in namespaces
+/// of its own (`LAMP_OPENCLAW_GATEWAY=on`, never the running gateway's,
+/// so it runs with the gateway down), with OpenClaw's own environment
+/// (`crate::gateway::APPROVALS_ENV`) and nothing else, killed with its
+/// process group past [`VALIDATE_WITHIN`]. `Ok` only on status 0; else
+/// what OpenClaw said, on one line and short.
+pub fn validate(validator: &Path, file: &Path) -> Result<(), String> {
+    use std::os::unix::process::CommandExt;
+    let (mut said_rx, said_tx) =
+        io::pipe().map_err(|error| format!("OpenClaw's config check: no pipe: {error}"))?;
+    let mut child = Command::new(validator)
+        .args(["config", "validate", "--json"])
+        .env_clear()
+        .envs(crate::gateway::APPROVALS_ENV)
+        .env("LAMP_OPENCLAW_GATEWAY", "on")
+        .env("OPENCLAW_CONFIG_PATH", file)
+        .current_dir("/")
+        .stdin(Stdio::null())
+        .stdout(
+            said_tx
+                .try_clone()
+                .map_err(|error| format!("OpenClaw's config check: no pipe: {error}"))?,
+        )
+        .stderr(said_tx)
+        .process_group(0)
+        .spawn()
+        .map_err(|error| format!("OpenClaw's config check did not start: {error}"))?;
+    let (sent, said) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut text = String::new();
+        let _ = said_rx.read_to_string(&mut text);
+        let _ = sent.send(text);
+    });
+    let began = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) if began.elapsed() < VALIDATE_WITHIN => {
+                std::thread::sleep(Duration::from_millis(20))
+            }
+            _ => {
+                let pid = rustix::process::Pid::from_child(&child);
+                let _ = rustix::process::kill_process_group(pid, rustix::process::Signal::KILL);
+                let _ = child.wait();
+                break None;
+            }
+        }
+    };
+    // Bounded: a pipe still held by a process outside the group is given
+    // up, never waited on.
+    let said = said
+        .recv_timeout(Duration::from_secs(2))
+        .unwrap_or_default();
+    let said: String = said
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(400)
+        .collect();
+    match status.map(|status| status.code()) {
+        Some(Some(0)) => Ok(()),
+        Some(code) => Err(format!(
+            "OpenClaw's own config check refused it (status {}): {said}",
+            code.map_or("killed".into(), |code| code.to_string())
+        )),
+        None => Err(format!(
+            "OpenClaw's own config check ran past {} s",
+            VALIDATE_WITHIN.as_secs()
+        )),
+    }
 }
 
 /// The lamp's guidance for OpenClaw: the same words as Hermes'
