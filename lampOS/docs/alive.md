@@ -53,7 +53,11 @@ changed):
   rest shifts by one of a few small moves (the old runtime's 10 s `idle`
   clip, a look up, a dip; a tilt either way only on a head that tilts
   standing, which lamp-4ace's does not) after a random wait of 40 s to 3 min
-  (`docs/body.md`, since 2026-10-16). While a body clip plays, Expression's
+  (`docs/body.md`, since 2026-10-16). With `LAMP_BODY_PRESENCE=on` (#7301,
+  on in the product) a standing lamp stays up while someone is at it, for
+  at most 15 quiet minutes, and shifts every 20 to 60 s, livelier for a few
+  minutes after talk or an arrival, with a sixth move that sags the arm
+  toward its fold (`docs/body.md`, "Someone at the lamp"). While a body clip plays, Expression's
   offsets are not added, except under a shift at rest: that is one layer
   with the breath and the drift, starting and ending at their offsets, and
   neither a shift nor a drift begins within 30 s of the other.

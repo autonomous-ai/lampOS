@@ -858,6 +858,9 @@ the shoulder (servo 2) and the elbow (servo 3):
   for less than that, somebody walking past, wakes nothing. Not yet seen on
   a lamp: whether a folded lamp-4ace's camera sees a person at the desk at
   all.
+- With `LAMP_BODY_PRESENCE=on` (#7301, "Someone at the lamp" below) a
+  standing lamp also stays up while `room/presence` says someone is there,
+  for at most 15 quiet minutes. It never stands a folded lamp for them.
 - Asleep for the night with `LAMP_NIGHT_STAYS_FOLDED=on` (#5156, "On the
   bus" below), a folded lamp is not raised by the voice listening or
   thinking alone, nor by a bare name hit Expression refused; a tap, a
@@ -1084,6 +1087,66 @@ shoulder at 2,658 and the elbow at 2,650, so it has stood there; nothing
 else about the pose has been checked on this unit, and the old runtime
 reached it by moving all five joints together over five seconds.
 
+### Someone at the lamp: it stays up for them, and stays alive (`LAMP_BODY_PRESENCE=on`, #7301)
+
+Without it a lamp folds 90 s after the last talk and then only breathes,
+which reads as switched off with a person still at the desk. With
+`LAMP_BODY_PRESENCE=on` (off unless exactly `on`; on in the product unit)
+the body reads `room/presence` ([presence.md](presence.md)) at most once a
+second (`presence_in.rs`):
+
+- **Someone there.** A fresh value (said within its 3 s) that says
+  someone, or nobody for under 120 s (`presence_in::GRACE_S`, someone
+  reading face down). Anything else is nobody: an old value, the camera
+  closed (nothing is said), a pause or a hand's sleep (`Asked::PAUSED`,
+  `Asked::ASLEEP`). Off: nobody, always.
+- **It stays up for them.** A lamp that is up keeps its `--awake-seconds`
+  window open while someone is there, as the lease does. It never stands a
+  folded lamp: an arrival alone raises nothing. Bounded:
+  - by time: no more than 15 minutes (`QUIET_STAND`) after the last talk,
+    call or arrival. Then it folds calmly at the window's end with the
+    person still there, and stands again when spoken to or called;
+  - by heat: not once the shoulder or the elbow reads 55 (`bus_out::WARM`),
+    so it folds before the strain guard's hot sit-down at 62;
+  - never in its night rest (`Asked::night`), and never while seated
+    (#4501).
+
+  Someone who leaves: folded about 120 s + 90 s after the last face or
+  voice.
+- **Alive while it stands.** Shifts at rest come every 20 to 60 s (`idle::
+  ALIVE_GAP_LEAST`, `ALIVE_GAP_MOST`) instead of 40 s to 3 min, and a sixth
+  move joins them: `settle`, the arm sagging toward its fold (table in
+  "Shifts at rest" below). In every shift the arm only sags: each offset
+  is taken toward the fold whatever its sign, scaled by the level's
+  `idle_size`, and cut into the way between the fold and the stand, as a
+  holder's pose is (`idle::sag`). The head's offsets are unchanged.
+- **Livelier after talk or an arrival.** For 2 minutes after either
+  (`LIVELY_FOR`) the shifts' waits and size are those of the owner's
+  energy level + 2, for the next 2 of level + 1, then the owner's own (at
+  most 5). Only the waits and the sag; never the speed or the stand. These
+  minutes are this switch's, not `LAMP_BODY_ENERGY`'s: with that one off
+  the owner's level is 1, and they still come.
+
+At the product's level 1, after a talk:
+
+| minutes after | as level | wait between shifts | arm sag x |
+|---|---|---|---|
+| 0 to 2 | 3 | 14 to 42 s | 1.1 |
+| 2 to 4 | 2 | 17 to 51 s | 1.05 |
+| after 4 | 1 | 20 to 60 s | 1.0 |
+
+At level 5 the waits are 10 to 30 s and the sag 1.2 times. The settle
+moves the head about 15 to 20 mm (estimated from lamp-4ace's link lengths,
+not measured on lamp-52e6): about 1 degree of view at 1 m, against the
+breath's 3 mm. It moves at most about 35 counts a second, against the
+pose's 300, to stay quiet.
+
+Rule 8: posture, as a breath let out. The base never turns and nothing
+sweeps; the timing is irregular and the same move seldom comes twice.
+
+Tests on the host only (`body/tests.rs`, `idle.rs`, `presence_in.rs`); the
+ROW on lamp-52e6 is to come (#7301).
+
 ### How lively it moves: the energy level (`LAMP_BODY_ENERGY=on`, #6893)
 
 With `LAMP_BODY_ENERGY=on` (off unless exactly `on`, set in no unit) the body reads the character's
@@ -1094,13 +1157,17 @@ the limits and the stand pace the unit gives (`Limits::at(1)` returns them uncha
 against `deploy/product/lamp-body.service`). Levels 2 to 5 (`energy.rs` `TABLE`) only go livelier, never
 under what the unit gives:
 
-| level | pose speed, counts/s (acceleration 6x) | stand and fold, s | idle wait x |
-|---|---|---|---|
-| 1 | the unit's (300) | the unit's (6) | 1.0 (40 to 180 s) |
-| 2 | 425 | 5.5 | 0.85 |
-| 3 | 550 | 5 | 0.7 |
-| 4 | 675 | 4.5 | 0.6 |
-| 5 | 800 | 4 | 0.5 (20 to 90 s) |
+| level | pose speed, counts/s (acceleration 6x) | stand and fold, s | idle wait x | idle size x |
+|---|---|---|---|---|
+| 1 | the unit's (300) | the unit's (6) | 1.0 (40 to 180 s; 20 to 60 s under `LAMP_BODY_PRESENCE`) | 1.0 |
+| 2 | 425 | 5.5 | 0.85 | 1.05 |
+| 3 | 550 | 5 | 0.7 | 1.1 |
+| 4 | 675 | 4.5 | 0.6 | 1.15 |
+| 5 | 800 | 4 | 0.5 (20 to 90 s; 10 to 30 s) | 1.2 |
+
+The idle size scales a shift's arm sag, and only under `LAMP_BODY_PRESENCE`
+("Someone at the lamp" above), which also makes the waits livelier for a
+few minutes after talk or an arrival.
 
 The idle wait is only the wait between shifts at rest (`Idler::share`). The awake time, the fold
 `--awake-seconds` after the last mood, face or gesture, is the unit's at every level: a livelier lamp
@@ -1915,12 +1982,13 @@ What the body does with the request:
 With `--idle on` a lamp standing at rest shifts a little by itself now and
 then: anything alive that stands with nothing to do does. Not on a clock
 (until 2026-10-16 it was every 18 s, `idle` after `idle` all afternoon on
-lamp-4ace, #705): each wait is drawn at random from 40 s to 3 min. A lamp
+lamp-4ace, #705): each wait is drawn at random from 40 s to 3 min (20 s
+to 60 s under `LAMP_BODY_PRESENCE`, "Someone at the lamp" above). A lamp
 left alone folds `--awake-seconds` after the last mood or face, and folded
 it never shifts: that is how it is still with nobody near. Each shift is
-one of five small moves (`crate::idle`), the one made last a third as
-likely as each other: not ruled out, as with only two to choose from that
-would be strict turns, a pattern of its own.
+one of five small moves (`crate::idle`), six under `LAMP_BODY_PRESENCE`,
+the one made last a third as likely as each other: not ruled out, as with
+only two to choose from that would be strict turns, a pattern of its own.
 
 | Move | Lasts | Mostly |
 | --- | --- | --- |
@@ -1928,6 +1996,11 @@ would be strict turns, a pattern of its own.
 | `tilt_left`, `tilt_right` | 3.2 s | head roll 25 to one side, the head lifting 10; only on a head that tilts standing (`--stand-roll` past `--reach`'s roll), as elsewhere the roll is left out and both are the same lift under a degree. No deployed unit gives `--stand-roll`, so there the moves are `idle`, `look_up` and `dip` |
 | `look_up` | 3.2 s | the head lifts 50 |
 | `dip` | 3.2 s | the head lowers 40, a breath let out |
+| `settle` | 6.0 s | only under `LAMP_BODY_PRESENCE`: the shoulder 45 and the elbow 30 toward the fold, the head lifting 20 so the light stays on the desk; eased out 2 s, held 1.5 s, back 2.5 s; not while a hand holds the arm. On a lamp with no `--stand-roll` the moves are then `idle`, `settle`, `look_up` and `dip`, half of them the arm's |
+
+Under `LAMP_BODY_PRESENCE` the arm only sags in every shift, `idle`'s
+sway too: each arm offset goes toward the fold, scaled by the level's
+idle size, and stays between the fold and the stand (`idle::sag`).
 
 The four head moves stay inside the reach of a glance at rest
 (`REST_GLANCE_REACH`) and move neither the base nor the arm; they pass
@@ -1936,8 +2009,9 @@ may not take their names. No shift
 while it is folded, rising or folding, while a mood other than rest is
 heard (someone talking to it, a call taken as listening), while a call or
 another gesture plays or waits, while the head or the base has given way to
-a hand or is in one, or while stillness is asked (Expression's `hold` for
-someone working under the light, or a pause); any of these lets a shift
+a hand or is in one, while stillness is asked (Expression's `hold` for
+someone working under the light, or a pause), or while lamp-control's
+lease holds the body (`Asked::held`, #7301); any of these lets a shift
 under way go and starts the wait again, so no shift comes right after it.
 
 A shift and Expression's rest layer under `--rest-glance` (its breath and

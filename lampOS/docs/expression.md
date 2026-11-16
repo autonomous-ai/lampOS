@@ -263,7 +263,10 @@ leaned into, a three-second hold puts it to sleep, a tap wakes it
 `voice/mute`, sleep follows the voice's mute with the reason `sleep`.
 No drift begins within 30 s of the body seen moving (`BODY_QUIET_US`): a
 shift at rest of the body's own (`docs/body.md`) and a drift are one layer
-and never land back to back. Any move counts, not only the body's shift: a
+and never land back to back. With the body's `LAMP_BODY_PRESENCE=on`
+(#7301) shifts come every 20 to 60 s while someone is at a standing lamp,
+so drifts there are fewer: the shift is the larger, more visible move and
+the breath goes on under it. Any move counts, not only the body's shift: a
 gesture, or the look up at a tap falling back, holds a drift off too, so a
 drift that waits after a tap is meant. It is seen on `body/joint_states`, which the
 service already reads: a joint's goal going 0.04 rad/s or faster for 0.3 s
