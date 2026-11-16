@@ -4660,7 +4660,17 @@ fn wait_in_range<P: PortIo, R: Runtime>(
     loop {
         let late = bus.runtime.now() >= asked_since + WAIT_ASKING;
         let (every, say) = if late {
-            (WAIT_READ_LATE, STOPPED_ASKING)
+            // A held arm is still read every `WAIT_READ` once nobody is
+            // asked any more: a hand carrying it across the 0/4095 seam is
+            // caught at the first read across, and the hold lands on the
+            // next, 100 ms on, not up to a second later (Migrate's P1 on
+            // #6836). Only what is said, and a lamp let go whole, go slower.
+            let every = if wait.follow_arm {
+                WAIT_READ
+            } else {
+                WAIT_READ_LATE
+            };
+            (every, STOPPED_ASKING)
         } else {
             (WAIT_READ, wait.say)
         };
