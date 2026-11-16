@@ -4350,6 +4350,134 @@ async fn the_wait_sound_comes_when_it_is_told() {
     );
 }
 
+/// #7332 (c): on lamp-74ff tool turns took 4 to 5 s in silence
+/// (`remember_my_face`, `web_search`); people talked on, and the answer was
+/// cut by the newer line. The wait sound came only during a connected
+/// service's call and before round 1. With `LAMP_BUSY_FOLLOW_UP_RENEWS`,
+/// any tool past the wait sound's time makes one sound, and so does the
+/// chat round after a call; one a round, never after a newer line began.
+/// The first audio of a slow tool turn comes at 1.5 s, not with its answer.
+#[tokio::test(start_paused = true)]
+async fn tool_round_past_cue_after_makes_one_sound() {
+    /// The wait sounds a tool turn made, and its first audio from the
+    /// line's end: its tool runs `tool_ms`, the round after it begins
+    /// `round_ms` after it is asked; a newer line begins `newer_ms` after
+    /// the words, if one does.
+    async fn sounds(
+        every: bool,
+        tool_ms: u64,
+        round_ms: u64,
+        newer_ms: Option<u64>,
+    ) -> (usize, Duration) {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What's in the news today?".to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call(
+                            "c1",
+                            "get_news",
+                            json!({}),
+                        )])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Here is the news."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            round_after: Mutex::new([Duration::ZERO, Duration::from_millis(round_ms)].into()),
+            ..Script::default()
+        });
+        let tools: ToolRunner = Arc::new(move |_, _, _, _| {
+            Box::pin(async move {
+                tokio::time::sleep(Duration::from_millis(tool_ms)).await;
+                json!({"ok": true})
+            })
+        });
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .waiting_with_a_sound(true)
+        .announcing(false);
+        if every {
+            engine = engine.cueing_every_tool();
+        }
+        wait_clip_ready(&engine, true);
+        spoken_turn(&mut engine);
+        let from = tokio::time::Instant::now();
+        let mut cues = 0;
+        let mut first = None;
+        let mut newer = newer_ms.map(|ms| from + Duration::from_millis(ms));
+        loop {
+            let next = match newer {
+                Some(at) => match tokio::time::timeout_at(at, engine.next()).await {
+                    Ok(next) => next,
+                    Err(_) => {
+                        newer = None;
+                        engine.submit(start(2));
+                        engine.submit(audio(2, 1));
+                        continue;
+                    }
+                },
+                // A turn cut by the newer line ends with no word of its own.
+                None => match tokio::time::timeout(Duration::from_secs(20), engine.next()).await {
+                    Ok(next) => next,
+                    Err(_) => return (cues, first.unwrap_or_else(|| from.elapsed())),
+                },
+            };
+            match next {
+                ProviderOutput::Audio {
+                    request: 1, spoken, ..
+                } => {
+                    first.get_or_insert_with(|| from.elapsed());
+                    cues += usize::from(!spoken);
+                }
+                ProviderOutput::TurnComplete { request: 1, .. }
+                | ProviderOutput::TurnFailed { request: 1, .. } => {
+                    return (cues, first.unwrap_or_else(|| from.elapsed()));
+                }
+                _ => {}
+            }
+        }
+    }
+    let s = Duration::from_secs;
+    // Off: no sound for a tool that is no connected service, nor for the
+    // round after it; the first audio is the answer's.
+    let (off, first_off) = sounds(false, 3_000, 0, None).await;
+    assert_eq!(off, 0, "off: a slow tool");
+    assert!(first_off >= s(3), "off: {first_off:?}");
+    assert_eq!(
+        sounds(false, 0, 3_000, None).await.0,
+        0,
+        "off: a slow round"
+    );
+    // On: one sound for a slow tool, at the wait sound's time.
+    let (on, first_on) = sounds(true, 3_000, 0, None).await;
+    assert_eq!(on, 1, "on: a slow tool");
+    assert!(first_on < s(2), "on: {first_on:?}");
+    assert_eq!(sounds(true, 0, 3_000, None).await.0, 1, "on: a slow round");
+    assert_eq!(
+        sounds(true, 3_000, 3_000, None).await.0,
+        1,
+        "on: one a round"
+    );
+    assert_eq!(sounds(true, 500, 500, None).await.0, 0, "on: quick");
+    // Never over the person's own words.
+    assert_eq!(
+        sounds(true, 3_000, 0, Some(1_000)).await.0,
+        0,
+        "on: a newer line began"
+    );
+    eprintln!(
+        "#7332: a slow tool turn's first audio, off {} ms, on {} ms",
+        first_off.as_millis(),
+        first_on.as_millis()
+    );
+}
+
 /// Keep rendering out of the timing tests: either a sound is already in
 /// memory, or its background render has not produced one yet.
 fn wait_clip_ready(engine: &Engine, ready: bool) {

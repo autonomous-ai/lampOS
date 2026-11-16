@@ -1759,6 +1759,10 @@ struct Shared {
     cues: Option<Arc<Cues>>,
     /// When the wait sound comes ([`CUE_AFTER`], or [`CUE_AFTER_ENVIRONMENT`]'s).
     cue_after: Duration,
+    /// `LAMP_BUSY_FOLLOW_UP_RENEWS=on` ([`Engine::cueing_every_tool`]).
+    every_tool_cued: bool,
+    /// With it, the request whose tool calls made their round's sound.
+    tool_cued: Mutex<Option<u64>>,
     /// [`DOWN_LINE`], when switched on.
     down: Option<Arc<DownLine>>,
     /// The owner's language, read at start (`None`: English): every fixed
@@ -4620,6 +4624,8 @@ impl Engine {
                 asked: None,
                 cues: None,
                 cue_after: CUE_AFTER,
+                every_tool_cued: false,
+                tool_cued: Mutex::new(None),
                 down: None,
                 language: crate::language::at_start(),
                 spoken_stop_ends: false,
@@ -6648,6 +6654,17 @@ impl Engine {
             if let Some(shared) = shared {
                 shared.cues = Some(Arc::default());
             }
+        }
+        self
+    }
+
+    /// `LAMP_BUSY_FOLLOW_UP_RENEWS=on` (#7332): with the wait sound, any
+    /// tool a heard line calls makes it past [`Shared::cue_after`], and so
+    /// does the chat round after a call; one a round, never once a newer
+    /// line began. Before any turn only.
+    pub fn cueing_every_tool(mut self) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.every_tool_cued = true;
         }
         self
     }
