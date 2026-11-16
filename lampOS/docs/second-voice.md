@@ -3959,7 +3959,10 @@ after a take-over, but now for every turn:
   warmer." answered in three words with `calls=none`): the phrase runs
   read only what was done or promised, and `LAMP_ACTION_CLAIM_WORDED` is
   off in the product. With this switch a reply whose first sentence past
-  lead words opens with a verb in "-ing" (bare or after "I'm"), has at
+  lead words opens with a verb acting on the light in "-ing"
+  (`action_claim::LIGHT_VERBS`: warm, cool, dim, brighten, switch, turn,
+  change, make, set, each held by a test to the light functions' text; not
+  "Thinking about blue whales.") (bare or after "I'm"), has at
   most six words, names one of the light's acts as `lamp_actions::catalog`
   declares them (a step function's name past `light_`, or a colour
   `light_colour` takes), and has no '?', "not" or "n't" is a light claim
