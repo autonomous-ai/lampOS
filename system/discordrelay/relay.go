@@ -217,16 +217,17 @@ func (r *Relay) Handle(ev domain.MQTTDiscordEventCommand) string {
 	return ""
 }
 
-// noMentionNeeded reports whether a server message may reach the agent without an
-// @mention: it is in a channel the owner chose, in a thread of such a channel, or in
-// a thread the bot has already joined. A message addressed to someone else is not for
-// the agent, so it still needs its own @mention.
+// noMentionNeeded reports whether an owner's server message may reach the agent
+// without an @mention. With no channels chosen, every channel of the connected server
+// is open to the owner; once the owner chooses channels, only those channels, their
+// threads and threads the bot has already joined are. A message addressed to someone
+// else is not for the agent, so it still needs its own @mention.
 func (r *Relay) noMentionNeeded(ev domain.MQTTDiscordEventCommand) bool {
 	if ev.GuildID == "" || ev.MentionsOthers {
 		return false
 	}
 	open, _ := r.cfg.DiscordAccessLists()
-	if slices.Contains(open, ev.ChannelID) {
+	if len(open) == 0 || slices.Contains(open, ev.ChannelID) {
 		return true
 	}
 	if ev.ParentChannelID == "" {
