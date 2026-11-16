@@ -553,7 +553,9 @@ impl StrainGuard {
 /// at a load over [`STAND_EASE_LOAD`] for [`STAND_EASE_STEPS`], has that goal
 /// eased to where it holds plus [`STAND_EASE_MARGIN`] for the rest of the
 /// run. lamp-74ff's elbow held 41 to 47 short at 176 to 200 and heated to
-/// 62 degrees in 40 min; lamp-52e6's held 3 short at 24.
+/// 62 degrees in 40 min; lamp-52e6's held 3 short at 24. An ease still
+/// loaded over [`STAND_EASE_LOAD`] for [`STAND_EASE_STEPS`] is undone, back
+/// to the measured stand, and the joint is not eased again that run.
 /// ponytail: tuned on two lamps; retune from journals of more arms.
 pub const STAND_EASE_SHORT: u16 = 20;
 /// Over this a joint is pushing at its goal, not just carrying the lamp:
@@ -6759,10 +6761,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut strain_since: [Option<Duration>; 2] = [None; 2];
     // #7289: the stand as measured, the steps each arm joint has been held
     // short of its stand goal under load, and whether one too far short to
-    // ease has been said.
+    // ease has been said. Once eased, the steps count only the load; an
+    // ease that leaves it loaded is undone and easing stops for the run.
     let stand_measured = standing.map(|up| [up.pose[3], up.pose[4]]);
     let mut stand_short_steps = [0u32; 2];
     let mut too_short_said = [false; 2];
+    let mut stand_eased = [false; 2];
+    let mut stand_ease_off = [false; 2];
     let mut seat_retreats: std::collections::VecDeque<Duration> = std::collections::VecDeque::new();
     let mut unlifted_said: Option<&'static str> = None;
     let mut strained_by: Option<(&'static str, u16)> = None;
@@ -9254,42 +9259,58 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // another goal, and pauses the count), held short of it
                 // under load: that goal is eased to where it holds. The
                 // strain guard below still judges every step as before.
+                // Eased once, it is kept only if the load comes under
+                // STAND_EASE_LOAD; else back to the measured stand, no more
+                // easing this run (lamp-74ff: each ease only lowered the lamp).
                 let goal = up.pose[3 + index];
-                if stand >= 1.0 && arm_written[index] == goal {
+                if stand >= 1.0 && arm_written[index] == goal && !stand_ease_off[index] {
                     let rising = goal > up.folded[index];
                     let short = if rising {
                         goal.saturating_sub(is.position)
                     } else {
                         is.position.saturating_sub(goal)
                     };
-                    stand_short_steps[index] =
-                        if short > STAND_EASE_SHORT && is.load > STAND_EASE_LOAD {
-                            stand_short_steps[index] + 1
-                        } else {
-                            0
-                        };
+                    stand_short_steps[index] = if is.load > STAND_EASE_LOAD
+                        && (stand_eased[index] || short > STAND_EASE_SHORT)
+                    {
+                        stand_short_steps[index] + 1
+                    } else {
+                        0
+                    };
                     if stand_short_steps[index] >= STAND_EASE_STEPS {
                         stand_short_steps[index] = 0;
                         let measured = stand_measured.map_or(goal, |stood| stood[index]);
-                        let eased = if rising {
-                            is.position + STAND_EASE_MARGIN
-                        } else {
-                            is.position.saturating_sub(STAND_EASE_MARGIN)
-                        };
-                        if eased.abs_diff(measured) <= STAND_EASE_FLOOR {
+                        if stand_eased[index] {
+                            stand_ease_off[index] = true;
                             if let Some(up) = standing.as_mut() {
-                                up.pose[3 + index] = eased;
+                                up.pose[3 + index] = measured;
                             }
                             eprintln!(
-                                "lamp-body: step {}: {joint} held short of its stand: goal {measured} eased to {eased}, held at {}, load {}",
+                                "lamp-body: step {}: {joint} eased stand did not lower its load: goal {goal}, held at {}, load {} (over {STAND_EASE_LOAD}); back to its stand goal {measured}, not eased again this run",
                                 report.steps, is.position, is.load
                             );
-                        } else if !too_short_said[index] {
-                            too_short_said[index] = true;
-                            eprintln!(
-                                "lamp-body: step {}: {joint} held {short} short of its stand goal {goal}, load {}: past {STAND_EASE_FLOOR}, not eased",
-                                report.steps, is.load
-                            );
+                        } else {
+                            let eased = if rising {
+                                is.position + STAND_EASE_MARGIN
+                            } else {
+                                is.position.saturating_sub(STAND_EASE_MARGIN)
+                            };
+                            if eased.abs_diff(measured) <= STAND_EASE_FLOOR {
+                                if let Some(up) = standing.as_mut() {
+                                    up.pose[3 + index] = eased;
+                                }
+                                stand_eased[index] = true;
+                                eprintln!(
+                                    "lamp-body: step {}: {joint} held short of its stand: goal {measured} eased to {eased}, held at {}, load {}",
+                                    report.steps, is.position, is.load
+                                );
+                            } else if !too_short_said[index] {
+                                too_short_said[index] = true;
+                                eprintln!(
+                                    "lamp-body: step {}: {joint} held {short} short of its stand goal {goal}, load {}: past {STAND_EASE_FLOOR}, not eased",
+                                    report.steps, is.load
+                                );
+                            }
                         }
                     }
                 }
