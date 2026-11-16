@@ -25,7 +25,7 @@ use lamp_seen::{
     burst::Pace,
     endpoint::Endpoint,
     frames::{self, Sink, Taker},
-    gate, keep, link,
+    gate, hold, keep, link,
     mark::{BusRing, Marked},
     opt_in,
     opt_in::Reader as _,
@@ -524,6 +524,16 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
     let mut stood_up_us: Option<u64> = None;
     let mut pause = Pause::default();
     let mut keep = keep::Keep::default();
+    // The owner's recognised sitting held while a close person is seen
+    // (`hold.rs`); off, none, and every step is as without it.
+    let mut holds =
+        switched_on(std::env::var(hold::ENVIRONMENT).ok().as_deref()).then(hold::Hold::default);
+    if holds.is_some() {
+        eprintln!(
+            "lamp-seen: {}=on: the owner's recognised sitting is held while a close person is seen",
+            hold::ENVIRONMENT
+        );
+    }
     let mut doing_said: Option<Instant> = None;
     let started = Instant::now();
     let mut said_at: Option<Instant> = None;
@@ -574,12 +584,44 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         // No frame before the lamp has begun saying it will look.
         let said_on = said_back.said_on(&kept, &record);
         let now_inputs = readings.inputs(opted_in, said_on, now);
+        // Held, the presence and stranger rules are taken as holding while
+        // the newest pose answer sees a close person (`hold.rs`).
+        let answers = frames
+            .as_mut()
+            .and_then(|(_, marked)| marked.inner_mut().pose.as_mut())
+            .map(|pose| pose.answers())
+            .unwrap_or_default();
+        // A hold beginning now begins with the newest answer when its frame
+        // went under 30 s ago (the rate lets no new frame go yet).
+        let posture_now = frames
+            .as_ref()
+            .and_then(|(_, marked)| marked.inner().pose.as_deref());
+        let posture_frames = posture_now.is_some();
+        let recent_answer = posture_now.and_then(|pose| pose.recent_answer(now));
+        let seen = readings.on_track(now);
+        let (now_inputs, on_track) = hold::wire(
+            holds.as_mut(),
+            &answers,
+            &hold::Now {
+                now_us: now,
+                inputs: &now_inputs,
+                stood_up: came.stood_up,
+                forgot: came.forgot,
+                seen: &seen,
+                recent_answer,
+                posture: posture_frames,
+            },
+        );
+        if let Some(holds) = holds.as_mut() {
+            for note in holds.notes() {
+                eprintln!("lamp-seen: {}", note.line());
+            }
+        }
         let gate = gate::may_request(&now_inputs);
         // A stranger reading on the same tracked face pauses: the gate stays
         // closed, and the window and timers are kept unsaid, at most 5 s.
         let was_paused = pause.paused();
         let before = pause.counts();
-        let on_track = readings.on_track(now);
         let verdict = pause.step(now, &now_inputs, &on_track);
         let verdict = pause::after_stood_up(&mut pause, verdict, came.stood_up);
         if pause.counts().paused != before.paused {

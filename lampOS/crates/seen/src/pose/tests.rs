@@ -901,3 +901,58 @@ fn a_partial_answer_is_judged_by_the_neck_and_says_so() {
         )
     );
 }
+
+/// A COCO-17 `pose_2d` with the shoulders at these x (pixels, y 100) and
+/// confidences, every other joint at 0 and confident.
+fn with_shoulders(left: (f64, f64), right: (f64, f64)) -> Value {
+    let mut joints = vec![json!([0.0, 0.0]); 17];
+    let mut confs = vec![json!(0.9); 17];
+    joints[5] = json!([left.0, 100.0]);
+    confs[5] = json!(left.1);
+    joints[6] = json!([right.0, 100.0]);
+    confs[6] = json!(right.1);
+    json!({"pose_2d": {"graph_type": "coco", "joints": joints, "confs": confs}, "ergo": good()})
+}
+
+#[test]
+fn each_answer_gives_its_shoulders_share_of_the_width() {
+    let mock = Mock::start(vec![
+        Reply::Answer(with_shoulders((100.0, 0.9), (180.0, 0.8))),
+        Reply::Answer(with_shoulders((100.0, 0.9), (180.0, 0.1))),
+        Reply::Ergo(None),
+    ]);
+    let mut pose = pose(&mock);
+    assert!(pose.answers().is_empty());
+    for at in [0, 30, 60] {
+        pose.step(at * S, Ok(()), false);
+        send(&mut pose, at * S);
+        settle(&mut pose, at * S, Ok(()));
+    }
+    let answers = pose.answers();
+    assert_eq!(answers.len(), 3);
+    // 80 px apart in a 320 px frame; then a shoulder under the threshold,
+    // then no body: none.
+    assert!((answers[0].unwrap() - 0.25).abs() < 1e-6, "{answers:?}");
+    assert_eq!(&answers[1..], &[None, None]);
+    assert!(pose.answers().is_empty(), "taken once");
+}
+
+#[test]
+fn the_newest_answer_is_recent_for_30_s_from_its_frame() {
+    let mock = Mock::start(vec![Reply::Answer(with_shoulders(
+        (100.0, 0.9),
+        (180.0, 0.8),
+    ))]);
+    let mut pose = pose(&mock);
+    assert_eq!(pose.recent_answer(0), None);
+    pose.step(0, Ok(()), false);
+    send(&mut pose, 0);
+    settle(&mut pose, 0, Ok(()));
+    let recent = pose.recent_answer(29 * S).expect("under 30 s");
+    assert!((recent.unwrap() - 0.25).abs() < 1e-6, "{recent:?}");
+    assert_eq!(pose.recent_answer(30 * S), None, "the next frame is due");
+    // Read again, not taken; forgotten with the window.
+    assert!(pose.recent_answer(S).is_some());
+    pose.forget();
+    assert_eq!(pose.recent_answer(S), None);
+}
