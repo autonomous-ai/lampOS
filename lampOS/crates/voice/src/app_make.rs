@@ -339,6 +339,44 @@ pub fn not_kept(directory: &Path, key: &str, why: &str) {
     }
 }
 
+/// Why an app's ask still being made when lamp-voice stopped was not
+/// kept ([`cut_by_restart`]).
+pub const RESTARTED: &str = "the lamp restarted while making it; try again";
+
+/// At start, each of the app's asks still being made (nothing kept from it
+/// and no word of why not) has no one making it: makes run on this
+/// process's threads alone, gone with the process that stopped. Each is
+/// marked not kept, [`RESTARTED`], so the app stops showing "making" (the
+/// audit's B4, 16 Nov: a make cut off by a lamp-voice restart or update
+/// read `making` forever) and another ask may start. How many.
+pub fn cut_by_restart(directory: &Path) -> usize {
+    let cut = transact(directory, false, |entries| {
+        let mut cut = 0;
+        for entry in entries.iter_mut() {
+            if entry.get("not_kept").is_none() && made_of(directory, entry).is_none() {
+                entry["not_kept"] = json!(RESTARTED);
+                cut += 1;
+            }
+        }
+        (cut > 0, cut)
+    });
+    match cut {
+        Ok(cut) => {
+            let cut = cut.unwrap_or(0);
+            if cut > 0 {
+                eprintln!(
+                    "lamp-voice: an app's skill: {cut} ask(s) cut off by a restart, told as not kept"
+                );
+            }
+            cut
+        }
+        Err(error) => {
+            eprintln!("lamp-voice: an app's skill: asks cut off by a restart not marked: {error}");
+            0
+        }
+    }
+}
+
 /// The made skill the app's ask `entry` became, if it is kept: the newest
 /// from its task.
 fn made_of(directory: &Path, entry: &Value) -> Option<Value> {
@@ -970,7 +1008,8 @@ pub fn app_caller_is_lamp_cloud(caller: Option<&lamp_ipc::caller::Caller>) -> bo
     app_caller_may(caller, lamp_ipc::caller::uid_named(APP_CALLER_USER))
 }
 
-/// Listen at `path`, opened to `group` if given, on a thread of its own:
+/// Listen at `path`, opened to `group` if given, on a thread of its own,
+/// the asks a restart cut off marked first ([`cut_by_restart`]):
 /// each client in turn, its line read within [`LINE_WAIT`], answered as far
 /// as `on` lets; each make written by the model `chat` gives, each written
 /// skill kept taking no name of a skill in `installed`, each put on at
@@ -986,6 +1025,8 @@ pub fn serve(
     installed: PathBuf,
     caller_may: fn(Option<&lamp_ipc::caller::Caller>) -> bool,
 ) -> io::Result<()> {
+    // Before any ask is taken: none made now is this process's.
+    cut_by_restart(&keeping.directory);
     let (listener, bound) = crate::say::bind(path, group)?;
     std::thread::Builder::new()
         .name("lamp-voice-app-make-socket".into())
@@ -1176,6 +1217,43 @@ mod tests {
             serde_json::to_vec(entries).unwrap(),
         )
         .unwrap();
+    }
+
+    /// The audit's B4 (16 Nov): an ask still being made when lamp-voice
+    /// stopped reads `making` no more once it starts again: not kept, and
+    /// why. One kept, or not kept already, is left as it is; another ask
+    /// may start at once.
+    #[test]
+    fn an_ask_cut_off_by_a_restart_is_told_not_kept_at_start() {
+        let dir = folder("restart");
+        let made = dir.as_path();
+        assert_eq!(cut_by_restart(made), 0, "no asks, nothing made");
+        assert!(!made.join(APP_INDEX).exists());
+        begin(
+            made,
+            "make me a skill that dims the light at 10 pm",
+            "r1",
+            NOW,
+        )
+        .unwrap();
+        handed(made, "r1", "s1:7");
+        assert_eq!(status(made, Some("r1"), NOW + 1_000)["state"], "making");
+        // Refused while it is being made.
+        assert!(begin(made, "make me another", "r2", NOW + 2_000).is_err());
+        assert_eq!(cut_by_restart(made), 1);
+        let told = status(made, Some("r1"), NOW + 3_000);
+        assert_eq!(
+            (told["state"].as_str(), told["why"].as_str()),
+            (Some("not_kept"), Some(RESTARTED))
+        );
+        // Another ask starts at once; one kept is left to its own state.
+        begin(made, "make me another", "r3", NOW + 4_000).unwrap();
+        handed(made, "r3", "s1:8");
+        write_made(made, &[made_entry("s1:8:1", &"a".repeat(64))]);
+        assert_eq!(cut_by_restart(made), 0);
+        assert_eq!(status(made, Some("r3"), NOW + 5_000)["state"], "making");
+        assert_eq!(status(made, Some("r1"), NOW + 5_000)["why"], RESTARTED);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// An ask goes through its states: making (made, then kept and being

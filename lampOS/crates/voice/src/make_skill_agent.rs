@@ -1,7 +1,8 @@
 //! A voice make the lamp's own model couldn't make, handed to the lamp's
 //! own agent (a proposal on #6059, the owner's OK and the first builder's
 //! yes, 11 Nov): with `LAMP_MAKE_SKILL_AGENT=on` ([`ENVIRONMENT`], off
-//! unless set; off in the product's lamp-voice, #7014).
+//! unless set; on in the product's lamp-voice since 15 Nov, a code make by
+//! the agent passing 3 of 3 on lamp-9adf).
 //!
 //! The order: DeepSeek writes first ([`crate::make_skill_local`]). With
 //! Hermes as the lamp's agent (the tasks part's `lamp` target; only Hermes
@@ -12,7 +13,8 @@
 //! and request, to the agent, which writes the blocks again and gets the
 //! repairs. Its answers go through the very same checks. With no agent on
 //! the lamp DeepSeek keeps its repairs, as today; with no answer from the
-//! agent within [`WRITE_WITHIN`], DeepSeek's failure stands.
+//! agent within [`WRITE_WITHIN`], or its run busy or failed, DeepSeek's
+//! failure stands, said as the agent's ([`not_made_try`]).
 //!
 //! The agent writes in a skill run's namespace (#6643, the first builder's
 //! guard, 12 Nov 18:15): the make goes to lamp-tasks' make socket
@@ -272,6 +274,33 @@ impl std::fmt::Display for NotWritten {
     }
 }
 
+/// What the person hears when the agent made nothing for a reason of its
+/// own side (`why`, a [`NotWritten`] as [`Agent::write`] says it): lamp-tasks
+/// makes one at a time (`busy`), [`crate::made_skill::AGENT_BUSY_TRY`]; no
+/// answer within [`WRITE_WITHIN`], [`crate::made_skill::AGENT_LATE_TRY`];
+/// no agent after all ([`NotWritten::NoAgent`]),
+/// [`crate::made_skill::AGENT_MISSING`], what is missing and never "try
+/// again"; any other (`run_failed`, `no_answer`, an answer cut or unread),
+/// [`crate::made_skill::AGENT_FAILED_TRY`]. Never the tip to ask for one
+/// thing: the ask was not at fault.
+pub fn not_made_try(why: &str) -> &'static str {
+    if why == NotWritten::NoAgent.to_string() {
+        crate::made_skill::AGENT_MISSING
+    } else if why == NotWritten::Timeout.to_string() {
+        crate::made_skill::AGENT_LATE_TRY
+    } else if why
+        == NotWritten::Failed(format!("lamp-tasks didn't make it ({BUSY_CODE})")).to_string()
+    {
+        crate::made_skill::AGENT_BUSY_TRY
+    } else {
+        crate::made_skill::AGENT_FAILED_TRY
+    }
+}
+
+/// lamp-tasks' code for a make while another is made
+/// (`lamp_tasks::skill_make`, one at a time).
+const BUSY_CODE: &str = "busy";
+
 impl Agent {
     /// The agent for a voice make, with the switch on and a tasks part;
     /// none otherwise.
@@ -526,7 +555,8 @@ pub(crate) mod tests {
     /// A stub tasks part in a folder of its own: its `lamp` target runs
     /// `engine` (none for no target; "old" for a build with no make
     /// socket; "not_held_off" for one whose run can't be held off;
-    /// "no_namespace" for one whose wrapper has no make-home line), and
+    /// "no_namespace" for one whose wrapper has no make-home line; "busy"
+    /// for one making another; "run_failed" for a run that failed), and
     /// its make run answers each make's rules with `answer(rules)`, or
     /// never with `None`. The lines it was sent are kept.
     pub(crate) struct StubTasks {
@@ -612,14 +642,20 @@ pub(crate) mod tests {
                         "targets" => match engine {
                             Some(engine) => {
                                 let engine = match engine {
-                                    "old" | "not_held_off" | "no_namespace" => "hermes",
+                                    "old" | "not_held_off" | "no_namespace" | "busy"
+                                    | "run_failed" => "hermes",
                                     engine => engine,
                                 };
                                 json!({"ok":true,"targets":[{"alias":"lamp","engine":engine}]})
                             }
                             None => json!({"ok":true,"targets":[]}),
                         },
-                        "skill_make" if matches!(engine, Some("not_held_off" | "no_namespace")) => {
+                        "skill_make"
+                            if matches!(
+                                engine,
+                                Some("not_held_off" | "no_namespace" | "busy" | "run_failed")
+                            ) =>
+                        {
                             json!({"ok":false,"error":engine.unwrap(),"message":"no"})
                         }
                         "skill_make" => {
@@ -775,6 +811,47 @@ pub(crate) mod tests {
             Err(NotWritten::Timeout)
         );
         assert!(began.elapsed() < Duration::from_secs(4));
+    }
+
+    /// The audit's A3 (16 Nov): the agent busy, its run failed or no answer
+    /// in time is the agent's side, and each is said as such, never as the
+    /// tip to ask for one thing.
+    #[test]
+    fn the_agents_own_failures_are_each_said_as_the_agents() {
+        use crate::made_skill::{
+            AGENT_BUSY_TRY, AGENT_FAILED_TRY, AGENT_LATE_TRY, AGENT_MISSING, NOT_MADE_TRY,
+        };
+        let busy = stub(Some("busy"), Arc::new(|_: &str| Some("x".into())));
+        let why = busy.agent().write("S", "B", false).unwrap_err().to_string();
+        assert_eq!(not_made_try(&why), AGENT_BUSY_TRY, "{why}");
+        let failed = stub(Some("run_failed"), Arc::new(|_: &str| Some("x".into())));
+        let why = failed
+            .agent()
+            .write("S", "B", false)
+            .unwrap_err()
+            .to_string();
+        assert_eq!(not_made_try(&why), AGENT_FAILED_TRY, "{why}");
+        assert_eq!(
+            not_made_try(&NotWritten::Timeout.to_string()),
+            AGENT_LATE_TRY
+        );
+        // No agent after all: what is missing, never "try again" (El's P3
+        // on #7243).
+        assert_eq!(
+            not_made_try(&NotWritten::NoAgent.to_string()),
+            AGENT_MISSING
+        );
+        assert!(!AGENT_MISSING.contains("try again"), "{AGENT_MISSING}");
+        for line in [
+            AGENT_BUSY_TRY,
+            AGENT_LATE_TRY,
+            AGENT_FAILED_TRY,
+            AGENT_MISSING,
+        ] {
+            assert_eq!(crate::made_skill::plain_reason(line), line);
+            assert_eq!(crate::made_skill::not_made_line(line), line);
+            assert_ne!(line, NOT_MADE_TRY);
+        }
     }
 
     /// The owner's ask, 13 Nov: a make naming mail, a calendar, Drive or

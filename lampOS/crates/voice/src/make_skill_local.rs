@@ -2445,15 +2445,48 @@ fn repaired(
     (made, refused_before)
 }
 
+/// What stands when the agent made nothing for a reason of its own side
+/// (`why`: lamp-tasks busy, its run failed, no answer within its 90 s):
+/// DeepSeek's failure (`stood`), said as the agent's
+/// ([`crate::make_skill_agent::not_made_try`]) when it would be the tip to
+/// ask for one thing ([`made_skill::NOT_MADE_TRY`], [`made_skill::NOT_KEPT_TRY`])
+/// or DeepSeek's `cannot:` of what the agent could make (the audit's A3,
+/// 16 Nov: "each morning read my unread mail" with the agent busy was told
+/// "Try asking for one thing"). A skill DeepSeek made after all, a lamp
+/// reason of its own (it can't do that yet, they have it already) and the
+/// brief's own refusals stand as they are.
+fn agent_side(
+    stood: Result<Made, Refused>,
+    why: &str,
+    models_cannot: &std::cell::Cell<bool>,
+) -> Result<Made, Refused> {
+    let agents = |said: &str| match models_cannot.get() {
+        true => !made_skill::briefs_own_refusal(said) || made_skill::briefs_send_refusal(said),
+        false => [made_skill::NOT_MADE_TRY, made_skill::NOT_KEPT_TRY]
+            .contains(&made_skill::plain_reason(said).as_str()),
+    };
+    match stood {
+        Err(Refused(said, lines)) if agents(&said) => {
+            models_cannot.set(false);
+            Err(Refused(
+                crate::make_skill_agent::not_made_try(why).to_owned(),
+                lines,
+            ))
+        }
+        stood => stood,
+    }
+}
+
 /// A make DeepSeek didn't make (`deepseek`), handed to the lamp's agent
 /// `agent`, called `engine` (`LAMP_MAKE_SKILL_AGENT`): the same system
 /// prompt and `brief`, its answer through the same checks (`kept`) and
 /// with repairs of its own, each begun only while one more answer fits
 /// the agent's [`crate::make_skill_agent::MAKE_WITHIN`]. With no answer
-/// from it at first (none within its 45 s, no make run, or no agent after
-/// all), DeepSeek's failure stands, as without the switch; a make sent
-/// straight to the agent ([`Before::NotAsked`]) then gets DeepSeek's one
-/// try, given no repairs.
+/// from it at first (none within its 90 s, its run busy or failed, no make
+/// run, or no agent after all), DeepSeek's failure stands, as without the
+/// switch, said as the agent's but for no make run ([`agent_side`]); a
+/// make sent straight to the agent ([`Before::NotAsked`]) then gets
+/// DeepSeek's one try, given no repairs.
 fn handed_to_agent(
     deepseek: Before<'_>,
     request: &str,
@@ -2497,8 +2530,9 @@ fn handed_to_agent(
                 deepseek.journaled()
             );
             // No answer of the agent's was taken, so whether the last was a
-            // `cannot:` is still DeepSeek's (`models_cannot`).
-            return deepseek.stands();
+            // `cannot:` is still DeepSeek's (`models_cannot`); said as the
+            // agent's own failure ([`agent_side`]).
+            return agent_side(deepseek.stands(), &why, models_cannot);
         }
     };
     let (made, _) = repaired(
@@ -5355,7 +5389,12 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             std::sync::Arc::new(|_: &str| Some(good())),
         );
         let silent = hermes_with_services(None);
-        for (n, agent, handed) in [(0, &old, 0), (1, &silent, 1)] {
+        // No make run: DeepSeek's failure as it is; the agent silent: said
+        // as the agent's (the audit's A3, 16 Nov).
+        for (n, agent, handed, said) in [
+            (0, &old, 0, made_skill::NOT_MADE_TRY),
+            (1, &silent, 1, made_skill::AGENT_LATE_TRY),
+        ] {
             let (url, served) = service(vec![(200, faces())]);
             let told = make_with_by(
                 0,
@@ -5368,10 +5407,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 Some(&agent.agent()),
             );
             assert!(told.get("made").is_none(), "{told}");
-            assert_eq!(
-                told["error"],
-                format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
-            );
+            assert_eq!(told["error"], format!("the skill couldn't be made: {said}"));
             assert_eq!(served.join().unwrap(), 1);
             assert_eq!(agent.hand_overs(), handed);
         }
@@ -5485,15 +5521,48 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
         assert_eq!(none.hand_overs(), 0);
+        // Silent past its time: DeepSeek's failure stands, said as the
+        // agent's (the audit's A3, 16 Nov), never the tip to ask for one
+        // thing.
         let silent = agent_answering(vec![None]);
         let (url, served) = service(vec![(200, faces())]);
         let told = made_by(&keeping, url, Some(&silent.agent()), NOW + 1);
         assert_eq!(
             told["error"],
-            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
+            format!("the skill couldn't be made: {}", made_skill::AGENT_LATE_TRY)
         );
         assert_eq!(served.join().unwrap(), 1);
         assert_eq!(silent.hand_overs(), 1);
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The audit's A3 (16 Nov): the agent busy with another make, or its
+    /// run failed, is the agent's side: the person hears so, and what to
+    /// do, never "Try asking for one thing"; told to the model whole.
+    #[test]
+    fn an_agent_busy_or_failed_is_said_as_the_agents_never_the_tip() {
+        let (root, keeping) = keeping("agent-busy");
+        for (n, engine, said) in [
+            (0, "busy", made_skill::AGENT_BUSY_TRY),
+            (1, "run_failed", made_skill::AGENT_FAILED_TRY),
+        ] {
+            let tasks = crate::make_skill_agent::tests::stub(
+                Some(engine),
+                std::sync::Arc::new(|_: &str| Some(good())),
+            );
+            let (url, served) = service(vec![(200, faces())]);
+            let told = made_by(&keeping, url, Some(&tasks.agent()), NOW + n);
+            assert!(told.get("made").is_none(), "{told}");
+            assert_eq!(
+                told["error"],
+                format!("the skill couldn't be made: {said}"),
+                "{engine}"
+            );
+            assert_eq!(told["next"], made_skill::not_made_in_their_language(said));
+            assert_eq!(served.join().unwrap(), 1);
+            assert_eq!(tasks.hand_overs(), 1);
+        }
         assert!(made_skill::entries(&keeping.directory).is_empty());
         let _ = std::fs::remove_dir_all(&root);
     }
