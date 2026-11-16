@@ -4755,6 +4755,21 @@ the same code for both writers.
   folder and the skills, and lamp-control's `control.sock` but never
   `admin.sock`. Its terminal and tools work only inside that namespace,
   and no token is minted.
+- **On OpenClaw too, through the one run path
+  (`LAMP_MAKE_AGENT_ONE_PATH=on`, off unless set, in no unit; #7245).**
+  With it, the make is handed to the lamp's agent whenever lamp-tasks says
+  it takes runs, Hermes or OpenClaw (`make_skill_agent::ONE_PATH_ENGINES`),
+  and its line carries `"one_path":true`. lamp-tasks keeps Hermes's
+  namespace runner for Hermes; for OpenClaw it sends the rules as one turn
+  through `harness new <engine>` in a fresh make folder (#7133's one run
+  path), reads `answer.md` back, mints no token and opens no skill-start
+  run, and removes the session and the folder however the make ends
+  ([tasks.md](tasks.md), "A voice make on OpenClaw, through the one run
+  path"). OpenClaw can run only skill-start, so its run skips the guide's
+  `lamp-skills pack`; the voice's checks and repairs are the same. A
+  `cannot:` goes on verbatim to #7234's fallback. The journal says "the
+  lamp's agent is OpenClaw: handed over on the one run path". Off, only
+  Hermes is handed a make, as above.
 - **Its network: `LAMP_MAKE_AGENT_NET`** (set in no unit; the owner's ask,
   12 Nov, the first builder's ruling, 12 Nov 19:14). By default
   the run keeps the network, as V1's agent did, and reaches the model at
