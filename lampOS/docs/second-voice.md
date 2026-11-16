@@ -843,11 +843,18 @@ order is kept. A written turn is the same from the chat on.
     something: `thinking today (UTC): N chat answers, P prompt tokens (H
     from the cache), C completion tokens; D turns declined`, and by model
     when there is more than one.
-  - **Not counted:** an answer cut before it ends (the service still
-    counts its prompt), and speech in either direction. Counts made in
-    the last minute before 00:00 UTC may be written into the new day,
-    and those of the last minute before the voice or its worker stops
-    are lost.
+  - **Not counted, and it is more than half of a day:** speech in either
+    direction. By the relay's own count of that lamp's day (Backend on
+    #7347, 16 Nov), thinking was about 38% of what the day cost, listening
+    30%, speaking 27% and the second model 4%. So this tally says what a
+    day's thinking cost and how many turns were declined, not what the
+    day cost; listening and speaking are counted next (#7347). The
+    relay also counts a token its cache held as far less than a fresh
+    one, which the two token counts here keep apart.
+  - **Also not counted:** an answer cut before it ends (the service still
+    counts its prompt). Counts made in the last minute before 00:00 UTC
+    may be written into the new day, and those of the last minute before
+    the voice or its worker stops are lost.
   - **Not yet:** the lamp does not read how much of its day the relay says
     is used, warn, or shed anything near the limit. Those are #7347's
     next parts. A reset does not wipe the file yet.
