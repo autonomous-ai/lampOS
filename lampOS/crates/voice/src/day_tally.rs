@@ -29,8 +29,13 @@
 //!   what a whole day cost. Counts made in the last [`FLUSH_EVERY`] before
 //!   midnight may be written into the new day, and those of the last
 //!   [`FLUSH_EVERY`] before the process stops are lost. Only a later day
-//!   turns the day over: a clock that has gone back goes on counting into
-//!   the day the file is on.
+//!   turns the day over: a clock that has gone back across midnight goes
+//!   on counting into the day the file is on.
+//! - The lamp's clock is not always right. Until it is set
+//!   ([`CLOCK_SET_FROM_DAY`]) nothing is written and the counts wait in
+//!   memory, so a boot before the clock is set neither loses a day nor
+//!   moves it. A file more than a day ahead of a set clock was written
+//!   under a clock set ahead: it is brought back to today with its counts.
 //! - Once an hour in which this process counted something, the journal
 //!   has today's totals in one line ([`told`]).
 
@@ -66,6 +71,9 @@ const MOST_MODELS: usize = 8;
 const MOST_NAME: usize = 64;
 const OTHER: &str = "other";
 const DAY_S: u64 = 86_400;
+/// The first day a clock can truly say: 1 Nov 2026, before this was
+/// written. A clock that reads an earlier day is not set yet.
+const CLOCK_SET_FROM_DAY: u64 = 20_758;
 
 /// One model's chat answers in a day.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -202,9 +210,13 @@ pub fn start(directory: &Path) {
         .name("lamp-voice-day-tally".into())
         .spawn(move || {
             let mut told_hour = None;
+            let mut told_waiting = false;
             loop {
                 std::thread::sleep(FLUSH_EVERY);
                 let now_s = unix_s();
+                if !clock_is_set(now_s) && !std::mem::replace(&mut told_waiting, true) {
+                    eprintln!("lamp-voice: the day's tally waits for the clock to be set");
+                }
                 match flush(&directory, now_s) {
                     Ok(Some(tally)) if told_hour != Some(now_s / 3_600) => {
                         told_hour = Some(now_s / 3_600);
@@ -318,12 +330,22 @@ fn unix_s() -> u64 {
         .map_or(0, |since| since.as_secs())
 }
 
+/// Whether the clock reads a day it can truly be.
+fn clock_is_set(now_s: u64) -> bool {
+    now_s / DAY_S >= CLOCK_SET_FROM_DAY
+}
+
 /// This process's counts added to [`FILE`] under [`LOCK`], for the UTC day
 /// `now_s` is in: read, the day turned over if it has changed, the counts
 /// added, written whole beside it and moved over it. `None` when this
 /// process had nothing to add and the day had not changed: nothing is
 /// written. Counts that could not be written are kept for the next time.
 fn flush(directory: &Path, now_s: u64) -> io::Result<Option<Tally>> {
+    // Until the clock is set nothing is written and nothing is taken: the
+    // counts wait in memory for a day that can be named.
+    if !clock_is_set(now_s) {
+        return Ok(None);
+    }
     // The sound counted since the last time, as whole milliseconds; what is
     // left of a millisecond waits for the next.
     let (heard_ms, left) = ms_of(HEARD_SAMPLES.swap(0, Ordering::Relaxed));
@@ -364,15 +386,24 @@ fn add(directory: &Path, now_s: u64, counts: &Day) -> io::Result<Option<Tally>> 
     };
     let before = tally.clone();
     let day = now_s / DAY_S;
-    // Only a later day turns the day over. A clock that has gone back, by a
-    // correction across midnight or because it is not set yet, goes on
-    // counting into the day the file is on (Heron on #7355).
     if day > tally.today.day {
+        // Only a later day turns the day over.
         let ended = std::mem::take(&mut tally.today);
         // Only the day just before is yesterday; an older one is let go.
         tally.yesterday = (ended.day + 1 == day && !ended.is_empty()).then_some(ended);
         tally.today.day = day;
+    } else if tally.today.day > day + 1 {
+        // The file is more than a day ahead of a clock that is set, so it
+        // was written under a clock set ahead and since put right (Heron on
+        // #7355). Its counts are a day's at most and the newest there are,
+        // so they are kept as today's; a day before that is not the day
+        // before today is let go.
+        tally.today.day = day;
+        tally.yesterday = tally.yesterday.take().filter(|kept| kept.day + 1 == day);
     }
+    // Otherwise it is the file's day still, or the clock has gone back
+    // across midnight, and that goes on counting into the day the file is
+    // on (Heron on #7355).
     tally.today.add(counts);
     if tally == before {
         return Ok(None);
@@ -611,8 +642,8 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
-    /// A clock that goes back, across midnight or to before it was set,
-    /// turns nothing over: today's counts stay, and the new ones join them.
+    /// A clock that goes back across midnight turns nothing over: today's
+    /// counts stay, and the new ones join them.
     #[test]
     fn a_clock_gone_back_keeps_todays_counts() {
         let dir = folder("back");
@@ -622,14 +653,57 @@ mod tests {
         let today = add(&dir, early, &one("m", usage.clone())).unwrap().unwrap();
         assert_eq!(today.today.day, 20_000);
         assert_eq!(today.yesterday.as_ref().unwrap().day, 19_999);
-        // Back across midnight, and then to a clock not yet set.
-        for now_s in [early - 60, 1_000] {
-            let kept = add(&dir, now_s, &one("m", usage.clone())).unwrap().unwrap();
-            assert_eq!(kept.today.day, 20_000, "{now_s}");
-            assert_eq!(kept.yesterday, today.yesterday, "{now_s}");
-        }
-        assert_eq!(read(&dir).unwrap().today.all().answers, 3);
+        let kept = add(&dir, early - 60, &one("m", usage.clone()))
+            .unwrap()
+            .unwrap();
+        assert_eq!(kept.today.day, 20_000);
+        assert_eq!(kept.yesterday, today.yesterday);
+        assert_eq!(read(&dir).unwrap().today.all().answers, 2);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A file written under a clock set far ahead is brought back to today
+    /// with its counts once the clock is right, and a day before it that
+    /// is not the day before today is let go. The next day then turns over
+    /// as any other.
+    #[test]
+    fn a_file_from_a_clock_set_ahead_is_brought_back_with_its_counts() {
+        let dir = folder("ahead");
+        let usage = json!({"prompt_tokens": 100, "completion_tokens": 10});
+        let ahead = 25_000 * DAY_S + 30;
+        add(&dir, ahead - DAY_S, &one("m", usage.clone())).unwrap();
+        let wrong = add(&dir, ahead, &one("m", usage.clone())).unwrap().unwrap();
+        assert_eq!(wrong.today.day, 25_000);
+        assert_eq!(wrong.yesterday.as_ref().unwrap().day, 24_999);
+        let right = 20_800 * DAY_S + 30;
+        let back = add(&dir, right, &one("m", usage.clone())).unwrap().unwrap();
+        assert_eq!(back.today.day, 20_800);
+        assert_eq!(back.today.all().answers, 2);
+        assert_eq!(back.yesterday, None);
+        // Nothing to add: the file is still brought back, once.
+        let dir_idle = folder("ahead-idle");
+        add(&dir_idle, ahead, &one("m", usage.clone())).unwrap();
+        let idle = add(&dir_idle, right, &Day::default()).unwrap().unwrap();
+        assert_eq!(idle.today.day, 20_800);
+        assert_eq!(idle.today.all().answers, 1);
+        assert!(add(&dir_idle, right, &Day::default()).unwrap().is_none());
+        let next = add(&dir, right + DAY_S, &one("m", usage)).unwrap().unwrap();
+        assert_eq!(next.today.day, 20_801);
+        assert_eq!(next.yesterday.unwrap().all().answers, 2);
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::remove_dir_all(&dir_idle);
+    }
+
+    /// Until the clock reads a day it can truly be, nothing is written and
+    /// nothing is taken from the counts waiting in memory.
+    #[test]
+    fn until_the_clock_is_set_nothing_is_written() {
+        assert!(!clock_is_set(0));
+        assert!(!clock_is_set(CLOCK_SET_FROM_DAY * DAY_S - 1));
+        assert!(clock_is_set(CLOCK_SET_FROM_DAY * DAY_S));
+        let dir = folder("unset");
+        assert!(flush(&dir, 1_000).unwrap().is_none());
+        assert!(!dir.exists());
     }
 
     /// A file that is not a tally is begun again rather than failing the
