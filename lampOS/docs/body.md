@@ -1035,7 +1035,7 @@ after lamp-52e6's runs on #4501); off unless the unit sets
   the guard on. A seated lamp is said seated on its health before any warm
   joint (#7281).
 - **A hot seat stands again once cool** (`LAMP_BODY_SEAT_COOLS=on`, #7281,
-  on in the product unit; `StrainGuard::cools`). A seat for heat ends by
+  off in the product until its row on lamp-52e6; `StrainGuard::cools`). A seat for heat ends by
   itself once the joint that seated it has read under 50 °C
   (`StrainGuard::COOL`, `bus_out::WARM` less 5: 12 under the 62 it sat
   down at, over a healthy standing elbow's 46 to 49 on lamp-4ace and
