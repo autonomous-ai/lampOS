@@ -2650,6 +2650,12 @@ struct Started<'a> {
     make: Option<crate::harness::EngineKind>,
     /// Whether a `close --now` of its session failed.
     not_closed: bool,
+    /// Whether Harness made it a session (a make's end is journaled only
+    /// then).
+    opened: bool,
+    /// A make whose `harness new` was uncertain or pending: what is live in
+    /// its folder is closed before the folder goes (#7245).
+    uncertain: bool,
 }
 
 impl Started<'_> {
@@ -2676,6 +2682,33 @@ impl Started<'_> {
 impl Drop for Started<'_> {
     fn drop(&mut self) {
         self.close();
+        if self.uncertain
+            && let Some(folder) = self.folder.to_str()
+        {
+            match self.cli.live_in(&self.machine, folder) {
+                Ok(live) => {
+                    for agent in live {
+                        let closed =
+                            self.cli
+                                .close_now(&self.machine, &agent, crate::harness::CLOSE_BUDGET);
+                        match closed {
+                            Ok(_) => {
+                                eprintln!("tasks: make: closed {agent} an uncertain new made late")
+                            }
+                            Err(why) => {
+                                self.not_closed = true;
+                                eprintln!(
+                                    "tasks: make: {agent} an uncertain new made was not closed: {why}"
+                                );
+                            }
+                        }
+                    }
+                }
+                Err(code) => {
+                    eprintln!("tasks: make: harness ps after an uncertain new: {code}");
+                }
+            }
+        }
         let removed = match std::fs::remove_dir_all(&self.folder) {
             Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
                 eprintln!(
@@ -2687,7 +2720,7 @@ impl Drop for Started<'_> {
             _ => true,
         };
         drop(self.token.take());
-        if let Some(engine) = self.make {
+        if let Some(engine) = self.make.filter(|_| self.opened) {
             let engine = engine.argument();
             if removed && !self.not_closed {
                 eprintln!("tasks: make: {engine} session closed, folder removed");
@@ -2998,6 +3031,8 @@ impl Runner for HarnessRunner {
             live: None,
             make: self.makes.then_some(engine),
             not_closed: false,
+            opened: false,
+            uncertain: false,
         };
         // Always before the launch. A per-run agent's wrapper reads it at
         // its start; a gateway agent's tools never see that wrapper, and
@@ -3120,6 +3155,13 @@ impl Runner for HarnessRunner {
             LaunchOutcome::Joined { .. } | LaunchOutcome::JoinedOn { .. } => {
                 return Err("Harness handed the run to a session already there".into());
             }
+            // A make has no token for a wrapper to refuse (#7245): what
+            // Harness may still have made is looked for in the make's own
+            // folder and closed by the guard, before the folder goes.
+            LaunchOutcome::Pending { .. } | LaunchOutcome::Uncertain { .. } if self.makes => {
+                started.uncertain = true;
+                return Err("Harness didn't start the make for sure, so it was given up".into());
+            }
             // A creation Harness may still finish: the folder and the token
             // file go with this guard, so it starts with no token, and its
             // wrapper ends it ("no token for run").
@@ -3131,6 +3173,7 @@ impl Runner for HarnessRunner {
             }
         };
         started.agent = Some(launched.clone());
+        started.opened = true;
         drop(token);
         if self.makes {
             eprintln!(
