@@ -70,7 +70,7 @@ pub fn function(skills: &[Tool]) -> Option<Tool> {
 
 fn built(skills: &[Tool]) -> Tool {
     let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
-    Tool {
+    let mut tool = Tool {
         name: NAME.to_owned(),
         description: "Use one of your skills, listed under \"Your skills\" in your instructions, each with when to use it. Call this when what someone asks is what a skill's line says: give the skill's name, and its choice and its yes-or-no only when its line names them. The call runs the skill: then do what its answer tells you, and don't call it again in this turn for the same ask unless its answer tells you to; a new ask in a later line is a call of its own.".to_owned(),
         parameters: Some(json!({
@@ -93,7 +93,23 @@ fn built(skills: &[Tool]) -> Tool {
             "required": ["skill"]
         })),
         silent: false,
+    };
+    // A question about any skill on the lamp, told from the lamp's own
+    // records (`LAMP_SKILL_STATE_TOLD`, #7335, [`crate::skill_about`]):
+    // `about`, given alone, so `skill` is no longer required. Only with the
+    // switch: off, the function is as before, byte for byte.
+    if crate::skill_about::on()
+        && let Some(parameters) = tool.parameters.as_mut()
+    {
+        parameters["properties"][crate::skill_about::ABOUT] = json!({
+            "type": "string",
+            "description": crate::skill_about::ABOUT_TOLD
+        });
+        parameters["required"] = json!([]);
+        tool.description
+            .push_str(crate::skill_about::USE_SKILL_TOLD);
     }
+    tool
 }
 
 /// The key of the note a skill's answer through `use_skill` carries ([`ran`]).

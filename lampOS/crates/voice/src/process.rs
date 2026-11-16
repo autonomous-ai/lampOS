@@ -1326,6 +1326,17 @@ fn worker_command(
             role,
             var(crate::skill_task_yes::ENVIRONMENT).as_deref(),
         ))
+        .envs(skill_state_told_worker_environment(
+            role,
+            var(crate::skill_about::ENVIRONMENT).as_deref(),
+        ))
+        .envs(
+            skill_state_told_worker_environment(
+                role,
+                var(crate::skill_about::PRESENT_ENVIRONMENT).as_deref(),
+            )
+            .map(|_| (crate::skill_about::PRESENT_ENVIRONMENT, "on")),
+        )
         .envs(made_scripts_worker_environment(
             role,
             var(crate::made_skill::SCRIPTS_ENVIRONMENT).as_deref(),
@@ -1488,6 +1499,19 @@ fn skill_tasks_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::skill_task_yes::ENVIRONMENT, "on"))
+}
+
+// A question about a skill on the lamp told from its records
+// (`skill_about::on`), passed the same narrow way: the exact `on`, to the
+// two routes whose `make_skill` answers it; and `LAMP_NUDGES_PRESENT`'s
+// exact `on` beside it, so a skill's `[present]` is read as lamp-skills
+// reads it.
+fn skill_state_told_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::skill_about::ENVIRONMENT, "on"))
 }
 
 // An agent skill added from a file (`upload_agent::on`), passed the same
@@ -2793,6 +2817,14 @@ mod tests {
             ),
             (
                 crate::skill_task_yes::ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::skill_about::ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::skill_about::PRESENT_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
             (
