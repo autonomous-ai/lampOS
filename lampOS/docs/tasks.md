@@ -690,7 +690,8 @@ and has to be made there first. A `new` Harness refuses as no daemon runs
 on this computer ("Harness is not running here. Start it with `harness
 start`.", Harness CLI's `NOT_RUNNING`, on stderr or stdout) ends `not_sent`
 with `harness_not_running`: nothing started (#7275). Its dispatch line
-carries Harness's stderr whole, on one line. The part then starts the
+carries stderr's not-running line whole; any other stderr line is cut as
+usual (above), as is all of stderr when the answer came on stdout only. The part then starts the
 daemon and tries that hand-over once more ("Harness's daemon, started on a
 not-running answer", below). Without the switch, and for every other
 failed `new`, the task stays `uncertain` with `new_failed`, and the lamp
@@ -2636,10 +2637,11 @@ credential of its own.
   Harness app stops its daemon too, as a sign-in does, and nothing started
   it again, so every hand-over to the lamp's own target then said "Harness
   is not running here". When a sign-in read turns from signed in to signed
-  out while the lamp's own engine may be its target, the part runs
-  `harness start --restart` (`daemon_restart`, with the same tries and the
-  same wait for no busy task) and journals `Harness signed out: its daemon
-  is started again for the lamp's own target (#7275)`.
+  out while the lamp's own engine may be its target, the part runs a plain
+  `harness start` (not `--restart`: it starts the stopped daemon and leaves
+  a running one alone, so it never waits for busy tasks while every
+  hand-over fails; the same tries) and journals `Harness signed out: its
+  daemon is started again for the lamp's own target (#7275)`.
 - **Started on a not-running answer (#7275).** The safety net when the
   daemon is gone anyway (it died, or a start above failed): a hand-over
   `new` answered `harness_not_running` makes the daemon's start due at once

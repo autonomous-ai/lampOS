@@ -2684,6 +2684,31 @@ fn a_new_harness_answers_not_running_here_is_not_sent_and_said_whole() {
             );
         }
     }
+    // Only stderr's not-running line is said whole: any other line, and
+    // all of stderr when the answer came on stdout only, keeps
+    // `said_of_stderr`'s cut, with nothing of the person's words.
+    let mut request = launch();
+    request.prompt = "Summarise Quarterly Payroll for Bob".into();
+    for (step, said) in [
+        (
+            json!({"exit": 1, "stderr": format!("{NOT_RUNNING}Summarise Quarterly Payroll for Bob\n")}),
+            ", stderr: Harness is not running here. Start it with `harness start`.)",
+        ),
+        (
+            json!({"exit": 1, "stdout": "Harness is not running here.\n", "stderr": "Summarise Quarterly Payroll for Bob\n"}),
+            "",
+        ),
+    ] {
+        let mut rig = Rig::new();
+        rig.new_step(step.clone());
+        let (outcome, lines) = journal_of(&mut rig, &request);
+        assert_eq!(outcome, not_sent("harness_not_running"), "{step}");
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        if !said.is_empty() {
+            assert!(lines[0].ends_with(said), "{}", lines[0]);
+        }
+        assert_said_nothing_private(&lines[0], &request);
+    }
 }
 
 /// The shared rule for any `harness new` caller ([`DaemonOnce::run`]): it
