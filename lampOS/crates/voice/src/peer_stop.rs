@@ -59,6 +59,23 @@ fn closed_peer_kind(kind: io::ErrorKind) -> bool {
     }
 }
 
+/// Whether a receive on a worker's control socket that failed with `kind`, in the coordinator's
+/// cleanup, is only the closed socket of a worker that has ended: off Linux, where macOS answers
+/// a receive on a datagram socket whose peer has gone with ECONNRESET (`os error 54`, run 4 of the
+/// Mac start, sim-macos on #7407). The worker's exit, read after the drain, is still the check.
+/// On Linux this is never true: its cleanup is as it was.
+pub(crate) fn control_receive_of_ended_worker(kind: io::ErrorKind) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        let _ = kind;
+        false
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        closed_peer_kind(kind)
+    }
+}
+
 /// Whether `error` is the reference link between capture and speaker
 /// refused by the other side (ECONNREFUSED on Linux, ECONNRESET on macOS, on
 /// a send or a receive): its peer has closed its socket. The coordinator's
@@ -87,6 +104,31 @@ pub(crate) fn stopped_with_peer(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The cleanup's excuse for a control receive from an ended worker: only the closed-peer kind
+    /// the OS gives, and none at all on Linux, so Linux's cleanup is as it was.
+    #[test]
+    fn a_control_receive_from_an_ended_worker_is_excused_off_linux_only() {
+        let reset = io::ErrorKind::ConnectionReset;
+        assert_eq!(
+            control_receive_of_ended_worker(reset),
+            !cfg!(target_os = "linux")
+        );
+        assert_eq!(
+            control_receive_of_ended_worker(io::ErrorKind::ConnectionRefused),
+            !cfg!(target_os = "linux")
+        );
+        for other in [
+            io::ErrorKind::PermissionDenied,
+            io::ErrorKind::BrokenPipe,
+            io::ErrorKind::InvalidData,
+            io::ErrorKind::TimedOut,
+            io::ErrorKind::Other,
+        ] {
+            assert!(!control_receive_of_ended_worker(other), "{other:?}");
+        }
+    }
+
     use crate::process::{SessionDirectory, new_boot};
     use lamp_turn_owner::{Controller, MonoTime};
 
