@@ -1072,6 +1072,28 @@ pub fn answered(answer: &str) -> Result<String, String> {
     }
 }
 
+/// lamp-tasks' code for a run granted `net` (`LAMP_TASK_NET`) it refused
+/// before anything of it ran, because the lamp's agent can't be given its
+/// way out (`lamp_tasks::skill_task::NO_NET`, #7200): a gateway default
+/// such as OpenClaw, or a wrapper whose round hasn't run.
+pub const NO_NET: &str = "no_net";
+
+/// What the lamp says aloud when lamp-tasks refused a run as [`NO_NET`]:
+/// the person asked for something that needs the internet, and hearing
+/// nothing would leave them waiting.
+pub const NO_NET_SAID: &str =
+    "I can't run that one: it needs the internet, and this lamp's agent can't reach it yet.";
+
+/// The plain line to say of lamp-tasks' answer to a hand-over (`answer`)
+/// when it refused the run in a way the person must hear: [`NO_NET_SAID`]
+/// for [`NO_NET`]. None for any other answer.
+pub fn refusal_said(answer: &str) -> Option<&'static str> {
+    let answer: serde_json::Value = serde_json::from_str(answer.trim()).ok()?;
+    (answer.get("ok").and_then(serde_json::Value::as_bool) != Some(true)
+        && answer["error"] == NO_NET)
+        .then_some(NO_NET_SAID)
+}
+
 /// The most sentences of an agent's answer said ([`told`]): as many as a
 /// read's lines, its count and [`crate::service_read::MOST_ITEMS`] items.
 pub const MOST_TOLD_LINES: usize = 11;
@@ -1135,6 +1157,38 @@ pub fn told(answer: &str) -> Option<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #7200: a run granted the internet that lamp-tasks can't give its
+    /// way out (OpenClaw the default: its turns run in its gateway's
+    /// namespaces) is said aloud in plain words, never the journal's, and
+    /// not counted against the day's runs (nothing of it ran). Any other
+    /// answer says nothing here.
+    #[test]
+    fn a_net_run_lamp_tasks_refused_is_said_in_plain_words() {
+        assert_eq!(NO_NET, lamp_tasks::skill_task::NO_NET);
+        let openclaw = serde_json::json!({
+            "ok": false,
+            "error": lamp_tasks::skill_task::NO_NET,
+            "message": lamp_tasks::skill_task::net_refused(
+                "the lamp's default agent (openclaw) runs its turns in its gateway's namespaces, which no one run can be held in"
+            ),
+        })
+        .to_string();
+        assert_eq!(refusal_said(&openclaw), Some(NO_NET_SAID));
+        assert!(!NO_NET_SAID.contains("openclaw") && !NO_NET_SAID.contains("LAMP_"));
+        assert!(matches!(
+            crate::service_write::agent_answered(&openclaw),
+            Err(crate::service_write::Unrun::NotTaken(_))
+        ));
+        for other in [
+            r#"{"ok":true,"id":0}"#,
+            r#"{"ok":false,"error":"run_failed","message":"Harness failed"}"#,
+            r#"{"ok":true,"error":"no_net"}"#,
+            "not json",
+        ] {
+            assert_eq!(refusal_said(other), None, "{other}");
+        }
+    }
 
     /// What the agent found comes back in lamp-tasks' answer, and is said
     /// a sentence a line, its markdown left out; an answer without it, a

@@ -167,6 +167,7 @@ fn lamp_of(engine: &str, text: &str) -> Lamp {
         "bin2",
         "bin3",
         "out",
+        "egress",
     ] {
         fs::create_dir(top.join(dir)).unwrap();
     }
@@ -180,6 +181,10 @@ fn lamp_of(engine: &str, text: &str) -> Lamp {
     fs::set_permissions(&stub, fs::Permissions::from_mode(0o755)).unwrap();
     let text = text
         .replace(RUNS, top.join("runs").to_str().unwrap())
+        .replace(
+            hermes_install::EGRESS_DIR,
+            top.join("egress").to_str().unwrap(),
+        )
         .replace(
             hermes_install::RUN_FOLDERS,
             top.join("project").to_str().unwrap(),
@@ -863,6 +868,124 @@ fn hermes_on_the_one_path_has_its_data_and_approvals_off_only_in_a_run() {
     assert!(lamp.read("argv").is_none());
     assert!(!file.exists());
     assert!(String::from_utf8_lossy(&out.stderr).contains("hermes: no forwarder token"));
+}
+
+/// (#7200) A skill's run granted the internet on the one run path: its
+/// egress socket and fresh home are found by its run id, since Harness
+/// passes none of lamp-tasks' variables. A run whose socket lamp-tasks made
+/// gets `LAMP_NS_EGRESS=skill-<run-id>` and, for Hermes, its fresh home as
+/// its make's home (`LAMP_NS_MAKE`, `HERMES_HOME` under it), `--net` as
+/// every run; a run with none gets no `LAMP_NS_EGRESS`, whatever the
+/// caller says; a link at the socket's place, a socket with no fresh home,
+/// or an agent whose data takes no make's home ends it before anything
+/// runs.
+#[test]
+fn a_run_with_its_egress_socket_is_named_its_way_out_and_one_without_is_not() {
+    let folder = tempfile::tempdir().unwrap();
+    let top = fs::canonicalize(folder.path()).unwrap();
+    let place = top.join("hermes-home");
+    let program = place.join(".local/bin/hermes");
+    fs::create_dir_all(program.parent().unwrap()).unwrap();
+    fs::write(&program, "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+    let forwarder = top.join("hermes-token");
+    fs::write(&forwarder, "tok_forwarder\n").unwrap();
+    let text = one_path_text(&hermes_install::agent())
+        .unwrap()
+        .replace(hermes_install::TOKEN, forwarder.to_str().unwrap())
+        .replace(hermes_install::PLACE, place.to_str().unwrap());
+    assert_eq!(text.matches(ONE_PATH_EGRESS_LINES).count(), 1);
+    assert_eq!(text.matches(ONE_PATH_EGRESS_GUARD).count(), 1);
+    let lamp = lamp_of("hermes", &text);
+    let socket = |run: &str| {
+        std::os::unix::net::UnixListener::bind(
+            lamp.top.join("egress").join(format!("skill-{run}.sock")),
+        )
+        .unwrap()
+    };
+    let home = |run: &str| {
+        let home = lamp.top.join(format!("project/lamp/make-{run}/home"));
+        fs::create_dir_all(&home).unwrap();
+        home
+    };
+    // Its socket and its fresh home: named, held, its home a make's.
+    let _held = socket("run-1");
+    let made = home("run-1");
+    lamp.token_file("run-1");
+    let out = lamp.run_in(&lamp.folder("run-1"), &[], "/usr/bin:/bin");
+    assert!(out.status.success(), "{out:?}");
+    let env = lamp.read("env").unwrap();
+    let lines: Vec<&str> = env.lines().collect();
+    for line in [
+        "LAMP_NS_EGRESS=skill-run-1".to_owned(),
+        "LAMP_NS_NET=run".to_owned(),
+        format!("LAMP_NS_MAKE={}", made.display()),
+        format!("HERMES_HOME={}/.hermes", made.display()),
+    ] {
+        assert!(lines.contains(&line.as_str()), "{line}: {env}");
+    }
+    assert!(
+        lamp.read("argv")
+            .unwrap()
+            .lines()
+            .any(|line| line == "--net")
+    );
+    // No socket: no way out, a caller's own dropped.
+    lamp.token_file("run-2");
+    home("run-2");
+    let out = lamp.run_in(
+        &lamp.folder("run-2"),
+        &[("LAMP_NS_EGRESS", "skill-run-1")],
+        "/usr/bin:/bin",
+    );
+    assert!(out.status.success(), "{out:?}");
+    let env = lamp.read("env").unwrap();
+    assert!(!env.contains("LAMP_NS_EGRESS"), "{env}");
+    assert!(!env.contains("LAMP_NS_MAKE"), "{env}");
+    // Not a run's folder: none either, the socket there or not.
+    let out = lamp.run(&[("LAMP_NS_EGRESS", "skill-run-1")], "/usr/bin:/bin");
+    assert!(out.status.success(), "{out:?}");
+    assert!(!lamp.read("env").unwrap().contains("LAMP_NS_EGRESS"));
+    // A link at the socket's place, to a real socket: refused.
+    symlink(
+        lamp.top.join("egress/skill-run-1.sock"),
+        lamp.top.join("egress/skill-run-3.sock"),
+    )
+    .unwrap();
+    home("run-3");
+    let file = lamp.token_file("run-3");
+    let out = lamp.run_in(&lamp.folder("run-3"), &[], "/usr/bin:/bin");
+    assert!(!out.status.success());
+    assert!(lamp.read("argv").is_none());
+    assert!(!file.exists(), "its token file is gone first");
+    assert!(
+        String::from_utf8_lossy(&out.stderr)
+            .contains("hermes: the way out of run run-3 is not lamp-tasks' socket"),
+        "{out:?}"
+    );
+    // Its socket but no fresh home: refused.
+    let _held = socket("run-4");
+    lamp.token_file("run-4");
+    let out = lamp.run_in(&lamp.folder("run-4"), &[], "/usr/bin:/bin");
+    assert!(!out.status.success());
+    assert!(lamp.read("argv").is_none());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("has no fresh home of its own"),
+        "{out:?}"
+    );
+    // An agent whose data takes no make's home: never in its lasting one.
+    let plain = lamp_of("eng", &one_path_text(&agent_of("eng").unwrap()).unwrap());
+    std::os::unix::net::UnixListener::bind(plain.top.join("egress/skill-run-5.sock")).unwrap();
+    fs::create_dir_all(plain.top.join("project/lamp/make-run-5/home")).unwrap();
+    plain.token_file("run-5");
+    let out = plain.run_in(&plain.folder("run-5"), &[], &plain.path());
+    assert!(!out.status.success());
+    assert!(plain.read("argv").is_none());
+    assert!(
+        String::from_utf8_lossy(&out.stderr)
+            .contains("eng: a run granted the internet never runs in the agent's lasting home"),
+        "{out:?}"
+    );
 }
 
 /// (#6685) With the one run path, the namespace script takes the agent's

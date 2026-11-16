@@ -78,7 +78,9 @@
 //!   lamp-voice's alone (set in its unit, which the unit census keeps), so
 //!   lamp-tasks can't see it.
 use crate::protocol::refusal;
-use crate::skill_task::{NOT_HELD_OFF, Runner, SkillRun, read_line_within, run_id, write_answer};
+use crate::skill_task::{
+    NOT_HELD_OFF, NOT_HELD_OFF_ONE_PATH, Runner, SkillRun, read_line_within, run_id, write_answer,
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::os::unix::net::UnixStream;
@@ -398,6 +400,7 @@ pub fn make_run_with(
         start_in: Some(folder.to_path_buf()),
         env_file: None,
         answer: Default::default(),
+        net: false,
     }
 }
 
@@ -579,7 +582,23 @@ pub(crate) fn fresh_home(work: &Path) -> std::io::Result<MadeFolder> {
 /// (`crate::skill_task`, `LAMP_AGENT_SERVICES` on in lamp-tasks), which
 /// reaches it only through lamp-control under the run's one-run token.
 pub(crate) fn fresh_home_for(work: &Path, services: bool) -> std::io::Result<MadeFolder> {
-    let made = fresh_folder(work, FOLDER_HEAD)?;
+    fresh_home_named(work, &format!("{FOLDER_HEAD}{}", run_id()), services)
+}
+
+/// [`fresh_home_for`], its folder named by the task's run id, `make-<run>`:
+/// on the one run path the wrapper finds a run granted `net` its fresh home
+/// by that id (#7200, `lamp_update::agent_ns::wrapper::ONE_PATH_EGRESS_LINES`),
+/// as Harness passes it no variable of lamp-tasks'.
+pub(crate) fn fresh_home_for_run(
+    work: &Path,
+    services: bool,
+    run: &str,
+) -> std::io::Result<MadeFolder> {
+    fresh_home_named(work, &format!("{FOLDER_HEAD}{run}"), services)
+}
+
+fn fresh_home_named(work: &Path, name: &str, services: bool) -> std::io::Result<MadeFolder> {
+    let made = fresh_folder(work, name)?;
     let home = folder_in(&made.fd, HOME_FOLDER)?;
     let hermes = folder_in(&home, HERMES_FOLDER)?;
     file_in(&hermes, CONFIG_FILE, &make_config(services)?)?;
@@ -589,15 +608,15 @@ pub(crate) fn fresh_home_for(work: &Path, services: bool) -> std::io::Result<Mad
     Ok(made)
 }
 
-/// A fresh folder `<head><run id>` in `work`, 0700 before anything is in
-/// it, opened never through a link and removed however its run ends.
-fn fresh_folder(work: &Path, head: &str) -> std::io::Result<MadeFolder> {
+/// A fresh folder `name` (`make-<run id>`) in `work`, 0700 before anything
+/// is in it, made new (never one there), opened never through a link and
+/// removed however its run ends.
+fn fresh_folder(work: &Path, name: &str) -> std::io::Result<MadeFolder> {
     use rustix::fs::{Mode, open};
-    let name = format!("{head}{}", run_id());
     let at = open(work, DIR_FLAGS, Mode::empty())?;
-    let fd = folder_in(&at, &name)?;
+    let fd = folder_in(&at, name)?;
     Ok(MadeFolder {
-        path: work.join(&name),
+        path: work.join(name),
         fd,
     })
 }
@@ -686,7 +705,7 @@ pub fn sweep(work: &Path) {
 /// The refusal's code for why a run can't start.
 fn not_started(why: &str) -> &'static str {
     match why {
-        NOT_HELD_OFF => "not_held_off",
+        NOT_HELD_OFF | NOT_HELD_OFF_ONE_PATH => "not_held_off",
         NO_NAMESPACE => "no_namespace",
         _ => "run_failed",
     }
@@ -1059,6 +1078,52 @@ pub fn lamp_runner(home: &Path, held: bool) -> MakeHermes {
 /// egress socket, the public web on ports 80 and 443 alone.
 pub fn net_runner(home: &Path) -> MakeHermes {
     lamp_runner_with(home, true, Some(crate::egress::Grant::lamp()))
+}
+
+/// The runner a task's run granted `net` goes through with
+/// [`NET_SWITCH`](crate::skill_task::NET_SWITCH) on (#7200). With
+/// lamp-update's one run path (`one_path`'s
+/// [`crate::skill_task::HarnessRunner::default_agent`]), the lamp's own
+/// Harness runner, as every skill's run: `harness new` (or the wrapper's
+/// task entry with no Harness) in the run's `skill-<run id>` folder, its
+/// egress socket `skill-<run id>.sock` made first
+/// ([`crate::skill_task::HarnessRunner::egress`]), which the one run path's
+/// wrapper finds by the run's id with its fresh home `make-<run id>/home`,
+/// as Harness passes it no variable of lamp-tasks'; refused in words for an
+/// agent that can't take it. Without the one run path, `make`
+/// ([`net_runner`]): Hermes's own wrapper, started by lamp-tasks with
+/// `LAMP_NS_EGRESS` in its environment.
+pub struct NetRunner {
+    pub make: MakeHermes,
+    pub one_path: Option<Arc<crate::skill_task::HarnessRunner>>,
+}
+
+impl NetRunner {
+    fn by_one_path(&self) -> Option<&crate::skill_task::HarnessRunner> {
+        self.one_path
+            .as_deref()
+            .filter(|harness| harness.default_agent)
+    }
+}
+
+impl Runner for NetRunner {
+    /// By the one run path, what the wrapper and namespace script carry is
+    /// checked at the run's start, with the default agent then known
+    /// ([`crate::skill_task::takes_net_runs`]); else the make's net runner's
+    /// checks.
+    fn ready(&self) -> Result<(), String> {
+        match self.by_one_path() {
+            Some(_) => Ok(()),
+            None => self.make.ready(),
+        }
+    }
+
+    fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
+        match self.by_one_path() {
+            Some(harness) => harness.run(run, end_token),
+            None => self.make.run(run, end_token),
+        }
+    }
 }
 
 fn lamp_runner_with(home: &Path, held: bool, egress: Option<crate::egress::Grant>) -> MakeHermes {
@@ -2172,9 +2237,10 @@ mod tests {
     /// one agent namespace, which carries Hermes's make lines: a make is
     /// ready, Hermes's own `hermes-ns` gone. Without either line, or with
     /// another agent's wrapper, it is refused [`NO_NAMESPACE`]; held, it
-    /// is refused [`NOT_HELD_OFF`], as the one run path holds only a
-    /// skill's run off the network; so is a task's run granted `net`, with
-    /// no egress socket made. The lines are lamp-update's own.
+    /// is refused [`NOT_HELD_OFF_ONE_PATH`], as the one run path holds only
+    /// a run started in its own folder; so is the make's net runner, with
+    /// no egress socket made (a task's run granted `net` goes by the one
+    /// run path, [`NetRunner`]). The lines are lamp-update's own.
     #[test]
     fn with_the_one_run_path_a_make_is_ready() {
         let dir = tempfile::tempdir().unwrap();
@@ -2207,14 +2273,16 @@ mod tests {
                 Err(NO_NAMESPACE.to_owned())
             );
         }
+        // Said as the one run path's, never blaming a switch or a round.
         assert_eq!(
             runner(true, hermes, &with_make).ready(),
-            Err(NOT_HELD_OFF.to_owned())
+            Err(NOT_HELD_OFF_ONE_PATH.to_owned())
         );
-        // A task's run granted `net` (#7200) is held too, so it is refused
-        // the same way there, before its egress socket is made: the one
-        // run path's wrapper gives `--net` only to a run Harness starts in
-        // its own `skill-<run-id>` folder, never to the make's runner.
+        // The make's net runner is held too, so it is refused the same way
+        // there, before its egress socket is made: the one run path's
+        // wrapper gives `--net` only to a run started in its own
+        // `skill-<run-id>` folder. A task's run granted `net` goes by the
+        // one run path instead (`NetRunner`, #7200).
         let mut net = runner(true, hermes, &with_make);
         let egress = dir.path().join("egress");
         net.egress = Some(crate::egress::Grant {
@@ -2229,7 +2297,7 @@ mod tests {
             false,
             &CheckSwitches::default(),
         );
-        assert_eq!(net.run(&run, &|| {}), Err(NOT_HELD_OFF.to_owned()));
+        assert_eq!(net.run(&run, &|| {}), Err(NOT_HELD_OFF_ONE_PATH.to_owned()));
         assert!(!egress.exists());
         assert_eq!(
             lamp_runner(Path::new("/var/lib/lampos-tasks"), false).agent_ns,

@@ -1646,10 +1646,14 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   public web on ports 80 and 443 through its own egress socket (a proxy
   and DNS inside the run, every address checked by lamp-tasks: never the
   lamp's networks, the home router or the lamp's local ports; docs/tasks.md,
-  "An agent skill's run and the `net` grant"). That is with lamp-update's
-  one run path off: with it on (`LAMP_SKILL_DEFAULT_AGENT`, on in the
-  product) a `net` run is refused for now (`run_failed`, `NOT_HELD_OFF`), nothing run and
-  nothing said aloud (docs/tasks.md, "On the one run path"). `net` is never one of
+  "An agent skill's run and the `net` grant"). With lamp-update's one run
+  path on (`LAMP_SKILL_DEFAULT_AGENT`, on in the product) the run goes
+  through Harness as every skill's run, and its wrapper finds its egress
+  socket and fresh home by its run id; a run the lamp's agent can't be
+  given its way out (OpenClaw the default, or a wrapper whose round hasn't
+  run) is refused `no_net`, not counted, and the lamp says "I can't run
+  that one: it needs the internet, and this lamp's agent can't reach it
+  yet." (`task::NO_NET_SAID`; docs/tasks.md, "On the one run path"). `net` is never one of
   lamp-control's own, so the yes holds it and the token never names it. An unknown one refuses the skill. A pushed skill is held to its
   computer's own grants for them too (`package::grants_asked`).
 - **First kind only.** A skill with a `do.task` loads only when its script
@@ -5864,9 +5868,12 @@ agent), set in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
 `lamp-skills-manage@`; `LAMP_TASK_NET` is on in the product too, so a file
 that reaches the internet is granted `net` (the public web on 80 and 443
 alone), asked the owner's spoken yes at its first run. With lamp-update's
-one run path on (`LAMP_SKILL_DEFAULT_AGENT`, on in the product) its run,
-like every agent skill's run, is refused for now (`run_failed`, `NOT_HELD_OFF`)
-(docs/tasks.md, "On the one run path"). `lamp_voice::upload_agent`. With
+one run path on (`LAMP_SKILL_DEFAULT_AGENT`, on in the product) a run
+granted `net` goes through Harness, its way out and fresh home found by
+its run id, or is refused `no_net` and said aloud; an agent skill's run
+without `net` still goes through the make's runner there and is refused
+(`run_failed`, `NOT_HELD_OFF_ONE_PATH`) (docs/tasks.md, "On the one run
+path"). `lamp_voice::upload_agent`. With
 `LAMP_UPLOAD_TO_AGENT=on` in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
 its manage helper, a bare `SKILL.md` of at most 64 KiB becomes an agent
 skill instead of a written one (off: a written skill, its note at most 900

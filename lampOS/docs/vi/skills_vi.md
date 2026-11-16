@@ -3182,8 +3182,10 @@ Yêu cầu của chủ (12/11): một `SKILL.md` tải lên từ app chạy qua 
 `lamp-voice`, `lamp-cloud`, `lamp-skills` và `lamp-skills-manage@`;
 `LAMP_TASK_NET` cũng bật trong sản phẩm, nên tệp cần tới internet được cấp `net` (chỉ web công khai trên cổng 80 và 443, không bao giờ mạng trong nhà),
 hỏi lời đồng ý bằng giọng nói của chủ ở lần chạy đầu. Khi đường chạy chung của lamp-update bật
-(`LAMP_SKILL_DEFAULT_AGENT`, bật trong sản phẩm), lần chạy đó, như mọi lần chạy của kỹ năng
-agent, hiện bị từ chối (`run_failed`, `NOT_HELD_OFF`; docs/vi/tasks_vi.md, "Trên đường chạy
+(`LAMP_SKILL_DEFAULT_AGENT`, bật trong sản phẩm), lần chạy có `net` đi qua Harness, lối ra
+và home mới được tìm theo run id, hoặc bị từ chối `no_net` và được nói thành lời; lần chạy
+của kỹ năng agent không có `net` vẫn đi qua runner của lần tạo ở đó và bị từ chối
+(`run_failed`, `NOT_HELD_OFF_ONE_PATH`; docs/vi/tasks_vi.md, "Trên đường chạy
 chung"). Khi bật (trong `lamp-voice`, `lamp-cloud`,
 `lamp-skills` và manage helper), một `SKILL.md` trần tối đa 64 KiB thành một
 kỹ năng agent thay vì kỹ năng viết (tắt: như trước, ghi chú tối đa 900 byte):
@@ -3634,7 +3636,11 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   lần chạy, tới được web công khai trên cổng 80 và 443 qua socket lối ra riêng,
   không bao giờ tới mạng của đèn, router trong nhà hay các cổng cục bộ của đèn
   (docs/vi/tasks_vi.md); khi đường chạy chung bật (`LAMP_SKILL_DEFAULT_AGENT`,
-  bật trong sản phẩm) lần chạy đó hiện bị từ chối. `net` không bao giờ là grant
+  bật trong sản phẩm) lần chạy đó đi qua Harness, wrapper tìm socket lối ra và
+  home mới của nó theo run id; lần chạy mà agent của đèn không thể được cho lối
+  ra (OpenClaw là mặc định, hoặc wrapper chưa qua vòng của lamp-update) bị từ
+  chối `no_net`, không bị tính, và đèn nói "I can't run that one: it needs the
+  internet, and this lamp's agent can't reach it yet." (`task::NO_NET_SAID`). `net` không bao giờ là grant
   của lamp-control, nên lời đồng ý giữ nó và token không bao giờ nêu nó. Grant
   lạ làm kỹ năng bị từ chối.
 - **Chỉ loại đầu tiên:** kỹ năng có `do.task` chỉ nạp khi script đến từ

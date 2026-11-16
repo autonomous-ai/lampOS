@@ -3768,9 +3768,11 @@ agent; docs/skills.md, "Run by the lamp's agent"); `LAMP_TASK_NET` is on
 in the product too, in the six units below, so a run granted `net` with the
 owner's spoken yes reaches the public web on ports 80 and 443, held like
 every run (the first builder's decision on #7200: never the lamp's
-networks or its local ports). That holds with lamp-update's one run path
-off; with it on (`LAMP_SKILL_DEFAULT_AGENT`, on in the product too) a `net`
-run is refused for now (`run_failed`, `NOT_HELD_OFF`) ("On the one run path", below).
+networks or its local ports). With lamp-update's one run path on
+(`LAMP_SKILL_DEFAULT_AGENT`, on in the product too) such a run goes through
+Harness as every skill's run, and its wrapper finds its way out and its
+fresh home by its run id ("On the one run path", below); a run that can't
+be given its way out is refused `no_net` and the lamp says why aloud.
 Built on #6643's `skill_make` path, so it moves onto #6510 step 2's
 one runner (a fresh home per run, the token as a file) with no new rules:
 
@@ -3778,9 +3780,11 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   lamp-skills and its manage helper, lamp-control, lamp-voice and
   lamp-cloud, whose skills page loads with lamp-skills' loader): a task
   grant beside lamp-control's own (`NET_GRANT`). A hand-over whose grants
-  name it runs through the make's net runner (`skill_make::net_runner`:
-  held, `LAMP_NS_NET=run`, with its own way out, below); any other is held
-  with none. lamp-control keeps
+  name it runs through `skill_make::NetRunner`: with the one run path off,
+  the make's net runner (`skill_make::net_runner`: held,
+  `LAMP_NS_NET=run`, with its own way out, below); on, lamp-tasks' Harness
+  runner ("On the one run path", below). Any other is held with none.
+  lamp-control keeps
   `net` in the owner's yes and checks it with the folder's declared
   grants, but never names it in the token (`task_yes::KeptYes`), so the
   minted grants are matched against the line's without it. So a run keeps
@@ -3843,28 +3847,60 @@ one runner (a fresh home per run, the token as a file) with no new rules:
     Python's requests/httpx/urllib, Node with `NODE_USE_ENV_PROXY`. Raw
     TCP, UDP and ICMP fail closed.
 - **On the one run path (`LAMP_SKILL_DEFAULT_AGENT` on in lamp-update and
-  lamp-tasks, as in the product): a `net` run is refused for now.** Its
-  fresh home and its egress socket reach Hermes's wrapper only in the
-  environment lamp-tasks starts it with (`LAMP_NS_HOME`,
-  `LAMP_NS_EGRESS`). There `/usr/local/bin/hermes` is the one run path's
-  wrapper: it drops the caller's `LAMP_NS_NET` and gives `--net` only to a
-  run in its own `skill-<run-id>` folder with a token file, which Harness
-  starts (`harness new`) with Harness's own environment, never lamp-tasks'.
-  So the make's net runner can't hold the run (`HermesRunner::ready`: the
-  wrapper has no `WRAPPER_NET_LINES`), and the run is refused `run_failed`
-  with `NOT_HELD_OFF` once its token is minted (and ended), before any
-  egress socket is made: nothing runs. An agent skill's run and a run given
-  keys go through the make's runner too, so they are refused the same way
-  there. Nothing is said to the person: lamp-skills journals it
-  (`do.task: lamp-tasks did not take it`). Giving such a run its fresh
-  home and its way out there is a design choice still to be made: the one
-  run path's wrapper taking both from the run's own folder, or such runs
-  started by lamp-tasks with no Harness (the wrapper's `--lamp-task`
-  entry). Test: `skill_make::tests::with_the_one_run_path_a_make_is_ready`.
-- **Never a gateway agent's (OpenClaw).** A `net` run goes through the
-  make's runner, which runs the lamp's Hermes only; a gateway agent's turn
-  runs in its gateway's namespaces, shared by every turn, which no one run
-  can be held in.
+  lamp-tasks, as in the product): the wrapper finds a `net` run's way out
+  by its run id** (#7200's way (a)). Harness starts the run's agent
+  (`harness new` in `skill-<run-id>`) with Harness's own environment, so
+  nothing per run of lamp-tasks' gets through it; the one run path's
+  wrapper already finds the run's token file by the run's id, and now its
+  egress socket and fresh home the same way:
+  - **lamp-tasks** (`HarnessRunner::way_out`, with `LAMP_TASK_NET=on`:
+    `HarnessRunner::egress`) makes the run's fresh home
+    `<work>/lamp/make-<run-id>/home` (`skill_make::fresh_home_for_run`)
+    and its egress socket `/run/lampos-tasks/egress/skill-<run-id>.sock`
+    before its token file and `harness new` (or the wrapper's
+    `--lamp-task` entry with no Harness), only for a run granted `net`
+    with the owner's yes for it, and removes both when the run ends or at
+    its deadline, after its session is closed.
+  - **The wrapper** (`one-path-<agent>.sh`,
+    `agent_ns::wrapper::ONE_PATH_EGRESS_LINES`): it drops the caller's
+    `LAMP_NS_EGRESS`; in a `skill-<run-id>` pane whose socket is there (a
+    socket, never a link: anything else there ends the run) it sets
+    `LAMP_NS_EGRESS=skill-<run-id>` and `LAMP_NS_HOME` to that fresh home
+    (missing, or a link, the run ends). Hermes's data takes it as its
+    make's home (`LAMP_NS_MAKE`, `HERMES_HOME` under it), so the agent
+    namespace covers Hermes's lasting home as for a make, and
+    `ONE_PATH_EGRESS_GUARD` ends a run given its way out whose agent took
+    no such home: never the lasting home with the internet (P1 #6643).
+    The run gets `--net` as every run.
+  - **The agent namespace** takes `skill-<run-id>` as well as
+    `make-<run-id>` (`egress::NS_SKILL_LINE`) and does the same egress
+    steps: that socket alone, read-only, the proxy and DNS inside the run.
+  - **Checked before anything is made** (`skill_task::takes_net_runs`):
+    the default agent's wrapper carries `ONE_PATH_EGRESS_LINES` and
+    Hermes's make-home line, and the agent namespace the egress lines and
+    Hermes's make lines. Otherwise, a gateway default (OpenClaw: its turns
+    run in its gateway's namespaces, shared by every turn, which no one run
+    can be held in), `LAMP_TASK_NET` off in lamp-tasks, or the lamp's
+    Hermes not yet on the one run path's wrapper (#6898's round): refused
+    in `skill_task::NET_REFUSED`'s words, nothing made, asked or started.
+  - **Every refusal is said.** A `net` run refused before anything of it
+    ran (any of the above, `NOT_HELD_OFF`, `NOT_HELD_OFF_ONE_PATH` or
+    `egress::NO_EGRESS`) is answered `no_net` (`skill_task::NO_NET`);
+    lamp-skills takes it off the day's runs (`service_write::NOT_TAKEN`)
+    and says `task::NO_NET_SAID` aloud, behind a told answer's gate:
+    "I can't run that one: it needs the internet, and this lamp's agent
+    can't reach it yet." The journal keeps lamp-tasks' words.
+  - The make's runner, which an agent skill's run and a run given keys
+    still go through, can't be held by the one run path's wrapper (it holds
+    only a run started in its own `skill-<run-id>` folder): refused
+    `NOT_HELD_OFF_ONE_PATH`, which no longer blames `LAMP_SKILL_TASKS` or
+    a round.
+  - Tests: `harness::a_net_run_by_the_one_run_path_gets_its_egress_socket_before_harness_new`,
+    `skill_task::tests::a_net_run_is_marked_its_home_named_by_its_id_and_refused_as_no_net`,
+    `the_one_path_wrappers_carry_the_egress_lines_once`,
+    `skill_make::tests::with_the_one_run_path_a_make_is_ready`;
+    lamp-update's `agent_ns::wrapper::tests::a_run_with_its_egress_socket_is_named_its_way_out_and_one_without_is_not`;
+    lamp-skills' `task::tests::a_net_run_lamp_tasks_refused_is_said_in_plain_words`.
 - **An agent skill's run** (`run` = `scripts/SKILL.md`,
   `AGENT_INSTRUCTIONS`) follows the file only within its grants and its
   network: the token holds lamp-control's grants, and the run is held
