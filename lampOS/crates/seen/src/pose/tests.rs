@@ -737,9 +737,9 @@ fn the_privacy_during_a_pause_wipes_and_says_nothing() {
     );
 }
 
-/// The face lost from 61 s for `away` seconds, then back under a new
-/// passing id and recognised: what is said when the gate opens again.
-fn lost_for(away: u64) -> (Pose, Served) {
+/// The face lost from 61 s for `away` seconds, then back under the passing
+/// id `id` and recognised: what is said when the gate opens again.
+fn lost_for(away: u64, id: &str) -> (Pose, Served) {
     let mock = Mock::start(vec![Reply::Ergo(Some(slumped()))]);
     let (mut pose, mut sitting, mut keep, mut scene) = sat_and_drank(&mock);
     let mut at = 61 * S;
@@ -755,7 +755,7 @@ fn lost_for(away: u64) -> (Pose, Served) {
         at += 5 * S;
     }
     let back = (61 + away) * S;
-    scene.faces(&[("f4", 0.4)], back);
+    scene.faces(&[(id, 0.4)], back);
     scene.known(back);
     let served = as_serve(&mut pose, &mut sitting, &mut keep, &mut scene, back, false);
     (pose, served)
@@ -763,7 +763,7 @@ fn lost_for(away: u64) -> (Pose, Served) {
 
 #[test]
 fn the_face_lost_30_s_keeps_the_window_and_the_drink_and_samples_go_on() {
-    let (mut pose, served) = lost_for(30);
+    let (mut pose, served) = lost_for(30, "f1");
     assert_eq!(served.plan.posture, crate::keep::Step::Resumed);
     assert_eq!(served.plan.sitting, crate::keep::Step::Resumed);
     let posture = served.posture.expect("said at once on the reopen");
@@ -796,7 +796,30 @@ fn the_face_lost_30_s_keeps_the_window_and_the_drink_and_samples_go_on() {
 
 #[test]
 fn the_face_lost_130_s_wipes() {
-    let (pose, served) = lost_for(130);
+    let (pose, served) = lost_for(130, "f1");
+    assert_eq!(served.posture, None, "a fresh window holds no sample");
+    assert_eq!(pose.samples(), 0);
+    assert_eq!(
+        served.doing.unwrap().drank_s_ago,
+        0,
+        "a new sitting from the return"
+    );
+}
+
+#[test]
+fn another_face_back_within_120_s_takes_nothing_on() {
+    // Back 30 s later under another passing id and recognised: the eyes'
+    // level says someone remembered, not who, so nothing slumped and no
+    // drink carries over.
+    let (pose, served) = lost_for(30, "f4");
+    assert_eq!(
+        served.plan.posture,
+        crate::keep::Step::Wiped(crate::keep::Why::OtherFace)
+    );
+    assert_eq!(
+        served.plan.sitting,
+        crate::keep::Step::Wiped(crate::keep::Why::OtherFace)
+    );
     assert_eq!(served.posture, None, "a fresh window holds no sample");
     assert_eq!(pose.samples(), 0);
     assert_eq!(
@@ -842,16 +865,22 @@ fn the_journal_says_each_sample_sent_and_its_answer() {
             bytes: jpeg().len()
         }
     );
-    assert_eq!(notes[0].line(), "posture sample sent: 8 bytes");
+    assert_eq!(notes[0].line(false), "posture sample sent: 8 bytes");
     let Note::Answered { took, .. } = notes[1] else {
         panic!("{notes:?}")
     };
     assert_eq!(
-        notes[1].line(),
+        notes[1].line(true),
         format!(
             "posture sample answered: score 5, risk 3, bad, region neck, {} ms",
             took.as_millis()
         )
+    );
+    // The switch off (the default): scored, with no score, risk, bad flag
+    // or region.
+    assert_eq!(
+        notes[1].line(false),
+        format!("posture sample answered: scored, {} ms", took.as_millis())
     );
     assert!(pose.notes().is_empty(), "drained");
     // Busy, a failure, no body and a cancel each say one line.
@@ -860,7 +889,7 @@ fn the_journal_says_each_sample_sent_and_its_answer() {
             took: Duration::from_millis(40),
             held_back_s: None
         }
-        .line(),
+        .line(false),
         "posture sample busy: the server is busy, the frame dropped, 40 ms"
     );
     assert_eq!(
@@ -869,14 +898,14 @@ fn the_journal_says_each_sample_sent_and_its_answer() {
             took: Duration::from_millis(12),
             held_back_s: Some(60)
         }
-        .line(),
+        .line(false),
         "posture sample failed (handshake_5xx), 12 ms; posture held back 60 s"
     );
     assert_eq!(
         Note::NoBody {
             took: Duration::from_millis(300)
         }
-        .line(),
+        .line(false),
         "posture sample answered: no body found, 300 ms"
     );
 }
@@ -894,11 +923,32 @@ fn a_partial_answer_is_judged_by_the_neck_and_says_so() {
         panic!("{notes:?}")
     };
     assert_eq!(
-        notes[1].line(),
+        notes[1].line(true),
         format!(
             "posture sample answered: score 3, risk 2, partial, bad, region neck, {} ms",
             took.as_millis()
         )
+    );
+    assert_eq!(
+        notes[1].line(false),
+        format!("posture sample answered: scored, {} ms", took.as_millis())
+    );
+}
+
+#[test]
+fn the_said_line_names_the_share_and_region_only_with_the_switch() {
+    let posture = HumanPosture {
+        window_s: 90,
+        bad_share: 0.5,
+        region: PostureRegion::Neck,
+    };
+    assert_eq!(
+        said_line(&posture, 4, false),
+        "posture said: window 90 s, 4 samples"
+    );
+    assert_eq!(
+        said_line(&posture, 4, true),
+        "posture said: window 90 s, 4 samples, bad_share 0.50, region neck"
     );
 }
 

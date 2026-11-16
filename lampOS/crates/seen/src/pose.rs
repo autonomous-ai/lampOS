@@ -42,8 +42,11 @@
 //!   if the gate opens again within it ([`Pose::hold`]). No frame and no
 //!   per-person history is kept.
 //! - **The journal** ([`Note`], drained by `serve` with [`Pose::notes`]):
-//!   each sample sent (its bytes) and its answer (the RULA score, bad or
-//!   not, the region, the time it took), at most one each 30 s.
+//!   each sample sent (its bytes) and its answer (scored or no body, the
+//!   time it took), at most one each 30 s. The RULA score, its risk, bad or
+//!   good and the region, and the said window's bad share and region, only
+//!   with the diagnostics switch [`crate::JOURNAL_LABELS`] `on`: a forget or
+//!   the opt-in off does not clear the journal ([`said_line`]).
 //! - **Said** on `humans/posture` ([`HumanPosture`]) every 30 s while the
 //!   gate is open and the window holds at least [`window::MIN_SAMPLES`]
 //!   samples: from the third sample of a sitting. The gate closed, nothing
@@ -158,9 +161,29 @@ pub enum Note {
     Cancelled,
 }
 
+/// The journal's line when `humans/posture` is said, without the
+/// `lamp-seen: ` prefix: the window's length and its samples, and its bad
+/// share and region only with `labels` ([`crate::JOURNAL_LABELS`]).
+pub fn said_line(posture: &HumanPosture, samples: usize, labels: bool) -> String {
+    let said = format!(
+        "posture said: window {} s, {samples} samples",
+        posture.window_s
+    );
+    if labels {
+        format!(
+            "{said}, bad_share {:.2}, region {}",
+            posture.bad_share,
+            window::region_word(posture.region)
+        )
+    } else {
+        said
+    }
+}
+
 impl Note {
-    /// The journal's line, without the `lamp-seen: ` prefix.
-    pub fn line(&self) -> String {
+    /// The journal's line, without the `lamp-seen: ` prefix; `labels`
+    /// ([`crate::JOURNAL_LABELS`]) names the score, off says only scored.
+    pub fn line(&self, labels: bool) -> String {
         let held = |held_back_s: &Option<u64>| {
             held_back_s
                 .map(|s| format!("; posture held back {s} s"))
@@ -168,6 +191,11 @@ impl Note {
         };
         match self {
             Note::Sent { bytes } => format!("posture sample sent: {bytes} bytes"),
+            Note::Answered { took, kept, .. } if !labels => format!(
+                "posture sample answered: scored, {} ms{}",
+                took.as_millis(),
+                if *kept { "" } else { "; not kept (no sitting)" }
+            ),
             Note::Answered {
                 score,
                 risk_level,

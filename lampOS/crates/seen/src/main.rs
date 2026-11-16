@@ -534,6 +534,15 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             hold::ENVIRONMENT
         );
     }
+    // What the journal may name of what was seen: counts and outcomes only
+    // unless the diagnostics switch is on.
+    let labels = switched_on(std::env::var(lamp_seen::JOURNAL_LABELS).ok().as_deref());
+    if labels {
+        eprintln!(
+            "lamp-seen: {}=on: the journal names each label and score",
+            lamp_seen::JOURNAL_LABELS
+        );
+    }
     let mut doing_said: Option<Instant> = None;
     let started = Instant::now();
     let mut said_at: Option<Instant> = None;
@@ -719,11 +728,8 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
                 && let Some(posture) = pose.step(now, posture_gate, came.stood_up)
             {
                 eprintln!(
-                    "lamp-seen: posture said: window {} s, {} samples, bad_share {:.2}, region {}",
-                    posture.window_s,
-                    pose.samples(),
-                    posture.bad_share,
-                    pose::window::region_word(posture.region)
+                    "lamp-seen: {}",
+                    pose::said_line(&posture, pose.samples(), labels)
                 );
                 if let Err(error) = posture_out.publish_json(now, &posture) {
                     eprintln!("lamp-seen: humans/posture could not be said: {error}");
@@ -754,12 +760,12 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             };
             if let Some(activity) = marked.inner_mut().activity.as_mut() {
                 for note in activity.notes() {
-                    eprintln!("lamp-seen: {}", note.line(&stopped));
+                    eprintln!("lamp-seen: {}", note.line(&stopped, labels));
                 }
             }
             if let Some(pose) = marked.inner_mut().pose.as_mut() {
                 for note in pose.notes() {
-                    eprintln!("lamp-seen: {}", note.line());
+                    eprintln!("lamp-seen: {}", note.line(labels));
                 }
             }
         }

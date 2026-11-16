@@ -541,10 +541,10 @@ fn the_journal_says_each_burst_and_its_answer() {
     let notes = activity.notes();
     assert_eq!(notes.len(), 3, "{notes:?}");
     assert_eq!(notes[0], Note::Started);
-    assert_eq!(notes[0].line("-"), "burst started");
+    assert_eq!(notes[0].line("-", true), "burst started");
     let bytes = 8 * jpeg(0).len() as u64;
     assert_eq!(notes[1], Note::Sent { frames: 8, bytes });
-    assert_eq!(notes[1].line("-"), "burst sent: 8 frames, 56 bytes");
+    assert_eq!(notes[1].line("-", true), "burst sent: 8 frames, 56 bytes");
     let Note::Ended(ended) = &notes[2] else {
         panic!("{notes:?}")
     };
@@ -553,12 +553,22 @@ fn the_journal_says_each_burst_and_its_answer() {
     assert_eq!((ended.frames, ended.bytes), (8, bytes));
     let (mean, most) = ended.server.expect("eight answers timed");
     assert!(mean <= most);
-    let line = notes[2].line("-");
+    let line = notes[2].line("-", true);
     assert!(
         line.starts_with("burst answered: top drinking 0.81; counted drinking 0.81; server "),
         "{line}"
     );
     assert!(line.contains("; 8 of 8 frames, 56 bytes, "), "{line}");
+    // The switch off (the default): a count, no label and no confidence.
+    let plain = notes[2].line("-", false);
+    assert!(
+        plain.starts_with("burst answered: 1 kind counted; server "),
+        "{plain}"
+    );
+    assert!(plain.contains("; 8 of 8 frames, 56 bytes, "), "{plain}");
+    for word in ["drinking", "0.81", "top", "computer"] {
+        assert!(!plain.contains(word), "{plain}");
+    }
     assert!(activity.notes().is_empty(), "drained");
 
     // Busy: one line, the burst dropped.
@@ -566,7 +576,7 @@ fn the_journal_says_each_burst_and_its_answer() {
     finish(&mut activity, EVERY_US + S);
     let notes = activity.notes();
     assert_eq!(notes[0], Note::Started);
-    let busy = notes.last().unwrap().line("-");
+    let busy = notes.last().unwrap().line("-", false);
     assert!(
         busy.starts_with(
             "burst busy: the server is busy, the burst dropped; 1 of 8 frames, 7 bytes"
@@ -579,7 +589,7 @@ fn the_journal_says_each_burst_and_its_answer() {
     activity.stopped();
     let notes = activity.notes();
     assert_eq!(
-        notes.last().unwrap().line("gate nobody"),
+        notes.last().unwrap().line("gate nobody", false),
         "burst aborted (gate nobody) after 2 frames, 14 bytes: its answers dropped"
     );
 }
@@ -597,7 +607,29 @@ fn a_refused_burst_says_its_http_status_and_the_hold_back() {
         held_back_s: Some(60),
     };
     assert_eq!(
-        Note::Ended(ended).line("-"),
+        Note::Ended(ended).line("-", true),
         "burst failed (refused, HTTP 503); 1 of 8 frames, 7 bytes, 80 ms in all; bursts held back 60 s"
+    );
+}
+
+#[test]
+fn an_answer_with_nothing_counted_names_nothing_off() {
+    let ended = BurstEnd {
+        outcome: Outcome::Answered,
+        frames: 8,
+        bytes: 56,
+        top: Some(("using computer".to_owned(), 0.4)),
+        seen: Vec::new(),
+        server: Some((Duration::from_millis(447), Duration::from_millis(600))),
+        took: Duration::from_millis(9000),
+        held_back_s: None,
+    };
+    assert_eq!(
+        Note::Ended(ended.clone()).line("-", false),
+        "burst answered: 0 kinds counted; server 447 ms a frame, at most 600; 8 of 8 frames, 56 bytes, 9000 ms in all"
+    );
+    assert_eq!(
+        Note::Ended(ended).line("-", true),
+        "burst answered: top using computer 0.40; counted none; server 447 ms a frame, at most 600; 8 of 8 frames, 56 bytes, 9000 ms in all"
     );
 }

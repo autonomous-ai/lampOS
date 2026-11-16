@@ -373,7 +373,8 @@ that one too, aborts a burst under way.
   "nobody remembered" reading on the one face in view outside a pause). When
   the gate's lines say nobody, or a face not yet recognised, it is kept,
   unsaid, for up to 120 s and goes on if the owner is recognised again
-  within them; past them it ends (below, "The pause on a misread" and "A
+  within them on the same passing id (another id starts afresh); past
+  them it ends (below, "The pause on a misread" and "A
   short closing keeps the sitting"). Its timers count from the desk arrival
   until something is seen, and from the last sighting after.
 - **Published**, on the topics `lamp_msgs` declares (`doing.rs`):
@@ -671,7 +672,7 @@ up to 120 s (`keep.rs`, `KEEP_US`), around the 5 s pause:
   the privacy, sleep and the opt-in: a sitting never ended on those alone,
   except when a pause wiped for them, and still does not.
 - **Kept, for up to 120 s:** any other closing. Nobody in view, the face
-  lost, a face back under a new passing id and not yet recognised, a
+  lost, a face (back) under a new passing id and not yet recognised, a
   reading gone stale (presence, the privacy lease, sleep not known), and a
   pause ended by the face going out of view or a reading lapsing.
 - **Nothing is sent or said while kept.** The gate is unchanged: no frame
@@ -679,13 +680,24 @@ up to 120 s (`keep.rs`, `KEEP_US`), around the 5 s pause:
   its answer dropped, and nothing kept is said (no `humans/posture`,
   `humans/doing` or `humans/doing_seen`).
 - **Goes on** when the gate opens again within the 120 s, which wants the
-  recogniser's own fresh level for the face then in view. Past 120 s both
-  are wiped, as any closing wiped them before. The posture window's
+  recogniser's own fresh level for the face then in view, and only on the
+  face it was kept for. The keep holds, in memory only and never said, the
+  passing id of the one face in view the last step it was open
+  (`keep::Away`); the gate opening on any other id, or with no id known
+  when it was kept, wipes both (`Why::OtherFace`), so a second remembered
+  person within the 120 s never takes on the first one's window or timers
+  (the Reviewer-lead's P2 on #7251). `humans/familiar` is only a level for
+  whoever the eyes recognise now, with no person id or name, so it cannot
+  tell that a new id is the same remembered person: a face back under a new
+  id (as the eyes give one coming back into view, `follows` included)
+  starts a fresh window and fresh timers. Past 120 s both are wiped, as any
+  closing wiped them before. The posture window's
   samples older than its ten minutes still age out.
 - **The journal** says, once each: `posture's window kept unsaid for up to
   120 s: the gate closed (nobody)`, `posture's window goes on: the gate
   opened again within 120 s`, `posture's window wiped: the gate stayed
-  closed 120 s (nobody)` or `posture's window wiped at once
+  closed 120 s (nobody)`, `posture's window wiped: the gate opened again
+  on another face than the one it was kept for` or `posture's window wiped at once
   (privacy_closed)`, and the same for `the sitting's timers`. No id and no
   box.
 
@@ -783,19 +795,31 @@ sample, and what the server answered: diagnostics only, never a picture, an
 id or a name. A burst a minute and a sample each 30 s keep it to a few
 lines a minute.
 
+By default the lines say only counts and outcomes: no label, confidence,
+score, risk, bad or good flag, region or bad share. The journal is kept on
+the lamp across reboots, and a forget or the opt-in going off does not
+clear it, so a line naming what was seen would be a timed record of what
+the person did (the Reviewer-lead's P2 on #7251). The diagnostics switch
+`LAMP_SEEN_JOURNAL_LABELS=on` (exactly `on`; in no unit) adds them, as the
+"with labels" lines below show, and `serve` says once at start that it is
+on.
+
 | When | Line |
 |---|---|
 | A burst's first frame opens its socket | `burst started` |
 | All 8 frames handed to it | `burst sent: 8 frames, 61234 bytes` |
-| Answered | `burst answered: top drinking 0.81; counted drinking 0.81; server 412 ms a frame, at most 530; 8 of 8 frames, 61234 bytes, 9874 ms in all` |
+| Answered | `burst answered: 1 kind counted; server 412 ms a frame, at most 530; 8 of 8 frames, 61234 bytes, 9874 ms in all` |
+| Answered, with labels | `burst answered: top drinking 0.81; counted drinking 0.81; server 412 ms a frame, at most 530; 8 of 8 frames, 61234 bytes, 9874 ms in all` |
 | Busy | `burst busy: the server is busy, the burst dropped; 3 of 8 frames, 22410 bytes, 2810 ms in all; bursts held back 60 s` (when the retreat holds) |
 | Failed | `burst failed (refused, HTTP 503); 1 of 8 frames, 7650 bytes, 80 ms in all; bursts held back 60 s` (or `no_answer`, `connect`, …) |
 | Stopped | `burst aborted (gate nobody) after 2 frames, 15300 bytes: its answers dropped` |
 | A posture frame handed to its socket | `posture sample sent: 7650 bytes` |
-| Its answer | `posture sample answered: score 5, risk 3, bad, region neck, 640 ms` (`score 3, risk 2, partial, bad, …` on a partial answer), or `no body found`, `busy`, `failed (handshake_5xx)`, `cancelled: the gate closed` |
-| `humans/posture` said | `posture said: window 93 s, 4 samples, bad_share 0.75, region neck` |
+| Its answer | `posture sample answered: scored, 640 ms`, or `no body found`, `busy`, `failed (handshake_5xx)`, `cancelled: the gate closed` |
+| Its answer, with labels | `posture sample answered: score 5, risk 3, bad, region neck, 640 ms` (`score 3, risk 2, partial, bad, …` on a partial answer) |
+| `humans/posture` said | `posture said: window 93 s, 4 samples` |
+| `humans/posture` said, with labels | `posture said: window 93 s, 4 samples, bad_share 0.75, region neck` |
 
-`top` is the surest label any frame's answer gave; `counted` is what the
+With labels, `top` is the surest label any frame's answer gave; `counted` is what the
 burst counts as drinking, eating or a break (`sitting.rs`), or `none`. The
 server's time is from a frame sent to its answer read. The retreat's hold is
 the bursts' own (`backoff::Retreat`): the server's `Retry-After` is not
