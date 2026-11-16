@@ -200,6 +200,70 @@ by hand, as Stuffy air's check did
 put `enabled = false` back at the top of each `skill.toml` (`lamp-skills
 remove` refuses a core skill); a later round keeps a file the lamp changed.
 
+### Four synthetic traces, and replaying one on a lamp (#1684)
+
+The project lead ruled on 16 Nov 2026 that nobody makes real smoke or dust
+for these two skills. Four `air/state` sequences made by hand stand in:
+smoke, dust, a cooking spike and a slow rise, in
+`crates/skills/tests/fixtures/air-traces/`, whose README gives each one's
+numbers, what is assumed, and where the sensor's range comes from. They are
+not recordings.
+
+**In the tests** (`cargo test -p lamp-skills air_traces`) each is replayed
+through both shipped skills in virtual time. With the present numbers:
+
+| Trace | Smoky air | Dusty air |
+|---|---|---|
+| Smoke: 12 µg/m³ up to 480 within a minute, 5 minutes there | Speaks once, 230 s in | Nothing |
+| Dust: up to 180 over 20 minutes, 65 minutes there | Nothing | Speaks once, an hour after 125 |
+| A cooking spike: up to 300 in 90 s, a minute there, down in 2 | **Speaks once, 255 s in**, as its design allows for a pan | Nothing |
+| A slow rise: 20 up to 200 over 90 minutes | Nothing | Nothing |
+
+The cooking spike is over 150 for 165 s, and Smoky air's rule tells a spike
+from smoke only by its being over 150 for under 30 s. Its numbers stay as
+they are (the first builder, 16 Nov 2026, #1684): on PM2.5 alone a pan
+frying hard and toast burning are the same shape, the skill's `toast` case
+wants the line within 2 minutes, and its SKILL.md says "Frying in the same
+room may set it off, once".
+
+**On a lamp**, `lampOS/tools/air-replay.sh TRACE.jsonl` replays one trace
+on the lamp's bus in real time. It runs on the lamp itself, as the lamp's
+user, in a 15-minute slot (`--check` prints its preconditions and changes
+nothing):
+
+- **It refuses** unless every precondition holds, and says each: the trace
+  fits the slot, `lamp-skills` runs, both skills are installed with the
+  `[trigger]` the traces were shaped for, Smoky air has not run in the last
+  45 minutes, and only `lamp-air` says `air/state`.
+- **It turns the two skills on** as above: the `enabled = false` line out
+  of each installed `skill.toml`, nothing else, and `lamp-skills` is not
+  restarted.
+- **It stops `lamp-air` for the replay** and starts it again. Beside a live
+  sensor the room's own reading every 5 s crosses the trace, and any
+  replayed level 100 above the room's then reads to Smoky air as a sudden
+  rise, a slow climb too (the test
+  `a_rooms_own_readings_between_a_traces_spoil_the_replay`). On a lamp
+  with no sensor nothing is stopped.
+- **It records** `air/state`, `voice/state` and `lamp-skills`' journal
+  lines about the two skills into a temp folder, and **prints a verdict**:
+  what each skill did, against the tests, and VOID if any reading but the
+  replay's was on `air/state` in the window.
+- **It puts back** at every exit, Ctrl-C and a dropped ssh too: each
+  `skill.toml` copied back and read back the same, `lamp-air` active with
+  its own reading on the bus again. After a power cut, `--put-back`.
+- **Which traces:** `smoke.jsonl` (11.5 minutes) and `cooking-spike.jsonl`
+  (8 minutes), one a slot and 45 minutes apart on one lamp, since after a
+  run Smoky air says nothing for 30 minutes. The dust and the slow rise
+  last 96 minutes and more and are test-only.
+- **While it runs** everything that reads `air/state` sees the trace: the
+  app's air readout shows its figures. Its CO2 is "not known", so Stuffy
+  air neither starts nor ends a spell on it. If Smoky air runs, the lamp
+  says its line aloud once.
+
+Not run on a lamp yet: it was checked on a Mac against the real
+`lamp-skills` and `lamp-bus`, with stand-ins for systemd, the journal and
+the sensor.
+
 ## Not shown
 
 - The PM figures against a reference instrument: one sensor, one office.

@@ -30,6 +30,20 @@ lamp-skills`, which runs every skill's cases).
 Changed by hand, the cases catch each number: a 1-hour cooldown, quiet
 hours from 23:30, or a level of 99 each fails one of them.
 
+**Four synthetic traces (#1684).** The project lead ruled on 16 Nov 2026
+that real dust is not made for this skill. Smoke, dust, a cooking spike and
+a slow rise, made by hand inside the sensor's range and at its 5 s period,
+are in `lampOS/crates/skills/tests/fixtures/air-traces/` (its README has
+their numbers), and `cargo test -p lamp-skills air_traces` replays them
+through this skill as it ships, a face in view from 10:00: the dust (180
+µg/m³ for 65 minutes) speaks once, an hour after the air passed 125; the
+smoke and the cooking spike, minutes long, say nothing; the slow rise says
+nothing while it lasts (40 minutes over 125) and speaks at its hour if the
+air stays there. None of the four is a false alarm for this skill. Its
+hour cannot be replayed in a 15-minute lamp slot, so
+`lampOS/tools/air-replay.sh` refuses the dust and the slow rise as
+test-only.
+
 The skill is installed disabled (`install::PRODUCT_SKILLS_OFF`)
 until it is measured: Smoky air's four traces (its `tests/README.md`) and an
 office's own days, recorded read only on a lamp with an air sensor and
