@@ -3221,6 +3221,14 @@ fn a_failed_daemon_start_is_tried_again_before_a_waiting_hand_over() {
     );
     // Every try fails: four in all, and then the hand-over goes as before.
     s.counts.order.lock().unwrap().clear();
+    // The launch kept as accepted before the clock moves: `launched` sees
+    // the adapter called, and the owner may record `finished` only later.
+    // The first look is counted from it, so a `finished` kept at 30 s
+    // falls due at 60 s, which this clock never reaches (train 961, Linux
+    // ARM64).
+    s.wait(&first["id"], |v| {
+        !v["task"]["dispatch"]["finished"].is_null()
+    });
     s.clock.0.lock().unwrap().monotonic_ms = WATCH_EARLY_MS;
     s.wait(&first["id"], |v| v["task"]["observations"] == json!(1));
     s.counts.daemon_fails.store(10, Ordering::SeqCst);
