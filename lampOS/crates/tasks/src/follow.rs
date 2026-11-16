@@ -29,13 +29,23 @@ use std::{
 pub const MOST_FOLLOWED: usize = 4;
 /// A task's watch that failed is started again after these, one after
 /// each of the first failures in a row; at [`FOLLOW_TRIES`] in a row the task is
-/// given up, and left to `wait` and the looks.
+/// given up, and left to `wait` and the looks. A line from the watch does
+/// not end the row (#7248): a watch held [`FOLLOW_KEPT`] does, or one heard
+/// from that ended on the agent settling or stopping.
 pub const FOLLOW_BACKOFF: [Duration; 2] = [Duration::from_secs(3), Duration::from_secs(10)];
 pub const FOLLOW_TRIES: u32 = 3;
 /// After a watch ended on the agent settling (`done`, `failed`,
 /// `stopped`), the task is followed again no sooner than this, if it is
 /// still watched: the push read found it at work again.
 pub const FOLLOW_AGAIN: Duration = Duration::from_secs(3);
+/// A watch held this long before it ended is taken for one that works:
+/// its task's failures in a row start again from none. Shorter, a failed
+/// end counts in the row even after a line, so a watch that says
+/// `working` and then dies is given up after [`FOLLOW_TRIES`], not
+/// started again every 3 s for good (#7248). A minute is well past the
+/// longest back-off (10 s) and a lamp's Node start, and well short of a
+/// watch's own 600 s.
+pub const FOLLOW_KEPT: Duration = Duration::from_secs(60);
 
 /// Harness's own `watch`, held beside the adapter's one lane: several may
 /// run at once, one a task.
@@ -81,6 +91,9 @@ struct Child {
     number: u64,
     cancel: Arc<AtomicBool>,
     began: Instant,
+    /// When it was started, on the part's clock (`tend`'s `now`): how long
+    /// it was held is judged on it, against [`FOLLOW_KEPT`].
+    since: Instant,
     /// A line came from it: Harness has `watch` and it follows the task.
     heard: bool,
     handle: JoinHandle<()>,
@@ -222,6 +235,7 @@ impl Follows {
                         number,
                         cancel,
                         began: Instant::now(),
+                        since: now,
                         heard: false,
                         handle,
                     },
@@ -243,7 +257,6 @@ impl Follows {
             match note {
                 Note::Event(event) => {
                     child.heard = true;
-                    self.failures.remove(&id);
                     eprintln!(
                         "tasks: watch of task {id}: {} after {took} ms",
                         event.name()
@@ -253,7 +266,16 @@ impl Follows {
                     }
                 }
                 Note::End(end) => {
+                    // Failures in a row end with a watch held [`FOLLOW_KEPT`],
+                    // or one heard from that ended on the agent settling or
+                    // stopping; a line alone does not end them (#7248).
                     if let Some(child) = self.held.remove(&id) {
+                        let kept = now.saturating_duration_since(child.since) >= FOLLOW_KEPT;
+                        let ended_well =
+                            child.heard && matches!(end, WatchEnd::Settled | WatchEnd::Stopped);
+                        if kept || ended_well {
+                            self.failures.remove(&id);
+                        }
                         self.ending.push(child.handle);
                     }
                     match end {
@@ -548,6 +570,74 @@ mod tests {
         assert_eq!(starts, FOLLOW_TRIES as usize);
         follows.tend(&tasks, &BTreeSet::new(), at + Duration::from_secs(600));
         assert!(!follows.held.contains_key(&2));
+    }
+
+    /// #7248: a watch that says `working` and then dies, each time, is
+    /// given up after [`FOLLOW_TRIES`] like one that dies at once: its line
+    /// does not end the failures in a row.
+    #[test]
+    fn a_watch_that_dies_after_its_first_line_is_still_given_up() {
+        let lane = Arc::new(Scripted::default());
+        lane.plans.lock().unwrap().insert(
+            "agent-1".into(),
+            (
+                vec![WatchEvent::Working],
+                Some(WatchEnd::Failed("DISCONNECTED".into())),
+            ),
+        );
+        let mut follows = Follows::new(Some(lane.clone()));
+        let tasks = watched(1);
+        let mut at = Instant::now();
+        settle(&mut follows, &tasks, at, |f| {
+            f.failures.get(&1) == Some(&1) && !f.held.contains_key(&1)
+        });
+        for (tries, after) in [(2, FOLLOW_BACKOFF[0]), (3, FOLLOW_BACKOFF[1])] {
+            at += after;
+            settle(&mut follows, &tasks, at, |f| {
+                f.failures.get(&1) == Some(&tries) || f.given_up.contains(&1)
+            });
+        }
+        assert!(follows.given_up.contains(&1));
+        follows.tend(&tasks, &BTreeSet::new(), at + Duration::from_secs(600));
+        assert!(!follows.held.contains_key(&1));
+        let starts = lane.started.lock().unwrap().len();
+        assert_eq!(starts, FOLLOW_TRIES as usize);
+    }
+
+    /// A watch held [`FOLLOW_KEPT`] worked: its failure starts the row
+    /// again, one, after failures that came short of giving up.
+    #[test]
+    fn a_watch_held_past_kept_then_failed_starts_the_count_again() {
+        let lane = Arc::new(Scripted::default());
+        lane.plans.lock().unwrap().insert(
+            "agent-1".into(),
+            (
+                vec![WatchEvent::Working],
+                Some(WatchEnd::Failed("DISCONNECTED".into())),
+            ),
+        );
+        let mut follows = Follows::new(Some(lane.clone()));
+        let tasks = watched(1);
+        let mut at = Instant::now();
+        settle(&mut follows, &tasks, at, |f| {
+            f.failures.get(&1) == Some(&1) && !f.held.contains_key(&1)
+        });
+        at += FOLLOW_BACKOFF[0];
+        settle(&mut follows, &tasks, at, |f| {
+            f.failures.get(&1) == Some(&2) && !f.held.contains_key(&1)
+        });
+        // The third is started, and its end only taken past FOLLOW_KEPT.
+        at += FOLLOW_BACKOFF[1];
+        follows.tend(&tasks, &BTreeSet::new(), at);
+        assert!(follows.held.contains_key(&1));
+        at += FOLLOW_KEPT;
+        settle(&mut follows, &tasks, at, |f| !f.held.contains_key(&1));
+        assert_eq!(follows.failures.get(&1), Some(&1));
+        assert!(!follows.given_up.contains(&1));
+        // Started again after the first back-off, as after a first failure.
+        at += FOLLOW_BACKOFF[0];
+        follows.tend(&tasks, &BTreeSet::new(), at);
+        assert!(follows.held.contains_key(&1));
     }
 
     #[test]
