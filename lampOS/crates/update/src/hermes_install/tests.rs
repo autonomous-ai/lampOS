@@ -2168,8 +2168,9 @@ fn the_first_tries_switch_is_on_in_the_product() {
 
 /// A known face giving another name is asked, and only their yes renames
 /// it (#5485, 9 of 9 on lamp-52e6, 9 Nov): both rename switches are on in
-/// the product. Only `lamp-voice` reads them, which sets each `on` once,
-/// and no product file sets either to anything else.
+/// the product, and so is the name-learn fix (#7331). Only `lamp-voice`
+/// reads them, which sets each `on` once, and no product file sets any of
+/// them to anything else.
 #[test]
 fn the_rename_switches_are_on_in_the_product() {
     let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
@@ -2187,6 +2188,10 @@ fn the_rename_switches_are_on_in_the_product() {
         (
             lamp_voice::known_faces::RENAME_YES_ENVIRONMENT,
             "LAMP_NAMES_RENAME_YES",
+        ),
+        (
+            lamp_voice::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
+            "LAMP_NAME_LEARN_FIX",
         ),
     ] {
         assert_eq!(name, want);
