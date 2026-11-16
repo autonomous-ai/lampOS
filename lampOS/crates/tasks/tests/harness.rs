@@ -9564,6 +9564,19 @@ fn a_one_path_gateway_make_ending_in_an_error_or_its_deadline_is_closed_and_gone
             json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"])
         );
         assert_eq!(fs::read_dir(&work).unwrap().count(), 0, "{timeout}: gone");
+        // The turn itself: an answer the agent wrote before its run failed
+        // is never taken as the make's.
+        let folder = work.join("make-direct");
+        fs::create_dir(&folder).unwrap();
+        fs::write(folder.join("rules.md"), "R").unwrap();
+        let run = lamp_tasks::skill_make::gateway_run(
+            &folder,
+            Duration::from_millis(if timeout { 1_000 } else { 20_000 }),
+            false,
+        );
+        assert!(gateway.turn.make_turn(&run).is_err());
+        assert_eq!(run.answer.get(), None, "{timeout}: never kept");
+        assert!(!folder.exists(), "{timeout}: the turn removes its folder");
     }
 }
 
@@ -9654,4 +9667,96 @@ fn a_one_path_make_with_no_harness_set_up_goes_to_the_lamps_hermes() {
     assert_eq!(hermes.0.load(Ordering::Acquire), 1);
     assert!(rig.calls().is_empty(), "Harness never asked");
     assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+}
+
+/// #7245: a make whose `harness new` is uncertain (a receipt Harness never
+/// gives) is refused, and at its end the agent Harness made late in the
+/// make's own folder is closed `--now`, then the folder removed: one
+/// `new`, never a second.
+#[test]
+fn an_uncertain_make_new_is_closed_in_its_folder_and_never_made_twice() {
+    let late = "33333333-3333-4333-8333-333333333333";
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"stdout":json!({"ok":true,"machineId":MACHINE,"agent":{
+            "id":AGENT,"name":"make","engine":"openclaw","permissionMode":"auto","bypassPermission":true}}).to_string()},
+        "ps":{"live_in_new_folder":late},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered["ok"], false, "{answered}");
+    assert_eq!(calls_of_verb(&rig, "new").len(), 1, "never made twice");
+    assert_eq!(calls_of_verb(&rig, "ps").len(), 1);
+    let closes = calls_of_verb(&rig, "close");
+    assert_eq!(closes.len(), 1, "{closes:?}");
+    assert_eq!(
+        closes[0]["args"],
+        json!(["close", "--machine", MACHINE, late, "--now", "--json"])
+    );
+    assert_eq!(
+        fs::read_dir(&work).unwrap().count(),
+        0,
+        "the folder is gone"
+    );
+    assert_eq!(hermes.0.load(Ordering::Acquire), 0);
+}
+
+/// #7245: a gateway make that can't start because the gateway isn't ready
+/// is told to the person at once, `not_ready` with the lamp's short words,
+/// never a silent failure: no `new`, and its folder gone.
+#[test]
+fn a_gateway_make_not_ready_is_said_at_once_in_short_words() {
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let work = make_work(&rig);
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let wrapper = openclaw_gateway_wrapper(&gateway_ns);
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &wrapper)],
+        Some("#!/bin/sh\n"),
+    );
+    let (mut runner, _) = with_gateway(
+        &rig,
+        runner,
+        EngineKind::Openclaw,
+        None,
+        Duration::from_millis(200),
+    );
+    runner.default_agent = false;
+    runner.makes = true;
+    let gateway = lamp_tasks::skill_make::MakeGateway::of(Arc::new(runner));
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(
+        answered,
+        json!({"ok": false, "error": "not_ready", "message": "I'm still getting ready. Give me a minute and ask me again."})
+    );
+    assert!(calls_of_verb(&rig, "new").is_empty());
+    assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+    assert_eq!(hermes.0.load(Ordering::Acquire), 0);
 }
