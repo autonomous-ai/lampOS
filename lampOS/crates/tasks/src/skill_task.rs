@@ -2408,22 +2408,24 @@ impl HarnessRunner {
     /// path, by its own data, nothing started: its engine, and whether it
     /// is a gateway agent that takes a run ([`default_agent_takes_runs`]
     /// with its gateway's namespace). A per-run agent is `false` here; a
-    /// gateway agent that can't take a run is refused in words.
-    pub fn make_agent(&self) -> Result<(crate::harness::EngineKind, bool), String> {
-        let harness = self.harness.get().ok_or(
-            "Harness isn't set up on this lamp yet, so the lamp's default agent isn't known and nothing was started",
-        )?;
-        let lamp = (harness.lamp)().ok_or(
-            "the lamp has no Harness target of its own yet, so the lamp's default agent isn't known and nothing was started",
-        )?;
+    /// gateway agent that can't take a run is refused in words. `None`
+    /// while Harness isn't set up or has no lamp target: no gateway agent
+    /// can be reached then, so the make goes as without the field.
+    pub fn make_agent(&self) -> Result<Option<(crate::harness::EngineKind, bool)>, String> {
+        let Some(harness) = self.harness.get() else {
+            return Ok(None);
+        };
+        let Some(lamp) = (harness.lamp)() else {
+            return Ok(None);
+        };
         let engine = (harness.default_engine)().unwrap_or(lamp.engine);
         let (wrapper, gateway) = self.default_agent_data(engine);
         let Some(gateway) = gateway else {
-            return Ok((engine, false));
+            return Ok(Some((engine, false)));
         };
         let script = std::fs::read_to_string(&gateway.ns).ok();
         default_agent_takes_runs(engine, wrapper.as_deref(), script.as_deref())
-            .map(|()| (engine, true))
+            .map(|()| Some((engine, true)))
     }
 
     /// Whether the lamp's default agent takes a skill's run with no
