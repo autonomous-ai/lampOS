@@ -83,11 +83,13 @@ pub const PRESENCE_TOPICS: [&str; 2] = ["humans/faces/tracked", "room/stood_up"]
 /// break forward). Off unless set: `sooner` is read, checked and ignored.
 pub const SOONER_ENVIRONMENT: &str = "LAMP_YAWN_SOONER";
 
-/// Topics no skill may read, whatever it lists: an agent's steps carry its
-/// tool's arguments and the start of its results (`tasks/step`, #7267),
-/// which only the owner's dev monitor shows. A skill that lists one is
-/// refused at load, and [`Permissions::refuses_reading`] refuses it too.
-pub const NEVER_READ: [&str; 1] = ["tasks/step"];
+/// Topics no skill may read, whatever it lists (#7267): an agent's steps
+/// carry its tool's arguments and the start of its results (`tasks/step`),
+/// and a turn's decision names the tools the lamp called for what was said
+/// (`voice/decision`); only the owner's dev monitor shows them. A skill
+/// that lists one is refused at load, and [`Permissions::refuses_reading`]
+/// refuses it too.
+pub const NEVER_READ: [&str; 2] = ["tasks/step", "voice/decision"];
 
 /// The topics a `[[while]]`'s `broken_by` may name, each with its rule
 /// ([`breaks`]): words heard, the lamp's name heard, a new push on the
