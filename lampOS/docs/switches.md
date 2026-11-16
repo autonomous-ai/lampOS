@@ -884,7 +884,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_SKILL_WRITTEN` | You can write a skill in your own words in the app; the lamp adds it and tells you it's on. |
 | `LAMP_SKILL_NAMED` | Say an installed skill's name or its own words, like "take a photo", and the lamp runs it, not saying no. |
 | `LAMP_TOLD_WHEN_ASKED` | Ask the lamp by voice to run a skill at night, and it tells you what it found, not waiting for morning. |
-| `LAMP_NAMED_AGENT_TAKES_LINE` | Name the lamp's agent ("Hey Lamp, OpenClaw, …") and the work goes to that agent, even something the lamp could answer itself, like the weather. |
+| `LAMP_NAMED_AGENT_TAKES_LINE` | Name the lamp's agent ("Hey Lamp, OpenClaw, …") and that agent does the work, even the weather. |
 | `LAMP_MAKE_SKILL_AGENT` | A skill the lamp can't make on the first try goes to its own helper agent before it gives up. |
 | `LAMP_MAKE_AGENT_GUIDE` | The lamp's helper agent checks and fixes a skill it makes before handing it back. |
 | `LAMP_MAKE_AGENT_ONE_PATH` | A skill the lamp can't make on the first try goes to its helper agent on OpenClaw too. |
