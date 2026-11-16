@@ -2549,6 +2549,90 @@ Kiểm thử: `made_skill::tests::with_its_switch_off_a_said_start_is_refused_as
 và `made::a_said_start_passes_the_real_checker_and_loads_as_a_function_with_its_when_line`
 của lamp-skills.
 
+## Bắt đầu bằng chính lời của người dùng (`LAMP_MADE_SKILL_ASKS=on`, tắt)
+
+Tắt nếu không đặt `LAMP_MADE_SKILL_ASKS=on`, và chưa có trong unit sản phẩm
+nào (#7233; chủ đèn, 16/11: "Every task must be doable; no 'couldn't'
+here"). Một kỹ năng tạo tại đây, bằng giọng nói hay trong app, có thể được
+bắt đầu bằng những từ người dùng đặt cho nó, với bất kỳ bước nào một kỹ
+năng tự tạo có: một lần ghi cố định (`do.write`, gửi Gmail), một `do.task`
+giao cho agent của đèn kèm grant, code riêng của nó, hoặc các bước của
+chính đèn (đèn, đầu, một câu nói). "When I say send my test note, email me
+..." là một ví dụ.
+
+1. **Nói với model tạo kỹ năng** (`make_skill_local`, model của đèn và
+   agent make như nhau, `made_skill::ASKS_RULES`): ở đầu, trước mọi bảng,
+   `asks = ["send my test note"]`, đúng lời người dùng nói, tối đa 3
+   (`made_skill::MOST_MADE_ASKS`), mỗi cụm 2 đến 8 từ thường, không bao giờ
+   là có, không, câu hỏi hay lệnh dừng; khi chỉ được bắt đầu bằng chúng thì
+   không có `[trigger]`, không `[ask]` và không topic; các bước như luật ở
+   trên. Prompt nói kỹ năng chưa nghe được lời trong phòng "other than the
+   words the person names to start it", và luật dịch vụ của agent cũng nhắc
+   đến chúng. Chúng thay cho kiểu bắt đầu `[said]` (`LAMP_MADE_SKILL_SAID`),
+   không được nói khi switch này bật. Brief nói "one [trigger] as listed, or
+   asks as above".
+2. **Cap giữ** (`made_skill::made_asks`, trong `held`): một mảng 1 đến 3
+   chuỗi, mỗi chuỗi tối đa 60 ký tự, 2 đến 8 từ gồm chữ, số và dấu nháy
+   đơn, cách nhau một dấu cách (như lamp-skills nhận asks của mọi kỹ năng),
+   không bị `skill_named::ask_refused` từ chối, mỗi cụm có ít nhất hai từ
+   của riêng nó ngoài những từ nói quanh một yêu cầu
+   (`skill_named::own_words_of`: "yes please" chỉ có một), không lặp lại;
+   nếu không, model sửa lại với `made_skill::MADE_ASKS_FORM`. Không bao giờ
+   có trong kỹ năng thêm từ file (`capped_added`). Bước dọn giữ nguyên
+   chúng.
+3. **Không bao giờ là của kỹ năng khác** (`made_skill::asks_taken`, lúc
+   tạo, sau khi tên đã trống): một cụm trùng với ask của kỹ năng khác, hoặc
+   chứa tên hay function của kỹ năng khác (đã cài, đẩy lên hoặc trong file
+   tools, gồm kỹ năng core và `made_asks` của kỹ năng tự tạo khác), so như
+   giọng nói so (`skill_named::same_ask`, `ask_holds_name`), bị từ chối kèm
+   lý do nói cho người dùng. Chính kỹ năng đó tạo lại thì không tính là
+   kỹ năng khác.
+4. **Nói lại kèm các từ** (`made_skill::plainly`): "When you say “send my
+   test note”, it mails me@example.com ... It starts only when you say it,
+   never on its own. It waits for you to agree before it sends anything."
+   Cạnh một trigger: "..., or when you say “...”, it ...". Một lần ghi vẫn
+   giữ phần đọc lại và lời đồng ý bằng giọng của chủ đèn cho đúng nội dung
+   (`skill_write_yes`), như mọi lần ghi tự tạo.
+5. **lamp-skills nạp** (`lamp_skills::started_by_words`): kỹ năng tạo
+   trên chính đèn này (`made_on_the_lamp`: installable, không phải đẩy lên,
+   thẻ có `made: here` và không có `added: file` hay `written: app`, khi
+   đã cài thì bản ghi package không phải từ Store) có `asks`, không tool và
+   không trigger được nạp (một lần đọc hay ghi có thể là bước duy nhất).
+   Kỹ năng từ Store, đẩy lên, core hay thêm từ file có asks mà không tool
+   vẫn bị từ chối như trước (P2 của sim-2 và Heron trên #7249), và `tools.json` liệt kê asks của nó dưới `made_asks`,
+   theo tên kỹ năng. Tắt: bị từ chối như trước và `tools.json` giữ nguyên
+   từng byte.
+6. **Bắt đầu bằng lời** (`skill_named`, `LAMP_SKILL_NAMED=on`, đường thứ
+   hai): một câu nghe được là một trong các asks của kỹ năng tự tạo, nói
+   đơn giản, được so như asks của kỹ năng Store, tạo lời gọi vòng 1 trong
+   code `make_skill` với `run` = tên kỹ năng (`skill_named::MADE`), tức là
+   chạy ngay bằng giọng nói (`made_run`): chỉ của chủ đèn (với
+   `LAMP_PRIVATE_ROOM` thì ai nói cũng là chủ; không thêm cổng nhận diện),
+   lần ghi chỉ theo lời đồng ý đã giữ, một lần mỗi lượt chạy, trong giới hạn
+   của ngày, task giữ lời đồng ý, token một lần chạy và grant. Câu phủ
+   định, câu hỏi, cụm hai kỹ năng cùng có, chỉ tên kỹ năng, hay khi đèn đang
+   chờ câu trả lời: không bắt đầu gì.
+7. **`SKILL.md` tải lên** (`upload_agent::files`, `LAMP_UPLOAD_TO_AGENT`):
+   các trigger phrase của nó cũng là `asks = [...]` của tool
+   (`upload_agent::asks_of`), nên `LAMP_SKILL_NAMED` gọi tool trong code khi
+   nghe thấy một cụm, như kỹ năng Store. Cap (`upload_agent::capped_with`)
+   chỉ nhận chúng khi viết đúng như vậy, và chỉ khi có switch. `SKILL.md`
+   trần khi `LAMP_UPLOAD_TO_AGENT` tắt (kỹ năng viết sẵn,
+   `upload_skill::written_with`) cũng nhận chúng như vậy, tối đa 8. Mỗi
+   cụm qua cùng bước kiểm tra như của kỹ năng tự tạo
+   (`upload_agent::asks_checked`) và kiểm tra trùng
+   (`made_skill::ask_taken`); cụm bị từ chối bị bỏ ra và app được báo cụm
+   nào, vì sao, trong `kept.asks_left_out = [{phrase, why}]`
+   (`upload_skill::take_telling`), phần còn lại vẫn được cài.
+
+Đặt giống nhau trong `lamp-voice` (truyền đúng `on` cho worker `provider`
+và `second`), `lamp-skills`, `lamp-skills-manage@`, `lamp-cloud` (nạp trong
+tiến trình, `load_each`) và `lamp-control` (task yes của nó nạp kỹ năng):
+nếu không, kỹ năng tự tạo có asks bị từ chối khi cài, không được nạp, hoặc
+hiện là chưa nạp. Tắt: `asks` của kỹ năng tự tạo bị dọn đi hoặc từ chối
+(`made_skill::MADE_ASKS`), prompt, brief, `skill.toml` của file tải lên và
+`tools.json` giữ nguyên từng byte như trước.
+
 ## Gửi kỹ năng tự tạo lên Skills Store (fourteen-P13, `LAMP_SKILLS_SHARE`, bật trong sản phẩm từ 2/11, #4948)
 
 Tắt nếu không đặt `LAMP_SKILLS_SHARE=on` trong unit của `lamp-cloud` (cùng

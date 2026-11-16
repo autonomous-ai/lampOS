@@ -235,7 +235,16 @@ fn system_for(reads: bool, agent: bool) -> String {
     // A start said to the lamp (#6526), told only with its switch: off, the
     // model still hears that a skill can't hear what is said, and the
     // prompt is as before.
-    let (hear, said) = if made_skill::said_on() {
+    // Its own words (the owner, 16 Nov: "no 'couldn't' here"), told only
+    // with their switch, in place of a [said] start: on, a skill may start
+    // when the person says the words they name for it, with any step.
+    let (hear, said) = if made_skill::asks_on() {
+        (
+            "hear what is said in the room, other than the words the person names to start it \
+             (asks, below)",
+            format!("\n{}", made_skill::ASKS_RULES),
+        )
+    } else if made_skill::said_on() {
         (
             "hear what is said in the room (a request told to the lamp is a [said] start, \
              below)",
@@ -246,7 +255,9 @@ fn system_for(reads: bool, agent: bool) -> String {
     };
     // Its can't-yet example, with writes on, is then the room's talk alone.
     let cant_example = match cant_example {
-        "hearing what is said" if made_skill::said_on() => "hearing what is said in the room",
+        "hearing what is said" if made_skill::said_on() || made_skill::asks_on() => {
+            "hearing what is said in the room"
+        }
         other => other,
     };
     format!(
@@ -378,7 +389,7 @@ fn agent_services() -> String {
          alone only CODE-write, CODE-read beside it only when it reads too), CODE one of: \
          {codes}; no other grant, and no services in [permissions]: only its trigger's \
          topics, and speak = true only beside a say step; its \
-         trigger the lamp's own (a time, someone coming or leaving, as above); and exactly one \
+         trigger the lamp's own (a time, someone coming or leaving, as above){words}; and exactly one \
          [[do]] step, alone in its step: task = {{ task = \"...\", run = \"scripts/main.py\" }}, \
          the task's words, at most {most} characters, saying plainly for the lamp's agent what \
          to read and what to tell the person, or what to send, in the request's own words, and \
@@ -392,6 +403,11 @@ fn agent_services() -> String {
          \n\n{AGENT_SERVICES_EXAMPLE}\n",
         cant_yet = made_skill::CANT_YET,
         codes = made_skill::SERVICE_GRANT_CODES.join(", "),
+        words = if made_skill::asks_on() {
+            ", or only the words they name for it (asks, as told at the end)"
+        } else {
+            ""
+        },
     )
 }
 
@@ -6348,6 +6364,105 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             "{on}"
         );
         made_skill::set_said_here(None);
+    }
+
+    /// The owner, 16 Nov ("no 'couldn't' here"): with
+    /// `LAMP_MADE_SKILL_ASKS` off the making model's prompt and brief are
+    /// byte for byte as with the switch unset, a skill can't yet hear what
+    /// is said; on, it is told a skill may start on the words the person
+    /// names ([`made_skill::ASKS_RULES`]) with any step, in place of a
+    /// [said] start, the agent's service rules naming them too.
+    #[test]
+    fn a_made_skills_own_words_are_told_to_the_maker_only_with_their_switch() {
+        let request = "when I say send my test note, email me a note saying hello";
+        made_skill::set_asks_here(None);
+        let unset = (
+            system_with(false),
+            system_for(true, true),
+            made_skill::brief(request),
+        );
+        made_skill::set_asks_here(Some(false));
+        let off = (
+            system_with(false),
+            system_for(true, true),
+            made_skill::brief(request),
+        );
+        assert_eq!(off, unset, "off is as before, byte for byte");
+        assert!(
+            off.0
+                .contains("A skill can't yet hear what is said, know who"),
+            "{}",
+            off.0
+        );
+        assert!(!off.0.contains("asks ="), "{}", off.0);
+        made_skill::set_asks_here(Some(true));
+        made_skill::set_said_here(Some(true));
+        let on = system_with(false);
+        assert!(on.ends_with(made_skill::ASKS_RULES), "{on}");
+        assert!(!on.contains(made_skill::SAID_RULES), "{on}");
+        assert!(
+            on.contains(
+                "A skill can't yet hear what is said in the room, other than the words the \
+                 person names to start it (asks, below)"
+            ),
+            "{on}"
+        );
+        made_skill::set_scripts_here(Some(true));
+        let agent = system_for(true, true);
+        assert!(
+            agent.contains("or only the words they name for it (asks, as told at the end)"),
+            "{agent}"
+        );
+        let brief = made_skill::brief(request).unwrap();
+        assert!(brief.contains("or asks as above"), "{brief}");
+        assert!(brief.len() <= made_skill::MOST_BRIEF_BYTES);
+        made_skill::set_scripts_here(None);
+        made_skill::set_said_here(None);
+        made_skill::set_asks_here(None);
+    }
+
+    /// The owner, 16 Nov: "when I say send my test note, email me ..." is
+    /// made, with `LAMP_MADE_SKILL_ASKS` on, as a skill whose asks are those
+    /// words beside its write: kept and put on, its say-back naming the
+    /// words, its write waiting for the person's yes as any made write's.
+    #[test]
+    fn a_skill_started_by_its_words_is_made_with_its_asks_and_its_write() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let (root, keeping) = keeping("asks-write");
+        let request = "when I say send my test note, email me@example.com with the subject \
+                       Test note, saying This is my test note.";
+        let toml = "asks = [\"send my test note\"]\n\
+            kind = \"installable\"\nversion = \"1.0.0\"\n\
+            [permissions]\nservices = { gmail = \"write\" }\n[[do]]\n\
+            write = { service = \"gmail\", action = \"send_mail\", to = [\"me@example.com\"], \
+            subject = \"Test note\", text = \"This is my test note.\" }\n";
+        let (url, served) = service(vec![(200, write_answer(toml))]);
+        let asked = manage_helper(&keeping.manage);
+        let told = make_with(
+            7,
+            Some(request),
+            request,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1, "{told}");
+        assert_eq!(told["made"], "leaving-mail", "{told}");
+        assert_eq!(told["writes_wait_for_yes"], true, "{told}");
+        let next = told["next"].as_str().unwrap();
+        for part in [
+            "when you say “send my test note”, it mails me@example.com",
+            made_skill::ASKS_ONLY_MANNERS.trim(),
+            made_skill::WAITS_FOR_YES.trim(),
+        ] {
+            assert!(next.contains(part), "{part}: {next}");
+        }
+        asked.join().unwrap();
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// #6307, with `LAMP_MADE_SCRIPTS` off: the making model is never told
