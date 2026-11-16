@@ -230,7 +230,7 @@ each line plays exactly as before.
 | A failed turn | `language::TURN_LOST` ("Sorry, I couldn't answer that. Could you ask me again?", #4883) | the notices release's file (none in the product: the sigh) | the cache's line when kept (`FailureNotices::owners_line`), the release's file or the sigh otherwise |
 | No Wi-Fi, recovery hotspot | `language::WIFI_LOST`, `WIFI_RECOVERING` | the notices release's English file, asked by name through the say service | the same (`Recordings::samples`) |
 | The second route's own words before a look, and before a search with `LAMP_SECOND_CHECKING_LINE` | `second_provider::LOOKING` ("Let me look."), `CHECKING` ("Let me check.") | said as the turn's text, in English | the owner's words (`language::fixed_in`), and the next round is told those words were said (Thirteen's P2 on #4707) |
-| The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`; `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
+| The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`, `DOWN_LINE_LIMIT` ("I've hit my usage limit."); `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
 | The second route's answer to a stop said over it, or within 3 s after it | `spoken_stop::LINE` ("Okay, I'll stop there.") | rendered by this route's voice as its worker starts, played at once as the lamp's words and kept in the thread (`LAMP_SPOKEN_STOP_ENDS`, on; `FixedClips`, #4710); `ProviderOutput::StopAnswered` tells the coordinator first, so a reminder's ring the line cut is held, not rung once more (`LAMP_RING_STOP_ENDS_IT`, schedule.md) | the owner's words, rendered ahead and kept in the thread (`language::fixed_in`); the stop itself is still heard by its English words (`spoken_stop::is_stop_request`) |
 | The second route's question after a cut-in that ended its answer with no words | `cut_in_wordless::LINE` ("Um, excuse me, did anyone say something?") | rendered ahead as the stop line, quiet room only (`LAMP_CUT_IN_WORDLESS_ASKS`, on in the product by the memory owner's call, 4 Nov; the lamp's own echo can still be asked, #4710, #4938) | the owner's words, rendered ahead (`language::fixed_in`) |
 | The second route's lines when a wordless cut-in is picked up again | `cut_in_wordless::BRIDGE` ("Anyway,"), `AGAIN` ("Oops, cut off again. Anyway,"), `PAUSE` ("It's a bit noisy here, so I'll pause. Just say 'Lamp' when you want me to go on.") | rendered ahead as the stop line; the first two then the cut answer's rest (`LAMP_CUT_IN_WORDLESS_RESUMES`, on in the product by the memory owner's call, 5 Nov) | the owner's words, rendered ahead (`language::fixed_in`); the rest in the answer's own words |
@@ -574,11 +574,26 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   says "Sorry, I can't answer just now." (`DOWN_LINE_CANNOT`) instead, at
   most once a minute, since asking again won't mend it and the slow line
   would promise it would (the Reviewer-lead's P3 on #3771); its journal:
-  `said it can't answer just now`. The journal: `said its thoughts are slow`,
-  and `(again, the shorter line)` for the second. Once the slow line (either one)
-  has been handed over, the route sends `DownLineSaid` for the request,
+  `said it can't answer just now`. A 429 that keeps coming is a usage
+  limit, not a burst (#7346: lamp-74ff's relay answered 429 for over an
+  hour on 16 Nov, and the lamp said "slow" and "still slow" the whole
+  time): the route keeps when the first 429 before any word came, and a
+  429 that comes `LIMIT_AFTER` (2 min) or more after it, with no chat round
+  begun between, says "I've hit my usage limit." (`DOWN_LINE_LIMIT`, V1's
+  `PhraseLLMLimit`) instead of the slow line, at most once a minute
+  (`DOWN_LINE_EVERY`) and never twice in a row: another 429 within that
+  minute says neither line. Any chat round that begins, or a refusal with
+  another status, ends the run of 429s. Recognised by how long the 429s
+  last, not by their body: the relay is not in this repo, its body is
+  unknown (the journal keeps only its codes) and a rate burst's per-minute
+  window passes well within 2 min. Until the line is rendered the slow line
+  is said as before. Its journal: `said it has hit its usage limit (429s
+  for N s)`. The journal: `said its thoughts are slow`,
+  and `(again, the shorter line)` for the second. Once the slow line (either
+  one) or the usage-limit line has been handed over, the route sends
+  `DownLineSaid` for the request,
   before its `TurnFailed`, and the coordinator then says no `turn_lost` over
-  it (#4332, failure-notices.md): one failure line a turn. The three lines are
+  it (#4332, failure-notices.md): one failure line a turn. The four lines are
   rendered together, each until it is kept: one whose render failed is asked
   again after the next turn, and until the short one is kept the long one is
   said in its place, never silence (Third's P2 on #3771). With an owner's
