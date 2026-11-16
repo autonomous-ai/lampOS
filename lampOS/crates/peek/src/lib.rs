@@ -4,7 +4,7 @@
 //! 2026: the person sat to the side, which only a Mac's camera pointed at
 //! the lamp showed.
 //!
-//! `/` is one page with a sidebar, Overview, Timeline, Turns, Camera, Body
+//! `/` is one page with a sidebar, Overview, Timeline, Turns, Tasks, Camera, Body
 //! and Health, kept fresh by one event stream (`/events`, [`page`]): each
 //! turn's steps on the bus ([`timeline`]) and its timings from the voice's
 //! own records ([`turns`]), words only in monitor mode.

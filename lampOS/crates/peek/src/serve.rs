@@ -545,6 +545,12 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         )
     };
     let light = read(lamp_msgs::Light::TOPICS[1]);
+    // A kept value: read as the others, no subscriber needed. One that
+    // does not read as a `TaskStatus` is said to be unreadable.
+    let tasks_kept = read(lamp_msgs::TaskStatus::TOPIC);
+    let tasks = tasks_kept
+        .as_ref()
+        .and_then(|message| message.parse::<lamp_msgs::TaskStatus>().ok());
     let overview = page::overview(&page::Glance {
         voice: voice.as_ref(),
         light: light.as_ref(),
@@ -555,6 +561,7 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         health: health.as_ref(),
         turns: &turns,
         units: &units,
+        tasks: tasks.as_ref(),
     });
     events.push(Event::default().event("overview").data(overview));
     events.push(
@@ -563,6 +570,11 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
             .data(page::timeline(&entries, &turns, words)),
     );
     events.push(Event::default().event("turns").data(page::turns(&turns)));
+    let tasks_html = match (&tasks_kept, &tasks) {
+        (Some(_), None) => "<p class=\"warn\">The tasks' progress can't be read.</p>".to_owned(),
+        _ => page::tasks(tasks.as_ref(), now_unix_ms()),
+    };
+    events.push(Event::default().event("tasks").data(tasks_html));
     events.push(Event::default().event("body").data(page::body(
         joints.as_ref(),
         report.as_ref(),
