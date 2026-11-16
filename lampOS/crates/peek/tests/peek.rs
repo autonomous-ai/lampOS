@@ -879,7 +879,7 @@ fn the_stream_reports_denied_sessions_and_recovers_without_words_or_paths() {
     safe(&sections);
     assert!(!sections["turns"].contains(PERMISSION));
     assert!(!sections["turns"].contains(STALE));
-    assert_eq!(sections["turns"].matches("<td>432</td>").count(), 1);
+    assert_eq!(sections["turns"].matches(">turn 432<").count(), 1);
     for (boundary, elapsed) in [
         ("first_denied", first),
         ("first_readable", readable),
@@ -997,7 +997,7 @@ fn the_one_page_streams_each_section_and_never_a_word() {
         "{turns}"
     );
     assert!(
-        turns.contains("<td class=\"slow\" title=\"first token\">"),
+        turns.contains("<span class=\"chip slow\" title=\"first token\">"),
         "{turns}"
     );
     assert!(turns.contains("played"), "{turns}");
@@ -1019,7 +1019,7 @@ fn the_one_page_streams_each_section_and_never_a_word() {
     // The timeline has the turn heard, without its words.
     let timeline = &sections["timeline"];
     assert!(
-        timeline.contains("request 4") && timeline.contains("<th>heard</th>"),
+        timeline.contains("request 4") && timeline.contains("heard +0 ms"),
         "{timeline}"
     );
     assert!(!timeline.contains(page::WORDS_SHOWN), "{timeline}");
@@ -1114,15 +1114,17 @@ fn monitor_mode_the_timeline_shows_a_turn_in_order_with_its_words_escaped() {
     let timeline = &sections["timeline"];
     assert!(timeline.contains(page::WORDS_SHOWN), "{timeline}");
     let order = [
-        "<th>heard</th>",
-        "&lt;script&gt;blue&lt;/script&gt;",
-        "<th>understood</th>",
-        "answered, final words 250 ms",
-        "<th>did</th>",
+        "<span class=\"lbl\">IN</span> “turn the light &lt;script&gt;blue&lt;/script&gt;”",
+        "<span class=\"lbl\">DID</span>",
         "light blue at 3",
         "skill glow done",
-        "<th>said</th>",
+        "<span class=\"lbl\">OUT</span> “It&#39;s blue now.”",
         "first audio 1100 ms",
+        "heard +0 ms",
+        "understood +",
+        "answered, final words 250 ms",
+        "did +",
+        "said +",
     ];
     let mut from = 0;
     for wanted in order {
@@ -1135,16 +1137,19 @@ fn monitor_mode_the_timeline_shows_a_turn_in_order_with_its_words_escaped() {
     assert!(!timeline.contains("PRIVATE"), "{timeline}");
     assert_eq!(timeline.matches("light blue at 3").count(), 1, "{timeline}");
     // Heard is the end of speech; each later step comes after it.
-    assert!(timeline.contains("<td>+0 ms</td>"), "{timeline}");
     let times: Vec<u64> = timeline
-        .split("<td>+")
+        .split(" +")
         .skip(1)
         .map(|rest| rest.split(" ms").next().unwrap().parse().unwrap())
         .collect();
     assert_eq!(times.len(), 5, "{timeline}");
     assert!(times.windows(2).all(|pair| pair[0] <= pair[1]), "{times:?}");
     assert!(times[4] >= 180, "{times:?}");
-    assert_eq!(timeline.matches("class=\"slow\"").count(), 1, "{timeline}");
+    assert_eq!(
+        timeline.matches("class=\"chip slow\"").count(),
+        1,
+        "{timeline}"
+    );
     // Never on `/bus`.
     let (status, _, body) = rig.ask_as("lamp-test.local", "GET", "/bus", &with, "");
     assert_eq!(status, 200);
@@ -1802,7 +1807,7 @@ fn monitor_mode_hostile_words_stay_escaped_in_a_card() {
     assert!(!html.contains("<script>"), "{html}");
     assert!(!html.contains("<img"), "{html}");
     assert!(
-        !html.contains("<b>") && !html.contains("<i>") && !html.contains("<u>"),
+        !html.contains("<b>light") && !html.contains("<i>") && !html.contains("<u>"),
         "{html}"
     );
     assert!(
