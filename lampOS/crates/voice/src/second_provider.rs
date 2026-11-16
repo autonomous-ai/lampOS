@@ -331,7 +331,12 @@ pub const DOWN_LINE_LIMIT: &str = "I've hit my usage limit.";
 pub const LIMIT_AFTER: Duration = Duration::from_secs(120);
 
 /// The down lines, in the order [`DownLine`] renders them at the start.
-pub(crate) const DOWN_LINES: [&str; 3] = [DOWN_LINE, DOWN_LINE_AGAIN, DOWN_LINE_CANNOT];
+pub(crate) const DOWN_LINES: [&str; 4] = [
+    DOWN_LINE,
+    DOWN_LINE_AGAIN,
+    DOWN_LINE_CANNOT,
+    DOWN_LINE_LIMIT,
+];
 
 /// Whether a refusal before any word is passing (429, a 5xx), which the slow
 /// line suits, or one asking again won't mend.
@@ -3507,6 +3512,12 @@ struct DownLine {
     again: Mutex<Option<Vec<i16>>>,
     cannot: Mutex<Option<Vec<i16>>>,
     cannot_at: Mutex<Option<tokio::time::Instant>>,
+    /// [`DOWN_LINE_LIMIT`], and when it was last said.
+    limit: Mutex<Option<Vec<i16>>>,
+    limit_at: Mutex<Option<tokio::time::Instant>>,
+    /// When the first of the 429s before any word came, with no chat round
+    /// begun and no other refusal since (#7346).
+    refused_since: Mutex<Option<tokio::time::Instant>>,
     rendering: AtomicBool,
     /// When the last was said, and whether it was [`DOWN_LINE_AGAIN`].
     said_at: Mutex<Option<(tokio::time::Instant, bool)>>,
@@ -3530,7 +3541,7 @@ impl DownLine {
             // the ones kept are not rendered again (Third's P2 on #3771).
             let missing =
                 |slot: &Mutex<Option<Vec<i16>>>| slot.lock().is_ok_and(|kept| kept.is_none());
-            for (slot, text) in [&line.clip, &line.again, &line.cannot]
+            for (slot, text) in [&line.clip, &line.again, &line.cannot, &line.limit]
                 .into_iter()
                 .zip(DOWN_LINES)
             {
@@ -3554,7 +3565,7 @@ impl DownLine {
                     *kept = Some(clip);
                 }
             }
-            if [&line.clip, &line.again, &line.cannot]
+            if [&line.clip, &line.again, &line.cannot, &line.limit]
                 .into_iter()
                 .any(missing)
             {
@@ -3596,6 +3607,47 @@ impl DownLine {
 
     fn cannot_said(&self) {
         if let Ok(mut at) = self.cannot_at.lock() {
+            *at = Some(tokio::time::Instant::now());
+        }
+    }
+
+    /// A refusal before any word with `status`: how long the 429s have
+    /// come, once that is [`LIMIT_AFTER`] or more (a usage limit, #7346).
+    /// Another status ends the run of them.
+    // ponytail: a burst, hours of no turn, then another burst reads as one
+    // run; an answered round in between (the usual case) ends it.
+    fn refused(&self, status: u16) -> Option<Duration> {
+        let mut since = self.refused_since.lock().ok()?;
+        if status != 429 {
+            *since = None;
+            return None;
+        }
+        let now = tokio::time::Instant::now();
+        let lasted = now.duration_since(*since.get_or_insert(now));
+        (lasted >= LIMIT_AFTER).then_some(lasted)
+    }
+
+    /// A chat round began: the 429s, if any, have passed.
+    fn answered(&self) {
+        if let Ok(mut since) = self.refused_since.lock() {
+            *since = None;
+        }
+    }
+
+    /// [`DOWN_LINE_LIMIT`]: `None` when not rendered yet (the slow line
+    /// then, as before), `Some(None)` when said in the last
+    /// [`DOWN_LINE_EVERY`] (never twice in a row: nothing), else its clip.
+    fn limit_due(&self) -> Option<Option<Vec<i16>>> {
+        let clip = self.limit.lock().ok()?.clone()?;
+        let at = *self.limit_at.lock().ok()?;
+        if at.is_some_and(|at| tokio::time::Instant::now().duration_since(at) < DOWN_LINE_EVERY) {
+            return Some(None);
+        }
+        Some(Some(clip))
+    }
+
+    fn limit_said(&self) {
+        if let Ok(mut at) = self.limit_at.lock() {
             *at = Some(tokio::time::Instant::now());
         }
     }
@@ -8176,6 +8228,36 @@ async fn say_cannot(shared: &Shared, request: u64, heard: bool) -> Result<(), St
         cue(shared, request, clip).await?;
         down.cannot_said();
         eprintln!("lamp-voice second: request {request} said it can't answer just now");
+    }
+    Ok(())
+}
+
+/// [`DOWN_LINE_LIMIT`] for 429s that have lasted `lasted`, to someone who
+/// spoke only: once in [`DOWN_LINE_EVERY`], nothing within it; the slow
+/// line ([`say_down`]) while it isn't rendered. Tells the coordinator as
+/// [`say_down`] does, so no `turn_lost` follows it.
+async fn say_limit(
+    shared: &Shared,
+    request: u64,
+    heard: bool,
+    lasted: Duration,
+) -> Result<(), Stop> {
+    let Some(down) = shared.down.as_ref().filter(|_| heard) else {
+        return Ok(());
+    };
+    let Some(due) = down.limit_due() else {
+        return say_down(shared, request, heard).await;
+    };
+    if let Some(clip) = due {
+        cue(shared, request, clip).await?;
+        down.limit_said();
+        if !shared.emit(ProviderOutput::DownLineSaid { request }).await {
+            return Err(Stop::Gone);
+        }
+        eprintln!(
+            "lamp-voice second: request {request} said it has hit its usage limit (429s for {} s)",
+            lasted.as_secs()
+        );
     }
     Ok(())
 }
@@ -16911,12 +16993,17 @@ async fn answer(
                         // silence (#1844's B). The slow line only for one
                         // that passes (429, a 5xx); a key, credit or request
                         // refused says it can't answer, with no promise
-                        // (the Reviewer-lead's P3 on #3771).
+                        // (the Reviewer-lead's P3 on #3771). 429s that last
+                        // are a usage limit and say so (#7346).
                         if first
                             && round == 1
                             && let net::Error::Status(status) = error
                         {
-                            if passing(status) {
+                            let limited =
+                                shared.down.as_ref().and_then(|down| down.refused(status));
+                            if let Some(lasted) = limited {
+                                say_limit(shared, request, heard, lasted).await?;
+                            } else if passing(status) {
                                 say_down(shared, request, heard).await?;
                             } else {
                                 say_cannot(shared, request, heard).await?;
@@ -16929,6 +17016,9 @@ async fn answer(
                     first = false;
                     if round == 1 {
                         reached(&writing_times, |times| &mut times.chat);
+                    }
+                    if let Some(down) = &shared.down {
+                        down.answered();
                     }
                     eprintln!(
                         "lamp-voice second: request {request} chat round {round} first event in {} ms",
