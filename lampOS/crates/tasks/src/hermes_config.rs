@@ -801,6 +801,17 @@ pub(crate) fn read_or_empty(path: &Path) -> io::Result<String> {
 /// `text` in place of `path`, 0600, through a new file beside it renamed
 /// over it, so a reader never sees half a file.
 pub(crate) fn replace(path: &Path, text: &str) -> io::Result<()> {
+    replace_checked(path, text, &|_| Ok(()))
+}
+
+/// [`replace`], with `check` run on the new file, whole and synced, before
+/// the rename (#7108: the engine's own check of its config): refused, the
+/// new file is removed and `path` is left as it was.
+pub(crate) fn replace_checked(
+    path: &Path,
+    text: &str,
+    check: &dyn Fn(&Path) -> Result<(), String>,
+) -> io::Result<()> {
     let dir = path.parent().unwrap_or(Path::new("."));
     let name = path
         .file_name()
@@ -819,6 +830,7 @@ pub(crate) fn replace(path: &Path, text: &str) -> io::Result<()> {
         file.write_all(text.as_bytes())?;
         file.sync_all()?;
         fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600))?;
+        check(&temporary).map_err(io::Error::other)?;
         fs::rename(&temporary, path)
     })();
     if written.is_err() {
