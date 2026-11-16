@@ -240,7 +240,20 @@ block at a wall-clock due time, so a test thread that is held up pushes the
 blocks it fell behind on back to back, and the worker meets a schedule no
 lamp gives it. That is the first read on #7295, not yet shown by a run.
 
-Until the rig is paced on the worker's own reads (#7295), the file's 19
+The rig is now paced on the worker's own reads: `speaker_quiet` holds a
+block once its time has come and the worker has read the one before (or has
+ended, or left it unread 500 ms), moves its schedule on instead of pushing
+blocks back to back, and the held-up test counts the quiet blocks the worker
+read (the scripted microphone's `taken`), not those pushed. The rig also
+sends nothing before the worker says `Ready`, as the supervisor does, so the
+start's messages no longer wait out the worker's set-up. The held-up test's
+early side is a time, not a count: the worker's last microphone read (the
+scripted microphone's `taken_at`) comes at least 30 ms after the speaker's
+last packet (the 40 ms reference age less one tick), so a held-up block only
+lengthens it, and the 200 runs below count nextest's `FLAKY` lines for this
+file, not its passes.
+
+Until 200 ARM64 runs show the pacing holds (#7295), the file's 19
 tests have `retries = 2` in `.config/nextest.toml`: a failed one is tried
 twice more. A test that needed another try is printed as `FLAKY` in the
 run's summary, so a drift still shows, and three failures in a row fail the
