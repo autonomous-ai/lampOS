@@ -771,34 +771,48 @@ struct SoonerFile {
     lasting: String,
 }
 
-/// A trigger's `sooner`: one table, as before, or a list of them (#6543).
+/// A `sooner`: one table, as before, or a list of them (#6543): a
+/// trigger's ([`SoonerFile`]) or a `[[while]]`'s ([`WhileSoonerFile`]).
 /// Read by its shape, so a single table's errors read as they always did.
-struct SoonersFile(Vec<SoonerFile>);
+struct SoonersFile<T = SoonerFile>(Vec<T>);
 
-impl<'de> Deserialize<'de> for SoonersFile {
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for SoonersFile<T> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct Shape;
-        impl<'de> serde::de::Visitor<'de> for Shape {
-            type Value = SoonersFile;
+        struct Shape<T>(std::marker::PhantomData<T>);
+        impl<'de, T: Deserialize<'de>> serde::de::Visitor<'de> for Shape<T> {
+            type Value = SoonersFile<T>;
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("a sooner table or a list of them")
             }
             fn visit_map<A: serde::de::MapAccess<'de>>(
                 self,
                 map: A,
-            ) -> Result<SoonersFile, A::Error> {
-                SoonerFile::deserialize(serde::de::value::MapAccessDeserializer::new(map))
+            ) -> Result<SoonersFile<T>, A::Error> {
+                T::deserialize(serde::de::value::MapAccessDeserializer::new(map))
                     .map(|one| SoonersFile(vec![one]))
             }
             fn visit_seq<A: serde::de::SeqAccess<'de>>(
                 self,
                 seq: A,
-            ) -> Result<SoonersFile, A::Error> {
+            ) -> Result<SoonersFile<T>, A::Error> {
                 Vec::deserialize(serde::de::value::SeqAccessDeserializer::new(seq)).map(SoonersFile)
             }
         }
-        deserializer.deserialize_any(Shape)
+        deserializer.deserialize_any(Shape(std::marker::PhantomData))
     }
+}
+
+/// A `[[while]]`'s `sooner` (#6543): `{ topic = "humans/doing_more", field =
+/// "drank_seen", above = 0, above_to = 3599 }`. While the sooner's own field
+/// is above its `above`, the `[[while]]`'s own `above` is `above_to`: the
+/// number lowered, never what the `[[while]]` watches.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WhileSoonerFile {
+    topic: String,
+    field: String,
+    above: f64,
+    above_to: f64,
 }
 
 /// `follows = { trigger = "leaned_in", within = "15m" }`.
@@ -859,6 +873,9 @@ struct TestFile {
     /// Topics whose messages begin that clock again ([`BROKEN_BY`]): words
     /// heard, a new push. With `through`.
     broken_by: Option<Vec<String>>,
+    /// A lower `above` while another topic's field is above a line (#6543):
+    /// one table or a list of them, each naming its own `above_to`.
+    sooner: Option<SoonersFile<WhileSoonerFile>>,
 }
 
 #[derive(Deserialize)]
@@ -2287,6 +2304,12 @@ impl Skill {
                     .iter()
                     .map(|sooner| (sooner.topic.clone(), "a trigger's sooner"))
             }))
+            .chain(self.conditions.iter().flat_map(|condition| {
+                condition
+                    .sooner
+                    .iter()
+                    .map(|sooner| (sooner.topic.clone(), "a [[while]]'s sooner"))
+            }))
             .chain(
                 self.triggers
                     .iter()
@@ -2626,9 +2649,33 @@ struct Condition {
     through: Vec<Value>,
     /// The topics that begin its clock again (`broken_by`).
     broken_by: Vec<String>,
+    /// Its lower `above`s, each while another topic's field is above a line
+    /// ([`SOONER_ENVIRONMENT`], #6543); empty without `sooner`. Of those
+    /// holding, the lowest wins. Only on an `above` without `for`.
+    sooner: Vec<WhileSooner>,
+}
+
+/// A `[[while]]`'s `sooner` (#6543): while `test` holds on `topic`'s newest
+/// value that lasts, the `[[while]]`'s own `above` is `above`.
+#[derive(Clone, Debug, PartialEq)]
+struct WhileSooner {
+    topic: String,
+    test: Test,
+    above: f64,
 }
 
 impl Condition {
+    /// Whether `value` holds, on `lowered` in place of its own `above`
+    /// when a sooner lowered it ([`Engine::lowered`]).
+    fn holds_on(&self, value: &Value, lowered: Option<f64>) -> bool {
+        match (&self.test, lowered) {
+            (Test::Above(field, _), Some(line)) => {
+                at(value, field).as_f64().is_some_and(|got| got > line)
+            }
+            _ => self.test.holds(value),
+        }
+    }
+
     /// Whether `value` is one its clock is carried through (`through`).
     fn carries(&self, value: &Value) -> bool {
         match &self.test {
@@ -4290,6 +4337,50 @@ fn manifest(
                 ));
             }
         }
+        // A sooner lowers this condition's own `above`, never what it
+        // watches (#6543): the lowered topic and field are always its own.
+        let soonest = match condition.sooner {
+            None => Vec::new(),
+            Some(SoonersFile(each)) if each.is_empty() => {
+                return Err(format!(
+                    "on {}: sooner is a table or a list of them, not an empty list",
+                    condition.topic
+                ));
+            }
+            Some(SoonersFile(each)) => each,
+        };
+        let mut sooner = Vec::with_capacity(soonest.len());
+        for one in soonest {
+            let Test::Above(_, own) = &test else {
+                return Err(format!(
+                    "on {}: sooner lowers a [[while]]'s above: give it an above",
+                    condition.topic
+                ));
+            };
+            if condition.lasting.is_some() {
+                return Err(format!(
+                    "on {}: sooner lowers a [[while]]'s above, not with its for",
+                    condition.topic
+                ));
+            }
+            if !one.above.is_finite() || !one.above_to.is_finite() {
+                return Err(format!(
+                    "on {}: sooner.above and sooner.above_to are numbers",
+                    condition.topic
+                ));
+            }
+            if one.above_to >= *own {
+                return Err(format!(
+                    "on {}: sooner.above_to is below the [[while]]'s above",
+                    condition.topic
+                ));
+            }
+            sooner.push(WhileSooner {
+                test: crate::test(&one.topic, Some(one.field), None, Some(one.above), None)?,
+                topic: one.topic,
+                above: one.above_to,
+            });
+        }
         conditions.push(Condition {
             topic: condition.topic,
             test,
@@ -4298,6 +4389,7 @@ fn manifest(
             stale_holds,
             through,
             broken_by,
+            sooner,
         });
     }
     let quiet = match file.quiet {
@@ -6536,8 +6628,13 @@ pub struct Engine {
     /// With [`REST_THROUGH_SOUNDS_ENVIRONMENT`] on: a `[[while]]`'s
     /// `through` and `broken_by` are kept (#1672).
     rest_through_sounds: bool,
-    /// With [`SOONER_ENVIRONMENT`] on: a trigger's `sooner` is kept (#3709).
+    /// With [`SOONER_ENVIRONMENT`] on: a trigger's `sooner` is kept (#3709),
+    /// and a `[[while]]`'s (#6543).
     sooner: bool,
+    /// The `[[while]]` conditions, by skill and index, a `sooner` lowered at
+    /// the last look, with the `above` it gave (#6543): a line in the
+    /// journal as one is lowered, changes or goes back, never each tick.
+    lowered: HashMap<(String, usize), f64>,
     /// The line each skill last picked from a list of lines, by skill: its
     /// next pick is one of the others, so a pet twice in a row never gets
     /// the same words twice (#3997). Behind a lock as [`Engine::still`]
@@ -6767,6 +6864,7 @@ impl Engine {
             reads: HashMap::new(),
             rest_through_sounds: false,
             sooner: false,
+            lowered: HashMap::new(),
             picked: std::sync::Mutex::default(),
             holds: None,
             restoring: None,
@@ -6791,10 +6889,61 @@ impl Engine {
     }
 
     /// A trigger's `sooner` shortens its `for` while its field is past its
-    /// line (`LAMP_YAWN_SOONER=on`, #3709). Without it `sooner` is ignored.
+    /// line (`LAMP_YAWN_SOONER=on`, #3709), and a `[[while]]`'s lowers its
+    /// `above` (#6543). Without it `sooner` is ignored.
     pub fn sooner(mut self) -> Self {
         self.sooner = true;
         self
+    }
+
+    /// Says in the journal, once as it happens, each `[[while]]` a `sooner`
+    /// lowered, lowered to another number, or let go back to its own
+    /// `above` (#6543): `comfort-break while room/activity sitting_s above
+    /// 7199 lowered to 3599 (sooner humans/doing_more drank_seen above 0)`.
+    /// Numbers and the topics and fields only.
+    fn note_lowered(&mut self, now_us: u64) {
+        if !self.sooner {
+            return;
+        }
+        for skill in &self.skills {
+            for (index, condition) in skill.conditions.iter().enumerate() {
+                let Test::Above(field, own) = &condition.test else {
+                    continue;
+                };
+                let key = (skill.name.clone(), index);
+                let now = Self::lowered(&self.latest, condition, true, now_us);
+                let was = self.lowered.get(&key).copied();
+                let line = match (was, now) {
+                    (None, None) => continue,
+                    (Some(was), Some(now)) if was == now.above => continue,
+                    (was, Some(now)) => {
+                        let field_of = match &now.test {
+                            Test::Above(field, line) => format!("{field} above {line}"),
+                            test => test.shows(),
+                        };
+                        self.lowered.insert(key, now.above);
+                        format!(
+                            "{} while {} {field} above {} lowered to {} (sooner {} {field_of})",
+                            skill.name,
+                            condition.topic,
+                            was.unwrap_or(*own),
+                            now.above,
+                            now.topic,
+                        )
+                    }
+                    (Some(was), None) => {
+                        self.lowered.remove(&key);
+                        format!(
+                            "{} while {} {field} above {own} again, from {was}: no sooner holds",
+                            skill.name, condition.topic,
+                        )
+                    }
+                };
+                if self.dropped.len() < DROPPED_LINES_KEPT {
+                    self.dropped.push(line);
+                }
+            }
+        }
     }
 
     /// The long holds kept in `file` across a short restart of the program
@@ -7635,6 +7784,7 @@ impl Engine {
     /// for [`SILENT_ENDS_US`]. Its spell is over with it.
     pub fn tick(&mut self, now_us: u64) -> Vec<Run> {
         self.judge_nudges(now_us);
+        self.note_lowered(now_us);
         self.invalidate_changes(now_us);
         let mut runs = Vec::new();
         let moment = self.local_moment(now_us);
@@ -7886,6 +8036,11 @@ impl Engine {
             let before = condition(&old, name, *index);
             before.is_some() && before == condition(new, name, *index)
         });
+        // A lowered `[[while]]` the edit kept is not said again (#6543).
+        self.lowered.retain(|(name, index), _| {
+            let before = condition(&old, name, *index);
+            before.is_some() && before == condition(new, name, *index)
+        });
         self.restore_holds();
         ends
     }
@@ -8004,12 +8159,35 @@ impl Engine {
             .map(|(value, _, _)| value)
     }
 
+    /// The `above` a holding `sooner` of `condition` lowers its own to, the
+    /// lowest of those holding (#6543), with the one that gives it; none
+    /// while none holds, or with `sooner` (the switch) off.
+    fn lowered<'a>(
+        latest: &HashMap<String, (Value, u64, Option<u64>)>,
+        condition: &'a Condition,
+        sooner: bool,
+        now_us: u64,
+    ) -> Option<&'a WhileSooner> {
+        if !sooner {
+            return None;
+        }
+        condition
+            .sooner
+            .iter()
+            .filter(|one| {
+                Self::fresh(latest, &one.topic, now_us).is_some_and(|value| one.test.holds(value))
+            })
+            .min_by(|a, b| a.above.total_cmp(&b.above))
+    }
+
     /// The condition holds on its topic's newest value that still lasts, and
-    /// has since `since_us` for its `for`.
+    /// has since `since_us` for its `for`. A `sooner` holding lowers its
+    /// `above` (#6543); it has no `for`, so no clock is asked then.
     fn condition_holds(
         latest: &HashMap<String, (Value, u64, Option<u64>)>,
         condition: &Condition,
         since_us: Option<&u64>,
+        sooner: bool,
         now_us: u64,
     ) -> bool {
         // A topic that has said nothing yet: held only when asked to be.
@@ -8020,6 +8198,10 @@ impl Engine {
         if condition.stale_holds && Self::fresh(latest, &condition.topic, now_us).is_none() {
             return true;
         }
+        if let Some(lowered) = Self::lowered(latest, condition, sooner, now_us) {
+            return Self::fresh(latest, &condition.topic, now_us)
+                .is_some_and(|value| condition.holds_on(value, Some(lowered.above)));
+        }
         Self::fresh(latest, &condition.topic, now_us)
             .is_some_and(|value| condition.test.holds(value))
             && since_us.is_some_and(|since| now_us - since >= condition.for_us)
@@ -8029,6 +8211,7 @@ impl Engine {
     fn conditions_hold(
         latest: &HashMap<String, (Value, u64, Option<u64>)>,
         holding: &HashMap<(String, usize), u64>,
+        sooner: bool,
         skill: &Skill,
         now_us: u64,
     ) -> bool {
@@ -8044,6 +8227,7 @@ impl Engine {
                     latest,
                     condition,
                     holding.get(&(skill.name.clone(), index)),
+                    sooner,
                     now_us,
                 )
             })
@@ -8056,6 +8240,7 @@ impl Engine {
     fn held_back(
         latest: &HashMap<String, (Value, u64, Option<u64>)>,
         holding: &HashMap<(String, usize), u64>,
+        sooner: bool,
         skill: &Skill,
         now_us: u64,
     ) -> String {
@@ -8089,6 +8274,7 @@ impl Engine {
                     latest,
                     condition,
                     holding.get(&(skill.name.clone(), *index)),
+                    sooner,
                     now_us,
                 )
             });
@@ -8141,6 +8327,7 @@ impl Engine {
     fn unmet(
         latest: &HashMap<String, (Value, u64, Option<u64>)>,
         holding: &HashMap<(String, usize), u64>,
+        sooner: bool,
         skill: &Skill,
         now_us: u64,
     ) -> String {
@@ -8156,11 +8343,22 @@ impl Engine {
                     latest,
                     condition,
                     holding.get(&(skill.name.clone(), *index)),
+                    sooner,
                     now_us,
                 )
             })
             .map_or_else(String::new, |(_, condition)| {
-                let mut wanted = format!("{} {}", condition.topic, condition.test.shows());
+                // A lowered `above` is the one it wants now (#6543).
+                let shows = match (
+                    &condition.test,
+                    Self::lowered(latest, condition, sooner, now_us),
+                ) {
+                    (Test::Above(field, _), Some(lowered)) => {
+                        Test::Above(field.clone(), lowered.above).shows()
+                    }
+                    (test, _) => test.shows(),
+                };
+                let mut wanted = format!("{} {}", condition.topic, shows);
                 if condition.for_us > 0 {
                     wanted += &format!(" for {} s", condition.for_us / 1_000_000);
                 }
@@ -8242,7 +8440,7 @@ impl Engine {
                 .then_some(None)?,
         };
         let run_item = run.from.as_ref().and_then(|(_, item)| item.as_deref());
-        Self::conditions_hold(&self.latest, &self.holding, skill, now_us).then(|| {
+        Self::conditions_hold(&self.latest, &self.holding, self.sooner, skill, now_us).then(|| {
             calls(
                 &self.latest,
                 &self.picked,
@@ -8267,7 +8465,8 @@ impl Engine {
             {
                 continue;
             }
-            let conditions = Self::conditions_hold(&self.latest, &self.holding, skill, now_us);
+            let conditions =
+                Self::conditions_hold(&self.latest, &self.holding, self.sooner, skill, now_us);
             for (index, trigger) in skill.triggers.iter().enumerate() {
                 if trigger.when == When::Changes
                     && (!conditions
@@ -8382,6 +8581,7 @@ impl Engine {
                 }
             }
         }
+        self.note_lowered(now_us);
         // Words heard or a new push: the clocks carried through a sound
         // begin again at the next value that holds.
         if self.rest_through_sounds && breaks(topic, &value, before.as_ref()) {
@@ -8526,8 +8726,20 @@ impl Engine {
                     };
                     watch.items = Some(items);
                     for name in came {
-                        if !Self::conditions_hold(&self.latest, &self.holding, skill, now_us) {
-                            let unmet = Self::unmet(&self.latest, &self.holding, skill, now_us);
+                        if !Self::conditions_hold(
+                            &self.latest,
+                            &self.holding,
+                            self.sooner,
+                            skill,
+                            now_us,
+                        ) {
+                            let unmet = Self::unmet(
+                                &self.latest,
+                                &self.holding,
+                                self.sooner,
+                                skill,
+                                now_us,
+                            );
                             dropped(
                                 &mut self.dropped,
                                 watch,
@@ -8932,7 +9144,13 @@ impl Engine {
                 // chance its own conditions hold back would not have spoken
                 // anyway, so it goes on as without the key.
                 if let Some(by) = stood_in
-                    && Self::conditions_hold(&self.latest, &self.holding, skill, now_us)
+                    && Self::conditions_hold(
+                        &self.latest,
+                        &self.holding,
+                        self.sooner,
+                        skill,
+                        now_us,
+                    )
                 {
                     if trigger.when != When::Appears {
                         watch.spent = false;
@@ -9065,7 +9283,7 @@ impl Engine {
                     dropped(&mut self.dropped, watch, &skill.name, gate, now_us, || why);
                     continue;
                 }
-                if !Self::conditions_hold(&self.latest, &self.holding, skill, now_us) {
+                if !Self::conditions_hold(&self.latest, &self.holding, self.sooner, skill, now_us) {
                     // Held back by a condition (someone talking): with a
                     // `wait`, the chance is kept while the trigger holds,
                     // and taken at its next message once they hold.
@@ -9077,7 +9295,7 @@ impl Engine {
                         // A chance kept waiting says so, once a hold: a
                         // matured spell waiting out a talk left no line for
                         // up to its whole `wait` (#6592).
-                        let (latest, holding) = (&self.latest, &self.holding);
+                        let (latest, holding, sooner) = (&self.latest, &self.holding, self.sooner);
                         dropped(
                             &mut self.dropped,
                             watch,
@@ -9088,7 +9306,7 @@ impl Engine {
                                 format!(
                                     "its while did not hold: kept up to {} s for it (held by {})",
                                     trigger.wait_us / 1_000_000,
-                                    Self::held_back(latest, holding, skill, now_us)
+                                    Self::held_back(latest, holding, sooner, skill, now_us)
                                 )
                             },
                         );
@@ -9128,7 +9346,13 @@ impl Engine {
                         if !trigger.once_per_day {
                             why = format!(
                                 "{why} (held by {})",
-                                Self::held_back(&self.latest, &self.holding, skill, now_us)
+                                Self::held_back(
+                                    &self.latest,
+                                    &self.holding,
+                                    self.sooner,
+                                    skill,
+                                    now_us
+                                )
                             );
                         }
                         runs.push(Run {
@@ -9152,7 +9376,8 @@ impl Engine {
                     // which #3007 gives every trigger with a `wait`, not
                     // here: it must not be said twice.
                     if trigger.wait_us == 0 && !(once && trigger.once_per_day) {
-                        let unmet = Self::unmet(&self.latest, &self.holding, skill, now_us);
+                        let unmet =
+                            Self::unmet(&self.latest, &self.holding, self.sooner, skill, now_us);
                         dropped(
                             &mut self.dropped,
                             watch,
@@ -9563,7 +9788,7 @@ impl Engine {
             return Err("Requested audio is disabled or has no spoken context.".into());
         }
         arguments(skill, args)?;
-        if !Self::conditions_hold(&self.latest, &self.holding, skill, now_us) {
+        if !Self::conditions_hold(&self.latest, &self.holding, self.sooner, skill, now_us) {
             return Err("I can't do that just now.".into());
         }
         let ran = self.tool_ran.get(&skill.name).copied();
