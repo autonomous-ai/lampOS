@@ -31,7 +31,16 @@
 //!   `humans/doing_seen` is said from what is kept.
 //! - **Goes on** only when the gate opens again, which wants the
 //!   recogniser's own fresh level said after the face now in view came
-//!   ([`crate::watch`]). Past [`KEEP_US`] closed, both are wiped as before.
+//!   ([`crate::watch`]), and only on the face it was kept for: the passing
+//!   id of the one face in view the last step it was open is kept with it
+//!   ([`Away`]), and the gate opening on any other id wipes it
+//!   ([`Why::OtherFace`]), so a second remembered person within the 120 s
+//!   never takes on the first one's window or timers (the Reviewer-lead's
+//!   P2 on #7251). `humans/familiar` is only a level, for whoever the eyes
+//!   recognise now, with no person id or name: it cannot say a new id is
+//!   the same remembered person, so a face back under a new id (as the
+//!   eyes give one coming back into view, `follows` included) starts
+//!   afresh. Past [`KEEP_US`] closed, both are wiped as before.
 //!   The posture window's samples older than its ten minutes still age out.
 //! - **The journal** says when each is kept, goes on, or is wiped, and why
 //!   (the gate's word): no id, no box.
@@ -135,6 +144,9 @@ pub enum Why {
     Hard(Hard),
     /// Closed for [`KEEP_US`].
     Expired,
+    /// The gate opened again on another face than the one it was kept for
+    /// (another passing id, or none known when it was kept).
+    OtherFace,
 }
 
 /// What to do with one thing kept this step.
@@ -177,6 +189,9 @@ impl Step {
             Step::Wiped(Why::Expired) => Some(format!(
                 "{what} wiped: the gate stayed closed {keep_s} s ({closed})"
             )),
+            Step::Wiped(Why::OtherFace) => Some(format!(
+                "{what} wiped: the gate opened again on another face than the one it was kept for"
+            )),
             Step::Wiped(Why::Hard(hard)) => {
                 Some(format!("{what} wiped at once ({})", hard.as_str()))
             }
@@ -184,30 +199,50 @@ impl Step {
     }
 }
 
-/// One thing kept through a closing: since when it is closed.
-#[derive(Clone, Copy, Debug, Default)]
+/// One thing kept through a closing: since when it is closed, and whose
+/// it is: the passing id of the one face in view the last step it was open
+/// (in memory only, never said).
+#[derive(Clone, Debug, Default)]
 pub struct Away {
     since_us: Option<u64>,
+    face: Option<String>,
 }
 
 impl Away {
     /// One step at `now_us`: whether its gate is `closed`, a closing that
-    /// wipes at once, and whether there is anything to keep.
-    pub fn step(&mut self, now_us: u64, closed: bool, hard: Option<Hard>, holding: bool) -> Step {
+    /// wipes at once, whether there is anything to keep, and the passing id
+    /// of the one face in view, if one is.
+    pub fn step(
+        &mut self,
+        now_us: u64,
+        closed: bool,
+        hard: Option<Hard>,
+        holding: bool,
+        face: Option<&str>,
+    ) -> Step {
         if !holding {
             self.since_us = None;
+            self.face = None;
             return Step::Open;
         }
         if let Some(hard) = hard {
             self.since_us = None;
+            self.face = None;
             return Step::Wiped(Why::Hard(hard));
         }
         if !closed {
-            return if self.since_us.take().is_some() {
-                Step::Resumed
-            } else {
-                Step::Open
-            };
+            if self.since_us.take().is_some() {
+                // Goes on only for the face it was kept for.
+                if face.is_some() && face == self.face.as_deref() {
+                    return Step::Resumed;
+                }
+                self.face = None;
+                return Step::Wiped(Why::OtherFace);
+            }
+            if let Some(face) = face {
+                self.face = Some(face.to_owned());
+            }
+            return Step::Open;
         }
         match self.since_us {
             None => {
@@ -232,7 +267,7 @@ pub struct Plan {
 }
 
 /// The posture window's keep and the doing timers', as `serve` steps them.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Keep {
     posture: Away,
     sitting: Away,
@@ -241,19 +276,20 @@ pub struct Keep {
 impl Keep {
     pub fn step(&mut self, now: &Now<'_>) -> Plan {
         let hard = hard(now);
+        let face = now.seen.track.as_ref().map(|track| track.id.as_str());
         // A pause holds both itself; its end, wiped or not, is read here.
         let posture_closed = now.posture_gate.is_err() && !now.verdict.paused;
         let posture = self
             .posture
-            .step(now.now_us, posture_closed, hard, now.watching);
+            .step(now.now_us, posture_closed, hard, now.watching, face);
         // The sitting ends, as before, only on the desk's own lines (nobody
         // or a stranger) outside a pause; a pause's wipe for the privacy,
         // sleep or the opt-in still ends it, as it did.
         let sitting_closed = pause::ends_sitting(now.verdict, false, now.desk);
         let sitting_hard = hard.filter(|hard| hard.ends_sitting() || now.verdict.wipe);
-        let sitting = self
-            .sitting
-            .step(now.now_us, sitting_closed, sitting_hard, now.sitting);
+        let sitting =
+            self.sitting
+                .step(now.now_us, sitting_closed, sitting_hard, now.sitting, face);
         Plan {
             hard,
             posture,

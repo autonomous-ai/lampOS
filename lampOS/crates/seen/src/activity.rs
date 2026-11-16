@@ -30,10 +30,13 @@
 //!   its socket closed, its frames wiped and its answers dropped.
 //! - **The journal** ([`Note`], drained by `serve` with [`Activity::notes`]):
 //!   each burst's start, its frames handed (count and bytes), and its end:
-//!   answered (the surest label and its confidence, the kinds counted, the
-//!   server's time per frame), busy or failed (and how long the bursts are
-//!   held back), or aborted. At most one burst a minute, so at most four
-//!   lines a minute. No picture, no id, no name.
+//!   answered (how many kinds were counted and the server's time per
+//!   frame), busy or failed (and how long the bursts are held back), or
+//!   aborted. At most one burst a minute, so at most four lines a minute.
+//!   No picture, no id, no name, and no label: the surest label and its
+//!   confidence and each kind counted by name only with the diagnostics
+//!   switch [`crate::JOURNAL_LABELS`] `on`, since a forget or the opt-in
+//!   off does not clear the journal.
 use crate::{
     backoff::{Ended, Retreat},
     burst::{Burst, Copied, Event, Failure, Outcome, Pace},
@@ -130,8 +133,9 @@ fn kind(what: lamp_msgs::Doing) -> &'static str {
 
 impl Note {
     /// The journal's line, without the `lamp-seen: ` prefix. `stopped` says
-    /// why a burst was aborted (the gate's word, or the link).
-    pub fn line(&self, stopped: &str) -> String {
+    /// why a burst was aborted (the gate's word, or the link); `labels`
+    /// ([`crate::JOURNAL_LABELS`]) names what was seen, off counts only.
+    pub fn line(&self, stopped: &str, labels: bool) -> String {
         match self {
             Note::Started => "burst started".to_owned(),
             Note::Sent { frames, bytes } => {
@@ -140,13 +144,13 @@ impl Note {
             Note::Aborted { frames, bytes } => format!(
                 "burst aborted ({stopped}) after {frames} frames, {bytes} bytes: its answers dropped"
             ),
-            Note::Ended(ended) => ended.line(),
+            Note::Ended(ended) => ended.line(labels),
         }
     }
 }
 
 impl BurstEnd {
-    fn line(&self) -> String {
+    fn line(&self, labels: bool) -> String {
         let held = self
             .held_back_s
             .map(|s| format!("; bursts held back {s} s"))
@@ -159,6 +163,17 @@ impl BurstEnd {
         );
         match self.outcome {
             Outcome::Answered => {
+                let server = self.server.map_or_else(
+                    || "no answer timed".to_owned(),
+                    |(mean, most)| format!("server {} ms a frame, at most {}", ms(mean), ms(most)),
+                );
+                if !labels {
+                    let kinds = self.seen.len();
+                    let plural = if kinds == 1 { "kind" } else { "kinds" };
+                    return format!(
+                        "burst answered: {kinds} {plural} counted; {server}; {sent}{held}"
+                    );
+                }
                 let top = self.top.as_ref().map_or_else(
                     || "no label".to_owned(),
                     |(label, conf)| format!("top {label} {conf:.2}"),
@@ -172,10 +187,6 @@ impl BurstEnd {
                         .collect::<Vec<_>>()
                         .join(", ")
                 };
-                let server = self.server.map_or_else(
-                    || "no answer timed".to_owned(),
-                    |(mean, most)| format!("server {} ms a frame, at most {}", ms(mean), ms(most)),
-                );
                 format!("burst answered: {top}; counted {seen}; {server}; {sent}{held}")
             }
             Outcome::Busy => {

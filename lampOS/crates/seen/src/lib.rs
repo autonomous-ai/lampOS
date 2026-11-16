@@ -81,6 +81,14 @@ pub fn switched_on(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// The journal's diagnostics switch (the Reviewer-lead's P2 on #7251):
+/// `on` exactly and the journal's burst and posture lines name what was
+/// seen (the surest label and its confidence, each kind counted, the RULA
+/// score, its risk, bad or good, the region, the window's bad share);
+/// anything else and they say only counts and outcomes, since a forget or
+/// the opt-in off does not clear the journal.
+pub const JOURNAL_LABELS: &str = "LAMP_SEEN_JOURNAL_LABELS";
+
 /// This part's name on the bus: as a subscriber, a publisher and a ring
 /// mark's asker (one token of `[a-z][a-z0-9_]{0,31}`, docs/bus.md).
 pub const BUS_NAME: &str = "lamp_seen";
