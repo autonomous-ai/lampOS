@@ -2455,6 +2455,17 @@ bước lên bus thành `tasks/step` (`TaskStep`, `crates/tasks/src/steps.rs`).
   - Sự kiện dài quá 256 KiB thì bị bỏ qua.
 - **Không lưu gì:** không ghi gì, và database không bao giờ được mở để
   ghi. Vị trí chỉ nằm trong bộ nhớ; sự kiện trên bus là bản duy nhất.
+- **Luồng riêng:** việc đọc, giải nén và parse chạy trên luồng riêng
+  `tasks-steps`, không bao giờ trên vòng lặp nhận socket của voice.
+- **Ẩn bí mật:** trước khi cắt ở 40/120 byte, `args`, `result`, lời trả
+  lời và lỗi được thay bằng `***` ở các chỗ sau: chữ sau `Bearer` hoặc
+  `Basic`; giá trị của `NAME=value` có tên giống bí mật (KEY, TOKEN,
+  SECRET, PASSWORD, AUTH, COOKIE), kể cả trong JSON tham số; và từ trông
+  như token (từ 24 ký tự trở lên, có cả chữ lẫn số, hoặc có tiền tố khóa
+  đã biết).
+- **Link:** file database được mở với `NOFOLLOW` (tối đa 64 lời gọi đang
+  chờ kết quả). Thư mục state được resolve trước (`fs::canonicalize`), nên
+  chỉ phần nằm dưới nó không được là link.
 - **Độ trễ:** bước lên bus trong vòng 1 s, và lên trang peek trong khoảng
   2 s. Peek chỉ hiện bước ở chế độ monitor.
 
