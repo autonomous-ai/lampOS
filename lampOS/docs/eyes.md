@@ -1605,7 +1605,7 @@ With the switch:
     There must be as many spelled runs as the model's name has words.
     Letters said without that ask ("I work at I B M", "I'm from the U S")
     are no name, and the name goes through the read-back above (El's HOLD
-    on #5159). With `LAMP_NAME_LEARN_FIX=on` (off unless set, #7331) a
+    on #5159). With `LAMP_NAME_LEARN_FIX=on` (on in the product unit, #7331) a
     rename (`replace`) takes the letters the same way: spelled in the turn
     in hand right after the lamp asked for a spelling, they are the name
     and its yes, two letters joined as a word ("A d a", "A, d, a" and
@@ -1758,7 +1758,7 @@ With the switch:
     model is told the result. Any other turn drops it: a no, another name,
     another face seen saying the yes (told), a carried line not read as
     the asker's, another session, a new save call. With
-    `LAMP_NAME_LEARN_FIX=on` (off unless set, #7331), one turn that is no
+    `LAMP_NAME_LEARN_FIX=on` (on in the product unit, #7331), one turn that is no
     yes only because the question was cut before its name was heard (the
     thread holds the question's answer as the one cut last, and what played
     of it does not say A, `LAMP_SAID_AS_HEARD`; `Thread::cut_played`) keeps
