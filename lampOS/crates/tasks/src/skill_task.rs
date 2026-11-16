@@ -2879,7 +2879,7 @@ impl Runner for HarnessRunner {
         if stopped() || std::time::Instant::now() >= until {
             return Err("the skill run ended before hand-over".into());
         }
-        let outcome = cli.launch(&launch);
+        let (outcome, named) = cli.launch_naming(&launch);
         // Asked of Harness: from here the agent may have begun, unless
         // Harness never sent the creation.
         if !matches!(outcome, LaunchOutcome::NotSent { .. }) {
@@ -2898,6 +2898,11 @@ impl Runner for HarnessRunner {
                 return Err("Harness didn't start the run at once, so it was given up".into());
             }
             LaunchOutcome::NotSent { code } | LaunchOutcome::Uncertain { code } => {
+                // #7171: an uncertain `new` whose reply still named the
+                // run's agent (a `machineId` not the lamp's, an `existing`
+                // one) may have started it, so the guard closes it as on
+                // every other end: the token ended, then `close --now`.
+                started.agent = named;
                 return Err(format!("Harness didn't start the run ({code})"));
             }
         };
@@ -5494,7 +5499,7 @@ mod tests {
             .and_then(|(_, rest)| rest.split_once("\n}\n"))
             .unwrap()
             .0;
-        assert!(run.contains("cli.launch(&launch)"));
+        assert!(run.contains("cli.launch_naming(&launch)"));
         for named in [
             "GatewayRunner",
             "gateway_run",

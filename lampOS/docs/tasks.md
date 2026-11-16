@@ -3033,7 +3033,12 @@ for each run, and is answered once the run ends
     `harness close --machine <lamp> <agent> --now --json`
     (`Cli::close_now`) and is `run_failed` "the run was ended at its
     deadline, 840 s". `new` not started (`not_sent`, `uncertain`, or a
-    `pending` creation) is `run_failed` too.
+    `pending` creation) is `run_failed` too. An `uncertain` `new` whose
+    reply still names the run's agent by its name (a `machineId` not the
+    lamp's, an `existing` agent) has that agent closed by the guard, token
+    first, then `close --now` (`Cli::launch_naming`, #7171); a reply naming
+    none closes nothing. Test:
+    `issue_7171_a_skill_run_refused_as_uncertain_closes_the_agent_harness_named`.
   - **A run that never reached its agent** (#6835 gap 1). When the engine
     exits before it is ready, Harness keeps the run's pane as a shell: the
     same agent id, agent "Terminal", and `wait` reads it `idle` within
