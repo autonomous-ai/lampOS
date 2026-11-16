@@ -701,6 +701,7 @@ const BUS_TOPICS: &[&str] = &[
     "expression/unplug_state",
     "eyes/camera_closed",
     "humans/doing",
+    "humans/doing_more",
     "humans/doing_seen",
     "humans/faces/tracked",
     "humans/familiar",

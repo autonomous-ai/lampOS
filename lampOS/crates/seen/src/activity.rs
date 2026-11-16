@@ -84,6 +84,9 @@ pub struct Finished {
     pub outcome: Outcome,
     /// What it saw (empty unless answered).
     pub seen: Vec<DoingSeen>,
+    /// Its tiredness, desk work and celebrating ([`sitting::read_more`]),
+    /// kept only with `LAMP_SEEN_MORE_DOINGS=on`; nothing unless answered.
+    pub more: sitting::More,
 }
 
 /// One line for the journal about a burst ([`Note::line`]).
@@ -322,6 +325,10 @@ impl Activity {
         }
         let outcome = done?;
         let running = self.running.take()?;
+        let more = match outcome {
+            Outcome::Answered => sitting::read_more(&running.answers),
+            _ => sitting::More::default(),
+        };
         let (ended, seen) = match outcome {
             Outcome::Answered => {
                 self.counts.answered = self.counts.answered.saturating_add(1);
@@ -356,7 +363,11 @@ impl Activity {
             took: running.started.elapsed(),
             held_back_s: self.held_back_s(now_us),
         }));
-        Some(Finished { outcome, seen })
+        Some(Finished {
+            outcome,
+            seen,
+            more,
+        })
     }
 
     fn start(&mut self, now_us: u64) -> bool {

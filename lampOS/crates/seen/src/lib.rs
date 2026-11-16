@@ -24,7 +24,9 @@
 //! - [`scale`]: the camera's frame scaled down to 320×240 and encoded
 //!   again before it is sent, whatever size the camera serves.
 //! - [`sitting`]: a burst's labels read as drinking, eating or a break,
-//!   and the sitting's timers for `humans/doing`.
+//!   and the sitting's timers for `humans/doing`; with
+//!   `LAMP_SEEN_MORE_DOINGS=on` also tiredness, desk work and celebrating,
+//!   on `humans/doing_more`, a topic of its own.
 //! - [`mark`]: the ring's mark before any frame: a [`frames::Sink`] that
 //!   asks the ring for it and takes no frame until the ring said it drew
 //!   it (fails closed).

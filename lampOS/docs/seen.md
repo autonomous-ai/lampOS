@@ -386,7 +386,23 @@ that one too, aborts a burst under way.
     the slide shut, no account given), so a skill's `[[while]] above` on a
     timer runs on the clock as it would without this part;
   - `humans/doing_seen` (`DoingSeen`): once for each kind newly seen, not
-    seen in the burst before.
+    seen in the burst before;
+  - with `LAMP_SEEN_MORE_DOINGS=on` only, `humans/doing_more`
+    (`HumanDoingMore`), with `humans/doing` and as often: `tired_s_ago`
+    and `tired_seen` (V1's `tired` group, a yawn, and a stretch of an arm
+    or a leg, which still counts as a break on `humans/doing` too),
+    `desk_work_s_ago` with a coarse `desk_work` (V1's `sedentary` group:
+    "using computer" and "playing controller" are `computer`, "texting"
+    `phone`, "reading", "reading book" and "reading newspaper" `reading`,
+    "writing" and "drawing" `writing`; the kind of the surest such label)
+    and `celebrate_s_ago` (V1's `celebrate` group). Every field always
+    there, each timer counting from the desk arrival; the same sureness
+    rule, the same bursts, no more pictures, wiped with the sitting. They
+    never set `last` or say `humans/doing_seen`: desk work shows in almost
+    every burst and would push a drink out of the second voice's note.
+    V1's `emotional` group (laughing, crying, singing) is never said. Its
+    own topic, so a skill given drinking, eating and breaks never receives
+    these; off, it is not even declared.
 - **Health**: with activity on, `diagnostics` also says `sends: activity`,
   its bursts (`bursts`, `answered`, `busy`, `failed`, `aborted`),
   `frames_sent`, `frames_wiped`, `wrong_frame` and `last_failure`.
