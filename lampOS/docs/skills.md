@@ -5708,7 +5708,10 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    the second route tells the model (`skill_named::shared_note`) to say so
    naming each skill, so the person knows which to make again with other
    words (the first builder's answer 2 on #7249); while the lamp waits for
-   an answer, no note. Two Store skills sharing a phrase stay as before.
+   an answer, no note. Told to the owner's line alone
+   (`services::owner_hears`, as `made_run` names no skill to anyone else;
+   sim-2's P2 on #7249): for another line nothing is told and no skill
+   named. Two Store skills sharing a phrase stay as before.
 7. **An uploaded `SKILL.md`** (`upload_agent::files`,
    `LAMP_UPLOAD_TO_AGENT`): its trigger phrases are also its tool's
    `asks = [...]` (`upload_agent::asks_of`: lower case, the marks around

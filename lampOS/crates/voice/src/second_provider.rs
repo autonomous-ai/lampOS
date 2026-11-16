@@ -15955,16 +15955,36 @@ async fn answer(
         // (`LAMP_MADE_SKILL_ASKS`, the first builder's answer 2 on #7249):
         // nothing is called, and the model is told each skill, to say so;
         // while the lamp waits for an answer, the model reads the line.
+        // Told only to the owner (`services::owner_hears`, as `made_run`
+        // names no skill to anyone else: sim-2's P2 on #7249): for another
+        // line, nothing is told and nothing named. The private room
+        // answers at once; outside it the owner's check may wait for the
+        // voice judge (`services::PRINT_WAIT`), off the turn's thread, and
+        // only for such a line.
         let (skill_named, shared_words) = match skill_named {
             Some((name, args)) if name == crate::skill_named::SHARED => (None, Some(args)),
             named => (named, None),
         };
         if let Some(args) = shared_words.filter(|_| !forgot_before_question && !awaits) {
-            eprintln!(
-                "lamp-voice second: request {request}: the heard words start more than one skill, none called: {}",
-                args["skills"]
-            );
-            messages.push(Message::system(crate::skill_named::shared_note(&args)));
+            let owner_hears = crate::person::private_room() || {
+                let lease = scope.clone();
+                tokio::task::spawn_blocking(move || {
+                    crate::services::owner_hears(request, heard, lease.as_ref())
+                })
+                .await
+                .unwrap_or(false)
+            };
+            if owner_hears {
+                eprintln!(
+                    "lamp-voice second: request {request}: the heard words start more than one skill, none called: {}",
+                    args["skills"]
+                );
+                messages.push(Message::system(crate::skill_named::shared_note(&args)));
+            } else {
+                eprintln!(
+                    "lamp-voice second: request {request}: the heard words start more than one skill, none called, none named: not the owner's line"
+                );
+            }
         }
         if let Some((name, args)) = skill_named
             .as_ref()
