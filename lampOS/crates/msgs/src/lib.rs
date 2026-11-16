@@ -765,6 +765,180 @@ impl VoiceTurn {
     }
 }
 
+/// What the lamp decided on a turn (`voice/decision`, #7267): answered it
+/// itself, handed work over, or held its answer back.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DecisionKind {
+    Answered,
+    Handed,
+    HeldBack,
+    /// The turn failed ([`VoiceDecision::error`] says why).
+    Error,
+}
+
+/// Where a hand-over stands ([`VoiceDecision::stage`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HandStage {
+    /// The tasks part prepared it; it waits for the person's yes.
+    Prepared,
+    /// The yes was taken and the tasks part started it.
+    Started,
+    /// The person said no, or a corrected ask replaced it.
+    Declined,
+}
+
+/// The most tool names one decision lists.
+pub const DECISION_MOST_TOOLS: usize = 8;
+/// The most bytes of one tool's name in a decision.
+pub const DECISION_MOST_TOOL_BYTES: usize = 40;
+
+/// What the lamp decided on a turn (`voice/decision`, #7267): answered it
+/// with these tools, handed work over to an engine (prepared, started or
+/// declined, with the task's number as `tasks/status` gives it), or held its
+/// answer back. Names and numbers only, never words, so it is always
+/// published. Beside `voice/turn`, whose `Copy` type Policy reads.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VoiceDecision {
+    /// The turn's request, as `voice/heard` and `voice/turn` number it.
+    pub request: u64,
+    pub kind: DecisionKind,
+    /// The functions the turn called, by name, each once, in name order
+    /// (not the order called): at most [`DECISION_MOST_TOOLS`], each at most
+    /// [`DECISION_MOST_TOOL_BYTES`] lowercase letters, digits or `_`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tools: Vec<String>,
+    /// The task's number in the tasks part's store (`handed` only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<u64>,
+    /// Who has the work, as `tasks/status` names it: required on `handed`,
+    /// 1..32 lowercase letters, digits or `_`, and on nothing else.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stage: Option<HandStage>,
+    /// Milliseconds from the words heard to the answer's first audio, as
+    /// the journal's "first answer audio N ms after the words were heard"
+    /// says it. It may come in a later decision for the same request: the
+    /// latest decision of a request wins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_reply_ms: Option<u32>,
+    /// The earlier request this line steers or joins (or whose task it
+    /// goes into), when it does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_request: Option<u64>,
+    /// Why the turn failed (`error` only): a short code name, at most
+    /// [`DECISION_MOST_TOOL_BYTES`] lowercase letters, digits or `_`; never
+    /// a person's words.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// `text` cut to at most `most` bytes, on a whole character.
+pub fn cut_whole_chars(text: &str, most: usize) -> &str {
+    let mut end = text.len().min(most);
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
+}
+
+impl VoiceDecision {
+    pub const TYPE: &str = "lamp_msgs/VoiceDecision";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "voice/decision";
+
+    /// One a turn's decision, and one a hand-over's step: no period.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+
+    /// A turn answered with `tools`: the first [`DECISION_MOST_TOOLS`]
+    /// names, each cut to [`DECISION_MOST_TOOL_BYTES`].
+    pub fn answered<'a>(request: u64, tools: impl IntoIterator<Item = &'a str>) -> Self {
+        Self {
+            tools: tools
+                .into_iter()
+                .take(DECISION_MOST_TOOLS)
+                .map(|name| cut_whole_chars(name, DECISION_MOST_TOOL_BYTES).to_owned())
+                .collect(),
+            ..Self::of(request, DecisionKind::Answered)
+        }
+    }
+
+    /// Task `task` handed to `engine` in `request`, at `stage`.
+    pub fn handed(request: u64, task: u64, engine: Option<&str>, stage: HandStage) -> Self {
+        Self {
+            task: Some(task),
+            engine: engine.map(|engine| engine.replace('-', "_")),
+            stage: Some(stage),
+            ..Self::of(request, DecisionKind::Handed)
+        }
+    }
+
+    /// A turn whose answer was held back.
+    pub fn held_back(request: u64) -> Self {
+        Self::of(request, DecisionKind::HeldBack)
+    }
+
+    /// A turn that failed, for `code`, cut to [`DECISION_MOST_TOOL_BYTES`].
+    pub fn failed(request: u64, code: &str) -> Self {
+        Self {
+            error: Some(cut_whole_chars(code, DECISION_MOST_TOOL_BYTES).to_owned()),
+            ..Self::of(request, DecisionKind::Error)
+        }
+    }
+
+    fn of(request: u64, kind: DecisionKind) -> Self {
+        Self {
+            request,
+            kind,
+            tools: Vec::new(),
+            task: None,
+            engine: None,
+            stage: None,
+            first_reply_ms: None,
+            host_request: None,
+            error: None,
+        }
+    }
+
+    pub fn check(&self) -> Result<(), Invalid> {
+        let code_named = |code: &String| {
+            !code.is_empty()
+                && code.len() <= DECISION_MOST_TOOL_BYTES
+                && code
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+        };
+        if (self.kind == DecisionKind::Error) != self.error.as_ref().is_some_and(code_named) {
+            return invalid(format!(
+                "an error, and only an error, has a code of 1..{DECISION_MOST_TOOL_BYTES} lowercase letters, digits or _"
+            ));
+        }
+        // Names only: a function's name, never words a caller put there.
+        if self.tools.len() > DECISION_MOST_TOOLS || !self.tools.iter().all(code_named) {
+            return invalid(format!(
+                "at most {DECISION_MOST_TOOLS} tools, each 1..{DECISION_MOST_TOOL_BYTES} lowercase letters, digits or _"
+            ));
+        }
+        let fits = if self.kind == DecisionKind::Handed {
+            self.task.is_some()
+                && self.stage.is_some()
+                && self.engine.as_deref().is_some_and(tasks::engine_named)
+        } else {
+            self.task.is_none() && self.engine.is_none() && self.stage.is_none()
+        };
+        if !fits {
+            return invalid(
+                "a task, its engine (1..32 lowercase letters, digits or _) and its stage go with a hand-over, and only with one".into(),
+            );
+        }
+        Ok(())
+    }
+}
+
 /// A line the voice held as a remark about the lamp in a busy room
 /// (`voice/remarked`, #4175, `LAMP_REMARK_ABOUT_IT`): "That lamp is cute."
 /// said between two people. It gets no words; Expression may answer it with
@@ -931,9 +1105,13 @@ pub fn hand_topics() -> Vec<(&'static str, Declaration)> {
     ]
 }
 
-/// The voice's turns' verdicts (#1155), apart from the first topics.
+/// The voice's turns' verdicts (#1155) and decisions (#7267), apart from
+/// the first topics.
 pub fn turn_topics() -> Vec<(&'static str, Declaration)> {
-    vec![(VoiceTurn::TOPIC, VoiceTurn::declaration())]
+    vec![
+        (VoiceTurn::TOPIC, VoiceTurn::declaration()),
+        (VoiceDecision::TOPIC, VoiceDecision::declaration()),
+    ]
 }
 
 /// How a person's voice sounded on a line, against their own way of
@@ -2780,8 +2958,8 @@ mod tests {
         assert_eq!(VoiceTurn::declaration().kind, Kind::Event);
         // Its own topic, apart from the first, and known by name.
         assert_eq!(
-            turn_topics(),
-            [(VoiceTurn::TOPIC, VoiceTurn::declaration())]
+            turn_topics()[0],
+            (VoiceTurn::TOPIC, VoiceTurn::declaration())
         );
         assert!(
             first_topics()
@@ -2791,6 +2969,92 @@ mod tests {
         assert_eq!(
             declaration_of(VoiceTurn::TOPIC),
             Some(VoiceTurn::declaration())
+        );
+    }
+
+    /// #7267: a turn's decision, names and numbers only, on its own topic.
+    #[test]
+    fn a_decision_is_answered_with_tools_handed_with_a_task_or_held_back() {
+        round_trip(
+            &VoiceDecision::answered(7, ["weather"]),
+            "{\"request\":7,\"kind\":\"answered\",\"tools\":[\"weather\"]}",
+        );
+        round_trip(
+            &VoiceDecision::handed(8, 2, Some("devin-cloud"), HandStage::Started),
+            "{\"request\":8,\"kind\":\"handed\",\"task\":2,\"engine\":\"devin_cloud\",\"stage\":\"started\"}",
+        );
+        round_trip(
+            &VoiceDecision::held_back(9),
+            "{\"request\":9,\"kind\":\"held_back\"}",
+        );
+        for stage in [HandStage::Prepared, HandStage::Started, HandStage::Declined] {
+            VoiceDecision::handed(1, 1, Some("openclaw"), stage)
+                .check()
+                .unwrap();
+            // A hand-over names its engine, a name only.
+            assert!(VoiceDecision::handed(1, 1, None, stage).check().is_err());
+            assert!(
+                VoiceDecision::handed(1, 1, Some(""), stage)
+                    .check()
+                    .is_err()
+            );
+            assert!(
+                VoiceDecision::handed(1, 1, Some("Open Claw"), stage)
+                    .check()
+                    .is_err()
+            );
+            assert!(
+                VoiceDecision::handed(1, 1, Some(&"a".repeat(33)), stage)
+                    .check()
+                    .is_err()
+            );
+        }
+        // A tool is a function's name, never words.
+        assert!(VoiceDecision::answered(1, ["it is sunny"]).check().is_err());
+        // At most 8 names, each cut to 40 bytes on a whole character.
+        let long = format!("{}\u{e9}", "a".repeat(39));
+        let names: Vec<String> = (0..10).map(|n| format!("tool_{n}")).collect();
+        let capped =
+            VoiceDecision::answered(1, names.iter().map(String::as_str).chain([long.as_str()]));
+        assert_eq!(capped.tools.len(), DECISION_MOST_TOOLS);
+        capped.check().unwrap();
+        let cut = VoiceDecision::answered(1, [long.as_str()]);
+        assert_eq!(cut.tools, ["a".repeat(39)]);
+        let mut wrong = VoiceDecision::answered(1, ["weather"]);
+        wrong.tools = vec!["x".repeat(41)];
+        assert!(wrong.check().is_err());
+        wrong.tools = vec!["x".into(); 9];
+        assert!(wrong.check().is_err());
+        let mut wrong = VoiceDecision::answered(1, ["weather"]);
+        wrong.task = Some(3);
+        assert!(wrong.check().is_err());
+        // An error carries a short code name, never words; nothing else does.
+        let failed = VoiceDecision::failed(4, "provider_error");
+        round_trip(
+            &failed,
+            "{\"request\":4,\"kind\":\"error\",\"error\":\"provider_error\"}",
+        );
+        failed.check().unwrap();
+        assert!(VoiceDecision::failed(4, "It broke!").check().is_err());
+        let mut wrong = VoiceDecision::answered(1, ["weather"]);
+        wrong.error = Some("provider_error".into());
+        assert!(wrong.check().is_err());
+        // Timing and the request steered: on any kind.
+        let timed = VoiceDecision {
+            first_reply_ms: Some(840),
+            host_request: Some(3),
+            ..VoiceDecision::answered(5, ["weather"])
+        };
+        round_trip(
+            &timed,
+            "{\"request\":5,\"kind\":\"answered\",\"tools\":[\"weather\"],\"first_reply_ms\":840,\"host_request\":3}",
+        );
+        timed.check().unwrap();
+        assert_eq!(VoiceDecision::declaration().kind, Kind::Event);
+        assert!(turn_topics().contains(&(VoiceDecision::TOPIC, VoiceDecision::declaration())));
+        assert_eq!(
+            declaration_of("voice/decision"),
+            Some(VoiceDecision::declaration())
         );
     }
 
