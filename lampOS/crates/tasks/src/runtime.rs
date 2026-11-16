@@ -5078,6 +5078,82 @@ mod tests {
         );
     }
 
+    /// #7108: the fence's new text is checked by the engine itself, through
+    /// its wrapper with lamp-update's own gateway data, before it is
+    /// renamed into place. A text the engine refuses never lands: the old
+    /// file stays byte for byte, no temporary file is left, and the journal
+    /// line says the check refused it. A text it takes is written, and the
+    /// line says it was checked.
+    #[test]
+    fn a_fence_the_engines_own_check_refuses_is_never_written() {
+        use super::{EngineKind, skill_run_fence_at_start};
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let wrappers = dir.path().join("bin");
+        let state = dir.path().join("state");
+        let home = dir.path().join("home");
+        std::fs::create_dir_all(&wrappers).unwrap();
+        std::fs::create_dir_all(&state).unwrap();
+        let openclaw_rs = include_str!("../../update/src/openclaw_install.rs");
+        let data = openclaw_rs
+            .split_once("pub const GATEWAY_DATA: &str = r#\"")
+            .and_then(|(_, rest)| rest.split_once("\"#;"))
+            .unwrap()
+            .0;
+        // A stand-in engine: its config check answers with the verdict
+        // file's status and keeps a copy of the text it was given.
+        let verdict = dir.path().join("verdict");
+        let checked = dir.path().join("checked");
+        let wrapper = wrappers.join("openclaw");
+        std::fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\n{}{data}[ \"$1 $2\" = \"config validate\" ] || exit 2\ncp \"$OPENCLAW_CONFIG_PATH\" {}\nexit \"$(cat {})\"\n",
+                crate::gateway_run::GATEWAY_MARK,
+                checked.display(),
+                verdict.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let config = state.join(crate::openclaw_config::CONFIG_FILE);
+        let before = "{\"gateway\": {\"mode\": \"local\", \"port\": 18789}}\n";
+        std::fs::write(&config, before).unwrap();
+        let at = || {
+            skill_run_fence_at_start(true, Some(EngineKind::Openclaw), &wrappers, &state, &home)
+                .unwrap()
+        };
+        let left = || {
+            std::fs::read_dir(&state)
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+                .filter(|name| name.ends_with(".new"))
+                .collect::<Vec<_>>()
+        };
+
+        std::fs::write(&verdict, "1").unwrap();
+        let said = at();
+        assert!(said.contains("not written"), "{said}");
+        assert!(said.contains("check"), "{said}");
+        assert_eq!(std::fs::read_to_string(&config).unwrap(), before);
+        assert!(left().is_empty(), "{:?}", left());
+        let refused = std::fs::read_to_string(&checked).unwrap();
+        assert!(
+            refused.contains(crate::openclaw_config::SKILL_RUN_AGENT),
+            "the engine was given the new text: {refused}"
+        );
+
+        std::fs::write(&verdict, "0").unwrap();
+        let said = at();
+        assert!(
+            said.contains("written") && said.contains("checked"),
+            "{said}"
+        );
+        let text = std::fs::read_to_string(&config).unwrap();
+        assert_eq!(text, std::fs::read_to_string(&checked).unwrap());
+        assert!(left().is_empty(), "{:?}", left());
+    }
+
     /// #5488: `status` says Harness's sign-in once it was read, and nothing
     /// else changes.
     #[test]
