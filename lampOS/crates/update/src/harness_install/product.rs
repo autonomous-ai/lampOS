@@ -45,12 +45,12 @@ pub const PRODUCT_DEFAULT: bool = true;
 
 /// The Harness manifest this build pins for a product lamp: a byte-for-byte
 /// copy of Harness's CDN manifest ([`ORIGIN`]) when it named [`VERSION`].
-pub const MANIFEST: &[u8] = include_bytes!("../../../../deploy/harness/cli-0.6.52.metadata.json");
+pub const MANIFEST: &[u8] = include_bytes!("../../../../deploy/harness/cli-0.6.57.metadata.json");
 /// [`MANIFEST`]'s SHA-256, checked by a test and again before each install.
 pub const MANIFEST_SHA256: &str =
-    "f1f8ce1ff35b4798a4f0d5dbfb751b0a273e70412d0720224ab67f07c08ab36a";
+    "482690e2c61703b3b382847a85425f4b161be6e4ac30e5a17fafead8c82eaeff";
 /// The Harness version [`MANIFEST`] names (its `cli.version`).
-pub const VERSION: &str = "0.6.52";
+pub const VERSION: &str = "0.6.57";
 /// Where [`MANIFEST`] was copied from: said, never fetched.
 pub const ORIGIN: &str =
     "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json";
@@ -89,28 +89,28 @@ pub const MANIFESTS: [Manifest; 4] = [
         env: "HARNESS_RUNTIME_METADATA_URL",
         path: "/runtime/metadata.json",
         bytes: include_bytes!("../../../../deploy/harness/runtime-node-v24.22.2.metadata.json"),
-        sha256: "bfc5936f43d698b1b64f3bb2e26d4c7be41863a5c341647b77b06b50a2bde485",
+        sha256: "cd76493f4b13bfa5cb7c3c0c3597ac828c1b326ff9760e62b72e3636b52ff648",
         origin: "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/metadata.json",
     },
     Manifest {
         env: "HARNESS_TMUX_METADATA_URL",
         path: "/runtime/tmux/metadata.json",
         bytes: include_bytes!("../../../../deploy/harness/runtime-tmux-3.7c.metadata.json"),
-        sha256: "f618bb8b9faac7e906b5223c1900797208d99885c1faa7de62c108b005c1f470",
+        sha256: "b8e85bbe32adc877411ed6ace2132874b118c65869e945e880918f1cd9115f3a",
         origin: "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/tmux/metadata.json",
     },
     Manifest {
         env: "HARNESS_GRID_METADATA_URL",
         path: "/runtime/grid/metadata.json",
         bytes: include_bytes!("../../../../deploy/harness/runtime-grid-0.3.63.metadata.json"),
-        sha256: "5dacba2bde0f19c34bcd2a174b830d80905eef50f94059adf5091b8f01e1ae5e",
+        sha256: "e54b6e6ab6cdd0d95e3122f7dfccf8a6fecb7c285f0b9c9a155a79a44d0853b2",
         origin: "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/grid/metadata.json",
     },
     Manifest {
         env: "HARNESS_TUI_MANIFEST_URL",
         path: "/tui/metadata.json",
         bytes: include_bytes!("../../../../deploy/harness/tui-0.1.46.metadata.json"),
-        sha256: "0b1ace516bf03198c9fca238946c918ff1bd9cd297cc6c7315304d39e6e3ecd5",
+        sha256: "924c99fad33e751c68a6bd39f2b3259bc7d85bec38243b8db0d8d98c1e0e4c83",
         origin: "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/tui/metadata.json",
     },
 ];
