@@ -7022,6 +7022,157 @@ Tests: `a_step_is_cleaned_and_cut_at_a_whole_character`,
 and `tasks_now_a_task_told_before_a_restart_stays_told_and_leaves_thirty_minutes_after`
 (`crates/tasks/tests/runtime.rs`). Not tried on a lamp.
 
+### An agent's steps (`tasks/step`, #7267, off unless `LAMP_TASKS_STEPS=on`)
+
+While a task lamp-tasks started on the lamp's own OpenClaw is watched,
+lamp-tasks reads that session's transcript every second and puts each step
+on the bus as `tasks/step` ([`TaskStep`](msgs.md)). The transcript is
+OpenClaw's own record, with one event per call, and the code is in
+`crates/tasks/src/steps.rs`. The `about` line above is not enough for this:
+it is a 3 × 140-character summary with no tool names, read every 30 s.
+
+- **The switch:** `LAMP_TASKS_STEPS`, `on` exactly. It is off unless set,
+  and off in the product unit, where its line in
+  `deploy/product/lamp-tasks.service` is a comment. Off, nothing is read,
+  the topic is never declared, and the store's owner does not hand the
+  watched tasks over.
+- **Where the transcript is:** OpenClaw 2026.11 keeps transcripts in SQLite,
+  not in files. This was read on lamp-52e6 on 16 Nov, which had no
+  `sessions.json` and no `*.jsonl`.
+  - The database is `<state>/agents/<agent>/agent/openclaw-agent.sqlite`.
+    `<state>` is `/var/lib/lampos-openclaw/state`, the folder that
+    lamp-update's wrapper and the gateway's unit give OpenClaw. An
+    absolute `LAMP_TASKS_STEPS_STATE` replaces it.
+  - The folder is `lampos`'s, mode 0700. lamp-tasks runs as `lampos`, so it
+    can read it with no change.
+  - The database is opened read-only (`file:…?mode=ro`, never `immutable`,
+    because OpenClaw writes it in WAL), never through a link
+    (`SQLITE_OPEN_NOFOLLOW`), with a 100 ms busy wait. It is opened once
+    per read.
+- **Which session:** Harness runs OpenClaw as `openclaw tui --session
+  harness-<agentId>`, and lamp-tasks knows each task's `agentId`. On 52e6
+  the keys are exactly `agent:main:harness-<uuid>`. The task's session is
+  the `session_nodes` row whose `session_key` ends `:harness-<agentId>`
+  (case ignored), and its events are the `transcript_events` rows with
+  that row's `current_session_id`, read by `seq`.
+- **When the database can't be read:** if it is locked, missing, or lacks
+  the tables and columns read (`session_nodes.session_key`,
+  `current_session_id`; `transcript_events.session_id`, `seq`,
+  `event_json`, `event_zstd`, `created_at`), nothing is published, and the
+  journal says so once. A read that fails is never taken for "no session".
+  If the task's start (its bound) cannot be read when the task is first
+  watched, the task has no bound yet. Nothing is read for it, and the bound
+  is read again a second later. It is never taken as 0 or as the whole
+  session, so earlier asks written meanwhile still stay out. A read that
+  fails later publishes nothing and is tried again; it never resets or
+  moves the task's position.
+- **Only the task's own words:** one session can hold many asks, because
+  #7258's one pane puts every ask in `agent:main:harness-<agent>`. So each
+  task begins at its own event:
+  - Its start is the session's highest `seq` at the moment the task is
+    first watched. This is checked at every turn of the serve loop, not
+    once a second.
+  - Nothing at or before that `seq` is read for it, even for a task handed
+    over in an earlier boot.
+  - When a newer task starts on the same session, the older task reads no
+    further than the newer one's start, so a step goes out under one task
+    only.
+  - A session that first appears after the task is watched is the task's
+    own, and is read from its first event.
+  - If the session moves to another id while the task is watched, the new
+    id is read only after its last event at that moment.
+  - The cost: events written before the task is first watched (within a
+    turn of the hand-over) are not shown.
+- **What becomes a step:** `event_json` is read as OpenClaw writes it
+  (pi-agent style). The 52e6 counts were message 67, custom 34,
+  custom_message 6, session 4, thinking_level_change 4. Only `message`
+  events are read; every other kind, a user's message (the ask itself) and
+  a row that is not JSON are skipped.
+  - Each `toolCall` in an assistant message becomes a `call` step. It is
+    published as soon as it is read, with `ok` absent (still running).
+    `args` is the call's `arguments.command`, or its arguments as compact
+    JSON.
+  - The same step number is published again once the `toolResult` with
+    that `toolCallId` is read, with the start of its text as `result` and
+    `ok` (false when `isError`). The latest step for a `(task, n)` is the
+    one that counts.
+  - An assistant message's text becomes a `reply` step, with `tool` empty.
+  - An assistant message with `stopReason: "error"` or an `errorMessage`
+    becomes an `error` step.
+  - `tool` is cut at 40 bytes, and `args` and `result` at 120, each on a
+    whole character, with runs of whitespace made one space.
+  - The time is the message's numeric `timestamp`, or else the row's
+    `created_at` (milliseconds, or seconds read as such). An event with
+    neither is skipped. So is one from before the hand-over, when that
+    time is known in this boot.
+- **Compressed events:** 27 of 115 rows on 52e6 had `event_json` empty and
+  the event in `event_zstd`: these are the large tool results. Such a row
+  is decoded with `ruzstd` 0.7.3, a pure-Rust zstd decoder (decode only, no
+  C build, so the ARM64 cross-build is unchanged).
+  - It is decoded as it streams and stops at 64 KiB + 1 byte, so it never
+    decodes more.
+  - A row that would decode past 64 KiB, or a corrupt one, is skipped and
+    counted. A compressed blob over 256 KiB is skipped and counted without
+    being decoded.
+  - The journal says so once, and gives the count when the task leaves the
+    watch.
+- **Never a skill's:** `tasks/step` is in `lamp-skills`' `NEVER_READ`. A
+  skill that lists it in `[permissions] topics` is refused at load,
+  whatever else it may do ([skills.md](skills.md)).
+- **Bounds:**
+  - Each task puts at most 50 step numbers on the bus. Later steps are
+    dropped and counted, and the journal gives the count when the task
+    leaves the watch.
+  - Each read (once a second) takes at most 200 events and 256 KiB of event text, decoded or not, for every task together; the rest wait for the next read. The first event of a read is taken whatever its size.
+  - An event over 256 KiB is skipped unparsed.
+  - At most 64 calls are kept waiting for their result.
+- **Nothing kept:** nothing is written, and the database is never opened
+  for writing. The position (`seq`), the step count and the calls still
+  running live in memory. The bus event is the only copy. After a
+  restart, a task still watched begins again after the session's last
+  event. A read that fails publishes nothing and is tried at the next one.
+- **Latency:** a step is on the bus within 1 s of its event, and on peek's
+  page within about 2 s once the bus and peek's push are added. Peek shows
+  steps only in monitor mode (#7267 PR 3).
+- **The link to the turn:** `tasks/step.task` is the same number as
+  `TaskProgress.task` and `voice/decision.task`.
+
+The event shapes are those read on 52e6. The test fixture
+`crates/tasks/tests/fixtures/openclaw-session-research.jsonl` has one
+`event_json` per line, with every word invented, and the tests load it into
+a SQLite database with OpenClaw's tables. It is a placeholder until stripped
+real rows replace it.
+
+Tests (`crates/tasks/src/steps/tests.rs`):
+
+- `the_fixtures_tool_calls_give_that_many_steps_with_their_tools`
+- `a_result_is_cut_at_120_bytes_on_a_whole_character`
+- `at_most_50_steps_a_task_the_rest_counted`
+- `switched_off_unless_exactly_on`
+- `nothing_is_written_to_disk`
+- `a_database_in_wal_is_read_while_its_writer_has_it_open`
+- `a_read_goes_on_after_its_last_event`
+- `a_step_is_on_the_bus_within_2_s_of_its_event`
+- `a_reply_an_error_and_unknown_records`
+- `an_event_with_no_time_of_its_own_is_skipped`
+- `events_before_the_hand_over_are_an_earlier_tasks`
+- `an_ask_already_in_the_session_is_never_this_tasks`
+- `two_asks_in_one_session_each_get_only_their_own`
+- `a_compressed_event_is_decoded` (the fixture's toolResult, compressed with
+  the `zstd` CLI: `tests/fixtures/openclaw-event-toolresult.zst`)
+- `a_compressed_event_past_64_kib_is_skipped_and_counted`
+- `a_corrupt_compressed_event_is_skipped_and_counted`
+- `a_locked_database_at_the_hand_over_never_lets_earlier_asks_out`
+- `a_busy_database_mid_task_reads_nothing_and_resets_nothing`
+- `a_read_takes_at_most_200_events`
+- `a_read_takes_at_most_256_kib`
+- `the_session_is_harness_named_one`
+- `a_link_or_another_schema_is_never_read`
+- `the_root_is_the_wrappers_state_unless_set`
+
+In `lamp-skills`, `a_skill_reads_and_does_only_what_its_permissions_declare`
+refuses a skill that lists `tasks/step`. Not tried on a lamp.
+
 ## The voice's side of progress news (#752)
 
 Built by the second builder on 2026-10-15, in `crates/voice/src/task_news.rs`
