@@ -1295,8 +1295,14 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   tối đa 240 s (`gateway::SERVING_WITHIN`, trong 14 phút của lần chạy)
   cho đến khi cổng trả lời và rồi lệnh đọc approvals của chính gateway
   thành công (`openclaw approvals get --gateway --json`, `#@fence-get` của
-  lamp-update, `gateway::Serving`), chạy nhiều nhất mỗi 3 s, mỗi lần giới
-  hạn 20 s. Nếu không, không gì được gửi ("tasks: the OpenClaw Gateway
+  lamp-update, `gateway::Serving`), mỗi lần giới hạn 20 s. Toàn bộ
+  lamp-tasks chỉ có một lần đọc đang chạy: lần chạy nào thấy lần đọc của
+  lần chạy khác đang chạy thì chờ nó và dùng kết quả của nó, và sau một
+  lần đọc thất bại thì lần sau chờ 3 s, rồi 6, 12 và tối đa 15 s
+  (`gateway::READ_EVERY`, `READ_MOST`, không bao giờ quá hạn chót của lần
+  chạy), để CLI Node mà mỗi lần đọc khởi động không làm chậm chính quá
+  trình khởi động của gateway trên lamp (#7174); một lần đọc thành
+  công đưa thời gian chờ về không. Nếu không, không gì được gửi ("tasks: the OpenClaw Gateway
   answered on 127.0.0.1:18789 but did not serve its approvals read
   (exec.approvals.get) before the readiness or run deadline; the hand-over is not sent", hoặc
   "did not answer on 127.0.0.1:18789" khi cổng không bao giờ trả lời), và

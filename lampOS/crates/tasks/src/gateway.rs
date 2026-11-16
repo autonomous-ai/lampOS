@@ -109,9 +109,18 @@ pub const APPROVALS_ENV: [(&str, &str); 4] = [
 const READ_WITHIN: Duration = Duration::from_secs(20);
 /// What the read asks the Gateway to answer within (`{ms}`).
 const READ_RPC_MS: u64 = 10_000;
-/// Between two approvals reads, at least: each starts a Node process, so
-/// they are far sparser than the port's looks.
+/// After a failed approvals read, the next waits at least this: each
+/// starts a Node process, so they are far sparser than the port's looks.
 const READ_EVERY: Duration = Duration::from_secs(3);
+/// The longest wait after a failed read: the wait doubles from
+/// [`READ_EVERY`] after each one (3, 6, 12, then 15 s), so a gateway still
+/// starting is not slowed by a Node CLI started every few seconds beside
+/// it on the lamp (#7174). A read that succeeds sets it back to
+/// none.
+const READ_MOST: Duration = Duration::from_secs(15);
+/// How often a run that shares another's read in flight looks at its own
+/// stop and deadline while it waits for that read.
+const SHARED_LOOK: Duration = Duration::from_millis(100);
 
 /// A Gateway that serves its RPCs (#7170): its port answers ([`answers`]),
 /// and then its approvals read ([`ApprovalsRead`]) succeeds. A Gateway
@@ -132,6 +141,10 @@ pub struct Serving {
     /// every run's wait, each made new.
     served: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
 }
+
+/// The lamp's [`ReadTurns`], for all of lamp-tasks: one approvals read at
+/// a time, whichever run waits (#7174).
+static READS: std::sync::OnceLock<std::sync::Arc<ReadTurns>> = std::sync::OnceLock::new();
 
 /// The lamp's [`Serving::served`], for all of lamp-tasks.
 static SERVED: std::sync::OnceLock<std::sync::Arc<std::sync::Mutex<Option<u64>>>> =
@@ -167,11 +180,14 @@ impl Serving {
     pub fn lamp() -> Self {
         Self::new(
             Box::new(Loopback),
-            Box::new(ApprovalsRead::new(
-                APPROVALS_READ.map(str::to_owned).to_vec(),
-                READ_WITHIN,
-                READ_EVERY,
-            )),
+            Box::new(
+                ApprovalsRead::new(
+                    APPROVALS_READ.map(str::to_owned).to_vec(),
+                    READ_WITHIN,
+                    READ_EVERY,
+                )
+                .sharing(READS.get_or_init(Default::default).clone()),
+            ),
         )
         .with_listener(
             Box::new(listener_here),
@@ -244,14 +260,83 @@ impl Probe for Serving {
     }
 }
 
+/// The approvals reads of every run that waits (#7174): at most one in
+/// flight, whose outcome every run waiting meanwhile shares, and after a
+/// failed one a wait that doubles up to [`READ_MOST`].
+#[derive(Default)]
+pub struct ReadTurns {
+    turn: std::sync::Mutex<Turn>,
+    done: std::sync::Condvar,
+}
+
+#[derive(Default)]
+struct Turn {
+    /// A read is in flight.
+    reading: bool,
+    /// Reads finished, counted: a run sharing one knows when it is done.
+    finished: u64,
+    /// Whether the last finished read was served.
+    served: bool,
+    /// No new read before this, after a failed one.
+    next: Option<Instant>,
+    /// The wait after the next failed read; `None`: the first spacing.
+    gap: Option<Duration>,
+}
+
+impl ReadTurns {
+    fn turn(&self) -> std::sync::MutexGuard<'_, Turn> {
+        self.turn
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
+
+/// Ends a turn's read however the read ends, a panic too, so the runs
+/// sharing it are never left waiting on a read that is gone.
+struct Reading<'a> {
+    turns: &'a ReadTurns,
+    every: Duration,
+    most: Duration,
+    /// What the read found: served, failed, or cut short by its run's
+    /// stop or deadline (`None`), which says nothing of the gateway.
+    outcome: Option<bool>,
+}
+
+impl Drop for Reading<'_> {
+    fn drop(&mut self) {
+        let mut turn = self.turns.turn();
+        turn.reading = false;
+        turn.finished = turn.finished.wrapping_add(1);
+        turn.served = self.outcome == Some(true);
+        match self.outcome {
+            Some(true) => {
+                turn.next = None;
+                turn.gap = None;
+            }
+            Some(false) => {
+                let gap = turn.gap.unwrap_or(self.every);
+                turn.next = Some(Instant::now() + gap);
+                turn.gap = Some(gap.saturating_mul(2).min(self.most.max(self.every)));
+            }
+            None => {}
+        }
+        drop(turn);
+        self.turns.done.notify_all();
+    }
+}
+
 /// The Gateway's approvals read ([`APPROVALS_READ`]) run as lamp-tasks'
-/// own user, each bounded by `within`, at most once every `every`: ready
-/// when one exits 0. Only a read: nothing is set.
+/// own user, each bounded by `within`: ready when one exits 0. One at a
+/// time across every [`ApprovalsRead`] sharing its [`ReadTurns`]: a run
+/// that finds one in flight waits for it and takes its outcome. After a
+/// failed one, none for `every`, doubled at each failure up to `most`
+/// (#7174). Only a read: nothing is set.
 pub struct ApprovalsRead {
     argv: Vec<String>,
     within: Duration,
     every: Duration,
-    last: Option<Instant>,
+    most: Duration,
+    turns: std::sync::Arc<ReadTurns>,
 }
 
 impl ApprovalsRead {
@@ -260,22 +345,37 @@ impl ApprovalsRead {
             argv,
             within,
             every,
-            last: None,
+            most: READ_MOST,
+            turns: Default::default(),
         }
     }
 
-    /// One read, killed with its process group past `within`.
-    fn read(&self, until: Instant, cancelled: &dyn Fn() -> bool) -> bool {
+    /// Taking turns with every read made with the same `turns`.
+    pub fn sharing(mut self, turns: std::sync::Arc<ReadTurns>) -> Self {
+        self.turns = turns;
+        self
+    }
+
+    /// With the longest wait after a failed read `most` (tests).
+    pub fn at_most(mut self, most: Duration) -> Self {
+        self.most = most;
+        self
+    }
+
+    /// One read, killed with its process group past `within`: served
+    /// (`Some(true)`), not served (`Some(false)`: it failed, or ran past
+    /// `within`), or cut short by the run's stop or deadline (`None`).
+    fn read(&self, until: Instant, cancelled: &dyn Fn() -> bool) -> Option<bool> {
         use rustix::process::{Pid, Signal, WaitId, WaitIdOptions, kill_process_group, waitid};
         use std::os::unix::process::CommandExt;
         use std::process::{Command, Stdio};
         if cancelled() || Instant::now() >= until {
-            return false;
+            return None;
         }
         let ms = READ_RPC_MS.to_string();
         let mut words = self.argv.iter().map(|word| word.replace("{ms}", &ms));
         let Some(program) = words.next() else {
-            return false;
+            return Some(false);
         };
         let Ok(mut child) = Command::new(program)
             .args(words)
@@ -287,7 +387,7 @@ impl ApprovalsRead {
             .process_group(0)
             .spawn()
         else {
-            return false;
+            return Some(false);
         };
         let pid = Pid::from_child(&child);
         let began = Instant::now();
@@ -298,12 +398,15 @@ impl ApprovalsRead {
                 WaitId::Pid(pid),
                 WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
             ) {
-                Ok(Some(status)) => break status.exit_status(),
+                Ok(Some(status)) => break Some(status.exit_status()),
                 Ok(None) => {}
                 Err(error) if error == rustix::io::Errno::INTR => {}
-                Err(_) => break None,
+                Err(_) => break Some(None),
             }
-            if cancelled() || Instant::now() >= until || began.elapsed() >= self.within {
+            if began.elapsed() >= self.within {
+                break Some(None);
+            }
+            if cancelled() || Instant::now() >= until {
                 break None;
             }
             thread::sleep(Duration::from_millis(20));
@@ -311,7 +414,13 @@ impl ApprovalsRead {
         let _ = kill_process_group(pid, Signal::KILL);
         let _ = child.kill();
         let _ = child.wait();
-        code == Some(0) && !cancelled() && Instant::now() < until
+        // Cut short by the run's stop or deadline: it says nothing of the
+        // gateway, and a read served after them hands nothing over.
+        let code = code?;
+        if code == Some(0) && (cancelled() || Instant::now() >= until) {
+            return None;
+        }
+        Some(code == Some(0))
     }
 }
 
@@ -321,11 +430,37 @@ impl Probe for ApprovalsRead {
     }
 
     fn ready_until(&mut self, until: Instant, cancelled: &dyn Fn() -> bool) -> bool {
-        if self.last.is_some_and(|last| last.elapsed() < self.every) {
+        let mut turn = self.turns.turn();
+        if turn.reading {
+            // Another run's read is in flight: wait for it and share what
+            // it found, within this run's own stop and deadline.
+            let finished = turn.finished;
+            while turn.reading && turn.finished == finished {
+                let left = until.saturating_duration_since(Instant::now());
+                if cancelled() || left.is_zero() {
+                    return false;
+                }
+                turn = self
+                    .turns
+                    .done
+                    .wait_timeout(turn, left.min(SHARED_LOOK))
+                    .map_or_else(|poisoned| poisoned.into_inner().0, |(turn, _)| turn);
+            }
+            return turn.served && !cancelled() && Instant::now() < until;
+        }
+        if turn.next.is_some_and(|next| Instant::now() < next) {
             return false;
         }
-        self.last = Some(Instant::now());
-        self.read(until, cancelled)
+        turn.reading = true;
+        drop(turn);
+        let mut reading = Reading {
+            turns: &self.turns,
+            every: self.every,
+            most: self.most,
+            outcome: None,
+        };
+        reading.outcome = self.read(until, cancelled);
+        reading.outcome == Some(true)
     }
 }
 
@@ -1092,6 +1227,72 @@ mod tests {
         let began = Instant::now();
         assert!(!read.ready(), "not read again before its spacing");
         assert!(began.elapsed() < Duration::from_millis(100));
+    }
+
+    /// #7174: runs waiting together on a gateway still starting run one
+    /// approvals read at a time, never one each, and wait longer after
+    /// each failed read, so the reads do not slow the start they wait on.
+    #[test]
+    fn runs_waiting_on_a_starting_gateway_share_one_read_and_back_off() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("starting");
+        let runs = dir.path().join("runs");
+        let busy = dir.path().join("busy");
+        let overlap = dir.path().join("overlap");
+        // A Node CLI that takes 100 ms to start and is never served; a
+        // read that finds another in flight leaves a mark.
+        std::fs::write(
+            &script,
+            format!(
+                "#!/bin/sh\nmkdir {busy} 2>/dev/null || touch {overlap}\necho x >> {runs}\nsleep 0.1\nrmdir {busy} 2>/dev/null\nexit 1\n",
+                busy = busy.display(),
+                overlap = overlap.display(),
+                runs = runs.display(),
+            ),
+        )
+        .unwrap();
+        let turns = Arc::new(ReadTurns::default());
+        let began = Instant::now();
+        let waited: Vec<_> = (0..3)
+            .map(|_| {
+                let argv = vec!["/bin/sh".into(), script.display().to_string()];
+                let turns = turns.clone();
+                thread::spawn(move || {
+                    let read =
+                        ApprovalsRead::new(argv, Duration::from_secs(5), Duration::from_millis(50))
+                            .at_most(Duration::from_millis(800))
+                            .sharing(turns);
+                    let port = Fake {
+                        ready_from: Some(1),
+                        ..Fake::default()
+                    };
+                    let mut gateway = Gateway::with_bounds(
+                        Box::new(Serving::new(Box::new(port), Box::new(read))),
+                        Duration::from_millis(3000),
+                        Duration::from_millis(10),
+                    );
+                    gateway.before_launch().is_err()
+                })
+            })
+            .collect();
+        for run in waited {
+            assert!(
+                run.join().unwrap(),
+                "a gateway never served was handed over"
+            );
+        }
+        assert!(began.elapsed() < Duration::from_secs(6), "past the bound");
+        let reads = std::fs::read_to_string(&runs).unwrap().lines().count();
+        assert!(!overlap.exists(), "two reads in flight at once");
+        // One at a time and backing off (50, 100, 200, 400, 800, 800 ms
+        // after each 100 ms read): about 7 in 3 s; one at a time at a
+        // fixed 50 ms: about 20; three runs each reading alone: more.
+        assert!((4..=10).contains(&reads), "{reads} reads in 3 s");
+        assert_eq!(
+            turns.turn().gap,
+            Some(Duration::from_millis(800)),
+            "the wait after {reads} failed reads did not grow to its cap"
+        );
     }
 
     #[test]

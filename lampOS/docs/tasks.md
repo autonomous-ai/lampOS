@@ -3734,7 +3734,13 @@ file:
   (`gateway::SERVING_WITHIN`, of the run's 14 minutes) until the port
   answers and then the gateway's own approvals read succeeds
   (`openclaw approvals get --gateway --json`, lamp-update's `#@fence-get`,
-  `gateway::Serving`), run at most every 3 s, each bounded at 20 s. If
+  `gateway::Serving`), each bounded at 20 s. One read is in flight at a
+  time for all of lamp-tasks: a run that finds another's read running
+  waits for it and takes its outcome, and after a failed read the next
+  waits 3 s, then 6, 12 and at most 15 s (`gateway::READ_EVERY`,
+  `READ_MOST`, never past the run's deadline), so the Node CLI each read
+  starts does not slow the gateway's own start on the lamp (#7174);
+  a read that succeeds sets the wait back to none. If
   it doesn't, nothing is sent ("tasks: the OpenClaw Gateway answered on
   127.0.0.1:18789 but did not serve its approvals read
   (exec.approvals.get) before the readiness or run deadline; the hand-over is not sent", or "did
