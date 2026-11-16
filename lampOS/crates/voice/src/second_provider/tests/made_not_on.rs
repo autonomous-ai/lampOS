@@ -168,7 +168,6 @@ fn went(
             .all(|only| only.is_empty()),
         "the judge is told no function"
     );
-    crate::skill_write_yes::clear_for_test();
     went
 }
 
@@ -217,29 +216,100 @@ fn a_late_yes_with_no_call_is_told_not_on_and_its_claim_is_replaced() {
 }
 
 /// Heron's HOLD on #7284: every way of saying it, Vietnamese too, and on a
-/// line that is more than a plain yes, goes to the judge whole; each the
-/// judge calls a claim is said as the fixed line, within the wait.
+/// line that is more than a plain yes, goes to the judge whole on the first
+/// late turn; each the judge calls a claim is said as the fixed line.
 #[test]
-fn every_claim_the_judge_holds_is_said_not_on_yet() {
+fn every_claim_the_judge_holds_is_said_not_on() {
     for heard in ["Yes.", "Yes, turn it on."] {
         for claim in CLAIMS {
-            waits(Duration::from_secs(10));
+            waits(Duration::from_secs(220));
             let went = went(true, heard, vec![saying(claim), saying("Yes.")], vec![]);
             assert_eq!(
                 went.said,
-                said(&[crate::made_not_on::NOT_ON_YET]),
+                said(&[crate::made_not_on::NOT_ON_LATE]),
                 "{claim}"
             );
             assert_eq!(went.judged, [claim]);
-            assert!(!told_not_on(&went));
+            assert!(told_not_on(&went));
         }
     }
+}
+
+/// Heron's latency P2 on #7284: only the first two heard turns past the wait
+/// are held and judged; a third streams as before, the note alone telling it.
+#[test]
+fn a_third_late_turn_is_not_held() {
+    waits(Duration::from_secs(220));
+    for _ in 0..2 {
+        let went = went(
+            true,
+            "Yes.",
+            vec![saying("All set!"), saying("yes")],
+            vec![],
+        );
+        assert_eq!(went.said, said(&[crate::made_not_on::NOT_ON_LATE]));
+    }
+    let third = went(
+        true,
+        "What's the weather?",
+        vec![saying("Sunny. Warm.")],
+        vec![],
+    );
+    assert_eq!(third.said, said(&["Sunny.", " Warm."]));
+    assert!(third.judged.is_empty());
+    assert!(told_not_on(&third), "the note still tells it");
+    crate::skill_write_yes::clear_for_test();
+}
+
+/// Within the 120 s a turn is never held: its first piece is said while its
+/// round is still going on (the chat never ends here).
+#[test]
+fn a_turn_within_the_wait_is_not_held() {
+    waits(Duration::from_secs(10));
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What's the weather?".to_owned())].into()),
+        chats: Mutex::new([vec![text("Sunny today. It is warm and")]].into()),
+        hold_chat: true,
+        ..Script::default()
+    });
+    let mut engine = Engine::with_clock(
+        script,
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) })),
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .telling_made_not_on(true);
+    let first = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            loop {
+                match tokio::time::timeout(Duration::from_secs(3), engine.next())
+                    .await
+                    .expect("its first piece is said before its round ends")
+                {
+                    ProviderOutput::Transcript {
+                        request: Some(1),
+                        text,
+                        ..
+                    } if !text.is_empty() => break text,
+                    _ => {}
+                }
+            }
+        });
+    assert_eq!(first, "Sunny today.");
+    crate::skill_write_yes::clear_for_test();
 }
 
 /// A reply the judge calls no claim is said as it came.
 #[test]
 fn a_reply_judged_no_claim_is_said() {
-    waits(Duration::from_secs(10));
+    waits(Duration::from_secs(220));
     let reply = "Sure. Before it goes on, I need your yes to what its code may use.";
     let went = went(true, "Okay.", vec![saying(reply), saying("No")], vec![]);
     assert_eq!(went.said, said(&[reply]));
@@ -250,7 +320,7 @@ fn a_reply_judged_no_claim_is_said() {
 /// said, then the fixed line, which is true, since the skill isn't on.
 #[test]
 fn a_judge_past_its_time_says_the_reply_then_the_fixed_line() {
-    waits(Duration::from_secs(10));
+    waits(Duration::from_secs(220));
     let went = went(
         true,
         "Yes.",
@@ -264,14 +334,14 @@ fn a_judge_past_its_time_says_the_reply_then_the_fixed_line() {
         went.said,
         said(&[
             "It's on now!",
-            &format!(" {}", crate::made_not_on::NOT_ON_YET)
+            &format!(" {}", crate::made_not_on::NOT_ON_LATE)
         ])
     );
 }
 
-/// A yes that ran: "It's on now." said before its call, in the same round,
-/// is let go unsaid, and the next round's, after the yes put it on, is said
-/// as it came. No judge, no not-on note, no fixed line.
+/// A yes that ran, within the wait: streamed as before, its call puts the
+/// skill on, and the next round's words are said as they came. No judge, no
+/// not-on note, no fixed line.
 #[test]
 fn a_real_yes_still_puts_it_on_with_no_line() {
     let id = waits(Duration::from_secs(10));
@@ -294,7 +364,10 @@ fn a_real_yes_still_puts_it_on_with_no_line() {
     );
     assert_eq!(
         went.said,
-        said(&["It's on now, and it runs the next time you sit at your desk."])
+        said(&[
+            "It's on now.",
+            " It's on now, and it runs the next time you sit at your desk."
+        ])
     );
     assert_eq!(went.ran, [crate::made_skill::MAKE.to_owned()]);
     assert!(went.judged.is_empty());

@@ -4248,7 +4248,11 @@ skill's task's):
   skill is not on and no yes turns it on now, so the person can ask for it to
   be made again (within the 120 s it is already told the skill waits, with
   its `approve_id`, as before);
-- each round's reply is held to the round's end. Beside a `make_skill` call
+- on the first two heard turns past its 120 s only
+  (`made_not_on::LATE_TURNS_GUARDED`, `skill_write_yes::late_guarded`), each
+  round's reply is held to the round's end; a turn within the 120 s, or a
+  third late one, streams as before, the note alone telling it (Heron's
+  latency P2 on #7284). Beside a `make_skill` call
   with an `approve_id` it goes unsaid (the next round speaks from that call's
   answer). Otherwise the same chat model the route uses, asked with no
   function in one short call bounded at 1.5 s (`made_not_on::JUDGE_WITHIN`,
