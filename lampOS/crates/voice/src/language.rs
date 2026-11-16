@@ -476,10 +476,10 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
     (
         lamp_body::seat_say::RESTS,
         [
-            "Mình hơi nóng, nên mình nghỉ vài phút nhé.",
-            "ちょっと熱くなっちゃった。数分休むね。",
-            "我有点热，先休息几分钟。",
-            "조금 뜨거워져서 몇 분만 쉴게요.",
+            "Mình hơi nóng, nên mình nghỉ một lúc nhé.",
+            "ちょっと熱くなっちゃった。少し休むね。",
+            "我有点热，先休息一会儿。",
+            "조금 뜨거워져서 잠시 쉴게요.",
         ],
     ),
     (
