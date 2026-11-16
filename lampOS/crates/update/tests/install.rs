@@ -3059,6 +3059,32 @@ fn the_product_summarises_a_long_conversation() {
     );
 }
 
+/// Each recent exchange is told to the model once (#6218's history side,
+/// C131): the owner's yes on 16 Nov. `LAMP_HISTORY_SAID_ONCE` leaves the
+/// history's exchanges out of the thread text, and `LAMP_HISTORY_AFTER_NOTE`
+/// those a stored running note holds out of both, which needs the summary.
+#[test]
+fn the_product_tells_each_exchange_once() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_HISTORY_SAID_ONCE=on",
+        "Environment=LAMP_HISTORY_AFTER_NOTE=on",
+        "Environment=LAMP_CONVERSATION_SUMMARY=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+    ] {
+        assert_eq!(
+            service.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice lacks {line}"
+        );
+    }
+}
+
 /// The privacy slide is the lamp's sleep and wake in the product (#5182, the
 /// lead's yes on 6 Nov): with the restart guard's own switch beside it, so a
 /// slide closed after a fault lays the lamp down too.
