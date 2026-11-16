@@ -1444,6 +1444,9 @@ pub type SameSpeaker = Arc<dyn Fn(u64, u64) -> Joined + Send + Sync>;
 /// Where a spoken turn's verdict is said (`voice/turn`, #1155): its
 /// request, and whether it is answered or its answer held back.
 pub type Verdicts = Arc<dyn Fn(u64, lamp_msgs::TurnVerdict) + Send + Sync>;
+/// Where a turn's decision is said (`voice/decision`, #7267): names and
+/// numbers only.
+pub type Decisions = Arc<dyn Fn(lamp_msgs::VoiceDecision) + Send + Sync>;
 /// Told that `request` ended as a cut-in over the lamp's answer
 /// (`ProviderInput::End { cut_in: true }`), before the rule judges it.
 pub type CutIn = Arc<dyn Fn(u64) + Send + Sync>;
@@ -1662,6 +1665,8 @@ struct Shared {
     opened: Option<Opened>,
     /// Where each judged turn's verdict is said, when it is.
     verdicts: Option<Verdicts>,
+    /// Where each answered turn's decision is said, with its tools.
+    decisions: Option<Decisions>,
     /// [`Engine::asking_again`]: told of cut-ins, and asked after a hold.
     ask_again: Option<(CutIn, AskAgain)>,
     /// When a cut-in was last held as misheard with the lamp's hum: the
@@ -4576,6 +4581,7 @@ impl Engine {
                 heed: None,
                 opened: None,
                 verdicts: None,
+                decisions: None,
                 ask_again: None,
                 misheard_at_us: Mutex::new(None),
                 holding_answer: false,
@@ -6562,6 +6568,16 @@ impl Engine {
     pub fn telling_verdicts(mut self, told: Verdicts) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.verdicts = Some(told);
+        }
+        self
+    }
+
+    /// Each answered turn's decision is said with `told` (`voice/decision`,
+    /// #7267), with the names of the functions it called. Before any turn
+    /// only.
+    pub fn telling_decisions(mut self, told: Decisions) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.decisions = Some(told);
         }
         self
     }

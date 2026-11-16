@@ -3701,6 +3701,45 @@ async fn a_turns_tools_are_journalled_by_name_and_count_never_words() {
     assert_eq!(super::function_name(""), "other");
 }
 
+/// #7267 (`Engine::telling_decisions`): a turn answered with a tool says
+/// one `answered` decision naming it, without `LAMP_MEMORY_REPLACES`'s
+/// journal line, and never its words.
+#[tokio::test(start_paused = true)]
+async fn a_weather_turn_says_it_was_answered_with_weather() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What's the weather in Hanoi?".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "a",
+                        "weather",
+                        json!({"place":"Hanoi"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Sunny, 30 degrees."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let decided = Arc::new(Mutex::new(Vec::new()));
+    let kept = decided.clone();
+    let mut engine = engine.telling_decisions(Arc::new(move |decision| {
+        kept.lock().unwrap().push(decision);
+    }));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    assert_eq!(
+        *decided.lock().unwrap(),
+        [lamp_msgs::VoiceDecision::answered(1, ["weather"])]
+    );
+}
+
 /// #1712: Flux's `TurnResumed` (`net::Early::Resumed`) takes the early words
 /// back: the chat begun on them is dropped, and round 1 is asked on the
 /// line's final words.

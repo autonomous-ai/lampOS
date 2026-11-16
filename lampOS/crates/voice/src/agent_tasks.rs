@@ -312,9 +312,46 @@ struct Pending {
     /// a read-back must say it too ([`reads_back`]), and another session is
     /// a correction.
     session: Option<String>,
+    /// The engine it was prepared for, as `tasks/status` names it, when the
+    /// voice knows it (not the lamp's own default): for `voice/decision`.
+    engine: Option<String>,
 }
 
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
+
+/// Where a hand-over's steps are said (`voice/decision`, #7267).
+pub type Decided = std::sync::Arc<dyn Fn(lamp_msgs::VoiceDecision) + Send + Sync>;
+
+/// Set once by the worker that has the bus ([`telling_decisions`]).
+#[cfg(not(test))]
+static DECIDED: OnceLock<Decided> = OnceLock::new();
+
+#[cfg(test)]
+thread_local! {
+    /// What this test's thread decided: requests repeat from test to test.
+    static DECIDED_IN_TEST: std::cell::RefCell<Vec<lamp_msgs::VoiceDecision>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Each hand-over's step (prepared, started, declined) is said with
+/// `told` from now on. Once a process; a later call changes nothing.
+pub fn telling_decisions(told: Decided) {
+    #[cfg(not(test))]
+    let _ = DECIDED.set(told);
+    #[cfg(test)]
+    drop(told);
+}
+
+/// Says task `task`'s step in `request`, if anything listens.
+fn decided(request: u64, task: u64, engine: Option<&str>, stage: lamp_msgs::HandStage) {
+    let decision = lamp_msgs::VoiceDecision::handed(request, task, engine, stage);
+    #[cfg(test)]
+    DECIDED_IN_TEST.with(|decided| decided.borrow_mut().push(decision));
+    #[cfg(not(test))]
+    if let Some(told) = DECIDED.get() {
+        told(decision);
+    }
+}
 
 /// An agent the tasks part can start: what the person calls it, how the
 /// model is told it may sound, the close forms the voice takes for it
@@ -4528,6 +4565,17 @@ fn run_for_asked(
                     (member.alias.as_str(), member.kind.name)
                 })
             };
+            // Who does it, for `voice/decision` (#7267): the lamp's engine
+            // only when named; a computer's, Claude when none is chosen.
+            let handed_engine = if on_the_lamp {
+                engine.clone()
+            } else {
+                Some(
+                    member
+                        .map_or("claude", |member| member.kind.engine)
+                        .to_owned(),
+                )
+            };
             // Devin's cloud has no sessions of the person's to name (the
             // Reviewer-lead's P3 on #5784): refused, never sent.
             if session.is_some() && member.is_some_and(|member| member.kind.engine == "devin-cloud")
@@ -4644,6 +4692,7 @@ fn run_for_asked(
                             text: task.to_owned(),
                             correct: place.correct,
                             session: session.map(str::to_owned),
+                            engine: handed_engine.clone(),
                         });
                     }
                     if let Some(old) = replaced {
@@ -6009,6 +6058,7 @@ pub(crate) mod tests {
             text: String::new(),
             correct: false,
             session: None,
+            engine: None,
         };
         assert!(may_confirm(&pending, 6, true, at + Duration::from_secs(10)));
         // In the request that prepared it: the model asking itself.
@@ -6046,6 +6096,7 @@ pub(crate) mod tests {
             text: String::new(),
             correct: false,
             session: None,
+            engine: None,
         };
         assert!(may_confirm(
             &pending,
@@ -6079,6 +6130,7 @@ pub(crate) mod tests {
             text: "Write a two-line poem about the moon".into(),
             correct: false,
             session: None,
+            engine: Some("claude".into()),
         }
     }
 
@@ -10826,6 +10878,7 @@ pub(crate) mod tests {
                 text: "Summarise the readme in three short lines".into(),
                 correct,
                 session: None,
+                engine: None,
             });
             let note = pending_note(2, "", at).unwrap();
             assert_eq!(note.contains("that is not a yes"), correct, "{note}");
@@ -12125,6 +12178,7 @@ pub(crate) mod tests {
             text: "Write a haiku about coffee".into(),
             correct: true,
             session: None,
+            engine: None,
         }
     }
 
@@ -12285,6 +12339,7 @@ pub(crate) mod tests {
             text: String::new(),
             correct,
             session: None,
+            engine: None,
         };
         *PENDING.lock().unwrap() = Some(waiting(false));
         assert_eq!(
@@ -13833,6 +13888,64 @@ pub(crate) mod tests {
         }
     }
 
+    /// What this test's thread said on `voice/decision` since it last asked.
+    fn decided_here() -> Vec<lamp_msgs::VoiceDecision> {
+        DECIDED_IN_TEST.with(|decided| std::mem::take(&mut *decided.borrow_mut()))
+    }
+
+    /// #7267: a hand-over says `prepared` in the request that prepared it,
+    /// then `started` with the same task in the request whose confirm
+    /// started it, each with the engine it went to.
+    #[test]
+    fn a_hand_over_says_prepared_then_started_with_its_task() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        decided_here();
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-decision-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let _seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status.clone()),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"fruits","revision":1}),
+                ),
+                ("request.sock", status),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":7,"queued":true,"revision":2}),
+                ),
+            ],
+        );
+        let place = correcting(&directory, false);
+        let call = |name: &str| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args: json!({"task":"List five fruits and write them to fruits.md"}),
+        };
+        let (told, _) = run(&place, &call(START), 1, true, PEER_WAIT);
+        assert!(told["prepared"] == json!(true), "{told}");
+        let handed =
+            |request, stage| lamp_msgs::VoiceDecision::handed(request, 7, Some("claude"), stage);
+        assert_eq!(decided_here(), [handed(1, lamp_msgs::HandStage::Prepared)]);
+        HEARD_HERE.with(|here| here.set(Some("Yes, go ahead and start it now.")));
+        let (told, _) = run(&place, &call(CONFIRM), 2, true, PEER_WAIT);
+        HEARD_HERE.with(|here| here.set(None));
+        assert!(told["handing_over"] == json!(true), "{told}");
+        assert_eq!(decided_here(), [handed(2, lamp_msgs::HandStage::Started)]);
+        // Nothing waits, so a confirm again says nothing more.
+        let _ = run(&place, &call(CONFIRM), 3, true, PEER_WAIT);
+        assert!(decided_here().is_empty());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     /// #6547 A, without `LAMP_TASKS_ONE_YES`: the lamp said the task back in
     /// words only, with nothing prepared, and the person said yes. The
     /// confirm says to prepare it, the START in the yes's own request is
@@ -14098,6 +14211,7 @@ pub(crate) mod tests {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let _thread = crate::provider_worker::tests::one_thread();
         *PENDING.lock().unwrap() = None;
+        decided_here();
         let directory =
             std::env::temp_dir().join(format!("agent-tasks-yes-in-code-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
@@ -14151,6 +14265,24 @@ pub(crate) mod tests {
         let note = yes_taken(&place, 9, "Yes.").expect("the yes is taken in code");
         assert!(note.contains("Claude Code"), "{note}");
         assert!(note.contains(CONFIRM), "{note}");
+        // #7267: prepared in request 8, started by the yes in request 9.
+        assert_eq!(
+            decided_here(),
+            [
+                lamp_msgs::VoiceDecision::handed(
+                    8,
+                    4,
+                    Some("claude"),
+                    lamp_msgs::HandStage::Prepared
+                ),
+                lamp_msgs::VoiceDecision::handed(
+                    9,
+                    4,
+                    Some("claude"),
+                    lamp_msgs::HandStage::Started
+                ),
+            ]
+        );
         assert!(PENDING.lock().unwrap().is_none(), "nothing waits after it");
         let ops: Vec<String> = std::iter::from_fn(|| seen.recv_timeout(PEER_WAIT).ok())
             .take(4)
@@ -14225,9 +14357,20 @@ pub(crate) mod tests {
             ..moon(now)
         });
         let mut cancelled = None;
+        decided_here();
         let note = declined_with(9, "No.", now, |id| cancelled = Some(id));
         assert_eq!(note.as_deref(), Some(DECLINED_NOTE));
         assert_eq!(cancelled, Some(4));
+        // #7267: said declined on the bus, with its task and engine.
+        assert_eq!(
+            decided_here(),
+            [lamp_msgs::VoiceDecision::handed(
+                9,
+                4,
+                Some("claude"),
+                lamp_msgs::HandStage::Declined
+            )]
+        );
         let directory =
             std::env::temp_dir().join(format!("agent-tasks-no-in-code-{}", std::process::id()));
         let place = Place {
