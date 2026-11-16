@@ -384,8 +384,20 @@ fn type_icon(spoken: bool) -> &'static str {
 /// The turns, newest first, as V1's cards: why it was taken, its status,
 /// ⚡ to the first token, each step from the end of speech with the
 /// slowest marked, and how it ended or what held it. Numbers and kinds
-/// only.
-pub fn turns(snapshot: &Snapshot) -> String {
+/// only. Where the voice's records can't be read (a product lamp keeps
+/// them `root:root 0700` and peek runs as `lampos`) or are not there, the
+/// bus's turns instead, as the timeline's cards (#7208), words only with
+/// `words`.
+pub fn turns(snapshot: &Snapshot, entries: &[Entry], words: bool) -> String {
+    if matches!(
+        snapshot.status,
+        ReadStatus::Unavailable(ReadFailure::Permission | ReadFailure::Missing)
+    ) {
+        return format!(
+            "<p class=\"small\">Turns from the bus.</p>{}",
+            timeline(entries, snapshot, words)
+        );
+    }
     let mut html = read_notice(snapshot.status);
     if snapshot.turns.is_empty() {
         if snapshot.status == ReadStatus::Current {
