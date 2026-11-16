@@ -2342,15 +2342,19 @@ fn run_call_with_scope(
                 true,
             ),
         ),
-        Route::Schedule(directory) => (
-            "the schedule through the executive",
-            ask_schedule_for(
+        Route::Schedule(directory) => {
+            let (mut told, answered) = ask_schedule_for(
                 directory,
                 call,
                 deadline,
                 Some(&schedule_whose::caller(lease, &call.name)),
-            ),
-        ),
+            );
+            // A reminder asked about may be one of the lamp's skills
+            // (`LAMP_SKILL_STATE_TOLD`, #7335's row): `list_reminders`'
+            // answer carries the skills' lines too. Off, as before.
+            crate::skill_about::with_reminders_here(&call.name, &mut told, request, heard, lease);
+            ("the schedule through the executive", (told, answered))
+        }
         // A face is the person's at the lamp: only words they said there
         // may keep or forget one, never a request the lamp wrote or a text
         // from the app (the reviewer on #1713), as for marks.
@@ -3845,6 +3849,40 @@ mod tests {
             json!({"op":"call","name":"set_timer","args":{"text":"Tea","seconds":60}})
         );
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #7335's row: with `LAMP_SKILL_STATE_TOLD`, `list_reminders`' answer
+    /// through the schedule carries the skills' records too, the schedule's
+    /// own words kept; off, it is the schedule's answer, byte for byte.
+    #[test]
+    fn a_reminders_answer_carries_the_skills_only_with_the_switch() {
+        let call = ToolCall {
+            id: "1".into(),
+            name: "list_reminders".into(),
+            args: json!({}),
+        };
+        for on in [false, true] {
+            let dir = schedule_directory(if on { "reminders-on" } else { "reminders-off" });
+            let served = executive(
+                &dir,
+                b"{\"ok\":true,\"result\":{\"reminders\":[]}}\n",
+                Duration::ZERO,
+            );
+            crate::skill_about::set_on_here(Some(on));
+            let (whom, (told, answered)) =
+                run_call_with_scope(&Route::Schedule(dir.clone()), &call, 1, true, None);
+            crate::skill_about::set_on_here(None);
+            assert_eq!(whom, "the schedule through the executive");
+            assert!(answered);
+            assert_eq!(served.join().unwrap()["name"], "list_reminders");
+            assert_eq!(told["reminders"], json!([]), "{told}");
+            if on {
+                assert!(told[crate::skill_about::SKILLS_NOTE].is_string(), "{told}");
+            } else {
+                assert_eq!(told.to_string(), json!({"reminders": []}).to_string());
+            }
+            std::fs::remove_dir_all(dir).unwrap();
+        }
     }
 
     #[test]
