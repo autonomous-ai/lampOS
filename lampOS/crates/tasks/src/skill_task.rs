@@ -2632,6 +2632,12 @@ impl Drop for LocalRun<'_> {
     }
 }
 
+/// How long a make's pending or uncertain `harness new` is looked for in
+/// its folder at its end, to be closed if Harness made it late (#7245).
+const LATE_NEW_WINDOW: Duration = Duration::from_secs(10);
+/// How often that folder is looked in: never more than ten `ps` calls.
+const LATE_NEW_STEP: Duration = Duration::from_secs(1);
+
 /// A run started through Harness, undone however the run ends: its
 /// session closed (`close --now`), then its folder removed, then its token
 /// file deleted (when the wrapper hasn't already).
@@ -2685,28 +2691,45 @@ impl Drop for Started<'_> {
         if self.uncertain
             && let Some(folder) = self.folder.to_str()
         {
-            match self.cli.live_in(&self.machine, folder) {
-                Ok(live) => {
-                    for agent in live {
-                        let closed =
-                            self.cli
-                                .close_now(&self.machine, &agent, crate::harness::CLOSE_BUDGET);
-                        match closed {
-                            Ok(_) => {
-                                eprintln!("tasks: make: closed {agent} an uncertain new made late")
-                            }
-                            Err(why) => {
-                                self.not_closed = true;
-                                eprintln!(
-                                    "tasks: make: {agent} an uncertain new made was not closed: {why}"
-                                );
+            // A pending `new` Harness may still make a few seconds on: its
+            // folder is looked in again each LATE_NEW_STEP, until a session
+            // there is closed or LATE_NEW_WINDOW runs out.
+            let until = std::time::Instant::now() + LATE_NEW_WINDOW;
+            loop {
+                let found = match self.cli.live_in(&self.machine, folder) {
+                    Ok(live) => {
+                        let found = !live.is_empty();
+                        for agent in live {
+                            let closed = self.cli.close_now(
+                                &self.machine,
+                                &agent,
+                                crate::harness::CLOSE_BUDGET,
+                            );
+                            match closed {
+                                Ok(_) => {
+                                    eprintln!(
+                                        "tasks: make: closed {agent} an uncertain new made late"
+                                    )
+                                }
+                                Err(why) => {
+                                    self.not_closed = true;
+                                    eprintln!(
+                                        "tasks: make: {agent} an uncertain new made was not closed: {why}"
+                                    );
+                                }
                             }
                         }
+                        found
                     }
+                    Err(code) => {
+                        eprintln!("tasks: make: harness ps after an uncertain new: {code}");
+                        false
+                    }
+                };
+                if found || std::time::Instant::now() + LATE_NEW_STEP > until {
+                    break;
                 }
-                Err(code) => {
-                    eprintln!("tasks: make: harness ps after an uncertain new: {code}");
-                }
+                std::thread::sleep(LATE_NEW_STEP);
             }
         }
         let removed = match std::fs::remove_dir_all(&self.folder) {
