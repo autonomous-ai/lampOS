@@ -751,8 +751,14 @@ A hand-over that ends `not_sent` as the lamp is still getting ready,
 `openclaw_gateway_not_ready` (its OpenClaw Gateway didn't answer within
 60 s) or `harness_not_running` (#7282), is told with Task news'
 `failed_not_ready` words, "I'm still getting ready. Give me a minute and ask
-me again.", not as work that "did not reach" its agent. Test:
-`task_news::tests::a_hand_over_to_a_lamp_still_getting_ready_is_told_so`.
+me again.", not as work that "did not reach" its agent. Only within 180 s
+of the lamp's start (`skill_words::NOT_READY_WITHIN_MS`, lamp-tasks' own
+`STARTING_AT_MOST`), by the refusal's `dispatch.finished.monotonic_ms` on
+lamp-tasks' boot clock: past it a Gateway or Harness still not up is broken,
+not starting, and the plain failure is told, as before, so a broken lamp
+never says "give me a minute" for good (El's P2 on #7351). Tests:
+`task_news::tests::a_hand_over_to_a_lamp_still_getting_ready_is_told_so` and
+`a_not_ready_refusal_past_the_start_window_is_told_as_a_plain_failure`.
 
 `null`, no row for that computer and engine, a failed exit, a timeout, or an
 older Harness without the command is no refusal, and is kept as long, so a
@@ -4318,8 +4324,10 @@ file:
   the port, up to 60 s. A run the person asked for by voice that is refused
   so (`openclaw_gateway_not_ready`), or as `harness_not_running` (#7282), is
   said once in exact words, "I'm still getting ready. Give me a minute and
-  ask me again." (lamp-skills' `task::not_ready_line`); a trigger's run says
-  nothing. A refusal for no lamp target of its own is not told so, as it
+  ask me again." (lamp-skills' `task::not_ready_line`), only within 180 s
+  of the lamp's start (`/proc/uptime`, `skill_words::NOT_READY_WITHIN_MS`);
+  past it, or with no time read, the run's failure is told as before. A
+  trigger's run says nothing. A refusal for no lamp target of its own is not told so, as it
   also stands for Hermes on the lamp being off. Test:
   `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`.
 - **A fixed write is refused.** A task with no script (a fixed write) is
