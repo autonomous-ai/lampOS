@@ -2047,7 +2047,150 @@ cả hai người viết.
   "Check the weather now, please."
 - **`cannot:` của chính agent không bao giờ được nói nguyên văn.** Đèn nói
   câu cố định của nó, "I couldn't make that one."
-  (`make_skill_agent::CANNOT_LINE`).
+  (`make_skill_agent::CANNOT_LINE`); với `LAMP_MAKE_NO_CANNOT=on` lời của nó
+  vẫn bị bỏ, và lần tạo trở thành một việc cho agent (bên dưới).
+- **Không có "couldn't" khi `LAMP_MAKE_NO_CANNOT=on`** (chủ sở hữu, 16/11:
+  "Every task must be doable; no 'couldn't' here"; #7234;
+  `crate::make_no_cannot`; tắt trừ khi là `on`, chỉ lamp-voice đọc, không có
+  trong unit sản phẩm nào). Một lần tạo mà câu trả lời cuối là `cannot:` của
+  chính model (của model riêng của đèn, hoặc của agent), hoặc một kỹ năng
+  chỉ bảo người dùng tự làm điều họ nhờ (`ECHOES_THE_ASK`), không bị bỏ (chủ
+  sở hữu, 16/11 11:4x: "every skill a person asks for must be made"), trừ
+  các câu từ chối của chính brief (bên dưới). Model riêng của đèn được hỏi thêm một lần
+  (`make_no_cannot::system`, trong thời gian dài nhất của lần tạo,
+  `make_skill_local::longest_make`) để lấy một tên, ít quyền nhất, và hoặc
+  một `[trigger]` của đèn, hoặc những lời người dùng sẽ nói để gọi nó
+  (`asks:`); nó không viết gì khác. Việc duy nhất của kỹ năng là yêu cầu của
+  người dùng bằng chính lời họ, chữ thường, tối đa 120 ký tự
+  (`make_no_cannot::task_words`), không bao giờ là lời của model. Khi nói, yêu cầu là tham số công cụ của model giọng nói chứ không phải câu nghe được; phần đọc lại giới hạn rủi ro này, vì chủ đèn đồng ý đúng những lời được đọc lại. Quyền của nó
+  được kiểm tra với các quyền có thật (`make_no_cannot::covered`): một quyền
+  của đèn (`skill_task_yes::GRANTS`), hoặc với `LAMP_AGENT_SERVICES=on` quyền
+  `-read` hay `-write` của một dịch vụ đã biết, đã liên kết hay chưa: dịch vụ
+  chưa liên kết vẫn được tạo, và ghi chú liên kết của lần tạo
+  (`made_skill::needs_link`) nhắc liên kết nó; phép kiểm tra quyền của lần
+  chạy giữ nó cho tới lúc đó. Quyền của đèn là `light` hoặc `speak`
+  (`make_no_cannot::FALLBACK_GRANTS`); camera chỉ cho việc được gọi bằng câu
+  nói, chạy ngay lúc đó, như kỹ năng được tạo thông thường (`ASKED_CAMERA`;
+  phán quyết của first builder trên #7261), không bao giờ theo trigger
+  (`WATCHING_GRANTS`: camera và `look`); không bao giờ là micro, `hear`,
+  `speech` hay `sound` (`LISTENING_GRANTS`, sim-2 trên #7261); model chỉ
+  được đề nghị các quyền đó.
+  - **Các câu từ chối của chính brief vẫn là từ chối** (P2 của sim-2 trên
+    #7261, quy tắc của #6439; chủ sở hữu: "if something can't be done, say
+    exactly why"), trừ câu về gửi (`made_skill::briefs_send_refusal`), mà
+    agent làm được. Không có lần gọi thêm. Những câu giữ an toàn cho mọi
+    người và dịch vụ của họ được nói bằng lý do riêng của đèn
+    (`make_no_cannot::kept_refusal`), không bao giờ là câu trơn hay lời của
+    model:
+    - Nghe điều người ta nói (`listening`): "I can't make that one: a skill
+      can't listen to what people say, to keep the room private."
+    - Biết ai là ai (`who_someone_is`): "I can't make that one: a skill
+      can't tell who someone is, to keep people private."
+    - Xoá hay sửa nội dung trong dịch vụ (`delete_or_change`): "I can't
+      make that one: a skill can't delete or change what's in your
+      services; it can read and send with your yes."
+    Các câu từ chối khác của brief (nhắc việc: "Ask me for a reminder
+    instead, …"; gửi không đúng từng chữ; sự kiện không có ngày giờ; đồng
+    hồ chưa đặt) đã nêu lý do và việc cần làm, nên được nói như model viết.
+  - **Theo trigger**: đèn tự viết thành một việc agent được tạo
+    (`make_no_cannot::skill_text`): `grants`, topics trong `[permissions]` và
+    `[trigger]` của model, `[ask]` là nudge, và một `do.task` có `run` là
+    `scripts/agent.py` của chính đèn, chỉ báo agent rằng việc đó là của nó.
+    Nó qua cùng các phép kiểm tra, lưu và đóng gói như mọi kỹ năng được tạo
+    có code (cần `LAMP_MADE_SCRIPTS` và `LAMP_SKILL_TASKS`), và được đọc lại
+    ngay, không bao giờ nói là đã tạo: "I can have the lamp's agent do that,
+    as plant check: every day at 08:00, it hands one task to the lamp's agent:
+    “…”. … The lamp's agent does it, and it changes the light and speaks and
+    plays sounds. It runs only once you agree." (`made_skill::agent_said`,
+    `Uses::agent_task`). Nó chờ lời đồng ý nói ra như kỹ năng có code
+    (`code_approve`), không bao giờ bật ngay (kể cả khi có
+    `LAMP_MADE_CODE_ON_AT_ONCE`), và chạy theo trigger.
+  - **Chỉ khi được gọi** (không nêu giờ hay lúc nào, hoặc "when I say send my
+    test note"), với `LAMP_UPLOAD_TO_AGENT=on`: lưu theo dạng kỹ năng agent
+    (`make_no_cannot::asked_files`, `made_skill::keep_agent_asked`): một công
+    cụ giọng nói có ghi chú chứa lời cần nói, một `do.task` để agent làm theo
+    `scripts/SKILL.md` (toàn bộ yêu cầu của người dùng, bọc trong lời của
+    đèn), quyền là quyền của kỹ năng agent (light, speak, camera,
+    internet khi `LAMP_TASK_NET=on`, quyền của dịch vụ liên kết), thẻ được
+    đánh dấu `agent: asked`, nên phần đọc lại nói nó đến từ "what you asked
+    the lamp for" (`task_asks` của lamp-skills). Nó được bật, việc chưa được
+    đồng ý, và đèn nói "I can have the lamp's agent do that, as test note:
+    only when you ask for it, it hands one task to the lamp's agent: “…”. …
+    The first time you ask, I'll read it back and wait for your yes." Lần
+    gọi đầu tiên đọc lại và chờ lời đồng ý (`upload_agent::first_run`), rồi
+    chạy như được yêu cầu. Khi `LAMP_UPLOAD_TO_AGENT` tắt, người dùng nghe
+    cần thêm gì: "I can make that as a task for the lamp's agent once you
+    tell me when it should run, …" (`make_no_cannot::no_when`, chỗ nối cho
+    `asks` nói ra của kỹ năng được tạo, `LAMP_MADE_SKILL_ASKS`).
+  - **Một yêu cầu không quyền nào đáp ứng được** được nói lý do bằng lời
+    thường, nêu thiếu gì rồi dừng, không bao giờ chỉ là "I couldn't make
+    that one." (`Uncovered::line`). Không câu nào bảo người dùng làm điều họ
+    không làm được (first builder trên #7261). Từng câu, nguyên văn:
+    - `net` khi `LAMP_TASK_NET` tắt (`net_off`): "I can't make that one yet:
+      it needs the internet, and skills on this lamp can't use the internet
+      yet."
+    - `net` theo trigger (`net_made`): "I can't make that one yet: it needs the
+      internet, which a skill that runs on its own can't have yet. Ask me to
+      make it for when you say a few words instead, and the lamp's agent
+      will do it each time you say them."
+    - Một dịch vụ khi `LAMP_AGENT_SERVICES` tắt (`services_off`): "I can't
+      make that one yet: it needs your linked services, and skills on this
+      lamp can't use them yet."
+    - Một dịch vụ đèn không biết (`service_unknown`): "I can't make that
+      one yet: it needs a service the lamp can't link yet."
+    - `LAMP_MADE_SCRIPTS` hoặc `LAMP_SKILL_TASKS` tắt (`tasks_off`): "I can't
+      make that one yet: it needs the lamp's agent, and skills on this lamp
+      can't hand tasks to it yet."
+    - Thứ model nêu mà không quyền nào cho (`needs: paying for things`,
+      `missing`, tối đa 60 ký tự): "I can't make that one yet: it needs
+      paying for things, which no skill on this lamp can be given yet."
+    - Camera theo trigger (`sensing`): "I can't make that one yet: it would need
+      the camera, and a skill that runs by itself can't watch or listen, to
+      keep the room private. Ask me to make it for when you say a few words,
+      and it can use the camera then."
+    - Micro hay một quyền khác nghe, dạng nào cũng vậy (`microphone`): "I
+      can't make that one yet: it would need the microphone, and a skill
+      can't listen, to keep the room private."
+    - Không nêu gì, hoặc một quyền không có (`other`): "I can't make that
+      one yet: it needs something no skill on this lamp can be given yet."
+    - Một việc chỉ chạy khi được gọi mà yêu cầu dài hơn phần đọc lại
+      (`too_long`, `make_no_cannot::task_cut`): "I can't make that one yet:
+      it's too long for me to read back to you whole, so ask for it in fewer
+      words." `scripts/SKILL.md` của nó chỉ mang đúng phần lời được đọc lại
+      và được đồng ý, không bao giờ thêm phần nào của yêu cầu (P1 của El
+      trên #7261).
+    Nhật ký chỉ ghi loại lý do, không bao giờ lời người dùng. Công tắc
+    internet và dịch vụ là của đèn, không có trong cài đặt của app, nên
+    không câu nào bảo người dùng vào app để bật chúng.
+  - **Model chọn dịch vụ; từ ngữ chỉ là gợi ý** (quy tắc của lead, first
+    builder trên #7261). Một từ chỉ dịch vụ trong yêu cầu
+    (`make_skill_agent::service_hint`, đã liên kết hay chưa, ưu tiên chính
+    tên dịch vụ: "Linear" hơn "issues") được đưa vào lần gọi thêm chỉ như
+    một gợi ý: "The request may mean the person's Linear (linear-read to
+    read it, linear-write to send with it): name its grant only if the
+    request asks for that service." Model quyết định bằng cách nêu quyền,
+    code chỉ kiểm tra quyền đó có thật. Chỉ một từ không đưa lần tạo nào
+    tới agent; định tuyến cho dịch vụ đang liên kết (`service_asked`) giữ
+    nguyên. Quyền dịch vụ của việc được nhắc trong ghi chú liên kết
+    (`made_skill::needs_link`): "when I sit down at my desk, tell me how
+    many open issues I have on Linear", Linear chưa liên kết, được tạo với
+    `linear-read` và nhắc liên kết Linear; "a linear timer" được tạo chỉ
+    với đèn.
+  - **Câu của lượt bị cắt cho kỹ năng có code không bao giờ là ngõ cụt**
+    (lamp-9adf, 16/11: "I couldn't tell you just now what its code may use,
+    so it isn't on."): `made_skill::cut_code_line` nói code được dùng gì
+    (hoặc agent làm gì), từng quyền bằng lời thường, rồi "It isn't on yet:
+    ask me for it again, and I'll read it back for your yes.", và từng dịch
+    vụ chưa liên kết: " Linear isn't linked yet; link it in the app."
+    (`made_skill::unlinked_said`).
+  - **Hỏi lại cùng yêu cầu thì nói đúng trạng thái** (lamp-9adf, 16/11:
+    nhật ký nói kỹ năng "is still on the lamp", trong khi nó đang tắt): hỏi
+    lại trong `ONE_ASK_WITHIN`, kỹ năng có code đang tắt chờ đồng ý được đọc
+    lại, và khi lần chờ cũ đã hết thì bắt đầu lần chờ mới
+    (`OneAsk::begin_in`), nên lời đồng ý được nhận.
+  - Mỗi lần chạy được tính vào số lần chạy việc trong ngày như mọi kỹ năng
+    (bộ đếm của lamp-skills). Khi tắt, lần tạo giữ nguyên từng byte như
+    trước.
 - **Cách tới agent: trong namespace của lần chạy kỹ năng** (#6643, điều
   kiện của first builder, 12/11 18:15). Lần tạo đi tới socket tạo của
   lamp-tasks, `/run/lampos-tasks/skill-make.sock` (`lamp_tasks::skill_make`,

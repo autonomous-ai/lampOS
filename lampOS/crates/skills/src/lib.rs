@@ -11999,6 +11999,53 @@ mod tests {
         task::set_on_here(None);
     }
 
+    /// #7234 (`LAMP_MAKE_NO_CANNOT`): a task for the lamp's agent the person
+    /// asked the voice for, kept in an agent skill's form, is said to come
+    /// from what they asked the lamp for, never from a file; one added from
+    /// a file still is.
+    #[test]
+    fn a_task_asked_for_by_voice_comes_from_what_was_asked_never_a_file() {
+        lamp_voice::upload_agent::set_on_here(Some(true));
+        task::set_on_here(Some(true));
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("skills");
+        let words = "when I say take a desk photo, take one and tell me what is on it";
+        let files = lamp_voice::make_no_cannot::asked_files(
+            "desk-photo",
+            &["take a desk photo".to_owned()],
+            &["camera".to_owned(), "speak".to_owned()],
+            words,
+        );
+        let folder = root.join("desk-photo");
+        std::fs::create_dir_all(folder.join("scripts")).unwrap();
+        std::fs::write(folder.join("skill.toml"), &files.toml).unwrap();
+        std::fs::write(folder.join(&files.scripts[0].0), &files.scripts[0].1).unwrap();
+        let card = |marks: &str| {
+            files
+                .card
+                .replacen("\n---\n", &format!("\n{marks}\n---\n"), 1)
+        };
+        std::fs::write(
+            folder.join("SKILL.md"),
+            card("made: here\nmade_by: voice\nadded: file\nagent: file\nagent: asked"),
+        )
+        .unwrap();
+        from_store(&folder, "desk-photo", false);
+        let asks = package::task_asks(&root, None, "desk-photo").unwrap();
+        assert_eq!(asks["from"], lamp_voice::make_no_cannot::FROM, "{asks}");
+        assert_eq!(asks["task"], words);
+        assert_eq!(asks["grants"], json!(["camera", "speak"]));
+        std::fs::write(
+            folder.join("SKILL.md"),
+            card("made: here\nmade_by: app\nadded: file\nagent: file"),
+        )
+        .unwrap();
+        let asks = package::task_asks(&root, None, "desk-photo").unwrap();
+        assert_eq!(asks["from"], lamp_voice::upload_agent::FROM, "{asks}");
+        task::set_on_here(None);
+        lamp_voice::upload_agent::set_on_here(None);
+    }
+
     /// #6305: the manage helper reads a skill's task back for the voice,
     /// and keeps no yes: whether the owner agreed is lamp-control's, so a
     /// `task_yes` is no request here, the voice's included, and its answer

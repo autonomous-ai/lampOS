@@ -865,10 +865,25 @@ const AT_LENGTH: &str = "chat answer stopped at its length";
 /// An answer that ended whole with no fenced block in it.
 const NO_BLOCK: &str = "chat answer with no fenced block";
 
+/// The model's answer to `brief` under `system` (`LAMP_MAKE_NO_CANNOT`'s
+/// one more call, [`crate::make_no_cannot::system`]): asked once more when
+/// [`again`] says so, a last fence left open closed, and no fenced block
+/// needed (its one-line answers have none).
+async fn written_with(chat: &Chat, system: &str, brief: &str) -> net::Result<String> {
+    match write_once_with(chat, system, brief).await {
+        Err(error) if again(&error) => write_once_with(chat, system, brief).await.map(fence_closed),
+        answer => answer.map(fence_closed),
+    }
+}
+
 async fn write_once(chat: &Chat, brief: &str) -> net::Result<String> {
+    write_once_with(chat, &system(), brief).await
+}
+
+async fn write_once_with(chat: &Chat, system: &str, brief: &str) -> net::Result<String> {
     tokio::time::timeout(WRITE_WITHIN, async {
         let mut stream = chat
-            .send(&[Message::system(system()), Message::user(brief)])
+            .send(&[Message::system(system), Message::user(brief)])
             .await?;
         let mut text = String::new();
         while let Some(event) = stream.next().await? {
@@ -1003,7 +1018,7 @@ fn make_with_by(
     // request of the voice's.
     let asked = match made_in {
         0 => None,
-        _ => match OneAsk::begin(&keeping.directory, heard, request, now_unix_ms) {
+        _ => match OneAsk::begin_in(&keeping.directory, heard, request, now_unix_ms, made_in) {
             Ok(asked) => Some(asked),
             Err(told) => return told,
         },
@@ -1044,6 +1059,7 @@ fn make_with_by(
     if made_in != 0
         && let Ok(made) = &made
         && !made.uses.code
+        && !made.uses.agent_task
         && let clashes = crate::made_clash::found(keeping, made)
         && !clashes.is_empty()
     {
@@ -1076,7 +1092,7 @@ fn make_with_by(
             told_with(line, made.clone(), on.clone(), needs.as_deref())
         }
         _ => {
-            MADE_LINE.with(|kept| kept.replace(Some(said_line(&made, &on))));
+            MADE_LINE.with(|kept| kept.replace(Some(said_line(&made, &on, needs.as_deref()))));
             told(made.clone(), on.clone(), needs.as_deref())
         }
     };
@@ -1116,7 +1132,9 @@ fn make_with_by(
     // Made and on (or waiting for its yes): held for the same ask asked
     // again; anything else is let go, so asking again tries again.
     if let (Some(asked), Ok(made), Ok(())) = (asked, &made, &on) {
-        asked.made(&made.name, &told, now_unix_ms);
+        let yes = (told["code_waits_for_yes"] == true)
+            .then(|| (code_asks(made), made_skill::on_line(made)));
+        asked.made_with(&made.name, &told, now_unix_ms, yes);
     }
     told
 }
@@ -1140,6 +1158,10 @@ struct HeldAsk {
     heard: Vec<String>,
     request: Vec<String>,
     made: Option<(String, Value, u64)>,
+    /// A skill with code of its own left off, waiting for its yes: what the
+    /// yes agrees to and its say-back, to wait for it again when it is
+    /// asked for again (`LAMP_MAKE_NO_CANNOT`).
+    yes: Option<(crate::skill_write_yes::Asks, String)>,
 }
 
 /// The voice's asks under way or made within [`ONE_ASK_WITHIN`].
@@ -1189,11 +1211,23 @@ fn same_ask(one: &[String], other: &[String]) -> bool {
 struct OneAsk(u64);
 
 impl OneAsk {
+    #[cfg(test)]
     fn begin(
         directory: &std::path::Path,
         heard: Option<&str>,
         request: &str,
         now_unix_ms: u64,
+    ) -> Result<Self, Value> {
+        Self::begin_in(directory, heard, request, now_unix_ms, 0)
+    }
+
+    /// [`Self::begin`] for the voice's request `made_in`.
+    fn begin_in(
+        directory: &std::path::Path,
+        heard: Option<&str>,
+        request: &str,
+        now_unix_ms: u64,
+        made_in: u64,
     ) -> Result<Self, Value> {
         let heard = ask_words(heard.unwrap_or_default());
         let request = ask_words(request);
@@ -1207,11 +1241,49 @@ impl OneAsk {
             }
             None => true,
         });
-        let earlier = asks.iter().find(|ask| {
+        let earlier = asks.iter().position(|ask| {
             ask.directory == directory
                 && (same_ask(&ask.heard, &heard) || same_ask(&ask.request, &request))
         });
-        match earlier.map(|ask| &ask.made) {
+        // `LAMP_MAKE_NO_CANNOT` (lamp-9adf, 16 Nov: the same ask a minute
+        // later was told the skill "is still on the lamp", and it was off):
+        // one with code of its own left off says so, and its yes is waited
+        // for again when the wait the make started is gone.
+        if crate::make_no_cannot::on()
+            && let Some(at) = earlier
+            && let Some((name, told, _)) = &asks[at].made
+            && told["code_waits_for_yes"] == true
+        {
+            let (name, mut told) = (name.clone(), told.clone());
+            let waiting = told
+                .get(crate::skill_write_yes::APPROVE_ID)
+                .and_then(Value::as_str)
+                .is_some_and(crate::skill_write_yes::waits);
+            match (&asks[at].yes, waiting, made_in) {
+                (Some((yes, line)), false, 1..) => {
+                    let id = crate::skill_write_yes::wait_for_yes(
+                        yes.clone(),
+                        made_in,
+                        std::time::Instant::now(),
+                    );
+                    told = waits_for_yes(told, line, &id);
+                    if let Some(told) = told.as_object_mut() {
+                        told.remove("writes_wait_for_yes");
+                    }
+                    if let Some((_, kept, _)) = asks[at].made.as_mut() {
+                        *kept = told.clone();
+                    }
+                    eprintln!(
+                        "lamp-voice: a skill wasn't made again: the same ask made {name} a moment ago, and it is off, waiting for its yes: read back again"
+                    );
+                }
+                _ => eprintln!(
+                    "lamp-voice: a skill wasn't made again: the same ask made {name} a moment ago, and it is off, waiting for its yes"
+                ),
+            }
+            return Err(already_made(&name, &told));
+        }
+        match earlier.map(|at| &asks[at].made) {
             Some(Some((name, told, _))) => {
                 eprintln!(
                     "lamp-voice: a skill wasn't made again: the same ask made {name} a moment ago, and it is still on the lamp"
@@ -1240,6 +1312,7 @@ impl OneAsk {
                     heard,
                     request,
                     made: None,
+                    yes: None,
                 });
                 Ok(Self(id))
             }
@@ -1248,9 +1321,22 @@ impl OneAsk {
 
     /// The ask's skill `name` made and on, its turn told `told`.
     fn made(self, name: &str, told: &Value, now_unix_ms: u64) {
+        self.made_with(name, told, now_unix_ms, None);
+    }
+
+    /// [`Self::made`], with what a yes to a skill with code of its own left
+    /// off agrees to and its say-back (`yes`).
+    fn made_with(
+        self,
+        name: &str,
+        told: &Value,
+        now_unix_ms: u64,
+        yes: Option<(crate::skill_write_yes::Asks, String)>,
+    ) {
         let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         if let Some(ask) = asks.iter_mut().find(|ask| ask.id == self.0) {
             ask.made = Some((name.to_owned(), told.clone(), now_unix_ms));
+            ask.yes = yes;
         }
         std::mem::forget(self);
     }
@@ -1325,10 +1411,11 @@ fn code_asks(made: &Made) -> crate::skill_write_yes::Asks {
         skill: made.name.clone(),
         sha256: made.sha256.clone(),
         writes: Vec::new(),
-        say_back: made_skill::code_said_as(
-            &made.uses.grants,
-            made_skill::code_goes_on_at_once(made),
-        )
+        say_back: if made.uses.agent_task {
+            made_skill::agent_said(&made.uses.grants)
+        } else {
+            made_skill::code_said_as(&made.uses.grants, made_skill::code_goes_on_at_once(made))
+        }
         .trim()
         .to_owned(),
         grants: Some(made.uses.grants.clone()),
@@ -2124,11 +2211,17 @@ pub fn take_said_line() -> Option<String> {
 /// sends or writes, made and on, is [`made_skill::cut_write_line`]: this
 /// line is said only for a turn cut, which never gave the model its say-back
 /// or its `approve_id`, so its yes can't be taken (App Only's P2 on #6142).
-fn said_line(made: &Result<Made, Refused>, on: &Result<(), String>) -> String {
+fn said_line(
+    made: &Result<Made, Refused>,
+    on: &Result<(), String>,
+    needs: Option<&[Value]>,
+) -> String {
     match (made, on) {
         (Ok(made), Ok(())) if !made.uses.writes.is_empty() => made_skill::cut_write_line(made),
-        (Ok(made), Ok(())) if made.uses.code => made_skill::cut_code_line(made),
+        (Ok(made), Ok(())) if made.uses.code => made_skill::cut_code_line(made, needs),
         (Ok(made), Ok(())) => made_skill::on_line(made),
+        // A task for the lamp's agent (#7234): never said as made.
+        (Ok(made), Err(why)) if made.uses.agent_task => made_skill::agent_not_on_line(why),
         (Ok(_), Err(why)) => made_skill::not_on_line(why),
         (Err(Refused(why, _)), _) => made_skill::not_made_line(why),
     }
@@ -2292,6 +2385,15 @@ fn made_and_journaled_by(
             &kept,
             &models_cannot,
         );
+        let made = no_cannot(
+            made,
+            &models_cannot,
+            request,
+            &chat,
+            began,
+            &kept,
+            (from, keeping),
+        );
         let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
         return (plain_unless_cannot(made, models_cannot.get()), line);
     }
@@ -2365,6 +2467,15 @@ fn made_and_journaled_by(
         }
         None => made,
     };
+    let made = no_cannot(
+        made,
+        &models_cannot,
+        request,
+        &chat,
+        began,
+        &kept,
+        (from, keeping),
+    );
     let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
     // A repair's answer cut or never come (a product lamp, 11 Nov, from the
     // app: three repairs on its hum, then a cut stream, and the person
@@ -2384,6 +2495,87 @@ fn made_and_journaled_by(
         (made, _) => made,
     };
     (plain_unless_cannot(made, models_cannot.get()), line)
+}
+
+/// With `LAMP_MAKE_NO_CANNOT` on, a make whose last answer was the model's
+/// own `cannot:` (`models_cannot`) made one task for the lamp's agent
+/// ([`crate::make_no_cannot::made`]): its grants and trigger asked of the
+/// lamp's own model in one more call (`chat`, begun only while one round
+/// still fits the make's longest, [`longest_make`]), kept through the
+/// make's own checks (`kept`), or only asked for, kept from `from` in
+/// `keeping` as an agent skill ([`made_skill::keep_agent_asked`]); or a
+/// reason no grant covers. So is a skill that would only tell the person
+/// to do what they asked of it ([`made_skill::ECHOES_THE_ASK`]). A
+/// `cannot:` of the lamp's own model that the system prompt itself asks for
+/// ([`made_skill::briefs_own_refusal`]), but for a send's
+/// ([`made_skill::briefs_send_refusal`]), stays a refusal, as #6439 has it:
+/// one that keeps people and their services safe is said with the lamp's
+/// own plain reason ([`crate::make_no_cannot::kept_refusal`]), any other as
+/// the model wrote it. The agent's ([`crate::make_no_cannot::AGENTS_CANNOT`])
+/// is never said. Off, or any other make, `made` as it is.
+fn no_cannot(
+    made: Result<Made, Refused>,
+    models_cannot: &std::cell::Cell<bool>,
+    request: &str,
+    chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    began: std::time::Instant,
+    kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
+    (from, keeping): (&str, &Keeping),
+) -> Result<Made, Refused> {
+    if !crate::make_no_cannot::on() {
+        return made;
+    }
+    // The brief's own refusals, but for a send's, stay refusals (#6439;
+    // sim-2's P2 on #7261; the owner: "if something can't be done, say
+    // exactly why"): one that keeps people or their services safe is said
+    // with the lamp's own plain reason, never the bare line.
+    if models_cannot.get()
+        && let Err(Refused(why, _)) = &made
+        && why != crate::make_no_cannot::AGENTS_CANNOT
+        && made_skill::briefs_own_refusal(why)
+        && !made_skill::briefs_send_refusal(why)
+    {
+        let Some((class, line)) = crate::make_no_cannot::kept_refusal(why) else {
+            return made;
+        };
+        eprintln!(
+            "lamp-voice: a skill made here: the brief's own refusal stays one, said with its \
+             reason ({class})"
+        );
+        models_cannot.set(false);
+        return Err(Refused(line.to_owned(), None));
+    }
+    // The owner, 16 Nov 11:4x: any other `cannot:` of the model's is never
+    // final, nor is a skill that would only tell the person to do what they
+    // asked of it.
+    match &made {
+        Err(Refused(why, _)) if why == made_skill::ECHOES_THE_ASK => {}
+        Err(Refused(_, _)) if models_cannot.get() => {}
+        _ => return made,
+    }
+    eprintln!(
+        "lamp-voice: a skill made here: the model's cannot goes to the lamp's agent as one task \
+         ({})",
+        crate::make_no_cannot::ENVIRONMENT
+    );
+    let made = crate::make_no_cannot::made(
+        request,
+        |brief| {
+            ask_in(
+                Arc::clone(chat),
+                Some(crate::make_no_cannot::system()),
+                brief.to_owned(),
+            )
+        },
+        || began.elapsed() + ROUND_WITHIN <= longest_make(),
+        kept,
+        |files, words| made_skill::keep_agent_asked(files, from, keeping, words),
+        // Only a hint: the model decides by naming the grant (the lead's
+        // rule; the first builder on #7261).
+        crate::make_skill_agent::service_hint(request),
+    );
+    models_cannot.set(false);
+    made
 }
 
 /// The person hears the lamp's own reason in everyday words, the
@@ -2577,10 +2769,17 @@ fn handed_to_agent(
         Err(_) => eprintln!("lamp-voice: a skill made here: the agent's ({engine}) wasn't kept"),
     }
     // The agent's own `cannot:` is never said as it wrote it: the lamp
-    // says its own fixed line (the Reviewer-lead on #6439).
+    // says its own fixed line (the Reviewer-lead on #6439); with
+    // `LAMP_MAKE_NO_CANNOT` on, its words are dropped all the same and the
+    // make is made one task for the agent ([`no_cannot`]).
     match made {
         Err(Refused(_, lines)) if models_cannot.get() => Err(Refused(
-            crate::make_skill_agent::CANNOT_LINE.to_owned(),
+            if crate::make_no_cannot::on() {
+                crate::make_no_cannot::AGENTS_CANNOT
+            } else {
+                crate::make_skill_agent::CANNOT_LINE
+            }
+            .to_owned(),
             lines,
         )),
         made => made,
@@ -2673,6 +2872,15 @@ fn ask(
     chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
     brief: String,
 ) -> Result<String, String> {
+    ask_in(chat, None, brief)
+}
+
+/// [`ask`], under `system` when one is given ([`written_with`]).
+fn ask_in(
+    chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    system: Option<String>,
+    brief: String,
+) -> Result<String, String> {
     std::thread::Builder::new()
         .name("lamp-voice-make-skill".into())
         .spawn(move || {
@@ -2682,7 +2890,12 @@ fn ask(
                 .map_err(|error| error.to_string())?;
             let chat = chat()?;
             runtime
-                .block_on(written(&chat, &brief))
+                .block_on(async {
+                    match &system {
+                        Some(system) => written_with(&chat, system, &brief).await,
+                        None => written(&chat, &brief).await,
+                    }
+                })
                 .map_err(|error| error.to_string())
         })
         .map_err(|error| error.to_string())
@@ -2704,7 +2917,7 @@ fn ask(
 /// to tell them after the line in its own words and the conversation's
 /// language ([`made_skill::needs_link_ask`]), never a fixed sentence.
 fn told(made: Result<Made, Refused>, on: Result<(), String>, needs: Option<&[Value]>) -> Value {
-    told_with(said_line(&made, &on), made, on, needs)
+    told_with(said_line(&made, &on, needs), made, on, needs)
 }
 
 /// [`told`], its one short line `line`.
@@ -3887,6 +4100,76 @@ light = { dim = 1 }
             .unwrap()
             .made("glow-on-return", &json!({"made": "glow-on-return"}), NOW);
         assert!(OneAsk::begin(&directory, Some("glow green when I come back"), "x", NOW).is_ok());
+    }
+
+    /// `LAMP_MAKE_NO_CANNOT` (lamp-9adf, 16 Nov): the same ask a minute
+    /// after a skill with code of its own was made and left off, its turn
+    /// cut, is not told it is on: its say-back and its yes are asked again,
+    /// the wait the make started gone, a new one begun. Off, the earlier
+    /// answer is given as it was.
+    #[test]
+    fn with_the_switch_the_same_ask_of_a_skill_left_off_asks_its_yes_again() {
+        const ASK: &str =
+            "when I sit down at my desk, tell me how many open issues I have on Linear";
+        let directory =
+            std::env::temp_dir().join(format!("one-ask-left-off-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(
+            directory.join(made_skill::INDEX),
+            r#"[{"name":"linear-open-issues","on":false}]"#,
+        )
+        .unwrap();
+        let line =
+            "I made linear open issues: … It waits for you to agree before it runs any code.";
+        let yes = crate::skill_write_yes::Asks {
+            skill: "linear-open-issues".into(),
+            sha256: "ab".repeat(32),
+            writes: Vec::new(),
+            say_back: "The lamp's model wrote its code, and that code may use your Linear.".into(),
+            grants: Some(vec!["linear-read".into(), "speak".into()]),
+            code: true,
+            remove: false,
+        };
+        let told = json!({
+            "made": "linear-open-issues",
+            "on": false,
+            "code_waits_for_yes": true,
+            crate::skill_write_yes::APPROVE_ID: "yes-gone",
+        });
+        for on in [false, true] {
+            crate::make_no_cannot::set_on_here(Some(on));
+            OneAsk::begin_in(&directory, Some(ASK), ASK, NOW, 7)
+                .unwrap()
+                .made_with(
+                    "linear-open-issues",
+                    &told,
+                    NOW,
+                    Some((yes.clone(), line.into())),
+                );
+            let again = OneAsk::begin_in(&directory, Some(ASK), ASK, NOW + 60_000, 9)
+                .err()
+                .unwrap();
+            assert_eq!(again["already_made"], true, "{again}");
+            let id = again[crate::skill_write_yes::APPROVE_ID].as_str().unwrap();
+            if on {
+                assert_ne!(id, "yes-gone", "{again}");
+                assert!(crate::skill_write_yes::waits(id), "{again}");
+                assert!(again["next"].as_str().unwrap().contains(line), "{again}");
+                assert!(again.get("writes_wait_for_yes").is_none(), "{again}");
+            } else {
+                assert_eq!(again, {
+                    let mut was = told.clone();
+                    was["already_made"] = json!(true);
+                    was
+                });
+            }
+            ASKS.lock()
+                .unwrap()
+                .retain(|ask| ask.directory != directory);
+        }
+        crate::skill_write_yes::clear_for_test();
+        crate::make_no_cannot::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     /// A made skill that mails mai when the person gets up (#6066).
@@ -7266,5 +7549,600 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             |_| Ok(json!({}))
         ));
         crate::skill_task_yes::set_on_here(None);
+    }
+
+    /// `LAMP_MAKE_NO_CANNOT` (#7234): what this test's thread needs on.
+    fn no_cannot_here(on: Option<bool>) {
+        crate::make_no_cannot::set_on_here(on);
+        made_skill::set_scripts_here(on.map(|_| true));
+        crate::skill_task_yes::set_on_here(on.map(|_| true));
+    }
+
+    const PLANT: &str = "every morning at eight, tell me a short poem about my plant";
+
+    /// The one more call's answer for [`PLANT`].
+    fn plant_answer(grants: &str) -> String {
+        format!(
+            "name: plant-check\ngrants: {grants}\n```skill.toml\n[permissions]\n\
+             topics = [\"clock/local\"]\n\n[trigger]\ntopic = \"clock/local\"\n\
+             field = \"known\"\nequals = true\nrearm = \"ends\"\n\
+             during = {{ from = \"08:00\", to = \"08:01\" }}\n```\n"
+        )
+    }
+
+    /// The owner, 16 Nov (#7234): with `LAMP_MAKE_NO_CANNOT` on, the lamp's
+    /// model's `cannot:` is not dropped. One more call to it picks the
+    /// grants and the trigger; the skill's one task is the person's request
+    /// in their words, its grants the ones named and checked, said back as
+    /// a task for the lamp's agent, never as made, and it waits for the yes.
+    #[test]
+    fn with_the_switch_a_cannot_becomes_a_task_for_the_agent_with_the_request_and_its_grants() {
+        no_cannot_here(Some(true));
+        let (root, keeping) = keeping("no-cannot-task");
+        let (url, served) = service_sent(vec![
+            (200, "cannot: a skill can't look at a plant.".to_owned()),
+            (200, plant_answer("light, speak")),
+        ]);
+        let told = make(PLANT, &keeping, chat_at(url), NOW);
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 2);
+        assert!(
+            sent[1].contains("You choose, for a lamp, when a skill runs and what it needs"),
+            "{}",
+            sent[1]
+        );
+        assert!(
+            sent[1].contains(&format!("Request: {PLANT}")),
+            "{}",
+            sent[1]
+        );
+        assert_eq!(told["made"], "plant-check", "{told}");
+        assert_eq!(told["code_waits_for_yes"], true, "{told}");
+        assert_eq!(told["on"], false, "{told}");
+        let description = told["description"].as_str().unwrap();
+        assert!(
+            description.contains(&format!("hands one task to the lamp's agent: “{PLANT}”")),
+            "{description}"
+        );
+        assert!(
+            description.ends_with(&format!(
+                "The lamp's agent does it, and {}. It runs only once you agree.",
+                crate::skill_task_yes::uses_said(&["light".to_owned(), "speak".to_owned()])
+            )),
+            "{description}"
+        );
+        let next = told["next"].as_str().unwrap();
+        assert!(
+            next.contains("\"I can have the lamp's agent do that, as plant check: every day"),
+            "{next}"
+        );
+        assert!(!next.contains("I made"), "{next}");
+        let entries = made_skill::entries(&keeping.directory);
+        let [entry] = entries.as_slice() else {
+            panic!("{entries:?}")
+        };
+        assert_eq!(
+            entry["uses"]["grants"],
+            json!(["light", "speak"]),
+            "{entry}"
+        );
+        assert_eq!(entry["uses"]["agent_task"], true, "{entry}");
+        assert!(take_said_line().is_some_and(|line| !line.contains("I made")));
+        no_cannot_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The lamp's agent's own `cannot:` is made a task the same way, its
+    /// words never said or journaled; the one more call goes to the lamp's
+    /// own model.
+    #[test]
+    fn with_the_switch_the_agents_cannot_becomes_a_task_too_its_words_never_said() {
+        no_cannot_here(Some(true));
+        let (root, keeping) = keeping("no-cannot-agent");
+        // The agent's thread has no switch of this one's, so its rules are
+        // not held to this thread's system prompt here.
+        let asked = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = std::sync::Arc::clone(&asked);
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            std::sync::Arc::new(move |rules: &str| {
+                assert!(rules.contains(made_skill::BRIEF_HEAD), "{rules}");
+                counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Some("cannot: a skill can't see PRIVATE-DETAIL-9's plant.".to_owned())
+            }),
+        );
+        let (url, served) = service(vec![
+            (200, "cannot: a skill can't look at a plant.".to_owned()),
+            (200, plant_answer("light, speak")),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            PLANT,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        assert_eq!((served.join().unwrap(), tasks.hand_overs()), (2, 1));
+        assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(told["made"], "plant-check", "{told}");
+        assert!(!told.to_string().contains("PRIVATE-DETAIL-9"), "{told}");
+        assert!(
+            !told
+                .to_string()
+                .contains(crate::make_skill_agent::CANNOT_LINE),
+            "{told}"
+        );
+        no_cannot_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A request no grant can cover is told why, in plain words that name
+    /// what is missing and what the person can do, never the bare "I
+    /// couldn't make that one."; the journal names neither the request nor
+    /// the reason's words.
+    #[test]
+    fn with_the_switch_a_request_no_grant_covers_is_told_its_reason() {
+        no_cannot_here(Some(true));
+        crate::skill_task_yes::set_net_here(Some(false));
+        let (root, keeping) = keeping("no-cannot-net");
+        let (url, served) = service(vec![
+            (
+                200,
+                "cannot: I can't do that yet: checking the weather for you.".to_owned(),
+            ),
+            (200, plant_answer("speak, net")),
+        ]);
+        let (made, line) = made_and_journaled(
+            PLANT,
+            None,
+            made_skill::brief(PLANT).unwrap(),
+            &keeping,
+            chat_at(url),
+            "local:1:1",
+        );
+        assert_eq!(served.join().unwrap(), 2);
+        let net = "I can't make that one yet: it needs the internet, and skills on this lamp \
+                   can't use the internet yet.";
+        assert_eq!(made, Err(Refused(net.to_owned(), None)));
+        assert_eq!(made_skill::not_made_line(net), net);
+        assert!(!line.contains("plant"), "{line}");
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        // What the model names that no grant gives: said, and nothing more.
+        let (url, served) = service(vec![
+            (200, "cannot: a skill can't pay for things.".to_owned()),
+            (200, "needs: paying for things".to_owned()),
+        ]);
+        let told = make("every friday pay my rent", &keeping, chat_at(url), NOW + 1);
+        assert_eq!(served.join().unwrap(), 2);
+        assert_eq!(
+            take_said_line().as_deref(),
+            Some(
+                "I can't make that one yet: it needs paying for things, which no skill on this \
+                 lamp can be given yet."
+            ),
+            "{told}"
+        );
+        // Nothing named: still a reason and what to do.
+        let (url, served) = service(vec![
+            (200, "cannot: a skill can't do that.".to_owned()),
+            (200, "needs: other".to_owned()),
+        ]);
+        let told = make("every friday do the thing", &keeping, chat_at(url), NOW + 2);
+        assert_eq!(served.join().unwrap(), 2);
+        assert_eq!(
+            take_said_line().as_deref(),
+            Some(crate::make_no_cannot::Uncovered::Other.line().as_str()),
+            "{told}"
+        );
+        // A reminder's refusal names what to ask for instead: said as it is.
+        let reminder = "I can't do that yet: a reminder every hour. Ask me for a reminder \
+                        instead, like 'remind me every hour to stand up'.";
+        let (url, served) = service(vec![(200, format!("cannot: {reminder}"))]);
+        let told = make(
+            "remind me every hour to stand up",
+            &keeping,
+            chat_at(url),
+            NOW + 3,
+        );
+        assert_eq!(served.join().unwrap(), 1, "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {reminder}"),
+            "{told}"
+        );
+        crate::skill_task_yes::set_net_here(None);
+        no_cannot_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// sim-2's P2 on #7261 (#6439's rule; the owner: "if something can't be
+    /// done, say exactly why"): with the switch on, the brief's own
+    /// refusals that keep people and their services safe stay refusals,
+    /// with no more call, each said with the lamp's own plain reason, never
+    /// the bare line or the model's words; the journal names neither the
+    /// request nor the model's sentence.
+    #[test]
+    fn with_the_switch_the_briefs_privacy_refusals_stay_refused_with_their_reason() {
+        no_cannot_here(Some(true));
+        let (root, keeping) = keeping("no-cannot-kept");
+        for (request, cannot, said) in [
+            (
+                "tell me who comes in",
+                "I can't do that yet: knowing who someone is.",
+                "I can't make that one: a skill can't tell who someone is, to keep people \
+                 private.",
+            ),
+            (
+                "when someone says my name, glow blue",
+                "I can't do that yet: hearing what is said.",
+                "I can't make that one: a skill can't listen to what people say, to keep the \
+                 room private.",
+            ),
+            (
+                "every night delete my old mail",
+                "I can't do that yet: deleting or changing what is in your services.",
+                "I can't make that one: a skill can't delete or change what's in your \
+                 services; it can read and send with your yes.",
+            ),
+        ] {
+            let (url, served) = service(vec![(200, format!("cannot: {cannot}"))]);
+            let (made, line) = made_and_journaled(
+                request,
+                None,
+                made_skill::brief(request).unwrap(),
+                &keeping,
+                chat_at(url),
+                "local:1:1",
+            );
+            assert_eq!(served.join().unwrap(), 1, "{request}: no more call");
+            assert_eq!(made, Err(Refused(said.to_owned(), None)), "{request}");
+            assert_ne!(said, crate::make_skill_agent::CANNOT_LINE);
+            assert_eq!(made_skill::not_made_line(said), said, "{request}");
+            assert!(!line.contains(request), "{line}");
+            assert!(!line.contains(cannot), "{line}");
+        }
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        // Through the whole make: what the voice's model is told to say.
+        let (url, served) = service(vec![(
+            200,
+            "cannot: I can't do that yet: knowing who someone is.".to_owned(),
+        )]);
+        let told = make("tell me who comes in", &keeping, chat_at(url), NOW);
+        assert_eq!(served.join().unwrap(), 1);
+        assert!(
+            told["next"]
+                .as_str()
+                .unwrap()
+                .contains("a skill can't tell who someone is, to keep people private."),
+            "{told}"
+        );
+        no_cannot_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// sim-2 on #7261 and the first builder's ruling: the one more call
+    /// never gives a task for the lamp's agent the microphone or anything
+    /// that listens, nor, when it runs by itself on a trigger, the camera,
+    /// which it may have only asked for, run when the person says its
+    /// phrase. "Listen to the room and tell me what people say" stays the
+    /// brief's own refusal with its reason; a microphone from the model is
+    /// refused with its own, on a trigger or asked for; a camera on a
+    /// trigger is told to ask for it by a phrase; nothing is kept.
+    #[test]
+    fn with_the_switch_a_task_never_listens_and_watches_only_when_asked() {
+        no_cannot_here(Some(true));
+        crate::upload_agent::set_on_here(Some(true));
+        let (root, keeping) = keeping("no-cannot-sensing");
+        const LISTEN: &str = "listen to the room and tell me what people say";
+        let (url, served) = service(vec![(
+            200,
+            "cannot: I can't do that yet: hearing what is said.".to_owned(),
+        )]);
+        let told = make(LISTEN, &keeping, chat_at(url), NOW);
+        assert_eq!(served.join().unwrap(), 1);
+        assert!(
+            told["next"]
+                .as_str()
+                .unwrap()
+                .contains("a skill can't listen to what people say, to keep the room private."),
+            "{told}"
+        );
+        use crate::make_no_cannot::Uncovered;
+        for (answer, refused) in [
+            (plant_answer("microphone, speak"), Uncovered::Listening),
+            (
+                "name: listen-room\ngrants: microphone, speak\nasks: listen to the room".to_owned(),
+                Uncovered::Listening,
+            ),
+            (plant_answer("camera, speak"), Uncovered::Sensing),
+        ] {
+            let (url, served) = service(vec![
+                (200, "cannot: a skill can't do that.".to_owned()),
+                (200, answer.clone()),
+            ]);
+            let (made, _) = made_and_journaled(
+                LISTEN,
+                None,
+                made_skill::brief(LISTEN).unwrap(),
+                &keeping,
+                chat_at(url),
+                "local:1:1",
+            );
+            assert_eq!(served.join().unwrap(), 2, "{answer}");
+            assert_eq!(made, Err(Refused(refused.line(), None)), "{answer}");
+        }
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        crate::upload_agent::set_on_here(None);
+        no_cannot_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// El's P2 on #7261: a `do.task` running the agent's path is a task for
+    /// the lamp's agent only with the lamp's own script there, byte for
+    /// byte. Real code the model wrote at that path is said and kept as the
+    /// model's code.
+    #[test]
+    fn with_the_switch_model_code_at_the_agents_path_is_the_models_code() {
+        no_cannot_here(Some(true));
+        let block = "[permissions]\ntopics = [\"clock/local\"]\n\n[trigger]\n\
+                     topic = \"clock/local\"\nfield = \"known\"\nequals = true\n\
+                     rearm = \"ends\"\nduring = { from = \"08:00\", to = \"08:01\" }";
+        let grants = ["light".to_owned(), "speak".to_owned()];
+        let ours = crate::make_no_cannot::skill_text("plant-check", &grants, block, PLANT);
+        let theirs = ours.replace(
+            crate::make_no_cannot::SCRIPT,
+            "import os\nprint(os.getcwd())\n",
+        );
+        assert_ne!(ours, theirs);
+        for (answer, agents) in [(theirs, false), (ours, true)] {
+            let (root, keeping) = keeping(&format!("no-cannot-own-code-{agents}"));
+            let (url, served) = service_sent(vec![(200, answer)]);
+            let told = make(PLANT, &keeping, chat_at(url), NOW);
+            assert_eq!(served.join().unwrap().len(), 1);
+            assert_eq!(told["code_waits_for_yes"], true, "{told}");
+            let description = told["description"].as_str().unwrap();
+            assert_eq!(
+                description.contains("The lamp's agent does it"),
+                agents,
+                "{description}"
+            );
+            let entries = made_skill::entries(&keeping.directory);
+            let [entry] = entries.as_slice() else {
+                panic!("{entries:?}")
+            };
+            assert_eq!(entry["uses"]["agent_task"] == true, agents, "{entry}");
+            let _ = take_said_line();
+            ASKS.lock()
+                .unwrap()
+                .retain(|ask| ask.directory != keeping.directory);
+            let _ = std::fs::remove_dir_all(&root);
+        }
+        crate::skill_write_yes::clear_for_test();
+        no_cannot_here(None);
+    }
+
+    /// The first builder on #7261 (the lead's rule): the bare word decides
+    /// nothing; the lamp's own model, given it only as a hint, decides by
+    /// naming the grant. "How many open issues I have on Linear", Linear
+    /// not linked, gets `linear-read` and is made with the link note; "a
+    /// linear timer", hinted the same, gets the light and is no Linear make.
+    #[test]
+    fn with_the_switch_the_model_names_the_service_the_word_only_hints() {
+        no_cannot_here(Some(true));
+        made_skill::set_agent_services_here(Some(true));
+        let (root, keeping) = keeping("no-cannot-hint");
+        let at_desk = "```skill.toml\n[permissions]\ntopics = [\"room/presence\"]\n\n\
+                       [trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\n\
+                       equals = true\n```\n";
+        for (made_in, request, answer, grants, linear) in [
+            (
+                1,
+                "when I sit down at my desk, tell me how many open issues I have on Linear",
+                format!("name: linear-issues\ngrants: linear-read, speak\n{at_desk}"),
+                json!(["linear-read", "speak"]),
+                true,
+            ),
+            (
+                2,
+                "when I sit down at my desk, start a linear timer that dims the light",
+                format!("name: desk-timer\ngrants: light\n{at_desk}"),
+                json!(["light"]),
+                false,
+            ),
+        ] {
+            let (url, served) = service_sent(vec![
+                (200, "cannot: a skill can't do that.".to_owned()),
+                (200, answer),
+            ]);
+            let told = make_with(
+                made_in,
+                None,
+                request,
+                &keeping,
+                chat_at(url),
+                NOW + made_in * 600_000,
+                || Some(Vec::new()),
+            );
+            let sent = served.join().unwrap();
+            assert_eq!(sent.len(), 2, "{request}");
+            assert!(
+                sent[1].contains("The request may mean the person's Linear (linear-read"),
+                "{}",
+                sent[1]
+            );
+            assert_eq!(told["code_waits_for_yes"], true, "{told}");
+            let entry = made_skill::entries(&keeping.directory)
+                .into_iter()
+                .find(|entry| entry["name"] == told["made"])
+                .unwrap();
+            assert_eq!(entry["uses"]["grants"], grants, "{entry}");
+            let needs = told.get("needs_link").cloned();
+            if linear {
+                assert_eq!(
+                    needs,
+                    Some(json!([{"code": "linear", "name": "Linear"}])),
+                    "{told}"
+                );
+            } else {
+                assert!(needs.is_none(), "{told}");
+            }
+            let _ = take_said_line();
+            ASKS.lock()
+                .unwrap()
+                .retain(|ask| ask.directory != keeping.directory);
+        }
+        crate::skill_write_yes::clear_for_test();
+        made_skill::set_agent_services_here(None);
+        no_cannot_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The first builder's ruling on #7261: "check the plant with the
+    /// camera", asked for by a phrase, is made, the camera its grant, as a
+    /// regular made skill may have it; it runs only when the phrase is said,
+    /// read back first and waiting for the yes.
+    #[test]
+    fn with_the_switch_a_camera_task_asked_by_its_phrase_is_made() {
+        no_cannot_here(Some(true));
+        crate::upload_agent::set_on_here(Some(true));
+        const CHECK: &str =
+            "when I say check my plant, look at it with the camera and tell me if it needs water";
+        let (root, keeping) = keeping("no-cannot-camera");
+        let helper = manage_helper(&keeping.manage);
+        let (url, served) = service(vec![
+            (200, "cannot: a skill can't look at a plant.".to_owned()),
+            (
+                200,
+                "name: plant-check\ngrants: camera, speak\nasks: check my plant".to_owned(),
+            ),
+        ]);
+        let told = make(CHECK, &keeping, chat_at(url), NOW);
+        assert_eq!(served.join().unwrap(), 2);
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        assert_eq!(told["made"], "plant-check", "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(
+            next.contains("I can have the lamp's agent do that, as plant check: only when you ask"),
+            "{next}"
+        );
+        assert!(
+            next.contains("I'll read it back and wait for your yes."),
+            "{next}"
+        );
+        let entries = made_skill::entries(&keeping.directory);
+        let [entry] = entries.as_slice() else {
+            panic!("{entries:?}")
+        };
+        assert_eq!(entry["grants"], json!(["camera", "speak"]), "{entry}");
+        assert_eq!(entry["agent"], true, "{entry}");
+        crate::upload_agent::set_on_here(None);
+        no_cannot_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// One of the morning's failed makes (#7234): "when I say send my test
+    /// note, …" runs only when asked. It is kept as an agent skill the
+    /// person asks for by those words, its task the request, its grant the
+    /// send's alone; on, its task not agreed, so its first ask reads it
+    /// back and waits for the spoken yes. Never said as made.
+    #[test]
+    fn with_the_switch_a_task_only_asked_for_is_an_agent_skill_asked_by_its_words() {
+        no_cannot_here(Some(true));
+        made_skill::set_agent_services_here(Some(true));
+        crate::upload_agent::set_on_here(Some(true));
+        const NOTE: &str = "when I say send my test note, email me the words lamp test one";
+        let (root, keeping) = keeping("no-cannot-asked");
+        let helper = manage_helper(&keeping.manage);
+        let (url, served) = service(vec![
+            (
+                200,
+                "cannot: a skill can't hear what you say to it.".to_owned(),
+            ),
+            (
+                200,
+                "name: test-note\ngrants: gmail-write\nasks: send my test note".to_owned(),
+            ),
+        ]);
+        let told = make(NOTE, &keeping, chat_at(url), NOW);
+        assert_eq!(served.join().unwrap(), 2);
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        assert_eq!(told["made"], "test-note", "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(
+            next.contains(&format!(
+                "I can have the lamp's agent do that, as test note: only when you ask for it, it \
+                 hands one task to the lamp's agent: “{NOTE}”. The lamp's agent does it, and it \
+                 prepares sends with your Gmail, each sent only on your yes. The first time you \
+                 ask, I'll read it back and wait for your yes."
+            )),
+            "{next}"
+        );
+        assert!(!next.contains("I made"), "{next}");
+        let entries = made_skill::entries(&keeping.directory);
+        let [entry] = entries.as_slice() else {
+            panic!("{entries:?}")
+        };
+        assert_eq!(entry["agent"], true, "{entry}");
+        assert_eq!(entry["grants"], json!(["gmail-write"]), "{entry}");
+        assert_eq!(
+            crate::upload_agent::agent_named(&keeping.directory, "test_note").as_deref(),
+            Some("test-note")
+        );
+        crate::upload_agent::set_on_here(None);
+        made_skill::set_agent_services_here(None);
+        no_cannot_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Switch off (#7234): a `cannot:` is said as before, DeepSeek's as it
+    /// wrote it and the agent's as the lamp's fixed line, with no more call;
+    /// the system prompt is the same either way.
+    #[test]
+    fn with_the_switch_off_a_cannot_is_said_as_before() {
+        let prompt = system();
+        crate::make_no_cannot::set_on_here(Some(true));
+        assert_eq!(system(), prompt);
+        crate::make_no_cannot::set_on_here(Some(false));
+        let (root, keeping) = keeping("no-cannot-off");
+        let (url, served) = service(vec![(
+            200,
+            "cannot: a skill can't look at a plant.".to_owned(),
+        )]);
+        let told = make(PLANT, &keeping, chat_at(url), NOW);
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(
+            told["error"], "the skill couldn't be made: a skill can't look at a plant.",
+            "{told}"
+        );
+        let tasks = agent_answering(vec![Some("cannot: no.".to_owned())]);
+        let (url, served) = service(vec![(
+            200,
+            "cannot: a skill can't look at a plant.".to_owned(),
+        )]);
+        let told = make_with_by(
+            0,
+            None,
+            PLANT,
+            &keeping,
+            chat_at(url),
+            NOW + 1,
+            || None,
+            Some(&tasks.agent()),
+        );
+        assert_eq!((served.join().unwrap(), tasks.hand_overs()), (1, 1));
+        assert_eq!(
+            told["error"],
+            format!(
+                "the skill couldn't be made: {}",
+                crate::make_skill_agent::CANNOT_LINE
+            ),
+            "{told}"
+        );
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        no_cannot_here(None);
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

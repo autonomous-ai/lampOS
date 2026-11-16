@@ -4798,7 +4798,159 @@ the same code for both writers.
   tell me if I need an umbrella" was kept as DeepSeek's, a skill that only
   said "Check the weather now, please."
 - **The agent's own `cannot:` is never said as it wrote it.** The lamp says
-  its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`).
+  its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`);
+  with `LAMP_MAKE_NO_CANNOT=on` its words are dropped all the same and the
+  make becomes one task for the agent (below).
+- **No "couldn't" with `LAMP_MAKE_NO_CANNOT=on`** (the owner, 16 Nov:
+  "Every task must be doable; no 'couldn't' here"; #7234;
+  `crate::make_no_cannot`; off unless `on`, lamp-voice alone reads it, in
+  no product unit). A make whose last answer is the model's own `cannot:`
+  (the lamp's own model's, or the agent's), or a skill that would only
+  tell the person to do what they asked of it (`ECHOES_THE_ASK`), is not
+  dropped (the owner, 16 Nov 11:4x: "every skill a person asks for must be
+  made"), but for the brief's own refusals (below). The lamp's own model is
+  asked once more
+  (`make_no_cannot::system`, within the make's longest,
+  `make_skill_local::longest_make`) for a name, the fewest grants, and
+  either one `[trigger]` of the lamp's own or the words the person will
+  say to ask for it (`asks:`); it writes nothing else. The skill's one
+  task is the person's request in their own words, plain, at most 120
+  characters (`make_no_cannot::task_words`), never a model's words. By
+  voice, the request is the voice model's tool argument rather than the
+  line heard; the read-back bounds this, because the owner agrees to
+  exactly the words said back. Its
+  grants are checked against the ones there are (`make_no_cannot::covered`):
+  `light` or `speak` (`make_no_cannot::FALLBACK_GRANTS`); the camera only
+  for a task asked for by its phrase, run right then, as a regular made
+  skill may have it (`ASKED_CAMERA`; the first builder's ruling on #7261),
+  never on a trigger (`WATCHING_GRANTS`: the camera and `look`); never the
+  microphone, `hear`, `speech` or `sound` (`LISTENING_GRANTS`, sim-2 on
+  #7261); or with `LAMP_AGENT_SERVICES=on`
+  a known service's `-read` or `-write`, linked or not: one not linked is
+  made all the same, and the make's link note (`made_skill::needs_link`)
+  asks for it to be linked; the run's own grant check holds it until then.
+  The model is offered only those grants.
+  - **The brief's own refusals stay refusals** (sim-2's P2 on #7261,
+    #6439's rule; the owner: "if something can't be done, say exactly
+    why"), all but a send's (`made_skill::briefs_send_refusal`), which the
+    agent can make. No more call is made. Those that keep people and their
+    services safe are said with the lamp's own plain reason
+    (`make_no_cannot::kept_refusal`), never the bare line or the model's
+    words:
+    - Hearing what is said (`listening`): "I can't make that one: a skill
+      can't listen to what people say, to keep the room private."
+    - Knowing who someone is (`who_someone_is`): "I can't make that one: a
+      skill can't tell who someone is, to keep people private."
+    - Deleting or changing what is in a service (`delete_or_change`): "I
+      can't make that one: a skill can't delete or change what's in your
+      services; it can read and send with your yes."
+    The brief's other refusals (a reminder: "Ask me for a reminder
+    instead, …"; a send not word for word; an event with no day or time;
+    the clock not set) already name their reason and what to do, and are
+    said as the model wrote them.
+  - **On a trigger**: written by the lamp as a made agent task
+    (`make_no_cannot::skill_text`): `grants`, the model's `[permissions]`
+    topics and `[trigger]`, `[ask]` a nudge, and one `do.task` whose `run`
+    is the lamp's own `scripts/agent.py`, which only tells the agent the task
+    is its to do, only while that file is the lamp's own script byte for
+    byte (`made_skill::agent_script_only`; model-written code at that path
+    is said and kept as the model's code). It goes through the same checks, keeping and packing as
+    any made skill with code (`LAMP_MADE_SCRIPTS` and `LAMP_SKILL_TASKS`
+    needed), and is said back at once, never as made: "I can have the
+    lamp's agent do that, as plant check: every day at 08:00, it hands one
+    task to the lamp's agent: “…”. … The lamp's agent does it, and it changes
+    the light and speaks and plays sounds. It runs only once you agree."
+    (`made_skill::agent_said`, `Uses::agent_task`). It waits for the spoken
+    yes as a made skill with code does (`code_approve`), never on at once
+    (not even with `LAMP_MADE_CODE_ON_AT_ONCE`), and runs at its trigger.
+  - **Only when asked** (no time or moment named, or "when I say send my
+    test note"), with `LAMP_UPLOAD_TO_AGENT=on`: kept in an agent skill's
+    form (`make_no_cannot::asked_files`, `made_skill::keep_agent_asked`): a
+    voice tool whose note carries the words to say, one `do.task` that has
+    the agent follow `scripts/SKILL.md` (the person's whole request, in the
+    lamp's own words around it), its grants the same and the camera
+    (light, speak, camera, the internet with `LAMP_TASK_NET=on`, a
+    service's),
+    its card marked `agent: asked`, so its read-back says it comes from
+    "what you asked the lamp for" (lamp-skills' `task_asks`). It goes on,
+    its task not agreed, and the lamp says "I can have the lamp's agent do
+    that, as test note: only when you ask for it, it hands one task to the
+    lamp's agent: “…”. … The first time you ask, I'll read it back and wait
+    for your yes." The first ask reads it back and waits for the spoken yes
+    (`upload_agent::first_run`), then it runs as asked. With
+    `LAMP_UPLOAD_TO_AGENT` off the person hears what to add instead: "I can
+    make that as a task for the lamp's agent once you tell me when it should
+    run, …" (`make_no_cannot::no_when`, the seam for a made skill's spoken
+    asks, `LAMP_MADE_SKILL_ASKS`).
+  - **A request no grant covers** is told its reason in plain words, what
+    is missing, and stops, never the bare "I couldn't make that one."
+    (`Uncovered::line`). No line tells the person to do what they can't
+    (the first builder on #7261). Each line, whole:
+    - `net` with `LAMP_TASK_NET` off (`net_off`): "I can't make that one
+      yet: it needs the internet, and skills on this lamp can't use the
+      internet yet."
+    - `net` on a trigger (`net_made`): "I can't make that one yet: it needs the
+      internet, which a skill that runs on its own can't have yet. Ask me to
+      make it for when you say a few words instead, and the lamp's agent
+      will do it each time you say them."
+    - A service with `LAMP_AGENT_SERVICES` off (`services_off`): "I can't
+      make that one yet: it needs your linked services, and skills on this
+      lamp can't use them yet."
+    - A service the lamp doesn't know (`service_unknown`): "I can't make
+      that one yet: it needs a service the lamp can't link yet."
+    - `LAMP_MADE_SCRIPTS` or `LAMP_SKILL_TASKS` off (`tasks_off`): "I can't
+      make that one yet: it needs the lamp's agent, and skills on this lamp
+      can't hand tasks to it yet."
+    - What the model names no grant gives (`needs: paying for things`,
+      `missing`, at most 60 characters): "I can't make that one yet: it
+      needs paying for things, which no skill on this lamp can be given
+      yet."
+    - The camera on a trigger (`sensing`): "I can't make that one yet: it would
+      need the camera, and a skill that runs by itself can't watch or
+      listen, to keep the room private. Ask me to make it for when you say
+      a few words, and it can use the camera then."
+    - The microphone or another grant that listens, either way
+      (`microphone`): "I can't make that one yet: it would need the
+      microphone, and a skill can't listen, to keep the room private."
+    - Nothing named, or a grant there isn't (`other`): "I can't make that
+      one yet: it needs something no skill on this lamp can be given yet."
+    - A task only asked for whose request is longer than the words read
+      back (`too_long`, `make_no_cannot::task_cut`): "I can't make that one
+      yet: it's too long for me to read back to you whole, so ask for it in
+      fewer words." Its `scripts/SKILL.md` carries exactly the words read
+      back and agreed to, never more of the request (El's P1 on #7261).
+    The journal names only the reason's class, never the person's words.
+    The internet and services switches are the lamp's own, in no app
+    setting, so no line sends the person to the app for them.
+  - **The model names the service; the word is only a hint** (the lead's
+    rule, the first builder on #7261). A service word in the request
+    (`make_skill_agent::service_hint`, linked or not, a service's own name
+    first: "Linear" over "issues") is passed into the one more call as a
+    hint only: "The request may mean the person's Linear (linear-read to
+    read it, linear-write to send with it): name its grant only if the
+    request asks for that service." The model decides by naming the grant,
+    and code only checks the grant exists. The word alone routes no make
+    to the agent; routing for a service linked now (`service_asked`) is as
+    it was. A task's service grants are asked for in its link note
+    (`made_skill::needs_link`): "when I sit down at my desk, tell me how
+    many open issues I have on Linear", Linear not linked, is made with
+    `linear-read` and asks for Linear to be linked; "a linear timer" is
+    made with the light alone.
+  - **A cut turn's code line is never a dead end** (lamp-9adf, 16 Nov: "I
+    couldn't tell you just now what its code may use, so it isn't on."):
+    `made_skill::cut_code_line` says what its code may use (or what the
+    lamp's agent does), every grant in plain words, then "It isn't on yet:
+    ask me for it again, and I'll read it back for your yes.", and each
+    service not linked yet: " Linear isn't linked yet; link it in the app."
+    (`made_skill::unlinked_said`).
+  - **The same ask again tells the real state** (lamp-9adf, 16 Nov: the
+    journal said the skill "is still on the lamp", and it was off): asked
+    again within `ONE_ASK_WITHIN`, a skill with code of its own left off
+    waiting for its yes is said back again, and when the wait its make
+    started is gone, a new one begins (`OneAsk::begin_in`), so the yes is
+    taken.
+  - Each run counts against the day's task runs as any skill's does
+    (lamp-skills' own count). Off, the make is byte for byte as before.
 - **How the agent is reached: in a skill run's namespace** (#6643, the
   first builder's guard, 12 Nov 18:15). The make goes to lamp-tasks' make
   socket, `/run/lampos-tasks/skill-make.sock` (`lamp_tasks::skill_make`,
