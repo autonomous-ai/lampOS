@@ -561,6 +561,36 @@ fn light_acts() -> &'static [String] {
     })
 }
 
+/// The verbs that act on the light, as its functions say them
+/// (`lamp_actions::catalog`: "Make your own light a step warmer", "Switch
+/// your own light off", "set your own light to one of its colours", "can
+/// change colour", "turn"; and the steps themselves, warm, cool, dim,
+/// brighten): a test holds each to the catalog's own text. A reply's
+/// "-ing" opener counts only as one of these ([`doing_claim`]), so
+/// "Thinking about blue whales." and "Imagining a red sunset." are talk
+/// (the Reviewer-lead's P2 on #7352).
+// ponytail: "Making a red sunset." still reads as a light act; tie the
+// generic verbs (make, set, turn, switch, change) to an object if a
+// journal shows one.
+const LIGHT_VERBS: [&str; 9] = [
+    "warm", "cool", "dim", "brighten", "switch", "turn", "change", "make", "set",
+];
+
+/// Whether `word` is one of [`LIGHT_VERBS`] in "-ing": "warming",
+/// "making" (its 'e' off), "dimming", "setting" (its last letter doubled).
+fn is_light_verb(word: &str) -> bool {
+    let Some(stem) = word.strip_suffix("ing") else {
+        return false;
+    };
+    LIGHT_VERBS.iter().any(|verb| {
+        stem == *verb
+            || verb.strip_suffix('e') == Some(stem)
+            || stem
+                .strip_prefix(verb)
+                .is_some_and(|doubled| doubled.len() == 1 && verb.ends_with(doubled))
+    })
+}
+
 /// Whether `word` names one of the light's acts ([`light_acts`]), bare or
 /// inflected ("warming", "warmed", "brightening", "dimming").
 fn names_a_light_act(word: &str) -> bool {
@@ -578,8 +608,9 @@ fn names_a_light_act(word: &str) -> bool {
 /// lamp-52e6 core w2 on 13333, 13417 and 13495, "Hold on, hey Lamp, make
 /// the light a little warmer." answered in three words, 16 characters,
 /// with `calls=none`, said, and nothing warmed): its first sentence past
-/// lead words ([`LEAD_WORDS`], "Sure,") opens with a verb in "-ing", bare
-/// or after "I'm", has at most [`DOING_WORDS`] words, names one of the
+/// lead words ([`LEAD_WORDS`], "Sure,") opens with a verb acting on the
+/// light in "-ing" ([`is_light_verb`]), bare or after "I'm", has at most
+/// [`DOING_WORDS`] words, names one of the
 /// light's acts ([`names_a_light_act`]: "Warming that up.", "Switching to
 /// blue."), is no '?' and says no "not" or "n't". Only the lamp's reply
 /// is read, never the person's line, so a story or talk that names a
@@ -618,7 +649,7 @@ pub fn doing_claim(reply: &str, ended: bool) -> Option<bool> {
     } else {
         first
     };
-    if !(verb.len() > 4 && verb.ends_with("ing")) {
+    if !is_light_verb(verb) {
         return Some(false);
     }
     // The sentence the verb opens, to its mark.
@@ -2757,8 +2788,51 @@ pub(crate) mod tests {
             "Warming it isn't possible.",
             "Warming it up?",
             "Okay.",
+            // The Reviewer-lead's P2 on #7352: no verb acting on the light.
+            "Thinking about blue whales.",
+            "Imagining a red sunset.",
+            "Thinking of something warm.",
+            "Wondering about green hills.",
+            "Picturing a warm beach.",
         ] {
             assert_eq!(doing_claim(reply, true), Some(false), "{reply}");
+        }
+        assert_eq!(doing_claim("Thinking", false), None);
+        assert_eq!(doing_claim("Thinking about", false), Some(false));
+        for word in [
+            "warming",
+            "cooling",
+            "dimming",
+            "brightening",
+            "making",
+            "setting",
+        ] {
+            assert!(is_light_verb(word), "{word}");
+        }
+        for word in [
+            "thinking",
+            "imagining",
+            "wondering",
+            "picturing",
+            "sing",
+            "settling",
+        ] {
+            assert!(!is_light_verb(word), "{word}");
+        }
+    }
+
+    /// Each of [`LIGHT_VERBS`] is said by the light's own functions, in a
+    /// name or a description ("brighten" as `light_brighter`'s "brighter").
+    #[test]
+    fn every_light_verb_is_in_the_light_catalog() {
+        let text: String = lamp_actions::catalog(false, true)
+            .iter()
+            .map(|function| format!("{} {} ", function.name, function.description))
+            .collect::<String>()
+            .to_lowercase();
+        for verb in LIGHT_VERBS {
+            let root = verb.strip_suffix("en").unwrap_or(verb);
+            assert!(text.contains(root), "{verb}");
         }
     }
 
