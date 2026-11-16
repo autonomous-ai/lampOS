@@ -320,6 +320,15 @@ pub const DOWN_LINE_AGAIN: &str = "Still slow, sorry.";
 /// on #3771). At most once in [`DOWN_LINE_EVERY`]; asking again changes
 /// nothing, so it isn't repeated.
 pub const DOWN_LINE_CANNOT: &str = "Sorry, I can't answer just now.";
+/// What it says when the chat has refused with 429 for [`LIMIT_AFTER`],
+/// with no answer between: a usage limit, not a burst, so no promise of a
+/// moment (#7346: lamp-74ff's relay answered 429 for over an hour on
+/// 16 Nov and the lamp kept saying its thoughts were slow). V1's
+/// `PhraseLLMLimit`. At most once in [`DOWN_LINE_EVERY`].
+pub const DOWN_LINE_LIMIT: &str = "I've hit my usage limit.";
+/// How long 429s must keep coming, with no answer between, before they are
+/// taken for a usage limit: a rate burst's per-minute window passes in one.
+pub const LIMIT_AFTER: Duration = Duration::from_secs(120);
 
 /// The down lines, in the order [`DownLine`] renders them at the start.
 pub(crate) const DOWN_LINES: [&str; 3] = [DOWN_LINE, DOWN_LINE_AGAIN, DOWN_LINE_CANNOT];

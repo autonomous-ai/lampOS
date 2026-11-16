@@ -6704,6 +6704,131 @@ async fn a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one(
     );
 }
 
+/// #7346 (lamp-74ff, 16 Nov 18:00-19:07): the relay out of its usage limit
+/// answered 429 for over an hour and the lamp kept promising "a moment".
+/// 429s with no answer between, spanning [`LIMIT_AFTER`], say
+/// [`DOWN_LINE_LIMIT`] instead of the slow line: at most once in
+/// [`DOWN_LINE_EVERY`], never twice in a row; an answered turn ends the
+/// streak; 503s that last as long keep the slow line; a written turn never
+/// says it; with the down line off, nothing.
+#[tokio::test(start_paused = true)]
+async fn a_429_that_lasts_says_the_usage_limit_line_not_the_slow_one() {
+    async fn turns(on: bool, status: u16) -> Vec<Vec<String>> {
+        let refused = || vec![Err(net::Error::Status(status))];
+        let answered = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                    .take(9)
+                    .collect(),
+            ),
+            chats: Mutex::new(
+                [
+                    answered(),
+                    refused(),
+                    refused(),
+                    refused(),
+                    refused(),
+                    refused(),
+                    refused(),
+                    answered(),
+                    refused(),
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.saying_when_down(on);
+        let mut heard = Vec::new();
+        // One chat each, the written turn's too.
+        for (request, wait, spoken) in [
+            (1, 0, true),
+            (2, 1, true),
+            (3, 1, true),
+            (4, 130, true),
+            (5, 1, true),
+            (6, 1, false),
+            (7, 61, true),
+            (8, 1, true),
+            (9, 1, true),
+        ] {
+            tokio::time::sleep(Duration::from_secs(wait)).await;
+            if spoken {
+                engine.submit(start(request));
+                engine.submit(audio(request, 1));
+                engine.submit(end(request));
+            } else {
+                engine.submit(written(request, "Say hello."));
+            }
+            heard.push(sent(&mut engine).await);
+        }
+        heard
+    }
+    let line = format!("audio:{}", DOWN_LINE.len());
+    let again = format!("audio:{}", DOWN_LINE_AGAIN.len());
+    let limit = format!("audio:{}", DOWN_LINE_LIMIT.len());
+    let slow = |turn: &Vec<String>| turn.contains(&line) || turn.contains(&again);
+    let on = turns(true, 429).await;
+    assert!(
+        on[1].contains(&line) && !on[1].contains(&limit),
+        "a first 429: {on:?}"
+    );
+    assert!(on[2].contains(&again) && !on[2].contains(&limit), "{on:?}");
+    assert!(
+        on[3].contains(&limit) && !slow(&on[3]),
+        "429s past the bound: {on:?}"
+    );
+    assert!(
+        on[3].iter().any(|event| event == "failed"),
+        "still a failed turn: {on:?}"
+    );
+    assert!(
+        !on[4].contains(&limit) && !slow(&on[4]),
+        "never twice in a row within the minute, nor the slow line: {on:?}"
+    );
+    assert!(
+        !on[5].contains(&limit) && !slow(&on[5]),
+        "a written turn: {on:?}"
+    );
+    assert!(
+        on[6].contains(&limit) && !slow(&on[6]),
+        "past the minute: {on:?}"
+    );
+    assert!(!on[7].contains(&limit), "answered: {on:?}");
+    assert!(
+        on[8].contains(&line) && !on[8].contains(&limit),
+        "an answer ends the streak: {on:?}"
+    );
+    let busy = turns(true, 503).await;
+    assert!(
+        busy.iter().all(|turn| !turn.contains(&limit)),
+        "a 5xx keeps the slow line: {busy:?}"
+    );
+    assert!(slow(&busy[3]) && slow(&busy[6]), "{busy:?}");
+    let off = turns(false, 429).await;
+    assert!(off.iter().all(|turn| !turn.contains(&limit)), "{off:?}");
+}
+
+/// #7346: the usage-limit line is said in each of the owner's languages,
+/// as the other down lines are.
+#[test]
+fn the_usage_limit_line_has_each_language() {
+    use crate::language::{Language, fixed_in};
+    for language in [
+        Language::Vietnamese,
+        Language::Japanese,
+        Language::Chinese,
+        Language::Korean,
+    ] {
+        assert_ne!(
+            fixed_in(Some(language), DOWN_LINE_LIMIT),
+            DOWN_LINE_LIMIT,
+            "{language:?}"
+        );
+    }
+}
+
 /// #4332 (lamp-e82d): a 503 that says the slow line tells the coordinator
 /// so, after the line's audio and before the turn's failure, so it says no
 /// `turn_lost` over it; "I can't answer just now" and a silent failure (the
