@@ -3697,7 +3697,11 @@ gone ([switches.md](switches.md)). What happens:
      what it keeps and when it reads it back. A skill's remove
      (`task_yes_forget`) deletes its notes; a heard "forget everything"
      sends lamp-control `notes_forget_skills`, deleting every made skill's
-     notes. Off, byte for byte as before.
+     notes. A notes grant written under another name (`note`, or `notes`
+     or `note` then `-` or `_` and a word, as `notes-write`) is written as
+     `notes` before the check (`made_skill::notes_granted`; c0a4, 18 Nov:
+     OpenClaw asked for `notes-write`); no other grant is renamed or
+     added. Off, byte for byte as before.
    - **Offered to the voice** (#6749 B): with the switch on, the
      `make_skill` function's description (`make_skill_local::CODE_TOLD`)
      says a made skill may carry its own Python script, run by its task

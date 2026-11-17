@@ -708,8 +708,12 @@ sau:
      một tệp người dùng mở được: lời đọc lại nói rõ nó giữ gì và khi nào đọc
      lại. Gỡ một kỹ năng (`task_yes_forget`) xóa ghi chú của nó; một câu
      "forget everything" được nghe sẽ gửi lamp-control `notes_forget_skills`,
-     xóa ghi chú của mọi kỹ năng tự tạo. Khi tắt, giữ nguyên từng byte như
-     trước.
+     xóa ghi chú của mọi kỹ năng tự tạo. Một quyền ghi chú viết dưới tên
+     khác (`note`, hoặc `notes` hay `note` rồi `-` hoặc `_` và một từ, như
+     `notes-write`) được viết lại thành `notes` trước khi kiểm tra
+     (`made_skill::notes_granted`; c0a4, 18/11: OpenClaw xin
+     `notes-write`); không quyền nào khác bị đổi tên hay thêm vào. Khi tắt,
+     giữ nguyên từng byte như trước.
    - **Được mời cho giọng nói** (#6749 B): khi bật công tắc, mô tả của
      hàm `make_skill` (`make_skill_local::CODE_TOLD`) nói rằng một kỹ năng
      tự tạo có thể mang script Python riêng, chạy bởi task của nó khi người

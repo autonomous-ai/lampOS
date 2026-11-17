@@ -2737,7 +2737,7 @@ pub fn paced_with(text: &str, asked: &[(u32, u32)], limits: bool) -> String {
 /// interval, a minute at least ([`say_paced_with`]).
 pub fn paced_for(text: &str, asked: &[(u32, u32)], limits: bool, repeat: Option<u64>) -> String {
     mannered_with(
-        &say_paced_with(&topic_granted(&tidied(text)), repeat),
+        &say_paced_with(&topic_granted(&notes_granted(&tidied(text))), repeat),
         asked,
         limits,
     )
@@ -3277,6 +3277,109 @@ fn entries_of(line: &str, key: &str) -> Vec<(usize, usize)> {
         }
     }
     spans
+}
+
+/// A made skill's `skill.toml` with a notes grant written under another
+/// name taken as the one grant there is, `notes`, with
+/// [`NOTES_ENVIRONMENT`] on (#7245, lamp-c0a4, 18 Nov 01:00: OpenClaw's
+/// "fruit notes" skill asked for `notes-write`, refused as a grant the lamp
+/// doesn't have, and no repair was left in time). Only a name of notes
+/// itself is taken (`note`, or `notes` or `note` then `-` or `_` and a
+/// word, as `notes-write`, `notes_read`): it gives the skill nothing more
+/// than the notes it asked for, which the say-back says. Each such grant is
+/// written once as `notes`, in the text itself, so what is checked, said
+/// and packed is one text; a skill written otherwise, or one that then
+/// doesn't read as the same skill with `notes` for those grants, is given
+/// back as it came, for the check to say why. Off, nothing changes.
+pub fn notes_granted(text: &str) -> String {
+    if !notes_on() {
+        return text.to_owned();
+    }
+    fn of_notes(grant: &str) -> bool {
+        grant != "notes"
+            && (grant == "note"
+                || ["notes", "note"].iter().any(|stem| {
+                    grant.strip_prefix(stem).is_some_and(|rest| {
+                        rest.len() > 1
+                            && (rest.starts_with('-') || rest.starts_with('_'))
+                            && rest[1..].chars().all(|c| c.is_ascii_alphabetic())
+                    })
+                }))
+    }
+    let Ok(table) = toml::from_str::<toml::Table>(text) else {
+        return text.to_owned();
+    };
+    let Some(toml::Value::Array(grants)) = table.get("grants") else {
+        return text.to_owned();
+    };
+    let Some(names) = grants
+        .iter()
+        .map(toml::Value::as_str)
+        .collect::<Option<Vec<&str>>>()
+    else {
+        return text.to_owned();
+    };
+    if !names.iter().any(|grant| of_notes(grant)) {
+        return text.to_owned();
+    }
+    let mut expected: Vec<&str> = Vec::new();
+    for grant in &names {
+        let grant = if of_notes(grant) { "notes" } else { grant };
+        if !expected.contains(&grant) {
+            expected.push(grant);
+        }
+    }
+    // The one line that starts the top-level `grants`, written on one line.
+    let lines: Vec<&str> = text.lines().collect();
+    let at: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| {
+            line.trim_start()
+                .strip_prefix("grants")
+                .is_some_and(|rest| rest.trim_start().starts_with('='))
+        })
+        .map(|(at, _)| at)
+        .collect();
+    let [at] = at[..] else {
+        return text.to_owned();
+    };
+    if !lines[at].trim_end().ends_with(']') {
+        return text.to_owned();
+    }
+    let quoted: Vec<String> = expected
+        .iter()
+        .map(|grant| Value::from(*grant).to_string())
+        .collect();
+    let mut written: Vec<String> = lines.iter().map(|line| (*line).to_owned()).collect();
+    written[at] = format!("grants = [{}]", quoted.join(", "));
+    let mut tidied = written.join("\n");
+    if text.ends_with('\n') {
+        tidied.push('\n');
+    }
+    let mut same = table.clone();
+    same.insert(
+        "grants".into(),
+        toml::Value::Array(
+            expected
+                .iter()
+                .map(|grant| toml::Value::String((*grant).to_owned()))
+                .collect(),
+        ),
+    );
+    if toml::from_str::<toml::Table>(&tidied).ok() != Some(same) {
+        return text.to_owned();
+    }
+    let asked: Vec<&str> = names.into_iter().filter(|grant| of_notes(grant)).collect();
+    eprintln!(
+        "lamp-voice: a made skill tidied: its grant {} taken as notes",
+        asked
+            .iter()
+            .map(|grant| named(grant))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    tidied
 }
 
 /// A made skill's `skill.toml` with the topics its own parts read in its
@@ -10581,6 +10684,41 @@ mod tests {
                 .any(|word| word == "file" || word == "files"),
             "{said}"
         );
+    }
+
+    // #7245: c0a4, 18 Nov 01:00, OpenClaw's notes skill asked for
+    // `notes-write`, refused as a grant the lamp doesn't have; with
+    // LAMP_MADE_NOTES on, a notes grant under another name is `notes`.
+    #[test]
+    fn a_notes_grant_under_another_name_is_taken_as_notes() {
+        let asked = "name = \"fruit-notes\"\ngrants = [\"speak\", \"notes-write\", \"notes_read\"]\n\
+                     [[do]]\ntask = { task = \"keep fruit facts\", run = \"scripts/main.py\" }\n";
+        set_notes_here(Some(false));
+        assert_eq!(notes_granted(asked), asked);
+        set_notes_here(Some(true));
+        let tidy = notes_granted(asked);
+        assert!(tidy.contains("grants = [\"speak\", \"notes\"]\n"), "{tidy}");
+        assert!(
+            !tidy.contains("notes-write") && !tidy.contains("notes_read"),
+            "{tidy}"
+        );
+        assert!(tidy.contains("[[do]]\ntask = "), "{tidy}");
+        // Through the chain each made skill takes.
+        assert!(paced_for(asked, &[], false, None).contains("\"notes\""));
+        // Only a name of notes itself: no other grant is taken or added.
+        for kept in [
+            "grants = [\"notes\"]\n",
+            "grants = [\"notebook\"]\n",
+            "grants = [\"notes-\"]\n",
+            "grants = [\"camera\", \"gmail-read\"]\n",
+            "grants = [\"notes-write-2\"]\n",
+        ] {
+            assert_eq!(notes_granted(kept), kept);
+        }
+        // Grants over several lines are given back as they came.
+        let spread = "grants = [\n  \"notes-write\",\n]\n";
+        assert_eq!(notes_granted(spread), spread);
+        set_notes_here(None);
     }
 
     // #7245: c0a4, 17 Nov, a say-only skill claimed a file it never wrote.
