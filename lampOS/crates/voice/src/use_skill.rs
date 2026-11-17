@@ -65,7 +65,38 @@ pub fn offered(skills: &[Tool]) -> &[Tool] {
 /// skill.
 pub fn function(skills: &[Tool]) -> Option<Tool> {
     let offered = offered(skills);
-    (!offered.is_empty()).then(|| built(offered))
+    (!offered.is_empty()).then(|| {
+        let mut tool = built(offered);
+        if said_among(offered) {
+            tool.description.push_str(SAID_CALLED);
+        }
+        tool
+    })
+}
+
+/// Told after `use_skill`'s description and after the skills' lines
+/// ([`SAID_TOLD`]) when a skill made to start on what the person tells the
+/// lamp is among them (`crate::made_skill::Said`, #6526), with
+/// `LAMP_MADE_SKILL_SAID` on: their telling is the ask, so the call is
+/// made on a plain statement too. On lamp-9adf (17 Nov, #7448's row) "Lamp,
+/// I'm busy." and "Lamp, I am in a meeting now." got no call 4 times in 4,
+/// answered in words ("I'll keep quiet and let you work.", once "turning
+/// red now"): the model read a statement as no ask. Off, or with no such
+/// skill, nothing is added: the function and the lines are as before, byte
+/// for byte.
+pub const SAID_CALLED: &str = " A skill whose line says \"said to you\" is called when what someone tells you is what its line says, even a plain statement with nothing asked.";
+
+/// What the skills' lines end with when a said start is among them
+/// ([`SAID_CALLED`]).
+pub const SAID_TOLD: &str = "A line that says \"said to you\" is a skill the person made to act when they tell you something: when what they tell you is what that line says, even a plain statement of how they are or what they are doing, with nothing asked, call use_skill for it before you answer; that is how they asked for it. Only that call does what its line says: never answer it in words alone, and never say it is done without the call.\n";
+
+/// Whether a said start ([`crate::made_skill::is_said`]) is among `skills`,
+/// with its switch on.
+fn said_among(skills: &[Tool]) -> bool {
+    crate::made_skill::said_on()
+        && skills
+            .iter()
+            .any(|skill| crate::made_skill::is_said(&skill.description))
 }
 
 fn built(skills: &[Tool]) -> Tool {
@@ -211,14 +242,17 @@ fn lines(
     if skills.is_empty() {
         return (String::new(), cut);
     }
+    // A said start's rule ([`SAID_TOLD`]) closes the lines, in their room.
+    let said = if said_among(skills) { SAID_TOLD } else { "" };
     // A skill's `when` line is its whole line and its short one.
     let when = |skill: &Tool| whens.get(&skill.name).map(|when| when_line(skill, when));
     let whole: Vec<String> = skills
         .iter()
         .map(|skill| format!("- {}\n", when(skill).unwrap_or_else(|| line(skill))))
         .collect();
-    if HEAD.len() + whole.iter().map(String::len).sum::<usize>() <= SECTION_MOST_BYTES {
-        return (HEAD.to_owned() + &whole.concat(), cut);
+    if HEAD.len() + whole.iter().map(String::len).sum::<usize>() + said.len() <= SECTION_MOST_BYTES
+    {
+        return (HEAD.to_owned() + &whole.concat() + said, cut);
     }
     let short: Vec<String> = skills
         .iter()
@@ -232,7 +266,7 @@ fn lines(
     // first, whole while it fits; then the others', short while it fits;
     // then, in order, the others made whole again while there is room.
     let mut given: Vec<Option<&String>> = vec![None; skills.len()];
-    let mut used = HEAD.len();
+    let mut used = HEAD.len() + said.len();
     let is_core = |index: usize| core.contains(&skills[index].name);
     for core_first in [true, false] {
         for index in (0..skills.len()).filter(|index| is_core(*index) == core_first) {
@@ -273,6 +307,7 @@ fn lines(
             cut.named_alone.push(skill.name.clone());
         }
     }
+    told.push_str(said);
     (told, cut)
 }
 
@@ -974,5 +1009,75 @@ mod tests {
             word["error"],
             "dance's choice is one of calm, upbeat, jazz."
         );
+    }
+
+    /// A said start's description, as `made_skill::Said::description`
+    /// writes it for "when I tell you I'm busy, turn red".
+    const BUSY_SAID: &str = "Use it when they say they're busy or in a meeting, said to you, never talk in the room you only overhear; their telling you so is the ask, even a plain statement with nothing asked: it turns the light red.";
+
+    /// `use_skill`'s description as it was before #7448's fix, and as it
+    /// stays with `LAMP_MADE_SKILL_SAID` off or no said start offered.
+    const DESCRIBED: &str = "Use one of your skills, listed under \"Your skills\" in your instructions, each with when to use it. Call this when what someone asks is what a skill's line says: give the skill's name, and its choice and its yes-or-no only when its line names them. The call runs the skill: then do what its answer tells you, and don't call it again in this turn for the same ask unless its answer tells you to; a new ask in a later line is a call of its own.";
+
+    /// #7448 (lamp-9adf, 17 Nov: "Lamp, I'm busy." answered "I'll keep
+    /// quiet and let you work." with no call, 4 times in 4): with
+    /// `LAMP_MADE_SKILL_SAID` on and a said start offered, the function and
+    /// the skills' lines tell the model a plain statement that is what the
+    /// line says is its call, and that only the call does it. Off, or with
+    /// no said start, both are as before, byte for byte.
+    #[test]
+    fn a_said_start_is_told_as_called_on_a_plain_statement_only_with_its_switch() {
+        crate::skill_about::set_on_here(Some(false));
+        let said = skill("written_busy", BUSY_SAID, None);
+        let dance = skill("dance", "Dance a little.", None);
+        let both = [said.clone(), dance.clone()];
+        assert!(crate::made_skill::is_said(BUSY_SAID));
+        let before = format!("{HEAD}- written_busy: {BUSY_SAID}\n- dance: Dance a little.\n");
+        crate::made_skill::set_said_here(Some(false));
+        assert_eq!(section(&both, &BTreeSet::new()), before);
+        assert_eq!(function(&both).unwrap().description, DESCRIBED);
+        crate::made_skill::set_said_here(Some(true));
+        // On with no said start: as before.
+        assert_eq!(
+            section(std::slice::from_ref(&dance), &BTreeSet::new()),
+            format!("{HEAD}- dance: Dance a little.\n")
+        );
+        assert_eq!(
+            function(std::slice::from_ref(&dance)).unwrap().description,
+            DESCRIBED
+        );
+        // On with one: the lines end with the rule, the function says it.
+        assert_eq!(
+            section(&both, &BTreeSet::new()),
+            format!(
+                "{before}A line that says \"said to you\" is a skill the person made to act when they tell you something: when what they tell you is what that line says, even a plain statement of how they are or what they are doing, with nothing asked, call use_skill for it before you answer; that is how they asked for it. Only that call does what its line says: never answer it in words alone, and never say it is done without the call.\n"
+            )
+        );
+        assert_eq!(
+            function(&both).unwrap().description,
+            format!(
+                "{DESCRIBED} A skill whose line says \"said to you\" is called when what someone tells you is what its line says, even a plain statement with nothing asked."
+            )
+        );
+        // Past the bound the rule is kept, within it, and the said start's
+        // line stays whole: its first sentence is all of it.
+        let mut many = vec![said];
+        many.extend((0..60).map(|index| {
+            skill(
+                &format!("skill_{index}"),
+                &format!("{}. More.", "Does a thing. ".repeat(4).trim_end()),
+                None,
+            )
+        }));
+        let told = section(&many, &BTreeSet::new());
+        assert!(told.len() <= SECTION_MOST_BYTES, "{}", told.len());
+        assert!(told.ends_with(SAID_TOLD), "{told}");
+        assert!(
+            told.contains(&format!("- written_busy: {BUSY_SAID}\n")),
+            "{told}"
+        );
+        assert!(!cut(&many, &BTreeSet::new()).is_empty());
+        crate::made_skill::set_said_here(None);
+        crate::skill_about::set_on_here(None);
     }
 }

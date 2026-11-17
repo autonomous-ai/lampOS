@@ -836,16 +836,19 @@ fn a_said_start_passes_the_real_checker_and_loads_as_a_function_with_its_when_li
     assert!(skill.permissions.topics.is_empty());
     let tools = lamp_skills::tools_file(std::slice::from_ref(&skill));
     assert_eq!(tools["tools"][0]["name"], "written_busy", "{tools}");
+    let description = tools["tools"][0]["description"]
+        .as_str()
+        .unwrap()
+        .trim_start_matches('"');
     assert!(
-        tools["tools"][0]["description"]
-            .as_str()
-            .unwrap()
-            .trim_start_matches('"')
-            .starts_with(
-                "Use it when they say they're busy or in a meeting, a request said to you"
-            ),
+        description.starts_with(
+            "Use it when they say they're busy or in a meeting, said to you, never talk in the \
+             room you only overhear; their telling you so is the ask"
+        ),
         "{tools}"
     );
+    // What the voice's `use_skill` tells as a said start (#7448).
+    assert!(lamp_voice::made_skill::is_said(description), "{tools}");
     lamp_voice::made_skill::set_said_here(None);
 }
 

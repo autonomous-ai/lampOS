@@ -3004,14 +3004,43 @@ chối khi cài.
    rồi `When they use it: WHEN`); và màu là bước thứ hai với `keep = true`,
    ánh sáng của người dùng, như của Light scenes: lamp-skills đặt nó khi lời
    gọi chạy và không bao giờ trả lại. `SKILL.md` giữ tên của mô hình, được
-   đánh dấu `made: here` cùng người tạo, với mô tả "Use it WHEN, a request
-   said to you, never talk in the room: it turns the light COLOUR.", dòng
-   `when` đứng đầu, nên dòng ngắn của `use_skill` vẫn giữ nó. Tên mà một kỹ
+   đánh dấu `made: here` cùng người tạo, với mô tả "Use it WHEN, said to
+   you, never talk in the room you only overhear; their telling you so is
+   the ask, even a plain statement with nothing asked: it turns the light
+   COLOUR." (`made_skill::SAID_TO_YOU` sau dòng `when`), dòng `when` đứng
+   đầu, nên dòng ngắn của `use_skill` vẫn giữ nó. Tên mà một kỹ
    năng trên đèn đã có thì lấy tên trống đầu tiên, như kỹ năng viết.
 3. **Đưa cho giọng nói** như một lựa chọn của `use_skill` (`LAMP_USE_SKILL=on`)
    qua dòng đó: mô hình giọng nói chọn nó theo một yêu cầu nó đã nghe sau
    tên đèn, cũng như nó chọn các kỹ năng của sản phẩm. Không nghe thêm gì,
    không giữ bản ghi lời nói, không so khớp cụm từ trên âm thanh trong phòng.
+   Lời kể chính là yêu cầu: trên lamp-9adf (17/11, lượt thử của #7448)
+   "Lamp, I'm busy." và "Lamp, I am in a meeting now." không có lời gọi nào
+   cả 4 lần với mô tả đầu tiên ("a request said to you, never talk in the
+   room"), chỉ được trả lời bằng lời ("I'll keep quiet and let you work.",
+   một lần "turning red now" mà không gọi gì): mô hình hiểu một câu kể là
+   không có yêu cầu. Vì vậy khi có một kỹ năng bắt đầu khi được nói trong
+   các kỹ năng được đưa ra (`made_skill::is_said`, `SAID_TO_YOU` trong mô
+   tả của nó) và công tắc bật, mô tả của `use_skill` kết thúc bằng "A skill
+   whose line says 'said to you' is called when what someone tells you is
+   what its line says, even a plain statement with nothing asked."
+   (`use_skill::SAID_CALLED`), và các dòng kỹ năng kết thúc, trong 4.096
+   byte của chúng, bằng "A line that says 'said to you' is a skill the
+   person made to act when they tell you something: when what they tell
+   you is what that line says, even a plain statement of how they are or
+   what they are doing, with nothing asked, call use_skill for it before
+   you answer; that is how they asked for it. Only that call does what its
+   line says: never answer it in words alone, and never say it is done
+   without the call." (`use_skill::SAID_TOLD`), trên cả hai tuyến. Mô hình
+   tự đánh giá sự khớp; không từ nào trong lời người dùng được so khớp
+   bằng mã. Khi tắt, hoặc không có kỹ năng như vậy, hàm và các dòng giữ
+   nguyên từng byte như trước. Một kỹ năng loại này tạo trước thay đổi này
+   giữ mô tả đầu tiên và không được nói như vậy: hãy tạo lại. Bước kiểm tra
+   lời nhận đã làm (`LAMP_ACTION_CLAIM_CHECKED`,
+   [second-voice.md](../second-voice.md)) không chặn những lời như vậy
+   ("turning red now" sau lời mở đầu, "I'll keep quiet"): các mẫu của nó
+   là của ánh sáng, âm lượng và Schedule, và mở rộng chúng không nằm trong
+   thay đổi này.
 4. **Nói lại đúng điều nó làm** (`Said::said_back`): "When you tell me
    you're busy, I'll turn red." (thêm " at level N" trước dấu chấm khi có
    yêu cầu mức sáng), rồi nó được bật ngay như một kỹ năng tự tạo, với
@@ -3037,6 +3066,7 @@ Kiểm thử: `made_skill::tests::with_its_switch_off_a_said_start_is_refused_as
 `a_said_start_is_offered_through_use_skill_with_its_when_line` và
 `nothing_starts_a_said_start_without_a_request_to_the_lamp`;
 `make_skill_local::tests::a_said_start_is_told_to_the_maker_only_with_its_switch`;
+`use_skill::tests::a_said_start_is_told_as_called_on_a_plain_statement_only_with_its_switch`;
 và `made::a_said_start_passes_the_real_checker_and_loads_as_a_function_with_its_when_line`
 của lamp-skills.
 
