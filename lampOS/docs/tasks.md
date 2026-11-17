@@ -2905,12 +2905,16 @@ for each run, and is answered once the run ends
   of whitespace or control characters one space, at most 3,000 bytes
   (`told_answer`, `MOST_TOLD_BYTES`). Its words, and only such a run's,
   a keyed run's too, end with its runner's `Runner::tell_words`
-  (`TELL_LINE` for Harness's), so the agent ends with a few plain
-  sentences for the owner. A run in a fresh home through the make's
+  (`TELL_LINE` for Harness's), so the agent ends with only a short spoken
+  answer, one to three plain sentences, and with a lone dash (`-`) when
+  the skill already said it aloud through the lamp, which lamp-skills
+  says nothing of. A run in a fresh home through the make's
   runner (`MakeHermes`: an uploaded agent skill's `scripts/SKILL.md` run,
   one given keys, or a `net` one's without the one run path), whose chat
   answer goes nowhere, is asked instead to write what to tell to its own
-  folder's `answer.md` (`tell_file_line`, the folder's full path), and the
+  folder's `answer.md` (`tell_file_line`, the folder's full path: a short
+  spoken answer, one to three plain sentences, or the file left empty when
+  the skill already said it aloud, which tells nothing), and the
   runner keeps it once the run ended well (`skill_make::keep_told_answer`,
   read as a make's answer is: a regular file, never through a link, not
   empty, at most 20 KiB; `its agent's answer: N bytes kept` or `none in
@@ -2918,9 +2922,13 @@ for each run, and is answered once the run ends
   never tells, nor a run Harness's runner starts with no Harness. lamp-skills
   says them to the owner as exact words, never a turn for the model, so
   text from the open web is never an instruction (docs/skills.md, "A
-  linked service as a task for the lamp's agent"). Nothing tracks whether
-  the run's own script already spoke through lamp-control's `say`, so such
-  a run's answer is said too. On lamp-9adf, 17 Nov (build 13929,
+  linked service as a task for the lamp's agent"), at most about 400
+  characters of it (`MOST_TOLD_CHARS`, the first builder on #7591), cut at
+  the last sentence end inside, then "There's more; ask me if you want
+  it." Nothing tracks whether the run's own script already spoke through
+  lamp-control's `say`; the agent is asked to leave its answer empty (a
+  dash, or an empty `answer.md`) when it did (Heron's P3 on #7591). On
+  lamp-9adf, 17 Nov (build 13929,
   `LAMP_TASK_NET=on`), an uploaded `btc-price` granted `speak` and `net`
   reached api.coinbase.com, kept its agent's 220-byte answer, and said
   nothing: `nothing: not a run that tells`. On lamp-9adf, 15 Nov (build 13135), a voice-made

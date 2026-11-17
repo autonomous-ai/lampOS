@@ -1983,7 +1983,13 @@ lượt đọc duy nhất của
 hình, nên nội dung thư không bao giờ là chỉ dẫn), cổng được xét lại trước
 mỗi dòng, có người đến thì dừng với "I'll tell you the rest later." Các câu
 là của `task::told`: bỏ ký hiệu markdown, mỗi câu tối đa 900 byte của dịch
-vụ nói, tối đa 11 câu. Skill không cần `speak`: lời đồng ý của chủ cho quyền
+vụ nói, tất cả tối đa khoảng 400 ký tự (`task::MOST_TOLD_CHARS`, người xây
+dựng đầu tiên trên #7591: một người trả lời bằng một hai câu) và 10 câu, cắt
+ở dấu kết câu cuối cùng bên trong (ở ranh giới từ khi riêng câu đầu đã dài
+hơn), rồi "There's more; ask me if you want it." (`task::MORE_LINE`). Agent
+được bảo trả lời nói ngắn, một đến ba câu, và để trống (một dấu gạch ngang,
+hoặc `answer.md` trống) khi skill đã tự nói điều đó, thì không nói gì (P3
+của Heron trên #7591). Skill không cần `speak`: lời đồng ý của chủ cho quyền
 đọc đã bao gồm việc này. Nhật ký chỉ ghi số câu đã nói (`do.task: what its
 agent found: told N`), và trước đó câu trả lời của lamp-tasks mang theo bao
 nhiêu câu trả lời của agent, chỉ độ dài (`do.task: lamp-tasks' answer

@@ -1120,12 +1120,25 @@ pub fn refusal_said(answer: &str) -> Option<&'static str> {
 /// read's lines, its count and [`crate::service_read::MOST_ITEMS`] items.
 pub const MOST_TOLD_LINES: usize = 11;
 
+/// The most characters of an agent's answer said ([`told`], the first
+/// builder on #7591): a person answers in a sentence or two, and 3,000
+/// bytes aloud is about two minutes of the lamp reading.
+pub const MOST_TOLD_CHARS: usize = 400;
+
+/// Said after an agent's answer cut at [`MOST_TOLD_CHARS`] or
+/// [`MOST_TOLD_LINES`].
+pub const MORE_LINE: &str = "There's more; ask me if you want it.";
+
 /// The sentences to say of lamp-tasks' answer to a hand-over (`answer`),
 /// when the run ended well and its agent's answer is in it
 /// (`lamp_tasks::skill_task::told_answer`): markdown's marks left out, one
 /// sentence a line, a sentence longer than the say service takes
-/// (`lamp_voice::say::MOST_WORDS_BYTES`) cut at its words, at most
-/// [`MOST_TOLD_LINES`]. None for any other answer, or one with no words.
+/// (`lamp_voice::say::MOST_WORDS_BYTES`) cut at its words. A longer answer
+/// is cut at the last sentence end within [`MOST_TOLD_CHARS`] (at its
+/// words, when its first sentence alone is longer) and fewer than
+/// [`MOST_TOLD_LINES`] sentences, and [`MORE_LINE`] said after it. None for
+/// any other answer, or one with no words (a lone dash: one the skill
+/// already said aloud).
 pub fn told(answer: &str) -> Option<Vec<String>> {
     let answer: serde_json::Value = serde_json::from_str(answer.trim()).ok()?;
     if answer.get("ok").and_then(serde_json::Value::as_bool) != Some(true) {
@@ -1172,8 +1185,57 @@ pub fn told(answer: &str) -> Option<Vec<String>> {
     if !line.is_empty() {
         lines.push(line);
     }
-    lines.truncate(MOST_TOLD_LINES);
-    (!lines.is_empty()).then_some(lines)
+    if lines.is_empty() {
+        return None;
+    }
+    Some(told_bounded(lines))
+}
+
+/// `lines` as [`told`] says them: whole while within [`MOST_TOLD_CHARS`]
+/// and [`MOST_TOLD_LINES`]; else cut at the last sentence end inside, with
+/// [`MORE_LINE`] after.
+fn told_bounded(lines: Vec<String>) -> Vec<String> {
+    let count = |line: &String| line.chars().count();
+    let all: usize = lines.iter().map(|line| count(line) + 1).sum::<usize>() - 1;
+    if all <= MOST_TOLD_CHARS && lines.len() <= MOST_TOLD_LINES {
+        return lines;
+    }
+    let mut kept: Vec<String> = Vec::new();
+    let mut used = 0;
+    for line in &lines {
+        let more = count(line) + usize::from(!kept.is_empty());
+        if used + more > MOST_TOLD_CHARS || kept.len() + 1 >= MOST_TOLD_LINES {
+            break;
+        }
+        used += more;
+        kept.push(line.clone());
+    }
+    // Cut at a sentence's end: a line its words were cut in goes.
+    while kept
+        .last()
+        .is_some_and(|line| !line.ends_with(['.', '!', '?']))
+    {
+        kept.pop();
+    }
+    if kept.is_empty() {
+        // Its first sentence alone is longer: its words that fit.
+        let mut first = String::new();
+        for word in lines[0].split(' ') {
+            if count(&first) + 1 + word.chars().count() > MOST_TOLD_CHARS {
+                break;
+            }
+            if !first.is_empty() {
+                first.push(' ');
+            }
+            first.push_str(word);
+        }
+        if first.is_empty() {
+            first = lines[0].chars().take(MOST_TOLD_CHARS).collect();
+        }
+        kept.push(first);
+    }
+    kept.push(MORE_LINE.to_owned());
+    kept
 }
 
 /// What lamp-tasks says in its refusal of a run when the lamp is still
@@ -1325,14 +1387,51 @@ mod tests {
             "word ".repeat(400)
         );
         let lines = told(&long).unwrap();
-        assert!(lines.len() > 1, "{lines:?}");
-        assert!(
-            lines
-                .iter()
-                .all(|line| line.len() <= lamp_voice::say::MOST_WORDS_BYTES)
-        );
+        assert_eq!(lines.len(), 2, "{lines:?}");
+        assert!(lines[0].chars().count() <= MOST_TOLD_CHARS);
+        assert_eq!(lines[1], MORE_LINE);
         let many = format!(r#"{{"ok":true,"id":0,"answer":"{}"}}"#, "One. ".repeat(30));
-        assert_eq!(told(&many).unwrap().len(), MOST_TOLD_LINES);
+        let lines = told(&many).unwrap();
+        assert_eq!(lines.len(), MOST_TOLD_LINES);
+        assert_eq!(lines.last().unwrap(), MORE_LINE);
+    }
+
+    /// The first builder on #7591: what is said of an agent's answer is
+    /// about 400 characters at most. A 3,000-byte answer (`answer.md`'s, as
+    /// lamp-tasks carries at most) is said as its sentences within
+    /// [`MOST_TOLD_CHARS`], ending at a sentence, then [`MORE_LINE`]; a
+    /// short one is said whole with no more line; an empty one, or a lone
+    /// dash (one the skill already said aloud), says nothing.
+    #[test]
+    fn a_long_answer_is_said_as_400_characters_and_theres_more() {
+        let sentence = "Bitcoin traded at 91,204 dollars on Coinbase a minute ago. ";
+        let mut text = String::new();
+        while text.len() + sentence.len() <= 3_000 {
+            text.push_str(sentence);
+        }
+        assert!(text.len() > 2_900);
+        let answer = serde_json::json!({"ok": true, "id": 3, "answer": text}).to_string();
+        let lines = told(&answer).unwrap();
+        let (more, said) = lines.split_last().unwrap();
+        assert_eq!(more, MORE_LINE);
+        let said = said.join(" ");
+        assert!(said.chars().count() <= MOST_TOLD_CHARS, "{said}");
+        assert!(said.chars().count() > MOST_TOLD_CHARS - sentence.len());
+        assert!(said.ends_with('.'), "{said}");
+        let short =
+            r#"{"ok":true,"id":3,"answer":"Bitcoin is at 91,204 dollars. It rose 2% today."}"#;
+        assert_eq!(
+            told(short).unwrap(),
+            ["Bitcoin is at 91,204 dollars.", "It rose 2% today."]
+        );
+        for nothing in [
+            r#"{"ok":true,"id":3,"answer":""}"#,
+            r#"{"ok":true,"id":3,"answer":"  "}"#,
+            r#"{"ok":true,"id":3,"answer":"-"}"#,
+            r#"{"ok":true,"id":3}"#,
+        ] {
+            assert_eq!(told(nothing), None, "{nothing}");
+        }
     }
 
     fn folder(dir: &Path) -> std::path::PathBuf {

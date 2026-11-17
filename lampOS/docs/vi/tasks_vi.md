@@ -317,13 +317,17 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   trắng hoặc ký tự điều khiển thành một dấu cách, tối đa 3.000 byte
   (`told_answer`, `MOST_TOLD_BYTES`). Lời giao việc của lần chạy đó, và
   chỉ của nó, cả lần chạy được cấp khóa, kết thúc bằng `Runner::tell_words`
-  của runner (`TELL_LINE` với runner của Harness), để agent kết thúc bằng
-  vài câu đơn giản cho chủ. Một lần chạy trong home mới qua runner của việc
+  của runner (`TELL_LINE` với runner của Harness), để agent kết thúc chỉ
+  bằng một câu trả lời nói ngắn, một đến ba câu đơn giản, và bằng một dấu
+  gạch ngang (`-`) khi skill đã tự nói điều đó qua đèn, mà lamp-skills
+  không nói gì. Một lần chạy trong home mới qua runner của việc
   làm skill (`MakeHermes`: lần chạy `scripts/SKILL.md` của một agent skill
   tải lên, một lần chạy được cấp khóa, hoặc một lần chạy `net` không có
   đường chạy duy nhất), vốn không giữ câu trả lời chat, thay vào đó được bảo
   ghi điều cần nói vào `answer.md` trong thư mục riêng của nó
-  (`tell_file_line`, đường dẫn đầy đủ của thư mục), và runner giữ nó khi lần
+  (`tell_file_line`, đường dẫn đầy đủ của thư mục: một câu trả lời nói
+  ngắn, một đến ba câu đơn giản, hoặc để file trống khi skill đã tự nói,
+  thì không nói gì), và runner giữ nó khi lần
   chạy kết thúc tốt (`skill_make::keep_told_answer`, đọc như câu trả lời
   của việc làm skill: một file thường, không bao giờ qua link, không rỗng,
   tối đa 20 KiB; `its agent's answer: N bytes kept` hoặc `none in its
@@ -331,9 +335,13 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   bao giờ nói, lần chạy runner của Harness khởi động không có Harness cũng
   vậy. lamp-skills nói chúng cho chủ nguyên văn, không bao giờ thành một lượt
   của model, nên chữ từ web mở không bao giờ là chỉ dẫn (docs/vi/skills_vi.md,
-  "Dịch vụ đã liên kết thành task cho agent của đèn"). Không có gì theo dõi
-  việc script của lần chạy đã tự nói qua `say` của lamp-control hay chưa,
-  nên câu trả lời của lần chạy đó cũng được nói. Trên lamp-9adf, 17/11
+  "Dịch vụ đã liên kết thành task cho agent của đèn"), tối đa khoảng 400 ký
+  tự (`MOST_TOLD_CHARS`, người xây dựng đầu tiên trên #7591), cắt ở dấu kết
+  câu cuối cùng bên trong, rồi "There's more; ask me if you want it."
+  Không có gì theo dõi việc script của lần chạy đã tự nói qua `say` của
+  lamp-control hay chưa; agent được bảo để trống câu trả lời (một dấu gạch
+  ngang, hoặc `answer.md` trống) khi đã nói (P3 của Heron trên #7591).
+  Trên lamp-9adf, 17/11
   (build 13929, `LAMP_TASK_NET=on`), một `btc-price` tải lên được cấp
   `speak` và `net` đã tới api.coinbase.com, giữ câu trả lời 220 byte của
   agent, mà không nói gì: `nothing: not a run that tells`. Trên lamp-9adf, 15/11 (build 13135), một
