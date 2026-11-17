@@ -50,9 +50,12 @@
 //!   person's `programs-reply` setting on, off by default. A reply refused
 //!   `REPLY_OFF` sends that task, and every later one until lamp-tasks
 //!   starts again, the per-task way, as with the switch off: its own
-//!   `harness new` with its words as `--message`, which needs no reply
+//!   `harness new` with its words as `--task`, which needs no reply
 //!   ([`OneSession::takes_reply`]), journaled once. Any other refusal is
-//!   [`Sent::NotTyped`], never a second session.
+//!   [`Sent::NotTyped`], never a second session. The pane is then closed
+//!   and none opened again. Signed out (no person, so no reply), the
+//!   same, read again at each look and not kept: no pane is opened and
+//!   each task goes the per-task way until a sign-in.
 //! - **Cancel or deadline** ends the turn: Harness has no interrupt verb,
 //!   so the pane is closed `--now` and opened again ([`OneSession::keep_open`]
 //!   or the next run), journaled. That cost is paid only then.
@@ -367,7 +370,7 @@ pub enum Sent {
     Uncertain(String),
     /// Harness takes no reply here (`reply_off`: the person's
     /// `programs-reply` setting off): nothing typed, so the task goes the
-    /// per-task way, its own `harness new` with its words as `--message`,
+    /// per-task way, its own `harness new` with its words as `--task`,
     /// as with the switch off ([`OneSession::takes_reply`]).
     NoReply,
 }
@@ -654,19 +657,31 @@ impl OneSession {
 
     /// Whether the pane may be typed into: false once Harness refused a
     /// reply with `REPLY_OFF` (the person's `programs-reply` setting off),
-    /// until lamp-tasks starts again. Then every task goes the per-task
-    /// way, as with the switch off.
+    /// until lamp-tasks starts again, and while the keep-open thread's
+    /// last look read the lamp signed out (no person, so no reply; read
+    /// again at each look, so a later sign-in opens the pane). Then every
+    /// task goes the per-task way, as with the switch off, and no pane is
+    /// opened.
     pub fn takes_reply(&self) -> bool {
-        !self.no_reply.load(Ordering::Acquire)
+        self.replies(&self.lock())
+    }
+
+    /// [`OneSession::takes_reply`] with the lock already held.
+    fn replies(&self, inner: &Inner) -> bool {
+        !self.no_reply.load(Ordering::Acquire) && !inner.signed_out
     }
 
     /// Harness refused a reply with `REPLY_OFF`: noted for the process's
-    /// life, journaled the first time only.
+    /// life, journaled the first time only. The pane, unused from now on,
+    /// is removed as at a sign-out ([`OneSession::drop_when_free`]: closed
+    /// `--now` at the keep-open thread's next look, nothing holding it),
+    /// and no other is opened ([`OneSession::open_if_due_while`]).
     fn no_reply_here(&self) {
         if !self.no_reply.swap(true, Ordering::AcqRel) {
             eprintln!(
                 "tasks: one session: Harness takes no reply here (reply_off); each task gets its own pane"
             );
+            self.drop_when_free("Harness takes no reply here (reply_off)");
         }
     }
 
@@ -999,11 +1014,12 @@ impl OneSession {
     /// to the lamp's machine and default engine as last looked at, or with
     /// none looked at yet. It waits in the store rather than going the
     /// per-run way, a second session.
-    /// Signed in or out alike: signed out, Harness still gives the lamp
-    /// its own machine once its daemon is up (#6407).
+    /// Never while Harness takes no reply here ([`OneSession::takes_reply`]:
+    /// `reply_off`, or signed out at the last look): then the per-task way.
     pub fn waits_for_place(&self, launch: &Launch) -> bool {
         let inner = self.lock();
-        if inner.pane.is_some() || inner.home.is_some() {
+        // Harness takes no reply here: the per-task way, never held.
+        if !self.replies(&inner) || inner.pane.is_some() || inner.home.is_some() {
             return false;
         }
         shares(launch.target.engine)
@@ -1161,7 +1177,10 @@ impl OneSession {
                 .pane
                 .as_ref()
                 .is_some_and(|pane| !pane.fresh_at(place));
-            if (inner.pane.is_some() && !stale)
+            // Harness takes no reply here (`reply_off`, or signed out): no
+            // pane opened.
+            if !self.replies(&inner)
+                || (inner.pane.is_some() && !stale)
                 || inner.holder.is_some()
                 || inner.next_open.is_some_and(|next| Instant::now() < next)
             {
@@ -1245,7 +1264,9 @@ impl OneSession {
             // both are known, is removed too.
             // ...or opened signed in and the lamp signed out now (a
             // sign-out while lamp-tasks was down). One opened signed out
-            // and still signed out (the ship lamp, #6407) is adopted.
+            // and still signed out (the ship lamp, #6407) is kept on disk:
+            // signed out no pane is opened or adopted (no reply), and it
+            // is adopted once a sign-in is read.
             self.kept_elsewhere(key)
                 || (signed_out && self.kept().is_some() && self.kept_signed_in())
         };
@@ -1279,7 +1300,8 @@ impl OneSession {
                 .pane
                 .as_ref()
                 .is_some_and(|pane| !pane.fresh_at(&pane.place));
-            if (inner.pane.is_some() && !rotation_due)
+            if !self.replies(&inner)
+                || (inner.pane.is_some() && !rotation_due)
                 || inner.holder.is_some()
                 || inner.next_open.is_some_and(|next| now < next)
             {

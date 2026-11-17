@@ -1704,7 +1704,8 @@ một byte (`crates/tasks/src/one_session.rs`).
   ra việc dành cho pane không bao giờ lùi về `new` riêng.
 - **Giữ lại khi chưa biết vị trí của đèn.** Việc nói có thể dành cho pane
   trong lúc vị trí của đèn chưa được biết (ngay sau khi khởi động, hoặc
-  khi daemon của Harness không chạy; đăng nhập hay đăng xuất đều vậy)
+  khi daemon của Harness không chạy; chỉ khi đăng nhập: khi đăng xuất việc
+  đi đường riêng, xem bên dưới)
   không đi đường riêng. Nó được giữ trong hàng đợi tới khi biết vị trí,
   tối đa 15 phút (`QUEUE_WAIT`), rồi thất bại `busy` mà không có
   `harness new` nào.
@@ -1762,9 +1763,20 @@ một byte (`crates/tasks/src/one_session.rs`).
   khởi động lại (`OneSession::takes_reply`): mọi việc sau đi đường riêng
   ngay, không thử reply và không chờ pane, và lần đầu được ghi journal
   `tasks: one session: Harness takes no reply here (reply_off); each task
-  gets its own pane`. Bản thân pane vẫn mở. Mọi lần từ chối reply khác
+  gets its own pane`. Pane, từ đó không còn dùng, được gỡ như khi đăng
+  xuất: khi không còn gì giữ nó, luồng `one-session` đóng nó `--now`, xoá
+  phiên OpenClaw và id đã giữ của nó (`dropped <id> (Harness takes no
+  reply here (reply_off))`), và không mở pane nào nữa cho tới khi
+  lamp-tasks khởi động lại. Mọi lần từ chối reply khác
   (`reply_failed`, pane bận, mất hoặc chưa sẵn sàng) vẫn như trước: không
-  có phiên thứ hai.
+  có phiên thứ hai. Lời giao đầu cho Devin (`Cli::first_message`) cũng cần
+  cài đặt này, như reply của một phiên.
+- **Đăng xuất: không có pane.** Khi đăng xuất không có người dùng, nên
+  Harness không nhận reply. Khi lần xem gần nhất của luồng `one-session`
+  (mỗi 2 s) đọc đèn là đăng xuất, không pane nào được mở hay nhận lại,
+  không việc nào chờ vị trí của đèn, và mọi việc đi đường riêng ngay,
+  không thử reply. Điều này được đọc lại ở mỗi lần xem và không được nhớ:
+  lần xem đầu tiên đọc thấy đăng nhập sẽ mở pane.
 - **Lượt của việc nói.** Store theo dõi pane như một phiên người dùng đã
   có (`Joined`) và không bao giờ đóng nó. Store chỉ đọc pane cho việc đó
   khi lời của việc đã được thấy là đã nhận. Không thấy nhận trong 120 s
@@ -1911,8 +1923,10 @@ Khi nào bị xoá:
   `signed_in`: đèn có đăng nhập hay không lúc pane được tạo (chỉ ghi lúc
   đó). Ở lần khởi động đọc đèn là đăng xuất, pane đã giữ được tạo khi đăng
   nhập bị xoá theo cùng cách; file không có trường này tính là đăng nhập.
-  Pane đã giữ được tạo khi đăng xuất thì được nhận lại khi đèn vẫn đăng
-  xuất (đèn xuất xưởng chạy đăng xuất, #6407).
+  Pane đã giữ được tạo khi đăng xuất thì được giữ khi đèn vẫn đăng xuất
+  (đèn xuất xưởng chạy đăng xuất, #6407), lúc đó không nhận lại cũng không
+  thay (khi đăng xuất không mở pane nào), và được nhận lại khi đọc thấy
+  đăng nhập.
 
 #### Pass của lần chạy kỹ năng giới hạn những gì trong một phiên
 
