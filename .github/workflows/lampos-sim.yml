@@ -217,17 +217,15 @@ jobs:
       # (`LAMP_PRIVACY_CONTROLS=no-slide`) and the software mute's record. It passes on `listening_ready` AND exit 0.
       # Run 4 reached `listening_ready` and then ended on a reference fault (F1: on a macOS runner the speaker's
       # 2 ms sleep came back after ~10 ms, so one block a pass could not keep its queue, #7443); a software queue is
-      # now written two blocks ahead and up to two a pass (#7434), and the start works. The step stays
-      # `continue-on-error` until F4 (the bus's clock id on a Mac, #6811 6933436245): off Linux the privacy gate
-      # judges the Controls state by the WALL clock, and on a slow runner it lost its 50 ms freshness
-      # ("privacy switch unreadable"), so the step is not yet a reliable blocker; it goes blocking again with F4.
+      # now written two blocks ahead and up to two a pass (#7434), and the start works. With F4 (#7486: the bus's
+      # clock id on a Mac is `kern.bootsessionuuid`, one read for the bus and Controls) the privacy gate judges the
+      # Controls state by CLOCK_MONOTONIC, not the wall clock a slow runner outran, so the step blocks.
       # If it fails it prints what the fault was (the journal's `reference_fault` row with every timestamp turned into an age before
       # the fault). Cleanup (F3): only the pids this step started; the sim's children (lamp-controls) outlive
       # `kill` by about a second and still write, so wait for the sim, poll up to 5 s for its sockets to go, and retry
       # the `rm -rf`; the step's exit is the voice's result, never the `rm`'s.
       - name: lamp-voice starts on a Mac with no host sound and the no-slide gate
         working-directory: lampOS
-        continue-on-error: true # until F4 (Mac clock id), #6811 6933436245
         run: |
           cargo build --locked -p lamp-voice -p lamp-controls
           # Under $HOME/.lampsim, as the whole-lamp step puts its folder: lamp-body refuses a lock folder under /tmp
