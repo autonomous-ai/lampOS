@@ -176,10 +176,27 @@ func (s *ClaudeCodeService) adoptOAuthToken(token string) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 	slog.Info("claude login: adopting subscription auth", "component", "claudecode-login", "token_captured", token != "")
+	// A session created under the gateway model fails under the new account
+	// ("issue with the selected model"); start fresh instead of resuming it.
+	s.sessionUUID.Store("")
+	dropBridgeSession(bridgeSessionFile)
 	if err := s.EnsureOnboarding(); err != nil {
 		return fmt.Errorf("apply subscription auth: %w", err)
 	}
 	return nil
+}
+
+// bridgeSessionFile is the bridge's persisted --resume id (CLAUDECODE_SESSION_FILE default).
+var bridgeSessionFile = claudecodeHome + "/session.json"
+
+// dropBridgeSession deletes the persisted session id so the restarted bridge
+// spawns claude without --resume.
+func dropBridgeSession(path string) {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		slog.Warn("claude login: remove bridge session failed", "component", "claudecode-login", "error", err)
+		return
+	}
+	slog.Info("claude login: bridge session reset for the new account", "component", "claudecode-login")
 }
 
 // loginScan is what scanLoginOutput extracted from the CLI stream.

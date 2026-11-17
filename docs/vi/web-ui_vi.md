@@ -310,6 +310,10 @@ sample, tức là thiết bị câm mà UI không báo lỗi gì. Bốn quy tắ
   khi xoá được đẩy live xuống HAL dưới dạng giá trị *đã resolve*
   (`GetTTSAPIKey()`), vì `/voice/tts/config` của HAL hiểu key rỗng là "giữ
   nguyên key hiện tại".
+- Đổi STT từ Deepgram về Autonomous sẽ gửi `clear_deepgram_api_key: true`, cùng
+  lý do PATCH ở trên. HAL chọn Deepgram mỗi khi `deepgram_api_key` có giá trị,
+  nên key còn sót lại làm thiết bị vẫn dùng Deepgram. Xoá key là đổi một field
+  HAL đọc lúc boot, nên HAL restart sang `AutonomousSTT`.
 
 Key đã gõ nhưng chưa lưu được cache theo từng provider **chỉ trong tab trình
 duyệt** (một `useRef` trong `TTSSection`), để đổi qua lại giữa các provider trước

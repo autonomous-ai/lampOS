@@ -1201,7 +1201,9 @@ Catalog bao phủ toàn bộ **21 intent local**, cùng `none` để chuyển ti
 - Âm thanh/media: `volume_up`, `volume_down`, `mute_speaker`, `unmute_speaker`,
   `music_stop`, `stop_talking`.
 - Camera/servo: `servo_track`, `servo_track_stop`.
-- Đồng hồ thiết bị: `what_time` (chỉ giờ địa phương hiện tại).
+- Đồng hồ thiết bị: `what_time` (chỉ giờ địa phương hiện tại). Câu trả lời theo
+  ngôn ngữ thiết bị (`i18n.TimeOfDay`, ví dụ tiếng Hàn "지금은 오후 3시 4분이에요."),
+  vì jev cũng chuyển câu hỏi không phải tiếng Anh tới rule này.
 
 Candidate phần cứng yêu cầu capability được khai báo rõ, kiểm tra trước suy luận
 và kiểm tra lại ngay trước thực thi. Thiếu hoặc chưa biết capability của body thì

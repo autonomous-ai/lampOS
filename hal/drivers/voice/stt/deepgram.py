@@ -6,7 +6,7 @@ import threading
 from typing import Any, Callable, Dict, List, Optional
 
 from hal import config as _hal_config
-from hal.presets import LANG_EN
+from hal.presets import LANG_EN, normalize_language
 from hal.drivers.voice.stt.provider import STTProvider, STTSession
 
 logger = logging.getLogger("hal.voice.stt")
@@ -23,6 +23,28 @@ DEFAULT_ENCODING = "linear16"
 
 # Keep mic audio out of Deepgram's Model Improvement Program (training); sent on every connect.
 MIP_OPT_OUT = "true"
+
+
+# Every non-English device language goes to Nova-3 (vi, ja, ko, ar, zh-CN, zh-TW are all supported);
+# flux-general-en is English-only.
+NON_ENGLISH_MODEL = "nova-3-general"
+
+
+def deepgram_options(stt_language: Optional[str], stt_model: Optional[str] = None) -> Dict[str, str]:
+    """Return DeepgramSTT model/language kwargs for the device's stt_language.
+
+    stt_model is honoured only when it names a Deepgram model (nova-*/flux-*), since the
+    same config key also feeds Autonomous STT.
+    """
+    lang = normalize_language(stt_language)
+    model = (stt_model or "").strip()
+    if not model.startswith(("nova", "flux")):
+        model = ""
+    if not lang or lang.lower() == LANG_EN or lang.lower().startswith(LANG_EN + "-"):
+        return {"model": model} if model else {}
+    if not model or model == DEFAULT_MODEL:
+        model = NON_ENGLISH_MODEL
+    return {"model": model, "language": lang}
 
 
 def _is_flux(model: str) -> bool:

@@ -457,3 +457,28 @@ func TestEnglishSTTSelectionMigratesModelWithoutResettingConversation(t *testing
 		t.Fatalf("saving Nova English again must not restart: %+v", ch)
 	}
 }
+
+// Switching STT back to Autonomous deletes the Deepgram key and restarts HAL into the new provider.
+func TestApplyUpdateClearDeepgramAPIKey(t *testing.T) {
+	c := baseConfig()
+	c.DeepgramAPIKey = "key-dg"
+	ch := applyUpdate(c, domain.UpdateConfigRequest{ClearDeepgramAPIKey: true}, "")
+
+	if c.DeepgramAPIKey != "" {
+		t.Fatalf("clear flag did not empty DeepgramAPIKey: %q", c.DeepgramAPIKey)
+	}
+	if !ch.halBoot {
+		t.Fatalf("clearing the Deepgram key must restart hal so it picks Autonomous STT: %+v", ch)
+	}
+}
+
+// An empty deepgram_api_key alone still means "not sent".
+func TestApplyUpdateEmptyDeepgramKeyKeepsStoredKey(t *testing.T) {
+	c := baseConfig()
+	c.DeepgramAPIKey = "key-dg"
+	applyUpdate(c, domain.UpdateConfigRequest{TTSVoice: "nova"}, "")
+
+	if c.DeepgramAPIKey != "key-dg" {
+		t.Fatalf("DeepgramAPIKey = %q, want it untouched", c.DeepgramAPIKey)
+	}
+}

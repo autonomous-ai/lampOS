@@ -132,11 +132,27 @@ def start_voice(req: VoiceStartRequest):
         stt_provider = None
         # Boost every wake-gate name (agent, device type, "autonomous"); STT mis-hears proper nouns.
         stt_keywords = state._stt_boost_terms()
+        # Same language/model selection as the boot path in hal/runtime.py.
+        from hal.config import _os_cfg_get
+        from hal.presets import normalize_language
+
+        stt_language = _os_cfg_get("stt_language")
+        stt_model = _os_cfg_get("stt_model")
         if req.deepgram_api_key and DeepgramSTT:
-            stt_provider = DeepgramSTT(api_key=req.deepgram_api_key, keywords=stt_keywords)
+            from hal.drivers.voice.stt.deepgram import deepgram_options
+
+            stt_provider = DeepgramSTT(
+                api_key=req.deepgram_api_key, keywords=stt_keywords,
+                **deepgram_options(stt_language, stt_model),
+            )
         elif AutonomousSTT:
+            stt_kwargs = {}
+            if (stt_model or "").strip():
+                stt_kwargs["model"] = stt_model.strip()
+            if normalize_language(stt_language):
+                stt_kwargs["language"] = normalize_language(stt_language)
             stt_provider = AutonomousSTT(
-                api_key=stt_api_key, base_url=stt_base_url, keywords=stt_keywords
+                api_key=stt_api_key, base_url=stt_base_url, keywords=stt_keywords, **stt_kwargs
             )
         if not stt_provider:
             raise HTTPException(503, "No STT provider available")

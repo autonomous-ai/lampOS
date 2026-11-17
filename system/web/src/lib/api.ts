@@ -229,6 +229,8 @@ export interface WifiProvisionBody {
   tts_api_key?: string;
   // Explicit delete: an empty tts_api_key means "not sent".
   clear_tts_api_key?: boolean;
+  // Explicit delete: an empty deepgram_api_key means "not sent".
+  clear_deepgram_api_key?: boolean;
   tts_base_url?: string;
   tts_provider?: string;
   tts_voice?: string;

@@ -1,6 +1,8 @@
 package claudecode
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -169,4 +171,18 @@ func TestSplitPTYLines(t *testing.T) {
 	if scan.lastLine != "c" {
 		t.Errorf("lastLine = %q, want %q (EOF fragment must be scanned)", scan.lastLine, "c")
 	}
+}
+
+// Signing in drops the gateway-model session so the bridge does not --resume it.
+func TestDropBridgeSessionRemovesFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "session.json")
+	if err := os.WriteFile(path, []byte(`{"session_id":"old"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dropBridgeSession(path)
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("session file still present: %v", err)
+	}
+	// A missing file is fine (first login, or already reset).
+	dropBridgeSession(path)
 }

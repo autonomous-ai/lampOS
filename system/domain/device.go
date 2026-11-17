@@ -1470,8 +1470,10 @@ type UpdateConfigRequest struct {
 	LLMDisableThinking *bool  `json:"llm_disable_thinking,omitempty"`
 
 	DeepgramAPIKey string `json:"deepgram_api_key"`
-	STTAPIKey      string `json:"stt_api_key"`
-	TTSAPIKey      string `json:"tts_api_key"`
+	// ClearDeepgramAPIKey deletes the stored Deepgram key so HAL falls back to Autonomous STT.
+	ClearDeepgramAPIKey bool   `json:"clear_deepgram_api_key"`
+	STTAPIKey           string `json:"stt_api_key"`
+	TTSAPIKey           string `json:"tts_api_key"`
 	// ClearTTSAPIKey deletes the stored TTS key (an empty TTSAPIKey means "not sent").
 	ClearTTSAPIKey bool   `json:"clear_tts_api_key"`
 	STTBaseURL     string `json:"stt_base_url"`
