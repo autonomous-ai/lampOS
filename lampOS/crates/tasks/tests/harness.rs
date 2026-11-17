@@ -10464,3 +10464,67 @@ fn a_gateway_make_not_ready_is_said_at_once_in_short_words() {
     assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
     assert_eq!(hermes.0.load(Ordering::Acquire), 0);
 }
+
+/// openharness#4393: the kept session's verbs, each with the token file's
+/// path only. The token's text is in no argument and no environment of
+/// any call; `reply` counts only `taken`, and Harness's codes are read.
+#[test]
+fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
+    use lamp_tasks::harness::{Ensured, Took};
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    let token = rig.root.path().join("kept-session.token");
+    lamp_tasks::one_session::token_file(&token).unwrap();
+    let secret = fs::read_to_string(&token).unwrap();
+    assert_eq!(fs::metadata(&token).unwrap().permissions().mode() & 0o777, 0o600);
+    rig.plan(json!({
+        "capabilities":{"stdout":"{\"programSessions\":1}\n"},
+        "ensure":{"stdout":format!("{}\n", json!({
+            "result":"resumed","id":AGENT,"name":"lamp-one-openclaw","engine":"openclaw",
+            "engineSession":"s","state":"idle"
+        }))},
+        "reply":{"each":[
+            {"stdout":"{\"state\":\"taken\",\"inputId\":\"in-1\",\"takenAt\":1}\n"},
+            {"stdout":"{\"error\":\"NOT_IDLE\",\"code\":\"NOT_IDLE\"}\n","exit":5},
+            {"stdout":"{\"error\":\"ENGINE_NOT_READY\"}\n","exit":5},
+            {"stdout":"","exit":124}
+        ]},
+        "wait":{"exit":3},
+        "close":{"stdout":"{\"ok\":true}\n"},
+    }));
+    let cli = rig.cli();
+    assert_eq!(cli.program_sessions(), Some(true));
+    assert_eq!(
+        cli.ensure_kept(EngineKind::Openclaw, "lamp-one-openclaw", &token, "/f", false),
+        Ok(Ensured {
+            result: "resumed".into(),
+            agent_id: AGENT.into(),
+            state: "idle".into(),
+            why: None
+        })
+    );
+    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "New task t:\nGo."), Took::Taken("in-1".into()));
+    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::NotIdle);
+    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::EngineNotReady);
+    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::Timeout);
+    assert_eq!(
+        cli.wait_kept("lamp-one-openclaw", &token, "in-1", &AtomicBool::new(false)),
+        Ok(Some("needs-input".into()))
+    );
+    assert_eq!(cli.close_kept("lamp-one-openclaw", &token), Ok(()));
+    let calls = rig.calls();
+    let path = token.to_str().unwrap();
+    for call in &calls {
+        assert!(!call.to_string().contains(secret.trim()), "{call}");
+        let args = call["args"].as_array().unwrap();
+        if args[0] != "capabilities" {
+            let at = args.iter().position(|arg| arg == "--program-token-file").unwrap();
+            assert_eq!(args[at + 1], path);
+        }
+    }
+    assert_eq!(calls[1]["args"][0], "ensure");
+    assert!(calls.last().unwrap()["args"].as_array().unwrap().contains(&json!("--forget")));
+    // An older Harness refuses the verb: no program sessions.
+    rig.plan(json!({"capabilities":{"stdout":"","stderr":"unknown command\n","exit":1}}));
+    assert_eq!(rig.cli().program_sessions(), Some(false));
+}
