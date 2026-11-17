@@ -351,7 +351,7 @@ const AFTER_NEWS: &str = "the first thing said after the lamp's own news";
 /// ([`about_its_work`]) is for it this long after the lamp's news, or after
 /// it started a task, a timer or a reminder.
 pub const WORK_ASKED_US: u64 = 600_000_000;
-const ABOUT_ITS_WORK: &str = "a question about the lamp's own task, reminder or timer";
+pub(crate) const ABOUT_ITS_WORK: &str = "a question about the lamp's own task, reminder or timer";
 
 /// With the switch, a line that follows, by at most this long, one that
 /// called someone other than the lamp by name ([`addresses_someone_else`])
@@ -1515,8 +1515,8 @@ pub(crate) const BUSY_TURNED_ALONE: &str =
 pub(crate) const TURNED_NOT_SPOKEN_TO: &str = "nobody spoke to the lamp: someone is turned to it, but no name, no call, no conversation with it going on";
 /// The text calling the lamp, as the rule says it.
 pub(crate) const CALLED_IN_TEXT: &str = "the text shows it was called";
-const SOUND_A_WORD: &str = "a short sound, heard as a short word said to the lamp";
-const SOUND_NEAR: &str = "a short sound, said close to the lamp";
+pub(crate) const SOUND_A_WORD: &str = "a short sound, heard as a short word said to the lamp";
+pub(crate) const SOUND_NEAR: &str = "a short sound, said close to the lamp";
 const SOUND_TURNED: &str = "a short sound, with someone turned to the lamp";
 const SOUND_ANSWERS: &str = "a short sound with a word in it, right after the lamp's own question, in a conversation going on";
 const SOUND_HELD: &str = "a short sound, and nothing shows it was said to the lamp: not a short word, not close, nobody turned to it";
@@ -3168,6 +3168,20 @@ impl Attention {
     /// 22:4x).
     pub fn played_only_as_going_on(&self) -> bool {
         self.going_on_alone && matches!(self.verdict, Some(Verdict::Play(_)))
+    }
+
+    /// Whether the request in hand was let out as a short word, a short
+    /// sound said close to the lamp, or a question about its work, with no
+    /// call of its own (no name, no tap, no words calling it): none of these
+    /// shows it was said to the lamp, so a made skill's said start in it
+    /// waits on a face as one let out only as the conversation going on
+    /// does (#7448, the first builder at 00:53 on 18 Nov). A reply to the
+    /// lamp's own news ([`AFTER_NEWS`]) was said to it.
+    pub fn played_on_no_call(&self) -> bool {
+        matches!(
+            self.verdict,
+            Some(Verdict::Play(SOUND_A_WORD | SOUND_NEAR | ABOUT_ITS_WORK))
+        ) && !self.called_for_itself()
     }
 
     /// Whether the answer to the request in hand was let out because the

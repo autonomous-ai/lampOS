@@ -3057,17 +3057,26 @@ chối khi cài.
    không bắt đầu kỹ năng loại này, trừ khi có một khuôn mặt trong lần nhìn
    mới nhất của mắt lúc lời gọi đến (`Heeding::holds_said_start`,
    `bus_out::faces_in_view`; không có mắt, hoặc camera đóng, là không có
-   khuôn mặt). Khi đó lời gọi kỹ năng đó, trực tiếp hoặc qua `use_skill`
+   khuôn mặt). Câu được cho qua như một từ ngắn nói với đèn, một âm thanh
+   ngắn nói gần đèn, hoặc một câu hỏi về việc của chính đèn, mà không có
+   lời gọi riêng (không có tên, không chạm, không có lời gọi đèn;
+   `Attention::played_on_no_call`, người xây dựng đầu tiên lúc 00:53 ngày
+   18/11) cũng vậy: không điều nào cho thấy câu đó nói với đèn, nên một tên
+   kỹ năng ngắn nói gần đèn chỉ là lời nói. Câu đầu tiên sau tin của chính
+   đèn là trả lời nó, và vẫn bắt đầu kỹ năng (`worker::unseen_line`). Khi
+   đó lời gọi kỹ năng đó, trực tiếp hoặc qua `use_skill`
    (`tools::starts_said`, theo `SAID_TO_YOU` trong thẻ của nó; không bao
    giờ là câu hỏi về một kỹ năng), bị giữ như một lời gọi mà quy tắc giữ
    (`Engine::holding_said_starts`): không chạy, và mô hình được báo là chưa
    làm (`policy_holds::HELD`); nó vẫn có thể trả lời bằng lời. Một câu được
    cho qua vì dấu hiệu riêng của nó (tên của đèn, khuôn mặt quay về đèn,
-   nói gần đèn, trả lời câu hỏi của đèn) không bị giữ, nên "Lamp, I'm
+   trả lời câu hỏi hoặc tin của đèn) không bị giữ, nên "Lamp, I'm
    busy." từ bên kia phòng vẫn bắt đầu nó. Chỉ dựa trên cấu trúc: không từ
    nào của câu được so khớp. Khi tắt công tắc, không gì được cài và không
    gì thay đổi. Kiểm thử:
    `a_said_start_is_held_on_a_line_only_going_on_with_no_face`,
+   `a_said_start_is_held_on_a_short_word_or_a_sound_said_close_with_no_name`,
+   `a_said_start_is_held_on_a_question_about_its_work_and_kept_after_its_news`,
    `a_held_said_start_is_not_run_and_the_model_is_told_so`,
    `a_said_start_is_found_by_its_card_itself_or_through_use_skill`.
 4. **Nói lại đúng điều nó làm** (`Said::said_back`): "When you tell me
