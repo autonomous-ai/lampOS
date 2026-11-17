@@ -6,8 +6,10 @@
 //! so that a wall clock set forward or back by chrony can be played without
 //! touching the host's.
 use crate::wire::Now;
+#[cfg(target_os = "linux")]
+use std::fs;
 use std::{
-    fmt, fs,
+    fmt,
     sync::{Arc, OnceLock},
 };
 
@@ -83,15 +85,104 @@ pub fn monotonic_us() -> u64 {
     seconds.saturating_mul(1_000_000).saturating_add(micros)
 }
 
-/// This boot's id, read once: `None` where there is none to read (macOS),
-/// and then no stamp is judged by the monotonic clock.
+/// This boot's id, read once: Linux's `/proc/sys/kernel/random/boot_id`; on macOS the boot session
+/// uuid, `kern.bootsessionuuid` (a new one with every boot, the id `lamp-controls`, `lamp-body` and
+/// `lamp-sim` use there); `None` where there is none to read or the read failed, and then no stamp
+/// is judged by the monotonic clock but by the wall clock, as before. Never an empty or made-up id.
 pub fn kernel_boot_id() -> Option<&'static str> {
     static READ: OnceLock<Option<String>> = OnceLock::new();
-    READ.get_or_init(|| {
-        fs::read_to_string(BOOT_ID_PATH)
-            .ok()
-            .map(|text| text.trim().to_owned())
-            .filter(|id| crate::wire::clock_id_is_valid(id))
-    })
-    .as_deref()
+    READ.get_or_init(read_boot_id).as_deref()
+}
+
+#[cfg(target_os = "linux")]
+fn read_boot_id() -> Option<String> {
+    fs::read_to_string(BOOT_ID_PATH)
+        .ok()
+        .map(|text| text.trim().to_owned())
+        .filter(|id| crate::wire::clock_id_is_valid(id))
+}
+
+/// Where macOS keeps `sysctl`: the absolute path, as every other asker of the id uses.
+#[cfg(target_os = "macos")]
+const SYSCTL: &str = "/usr/sbin/sysctl";
+
+#[cfg(target_os = "macos")]
+fn read_boot_id() -> Option<String> {
+    let out = std::process::Command::new(SYSCTL)
+        .args(["-n", "kern.bootsessionuuid"])
+        .output()
+        .ok()?;
+    boot_session_id(out.status.success(), &out.stdout)
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn read_boot_id() -> Option<String> {
+    None
+}
+
+/// What `sysctl -n kern.bootsessionuuid` printed, as an id: its text trimmed, when the command
+/// succeeded and the text is a valid clock id (1 to 64 letters, digits or dashes); otherwise none.
+#[cfg(any(target_os = "macos", test))]
+fn boot_session_id(succeeded: bool, stdout: &[u8]) -> Option<String> {
+    if !succeeded {
+        return None;
+    }
+    let text = std::str::from_utf8(stdout).ok()?.trim();
+    crate::wire::clock_id_is_valid(text).then(|| text.to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const UUID: &str = "6F2C1A90-3B7D-4E58-9A14-0C5D8E7B2F61";
+
+    /// What `sysctl -n kern.bootsessionuuid` prints is an id only when the command succeeded and
+    /// the text is a valid clock id; a failed read is none, never an empty or made-up id, so the
+    /// stamps are then judged by the wall clock as before.
+    #[test]
+    fn a_boot_session_id_is_the_trimmed_text_of_a_successful_read_and_none_otherwise() {
+        assert_eq!(
+            boot_session_id(true, format!("{UUID}\n").as_bytes()).as_deref(),
+            Some(UUID)
+        );
+        assert_eq!(boot_session_id(false, UUID.as_bytes()), None);
+        assert_eq!(boot_session_id(true, b""), None);
+        assert_eq!(boot_session_id(true, b"  \n"), None);
+        assert_eq!(boot_session_id(true, &[0xff, 0xfe]), None);
+        assert_eq!(boot_session_id(true, b"not a uuid"), None);
+        assert_eq!(boot_session_id(true, "A".repeat(65).as_bytes()), None);
+    }
+
+    /// The boot id, when there is one, is a valid clock id, and it is read once.
+    #[test]
+    fn the_kernel_boot_id_is_valid_when_there_is_one_and_the_same_every_time() {
+        let first = kernel_boot_id();
+        assert_eq!(first, kernel_boot_id());
+        if let Some(id) = first {
+            assert!(crate::wire::clock_id_is_valid(id), "{id}");
+        }
+    }
+
+    /// Linux is as it was: the boot id is `/proc`'s, trimmed.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn on_linux_the_boot_id_is_proc_s_text_trimmed() {
+        let text = std::fs::read_to_string(BOOT_ID_PATH).unwrap();
+        assert_eq!(kernel_boot_id(), Some(text.trim()));
+    }
+
+    /// On a Mac the boot id is what `sysctl -n kern.bootsessionuuid` says (the id lamp-controls
+    /// and lamp-body use there), byte for byte.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn on_a_mac_the_boot_id_is_the_sysctl_boot_session_uuid() {
+        let out = std::process::Command::new(SYSCTL)
+            .args(["-n", "kern.bootsessionuuid"])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        let said = String::from_utf8(out.stdout).unwrap();
+        assert_eq!(kernel_boot_id(), Some(said.trim()));
+    }
 }
