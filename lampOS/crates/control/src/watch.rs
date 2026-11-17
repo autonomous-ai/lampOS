@@ -701,8 +701,11 @@ impl Watch {
     /// (`LAMP_CONTROL_PAIR_CUE`), or none when a cue would be out of place: the
     /// lamp is private, paused, asleep or talking, its light is off or not
     /// known, or the ring is showing something other than that light (a
-    /// computer's or a skill's, which a cue never takes over). The level is
-    /// at least a pulse's own least ([`lamp_msgs::LightPattern::PULSE_LEAST_LEVEL`]).
+    /// computer's or a skill's, which a cue never takes over), or the light is
+    /// below a pulse's own least level
+    /// ([`lamp_msgs::LightPattern::PULSE_LEAST_LEVEL`]): raising a dim room's
+    /// light to it would flash the whole ring several times brighter and snap
+    /// back, a status blink, so a dim room is left quiet.
     pub fn cue_light(&self) -> Option<lamp_msgs::Light> {
         if self.private || self.paused || self.asleep || self.talking {
             return None;
@@ -719,10 +722,10 @@ impl Watch {
         {
             return None;
         }
-        light.level = light.level.clamp(
-            lamp_msgs::LightPattern::PULSE_LEAST_LEVEL,
-            lamp_msgs::Light::BRIGHTEST,
-        );
+        if light.level < lamp_msgs::LightPattern::PULSE_LEAST_LEVEL {
+            return None;
+        }
+        light.level = light.level.min(lamp_msgs::Light::BRIGHTEST);
         Some(light)
     }
 
@@ -1278,6 +1281,15 @@ mod tests {
         watch.take(
             "light/state",
             &json!({"on": true, "colour": "warm", "level": 1}),
+            S,
+        );
+        assert!(
+            watch.cue_light().is_none(),
+            "a light below a pulse's least level is a dim room: no cue, never raised"
+        );
+        watch.take(
+            "light/state",
+            &json!({"on": true, "colour": "warm", "level": 2}),
             S,
         );
         let cue = watch.cue_light().unwrap();

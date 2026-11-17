@@ -433,8 +433,10 @@ next connection; a missing, empty or unknown value says `en`, as the voice reads
    priority that lapses after 4.5 s, asked only after the reply has gone and
    by a one-slot channel that drops a cue rather than queue it. It shows
    nothing for the same key paired again, while the lamp is private, paused,
-   asleep or talking, with its light off, while a computer holds the light,
-   or while the ring shows another light. There is no nod and no sound.
+   asleep or talking, with its light off or at level 1 (a dim room: raising it
+   to the pulse's least level would flash the whole ring), while a computer
+   holds the light, or while the ring shows another light. There is no nod and
+   no sound.
 4. **No pairing without the app's pin.** A code alone, said aloud or typed
    without its pin, can't pair (the spoken-code fallback is dropped, below).
 
