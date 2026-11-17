@@ -2465,6 +2465,7 @@ fn second_route_worker_environment(
         crate::second_provider::DECLINE_SILENT_ENVIRONMENT,
         // Inside a live back-and-forth the doubt goes to the person (#7332).
         crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT,
+        crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::speaking_faces::EYES_ENVIRONMENT,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
@@ -2758,6 +2759,7 @@ mod tests {
             crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT,
             crate::second_provider::DECLINE_SILENT_ENVIRONMENT,
             crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT,
+            crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
             crate::speaking_faces::EYES_ENVIRONMENT,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
@@ -3806,6 +3808,7 @@ mod tests {
                     || name == crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT
                     || name == crate::second_provider::DECLINE_SILENT_ENVIRONMENT
                     || name == crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT
+                    || name == crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
@@ -3908,6 +3911,7 @@ mod tests {
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
                     "LAMP_BUSY_FOLLOW_UP_RENEWS=on",
+                    "LAMP_BUSY_NO_FACE_RENEWS=on",
                     "LAMP_CARRIED_LINES_KEEP_TALK=on",
                     "LAMP_CHOSEN_VOICE=on",
                     "LAMP_CONVERSATION_CARRIED_MEMORY=on",

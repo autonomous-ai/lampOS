@@ -4675,6 +4675,18 @@ pub fn serve(
                 heeding.renewing_busy_follow_ups();
             }
             engine = engine.cueing_every_tool();
+            // A follow-up no face was seen speaking renews it too
+            // (`LAMP_BUSY_NO_FACE_RENEWS=on`, #7332).
+            if std::env::var(crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT)
+                .is_ok_and(|value| value == "on")
+            {
+                eprintln!(
+                    "lamp-voice second: in a busy room a follow-up no face was seen speaking renews the caller's call too, and is carried by it; another face seen speaking it renews nothing (LAMP_BUSY_NO_FACE_RENEWS)"
+                );
+                if let Ok(mut heeding) = heeding.lock() {
+                    heeding.renewing_no_face_follow_ups();
+                }
+            }
         }
         // At a desk, a face turned to the lamp is no sign, and a
         // conversation goes on only shortly after its words
@@ -7261,6 +7273,9 @@ pub(crate) struct Heeding {
     from_start: bool,
     /// `LAMP_BUSY_FOLLOW_UP_RENEWS=on` ([`Self::renewing_busy_follow_ups`]).
     follow_up_renews: bool,
+    /// With it, `LAMP_BUSY_NO_FACE_RENEWS=on`
+    /// ([`Self::renewing_no_face_follow_ups`]).
+    no_face_renews: bool,
     /// With it, the request let out as the caller's own follow-up
     /// ([`FOLLOW_UP_NOTE`]).
     follow_up_line: Option<u64>,
@@ -8341,6 +8356,7 @@ impl Heeding {
             name_stays: false,
             from_start: false,
             follow_up_renews: false,
+            no_face_renews: false,
             follow_up_line: None,
             call_renewed_at: None,
             last_speakers: None,
@@ -8908,10 +8924,18 @@ impl Heeding {
         self.follow_up_renews = true;
     }
 
+    /// `LAMP_BUSY_NO_FACE_RENEWS=on` (#7332): with
+    /// [`Self::renewing_busy_follow_ups`], a follow-up no face was seen
+    /// speaking renews the call too, and is carried by it.
+    pub(crate) fn renewing_no_face_follow_ups(&mut self) {
+        self.no_face_renews = true;
+    }
+
     /// The call a line said in `window` goes on from: the person's last
     /// call let out, or with `LAMP_BUSY_FOLLOW_UP_RENEWS` the caller's
     /// follow-up since (`call_renewed_at`), for a line the caller's face alone
-    /// was seen speaking. Anyone else's line is judged by the call alone, as
+    /// was seen speaking, or with `LAMP_BUSY_NO_FACE_RENEWS` no face
+    /// (`renews_for_the_caller`). Anyone else's line is judged by the call alone, as
     /// without the switch (the Reviewer-lead's P2 on #7349: a colleague's
     /// line 20 s after the call was let out by the owner's renewal, #7297).
     fn call_for(&self, request: u64, (began, ended): (u64, u64)) -> Option<Instant> {
@@ -8922,11 +8946,11 @@ impl Heeding {
             return self.called_at;
         };
         let (speakers, _) = speakers_between(self.eyes.as_ref(), began, ended);
-        if spoken_by_the_caller_alone(&speakers, &self.caller_faces) {
+        if renews_for_the_caller(&speakers, &self.caller_faces, self.no_face_renews) {
             Some(renewed)
         } else {
             eprintln!(
-                "lamp-voice second: request {request}: not the caller's face alone: the call renewed by the caller's follow-up carries it not (LAMP_BUSY_FOLLOW_UP_RENEWS)"
+                "lamp-voice second: request {request}: another face seen speaking: the call renewed by the caller's follow-up carries it not (LAMP_BUSY_FOLLOW_UP_RENEWS)"
             );
             self.called_at
         }
@@ -11846,7 +11870,8 @@ impl Heeding {
             (played && (attention.called_for_itself() || seen.named_faced)).then_some(request);
         // `LAMP_BUSY_FOLLOW_UP_RENEWS` (#7332): a line let out only as the
         // conversation going on, spoken by the caller (their face alone, or
-        // the conversation's voice), renews the call as a call does, whatever
+        // with `LAMP_BUSY_NO_FACE_RENEWS` no face seen speaking it and no
+        // other voice), renews the call as a call does, whatever
         // the model makes of it: on lamp-74ff the owner's follow-up got
         // `not_for_me`, neither clock moved, and the next lines were held.
         // Its note says it is the caller's follow-up ([`FOLLOW_UP_NOTE`]).
@@ -11859,7 +11884,8 @@ impl Heeding {
             && !opens_nothing
             && !called
             && !someone_else
-            && spoken_by_the_caller_alone(&seen.speakers, &self.caller_faces);
+            && !seen.other_voice
+            && renews_for_the_caller(&seen.speakers, &self.caller_faces, self.no_face_renews);
         if callers_follow_up {
             eprintln!(
                 "lamp-voice second: request {request}: the caller's own follow-up: it renews the call for the caller's lines, and the model is told it is theirs (LAMP_BUSY_FOLLOW_UP_RENEWS)"
@@ -12199,6 +12225,21 @@ fn another_face_speaking(
 ) -> bool {
     speakers.len() > 1
         || !caller_faces.is_empty() && speakers.iter().any(|face| !caller_faces.contains(face))
+}
+
+/// `LAMP_BUSY_FOLLOW_UP_RENEWS` (#7332): whether a line renews, or is
+/// carried by, the caller's renewed call: the caller's face alone seen
+/// speaking it, or with `LAMP_BUSY_NO_FACE_RENEWS` (`no_face`) no face seen
+/// speaking it. On lamp-74ff on 17 Nov (13706) the owner's follow-ups r47
+/// to r49 had no face seen speaking, renewed nothing, and r50, r52 and r53
+/// were held 22 to 38 s after the call. Any other face seen speaking it
+/// renews nothing.
+fn renews_for_the_caller(
+    speakers: &crate::speaking_faces::Speakers,
+    caller_faces: &crate::speaking_faces::Speakers,
+    no_face: bool,
+) -> bool {
+    (no_face && speakers.is_empty()) || spoken_by_the_caller_alone(speakers, caller_faces)
 }
 
 /// Whether the faces seen speaking a line are the caller's one face and no

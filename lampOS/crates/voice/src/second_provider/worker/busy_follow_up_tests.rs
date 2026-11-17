@@ -75,6 +75,12 @@ fn play(renews: bool, steps: &[Step]) -> Vec<Judged> {
 /// [`play`], with `LAMP_DECLINE_SILENT` when `decline_silent`: a decline
 /// then rolls back what letting its line out began.
 fn play_with(renews: bool, decline_silent: bool, steps: &[Step]) -> Vec<Judged> {
+    play_all(renews, decline_silent, false, steps)
+}
+
+/// [`play_with`], with `LAMP_BUSY_NO_FACE_RENEWS` when `no_face`. A line
+/// whose face is `""` has no face seen speaking it.
+fn play_all(renews: bool, decline_silent: bool, no_face: bool, steps: &[Step]) -> Vec<Judged> {
     let _one = crate::provider_worker::tests::one_thread();
     let _clock =
         crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
@@ -89,6 +95,9 @@ fn play_with(renews: bool, decline_silent: bool, steps: &[Step]) -> Vec<Judged> 
     }
     if decline_silent {
         heeding.declining_silently();
+    }
+    if no_face {
+        heeding.renewing_no_face_follow_ups();
     }
     let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
     heeding.seeing_speaking_faces(eyes.clone(), None);
@@ -144,6 +153,9 @@ fn play_with(renews: bool, decline_silent: bool, steps: &[Step]) -> Vec<Judged> 
         let window = (10_000_000 + at * 1_000, 10_000_000 + judged * 1_000);
         let seen = frame(face);
         for look in 0..4u64 {
+            if face.is_empty() {
+                break;
+            }
             seq += 1;
             let at_us = window.0 + (window.1 - window.0) * (2 * look + 1) / 8;
             eyes.look(
@@ -348,4 +360,44 @@ fn the_renewed_call_carries_only_the_caller() {
     );
     assert_eq!(let_out(&play(true, &steps(COLLEAGUE))), [true, true, false]);
     assert_eq!(let_out(&play(true, &steps(OWNER))), [true, true, true]);
+}
+
+/// lamp-74ff on 17 Nov (13706), r47 to r53: the owner calls the lamp, then
+/// follows up three times with no face seen speaking, the model declining
+/// each, and speaks again 22 s and 35 s after the call. With
+/// `LAMP_BUSY_FOLLOW_UP_RENEWS` alone, as on the lamp, the no-face
+/// follow-ups renew nothing and the late lines are held; with
+/// `LAMP_BUSY_NO_FACE_RENEWS` too, each follow-up renews the call and all
+/// are let out. A colleague's face seen speaking a late line still renews
+/// nothing and is held.
+#[test]
+fn a_no_face_follow_up_renews_the_call() {
+    let steps = |late: &'static str| {
+        [
+            line(0, 2_000, "Lamp, can you remember my face?", OWNER),
+            line(
+                6_000,
+                4_000,
+                "And the one I told you about yesterday too.",
+                "",
+            ),
+            line(12_000, 2_000, "You know, the one from the office.", ""),
+            line(22_000, 1_000, "Are you still there?", ""),
+            line(35_000, 1_000, "Hello, can you hear me?", late),
+        ]
+    };
+    assert_eq!(
+        let_out(&play_all(true, false, false, &steps(""))),
+        [true, true, true, false, false]
+    );
+    assert_eq!(let_out(&play_all(true, false, true, &steps(""))), [true; 5]);
+    assert_eq!(
+        let_out(&play_all(true, false, true, &steps(COLLEAGUE))),
+        [true, true, true, true, false]
+    );
+    // The switch alone, without the renewal, changes nothing.
+    assert_eq!(
+        let_out(&play_all(false, false, true, &steps(""))),
+        let_out(&play_all(false, false, false, &steps("")))
+    );
 }
