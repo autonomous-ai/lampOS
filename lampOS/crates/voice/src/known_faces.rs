@@ -5463,6 +5463,8 @@ mod tests {
     /// frame, as the eyes report it.
     fn desk_face(id: &str, width: f32, confidence: f32) -> lamp_msgs::Face {
         lamp_msgs::Face {
+            pitch: None,
+            looking: None,
             id: id.to_owned(),
             xmin: 0.3,
             ymin: 0.2,

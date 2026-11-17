@@ -193,6 +193,8 @@ mod tests {
 
     fn face(id: &str) -> Face {
         Face {
+            pitch: None,
+            looking: None,
             id: id.into(),
             xmin: 0.3,
             ymin: 0.3,

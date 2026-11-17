@@ -32,6 +32,8 @@ impl People {
     pub fn say(&mut self) -> io::Result<()> {
         let faces = (0..self.count())
             .map(|k| Face {
+                pitch: None,
+                looking: None,
                 id: format!("sim{k}"),
                 xmin: 0.3,
                 ymin: 0.2,

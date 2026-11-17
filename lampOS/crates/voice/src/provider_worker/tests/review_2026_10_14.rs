@@ -1158,6 +1158,8 @@ async fn with_name_or_follow_up_two_faces_make_the_room_busy_and_a_face_alone_is
     let _one = super::one_thread();
     let root = Root::new();
     let face = |id: &str, facing: bool| Face {
+        pitch: None,
+        looking: None,
         id: id.into(),
         xmin: 0.4,
         ymin: 0.0,
@@ -1264,6 +1266,8 @@ async fn with_name_or_follow_up_another_voice_makes_the_room_busy_before_its_own
             monotonic_us(),
             &Faces {
                 faces: vec![Face {
+                    pitch: None,
+                    looking: None,
                     id: "at-the-desk".into(),
                     xmin: 0.4,
                     ymin: 0.0,

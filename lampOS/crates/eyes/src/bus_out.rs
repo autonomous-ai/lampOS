@@ -323,6 +323,8 @@ fn message_observed(
                 ids.talking.push(id);
             }
             Face {
+                pitch: None,
+                looking: None,
                 speaking,
                 follows: ids.followed(id).map(|old| format!("f{old}")),
                 id: format!("f{id}"),

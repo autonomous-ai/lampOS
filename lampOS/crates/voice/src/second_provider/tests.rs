@@ -15894,6 +15894,8 @@ async fn a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs
                     let faces = lamp_msgs::Faces {
                         faces: ["f1", "f2"]
                             .map(|id| lamp_msgs::Face {
+                                pitch: None,
+                                looking: None,
                                 id: id.to_owned(),
                                 xmin: 0.1,
                                 ymin: 0.1,
@@ -16010,6 +16012,8 @@ async fn without_the_switch_a_line_another_face_spoke_stays_the_known_persons() 
     let eyes = SpeakingFaces::default();
     let speaking = lamp_msgs::Faces {
         faces: vec![lamp_msgs::Face {
+            pitch: None,
+            looking: None,
             id: "f2".into(),
             xmin: 0.1,
             ymin: 0.1,
@@ -20765,6 +20769,8 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
                             .into_iter()
                             .filter(|id| in_view || *id != "f1")
                             .map(|id| lamp_msgs::Face {
+                                pitch: None,
+                                looking: None,
                                 id: id.to_owned(),
                                 xmin: 0.1,
                                 ymin: 0.1,

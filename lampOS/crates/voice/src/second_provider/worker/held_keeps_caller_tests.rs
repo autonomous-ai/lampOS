@@ -108,6 +108,8 @@ fn frame(faces: &[(&str, bool)]) -> lamp_msgs::Faces {
             .iter()
             .enumerate()
             .map(|(index, (id, speaking))| Face {
+                pitch: None,
+                looking: None,
                 id: (*id).to_owned(),
                 xmin: 0.1 + 0.4 * index as f32,
                 ymin: 0.2,

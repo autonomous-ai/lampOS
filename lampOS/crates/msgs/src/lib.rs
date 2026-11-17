@@ -459,6 +459,17 @@ pub struct Face {
     /// Whether the face is turned to the lamp, if that was judged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub facing: Option<bool>,
+    /// How far the head is tipped, in radians, if that was estimated: 0
+    /// level, positive tipped down, as ROS has pitch. Only with the eyes'
+    /// `LAMP_EYES_PITCH_GAZE=on` (#7442); a reader that does not know it
+    /// ignores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pitch: Option<f32>,
+    /// Whether the eyes themselves look toward the lamp, if that was read:
+    /// only for the face the eyes' Blendshape V2 read ran on, with
+    /// `LAMP_EYES_PITCH_GAZE=on` (#7442). Absent is unknown, not away.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub looking: Option<bool>,
     /// Whether the face's mouth moves as a speaking mouth does, if the
     /// eyes were asked to judge it (`LAMP_EYES_SPEAKING=on`, docs/eyes.md,
     /// "Whether a face is speaking"). Absent when they were not.
@@ -2776,12 +2787,16 @@ mod tests {
             confidence: 0.875,
             yaw: Some(-0.25),
             facing: Some(true),
+            pitch: Some(0.5),
+            looking: Some(false),
             follows: None,
         };
         let unjudged = Face {
             id: "f8".into(),
             yaw: None,
             facing: None,
+            pitch: None,
+            looking: None,
             ..seen.clone()
         };
         let faces = Faces {
@@ -2789,7 +2804,8 @@ mod tests {
         };
         // What was not estimated is left out, not written as nothing.
         let text = "{\"faces\":[{\"id\":\"f7\",\"xmin\":0.25,\"ymin\":0.125,\"xmax\":0.5,\
-                    \"ymax\":0.625,\"confidence\":0.875,\"yaw\":-0.25,\"facing\":true},\
+                    \"ymax\":0.625,\"confidence\":0.875,\"yaw\":-0.25,\"facing\":true,\
+                    \"pitch\":0.5,\"looking\":false},\
                     {\"id\":\"f8\",\"xmin\":0.25,\"ymin\":0.125,\"xmax\":0.5,\"ymax\":0.625,\
                     \"confidence\":0.875}]}";
         round_trip(&faces, text);

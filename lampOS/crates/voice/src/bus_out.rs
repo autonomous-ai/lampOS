@@ -2204,6 +2204,8 @@ mod tests {
             .unwrap();
         eyes.expires_after(Some(Duration::from_millis(300)));
         let face = |facing: Option<bool>| Face {
+            pitch: None,
+            looking: None,
             speaking: None,
             id: "f1".into(),
             xmin: 0.4,
@@ -2244,6 +2246,8 @@ mod tests {
             .unwrap();
         eyes.expires_after(Some(Duration::from_millis(300)));
         let face = |id: &str, facing: Option<bool>| Face {
+            pitch: None,
+            looking: None,
             speaking: None,
             id: id.into(),
             xmin: 0.4,
