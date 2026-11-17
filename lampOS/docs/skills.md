@@ -6642,6 +6642,48 @@ Tests: `made_skill::tests::a_made_skill_started_by_its_words_carries_its_asks_on
 lamp-skills' `a_skill_started_by_its_own_words_loads_and_runs_now_only_with_its_switch`
 and `an_uploaded_files_trigger_phrases_load_as_its_tools_asks`.
 
+#### A make held to what was heard (`LAMP_MADE_UNRELATED_REFUSED=on`, off)
+
+Off unless `LAMP_MADE_UNRELATED_REFUSED=on`, in no product unit (#7621: on
+c0a4 "every day at four fifteen in the morning, look up the title of the
+example dot com web page and tell me what it says" was made as `moon-time`,
+a say on "moon time", and as `morning-skip`, a dance at 04:15, and each was
+kept and put on). On, and only while the lamp's language is English, a
+voice make's skill is held to the person's own line for it
+(`thread.heard_in_own_line`, never the newest words heard) and the request,
+in `made_skill::keep_asked`, before anything is kept, a said start too:
+
+- A fast pass, of no cost: when the skill's name, asks and step words (its
+  say text, gesture, task words; never a step's kind, trigger, times or
+  permissions) share a content word with the line, it is kept as before.
+  The request counts only when the line has fewer than three content
+  words: a request the voice model filled from an earlier ask would share
+  its words with the skill made of it. Content words are lowercase words of three letters or
+  more, without a trailing `s`, never small words nor words of when it
+  runs (day, morning, every, the numbers, digits) and verbs any ask holds (look, find, get, show, see, keep, want, need), counted once; two are
+  one when the shorter has five letters or more and they share all of it
+  but its last (`stretch` and `stretching`; `good` is not `goodnight`).
+  Fewer than three distinct content words in the line and the request: no
+  check.
+- With no shared word, one short call to the make's own DeepSeek chat,
+  bound to 1.5 seconds and about 300 tokens (`make_skill_local::JUDGE_WITHIN`):
+  "Asked: <line>. Made: <name and step words>. Does the made skill do what
+  was asked? Answer yes or no." A clear no refuses it; a yes or any other
+  answer keeps it; a timeout or an error keeps it too, as
+  `made_skill::ON_JUDGE_LOST` says (`Keep`; `AskAgain` asks again), journaled as
+  `judge=yes|no|unclear|timeout|error` with counts only, never words. So a
+  paraphrase ("remind me to drink water" made as `hydration-nudge`) is kept.
+  The 1.5 seconds are added at most, and only on this no-overlap path. The
+  person's own line goes to DeepSeek in this call, which the make's brief
+  (the request alone) does not send.
+- A refusal is not repaired nor handed to the lamp's agent: the voice
+  model is told to say exactly "I didn't catch which skill to make. Could
+  you say it again?", never what was nearly made.
+
+The app's make has no judge and is never refused by it. In another language
+the check is skipped and journaled. `lamp-voice` passes the exact `on` to its
+`provider` and `second` workers. Off, every make is byte for byte as before.
+
 ## V1's moves and emotions: what we take
 
 The owner, 08:00: "evaluate carefully to pick the good stuff from V1, not

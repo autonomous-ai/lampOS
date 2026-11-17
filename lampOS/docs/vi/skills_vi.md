@@ -3131,6 +3131,50 @@ hiện là chưa nạp. Tắt: `asks` của kỹ năng tự tạo bị dọn đi
 (`made_skill::MADE_ASKS`), prompt, brief, `skill.toml` của file tải lên và
 `tools.json` giữ nguyên từng byte như trước.
 
+## Tạo kỹ năng bám theo lời đã nghe (`LAMP_MADE_UNRELATED_REFUSED=on`, tắt)
+
+Tắt nếu không đặt `LAMP_MADE_UNRELATED_REFUSED=on`, chưa có trong unit sản
+phẩm nào (#7621: trên c0a4 câu "every day at four fifteen in the morning,
+look up the title of the example dot com web page and tell me what it says"
+lại thành `moon-time`, một câu nói khi nghe "moon time", và thành
+`morning-skip`, một điệu nhảy lúc 04:15, và cả hai đều được giữ và bật).
+Khi bật, và chỉ khi ngôn ngữ của đèn là tiếng Anh, kỹ năng tạo bằng giọng
+nói được đối chiếu với chính câu của người dùng (`thread.heard_in_own_line`,
+không bao giờ lấy lời mới nhất nghe được) và request, trong
+`made_skill::keep_asked`, trước khi giữ bất cứ gì, kể cả kỹ năng bắt đầu
+bằng lời nói:
+
+- Bước nhanh, không tốn gì: nếu tên, asks và lời của các bước (lời nói, cử
+  chỉ, việc; không tính loại bước, trigger, giờ hay quyền) chung một từ
+  nội dung với câu thì kỹ năng được giữ như trước. Request chỉ được tính
+  khi câu có ít hơn ba từ nội dung: request mà mô hình giọng nói lấy từ
+  một yêu cầu cũ sẽ chung từ với chính kỹ năng tạo từ nó. Từ nội dung
+  là từ viết thường từ ba chữ cái trở lên, bỏ `s` ở cuối, không tính từ
+  nhỏ và từ chỉ thời điểm chạy (day, morning, every, các số, chữ số) và động từ yêu cầu nào cũng có (look, find, get, show, see, keep, want, need), mỗi
+  từ đếm một lần; hai từ là một khi từ ngắn hơn có từ năm chữ cái và chung
+  toàn bộ trừ chữ cuối (`stretch` và `stretching`; `good` không phải
+  `goodnight`). Câu và request có ít hơn ba từ nội dung khác nhau thì không
+  kiểm tra.
+- Không chung từ nào: một lần gọi ngắn tới chính chat DeepSeek của lần tạo,
+  giới hạn 1,5 giây và khoảng 300 token (`make_skill_local::JUDGE_WITHIN`):
+  "Asked: <câu>. Made: <tên và lời các bước>. Does the made skill do what
+  was asked? Answer yes or no." Một câu "no" rõ ràng thì từ chối; yes hay
+  câu khác thì giữ; hết giờ hay lỗi cũng giữ, theo
+  `made_skill::ON_JUDGE_LOST` (`Keep`; `AskAgain` thì hỏi lại), ghi nhật ký
+  `judge=yes|no|unclear|timeout|error` chỉ với số đếm, không ghi lời. Vì
+  vậy kỹ năng diễn đạt lại ("remind me to drink water" thành
+  `hydration-nudge`) vẫn được giữ. Tối đa 1,5 giây chỉ cộng thêm trên nhánh
+  không chung từ này. Lần gọi này gửi chính câu của người dùng tới
+  DeepSeek, điều mà phần brief của lần tạo (chỉ có request) không gửi.
+- Bị từ chối thì không sửa lại và không chuyển cho agent của đèn: mô hình
+  giọng nói được bảo nói đúng câu "I didn't catch which skill to make.
+  Could you say it again?", không bao giờ nói kỹ năng suýt được tạo.
+
+Lần tạo trong app không có bước phán xét và không bao giờ bị nó từ chối. Ở
+ngôn ngữ khác bước kiểm tra được bỏ qua và ghi nhật ký. `lamp-voice` truyền
+đúng `on` cho worker `provider` và `second`. Khi tắt, mọi lần tạo giống hệt
+từng byte như trước.
+
 ## Gửi kỹ năng tự tạo lên Skills Store (fourteen-P13, `LAMP_SKILLS_SHARE`, bật trong sản phẩm từ 2/11, #4948)
 
 Tắt nếu không đặt `LAMP_SKILLS_SHARE=on` trong unit của `lamp-cloud` (cùng

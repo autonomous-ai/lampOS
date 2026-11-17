@@ -1070,6 +1070,17 @@ pub fn make_in(
             .and_then(|thread| thread.heard_for(made_in, std::time::Instant::now()))
             .unwrap_or_default()
     });
+    // The person's own line alone, for the judge of a made skill with no
+    // word of the ask (#7621): never the newest words heard, another
+    // utterance's, since a false refusal is worse than no check (#6537).
+    let _own = (made_in != 0 && made_skill::unrelated_on()).then(|| {
+        OwnLine::set(
+            crate::thread::THREAD
+                .lock()
+                .ok()
+                .and_then(|thread| thread.heard_in_own_line(made_in)),
+        )
+    });
     make_with_by(
         made_in,
         heard.as_deref(),
@@ -1152,6 +1163,20 @@ fn make_with_by(
     // counts: one atomic add here, written later (`crate::made_counts`).
     if made.is_err() {
         crate::made_counts::refused(&keeping.directory, made_skill::Maker::Voice);
+    }
+    // A made skill the judge said isn't what was asked (#7621): the person
+    // is asked again in the lamp's own words alone, never told its name.
+    if let Err(Refused(why, _)) = &made
+        && why == made_skill::UNRELATED
+    {
+        MADE_LINE.with(|kept| kept.replace(Some(made_skill::UNRELATED.to_owned())));
+        return json!({
+            "error": made_skill::UNRELATED,
+            "next": format!(
+                "Say exactly this and nothing else: {}",
+                made_skill::UNRELATED
+            )
+        });
     }
     let needs = made
         .as_ref()
@@ -2429,10 +2454,24 @@ fn made_and_journaled_by(
     // within one runs at night without quiet hours (Thirteen's HOLD on
     // #6103); and a write's words and recipients (#6066), with what is
     // linked now for their own address.
+    // The judge of a made skill with no word of the ask (#7621): the
+    // person's own line ([`OwnLine`], or the line given for a make called
+    // here directly), asked of the make's own chat in one short call.
+    let own_line = OWN_LINE
+        .with(std::cell::RefCell::take)
+        .unwrap_or_else(|| heard.map(str::to_owned));
+    let judge_ask = |question: &str| judged(Arc::clone(&chat), question.to_owned());
     let asked = made_skill::Asked {
         request,
         own: own_accounts_now(),
         heard,
+        judge: own_line
+            .as_deref()
+            .filter(|_| made_skill::unrelated_on())
+            .map(|line| made_skill::Judge {
+                line,
+                ask: &judge_ask,
+            }),
     };
     // Whether the last answer was the model's own `cannot:`: its reason is
     // never journaled ([`kept_line`]).
@@ -2564,6 +2603,11 @@ fn made_and_journaled_by(
             &models_cannot,
             &deepseek_repaired,
         );
+        // Judged not what was asked (#7621): asked again as it stands.
+        if matches!(&made, Err(Refused(why, _)) if why == made_skill::UNRELATED) {
+            let line = kept_line(&made, false, began.elapsed().as_millis());
+            return (made, line);
+        }
         let made = net_made(
             made,
             &needs_net,
@@ -2586,6 +2630,11 @@ fn made_and_journaled_by(
         return (plain_unless_cannot(made, models_cannot.get()), line);
     }
     let mut made = kept(ask(Arc::clone(&chat), brief.clone()));
+    // Judged not what was asked (#7621): no repair, no agent, asked again.
+    if matches!(&made, Err(Refused(why, _)) if why == made_skill::UNRELATED) {
+        let line = kept_line(&made, false, began.elapsed().as_millis());
+        return (made, line);
+    }
     if engine.is_none() {
         made = deepseek_repaired(made, Duration::ZERO);
     }
@@ -3151,6 +3200,105 @@ fn kept_line(made: &Result<Made, Refused>, models_cannot: bool, ms: u128) -> Str
         Err(Refused(why, _)) => {
             format!("lamp-voice: a skill made here wasn't kept in {ms} ms: {why}")
         }
+    }
+}
+
+/// The longest the judge of a made skill with no word of the ask is waited
+/// for (#7621): only on that path, the overlap's fast pass never waits.
+pub const JUDGE_WITHIN: Duration = Duration::from_millis(1_500);
+
+/// The most bytes of the judge's answer read, about 300 tokens.
+const JUDGE_MOST_BYTES: usize = 1_200;
+
+/// The judge's system prompt.
+const JUDGE_SYSTEM: &str = "You check whether a voice assistant made the skill a person asked \
+                            for. Answer yes or no, one word.";
+
+/// The judge's answer to `question` ([`made_skill::judge_ask`]) from the
+/// make's own chat, on a thread of its own, within [`JUDGE_WITHIN`]: yes,
+/// no, unclear, a timeout or an error, never its words.
+fn judged(
+    chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    question: String,
+) -> made_skill::Judged {
+    use made_skill::Judged;
+    // Its answer by a channel, waited on for its bound and a little more:
+    // never a join, which a DNS lookup hung on tokio's blocking pool holds
+    // past the bound (the second adversarial read's P2). A thread past it
+    // ends by itself; its answer is dropped.
+    let (sent, answered) = std::sync::mpsc::sync_channel(1);
+    let answer = std::thread::Builder::new()
+        .name("lamp-voice-make-judge".into())
+        .spawn(move || {
+            let _ = sent.send(judge_once(chat, question));
+        });
+    match answer {
+        Ok(_) => answered
+            .recv_timeout(JUDGE_WITHIN + Duration::from_millis(100))
+            .unwrap_or(Err(Judged::Timeout))
+            .unwrap_or_else(|judged| judged),
+        Err(_) => Judged::Failed,
+    }
+}
+
+/// One judge call within [`JUDGE_WITHIN`], on its own runtime ([`judged`]).
+fn judge_once(
+    chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    question: String,
+) -> Result<made_skill::Judged, made_skill::Judged> {
+    use made_skill::Judged;
+    {
+        {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|_| Judged::Failed)?;
+            let chat = chat().map_err(|_| Judged::Failed)?;
+            runtime.block_on(async {
+                tokio::time::timeout(JUDGE_WITHIN, async {
+                    let mut stream = chat
+                        .send(&[Message::system(JUDGE_SYSTEM), Message::user(&question)])
+                        .await
+                        .map_err(|_| Judged::Failed)?;
+                    let mut text = String::new();
+                    while let Some(event) = stream.next().await.map_err(|_| Judged::Failed)? {
+                        if let ChatEvent::Text(words) = event {
+                            text.push_str(&words);
+                            if text.len() > JUDGE_MOST_BYTES {
+                                break;
+                            }
+                        }
+                    }
+                    Ok(Judged::read(&text))
+                })
+                .await
+                .unwrap_or(Err(Judged::Timeout))
+            })
+        }
+    }
+}
+
+thread_local! {
+    /// The person's own line for the voice's make on this thread
+    /// ([`OwnLine`]): `Some(None)` when it isn't known.
+    static OWN_LINE: std::cell::RefCell<Option<Option<String>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// The person's own line for a voice make, held while it runs, then
+/// cleared, so no later make on this thread is judged by it.
+struct OwnLine;
+
+impl OwnLine {
+    fn set(line: Option<String>) -> Self {
+        OWN_LINE.with(|own| own.replace(Some(line)));
+        Self
+    }
+}
+
+impl Drop for OwnLine {
+    fn drop(&mut self) {
+        OWN_LINE.with(|own| own.replace(None));
     }
 }
 
@@ -3897,7 +4045,12 @@ light = { dim = 1 }
                     };
                     let body = std::str::from_utf8(&body).expect("authenticated chat body is UTF-8");
                     sent.push(body.to_owned());
-                    assert!(body.contains(made_skill::BRIEF_HEAD), "{body}");
+                    // A make's brief, or its judge's question (#7621).
+                    assert!(
+                        body.contains(made_skill::BRIEF_HEAD)
+                            || body.contains("Does the made skill do what was asked?"),
+                        "{body}"
+                    );
                     assert!(!body.contains("\"tools\""), "{body}");
                     let reply = if [200, BROKEN, STOPPED_AT_LENGTH].contains(&status) {
                         let (first, rest) = text.split_at(text.len() / 2);
@@ -4108,6 +4261,146 @@ light = { dim = 1 }
     }
 
     const REQUEST: &str = "make me a skill that dims the light at 10 pm";
+
+    /// #7621: the line heard on c0a4, transcribed whole.
+    const FOURTEEN: &str = "Lamp, make a skill: every day at four fifteen in the morning, look \
+                            up the title of the example dot com web page and tell me what it says.";
+    /// The moon-time DeepSeek made from an old ask in `request`.
+    const MOON_TIME: &str = "```skill.toml\nasks = [\"moon time\"]\nkind = \"installable\"\n\
+                             version = \"1.0.0\"\n[permissions]\nspeak = true\n[[do]]\nsay = { \
+                             text = \"The moon is moving away from Earth, a little more each \
+                             year.\" }\n```\n\n```SKILL.md\n---\nname: moon-time\ndescription: \
+                             A moon fact.\n---\n\n# Moon time\n```\n";
+
+    /// What a voice make with Fourteen's line should have asked.
+    const FOURTEEN_ASK: &str = "every day at 4:15 in the morning, look up the title of the \
+                                example.com web page and tell me what it says";
+
+    /// #7621, its switch on: moon-time, with no word of Fourteen's line, is
+    /// judged in one more call of the make's chat; its no refuses it with
+    /// no repair and no agent, nothing kept or put on, and the voice model
+    /// is told to say exactly the ask-again line, never the skill's name.
+    #[test]
+    fn a_make_judged_not_what_was_asked_is_asked_again_with_no_repair() {
+        made_skill::set_unrelated_here(Some(true));
+        made_skill::set_english_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let (root, keeping) = keeping("unrelated-judged");
+        let (url, served) =
+            service_sent(vec![(200, MOON_TIME.to_owned()), (200, "No.".to_owned())]);
+        let told = make_with(
+            7,
+            Some(FOURTEEN),
+            FOURTEEN_ASK,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 2, "the make and its judge alone: {told}");
+        assert!(sent[1].contains("Does the made skill do what was asked?"));
+        assert_eq!(told["error"], made_skill::UNRELATED, "{told}");
+        assert_eq!(
+            told["next"],
+            format!(
+                "Say exactly this and nothing else: {}",
+                made_skill::UNRELATED
+            )
+        );
+        assert!(told.get("made").is_none(), "{told}");
+        assert!(!told.to_string().to_lowercase().contains("moon"), "{told}");
+        assert_eq!(take_said_line().as_deref(), Some(made_skill::UNRELATED));
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        made_skill::set_asks_here(None);
+        made_skill::set_english_here(None);
+        made_skill::set_unrelated_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7621: what the judge adds to a make, printed: an answer at once
+    /// costs one short call; one that never comes is cut at
+    /// [`JUDGE_WITHIN`] and read as a timeout. (The overlap's fast pass,
+    /// which never calls it, is timed in `made_skill`'s tests.)
+    #[test]
+    fn the_judges_added_latency_is_bounded() {
+        let question = made_skill::judge_ask("look up the example page's title", "moon-time");
+        let (url, served) = service(vec![(200, "No.".to_owned())]);
+        let began = std::time::Instant::now();
+        let judged_now = judged(Arc::new(chat_at(url)), question.clone());
+        let at_once = began.elapsed();
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(judged_now, made_skill::Judged::No);
+        // A chat that takes the call and never answers.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/v1/", listener.local_addr().unwrap());
+        let held = std::thread::spawn(move || {
+            let (socket, _) = listener.accept().unwrap();
+            std::thread::sleep(JUDGE_WITHIN + Duration::from_secs(1));
+            drop(socket);
+        });
+        let began = std::time::Instant::now();
+        let judged_late = judged(Arc::new(chat_at(url)), question);
+        let at_bound = began.elapsed();
+        held.join().unwrap();
+        assert_eq!(judged_late, made_skill::Judged::Timeout);
+        println!(
+            "#7621 judge latency: answered at once {} ms, at its bound {} ms (bound {} ms)",
+            at_once.as_millis(),
+            at_bound.as_millis(),
+            JUDGE_WITHIN.as_millis()
+        );
+        assert!(at_once < JUDGE_WITHIN, "{at_once:?}");
+        assert!(
+            at_bound >= JUDGE_WITHIN && at_bound < JUDGE_WITHIN + Duration::from_millis(500),
+            "{at_bound:?}"
+        );
+    }
+
+    /// #7621: the same make with the judge failing (an error answer) is
+    /// kept and put on; with the switch off or the lamp not in English it
+    /// is made with no judge at all, exactly as before.
+    #[test]
+    fn a_failed_judge_or_its_switch_off_makes_as_before() {
+        made_skill::set_asks_here(Some(true));
+        for (index, (on, english, replies)) in [
+            (
+                true,
+                true,
+                vec![(200, MOON_TIME.to_owned()), (500, "busy".to_owned())],
+            ),
+            (false, true, vec![(200, MOON_TIME.to_owned())]),
+            (true, false, vec![(200, MOON_TIME.to_owned())]),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            made_skill::set_unrelated_here(Some(on));
+            made_skill::set_english_here(Some(english));
+            let (root, keeping) = keeping(&format!("unrelated-off-{index}"));
+            let calls = replies.len();
+            let (url, served) = service(replies);
+            let asked = manage_helper(&keeping.manage);
+            let told = make_with(
+                7,
+                Some(FOURTEEN),
+                FOURTEEN_ASK,
+                &keeping,
+                chat_at(url),
+                NOW,
+                || None,
+            );
+            assert_eq!(served.join().unwrap(), calls, "{index}: {told}");
+            assert_eq!(told["made"], "moon-time", "{index}: {told}");
+            assert_eq!(told["on"], true, "{index}: {told}");
+            asked.join().unwrap();
+            let _ = take_said_line();
+            let _ = std::fs::remove_dir_all(&root);
+        }
+        made_skill::set_asks_here(None);
+        made_skill::set_english_here(None);
+        made_skill::set_unrelated_here(None);
+    }
     const NOW: u64 = 1_800_000_000_000;
 
     /// Whether any kept skill in `directory` is on.
@@ -5247,6 +5540,7 @@ light = { dim = 1 }
             request: WRITE_EXAMPLE_ASKED,
             own,
             heard: Some(WRITE_EXAMPLE_ASKED),
+            judge: None,
         };
         let made = made_skill::keep_asked(&answer, false, FROM, &keeping, &asked).unwrap();
         assert_eq!(made.uses.writes, ["gmail"]);
