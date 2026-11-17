@@ -79,6 +79,9 @@ pub fn asks_to_look(opening: &str) -> bool {
 }
 
 const THERE_FOR_US: u64 = 3_000_000;
+/// How long a face must stay gone before it counts as having left
+/// ([`Presence::left_since`]): a lost frame or two is no leaving.
+const LEFT_FOR_US: u64 = 1_000_000;
 /// The file is read this often, and counts while it is this fresh.
 const READ_EVERY_US: u64 = 250_000;
 const FRESH: Duration = Duration::from_millis(1_500);
@@ -90,9 +93,15 @@ const NEAR: f32 = 0.14;
 pub struct Presence {
     path: Option<PathBuf>,
     read_us: u64,
-    near: bool,
+    /// Whether the eyes have a near face, or `None` while their file is
+    /// stale, absent or unreadable (the eyes not running): not known.
+    near: Option<bool>,
     /// Since when someone has been there without a break.
     there_since: Option<u64>,
+    /// The face that was there and left, seen leaving by fresh eyes: since
+    /// when it had been there, and since when it has been gone without a
+    /// break.
+    gone: Option<(u64, u64)>,
     /// The bus Mood's state is read from, and how familiar the remembered
     /// person at the lamp is by it (#1670): none without a fresh level.
     mood: Option<Bus>,
@@ -129,8 +138,9 @@ impl Presence {
         Self {
             path,
             read_us: 0,
-            near: false,
+            near: None,
             there_since: None,
+            gone: None,
             mood: None,
             familiar: None,
         }
@@ -142,8 +152,9 @@ impl Presence {
         self.familiar
     }
 
-    /// Whether the eyes have a near face now, from their file.
-    fn near_now(&mut self, now_us: u64) -> bool {
+    /// Whether the eyes have a near face now, from their file; `None` while
+    /// it is stale, absent or unreadable.
+    fn near_now(&mut self, now_us: u64) -> Option<bool> {
         if now_us.saturating_sub(self.read_us) < READ_EVERY_US {
             return self.near;
         }
@@ -151,17 +162,20 @@ impl Presence {
         if let Some(bus) = self.mood.as_ref() {
             self.familiar = familiar_in(bus.latest(MoodState::TOPIC).ok().flatten(), now_us);
         }
-        self.near = self.path.as_ref().is_some_and(|path| {
+        self.near = self.path.as_ref().and_then(|path| {
             let fresh = std::fs::metadata(path)
                 .and_then(|about| about.modified())
                 .ok()
                 .and_then(|at| SystemTime::now().duration_since(at).ok())
                 .is_some_and(|age| age < FRESH);
-            fresh
-                && std::fs::read_to_string(path)
-                    .ok()
-                    .and_then(|text| text.trim().parse::<f32>().ok())
-                    .is_some_and(|size| size.is_finite() && size >= NEAR)
+            if !fresh {
+                return None;
+            }
+            std::fs::read_to_string(path)
+                .ok()
+                .and_then(|text| text.trim().parse::<f32>().ok())
+                .filter(|size| size.is_finite())
+                .map(|size| size >= NEAR)
         });
         self.near
     }
@@ -172,12 +186,37 @@ impl Presence {
         self.note(near, now_us);
     }
 
-    fn note(&mut self, near: bool, now_us: u64) {
-        if near {
-            self.there_since.get_or_insert(now_us);
-        } else {
-            self.there_since = None;
+    /// Takes in whether a near face is there, `None` when not known: no one
+    /// counts as there then, and no face as having left, since the eyes
+    /// didn't see it go (a stale file is the eyes stopped, not a person
+    /// turning away).
+    fn note(&mut self, near: Option<bool>, now_us: u64) {
+        match near {
+            Some(true) => {
+                self.there_since.get_or_insert(now_us);
+                self.gone = None;
+            }
+            Some(false) => {
+                if let Some(there) = self.there_since.take() {
+                    self.gone = Some((there, now_us));
+                }
+            }
+            None => {
+                self.there_since = None;
+                self.gone = None;
+            }
         }
+    }
+
+    /// Whether the face at the lamp at `since_us` left its view after, as
+    /// the eyes saw, and has stayed gone [`LEFT_FOR_US`] by `now_us`: a note
+    /// that may end unsaid is let go then (#6543,
+    /// [`crate::say::moment_passed`]). Nobody there when it was asked, a
+    /// face that came only after, or eyes gone stale is no leaving.
+    pub fn left_since(&self, since_us: u64, now_us: u64) -> bool {
+        self.gone.is_some_and(|(there, gone)| {
+            there <= since_us && gone >= since_us && now_us.saturating_sub(gone) >= LEFT_FOR_US
+        })
     }
 
     /// Whether someone has been at the lamp for a moment now.
@@ -247,13 +286,52 @@ mod tests {
     #[test]
     fn someone_is_present_after_three_seconds_and_gone_at_once() {
         let mut presence = Presence::new(None);
-        presence.note(true, S);
+        presence.note(Some(true), S);
         assert!(!presence.present(3 * S));
         assert!(presence.present(4 * S));
-        presence.note(true, 4 * S);
+        presence.note(Some(true), 4 * S);
         assert!(presence.present(4 * S), "still the same sitting");
-        presence.note(false, 5 * S);
+        presence.note(Some(false), 5 * S);
         assert!(!presence.present(5 * S));
+    }
+
+    /// #6543: a face that was there and left after a note was asked, and
+    /// stayed gone a second, has left since then; a lost frame, a face
+    /// gone before the ask, a face that came only after it, eyes gone stale,
+    /// or nobody there at all has not.
+    #[test]
+    fn a_face_left_since_an_ask_only_once_gone_a_second() {
+        let mut presence = Presence::new(None);
+        presence.note(Some(false), S);
+        assert!(!presence.left_since(0, 10 * S), "nobody was there");
+        presence.note(Some(true), 2 * S);
+        presence.note(Some(false), 5 * S);
+        assert!(
+            !presence.left_since(4 * S, 5 * S + S / 2),
+            "gone half a second"
+        );
+        assert!(presence.left_since(4 * S, 6 * S));
+        assert!(!presence.left_since(6 * S, 7 * S), "gone before the ask");
+        presence.note(Some(false), 6 * S);
+        assert!(presence.left_since(4 * S, 6 * S), "still gone since 5 s");
+        presence.note(Some(true), 7 * S);
+        assert!(!presence.left_since(4 * S, 9 * S), "back again");
+        presence.note(Some(false), 9 * S);
+        assert!(
+            !presence.left_since(6 * S + S / 2, 11 * S),
+            "came only after the ask"
+        );
+        presence.note(Some(true), 12 * S);
+        presence.note(Some(false), 14 * S);
+        assert!(presence.left_since(13 * S, 15 * S));
+        presence.note(None, 15 * S);
+        assert!(
+            !presence.left_since(13 * S, 16 * S),
+            "the eyes went stale: not seen leaving"
+        );
+        presence.note(Some(true), 17 * S);
+        presence.note(None, 18 * S);
+        assert!(!presence.present(21 * S), "nobody known there while stale");
     }
 
     /// #1670: Mood's familiar level is read from source `mood` only, fresh,
@@ -350,14 +428,22 @@ mod tests {
         std::fs::create_dir_all(&directory).unwrap();
         let path = directory.join("present");
         let mut arrival = Presence::new(Some(path.clone()));
-        assert!(!arrival.near_now(S));
+        assert_eq!(arrival.near_now(S), None, "no file: not known");
         std::fs::write(&path, "0.21\n").unwrap();
-        assert!(!arrival.near_now(S + 1), "read at most four times a second");
-        assert!(arrival.near_now(2 * S));
+        assert_eq!(
+            arrival.near_now(S + 1),
+            None,
+            "read at most four times a second"
+        );
+        assert_eq!(arrival.near_now(2 * S), Some(true));
         std::fs::write(&path, "0.09\n").unwrap();
-        assert!(!arrival.near_now(3 * S), "a face across the room");
+        assert_eq!(
+            arrival.near_now(3 * S),
+            Some(false),
+            "a face across the room"
+        );
         std::fs::write(&path, "not a number").unwrap();
-        assert!(!arrival.near_now(4 * S));
+        assert_eq!(arrival.near_now(4 * S), None);
         std::fs::write(&path, "0.30").unwrap();
         let old = SystemTime::now() - Duration::from_secs(5);
         std::fs::File::options()
@@ -366,7 +452,7 @@ mod tests {
             .unwrap()
             .set_modified(old)
             .unwrap();
-        assert!(!arrival.near_now(5 * S), "the eyes stopped writing");
+        assert_eq!(arrival.near_now(5 * S), None, "the eyes stopped writing");
         std::fs::remove_dir_all(&directory).unwrap();
     }
 }

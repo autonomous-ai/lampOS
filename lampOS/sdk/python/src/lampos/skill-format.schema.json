@@ -1285,6 +1285,10 @@
             "question": {
               "description": "With a note, in a skill given who: the hello may ask the one question its note asks (#5207).",
               "type": "boolean"
+            },
+            "may_end_unsaid": {
+              "description": "With a note: the voice may let it go, never begun, once its moment has passed (someone heard, or the face gone) since it was asked; its run is given back (#6543).",
+              "type": "boolean"
             }
           }
         }

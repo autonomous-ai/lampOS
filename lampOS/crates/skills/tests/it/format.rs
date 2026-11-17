@@ -598,3 +598,28 @@ fn the_schemas_lists_are_the_codes() {
         [SkillKind::Core, SkillKind::Installable, SkillKind::Addon].map(SkillKind::name)
     );
 }
+
+/// A `say` table's keys in the schema are the code's (#6543: a key the
+/// loader took, the schema refused, and no test saw it).
+#[test]
+fn the_schemas_say_table_keys_are_the_codes() {
+    let tables: Vec<Vec<String>> = schema()["$defs"]["say"]["oneOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|form| form["required"].as_array().is_none())
+        .filter_map(|form| form["properties"].as_object())
+        .map(|keys| keys.keys().cloned().collect())
+        .collect();
+    let mut code: Vec<String> = lamp_skills::SAY_TABLE_KEYS
+        .iter()
+        .map(|key| key.to_string())
+        .collect();
+    code.sort();
+    let mut table = match tables.as_slice() {
+        [one] => one.clone(),
+        other => panic!("one say table of words in the schema, not {other:?}"),
+    };
+    table.sort();
+    assert_eq!(table, code);
+}
