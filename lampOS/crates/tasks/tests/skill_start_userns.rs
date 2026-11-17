@@ -393,6 +393,14 @@ const RUN_SECRET: &str = "run-file-7024";
 /// What a settings file under the `/etc/lampOS` stand-in holds.
 const ETC_SECRET: &str = "etc-file-7024";
 
+/// Cargo's per-target temp folder, made if missing: CI can run the test
+/// binaries after `target/tmp` is gone.
+fn target_tmp() -> &'static str {
+    let dir = env!("CARGO_TARGET_TMPDIR");
+    std::fs::create_dir_all(dir).unwrap();
+    dir
+}
+
 /// #7024 on the real kernel: lamp-tasks (this process) serves the launcher
 /// socket and starts the run's fence itself with the real `fence_args`, for
 /// `script_text` in the skill's folder as `script_name`, run by
@@ -418,7 +426,7 @@ fn run_beside_gateway(
     // Not under /tmp: the fence puts a tmpfs of its own over /tmp.
     let base = tempfile::Builder::new()
         .prefix("ss7024")
-        .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
+        .tempdir_in(target_tmp())
         .unwrap();
     let base_path = base.path().to_owned();
     let start = base_path.join("start");
@@ -833,7 +841,7 @@ fn the_fence_runs_only_the_run_folder_lamp_tasks_saw() {
     }
     let base = tempfile::Builder::new()
         .prefix("ss7024ino")
-        .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
+        .tempdir_in(target_tmp())
         .unwrap();
     let run = base.path().join("project/skill-task-1");
     let skill = base.path().join("skill");
