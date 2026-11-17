@@ -2134,6 +2134,38 @@ fn the_product_asks_a_holding_answer_to_go_on_in_the_voice_alone() {
     assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
 }
 
+/// A made skill started on a request said to the lamp (#6526,
+/// `LAMP_MADE_SKILL_SAID`): `on` once in the two units that read it,
+/// `lamp-voice` (makes the skill, both routes) and `lamp-skills`' manage
+/// helper (holds its said start as it is put on,
+/// `made_skill::written_capped`), and in no other product unit: with it on
+/// in the voice alone, such a skill would be refused at install.
+#[test]
+fn the_product_turns_a_said_start_on_in_its_two_units() {
+    let name = lamp_voice::made_skill::SAID_ENVIRONMENT;
+    assert_eq!(name, "LAMP_MADE_SKILL_SAID");
+    let owners = ["lamp-voice.service", "lamp-skills-manage@.service"];
+    let line = format!("Environment={name}=on");
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|set| **set == line)
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|set| !set.starts_with('#') && set.contains(name))
+            .count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+        assert_eq!(mentioned, on, "{unit}: {name}");
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner} is not a product unit"
+        );
+    }
+}
+
 /// A made skill's write goes out after its owner's yes in the product
 /// (#6066, #6142): the owner's ask on 11 Nov, so the testers can try it.
 /// `LAMP_SKILL_WRITES=on` in the four units that read it, `lamp-services`

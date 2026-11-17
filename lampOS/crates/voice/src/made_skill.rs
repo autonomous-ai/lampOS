@@ -232,8 +232,8 @@ fn least_say_cooldown_secs() -> u64 {
 }
 
 /// The switch for a made skill that starts on a request said to the lamp
-/// (#6526, the first builder's design): `on` only, off unless set, in no
-/// product unit. Off, the making model is never told of a said start, any
+/// (#6526, the first builder's design): `on` only, off unless set, on in
+/// the product. Off, the making model is never told of a said start, any
 /// `[said]` in its answer is refused as any part a made skill can't have,
 /// and a trigger on what the microphone hears stays what the lamp can't do
 /// yet ([`topic_cant_yet`]), exactly as before. On, "when I tell you I'm
@@ -244,7 +244,7 @@ fn least_say_cooldown_secs() -> u64 {
 /// matched and no words kept. A trigger on `voice/heard` or `name/heard`
 /// is refused as before, switch on or off. Read by the two routes, the
 /// app's make and the manage helper ([`put_on_cap`]): set it alike in
-/// `lamp-voice` and `lamp-skills-manage@`.
+/// `lamp-voice` and `lamp-skills-manage@`, as the product does.
 pub const SAID_ENVIRONMENT: &str = "LAMP_MADE_SKILL_SAID";
 
 thread_local! {

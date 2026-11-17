@@ -438,6 +438,8 @@ Environment=LAMP_AGENT_SERVICES=on
 Environment=LAMP_MADE_SKILL_LOOSE=on
 # #7233, docs/skills.md; also in lamp-skills, -manage@, -cloud, -control
 Environment=LAMP_MADE_SKILL_ASKS=on
+# #6526, docs/skills.md; first builder, 17 Nov
+Environment=LAMP_MADE_SKILL_SAID=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill
