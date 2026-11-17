@@ -2935,7 +2935,7 @@ until its lamp check. Both yeses stay off by default.
   which has the slide) is a slide lamp: no `room_sounds` in either reply,
   and a set of it refused. Seen activity (#6543, `seen_activity`) the same
   way, only where lamp-seen looks: `lamp-cloud`'s own
-  `LAMP_SEEN_ACTIVITY=on` exactly; lamp-seen reads its yes every 2 s, so
+  `LAMP_SEEN_ACTIVITY=on` exactly, which the product unit sets; lamp-seen reads its yes every 2 s, so
   nothing restarts ([onboarding.md](onboarding.md), "Seen activity").
 - **Reading** (`consent.get`): the files in `/var/lib/lampOS/consent`, which
   `lampos` may read (0750 `root:lampos`, files 0640), with the readers' rule:

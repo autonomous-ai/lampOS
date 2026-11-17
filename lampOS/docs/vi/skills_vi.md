@@ -3622,6 +3622,14 @@ Anh, "Its keys, given in the app".
 
 Bảng đầy đủ các khóa trigger ở [skills.md](../skills.md).
 
+## Trigger đến sớm hơn (`trigger.sooner`, #3709, `LAMP_YAWN_SOONER`, bật trong sản phẩm)
+
+| Khóa | Bắt buộc | Ý nghĩa |
+|------|----------|---------|
+| `trigger.sooner` | không | `{ topic = T, field = F, above = N, for = D }` (#3709): trong khi F của giá trị mới nhất còn hạn của T lớn hơn N, trigger chỉ cần đã giữ D, ngắn hơn `for` của chính nó (trigger phải có `for`; D bằng 0 hoặc dài hơn bị từ chối lúc nạp). Nó cũng có thể là một danh sách các bảng như vậy (#6543), `sooner = [{ … }, { … }]`: mỗi bảng được kiểm tra lúc nạp như khi đứng một mình (danh sách rỗng bị từ chối), và trong các bảng đang giữ tại một thời điểm, `for` ngắn nhất thắng; một bảng và danh sách chỉ có bảng đó hoạt động như nhau. Chủ đề của mỗi mục chỉ được đọc nếu `[permissions] topics` liệt kê nó. Với `rearm`, mỗi lần giữ nó vẫn chỉ lấy một cơ hội: được đưa lên sớm, không bao giờ hai lần. Chỉ có hiệu lực với `LAMP_YAWN_SOONER=on` trong `lamp-skills` (bật trong unit sản phẩm, #6543); tắt thì nó được đọc, kiểm tra và bỏ qua. Stretch break có `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`: một cái ngáp mà eyes thấy trong lần ngồi này (`LAMP_EYES_YAWN=on`) đưa lời nhắc vươn vai về 30 phút, như luật ngáp của V1. Vì `LAMP_EYES_YAWN` chưa có trong unit sản phẩm nào, eyes không đếm cái ngáp nào, nên trong sản phẩm nó chưa làm gì. Test: `a_yawn_in_the_sitting_brings_the_stretch_forward_once`, `a_list_of_sooners_brings_the_trigger_to_the_shortest_holding` |
+
+`sooner` của một điều kiện `[[while]]` (#6543, cùng `LAMP_YAWN_SOONER=on`) hạ `above` của chính điều kiện đó xuống con số kỹ năng tự nêu, xem [skills.md](../skills.md).
+
 ## Điều kiện `[[while]]` khi chủ đề đã hết hạn (`unknown = "holds_stale"`, #6543)
 
 | Giá trị | Ý nghĩa |
@@ -4362,7 +4370,8 @@ của tool) và `voice/decision` (các tool mà một lượt nói đã gọi) n
 trong hai chủ đề này trong `[permissions] topics` đều bị từ chối lúc nạp
 (`[permissions] topics: <topic> is never a skill's to read`).
 `humans/doing_more` (mệt, việc ở bàn theo loại thô
-và ăn mừng, `lamp-seen` chỉ phát khi `LAMP_SEEN_MORE_DOINGS=on`) là một chủ
+và ăn mừng, `lamp-seen` chỉ phát khi `LAMP_SEEN_MORE_DOINGS=on`, bật trong
+sản phẩm) là một chủ
 đề riêng: kỹ năng ghi nó hiện quyền dùng `seen_more`, riêng tư và tách khỏi
 `seen`, nên kỹ năng được `humans/doing` không bao giờ nhận nó. Chưa kỹ năng
 nào đọc nó. **Lời đồng ý seen_more của chủ đèn** (#6543): kỹ năng ghi chủ
@@ -4421,7 +4430,8 @@ của trigger, không có khoảng dư: nếu lúc đến bàn của lamp-seen (
 khi có `room/stood_up`) muộn hơn lần ngồi mà trigger đếm (lần ngồi này vẫn
 giữ qua các khoảng trống tới 2 phút), lời nhắc phải chờ bộ đếm, và chờ quá
 `wait` của trigger thì mất lời nhắc của lần ngồi đó.
-Khi `LAMP_SEEN_BREAK_IS_STANDING=on` (#6543 bước 2, [seen.md](../seen.md)),
+Khi `LAMP_SEEN_BREAK_IS_STANDING=on` (#6543 bước 2, bật trong sản phẩm,
+[seen.md](../seen.md)),
 nghỉ giải lao là đứng dậy, không phải vươn vai: `break_s_ago` đếm từ lúc
 người đó quay lại sau `room/stood_up`, và thấy vươn vai không còn đặt lại nó.
 Vì vậy Đứng dậy và Vươn vai giữ lời nhắc sau một lần thật sự đứng dậy, kể cả

@@ -2591,6 +2591,9 @@ pub fn serve(
     } else {
         declare
     };
+    // Seen activity's offer is never made during setup's walk (#6543),
+    // whatever `LAMP_SECOND_WHILE_THEY_APPLY` says.
+    let declare = without_desk_offer_in_walk(declare);
     // Texts from the Autonomous app (#1673): a client of their own, on the
     // same model, beside the spoken turns.
     let texts = match (&files.bus_root, files.messages) {
@@ -2626,6 +2629,7 @@ pub fn serve(
     } else {
         spoken_declare
     };
+    let spoken_declare = without_desk_offer_in_walk(spoken_declare);
     // A few emotion tags, given to the voice only when it reads them
     // (ElevenLabs, with a model that reads them, the speech socket's too),
     // with `LAMP_SECOND_SPEECH_TAGS=on` (#2901).
@@ -6203,6 +6207,27 @@ pub(crate) fn applying(mut tools: Vec<lamp_gemini::Tool>, walk: bool) -> Vec<lam
     tools
 }
 
+/// `declare` without seen activity's offer (`seen_yes::OFFER`) while
+/// setup's walk is under way ([`crate::onboarding::under_way_now`], told to
+/// this worker with each turn), always, not behind a switch: the offer asks
+/// the owner to let pictures go to the cloud, and setup's walk is no time to
+/// ask it (the first builder's condition on #7506). Without the offer the
+/// owner's yes (`look_at_my_desk`) has nothing to answer, so it is refused
+/// as before an offer.
+fn without_desk_offer_in_walk(
+    declare: crate::second_provider::net::Declare,
+) -> crate::second_provider::net::Declare {
+    Arc::new(move || no_desk_offer_in_walk(declare(), crate::onboarding::under_way_now()))
+}
+
+/// `tools` without `seen_yes::OFFER` while `walk`.
+fn no_desk_offer_in_walk(mut tools: Vec<lamp_gemini::Tool>, walk: bool) -> Vec<lamp_gemini::Tool> {
+    if walk {
+        tools.retain(|tool| tool.name != crate::seen_yes::OFFER);
+    }
+    tools
+}
+
 #[cfg(test)]
 mod while_they_apply_tests {
     use super::*;
@@ -6238,6 +6263,45 @@ mod while_they_apply_tests {
         // A late call is still the walk's: routed by its name, whatever the
         // request was given.
         assert!(crate::onboarding::is_tool(crate::onboarding::STEP));
+    }
+
+    /// Seen activity's offer is left out of every request while setup's
+    /// walk is under way, with or without `LAMP_SECOND_WHILE_THEY_APPLY`,
+    /// and given again once it ends (#6543, the first builder's condition
+    /// on #7506).
+    #[test]
+    fn the_desk_offer_is_never_made_during_setups_walk() {
+        let mut declared = vec![lamp_gemini::Tool {
+            name: "light_on".into(),
+            description: "Turn the light on.".into(),
+            parameters: None,
+            silent: false,
+        }];
+        declared.extend(crate::onboarding::tools());
+        declared.extend(crate::seen_yes::tools());
+        let all = names(&declared);
+        let source = declared.clone();
+        let plain = without_desk_offer_in_walk(Arc::new(move || source.clone()));
+        let source = declared.clone();
+        let they_apply =
+            without_desk_offer_in_walk(while_they_apply(Arc::new(move || source.clone())));
+        crate::onboarding::set_under_way(true);
+        for declare in [&plain, &they_apply] {
+            let told = names(&declare());
+            assert!(
+                !told.iter().any(|name| name == crate::seen_yes::OFFER),
+                "during the walk: {told:?}"
+            );
+            assert!(told.iter().any(|name| name == "light_on"), "{told:?}");
+        }
+        crate::onboarding::set_under_way(false);
+        assert_eq!(names(&plain()), all, "after the walk");
+        assert!(
+            names(&they_apply())
+                .iter()
+                .any(|name| name == crate::seen_yes::OFFER),
+            "after the walk, with the switch"
+        );
     }
 }
 

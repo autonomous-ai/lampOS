@@ -46,7 +46,11 @@ const SERVICES: &str = "services";
 
 /// The lamp's own functions a product lamp's chat request offers now, on the
 /// product's route (`LAMP_VOICE_ROUTE=second`, bound
-/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 30 (lamp-services'
+/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 32 (seen
+/// activity's `look_at_my_desk` and `stop_looking_at_my_desk` since
+/// `LAMP_SEEN_ACTIVITY` is on in the product, #6543, its
+/// `offer_desk_noticing` not, `LAMP_SEEN_VOICE_OFFER` being off in the
+/// product, and before them 30: lamp-services'
 /// `services_connected`, `service_read` and `service_write` since
 /// `LAMP_SERVICES` is on in the product, and before them 27, with
 /// onboarding's two and memory's `forget_everything` since 25 Oct,
@@ -67,14 +71,14 @@ const SERVICES: &str = "services";
 /// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,
 /// were 3 before it; the FAQ's `lamp_help` since #5790, Light show's
 /// `light_show` since #5745, Light scenes' `light_scene` and Point the
-/// light's `point_light` since #5744): 48, and 52 with the route's 4 (the
-/// search, its fetch, the weather and the look), past the bound of 48 it
-/// had until #7433, which left out the fetch, the time elsewhere,
-/// `reports_state` and the weather on every lamp. However many skills
+/// light's `point_light` since #5744): 50, and 54 with the route's 4 (the
+/// search, its fetch, the weather and the look), within the bound of 64;
+/// 52 was past the bound of 48 it had until #7433, which left out the
+/// fetch, the time elsewhere, `reports_state` and the weather on every lamp. However many skills
 /// are installed, the skills' stay 1. The test prints this split. A change
 /// to it is a change to what every session is told: say in its pull
 /// request what is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 48;
+const PRODUCT_FUNCTIONS: usize = 50;
 
 /// The lamp's own with `LAMP_HARD_ASKS_TO_AGENT` on (off in the product, a
 /// lamp's drop-in): [`PRODUCT_FUNCTIONS`] and the lamp's agent's

@@ -47,6 +47,14 @@ pub const FLAG: &str = "--seen-activity";
 pub const POSTURE_ENVIRONMENT: &str = "LAMP_SEEN_POSTURE";
 /// The provider worker's flag for it, right after [`FLAG`].
 pub const POSTURE_FLAG: &str = "--seen-posture";
+/// The voice's own offer (`on` only, with [`ENVIRONMENT`]): only with it is
+/// [`OFFER`] declared and routed, so the owner's spoken yes can be asked
+/// for. Off unless set, and off in the product (the first builder on
+/// #7506): the yes comes from the app's button instead, while
+/// [`LOOK`] (refused with no offer just before) and [`STOP`] stay.
+pub const OFFER_ENVIRONMENT: &str = "LAMP_SEEN_VOICE_OFFER";
+/// The provider worker's flag for it, after [`POSTURE_FLAG`].
+pub const OFFER_FLAG: &str = "--seen-voice-offer";
 /// The function the model calls first, to say the disclosure.
 pub const OFFER: &str = "offer_desk_noticing";
 /// The function the model calls on the owner's yes to the offer.
@@ -55,20 +63,26 @@ pub const LOOK: &str = "look_at_my_desk";
 pub const STOP: &str = "stop_looking_at_my_desk";
 
 /// What the lamp says before any yes, the PM's wording on #6543 with the
-/// lead's "you or anyone else" (#1711, no stranger check): what it
-/// notices, that pictures go to Autonomous's server to be recognised and
-/// are deleted once checked, that the light shows each send, and that a
+/// first builder's c6957770745 and the lead's "you or anyone else"
+/// (#1711, no stranger check): what it notices (eating, drinking, a
+/// break, looking tired, celebrating) and that it reacts to it, that
+/// pictures go to Autonomous's server to be labelled and are deleted once
+/// checked, that the light shows each send, and that a
 /// stop works any time. "Deleted once they're checked" waits on the
 /// backend's written retention confirmation before the switch goes on
 /// (#6912).
-pub const SEEN_DISCLOSURE: &str = "I can notice when you eat, drink or take a break, so my reminders fit better. To do that, while you or anyone else is at the desk I'd send a few pictures from my camera to Autonomous's server to be recognised, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?";
+pub const SEEN_DISCLOSURE: &str = "I can notice when you eat, drink, take a break, look tired or celebrate, and I react to what I notice. To do that, while you or anyone else is at the desk I'd send a few pictures from my camera to Autonomous's server to be labelled, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?";
 /// [`SEEN_DISCLOSURE`] with posture on.
-pub const SEEN_DISCLOSURE_POSTURE: &str = "I can notice when you eat, drink or take a break, and how you're sitting, so my reminders fit better. To do that, while you or anyone else is at the desk I'd send a few pictures from my camera to Autonomous's server to be recognised, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?";
+pub const SEEN_DISCLOSURE_POSTURE: &str = "I can notice when you eat, drink, take a break, look tired or celebrate, and how you're sitting, and I react to what I notice. To do that, while you or anyone else is at the desk I'd send a few pictures from my camera to Autonomous's server to be labelled, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?";
 
 /// Told with the disclosure.
 pub const OFFER_SAY: &str = "Say exactly the words in \"say\", and nothing else, then wait for their answer. Only a plain yes in their very next words is a yes: then call look_at_my_desk.";
 /// Refused: no offer was said just before.
 pub const OFFER_FIRST: &str = "Not done: it must be offered first, in the lamp's own words, and only a yes right after counts. If they asked you to notice what they do at the desk, call offer_desk_noticing; if they only asked you to look at something, just look.";
+/// Refused with the voice's own offer off ([`OFFER_ENVIRONMENT`] unset, as
+/// in the product): [`OFFER`] is not declared, so the model is told the
+/// yes is the app's (Heron on #7506), never to call it.
+pub const APP_FIRST: &str = "Not done: they turn this on in the app, under Desk noticing; the lamp can't turn it on by voice yet. If they asked you to notice what they do at the desk, say so in a few words; if they only asked you to look at something, just look.";
 /// Kept: lamp-seen says what it will look for.
 pub const LOOKING: &str = "Done. The lamp says itself, in its own words, what it will look for, so say nothing more about it.";
 /// Kept already.
@@ -85,14 +99,18 @@ pub const STOPPED: &str =
 pub const NOT_LOOKING: &str =
     "It was not on: say in a few words that you are not looking at their desk.";
 
-/// The provider worker's flags: [`FLAG`] with the switch `on`, and
-/// [`POSTURE_FLAG`] after it with posture `on` too.
-pub fn arguments(value: Option<&str>, posture: Option<&str>) -> Vec<String> {
+/// The provider worker's flags: [`FLAG`] with the switch `on`, then
+/// [`POSTURE_FLAG`] with posture `on` too and [`OFFER_FLAG`] with the
+/// voice's offer `on` too.
+pub fn arguments(value: Option<&str>, posture: Option<&str>, offer: Option<&str>) -> Vec<String> {
     let mut flags = Vec::new();
     if value == Some("on") {
         flags.push(FLAG.to_owned());
         if posture == Some("on") {
             flags.push(POSTURE_FLAG.to_owned());
+        }
+        if offer == Some("on") {
+            flags.push(OFFER_FLAG.to_owned());
         }
     }
     flags
@@ -289,14 +307,16 @@ fn owners_spoken_yes(
 }
 
 /// `call` for the line `request` (`heard`: spoken at the lamp; `lease`, its
-/// memory scope; `posture`, `LAMP_SEEN_POSTURE`): the offer said, the
-/// owner's yes kept, or the yes taken back, and what the model is told.
+/// memory scope; `posture`, `LAMP_SEEN_POSTURE`; `offer`,
+/// `LAMP_SEEN_VOICE_OFFER`): the offer said, the owner's yes kept, or the
+/// yes taken back, and what the model is told.
 pub fn run(
     call: &ToolCall,
     request: u64,
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
     posture: bool,
+    offer_on: bool,
 ) -> Value {
     let Ok(mut offer) = OFFERED.lock() else {
         return json!({"ok": false, "note": NOT_KEPT});
@@ -310,6 +330,7 @@ pub fn run(
             run_at(
                 &path(),
                 LOOK,
+                offer_on,
                 answered,
                 owners,
                 now_unix_s(),
@@ -318,7 +339,7 @@ pub fn run(
         }
         _ => {
             drop(offer);
-            run_at(&path(), STOP, false, false, 0, || None)
+            run_at(&path(), STOP, offer_on, false, false, 0, || None)
         }
     }
 }
@@ -343,13 +364,15 @@ fn offered(offer: &mut Offer, request: u64, heard: bool, posture: bool) -> Value
     json!({"ok": true, "say": say, "note": OFFER_SAY})
 }
 
-/// [`run`] at `path` for `look_at_my_desk` and the stop: `answered`, the
+/// [`run`] at `path` for `look_at_my_desk` and the stop: `offer_on`, the
+/// voice's own offer is declared ([`OFFER_ENVIRONMENT`]); `answered`, the
 /// call's line is the very next after the offer, played whole; `owners`, it is the
 /// owner's own spoken yes; `at`, now in Unix seconds; `group`, the reader
 /// group's id, asked only for a yes to keep.
 fn run_at(
     path: &Path,
     name: &str,
+    offer_on: bool,
     answered: bool,
     owners: bool,
     at: u64,
@@ -359,7 +382,8 @@ fn run_at(
     if name == LOOK {
         if !answered {
             eprintln!("lamp-voice: a yes to seen activity with no offer just before: not kept");
-            return json!({"ok": false, "note": OFFER_FIRST});
+            let note = if offer_on { OFFER_FIRST } else { APP_FIRST };
+            return json!({"ok": false, "note": note});
         }
         if !owners {
             eprintln!("lamp-voice: a yes to seen activity not the owner's own line: not kept");
@@ -451,11 +475,20 @@ mod tests {
 
     #[test]
     fn declared_only_with_the_switch_on_exactly() {
-        assert_eq!(arguments(Some("on"), None), [FLAG]);
-        assert_eq!(arguments(Some("on"), Some("on")), [FLAG, POSTURE_FLAG]);
-        assert!(arguments(None, Some("on")).is_empty());
+        assert_eq!(arguments(Some("on"), None, None), [FLAG]);
+        assert_eq!(
+            arguments(Some("on"), Some("on"), None),
+            [FLAG, POSTURE_FLAG]
+        );
+        assert_eq!(
+            arguments(Some("on"), Some("on"), Some("on")),
+            [FLAG, POSTURE_FLAG, OFFER_FLAG]
+        );
+        assert_eq!(arguments(Some("on"), None, Some("on")), [FLAG, OFFER_FLAG]);
+        assert!(arguments(None, Some("on"), Some("on")).is_empty());
         for value in [None, Some("yes"), Some("ON"), Some("")] {
-            assert!(arguments(value, None).is_empty(), "{value:?}");
+            assert!(arguments(value, None, None).is_empty(), "{value:?}");
+            assert_eq!(arguments(Some("on"), None, value), [FLAG], "{value:?}");
         }
         assert!(is_tool(OFFER) && is_tool(LOOK) && is_tool(STOP) && !is_tool("look"));
         assert_eq!(
@@ -485,19 +518,25 @@ mod tests {
     fn the_disclosure_names_the_server_and_posture_only_when_on() {
         for line in [SEEN_DISCLOSURE, SEEN_DISCLOSURE_POSTURE] {
             assert!(
-                line.contains("to Autonomous's server to be recognised"),
+                line.contains("to Autonomous's server to be labelled"),
                 "{line}"
             );
             assert!(line.contains("they're deleted once they're checked"));
             assert!(line.contains("My light shows each time I send one"));
             assert!(line.contains("tell me to stop any time") && line.ends_with("Shall I?"));
+            // What the yes covers, the first builder's c6957770745: tired
+            // and celebrating as well as eating and drinking, and a reaction.
+            assert!(line.starts_with(
+                "I can notice when you eat, drink, take a break, look tired or celebrate,"
+            ));
+            assert!(line.contains("and I react to what I notice."));
         }
         assert_eq!(
             SEEN_DISCLOSURE_POSTURE,
-            SEEN_DISCLOSURE.replacen("take a break", "take a break, and how you're sitting", 1)
+            SEEN_DISCLOSURE.replacen("celebrate,", "celebrate, and how you're sitting,", 1)
         );
         assert!(!SEEN_DISCLOSURE.contains("sitting"));
-        assert!(SEEN_DISCLOSURE_POSTURE.contains("take a break, and how you're sitting,"));
+        assert!(SEEN_DISCLOSURE_POSTURE.contains("celebrate, and how you're sitting,"));
         let mut offer = Offer::default();
         assert_eq!(offered(&mut offer, 4, true, false)["say"], SEEN_DISCLOSURE);
         assert_eq!(
@@ -628,7 +667,7 @@ mod tests {
         // "Look at my desk, where are my keys?": no offer, so no yes,
         // even the owner's.
         assert_eq!(
-            run_at(&path, LOOK, false, true, 7, || panic!("no write")),
+            run_at(&path, LOOK, true, false, true, 7, || panic!("no write")),
             json!({"ok": false, "note": OFFER_FIRST})
         );
         assert!(!path.exists());
@@ -639,20 +678,23 @@ mod tests {
         offer.began(42);
         let answered = offer.answered_in(42);
         assert_eq!(
-            run_at(&path, LOOK, answered, true, 7, || panic!("no write"))["note"],
+            run_at(&path, LOOK, true, answered, true, 7, || panic!("no write"))["note"],
             OFFER_FIRST
         );
         // A guest's yes, or a television's (no owner seen, no owner's
         // voice), in the very next turn: not the owner's.
         assert_eq!(
-            run_at(&path, LOOK, true, false, 7, || panic!("no write")),
+            run_at(&path, LOOK, true, true, false, 7, || panic!("no write")),
             json!({"ok": false, "note": OWNER_ONLY})
         );
         assert!(!path.exists());
         // Through the route, with no offer pending for these requests.
-        assert_eq!(run(&call(LOOK), 1, true, None, false)["note"], OFFER_FIRST);
         assert_eq!(
-            run(&call(OFFER), 2, false, None, false)["say"],
+            run(&call(LOOK), 1, true, None, false, true)["note"],
+            OFFER_FIRST
+        );
+        assert_eq!(
+            run(&call(OFFER), 2, false, None, false, true)["say"],
             SEEN_DISCLOSURE
         );
         let _ = std::fs::remove_dir_all(folder);
@@ -672,7 +714,7 @@ mod tests {
         // The reader group's: 0640 and that group (here the test's own).
         let group = std::fs::metadata(&folder).unwrap().gid();
         assert_eq!(
-            run_at(&path, LOOK, answered, true, 7, || Some(group)),
+            run_at(&path, LOOK, true, answered, true, 7, || Some(group)),
             json!({"ok": true, "note": LOOKING})
         );
         assert_eq!(
@@ -687,7 +729,7 @@ mod tests {
         assert!(read.yes && !read.by_app() && read.at_unix_s == Some(7));
         // Said again, kept as it was: lamp-seen says nothing new.
         assert_eq!(
-            run_at(&path, LOOK, true, true, 9, || panic!("no write")),
+            run_at(&path, LOOK, true, true, true, 9, || panic!("no write")),
             json!({"ok": true, "note": LOOKING_ALREADY})
         );
         assert_eq!(
@@ -696,7 +738,7 @@ mod tests {
         );
         // With no group known, root's alone.
         std::fs::remove_file(&path).unwrap();
-        run_at(&path, LOOK, true, true, 8, || None);
+        run_at(&path, LOOK, true, true, true, 8, || None);
         let mode = std::fs::metadata(&path).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o600);
         let _ = std::fs::remove_dir_all(folder);
@@ -706,16 +748,16 @@ mod tests {
     fn stop_and_any_forget_take_it_back() {
         let folder = folder("stop");
         let path = file_in(&folder);
-        run_at(&path, LOOK, true, true, 7, || None);
+        run_at(&path, LOOK, true, true, true, 7, || None);
         assert!(path.exists());
         // Anyone's stop, the owner's or not, with no offer.
         assert_eq!(
-            run_at(&path, STOP, false, false, 9, || panic!("no write")),
+            run_at(&path, STOP, true, false, false, 9, || panic!("no write")),
             json!({"ok": true, "note": STOPPED})
         );
         assert!(!path.exists());
         assert_eq!(
-            run_at(&path, STOP, false, false, 9, || None),
+            run_at(&path, STOP, true, false, false, 9, || None),
             json!({"ok": true, "note": NOT_LOOKING})
         );
         // An app yes too (`"by":"app"`), and with none there nothing.
@@ -734,7 +776,7 @@ mod tests {
         // A removal that fails says not done.
         std::fs::create_dir(&path).unwrap();
         assert_eq!(
-            run_at(&path, STOP, true, true, 9, || None),
+            run_at(&path, STOP, true, true, true, 9, || None),
             json!({"ok": false, "note": NOT_KEPT})
         );
         let _ = std::fs::remove_dir_all(folder);

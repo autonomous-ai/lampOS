@@ -256,6 +256,9 @@ pub struct Settings {
     pub seen_activity: bool,
     /// With it, posture too: the offer names it (`LAMP_SEEN_POSTURE=on`).
     pub seen_posture: bool,
+    /// With it, the voice's own offer, `offer_desk_noticing`
+    /// (`LAMP_SEEN_VOICE_OFFER=on`, off in the product).
+    pub seen_voice_offer: bool,
     /// The app's off button turns the lamp off (`LAMP_SHUTDOWN=on`,
     /// shutdown.md): only then is a model with no `prepare_to_unplug` told
     /// to say so ([`crate::without_a_tool`], #4595).
@@ -345,6 +348,9 @@ pub fn arguments_from_environment() -> Vec<String> {
     flags.extend(crate::seen_yes::arguments(
         std::env::var(crate::seen_yes::ENVIRONMENT).ok().as_deref(),
         std::env::var(crate::seen_yes::POSTURE_ENVIRONMENT)
+            .ok()
+            .as_deref(),
+        std::env::var(crate::seen_yes::OFFER_ENVIRONMENT)
             .ok()
             .as_deref(),
     ));
@@ -590,6 +596,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         && flag == crate::seen_yes::POSTURE_FLAG
     {
         settings.seen_posture = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::seen_yes::OFFER_FLAG
+    {
+        settings.seen_voice_offer = true;
         flags = rest;
     }
     if let [flag, rest @ ..] = flags
@@ -965,7 +977,12 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
         tools.push(crate::sleep_asked::tool());
     }
     if settings.seen_activity {
-        tools.extend(crate::seen_yes::tools());
+        // The offer only with the voice's own (`LAMP_SEEN_VOICE_OFFER`).
+        tools.extend(
+            crate::seen_yes::tools()
+                .into_iter()
+                .filter(|tool| settings.seen_voice_offer || tool.name != crate::seen_yes::OFFER),
+        );
     }
     // The connected services' functions, before the executive's: never the
     // ones the executive or a skill names (`voices_own`).
@@ -1176,8 +1193,9 @@ pub enum Route {
     Sleep,
     /// The owner's yes to seen activity kept, or any "stop looking" taking
     /// it back ([`crate::seen_yes`], #6543). True when the offer also names
-    /// posture (`LAMP_SEEN_POSTURE`).
-    SeenActivity(bool),
+    /// posture (`LAMP_SEEN_POSTURE`), then true when the voice's own offer is
+    /// declared (`LAMP_SEEN_VOICE_OFFER`).
+    SeenActivity(bool, bool),
     /// A connected service's function, through `lamp-services`' tools
     /// folder ([`crate::services`]): held to the voice's own rules, and
     /// waited for [`crate::services::DEADLINE`].
@@ -1318,8 +1336,10 @@ pub fn route(settings: &Settings, name: &str) -> Route {
         };
     }
     if crate::seen_yes::is_tool(name) {
-        return if settings.seen_activity {
-            Route::SeenActivity(settings.seen_posture)
+        return if settings.seen_activity
+            && (settings.seen_voice_offer || name != crate::seen_yes::OFFER)
+        {
+            Route::SeenActivity(settings.seen_posture, settings.seen_voice_offer)
         } else {
             Route::Nobody
         };
@@ -2799,10 +2819,10 @@ fn run_call_with_scope(
             "the lamp's agent",
             (crate::agent_asks::run(call, request, heard, lease), true),
         ),
-        Route::SeenActivity(posture) => (
+        Route::SeenActivity(posture, offer) => (
             "the seen activity yes",
             (
-                crate::seen_yes::run(call, request, heard, lease, *posture),
+                crate::seen_yes::run(call, request, heard, lease, *posture, *offer),
                 true,
             ),
         ),
@@ -3571,6 +3591,7 @@ mod tests {
             sleep_asked: false,
             seen_activity: false,
             seen_posture: false,
+            seen_voice_offer: false,
             shutdown_from_app: false,
             services: None,
             decline: true,
@@ -3929,6 +3950,7 @@ mod tests {
                 sleep_asked: false,
                 seen_activity: false,
                 seen_posture: false,
+                seen_voice_offer: false,
                 shutdown_from_app: false,
                 services: None,
                 decline: true,
@@ -6012,10 +6034,14 @@ mod tests {
     fn the_seen_activity_yes_is_the_voices_own_and_only_the_owners() {
         let untouched = ["--session".to_owned(), "7".to_owned()];
         let mut flags = crate::without_a_tool::arguments(Some("on"));
-        flags.extend(crate::seen_yes::arguments(Some("on"), Some("on")));
+        flags.extend(crate::seen_yes::arguments(
+            Some("on"),
+            Some("on"),
+            Some("on"),
+        ));
         flags.extend(untouched.clone());
         let (on, rest) = take(&flags).unwrap();
-        assert!(on.seen_activity && on.seen_posture && on.shutdown_from_app);
+        assert!(on.seen_activity && on.seen_posture && on.seen_voice_offer && on.shutdown_from_app);
         assert_eq!(rest, untouched);
         let (off, _) = take(&untouched).unwrap();
         assert!(!off.seen_activity);
@@ -6028,7 +6054,10 @@ mod tests {
                 |settings: &Settings| core_tools(settings).iter().any(|tool| tool.name == name);
             assert!(named(&on) && !named(&off), "{name}");
             assert!(voices_own(name));
-            assert_eq!(route(&on, name), Route::SeenActivity(on.seen_posture));
+            assert_eq!(
+                route(&on, name),
+                Route::SeenActivity(on.seen_posture, on.seen_voice_offer)
+            );
             assert_eq!(route(&off, name), Route::Nobody);
             assert_eq!(answer(&off, &call(name), 7, true), unavailable());
         }
@@ -6049,6 +6078,55 @@ mod tests {
             answer(&on, &offer, 70_102, false)["say"],
             crate::seen_yes::SEEN_DISCLOSURE_POSTURE
         );
+    }
+
+    /// The first builder on #7506: with `LAMP_SEEN_ACTIVITY=on` and the
+    /// voice's own offer off (`LAMP_SEEN_VOICE_OFFER` unset, as in the
+    /// product), no request is offered `offer_desk_noticing` and a call of
+    /// it is nobody's, while the yes (refused with no offer before it) and
+    /// "stop looking" are declared and routed as ever.
+    #[test]
+    fn with_the_voice_offer_off_no_request_is_offered_the_desk_offer() {
+        let flags = crate::seen_yes::arguments(Some("on"), Some("on"), None);
+        let (settings, rest) = take(&flags).unwrap();
+        assert!(rest.is_empty());
+        assert!(settings.seen_activity && !settings.seen_voice_offer);
+        let told: Vec<String> = core_tools(&settings)
+            .iter()
+            .map(|tool| tool.name.clone())
+            .collect();
+        assert!(
+            !told.iter().any(|name| name == crate::seen_yes::OFFER),
+            "{told:?}"
+        );
+        assert_eq!(route(&settings, crate::seen_yes::OFFER), Route::Nobody);
+        assert_eq!(
+            answer(&settings, &call(crate::seen_yes::OFFER), 70_201, true),
+            unavailable()
+        );
+        for name in [crate::seen_yes::LOOK, crate::seen_yes::STOP] {
+            assert!(told.iter().any(|told| told == name), "{name}: {told:?}");
+            assert_eq!(
+                route(&settings, name),
+                Route::SeenActivity(settings.seen_posture, false)
+            );
+        }
+        // Heron on #7506: the look's refusal names the app, never the
+        // offer that is not declared, and no refusal names a function the
+        // model was not told.
+        let look = answer(&settings, &call(crate::seen_yes::LOOK), 70_202, true);
+        assert_eq!(look["note"], crate::seen_yes::APP_FIRST);
+        let note = look["note"].as_str().unwrap();
+        assert!(note.contains("in the app"), "{note}");
+        for name in [
+            crate::seen_yes::OFFER,
+            crate::seen_yes::LOOK,
+            crate::seen_yes::STOP,
+        ] {
+            let refused = answer(&settings, &call(name), 70_203, true);
+            let said = refused.to_string();
+            assert!(!said.contains(crate::seen_yes::OFFER), "{name}: {said}");
+        }
     }
 
     /// The reviewer on #1706: the setup line's two notes with `use_skill`,
