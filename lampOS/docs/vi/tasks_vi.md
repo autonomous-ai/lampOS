@@ -2085,10 +2085,13 @@ của chính đèn, một phiên Harness do chương trình sở hữu, mà Harn
 reply không cần đăng nhập và không cần cài đặt `programs-reply`
 (`crates/tasks/src/one_session.rs`). Công tắc bật trong unit lamp-tasks của
 sản phẩm và phụ thuộc Harness: ở lần mở đầu tiên của phiên duy nhất, và lại
-sau khi daemon của Harness khởi động lại, lamp-tasks hỏi
-`harness capabilities --json`. Chỉ khi `programSessions` từ 1 trở lên thì
-pane mới là phiên được giữ; Harness cũ từ chối lệnh này, và phiên duy nhất
-y như trên, kể cả đường lùi `reply_off`.
+sau khi daemon của Harness khởi động lại, lamp-tasks hỏi `harness capabilities
+--json` (`programSessions` từ 1 trở lên là có). Harness không có lệnh này
+(các bản đầu tiên có phiên chương trình đều không có) thì được hỏi
+`harness ensure --help`: có `--program-token-file` trong phần help là có. Không có cả hai, tức
+Harness cũ: phiên duy nhất y như trên, kể cả đường lùi `reply_off`. Đã chứng
+minh trên lamp-c0a4 (17/11) với Harness 0.6.58-p4393.5, cả khi đăng nhập lẫn
+khi đăng xuất.
 
 - **Token.** `kept-session.token` trong thư mục store của lamp-tasks: 0600,
   của user này, 32 byte ngẫu nhiên dạng hex, tạo một lần và giữ qua các lần
@@ -2097,26 +2100,56 @@ y như trên, kể cả đường lùi `reply_off`.
   không nằm trong tham số, dòng journal hay môi trường nào.
 - **Mở.** `harness ensure openclaw <folder> --name lamp-one-openclaw
   --program-token-file … --json`: `live`, `resumed` (pane đã chết, sau khi
-  khởi động lại) hoặc `new`. Phiên mới nhận câu mở đầu bằng một reply có
-  xác nhận và lượt đó được chờ. Pane cũ mở theo cách trước giữ tên đó, nên
-  được đóng và xoá hội thoại trước. `ENGINE_NOT_READY` thử lại sau 60 s, gấp
-  đôi tới 10 phút; `NAME_TAKEN` hoặc `NOT_YOURS` đưa pane về cách cũ cho tới
-  khi daemon khởi động lại.
+  khởi động lại) hoặc `new`, với khoá phiên OpenClaw của nó (`engineSession`,
+  `agent:main:harness-<id>`) được giữ trong bản ghi. Phiên mới nhận câu mở
+  đầu bằng một reply có xác nhận và lượt đó được chờ. Pane cũ mở theo cách
+  trước giữ tên đó, nên được đóng và xoá hội thoại trước. `ENGINE_NOT_READY`
+  (engine còn đang khởi động, hoặc một engine đã crash còn đang thoát) được
+  thử lại mỗi 5 s trong tối đa 45 s, rồi sau 60 s, gấp đôi tới 10 phút;
+  `NAME_TAKEN` hoặc `NOT_YOURS` đưa pane về cách cũ cho tới khi daemon khởi
+  động lại. Lần đọc approvals của gateway (`LAMP_PLACE_GATEWAY_WITHIN`) được
+  bỏ qua trên đường này: `ensure` và `reply` tự chờ engine, và riêng lần đọc
+  đó đã mất 17 s trên một đèn đang tải nặng, nên phiên được giữ không bao giờ
+  mở được.
+- **Nhận lại lúc khởi động.** Bản ghi (`one-session.json`) ghi phiên được mở
+  khi đã đăng nhập hay chưa. Một lần nhận lại ngay sau khi lamp-tasks khởi
+  động, trước lần đọc trạng thái đăng nhập đầu tiên, giữ đúng điều bản ghi
+  nói, nên phiên mở khi đăng xuất không bao giờ bị nhầm là phiên đã đăng nhập
+  rồi bị gỡ khi engine của nó chết sau đó; một lượt gõ khi đã đăng nhập đánh
+  dấu phiên là đã đăng nhập.
 - **Mỗi việc.** `harness reply lamp-one-openclaw --program-token-file …
-  --json -- <dòng đầu và lời>`, chỉ trả về khi engine đã nhận
-  (`{"state":"taken","inputId"}`); chỉ khi đó lượt mới được đếm, và việc nói
-  được join mà không cần nhìn `show`. `NOT_IDLE` và `ENGINE_NOT_READY` giữ
-  việc trong hàng đợi của lamp-tasks, thử lại tới hạn của nó; `NOT_RUNNING`
-  hoặc `TIMEOUT` ensure lại một lần (pane đã chết quay lại dạng resumed),
-  rồi việc thất bại như trước. Kết thúc của một lần chạy kỹ năng là
-  `harness wait lamp-one-openclaw --after <inputId>` (0 rảnh, rồi `show` lấy
-  câu trả lời; 3 có câu hỏi, đóng `--forget`; 4 đã mất).
+  --timeout 60s --json -- <dòng đầu và lời>`, chỉ trả về khi engine đã nhận
+  (`{"state":"taken","inputId":"program:<uuid>"}`); chỉ khi đó lượt mới được
+  đếm, và việc nói được join mà không cần nhìn `show`. Mức chờ 60 s dài hơn
+  mặc định 30 s của chính Harness: reply đầu tiên sau khi engine khởi động
+  mất 21 tới 34 s trên lamp-c0a4, các lần sau 1 tới 4 s. Lời có ký tự đầu là
+  `!` hoặc `/` (TUI của OpenClaw sẽ coi là lệnh shell hoặc lệnh TUI) được
+  thêm `Task: ` phía trước. `NOT_IDLE` và `ENGINE_NOT_READY` giữ việc trong
+  hàng đợi của lamp-tasks, thử lại tới hạn của nó. Một `TIMEOUT` với
+  `cancelled: true` chưa gõ gì và được thử lại; một `TIMEOUT` với
+  `cancelled: false` và có `inputId` đã được gõ và được chờ sau đó, không bao
+  giờ gõ lại. `NOT_RUNNING` (engine của nó đã chết) hoặc một `TIMEOUT` không
+  có gì được nhận thì ensure lại phiên một lần, phiên quay lại `resumed` với
+  cùng id và hội thoại của nó, rồi việc thất bại như trước. Kết thúc của
+  lượt là `harness wait lamp-one-openclaw --after <inputId>` (0 rảnh, rồi
+  `show` lấy câu trả lời; 3 có câu hỏi; 4 đã mất).
+- **Reply khi đã đăng nhập, có xác nhận.** Với Harness có xác nhận reply, mọi
+  reply vào một phiên của người dùng (pane duy nhất của `harness new`,
+  `--reply-named`, một phiên resumed, một tin nhắn đầu tiên) chỉ được tính là
+  đã giao khi có `taken` kèm `inputId`; một `TIMEOUT` với `cancelled: true`
+  được gõ lại, một `TIMEOUT` với `cancelled: false` và có `inputId` đã được gõ
+  và không bao giờ gửi lại, và lượt của pane duy nhất kết thúc bằng
+  `harness wait --after <inputId>`. Câu trả lời của Harness cũ được đọc như
+  trước.
 - **Xoay vòng và gỡ bỏ.** Phiên giữ lại của OpenClaw không bị xoay theo
-  số lượt (nó tự nén); khi có xoay vòng thì là `ensure --fresh`. Huỷ, câu hỏi không ai trả lời, đăng xuất hoặc đổi engine
-  là `harness close lamp-one-openclaw --program-token-file … --forget`, xoá
-  hội thoại; đăng xuất hoặc đổi engine xoá cả file token. Phiên chưa đóng
-  được thì thử lại ở lần nhìn sau, và trong lúc đó không mở pane nào.
-  Factory reset xoá thư mục store, cả token.
+  số lượt (gateway của nó tự nén phiên, `agents.defaults.compaction`); khi có
+  xoay vòng thì là `ensure --fresh`. Huỷ, câu hỏi không ai trả lời, đăng xuất
+  hoặc đổi engine là `harness close lamp-one-openclaw --program-token-file …`
+  rồi `openclaw gateway call sessions.delete` với `engineSession` của nó, xoá
+  hội thoại (`close --forget` của Harness chưa được xây); đăng xuất hoặc đổi
+  engine xoá cả file token. Phiên chưa đóng được thì thử lại ở lần nhìn sau,
+  và trong lúc đó không mở pane nào. Factory reset xoá thư mục store, cả
+  token.
 
 ### Giới hạn được chấp nhận cho thứ Hai: grant của kỹ năng đang chạy trong gateway
 

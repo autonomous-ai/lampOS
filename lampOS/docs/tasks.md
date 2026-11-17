@@ -98,6 +98,11 @@ when it is idle as `harness reply` does (openharness#2157, the person's
   working one is `NOT_IDLE` at the router, so `agent_busy`) keeps its task
   (a close under way holds every launch until it ends), and the words typed into it are `uncertain`
   (`reused_remote_id`), never sent again.
+  The voice may tell the earlier task's answer while the follow-up is being
+  typed: the store's last receipt then names the task the follow-up takes
+  over, so the takeover drops that receipt (as a replaced read's is), and a
+  retry of that request finds the revision moved on. Before, the store
+  failed its own check and lamp-tasks exited (lamp-c0a4, 17 Nov).
 - **`new` as before:** the router says new work, is off or can't be
   reached (`ROUTER_UNAVAILABLE`), refuses (`REPLY_OFF`, `NOT_YOURS`), or its
   pick is no longer running or its computer refused the words (`FAILED`).
@@ -4639,10 +4644,13 @@ session, a Harness session a program owns, which Harness takes replies for
 with no sign-in and no `programs-reply` setting
 (`crates/tasks/src/one_session.rs`). It is on in the product's lamp-tasks
 unit and gated on Harness: at the one session's first open, and again after
-Harness's daemon starts again, lamp-tasks asks `harness capabilities --json`.
-Only with `programSessions` 1 or more is the pane the kept session; an
-older Harness refuses the verb, and the one session is exactly as above,
-its `reply_off` fallback included.
+Harness's daemon starts again, lamp-tasks asks `harness capabilities
+--json` (`programSessions` 1 or more is yes). A Harness without that verb
+(the first builds with program sessions have none) is asked `harness ensure
+--help`: `--program-token-file` in its help is yes. Neither, an older
+Harness: the one session is exactly as above, its `reply_off` fallback
+included. Proven on lamp-c0a4 (17 Nov) with Harness 0.6.58-p4393.5, signed
+in and signed out.
 
 - **Token.** `kept-session.token` in lamp-tasks' store folder: 0600, this
   user's, 32 random bytes as hex, made once and kept across restarts (made
@@ -4651,30 +4659,49 @@ its `reply_off` fallback included.
   journal line or environment.
 - **Open.** `harness ensure openclaw <folder> --name lamp-one-openclaw
   --program-token-file … --json`: `live`, `resumed` (a pane that died, a
-  reboot) or `new`. A new one is given the open's first words with an
-  acknowledged reply and its turn waited for. A pane the old way kept holds
-  the name, so it is closed and its conversation deleted first.
-  `ENGINE_NOT_READY` is tried again after 60 s, doubling to 10 min;
-  `NAME_TAKEN` or `NOT_YOURS` sends the pane the old way until the daemon
-  starts again.
+  reboot) or `new`, with its OpenClaw session key (`engineSession`,
+  `agent:main:harness-<id>`) kept in the record. A new one is given the
+  open's first words with an acknowledged reply and its turn waited for. A
+  pane the old way kept holds the name, so it is closed and its conversation
+  deleted first. `ENGINE_NOT_READY` (the engine still starting, or a crashed
+  one still exiting) is tried again every 5 s for up to 45 s, then after
+  60 s, doubling to 10 min; `NAME_TAKEN` or `NOT_YOURS` sends the pane the
+  old way until the daemon starts again. The gateway's approvals read
+  (`LAMP_PLACE_GATEWAY_WITHIN`) is skipped on this path: `ensure` and
+  `reply` wait for the engine themselves, and that read alone took 17 s on
+  a loaded lamp, so the kept session never opened.
+- **Adopted at a start.** The record (`one-session.json`) says whether the
+  session was opened signed in. An adopt right after lamp-tasks starts,
+  before its first sign-in read, keeps what the record says, so a session
+  opened signed out is never mistaken for a signed-in one and removed when
+  its engine later dies; a turn typed signed in marks it signed in.
 - **Each task.** `harness reply lamp-one-openclaw --program-token-file …
-  --json -- <header and words>`, which returns only once the engine took
-  them (`{"state":"taken","inputId"}`); only then is the turn counted, and
-  a spoken task joined with no look at `show`. `NOT_IDLE` and
+  --timeout 60s --json -- <header and words>`, which returns only once the
+  engine took them (`{"state":"taken","inputId":"program:<uuid>"}`); only
+  then is the turn counted, and a spoken task joined with no look at
+  `show`. The 60 s hold is past Harness's own 30 s default: the first reply
+  after the engine starts took 21 to 34 s on lamp-c0a4, a later one 1 to
+  4 s. Words whose first character is `!` or `/` (OpenClaw's TUI would take
+  them as a shell or TUI command) get `Task: ` before them. `NOT_IDLE` and
   `ENGINE_NOT_READY` keep the task in lamp-tasks' own queue, tried again
-  until its end; `NOT_RUNNING` or `TIMEOUT` ensures the session again once
-  (a died pane comes back resumed), then the task fails as before. A skill
-  run's end is `harness wait lamp-one-openclaw --after <inputId>` (0 idle,
-  then `show` for the answer; 3 an ask, closed `--forget`; 4 gone).
-- **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again, one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before. Each `ensure` answered `ENGINE_NOT_READY` is tried again every 5 s for up to 45 s before the long backoff.
+  until its end. A `TIMEOUT` with `cancelled: true` typed nothing and is
+  tried again; one with `cancelled: false` and an `inputId` was typed and is
+  waited after, never typed again. `NOT_RUNNING` (its engine died) or a
+  `TIMEOUT` with nothing taken ensures the session again once, which comes
+  back `resumed` with the same id and its conversation, then the task fails
+  as before. The turn's end is `harness wait lamp-one-openclaw --after
+  <inputId>` (0 idle, then `show` for the answer; 3 an ask; 4 gone).
+- **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again, one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before.
 - **Rotation and removal.** OpenClaw's kept session is not rotated by
-  count (it compacts itself); a rotation, where one is due, is
-  `ensure --fresh`. A cancel, an ask no one answers, a sign-out or an engine
-  switch is `harness close lamp-one-openclaw --program-token-file …
-  --forget`, which deletes the conversation; a sign-out or an engine switch
-  removes the token file too. One not closed is tried again at the next
-  look, and no pane is opened meanwhile. A factory reset wipes the store
-  folder, token included.
+  count (its gateway compacts the session itself, `agents.defaults.compaction`);
+  a rotation, where one is due, is `ensure --fresh`. A cancel, an ask no one
+  answers, a sign-out or an engine switch is `harness close
+  lamp-one-openclaw --program-token-file …` and then `openclaw gateway call
+  sessions.delete` of its `engineSession`, which deletes the conversation
+  (Harness's `close --forget` is not built yet); a sign-out or an engine
+  switch removes the token file too. One not closed is tried again at the
+  next look, and no pane is opened meanwhile. A factory reset wipes the
+  store folder, token included.
 
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 
