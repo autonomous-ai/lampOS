@@ -2039,7 +2039,7 @@ impl<H: Http, M: Mail> Services<H, M> {
                 // Bound to the account it was read as, as every write.
                 writes::Pending {
                     account: entry.account(),
-                    ..writes::prepare_edit(args, &current)?
+                    ..writes::prepare_edit(args, &current, &writes::Clock::here())?
                 }
             } else {
                 writes::prepare(service.code, args, &entry)?
@@ -7053,11 +7053,16 @@ mod tests {
         let read_back = moved["result"]["read_back"].as_str().unwrap();
         for part in [
             "\"Hamburger party\"",
-            "2026-11-12T18:00:00+07:00",
-            "2026-11-12T20:00:00+07:00 to 2026-11-12T21:00:00+07:00",
+            "now from ",
+            ": move it to ",
             "octavia@b.test",
         ] {
             assert!(read_back.contains(part), "{part}: {read_back}");
+        }
+        // Its times said as the lamp says one, in the lamp's own offset,
+        // never as RFC 3339 (lamp-06c1, 17 Nov).
+        for raw in ["2026-11-12", "T18:00", "T20:00", "+07:00"] {
+            assert!(!read_back.contains(raw), "{raw}: {read_back}");
         }
         assert_eq!(moved["result"]["sent"], false);
         // Only the event was read: nothing changed yet.
