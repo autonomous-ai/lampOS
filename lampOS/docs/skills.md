@@ -5900,8 +5900,8 @@ bytes, as above):
   selfie) and `net` (an `http://` or `https://` link, a webhook, or a web
   API, URL or endpoint the file says to fetch, call, post, send, get or
   the like: a bare "API" or "URL" is not enough), never
-  more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on` (on
-  in the product); off, such a file is refused ("it reaches the internet, which a skill's
+  more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on` (off
+  in the product until its checks); off, such a file is refused ("it reaches the internet, which a skill's
   task can't on this lamp").
 - **A linked service it uses gets that service's grants** (the owner's
   ruling, 13 Nov: anything that touches the connectors goes to the lamp's
