@@ -169,11 +169,17 @@ fn catalog_for(offset_minutes: Option<i32>, edits: Edits, linked: Option<&[Strin
     if let Some(kinds) = mcp_kinds {
         kinds_by_service.push(format!("{mcp}: {}", kinds.join(", ")));
     }
-    let what = json!({
-        "type": "string",
-        "enum": every_kind,
-        "description": format!("{KINDS_OPEN}{}.", kinds_by_service.join("; ")),
-    });
+    // None offered (only a send-only `gmail-app` linked): no empty enum,
+    // which no call meets; its read is answered with how to link Gmail.
+    let what = if every_kind.is_empty() {
+        string("What to read, as listed for the service.")
+    } else {
+        json!({
+            "type": "string",
+            "enum": every_kind,
+            "description": format!("{KINDS_OPEN}{}.", kinds_by_service.join("; ")),
+        })
+    };
     let mut actions: Vec<String> = writes::ACTIONS
         .iter()
         .filter(|(code, _)| shown(code))
@@ -676,6 +682,34 @@ mod tests {
         assert!(notion.contains("notion: tools, call {tool, arguments}"));
         assert!(notion.contains("notion: call {tool, arguments}"));
         assert!(!notion.contains("slack"));
+    }
+
+    /// With only a send-only Gmail sign-in linked (`gmail-app`, no kinds
+    /// of read), the read is still offered so its call hears how to link
+    /// Gmail for reading, and `what` names no empty `enum`, which no call
+    /// can meet and a strict provider refuses the tools for (El's P2 on
+    /// #7540).
+    #[test]
+    fn a_read_with_no_kind_linked_names_no_empty_enum() {
+        let app = catalog_for(Some(420), Edits::default(), Some(&linked(&["gmail-app"])));
+        assert_eq!(names(&app), [CONNECTED, READ, WRITE]);
+        let what = &app["tools"][1]["parameters"]["properties"]["what"];
+        assert!(what.get("enum").is_none(), "{what}");
+        let about = what["description"].as_str().unwrap();
+        assert!(
+            !about.contains(KINDS_OPEN) && !about.ends_with(": ."),
+            "{about}"
+        );
+        // One kind linked names it.
+        let both = catalog_for(
+            Some(420),
+            Edits::default(),
+            Some(&linked(&["gmail-app", "google_calendar"])),
+        );
+        assert_eq!(
+            both["tools"][1]["parameters"]["properties"]["what"]["enum"],
+            json!(["events", "get"])
+        );
     }
 
     /// Every service linked names what the switch off names.
