@@ -634,7 +634,31 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   Its journal: `said it has hit its usage limit (429s for N s)`, `, with
   when it comes back` when timed, and `heard nothing: its usage limit was
   said earlier in this run (not named)` or `(named within 5 min of it)` for
-  the quiet asks. The journal: `said its thoughts are slow`,
+  the quiet asks. With `LAMP_LIMIT_LOCAL_ASKS=on` (#7346's condition 4,
+  off by default, an English owner only), what needs no model is still
+  done at the limit: a heard line that is plainly a light or volume ask
+  (`limit_local::matched`: on, off, a colour, brighter, dimmer, warmer,
+  cooler, louder, quieter; once the name, a greeting and politeness are set
+  aside every word left must be the ask's, and a question never is one)
+  runs the same `lamp-actions` function the model would call, through the
+  route's own runner, and the lamp says that function's own short line
+  ("Brighter.", "Done.", "I'm already as dim as I go.", one of
+  `action_claim::SAID_LINES`) from its clip, rendered with the fixed answers
+  at start, since the relay renders no new speech at the limit; with none
+  kept, the change alone answers. It is tried at the run's refused chat,
+  and once the run is known to be the limit (`DownLine::limited`) before
+  any chat is asked, so the answer waits only on the speech to text and the
+  function (the host test holds the line's end to its first audio under
+  0.7 s with a 300 ms function). It sends `DownLineSaid` as the limit line
+  does, so no `turn_lost`, limit line or other line follows it, and it is
+  still a refused turn to the coordinator. Any other line, or an ask its
+  function refuses (run once, never again after the chat), hears the limit
+  as above. With `LAMP_SECOND_REFUSED_HOLD`, a spoken line held only for
+  429s is sent all the same (`model_refusing::only_rate_limited`), so the
+  route can match it; any other refusal still holds it. A timer and the
+  time are not done yet: their lines carry a time and can't be rendered
+  at the limit. The journal: `at the usage limit <function> was done
+  without the model, its own line said in N ms (LAMP_LIMIT_LOCAL_ASKS)`. The journal: `said its thoughts are slow`,
   and `(again, the shorter line)` for the second. Once the slow line (either
   one) or the usage-limit line has been handed over, or a quiet ask in a
   limit run has ended, the route sends `DownLineSaid` for the request,
