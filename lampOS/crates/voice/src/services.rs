@@ -1017,6 +1017,15 @@ pub fn wait_for_run_yes(request: u64, run: &crate::run_write_yes::RunWrite, now:
         skill: run.skill.clone(),
         sha256: lamp_services::serve::read_back_sha256(&run.read_back),
     });
+    // Its run named for the person it is read back to, and its calls kept
+    // as their agent rows (`LAMP_SERVICE_RECORDS_AGENT`).
+    crate::service_records::agent_rows::read_back(
+        &person,
+        &run.skill,
+        &run.service,
+        &run.send_id,
+        crate::service_records::unix_ms(),
+    );
     kept::pending(|pending| {
         if let Some(old) = pending.take() {
             crate::service_records::settle(

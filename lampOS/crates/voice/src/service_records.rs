@@ -572,6 +572,9 @@ pub fn settle(send_id: &str, status: Status, why: &str) {
 }
 
 fn settle_with(send_id: &str, status: Status, why: &str, result_id: &str) {
+    // A skill run's write read back (`LAMP_SERVICE_RECORDS_AGENT`): its
+    // agent row's outcome.
+    agent_rows::settled(send_id, status, unix_ms());
     if !on() || send_id.is_empty() {
         return;
     }
@@ -712,6 +715,11 @@ pub enum Got<'a> {
 /// refusal goes, else the oldest try. With no attempt id (the Live route's
 /// try) no receipt is kept, the record still is.
 pub fn keep_send(attempt: Option<u64>, send_id: Option<&str>, got: Got<'_>) {
+    // A skill run's write sent on the yes (`LAMP_SERVICE_RECORDS_AGENT`):
+    // its agent row's outcome.
+    if let Some(send_id) = send_id {
+        agent_rows::sent(send_id, &got, unix_ms());
+    }
     let change = kept::ledger(|ledger| {
         let record = send_id
             .filter(|_| on())
@@ -1169,6 +1177,7 @@ fn start_saver() {
 #[cfg(test)]
 fn start_saver() {}
 
+pub mod agent_rows;
 pub mod linked;
 pub mod redo;
 pub mod reminder_rows;
