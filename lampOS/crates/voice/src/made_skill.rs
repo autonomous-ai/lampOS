@@ -343,6 +343,436 @@ pub fn set_off_said_here(on: Option<bool>) {
     OFF_SAID_HERE.with(|here| here.set(on));
 }
 
+/// The switch for a made skill that has nothing to do with what was asked
+/// (#7621: "every day at four fifteen in the morning, look up the title of
+/// the example dot com web page and tell me what it says" was made as
+/// `moon-time`, a say on "moon time", from an old ask the voice model
+/// wrote into `make_skill`'s `request`, and as `morning-skip`, a dance at
+/// 04:15): `on` only, off unless set, in no product unit. On, with the
+/// lamp in English, a voice make whose made skill shares no content word
+/// with the person's own line and the request ([`unrelated_words`], a fast
+/// pass of no cost) is judged in one short call ([`Judge`], [`judge_ask`]);
+/// a clear no refuses it, before anything is kept, and the person is
+/// asked again ([`UNRELATED`]). Yes or an unclear answer keeps it; a
+/// timeout or an error does as [`ON_JUDGE_LOST`] says (kept). Off,
+/// every make is byte for byte as before. Read by the voice alone: set it
+/// in `lamp-voice`.
+pub const UNRELATED_ENVIRONMENT: &str = "LAMP_MADE_UNRELATED_REFUSED";
+
+thread_local! {
+    /// [`UNRELATED_ENVIRONMENT`] as a test of this thread sets it.
+    static UNRELATED_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a make unrelated to what was heard is refused in this process.
+pub fn unrelated_on() -> bool {
+    if let Some(on) = UNRELATED_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(UNRELATED_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`unrelated_on`] for the calling thread alone, for tests; `None` reads
+/// the environment again. The product never calls it.
+#[doc(hidden)]
+pub fn set_unrelated_here(on: Option<bool>) {
+    UNRELATED_HERE.with(|here| here.set(on));
+}
+
+thread_local! {
+    /// The lamp's language as a test of this thread sets it: `Some(true)`
+    /// for English.
+    static ENGLISH_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// [`unrelated_held`]'s language for the calling thread alone, for tests;
+/// `None` reads the lamp's own again. The product never calls it.
+#[doc(hidden)]
+pub fn set_english_here(english: Option<bool>) {
+    ENGLISH_HERE.with(|here| here.set(english));
+}
+
+/// Whether a make is held to what was heard (#7621): [`unrelated_on`], and
+/// the lamp's language English ([`crate::language::at_start`]), the only
+/// one whose words [`content_words`] reads. In another language the check
+/// is skipped, journaled with no one's words, and nothing is refused.
+fn unrelated_held() -> bool {
+    if !unrelated_on() {
+        return false;
+    }
+    let english = ENGLISH_HERE
+        .with(std::cell::Cell::get)
+        .unwrap_or_else(|| crate::language::at_start().is_none());
+    if !english {
+        eprintln!(
+            "lamp-voice: a made skill's words were not held to the heard line: the lamp's \
+             language is not English"
+        );
+    }
+    english
+}
+
+/// Why a made skill is refused when the judge says it isn't what was asked
+/// ([`Judge`]): nothing is kept or put on, nothing repaired or handed to
+/// the agent, and the person is asked again in these words alone, never
+/// told what was nearly made: no skill's name, none of its words.
+pub const UNRELATED: &str = "I didn't catch which skill to make. Could you say it again?";
+
+/// The fewest distinct content words the person's line and the request
+/// have for [`unrelated_words`] to hold a made skill to them: fewer ("make
+/// that one") say too little to tell.
+pub const FEWEST_ASKED_WORDS: usize = 3;
+
+/// Small words that say nothing of what a skill is about, beside any word
+/// of fewer than three letters and any digit (#7621); and words of when it
+/// runs, never what it does: on c0a4 a heard "every day at four fifteen
+/// ..." ask was made as `morning-skip`, a dance at 04:15, the time kept and
+/// the doing swapped.
+// And verbs any ask may hold of any skill (the second adversarial read's
+// P2: a moon say "Look up at the moon" kept for a web-title ask by "look").
+const UNRELATED_STOP: [&str; 91] = [
+    "look",
+    "find",
+    "get",
+    "give",
+    "let",
+    "show",
+    "see",
+    "keep",
+    "want",
+    "need",
+    "can",
+    "the",
+    "and",
+    "you",
+    "your",
+    "say",
+    "tell",
+    "make",
+    "skill",
+    "lamp",
+    "when",
+    "every",
+    "what",
+    "that",
+    "this",
+    "with",
+    "for",
+    "its",
+    "are",
+    "was",
+    "has",
+    "have",
+    "from",
+    "then",
+    "please",
+    "can",
+    "will",
+    "want",
+    "just",
+    "also",
+    "but",
+    "they",
+    "them",
+    "there",
+    "about",
+    "how",
+    "who",
+    "day",
+    "daily",
+    "morning",
+    "evening",
+    "night",
+    "afternoon",
+    "today",
+    "tomorrow",
+    "hour",
+    "minute",
+    "second",
+    "week",
+    "weekday",
+    "weekend",
+    "clock",
+    "time",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+    "thirty",
+    "forty",
+    "fifty",
+    "hundred",
+    "am",
+    "pm",
+    "noon",
+    "midnight",
+];
+
+/// The content words of `text` (#7621): lowercase alphabetic words of at
+/// least three letters, not in [`UNRELATED_STOP`], each without a trailing
+/// `s`.
+pub fn content_words(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphabetic())
+        .map(str::to_lowercase)
+        .filter(|word| word.chars().count() >= 3)
+        .filter(|word| !UNRELATED_STOP.contains(&word.as_str()))
+        .map(|word| match word.strip_suffix('s') {
+            Some(stem) if stem.chars().count() >= 3 && !stem.ends_with('s') => stem.to_owned(),
+            _ => word,
+        })
+        .filter(|word| !UNRELATED_STOP.contains(&word.as_str()))
+        .collect()
+}
+
+/// The fewest letters two words share at their start to be one word
+/// ([`same_word`]).
+const SAME_START_CHARS: usize = 4;
+
+/// The fewest letters of the shorter word for a shared start to make two
+/// words one ([`same_word`]): "good" is never "goodnight".
+const SAME_SHORTER_CHARS: usize = 5;
+
+/// Whether two content words are one word, as said and paraphrased: the
+/// same, or, the shorter of at least [`SAME_SHORTER_CHARS`] letters,
+/// sharing their first letters, at least [`SAME_START_CHARS`] and all of
+/// the shorter but its last ("stretch" and "stretching", "dance" and
+/// "dancing").
+fn same_word(one: &str, other: &str) -> bool {
+    if one == other {
+        return true;
+    }
+    let shared = one
+        .chars()
+        .zip(other.chars())
+        .take_while(|(one, other)| one == other)
+        .count();
+    let shorter = one.chars().count().min(other.chars().count());
+    shorter >= SAME_SHORTER_CHARS && shared >= SAME_START_CHARS && shared + 1 >= shorter
+}
+
+/// Whether `one` and `other` share no content word ([`content_words`],
+/// [`same_word`]).
+fn share_none(one: &[String], other: &[String]) -> bool {
+    !one.iter()
+        .any(|word| other.iter().any(|their| same_word(word, their)))
+}
+
+/// Every string of `value`, its keys left out.
+fn toml_strings(value: &toml::Value, out: &mut String) {
+    match value {
+        toml::Value::String(text) => {
+            out.push_str(text);
+            out.push(' ');
+        }
+        toml::Value::Array(values) => values.iter().for_each(|value| toml_strings(value, out)),
+        toml::Value::Table(table) => table.values().for_each(|value| toml_strings(value, out)),
+        _ => {}
+    }
+}
+
+/// What a made skill does, in words: its `asks`, and each `[[do]]` step's
+/// strings (its say text, its gesture, its task's words), never the step's
+/// kind (`light`, `task`), its guards, its trigger, its times or its
+/// permissions.
+fn doing_words(table: &toml::Table, out: &mut String) {
+    if let Some(asks) = table.get("asks") {
+        toml_strings(asks, out);
+    }
+    let steps = table.get("do").and_then(toml::Value::as_array);
+    for step in steps
+        .into_iter()
+        .flatten()
+        .filter_map(toml::Value::as_table)
+    {
+        for (kind, value) in step {
+            if GUARD_KEYS.contains(&kind.as_str()) {
+                continue;
+            }
+            toml_strings(value, out);
+        }
+    }
+}
+
+/// What a made skill does, in words, when none of its content words is
+/// one of the person's own `line` or the `request` (#7621, with
+/// [`UNRELATED_ENVIRONMENT`] on and the lamp in English): its name
+/// ([`card_name`]) and [`doing_words`], for the judge. None when one is
+/// shared (the fast pass: kept as it is, no call), when the line and the
+/// request have fewer than [`FEWEST_ASKED_WORDS`] distinct content words,
+/// or when its `skill.toml` doesn't read.
+fn unrelated_words(files: &Files, line: &str, request: &str) -> Option<String> {
+    if !unrelated_held() {
+        return None;
+    }
+    // The person's own line alone when it holds enough: a `request` the
+    // voice model filled from history (an earlier moon ask, #7621) would
+    // otherwise share its words with the skill made of it and pass (the
+    // second adversarial read's P1). The request only when no line is
+    // known or the line says too little.
+    let distinct = |text: &str| {
+        let mut words = content_words(text);
+        words.sort();
+        words.dedup();
+        words
+    };
+    let mut asked = distinct(line);
+    if asked.len() < FEWEST_ASKED_WORDS {
+        asked = distinct(&format!("{line} {request}"));
+    }
+    if asked.len() < FEWEST_ASKED_WORDS {
+        return None;
+    }
+    let table = files.toml.parse::<toml::Table>().ok()?;
+    let mut made = card_name(&files.card).unwrap_or_default();
+    made.push_str(": ");
+    doing_words(&table, &mut made);
+    let mut words = content_words(&made);
+    words.sort();
+    words.dedup();
+    if !share_none(&asked, &words) {
+        return None;
+    }
+    eprintln!(
+        "lamp-voice: a made skill's {} content words share none of the ask's {}: judged",
+        words.len(),
+        asked.len()
+    );
+    Some(made.trim().to_owned())
+}
+
+/// What the judge answered of a made skill with no word of the ask
+/// ([`Judge`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Judged {
+    /// It does what was asked: kept.
+    Yes,
+    /// It doesn't: refused, the person asked again ([`UNRELATED`]).
+    No,
+    /// Neither a yes nor a no: kept.
+    Unclear,
+    /// No answer within its bound: kept.
+    Timeout,
+    /// The call failed: kept.
+    Failed,
+}
+
+impl Judged {
+    /// The judge's `answer` read: a clear no or yes at its start, else
+    /// [`Self::Unclear`].
+    pub fn read(answer: &str) -> Self {
+        let first = answer
+            .trim_start()
+            .split(|c: char| !c.is_alphabetic())
+            .next()
+            .unwrap_or_default()
+            .to_lowercase();
+        match first.as_str() {
+            "no" => Self::No,
+            "yes" => Self::Yes,
+            _ => Self::Unclear,
+        }
+    }
+
+    /// For the journal: `judge=no` and the like.
+    pub fn journaled(self) -> &'static str {
+        match self {
+            Self::Yes => "yes",
+            Self::No => "no",
+            Self::Unclear => "unclear",
+            Self::Timeout => "timeout",
+            Self::Failed => "error",
+        }
+    }
+}
+
+/// What a judge that gave no answer does to a made skill with no word of
+/// the ask ([`Judged::Timeout`], [`Judged::Failed`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OnJudgeLost {
+    /// Kept, as if the judge said yes (fail open).
+    Keep,
+    /// Refused, the person asked again (fail safe).
+    AskAgain,
+}
+
+/// What a judge's timeout or error does (#7621): kept for now, the first
+/// builder's call to flip to [`OnJudgeLost::AskAgain`] in this one line.
+pub const ON_JUDGE_LOST: OnJudgeLost = OnJudgeLost::Keep;
+
+impl Judged {
+    /// Whether this answer refuses the skill, a lost judge's as `lost`
+    /// says: a clear no always; an unclear answer never.
+    pub fn refuses(self, lost: OnJudgeLost) -> bool {
+        match self {
+            Self::No => true,
+            Self::Timeout | Self::Failed => lost == OnJudgeLost::AskAgain,
+            Self::Yes | Self::Unclear => false,
+        }
+    }
+}
+
+/// The judge's question of a made skill with no word of the ask
+/// ([`unrelated_words`]): the person's own `line`, and what was `made`.
+pub fn judge_ask(line: &str, made: &str) -> String {
+    format!("Asked: {line}. Made: {made}. Does the made skill do what was asked? Answer yes or no.")
+}
+
+/// The judge of a voice make (#7621): the person's own line for it, and
+/// one short call that answers [`judge_ask`]'s question.
+#[derive(Clone, Copy)]
+pub struct Judge<'a> {
+    /// The person's own line for the make, never another utterance's.
+    pub line: &'a str,
+    /// The call: the question in, its answer read.
+    pub ask: &'a dyn Fn(&str) -> Judged,
+}
+
+impl std::fmt::Debug for Judge<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("Judge")
+    }
+}
+
+/// Whether a made skill is refused as unrelated to what was asked (#7621):
+/// a clear no of `judge` for one with no word of the ask
+/// ([`unrelated_words`]), or its timeout or error as [`ON_JUDGE_LOST`]
+/// says; none without a judge.
+fn judged_unrelated(files: &Files, request: &Asked<'_>) -> bool {
+    let Some(judge) = request.judge else {
+        return false;
+    };
+    let Some(made) = unrelated_words(files, judge.line, request.request) else {
+        return false;
+    };
+    let judged = (judge.ask)(&judge_ask(judge.line, &made));
+    let refused = judged.refuses(ON_JUDGE_LOST);
+    eprintln!(
+        "lamp-voice: a made skill with no word of the ask: judge={}{}",
+        judged.journaled(),
+        match refused {
+            true => ": asked again, nothing kept or put on",
+            false => ": kept",
+        }
+    );
+    refused
+}
+
 /// The most phrases a made skill's `asks` lists ([`made_asks`]): fewer than
 /// a Store skill's eight (`lamp_skills::MOST_ASKS`), each said back.
 pub const MOST_MADE_ASKS: usize = 3;
@@ -1261,6 +1691,7 @@ pub fn plain_reason(why: &str) -> String {
         || AGENT_TRIES.contains(&why)
         || PLAIN_REASONS.contains(&why)
         || crate::make_no_cannot::said_as_is(why)
+        || why == UNRELATED
     {
         return why.to_owned();
     }
@@ -7682,6 +8113,9 @@ pub struct Asked<'a> {
     /// `request` argument, which may carry a read's (App Only's P1 on
     /// #6142). `None` for the app's typed ask, held to `request`.
     pub heard: Option<&'a str>,
+    /// The judge of a voice make with no word of the ask (#7621,
+    /// [`UNRELATED_ENVIRONMENT`]): none for the app's, and none off.
+    pub judge: Option<Judge<'a>>,
 }
 
 /// [`keep`], with the person's request: the times of day it named
@@ -7709,6 +8143,12 @@ pub fn keep_asked(
         return Err(Refused::new(MODEL_CUT_OFF));
     }
     let mut files = files(answer)?;
+    // A made skill the judge says isn't what was asked (#7621, its switch
+    // on): refused before a said start returns, so nothing is kept or put
+    // on, with no repair.
+    if judged_unrelated(&files, request) {
+        return Err(Refused(UNRELATED.into(), None));
+    }
     // A `do.task` running the agent's path is the agent's only with the
     // lamp's own script there, byte for byte (El's P2 on #7261).
     let _agent_script = AgentScript::set(agent_script_only(&files.scripts));
@@ -16248,5 +16688,432 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             kind: "body".into()
         }));
         assert!(parts.contains(&Loose::Step(0)));
+    }
+
+    /// #7621: the line heard on c0a4, transcribed whole.
+    const FOURTEEN: &str = "Lamp, make a skill: every day at four fifteen in the morning, look \
+                            up the title of the example dot com web page and tell me what it says.";
+    /// What was asked in that line, as the voice model should write it.
+    const FOURTEEN_ASK: &str = "every day at 4:15 in the morning, look up the title of the \
+                                example.com web page and tell me what it says";
+    /// What DeepSeek made from an old moon ask in `request`.
+    const MOON_TIME: &str = "asks = [\"moon time\"]\nkind = \"installable\"\nversion = \
+                             \"1.0.0\"\n[permissions]\nspeak = true\n[[do]]\nsay = { text = \
+                             \"The moon is moving away from Earth, a little more each year.\" }\n";
+    const MOON_CARD: &str = "---\nname: moon-time\ndescription: A moon fact.\n---\n\n# Moon time\n";
+    /// What was made from Fourteen's line on c0a4: the time kept, the
+    /// doing swapped.
+    const MORNING_SKIP: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\n\
+                                topics = [\"voice/state\"]\nbody = true\n[trigger]\ntopic = \
+                                \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\
+                                cooldown = \"12h\"\nduring = { from = \"04:15\", to = \"04:30\" }\n\
+                                [ask]\npolicy = \"nudge\"\n[[do]]\nbody = { gesture = \
+                                \"dance_hype\" }\n";
+    const MORNING_SKIP_CARD: &str =
+        "---\nname: morning-skip\ndescription: Every day at 04:15 it dances.\n---\n\n# Skip\n";
+
+    fn judged_by<'a>(
+        request: &'a str,
+        line: &'a str,
+        ask: &'a dyn Fn(&str) -> Judged,
+    ) -> Asked<'a> {
+        Asked {
+            request,
+            heard: Some(line),
+            judge: Some(Judge { line, ask }),
+            ..Asked::default()
+        }
+    }
+
+    /// A judge that is never to be called: the overlap's fast pass.
+    fn never_judged(question: &str) -> Judged {
+        panic!("judged: {question}")
+    }
+
+    /// #7621, its switch on: moon-time and morning-skip, with no word of
+    /// Fourteen's line, go to the judge; its clear no refuses them before
+    /// anything is kept, with no repair, and the person is asked again with
+    /// no word of what was nearly made.
+    #[test]
+    fn a_made_skill_judged_not_what_was_asked_is_refused_and_nothing_kept() {
+        set_unrelated_here(Some(true));
+        set_english_here(Some(true));
+        set_asks_here(Some(true));
+        let (root, keeping) = crate::make_skill_local::tests::keeping("unrelated-made");
+        let questions = std::cell::RefCell::new(Vec::new());
+        let no = |question: &str| {
+            questions.borrow_mut().push(question.to_owned());
+            Judged::No
+        };
+        for (index, (toml, card)) in [(MOON_TIME, MOON_CARD), (MORNING_SKIP, MORNING_SKIP_CARD)]
+            .into_iter()
+            .enumerate()
+        {
+            let refused = keep_asked(
+                &answer(toml, card),
+                false,
+                &format!("local:s1:{index}:1"),
+                &keeping,
+                &judged_by(FOURTEEN_ASK, FOURTEEN, &no),
+            )
+            .unwrap_err();
+            assert_eq!(refused, Refused(UNRELATED.into(), None), "{card}");
+            for nearly in ["moon", "skip", "dance", "time"] {
+                assert!(!refused.0.to_lowercase().contains(nearly), "{}", refused.0);
+            }
+        }
+        // The request the voice model filled from an earlier moon ask, as
+        // on 9adf: its moon words never pass the skill made of it, which is
+        // held to the person's own line (the second adversarial read's P1).
+        let refused = keep_asked(
+            &answer(MOON_TIME, MOON_CARD),
+            false,
+            "local:s1:2:1",
+            &keeping,
+            &judged_by("say a moon fact when I say moon time", FOURTEEN, &no),
+        )
+        .unwrap_err();
+        assert_eq!(refused, Refused(UNRELATED.into(), None));
+        let questions = questions.into_inner();
+        assert_eq!(questions.len(), 3, "{questions:?}");
+        assert!(questions[0].starts_with(&format!("Asked: {FOURTEEN}. Made: moon-time:")));
+        assert!(
+            questions[1].contains("morning-skip: dance_hype"),
+            "{}",
+            questions[1]
+        );
+        assert!(index(&keeping.directory).is_empty(), "nothing kept");
+        set_asks_here(None);
+        set_english_here(None);
+        set_unrelated_here(None);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// #7621: the judge fails open. A yes, an unclear answer, a timeout or
+    /// an error keeps the skill; a moon ask's moon-time shares a word and
+    /// is kept with no call; off, or in another language, even Fourteen's
+    /// line keeps it with no call, exactly as before; and with no judge
+    /// (the app's make) nothing is refused.
+    #[test]
+    fn the_judge_fails_open_and_off_or_not_english_nothing_is_judged() {
+        set_asks_here(Some(true));
+        let (root, keeping) = crate::make_skill_local::tests::keeping("unrelated-kept");
+        let moon = "when I say moon time, tell me a moon fact";
+        let yes = |_: &str| Judged::Yes;
+        let unclear = |_: &str| Judged::Unclear;
+        let timeout = |_: &str| Judged::Timeout;
+        let failed = |_: &str| Judged::Failed;
+        type Case<'a> = (bool, bool, &'a str, &'a str, &'a dyn Fn(&str) -> Judged);
+        let cases: [Case<'_>; 7] = [
+            (true, true, moon, moon, &never_judged),
+            (true, true, FOURTEEN_ASK, FOURTEEN, &yes),
+            (true, true, FOURTEEN_ASK, FOURTEEN, &unclear),
+            (true, true, FOURTEEN_ASK, FOURTEEN, &timeout),
+            (true, true, FOURTEEN_ASK, FOURTEEN, &failed),
+            (false, true, FOURTEEN_ASK, FOURTEEN, &never_judged),
+            (true, false, FOURTEEN_ASK, FOURTEEN, &never_judged),
+        ];
+        for (index, (on, english, request, line, judge)) in cases.into_iter().enumerate() {
+            set_unrelated_here(Some(on));
+            set_english_here(Some(english));
+            let made = keep_asked(
+                &answer(MOON_TIME, MOON_CARD),
+                false,
+                &format!("local:s1:{index}:1"),
+                &keeping,
+                &judged_by(request, line, judge),
+            );
+            assert_eq!(
+                made.map(|made| made.name),
+                Ok("moon-time".to_owned()),
+                "{index}"
+            );
+        }
+        set_unrelated_here(Some(true));
+        set_english_here(Some(true));
+        let unjudged = Asked {
+            request: FOURTEEN_ASK,
+            heard: Some(FOURTEEN),
+            ..Asked::default()
+        };
+        let made = keep_asked(
+            &answer(MOON_TIME, MOON_CARD),
+            false,
+            "local:s1:9:1",
+            &keeping,
+            &unjudged,
+        );
+        assert!(made.is_ok(), "{made:?}");
+        set_asks_here(None);
+        set_english_here(None);
+        set_unrelated_here(None);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    fn made_files(name: &str, toml: &str) -> Files {
+        Files {
+            toml: format!("kind = \"installable\"\nversion = \"1.0.0\"\n{toml}"),
+            card: format!("---\nname: {name}\ndescription: made.\n---\n\n# Made\n"),
+            left_out: None,
+            scripts: Vec::new(),
+        }
+    }
+
+    fn say_step(text: &str) -> String {
+        format!("[[do]]\nsay = {{ text = \"{text}\" }}\n")
+    }
+
+    fn task_step(text: &str) -> String {
+        format!("[[do]]\ntask = {{ task = \"{text}\" }}\n")
+    }
+
+    /// #7621, the first builder's condition 3: ordinary makes that share a
+    /// word with their ask are kept by the fast pass, the judge never
+    /// called; a step's kind is no word of it, and "good" is not
+    /// "goodnight".
+    #[test]
+    fn makes_sharing_a_word_are_kept_with_no_judge() {
+        set_unrelated_here(Some(true));
+        set_english_here(Some(true));
+        let makes: [(&str, &str, &str, String); 10] = [
+            (
+                "Lamp, make a skill: tell me a moon fact when I'm back",
+                "tell me a moon fact when I come back to my desk",
+                "moon-fact-when-back",
+                say_step("The moon drifts a little further from Earth each year."),
+            ),
+            (
+                "Lamp, make a skill: read me the example page's title every morning",
+                "every morning look up the title of example.com and tell me",
+                "morning-page-title",
+                task_step("open https://example.com and read out its title"),
+            ),
+            (
+                "make a skill that reminds me to stretch my back every hour",
+                "remind me to stretch my back every hour",
+                // Alike only by their start: "stretch" and "stretching".
+                "posture-break",
+                say_step("Time for a stretching break."),
+            ),
+            (
+                "make a cozy reading light scene when I say reading mode",
+                "when I say reading mode, set a cozy reading light",
+                "reading-scene",
+                "[[do]]\nlight = { colour = \"warm\", level = 3 }\n".to_owned(),
+            ),
+            (
+                "remind me to drink some water every two hours",
+                "every two hours remind me to drink water",
+                "water-reminder",
+                say_step("Have a glass of water."),
+            ),
+            (
+                "make me a pomodoro focus timer of twenty five minutes",
+                "a twenty five minute pomodoro focus timer",
+                "focus-timer",
+                say_step("Your focus session is over; take a short break."),
+            ),
+            (
+                "tell me the weather forecast every morning at seven",
+                "every morning at seven tell me the weather forecast",
+                "morning-weather",
+                task_step("check today's weather and say the forecast"),
+            ),
+            (
+                "every morning give me a summary of my calendar",
+                "summarize my calendar every morning",
+                "calendar-summary",
+                task_step("read today's calendar events and summarize them briefly"),
+            ),
+            (
+                "Lamp, make a skill: dance when I say party",
+                "dance when I say party",
+                "party-dance",
+                "asks = [\"party time\"]\n[[do]]\nbody = { gesture = \"dance_hype\" }\n".to_owned(),
+            ),
+            (
+                "make a goodnight skill that dims the light slowly",
+                "when I say goodnight, dim the light slowly",
+                "goodnight-dim",
+                "[[do]]\nlight = { level = 1, for = \"30s\" }\n".to_owned(),
+            ),
+        ];
+        for (line, request, name, toml) in &makes {
+            let asked = judged_by(request, line, &never_judged);
+            assert!(!judged_unrelated(&made_files(name, toml), &asked), "{name}");
+        }
+        // Words counted once: "party" and "dance" twice are two, too few
+        // to hold anything to.
+        let unrelated = made_files("moon-time", &say_step("The moon drifts away."));
+        assert_eq!(
+            unrelated_words(&unrelated, "dance when I say party", "dance at my party"),
+            None
+        );
+        // A light step's kind, or "good" in "goodnight", is no shared word:
+        // these go to the judge.
+        let no = |_: &str| Judged::No;
+        for (line, name, toml) in [
+            (
+                "make the light turn on when I sit at the desk please",
+                "arrival-glow",
+                "[[do]]\nlight = { colour = \"warm\" }\n",
+            ),
+            (
+                "say good things to cheer me up please",
+                "goodnight-kiss",
+                "[[do]]\nbody = { gesture = \"nod\" }\n",
+            ),
+        ] {
+            let files = made_files(name, toml);
+            let asked = judged_by(line, line, &no);
+            assert!(
+                unrelated_words(&files, line, line).is_some(),
+                "{name}: {line}"
+            );
+            assert!(judged_unrelated(&files, &asked), "{name}");
+        }
+        set_english_here(None);
+        set_unrelated_here(None);
+    }
+
+    /// #7621: the overlap's fast pass adds no call and next to no time,
+    /// printed for the report.
+    #[test]
+    fn the_fast_pass_adds_next_to_no_time() {
+        set_unrelated_here(Some(true));
+        set_english_here(Some(true));
+        let files = made_files(
+            "water-reminder",
+            &say_step("Have a glass of water, and stretch a little."),
+        );
+        let asked = judged_by(
+            "every two hours remind me to drink water",
+            "remind me to drink some water every two hours",
+            &never_judged,
+        );
+        let rounds: u32 = 100;
+        let began = std::time::Instant::now();
+        for _ in 0..rounds {
+            assert!(!judged_unrelated(&files, &asked));
+        }
+        let each = began.elapsed() / rounds;
+        println!("#7621 fast pass: {} us a make", each.as_micros());
+        assert!(each < Duration::from_millis(5), "{each:?}");
+        set_english_here(None);
+        set_unrelated_here(None);
+    }
+
+    /// #7621, the adversarial read's P1s: eleven paraphrased makes with no
+    /// word of their ask are judged, and a yes keeps each; the same moon
+    /// and morning-skip makes of Fourteen's line are refused by a no.
+    #[test]
+    fn paraphrased_makes_judged_yes_are_kept() {
+        set_unrelated_here(Some(true));
+        set_english_here(Some(true));
+        let makes: [(&str, &str, &str, String); 11] = [
+            (
+                "make a skill that reminds me to drink water",
+                "remind me to drink water",
+                "hydration-nudge",
+                say_step("Hydrate!"),
+            ),
+            (
+                "make a skill that wakes me gently",
+                "wake me gently",
+                "sunrise",
+                "[[do]]\nlight = { colour = \"orange\", level = 2 }\n".to_owned(),
+            ),
+            (
+                "tell me a joke when I sit down",
+                "tell me a joke when I sit down",
+                "desk-humor",
+                say_step("Why did the lamp blush? It saw the switch."),
+            ),
+            (
+                "make a skill to check the weather",
+                "check the weather",
+                "forecast",
+                task_step("look up the forecast and say it"),
+            ),
+            (
+                "greet me when I come home",
+                "greet me when I come home",
+                "welcome-back",
+                say_step("Welcome back!"),
+            ),
+            (
+                "cheer me up when I'm sad",
+                "cheer me up when I'm sad",
+                "mood-lift",
+                say_step("You're doing great."),
+            ),
+            (
+                "blink when my timer ends",
+                "blink when my timer ends",
+                "alarm-flash",
+                "[[do]]\nlight = { colour = \"red\", for = \"3s\" }\n".to_owned(),
+            ),
+            (
+                "make a skill that reminds me to hydrate throughout the day",
+                "every two hours say drink some water",
+                "sip-break",
+                say_step("Time for a glass."),
+            ),
+            (
+                "make a skill to help me wind down before bed",
+                "help me relax before sleep",
+                "calm-evening",
+                "[[do]]\nlight = { colour = \"warm\", level = 1 }\n".to_owned(),
+            ),
+            (
+                "let me know when it's going to rain today",
+                "warn me about rain",
+                "umbrella-alert",
+                task_step("check for showers and say bring an umbrella"),
+            ),
+            (
+                "make a skill that tells me to sit up straight",
+                "posture reminder",
+                "spine-check",
+                say_step("Shoulders back."),
+            ),
+        ];
+        let judged = std::cell::Cell::new(0);
+        let yes = |_: &str| {
+            judged.set(judged.get() + 1);
+            Judged::Yes
+        };
+        for (line, request, name, toml) in &makes {
+            let asked = judged_by(request, line, &yes);
+            assert!(!judged_unrelated(&made_files(name, toml), &asked), "{name}");
+        }
+        assert!(judged.get() >= 7, "judged {}", judged.get());
+        let no = |_: &str| Judged::No;
+        for (toml, card) in [(MOON_TIME, MOON_CARD), (MORNING_SKIP, MORNING_SKIP_CARD)] {
+            let files = files(&answer(toml, card)).unwrap();
+            let asked = judged_by(FOURTEEN_ASK, FOURTEEN, &no);
+            assert!(judged_unrelated(&files, &asked), "{card}");
+        }
+        // A lost judge, both ways [`ON_JUDGE_LOST`] may be set.
+        for lost in [Judged::Timeout, Judged::Failed] {
+            assert!(!lost.refuses(OnJudgeLost::Keep), "{lost:?}");
+            assert!(lost.refuses(OnJudgeLost::AskAgain), "{lost:?}");
+        }
+        for (judged, refuses) in [
+            (Judged::No, true),
+            (Judged::Yes, false),
+            (Judged::Unclear, false),
+        ] {
+            for lost in [OnJudgeLost::Keep, OnJudgeLost::AskAgain] {
+                assert_eq!(judged.refuses(lost), refuses, "{judged:?} {lost:?}");
+            }
+        }
+        assert_eq!(ON_JUDGE_LOST, OnJudgeLost::Keep, "kept for now");
+        assert_eq!(Judged::read(" No, it doesn't."), Judged::No);
+        assert_eq!(Judged::read("Yes."), Judged::Yes);
+        assert_eq!(Judged::read("Nope"), Judged::Unclear);
+        assert_eq!(Judged::read(""), Judged::Unclear);
+        set_english_here(None);
+        set_unrelated_here(None);
     }
 }
