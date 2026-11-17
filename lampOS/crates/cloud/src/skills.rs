@@ -532,6 +532,21 @@ pub struct Listed {
     /// Left out when all are linked, or when `lamp-services` can't say.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub needs_link: Option<Vec<Value>>,
+    /// For a pushed skill only: the paired computer that pushed it, as its
+    /// `.pushed.json` says (`computer` is the name the owner saw at pairing,
+    /// `client` its id in `control.clients`), so the app can say where it came
+    /// from and list it under that computer. Left out for every other skill.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pushed_by: Option<PushedBy>,
+}
+
+/// The computer that pushed a skill ([`Listed::pushed_by`]).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct PushedBy {
+    /// Its name at pairing, at most 64 bytes.
+    pub computer: String,
+    /// Its id, `c_` and hex, as the door lists it.
+    pub client: String,
 }
 
 /// `skills.list`'s reply: `{"version", "skills", "left_out"}`, the skills
@@ -599,12 +614,21 @@ pub(crate) fn pushed_rows(places: &Places, off: Option<&BTreeSet<String>>) -> Ve
     let yes = lamp_skills::package::picture_yes(&dev);
     lamp_skills::load_each(&dev)
         .into_iter()
-        .filter(|(folder, _)| {
-            fs::symlink_metadata(folder).is_ok_and(|folder| folder.is_dir())
-                && lamp_skills::package::pushed_from(folder).is_some()
+        .filter_map(|(folder, loaded)| {
+            // The folder first: a link is no pushed skill, and its
+            // `.pushed.json` is never read through it.
+            if !fs::symlink_metadata(&folder).is_ok_and(|meta| meta.is_dir()) {
+                return None;
+            }
+            let from = lamp_skills::package::pushed_from(&folder)?;
+            Some((folder, loaded, from))
         })
-        .map(|(folder, loaded)| {
+        .map(|(folder, loaded, from)| {
             let mut listed = row(&folder, loaded, off, places.addons);
+            listed.pushed_by = Some(PushedBy {
+                computer: cut(&from.computer, 64),
+                client: cut(&from.client, 64),
+            });
             listed.group = Group::Pushed;
             listed.can_remove = false;
             listed.can_turn_off = false;
@@ -967,6 +991,7 @@ fn row(
         written,
         services: permissions.services.keys().cloned().collect(),
         needs_link: None,
+        pushed_by: None,
         name,
     }
 }
@@ -1174,6 +1199,52 @@ pub mod tests {
     }
 
     #[test]
+    fn a_linked_folder_in_the_pushed_folder_is_not_listed_and_its_pushed_by_is_not_read() {
+        let places = places("pushed-link");
+        let dev = places.folder.with_file_name("skills-dev");
+        let pushed_places = Places {
+            folder: dev.clone(),
+            ..places.clone()
+        };
+        // A real pushed skill, and a link beside it to a folder elsewhere that
+        // holds a complete skill and a `.pushed.json` naming another computer.
+        skill(
+            &pushed_places,
+            "wave",
+            "wave",
+            "",
+            "kind = \"installable\"\nversion = \"0.1.0\"\n[permissions]\nbody = true",
+        );
+        fs::write(
+            dev.join("wave").join(".pushed.json"),
+            r#"{"computer":"laptop","client":"c_1","sha256":"ab","at_unix_ms":1}"#,
+        )
+        .unwrap();
+        let outside = places.folder.with_file_name("outside-link");
+        fs::create_dir_all(&outside).unwrap();
+        fs::copy(dev.join("wave/SKILL.md"), outside.join("SKILL.md")).unwrap();
+        fs::copy(dev.join("wave/skill.toml"), outside.join("skill.toml")).unwrap();
+        fs::write(
+            outside.join(".pushed.json"),
+            r#"{"computer":"stranger","client":"c_link","sha256":"cd","at_unix_ms":2}"#,
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(&outside, dev.join("linked")).unwrap();
+        let rows = listed(&places);
+        assert!(rows.iter().all(|row| row["name"] != "linked"));
+        assert!(
+            rows.iter().all(|row| row["pushed_by"]["client"] != "c_link"
+                && row["pushed_by"]["computer"] != "stranger"),
+            "the link's .pushed.json must not be read: {rows:?}"
+        );
+        let wave = rows.iter().find(|row| row["name"] == "wave").unwrap();
+        assert_eq!(
+            wave["pushed_by"],
+            json!({"computer": "laptop", "client": "c_1"})
+        );
+    }
+
+    #[test]
     fn a_pushed_skill_is_listed_in_its_own_group_with_the_owners_yes_for_the_picture() {
         let places = places("pushed-list");
         skill(
@@ -1223,8 +1294,34 @@ pub mod tests {
         let rows = listed(&places);
         let of = |name: &str| rows.iter().find(|row| row["name"] == name).cloned();
         assert_eq!(of("water").unwrap()["group"], "made_here");
+        // Only a pushed row says which computer pushed it.
+        assert!(of("water").unwrap().get("pushed_by").is_none());
         let wave = of("wave").unwrap();
         assert_eq!(wave["group"], "pushed");
+        for name in ["wave", "watch"] {
+            assert_eq!(
+                of(name).unwrap()["pushed_by"],
+                json!({"computer": "laptop", "client": "c_1"})
+            );
+        }
+        // A computer's name is cut at 64 bytes, as the row's other free text is.
+        fs::write(
+            dev.join("wave").join(".pushed.json"),
+            format!(
+                r#"{{"computer":"{}","client":"c_2","sha256":"ab","at_unix_ms":1}}"#,
+                "x".repeat(100)
+            ),
+        )
+        .unwrap();
+        let longer = listed(&places);
+        let long = longer.iter().find(|row| row["name"] == "wave").unwrap();
+        assert_eq!(long["pushed_by"]["computer"], "x".repeat(64));
+        assert_eq!(long["pushed_by"]["client"], "c_2");
+        fs::write(
+            dev.join("wave").join(".pushed.json"),
+            r#"{"computer":"laptop","client":"c_1","sha256":"ab","at_unix_ms":1}"#,
+        )
+        .unwrap();
         assert_eq!(
             (
                 &wave["can_remove"],
