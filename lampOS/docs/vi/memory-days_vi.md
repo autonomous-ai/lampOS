@@ -605,9 +605,10 @@ Phía voice của đường ghi cho những bản ghi chỉ voice mới biết l
 việc Harness, lệnh ghi của agent và lời nhắc (các lát sau). Voice xếp hàng
 mỗi thay đổi thành một `service_record` có `source_kind`, `source_ref`,
 `summary` và `deed_unix_ms`, qua socket gốc của chính nó
-(`lamp-voice` `service_records::linked`). Hiện chưa có gì đưa vào: mỗi bên
-ghi đến cùng công tắc riêng (`LAMP_SERVICE_RECORDS_TASKS`, `_AGENT`,
-`_REMINDERS`), và khi `LAMP_SERVICE_RECORDS` tắt thì không giữ gì.
+(`lamp-voice` `service_records::linked`). Mỗi bên ghi đến cùng công tắc
+riêng: dòng việc Harness (`LAMP_SERVICE_RECORDS_TASKS`, lát 3,
+[tasks_vi.md](tasks_vi.md)); dòng của agent và lời nhắc đến sau (`_AGENT`,
+`_REMINDERS`). Khi `LAMP_SERVICE_RECORDS` tắt thì không giữ gì.
 
 - **Giới hạn riêng.** Tối đa 16 thay đổi chờ, tách khỏi 32 của bản ghi
   connector, để một loạt tin việc hay lời nhắc không bao giờ đẩy mất bản ghi
@@ -635,8 +636,12 @@ ghi đến cùng công tắc riêng (`LAMP_SERVICE_RECORDS_TASKS`, `_AGENT`,
   khi gửi lần quên và lần nữa khi có trả lời, quên về một điều thì so với
   dịch vụ, hành động và tóm tắt của thay đổi; memory từ chối việc làm trước
   một lần quên (lát 1).
-- **Quay về bản cũ.** Chưa có gì gọi tới, nên voice cũ chỉ khác ở chỗ không
-  có dữ kiện `linked_dropped`.
+- **Lần quên tới cả dòng việc.** Cùng các lần quên đó bỏ theo dõi những
+  việc Harness của người đó (hay khớp với điều đó), nên kết quả đến sau
+  không bao giờ được ghi (lát 3).
+- **Quay về bản cũ.** Chỉ dòng việc gọi tới, sau công tắc riêng của nó, nên
+  voice cũ chỉ khác ở chỗ không có dữ kiện `linked_dropped` và không có
+  dòng việc.
 
 ## Danh bạ dịch vụ (`service_contact`, `LAMP_SERVICE_CONTACTS` của voice)
 
