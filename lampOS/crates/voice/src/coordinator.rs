@@ -6850,6 +6850,12 @@ fn conversation_with_gate_inner(
     } else {
         None
     };
+    // The lamp's agent's answer to a full read is said only while the
+    // owner is seen alone, looked at by the say client here
+    // (`LAMP_SERVICES_TO_AGENT`, `agent_asks`).
+    if lifetime.continuous() {
+        crate::agent_asks::count_faces_here();
+    }
     // Told at the first pause of a second, not after 15 s with no turn
     // (#560, `LAMP_TASK_NEWS_AT_PAUSE=on`).
     let news_at_pause = crate::task_news::at_pause(

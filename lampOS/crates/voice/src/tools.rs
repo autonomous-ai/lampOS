@@ -1014,7 +1014,9 @@ pub(crate) fn voices_own(name: &str) -> bool {
         || name == THE_TIME
         || crate::remember::is_tool(name)
         || crate::agent_tasks::is_tool(name)
-        || crate::agent_asks::is_tool(name)
+        // Only while it is offered (`LAMP_HARD_ASKS_TO_AGENT`): off, a
+        // skill's tool of that name is the skill's.
+        || (crate::agent_asks::is_tool(name) && crate::agent_asks::hard_on())
         || crate::known_faces::is_tool(name)
         || crate::photo_faces::is_tool(name)
         || crate::marked::is_tool(name)
@@ -2670,7 +2672,7 @@ fn run_call_with_scope(
         ),
         Route::AgentAsk => (
             "the lamp's agent",
-            (crate::agent_asks::run(call, request, heard), true),
+            (crate::agent_asks::run(call, request, heard, lease), true),
         ),
         Route::SeenActivity(posture) => (
             "the seen activity yes",
@@ -4986,9 +4988,20 @@ mod tests {
             args: serde_json::json!({"ask": "plan a three-day trip to Hue"}),
         };
         assert_eq!(
-            crate::agent_asks::run(&ask, 9, false)["error"],
+            crate::agent_asks::run(&ask, 9, false, None)["error"],
             crate::services::NOT_HEARD
         );
+        // Heard, but not the owner's own line (Heron's P2 6 on #7509):
+        // nothing is handed over, as a `service_read` is held.
+        assert_eq!(
+            crate::agent_asks::run(&ask, 9, true, None)["error"],
+            crate::agent_asks::OWNER_ONLY_NEXT
+        );
+        // With the switch on, a skill's tool named so is the voice's own;
+        // off, the name is a skill's like any other (Heron's P3).
+        assert!(voices_own(crate::agent_asks::TOOL));
+        crate::agent_asks::set_on_here(Some((false, false)));
+        assert!(!voices_own(crate::agent_asks::TOOL));
         crate::agent_asks::set_on_here(None);
     }
 

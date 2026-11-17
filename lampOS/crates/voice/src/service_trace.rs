@@ -210,6 +210,7 @@ impl SharedMetadata {
                             "second_route_failed",
                             "service_stopped",
                             "unplug_authority_lost",
+                            crate::say::NOT_ALONE,
                             "asker_stopped",
                             "reminder_authority_lost",
                             "privacy_gap",

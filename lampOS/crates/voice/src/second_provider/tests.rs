@@ -14373,6 +14373,7 @@ async fn a_stop_said_over_the_lamps_answer_is_answered_without_the_model() {
         "That's enough.",
         "Okay, enough.",
     ] {
+        let before = crate::agent_asks::forgets();
         let asked = asked_with(
             stop,
             |engine| engine.telling_cut_ins(true).ending_spoken_stops(true),
@@ -14382,7 +14383,11 @@ async fn a_stop_said_over_the_lamps_answer_is_answered_without_the_model() {
         )
         .await;
         assert!(asked.is_empty(), "{stop}: {asked:?}");
+        // An ask with the lamp's agent is stopped with it (Heron's P2 4 on
+        // #7509).
+        assert_eq!(crate::agent_asks::forgets(), before + 1, "{stop}");
     }
+    let before = crate::agent_asks::forgets();
     let off = asked_with(
         "Stop them.",
         |engine| engine.telling_cut_ins(true),
@@ -14392,6 +14397,8 @@ async fn a_stop_said_over_the_lamps_answer_is_answered_without_the_model() {
     )
     .await;
     assert_eq!(off.len(), 1, "{off:?}");
+    // Asked of the model: nothing is stopped.
+    assert_eq!(crate::agent_asks::forgets(), before);
     let quiet = asked_with(
         "Stop them.",
         |engine| engine.ending_spoken_stops(true),
