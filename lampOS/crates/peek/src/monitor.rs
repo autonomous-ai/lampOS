@@ -195,21 +195,41 @@ pub fn on_the_lamps_subnet(local: IpAddr, prefix: u32, peer: IpAddr) -> bool {
     }
 }
 
-/// Whether the connection's peer is on the local network: [`lan_peer`], or
-/// inside the subnet of the interface the request came to (#7208: an office
-/// LAN on 172.168.20.0/24 is no RFC1918 range but is the lamp's own).
-pub fn peer_answered(conn: &Conn) -> bool {
+/// Why the connection's peer is refused, or `None` when it is on the local
+/// network: [`lan_peer`], or inside the subnet of the interface the request
+/// came to (#7208: an office LAN on 172.168.20.0/24 is no RFC1918 range but
+/// is the lamp's own). The interface list is read once, and only for a peer
+/// [`lan_peer`] does not answer.
+pub fn peer_refused(conn: &Conn) -> Option<String> {
     let (peer, local) = (conn.peer.ip(), conn.local.ip());
-    lan_peer(peer)
-        || interface_prefix(local).is_some_and(|prefix| on_the_lamps_subnet(local, prefix, peer))
+    if lan_peer(peer) {
+        return None;
+    }
+    refusal(peer, local, interface_prefix(local))
 }
 
-/// The prefix length of the interface that holds `local`, if one does.
+/// The refusal for a peer [`lan_peer`] does not answer, given what reading
+/// the prefix of `local`'s interface found: the peer, the local address and
+/// the prefix or why there is none (#7456), nothing else; `None` when the
+/// peer is on that subnet.
+pub fn refusal(peer: IpAddr, local: IpAddr, prefix: io::Result<Option<u32>>) -> Option<String> {
+    let prefix = match prefix {
+        Ok(Some(prefix)) if on_the_lamps_subnet(local, prefix, peer) => return None,
+        Ok(Some(prefix)) => format!("prefix /{prefix}"),
+        Ok(None) => "no prefix (no interface holds the local address)".to_owned(),
+        Err(error) => format!("no prefix (interface list unreadable: {error})"),
+    };
+    Some(format!("peer {peer} refused, local {local}, {prefix}"))
+}
+
+/// The prefix length of the interface that holds `local`, if one does; an
+/// error when the interface list cannot be read (glibc's getifaddrs opens a
+/// netlink socket: the unit allows AF_NETLINK, #7456).
 #[allow(unsafe_code)]
-pub fn interface_prefix(local: IpAddr) -> Option<u32> {
+pub fn interface_prefix(local: IpAddr) -> io::Result<Option<u32>> {
     let local = local.to_canonical();
     if local.is_unspecified() {
-        return None;
+        return Ok(None);
     }
     let mut list: *mut libc::ifaddrs = std::ptr::null_mut();
     // SAFETY: getifaddrs fills `list` with a linked list that stays valid
@@ -217,7 +237,7 @@ pub fn interface_prefix(local: IpAddr) -> Option<u32> {
     // read only as the family the address names.
     unsafe {
         if libc::getifaddrs(&mut list) != 0 {
-            return None;
+            return Err(io::Error::last_os_error());
         }
         let mut found = None;
         let mut at = list;
@@ -244,7 +264,7 @@ pub fn interface_prefix(local: IpAddr) -> Option<u32> {
             }
         }
         libc::freeifaddrs(list);
-        found
+        Ok(found)
     }
 }
 
@@ -428,9 +448,70 @@ mod tests {
     #[test]
     fn loopback_is_its_own_interface() {
         let local: IpAddr = "127.0.0.1".parse().unwrap();
-        assert!(interface_prefix(local).is_some_and(|prefix| prefix >= 8));
-        assert_eq!(interface_prefix("0.0.0.0".parse().unwrap()), None);
-        assert_eq!(interface_prefix("203.0.113.9".parse().unwrap()), None);
+        assert!(
+            interface_prefix(local)
+                .unwrap()
+                .is_some_and(|prefix| prefix >= 8)
+        );
+        assert_eq!(interface_prefix("0.0.0.0".parse().unwrap()).unwrap(), None);
+        assert_eq!(
+            interface_prefix("203.0.113.9".parse().unwrap()).unwrap(),
+            None
+        );
+    }
+
+    /// #7456: lamp-52e6 at 172.168.20.21/23 refused the office Mac at
+    /// 172.168.21.18; the refusal names the peer, the local address and
+    /// the prefix or why there is none.
+    #[test]
+    fn a_peer_on_the_lamps_slash_23_is_answered_and_a_refusal_says_why() {
+        let ip = |text: &str| text.parse::<IpAddr>().unwrap();
+        let (peer, local) = (ip("172.168.21.18"), ip("172.168.20.21"));
+        assert!(!lan_peer(peer));
+        assert!(on_the_lamps_subnet(local, 23, peer));
+        assert!(refusal(peer, local, Ok(Some(23))).is_none());
+        assert!(!on_the_lamps_subnet(local, 24, peer));
+        assert_eq!(
+            refusal(peer, local, Ok(Some(24))).unwrap(),
+            "peer 172.168.21.18 refused, local 172.168.20.21, prefix /24"
+        );
+        assert_eq!(
+            refusal(peer, local, Ok(None)).unwrap(),
+            "peer 172.168.21.18 refused, local 172.168.20.21, \
+             no prefix (no interface holds the local address)"
+        );
+        // The sandbox's refusal of a netlink socket, as getifaddrs met it.
+        let unreadable = refusal(
+            peer,
+            local,
+            Err(io::Error::from_raw_os_error(libc::EAFNOSUPPORT)),
+        )
+        .unwrap();
+        assert!(
+            unreadable.starts_with(
+                "peer 172.168.21.18 refused, local 172.168.20.21, \
+                 no prefix (interface list unreadable: "
+            ),
+            "{unreadable}"
+        );
+        // A peer on the local network is answered before any list is read.
+        let conn = Conn {
+            peer: SocketAddr::from(([192, 168, 1, 9], 50000)),
+            local: SocketAddr::from(([0, 0, 0, 0], 0)),
+        };
+        assert_eq!(peer_refused(&conn), None);
+    }
+
+    /// #7456: the product unit's sandbox lets getifaddrs open its netlink
+    /// socket, or the subnet half of the gate never answers on a lamp.
+    #[test]
+    fn the_product_unit_allows_netlink_for_the_interface_list() {
+        let unit = include_str!("../../../deploy/product/lamp-peek.service");
+        let families: Vec<&str> = unit
+            .lines()
+            .filter_map(|line| line.strip_prefix("RestrictAddressFamilies="))
+            .collect();
+        assert_eq!(families, ["AF_INET AF_INET6 AF_UNIX AF_NETLINK"]);
     }
 
     #[test]

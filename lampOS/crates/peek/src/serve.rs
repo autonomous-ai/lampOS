@@ -169,14 +169,22 @@ fn monitor_refuses(monitor: &Monitor, request: &Request) -> Option<Response> {
         .get::<ConnectInfo<Conn>>()
         .map(|info| info.0)
         .or_else(|| extensions.get::<MockConnectInfo<Conn>>().map(|info| info.0));
-    let Some(conn) = conn.filter(monitor::peer_answered) else {
-        return Some(
-            (
-                StatusCode::FORBIDDEN,
-                "The dev monitor answers only on the lamp's own network.",
-            )
-                .into_response(),
-        );
+    let answered = conn
+        .ok_or_else(|| "peer unknown refused, no connection info".to_owned())
+        .and_then(|conn| monitor::peer_refused(&conn).map_or(Ok(conn), Err));
+    let conn = match answered {
+        Ok(conn) => conn,
+        Err(why) => {
+            // One journal line per refusal: peer, local address, prefix (#7456).
+            eprintln!("lamp-peek: monitor {why}");
+            return Some(
+                (
+                    StatusCode::FORBIDDEN,
+                    "The dev monitor answers only on the lamp's own network.",
+                )
+                    .into_response(),
+            );
+        }
     };
     let host = request
         .headers()
