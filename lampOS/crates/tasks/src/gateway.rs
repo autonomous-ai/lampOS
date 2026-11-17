@@ -883,15 +883,18 @@ fn approvals_json() -> Result<String, String> {
     }
 }
 
-/// The address space the skill's script may map, in KiB (`ulimit -v`,
-/// [`FENCE_TEXT`]): 1536 MiB, as glibc reserves about 64 MiB of address
-/// space for each thread's malloc arena (and OpenBLAS or numpy more), so a
-/// smaller cap fails a threaded script long before it uses that much RAM.
-/// The fence's own writable tmpfs (`/tmp` 256 MiB, `/var/tmp` and
-/// `/dev/shm` 64 MiB each) add at most 384 MiB: about 1.9 GiB at worst,
-/// under lamp-tasks' `MemoryHigh=2100M` (no swap on a lamp). A cgroup cap is not open to lamp-tasks (`lampos`, no
-/// delegation); `ulimit -v` is, and Python, its threads and the SDK fit.
-pub const SCRIPT_MEMORY_KB: &str = "1572864";
+/// The address space each process of the skill's script may map, in KiB
+/// (`ulimit -v`, soft and hard, [`FENCE_TEXT`]): 768 MiB. glibc's
+/// per-thread malloc arenas (about 64 MiB of address space each) are kept
+/// to two (`MALLOC_ARENA_MAX=2`), so a threaded script fits. A limit per
+/// process, not a bound on the run: each child the script forks gets its
+/// own 768 MiB, and the fence's writable tmpfs (`/tmp` 256 MiB, `/var/tmp`
+/// and `/dev/shm` 64 MiB each) come on top. The script shares
+/// lamp-tasks.service's cgroup (`MemoryHigh=2100M`, 632 to 1120 MiB in use
+/// measured, `skill_task::MEASURED_REST_MEMORY_MB`), so this caps one
+/// process, not the cgroup: a cap on the run as a whole needs a cgroup of
+/// its own, which lamp-tasks (`lampos`, no delegation) can't make.
+pub const SCRIPT_MEMORY_KB: &str = "786432";
 
 /// The `PATH` the skill's script is run with ([`FENCE_TEXT`]), and its
 /// fence's `unshare` ([`crate::skill_start::lamp_fence`]).
@@ -942,8 +945,8 @@ pub const TASKS_RUN: &str = "/run/lampos-tasks";
 /// skill's folder made read-only (with the flags its bind had, as a user
 /// namespace may only add flags), then the project and each hidden tmpfs
 /// but those two, so the script writes only its run's folder and its own
-/// `/tmp`, `/var/tmp` and `/dev/shm`; `/dev/null` bound over every camera, microphone,
-/// speaker, serial, I2C, SPI, GPIO, HID, framebuffer and GPU device, as
+/// `/tmp`, `/var/tmp` and `/dev/shm`; `/dev/null` bound over every
+/// camera, microphone, speaker, serial, I2C, SPI, GPIO, HID, framebuffer and GPU device, as
 /// the gateway's namespace does (lamp-update's `hermes_install::DEVICES`:
 /// under `--map-root-user` lamp-tasks' groups can't be dropped); no core
 /// file (`ulimit -c 0`, soft and hard); its address space capped
@@ -1015,7 +1018,7 @@ cd "$r" || no "the run's folder"
 ulimit -c 0 || no "no core"
 ulimit -v "$mv" || no "no memory cap"
 case "${i##*/}" in python*) set -- "$i" -s "$s" ;; *) set -- "$i" "$s" ;; esac
-exec nice -n 10 unshare --user --map-user="$u" --map-group="$g" -- env -i PATH="$SCRIPT_PATH" HOME="$hm" PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 LAMP_CONTROL_SOCKET="$so" PYTHONPATH="$py" /bin/sh -c 'IFS= read -r t <&3 || exit 1; exec 3<&-; command -v "$1" >/dev/null || { echo "no interpreter $1: the script was not run" >&2; exit 127; }; LAMP_CONTROL_TOKEN=$t; unset t; export LAMP_CONTROL_TOKEN; printf "started\n" >&4 || exit 1; exec 4>&-; exec "$@"' run "$@"
+exec nice -n 10 unshare --user --map-user="$u" --map-group="$g" -- env -i PATH="$SCRIPT_PATH" HOME="$hm" PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 MALLOC_ARENA_MAX=2 LAMP_CONTROL_SOCKET="$so" PYTHONPATH="$py" /bin/sh -c 'IFS= read -r t <&3 || exit 1; exec 3<&-; command -v "$1" >/dev/null || { echo "no interpreter $1: the script was not run" >&2; exit 127; }; LAMP_CONTROL_TOKEN=$t; unset t; export LAMP_CONTROL_TOKEN; printf "started\n" >&4 || exit 1; exec 4>&-; exec "$@"' run "$@"
 "#;
 
 /// The fence's `unshare` arguments for `grant` (its run's folder in the
@@ -1924,6 +1927,7 @@ mod tests {
         for part in [
             " PYTHONNOUSERSITE=1 ",
             " PYTHONSAFEPATH=1 ",
+            " MALLOC_ARENA_MAX=2 ",
             "set -- \"$i\" -s \"$s\"",
             "[ \"$(stat -c %d:%i \"$t1\")\" = \"$ri\" ] || no ",
             "mount -n --bind /dev/null \"$d\" || no ",

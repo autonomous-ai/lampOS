@@ -473,7 +473,15 @@ fn run_beside_gateway(
         pythonpath: "/sdk".into(),
     };
     let live = starts.open(&id, grant, TOKEN).unwrap();
-    let fence_hidden = [hidden.clone(), run_standin.clone(), etc_standin.clone()];
+    // The real /var/tmp and /dev/shm too: the fence gives each a writable
+    // 64 MiB tmpfs of its own (in its own mount namespace only).
+    let fence_hidden = [
+        hidden.clone(),
+        run_standin.clone(),
+        etc_standin.clone(),
+        PathBuf::from("/var/tmp"),
+        PathBuf::from("/dev/shm"),
+    ];
     let server = Server {
         socket: socket.clone(),
         starts: starts.clone(),
@@ -699,6 +707,7 @@ fn a_planted_pth_in_the_run_folder_never_relays_the_token() {
          [t.start() for t in threads]\n\
          [t.join() for t in threads]\n\
          print('threads=%d' % len(got))\n\
+         print('arenas=' + os.environ.get('MALLOC_ARENA_MAX', ''))\n\
          import socket\n\
          c = socket.socket(socket.AF_UNIX)\n\
          c.connect(os.environ['LAMP_CONTROL_SOCKET'])\n\
@@ -726,6 +735,7 @@ fn a_planted_pth_in_the_run_folder_never_relays_the_token() {
         "socket-connected\n",
         // Eight threads, each with its own malloc arena, under the cap.
         "threads=8\n",
+        "arenas=2\n",
     ] {
         assert!(ran.out.contains(line), "{line}: {}", ran.out);
     }
@@ -761,7 +771,12 @@ fn the_script_reads_nothing_under_run_or_etc_lampos_and_no_device() {
          dd if=/dev/zero of=/tmp/big bs=1M count=300 2>/dev/null\n\
          echo \"tmp-mib=$(($(wc -c < /tmp/big) / 1048576))\"\n\
          rm -f /tmp/big\n\
-         echo \"as=$(ulimit -v) nice=$(cut -d' ' -f19 /proc/$$/stat)\"\n\
+         echo \"as=$(ulimit -v) hardas=$(ulimit -H -v) nice=$(cut -d' ' -f19 /proc/$$/stat)\"\n\
+         for w in /var/tmp /dev/shm; do\n\
+           dd if=/dev/zero of=$w/big bs=1M count=100 2>/dev/null\n\
+           echo \"$w-mib=$(($(wc -c < $w/big) / 1048576))\"\n\
+           rm -f $w/big\n\
+         done\n\
          for d in /dev/video* /dev/snd/* /dev/ttyS* /dev/ttyACM* /dev/ttyUSB* /dev/i2c-* /dev/gpiochip* /dev/fb*; do\n\
            [ -c \"$d\" ] || continue\n\
            if [ \"$(stat -Lc %t:%T \"$d\")\" = 1:3 ]; then echo \"hidden-device $d\"; else echo \"shown-device $d\"; fi\n\
@@ -783,7 +798,13 @@ fn the_script_reads_nothing_under_run_or_etc_lampos_and_no_device() {
         "run-read-only\n",
         "project-read-only\n",
         "run-folder-written\n",
-        &format!("as={} nice=10\n", lamp_tasks::gateway::SCRIPT_MEMORY_KB),
+        &format!(
+            "as={0} hardas={0} nice=10\n",
+            lamp_tasks::gateway::SCRIPT_MEMORY_KB
+        ),
+        // Writable, and 64 MiB each: a 100 MiB write stops there.
+        "/var/tmp-mib=64\n",
+        "/dev/shm-mib=64\n",
     ] {
         assert!(ran.out.contains(line), "{line}: {}", ran.out);
     }

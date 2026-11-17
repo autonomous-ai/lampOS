@@ -3996,14 +3996,18 @@ file:
   GPIO, HID, framebuffer and GPU device, as the gateway's namespace does.
   Every mount is `mount -n`, so none writes libmount's utab under `/run`.
   It sets `ulimit -c 0` (no core file, soft and hard limit), caps the
-  script's address space at 1536 MiB (`ulimit -v`,
-  `gateway::SCRIPT_MEMORY_KB`: glibc reserves about 64 MiB of address
-  space per thread's malloc arena, so a smaller cap fails threaded
-  scripts; with the 384 MiB of writable tmpfs the worst case is about
-  1.9 GiB, under lamp-tasks' `MemoryHigh=2100M`, and a lamp has no swap), and
-  runs it at niceness 10 (`nice -n 10`). It gets no CPU quota as the
+  address space of each of the script's processes at 768 MiB
+  (`ulimit -v`, soft and hard, `gateway::SCRIPT_MEMORY_KB`), with glibc's
+  malloc arenas kept to two (`MALLOC_ARENA_MAX=2`, so threads don't each
+  reserve 64 MiB), and runs it at niceness 10 (`nice -n 10`). It gets no CPU quota as the
   gateway's unit has (`CPUQuota=100%`): that needs a cgroup, which
-  `lampos` can't make, and `ulimit -t` would end a long run. Then, in a
+  `lampos` can't make, and `ulimit -t` would end a long run. The memory
+  cap is per process, not a bound on the run: each child the script forks
+  gets its own 768 MiB, and the writable tmpfs come on top. The script
+  shares lamp-tasks.service's cgroup (`MemoryHigh=2100M`, 632 to 1120 MiB
+  in use as measured above), so nothing here bounds that cgroup; a bound
+  on the run as a whole needs a cgroup of its own, which `lampos` can't
+  make either (no delegation). Then, in a
   user namespace of its own, it reads the token from fd 3, ends if the
   interpreter is not there, writes `started` to fd 4 and closes it, and
   execs the script in the run's folder with

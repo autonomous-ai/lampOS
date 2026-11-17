@@ -1452,15 +1452,19 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   serial, I2C, SPI, GPIO, HID, framebuffer và GPU, như namespace của
   gateway. Mọi mount đều là `mount -n`, nên không mount nào ghi utab của
   libmount dưới `/run`. Rào đặt `ulimit -c 0` (không có file core, cả giới
-  hạn mềm lẫn cứng), giới hạn không gian địa chỉ của script ở 1536 MiB
-  (`ulimit -v`, `gateway::SCRIPT_MEMORY_KB`: glibc giữ trước khoảng 64 MiB
-  không gian địa chỉ cho arena malloc của mỗi luồng, nên giới hạn nhỏ hơn
-  làm hỏng script nhiều luồng; cộng 384 MiB tmpfs ghi được, trường hợp
-  xấu nhất khoảng 1,9 GiB, vẫn dưới `MemoryHigh=2100M` của lamp-tasks, và
-  đèn không có swap), và
-  chạy nó với độ nice 10 (`nice -n 10`). Không có hạn mức CPU như unit của
-  gateway (`CPUQuota=100%`): việc đó cần một cgroup mà `lampos` không tạo
-  được, còn `ulimit -t` sẽ kết thúc một lần chạy dài. Sau đó, trong một user namespace riêng, nó đọc token
+  hạn mềm lẫn cứng), giới hạn không gian địa chỉ của mỗi tiến trình của
+  script ở 768 MiB (`ulimit -v`, cả mềm lẫn cứng,
+  `gateway::SCRIPT_MEMORY_KB`), với arena malloc của glibc giữ ở hai
+  (`MALLOC_ARENA_MAX=2`, để mỗi luồng không giữ trước 64 MiB), và chạy nó
+  với độ nice 10 (`nice -n 10`). Không có hạn mức CPU như unit của gateway
+  (`CPUQuota=100%`): việc đó cần một cgroup mà `lampos` không tạo được,
+  còn `ulimit -t` sẽ kết thúc một lần chạy dài. Giới hạn bộ nhớ là cho
+  từng tiến trình, không phải cho cả lần chạy: mỗi tiến trình con script
+  fork ra có 768 MiB riêng, và các tmpfs ghi được cộng thêm. Script dùng
+  chung cgroup của lamp-tasks.service (`MemoryHigh=2100M`, đo được 632 đến
+  1120 MiB đang dùng), nên không gì ở đây giới hạn cgroup đó; giới hạn cả
+  lần chạy cần một cgroup riêng, mà `lampos` cũng không tạo được (không
+  được ủy quyền). Sau đó, trong một user namespace riêng, nó đọc token
   từ fd 3, dừng nếu không có trình thông dịch, ghi `started` vào fd 4 rồi
   đóng fd đó, và exec script trong thư mục của lần chạy với
   `PATH=/usr/local/bin:/usr/bin:/bin` (`gateway::SCRIPT_PATH`), `HOME` là
