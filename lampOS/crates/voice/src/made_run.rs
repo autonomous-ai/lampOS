@@ -84,16 +84,29 @@ pub const ANSWERS_WITHIN: std::time::Duration = crate::thread::GOING_ON_FOR;
 static RAN_NOW: std::sync::Mutex<Vec<(String, std::time::Instant)>> =
     std::sync::Mutex::new(Vec::new());
 
-/// The made skill a call's answer `told` says was run now ([`asked`]'s
-/// `{"run": NAME, "ran": true}`), if any: the worker tells the coordinator
-/// (`ProviderOutput::MadeRunNow`), which keeps it ([`ran_now`]) where the
-/// say service reads it. Never kept in the worker's own process, which
-/// the say service never reads (El's P1 on #7363).
+/// The key lamp-skills names a skill's run by in its answer to the voice's
+/// call of that skill's own tool, when the run has a task it marked as
+/// asked by voice (lamp-9adf, 18 Nov: "run my bitcoin price skill now"
+/// called `btc_price`, not a run now): `{"task_run": NAME}` (#7363).
+pub const TASK_RUN: &str = "task_run";
+
+/// The skill a call's answer `told` says was run by voice, if any: a made
+/// skill run now ([`asked`]'s `{"run": NAME, "ran": true}`) or a skill's
+/// own tool whose run has a task (`{"task_run": NAME}`, [`TASK_RUN`]). The
+/// worker tells the coordinator (`ProviderOutput::MadeRunNow`), which keeps
+/// it ([`ran_now`]) where the say service reads it. Never kept in the
+/// worker's own process, which the say service never reads (El's P1 on
+/// #7363). An error is no run.
 pub fn ran_of(told: &Value) -> Option<String> {
+    if told.get("error").is_some() {
+        return None;
+    }
     (told["ran"] == true)
-        .then(|| told[RUN].as_str().map(str::to_owned))
+        .then(|| told[RUN].as_str())
         .flatten()
+        .or_else(|| told[TASK_RUN].as_str())
         .filter(|skill| !skill.is_empty())
+        .map(str::to_owned)
 }
 
 /// `skill` run now by the owner's voice at `at`: the coordinator's alone,
@@ -347,6 +360,26 @@ mod tests {
     use crate::made_remove::tests::made_here;
     use crate::make_skill_local::tests::keeping;
     use std::path::PathBuf;
+
+    /// lamp-9adf, 18 Nov: "run my bitcoin price skill now" was the model's
+    /// call of `btc_price`, no run now: lamp-skills names the run with a
+    /// task in its answer ([`TASK_RUN`]), and the worker tells the
+    /// coordinator of it as of a run now, through `use_skill`'s note too;
+    /// a refusal, or an answer naming no run, is none (#7363).
+    #[test]
+    fn a_skill_tools_run_with_a_task_is_told_as_run_by_voice() {
+        let told = json!({"next": "Say you'll get the price.", TASK_RUN: "btc-price"});
+        assert_eq!(ran_of(&told).as_deref(), Some("btc-price"));
+        let mut through = told.clone();
+        crate::use_skill::ran("btc-price", &mut through);
+        assert_eq!(ran_of(&through).as_deref(), Some("btc-price"));
+        assert_eq!(ran_of(&json!({"next": "Say you'll dance."})), None);
+        assert_eq!(ran_of(&json!({TASK_RUN: ""})), None);
+        assert_eq!(
+            ran_of(&json!({"error": "I'm still doing that.", TASK_RUN: "btc-price"})),
+            None
+        );
+    }
 
     /// The owner's lamp-9adf on 15 Nov: unread-mail and
     /// read-newest-email-when-sitting made and on, evening-dim made and off.
