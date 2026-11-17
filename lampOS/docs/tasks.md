@@ -3411,6 +3411,54 @@ whose script runs `curl https://example.com` gets a failure (no name
 resolves, no route), while the same run's model call is answered and its
 `control.sock` call works with its token.
 
+### Skills' runs and the voice's share of the day (#7342, `LAMP_SKILL_RUNS_VOICE_SHARE`, off)
+
+A skill's run is an agent session. Its chats go through lamp-cloud's model
+forwarder on the voice's key, so they spend the same daily allowance the
+voice talks on. With up to 100 runs a day (#7151), skills must never leave
+the lamp unable to answer. The switch is off unless set, in no product unit.
+
+- **The meter:** the relay's `X-Usage-Day-Used` header, from 0 to 1, on each
+  HTTP answer of a metered route. It is counted the way the relay counts,
+  and absent when the lamp has no day limit (Backend on #7347). With the
+  switch set in lamp-cloud, the forwarder reads it from each answer and
+  keeps it in `/var/lib/lampos-cloud/day-used.json` (`lampos`'s, 0600). The
+  file holds the UTC day, the day used, when it was read, and the day's
+  count of agent chat answers and tokens from the relay's `usage`. Numbers
+  only. A new UTC day starts from nothing.
+- **The bound:** with the switch set in lamp-skills, a skill's run is refused
+  before it is handed over once what is left of the day, `1 - used`, is at
+  or below the voice's share. `on` keeps half the day; a decimal between 0
+  and 1 (`0.3`) keeps that share. The share is of the relay's own count,
+  never a token number guessed on the lamp. The refusal is not counted
+  against the day's runs, and its words are plain: "the lamp has used 62%
+  of its thinking for today, and the last 50% is kept for talking, so
+  skills' runs wait until its day starts again". A run asked for by voice
+  hears it; one started by a trigger is journaled only, since saying it
+  would spend the voice's share on words nobody asked for.
+- **The voice is never refused by it.** The voice talks to the relay itself.
+  The forwarder only reads the header and forwards every request as before,
+  the owner's own agent tasks and a request past the share included.
+- **Not known is let through:** no reading, one of another UTC day, a 2xx
+  answer with no header, or a file that can't be read. The relay's own
+  limit still holds.
+- **How fresh:** the reading is the forwarder's last answer's. The voice's
+  use since then is not in it yet, so a run may start a little past the
+  mark; its first chat updates the reading and the next run is refused.
+- **For measuring a run (#7342's part 1):** each chat answer has a journal
+  line in lamp-cloud, `a chat answer: P prompt tokens (H from the cache),
+  C completion tokens; the relay's day used U`, or `no usage given` when
+  the agent did not ask for it. Each run has one in lamp-skills, `the
+  relay's day used A before its run and B after; the agent's chats
+  meanwhile: N answers (M gave no count), P prompt tokens (H from the
+  cache), C completion tokens`. Any agent chat in that time is in it, and
+  the day used counts the voice's use too.
+- Tests: `relay_share::tests`,
+  `task::tests::a_run_is_refused_once_the_voices_share_is_reached`, and
+  the forwarder's
+  `hermes_llm::tests::the_meter_keeps_the_day_used_and_every_chat_still_goes`
+  and `without_the_meter_nothing_is_kept`.
+
 ### A voice make in a skill run's namespace (`skill_make`, #6643)
 
 The first builder's guard on #6643 (12 Nov 18:15): a voice make that
