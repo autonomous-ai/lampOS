@@ -4980,10 +4980,12 @@ as the lamp's task news" had no path: on lamp-9adf, 15 Nov, build 13135,
 said). Every task's run, whatever its grants (a linked service's read, a
 `net` read of the web, or none; the owner, 17 Nov), ends with the agent's
 last answer in lamp-tasks' answer (docs/tasks.md, "What its agent found"),
-only through a runner that keeps it (Harness's, a `net` run's by the one
-run path: a run started with no Harness or in a make's fresh home keeps
-none, so it is never told its answer is said; a fixed write's never
-tells), and
+through a runner that keeps it: Harness's, from its chat, or the make's
+runner in a fresh home (an uploaded agent skill's `scripts/SKILL.md` run, a
+keyed run, a `net` run off the one run path), from what the agent was asked
+to write to its own folder's `answer.md` (a run Harness's runner starts
+with no Harness keeps none, so it is never told its answer is said; a
+fixed write's never tells), and
 `lamp-skills` says it to the owner as a `do.read`'s lines are said
 (`service_read::tell`): behind the same gate (the owner's known face alone
 in view and steady 5 s, no voice for a minute, not private or paused, not

@@ -1756,6 +1756,7 @@ mod tests {
             write: false,
             not_made: Default::default(),
             net: false,
+            tells: false,
         }
     }
 

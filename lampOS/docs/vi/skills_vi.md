@@ -1965,11 +1965,14 @@ build 13135, `morning-unread-mail` đọc Gmail 19 lần, kết thúc idle, và
 không nói gì). Mọi lần chạy task, dù được cấp quyền gì (đọc một dịch vụ đã
 liên kết, đọc web qua `net`, hay không gì; chủ đèn, 17/11), kết thúc với
 câu trả lời cuối của agent trong câu trả lời của lamp-tasks
-(docs/vi/tasks_vi.md, "Điều agent tìm thấy"), chỉ qua một runner giữ câu
-trả lời đó (của Harness, của một lần chạy `net` theo đường chạy duy nhất:
-lần chạy khởi động không có Harness hay trong home mới của việc làm skill
-không giữ câu trả lời nào, nên không bao giờ được bảo rằng câu trả lời của
-nó sẽ được nói; lần chạy ghi cố định không bao giờ nói), và `lamp-skills` nói nó cho chủ như
+(docs/vi/tasks_vi.md, "Điều agent tìm thấy"), qua một runner giữ câu trả
+lời đó: của Harness, từ chat của nó, hoặc runner của việc làm skill trong
+home mới (lần chạy `scripts/SKILL.md` của một agent skill tải lên, một lần
+chạy được cấp khóa, một lần chạy `net` không có đường chạy duy nhất), từ
+điều agent được bảo ghi vào `answer.md` trong thư mục riêng của nó (lần
+chạy runner của Harness khởi động không có Harness không giữ câu trả lời
+nào, nên không bao giờ được bảo rằng câu trả lời của nó sẽ được nói; lần
+chạy ghi cố định không bao giờ nói), và `lamp-skills` nói nó cho chủ như
 các dòng của một `do.read` (`service_read::tell`): sau cùng một cổng (chỉ
 khuôn mặt đã biết của chủ trong tầm nhìn và ổn định 5 giây, không có giọng
 nói trong một phút, không riêng tư, không tạm dừng, không trong giờ yên

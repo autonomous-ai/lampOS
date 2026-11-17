@@ -791,19 +791,36 @@ pub struct SkillRun {
     /// that can't give them refuses the run before it starts. None: no keys.
     pub env_file: Option<PathBuf>,
     /// The agent's last answer, as Harness showed it once the run ended
-    /// well: set by the Harness runner, read only for a run that tells it
-    /// ([`tells_answer`]), never journaled.
+    /// well, or as a make's runner read it from the run's own
+    /// `answer.md` ([`crate::skill_make::MakeHermes`]): read only for a run
+    /// that tells it ([`tells_answer`]), never journaled.
     pub answer: std::sync::OnceLock<String>,
     /// Granted [`NET_GRANT`] with the owner's yes for it (#7200): on the
     /// one run path the Harness runner gives it its own egress socket,
     /// `skill-<run id>`, or refuses it ([`HarnessRunner::egress`]).
     pub net: bool,
+    /// A task's run that tells its agent's answer ([`tells_answer`]): a
+    /// make's runner reads it back from the run's own folder
+    /// ([`Runner::tell_words`]). Never a make's or a fixed write's.
+    pub tells: bool,
 }
 
 /// What a run that tells its answer ([`tells_answer`]) is asked of its
 /// last answer: the lamp says it to the owner word for word.
 pub const TELL_LINE: &str = "Your last answer is said aloud to the owner by the lamp, word for word: \
      end with only what to tell them, in a few short plain sentences, with no list, link or markdown.";
+
+/// [`TELL_LINE`] for a run through a make's runner, which keeps no chat
+/// answer: what it writes to `answer` (its own folder's `answer.md`) is
+/// said instead.
+pub fn tell_file_line(answer: &Path) -> String {
+    format!(
+        "What you write to the file {} is said aloud to the owner by the lamp, word for word: \
+         when you are done, write there only what to tell them, in a few short plain sentences, \
+         with no list, link or markdown.",
+        answer.display()
+    )
+}
 
 /// The code of a fixed write's run refused before its agent began
 /// ([`SkillRun::started`]): nothing of it can have been sent.
@@ -847,6 +864,7 @@ impl std::fmt::Debug for SkillRun {
             // Never the answer, only its length.
             .field("answer", &self.answer.get().map(|answer| answer.len()))
             .field("net", &self.net)
+            .field("tells", &self.tells)
             .finish()
     }
 }
@@ -882,6 +900,7 @@ impl SkillRun {
             env_file: None,
             answer: std::sync::OnceLock::new(),
             net: false,
+            tells: false,
         }
     }
 
@@ -923,18 +942,6 @@ impl SkillRun {
             hand.folder.join(&hand.run),
             serde_json::to_string(hand.task.trim()).unwrap_or_default(),
         )
-    }
-
-    /// [`Self::prompt`], and for a run that `tells` its last answer
-    /// ([`tells_answer`]: its runner [`Runner::answers`]) the
-    /// [`TELL_LINE`]: the lamp says it to the owner as written.
-    pub fn prompt_telling(hand: &HandOver, tells: bool) -> String {
-        let prompt = Self::prompt(hand);
-        if tells {
-            format!("{prompt} {TELL_LINE}")
-        } else {
-            prompt
-        }
     }
 
     pub fn prompt(hand: &HandOver) -> String {
@@ -1019,9 +1026,16 @@ pub trait Runner {
     /// Whether a run it ends well keeps its agent's last answer
     /// ([`SkillRun::answer`]) for the hand-over's answer: only then is a
     /// run that tells it ([`tells_answer`]) asked for one fit to say
-    /// ([`TELL_LINE`]). None by default (Hermes's and a make's runners).
+    /// ([`Self::tell_words`]). None by default (Hermes's own runner); a
+    /// make's runner keeps a task's from the run's `answer.md`.
     fn answers(&self) -> bool {
         false
+    }
+    /// What a run that tells its answer is asked, last in its words, for
+    /// one fit to say, its own folder `start_in` given: [`TELL_LINE`] by
+    /// default (a chat answer kept, as Harness's runner keeps it).
+    fn tell_words(&self, _start_in: Option<&Path>) -> String {
+        TELL_LINE.to_owned()
     }
 }
 
@@ -1284,8 +1298,8 @@ pub fn answer_for(
         .cloned()
         .collect();
     // Told only by a run whose reply can carry its agent's answer: one
-    // through a runner that keeps it (Harness's, a `net` run's on the one
-    // run path), never a make's fresh home's.
+    // through a runner that keeps it (Harness's, or a make's from the run's
+    // own `answer.md`).
     let tells = tells_answer(runner);
     let mode = (false, tells);
     let told = run_on_token(&hand.skill, &asked, mode, tokens, runner, |run, token| {
@@ -1302,7 +1316,7 @@ pub fn answer_for(
         }
         let mut made = SkillRun::of(
             &hand.skill,
-            SkillRun::prompt_telling(&hand, tells),
+            SkillRun::prompt(&hand),
             &hand.folder,
             SkillRun::task_parts(&hand),
             run,
@@ -1345,10 +1359,6 @@ pub fn answer_for(
             made.env_file = Some(file);
             let names: Vec<String> = values.iter().map(|(name, _)| name.clone()).collect();
             made.prompt = SkillRun::prompt_with_keys(&hand, &names);
-            // A run that tells keeps its ask for a last answer fit to say.
-            if tells {
-                made.prompt = format!("{} {TELL_LINE}", made.prompt);
-            }
             eprintln!(
                 "[lamp-tasks] skill task: {} given {} key(s) in its environment file",
                 hand.skill,
@@ -1356,6 +1366,16 @@ pub fn answer_for(
             );
         }
         drop(values);
+        // A run that tells: asked last, its words whole (a keyed run's
+        // too), for an answer fit to say, as its runner keeps it.
+        if tells {
+            made.tells = true;
+            made.prompt = format!(
+                "{} {}",
+                made.prompt,
+                runner.tell_words(made.start_in.as_deref())
+            );
+        }
         Ok((made, fresh))
     });
     match told["message"].as_str() {
@@ -4687,7 +4707,6 @@ mod tests {
         assert_eq!(told, json!({"ok": true, "id": 0}));
         assert!(!hermes.seen.borrow()[0].0.contains(TELL_LINE));
         let hand = HandOver::parse(&line(gmail), skills()).unwrap();
-        assert!(SkillRun::prompt_telling(&hand, true).ends_with(TELL_LINE));
         assert!(!SkillRun::prompt(&hand).contains(TELL_LINE));
         assert_eq!(told_answer(&"a ".repeat(4_000)).len(), MOST_TOLD_BYTES - 1);
     }
@@ -4695,8 +4714,8 @@ mod tests {
     /// A run granted `net` with the net grant on is a read of the web: it
     /// tells what its agent found, as a service's read does, through a
     /// runner that keeps it (the one run path's Harness), its words asking
-    /// for a last answer fit to say, a keyed one's too; through the make's
-    /// net runner, which keeps none, it tells nothing.
+    /// for a last answer fit to say, a keyed one's too; through a runner
+    /// that keeps none, it tells nothing.
     #[test]
     fn a_net_runs_ended_answer_carries_what_its_agent_found() {
         let work = tempfile::tempdir().unwrap();
@@ -4735,8 +4754,7 @@ mod tests {
             prompt.contains("COIN_KEY") && prompt.ends_with(TELL_LINE),
             "{prompt}"
         );
-        // A net runner that keeps no answer (the make's): neither told nor
-        // asked.
+        // A net runner that keeps no answer: neither told nor asked.
         let open = where_runner();
         let make = Agent {
             net: Some(&open),
@@ -4746,6 +4764,80 @@ mod tests {
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &make);
         assert_eq!(told, json!({"ok": true, "id": 0}));
         assert!(open.started.borrow().len() == 1);
+    }
+
+    /// A make's runner as a task's run goes through it: answers as
+    /// [`crate::skill_make::MakeHermes`] does, its agent writing `0` to
+    /// the file its words name, the answer kept from it
+    /// ([`crate::skill_make::keep_told_answer`]); the words each run was
+    /// given.
+    struct MakeLike(&'static str, RefCell<Vec<String>>);
+
+    impl Runner for MakeLike {
+        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+            run.started.store(true, Ordering::Release);
+            self.1.borrow_mut().push(run.prompt.clone());
+            if let Some(folder) = &run.start_in {
+                std::fs::write(folder.join(crate::skill_make::ANSWER_FILE), self.0).unwrap();
+            }
+            crate::skill_make::keep_told_answer(run);
+            Ok(0)
+        }
+
+        fn answers(&self) -> bool {
+            true
+        }
+
+        fn tell_words(&self, start_in: Option<&Path>) -> String {
+            let make = crate::skill_make::lamp_runner(Path::new("/var/lib/lampos-tasks"), true);
+            make.tell_words(start_in)
+        }
+    }
+
+    /// The owner: every agent's result is told. An uploaded agent skill's
+    /// run (`scripts/SKILL.md`) and a keyed run, both through the make's
+    /// held runner in a fresh home of their own, are asked to write what
+    /// to tell to their own folder's `answer.md`, and their ended answer
+    /// carries it, as a Harness run's chat answer.
+    #[test]
+    fn an_agent_skills_and_a_keyed_runs_ended_answers_carry_what_their_agent_found() {
+        let work = tempfile::tempdir().unwrap();
+        let found = json!({"ok": true, "id": 0, "answer": "It is 21 degrees and sunny."});
+        let make = MakeLike("It is 21 degrees\n and sunny.", RefCell::default());
+        let tokens = FakeTokens::default();
+        let plain = runner(&tokens, Ok(0));
+        let agent = Agent {
+            held: Some(&make),
+            work: Some(work.path()),
+            ..Default::default()
+        };
+        let skill_md = line(|value| value["run"] = json!(AGENT_INSTRUCTIONS));
+        let told = answer_agent(&skill_md, true, skills(), &tokens, &plain, &agent);
+        assert_eq!(told, found);
+        let keys = FakeKeys(Ok((vec![("WEATHER_KEY", "test-value-123")], vec![])));
+        let keyed = Agent {
+            held: Some(&make),
+            work: Some(work.path()),
+            keys: Some(&keys),
+            ..Default::default()
+        };
+        let told = answer_agent(&line(|_| {}), true, skills(), &tokens, &plain, &keyed);
+        assert_eq!(told, found);
+        let asked = make.1.borrow();
+        assert_eq!(asked.len(), 2);
+        for words in asked.iter() {
+            assert!(
+                words.contains(&format!("/{}", crate::skill_make::ANSWER_FILE))
+                    && words.contains("is said aloud to the owner by the lamp, word for word")
+                    && !words.contains(TELL_LINE),
+                "{words}"
+            );
+        }
+        assert!(asked[1].contains("WEATHER_KEY"), "{}", asked[1]);
+        assert!(
+            plain.seen.borrow().is_empty(),
+            "both went through the make's"
+        );
     }
 
     fn runner(tokens: &FakeTokens, result: Result<u64, String>) -> FakeRunner<'_> {

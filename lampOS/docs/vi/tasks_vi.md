@@ -316,13 +316,20 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   kết thúc `stopped`, là `show` đã thấy phiên được gắn), mỗi dãy khoảng
   trắng hoặc ký tự điều khiển thành một dấu cách, tối đa 3.000 byte
   (`told_answer`, `MOST_TOLD_BYTES`). Lời giao việc của lần chạy đó, và
-  chỉ của nó (`SkillRun::prompt_telling`, cả lần chạy được cấp khóa), kết
-  thúc bằng `TELL_LINE`, để agent kết thúc bằng vài câu đơn giản cho chủ;
-  một lần chạy trong home mới qua runner của việc làm skill (của một agent
-  skill, một lần chạy được cấp khóa, hoặc một lần chạy `net` không có
-  đường chạy duy nhất), vốn không giữ câu trả lời, không bao giờ được bảo
-  rằng câu trả lời của nó sẽ được nói, lần chạy ghi cố định cũng vậy.
-  lamp-skills nói chúng cho chủ nguyên văn, không bao giờ thành một lượt
+  chỉ của nó, cả lần chạy được cấp khóa, kết thúc bằng `Runner::tell_words`
+  của runner (`TELL_LINE` với runner của Harness), để agent kết thúc bằng
+  vài câu đơn giản cho chủ. Một lần chạy trong home mới qua runner của việc
+  làm skill (`MakeHermes`: lần chạy `scripts/SKILL.md` của một agent skill
+  tải lên, một lần chạy được cấp khóa, hoặc một lần chạy `net` không có
+  đường chạy duy nhất), vốn không giữ câu trả lời chat, thay vào đó được bảo
+  ghi điều cần nói vào `answer.md` trong thư mục riêng của nó
+  (`tell_file_line`, đường dẫn đầy đủ của thư mục), và runner giữ nó khi lần
+  chạy kết thúc tốt (`skill_make::keep_told_answer`, đọc như câu trả lời
+  của việc làm skill: một file thường, không bao giờ qua link, không rỗng,
+  tối đa 20 KiB; `its agent's answer: N bytes kept` hoặc `none in its
+  answer.md`), nên nó được nói như của Harness. Lần chạy ghi cố định không
+  bao giờ nói, lần chạy runner của Harness khởi động không có Harness cũng
+  vậy. lamp-skills nói chúng cho chủ nguyên văn, không bao giờ thành một lượt
   của model, nên chữ từ web mở không bao giờ là chỉ dẫn (docs/vi/skills_vi.md,
   "Dịch vụ đã liên kết thành task cho agent của đèn"). Không có gì theo dõi
   việc script của lần chạy đã tự nói qua `say` của lamp-control hay chưa,
@@ -345,7 +352,9 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   ra nó mất ở đâu. Test:
   `every_runs_ended_answer_carries_what_its_agent_found`,
   `a_net_runs_ended_answer_carries_what_its_agent_found`,
-  `skill_make::tests::a_net_runner_keeps_an_answer_only_by_the_one_run_path`,
+  `an_agent_skills_and_a_keyed_runs_ended_answers_carry_what_their_agent_found`,
+  `skill_make::tests::a_net_runner_keeps_an_answer_by_either_path`,
+  `skill_make::tests::a_makes_runner_keeps_a_telling_runs_answer_from_its_folder`,
   `a_skill_runs_end_keeps_its_agents_last_answer`,
   `an_agent_run_granted_a_service_has_the_lamps_connectors_in_its_fresh_home`.
 - **Token một lần chạy** (điều kiện 12:45 của người xây dựng đầu tiên trên

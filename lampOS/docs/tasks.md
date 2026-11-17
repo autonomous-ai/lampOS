@@ -2903,12 +2903,19 @@ for each run, and is answered once the run ends
   answer as the run's end `show` gave it (`--chars 4000`, `Cli::shown_end`;
   for a `stopped` end, the `show` that found its session bound), every run
   of whitespace or control characters one space, at most 3,000 bytes
-  (`told_answer`, `MOST_TOLD_BYTES`). Its words, and only such a run's
-  (`SkillRun::prompt_telling`, a keyed run's too), end with `TELL_LINE`,
-  so the agent ends with a few plain sentences for the owner; a run in a
-  fresh home through the make's runner (an agent skill's, one given keys,
-  or a `net` one's without the one run path), which keeps no answer, is
-  never told its answer is said, nor is a fixed write's run. lamp-skills
+  (`told_answer`, `MOST_TOLD_BYTES`). Its words, and only such a run's,
+  a keyed run's too, end with its runner's `Runner::tell_words`
+  (`TELL_LINE` for Harness's), so the agent ends with a few plain
+  sentences for the owner. A run in a fresh home through the make's
+  runner (`MakeHermes`: an uploaded agent skill's `scripts/SKILL.md` run,
+  one given keys, or a `net` one's without the one run path), whose chat
+  answer goes nowhere, is asked instead to write what to tell to its own
+  folder's `answer.md` (`tell_file_line`, the folder's full path), and the
+  runner keeps it once the run ended well (`skill_make::keep_told_answer`,
+  read as a make's answer is: a regular file, never through a link, not
+  empty, at most 20 KiB; `its agent's answer: N bytes kept` or `none in
+  its answer.md`), so it is told as Harness's is. A fixed write's run
+  never tells, nor a run Harness's runner starts with no Harness. lamp-skills
   says them to the owner as exact words, never a turn for the model, so
   text from the open web is never an instruction (docs/skills.md, "A
   linked service as a task for the lamp's agent"). Nothing tracks whether
@@ -2931,7 +2938,9 @@ for each run, and is answered once the run ends
   said (#7180), which these lines place. Tests:
   `every_runs_ended_answer_carries_what_its_agent_found`,
   `a_net_runs_ended_answer_carries_what_its_agent_found`,
-  `skill_make::tests::a_net_runner_keeps_an_answer_only_by_the_one_run_path`,
+  `an_agent_skills_and_a_keyed_runs_ended_answers_carry_what_their_agent_found`,
+  `skill_make::tests::a_net_runner_keeps_an_answer_by_either_path`,
+  `skill_make::tests::a_makes_runner_keeps_a_telling_runs_answer_from_its_folder`,
   `a_skill_runs_end_keeps_its_agents_last_answer`,
   `an_agent_run_granted_a_service_has_the_lamps_connectors_in_its_fresh_home`.
 - **A one-run token** (the first builder's 12:45 conditions on #6071): for
