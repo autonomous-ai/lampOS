@@ -1788,7 +1788,17 @@ mod tests {
         // Said whole again, then a "no": the wait ends, nothing kept.
         lamp_said(6, &line);
         assert!(approve_forced_now(now));
-        let no = answered(&id, 7, Some("no")).unwrap();
+        // With #7561's bound yes: the forced note asks for the name, a yes
+        // naming none is taken by the approve, and one with no name given
+        // is unclear, the wait kept and asked once more.
+        let note = waiting_note(7, now).unwrap();
+        assert!(note.contains("Give named too"), "{note}");
+        assert_eq!(answered(&id, 7, Some("yes"), Some(NAMED_NONE)), None);
+        assert_eq!(answered(&id, 7, Some("yes"), Some("fruit notes")), None);
+        let unclear = answered(&id, 7, Some("yes"), None).unwrap();
+        assert_eq!(unclear["approved"], false, "{unclear}");
+        assert!(waits(&id) && approve_forced_now(now));
+        let no = answered(&id, 7, Some("no"), None).unwrap();
         assert_eq!(no["approved"], false, "{no}");
         assert!(!waits(&id) && !approve_forced_now(now));
         // A second make while one waits takes the wait: the first make's
