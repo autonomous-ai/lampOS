@@ -4146,7 +4146,8 @@ gone ([switches.md](switches.md)). What happens:
    - any other refusal: "the lamp's check didn't let it on".
    Never without `LAMP_MAKE_SKILL`, whatever the model calls: without it
    `make_skill` is nobody's. Taking a made skill off (the app's remove, or
-   `{"off": NAME}`) is unchanged; by voice, see "Removed by voice" below.
+   `{"off": NAME}`) is unchanged; by voice, see "Removed by voice" and
+   "Turned off and on by voice" below.
 9. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
    for up to 30 s an ask, with one more try after a failure; repairs after
    a refusal are begun only while one more ask still ends within
@@ -4511,6 +4512,62 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `a_yes_after_remove_moon_fact_is_forced_and_removes_it`,
 `a_no_after_remove_moon_fact_keeps_it`,
 `no_force_before_the_question_is_said_whole`.
+
+**Turned off and on by voice** (#7445, with `LAMP_MADE_SKILL_OFF_SAID` on
+alone: on lamp-9adf, build 13252, "Lamp, turn off the coffee time skill"
+called `make_skill`'s `remove`, the only verb it had for a made skill, and
+the lamp asked "Remove coffee time?": a yes would have lost the skill for
+good). A skill the person made is turned off, paused or stopped through
+`make_skill` itself, its `turn_off` alone, and back on through its
+`turn_on` alone: the name as heard (`made_turn::TURN_OFF`,
+`made_turn::TURN_ON`), parameters of the function the voice has, as a
+remove's. Which one a line asks is the model's judgment, never a list of
+words: the function's last sentence becomes "To turn off, pause or stop one
+they made: turn_off alone, never remove; back on: turn_on; delete: remove;
+run now: run; list: made; say nothing first."
+(`make_skill_local::TURN_OFF_TOLD`, as many bytes as the sentence it
+replaces, so every switch on still fits the link's 1,024), `turn_off`'s
+parameter says "turn off, pause or stop a skill they made, which keeps it
+to turn back on ... Never remove for this", and `remove`'s says "delete or
+remove a skill for good, never to turn one off, pause or stop it". A call
+that carries a turn-off is read before the remove, so a turn-off never
+becomes a remove. Then, in code (`made_turn::asked`):
+- **The owner's alone, heard.** A turn nobody spoke changes nothing; a line
+  not the owner's (`services::owner_hears`, as a run) changes nothing and
+  names no skill ("only the lamp's owner can turn a skill they made off or
+  on by voice").
+- **Only the person's own.** The name is matched as a remove's is
+  (`made_remove::found`); one they didn't make, several as near, or none
+  near are said so, as for a run. One not on the lamp now, or whose folder
+  there is not the package made, is said not turned, and why.
+- **As the app's switch.** It is turned by the manage helper's own
+  `{"off": NAME}` or `{"on": NAME}` (`made_turn::turned_by_helper`), the
+  very lines the app's switch asks (`lamp-cloud`'s `skills.off` and
+  `skills.on`), kept in lamp-skills' `off` file, which a round and a
+  restart keep. It stays a made skill, on the lamp, and nothing waits: no
+  yes, since nothing is lost and "turn it back on" undoes it. The model is
+  told to say, in a few words, in the conversation's language, that NAME
+  is off and that they can say turn it back on whenever they like ("Coffee
+  time is off. Say turn it back on whenever you like."), never that it is
+  removed; or that NAME is on again. A refusal is said as not turned, and
+  why.
+- **A remove still asks first.** "Remove coffee time?" and the owner's yes,
+  as above (#6960).
+- **No extra round trip.** The match reads two local folders, then one line
+  to the manage helper over its local socket, at most 8 s.
+
+Off (unset, or anything but `on`), `make_skill`'s description and
+parameters, and every answer, are byte for byte as before.
+
+Tests: `made_turn::tests::turn_off_sets_the_off_state_and_removes_nothing`,
+`turn_on_clears_the_off_state`, `the_helper_is_asked_the_apps_off_and_on`,
+`a_stranger_cant_turn_one_off_or_on`,
+`only_their_own_made_skill_on_the_lamp_is_turned`,
+`a_refusal_is_said_not_turned`, `switch_off_is_byte_for_byte_as_before`,
+`switch_on_tells_a_turn_off_from_a_remove_within_the_bounds`,
+`remove_still_waits_for_its_yes`; and lamp-skills'
+`made::a_made_skill_is_turned_off_and_on_by_voice_as_the_apps_switch`,
+through the real manage helper.
 
 **Listed by voice** (lamp-9adf, 15 Nov, build 13162: "which skills have you
 made for me?" called nothing and was answered from the last few turns, two
