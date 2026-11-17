@@ -54,7 +54,9 @@ const UNPLUG: &str = "unplug: ";
 /// the product, #5750, and Harness's `harness_status` since
 /// `LAMP_TASKS_HARNESS_STATUS` is on in the product, #6061, and the asked
 /// sleep's `go_to_sleep` since `LAMP_SLEEP_ASKED` is on in the product,
-/// #6853: 45 with the route's 3 is the bound of 48 exactly), the
+/// #6853: 45, and 48 with the route's 3; a real lamp also has lamp-services'
+/// 3 and the weather, which this run doesn't count, so the bound is 64
+/// since #7433), the
 /// actions part's 17 and the skills' 1: `use_skill`, which reaches every
 /// skill's function (`LAMP_USE_SKILL=on` since #2826; Dance's `dance`,
 /// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,

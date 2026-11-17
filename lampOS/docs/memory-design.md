@@ -175,7 +175,7 @@ night.
 The eventual store belongs in the memory process, backed by SQLite. Working
 conversation state belongs in voice. The design uses a session-start owner
 snapshot and cue-driven recall; it does not require new live model tools or
-exceed the second route's current **48-tool limit** (`second_provider.rs`);
+exceed the second route's current **64-tool limit** (`second_provider.rs`);
 the 32-tool limit applies to Gemini Live. Integration must preserve compatibility with
 the previous build on each side of the process interface.
 

@@ -789,7 +789,7 @@ other installable skills and the parked Laugh glance are left out,
 `install::NOT_PRODUCT_SKILLS`), and the product voice with the say service
 on, no hello of its own (#2825), and its reminders and task news waiting for their
 skills (`LAMP_SCHEDULE_SPEAK=skill`, `LAMP_TASK_NEWS=skill`; install.md).
-A skill with a tool costs one of the 32 functions a Live session takes (48
+A skill with a tool costs one of the 32 functions a Live session takes (64
 on the second route's chat requests, `second_provider::MAX_TOOLS`), after
 the voice's own and the actions part's: a product lamp's are 31
 (`crates/update/tests/functions.rs`). Past 32 a core skill's function is
@@ -4354,8 +4354,9 @@ a read-back that found no "moon-fax", since nothing in `make_skill` named a
 remove and a read-back takes only the exact name). A skill the person made
 is removed through `make_skill` itself, its `remove` alone: the name as
 heard (`made_remove::REMOVE`). It is a parameter of the function the voice
-has, never a function of its own, as the voice is at its 48
-(`lamp_gemini::MAX_TOOLS`). Whether a line asks to remove a skill is the
+has, never a function of its own, as the voice keeps its functions few
+(the second route's bound, `second_provider::MAX_TOOLS`, was full at 48
+when this was built; it is 64 since #7433). Whether a line asks to remove a skill is the
 model's judgment, told in the function's description ("To delete or
 remove a skill, call it with remove alone; to run one they made now,
 run alone; to list those they made, made alone; say nothing first.", the
