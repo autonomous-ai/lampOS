@@ -1013,6 +1013,23 @@ impl SpeakingFaces {
         })
     }
 
+    /// Whether a face in view was read silent from `from` to `to`: some look
+    /// had a face whose mouth read `no`, and no look a face read `yes`. No
+    /// look, no face or a mouth never read is not (`LAMP_SAID_TO_ME`, the
+    /// first builder's HOLD on #7457: unknown blocks nothing).
+    pub fn read_silent_between(&self, from: Instant, to: Instant) -> bool {
+        self.looks.lock().is_ok_and(|looks| {
+            let during = || {
+                looks
+                    .kept
+                    .iter()
+                    .filter(|look| look.at >= from && look.at <= to)
+            };
+            during().any(|look| !look.still.is_empty())
+                && !during().any(|look| !look.speaking.is_empty())
+        })
+    }
+
     /// The head pitch (radians, down positive) and gaze of the turned face
     /// read speaking, from `from` to `to`, both from the newest look that
     /// gave either; `None` when none did, which is unknown (`LAMP_SAID_TO_ME`,
