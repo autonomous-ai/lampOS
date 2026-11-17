@@ -10555,3 +10555,36 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
     }));
     assert_eq!(rig.cli().program_sessions(), Some(false));
 }
+
+/// openharness#4393: the one session's reply into a pane of `harness new`
+/// (the person's, no token) read the acknowledged way: `taken` with its
+/// input, a `TIMEOUT` that typed nothing, one that typed, and an older
+/// Harness's answer as before; `wait --after` with no token.
+#[test]
+fn a_reply_to_the_pane_reads_the_acknowledged_answer() {
+    use lamp_tasks::harness::Typed;
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    rig.plan(json!({
+        "reply":{"each":[
+            {"stdout":"{\"state\":\"taken\",\"inputId\":\"in-1\"}\n"},
+            {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":true}\n","exit":124},
+            {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":false,\"inputId\":\"in-2\"}\n","exit":124},
+            {"stdout":format!("{}\n", json!({"ok":true,"id":AGENT,"state":"queued"}))}
+        ]},
+        "wait":{"exit":0},
+    }));
+    let cli = rig.cli();
+    assert_eq!(cli.reply_to(MACHINE, AGENT, "New task t:\nGo."), Typed::Taken("in-1".into()));
+    assert_eq!(cli.reply_to(MACHINE, AGENT, "x"), Typed::Cancelled);
+    assert_eq!(cli.reply_to(MACHINE, AGENT, "x"), Typed::Taken("in-2".into()));
+    assert_eq!(cli.reply_to(MACHINE, AGENT, "x"), Typed::Typed);
+    assert_eq!(
+        cli.wait_after(MACHINE, AGENT, "in-1", &AtomicBool::new(false)),
+        Ok(Some("idle".into()))
+    );
+    let calls = rig.calls();
+    let wait = calls.last().unwrap()["args"].as_array().unwrap().clone();
+    assert!(wait.contains(&json!("--after")) && wait.contains(&json!("in-1")), "{wait:?}");
+    assert!(!wait.contains(&json!("--program-token-file")));
+}

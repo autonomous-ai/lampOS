@@ -167,6 +167,11 @@ pub const OPEN_IDLE_WITHIN: Duration = Duration::from_secs(120);
 /// The first wait after an open failed, doubled at each failure in a row
 /// up to [`OPEN_RETRY_MOST`] (the daemon start's backoff style).
 pub const OPEN_RETRY_FIRST: Duration = Duration::from_secs(5);
+/// Between two `harness ensure` that said `ENGINE_NOT_READY` in a row
+/// (openharness#4393: the old engine still exiting after a crash)...
+pub const ENGINE_RETRY: Duration = Duration::from_secs(5);
+/// ...within this, before [`NOT_READY_FIRST`]'s backoff.
+pub const ENGINE_RETRY_WITHIN: Duration = Duration::from_secs(45);
 /// The longest wait between two opens that failed.
 pub const OPEN_RETRY_MOST: Duration = Duration::from_secs(300);
 /// The pane's rotation, as Hermes' gateway rotates its sessions
@@ -289,6 +294,17 @@ pub trait PaneHarness {
     ) -> Result<Option<String>, String> {
         Err("unsupported".into())
     }
+    /// `harness wait --after` an input a pane of `harness new` took, no
+    /// token ([`Cli::wait_after`]).
+    fn wait_after(
+        &self,
+        _machine: &str,
+        _agent: &str,
+        _input: &str,
+        _cancel: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        Err("unsupported".into())
+    }
     /// `harness close` of it with the token ([`Cli::close_kept`]); its
     /// conversation stays in the engine's store.
     fn close_kept(&self, _name: &str, _token: &Path) -> Result<(), String> {
@@ -358,6 +374,15 @@ impl PaneHarness for Cli {
     }
     fn close_kept(&self, name: &str, token: &Path) -> Result<(), String> {
         Cli::close_kept(self, name, token)
+    }
+    fn wait_after(
+        &self,
+        machine: &str,
+        agent: &str,
+        input: &str,
+        cancel: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        Cli::wait_after(self, machine, agent, input, cancel)
     }
 }
 
@@ -709,7 +734,7 @@ pub fn spoken_launch(
             let past = || ended() || Instant::now() >= taken_until;
             // The kept session's reply returns only once the engine took
             // the words (openharness#4393): no look needed.
-            if one.kept_now(&agent).is_none()
+            if !one.took_input(&agent)
                 && !one.wait_taken_while(harness, &place.machine, &agent, &launch.name, &past)
             {
                 eprintln!(
@@ -865,6 +890,15 @@ impl OneSession {
         let inner = self.lock();
         let pane = inner.pane.as_ref()?;
         (pane.kept && pane.agent == agent).then(|| (name_for(pane.place.engine), token))
+    }
+
+    /// The pane `agent` took this turn's words with an acknowledged reply
+    /// (openharness#4393): its input id is kept.
+    fn took_input(&self, agent: &str) -> bool {
+        self.lock()
+            .pane
+            .as_ref()
+            .is_some_and(|pane| pane.agent == agent && pane.input.is_some())
     }
 
     /// The kept session's token file removed (a sign-out, an engine
@@ -1996,7 +2030,20 @@ impl OneSession {
             .then(|| self.kept().map(|(agent, _, _)| (self.kept_session_key(&agent), agent)))
             .flatten();
         let name = name_for(place.engine);
-        let ensured = match harness.ensure_kept(place.engine, &name, token, &place.folder, fresh) {
+        // `ENGINE_NOT_READY` (the old engine still exiting after a crash,
+        // a gateway still starting): tried again every few seconds within a
+        // short bound, then the long backoff.
+        let gap = ENGINE_RETRY.min(self.look.saturating_mul(50));
+        let short_until = until.min(Instant::now() + ENGINE_RETRY_WITHIN);
+        let mut ensured = harness.ensure_kept(place.engine, &name, token, &place.folder, fresh);
+        while matches!(&ensured, Err(code) if code == "engine_not_ready")
+            && Instant::now() + gap < short_until
+            && !ended()
+        {
+            std::thread::sleep(gap);
+            ensured = harness.ensure_kept(place.engine, &name, token, &place.folder, fresh);
+        }
+        let ensured = match ensured {
             Ok(ensured) => ensured,
             Err(code) if code == "engine_not_ready" => {
                 return Err(self.not_ready("harness ensure: engine_not_ready"));
@@ -2289,6 +2336,19 @@ impl Turn<'_> {
                     let turns = self.counted(&agent, place, &text, None);
                     return Sent::Typed(turns);
                 }
+                // An acknowledged reply (openharness#4393): the turn's end
+                // is read with `wait --after` this input.
+                Typed::Taken(input) => {
+                    let turns = self.counted(&agent, place, &text, Some(input));
+                    return Sent::Typed(turns);
+                }
+                // Not taken in Harness's bound, nothing typed: again.
+                Typed::Cancelled => {
+                    if ended() || Instant::now() >= until {
+                        return self.fallback("the pane did not take the words until the run's end");
+                    }
+                    std::thread::sleep(self.one.look);
+                }
                 Typed::NotIdle => {
                     // Busy with another input (a person's, or the open's
                     // first turn): waited for, never typed over.
@@ -2326,9 +2386,7 @@ impl Turn<'_> {
         let turns = inner.pane.as_mut().map_or(1, |pane| {
             pane.turns += 1;
             pane.tokens += tokens_in(text);
-            if input.is_some() {
-                pane.input = input;
-            }
+            pane.input = input;
             pane.turns
         });
         drop(inner);
@@ -2366,7 +2424,18 @@ impl Turn<'_> {
             return Ended::Failed("the pane was let go".into());
         };
         if let Some((name, token)) = self.one.kept_now(&agent) {
-            return self.wait_kept(harness, machine, &agent, (&name, &token), cancel, before_close);
+            return self.wait_kept(
+                harness,
+                machine,
+                &agent,
+                Some((&name, &token)),
+                cancel,
+                before_close,
+            );
+        }
+        // An acknowledged reply took this turn's words: `wait --after`.
+        if self.one.took_input(&agent) {
+            return self.wait_kept(harness, machine, &agent, None, cancel, before_close);
         }
         let mine = header(&self.id);
         loop {
@@ -2435,15 +2504,17 @@ impl Turn<'_> {
         }
     }
 
-    /// [`Turn::wait_end`] for the kept session (openharness#4393): `harness
-    /// wait --after` the input this turn's reply was taken as, so its idle
-    /// is this turn's end, then `show` for its answer.
+    /// [`Turn::wait_end`] after an acknowledged reply (openharness#4393),
+    /// into the kept session (`kept`: its name and token) or a pane of
+    /// `harness new`: `harness wait --after` the input this turn's reply
+    /// was taken as, so its idle is this turn's end, then `show` for its
+    /// answer.
     fn wait_kept(
         &self,
         harness: &dyn PaneHarness,
         machine: &str,
         agent: &str,
-        (name, token): (&str, &Path),
+        kept: Option<(&str, &Path)>,
         cancel: &AtomicBool,
         before_close: &dyn Fn(),
     ) -> Ended {
@@ -2456,7 +2527,11 @@ impl Turn<'_> {
                 before_close();
                 return self.cancelled(harness, machine, agent);
             }
-            match harness.wait_kept(name, token, &input, cancel) {
+            let waited = match kept {
+                Some((name, token)) => harness.wait_kept(name, token, &input, cancel),
+                None => harness.wait_after(machine, agent, &input, cancel),
+            };
+            match waited {
                 Ok(None) => {}
                 Ok(Some(state)) if state == "idle" => match harness.observe(machine, agent) {
                     Ok(PaneSeen { seen, .. }) => {
@@ -2472,11 +2547,19 @@ impl Turn<'_> {
                     Err(_) => self.rest(cancel),
                 },
                 Ok(Some(state)) if state == "needs-input" => {
-                    let _ = harness.close_kept(name, token);
-                    self.one.kept_closed(agent, EngineKind::Openclaw);
+                    match kept {
+                        Some((name, token)) => {
+                            let _ = harness.close_kept(name, token);
+                            self.one.kept_closed(agent, EngineKind::Openclaw);
+                        }
+                        None => {
+                            let _ = harness.close_now(machine, agent);
+                            self.one.closed_by_us(agent, EngineKind::Openclaw, true);
+                        }
+                    }
                     self.one.gone(agent, "its turn asked something");
                     eprintln!(
-                        "tasks: one session: {}'s turn asks something; the kept session closed and its conversation deleted, ensured again next",
+                        "tasks: one session: {}'s turn asks something; closed and its conversation deleted, opened again next",
                         self.id
                     );
                     return Ended::Failed(
