@@ -2418,6 +2418,8 @@ fn second_route_worker_environment(
         crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
         // An ask cut by a line let out that only declines is answered (#5961).
         crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT,
+        // An ask left on its holding line is not told to later turns.
+        crate::second_provider::LATE_ANSWER_LET_GO_ENVIRONMENT,
         crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
         crate::remember::HITS_ENVIRONMENT,
         // A don't-know about the person recalls their kept things first (C57).
@@ -2736,6 +2738,7 @@ mod tests {
             crate::cut_in_prompt_log::ENVIRONMENT,
             crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
             crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT,
+            crate::second_provider::LATE_ANSWER_LET_GO_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::dont_know::ENVIRONMENT,
             crate::remember::doubted::UNDOES_ENVIRONMENT,
@@ -3798,6 +3801,7 @@ mod tests {
                     || name == crate::cut_in_prompt_log::ENVIRONMENT
                     || name == crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT
                     || name == crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT
+                    || name == crate::second_provider::LATE_ANSWER_LET_GO_ENVIRONMENT
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::dont_know::ENVIRONMENT
@@ -3991,6 +3995,7 @@ mod tests {
                     "LAMP_KEEP_QUIETLY=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
+                    "LAMP_LATE_ANSWER_LET_GO=on",
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
                     "LAMP_MADE_NOT_ON_TOLD=on",

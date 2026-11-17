@@ -4950,6 +4950,41 @@ after a take-over, but now for every turn:
     a cut line neither joined nor carried keeps its exchange: with
     `LAMP_SAID_AS_HEARD` its part is "—", so the person's words are not
     lost.
+- **An ask left on its holding line is not told to later turns**
+  (`LAMP_LATE_ANSWER_LET_GO=on`; exactly `on`, off unless set, in no
+  product unit). A turn that said words ("Let me search that.") and then
+  called a function, and ended before saying any words after that
+  function's round (cut by a newer line, stopped or retired), is left on
+  its holding line. Its search was already let go (`Engine::begin` drops
+  the turn, so no result of it is ever spoken), but its exchange stayed in
+  the thread answered only by the holding line, and the next turn's model,
+  given "Person: How many dong is one US dollar? / You: Let me search
+  that." in the system message's thread text and as history messages,
+  kept the promise inside its own turn: on lamp-9adf on 17 Nov at 18:18
+  the dong ask was answered about 25 s later inside the next ask's make
+  turn. An agent hand-over carries nothing from the thread
+  (`make_skill_agent`), so it is the history alone. With the switch on,
+  the turn is marked as its round's calls start after words were said,
+  the mark cleared by any later words of the turn or its end; a turn ended
+  while marked (`Engine::begin`, `retire_through`, `stop_through`) has its
+  exchange marked in the thread (`thread::left_on_holding_line`; one not
+  yet opened is marked as it opens). Such an exchange is left out of every
+  later turn's history messages (`Thread::recent_picks_for`,
+  `recent_picks_with_room_lines`), the thread's text
+  (`recall_for_leaving_out`), the running summary (`summary_due`,
+  `summary_rest`) and the thread file. The person's line is still
+  journalled to memory, and the conversation goes on as before; a person
+  who still wants the answer asks again. The journal says `request N: ended
+  on its holding line, its function round unanswered; left out of later
+  turns' history (LAMP_LATE_ANSWER_LET_GO)`, with no words. An ask whose
+  answer was said after its function's round keeps its exchange whole.
+  Off, nothing is marked and every turn's history is as before, byte for
+  byte. A cut ask joined into the next line (`LAMP_JOIN_CUT_WORDS`) is
+  another case: the join takes its exchange out of the thread. Tests:
+  `an_ask_left_on_its_holding_line_is_not_given_to_the_next_turn_as_unanswered`,
+  `with_the_switch_off_an_ask_left_on_its_holding_line_is_still_given_to_the_next_turn`,
+  `an_ask_answered_after_its_search_is_still_given_to_the_next_turn`, and
+  the thread's `an_exchange_left_on_its_holding_line_is_told_to_no_later_turn`.
 - **What the lamp said is kept as what was heard** (`LAMP_SAID_AS_HEARD=on`,
   off unless set, on in the product unit since #4547; #1712, the first builder's yes on #1722, 20 Oct 09:38).
   - **The fault it fixes:** this route sends each piece of an answer, its

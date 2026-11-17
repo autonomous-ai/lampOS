@@ -4422,6 +4422,19 @@ pub fn serve(
         );
     }
     engine = engine.answering_cut_words_a_decline_leaves(cut_ask_answered);
+    // An ask whose turn ended on its holding line, its function round
+    // unanswered, is left out of later turns' history, so it is never
+    // answered inside another ask's turn (`LAMP_LATE_ANSWER_LET_GO=on`).
+    let late_answer_let_go = std::env::var(crate::second_provider::LATE_ANSWER_LET_GO_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if late_answer_let_go {
+        eprintln!(
+            "lamp-voice second: an ask whose turn ended on its holding line, its function round unanswered, is left out of later turns' history (LAMP_LATE_ANSWER_LET_GO)"
+        );
+    }
+    engine = engine.letting_go_late_answers(late_answer_let_go);
     // The lamp's own written turns, news above all, may begin later than a
     // spoken one (`LAMP_SECOND_WRITTEN_WAIT=on`; #1854's follow-up).
     let written_wait = std::env::var(crate::second_provider::WRITTEN_WAIT_ENVIRONMENT)
