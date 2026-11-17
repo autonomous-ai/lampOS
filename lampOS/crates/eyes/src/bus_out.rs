@@ -67,6 +67,14 @@ pub fn activity_by(value: Option<&str>) -> Option<ActivityBy> {
         _ => None,
     }
 }
+/// Where the eyes read whether each face gets `pitch`, and the face the
+/// Blendshape V2 read ran on `looking` (#7442): `on` only. Off, both stay
+/// absent and the faces are published as before.
+pub const PITCH_GAZE_ENVIRONMENT: &str = "LAMP_EYES_PITCH_GAZE";
+/// A face's `looking` is said for this long after the frame it was read
+/// from: one seems read ([`crate::seems::READ_EVERY`]) and the half second
+/// its thread may take.
+pub const LOOKING_LASTS_US: u64 = 2_500_000;
 /// The name the eyes publish under.
 pub const SOURCE: &str = "eyes";
 /// How long a list of faces means anything.
@@ -96,6 +104,12 @@ pub struct Ids {
     pub follows: bool,
     /// Each new id and the id it follows, while both are kept.
     followed: Vec<(u32, u32)>,
+    /// With [`PITCH_GAZE_ENVIRONMENT`] on: each face's `pitch`, and
+    /// `looking` from [`Ids::gaze`].
+    pub pitch_gaze: bool,
+    /// The last Blendshape V2 read's gaze: the passing id it was read for,
+    /// whether its eyes looked toward the lamp, and when that face was seen.
+    gaze: Option<(u32, bool, u64)>,
 }
 
 /// Whether passing ids are followed across a new track: both the hold and
@@ -221,6 +235,13 @@ impl Ids {
     pub fn index_of(&self, id: u32) -> Option<usize> {
         self.last.iter().position(|seen| *seen == id)
     }
+
+    /// A Blendshape V2 read's gaze for the face `id`, seen at `at_us`
+    /// (#7442): said as its `looking` while it lasts. A read with no gaze
+    /// forgets the last one.
+    pub fn gazed(&mut self, id: u32, looking: Option<bool>, at_us: u64) {
+        self.gaze = looking.map(|looking| (id, looking, at_us));
+    }
 }
 
 /// A face's box as fractions of the picture: (xmin, ymin, xmax, ymax).
@@ -322,9 +343,21 @@ fn message_observed(
             if speaking.is_some_and(|speaking| speaking.state == lamp_msgs::SpeakingState::Yes) {
                 ids.talking.push(id);
             }
+            let pitch = (ids.pitch_gaze && measured)
+                .then(|| facing::pitch_deg(&face.marks))
+                .flatten()
+                .map(f32::to_radians);
+            let looking = ids
+                .gaze
+                .filter(|(gazed, _, at_us)| {
+                    ids.pitch_gaze
+                        && *gazed == id
+                        && now_us.saturating_sub(*at_us) <= LOOKING_LASTS_US
+                })
+                .map(|(_, looking, _)| looking);
             Face {
-                pitch: None,
-                looking: None,
+                pitch,
+                looking,
                 speaking,
                 follows: ids.followed(id).map(|old| format!("f{old}")),
                 id: format!("f{id}"),
@@ -523,6 +556,7 @@ impl BusOut {
             ids: Ids {
                 mouths: speaking::from_environment(),
                 follows: follows_from_environment(),
+                pitch_gaze: std::env::var(PITCH_GAZE_ENVIRONMENT).as_deref() == Ok("on"),
                 ..Ids::default()
             },
             alive_at_us: 0,
@@ -793,6 +827,16 @@ impl BusOut {
         self.ids.index_of(id)
     }
 
+    /// The passing id the last look gave the face at `index`.
+    pub fn id_at(&self, index: usize) -> Option<u32> {
+        self.ids.last.get(index).copied()
+    }
+
+    /// A Blendshape V2 read's gaze ([`Ids::gazed`], #7442).
+    pub fn gazed(&mut self, id: u32, looking: Option<bool>, at_us: u64) {
+        self.ids.gazed(id, looking, at_us);
+    }
+
     /// Whether the face `id` (`f3`) is in the last look.
     pub fn in_view(&self, id: &str) -> bool {
         id.strip_prefix('f')
@@ -974,6 +1018,66 @@ mod tests {
         assert!(turned(0.95).faces[0].yaw.unwrap() > 1.0);
         assert!(turned(-0.95).faces[0].yaw.unwrap() < -1.0);
         assert_eq!(turned(-0.95).faces[0].facing, Some(false));
+    }
+
+    /// #7442: with the switch each measured face has a pitch, and the face
+    /// the Blendshape V2 read ran on has `looking` while the read lasts;
+    /// without it neither is said, whatever was read.
+    #[test]
+    fn with_the_switch_faces_get_a_pitch_and_the_read_face_whether_it_looks() {
+        let faces = [
+            face(240.0, 120.0, 160.0, 200.0, 0.0),
+            face(40.0, 100.0, 120.0, 150.0, 0.0),
+            face(300.0, 200.0, 40.0, 50.0, 0.0),
+        ];
+        let mut off = Ids::default();
+        message(&faces, &[], PICTURE, &mut off, 0);
+        off.gazed(1, Some(false), 0);
+        let seen = message(&faces, &[], PICTURE, &mut off, 100);
+        assert!(
+            seen.faces
+                .iter()
+                .all(|f| (f.pitch, f.looking) == (None, None))
+        );
+        let mut on = Ids {
+            pitch_gaze: true,
+            ..Ids::default()
+        };
+        message(&faces, &[], PICTURE, &mut on, 0);
+        let seen = message(&faces, &[], PICTURE, &mut on, 100);
+        // The fixture's nose sits a little low: a head tipped a little down.
+        let pitch = seen.faces[0].pitch.unwrap().to_degrees();
+        assert!((0.0..15.0).contains(&pitch), "{pitch}");
+        assert!(seen.faces[1].pitch.is_some());
+        // Too small to measure: no pitch, as no yaw.
+        assert_eq!(seen.faces[2].pitch, None);
+        assert!(seen.faces.iter().all(|f| f.looking.is_none()));
+        on.gazed(1, Some(false), 50);
+        let seen = message(&faces, &[], PICTURE, &mut on, 100);
+        assert_eq!(seen.faces[0].looking, Some(false));
+        assert_eq!((seen.faces[1].looking, seen.faces[2].looking), (None, None));
+        // A read with no gaze forgets the last.
+        on.gazed(1, Some(true), 200);
+        assert_eq!(
+            message(&faces, &[], PICTURE, &mut on, 300).faces[0].looking,
+            Some(true)
+        );
+        on.gazed(1, None, 300);
+        assert_eq!(
+            message(&faces, &[], PICTURE, &mut on, 400).faces[0].looking,
+            None
+        );
+        // A read is said only while it lasts (the same face looked at
+        // throughout, so it keeps its passing id).
+        on.gazed(1, Some(false), 400);
+        message(&faces, &[], PICTURE, &mut on, 1_400_000);
+        let last = message(&faces, &[], PICTURE, &mut on, 400 + LOOKING_LASTS_US);
+        assert_eq!(last.faces[0].looking, Some(false));
+        let later = message(&faces, &[], PICTURE, &mut on, 400 + LOOKING_LASTS_US + 1);
+        assert_eq!(
+            (later.faces[0].id.as_str(), later.faces[0].looking),
+            ("f1", None)
+        );
     }
 
     #[test]
