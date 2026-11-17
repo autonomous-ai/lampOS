@@ -9742,6 +9742,55 @@ fn with_one_session_on_a_busy_pane_never_makes_a_second_session() {
     nothing_left(&rig);
 }
 
+/// #7246 on c0a4: Harness takes a reply only with the person's
+/// `programs-reply` setting on, off on a fresh lamp. A run whose reply is
+/// refused `REPLY_OFF` is not failed: it goes the per-run way, its own
+/// `harness new` with its words as `--task`, as with the switch off; the
+/// next run goes there at once, with no reply tried again.
+#[test]
+fn with_one_session_on_a_reply_off_sends_each_run_its_own_way() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":json!({
+            "id":AGENT,"state":"idle","ask":"New task task-1:\nRun the skill.",
+            "answer":"Took the photo.","truncated":false,"tools":1
+        }).to_string()},
+        "reply":{
+            "stdout":format!("{}\n", json!({"error":"REPLY_OFF","detail":"…","code":"REPLY_OFF","next":[]})),
+            "exit":5
+        },
+        "close":{"exit":0},
+    }));
+    let runner = one_session_runner(&rig);
+    for _ in 0..2 {
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        assert_eq!(
+            runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+            Ok(0)
+        );
+        launched.join().unwrap();
+        nothing_left(&rig);
+    }
+    let calls = rig.calls();
+    let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
+    // The pane's own `new`, its one refused reply, then each run's own
+    // `new` and `close`.
+    assert_eq!((count("new"), count("reply"), count("close")), (3, 1, 2));
+    let runs: Vec<&Value> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "new" && call.to_string().contains("skill-task-1"))
+        .collect();
+    assert_eq!(runs.len(), 2, "{calls:?}");
+    for new in runs {
+        assert!(new.to_string().contains("--task"), "{new}");
+        assert!(!new.to_string().contains("one-session"), "{new}");
+    }
+}
+
 /// #7245: the lamp's make runner with an OpenClaw gateway default, its
 /// gateway's namespace showing lamp-control's socket: the one run path's
 /// runner with `makes` on, as `MakeGateway::lamp` makes it.
