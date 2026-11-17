@@ -46,7 +46,9 @@
 //!   its next trigger, never this one's.
 //! - **Limits**: one `do.task` at a time a skill, and at most [`PER_SKILL`]
 //!   a skill and [`ALL_SKILLS`] across every skill in any 24 hours
-//!   ([`Runs`]).
+//!   ([`Runs`]); with `LAMP_SKILL_RUNS_VOICE_SHARE` set, none once what is
+//!   left of the lamp's day on the relay is the voice's share
+//!   ([`crate::relay_share`], #7342).
 //! - **The hand-over** ([`HandOver::line`]): one line to lamp-tasks
 //!   (`--tasks-socket`, #6306), answered when the run ends. The other steps
 //!   of the skill (light, cue, say) run at once beside it.
@@ -760,8 +762,9 @@ fn ledger(state: Option<&Path>) -> Result<Vec<(String, u64)>, String> {
 
 /// Why [`hand`] would refuse `skill`'s task at `now_ms` whatever the
 /// owner's yes: the switch off, no `state` (`--state-dir`), its last still
-/// under way, or past the bounds of [`begin`]'s ledger (one unreadable is
-/// full). Read only: nothing is counted or written, and a run that passes
+/// under way, past the bounds of [`begin`]'s ledger (one unreadable is
+/// full), or past the voice's share of the day ([`crate::relay_share`]).
+/// Read only: nothing is counted or written, and a run that passes
 /// here is still held to [`hand`] and [`begin`], the real gate.
 pub fn would_refuse(skill: &str, state: Option<&Path>, now_ms: u64) -> Option<String> {
     if !on() {
@@ -779,7 +782,18 @@ pub fn would_refuse(skill: &str, state: Option<&Path>, now_ms: u64) -> Option<St
     }
     ledger(Some(state))
         .and_then(|runs| bounded(&runs, skill, now_ms))
+        .and_then(|()| voice_share(now_ms))
         .err()
+}
+
+/// Refused once what is left of the lamp's day on the relay is the voice's
+/// share, with `LAMP_SKILL_RUNS_VOICE_SHARE` set (#7342,
+/// [`crate::relay_share`]); off, never.
+fn voice_share(now_ms: u64) -> Result<(), String> {
+    match crate::relay_share::would_refuse(now_ms) {
+        Some(why) => Err(format!("{NOT_HANDED}{why}")),
+        None => Ok(()),
+    }
 }
 
 /// `skill`'s task begun at `now_ms`, if it may be: none of its own under
@@ -795,6 +809,7 @@ pub fn begin(skill: &str, state: Option<&Path>, now_ms: u64) -> Result<Runs, Str
     }
     let mut runs = ledger(state)?;
     bounded(&runs, skill, now_ms)?;
+    voice_share(now_ms)?;
     runs.retain(|(_, at)| now_ms.saturating_sub(*at) < DAY_MS);
     runs.push((skill.to_owned(), now_ms));
     match state {
@@ -1903,6 +1918,68 @@ mod tests {
                 .unwrap()
                 .contains("can't be read")
         );
+        set_on_here(None);
+    }
+
+    /// #7342: with `LAMP_SKILL_RUNS_VOICE_SHARE` set, a run is refused
+    /// before it is handed over once the relay's day left is the voice's
+    /// share, in words the lamp can say, and nothing is counted; below it,
+    /// or with the switch off, runs go as before.
+    #[test]
+    fn a_run_is_refused_once_the_voices_share_is_reached() {
+        use crate::relay_share::{self, Reading};
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        let cloud = dir.path().join("cloud");
+        fs::create_dir_all(&state).unwrap();
+        fs::create_dir_all(&cloud).unwrap();
+        // A real day, so the reading's UTC day is the run's.
+        let now = 20_774 * DAY_MS + 3_600_000;
+        let kept = |used: f64| {
+            let reading = Reading {
+                day: relay_share::day_of(now),
+                used: Some(used),
+                at_ms: now - 1_000,
+                ..Reading::default()
+            };
+            relay_share::keep(&cloud, &reading).unwrap();
+        };
+        set_on_here(Some(true));
+        relay_share::set_here(Some(0.5), Some(&cloud));
+        // Below the mark: let through.
+        kept(0.49);
+        assert_eq!(would_refuse("share-skill", Some(&state), now), None);
+        drop(begin("share-skill", Some(&state), now).unwrap());
+        let counted = fs::read(state.join(RUNS_FILE)).unwrap();
+        // At the mark: refused before it starts, said plainly, not counted.
+        kept(0.5);
+        let refused = would_refuse("share-skill", Some(&state), now + 1).unwrap();
+        assert!(refused.starts_with(NOT_HANDED), "{refused}");
+        assert!(
+            refused.ends_with(
+                "the lamp has used 50% of its thinking for today, and the last 50% is kept \
+                 for talking, so skills' runs wait until its day starts again"
+            ),
+            "{refused}"
+        );
+        assert_eq!(
+            begin("share-skill", Some(&state), now + 1).unwrap_err(),
+            refused
+        );
+        assert_eq!(fs::read(state.join(RUNS_FILE)).unwrap(), counted);
+        // The relay's own limit met: refused too.
+        kept(1.0);
+        assert!(begin("share-skill", Some(&state), now + 2).is_err());
+        // Its day turned over: the reading is yesterday's, so it goes.
+        assert_eq!(
+            would_refuse("share-skill", Some(&state), now + DAY_MS),
+            None
+        );
+        // Off: the same reading changes nothing.
+        relay_share::set_here(None, Some(&cloud));
+        assert_eq!(would_refuse("share-skill", Some(&state), now + 3), None);
+        drop(begin("share-skill", Some(&state), now + 3).unwrap());
+        relay_share::set_here(None, None);
         set_on_here(None);
     }
 

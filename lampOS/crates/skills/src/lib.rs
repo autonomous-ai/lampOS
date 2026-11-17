@@ -28,6 +28,7 @@ pub mod knowledge;
 pub mod known;
 pub mod limits;
 pub mod package;
+pub mod relay_share;
 pub mod remind;
 pub mod requested_audio;
 pub mod routine;

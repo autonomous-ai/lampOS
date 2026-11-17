@@ -5734,7 +5734,19 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
         let refused = std::cell::Cell::new(None);
         let tried = lamp_skills::task_sure::Tried::default();
         let send = |socket: &Path, line: &str| {
+            // With `LAMP_SKILL_RUNS_VOICE_SHARE` set (#7342), the relay's day
+            // used and the agent's chat tokens around the run, for
+            // measuring a run's share of the day on a lamp. Numbers only.
+            let metered = lamp_skills::relay_share::on();
+            let before = metered.then(lamp_skills::relay_share::read_here).flatten();
             let sent = hand_over(socket, line);
+            if metered {
+                let after = lamp_skills::relay_share::read_here();
+                eprintln!(
+                    "lamp-skills: skill:{skill}: do.task: {}",
+                    lamp_skills::relay_share::run_line(before.as_ref(), after.as_ref())
+                );
+            }
             if sure {
                 tried.sent(&skill, &sent);
             }
