@@ -2399,7 +2399,13 @@ order is kept. A written turn is the same from the chat on.
     follow-on's) still drops that chat. The note asks a short "Okay, I'll
     stop." alone for a stop or wait, a few words ("Oh, sure —") before any
     other answer, and where it was before going back (#3997's cut-in
-    proposal, `docs/not-speech.md`). With `LAMP_SAID_AS_HEARD=on` too, an
+    proposal, `docs/not-speech.md`). A line with a stop word and more
+    asked ("Hold on, hey Lamp, make the light a little warmer",
+    `stop_words::a_stop_and_more`) is told `cut_in_told::ASKED_MORE`
+    instead, the note without its stop sentence: told the whole, that line
+    was answered "Okay, I'll stop." with no call 8 times in 29 core gates
+    (#7285). The early words' chat chooses by its own words the same way
+    (`cut_in_told::note`). With `LAMP_SAID_AS_HEARD=on` too, an
     answer cut and kept as heard is followed in the history by
     `cut_in_told::CUT_HERE`, so a later "go on", told no note, says where
     it was and goes on from the cut (`worker::messages`).
