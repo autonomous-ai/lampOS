@@ -167,9 +167,17 @@ pub fn chosen_now(dir: &std::path::Path) -> Value {
     })
 }
 
+/// How often [`tell_energy`] reads the kept energy again: a change is said
+/// at once (#7438), so an app's tap reaches the body, which reads once a
+/// second, within about 1.5 s, never a 5 s tick later.
+const ENERGY_LOOK: Duration = Duration::from_millis(500);
+/// The kept energy is said again this often unchanged (its declaration's).
+const ENERGY_EVERY: Duration = Duration::from_secs(5);
+
 /// Says the energy kept in `dir` on `character/energy` (#6893), read again
-/// every time it is said, so a `character.set` or a reset is said within
-/// five seconds. None kept, or one that does not read, is level 1. Inert
+/// every [`ENERGY_LOOK`] and said when it changes or [`ENERGY_EVERY`] has
+/// passed, so a `character.set` or a reset is said within half a second
+/// (#7438). None kept, or one that does not read, is level 1. Inert
 /// data, so no switch: the body reads it only with its own. Without a bus,
 /// or a topic it can publish, it only waits. With a `rater`
 /// (`LAMP_ENERGY_FROM_MODEL=on`, #7314) a level not chosen in the app is
@@ -187,6 +195,7 @@ pub async fn tell_energy(
     let Some(mut publisher) = publisher else {
         return std::future::pending().await;
     };
+    let mut said: Option<(Energy, Instant)> = None;
     loop {
         let mut now = lamp_msgs::chosen_voice::energy_kept(&dir.join("energy"));
         if let Some(rater) = rater.as_mut().filter(|_| !now.chosen)
@@ -194,8 +203,11 @@ pub async fn tell_energy(
         {
             now.level = rater.level(words).await;
         }
-        let _ = publisher.publish_json(lamp_ipc::monotonic_us(), &now);
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        if said.is_none_or(|(last, at)| last != now || at.elapsed() >= ENERGY_EVERY) {
+            let _ = publisher.publish_json(lamp_ipc::monotonic_us(), &now);
+            said = Some((now, Instant::now()));
+        }
+        tokio::time::sleep(ENERGY_LOOK).await;
     }
 }
 
@@ -2951,5 +2963,57 @@ mod tests {
             outcome.result,
             Err("the lamp's voice is not running".into())
         );
+    }
+
+    /// #7438: a level the app keeps is said on `character/energy` within a
+    /// second of the helper writing it, not at the next 5 s tick, so the
+    /// body (which reads once a second) takes it within the 5 s the tap's
+    /// row allows.
+    #[test]
+    fn a_kept_energy_is_said_within_a_second() {
+        use lamp_msgs::Energy;
+        let root = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(root.path()).unwrap();
+        let said = || {
+            bus.latest(Energy::TOPIC)
+                .unwrap()
+                .and_then(|message| message.parse::<Energy>().ok())
+        };
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let telling = tokio::spawn(tell_energy(
+                dir.path().to_path_buf(),
+                Some(lamp_bus::Bus::new(root.path()).unwrap()),
+                None,
+            ));
+            let until = |wanted: Energy, within: Duration| async move {
+                let started = Instant::now();
+                while started.elapsed() < within {
+                    if said() == Some(wanted) {
+                        return Some(started.elapsed());
+                    }
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                }
+                None
+            };
+            assert!(
+                until(Energy::default(), Duration::from_secs(2))
+                    .await
+                    .is_some()
+            );
+            std::fs::write(dir.path().join("energy"), "3\nchosen\n").unwrap();
+            let chosen = Energy {
+                level: 3,
+                chosen: true,
+            };
+            let took = until(chosen, Duration::from_secs(6)).await;
+            telling.abort();
+            let took = took.expect("the kept level is said");
+            assert!(took < Duration::from_secs(1), "said after {took:?}");
+        });
     }
 }
