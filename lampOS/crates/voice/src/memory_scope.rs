@@ -212,6 +212,8 @@ pub struct RefreshToken {
 /// keeps only for a face named within [`REFRESH_EVERY`] of its start
 /// ([`ScopeLease::face_at_end_seen`]).
 pub const COLD_FOR: Duration = Duration::from_secs(5);
+// The cold window must outlast the known file's freshness (#7146).
+const _: () = assert!(COLD_FOR.as_millis() > crate::known_faces::FRESH.as_millis());
 
 /// Why a heard line is admitted as the room's while the camera is allowed
 /// (the sticky plan's T0, [`FaceCache::room_told`]).
