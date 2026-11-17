@@ -4660,7 +4660,7 @@ after a take-over, but now for every turn:
   row (the person's follow-ups answered three of three, the colleague
   track's lines answered none, first audio on tool turns before and after).
 - **A follow-up no face was seen speaking renews the call too, with
-  `LAMP_BUSY_NO_FACE_RENEWS=on`** (off unless set, needs
+  `LAMP_BUSY_NO_FACE_RENEWS=on`** (on in the product, off unless set elsewhere, needs
   `LAMP_BUSY_FOLLOW_UP_RENEWS=on`, #7332). On lamp-74ff on 17 Nov (13706,
   the renewal on), in a busy room, the owner's r47 to r49 were a
   back-and-forth with the lamp, each cut by the next, r49 declined
