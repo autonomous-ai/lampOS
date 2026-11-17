@@ -2580,12 +2580,20 @@ fn run_call_with_scope(
             ("the lamp's own model", (told, true))
         }
         Route::Schedule(directory) => {
-            let (mut told, answered) = ask_schedule_for(
-                directory,
-                call,
-                deadline,
-                Some(&schedule_whose::caller(lease, &call.name)),
-            );
+            let caller = schedule_whose::caller(lease, &call.name);
+            let (mut told, answered) = ask_schedule_for(directory, call, deadline, Some(&caller));
+            // A reminder its known creator set, or cancelled, is their
+            // linked record (`LAMP_SERVICE_RECORDS_REMINDERS`). Read from
+            // the schedule's own answer, before any skill line is added.
+            if answered {
+                crate::service_records::reminder_rows::after_call(
+                    &call.name,
+                    &call.args,
+                    Some(&caller),
+                    &told,
+                    crate::service_records::unix_ms(),
+                );
+            }
             // A reminder asked about may be one of the lamp's skills
             // (`LAMP_SKILL_STATE_TOLD`, #7335's row): `list_reminders`'
             // answer carries the skills' lines too. Off, as before.

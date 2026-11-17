@@ -607,8 +607,9 @@ mỗi thay đổi thành một `service_record` có `source_kind`, `source_ref`,
 `summary` và `deed_unix_ms`, qua socket gốc của chính nó
 (`lamp-voice` `service_records::linked`). Mỗi bên ghi đến cùng công tắc
 riêng: dòng việc Harness (`LAMP_SERVICE_RECORDS_TASKS`, lát 3,
-[tasks_vi.md](tasks_vi.md)); dòng của agent và lời nhắc đến sau (`_AGENT`,
-`_REMINDERS`). Khi `LAMP_SERVICE_RECORDS` tắt thì không giữ gì.
+[tasks_vi.md](tasks_vi.md)); dòng lời nhắc (`LAMP_SERVICE_RECORDS_REMINDERS`,
+[schedule.md](../schedule.md)); dòng của agent đến sau (`_AGENT`). Khi
+`LAMP_SERVICE_RECORDS` tắt thì không giữ gì.
 
 - **Giới hạn riêng.** Tối đa 16 thay đổi chờ, tách khỏi 32 của bản ghi
   connector, để một loạt tin việc hay lời nhắc không bao giờ đẩy mất bản ghi

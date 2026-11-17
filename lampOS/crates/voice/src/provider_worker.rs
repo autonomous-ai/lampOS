@@ -971,6 +971,12 @@ pub enum ProviderInput {
         /// repeat ([`crate::reminders::Offer::again`]).
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         again: bool,
+        /// The Schedule ids said in it, its own then those joined, for the
+        /// second route's reminder rows (`LAMP_SERVICE_RECORDS_REMINDERS`,
+        /// [`crate::service_records::reminder_rows::said`]). Given only
+        /// with that switch on, so the packet is as before when off.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        ids: Vec<u64>,
     },
 }
 impl ProviderInput {
