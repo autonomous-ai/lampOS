@@ -178,6 +178,14 @@ jobs:
           cargo test --locked -p lamp-voice --lib peer_stop::
           cargo test --locked -p lamp-voice --lib process::ring_startup_tests::
           cargo test --locked -p lamp-voice --lib transport::tests::a_receive_from_a_peer_that_has_gone
+      # The chunk test is ignored on a Mac (its worker ended early once on this runner, reason unknown). This
+      # step runs it anyway, and never blocks: a failure prints why the worker ended (the test's join), so a
+      # runner fault can be told from a fault in the speaker loop. Read it, then decide; C5b follow-up.
+      - name: lamp-voice's speaker chunk test, ignored on a Mac (reads only)
+        continue-on-error: true
+        working-directory: lampOS
+        run: |
+          cargo test --locked -p lamp-voice --lib speaker_chunk_tests:: -- --ignored --nocapture
       - name: lamp-sim's tests
         working-directory: lampOS
         run: |
