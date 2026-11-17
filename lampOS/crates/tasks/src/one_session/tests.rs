@@ -1582,3 +1582,59 @@ fn a_kept_pane_asking_something_is_not_adopted() {
     assert_eq!(fake.count("close"), 1, "{:?}", fake.calls());
     assert_eq!(again.agent(), Some(agent_of(2)));
 }
+
+/// #7246 on c0a4: Harness takes a reply only with the person's
+/// `programs-reply` setting on, off on a fresh lamp. A reply refused
+/// `reply_off` sends that task the per-task way (`None`: its own
+/// `harness new`), not failed `busy`; from then on no task is typed or
+/// queued for the pane, and no reply is tried again.
+#[test]
+fn a_reply_off_sends_this_task_and_every_later_one_the_per_task_way() {
+    let (one, fake) = (session(), Fake::default());
+    one.open_if_due(&fake, &place());
+    fake.replies
+        .lock()
+        .unwrap()
+        .push_back(Typed::NotSent("reply_off".into()));
+    assert!(one.takes_reply());
+    assert_eq!(spoken_launch(&one, &fake, &spoken("lamp-1")), None);
+    assert!(!one.takes_reply());
+    assert_eq!(fake.count("reply"), 1);
+    assert!(one.free(), "the pane let go");
+    // A later spoken task is not for the pane at all, and a skill run's
+    // turn is the per-task way with no reply tried.
+    assert_eq!(for_the_pane(&one, &spoken("lamp-2")), None);
+    assert_eq!(spoken_launch(&one, &fake, &spoken("lamp-2")), None);
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert_eq!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::NoReply
+    );
+    assert_eq!(fake.count("reply"), 1, "no reply tried again");
+    assert_eq!(fake.count("new"), 1, "the pane's own only");
+}
+
+/// Any other refused reply keeps today's way: the task fails, never a
+/// second session, and the next task still tries the pane.
+#[test]
+fn another_refused_reply_still_fails_the_task_with_no_second_session() {
+    let (one, fake) = (session(), Fake::default());
+    one.open_if_due(&fake, &place());
+    fake.replies
+        .lock()
+        .unwrap()
+        .push_back(Typed::NotSent("reply_failed".into()));
+    assert_eq!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::NotSent {
+            code: "busy".into()
+        })
+    );
+    assert!(one.takes_reply());
+    one.release("lamp-1");
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-2")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+    assert_eq!(fake.count("reply"), 2);
+}

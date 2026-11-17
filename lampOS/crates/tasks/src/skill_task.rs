@@ -3510,6 +3510,11 @@ impl HarnessRunner {
     ) -> Option<Result<u64, String>> {
         use crate::one_session::{Ended, Kind, Place, Refused, Sent};
         use std::os::unix::fs::DirBuilderExt;
+        // Harness takes no reply here (`reply_off`): the per-run way, as
+        // with the switch off.
+        if !one.takes_reply() {
+            return None;
+        }
         // Never typed while agent main may not exec the launcher: its exec
         // would be denied headless and the run end as never started.
         if let Err(why) = self.skill_start_allowed.check() {
@@ -3560,6 +3565,9 @@ impl HarnessRunner {
                 run.started.store(true, Ordering::Release);
                 return Some(Err(format!("Harness didn't start the run ({code})")));
             }
+            // Nothing typed: the per-run way, its own `harness new` with
+            // the run's words as `--message`, as with the switch off.
+            Sent::NoReply => return None,
         }
         let cancel = std::sync::atomic::AtomicBool::new(false);
         let ended = std::thread::scope(|scope| {
