@@ -4839,8 +4839,12 @@ pub fn serve<C: Clock>(
             // A voice make handed to the lamp's Hermes runs in the same
             // namespace as a skill's run (#6643, the first
             // builder's guard): with the same switch, or not at all.
-            match crate::skill_make::MakeHandOvers::lamp(&home, skill_harness.clone())
-                .start(true, stop.clone())
+            match crate::skill_make::MakeHandOvers::lamp(
+                &home,
+                skill_harness.clone(),
+                no_harness.clone(),
+            )
+            .start(true, stop.clone())
             {
                 Ok(_) => eprintln!(
                     "tasks: a voice make's runs are taken on {}",
