@@ -463,17 +463,41 @@ pub fn unit_up_of(state: &str) -> Option<bool> {
     }
 }
 
+/// How long [`gateway_unit_up`] waits for systemctl: past it, the state
+/// is unknown, and the wait ends at the port's bound (the first builder on
+/// #7568).
+pub const UNIT_SHOW_WITHIN: Duration = Duration::from_secs(2);
+
 /// [`unit_up_of`] the Gateway unit's state, read now (`systemctl show
-/// lamp-openclaw-gateway.service --property=ActiveState --value`).
+/// lamp-openclaw-gateway.service -p ActiveState --value`), at most
+/// [`UNIT_SHOW_WITHIN`]: None when it fails or takes longer (killed).
 fn gateway_unit_up() -> Option<bool> {
-    let shown = std::process::Command::new("systemctl")
-        .args(["show", GATEWAY_UNIT, "--property=ActiveState", "--value"])
+    let mut shown = std::process::Command::new("systemctl")
+        .args(["show", GATEWAY_UNIT, "-p", "ActiveState", "--value"])
         .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
-        .output()
-        .ok()
-        .filter(|shown| shown.status.success())?;
-    unit_up_of(&String::from_utf8_lossy(&shown.stdout))
+        .spawn()
+        .ok()?;
+    let began = Instant::now();
+    let status = loop {
+        match shown.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if began.elapsed() < UNIT_SHOW_WITHIN => {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            _ => {
+                let _ = shown.kill();
+                let _ = shown.wait();
+                return None;
+            }
+        }
+    };
+    // A state is one short word: the pipe holds it whole after the exit.
+    let mut out = String::new();
+    shown.stdout.take()?.read_to_string(&mut out).ok()?;
+    status.success().then_some(())?;
+    unit_up_of(&out)
 }
 
 impl Gateway {
@@ -1986,17 +2010,25 @@ mod tests {
         let unit = concat!("lamp-openclaw-", "gateway");
         let manager = concat!("system", "ctl");
         // The Gateway's unit is only looked at, never started or stopped:
-        // gateway.rs reads its state (`systemctl show`, #7550) and runs no
-        // other verb of the unit manager.
+        // gateway.rs reads its state (`systemctl show`, #7550), that unit's
+        // `ActiveState` only, within 2 s, and runs no other verb of the unit
+        // manager (the first builder on #7568).
         let gateway = include_str!("gateway.rs");
-        let shown = concat!("\"sh", "ow\", GATEWAY_UNIT");
+        let shown = concat!(
+            "[\"sh",
+            "ow\", GATEWAY_UNIT, \"-p\", \"ActiveState\", \"--value\"]"
+        );
         assert_eq!(
             gateway
                 .matches(concat!("Command::new(\"system", "ctl\")"))
                 .count(),
             1
         );
-        assert!(gateway.contains(shown), "the one systemctl run is a show");
+        assert!(
+            gateway.contains(shown),
+            "the one systemctl run is a show of ActiveState"
+        );
+        assert_eq!(UNIT_SHOW_WITHIN, Duration::from_secs(2));
         for verb in [
             "start", "stop", "restart", "kill", "reload", "enable", "disable", "mask",
         ] {

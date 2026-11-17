@@ -4371,12 +4371,11 @@ file:
   serves 126-144 s after), within the run's own deadline. A gateway whose
   port has not answered within 60 s (`gateway::READY_WITHIN`, a spoken
   task's bound) is then asked about once: if its unit
-  (`lamp-openclaw-gateway.service`, `systemctl show
-  --property=ActiveState`, only read, never started or stopped) is
-  `active`, `activating` or `reloading`, it is starting and is waited for
-  ("tasks: the OpenClaw Gateway's port has not answered in 60 s, but its
+  (`lamp-openclaw-gateway.service`, `systemctl show -p ActiveState
+  --value`, only read, at most 2 s, never started or stopped) is `active`,
+  `activating` or `reloading`, it is starting and is waited for ("tasks: the OpenClaw Gateway's port has not answered in 60 s, but its
   unit is up: waited for as it starts"); otherwise, or when systemd can't
-  say, it is stopped, and the wait ends then ("tasks: the OpenClaw Gateway
+  say within 2 s, it is stopped, and the wait ends then ("tasks: the OpenClaw Gateway
   did not answer on 127.0.0.1:18789 within 60 s"), never held to 240 s
   (#6577, lamp-fc4b, 17 Nov: a stopped gateway held a skill's run 240 s). Each read starts OpenClaw's CLI, about
   10 s on lamp-c0a4 even on a warm gateway (C7170, 15 Nov), so it is made
