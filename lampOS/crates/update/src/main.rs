@@ -999,6 +999,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     say: &mut say,
                     phase: &mut |_| {},
                     target: &mut |_| {},
+                    now: None,
                 };
                 own::confirm(&config, &mut world, running.as_deref())
             };
@@ -1045,6 +1046,16 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // `serve` that acts, the one that says `update/status`.
     let mut app_check = (config.apply && command == "serve")
         .then(|| lamp_update::app_check::AppCheck::new(&bus_root, &mut say));
+    // The owner's Update now (#7517): only with its switch on, vouched for by
+    // lamp-cloud's mark under the lamp's root.
+    if lamp_update::update_now::on(
+        std::env::var(lamp_update::update_now::SWITCH)
+            .ok()
+            .as_deref(),
+    ) {
+        app_check = app_check
+            .map(|check| check.with_now(lamp_update::update_now::Marks::under(&config.root)));
+    }
     // The first update after setup (#6284, LAMP_FIRST_UPDATE=on): only
     // the `serve` that acts, the one the app's check is read by.
     let mut first = app_check
@@ -1250,6 +1261,10 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     telling.target(build);
                 }
             };
+            let mut asked_now = app_check.as_mut().map(|check| NowAsked {
+                check,
+                telling: &telling,
+            });
             let mut world = World {
                 channel: &mut channel,
                 systemd: &mut systemd,
@@ -1259,6 +1274,9 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 say: &mut say,
                 phase: &mut phase,
                 target: &mut target,
+                now: asked_now
+                    .as_mut()
+                    .map(|asked| asked as &mut dyn lamp_update::update_now::NowAsk),
             };
             round(&config, &mut world)
         };
@@ -1567,6 +1585,32 @@ mod product_settings_tests {
 /// no longer took it, a climbed updater would end with 2 at each start,
 /// unconfirmed, and `lamp-update-back` would put 7071's back at its
 /// deadline: every 7071 lamp would climb and fall back, round after round.
+/// The round's side of the owner's Update now (#7517): the app's check heard
+/// during the round, and what the round says of it on `update/status`.
+struct NowAsked<'a, 'b> {
+    check: &'a mut lamp_update::app_check::AppCheck,
+    telling: &'b std::cell::RefCell<Option<lamp_update::status::Telling>>,
+}
+
+impl lamp_update::update_now::NowAsk for NowAsked<'_, '_> {
+    fn heard(&mut self) -> bool {
+        self.check
+            .hear_now(&mut |line| eprintln!("lamp-update: {line}"))
+    }
+
+    fn waiting(&mut self, waiting: Option<&'static str>) {
+        if let Some(telling) = self.telling.borrow_mut().as_mut() {
+            telling.waiting(waiting);
+        }
+    }
+
+    fn asked(&mut self) {
+        if let Some(telling) = self.telling.borrow_mut().as_mut() {
+            telling.asked_now();
+        }
+    }
+}
+
 #[cfg(test)]
 mod own_unit_line_tests {
     use super::*;

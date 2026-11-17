@@ -56,6 +56,9 @@ mod models_file;
 #[path = "round/asleep_quiet.rs"]
 mod asleep_quiet;
 
+#[path = "round/update_now.rs"]
+mod update_now;
+
 #[path = "round/cut_short.rs"]
 mod cut_short;
 #[path = "round/product_adds.rs"]
@@ -868,6 +871,7 @@ impl Lamp {
             say: &mut say,
             phase: &mut phase,
             target: &mut target,
+            now: None,
         };
         let outcome = round(&self.config, &mut world);
         self.talking = Some(ears.talking);
@@ -3699,6 +3703,7 @@ impl Lamp {
             say: &mut say,
             phase: &mut |_| {},
             target: &mut |_| {},
+            now: None,
         };
         own::confirm(&self.config, &mut world, Some(running)).unwrap()
     }

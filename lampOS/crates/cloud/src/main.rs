@@ -319,9 +319,18 @@ fn main() -> ExitCode {
         update_page: lamp_cloud::update::from_environment(),
         // The lamp's agents, a missing one installed from the app (#6240): only with
         // LAMP_APP_ENGINES=on as well.
-        update_checks: lamp_cloud::update::Checks::with_engines(
-            lamp_cloud::update::engines_from_environment(),
-        ),
+        // The owner's Update now (#7517): only with LAMP_UPDATE_NOW=on as well,
+        // marked in this part's own state folder for lamp-update.
+        update_checks: {
+            let checks = lamp_cloud::update::Checks::with_engines(
+                lamp_cloud::update::engines_from_environment(),
+            );
+            if lamp_cloud::update::now_from_environment() {
+                checks.with_now(lamp_msgs::UPDATE_NOW_FILE.into())
+            } else {
+                checks
+            }
+        },
         // A restart from the app, asked of setup's change helper (#2193): only with LAMP_APP_RESTART=on.
         restart: (std::env::var(lamp_cloud::lamp::RESTART_ENVIRONMENT)
             .ok()

@@ -163,6 +163,9 @@ pub struct World<'a> {
     /// found newer than the lamp's and not one put back on it. Later checks
     /// in `checking` can still refuse it; the round's end then clears it.
     pub target: &'a mut dyn FnMut(&Build),
+    /// The owner's Update now (#7517, `LAMP_UPDATE_NOW=on`): heard at the
+    /// round's start and at each look of its quiet wait. None: never.
+    pub now: Option<&'a mut dyn crate::update_now::NowAsk>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -465,6 +468,8 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         rollback_order: None,
         held: None,
         apply_failed: false,
+        asked_now: false,
+        gave_way: false,
         lines: Vec::new(),
     };
     if !config.apply {
@@ -509,6 +514,8 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         Err(error) => return Outcome::Failed(error.to_string()),
     });
     (run.world.phase)("checking");
+    // An Update now that started this round (#7517).
+    run.hear_now();
     // A switch of lamp-update's own not yet confirmed: no round acts, so
     // an updater restarted in phase 2, or the old one run by hand, never
     // begins a second round (#1680). The new one confirms before its first.
@@ -614,6 +621,11 @@ struct Run<'r, 'w> {
     /// This round's `apply` of the build's settings failed: a writer not yet
     /// proved is put back after the apply's own undo (crate::writer_swap).
     apply_failed: bool,
+    /// The owner's Update now asked for this round, or took it over while
+    /// it waited (#7517): no quiet moment is waited for, only the voice's
+    /// moment to give way ([`Self::give_way`]), once.
+    asked_now: bool,
+    gave_way: bool,
     /// What this round said, kept for [`Self::keep_lines`] (#6266 5b): at most
     /// [`MOST_LINES`] lines of [`MOST_LINE`] characters.
     lines: Vec<String>,
@@ -2236,6 +2248,71 @@ impl Run<'_, '_> {
         }
     }
 
+    /// Whether the owner's Update now asked for this round (#7517): heard
+    /// now if not before, and said on `update/status` once.
+    fn hear_now(&mut self) -> bool {
+        if self.asked_now {
+            return true;
+        }
+        let Some(now) = self.world.now.as_mut() else {
+            return false;
+        };
+        if now.heard() {
+            now.asked();
+            self.asked_now = true;
+            self.say("the owner asked to update now: the switch waits for no quiet moment");
+        }
+        self.asked_now
+    }
+
+    /// What the round waits for, on `update/status` (#7517).
+    fn tell_waiting(&mut self, waiting: Option<&'static str>) {
+        if let Some(now) = self.world.now.as_mut() {
+            now.waiting(waiting);
+        }
+    }
+
+    /// An Update now's moment for the voice (#7517), once a round: up to
+    /// [`crate::update_now::GIVE_WAY_MOST`] for
+    /// [`crate::update_now::GIVE_WAY_QUIET`] of quiet, watched afresh, so a
+    /// voice talking with someone can say it is updating and end its turn.
+    /// A lamp asleep or muted is quiet at once. Past it, the switch goes on
+    /// anyway.
+    fn give_way(&mut self) {
+        if self.gave_way {
+            return;
+        }
+        self.gave_way = true;
+        self.tell_waiting(Some(lamp_msgs::UpdateRound::WAITING_GIVE_WAY));
+        let start = self.world.clock.now_ms();
+        self.quiet = Quiet::new(start);
+        let until = start + crate::update_now::GIVE_WAY_MOST.as_millis() as u64;
+        loop {
+            if !self.voice_running() {
+                break;
+            }
+            let now = self.world.clock.now_ms();
+            match self
+                .quiet
+                .for_at_least(crate::update_now::GIVE_WAY_QUIET, now)
+            {
+                Ok(()) => {
+                    self.say("Update now: the voice gave way; switching");
+                    break;
+                }
+                Err(why) if now >= until => {
+                    self.say(&format!(
+                        "Update now: no quiet in {} s ({why}); switching anyway",
+                        crate::update_now::GIVE_WAY_MOST.as_secs()
+                    ));
+                    break;
+                }
+                Err(_) => self.listen(LOOK_EVERY),
+            }
+        }
+        self.tell_waiting(None);
+    }
+
     /// Whether the voice runs here: one that does not hears nobody. Not
     /// known counts as running.
     fn voice_running(&mut self) -> bool {
@@ -2277,6 +2354,13 @@ impl Run<'_, '_> {
             }
             if walk && crate::walk::holds(self.config) {
                 return Err(crate::walk::UNDER_WAY.to_owned());
+            }
+            // The owner's Update now (#7517): asked before or during this
+            // wait, the voice is given its moment, and no more quiet is
+            // waited for, here or at any later wait of this round.
+            if !unseen_is_quiet && self.hear_now() {
+                self.give_way();
+                return Ok(());
             }
             let now = self.world.clock.now_ms();
             if unseen_is_quiet && !self.quiet.seen(now) {
@@ -2633,8 +2717,10 @@ impl Run<'_, '_> {
         // A count that can't be kept holds nothing: the wait goes on as
         // before, with the walk no longer looked at.
         let walk = !crate::walk::spent(self.records.folder());
-        let waited = match self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, walk)
-        {
+        self.tell_waiting(Some(lamp_msgs::UpdateRound::WAITING_QUIET));
+        let waited = self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, walk);
+        self.tell_waiting(None);
+        let waited = match waited {
             Err(why) if walk && why == crate::walk::UNDER_WAY => {
                 if let Some(held) = crate::walk::hold(self.records.folder()) {
                     return Outcome::NotQuiet(crate::walk::held(held));
@@ -2792,6 +2878,7 @@ impl Run<'_, '_> {
         let now = self.world.clock.now_ms();
         if self.voice_running()
             && !self.forced()
+            && !self.asked_now
             && let Err(why) = self.quiet.for_at_least(self.quiet_needed(), now)
         {
             let restored = self.put_units_and_links_back(&backs);
