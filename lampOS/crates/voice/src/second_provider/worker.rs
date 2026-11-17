@@ -10649,8 +10649,9 @@ impl Heeding {
 
     /// `LAMP_SAID_TO_ME=on` ([`crate::said_to_me::judge`]): whether the line
     /// is held as not said to the lamp, its face and conversation then no
-    /// sign. The face's pitch and gaze are not on the eyes' faces yet, so
-    /// they are given as unknown, which blocks nothing.
+    /// sign. The turned face's pitch and gaze are the eyes' newest through
+    /// the line (`LAMP_EYES_PITCH_GAZE` on lamp-eyes); none given is
+    /// unknown, which blocks nothing.
     fn not_said_to_me(
         &mut self,
         request: u64,
@@ -10662,13 +10663,20 @@ impl Heeding {
             return false;
         }
         let turned = signs.turned == Some(true);
+        let (pitch, looking) = self
+            .eyes
+            .as_ref()
+            .zip(line_between(said.0, said.1))
+            .map_or((None, None), |((eyes, _), (from, to))| {
+                eyes.turned_pose_between(from, to)
+            });
         let line = crate::said_to_me::Line {
             heard,
             name_heard: !signs.names.is_empty(),
             going_on: signs.going_on,
             turned,
-            pitch_deg: None,
-            looking: None,
+            pitch,
+            looking,
             // In a conversation any face speaking it; else the turned one.
             seen_speaking: seen_speaking_between(
                 self.eyes.as_ref(),
@@ -27493,13 +27501,25 @@ mod tests {
         states: &[Option<lamp_msgs::SpeakingState>],
         seq: &mut u64,
     ) {
+        turned_face_looks_posed(eyes, now, from_ms, states, seq, (None, None));
+    }
+
+    /// [`turned_face_looks`] with the face's `pitch` and `looking` given.
+    fn turned_face_looks_posed(
+        eyes: &crate::speaking_faces::SpeakingFaces,
+        now: Instant,
+        from_ms: u64,
+        states: &[Option<lamp_msgs::SpeakingState>],
+        seq: &mut u64,
+        (pitch, looking): (Option<f32>, Option<bool>),
+    ) {
         use lamp_msgs::{Face, Faces, Speaking};
         for look in 0..5u64 {
             *seq += 1;
             let faces = Faces {
                 faces: vec![Face {
-                    pitch: None,
-                    looking: None,
+                    pitch,
+                    looking,
                     id: "f1".into(),
                     xmin: 0.4,
                     ymin: 0.3,
@@ -27690,6 +27710,48 @@ mod tests {
         assert_eq!(
             judged(true, false, &still, going_on, "And tomorrow in Hanoi?"),
             None
+        );
+    }
+
+    /// `LAMP_SAID_TO_ME` with the eyes' pitch and gaze (#7442): a question
+    /// said facing the lamp and seen speaking is held with the head down to
+    /// a phone (40 degrees) or the eyes looking away, and answered level and
+    /// looking, or with neither given; its name answers it head down.
+    #[test]
+    fn with_said_to_me_a_head_down_or_looking_away_is_not_said_to_the_lamp() {
+        use lamp_msgs::SpeakingState::{No, Yes};
+        let judged = |pose: (Option<f32>, Option<bool>), words: &str| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            turned_face_looks_posed(&eyes, now, 200, &[Some(Yes), Some(No)], &mut 0, pose);
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.seeing_speaking_faces(eyes, None);
+            heeding.hearing_only_said_to_me();
+            let said = (now_us, now_us + 2_200_000);
+            let verdict = heeding.heed_signs(
+                9,
+                said,
+                words,
+                turned_signs(crate::room_told::Room::Unknown),
+            );
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        let ask = "Can you call Ada back?";
+        let down = Some(40f32.to_radians());
+        assert!(judged((down, None), ask).is_some(), "head down");
+        assert!(judged((None, Some(false)), ask).is_some(), "looking away");
+        assert_eq!(
+            judged((Some(0.05), Some(true)), ask),
+            None,
+            "level, looking"
+        );
+        assert_eq!(judged((None, None), ask), None, "unknown");
+        assert_eq!(
+            judged((down, Some(false)), "Lamp, call Ada back."),
+            None,
+            "named"
         );
     }
 
