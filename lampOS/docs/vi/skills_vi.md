@@ -4163,7 +4163,22 @@ trong hai chủ đề này trong `[permissions] topics` đều bị từ chối 
 và ăn mừng, `lamp-seen` chỉ phát khi `LAMP_SEEN_MORE_DOINGS=on`) là một chủ
 đề riêng: kỹ năng ghi nó hiện quyền dùng `seen_more`, riêng tư và tách khỏi
 `seen`, nên kỹ năng được `humans/doing` không bao giờ nhận nó. Chưa kỹ năng
-nào đọc nó. Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
+nào đọc nó. **Lời đồng ý seen_more của chủ đèn** (#6543): kỹ năng ghi chủ
+đề này không nhận được gì từ nó cho tới khi chủ đèn đồng ý cho chính kỹ năng
+đó trong app (`skills.seen_more`, [cloud.md](../cloud.md)), giữ theo tên
+trong tệp `seen_more` của `--state-dir`, như lời đồng ý camera (tệp
+`camera`). Chưa có lời đồng ý, kể cả kỹ năng lõi, không trigger nào trên chủ
+đề này đúng, không `[[while]]` hay `sooner` nào đọc nó: nó như một chủ đề
+chưa nói gì, nên `unknown = "holds"` đúng trên nó. Nhật ký ghi `skill:NAME:
+humans/doing_more not given to it: the owner hasn't said yes to its
+seen_more` một lần cho mỗi kỹ năng như vậy, chỉ ghi lại sau một lần đồng ý.
+Các lời đồng ý được đọc lúc khởi động và đọc lại cùng tệp off, trong vòng
+2 s; lời đồng ý bị rút lại thì kỹ năng buông ngay những gì nó đang giữ trên
+chủ đề (đồng hồ `[[while]]` bắt đầu lại, lượt chạy giữ tới khi trigger như
+vậy kết thúc thì được kết thúc). Trình quản lý nhận `{"seen_more": NAME}` và
+`{"seen_more_off": NAME}` (`package::seen_more`); gỡ kỹ năng, hay cài không
+từ Store dưới tên đó, đều rút lời đồng ý lại. Không kỹ năng nào đi kèm đèn
+có sẵn lời đồng ý này. Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
 lúc đến bàn khi chưa thấy gì, nên `[[while]] topic = "humans/doing" field =
 "drank_s_ago" above = 1799 unknown = "holds_stale"` vẫn đúng với người đèn
 chưa thấy uống, như khi chỉ có đồng hồ; mỗi giá trị `humans/posture` được

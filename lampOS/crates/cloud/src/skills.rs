@@ -128,6 +128,13 @@ pub struct Places {
     /// page reads the same switch from its own (`docs/addons.md`), and says
     /// an add-on is off rather than show it working.
     pub addons: bool,
+    /// Whether the lamp says `humans/doing_more` (tiredness, desk work and
+    /// celebrating, #6543): `lamp-seen` says it only with
+    /// [`SEEN_MORE_ENVIRONMENT`]`=on` in its own unit, so the page reads
+    /// the same switch from its own, as [`Places::addons`] is read. On,
+    /// `can` names `skills.seen_more` and a row that names the topic
+    /// carries `seen_more_allowed`; off, the page is as before.
+    pub seen_more: bool,
     /// `lamp-services`' admin socket, asked once a list which services are
     /// linked, for each row's `needs_link` and the [`NEEDS_LINK_KIND`]
     /// event, with [`LINK_ENVIRONMENT`] on; none without it.
@@ -145,11 +152,17 @@ impl Places {
             off: "/var/lib/lampos-skills-state/off".into(),
             manage: lamp_skills::package::MANAGE_SOCKET.into(),
             addons: std::env::var(lamp_skills::ADDONS_ENVIRONMENT).is_ok_and(|value| value == "on"),
+            seen_more: std::env::var(SEEN_MORE_ENVIRONMENT).is_ok_and(|value| value == "on"),
             link: link_on_from(std::env::var(LINK_ENVIRONMENT).ok().as_deref())
                 .then(|| crate::services::ADMIN_SOCKET.into()),
         }
     }
 }
+
+/// `lamp-seen`'s switch for tiredness, desk work and celebrating
+/// (`lamp_seen::sitting::ENVIRONMENT`, #6543), read by `lamp-cloud` from
+/// its own unit for [`Places::seen_more`]: `on` only.
+pub const SEEN_MORE_ENVIRONMENT: &str = "LAMP_SEEN_MORE_DOINGS";
 
 /// `on` tells the app a skill that needs a connector not linked (App
 /// Only's proposal on #6059): `skills.list` rows carry `needs_link`, and an
@@ -508,6 +521,14 @@ pub struct Listed {
     /// when that file can't be read (#3504's piece C); null when it
     /// doesn't ask the picture.
     pub camera_allowed: Option<bool>,
+    /// With [`Places::seen_more`] on, when it names `humans/doing_more`
+    /// (its `may_use` has `seen_more`): true when the owner said yes to it
+    /// hearing that, `skills.seen_more`, kept in `lamp-skills`'
+    /// `seen_more` beside the off file, false when not or when that file
+    /// can't be read (#6543). A core skill too needs the yes. Left out
+    /// otherwise, so the page is as before with the switch off.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seen_more_allowed: Option<bool>,
     /// Whether the running `lamp-skills` loads it.
     pub loads: bool,
     /// Why not, in the lamp's words, when it does not; else null.
@@ -577,6 +598,17 @@ pub fn list(places: &Places) -> Result<Value, String> {
     for listed in pushed_rows(places, off.as_ref()) {
         if !rows.iter().any(|other| other.name == listed.name) {
             rows.push(listed);
+        }
+    }
+    // The owner's seen_more yes, only with the switch on (#6543).
+    if places.seen_more {
+        let yes = read_off(&places.off.with_file_name(lamp_skills::SEEN_MORE_FILE));
+        for listed in &mut rows {
+            listed.seen_more_allowed = listed
+                .may_use
+                .iter()
+                .any(|used| used.name == "seen_more")
+                .then(|| yes.as_ref().is_some_and(|yes| yes.contains(&listed.name)));
         }
     }
     rows.sort_by(|a, b| (a.group, &a.name).cmp(&(b.group, &b.name)));
@@ -734,6 +766,39 @@ pub fn camera(places: &Places, data: &Value) -> Result<Value, String> {
         .ok()
         .map(|yes| yes.contains(name));
     page["camera"] = json!({"name": name, "allowed": kept});
+    Ok(page)
+}
+
+/// `skills.seen_more {"name", "allow"}` (#6543): the owner's yes to the
+/// skill hearing `humans/doing_more` (when they last looked tired, worked
+/// at the desk and at what, or celebrated), given (`allow` true) or taken
+/// back, as [`camera`] gives the camera's: asked of the manage helper,
+/// which keeps it in `lamp-skills`' `seen_more`
+/// ([`lamp_skills::package::seen_more`]); the name need not be on the
+/// lamp yet. Answered only with [`Places::seen_more`] on. The reply is the
+/// page as it now is, [`list`]'s, with `"seen_more": {"name", "allowed"}`:
+/// what the helper kept for that name.
+pub fn seen_more(places: &Places, data: &Value) -> Result<Value, String> {
+    let name = data
+        .get("name")
+        .and_then(Value::as_str)
+        .filter(|name| lamp_skills::package::skill_name_ok(name))
+        .ok_or(NOT_A_NAME)?;
+    let allow = data
+        .get("allow")
+        .and_then(Value::as_bool)
+        .ok_or("allow must be true or false")?;
+    let way = if allow { "seen_more" } else { "seen_more_off" };
+    let mut page = changed(
+        places,
+        "skills.seen_more",
+        &json!({ way: name }),
+        ASK_TIMEOUT,
+    )?;
+    let kept = lamp_skills::read_names(&places.off.with_file_name(lamp_skills::SEEN_MORE_FILE))
+        .ok()
+        .map(|yes| yes.contains(name));
+    page["seen_more"] = json!({"name": name, "allowed": kept});
     Ok(page)
 }
 
@@ -984,6 +1049,7 @@ fn row(
             .then(|| off.map(|off| disabled || off.contains(&name)))
             .flatten(),
         camera_allowed: None,
+        seen_more_allowed: None,
         loads,
         why,
         may_use: may_use(&permissions),
@@ -1098,6 +1164,7 @@ pub mod tests {
             manage: root.join("m.sock"),
             store: true,
             addons: false,
+            seen_more: false,
             link: None,
         }
     }

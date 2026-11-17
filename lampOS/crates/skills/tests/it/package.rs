@@ -1568,6 +1568,105 @@ fn the_owners_camera_yes_is_kept_read_at_each_call_and_taken_back() {
     assert_eq!(bare.picture_refused("point-light"), None);
 }
 
+/// #6543: the owner's yes to a skill hearing `humans/doing_more`, asked of
+/// the manage helper as the camera's is, is kept by name in the state
+/// folder's `seen_more`, read by a program that starts again, taken back,
+/// and taken away by a remove and by a hand install under that name; a
+/// name not on the lamp is kept too, and another name's yes stays.
+#[test]
+fn the_owners_seen_more_yes_is_kept_across_a_restart_and_taken_back_by_a_remove() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    let state = dir.path().join("state");
+    fs::create_dir_all(&state).unwrap();
+    fs::create_dir_all(&skills).unwrap();
+    let packed = package::pack(
+        &tutor(&dir.path().join("src"), "1.0.0"),
+        &dir.path().join("out"),
+    )
+    .unwrap();
+    package::install(&skills, None, &packed).unwrap();
+    let ask = |line: &str| {
+        let mut answer = Vec::new();
+        let ok = package::asked(
+            &skills,
+            &skills.join("no-made"),
+            &state,
+            package::ASKED_LOCK_WAIT,
+            None,
+            None,
+            line.as_bytes(),
+            &mut answer,
+        )
+        .unwrap();
+        (
+            serde_json::from_slice::<serde_json::Value>(&answer).unwrap(),
+            ok,
+        )
+    };
+    let started = || {
+        let (loaded, _) = lamp_skills::load_all(&skills);
+        let mut running = lamp_skills::Engine::new(loaded, true);
+        running.keep_off_in(&state).unwrap();
+        running
+    };
+    let kept = state.join(lamp_skills::SEEN_MORE_FILE);
+    assert!(!started().hears_more("desk-tutor"), "no yes, none given");
+
+    let (answer, ok) = ask("{\"seen_more\": \"desk-tutor\"}\n");
+    assert!(ok, "{answer}");
+    assert_eq!(
+        answer["done"],
+        "desk-tutor may know when you looked tired, worked or celebrated"
+    );
+    assert!(ask("{\"seen_more\": \"desk-tutor\"}\n").1);
+    assert!(ask("{\"seen_more\": \"not-here-yet\"}\n").1);
+    assert_eq!(
+        fs::read_to_string(&kept).unwrap(),
+        "desk-tutor\nnot-here-yet\n"
+    );
+    // The camera's yes is its own file, untouched.
+    assert!(!state.join(lamp_skills::CAMERA_FILE).exists());
+    // A program started again reads it.
+    assert!(started().hears_more("desk-tutor"));
+
+    let (answer, ok) = ask("{\"seen_more_off\": \"desk-tutor\"}\n");
+    assert!(ok, "{answer}");
+    assert_eq!(
+        answer["done"],
+        "desk-tutor may not know when you looked tired, worked or celebrated"
+    );
+    assert_eq!(fs::read_to_string(&kept).unwrap(), "not-here-yet\n");
+    assert!(!started().hears_more("desk-tutor"));
+
+    // A remove takes it back with the skill; the other name's stays.
+    assert!(ask("{\"seen_more\": \"desk-tutor\"}\n").1);
+    let (answer, ok) = ask("{\"remove\": \"desk-tutor\"}\n");
+    assert!(ok, "{answer}");
+    assert_eq!(fs::read_to_string(&kept).unwrap(), "not-here-yet\n");
+    // So does a hand install under a granted name.
+    lamp_skills::keep_names(
+        &kept,
+        &["desk-tutor".to_owned(), "not-here-yet".to_owned()].into(),
+    )
+    .unwrap();
+    package::install(&skills, Some(&state), &packed).unwrap();
+    assert_eq!(fs::read_to_string(&kept).unwrap(), "not-here-yet\n");
+
+    let (answer, ok) = ask("{\"seen_more\": \"../off\"}\n");
+    assert!(!ok);
+    assert!(
+        answer["refused"]
+            .as_str()
+            .unwrap()
+            .contains("is not a skill's name"),
+        "{answer}"
+    );
+    let (answer, _) = ask("{\"seen_more\": true}\n");
+    assert_eq!(answer["refused"], package::NOT_A_REQUEST);
+    assert_eq!(fs::read_to_string(&kept).unwrap(), "not-here-yet\n");
+}
+
 /// The reviewer's P2 on #2878: root's helper writes `off` in a folder the
 /// skills' user owns, so a link planted where the file beside goes is
 /// refused and its target untouched, and a link at `off` is not read

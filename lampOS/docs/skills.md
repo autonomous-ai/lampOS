@@ -71,7 +71,19 @@ publishes them, coming with #6543 phases 2 and 3. A skill that names one in
 said by `lamp-seen` only with `LAMP_SEEN_MORE_DOINGS=on`) is a topic of its
 own: a skill naming it shows the `seen_more` use, private and apart from
 `seen`, so a skill given `humans/doing` never receives it. No skill reads it
-yet.
+yet. **The owner's seen_more yes** (#6543): a skill that names it receives
+nothing from it until the owner says yes to that skill in the app
+(`skills.seen_more`, [cloud.md](cloud.md)), kept by name in `--state-dir`'s
+`seen_more` ("The manage helper", below). Without the yes, a core skill's
+too, no trigger on it holds, and no `[[while]]` or `sooner` reads it: it
+reads as a topic that has said nothing yet, so `unknown = "holds"` holds
+on it. The journal says `skill:NAME: humans/doing_more not given to it: the
+owner hasn't said yes to its seen_more` once for each such skill, again
+only after a yes. The yeses are read at the start and again with the off
+file, within 2 s; a yes taken back lets go at once of what the skill held
+on the topic (its `[[while]]` clocks begin again, a run held until such a
+trigger ends is ended). No shipped skill has the yes (test
+`humans_doing_more_reaches_a_skill_only_with_the_owners_seen_more_yes`).
 `humans/doing`'s three timers are always said, counted from the desk
 arrival when nothing was seen, so `[[while]] topic = "humans/doing" field =
 "drank_s_ago" above = 1799 unknown = "holds_stale"` holds for someone the
@@ -2246,7 +2258,8 @@ it does not know).
   number; a link or a file of such a name is left as it is) and says so.
 - **`remove`** renames an installable skill's folder aside, so it is gone
   at once for the program, then deletes it. First it takes the owner's
-  yes to the skill's camera out of `--state-dir`'s `camera` (below).
+  yes to the skill's camera out of `--state-dir`'s `camera` (below), and
+  its seen_more out of `seen_more`.
   The app's skills page removes a skill the same way, through the manage
   helper below.
 - **`asked`** is the manage helper ("The manage helper", below): one
@@ -2403,7 +2416,7 @@ for it.
   desktop lamp only (the virtual lamp's own manage socket, `lamp-sim`): where lamp-control keeps
   a pushed package for the helper (`/var/lib/lampos-control/push`) and where a pushed skill is
   kept (`/var/lib/lampOS/skills-dev`); with neither, those are the paths, and no unit passes
-  them (a test checks every file under `deploy/`). `off`, `on` and `camera` are written beside
+  them (a test checks every file under `deploy/`). `off`, `on`, `camera` and `seen_more` are written beside
   and moved over, the file beside only ever made new and never through a
   link (`O_CREAT | O_EXCL | O_NOFOLLOW`; a link there is refused, its
   target untouched), and read never through a link (the reviewer's P2 on
@@ -2520,6 +2533,21 @@ for it.
     `from_store`) is refused, "a skill called NAME is already on this lamp,
     and it wasn't added from the Skills Store: remove it first to add this
     one", its folder and yes as they were (the Reviewer-lead's P2 on #4875).
+  - `{"seen_more": NAME}` and `{"seen_more_off": NAME}`, a string: the
+    owner's yes to the skill hearing `humans/doing_more` (tiredness, desk
+    work and celebrating, #6543, `package::seen_more`), given or taken back
+    in the app (`skills.seen_more`), kept as the camera's is: under the
+    folder's lock, in `--state-dir`'s `seen_more`, one name a line, beside
+    `camera`; the name need not be on the lamp yet. It answers `NAME may
+    know when you looked tired, worked or celebrated` or `NAME may not know
+    …`. The running program reads it at the start and again with the off
+    file (`Engine::reread_seen_more`), and a skill that names the topic
+    without its yes, core or not, receives nothing from it (above,
+    "The owner's seen_more yes"). A remove takes it back, and so does any
+    install not from the Store under that name; a Store package never needs
+    it to install. Test:
+    `the_owners_seen_more_yes_is_kept_across_a_restart_and_taken_back_by_a_remove`
+    (`tests/it/package.rs`).
     Any
     other install that puts a skill in place under a name with a yes (by
     hand, `lamp-skills install` of a folder or a package, whose
