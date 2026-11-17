@@ -8793,7 +8793,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(told["made"], "bitcoin-price", "{told}");
         let next = told["next"].as_str().unwrap();
         let uses = crate::skill_task_yes::uses_said(&["net".to_owned(), "speak".to_owned()]);
-        assert!(uses.contains("reaches the internet"), "{uses}");
+        assert!(uses.contains("reaches the public internet"), "{uses}");
         assert!(
             next.contains(&format!(
                 "I can have the lamp's agent do that, as bitcoin price: only when you ask for it, \

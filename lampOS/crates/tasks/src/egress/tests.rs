@@ -752,6 +752,9 @@ fn the_names_agree_with_the_namespace_script() {
     assert!(source.contains(&format!("pub const EGRESS_DIR: &str = \"{EGRESS_DIR}\";")));
     assert!(source.contains(NS_LINE), "{NS_LINE}");
     assert!(source.contains(NS_SKILL_LINE), "{NS_SKILL_LINE}");
+    assert!(source.contains(NS_OWN_SKILL_LINE), "{NS_OWN_SKILL_LINE}");
+    assert!(NS_OWN_SKILL_LINE.contains(&format!("/{OWN_SKILL_FILE} ")));
+    assert!(NS_OWN_SKILL_LINE.contains(crate::skill_make::FOLDER_HEAD));
     assert!(source.contains("--egress \\\"$V\\\""));
     assert!(plain_name("make-task-1") && plain_name("skill-task-1"));
     assert!(!plain_name("skill-") && !plain_name("other-task-1") && !plain_name("skill-A"));

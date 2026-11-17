@@ -269,8 +269,20 @@ pub fn grants_of(grants: &[String]) -> Result<Vec<String>, String> {
         }
         kept.push(grant.clone());
     }
+    // `net` never beside a private grant (Heron's P1 on #7590): private
+    // data and a way out never share one run.
+    if let Some(private) = private_beside_net(&kept) {
+        return Err(format!(
+            "grants: \"net\" beside {private:?}: {NET_BESIDE_PRIVATE}"
+        ));
+    }
     Ok(kept)
 }
+
+/// A private grant beside `net` (`lamp_voice::skill_task_yes`): refused at
+/// load here, in the manage helper, in lamp-control's yes and in
+/// lamp-tasks' hand-over.
+pub use lamp_voice::skill_task_yes::{NET_BESIDE_PRIVATE, private_beside_net};
 
 /// The task grant that gives a run the public web (`LAMP_TASK_NET`,
 /// `lamp_voice::skill_task_yes::NET`): a grant here, in the manage helper
@@ -1695,13 +1707,14 @@ mod tests {
     fn an_agent_skill_from_a_file_carries_its_task_only_with_its_switch() {
         lamp_voice::skill_task_yes::set_net_here(Some(true));
         lamp_voice::upload_agent::set_on_here(Some(true));
-        let card = "---\nname: photo-booth\ndescription: Takes three photos. Call it when the \
-                    person says 'take a photo'.\n---\n\nTake three photos and flash the light; \
-                    send them to the image API at https://images.example.invalid/ and say \
+        // No camera: `net` never sits beside it (Heron's P1 on #7590).
+        let card = "---\nname: web-glow\ndescription: Glows three times. Call it when the \
+                    person says 'glow for me'.\n---\n\nFlash the light three times; send a \
+                    note to the web API at https://images.example.invalid/ and say \
                     cheese.\n";
         let (files, grants) = lamp_voice::upload_agent::files(card).unwrap();
         let dir = tempfile::tempdir().unwrap();
-        let folder = dir.path().join("photo-booth");
+        let folder = dir.path().join("web-glow");
         fs::create_dir_all(folder.join(SCRIPTS)).unwrap();
         fs::write(folder.join("skill.toml"), &files.toml).unwrap();
         fs::write(
@@ -1715,7 +1728,7 @@ mod tests {
         fs::write(folder.join(&files.scripts[0].0), &files.scripts[0].1).unwrap();
         let skill = crate::load(&folder).unwrap();
         assert_eq!(skill.grants, grants);
-        assert_eq!(grants, ["light", "speak", "camera", "net"]);
+        assert_eq!(grants, ["light", "speak", "net"]);
         assert_eq!(
             skill.task_step().unwrap().run,
             lamp_voice::upload_agent::INSTRUCTIONS
@@ -1726,7 +1739,7 @@ mod tests {
             sha256: "ab".repeat(32),
             manifest: package::Manifest {
                 format: 1,
-                name: "photo-booth".into(),
+                name: "web-glow".into(),
                 version: "1.0.0".into(),
                 files: Vec::new(),
             },
@@ -1748,6 +1761,39 @@ mod tests {
         assert!(grants_of(&["net".to_owned()]).is_err());
         lamp_voice::skill_task_yes::set_net_here(Some(true));
         assert_eq!(grants_of(&["net".to_owned()]).unwrap(), ["net"]);
+        lamp_voice::skill_task_yes::set_net_here(None);
+    }
+
+    /// Heron's P1 on #7590: `net` never loads beside a private grant (a
+    /// service's read or write, the camera, the microphone, what the lamp
+    /// says, its notes); each of them alone still loads, and `net` beside
+    /// the lamp's voice does too.
+    #[test]
+    fn net_never_loads_beside_a_private_grant() {
+        lamp_voice::skill_task_yes::set_net_here(Some(true));
+        set_agent_services_here(Some(true));
+        let of = |grants: &[&str]| {
+            grants_of(&grants.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>())
+        };
+        for private in [
+            "gmail-read",
+            "gmail-write",
+            "google_calendar-read",
+            "camera",
+            "microphone",
+            "speech",
+            "notes",
+        ] {
+            assert_eq!(of(&[private]).unwrap(), [private]);
+            for pair in [[private, "net"], ["net", private]] {
+                let why = of(&pair).unwrap_err();
+                assert!(why.contains(NET_BESIDE_PRIVATE), "{pair:?}: {why}");
+            }
+            assert!(of(&["speak", private, "net"]).is_err(), "{private}");
+        }
+        assert_eq!(of(&["speak", "net"]).unwrap(), ["speak", "net"]);
+        assert_eq!(of(&["light", "net"]).unwrap(), ["light", "net"]);
+        set_agent_services_here(None);
         lamp_voice::skill_task_yes::set_net_here(None);
     }
 
