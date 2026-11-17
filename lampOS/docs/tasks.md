@@ -4203,12 +4203,13 @@ is the name Harness's `show` gives for the session, or `the lamp's default
 agent` when Harness says stopped, or `not known (harness show: …)` when its
 reply can't be read. The same holds for Hermes and OpenClaw.
 
-### One session for the lamp's default agent (#7246, `LAMP_TASKS_ONE_SESSION=on` in the product's lamp-tasks unit)
+### One session for the lamp's default agent (#7246, `LAMP_TASKS_ONE_SESSION`, off in the product)
 
 Phase 1 of #7246, the lead's final design: the lamp's default agent keeps
 ONE Harness pane, and every spoken task and every skill run is a message
-typed into it. It is on in the product's lamp-tasks unit
-(`deploy/product/lamp-tasks.service`). Switched off (any value but `on`
+typed into it. It is off in the product: the product's lamp-tasks unit
+(`deploy/product/lamp-tasks.service`) does not set it, and the `reply_off`
+fallback below is ready for a switch-on later. Switched off (any value but `on`
 exactly, the default when unset), every task and run is its own
 `harness new` as above, the old per-task panes, byte for byte
 (`crates/tasks/src/one_session.rs`).
