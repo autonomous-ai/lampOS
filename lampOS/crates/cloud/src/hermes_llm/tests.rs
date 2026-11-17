@@ -420,3 +420,167 @@ async fn with_no_place_free_it_is_429_and_no_minute_start_is_used() {
     assert_eq!(ask(address, &chat(Some(TOKEN), ASKED)).await.0, 502);
     assert_eq!(forwarder.started.lock().unwrap().0.len(), 1);
 }
+
+/// One answer of [`metered_relay`]: its status, its `X-Usage-Day-Used` (or
+/// none), its `Content-Type` and its body.
+type Metered = (u16, Option<&'static str>, &'static str, &'static str);
+
+/// A stand-in relay that answers each of `answers` on a connection of its
+/// own, in order, each body sent in two pieces.
+async fn metered_relay(answers: Vec<Metered>) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        for (status, used, kind, body) in answers {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut bytes = Vec::new();
+            let mut chunk = [0u8; 4096];
+            let end = loop {
+                if let Some(end) = find_head_end(&bytes) {
+                    break end;
+                }
+                let read = stream.read(&mut chunk).await.unwrap();
+                assert!(read > 0);
+                bytes.extend_from_slice(&chunk[..read]);
+            };
+            let head = String::from_utf8_lossy(&bytes[..end]).to_ascii_lowercase();
+            let length: usize = head
+                .lines()
+                .find_map(|line| line.strip_prefix("content-length:"))
+                .map(|value| value.trim().parse().unwrap())
+                .unwrap_or(0);
+            while bytes.len() < end + 4 + length {
+                let read = stream.read(&mut chunk).await.unwrap();
+                bytes.extend_from_slice(&chunk[..read]);
+            }
+            let used = used
+                .map(|used| format!("X-Usage-Day-Used: {used}\r\n"))
+                .unwrap_or_default();
+            let head = format!(
+                "HTTP/1.1 {status} Answer\r\nContent-Type: {kind}\r\n{used}\
+                 Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
+            );
+            stream.write_all(head.as_bytes()).await.unwrap();
+            let (one, two) = body.split_at(body.len() / 2);
+            for piece in [one, two] {
+                let framed = format!("{:x}\r\n{piece}\r\n", piece.len());
+                stream.write_all(framed.as_bytes()).await.unwrap();
+                stream.flush().await.unwrap();
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            stream.write_all(b"0\r\n\r\n").await.unwrap();
+        }
+    });
+    format!("http://{address}/api/v1/ai/v1/deepseek")
+}
+
+/// The forwarder on a free loopback port, to `base`, keeping the relay's
+/// day in `meter` when given.
+async fn metered_forwarder(base: &str, meter: Option<&Path>) -> SocketAddr {
+    let listener = Forwarder::bind(0).await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let mut forwarder = Forwarder::new(base, KEY, TOKEN).unwrap();
+    if let Some(meter) = meter {
+        forwarder = forwarder.with_meter(meter);
+    }
+    tokio::spawn(Arc::new(forwarder).serve(listener));
+    address
+}
+
+const STREAMED: &str = "data: {\"choices\":[{\"delta\":{\"content\":\"rain\"}}],\"usage\":null}\n\n\
+     data: {\"choices\":[],\"usage\":{\"prompt_tokens\":9000,\"completion_tokens\":120,\
+     \"prompt_cache_hit_tokens\":8000}}\n\ndata: [DONE]\n\n";
+const WHOLE: &str = r#"{"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":5}}"#;
+const LIMIT: &str = r#"{"error":{"code":"usage_limit","message":"day used"}}"#;
+
+/// #7342: with the switch's meter, each answer's day used and each chat's
+/// tokens are kept for lamp-skills; and every chat is still forwarded as it
+/// came, past the voice's share and at the relay's own limit: the forwarder
+/// never refuses for it, so the owner's own agent tasks go on.
+#[tokio::test]
+async fn the_meter_keeps_the_day_used_and_every_chat_still_goes() {
+    use lamp_skills::relay_share::{self, Reading};
+    let dir = tempfile::tempdir().unwrap();
+    let base = metered_relay(vec![
+        (200, Some("0.412"), "text/event-stream", STREAMED),
+        (200, Some("0.990"), "application/json", WHOLE),
+        (429, Some("1.000"), "application/json", LIMIT),
+        (200, None, "application/json", WHOLE),
+    ])
+    .await;
+    let address = metered_forwarder(&base, Some(dir.path())).await;
+    let today = relay_share::day_of(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64,
+    );
+    let (status, _, answer) = ask(address, &chat(Some(TOKEN), ASKED)).await;
+    assert_eq!((status, answer.as_slice()), (200, STREAMED.as_bytes()));
+    let kept = relay_share::read(dir.path()).unwrap();
+    assert_eq!((kept.day, kept.used, kept.answers), (today, Some(0.412), 1));
+    assert_eq!(
+        (
+            kept.prompt_tokens,
+            kept.cached_tokens,
+            kept.completion_tokens
+        ),
+        (9000, 8000, 120)
+    );
+    // Past any share: forwarded whole all the same.
+    let (status, _, answer) = ask(address, &chat(Some(TOKEN), ASKED)).await;
+    assert_eq!((status, answer.as_slice()), (200, WHOLE.as_bytes()));
+    // The relay's own refusal is the relay's, passed on as it came.
+    let (status, _, answer) = ask(address, &chat(Some(TOKEN), ASKED)).await;
+    assert_eq!((status, answer.as_slice()), (429, LIMIT.as_bytes()));
+    let kept = relay_share::read(dir.path()).unwrap();
+    assert_eq!(
+        kept,
+        Reading {
+            day: today,
+            used: Some(1.0),
+            at_ms: kept.at_ms,
+            answers: 3,
+            uncounted: 1,
+            prompt_tokens: 9100,
+            cached_tokens: 8000,
+            completion_tokens: 125,
+        }
+    );
+    // A successful answer with no header: no day limit.
+    assert_eq!(ask(address, &chat(Some(TOKEN), ASKED)).await.0, 200);
+    assert_eq!(relay_share::read(dir.path()).unwrap().used, None);
+}
+
+/// Off (no meter): the same answer, byte for byte, and nothing kept.
+#[tokio::test]
+async fn without_the_meter_nothing_is_kept() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = metered_relay(vec![(200, Some("0.990"), "text/event-stream", STREAMED)]).await;
+    let address = metered_forwarder(&base, None).await;
+    let (status, _, answer) = ask(address, &chat(Some(TOKEN), ASKED)).await;
+    assert_eq!((status, answer.as_slice()), (200, STREAMED.as_bytes()));
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn a_streams_usage_is_found_across_its_pieces_and_a_chats_line_is_numbers() {
+    let mut usage = Usage::new("text/event-stream");
+    for piece in STREAMED.as_bytes().chunks(7) {
+        usage.feed(piece);
+    }
+    let found = usage.end().unwrap();
+    assert_eq!(found["prompt_tokens"], 9000);
+    assert_eq!(
+        told(Some(&found), Some(0.4125)),
+        "a chat answer: 9000 prompt tokens (8000 from the cache), 120 completion tokens; \
+         the relay's day used 0.412"
+    );
+    assert_eq!(
+        told(None, None),
+        "a chat answer: no usage given; the relay's day used not limited"
+    );
+    let mut whole = Usage::new("application/json");
+    whole.feed(WHOLE.as_bytes());
+    assert_eq!(whole.end().unwrap()["completion_tokens"], 5);
+}
