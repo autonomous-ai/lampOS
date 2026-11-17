@@ -112,6 +112,7 @@ impl Limits {
             && self.groups.iter().zip(&other.groups).all(|(a, b)| {
                 a.0 == b.0
                     && a.1.began_us == b.1.began_us
+                    && a.1.day == b.1.day
                     && a.1.waits.len() == b.1.waits.len()
                     && a.1
                         .waits
@@ -157,6 +158,9 @@ pub(crate) struct GroupLimits {
     /// Each member waiting for its hour: since when, and when it was last
     /// held back for it.
     pub(crate) waits: BTreeMap<String, (u64, u64)>,
+    /// Its runs counted for `[budget] per_day` (#6543): the local day they
+    /// are of, and how many. Kept only on that day.
+    pub(crate) day: Option<(i64, u32)>,
 }
 
 #[derive(Serialize, Deserialize)]
