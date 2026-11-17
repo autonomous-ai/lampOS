@@ -67,8 +67,11 @@ pub struct Search {
 /// What the model is told of the search. The month and year go in a query
 /// for news, results and prices (#1712: on lamp-4ace on 19 Oct "Who won the
 /// last Formula One race?" found last season's; the first builder: "try a
-/// dated query").
-pub(crate) const DESCRIPTION: &str = "Look something up on the web that you cannot know yourself: today's news, a score, opening hours, a price. One short query; for news, results and prices, put the month and year you were told in it, so it finds this month's, not last year's. A price you find may be out of date: say so. For Autonomous's own products, give only the price autonomous.ai's own product page shows; if someone looking at the page sees another, believe them and never argue. Say what you found in a sentence or two. Never search a place you guessed: if you aren't sure you heard a place right, or they said near them and you don't know where, ask which area first. If you searched near a place they didn't name, say which place you used.";
+/// dated query"). A named site or page is searched for at once, never
+/// offered (Queue #6811, lamp-9adf, 17 Nov: "Want me to search for the
+/// latest BBC headlines instead?"); `fetch_page` still reads only a page a
+/// search found.
+pub(crate) const DESCRIPTION: &str = "Look something up on the web that you cannot know yourself: today's news, a score, opening hours, a price. One short query; for news, results and prices, put the month and year you were told in it, so it finds this month's, not last year's. Asked what a site or page says, search for it at once and answer from what you find; never offer to search or ask first. A price you find may be out of date: say so. For Autonomous's own products, give only the price autonomous.ai's own product page shows; if someone looking at the page sees another, believe them and never argue. Say what you found in a sentence or two. Never search a place you guessed: if you aren't sure you heard a place right, or they said near them and you don't know where, ask which area first. If you searched near a place they didn't name, say which place you used.";
 
 /// Told with a search's results when they or the query speak of a price.
 pub(crate) const SEARCHED_PRICE_NOTE: &str = "A price found by a search may be out of date: if you give one, say it may have changed. Never give one for Autonomous's own products from a search or another site, only the one autonomous.ai's own product page shows. If they are looking at the page and see another price, believe them and never argue.";
@@ -650,6 +653,26 @@ mod tests {
         assert!(DESCRIPTION.contains("A price you find may be out of date: say so."));
         assert!(DESCRIPTION.contains("only the price autonomous.ai's own product page shows"));
         assert!(DESCRIPTION.contains("believe them and never argue"));
+    }
+
+    /// Queue #6811 (lamp-9adf, 17 Nov): "what does the front page of the
+    /// BBC say right now?" was answered "I can't browse… Want me to search
+    /// for the latest BBC headlines instead?". A named site or page is
+    /// searched for at once, never offered; `fetch_page` still reads only
+    /// a page a search found.
+    #[test]
+    fn a_named_site_is_searched_for_never_offered() {
+        assert!(DESCRIPTION.contains(
+            "Asked what a site or page says, search for it at once and answer from what you find; never offer to search or ask first."
+        ));
+        let deepseek = Search::deepseek("k").unwrap();
+        let fetch = deepseek
+            .declarations()
+            .into_iter()
+            .find(|tool| tool.name == FETCH)
+            .unwrap();
+        assert!(fetch.description.contains("a search found"));
+        assert!(DESCRIPTION.len() <= 1024, "{}", DESCRIPTION.len());
     }
 
     /// Only Autonomous's own site is read for its price, at `OWN_SITE` over
