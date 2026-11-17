@@ -1365,7 +1365,10 @@ How it is wired (`crates/memory/src/tiers.rs`, `tiers_log.rs`):
     `tiers_night::GIVE_AGAIN_AFTER`, `GIVE_TRIES`), and memory keeps the
     latest gives' outcomes by job id (`tiers::GIVEN_KEPT`, 64; ids and
     outcomes only), so a give again is told the same outcome and nothing
-    is applied twice. An applied pass with more records pending
+    is applied twice. A reply held to give again is dropped, and counted in
+    the voice's journal (`held reply dropped`), when someone speaks, the
+    slide closes or the night's hours end first, as the call itself would
+    be: the job's words stay with the voice no longer than its call. An applied pass with more records pending
     queues the scope's next pass (at most 4 a night).
   - Jobs are bounded: at most 16 (`tiers::NIGHT_JOBS`; a night that finds
     the queue full is not queued, counted `jobs_expired` and

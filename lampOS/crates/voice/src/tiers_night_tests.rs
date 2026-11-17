@@ -406,3 +406,50 @@ fn no_call_starts_within_its_last_start_of_six() {
     assert_eq!(night.step(), Step::Waiting);
     assert_eq!(memory.takes.load(Ordering::SeqCst), 0);
 }
+
+#[test]
+fn a_held_reply_is_dropped_when_the_call_would_be_dropped() {
+    // Someone speaks (or the slide closes) while a busy give is held.
+    let memory = FakeMemory::with_jobs(2, 10);
+    memory.busy.store(1, Ordering::SeqCst);
+    let lamp = FakeLamp::default();
+    let (mut spoken, logged) = night(
+        memory.clone(),
+        lamp.clone(),
+        FakeModel::answering(REPLY),
+        NIGHT_MS,
+    );
+    assert_eq!(spoken.step(), Step::Busy);
+    lamp.loud.store(true, Ordering::SeqCst);
+    assert_eq!(spoken.step(), Step::Waiting);
+    assert!(spoken.held.is_none(), "the night's reply outlived the call");
+    lamp.loud.store(false, Ordering::SeqCst);
+    // Not given again: the next look takes the next job.
+    assert_eq!(spoken.step(), Step::Given("applied".into()));
+    let ids: Vec<String> = memory.given().into_iter().map(|(id, _)| id).collect();
+    assert_eq!(ids, ["job0", "job1"]);
+    let logged = logged.lock().unwrap();
+    assert!(
+        logged
+            .iter()
+            .any(|l| l.contains("held reply dropped") && l.contains("1 dropped")),
+        "{logged:?}"
+    );
+
+    // The night's hours end while a busy give is held.
+    let memory = FakeMemory::with_jobs(1, 10);
+    memory.busy.store(1, Ordering::SeqCst);
+    let (mut late, _) = night(
+        memory.clone(),
+        FakeLamp::default(),
+        FakeModel::answering(REPLY),
+        NIGHT_MS,
+    );
+    assert_eq!(late.step(), Step::Busy);
+    late.clock = Box::new(|| NOON_MS);
+    assert_eq!(late.step(), Step::Waiting);
+    assert!(late.held.is_none(), "the night's reply outlived the night");
+    late.clock = Box::new(|| NIGHT_MS);
+    assert_eq!(late.step(), Step::NoJob);
+    assert_eq!(memory.given().len(), 1);
+}
