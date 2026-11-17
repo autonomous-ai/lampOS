@@ -5866,6 +5866,28 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
     });
 }
 
+/// The owner's spoken ask whose run's told answer, found or failed, lifts
+/// the quiet (#7180): `asked`, with `LAMP_TOLD_WHEN_ASKED` on, or with
+/// `LAMP_SKILL_TASK_SURE` on (`sure`) any run now asked by voice
+/// (`asked_at`; lamp-9adf, 18 Nov 00:11: "Lamp, use my bitcoin price
+/// skill." was run, its agent's answer kept, and it waited behind quiet
+/// hours unsaid, the product setting no `LAMP_TOLD_WHEN_ASKED`).
+fn quiet_ask(asked: Option<u64>, asked_at: Option<u64>, sure: bool) -> Option<u64> {
+    asked.or(asked_at.filter(|_| sure))
+}
+
+/// The quiet lifted in `room`'s gate for an answer ready at `ready`, of a
+/// run its owner asked for by voice at `asked`: until five minutes after
+/// it was ready, when ready within five of the ask
+/// (`lamp_voice::told_when_asked::lifted_until`); the gate's own look then
+/// counts no quiet hours ([`LampRoom::seen`]), so news isn't dropped for
+/// them either. None: the quiet holds.
+fn lift_quiet(room: &mut LampRoom, asked: u64, ready: u64) -> Option<u64> {
+    let until = lamp_voice::told_when_asked::lifted_until(asked, ready)?;
+    room.quiet_lifted = Some(until);
+    Some(until)
+}
+
 /// What [`hand_task`] tells of its run, once it ended, on its thread: what
 /// its agent found, behind a read's gate; or, with `LAMP_SKILL_TASK_SURE`
 /// on (`sure`), why it didn't run (`failed`), unless a refusal was said
@@ -5873,7 +5895,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
 /// run while it goes on, a run now its owner asked by voice at `asked_at`
 /// (`lamp_skills::task_sure::in_asking_conversation`), else as news
 /// (`lamp_skills::service_read::tell_failed`, #7363). `asked`: that ask
-/// with `LAMP_TOLD_WHEN_ASKED` on, which lifts the quiet (#7180). The
+/// with `LAMP_TOLD_WHEN_ASKED` on; either lifts the quiet ([`quiet_ask`]). The
 /// journal's words, or none when nothing was told.
 #[allow(clippy::too_many_arguments)]
 fn tell_its_run(
@@ -5902,16 +5924,17 @@ fn tell_its_run(
         eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {error}");
     }
     // Asked by the owner's voice and ready within five minutes: the
-    // quiet lifted for it, for five minutes more (#7180).
-    if let Some(asked) = asked {
+    // quiet lifted for it, for five minutes more (#7180), with
+    // `LAMP_TOLD_WHEN_ASKED` or `LAMP_SKILL_TASK_SURE` on ([`quiet_ask`]).
+    if let Some(asked) = quiet_ask(asked, asked_at, sure) {
         let ready = unix_ms();
         let after = ready.saturating_sub(asked) / 1000;
-        match lamp_voice::told_when_asked::lifted_until(asked, ready) {
-            Some(until) => {
-                room.quiet_lifted = Some(until);
+        match lift_quiet(room, asked, ready) {
+            Some(_) => {
                 eprintln!(
-                    "lamp-skills: skill:{skill}: do.task: {what}: told in quiet hours too, its owner asked by voice {after} s before ({})",
-                    lamp_voice::told_when_asked::ENVIRONMENT
+                    "lamp-skills: skill:{skill}: do.task: {what}: told in quiet hours too, its owner asked by voice {after} s before ({} or {})",
+                    lamp_voice::told_when_asked::ENVIRONMENT,
+                    lamp_skills::task_sure::ENVIRONMENT
                 );
             }
             None => eprintln!(
@@ -6707,6 +6730,49 @@ mod tests {
         room.quiet_lifted = Some(unix_ms() + 60_000);
         assert!(!room.seen().quiet, "asked by voice, it is lifted");
         assert_eq!(task_room("morning-mail", &step(None), &runner).quiet, None);
+    }
+
+    /// lamp-9adf, 18 Nov 00:11–00:12: "Lamp, use my bitcoin price skill."
+    /// ran, its agent's answer was kept, and it waited behind quiet hours
+    /// unsaid: the product sets `LAMP_SKILL_TASK_SURE`, never
+    /// `LAMP_TOLD_WHEN_ASKED`. A run now asked by voice lifts the quiet for
+    /// its answer, found or failed, with either switch, as #7180 says;
+    /// a trigger's run, neither switch, or an answer ready past five
+    /// minutes of the ask keeps it.
+    #[test]
+    fn a_voice_asked_runs_answer_ready_in_quiet_hours_is_not_held_by_them() {
+        use lamp_skills::service_read::Room;
+        let dir = tempfile::Builder::new()
+            .prefix("qa")
+            .tempdir_in("/tmp")
+            .unwrap();
+        // No local time: the lamp's quiet hours, as at 00:12.
+        let mut room = LampRoom {
+            skill: "btc-price".into(),
+            say: dir.path().join("say.sock"),
+            services: dir.path().join("call.sock"),
+            bus: Bus::new(dir.path().join("bus")).unwrap(),
+            known_file: None,
+            owner: None,
+            local_time: None,
+            quiet: None,
+            quiet_lifted: None,
+        };
+        assert!(room.seen().quiet);
+        let ready = unix_ms();
+        let asked = ready - 40_000;
+        // The product: the task made sure of, no told-when-asked switch.
+        assert_eq!(quiet_ask(None, Some(asked), true), Some(asked));
+        assert!(lift_quiet(&mut room, asked, ready).is_some());
+        assert!(!room.seen().quiet, "its answer is said in quiet hours");
+        // A trigger's run, or neither switch: the quiet holds.
+        assert_eq!(quiet_ask(None, None, true), None);
+        assert_eq!(quiet_ask(None, Some(asked), false), None);
+        assert_eq!(quiet_ask(Some(asked), None, false), Some(asked));
+        // Ready past five minutes of the ask: it holds.
+        room.quiet_lifted = None;
+        assert_eq!(lift_quiet(&mut room, asked, asked + 5 * 60_000 + 1), None);
+        assert!(room.seen().quiet);
     }
 
     /// #7363 (El's P2): `hand_task`'s telling of a run now its owner asked
