@@ -1264,6 +1264,14 @@ pub fn speaker(
     } else {
         result.as_ref().copied().unwrap_or(EndReason::Fault)
     };
+    // A diagnostic, said only when the speaker ends on a fault (the Mac start's F1): never on a clean
+    // stop. After the device is dropped and the fault reported: a stderr write that blocks under load
+    // must never keep a faulted speaker sounding (El's read of #7443).
+    if result.is_err()
+        && let Some(line) = output.times.line()
+    {
+        eprintln!("{line}");
+    }
     let finish = recording.map_or(Ok(()), |r| r.finish(&mut channels, reason));
     result.map(|_| ()).and(stop).and(finish)
 }
@@ -1378,8 +1386,115 @@ struct PendingChunk {
     chunk: SpeakerChunk,
     offset: usize,
 }
+/// How many passes of the speaker with its clock running are timed (a diagnostic only).
+const PASS_ROWS: usize = 64;
+
+/// One timed pass, in microseconds: when it began (from the first timed pass), how long it ran
+/// before the write block, in the device write (the sink included), in sending the reference
+/// packet, and in all before its sleep.
+#[derive(Clone, Copy, Default)]
+struct PassRow {
+    at_us: u64,
+    pre_us: u32,
+    write_us: u32,
+    send_us: u32,
+    work_us: u32,
+}
+
+/// What the speaker's first passes with the clock running cost, kept in fixed arrays (no
+/// allocation in the loop) and said once, on stderr, when the speaker ends on a fault. A
+/// diagnostic: nothing decides on it, nothing goes to the journal or the wire.
+struct PassTimes {
+    rows: [PassRow; PASS_ROWS],
+    len: usize,
+    first: Option<Instant>,
+    started: Option<Instant>,
+    current: PassRow,
+    clocked: bool,
+}
+
+impl Default for PassTimes {
+    fn default() -> Self {
+        Self {
+            rows: [PassRow::default(); PASS_ROWS],
+            len: 0,
+            first: None,
+            started: None,
+            current: PassRow::default(),
+            clocked: false,
+        }
+    }
+}
+
+fn micros(duration: Duration) -> u32 {
+    u32::try_from(duration.as_micros()).unwrap_or(u32::MAX)
+}
+
+impl PassTimes {
+    /// A pass begins: the one before is kept if its clock was running and there is room.
+    fn begin(&mut self, now: Instant) {
+        if self.clocked && self.len < PASS_ROWS {
+            self.rows[self.len] = self.current;
+            self.len += 1;
+        }
+        self.started = Some(now);
+        self.current = PassRow::default();
+        self.clocked = false;
+    }
+
+    /// The pass reached its write block with the clock running.
+    fn clock_pass(&mut self) {
+        let Some(started) = self.started else { return };
+        let first = *self.first.get_or_insert(started);
+        self.current.at_us = started.duration_since(first).as_micros() as u64;
+        self.current.pre_us = micros(started.elapsed());
+        self.clocked = true;
+    }
+
+    fn add_write(&mut self, spent: Duration) {
+        self.current.write_us = self.current.write_us.saturating_add(micros(spent));
+    }
+
+    fn add_send(&mut self, spent: Duration) {
+        self.current.send_us = self.current.send_us.saturating_add(micros(spent));
+    }
+
+    /// The pass's work is done, its sleep is next.
+    fn work_done(&mut self) {
+        if let Some(started) = self.started {
+            self.current.work_us = micros(started.elapsed());
+        }
+    }
+
+    /// The passes as one line, or none when no pass ran with the clock.
+    fn line(&self) -> Option<String> {
+        let mut rows = self.rows[..self.len].to_vec();
+        if self.clocked && self.len < PASS_ROWS {
+            rows.push(self.current);
+        }
+        if rows.is_empty() {
+            return None;
+        }
+        let said: Vec<String> = rows
+            .iter()
+            .map(|row| {
+                format!(
+                    "{}/{}/{}/{}/{}",
+                    row.at_us, row.pre_us, row.write_us, row.send_us, row.work_us
+                )
+            })
+            .collect();
+        Some(format!(
+            "lamp-voice: speaker passes (first {} with the clock running; us: began/before the write/in the device write/in sending the reference/work before the sleep): {}",
+            rows.len(),
+            said.join(" ")
+        ))
+    }
+}
+
 #[derive(Default)]
 struct ReferenceOutput {
+    times: PassTimes,
     sequence: u64,
     privacy: Option<u64>,
     primed_at: Option<u64>,
@@ -1530,6 +1645,7 @@ fn speaker_loop(
     let mut stalls = crate::stalls::Stalls::from_environment("speaker");
     'tick: loop {
         let tick = Instant::now();
+        output.times.begin(tick);
         let stall_pass = stalls.begin();
         for index in 0..=MAX_CONTROL {
             let Some(control) = channels.control.receive_renewed(Control::is_renewal)? else {
@@ -1925,16 +2041,19 @@ fn speaker_loop(
             .last_poll()
             .is_some_and(|status| status.tracked_authorized_frames <= RENDER_SAMPLES);
         if speaker.clock_started() && writable_block {
+            output.times.clock_pass();
             let mut wrote_speech = false;
             if let Some(partial) = pending.as_mut() {
                 // Read before this write's reset report clears it (#3697).
                 let speaking = speech
                     .unfinished_owner()
                     .or((partial.offset > 0).then(|| partial.chunk.permit.owner()));
+                let write_started = Instant::now();
                 let result = speaker.try_write(
                     partial.chunk.permit,
                     &partial.chunk.samples[partial.offset..],
                 );
+                output.times.add_write(write_started.elapsed());
                 // Record actual acceptance under its original epoch even if the
                 // post-write permission check already dropped it. The following
                 // reset receipt marks that tail; it never reaches new-epoch AEC.
@@ -1985,6 +2104,7 @@ fn speaker_loop(
                                     io::Error::other("invalid accepted speaker count")
                                 })?;
                             let owner = partial.chunk.permit.owner();
+                            let send_started = Instant::now();
                             output.send(
                                 link,
                                 written,
@@ -1993,6 +2113,7 @@ fn speaker_loop(
                                     samples: partial.chunk.samples[partial.offset..end].to_vec(),
                                 },
                             )?;
+                            output.times.add_send(send_started.elapsed());
                             partial.offset = end;
                             if let Some(gap) = speech.speech_accepted(
                                 owner,
@@ -2055,10 +2176,12 @@ fn speaker_loop(
                 && !wrote_speech
                 && (pending.is_none() || speaker.is_retiring_tail())
             {
-                let written = match speaker
+                let write_started = Instant::now();
+                let silence = speaker
                     .zero_authority()
-                    .and_then(|token| speaker.try_write_silence(token, RENDER_SAMPLES))
-                {
+                    .and_then(|token| speaker.try_write_silence(token, RENDER_SAMPLES));
+                output.times.add_write(write_started.elapsed());
+                let written = match silence {
                     Ok(written) => written,
                     Err(error) if underran(error.as_ref()) => {
                         underrun(
@@ -2115,6 +2238,7 @@ fn speaker_loop(
                             .fault(speaker, ReferenceFaultKind::ClockStopped)
                             .into());
                     }
+                    let send_started = Instant::now();
                     output.send(
                         link,
                         written,
@@ -2122,6 +2246,7 @@ fn speaker_loop(
                             frames: written.frames as u16,
                         },
                     )?;
+                    output.times.add_send(send_started.elapsed());
                     if let Some(gap) = speech.zeros_accepted(
                         written.first_sample,
                         written.end_sample,
@@ -2132,6 +2257,7 @@ fn speaker_loop(
                 }
             }
         }
+        output.times.work_done();
         stall_pass.done();
         finish_tick(tick);
     }
@@ -2859,5 +2985,49 @@ mod peer_stop_speaker_tests {
         assert!(error.to_string().starts_with("ref.c.speaker: "), "{error}");
         assert_eq!(ends.speaker.flush_count(), flushes);
         assert_eq!(gaps_cancelled(&mut ends.parent), 0);
+    }
+}
+
+#[cfg(test)]
+mod pass_times_tests {
+    use super::*;
+
+    /// The speaker's pass diagnostic: nothing before a pass ran with the clock, then one row per
+    /// such pass (the write and send times as given), at most [`PASS_ROWS`] of them.
+    #[test]
+    fn the_pass_line_has_a_row_for_each_pass_with_the_clock_and_no_more_than_the_bound() {
+        let mut times = PassTimes::default();
+        assert!(times.line().is_none());
+        // A pass before the clock runs is not kept.
+        times.begin(Instant::now());
+        times.work_done();
+        assert!(times.line().is_none());
+        times.begin(Instant::now());
+        times.clock_pass();
+        times.add_write(Duration::from_micros(150));
+        times.add_write(Duration::from_micros(50));
+        times.add_send(Duration::from_micros(40));
+        times.work_done();
+        let line = times.line().unwrap();
+        assert!(line.contains("(first 1 with the clock running;"), "{line}");
+        let row: Vec<u32> = line
+            .rsplit(": ")
+            .next()
+            .unwrap()
+            .split('/')
+            .map(|field| field.parse().unwrap())
+            .collect();
+        assert_eq!(row.len(), 5);
+        assert_eq!((row[0], row[2], row[3]), (0, 200, 40));
+        for _ in 0..(PASS_ROWS + 10) {
+            times.begin(Instant::now());
+            times.clock_pass();
+        }
+        let line = times.line().unwrap();
+        assert!(line.contains(&format!("(first {PASS_ROWS} with")), "{line}");
+        assert_eq!(
+            line.rsplit(": ").next().unwrap().split(' ').count(),
+            PASS_ROWS
+        );
     }
 }
