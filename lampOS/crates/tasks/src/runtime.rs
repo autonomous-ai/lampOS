@@ -4727,9 +4727,12 @@ pub fn serve<C: Clock>(
             .name("one-session".into())
             .spawn(move || {
                 let key_slot = slot.clone();
+                let place_one = one.clone();
                 let cli_slot = slot.clone();
                 one.keep_open(
-                    Box::new(move || crate::one_session::lamp_place(&slot, &project)),
+                    Box::new(move || {
+                        crate::one_session::lamp_place(&slot, &project, Some(&place_one))
+                    }),
                     Box::new(move || crate::one_session::lamp_key(&key_slot)),
                     Box::new(move || {
                         let harness = cli_slot.get()?;
