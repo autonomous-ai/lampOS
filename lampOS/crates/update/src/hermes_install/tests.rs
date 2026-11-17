@@ -4146,6 +4146,17 @@ fn a_net_run_shows_its_egress_socket_opens_53_and_names_127_0_0_1() {
     let _bridge = std::os::unix::net::UnixListener::bind(&bridge).unwrap();
     let egress = at(&format!("{EGRESS_DIR}/make-task-1-2-3.sock"));
     let _egress = std::os::unix::net::UnixListener::bind(&egress).unwrap();
+    // Its own skill's folder, named in its run's folder (Heron's P3 on
+    // #7590), beside another skill's.
+    let own = format!("{}/mine", at(SKILLS));
+    for made in [own.clone(), format!("{}/other", at(SKILLS))] {
+        fs::create_dir_all(made).unwrap();
+    }
+    for id in ["1-2-3", "9"] {
+        let run_folder = format!("{}/lamp/make-task-{id}", at(WORK));
+        fs::create_dir_all(&run_folder).unwrap();
+        fs::write(format!("{run_folder}/skill-folder"), format!("{own}\n")).unwrap();
+    }
     let uid_map = folder.path().join("uid_map");
     fs::write(&uid_map, "         0        996          1\n").unwrap();
     let port_start = folder.path().join("ip_unprivileged_port_start");
@@ -4260,6 +4271,23 @@ fn a_net_run_shows_its_egress_socket_opens_53_and_names_127_0_0_1() {
     ];
     let places: Vec<usize> = order.iter().map(|line| find(line)).collect();
     assert!(places.windows(2).all(|two| two[0] < two[1]), "{lines:#?}");
+    // Only its own skill's folder staged and shown, read-only; never the
+    // skills' whole folder.
+    let skills_at = at(SKILLS);
+    let own_order = [
+        format!("mount --bind {own} {stage}/k"),
+        format!("mkdir -p {own}"),
+        format!("mount --move {stage}/k {own}"),
+        format!("mount -o remount,bind,ro,nosuid,nodev,relatime {own}"),
+    ];
+    let places: Vec<usize> = own_order.iter().map(|line| find(line)).collect();
+    assert!(places.windows(2).all(|two| two[0] < two[1]), "{lines:#?}");
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains(&format!("{skills_at} ")) || line.ends_with(&skills_at)),
+        "{lines:#?}"
+    );
     // Each step failing ends it before Hermes runs.
     let hermes_ran = |lines: &[String]| lines.iter().any(|line| line.ends_with(" chat -q a b"));
     for fail_on in [
@@ -4329,4 +4357,95 @@ fn a_net_run_shows_its_egress_socket_opens_53_and_names_127_0_0_1() {
             "{lines:#?}"
         );
     }
+}
+
+/// Heron's P3 on #7590, made required by the first builder: a run granted
+/// `net` sees only its own skill's folder. [`OWN_SKILL_LINES`] run alone:
+/// the folder lamp-tasks names in the run's folder (found by the run's id,
+/// `skill-<id>` or `make-<id>`) becomes `K` (or `P`, a pushed one) and the
+/// other is emptied, so the staging that follows binds that folder alone
+/// under an empty read-only `/var/lib`: another skill's folder is not
+/// there to list. A name missing, a link, or a folder that is no skill's
+/// ends the run; a run without `net` keeps every skill, as before.
+#[test]
+fn a_net_run_sees_only_its_own_skills_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let (w, k, p) = (root.join("w"), root.join("skills"), root.join("pushed"));
+    for folder in [k.join("mine"), k.join("other"), p.join("pushed-one")] {
+        fs::create_dir_all(folder).unwrap();
+    }
+    let run = |net: Option<&str>, egress: &str| {
+        let script = format!(
+            "fail() {{ echo \"fail: $1\"; exit 1; }}\nW={w} K={k} P={p}\n{OWN_SKILL_LINES}echo \"K=$K P=$P\"\n",
+            w = w.display(),
+            k = k.display(),
+            p = p.display(),
+        );
+        let mut command = std::process::Command::new("/bin/sh");
+        command
+            .args(["-c", &script])
+            .env_remove("LAMP_NS_NET")
+            .env("LAMP_NS_EGRESS", egress);
+        if let Some(net) = net {
+            command.env("LAMP_NS_NET", net);
+        }
+        let out = command.output().unwrap();
+        String::from_utf8_lossy(&out.stdout).trim().to_owned()
+    };
+    let name = |id: &str, folder: &str| {
+        let at = w.join("lamp").join(format!("make-{id}"));
+        fs::create_dir_all(&at).unwrap();
+        fs::write(at.join("skill-folder"), format!("{folder}\n")).unwrap();
+    };
+    let (k_shown, p_shown) = (k.display().to_string(), p.display().to_string());
+    name("r1", &format!("{k_shown}/mine"));
+    // Its own folder alone, by the one run path's name and by the make's.
+    let own = format!("K={k_shown}/mine P=");
+    assert_eq!(run(Some("run"), "skill-r1"), own);
+    assert_eq!(run(Some("run"), "make-r1"), own);
+    // A pushed skill's: the lamp's skills hidden whole.
+    name("r2", &format!("{p_shown}/pushed-one"));
+    assert_eq!(
+        run(Some("run"), "skill-r2"),
+        format!("K= P={p_shown}/pushed-one")
+    );
+    // No name, a name past the skills, a link or no folder: the run ends.
+    assert!(run(Some("run"), "skill-r9").starts_with("fail: "));
+    symlink(k.join("other"), k.join("linked")).unwrap();
+    for (id, folder) in [
+        ("r3", "/etc".to_owned()),
+        ("r4", format!("{k_shown}/../w")),
+        ("r5", format!("{k_shown}/mine/scripts")),
+        ("r6", format!("{k_shown}/gone")),
+        ("r7", format!("{k_shown}/linked")),
+    ] {
+        name(id, &folder);
+        assert!(
+            run(Some("run"), &format!("skill-{id}")).starts_with("fail: "),
+            "{folder}"
+        );
+    }
+    assert!(run(Some("run"), "other-r1").starts_with("fail: "));
+    assert!(run(Some("run"), "skill-R1").starts_with("fail: "));
+    // No `net`: every skill, as before.
+    let every = format!("K={k_shown} P={p_shown}");
+    assert_eq!(run(None, "skill-r1"), every);
+    assert_eq!(run(Some("run"), ""), every);
+    // In both namespace scripts, before the skills are staged and after the
+    // work folder is.
+    let agent = crate::agent_ns::wrapper::ns_text(Shown {
+        skills: true,
+        tasks: true,
+        one_path: true,
+    });
+    for text in [ns_text(true, true), ns_text(false, true), agent] {
+        assert_eq!(text.matches(OWN_SKILL_LINES).count(), 1);
+        let lines = text.find(OWN_SKILL_LINES).unwrap();
+        let work = text.find("mount --bind \"$W\" \"$S/w\"").unwrap();
+        let staged = text.find("mount --bind \"$K\" \"$S/k\"").unwrap();
+        let pushed = text.find("mount --bind \"$P\" \"$S/p\"").unwrap();
+        assert!(work < lines && lines < staged && staged < pushed);
+    }
+    assert!(!ns_text(true, false).contains(OWN_SKILL_LINES));
 }
