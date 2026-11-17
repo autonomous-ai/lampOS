@@ -8727,19 +8727,28 @@ fn a_net_run_by_the_one_run_path_gets_its_egress_socket_before_harness_new() {
     );
     runner.egress = Some(egress_of(&rig));
     let socket = rig.root.path().join("egress/skill-task-1.sock");
+    // The socket is looked for once, at the first look after the fixture
+    // logs `new`. The fixture logs a call before its 600 ms delay, so that
+    // look falls while Harness is starting the run, which is when the
+    // wrapper must find the socket. Looking for "a socket and no `new` yet"
+    // instead missed, now and then, the few milliseconds between the socket
+    // and the call (train 1013's PRs, 17 Nov: #7430's head went red here).
+    let looked = std::sync::atomic::AtomicBool::new(false);
     let seen = std::sync::atomic::AtomicBool::new(false);
     let done = std::sync::atomic::AtomicBool::new(false);
     let ran = std::thread::scope(|scope| {
         scope.spawn(|| {
             use std::os::unix::fs::FileTypeExt;
-            while !done.load(std::sync::atomic::Ordering::Acquire) {
-                let asked_new = rig.calls().iter().any(|call| call["args"][0] == "new");
-                if fs::symlink_metadata(&socket).is_ok_and(|meta| meta.file_type().is_socket())
-                    && !asked_new
-                {
-                    seen.store(true, std::sync::atomic::Ordering::Release);
+            while !done.load(std::sync::atomic::Ordering::Acquire)
+                && !looked.load(std::sync::atomic::Ordering::Acquire)
+            {
+                if rig.calls().iter().any(|call| call["args"][0] == "new") {
+                    let there = fs::symlink_metadata(&socket)
+                        .is_ok_and(|meta| meta.file_type().is_socket());
+                    seen.store(there, std::sync::atomic::Ordering::Release);
+                    looked.store(true, std::sync::atomic::Ordering::Release);
                 }
-                std::thread::sleep(Duration::from_millis(10));
+                std::thread::sleep(Duration::from_millis(5));
             }
         });
         let ran = runner.run(&net_run(), &|| {});
@@ -8748,8 +8757,12 @@ fn a_net_run_by_the_one_run_path_gets_its_egress_socket_before_harness_new() {
     });
     assert_eq!(ran, Ok(0));
     assert!(
+        looked.load(std::sync::atomic::Ordering::Acquire),
+        "harness new was asked"
+    );
+    assert!(
         seen.load(std::sync::atomic::Ordering::Acquire),
-        "made before harness new"
+        "there while Harness starts the run"
     );
     assert!(!socket.exists(), "gone after the run");
     let verbs: Vec<String> = rig
