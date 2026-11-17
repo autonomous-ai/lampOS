@@ -821,10 +821,10 @@ fn an_agent_skills_file_is_taken_to_64_kib_only_with_its_switch() {
     assert_eq!(off.unwrap_err(), TOO_LONG);
     assert!(seen.try_recv().is_err());
     let mut answer = kept();
-    answer["kept"]["grants"] = json!(["light", "speak", "camera", "net"]);
+    answer["kept"]["grants"] = json!(["light", "speak", "net"]);
     let (on, seen) = run("agent-on", &card, true, vec![answer]);
     let on = on.unwrap();
-    assert_eq!(on["grants"], json!(["light", "speak", "camera", "net"]));
+    assert_eq!(on["grants"], json!(["light", "speak", "net"]));
     assert_eq!(seen.recv().unwrap(), json!({"upload": {"skill_md": card}}));
     let long = format!("{card}{}", "x".repeat(MOST_AGENT_BYTES));
     let (past, _) = run("agent-past", &long, true, vec![]);

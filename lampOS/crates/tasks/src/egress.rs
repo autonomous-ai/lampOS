@@ -63,6 +63,17 @@ pub const NS_LINE: &str = "V=/run/lampos-tasks/egress/$LAMP_NS_EGRESS.sock";
 /// ([`crate::skill_task::RUN_FOLDER_PREFIX`]): without it such a run is
 /// refused ([`crate::skill_task::NET_NO_WAY_OUT`]).
 pub const NS_SKILL_LINE: &str = "case $LAMP_NS_EGRESS in make-?*|skill-?*) ;;";
+/// The file lamp-tasks writes in a run granted `net`'s own folder
+/// (`make-<run id>`, beside its fresh home): its skill's folder as the
+/// hand-over names it, one line. The namespace script finds it by the
+/// run's id and shows that folder alone of the lamp's skills and those
+/// pushed (Heron's P3 on #7590, made required by the first builder).
+pub const OWN_SKILL_FILE: &str = "skill-folder";
+/// The line lamp-update's namespace script carries when it shows a run
+/// granted `net` only its own skill's folder ([`OWN_SKILL_FILE`],
+/// `lamp_update::hermes_install::OWN_SKILL_LINES`): without it such a run
+/// is refused, as it would see every skill's folder.
+pub const NS_OWN_SKILL_LINE: &str = "O=$W/lamp/make-${LAMP_NS_EGRESS#*-}/skill-folder N=";
 /// Said when the namespace script has no [`NS_LINE`]: nothing is started.
 pub const NO_EGRESS: &str = "the lamp's agent can't be given the internet yet (its namespace script has no egress line: lamp-update's round hasn't run), so nothing was started";
 /// The ports a run granted `net` reaches (Heron's answer 1): the web.
