@@ -2161,7 +2161,9 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   phiên của OpenClaw không bao giờ bị xoay theo số lượt. Cả hai trường hợp,
   vòng keep-open mở một phiên mới (agent id và token mới, nên là một phiên
   OpenClaw mới) ngay trong cùng lần nhìn, ngay sau khi gỡ, không đợi tới
-  việc tiếp theo. Journal: `the kept session dropped (the owner asked to
+  việc tiếp theo. Việc nào cần pane trong lúc việc gỡ đã được yêu cầu
+  hoặc đang chạy (quên, đăng xuất) sẽ chờ trong hàng đợi, rồi vào phiên
+  mới, không bao giờ vào phiên cũ (`OneSession::enter`). Journal: `the kept session dropped (the owner asked to
   forget); a new one opens` (hoặc `(no task for 120 min)`), `dropped the
   kept session <id> (…); its conversation forgotten`, rồi `kept session new
   <id> (openclaw, …) in <ms> ms`.

@@ -464,6 +464,10 @@ struct Inner {
     /// The pane to be removed for good, and why (a sign-out): done at the
     /// next [`OneSession::tend`], which has Harness to close it with.
     drop_due: Option<String>,
+    /// A removal under way ([`OneSession::drop_pane_as`]): the pane taken,
+    /// its close, its OpenClaw session's delete and its token's removal
+    /// not all done yet.
+    dropping: bool,
     /// The spoken task whose turn ended unanswered (cancelled, or an ask
     /// no one answered): it holds the pane until the drop closes it.
     closing_for: Option<String>,
@@ -1058,6 +1062,15 @@ impl OneSession {
     /// that ended unanswered). A kept session not closed is tried again at
     /// the next look, never let go with its conversation still there.
     fn drop_pane_as(&self, harness: &dyn PaneHarness, why: &str, token: bool) {
+        self.lock().dropping = true;
+        self.drop_pane_now(harness, why, token);
+        self.lock().dropping = false;
+        // A task waiting in [`OneSession::enter`] for the removal goes on.
+        self.turned.notify_all();
+    }
+
+    /// [`OneSession::drop_pane_as`]'s removal itself.
+    fn drop_pane_now(&self, harness: &dyn PaneHarness, why: &str, token: bool) {
         let pane = self.lock().pane.take();
         let kept = self.kept();
         let program = pane
@@ -1505,7 +1518,17 @@ impl OneSession {
     ) -> Result<Turn<'_>, Refused> {
         let mut inner = self.lock();
         let behind_spoken = |inner: &Inner| kind == Kind::Skill && !inner.spoken_queue.is_empty();
-        if inner.holder.is_none() && inner.waiting.is_empty() && !behind_spoken(&inner) {
+        // A removal asked for (a forget, a sign-out) or under way: no task
+        // is typed into that pane; it waits for the removal (and the new
+        // pane, which its turn opens if the look has not yet). After a
+        // `reply_off` no task uses the pane: none waits.
+        let removing =
+            |inner: &Inner| (inner.drop_due.is_some() || inner.dropping) && self.takes_reply();
+        if inner.holder.is_none()
+            && inner.waiting.is_empty()
+            && !behind_spoken(&inner)
+            && !removing(&inner)
+        {
             inner.holder = Some(id.to_owned());
             return Ok(Turn {
                 one: self,
@@ -1543,7 +1566,7 @@ impl OneSession {
         let given_up = (Instant::now() + most).min(until);
         loop {
             let first = inner.waiting.front().is_some_and(|(first, _)| first == id);
-            if first && inner.holder.is_none() && !behind_spoken(&inner) {
+            if first && inner.holder.is_none() && !behind_spoken(&inner) && !removing(&inner) {
                 inner.waiting.pop_front();
                 inner.holder = Some(id.to_owned());
                 return Ok(Turn {

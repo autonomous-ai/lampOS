@@ -4711,7 +4711,10 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   last turn) is dropped the same way, since OpenClaw's is never rotated by
   count. Either way the keep-open loop opens a new one (a new agent id and
   token, so a new OpenClaw session) in the same look, right after the
-  drop, not at the next task. Journal: `the kept session dropped (the
+  drop, not at the next task. A task that asks for the pane while a drop
+  is asked for or under way (a forget, a sign-out) waits for it in the
+  queue, then goes into the new session, never the old one
+  (`OneSession::enter`). Journal: `the kept session dropped (the
   owner asked to forget); a new one opens` (or `(no task for 120 min)`),
   `dropped the kept session <id> (…); its conversation forgotten`, then
   `kept session new <id> (openclaw, …) in <ms> ms`.
