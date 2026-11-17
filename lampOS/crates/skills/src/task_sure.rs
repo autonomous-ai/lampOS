@@ -1,5 +1,5 @@
 //! A skill's `do.task` made sure of (`LAMP_SKILL_TASK_SURE`, `on` only,
-//! off unless set, in no product unit): two ways its hand-over to
+//! off unless set, on in the product's lamp-skills): two ways its hand-over to
 //! lamp-tasks ([`crate::task::hand`]) ended with nothing said.
 //!
 //! - **A run that failed is told** ([`failed_line`]): lamp-tasks' `ok:false`
