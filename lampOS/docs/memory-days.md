@@ -917,6 +917,42 @@ switch: Harness task rows (`LAMP_SERVICE_RECORDS_TASKS`, slice 3,
 - **Rollback.** Only the task rows call it, behind their own switch, so an
   older voice differs in having no `linked_dropped` fact and no task rows.
 
+### Linked records told: the caps (slice 8, the voice's `LAMP_SERVICE_RECORDS_LINKED_TOLD`, off)
+
+With `LAMP_SERVICE_RECORDS_LINKED_TOLD=on` beside `LAMP_SERVICE_RECORDS_TOLD`
+and `LAMP_SERVICE_RECORDS` (the second route only,
+`process::service_records_linked_told_worker_environment`; `lamp-voice`
+`service_records::told::linked_on`), the linked records are told apart from
+the connector records, each kind bounded:
+
+- **The standing note.** The connector records as before, then at most 2
+  linked lines changed in the last 24 h, latest first, each tagged by kind
+  with its key: "[task] Book the dentist · done · today 15:40 · key
+  t-s1-7", with the rule "Lines tagged [task], [agent] or [reminder] are
+  work handed on for the owner, with its one-line summary only: never add
+  to it." and, in full with `record_source` offered, "For more of one, call
+  record_source with its key." The linked lines are never dropped for the
+  note's 1,900 bytes; the connector lines go first. They come from what the
+  linked outbox put (its last 16, RAM only) and, after a start, from the
+  memory's list of the owner's records, which never puts a linked record
+  in the connector records' ledger.
+- **Recall.** The memory is asked for 10 records about the words, not 5,
+  with `linked_most` 3: past the 3 best linked records it skips the linked
+  ones, so however many later linked records match, they never take a
+  connector record's place in the 10. Of those, every connector record
+  found is told first, up to 5, and linked ones fill
+  the room left, at most 3, so a linked record never pushes a connector one
+  out. Each in the memory's order; a linked one is told by its line, kind,
+  status, when and key.
+- **Someone else here.** Not in full (the told records' gate), a linked
+  line and a recall's linked record say only the kind, the status and when,
+  never the summary or the key, with `BRIEF`.
+- **Forgets.** A forget everything, of the person, or about a thing its
+  summary matches, takes the linked lines held, as it takes the waiting
+  changes.
+- **Off.** Nothing changes: no linked line, a recall asks 5 and tells what
+  it finds as before, and the memory's list is merged as before.
+
 ### Find the source: `record_source` (slice 7, the voice's `LAMP_SERVICE_RECORDS_SOURCE`, off)
 
 With `LAMP_SERVICE_RECORDS_SOURCE=on` beside `LAMP_SERVICE_RECORDS=on` (the

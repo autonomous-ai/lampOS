@@ -360,6 +360,11 @@ enum Extra {
         limit: Option<u64>,
         #[serde(default)]
         about: Option<String>,
+        /// With `about`: at most this many linked records among the
+        /// `limit` (the voice's `LAMP_SERVICE_RECORDS_LINKED_TOLD`). An
+        /// older build refuses the field.
+        #[serde(default)]
+        linked_most: Option<u64>,
         /// The one record of this key, or none (the voice's
         /// `record_source`, `LAMP_SERVICE_RECORDS_SOURCE`); `about` and
         /// `limit` are not read with it. An older build refuses the field.
@@ -1278,13 +1283,17 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
             person,
             limit,
             about,
+            linked_most,
             key,
         } => {
             let limit = limit.unwrap_or(crate::service_records::LIST_MOST as u64) as usize;
+            let linked_most = linked_most.map(|most| usize::try_from(most).unwrap_or(usize::MAX));
             let records = match (key, about) {
                 (Some(key), _) => store.service_record_keyed(&one(person)?, &key)?,
                 (None, about) => match about {
-                    Some(about) => store.service_records_about(&one(person)?, &about, limit)?,
+                    Some(about) => {
+                        store.service_records_about(&one(person)?, &about, limit, linked_most)?
+                    }
                     None => store.service_records(&one(person)?, limit)?,
                 },
             };
