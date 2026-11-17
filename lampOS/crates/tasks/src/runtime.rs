@@ -4668,6 +4668,18 @@ fn lamp_target_of(config: &Config) -> Box<dyn Fn() -> Option<Target> + Send + Sy
     }
 }
 
+/// The lamp's default agent now, read at each call: [`lamp_default`], else
+/// the build's first switched on ([`lamp_order`]), else the lamp target's
+/// own engine. A skill's run with no Harness and a live ask read the same.
+fn default_engine_of(config: &Config, side: Option<LampSide>) -> crate::voice_ask::DefaultEngine {
+    let target = lamp_target_of(config);
+    Box::new(move || {
+        side.as_ref()
+            .and_then(|side| lamp_default(side).or_else(|| lamp_order(side).first().copied()))
+            .or_else(|| target().map(|lamp| lamp.engine))
+    })
+}
+
 /// What a skill's run with no Harness account reads at its start (#6685
 /// PR 3), put in `slot`: the lamp's default agent ([`lamp_default`], else
 /// the build's first switched on, [`lamp_order`], else the lamp target's
@@ -4684,12 +4696,7 @@ fn set_no_harness(
     absent: bool,
     home: PathBuf,
 ) {
-    let target = lamp_target_of(config);
-    let default_engine = Box::new(move || {
-        side.as_ref()
-            .and_then(|side| lamp_default(side).or_else(|| lamp_order(side).first().copied()))
-            .or_else(|| target().map(|lamp| lamp.engine))
-    });
+    let default_engine = default_engine_of(config, side);
     let swept = Arc::new(AtomicBool::new(false));
     let here = {
         let swept = swept.clone();
@@ -4742,6 +4749,9 @@ pub fn serve<C: Clock>(
     // A skill's run with no Harness account (#6685 PR 3): set below, once
     // the lamp's default agent can be read.
     let no_harness: crate::skill_task::NoHarnessSlot = Arc::default();
+    // The lamp's default agent for a live ask (`crate::voice_ask`): set
+    // below with the lamp's engines, whatever LAMP_SKILL_DEFAULT_AGENT says.
+    let ask_default: crate::voice_ask::DefaultEngineSlot = Arc::default();
     // Joined at the stop, so a skill's run is ended before the process exits.
     let mut skill_served: Option<thread::JoinHandle<()>> = None;
     let skill_stop = stop.clone();
@@ -4842,7 +4852,7 @@ pub fn serve<C: Clock>(
             match crate::skill_make::MakeHandOvers::lamp(
                 &home,
                 skill_harness.clone(),
-                no_harness.clone(),
+                ask_default.clone(),
             )
             .start(true, stop.clone())
             {
@@ -4895,6 +4905,7 @@ pub fn serve<C: Clock>(
         .as_ref()
         .filter(|later| later.engines && later.from_machines.is_some())
         .and_then(|later| later.lamp.clone());
+    let _ = ask_default.set(default_engine_of(&config, lamp_side.clone()));
     let lamp_has = |engine: EngineKind| {
         lamp_side
             .as_ref()

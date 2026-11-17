@@ -103,6 +103,13 @@ pub const FAILED_LINE: &str =
 /// agent can't take one yet (`lamp_tasks::voice_ask::NO_SERVICES`,
 /// OpenClaw today).
 pub const NO_SERVICES: &str = "no_services";
+/// lamp-tasks' refusal while Harness hasn't looked at the lamp's default
+/// agent yet (`lamp_tasks::skill_make::NOT_READY`): told
+/// `made_skill::NOT_READY_LINE`, as a make's.
+pub const NOT_READY: &str = "not_ready";
+/// The field of lamp-tasks' answer that holds it to the owner seen alone
+/// (`lamp_tasks::voice_ask::OWNER_ALONE`).
+pub const OWNER_ALONE: &str = "owner_alone";
 /// What is said for [`NO_SERVICES`].
 pub const NO_SERVICES_LINE: &str =
     "Your lamp's agent can't read your linked services yet, so I can't get that for you.";
@@ -355,18 +362,28 @@ pub fn hand_at(socket: PathBuf, asked: Asked, told: fn(Told, Since)) -> Value {
             let told_now = match outcome {
                 Ok(answer) => {
                     eprintln!(
-                        "lamp-voice: an ask for the lamp's agent: answered, {} bytes",
-                        answer.len()
+                        "lamp-voice: an ask for the lamp's agent: answered, {} bytes{}",
+                        answer.words.len(),
+                        if answer.owner_alone {
+                            ", held to the owner seen alone"
+                        } else {
+                            ""
+                        }
                     );
+                    // Held to the owner alone when the ask asked it (a full
+                    // read), or when lamp-tasks says so (an answer from the
+                    // owner's own OpenClaw, AppOnly's P2 on #7509).
                     Told::Answer {
-                        words: one_line(&answer),
-                        owner_alone: asked.owner_alone,
+                        words: one_line(&answer.words),
+                        owner_alone: asked.owner_alone || answer.owner_alone,
                     }
                 }
                 Err(why) => {
                     eprintln!("lamp-voice: an ask for the lamp's agent: not answered: {why}");
                     if why == format!("refused {NO_SERVICES}") {
                         Told::Line(NO_SERVICES_LINE)
+                    } else if why == format!("refused {NOT_READY}") {
+                        Told::Line(crate::made_skill::NOT_READY_LINE)
                     } else {
                         Told::Line(FAILED_LINE)
                     }
@@ -422,9 +439,19 @@ pub(crate) fn forgets() -> u64 {
     generations().load(Ordering::Acquire)
 }
 
+/// lamp-tasks' answer to an ask: the agent's words, and whether lamp-tasks
+/// asks that they be said only to the owner seen alone
+/// (`lamp_tasks::voice_ask::OWNER_ALONE`: an answer from the owner's own
+/// OpenClaw, whose memory and sessions it has).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Answered {
+    pub words: String,
+    pub owner_alone: bool,
+}
+
 /// One ask's line on lamp-tasks' socket and its answer, read until
 /// `within`: the agent's answer, or why there is none.
-pub fn exchange(socket: &Path, line: &Value, within: Duration) -> Result<String, String> {
+pub fn exchange(socket: &Path, line: &Value, within: Duration) -> Result<Answered, String> {
     let mut stream = UnixStream::connect(socket)
         .map_err(|error| format!("lamp-tasks' socket is not reachable: {error}"))?;
     stream
@@ -450,7 +477,10 @@ pub fn exchange(socket: &Path, line: &Value, within: Duration) -> Result<String,
                 .as_str()
                 .map(str::trim)
                 .filter(|text| !text.is_empty())
-                .map(str::to_owned)
+                .map(|words| Answered {
+                    words: words.to_owned(),
+                    owner_alone: answer[OWNER_ALONE] == true,
+                })
                 .ok_or_else(|| "lamp-tasks' answer has no words".into());
         }
         return Err(format!(
@@ -776,6 +806,26 @@ mod tests {
             Told::Line(NO_SERVICES_LINE)
         );
         wait_free();
+        // Harness not looked yet at the lamp's default agent: the lamp's
+        // not-ready line, as a make's (AppOnly's P3 on #7509).
+        let (_dir, socket, _seen) = tasks(vec![json!({
+            "ok": false,
+            "error": NOT_READY,
+            "message": "not ready"
+        })]);
+        hand_at(
+            socket,
+            Asked {
+                ask: "x".into(),
+                ..Asked::default()
+            },
+            told,
+        );
+        assert_eq!(
+            notes.recv_timeout(Duration::from_secs(5)).unwrap(),
+            Told::Line(crate::made_skill::NOT_READY_LINE)
+        );
+        wait_free();
         // No socket at all: the fixed line too.
         let gone = std::env::temp_dir().join("va-none/skill-make.sock");
         hand_at(
@@ -942,6 +992,60 @@ mod tests {
         assert!(!not_alone(&crate::say::Outcome::Expired));
     }
 
+    /// AppOnly's P2 on #7509: a hard ask (no grant, not held by the voice)
+    /// answered by the owner's own OpenClaw, which has their memory and
+    /// sessions, is held to the owner seen alone when lamp-tasks says so:
+    /// with a guest in view the say client refuses it and only the fixed
+    /// line is said. Hermes's answer, from a fresh home, is as before.
+    #[test]
+    fn a_gateway_hard_ask_is_held_to_the_owner_alone_and_hermess_is_not() {
+        let _one = ONE.lock().unwrap_or_else(|p| p.into_inner());
+        wait_free();
+        let notes = listen();
+        for (held, expected) in [(Some(true), true), (None, false)] {
+            let mut answered = json!({"ok": true, "answer": "You said Ana likes tea."});
+            if let Some(held) = held {
+                answered[OWNER_ALONE] = json!(held);
+            }
+            let (_dir, socket, _seen) = tasks(vec![json!({"ok": true, "started": true}), answered]);
+            hand_at(
+                socket,
+                Asked {
+                    ask: "what did I tell you about Ana".into(),
+                    ..Asked::default()
+                },
+                told,
+            );
+            assert_eq!(
+                notes.recv_timeout(Duration::from_secs(5)).unwrap(),
+                Told::Answer {
+                    words: "You said Ana likes tea.".into(),
+                    owner_alone: expected,
+                }
+            );
+            wait_free();
+        }
+        // A guest in view: the say client refuses the held answer, and only
+        // the fixed line is said.
+        let held = Told::Answer {
+            words: "You said Ana likes tea.".into(),
+            owner_alone: true,
+        };
+        let (_dir, socket, seen) = say_service(vec![
+            Some(json!({"outcome": "refused", "why": crate::say::NOT_ALONE})),
+            Some(json!({"outcome": "spoken"})),
+        ]);
+        tell_at(&socket, held, &Since::now());
+        assert_eq!(
+            seen.recv_timeout(Duration::from_secs(5)).unwrap()["owner_alone"],
+            true
+        );
+        assert_eq!(
+            seen.recv_timeout(Duration::from_secs(5)).unwrap()["note"],
+            in_their_language(NOT_ALONE_LINE)
+        );
+    }
+
     /// Heron's P2 4 on #7509: a forget while the answer waits for its
     /// moment cancels it on its own connection, and nothing follows.
     #[test]
@@ -999,6 +1103,12 @@ mod tests {
         assert_eq!(HARD_ENVIRONMENT, lamp_tasks::voice_ask::HARD_SWITCH);
         assert_eq!(lamp_services::VOICE_ASK_SKILL, lamp_tasks::voice_ask::SKILL);
         assert_eq!(NO_SERVICES, lamp_tasks::voice_ask::NO_SERVICES);
+        assert_eq!(NOT_READY, lamp_tasks::skill_make::NOT_READY);
+        assert_eq!(OWNER_ALONE, lamp_tasks::voice_ask::OWNER_ALONE);
+        assert_eq!(
+            crate::made_skill::NOT_READY_LINE,
+            lamp_tasks::skill_make::NOT_READY_LINE
+        );
         assert_eq!(crate::say::AGENT_SKILL, lamp_services::VOICE_ASK_SKILL);
         assert_eq!(
             line(&Asked::default())["within_ms"].as_u64().unwrap(),
