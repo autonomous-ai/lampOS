@@ -2055,6 +2055,80 @@ fn a_forget_closes_the_kept_session_and_opens_a_new_one_at_once() {
     assert_eq!(fake.count("ensure"), 2);
 }
 
+/// The Reviewer-lead's P2 on #7507: a forget asked while task A holds the
+/// kept session, B queued behind it. When A ends, B waits for the drop and
+/// is typed into the new session, never into the one the owner asked to
+/// forget.
+#[test]
+fn a_task_queued_behind_a_forget_is_typed_into_the_new_session() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    let one = Arc::new(one.with_session_delete(Box::new(|_| Ok(()))));
+    let fake = Arc::new(fake);
+    let mut looks = Looks::default();
+    keep_open_step(&one, &fake, &mut looks);
+    one_turn(&one, &fake, "task-0");
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    let held = one.enter("task-a", Kind::Skill, far(), &|| false).unwrap();
+    one.forget_conversation();
+    let (one2, fake2) = (one.clone(), fake.clone());
+    let second = thread::spawn(move || one_turn(&one2, &fake2, "task-b"));
+    let until = Instant::now() + Duration::from_secs(5);
+    while one.waiting() == 0 {
+        assert!(Instant::now() < until, "queued");
+        thread::sleep(Duration::from_millis(1));
+    }
+    drop(held);
+    // Past the queue's own look: B would have been typed by now.
+    thread::sleep(Duration::from_millis(50));
+    keep_open_step(&one, &fake, &mut looks);
+    assert_eq!(
+        second.join().unwrap(),
+        Ended::Answered("answer to New task task-b:".into())
+    );
+    let calls = fake.calls();
+    assert_eq!(fake.count("close-kept"), 1, "{calls:?}");
+    let asked = fake.asked.lock().unwrap().clone();
+    assert!(
+        !asked[&agent_of(1)].contains("task-b"),
+        "B typed into the session the owner asked to forget: {calls:?}"
+    );
+    assert!(asked[&agent_of(2)].contains("task-b"), "{asked:?}");
+    assert_eq!(one.agent(), Some(agent_of(2)), "{calls:?}");
+}
+
+/// The Reviewer-lead's P3 on #7507: while a removal is under way (the pane
+/// taken, its OpenClaw session not deleted yet), a task entering waits for
+/// it, so it never ensures the old name with the old token.
+#[test]
+fn a_task_entering_during_a_removal_waits_for_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel::<()>();
+    let (go_tx, go_rx) = std::sync::mpsc::channel::<()>();
+    let (entered_tx, go_rx) = (Mutex::new(entered_tx), Mutex::new(go_rx));
+    let (one, fake) = kept_on(dir.path());
+    let one = Arc::new(one.with_session_delete(Box::new(move |_| {
+        entered_tx.lock().unwrap().send(()).unwrap();
+        go_rx.lock().unwrap().recv().unwrap();
+        Ok(())
+    })));
+    let fake = Arc::new(fake);
+    one_turn(&one, &fake, "task-0");
+    one.drop_when_free("the lamp signed out");
+    let (one2, fake2) = (one.clone(), fake.clone());
+    let dropper = thread::spawn(move || one2.drop_if_due(&*fake2));
+    entered_rx.recv().unwrap();
+    let soon = Instant::now() + Duration::from_millis(50);
+    assert!(
+        one.enter("task-c", Kind::Skill, soon, &|| false).is_err(),
+        "no task enters while the removal is under way"
+    );
+    go_tx.send(()).unwrap();
+    assert!(dropper.join().unwrap());
+    assert!(!dir.path().join(TOKEN_FILE).exists());
+    assert!(one.enter("task-d", Kind::Skill, far(), &|| false).is_ok());
+}
+
 /// A kept session left with no task for [`KEPT_IDLE_MAX`] is dropped the
 /// same way (closed, deleted, token removed) and a fresh one opened.
 #[test]
