@@ -33,6 +33,7 @@ pub mod notes;
 pub mod paired_by;
 pub mod pairing;
 pub mod parts;
+pub mod peer;
 pub mod protocol;
 pub mod push;
 pub mod pushed_moves;
