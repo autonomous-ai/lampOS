@@ -633,6 +633,19 @@ class LiftedByCommit(unittest.TestCase):
         # A "not" in an earlier sentence doesn't negate the lift.
         self.assertEqual(lifted_commits("Not a P1. My HOLD on " + self.OLD + " is lifted."), [self.OLD])
 
+    def test_a_read_hold_lifted_or_replaced_in_words(self):
+        # 18 Nov (#7474, #7469): the SDK builder's READ-HOLDs, lifted in its READ-OKs' own words.
+        for words in ("This lifts my READ-HOLD at " + self.OLD + ".", "This replaces my READ-HOLD at `" + self.OLD[:8] + "`.",
+                      "It replaced my HOLD on " + self.OLD + "."):
+            self.assertEqual(lifted_commits(words), [words.split(" ")[-1].strip("`.")], words)
+            cs = [c("writer-a", "READ-HOLD " + self.OLD + "  The SDK builder's read: one line to change."),
+                  c("writer-a", "READ-OK " + HEAD + "  The line is changed. " + words)]
+            self.assertEqual(read_markers(cs, W), "READ-OK " + HEAD, words)
+        for words in ("This doesn't replace my READ-HOLD at " + self.OLD + ".", "I will replace my HOLD on " + self.OLD + " later."):
+            self.assertIsNone(lifted_commits(words), words)
+            cs = [c("writer-a", "READ-HOLD " + self.OLD + "  One line to change."), c("writer-a", "READ-OK " + HEAD + "  " + words)]
+            self.assertEqual(read_markers(cs, W), "HELD", words)
+
     def test_a_hold_carried_over_a_rebase_and_lifted_on_the_new_commit_leaves_the_old_one_standing(self):
         # Intended (fail closed): the lift names only B, so the HOLD on A stands, and --held (held_note) names it.
         cs = [c("writer-a", "HOLD " + self.OLD + "  Read at the author's ask."),
