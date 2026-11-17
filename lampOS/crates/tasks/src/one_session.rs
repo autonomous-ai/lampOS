@@ -1166,9 +1166,21 @@ impl OneSession {
 
     /// The pane `agent` at `place` kept, so the next start adopts it.
     fn keep(&self, agent: &str, place: &Place) {
+        self.keep_as(agent, place, false);
+    }
+
+    /// [`OneSession::keep`]. The same pane already recorded keeps the
+    /// sign-in it was opened under (an adopt right after a start, before
+    /// the first sign-in read, says nothing of it), unless `signed_in`: a
+    /// turn typed signed in ([`OneSession::used`]).
+    fn keep_as(&self, agent: &str, place: &Place, signed_in: bool) {
         let Some(file) = &self.state_file else {
             return;
         };
+        let recorded = self
+            .kept()
+            .is_some_and(|(kept, _, _)| kept == agent)
+            .then(|| self.kept_signed_in());
         let (signed_in, program, session) = {
             let inner = self.lock();
             let pane = inner
@@ -1176,7 +1188,7 @@ impl OneSession {
                 .as_ref()
                 .filter(|pane| pane.kept && pane.agent == agent);
             (
-                !inner.signed_out,
+                signed_in || recorded.unwrap_or(!inner.signed_out),
                 pane.is_some(),
                 pane.and_then(|pane| pane.session.clone()),
             )
@@ -1211,7 +1223,7 @@ impl OneSession {
         {
             return;
         }
-        self.keep(agent, place);
+        self.keep_as(agent, place, true);
     }
 
     /// The store's spoken tasks queued for the pane, in order (each owner
