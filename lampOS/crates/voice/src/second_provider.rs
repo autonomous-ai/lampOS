@@ -14438,6 +14438,9 @@ fn keep_asker(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<(u64, S
 /// [`keep_asker`]).
 type HeldAsker = (u64, String);
 
+/// [`not_theirs`]'s reason for a line no one is known on.
+const NO_ONE_KNOWN: &str = "not the same person: no one known on the line";
+
 /// Why a yes is not the held call's person's, as the journal says it, or
 /// none when it is: no known person on the line (none admitted, a gap, a
 /// cold face cache), the same person in a later session, or another
@@ -14447,7 +14450,7 @@ type HeldAsker = (u64, String);
 fn not_theirs(line: Option<&HeldAsker>, held: &HeldAsker) -> Option<&'static str> {
     match line {
         Some(line) if line == held => None,
-        None => Some("not the same person: no one known on the line"),
+        None => Some(NO_ONE_KNOWN),
         Some((_, person)) if *person == held.1 => {
             Some("not the same person: theirs, in a later session")
         }
@@ -14472,7 +14475,8 @@ fn late_or_not_theirs(
 
 /// What became of a held forget on a turn ([`take_held_forget`]).
 enum Taken {
-    /// Nothing held, or dropped: nothing runs and nothing is told.
+    /// Nothing held, or dropped: nothing runs and nothing is told (but see
+    /// [`Taken::Unseen`] and [`Taken::Unknown`]).
     Nothing,
     /// Their yes runs exactly this call, with a carried keep's heard line
     /// ([`HeldForget::line`]), and whether it is a one-face line's named
@@ -14482,6 +14486,11 @@ enum Taken {
     /// person's face say it (`LAMP_EYES_SPEAKING=on`, #2377): dropped, and
     /// the model is told the yes did not count.
     Unseen(String),
+    /// A one-face forget's plain yes in time on a line no one is known on
+    /// (no face, an unknown face, a carried line): dropped, it is kept, and
+    /// the model is told the yes did not count and that they may say it
+    /// facing the lamp ([`crate::remember::unknown_yes_told`], #7454).
+    Unknown(String),
     /// A held keep's answer that was neither a yes nor a no
     /// (`known_faces::unclear_answer_to_keep`): held on for this turn, which
     /// the model is told to ask once more ([`crate::remember::KEEP_ASKED_AGAIN`]).
@@ -14650,7 +14659,13 @@ fn take_held_forget(
                     "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): {why}; it is kept",
                     held.request
                 );
-                Taken::Nothing
+                // A yes from no one known is told, as an unseen one is: the
+                // model must not say it is forgotten (#7454).
+                if why == NO_ONE_KNOWN {
+                    Taken::Unknown(held.call.name)
+                } else {
+                    Taken::Nothing
+                }
             }
             None => {
                 eprintln!(
@@ -16177,6 +16192,7 @@ async fn answer(
         }
         Taken::Runs(call, line, one_face) => (Some((call, line, one_face)), None),
         Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
+        Taken::Unknown(name) => (None, Some(crate::remember::unknown_yes_told(&name))),
         Taken::AskAgain => (None, Some(crate::remember::KEEP_ASKED_AGAIN.to_owned())),
     };
     let (mut held_save_runs, held_save_dropped, face_to_ask) =

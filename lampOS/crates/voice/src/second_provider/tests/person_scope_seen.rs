@@ -37,6 +37,10 @@ thread_local! {
     /// `LAMP_PERSON_SCOPE_ONE_FACE_READS` ([`Engine::reading_by_one_face`])
     /// for the next [`lines_known`] on this thread, once.
     static ONE_FACE_READS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The first request a fixed `going_on` answers for, in the next
+    /// [`lines_known`] on this thread, once: lines before it are in no
+    /// conversation going on (#7454: a one-face line, then a carried yes).
+    static GOING_ON_FROM: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
     /// `LAMP_MEMORY_DOUBT_UNDOES` ([`Engine::undoing_doubted_keeps`]) for
     /// the next [`lines_known`] on this thread, once: a `remember` is then
     /// answered as a new keep with id 391, and a `forget` as forgotten.
@@ -641,9 +645,14 @@ async fn lines_known(
                     .going_on_asked(request, Instant::now(), asked)
             }))
         }
-        None => going_on.map(|going_on| -> crate::second_provider::GoingOnWith {
-            Arc::new(move |_, _| going_on.then(|| (a.clone(), false)))
-        }),
+        None => {
+            let from = GOING_ON_FROM.with(|from| from.replace(0));
+            going_on.map(|going_on| -> crate::second_provider::GoingOnWith {
+                Arc::new(move |request, _| {
+                    (going_on && request >= from).then(|| (a.clone(), false))
+                })
+            })
+        }
     });
     let mut engine = engine
         .saving_carried(saves)
@@ -3324,7 +3333,9 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
         match taken {
             Taken::Runs(..) => assert!(runs, "by one face: no yes"),
             Taken::Unseen(_) => assert!(!runs, "not by one face: runs"),
-            Taken::Nothing | Taken::AskAgain => panic!("dropped for another reason"),
+            Taken::Nothing | Taken::AskAgain | Taken::Unknown(_) => {
+                panic!("dropped for another reason")
+            }
         }
     }
 }
@@ -3684,6 +3695,18 @@ fn forget_umbrella_then(after: &[&'static str]) -> Vec<Vec<net::Result<ChatEvent
 /// in view, A's umbrella the one kept thing it names ([`UMBRELLA`]), and
 /// the private room as `private_room`.
 async fn asked_once(what: &str, lines: Vec<Line>, after: &[&'static str], room: bool) -> Outcome {
+    asked_once_going(what, lines, after, room, None).await
+}
+
+/// [`asked_once`] with `going_on` whether A is in a conversation going on
+/// (`LAMP_CONVERSATION_CARRIES`, [`lines_saving`]).
+async fn asked_once_going(
+    what: &str,
+    lines: Vec<Line>,
+    after: &[&'static str],
+    room: bool,
+    going_on: Option<bool>,
+) -> Outcome {
     ONE_FACE_READS.with(|reads| reads.set(true));
     FORGET_TARGET.with(|target| target.set(Some(UMBRELLA)));
     crate::person::set_private_room_for_test(Some(room));
@@ -3695,7 +3718,7 @@ async fn asked_once(what: &str, lines: Vec<Line>, after: &[&'static str], room: 
         true,
         true,
         None,
-        None,
+        going_on,
         true,
         true,
         Voice::One,
@@ -3790,6 +3813,41 @@ async fn an_unseen_yes_runs_it_only_in_the_private_room() {
         } else {
             assert_eq!(forgets_ran(&got), Vec::<Value>::new(), "kept");
         }
+    }
+}
+
+/// #7454: a yes to the one-face forget on a line nobody is known on (no
+/// face in view, an unknown face, or a line carried in their conversation
+/// going on) is dropped, and the model is told it did not count: nothing
+/// was forgotten, it is kept, and they may say it facing the lamp. It never
+/// says it is forgotten.
+#[tokio::test]
+async fn a_yes_on_a_line_nobody_is_known_on_tells_the_model_it_is_kept() {
+    for (what, in_view, going_on) in [
+        ("ask-once-nobody-no-face", vec![], None),
+        ("ask-once-nobody-unknown-face", vec![("f2", false)], None),
+        ("ask-once-nobody-carried", vec![], Some(true)),
+    ] {
+        // Only the yes is carried: the forget's line is A's by one face.
+        GOING_ON_FROM.with(|from| from.set(2));
+        let got = asked_once_going(
+            what,
+            vec![
+                line(FORGET_UMBRELLA, vec![("f1", false)], 0),
+                line("Yes.", in_view, 5),
+            ],
+            &["Okay."],
+            false,
+            going_on,
+        )
+        .await;
+        assert_eq!(forgets_ran(&got), Vec::<Value>::new(), "{what}: kept");
+        let told = Message::system(crate::remember::unknown_yes_told(crate::remember::FORGET));
+        assert!(
+            got.rounds.iter().flatten().any(|message| *message == told),
+            "{what}: told it is kept: {:?}",
+            got.rounds
+        );
     }
 }
 
