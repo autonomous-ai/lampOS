@@ -2852,8 +2852,9 @@ fn session_bound(seen: &crate::harness::Observation) -> bool {
 
 /// What an agent Harness says `stopped` comes to ([`after_stop`]).
 enum AfterStop {
-    /// It had a session: the run's end, with the agent's last answer.
-    Bound(String),
+    /// It had a session: the run's end, with the agent's last answer and
+    /// whether Harness cut it short (`truncated`).
+    Bound(String, bool),
     /// None bound, and this agent, a new one, is live in the run's folder.
     Moved(String),
     /// None bound, and none live in the run's folder within the look.
@@ -2885,7 +2886,7 @@ fn after_stop(
         if let Ok(seen) = cli.observe(machine, agent)
             && session_bound(&seen)
         {
-            return AfterStop::Bound(seen.answer);
+            return AfterStop::Bound(seen.answer, seen.truncated);
         }
         if let Ok(live) = cli.live_in(machine, folder)
             && let Some(live) = live.into_iter().find(|id| !seen.contains(id))
@@ -3317,7 +3318,7 @@ impl Runner for HarnessRunner {
         // bound (#6432's [`after_stop`]): its agent started, so the end
         // need not be shown again (#6835 gap 1). Its answer, kept.
         let bound = std::cell::Cell::new(false);
-        let bound_answer = std::cell::RefCell::new(None::<String>);
+        let bound_answer = std::cell::RefCell::new(None::<(String, bool)>);
         let ended = std::thread::scope(|scope| {
             let (done, wakes) = std::sync::mpsc::channel::<()>();
             let cancel = &cancel;
@@ -3365,9 +3366,9 @@ impl Runner for HarnessRunner {
                             self.lost_look,
                             cancel,
                         ) {
-                            AfterStop::Bound(answer) => {
+                            AfterStop::Bound(answer, truncated) => {
                                 bound.set(true);
-                                *bound_answer.borrow_mut() = Some(answer);
+                                *bound_answer.borrow_mut() = Some((answer, truncated));
                                 break Some(Ok(ended.state));
                             }
                             // Waited on in its place, and closed by the guard.
@@ -3455,8 +3456,12 @@ impl Runner for HarnessRunner {
                 // started the script, never ran the skill's script.
                 let ended = if self.makes {
                     if ended.is_ok()
-                        && let Some((text, from)) =
-                            crate::skill_make::make_answer(&started.folder, answer.as_deref())
+                        && let Some((text, from)) = crate::skill_make::make_answer(
+                            &started.folder,
+                            answer
+                                .as_ref()
+                                .map(|(text, truncated)| (text.as_str(), *truncated)),
+                        )
                     {
                         if from == crate::skill_make::AnswerFrom::Chat {
                             eprintln!(
@@ -3481,7 +3486,9 @@ impl Runner for HarnessRunner {
                 } else {
                     ended
                 };
-                let answer = answer.filter(|answer| !answer.trim().is_empty());
+                let answer = answer
+                    .map(|(text, _)| text)
+                    .filter(|answer| !answer.trim().is_empty());
                 // What of its agent's answer is kept: its length only, never
                 // its words (#7180).
                 eprintln!(

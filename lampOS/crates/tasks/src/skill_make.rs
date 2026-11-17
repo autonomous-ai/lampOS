@@ -690,27 +690,36 @@ pub(crate) enum AnswerFrom {
 /// lamp-c0a4 (OpenClaw, deepseek-flash) the agent put every make's answer
 /// in chat and wrote no file: a `cannot:` (13584), and a whole skill
 /// (17 Nov 09:35, `head-pat-next-event`), each dropped as `no_answer`.
-/// Any other chat answer is dropped, as before.
-pub(crate) fn make_answer(folder: &Path, chat: Option<&str>) -> Option<(String, AnswerFrom)> {
+/// Any other chat answer is dropped, as before. `chat` comes with whether
+/// Harness cut it short (`truncated`, its `show`'s `--chars`).
+pub(crate) fn make_answer(
+    folder: &Path,
+    chat: Option<(&str, bool)>,
+) -> Option<(String, AnswerFrom)> {
     if let Some(text) = answer_in(folder) {
         return Some((text, AnswerFrom::File));
     }
-    chat.and_then(chat_answer)
+    chat.and_then(|(chat, truncated)| chat_answer(chat, truncated))
         .map(|text| (text, AnswerFrom::Chat))
 }
 
 /// The agent's chat answer when it is a make's answer: its `cannot:` line
 /// ([`chat_cannot`]), or the whole chat when it holds a skill's files
-/// ([`chat_skill`]); else none.
-pub(crate) fn chat_answer(chat: &str) -> Option<String> {
-    chat_cannot(chat).or_else(|| chat_skill(chat))
+/// ([`chat_skill`]), only when Harness didn't cut it short (`truncated`,
+/// Heron on #7441: a cut answer may have lost a file of its code after two
+/// whole blocks); else none.
+pub(crate) fn chat_answer(chat: &str, truncated: bool) -> Option<String> {
+    chat_cannot(chat, truncated).or_else(|| (!truncated).then(|| chat_skill(chat)).flatten())
 }
 
 /// The agent's chat answer's `cannot:` line, held as [`answer_read`] holds
 /// the file: the first line only, beginning with [`CANNOT`] (any case,
 /// after blank space) and with a reason after it, no fenced block, not
-/// empty and at most [`MOST_ANSWER_BYTES`]; else none.
-pub(crate) fn chat_cannot(chat: &str) -> Option<String> {
+/// empty and at most [`MOST_ANSWER_BYTES`]; else none. With the chat cut
+/// short (`truncated`), only a line that ended before the cut (a line
+/// break follows it in what Harness showed), so a reason is never taken
+/// cut mid-word.
+pub(crate) fn chat_cannot(chat: &str, truncated: bool) -> Option<String> {
     let chat = chat.trim_start();
     let line = chat.lines().next()?.trim_end();
     let head = line.get(..CANNOT.len())?;
@@ -718,6 +727,7 @@ pub(crate) fn chat_cannot(chat: &str) -> Option<String> {
     (head.eq_ignore_ascii_case(CANNOT)
         && !reason.is_empty()
         && !chat.contains("```")
+        && (!truncated || chat.contains('\n'))
         && line.len() as u64 <= MOST_ANSWER_BYTES)
         .then(|| line.to_owned())
 }
@@ -725,12 +735,63 @@ pub(crate) fn chat_cannot(chat: &str) -> Option<String> {
 /// The agent's whole chat answer when it holds a skill as `answer.md`
 /// does: held as the file is ([`answer_held`]: not empty, at most
 /// [`MOST_ANSWER_BYTES`]), with one closed fenced block that is
-/// `skill.toml` and one that is `SKILL.md` ([`skill_parts`]); else none.
-/// Words around the blocks are kept: the voice reads the blocks alone
+/// `skill.toml` and one that is `SKILL.md` ([`skill_blocks`]), and not the
+/// rules' own example skill given back ([`is_example`]); else none. Words
+/// around the blocks are kept: the voice reads the blocks alone
 /// (`made_skill::files`), through the same checks and repairs as a file's.
 pub(crate) fn chat_skill(chat: &str) -> Option<String> {
     let text = answer_held(chat.to_owned())?;
-    (skill_parts(&text) == (1, 1)).then_some(text)
+    let blocks = skill_blocks(&text);
+    let one = |part: Part| {
+        let mut of = blocks.iter().filter(|(at, _)| *at == part);
+        match (of.next(), of.next()) {
+            (Some((_, body)), None) => Some(body.as_str()),
+            _ => None,
+        }
+    };
+    let (toml, card) = (one(Part::Toml)?, one(Part::Card)?);
+    (!is_example(toml, card)).then_some(text)
+}
+
+/// The example skill the rules show the model whole
+/// (`make_skill_local::EXAMPLE`, lamp-voice's; lamp-voice depends on
+/// lamp-tasks, so it is copied here): its `SKILL.md` name, and its
+/// `skill.toml`.
+const EXAMPLE_NAME: &str = "example-only";
+const EXAMPLE_TOML: &str = "kind = \"installable\"
+version = \"1.0.0\"
+needs = [\"light\"]
+
+[permissions]
+topics = [\"room/presence\"]
+light = true
+
+[trigger]
+topic = \"room/presence\"
+field = \"someone\"
+equals = true
+for = \"5s\"
+cooldown = \"1h\"
+rearm = \"ends\"
+
+[ask]
+policy = \"nudge\"
+
+[[do]]
+light = { colour = \"cyan\", level = 2, for = \"25s\" }
+";
+
+/// Whether a skill's two files are the rules' example given back, as the
+/// voice's own maker tells it (`make_skill_local::is_example`): its
+/// `skill.toml` the example's but for blank space, or its `SKILL.md` named
+/// as the example is.
+fn is_example(toml: &str, card: &str) -> bool {
+    let bare = |text: &str| text.split_whitespace().collect::<String>();
+    let name = card
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("name:"))
+        .map(|name| name.trim().trim_matches('"'));
+    bare(toml) == bare(EXAMPLE_TOML) || name == Some(EXAMPLE_NAME)
 }
 
 /// Which of a skill's two files a fenced block is, read as the voice reads
@@ -740,7 +801,7 @@ enum Part {
     Toml,
     Card,
     /// No name: `SKILL.md` when it begins with front matter, else
-    /// `skill.toml`.
+    /// `skill.toml` ([`skill_blocks`]).
     Bare,
     /// A file of its code (`scripts/…`), or any other.
     Other,
@@ -779,32 +840,38 @@ fn fence_part(info: &str) -> (Part, bool) {
     }
 }
 
-/// How many closed fenced blocks of `answer` are `skill.toml` and how many
-/// `SKILL.md`, its blocks found as the voice finds them
-/// (`made_skill::fenced`): a block closes on a bare fence of its mark at
-/// least as long, or at the end of a line; a fence naming another file
-/// whole, or any named fence in `skill.toml`, closes it and opens that
-/// one; in `SKILL.md` another named fence opens a block within it. A block
-/// left open at the end counts for neither.
-fn skill_parts(answer: &str) -> (usize, usize) {
-    let (mut toml, mut card) = (0, 0);
-    // The block open now: its part, mark, run, how many blocks within it
-    // are open, and whether it has begun (a bare one's first line).
-    let mut open: Option<(Part, u8, usize, usize, bool)> = None;
+/// The closed fenced blocks of `answer`, each as the file it is and its
+/// body, found as the voice finds them (`made_skill::fenced`, line for
+/// line): a block closes on a bare fence of its own mark at least as long
+/// (any other bare fence is a line of its body), or at the end of its
+/// line; a fence naming another file whole, or any named fence in
+/// `skill.toml`, closes it and opens that one; in `SKILL.md` another named
+/// fence opens a block within it, closed by the next bare fence. A bare
+/// block is `SKILL.md` when it begins with front matter, else
+/// `skill.toml`. A block left open at the end is not one.
+fn skill_blocks(answer: &str) -> Vec<(Part, String)> {
+    let mut blocks = Vec::new();
+    // The block open now: its part, body, mark, run, and how many blocks
+    // within it are open.
+    let mut open: Option<(Part, String, u8, usize, usize)> = None;
     let mut lines = answer.lines();
     let mut again = None;
     while let Some(line) = again.take().or_else(|| lines.next()) {
-        let Some((mut part, mark, run, mut depth, mut begun)) = open.take() else {
+        let Some((part, mut body, mark, run, mut depth)) = open.take() else {
             if let Some((mark, run, info)) = fence(line) {
-                open = Some((fence_part(info).0, mark, run, 0, false));
+                open = Some((fence_part(info).0, String::new(), mark, run, 0));
             }
             continue;
         };
         let mut closed = false;
         match fence(line) {
-            Some((_, _, "")) if depth > 0 => depth -= 1,
+            Some((_, _, "")) if depth > 0 => {
+                depth -= 1;
+                body.push_str(line);
+                body.push('\n');
+            }
             Some((this, length, "")) if this == mark && length >= run => closed = true,
-            Some((_, _, info)) if depth == 0 => {
+            Some((_, _, info)) if !info.is_empty() && depth == 0 => {
                 let (named, whole) = fence_part(info);
                 // A file of its code always begins a block of its own.
                 let other_file = whole && (named != part || named == Part::Other);
@@ -813,37 +880,42 @@ fn skill_parts(answer: &str) -> (usize, usize) {
                     again = Some(line);
                 } else {
                     depth += 1;
+                    body.push_str(line);
+                    body.push('\n');
                 }
             }
-            Some(_) => depth += 1,
-            None => {
+            Some((_, _, info)) if !info.is_empty() => {
+                depth += 1;
+                body.push_str(line);
+                body.push('\n');
+            }
+            _ => {
                 let end = String::from_utf8(vec![mark; run]).unwrap_or_default();
-                let body = match line.trim_end().strip_suffix(end.as_str()) {
+                match line.trim_end().strip_suffix(end.as_str()) {
                     Some(before) if depth == 0 && !before.trim().is_empty() => {
+                        body.push_str(before);
+                        body.push('\n');
                         closed = true;
-                        before
                     }
-                    _ => line,
-                };
-                if part == Part::Bare && !begun && !body.trim().is_empty() {
-                    begun = true;
-                    if body.trim_start().starts_with("---") {
-                        part = Part::Card;
+                    _ => {
+                        body.push_str(line);
+                        body.push('\n');
                     }
                 }
             }
         }
         if closed {
-            match part {
-                Part::Toml | Part::Bare => toml += 1,
-                Part::Card => card += 1,
-                Part::Other => {}
-            }
+            let part = match part {
+                Part::Bare if body.trim_start().starts_with("---") => Part::Card,
+                Part::Bare => Part::Toml,
+                part => part,
+            };
+            blocks.push((part, body));
         } else {
-            open = Some((part, mark, run, depth, begun));
+            open = Some((part, body, mark, run, depth));
         }
     }
-    (toml, card)
+    blocks
 }
 
 /// Make folders an earlier lamp-tasks left in `work` (stopped while a make
@@ -1914,7 +1986,7 @@ mod tests {
 
     /// The answer's text when it was taken from the agent's chat.
     fn from_chat(folder: &Path, chat: &str) -> Option<String> {
-        match make_answer(folder, Some(chat)) {
+        match make_answer(folder, Some((chat, false))) {
             Some((text, AnswerFrom::Chat)) => Some(text),
             Some((_, AnswerFrom::File)) => panic!("taken from the file"),
             None => None,
@@ -1945,7 +2017,11 @@ mod tests {
             "cannot: no\n```toml\n```",
             long.as_str(),
         ] {
-            assert_eq!(make_answer(&made.path, Some(chat)), None, "{chat:?}");
+            assert_eq!(
+                make_answer(&made.path, Some((chat, false))),
+                None,
+                "{chat:?}"
+            );
         }
     }
 
@@ -2002,9 +2078,95 @@ mod tests {
             // Past the bound.
             big.as_str(),
         ] {
-            assert_eq!(make_answer(&made.path, Some(chat)), None, "{chat:?}");
+            assert_eq!(
+                make_answer(&made.path, Some((chat, false))),
+                None,
+                "{chat:?}"
+            );
         }
         assert_eq!(make_answer(&made.path, None), None);
+    }
+
+    /// Heron on #7441: a chat answer Harness says it cut short is never
+    /// taken as a skill, though its two files' blocks are whole (a
+    /// `scripts/…` block cut off after them): `no_answer`. A `cannot:` line
+    /// that ended before the cut is still taken.
+    #[test]
+    fn a_gateway_make_never_takes_a_chat_skill_harness_cut_short() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        let cut = "```toml skill.toml\nname = \"x\"\n```\n\
+            ```markdown SKILL.md\n---\nname: x\n---\nSays.\n```\n\
+            ```python scripts/main.py\nprint(\"ne";
+        assert_eq!(make_answer(&made.path, Some((cut, true))), None);
+        assert_eq!(make_answer(&made.path, Some((CHAT_SKILL, true))), None);
+        assert_eq!(
+            make_answer(
+                &made.path,
+                Some(("cannot: no battery here.\nMore wo", true))
+            ),
+            Some(("cannot: no battery here.".to_owned(), AnswerFrom::Chat))
+        );
+    }
+
+    /// The adversarial read on #7441: a `cannot:` line Harness cut short
+    /// (no line break after it in what it showed) is never taken: its
+    /// reason may end mid-word. Whole, it still is.
+    #[test]
+    fn a_gateway_make_never_takes_a_cannot_line_harness_cut_short() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        for chat in ["cannot: a skill can't read your pho", "  cannot: no batt  "] {
+            assert_eq!(
+                make_answer(&made.path, Some((chat, true))),
+                None,
+                "{chat:?}"
+            );
+            assert!(
+                make_answer(&made.path, Some((chat, false))).is_some(),
+                "{chat:?}"
+            );
+        }
+    }
+
+    /// The adversarial read on #7441: the rules' own example skill given
+    /// back in chat (`example-only`, or its `skill.toml` as shown) is never
+    /// taken as the make's answer.
+    #[test]
+    fn a_gateway_make_never_takes_the_rules_example_given_back_in_chat() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        let card = "```SKILL.md\n---\nname: glow-back\ndescription: x\n---\n```";
+        let example = format!("```skill.toml\n{EXAMPLE_TOML}```\n\n{card}");
+        let renamed = CHAT_SKILL.replace("name: head-pat-next-event", "name: example-only");
+        assert_ne!(renamed, CHAT_SKILL);
+        for chat in [example.as_str(), renamed.as_str()] {
+            assert_eq!(
+                make_answer(&made.path, Some((chat, false))),
+                None,
+                "{chat:?}"
+            );
+        }
+        // The same form with its own `skill.toml` and name is taken.
+        let own = example.replace("cyan", "amber");
+        assert!(make_answer(&made.path, Some((own.as_str(), false))).is_some());
+    }
+
+    /// The adversarial read on #7441: a bare fence of another mark, or a
+    /// shorter one, inside a block is a line of its body, never its end,
+    /// as the voice reads it.
+    #[test]
+    fn a_bare_fence_closes_only_a_block_of_its_mark_and_length() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        // Closed by its own `~~~~`: the ``` and ~~~ inside are its body.
+        let whole = "~~~~toml\na = 1\n```\n~~~\nb = 2\n~~~~\n```md\n---\nname: x\n---\n```";
+        assert_eq!(skill_blocks(whole).len(), 2);
+        assert!(make_answer(&made.path, Some((whole, false))).is_some());
+        // Never closed: a ``` is not its end, so all that follows is its
+        // body and no `SKILL.md` was written.
+        let open = "~~~~toml\na = 1\n```\n```\n---\nname: x\n---\n```";
+        assert_eq!(make_answer(&made.path, Some((open, false))), None);
     }
 
     /// `answer.md` wins over whatever the agent said in chat.
@@ -2013,7 +2175,12 @@ mod tests {
         let work = tempfile::tempdir().unwrap();
         let made = put(work.path(), "R").unwrap();
         std::fs::write(made.path.join(ANSWER_FILE), "FILE").unwrap();
-        for chat in [Some("cannot: chat says no"), Some(CHAT_SKILL), None] {
+        for chat in [
+            Some(("cannot: chat says no", false)),
+            Some((CHAT_SKILL, false)),
+            Some((CHAT_SKILL, true)),
+            None,
+        ] {
             assert_eq!(
                 make_answer(&made.path, chat),
                 Some(("FILE".to_owned(), AnswerFrom::File)),
