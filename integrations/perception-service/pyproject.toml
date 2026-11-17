@@ -20,7 +20,8 @@ dependencies = [
 [project.optional-dependencies]
 dl = [
     "ultralytics>=8.3.0",
-    "transformers>=4.40.0",
+    # transformers 5 requires torch>=2.6 and disables torch below it, so the OWLv2 processor fails to load
+    "transformers>=4.40.0,<5",
     "torch>=2.0.0",
     "torchvision>=0.15.0",
     "pillow>=10.0.0",
@@ -40,9 +41,10 @@ dl = [
     "onnx==1.21.0"
 ]
 cpu = ["onnxruntime"]
-gpu = ["onnxruntime-gpu"]
+# Newer onnxruntime-gpu (1.31.1 checked) links CUDA 13 (libcublas.so.13); this stack is CUDA 12 + TensorRT 10.8
+gpu = ["onnxruntime-gpu==1.26.0"]
 tensorrt = [
-    "onnxruntime-gpu",
+    "onnxruntime-gpu==1.26.0",
     "tensorrt_cu12==10.8.*",
     "tensorrt_cu12_bindings==10.8.*",
     "tensorrt_cu12_libs==10.8.*",

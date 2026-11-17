@@ -38,6 +38,12 @@ make install-dev    # CPU + dev/test tooling
 `make install-tensorrt` installs TensorRT 10.8 (cu12) + cuDNN 9 and appends the
 matching `LD_LIBRARY_PATH` to `~/.bashrc`. If it fails it falls back to CUDA/CPU.
 
+`onnxruntime-gpu` is pinned to `1.26.0` and `transformers` to `<5`. Newer
+`onnxruntime-gpu` releases link CUDA 13 and cannot load the CUDA or TensorRT
+provider on this CUDA 12 stack, so every model runs on CPU; `transformers` 5
+needs `torch>=2.6` and breaks the OWLv2 processor on `torch` 2.4. Raise either
+pin only together with the CUDA/torch stack.
+
 ## Required configuration
 
 | Env | Required | Purpose |
