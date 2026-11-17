@@ -473,6 +473,7 @@ export class Lamp {
     // The hand this connection's head follows, if any (`followHand`).
     this.following = null;
     this.closeReason = null; // why the lamp closed the connection, when it said
+    this.keepaliveEnded = false; // this client ended it: no answer to its keepalive ping
     this.waiting = new Map();
     this.done = new Map();
     this.handlers = new Map();
@@ -493,6 +494,9 @@ export class Lamp {
     ws.on('pong', () => { answered = true; });
     this.keepalive = setInterval(() => {
       if (!answered) {
+        // Said, not silent: with no pong the connection is ended here, and nothing else would say why (`endedWhy`).
+        this.keepaliveEnded = true;
+        console.error(`lampos: no answer to the keepalive ping for ${Lamp.KEEPALIVE_MS / 1000} s: the connection is ended`);
         ws.terminate();
         return;
       }
@@ -692,6 +696,13 @@ export class Lamp {
   async close() {
     for (const lease of [...this.leases.values()]) await lease.release();
     this.ws.close();
+  }
+
+  // Why the connection ended, in words, once it has: what the lamp said, else that this client ended it for want of a pong, else that
+  // it dropped with no reason given (a reset, the Wi-Fi). Undefined while it is open.
+  get endedWhy() {
+    if (this.ws.readyState !== WebSocket.CLOSED) return undefined;
+    return this.closeReason ?? (this.keepaliveEnded ? `no answer to the keepalive ping for ${Lamp.KEEPALIVE_MS / 1000} s` : 'the connection dropped, with no reason given');
   }
 
   closed() { return new Promise((resolve) => (this.ws.readyState === WebSocket.CLOSED ? resolve() : this.ws.once('close', resolve))); }
