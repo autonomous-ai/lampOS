@@ -125,6 +125,8 @@ pub struct RefreshToken {
 /// keeps only for a face named within [`REFRESH_EVERY`] of its start
 /// ([`ScopeLease::face_at_end_seen`]).
 pub const COLD_FOR: Duration = Duration::from_secs(5);
+// The cold window must outlast the known file's freshness (#7146).
+const _: () = assert!(COLD_FOR.as_millis() > crate::known_faces::FRESH.as_millis());
 
 /// The caller refreshes this slot off the audio path and owns that refresh's
 /// lifetime. Snapshot and invalidation never wait on the refresh mutex.

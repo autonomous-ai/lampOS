@@ -3996,7 +3996,7 @@ pub const KNOWN_LATELY: Duration = Duration::from_secs(8);
 
 /// The name in the eyes' known file at `path` while it is at most
 /// [`KNOWN_LATELY`] old, for the by-default rule (#3884): [`known_now`]'s
-/// 3 s read a file rewritten every 2–3 s as nobody (lamp-52e6, 29 Oct
+/// read, then 3 s ([`FRESH`] since #7146), read a file rewritten every 2–3 s as nobody (lamp-52e6, 29 Oct
 /// 16:49, "an unknown face in view" with the file there; #4118).
 pub fn known_lately(path: &Path) -> Option<String> {
     let modified = std::fs::metadata(path).ok()?.modified().ok()?;
@@ -4021,7 +4021,7 @@ pub fn known_from_environment() -> Option<String> {
 }
 
 /// A known person counts as gone only after this long without a fresh known
-/// file. The eyes renew it within 3 s while they see the face, so a person
+/// file. The eyes renew it at each check, about every 2 s, while they see the face, so a person
 /// who looks away for a few seconds is still there; a new session for the
 /// room is opened only once they have been unseen this long (#764).
 pub const GONE_AFTER: Duration = Duration::from_secs(30);
@@ -5781,7 +5781,7 @@ mod tests {
     }
 
     /// lamp-52e6, 29 Oct 16:49 (#4118): a known file rewritten every 2–3 s
-    /// still names its person at 5 s, as `known_now`'s 3 s did not; one
+    /// still names its person at 5 s, as `known_now`'s [`FRESH`] does not; one
     /// past [`KNOWN_LATELY`], or none, names nobody.
     #[test]
     fn the_known_file_counts_for_the_by_default_rule_a_few_seconds_old() {
@@ -5799,7 +5799,7 @@ mod tests {
                 .unwrap();
         };
         aged(5);
-        assert_eq!(known_now(&path), None, "the 3 s read misses it");
+        assert_eq!(known_now(&path), None, "the FRESH read misses it");
         assert_eq!(known_lately(&path).as_deref(), Some("Example Name"));
         aged(KNOWN_LATELY.as_secs() + 2);
         assert_eq!(known_lately(&path), None);

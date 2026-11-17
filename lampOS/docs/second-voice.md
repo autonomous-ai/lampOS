@@ -5849,7 +5849,8 @@ last 10 s holds the name back (`a face not at the desk seen speaking`,
 the one screen face read as two). The face the eyes know is read from their
 known file while it is at most 8 s old (`known_faces::known_lately`): the
 eyes rewrite it at each check, every 2–3 s, and remove it as soon as the
-near face matches nobody, so the 3 s read of `known_now` took a file still
+near face matches nobody, so `known_now`'s read, then 3 s (4 s,
+`lamp_msgs::known::FRESH`, since #7146), took a file still
 there for nobody (16:49, "an unknown face in view" with the file present;
 #4118). On lamp-29e7 on 8545 (29 Oct) the owner,
 4.5 minutes after setup, asked "can you remember my name?" and was told

@@ -2770,6 +2770,10 @@ mod tests {
         aged(&known_face_of(&known), Duration::from_millis(3_010));
         let lan = Some(("Lan".to_owned(), "b/f1".to_owned()));
         assert_eq!(eyes.known_with_boot(&known), lan, "3.01 s old: hers");
+        // Just under the bound, with room for the test's own time.
+        let just_under = crate::known_faces::FRESH - Duration::from_millis(300);
+        aged(&known_face_of(&known), just_under);
+        assert_eq!(eyes.known_with_boot(&known), lan, "just under FRESH: hers");
         aged(&known_face_of(&known), crate::known_faces::FRESH);
         assert_eq!(eyes.known_with_boot(&known), None, "at the bound: nobody's");
         std::fs::remove_dir_all(dir).unwrap();
