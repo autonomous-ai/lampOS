@@ -1511,7 +1511,7 @@ impl MakeHandOvers {
     pub fn lamp(
         home: &Path,
         harness: crate::skill_task::SkillHarnessSlot,
-        no_harness: crate::skill_task::NoHarnessSlot,
+        default_engine: crate::voice_ask::DefaultEngineSlot,
     ) -> Self {
         let held = held(std::env::var(NET_SWITCH).ok().as_deref());
         eprintln!(
@@ -1540,9 +1540,7 @@ impl MakeHandOvers {
                 held: Arc::new(lamp_runner(home, true)),
                 agent: Some(gateway.clone()),
                 default_engine: Box::new(move || {
-                    no_harness
-                        .get()
-                        .and_then(|local| (local.default_engine)())
+                    default_engine.get().and_then(|engine| engine())
                 }),
                 tokens: Arc::new(crate::skill_task::ControlTokens::default()),
                 asking: AtomicBool::new(false),

@@ -1180,6 +1180,52 @@ trên `PATH` đăng nhập của `lampos` (lần tìm thất bại thì giữ l�
 vẫn đúng qua nhiều vòng chỉ được ghi log một lần. Lần chạy của kỹ năng vẫn
 chỉ tới Hermes (`HarnessRunner`, ở trên).
 
+### Một yêu cầu nói trực tiếp trên socket tạo kỹ năng (`voice_ask`, tắt trừ khi bật)
+
+Quyết định của chủ đèn ngày 17/11: một lần đọc dịch vụ đã liên kết, và một
+yêu cầu mà mô hình của tuyến thứ hai không làm được, đi tới tác tử mặc định
+của đèn (Hermes hoặc OpenClaw, ~17:55), không bao giờ cố định là Hermes.
+Socket tạo kỹ năng nhận thêm một loại dòng từ lamp-voice,
+`{"op":"voice_ask","ask","grants","within_ms"}` (`lamp_tasks::voice_ask`),
+được trả lời như một lần tạo (`started`, rồi `answer` hoặc một lời từ chối),
+với một chỗ riêng bên cạnh lần tạo. Tác tử được chọn ở mỗi yêu cầu như một
+lần tạo với `"one_path":true` (`skill_make::MakeGateway`,
+`HarnessRunner::make_agent`), không có trường nào trên dòng:
+
+- **Hermes** chạy nó như dưới đây.
+- **Một tác tử gateway (OpenClaw)** nhận một yêu cầu khó thành một lượt tạo
+  (`MakeTurn`, `harness new openclaw` trong một thư mục `make-<run id>` mới
+  chỉ có `rules.md`; không token, không gì trong môi trường từ lamp-tasks).
+  Đó không phải là cô lập: lượt chạy trong chính Gateway của chủ đèn, với
+  workspace, bộ nhớ và các phiên của chủ đèn (nó giữ bản ghi của lượt), cùng
+  các công cụ, kênh nhắn tin và mạng của Gateway. Nó chỉ được giữ ở mức trả
+  lời bằng quy tắc của nó (`voice_ask::ANSWER_ONLY`, P2 của Heron trên
+  #7509): không gửi, mua, đổi, xoá hay đăng gì, không chạy gì làm việc đó,
+  không dùng kênh nhắn tin nào, và nói điều cần làm thay vì làm. Quy tắc của
+  Hermes giữ "làm điều họ yêu cầu": home mới của nó không có kênh nào và
+  không có bộ nhớ nào của chủ đèn. Câu trả lời mang `"owner_alone":true`
+  (`voice_ask::OWNER_ALONE`, P2 của AppOnly trên #7509): lamp-voice chỉ nói
+  nó khi chủ đèn được thấy một mình. Câu trả lời là `answer.md`, nếu không có
+  thì câu trả lời chat cuối của tác tử khi Harness không cắt nó
+  (`voice_ask::run_answer`), giữ trong 120 s tính từ lúc yêu cầu bắt đầu.
+  Một lần đọc trên OpenClaw bị từ chối `no_services` trước khi cấp token.
+- **Harness chưa xem** mà mặc định của đèn (`runtime::default_engine_of`,
+  đặt cùng các engine của đèn, bất kể `LAMP_SKILL_DEFAULT_AGENT`) không phải
+  Hermes: một lựa chọn Hermes bị từ chối `not_ready`. Lựa chọn thất bại là
+  `run_failed`.
+
+Không có quyền nào, nó chỉ được nhận với `LAMP_HARD_ASKS_TO_AGENT=on`, trên
+Hermes bằng runner của lần tạo (mạng như `LAMP_MAKE_AGENT_NET` nói); với một
+quyền `<code>-read` của một dịch vụ (chỉ đọc: `-write` hay quyền thứ hai bị
+từ chối `bad_request`) chỉ với `LAMP_SERVICES_TO_AGENT=on` và
+`LAMP_AGENT_SERVICES=on`, tách khỏi mạng, trên một token lamp-control cấp
+cho đúng quyền đó, cấu hình home mới có `mcp_servers.lamp-services`. Trên
+Hermes, lời người nói nằm trong tệp quy tắc (không bao giờ trong đối số),
+câu trả lời đọc từ `answer.md`, gộp khoảng trắng và tối đa 3.000 byte, thư
+mục bị xoá và token kết thúc dù lượt chạy kết thúc thế nào, tối đa 120 s.
+Tắt thì dòng bị từ chối `off` và các lần tạo như trước
+([services_vi.md](services_vi.md)).
+
 ### Một lần tạo bằng giọng nói trên OpenClaw, qua đường chạy chung (`LAMP_MAKE_AGENT_ONE_PATH`, bật, #7245)
 
 Trên lamp-c0a4 (bản build 13333, OpenClaw là mặc định, 16/11 11:46) một
