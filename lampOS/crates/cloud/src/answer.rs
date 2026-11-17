@@ -372,7 +372,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 76] = [
+pub const KINDS: [(&str, Switch); 77] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -416,6 +416,7 @@ pub const KINDS: [(&str, Switch); 76] = [
     (crate::settings::VOICE_KINDS[0], VOICE),
     (crate::settings::VOICE_KINDS[1], VOICE),
     (crate::settings::VOICE_GET_KIND, VOICE),
+    (crate::settings::PREVIEW_KIND, VOICE),
     ("faces.add_photo", |lamp| lamp.photos().is_some()),
     ("face.list", |lamp| lamp.faces().is_some()),
     ("face.remove", |lamp| lamp.faces().is_some()),
@@ -732,6 +733,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::voice_line(kind, data)?;
             changes.start(kind, line);
+            Ok(None)
+        }
+        // The app's voice preview (#7485), with LAMP_CHOSEN_VOICE=on too:
+        // checked here, then said by the voice's say service, nothing kept.
+        crate::settings::PREVIEW_KIND if on(lamp, kind) => {
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            changes.start_preview(data)?;
             Ok(None)
         }
         // What the lamp keeps now (#5394's follow-up), read where the
@@ -2016,6 +2024,7 @@ pub mod tests {
                     "voice.set",
                     "character.set",
                     "voice.get",
+                    "tts.preview",
                 ],
             ),
             (
