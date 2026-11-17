@@ -241,6 +241,7 @@ pub mod speaking_faces;
 pub mod staff_note;
 pub mod stage_cost;
 pub mod stalls;
+pub mod stop_scope;
 pub mod stop_words;
 pub mod task_news;
 mod termination;

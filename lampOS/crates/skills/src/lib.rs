@@ -398,6 +398,9 @@ struct StopFile {
     done: Option<StopDoneFile>,
     #[serde(default)]
     group: Option<String>,
+    /// The word a shared stop names this skill by (#6543), beside its name.
+    #[serde(default)]
+    kind: Option<String>,
 }
 
 /// `[stop.done]`: a way of the `[stop]` function that says the person just
@@ -427,6 +430,11 @@ pub struct Stop {
     /// it share the function as a `[budget]` group's do, in a skill with no
     /// `[budget]` (the seen reactions, with no limit of their own).
     pub group: Option<String>,
+    /// The word a call of a shared stop may name this skill by, beside its
+    /// name, as [`STOP_KIND`] (#6543): "drinks" for "stop telling me about
+    /// drinks". Declared by any skill sharing the function, the function
+    /// offers the choice; with none declared it is as before, byte for byte.
+    pub kind: Option<String>,
 }
 
 /// `[stop.done]` as loaded: a value of the function's `how` that rests only
@@ -449,11 +457,25 @@ pub const STOP_DONE_ABOUT_MOST_BYTES: usize = 160;
 
 /// The one argument of a `[stop]` function, and its values: `snooze` until
 /// the next local morning, `off` until it is asked for again, `on` again.
-pub const STOP_CHOICE: &str = "how";
-pub const STOP_WAYS: [&str; 3] = ["snooze", "off", "on"];
+pub const STOP_CHOICE: &str = lamp_voice::use_skill::STOP_CHOICE;
+pub const STOP_WAYS: [&str; 3] = lamp_voice::use_skill::STOP_WAYS;
 /// The yes-or-no of a `[stop]` function its group's skills share: true for
-/// every one of them, left out for the one that nudged last.
+/// every one of them, as "the nudges", plural or in general, asks (#7473);
+/// left out for the one that nudged last, as "that one" or "this nudge".
 pub const STOP_ALL: &str = "all";
+/// The word of a shared `[stop]` function naming one kind of its skills
+/// (#6543): a skill's `[stop] kind`, or its name. Given, only the skills of
+/// that kind are stopped or put on again, and `all` is not read. The same
+/// name `use_skill` passes on ([`lamp_voice::use_skill::KIND`]). A list of
+/// kinds is taken too, each one's skills (#7473: the voice sets it from the
+/// person's own words, "the water and eye nudges").
+pub const STOP_KIND: &str = lamp_voice::use_skill::KIND;
+/// The most a `[stop] kind` may say: lowercase letters, digits and hyphens.
+pub const STOP_KIND_MOST_BYTES: usize = 32;
+/// Said after a shared stop's `about` when it offers a [`STOP_KIND`]
+/// (#7473): on lamp-06c1 the model, told only the `about`, stopped the last
+/// nudge for "snooze only the eyes nudges", 3 of 3, and never passed a kind.
+pub const STOP_KIND_LEAD: &str = "When they name a kind ('stop the water nudge', 'no more eye nudges'), give that kind: never all, and never the one that came last.";
 /// The most a `[stop]`'s `about` may say.
 pub const STOP_ABOUT_MOST_BYTES: usize = 512;
 /// The most a `when` may say: `SKILL.md`'s, or a `[stop]`'s (#6218).
@@ -467,6 +489,30 @@ pub const SUMMARY_ENVIRONMENT: &str = "LAMP_USE_SKILL_SUMMARY";
 /// only.
 pub fn summary_on(value: Option<&str>) -> bool {
     value == Some("on")
+}
+
+/// Whether `kind` is a `[stop] kind`: a lowercase letter, then lowercase
+/// letters, digits and single hyphens between them, at most
+/// [`STOP_KIND_MOST_BYTES`].
+fn stop_kind_word(kind: &str) -> bool {
+    kind.len() <= STOP_KIND_MOST_BYTES
+        && kind.starts_with(|c: char| c.is_ascii_lowercase())
+        && !kind.ends_with('-')
+        && !kind.contains("--")
+        && kind
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// A kind as a call's and a skill's are matched: its case, and a hyphen,
+/// underscore or space between words, not told apart.
+fn stop_kind_folded(kind: &str) -> String {
+    kind.trim()
+        .to_lowercase()
+        .split(['-', '_', ' '])
+        .filter(|word| !word.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 /// A `when` as kept: some text, at most [`WHEN_MOST_BYTES`], with no
@@ -4880,6 +4926,13 @@ fn manifest(
                     "[stop] about is 1 to {STOP_ABOUT_MOST_BYTES} bytes, with no control characters: when the model calls it"
                 ));
             }
+            if let Some(kind) = &stop.kind
+                && !stop_kind_word(kind)
+            {
+                return Err(format!(
+                    "[stop] kind {kind:?}: 1 to {STOP_KIND_MOST_BYTES} lowercase letters, digits and hyphens, beginning with a letter"
+                ));
+            }
             let done = match stop.done {
                 None => None,
                 Some(done) => {
@@ -4933,6 +4986,7 @@ fn manifest(
                 when: checked_when(stop.when, "[stop]"),
                 done,
                 group: stop.group,
+                kind: stop.kind,
             })
         }
     };
@@ -8062,11 +8116,29 @@ impl Engine {
         self.off.contains(skill) || self.snoozed.get(skill).is_some_and(|until| now_us < *until)
     }
 
+    /// Each skill sharing a `[stop]` function with its `[stop] kind`, if it
+    /// declares one ([`STOP_KIND`]).
+    fn stop_kinds(&self, sharing: &[String]) -> Vec<(String, Option<String>)> {
+        sharing
+            .iter()
+            .map(|name| {
+                let kind = self
+                    .skills
+                    .iter()
+                    .find(|skill| skill.name == *name)
+                    .and_then(|skill| skill.stop.as_ref())
+                    .and_then(|stop| stop.kind.clone());
+                (name.clone(), kind)
+            })
+            .collect()
+    }
+
     /// A call of a `[stop]` function: `snooze`, `off` or `on` for its skill,
     /// and the words for the model to pass on, as the note of a tool's say.
     /// Shared by a group's skills (#1685), it stops the one of them that
     /// started or was asked last, or with `all` (or none of them yet) every
-    /// one of them, and the words say which.
+    /// one of them, or with a kind (#6543) the ones of that kind, and the
+    /// words say which.
     fn stop(
         &mut self,
         sharing: &[String],
@@ -8076,20 +8148,122 @@ impl Engine {
     ) -> Result<Run, String> {
         const HOW: &str = "Say how: snooze, off or on.";
         let shared = sharing.len() > 1;
-        let (how, all) = match args {
+        let kinds = self.stop_kinds(sharing);
+        // A kind is taken only where the tools file offers one: a shared
+        // stop one of whose skills declares a `[stop] kind`.
+        let kinded = shared && kinds.iter().any(|(_, kind)| kind.is_some());
+        // A kind is a word, or (#7473, the voice reading the person's own
+        // words, "the water and eye nudges") a list of them, each its kind.
+        fn kind_words(given: &Value) -> Option<Vec<&str>> {
+            match given {
+                Value::String(one) => Some(vec![one.as_str()]),
+                Value::Array(many) if !many.is_empty() => many.iter().map(Value::as_str).collect(),
+                _ => None,
+            }
+        }
+        let (how, all, kind) = match args {
             Value::Object(given)
-                if given
-                    .keys()
-                    .all(|key| key == STOP_CHOICE || (shared && key == STOP_ALL))
-                    && given.get(STOP_ALL).is_none_or(Value::is_boolean) =>
+                if given.keys().all(|key| {
+                    key == STOP_CHOICE
+                        || (shared && key == STOP_ALL)
+                        || (kinded && key == STOP_KIND)
+                }) && given.get(STOP_ALL).is_none_or(Value::is_boolean)
+                    && given
+                        .get(STOP_KIND)
+                        .is_none_or(|kind| kind_words(kind).is_some()) =>
             {
                 (
                     given.get(STOP_CHOICE).and_then(Value::as_str),
                     given.get(STOP_ALL).and_then(Value::as_bool) == Some(true),
+                    given.get(STOP_KIND).and_then(kind_words),
                 )
             }
-            _ => (None, false),
+            _ => (None, false, None),
         };
+        // A `[stop.done]` way of a skill sharing the function is a way too.
+        let a_done_way = |how: &str| {
+            self.skills.iter().any(|skill| {
+                sharing.contains(&skill.name)
+                    && skill
+                        .stop
+                        .as_ref()
+                        .and_then(|stop| stop.done.as_ref())
+                        .is_some_and(|done| done.how == how)
+            })
+        };
+        if !how.is_some_and(|how| matches!(how, "snooze" | "off" | "on") || a_done_way(how)) {
+            return Err(HOW.into());
+        }
+        // One kind named (#6543): the skills of that kind only, by their
+        // `[stop] kind`, or by their name when no declared kind is it (so a
+        // kind that is another skill's name stops only the kind); a kind
+        // none of them is changes nothing, and the model is told the kinds
+        // there are.
+        let kind: Option<Vec<&str>> = kind.map(|kinds| kinds.into_iter().map(str::trim).collect());
+        // An empty kind is refused, not read as none (the voice read on
+        // #7473): the person named one, so the last one or every one is not
+        // stopped in its place.
+        let words = || {
+            let mut words: Vec<&str> = Vec::new();
+            for (skill, declared) in &kinds {
+                let word = declared.as_deref().unwrap_or(skill);
+                if !words.contains(&word) {
+                    words.push(word);
+                }
+            }
+            words.join(", ")
+        };
+        if kind.as_ref().is_some_and(|kinds| kinds.contains(&"")) {
+            return Err(format!(
+                "Nothing changed: the kind is empty. The kinds are {}; or leave the kind out.",
+                words()
+            ));
+        }
+        // Each kind's skills. A kind none of them is changes nothing when it
+        // is the only one asked; in a list beside kinds they are, it is
+        // left out and the rest are stopped, the words naming only those
+        // (the second HOLD's P3 on #7473: a stale kind in the tools file).
+        let of_kind = |kind: &str| -> Vec<String> {
+            let kind = stop_kind_folded(kind);
+            let of = |by_name: bool| -> Vec<String> {
+                kinds
+                    .iter()
+                    .filter(|(skill, declared)| {
+                        let word = if by_name {
+                            Some(skill)
+                        } else {
+                            declared.as_ref()
+                        };
+                        word.is_some_and(|word| stop_kind_folded(word) == kind)
+                    })
+                    .map(|(skill, _)| skill.clone())
+                    .collect()
+            };
+            let declared = of(false);
+            if declared.is_empty() {
+                of(true)
+            } else {
+                declared
+            }
+        };
+        if let Some(asked) = &kind
+            && asked.iter().all(|kind| of_kind(kind).is_empty())
+            && let Some(kind) = asked.first()
+        {
+            return Err(format!(
+                "Nothing changed: none of these is {kind:?}. The kinds are {}; or leave the kind out.",
+                words()
+            ));
+        }
+        let named: Option<Vec<String>> = kind.as_ref().map(|kinds| {
+            let mut named: Vec<String> = Vec::new();
+            for skill in kinds.iter().flat_map(|kind| of_kind(kind)) {
+                if !named.contains(&skill) {
+                    named.push(skill);
+                }
+            }
+            named
+        });
         let group = self
             .skills
             .iter()
@@ -8108,9 +8282,12 @@ impl Engine {
             .max()
             .map(|(_, skill)| skill.clone())
             .filter(|_| shared && !all);
-        let targets: Vec<String> = last.map_or_else(|| sharing.to_vec(), |one| vec![one]);
+        let targets: Vec<String> = match &named {
+            Some(named) => named.clone(),
+            None => last.map_or_else(|| sharing.to_vec(), |one| vec![one]),
+        };
         // What the person hears it is about: "these" for a skill's own, else
-        // the one by its name, or the group's.
+        // the one by its name, the kind named, or the group's.
         // A `[stop.done]` way rests only the skills that declare it, each
         // for its `for` from now, whichever came last and with or without
         // `all`; a longer snooze already there is kept.
@@ -8155,10 +8332,39 @@ impl Engine {
                 held: None,
             });
         }
-        let these = match (shared, targets.as_slice()) {
-            (false, _) => "these".to_owned(),
-            (true, [one]) => format!("the {} nudges", one.replace('-', " ")),
-            (true, _) => format!("the {} nudges", group.as_deref().unwrap_or("wellbeing")),
+        // Each stopped skill by its `[stop] kind`, else its name, so the
+        // words name exactly what changed (#7473: on lamp-06c1 "the rest
+        // your eyes nudges" was said back as "the water nudges and the
+        // rest", and the last one alone as "no nudges at all").
+        let some = shared && (named.is_some() || targets.len() < sharing.len());
+        let these = if !shared {
+            "these".to_owned()
+        } else if some {
+            let mut said: Vec<String> = Vec::new();
+            for (skill, declared) in kinds.iter().filter(|(skill, _)| targets.contains(skill)) {
+                let word = declared
+                    .as_deref()
+                    .unwrap_or(skill)
+                    .replace(['-', '_'], " ");
+                if !said.contains(&word) {
+                    said.push(word);
+                }
+            }
+            let said = match said.split_last() {
+                Some((last, [])) => last.clone(),
+                Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+                None => String::new(),
+            };
+            format!("the {said} nudges")
+        } else {
+            format!("the {} nudges", group.as_deref().unwrap_or("wellbeing"))
+        };
+        // Only some of them: the others are said to be as they were, so the
+        // reply never says every nudge changed.
+        let only = if some && targets.len() < sharing.len() {
+            " Only those: every other nudge is as it was, so never say all of them."
+        } else {
+            ""
         };
         // What the app turned since is kept: read again before writing.
         if matches!(how, Some("off" | "on")) {
@@ -8172,7 +8378,7 @@ impl Engine {
                     self.done_until.remove(skill);
                 }
                 format!(
-                    "Done: none of {these} until tomorrow morning. Tell them so in a few words."
+                    "Done: none of {these} until tomorrow morning.{only} Tell them so in a few words."
                 )
             }
             Some("off") => {
@@ -8183,11 +8389,11 @@ impl Engine {
                 }
                 if self.keep_off() {
                     format!(
-                        "Done: none of {these} until they ask for them again. Tell them so in a few words."
+                        "Done: none of {these} until they ask for them again.{only} Tell them so in a few words."
                     )
                 } else {
                     format!(
-                        "Done, but only until the lamp restarts: none of {these} until then, or until they ask for them again. Tell them so in a few words."
+                        "Done, but only until the lamp restarts: none of {these} until then, or until they ask for them again.{only} Tell them so in a few words."
                     )
                 }
             }
@@ -8202,7 +8408,7 @@ impl Engine {
                     self.keep_off();
                 }
                 let these = if shared { these } else { "these".to_owned() };
-                format!("Done: {these} come again as before. Tell them so in a few words.")
+                format!("Done: {these} come again as before.{only} Tell them so in a few words.")
             }
             _ => return Err(HOW.into()),
         };
@@ -11475,6 +11681,7 @@ pub fn tools_file_summary(
             );
             // Shared by a group's skills: one function, and a yes-or-no for
             // all of them (#1685).
+            let mut kinded = false;
             let shared = skills
                 .iter()
                 .filter(|other| {
@@ -11490,9 +11697,49 @@ pub fn tools_file_summary(
                     STOP_ALL.into(),
                     json!({
                         "type": "boolean",
-                        "description": "true for every one of them; left out for the one that came last"
+                        "description": "true for every one of them: 'the nudges', plural or in general, with no kind named; left out only for one, 'that one' or 'this nudge', the one that came last"
                     }),
                 );
+                // A kind to name one of them by (#6543), only when one of
+                // them declares a `[stop] kind`: each enabled one's kind, or
+                // its name, sorted, so the list is the same whatever order
+                // the skills come in and a skill installed off adds none.
+                let sharing: Vec<&Skill> = skills
+                    .iter()
+                    .filter(|other| other.enabled)
+                    .filter(|other| {
+                        other
+                            .stop
+                            .as_ref()
+                            .is_some_and(|theirs| theirs.tool == stop.tool)
+                    })
+                    .collect();
+                if sharing
+                    .iter()
+                    .any(|other| other.stop.as_ref().is_some_and(|s| s.kind.is_some()))
+                {
+                    let mut kinds: Vec<&str> = Vec::new();
+                    for other in &sharing {
+                        let word = other
+                            .stop
+                            .as_ref()
+                            .and_then(|s| s.kind.as_deref())
+                            .unwrap_or(&other.name);
+                        if !kinds.contains(&word) {
+                            kinds.push(word);
+                        }
+                    }
+                    kinds.sort_unstable();
+                    kinded = true;
+                    properties.insert(
+                        STOP_KIND.into(),
+                        json!({
+                            "type": "string",
+                            "enum": kinds,
+                            "description": "whenever they name a kind, singular or plural ('stop the water nudge': water), that kind, and only the ones of it; all is then not read; left out only when they named none"
+                        }),
+                    );
+                }
             }
             // A core skill's: one of an enabled core skill sharing it (Meal
             // check, installable, shares the core wellbeing skills').
@@ -11509,9 +11756,16 @@ pub fn tools_file_summary(
             if let Some(when) = &stop.when {
                 whens.insert(stop.tool.clone(), json!(when));
             }
+            // With a kind offered, the `about` leads the model to it
+            // ([`STOP_KIND_LEAD`]); with none, as before, byte for byte.
+            let about = if kinded {
+                format!("{} {STOP_KIND_LEAD}", stop.about.trim_end())
+            } else {
+                stop.about.clone()
+            };
             tools.push(json!({
                 "name": stop.tool,
-                "description": stop.about,
+                "description": about,
                 "parameters": {"type": "object", "properties": properties}
             }));
         }
