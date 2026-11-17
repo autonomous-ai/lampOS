@@ -3,13 +3,18 @@
 //!
 //! The voice never says list markup (Queue #6811, lamp-9adf, 17 Nov: a web
 //! answer was said "this week: - New CEO… - Analysts…"). A `- `, `* `,
-//! `• `, `1. ` or `1) ` at a line's start, at the reply's start or after a
-//! sentence's break (`.`, `!`, `?`, `…`, `:`, `;` and a space) is taken out
-//! and becomes a pause: the item before it ends as a sentence (a `.` is
-//! added when it has no stop or comma of its own). A hyphen inside a word
-//! or a number (`e-mail`, `25-30`, `-5`) and a dash inside a sentence
-//! (`too - cold`) are words. Always on, every voice; the lamp's words get
-//! the same text.
+//! `• `, `1. ` or `1) ` at a line's start or at the reply's start is taken
+//! out and becomes a pause: the item before it ends as a sentence (a `.` is
+//! added when it has no stop or comma of its own). After a sentence's break
+//! inside a line (`.`, `!`, `?`, `…`, `:`, `;` and a space) only a `- `,
+//! `* ` or `• ` is: a number there is said, as it may be the answer ("The
+//! answer is: 2.", "Gate: 12."), and so is a `-` before a number
+//! ("Temperature: - 5 degrees"). One marker a break: a second right after
+//! it is a word. A hyphen inside a word or a number (`e-mail`, `25-30`,
+//! `-5`) and a dash inside a sentence (`too - cold`) are words. Each word is
+//! decided once, when the whitespace after it has come, so the text is the
+//! same however it is cut into pieces. Always on, every voice; the lamp's
+//! words get the same text.
 
 /// Words whose `.` does not end a sentence.
 // ponytail: a fixed English list and "terminator then whitespace"; quotes
@@ -22,7 +27,7 @@ const ABBREVIATIONS: &[&str] = &[
 /// The fewest words a first clause is said on its own with.
 pub const CLAUSE_WORDS: usize = 4;
 
-/// What a list marker may follow, with a space between, on one line.
+/// What a bullet inside a line may follow, with a space between.
 const BREAKS: [char; 6] = ['.', '!', '?', '…', ':', ';'];
 
 /// What a list marker taken out needs no `.` added after.
@@ -31,10 +36,14 @@ const PAUSES: [char; 7] = ['.', '!', '?', '…', ':', ';', ','];
 #[derive(Debug, Default)]
 pub struct Sentences {
     text: String,
-    /// The text kept begins inside a sentence (after a first clause or
-    /// first words that did not end at a break), so a marker at its start
-    /// is no list marker unless a new line comes first.
-    mid_sentence: bool,
+    /// How much of `text` is decided: list markers out, each word passed
+    /// on for good. The rest (the last word and the whitespace before it)
+    /// waits for the whitespace after that word.
+    decided: usize,
+    /// The last character of the last word passed on, or a space after a
+    /// marker taken out; `None` at the reply's start. Kept when a
+    /// sentence, clause or first words are taken.
+    last: Option<char>,
 }
 
 impl Sentences {
@@ -43,12 +52,12 @@ impl Sentences {
     /// arrived, so `3.5` split across two pieces is not cut.
     pub fn push(&mut self, piece: &str) -> Vec<String> {
         self.text.push_str(piece);
-        self.text = unlisted(&self.text, !self.mid_sentence, false);
+        self.unlist(false);
         let mut done = Vec::new();
         let mut start = 0;
-        let mut chars = self.text.char_indices().peekable();
-        while let Some((at, c)) = chars.next() {
-            let Some(&(next_at, next)) = chars.peek() else {
+        for (at, c) in self.text[..self.decided].char_indices() {
+            let next_at = at + c.len_utf8();
+            let Some(next) = self.text[next_at..].chars().next() else {
                 break;
             };
             if matches!(c, '.' | '!' | '?')
@@ -62,10 +71,7 @@ impl Sentences {
                 start = next_at;
             }
         }
-        if start > 0 {
-            self.mid_sentence = false;
-        }
-        self.text.drain(..start);
+        self.take(start);
         done
     }
 
@@ -74,18 +80,17 @@ impl Sentences {
     /// words, so speech starts before the first sentence is finished.
     pub fn clause(&mut self) -> Option<String> {
         let mut words = 0;
-        let mut chars = self.text.char_indices().peekable();
-        while let Some((at, c)) = chars.next() {
+        for (at, c) in self.text[..self.decided].char_indices() {
             if c.is_whitespace() {
                 words += 1;
             }
-            let Some(&(next_at, next)) = chars.peek() else {
+            let next_at = at + c.len_utf8();
+            let Some(next) = self.text[next_at..].chars().next() else {
                 break;
             };
             if matches!(c, ',' | ';' | ':') && next.is_whitespace() && words + 1 >= CLAUSE_WORDS {
                 let clause = self.text[..=at].trim().to_owned();
-                self.text.drain(..next_at);
-                self.mid_sentence = c == ',';
+                self.take(next_at);
                 return Some(clause);
             }
         }
@@ -102,11 +107,14 @@ impl Sentences {
             if !c.is_whitespace() {
                 in_word = true;
             } else if std::mem::replace(&mut in_word, false) {
+                if at > self.decided {
+                    // A `-` still waiting to be known a minus or a bullet.
+                    return None;
+                }
                 words += 1;
                 if words == n {
                     let piece = self.text[..at].trim().to_owned();
-                    self.text.drain(..at);
-                    self.mid_sentence = !piece.ends_with(BREAKS);
+                    self.take(at);
                     return Some(piece);
                 }
             }
@@ -122,85 +130,88 @@ impl Sentences {
 
     /// Whatever is left when the text ends.
     pub fn finish(&mut self) -> Option<String> {
-        let rest = unlisted(&std::mem::take(&mut self.text), !self.mid_sentence, true);
-        self.mid_sentence = false;
+        self.unlist(true);
+        let rest = std::mem::take(&mut self.text);
+        self.decided = 0;
+        self.last = None;
         let rest = rest.trim();
         (!rest.is_empty()).then(|| rest.to_owned())
     }
+
+    /// Drops the first `n` bytes of the text, all decided, as said.
+    fn take(&mut self, n: usize) {
+        self.text.drain(..n);
+        self.decided = self.decided.saturating_sub(n);
+    }
+
+    /// Decides each word after [`Self::decided`] once ([module
+    /// docs](self)): a list marker is taken out, any other word passed on.
+    /// `ended`: no more text comes, so the last word is whole; until then
+    /// it waits for the next push, and so does a `-` after a break with no
+    /// word after it yet.
+    fn unlist(&mut self, ended: bool) {
+        let text = std::mem::take(&mut self.text);
+        let mut out = String::with_capacity(text.len());
+        out.push_str(&text[..self.decided]);
+        let mut rest = &text[self.decided..];
+        loop {
+            let word_at = rest
+                .find(|c: char| !c.is_whitespace())
+                .unwrap_or(rest.len());
+            let (space, after) = rest.split_at(word_at);
+            let word_end = after.find(char::is_whitespace);
+            if after.is_empty() || (word_end.is_none() && !ended) {
+                self.decided = out.len();
+                out.push_str(rest);
+                break;
+            }
+            let word = &after[..word_end.unwrap_or(after.len())];
+            let next = after[word.len()..].trim_start();
+            let marker = if space.contains('\n') || self.last.is_none() {
+                list_marker(word)
+            } else if !space.is_empty() && self.last.is_some_and(|c| BREAKS.contains(&c)) {
+                if word == "-" && next.is_empty() && !ended {
+                    // A minus or a bullet: the word after it says which.
+                    self.decided = out.len();
+                    out.push_str(rest);
+                    break;
+                }
+                matches!(word, "*" | "•")
+                    || (word == "-" && !next.starts_with(|c: char| c.is_ascii_digit()))
+            } else {
+                false
+            };
+            if marker {
+                // The marker and the whitespace after it go; the
+                // whitespace before it becomes a pause.
+                if !out.trim().is_empty() {
+                    let closed = out.trim_end_matches(['"', '\'', '”', '’', ')', '*']);
+                    if !closed.ends_with(PAUSES) {
+                        out.push('.');
+                    }
+                    out.push(' ');
+                }
+                self.last = Some(' ');
+                rest = next;
+                continue;
+            }
+            out.push_str(space);
+            out.push_str(word);
+            self.last = word.chars().last();
+            rest = &after[word.len()..];
+        }
+        self.text = out;
+    }
 }
 
-/// Whether `word`, a whole word, is a list marker: `-`, `*`, `•`, or one
-/// or two digits and `.` or `)`.
+/// Whether `word`, a whole word, is a list marker at a line's start: `-`,
+/// `*`, `•`, or one or two digits and `.` or `)`.
 fn list_marker(word: &str) -> bool {
     if matches!(word, "-" | "*" | "•") {
         return true;
     }
     let digits = word.len() - word.trim_start_matches(|c: char| c.is_ascii_digit()).len();
     (1..=2).contains(&digits) && matches!(&word[digits..], "." | ")")
-}
-
-/// Whether `word`, still being written, may yet become a list marker.
-fn may_become_marker(word: &str) -> bool {
-    let digits = word.len() - word.trim_start_matches(|c: char| c.is_ascii_digit()).len();
-    list_marker(word) || (digits == word.len() && (1..=2).contains(&digits))
-}
-
-/// `text` with each list marker that is known whole taken out ([module
-/// docs](self)). `at_break`: the text begins at a sentence's break.
-/// `ended`: no more text comes, so a marker at its very end is whole; until
-/// then a word at the end that may yet be one ("1", "1.", "-") is left as
-/// written, and the next push decides.
-fn unlisted(text: &str, at_break: bool, ended: bool) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text;
-    while !rest.is_empty() {
-        let word_at = rest
-            .find(|c: char| !c.is_whitespace())
-            .unwrap_or(rest.len());
-        let (space, after) = rest.split_at(word_at);
-        if after.is_empty() {
-            out.push_str(space);
-            break;
-        }
-        let word_end = after.find(char::is_whitespace);
-        let word = &after[..word_end.unwrap_or(after.len())];
-        // `out` ends with the last word passed on, or is empty.
-        let before = out.chars().last();
-        let new_line = space.contains('\n');
-        let breaks = new_line
-            || match before {
-                None => at_break,
-                Some(c) => !space.is_empty() && BREAKS.contains(&c),
-            };
-        if breaks {
-            match word_end {
-                None if !ended && may_become_marker(word) => {
-                    out.push_str(space);
-                    out.push_str(after);
-                    break;
-                }
-                _ if list_marker(word) => {
-                    // The marker and the whitespace after it go; the
-                    // whitespace before it becomes a pause.
-                    let next = after[word.len()..].trim_start();
-                    if before.is_some() {
-                        let closed = out.trim_end_matches(['"', '\'', '”', '’', ')', '*']);
-                        if !closed.ends_with(PAUSES) {
-                            out.push('.');
-                        }
-                        out.push(' ');
-                    }
-                    rest = next;
-                    continue;
-                }
-                _ => {}
-            }
-        }
-        out.push_str(space);
-        out.push_str(word);
-        rest = &after[word.len()..];
-    }
-    out
 }
 
 fn abbreviation(before: &str) -> bool {
@@ -222,6 +233,15 @@ mod tests {
         let mut out: Vec<String> = pieces.iter().flat_map(|p| sentences.push(p)).collect();
         out.extend(sentences.finish());
         out
+    }
+
+    /// `text` pushed whole, and a character a push: the same sentences.
+    fn whole_and_by_char(text: &str) -> Vec<String> {
+        let whole = all(&[text]);
+        let chars: Vec<String> = text.chars().map(String::from).collect();
+        let chars: Vec<&str> = chars.iter().map(String::as_str).collect();
+        assert_eq!(all(&chars), whole, "{text:?} a character a push");
+        whole
     }
 
     #[test]
@@ -281,8 +301,8 @@ mod tests {
     }
 
     /// Queue #6811 (lamp-9adf, 17 Nov): a web answer's list was said with
-    /// its "- " markers. A marker at a line's start or after a sentence's
-    /// break is a pause, never a word.
+    /// its "- " markers. A marker at a line's start, or a bullet after a
+    /// sentence's break, is a pause, never a word.
     #[test]
     fn list_markers_are_pauses_not_words() {
         assert_eq!(
@@ -297,12 +317,59 @@ mod tests {
             ]
         );
         assert_eq!(
-            all(&["* One\n* Two.\n• Three\n1. Four\n2) Five"]),
+            whole_and_by_char("* One\n* Two.\n• Three\n1. Four\n2) Five"),
             ["One.", "Two.", "Three.", "Four.", "Five"]
         );
+        assert_eq!(whole_and_by_char("1. foo\n2. bar"), ["foo.", "bar"]);
         assert_eq!(
-            all(&["Two things: - tea. - Cake. 1. Bread"]),
+            whole_and_by_char("Two things: - tea. * Cake. • Bread"),
             ["Two things: tea.", "Cake.", "Bread"]
+        );
+    }
+
+    /// El's hold on #7564: a number after a break inside a line is said,
+    /// as it may be the answer; only a line's or the reply's start makes
+    /// it a list marker. A minus after a break is said too (Heron).
+    #[test]
+    fn a_number_after_a_break_in_a_line_is_said() {
+        assert_eq!(
+            whole_and_by_char("The answer is: 2."),
+            ["The answer is: 2."]
+        );
+        assert_eq!(
+            whole_and_by_char("Today's high: 25. Humidity: 60."),
+            ["Today's high: 25.", "Humidity: 60."]
+        );
+        assert_eq!(
+            whole_and_by_char("Gate: 12. Boarding at nine."),
+            ["Gate: 12.", "Boarding at nine."]
+        );
+        assert_eq!(
+            whole_and_by_char("Score: Arsenal 2, Chelsea 1. Final: 3."),
+            ["Score: Arsenal 2, Chelsea 1.", "Final: 3."]
+        );
+        assert_eq!(
+            whole_and_by_char("Steps: 1) open it."),
+            ["Steps: 1) open it."]
+        );
+        assert_eq!(
+            whole_and_by_char("I'd pick option 1."),
+            ["I'd pick option 1."]
+        );
+        assert_eq!(
+            whole_and_by_char("Temperature: - 5 degrees. Cold."),
+            ["Temperature: - 5 degrees.", "Cold."]
+        );
+    }
+
+    /// El's P3 on #7564: each word is decided once, so a marker's removal
+    /// does not go on with each push ("Note: - - x" lost a `-` a push).
+    #[test]
+    fn markers_are_taken_once_however_the_text_comes() {
+        assert_eq!(whole_and_by_char("Note: - - x more."), ["Note: - x more."]);
+        assert_eq!(
+            all(&["Note: - - x", " and", " more", "."]),
+            ["Note: - x and more."]
         );
     }
 
@@ -317,6 +384,8 @@ mod tests {
         let mut sentences = Sentences::default();
         assert!(sentences.push("Here:\n1.").is_empty());
         assert_eq!(sentences.push(" Milk. Then"), ["Here: Milk."]);
+        assert_eq!(all(&["1", ". Milk\n", "2", ") Eggs"]), ["Milk.", "Eggs"]);
+        assert_eq!(all(&["Done.\n", "1", ".", " Milk"]), ["Done.", "Milk"]);
     }
 
     /// A hyphen inside a word or a number, a minus, or a dash in a
@@ -324,7 +393,9 @@ mod tests {
     #[test]
     fn hyphens_in_words_and_numbers_are_kept() {
         assert_eq!(
-            all(&["Send an e-mail by 25-30 May. -5 degrees, \u{2212}5 too - cold.\n-3 at night."]),
+            whole_and_by_char(
+                "Send an e-mail by 25-30 May. -5 degrees, \u{2212}5 too - cold.\n-3 at night."
+            ),
             [
                 "Send an e-mail by 25-30 May.",
                 "-5 degrees, \u{2212}5 too - cold.",
