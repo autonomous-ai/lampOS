@@ -340,10 +340,15 @@ impl ReferenceAssembly {
             || self.timing.clock_started_at_us.is_some()
             || requested_at < self.prime_observed_at_us
             || requested_at > completed_at
-            || !fresh(requested_at, now, MAX_REFERENCE_AGE_US)
-            || !fresh(completed_at, now, MAX_REFERENCE_AGE_US)
+            || completed_at > now
+            || !fresh(requested_at, now, self.start_age_bound_us())
         {
             return Err(self.fault(Kind::InvalidStart, now).into());
+        }
+        if !fresh(requested_at, now, MAX_REFERENCE_AGE_US) {
+            // Only reached capture-clocked with recovery: see
+            // `start_age_bound_us`.
+            self.note_late_start(now - requested_at);
         }
         let origin = self.captures_before_start_notice[..self.captures_before_start_notice_len]
             .iter()
@@ -380,7 +385,9 @@ impl ReferenceAssembly {
             return Ok(false);
         }
         // Starting a stream is not recovered: until the clock has started
-        // every rule below is in force.
+        // every rule below is in force. The one exception is the start
+        // notice's own age, which `started` allows capture-clocked with
+        // recovery, where only the delay hint reads it.
         if self.recovery.is_some()
             && self.clock.is_some()
             && self.timing.clock_started_at_us.is_some()
