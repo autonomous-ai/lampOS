@@ -5712,8 +5712,10 @@ after a take-over, but now for every turn:
   when it is in a live conversation (the window), unless it is 0 to 2 words
   no face was seen speaking; or when a face turned to the lamp is facing it
   (head pitch from 20 degrees up to 25 degrees down, `said_to_me::PITCH_DEG`
-  as the eyes' `facing` window, and not looking away: the eyes' newest
-  `pitch` and `looking` through the line with `LAMP_EYES_PITCH_GAZE`,
+  as the eyes' `facing` window, and not looking away: the newest `pitch`
+  and `looking` of the one turned face read speaking, both from that face in
+  one look, with `LAMP_EYES_PITCH_GAZE` (a bystander turned to the lamp says
+  nothing; two speaking faces give none),
   `SpeakingFaces::turned_pose_between`; unknown blocks nothing) and is seen
   speaking it (one `yes` in a look of the line,
   `SpeakingFaces::seen_speaking_between`; a mouth never read is not seen
