@@ -1903,6 +1903,36 @@ fn the_kept_session_busy_or_not_running_is_waited_or_ensured_again() {
     ));
 }
 
+/// Seen on lamp-c0a4 (openharness#4393): a kept session opened signed
+/// out, adopted by a lamp-tasks started again before its first sign-in
+/// read, then its engine killed. The adopt keeps the record's signed out,
+/// so the pane let go is not removed as one opened signed in: never
+/// closed, ensured again as the same session with its conversation.
+#[test]
+fn a_kept_session_whose_engine_died_after_a_start_is_resumed_not_removed() {
+    let dir = tempfile::tempdir().unwrap();
+    let key = Some(format!("{MACHINE} openclaw"));
+    let none = || None::<&Fake>;
+    let (one, fake) = kept_on(dir.path());
+    one.remove_if_due(&Looks::default(), key.as_ref(), true, &none);
+    one.open_if_due(&fake, &place());
+    assert!(!one.kept_signed_in());
+    // Started again: adopted before any sign-in read.
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), Some(agent_of(1)));
+    assert!(!again.kept_signed_in(), "the adopt keeps the sign-in it was opened under");
+    // Its engine died: let go by the turn, then the next look signed out.
+    again.gone(&agent_of(1), "Harness did not take the words into the kept session");
+    let harness = || Some(&fake);
+    again.remove_if_due(&Looks::default(), key.as_ref(), true, &harness);
+    assert_eq!(fake.count("close"), 0, "{:?}", fake.calls());
+    assert!(dir.path().join(STATE_FILE).exists());
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), Some(agent_of(1)), "the same session");
+    assert_eq!(fake.count("ensure"), 3);
+}
+
 /// OpenClaw's kept session is not rotated by count; a sign-out closes it,
 /// deletes its OpenClaw session by `ensure`'s `engineSession` (Harness's
 /// `close --forget` is not built), and removes its token and record.
