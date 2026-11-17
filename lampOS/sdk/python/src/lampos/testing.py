@@ -551,6 +551,7 @@ class FakeLamp:
         lamp_id: str = "lamp-fake",
         name: str = "Fake lamp",
         language: str | None = "en",
+        build: str | None = None,
         auto_done: bool = True,
         refuses: dict[str, str] | None = None,
         follows_hand: bool = True,
@@ -633,6 +634,10 @@ class FakeLamp:
         # it out, as a lamp from before it does.
         if language is not None:
             self.lamp["language"] = language
+        # The lamp's build (`143+ab12cd34ef56`) in hello's answer only, never
+        # the welcome (any connection gets that first); None leaves it out, as
+        # a lamp that has none to say does.
+        self.build = build
         self.host = "127.0.0.1"
         self.port = 0
         # The certificate's pin (full SHA-256), as the owner's app shows it,
@@ -729,6 +734,10 @@ class FakeLamp:
             if jsonschema
             else None
         )
+
+    def _lamp_known(self) -> dict:
+        """The `lamp` of hello's answer: the welcome's and, when known, the build."""
+        return {**self.lamp, **({} if self.build is None else {"build": self.build})}
 
     async def __aenter__(self) -> "FakeLamp":
         cert, key = _certificate()
@@ -1294,7 +1303,7 @@ class FakeLamp:
             await ws.close()
             return None
         limits = {**LIMITS, "motion_done": True} if self.motion_done else LIMITS
-        await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits=limits)
+        await self._ok(ws, request["id"], lamp=self._lamp_known(), grants=paired["grants"], limits=limits)
         return request["client"]
 
     async def _hello_app(self, ws, request: dict) -> str | None:

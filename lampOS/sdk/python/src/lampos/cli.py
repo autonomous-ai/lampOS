@@ -169,7 +169,8 @@ async def _speaker(args) -> int:
 
 async def _hello(args) -> int:
     async with await Lamp.connect(args.lamp) as lamp:
-        print(f"{lamp.info.get('id')}: grants {', '.join(lamp.grants)}")
+        build = f"build {lamp.build}, " if lamp.build else ""
+        print(f"{lamp.info.get('id')}: {build}grants {', '.join(lamp.grants)}")
     return 0
 
 

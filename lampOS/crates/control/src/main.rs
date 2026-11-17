@@ -37,7 +37,7 @@
 //! the microphone, which stay on the lamp's own network (docs/control.md,
 //! "The wire").
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use lamp_control::{cert, pairing::Clients, parts, server, session};
 use lamp_msgs::LightRequest;
@@ -236,6 +236,16 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     } else {
         eprintln!("lamp-control: rates on, this lamp's setting");
     }
+    // The build the app shows, from lamp-update's state as the unit hands it in
+    // (a credential): left out of the hello when the lamp has none.
+    let lamp_build = std::env::var_os("CREDENTIALS_DIRECTORY")
+        .and_then(|folder| lamp_control::build::read(Path::new(&folder)));
+    match &lamp_build {
+        Some(build) => eprintln!("lamp-control: the build said in hello: {build}"),
+        None => {
+            eprintln!("lamp-control: no build to say in hello (lamp-update's state not handed in)")
+        }
+    }
     let mut door = session::Door::new(
         &host,
         &host,
@@ -250,7 +260,8 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     .with_language_file(std::env::var_os("LAMP_LANGUAGE_FILE").map_or_else(
         || PathBuf::from(lamp_control::language::PATH),
         PathBuf::from,
-    ));
+    ))
+    .with_build(lamp_build);
     if rates_off {
         door = door.with_rates_off();
     }

@@ -434,7 +434,7 @@ export class FakeLamp {
   // no `done` follows them.
   // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
   // route them yet does (LAMP_CONTROL_REFUSES); none by default.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false, local = false, app = false, appName = 'fake-app', appGrants = ['speak', 'hear', 'light'], appVersion = '1.0.0', appSettings = {}, panelRateS = 60 } = {}) {
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', build = null, autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false, local = false, app = false, appName = 'fake-app', appGrants = ['speak', 'hear', 'light'], appVersion = '1.0.0', appSettings = {}, panelRateS = 60 } = {}) {
     // `local`: also serve lamp-control's control socket (a unix socket, `localPath`) for a skill's run, where a
     // one-run token from `mintToken` is what lets a connection in (`Lamp.local`).
     this.local = local;
@@ -471,6 +471,8 @@ export class FakeLamp {
     this.asker = new Map();
     // The owner's language the lamp says in welcome and hello; null leaves it out, as a lamp from before it does.
     this.lamp = { id: lampId, name, v: schema.VERSION, ...(language === null ? {} : { language }) };
+    // The build is in hello's answer only, never the welcome (any connection gets that first).
+    this.build = build;
     this.clients = new Map();
     this.requests = [];
     this.received = [];
@@ -1072,7 +1074,7 @@ export class FakeLamp {
       return null;
     }
     const limits = this.motionDone ? { ...LIMITS, motion_done: true } : LIMITS;
-    this.ok(ws, request.id, { lamp: this.lamp, grants: paired.grants, limits });
+    this.ok(ws, request.id, { lamp: { ...this.lamp, ...(this.build === null ? {} : { build: this.build }) }, grants: paired.grants, limits });
     return request.client;
   }
 
