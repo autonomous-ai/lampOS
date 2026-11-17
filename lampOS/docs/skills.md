@@ -5171,6 +5171,36 @@ the same code for both writers.
   lamp-9adf, 12 Nov 18:10, "every morning at eight, check the weather and
   tell me if I need an umbrella" was kept as DeepSeek's, a skill that only
   said "Check the weather now, please."
+- **With `LAMP_TASK_NET=on`, what only the internet tells is a task for the
+  agent** (lamp-9adf, 17 Nov: "when I say bitcoin price, check the Bitcoin
+  price on the web and tell me" was refused by DeepSeek and then by Hermes,
+  65 s, as both were told a price is "anything from the internet" a skill
+  can't find out). With `LAMP_TASK_NET`, `LAMP_MADE_SCRIPTS`,
+  `LAMP_SKILL_TASKS` and `LAMP_UPLOAD_TO_AGENT` on in lamp-voice
+  (`make_no_cannot::net_by_agent`), the system prompt keeps `cannot:` for
+  a summary of mail or calendar content no read gives, and says instead
+  that what only the internet tells at run time (the weather or a
+  forecast, the news, a web lookup, a price) is looked up by the lamp's
+  agent each time, in a task the lamp sets up and reads back for the yes:
+  such a request, whenever it runs, is answered with one line and no
+  blocks, `internet:` and what it looks up (`make_no_cannot::NEEDS_NET`),
+  never `cannot:`. The model judges what needs the internet; no word list
+  does. That line, DeepSeek's or the agent's (whose rules file is the same
+  prompt), is never repaired and never handed to the agent to write
+  (`make_skill_local::net_made`): the make becomes one task for the lamp's
+  agent through the one more call below (`make_no_cannot::made`), whatever
+  `LAMP_MAKE_NO_CANNOT` says. Asked for by its words ("when I say bitcoin
+  price"), it is kept as an agent skill granted `net` and `speak`, said
+  back "I can have the lamp's agent do that, as bitcoin price: only when
+  you ask for it, it hands one task to the lamp's agent: “…”. The lamp's
+  agent does it, and it reaches the internet and speaks and plays sounds.
+  The first time you ask, I'll read it back and wait for your yes."; its
+  first ask reads it back and waits for the spoken yes, and its run
+  reaches the public web as docs/tasks.md, "An agent skill's run and the
+  `net` grant", has it. On a trigger ("every day at nine"), it is never
+  granted `net` (`net_made`, below), and the person hears why and to ask
+  for it by a few words instead; nothing is kept. Off, the prompt is as
+  before, byte for byte.
 - **The agent's own `cannot:` is never said as it wrote it.** The lamp says
   its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`);
   with `LAMP_MAKE_NO_CANNOT=on` its words are dropped all the same and the
