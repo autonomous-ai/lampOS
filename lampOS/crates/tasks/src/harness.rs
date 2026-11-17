@@ -442,6 +442,12 @@ fn told_taken(bytes: &[u8]) -> bool {
 pub enum Typed {
     /// Harness took the words for that pane.
     Typed,
+    /// A Harness with acknowledged replies (openharness#4393): the engine
+    /// took the words, as this input, to be waited after.
+    Taken(String),
+    /// Not taken within Harness's own bound, and nothing typed (`TIMEOUT`
+    /// with `cancelled: true`): safe to type again.
+    Cancelled,
     /// The pane is busy with a turn (`NOT_IDLE`): nothing typed.
     NotIdle,
     /// Harness says the pane was closed or stopped (`NOT_RUNNING`).
@@ -1959,8 +1965,26 @@ impl Cli {
             );
             seen.took(&reply);
             let ms = began.elapsed().as_millis();
+            // A Harness with acknowledged replies (openharness#4393): a
+            // `TIMEOUT` that typed nothing is typed again within the bound.
+            if let Ok(reply) = &reply
+                && let Answer::Cancelled = reply_answer(reply, &agent_id)
+            {
+                eprintln!(
+                    "tasks: {}: the named session did not take the words in Harness's bound (nothing typed); again",
+                    launch.name
+                );
+                continue;
+            }
             return match reply {
-                Ok(reply) if reply.success && replied(&reply.stdout, &agent_id) => {
+                Ok(reply) if matches!(reply_answer(&reply, &agent_id), Answer::Taken(_)) => {
+                    if let Answer::Taken(Some(input)) = reply_answer(&reply, &agent_id) {
+                        eprintln!(
+                            "tasks: {}: the named session took the words as input {}",
+                            launch.name,
+                            short_id(&input)
+                        );
+                    }
                     eprintln!(
                         "tasks: {}: typed into the named session{}{}, in {ms} ms",
                         launch.name,
@@ -1984,7 +2008,9 @@ impl Cli {
                 // Taken by Harness, and an answer that can't say for this
                 // session: the words may be there, so never asked again (the
                 // Reviewer-lead's P3 on #5779).
-                Ok(reply) if reply.success => uncertain("reply_uncertain"),
+                Ok(reply) if matches!(reply_answer(&reply, &agent_id), Answer::Uncertain) => {
+                    uncertain("reply_uncertain")
+                }
                 // Refused, or its machine did not take the words: nothing typed.
                 // A session Harness says was closed or stopped (`NOT_RUNNING`)
                 // has its own reason, `session_closed`, so the lamp tells the
@@ -2049,10 +2075,18 @@ impl Cli {
             self.config.launch_timeout,
         );
         match reply {
-            Ok(reply) if reply.success && replied(&reply.stdout, agent_id) => Typed::Typed,
-            // Taken, with an answer that can't say for this pane: the words
-            // may be there.
-            Ok(reply) if reply.success => Typed::Uncertain("reply_uncertain".into()),
+            Ok(reply) if !matches!(reply_answer(&reply, agent_id), Answer::Refused) => {
+                match reply_answer(&reply, agent_id) {
+                    Answer::Taken(Some(input)) => Typed::Taken(input),
+                    Answer::Taken(None) => Typed::Typed,
+                    Answer::Cancelled => Typed::Cancelled,
+                    // Taken, with an answer that can't say for this pane:
+                    // the words may be there.
+                    Answer::Uncertain | Answer::Refused => {
+                        Typed::Uncertain("reply_uncertain".into())
+                    }
+                }
+            }
             Ok(reply) => match reply_refusal(&reply.stdout) {
                 "reply_not_idle" => Typed::NotIdle,
                 "reply_not_running" => Typed::NotRunning,
@@ -2216,6 +2250,46 @@ impl Cli {
                     name.into(),
                     "--program-token-file".into(),
                     token.into(),
+                    "--after".into(),
+                    input.into(),
+                    "--timeout".into(),
+                    format!("{}s", WAIT_HELD.as_secs()).into(),
+                    "--json".into(),
+                ],
+                WAIT_HELD + WAIT_SLACK,
+                STDOUT_LIMIT,
+                Some(cancel),
+            )
+            .map_err(|error| error.code.to_string())?;
+        match reply.code {
+            Some(0) => Ok(Some("idle".into())),
+            Some(3) => Ok(Some("needs-input".into())),
+            Some(4) => Ok(Some("gone".into())),
+            Some(124) => Ok(None),
+            _ => Err(program_refusal(&reply.stdout, reply.code, "wait_failed")),
+        }
+    }
+
+    /// `harness wait --machine <id> <agent> --after <input> --timeout <s>
+    /// --json` (openharness#4393) on a session of the person's, no token:
+    /// as [`Cli::wait_kept`].
+    pub fn wait_after(
+        &self,
+        machine: &str,
+        agent: &str,
+        input: &str,
+        cancel: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        if !machine_id(machine) || !self::agent_id(agent) || !self::token(input, 128) {
+            return Err("invalid_input".into());
+        }
+        let reply = self
+            .run_cancellable(
+                &[
+                    "wait".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    agent.into(),
                     "--after".into(),
                     input.into(),
                     "--timeout".into(),
@@ -3211,7 +3285,7 @@ impl Cli {
         let reply = self.run(&args, left);
         seen.took(&reply);
         match reply {
-            Ok(reply) if reply.success && replied(&reply.stdout, &agent_id) => {
+            Ok(reply) if matches!(reply_answer(&reply, &agent_id), Answer::Taken(_)) => {
                 LaunchOutcome::Created { agent_id }
             }
             Ok(reply) => uncertain(reply_refusal(&reply.stdout)),
@@ -6532,6 +6606,47 @@ fn taken_input(bytes: &[u8]) -> Option<String> {
         .as_str()
         .filter(|input| token(input, 128))
         .map(str::to_owned)
+}
+
+/// What a `harness reply --json` on a session of the person's said
+/// ([`reply_answer`]).
+enum Answer {
+    /// Typed: with its input id from a Harness with acknowledged replies
+    /// (openharness#4393, `{"state":"taken","inputId"}`, or a `TIMEOUT`
+    /// with `cancelled: false`), none from an older one (`ok`, `id`).
+    Taken(Option<String>),
+    /// A `TIMEOUT` with `cancelled: true`: nothing typed.
+    Cancelled,
+    /// Exit 0 with an answer that can't say: the words may be there.
+    Uncertain,
+    /// Refused: [`reply_refusal`] says why.
+    Refused,
+}
+
+/// A `harness reply --json` for `agent_id`, read the older way (`ok`,
+/// `id`) and the acknowledged way (openharness#4393). An older Harness
+/// never answers `taken` or `cancelled`, so its replies read as before.
+fn reply_answer(reply: &Reply, agent_id: &str) -> Answer {
+    if reply.success {
+        if let Some(input) = taken_input(&reply.stdout) {
+            return Answer::Taken(Some(input));
+        }
+        return if replied(&reply.stdout, agent_id) {
+            Answer::Taken(None)
+        } else {
+            Answer::Uncertain
+        };
+    }
+    let read = serde_json::from_slice::<Value>(&reply.stdout).unwrap_or_default();
+    if read["error"].as_str().or(read["code"].as_str()) == Some("TIMEOUT") {
+        match timed_out(&reply.stdout) {
+            Took::Timeout => return Answer::Cancelled,
+            Took::Taken(input) => return Answer::Taken(Some(input)),
+            Took::Uncertain(_) if read["cancelled"] == false => return Answer::Uncertain,
+            _ => {}
+        }
+    }
+    Answer::Refused
 }
 
 /// A refused or failed `harness reply`, by Harness's code.

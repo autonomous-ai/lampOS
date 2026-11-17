@@ -108,7 +108,7 @@ impl PaneHarness for Fake {
             .unwrap()
             .pop_front()
             .unwrap_or(Typed::Typed);
-        if typed == Typed::Typed {
+        if matches!(typed, Typed::Typed | Typed::Taken(_)) {
             self.asked
                 .lock()
                 .unwrap()
@@ -260,6 +260,22 @@ impl PaneHarness for Fake {
         _: &AtomicBool,
     ) -> Result<Option<String>, String> {
         self.call(format!("wait-after {input}"));
+        let state = self
+            .waits
+            .lock()
+            .unwrap()
+            .pop_front()
+            .unwrap_or_else(|| "idle".into());
+        Ok((state != "none").then_some(state))
+    }
+    fn wait_after(
+        &self,
+        _: &str,
+        _: &str,
+        input: &str,
+        _: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        self.call(format!("wait-after-pane {input}"));
         let state = self
             .waits
             .lock()
@@ -1941,4 +1957,49 @@ fn a_kept_session_not_ours_sends_the_pane_the_old_way() {
     one.forget("Harness's daemon started");
     one.open_if_due(&fake, &place());
     assert_eq!(fake.count("capabilities"), 2, "asked again after a restart");
+}
+
+/// A Harness with acknowledged replies, the pane of `harness new` (signed
+/// in, no kept session): a reply `taken` is waited `--after` its input,
+/// and a spoken task is joined with no look at `show`; `TIMEOUT` with
+/// nothing typed is typed again. An older Harness's `Typed` waits as
+/// before.
+#[test]
+fn an_acknowledged_reply_into_the_pane_is_waited_after_its_input() {
+    let (one, fake) = (session(), Fake::default());
+    fake.replies
+        .lock()
+        .unwrap()
+        .extend([Typed::Cancelled, Typed::Taken("in-9".into())]);
+    assert_eq!(
+        one_turn(&one, &fake, "task-1"),
+        Ended::Answered("answer to New task task-1:".into())
+    );
+    assert_eq!(fake.count("reply"), 2);
+    assert!(fake.calls().contains(&"wait-after-pane in-9".to_owned()));
+    assert_eq!(fake.count("wait"), 1, "only the open's first turn");
+    // An older Harness: `wait --any` as before.
+    one_turn(&one, &fake, "task-2");
+    assert_eq!(fake.count("wait-after-pane"), 1);
+    assert_eq!(fake.count("wait"), 2);
+}
+
+/// `ENGINE_NOT_READY` from `ensure` (the old engine still exiting) is
+/// tried again within a short bound before the long backoff.
+#[test]
+fn an_engine_not_ready_ensure_is_tried_again_shortly() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, fake) = kept_on(dir.path());
+    // A first-turn bound well past the retries' (250 ms apart here).
+    let one = OneSession::new(Duration::from_secs(5), Duration::from_millis(5), Duration::from_secs(20))
+        .with_session_delete(Box::new(|_| Ok(())))
+        .with_state_file(dir.path().join(STATE_FILE))
+        .with_kept_session(dir.path().join(TOKEN_FILE));
+    fake.ensure_errors
+        .lock()
+        .unwrap()
+        .extend(["engine_not_ready".to_owned(), "engine_not_ready".to_owned()]);
+    one.open_if_due(&fake, &place());
+    assert_eq!(fake.count("ensure"), 3);
+    assert_eq!(one.agent(), Some(agent_of(1)));
 }
