@@ -1374,6 +1374,29 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   lời đồng ý có `net` cho thư mục đúng như hiện tại thì lần chạy mới có
   lối ra, nếu không thì `no_token` và không chạy gì. Tắt: `net` bị từ chối
   trước khi có token.
+- **Điều lần chạy có `net` không bao giờ giữ, và giới hạn của nó** (P1 và các
+  P3 của Heron trên #7590, quyết định 23:22 của người xây dựng đầu tiên):
+  - `net` không bao giờ được cấp cùng một quyền riêng tư: quyền đọc hay ghi
+    của dịch vụ (`*-read`, `*-write`), `camera`, `microphone`, `speech` hay
+    `notes` (`skill_task::PRIVATE_GRANTS`, `skill_task_yes::private_grant`).
+    Cặp đó bị từ chối khi nạp (`grants_of` của lamp-skills), khi tải lên
+    (`upload_agent::files` và phần kiểm tra `skill.toml` đã giữ, nói rõ
+    bằng lời), trong lời đồng ý của lamp-control (`grants_ok`) và trong lần
+    giao của lamp-tasks (`HandOver::check`, `bad_request`, không tạo token).
+    Kỹ năng cần cả hai thì là hai kỹ năng.
+  - Lần chạy có `net` chỉ thấy thư mục kỹ năng của chính nó, không bao giờ
+    thấy thư mục của kỹ năng khác: lamp-tasks ghi tên thư mục đó trong thư
+    mục riêng của lần chạy, `make-<run id>/skill-folder`
+    (`egress::OWN_SKILL_FILE`), và script namespace chỉ đưa thư mục đó vào
+    trong `/var/lib/lampOS/skills` và `skills-dev`
+    (`hermes_install::OWN_SKILL_LINES`); script không có dòng đó
+    (`egress::NS_OWN_SKILL_LINE`) thì không nhận lần chạy `net` (`no_net`).
+  - Không có giới hạn byte cho lưu lượng của lần chạy `net` ngoài 16 đường
+    ống, 60 s nhàn rỗi và hạn chót của lần chạy.
+  - Câu hỏi DNS của lần chạy `net` đi tới resolver của đèn, thường là router
+    trong nhà.
+  - Lời đồng ý cho `net` chỉ được rút lại bằng cách gỡ kỹ năng; lần chạy đang
+    diễn ra vẫn giữ lối ra tới khi kết thúc.
 - **Lối ra của lần chạy có `net`** (`crate::egress`, ghi chú thiết kế trên
   #7200, câu trả lời của Heron): mọi lần chạy đều bị giữ, có `net` hay không.
   Lần chạy có `net` đi qua `skill_make::net_runner(home)`: runner bị giữ
