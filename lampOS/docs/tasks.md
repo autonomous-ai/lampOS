@@ -4204,7 +4204,12 @@ file:
   (exec.approvals.get) before the readiness or run deadline; the hand-over is not sent", or "did
   not answer on 127.0.0.1:18789" when the port never answered), and the
   run's error is `Harness didn't start the run
-  (openclaw_gateway_not_ready)`. Each read starts OpenClaw's CLI, about
+  (openclaw_gateway_not_ready)`. A gateway whose port has not answered
+  within 60 s (`gateway::READY_WITHIN`, a spoken task's bound) is not
+  starting, so the wait ends then ("tasks: the OpenClaw Gateway did not
+  answer on 127.0.0.1:18789 within 60 s"), never held to 240 s (#6577,
+  lamp-fc4b, 17 Nov: a stopped gateway held a skill's run 240 s); once
+  the port has answered, only the 240 s bound holds. Each read starts OpenClaw's CLI, about
   10 s on lamp-c0a4 even on a warm gateway (C7170, 15 Nov), so it is made
   once per gateway start: a read that succeeded is kept against the inode
   of the socket listening on 18789 (`/proc/net/tcp`,
