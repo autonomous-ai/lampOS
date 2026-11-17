@@ -42,6 +42,16 @@ struct Fake {
     failing_closes: Mutex<u32>,
     /// The code a failing close answers; none: `timed_out`.
     close_error: Mutex<Option<String>>,
+    /// `harness capabilities` says program sessions (openharness#4393).
+    programs: Mutex<bool>,
+    /// The kept session Harness holds by name and token, if any.
+    kept: Mutex<Option<String>>,
+    /// Scripted refusals of `ensure`, in order, first.
+    ensure_errors: Mutex<VecDeque<String>>,
+    /// Scripted answers to an acknowledged `reply`, in order; empty: taken.
+    takes: Mutex<VecDeque<Took>>,
+    /// Inputs the kept session took.
+    inputs: Mutex<u32>,
 }
 
 fn agent_of(n: u32) -> String {
@@ -181,6 +191,85 @@ impl PaneHarness for Fake {
             .unwrap()
             .clone()
             .ok_or_else(|| "session_closed".into())
+    }
+    fn program_sessions(&self) -> Option<bool> {
+        self.call("capabilities".into());
+        Some(*self.programs.lock().unwrap())
+    }
+    fn ensure_kept(
+        &self,
+        engine: EngineKind,
+        name: &str,
+        token: &Path,
+        _: &str,
+        fresh: bool,
+    ) -> Result<Ensured, String> {
+        self.call(format!(
+            "ensure {name}{}",
+            if fresh { " --fresh" } else { "" }
+        ));
+        assert_eq!(name, name_for(engine));
+        assert!(token.exists(), "the token file is made before ensure");
+        if let Some(code) = self.ensure_errors.lock().unwrap().pop_front() {
+            return Err(code);
+        }
+        let mut kept = self.kept.lock().unwrap();
+        let mut gone = self.gone.lock().unwrap();
+        let (result, agent) = match kept.clone() {
+            Some(agent) if !fresh && gone.contains(&agent) => {
+                gone.retain(|g| *g != agent);
+                ("resumed", agent)
+            }
+            Some(agent) if !fresh => ("live", agent),
+            _ => {
+                let mut opens = self.opens.lock().unwrap();
+                *opens += 1;
+                ("new", agent_of(*opens))
+            }
+        };
+        *kept = Some(agent.clone());
+        Ok(Ensured {
+            result: result.into(),
+            agent_id: agent,
+            state: "idle".into(),
+            why: None,
+        })
+    }
+    fn reply_kept(&self, name: &str, _: &Path, words: &str) -> Took {
+        self.call(format!("reply-kept {name}"));
+        let took = self.takes.lock().unwrap().pop_front();
+        let took = took.unwrap_or_else(|| {
+            let mut inputs = self.inputs.lock().unwrap();
+            *inputs += 1;
+            Took::Taken(format!("in-{inputs}"))
+        });
+        if matches!(took, Took::Taken(_))
+            && let Some(agent) = self.kept.lock().unwrap().clone()
+        {
+            self.asked.lock().unwrap().insert(agent, words.to_owned());
+        }
+        took
+    }
+    fn wait_kept(
+        &self,
+        _: &str,
+        _: &Path,
+        input: &str,
+        _: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        self.call(format!("wait-after {input}"));
+        let state = self
+            .waits
+            .lock()
+            .unwrap()
+            .pop_front()
+            .unwrap_or_else(|| "idle".into());
+        Ok((state != "none").then_some(state))
+    }
+    fn close_kept(&self, name: &str, _: &Path) -> Result<(), String> {
+        self.call(format!("close-forget {name}"));
+        *self.kept.lock().unwrap() = None;
+        Ok(())
     }
 }
 
@@ -1723,4 +1812,124 @@ fn an_uncertain_or_busy_reply_never_stops_replies() {
     assert!(one.takes_reply());
     assert_eq!(fake.count("reply"), 3);
     assert_eq!(fake.count("close"), 0);
+}
+
+/// The kept session (openharness#4393): a lamp-tasks with the switch on,
+/// its state and token files in `dir`, and a Harness that keeps program
+/// sessions.
+fn kept_on(dir: &std::path::Path) -> (OneSession, Fake) {
+    let one = kept_session(dir).with_kept_session(dir.join(TOKEN_FILE));
+    let fake = Fake::default();
+    *fake.programs.lock().unwrap() = true;
+    (one, fake)
+}
+
+/// The switch on, but an older Harness (no program sessions): the pane is
+/// as before, `harness new` and `reply`, no `ensure`, no token file.
+#[test]
+fn with_no_program_sessions_the_pane_is_as_before() {
+    let dir = tempfile::tempdir().unwrap();
+    let one = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    let fake = Fake::default();
+    assert_eq!(
+        one_turn(&one, &fake, "task-1"),
+        Ended::Answered("answer to New task task-1:".into())
+    );
+    assert_eq!(fake.count("capabilities"), 1);
+    assert_eq!((fake.count("new"), fake.count("reply")), (1, 1));
+    assert_eq!(fake.count("ensure"), 0);
+    assert!(!dir.path().join(TOKEN_FILE).exists());
+    // Asked once only.
+    one_turn(&one, &fake, "task-2");
+    assert_eq!(fake.count("capabilities"), 1);
+}
+
+/// Ensured new, given its first words, then each task an acknowledged
+/// reply and `wait --after` its input, with its own answer; the next start
+/// finds it live by name and token, never a second.
+#[test]
+fn the_kept_session_is_ensured_typed_with_acks_and_waited_after() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    assert_eq!(fake.count("new"), 0);
+    assert_eq!(fake.count("ensure"), 1);
+    assert_eq!(fake.count("reply-kept"), 1, "its first words");
+    let token = std::fs::metadata(dir.path().join(TOKEN_FILE)).unwrap();
+    assert_eq!(token.permissions().mode() & 0o777, 0o600);
+    assert!(token.len() >= 32);
+    for n in 1..=3 {
+        let id = format!("task-{n}");
+        assert_eq!(
+            one_turn(&one, &fake, &id),
+            Ended::Answered(format!("answer to New task {id}:"))
+        );
+    }
+    let calls = fake.calls();
+    assert!(calls.contains(&"wait-after in-4".to_owned()), "{calls:?}");
+    assert_eq!(fake.count("show"), 3, "only for each answer");
+    assert_eq!(fake.count("ensure"), 1);
+    // A restart: the same token, found live.
+    let before = std::fs::read(dir.path().join(TOKEN_FILE)).unwrap();
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), Some(agent_of(1)));
+    assert_eq!(std::fs::read(dir.path().join(TOKEN_FILE)).unwrap(), before);
+    assert_eq!(fake.count("reply-kept"), 4, "no first words for a live one");
+}
+
+/// `NOT_IDLE` and `ENGINE_NOT_READY` keep the task waiting, never counted
+/// until taken; `NOT_RUNNING` ensures again (resumed) and types once more.
+#[test]
+fn the_kept_session_busy_or_not_running_is_waited_or_ensured_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    fake.takes
+        .lock()
+        .unwrap()
+        .extend([Took::NotIdle, Took::EngineNotReady]);
+    one_turn(&one, &fake, "task-1");
+    assert_eq!(fake.count("reply-kept"), 4);
+    assert_eq!(one.turns(), 1);
+    // Died: gone in Harness, the reply says not running.
+    fake.gone.lock().unwrap().push(agent_of(1));
+    fake.takes.lock().unwrap().push_back(Took::NotRunning);
+    assert_eq!(
+        one_turn(&one, &fake, "task-2"),
+        Ended::Answered("answer to New task task-2:".into())
+    );
+    assert_eq!(fake.count("ensure"), 2);
+    assert_eq!(one.agent(), Some(agent_of(1)), "resumed, the same one");
+    // Not taken twice: the turn fails, never counted.
+    fake.takes
+        .lock()
+        .unwrap()
+        .extend([Took::Timeout, Took::Timeout]);
+    let turn = one.enter("task-3", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run.", far(), &|| false),
+        Sent::NotTyped(_)
+    ));
+}
+
+/// A rotation is `ensure --fresh`; a sign-out closes it `--forget` and
+/// removes its token and record.
+#[test]
+fn the_kept_session_rotates_fresh_and_a_sign_out_forgets_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    for n in 0..=ROTATE_TURNS {
+        one_turn(&one, &fake, &format!("task-{n}"));
+    }
+    assert!(fake.calls().contains(&"ensure lamp-one-openclaw --fresh".to_owned()));
+    assert_eq!(fake.count("close"), 0);
+    one.drop_when_free("the lamp signed out");
+    one.tend(&fake, &place(), &|| false);
+    assert_eq!(fake.count("close-forget"), 1);
+    assert!(!dir.path().join(TOKEN_FILE).exists());
+    assert!(!dir.path().join(STATE_FILE).exists());
+    assert_eq!(one.agent(), None);
 }
