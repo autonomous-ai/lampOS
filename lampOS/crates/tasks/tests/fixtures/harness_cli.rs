@@ -99,6 +99,15 @@ pub fn main() -> io::Result<()> {
     );
     calls.write_all(line.as_bytes())?;
     calls.flush()?;
+    // `{"program": true}`: the openharness#4393 program-session contract
+    // v1, kept across calls in `program-sessions.json` under HOME
+    // ([`program`]). Every other step is answered as before.
+    if step["program"] == true {
+        let (said, exit) = program::run(&home, operation, &args, step)?;
+        println!("{said}");
+        io::stdout().flush()?;
+        std::process::exit(exit);
+    }
     if step["stdin_eof"] == true {
         let mut input = Vec::new();
         io::stdin().read_to_end(&mut input)?;
@@ -281,4 +290,503 @@ pub fn main() -> io::Result<()> {
         thread::sleep(Duration::from_millis(ms.min(5000)));
     }
     std::process::exit(step["exit"].as_i64().unwrap_or(0).clamp(0, 255) as i32);
+}
+
+/// openharness#4393 contract v1, a program-owned harness: `capabilities`,
+/// `ensure`, an acknowledged `reply`, `wait --after` and `close`, as the
+/// Harness builder answered it (exits: 0 ok, 1 failed, 2 usage, 3 needs
+/// the person, 4 stopped, 5 refused, 124 timeout; a refusal says exactly
+/// `{"error":CODE,"detail":TEXT}`, with `cancelled` and `inputId` beside
+/// them on a reply's `TIMEOUT`). `close --forget` is not built upstream:
+/// `--forget` is passed over and `close` says what it always says.
+///
+/// Sessions are kept by name in `program-sessions.json` under HOME, read
+/// and written under `program-sessions.lock`, so calls made together see
+/// one another; one closed by `ensure` (`--fresh`, or an engine that
+/// cannot continue) moves to `closed`, so `wait --after` still finds the
+/// input it took. A token is checked as the daemon checks it: a regular
+/// file, not a link, opened once and its open file's metadata read, owned
+/// by the caller, mode 0600 exactly, and 32 bytes or more once surrounding
+/// whitespace is taken off; only its SHA-256 is kept.
+///
+/// What a test drives, from the step: `ensure` with `"starting": true`
+/// leaves the engine starting (`ensure` never refuses `ENGINE_NOT_READY`;
+/// `reply` does, unless its step says `"ready": true`); with `"why": TEXT`
+/// the engine cannot continue a closed session and a new one starts; with
+/// `"daemon_start_ms": N` the daemon was down and started in N ms. `reply`
+/// with `"timeout": "cancelled"` types nothing, with `"timeout": "typed"`
+/// types and is not seen to start. `wait` with `"ends": "person" |
+/// "stopped" | "timeout"` ends so. `"exits": {"CODE": N}` sets a refusal's
+/// exit.
+mod program {
+    use serde_json::{Value, json};
+    use sha2::{Digest, Sha256};
+    use std::{
+        fs,
+        io::{self, Read, Write},
+        os::unix::fs::{MetadataExt, OpenOptionsExt},
+        path::Path,
+    };
+
+    /// The most a token file may hold, as the daemon reads one.
+    const MOST_TOKEN_BYTES: u64 = 4096;
+    /// Options that take a value, so a value is not read as a word.
+    const VALUED: [&str; 5] = [
+        "--name",
+        "--program-token-file",
+        "--timeout",
+        "--after",
+        "--machine",
+    ];
+
+    /// A refusal's exit when the step sets none (openharness `EXIT`).
+    fn exit_of(code: &str, step: &Value) -> i32 {
+        if let Some(exit) = step["exits"][code].as_i64() {
+            return exit.clamp(0, 255) as i32;
+        }
+        match code {
+            "BAD_TOKEN_FILE" | "NAME_TAKEN" | "NOT_YOURS" | "NOT_IDLE" | "ENGINE_NOT_READY" => 5,
+            "NOT_RUNNING" => 4,
+            "TIMEOUT" => 124,
+            "USAGE" => 2,
+            // UNKNOWN_HARNESS, UNKNOWN_INPUT.
+            _ => 1,
+        }
+    }
+
+    /// A refusal: its code, its detail, and the fields said beside them.
+    struct Refusal {
+        code: &'static str,
+        detail: String,
+        beside: Option<Value>,
+    }
+
+    fn refusal(code: &'static str, detail: impl Into<String>) -> Refusal {
+        Refusal {
+            code,
+            detail: detail.into(),
+            beside: None,
+        }
+    }
+
+    fn refused(refusal: Refusal, step: &Value) -> (Value, i32) {
+        let mut said = json!({"error":refusal.code,"detail":refusal.detail});
+        if let Some(Value::Object(beside)) = refusal.beside {
+            for (key, value) in beside {
+                said[key] = value;
+            }
+        }
+        (said, exit_of(refusal.code, step))
+    }
+
+    /// The words before `--`; after it is the reply's text.
+    fn options(args: &[String]) -> &[String] {
+        &args[..args
+            .iter()
+            .position(|arg| arg == "--")
+            .unwrap_or(args.len())]
+    }
+
+    fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
+        let options = options(args);
+        options
+            .iter()
+            .position(|arg| arg == name)
+            .and_then(|at| options.get(at + 1))
+            .map(String::as_str)
+    }
+
+    fn has(args: &[String], name: &str) -> bool {
+        options(args).iter().any(|arg| arg == name)
+    }
+
+    /// The first word after the verb that is no option or option value:
+    /// `ensure`'s engine, the harness `reply`, `wait` and `close` name.
+    fn first_word(args: &[String]) -> Option<&str> {
+        let mut rest = options(args).iter().skip(1);
+        while let Some(arg) = rest.next() {
+            if !arg.starts_with("--") {
+                return Some(arg);
+            }
+            if VALUED.contains(&arg.as_str()) {
+                rest.next();
+            }
+        }
+        None
+    }
+
+    /// The token's SHA-256, or `BAD_TOKEN_FILE`. The file is opened once,
+    /// a link refused by `O_NOFOLLOW` (and a FIFO not waited on), and the
+    /// open file's own metadata checked, so nothing is checked by its path
+    /// and then read by it again.
+    fn token_hash(args: &[String]) -> Result<String, Refusal> {
+        let path = flag(args, "--program-token-file")
+            .ok_or_else(|| refusal("USAGE", "This needs --program-token-file <path>."))?;
+        let bad = |why: &str| {
+            refusal(
+                "BAD_TOKEN_FILE",
+                format!(
+                    "{path}: {why}. A program token file is a regular file of yours, mode 0600, holding 32 or more bytes."
+                ),
+            )
+        };
+        let file = fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(
+                (rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK).bits() as i32,
+            )
+            .open(path)
+            .map_err(|_| bad("it cannot be read, or it is a link"))?;
+        let meta = file.metadata().map_err(|_| bad("it cannot be read"))?;
+        if !meta.is_file() {
+            return Err(bad("it is not a regular file"));
+        }
+        if meta.uid() != rustix::process::geteuid().as_raw() {
+            return Err(bad("it is not owned by you"));
+        }
+        if meta.mode() & 0o777 != 0o600 {
+            return Err(bad(&format!(
+                "its mode is {:o}, not 0600",
+                meta.mode() & 0o777
+            )));
+        }
+        let mut bytes = Vec::new();
+        file.take(MOST_TOKEN_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| bad("it cannot be read"))?;
+        if bytes.len() as u64 > MOST_TOKEN_BYTES {
+            return Err(bad("it is too large"));
+        }
+        let token = bytes.trim_ascii();
+        if token.len() < 32 {
+            return Err(bad(&format!("it holds {} bytes", token.len())));
+        }
+        Ok(Sha256::digest(token)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect())
+    }
+
+    /// The program's harness `name`: `UNKNOWN_HARNESS` when there is none,
+    /// `NOT_YOURS` when another token holds it.
+    fn owned<'a>(state: &'a mut Value, name: &str, hash: &str) -> Result<&'a mut Value, Refusal> {
+        let session = state["sessions"].get_mut(name).ok_or_else(|| {
+            refusal(
+                "UNKNOWN_HARNESS",
+                format!(
+                    "No harness named \"{name}\" is owned by this token on this computer. Start it with harness ensure."
+                ),
+            )
+        })?;
+        if session["tokenSha256"] != hash {
+            return Err(refusal(
+                "NOT_YOURS",
+                format!("\"{name}\" is not a harness this token owns."),
+            ));
+        }
+        Ok(session)
+    }
+
+    fn next(state: &mut Value, counter: &str) -> u64 {
+        let n = state[counter].as_u64().unwrap_or(0) + 1;
+        state[counter] = json!(n);
+        n
+    }
+
+    /// A session `ensure` closes to start another: stopped, and kept in
+    /// `closed` with the inputs it took.
+    fn retire(state: &mut Value, mut session: Value) {
+        session["state"] = json!("stopped");
+        if !state["closed"].is_array() {
+            state["closed"] = json!([]);
+        }
+        if let Some(closed) = state["closed"].as_array_mut() {
+            closed.push(session);
+        }
+    }
+
+    pub fn run(
+        home: &Path,
+        operation: &str,
+        args: &[String],
+        step: &Value,
+    ) -> io::Result<(Value, i32)> {
+        if operation == "capabilities" {
+            return Ok((json!({"programSessions":1}), 0));
+        }
+        let lock = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .mode(0o600)
+            .open(home.join("program-sessions.lock"))?;
+        lock.lock()?;
+        let path = home.join("program-sessions.json");
+        let mut state: Value = match fs::read(&path) {
+            Ok(bytes) => serde_json::from_slice(&bytes)?,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => json!({"sessions":{}}),
+            Err(error) => return Err(error),
+        };
+        let answer = match answer(&mut state, operation, args, step) {
+            Ok(answer) => answer,
+            Err(refusal) => refused(refusal, step),
+        };
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&path)?;
+        file.write_all(serde_json::to_string(&state)?.as_bytes())?;
+        Ok(answer)
+    }
+
+    fn answer(
+        state: &mut Value,
+        operation: &str,
+        args: &[String],
+        step: &Value,
+    ) -> Result<(Value, i32), Refusal> {
+        let usage = || refusal("USAGE", "Name the harness.");
+        match operation {
+            "ensure" => {
+                let hash = token_hash(args)?;
+                let name = flag(args, "--name").ok_or_else(usage)?.to_owned();
+                let engine = first_word(args)
+                    .ok_or_else(|| {
+                        refusal(
+                            "USAGE",
+                            "Name the engine: harness ensure <engine> --name <name>.",
+                        )
+                    })?
+                    .to_owned();
+                let fresh = has(args, "--fresh");
+                let held = state["sessions"].get(&name).cloned();
+                if let Some(held) = &held {
+                    if held["tokenSha256"] != hash.as_str() {
+                        return Err(refusal(
+                            "NAME_TAKEN",
+                            format!("\"{name}\" is held by another program."),
+                        ));
+                    }
+                    if held["engine"] != engine.as_str() {
+                        return Err(refusal(
+                            "NAME_TAKEN",
+                            format!(
+                                "\"{name}\" runs {}, not {engine}. Close it and pick another name.",
+                                held["engine"].as_str().unwrap_or_default()
+                            ),
+                        ));
+                    }
+                }
+                let why = step["why"].as_str();
+                let up = if step["starting"] == true {
+                    "starting"
+                } else {
+                    "idle"
+                };
+                let (result, session) = match held {
+                    Some(held) if !fresh && held["state"] != "stopped" => ("live", held),
+                    Some(mut held) if !fresh && why.is_none() => {
+                        held["state"] = json!(up);
+                        ("resumed", held)
+                    }
+                    held => {
+                        // `--fresh` on a live one closes it first.
+                        if let Some(held) = held {
+                            retire(state, held);
+                        }
+                        let id = next(state, "nextId");
+                        let conversation = next(state, "nextEngineSession");
+                        (
+                            "new",
+                            json!({
+                                "id":format!("{id:08x}-0000-4000-8000-{id:012x}"),
+                                "name":name,
+                                "engine":engine,
+                                "engineSession":format!("{engine}-session-{conversation}"),
+                                "state":up,
+                                "tokenSha256":hash,
+                                "inputs":[],
+                            }),
+                        )
+                    }
+                };
+                state["sessions"][&name] = session.clone();
+                // The contract's three: one at work or with the person is
+                // working, as far as `ensure` says.
+                let said_state = session["state"]
+                    .as_str()
+                    .filter(|now| matches!(*now, "idle" | "starting"))
+                    .unwrap_or("working");
+                let mut answer = json!({
+                    "result":result,"id":session["id"],"name":name,"engine":session["engine"],
+                    "engineSession":session["engineSession"],"state":said_state,
+                });
+                if let (Some(why), "new") = (why, result) {
+                    answer["why"] = json!(why);
+                }
+                if let Some(ms) = step["daemon_start_ms"].as_u64() {
+                    answer["daemonStarted"] = json!(true);
+                    answer["daemonStartMs"] = json!(ms);
+                }
+                Ok((answer, 0))
+            }
+            "reply" => {
+                let hash = token_hash(args)?;
+                let name = first_word(args).ok_or_else(usage)?.to_owned();
+                let text = args
+                    .iter()
+                    .position(|arg| arg == "--")
+                    .map(|at| args[at + 1..].join(" "))
+                    .unwrap_or_default();
+                let now = owned(state, &name, &hash)?["state"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned();
+                match now.as_str() {
+                    "stopped" => {
+                        return Err(refusal(
+                            "NOT_RUNNING",
+                            format!(
+                                "{name} is not running: it was closed or stopped. Run harness ensure to open it again."
+                            ),
+                        ));
+                    }
+                    "needs-input" => {
+                        return Err(refusal(
+                            "NOT_IDLE",
+                            format!("{name} waits for the person (a question or a permission)."),
+                        ));
+                    }
+                    "working" => {
+                        return Err(refusal(
+                            "NOT_IDLE",
+                            format!(
+                                "{name} is still working on the last words. Wait for it (harness wait {name}), then reply."
+                            ),
+                        ));
+                    }
+                    // Waited for within --timeout (30 s by default), here
+                    // answered at once as if it passed.
+                    "starting" if step["ready"] != true => {
+                        return Err(refusal(
+                            "ENGINE_NOT_READY",
+                            format!(
+                                "{name}'s engine is not ready for words yet. Nothing was typed; try again."
+                            ),
+                        ));
+                    }
+                    _ => {}
+                }
+                if step["timeout"] == "cancelled" {
+                    return Err(Refusal {
+                        beside: Some(json!({"cancelled":true})),
+                        ..refusal(
+                            "TIMEOUT",
+                            format!(
+                                "{name} did not take the words in time. Nothing was typed; send them again."
+                            ),
+                        )
+                    });
+                }
+                let input = next(state, "nextInput");
+                let input_id = format!("in-{input}");
+                let session = &mut state["sessions"][&name];
+                session["state"] = json!("working");
+                if let Some(inputs) = session["inputs"].as_array_mut() {
+                    inputs.push(json!({"inputId":input_id,"text":text}));
+                }
+                if step["timeout"] == "typed" {
+                    return Err(Refusal {
+                        beside: Some(json!({"cancelled":false,"inputId":input_id})),
+                        ..refusal(
+                            "TIMEOUT",
+                            format!(
+                                "{name} was given the words but has not been seen to take them. Follow it with harness wait {name} --after {input_id} before sending them again."
+                            ),
+                        )
+                    });
+                }
+                Ok((json!({"state":"taken","inputId":input_id}), 0))
+            }
+            // The plain `harness wait --json` reply (`parse_wait`): the rows
+            // that ended, by exit 0 idle, 3 the person, 4 stopped, 124 none.
+            "wait" => {
+                let after = flag(args, "--after")
+                    .ok_or_else(|| {
+                        refusal(
+                            "USAGE",
+                            "This stand-in answers only harness wait <name> --after <inputId>.",
+                        )
+                    })?
+                    .to_owned();
+                let hash = match flag(args, "--program-token-file") {
+                    Some(_) => Some(token_hash(args)?),
+                    None => None,
+                };
+                let name = first_word(args).ok_or_else(usage)?.to_owned();
+                let unknown = || {
+                    refusal(
+                        "UNKNOWN_INPUT",
+                        format!("No harness here took an input {after}."),
+                    )
+                };
+                let took = |session: &Value| {
+                    session["inputs"]
+                        .as_array()
+                        .is_some_and(|inputs| inputs.iter().any(|input| input["inputId"] == after))
+                };
+                // The session that took it: live by its name, or closed.
+                let live = state["sessions"]
+                    .as_object()
+                    .and_then(|sessions| sessions.values().find(|session| took(session)))
+                    .cloned();
+                let closed = state["closed"]
+                    .as_array()
+                    .and_then(|closed| closed.iter().find(|session| took(session)))
+                    .cloned();
+                let holder = live.clone().or(closed).ok_or_else(unknown)?;
+                if holder["name"] != name.as_str() {
+                    return Err(unknown());
+                }
+                if hash.is_some_and(|hash| holder["tokenSha256"] != hash.as_str()) {
+                    return Err(refusal(
+                        "NOT_YOURS",
+                        format!("\"{name}\" is not a harness this token owns."),
+                    ));
+                }
+                let id = holder["id"].clone();
+                let (end, exit) = match step["ends"].as_str() {
+                    _ if live.is_none() || holder["state"] == "stopped" => ("stopped", 4),
+                    Some("person") => ("needs-input", 3),
+                    Some("stopped") => ("stopped", 4),
+                    Some("timeout") => ("timeout", 124),
+                    _ => ("idle", 0),
+                };
+                if live.is_some() && end != "timeout" {
+                    state["sessions"][&name]["state"] = json!(end);
+                }
+                Ok((
+                    json!({"harnesses":[{"id":id,"name":name,"state":end}]}),
+                    exit,
+                ))
+            }
+            // Today's `close --json` reply, unchanged.
+            "close" => {
+                let hash = token_hash(args)?;
+                let name = first_word(args).ok_or_else(usage)?.to_owned();
+                let session = owned(state, &name, &hash)?;
+                session["state"] = json!("stopped");
+                Ok((
+                    json!({
+                        "name":name,"id":session["id"],"closed":true,
+                        "effect":"Its conversation is kept; the person can resume it.","next":[],
+                    }),
+                    0,
+                ))
+            }
+            _ => Err(refusal("USAGE", "Unknown program-session verb.")),
+        }
+    }
 }
