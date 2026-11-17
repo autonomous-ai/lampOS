@@ -1423,33 +1423,23 @@ fn an_uncertain_new_is_found_and_kept_never_made_twice() {
     assert!(kept.contains(&agent_of(1)), "{kept}");
 }
 
-/// A pane kept as opened signed out (by an earlier build), as `keep`
-/// writes it.
-fn kept_signed_out(dir: &std::path::Path) {
-    let kept = serde_json::json!({
-        "agent": agent_of(1), "machine": MACHINE, "engine": "openclaw", "signed_in": false,
-    });
-    std::fs::write(dir.join(STATE_FILE), kept.to_string()).unwrap();
-}
-
-/// The ship lamp runs signed out for good (#6407): a pane kept as opened
-/// signed out is never thrown away at a start still signed out. Signed
-/// out Harness takes no reply, so it is neither adopted nor replaced
-/// then; it is adopted once a sign-in is read.
+/// The ship lamp runs signed out for good (#6407): a pane opened signed
+/// out is adopted at a start still signed out, never thrown away; one
+/// opened signed in is removed at a start signed out.
 #[test]
 fn a_pane_opened_signed_out_is_kept_at_a_start_signed_out() {
     let dir = tempfile::tempdir().unwrap();
     let key = Some(format!("{MACHINE} openclaw"));
-    kept_signed_out(dir.path());
+    let none = || None::<&Fake>;
+    let one = kept_session(dir.path());
+    one.remove_if_due(&Looks::default(), key.as_ref(), true, &none);
+    one.open_if_due(&Fake::default(), &place());
     let again = kept_session(dir.path());
     let fake = Fake::default();
     let harness = || Some(&fake);
     again.remove_if_due(&Looks::default(), key.as_ref(), true, &harness);
     assert_eq!(fake.count("close"), 0, "{:?}", fake.calls());
     assert!(dir.path().join(STATE_FILE).exists());
-    again.open_if_due(&fake, &place());
-    assert_eq!((fake.count("new"), again.agent()), (0, None), "signed out");
-    again.remove_if_due(&Looks::default(), key.as_ref(), false, &harness);
     again.open_if_due(&fake, &place());
     assert_eq!(fake.count("new"), 0, "adopted: {:?}", fake.calls());
     assert_eq!(again.agent(), Some(agent_of(1)));
@@ -1464,12 +1454,11 @@ fn a_pane_opened_signed_out_and_used_signed_in_is_removed_at_a_start_signed_out(
     let dir = tempfile::tempdir().unwrap();
     let key = Some(format!("{MACHINE} openclaw"));
     let none = || None::<&Fake>;
-    kept_signed_out(dir.path());
     let one = kept_session(dir.path());
     let fake = Fake::default();
-    one.remove_if_due(&Looks::default(), key.as_ref(), false, &none);
+    one.remove_if_due(&Looks::default(), key.as_ref(), true, &none);
     one.open_if_due(&fake, &place());
-    assert_eq!(fake.count("new"), 0, "adopted");
+    one.remove_if_due(&Looks::default(), key.as_ref(), false, &none);
     one_turn(&one, &fake, "task-1");
     let deleted = Arc::new(Mutex::new(Vec::new()));
     let seen = deleted.clone();
@@ -1487,9 +1476,7 @@ fn a_pane_opened_signed_out_and_used_signed_in_is_removed_at_a_start_signed_out(
     );
     assert!(!dir.path().join(STATE_FILE).exists());
     again.open_if_due(&fake, &place());
-    // Signed out: neither adopted nor replaced (no reply).
-    assert_eq!(fake.count("new"), 0, "{:?}", fake.calls());
-    assert_eq!(again.agent(), None, "not adopted");
+    assert_eq!(fake.count("new"), 1, "not adopted: {:?}", fake.calls());
 }
 
 /// Harness changes the lamp's own machine id at a sign-in (the computer
@@ -1682,12 +1669,11 @@ fn a_reply_off_closes_the_pane_and_the_keep_open_loop_opens_no_other() {
     assert_eq!(one.agent(), None);
 }
 
-/// Signed out (no person, so Harness takes no reply): the keep-open loop
-/// opens no pane, and the first tasks go the per-task way with no reply
-/// tried and nothing held for the pane. Not kept: once a sign-in is read,
-/// the pane is opened.
+/// Signed out the lamp's engines still work (#6407: the ship lamp runs
+/// signed out): the keep-open loop opens the pane as signed in, and a
+/// spoken task is typed into it. Only a `reply_off` stops replies.
 #[test]
-fn signed_out_no_pane_is_opened_and_each_task_goes_the_per_task_way() {
+fn signed_out_the_pane_is_still_opened_and_tasks_are_typed_into_it() {
     let (one, fake) = (session(), Fake::default());
     let place_now = || -> Result<(&Fake, Place), String> { Ok((&fake, place())) };
     let key = Some(format!("{MACHINE} openclaw"));
@@ -1702,23 +1688,13 @@ fn signed_out_no_pane_is_opened_and_each_task_goes_the_per_task_way() {
             &place_now,
         );
     }
-    assert_eq!(fake.count("new"), 0, "{:?}", fake.calls());
-    assert!(!one.takes_reply());
-    assert!(!one.waits_for_place(&spoken("lamp-1")), "never held");
-    assert_eq!(spoken_launch(&one, &fake, &spoken("lamp-1")), None);
-    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
-    assert_eq!(
-        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
-        Sent::NoReply
-    );
-    drop(turn);
-    assert_eq!(fake.count("reply"), 0);
-    // Signed in at the next look: the pane is opened.
-    one.remove_if_due(&looks, key.as_ref(), false, &|| Some(&fake));
-    one.forget("signed in");
-    one.look(&mut looks, start + KEEP_OPEN_EVERY * 6, key, &place_now);
-    assert!(one.takes_reply());
     assert_eq!(fake.count("new"), 1, "{:?}", fake.calls());
+    assert!(one.takes_reply());
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+    assert_eq!(fake.count("reply"), 1);
 }
 
 /// Only `reply_off` stops replies: an uncertain reply or a busy pane
