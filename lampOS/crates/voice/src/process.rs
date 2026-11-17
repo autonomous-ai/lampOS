@@ -2615,6 +2615,8 @@ fn second_route_worker_environment(
         crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
         // The owner's face linked to the typed name by their own words (#7501).
         crate::owner_link::ENVIRONMENT,
+        // A held rename's short yes, with it (#7419).
+        crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_config::OWN_KEYS_ENV,
         // The owner's place for a question that needs one, and cleared
@@ -2913,6 +2915,7 @@ mod tests {
             crate::known_faces::RENAME_YES_ENVIRONMENT,
             crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
             crate::owner_link::ENVIRONMENT,
+            crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -3997,6 +4000,7 @@ mod tests {
                     || name == crate::known_faces::RENAME_YES_ENVIRONMENT
                     || name == crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT
                     || name == crate::owner_link::ENVIRONMENT
+                    || name == crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
                     || name == crate::owner_place::ENVIRONMENT
                     || name == lamp_msgs::chosen_voice::ENVIRONMENT
@@ -4200,6 +4204,7 @@ mod tests {
                     "LAMP_RELAY_ROUTES=on",
                     "LAMP_REMARK_ABOUT_IT=on",
                     "LAMP_REMINDERS_ASKED=on",
+                    "LAMP_RENAME_SHORT_YES=on",
                     "LAMP_REST_THROUGH_SOUNDS=on",
                     "LAMP_ROOM_HELD_TALK=on",
                     "LAMP_SAID_TO_ME=on",

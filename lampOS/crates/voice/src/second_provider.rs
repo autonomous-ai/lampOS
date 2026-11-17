@@ -892,6 +892,11 @@ pub const BUSY_NO_FACE_RENEWS_ENVIRONMENT: &str = "LAMP_BUSY_NO_FACE_RENEWS";
 /// [`crate::room_told::RoomTold::count_held_not_spoken_to`], #7332).
 pub const ROOM_HELD_TALK_ENVIRONMENT: &str = "LAMP_ROOM_HELD_TALK";
 
+/// A held rename's one- or two-word yes read by the short-line rule, with
+/// `LAMP_NAME_LEARN_FIX` (`LAMP_RENAME_SHORT_YES=on`, #7419,
+/// [`held_rename::SHORT_YES_ENVIRONMENT`]).
+pub const RENAME_SHORT_YES_ENVIRONMENT: &str = "LAMP_RENAME_SHORT_YES";
+
 /// Where the worker reads whether the lamp's name at a line's start
 /// ([`crate::attention::NAME_AT_THE_START_US`]) is dated from the line's usual
 /// start, not its soft start's lead (`on`, and nothing else;
@@ -9776,9 +9781,11 @@ async fn spoken(
             // Each id with the eyes' boot, the known face's too: after the
             // eyes start again a passing id names someone else (#3037).
             let speakers = eyes.speakers_with_boot(begun, finishing);
-            // A held rename's short yes, with `LAMP_NAME_LEARN_FIX` (#7419).
-            let rename_speakers = renaming
-                .then(|| held_rename::yes_speakers(eyes, begun, finishing, shared.name_learn_fix));
+            // A held rename's short yes, with `LAMP_NAME_LEARN_FIX` and
+            // `LAMP_RENAME_SHORT_YES` (#7419).
+            let short_yes = shared.name_learn_fix && held_rename::short_yes_from_environment();
+            let rename_speakers =
+                renaming.then(|| held_rename::yes_speakers(eyes, begun, finishing, short_yes));
             let (eyes, known) = (eyes.clone(), known.clone());
             let pair = tokio::task::spawn_blocking(move || eyes.known_with_boot(&known))
                 .await
