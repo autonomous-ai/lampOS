@@ -36,7 +36,7 @@ from websockets.asyncio.client import ClientConnection, connect as ws_connect, u
 from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from . import debug, errors, schema
-from .errors import BY_CODE, LampError, NotPaired, WrongLamp, from_reply
+from .errors import BY_CODE, LampError, NotPaired, SecureConnectionFailed, Unreachable, WrongLamp, from_reply
 from .keys import Keyring, Pairing, b64, is_pin, pin_of, proof, unb64
 from .moves import POSES_STEP_MS, poses_to_frames
 
@@ -104,15 +104,47 @@ def _tls() -> ssl.SSLContext:
     return context
 
 
+# macOS's errno for "no route to host": there, a program the owner never allowed
+# on the Local Network setting is refused with it while `ping` still works.
+_MAC_NO_ROUTE = 65
+
+
+def _no_answer(host: str, port: int, error: BaseException) -> str:
+    """One line for a lamp that did not answer: the address, the system's own
+    reason, and what to check (the same advice as the connect guide's table)."""
+    reason = str(error) or type(error).__name__
+    line = (
+        f"no answer from {host}:{port} ({reason}): check the lamp's address, that the owner "
+        "turned developer access on in the app, and that this computer is on the lamp's network"
+    )
+    if sys.platform == "darwin" and getattr(error, "errno", None) == _MAC_NO_ROUTE:
+        line += (
+            "; on a Mac, turn Python on in System Settings, Privacy & Security, Local Network if it is listed; "
+            "if it is not, see the connect guide's \"On a Mac when Python is not listed\""
+        )
+    return line
+
+
 async def _open(host: str, port: int, pin: str) -> ClientConnection:
     if not is_pin(pin):
         raise WrongLamp("no pin to check the lamp by: the 64 hex the owner's app shows with the code")
-    ws = await ws_connect(
-        f"wss://{host}:{port}/v{schema.VERSION}",
-        ssl=_tls(),
-        max_size=1 << 20,
-        ping_interval=KEEPALIVE_S,
-    )
+    try:
+        ws = await ws_connect(
+            f"wss://{host}:{port}/v{schema.VERSION}",
+            ssl=_tls(),
+            max_size=1 << 20,
+            ping_interval=KEEPALIVE_S,
+        )
+    except ssl.SSLError as error:
+        # An SSLError is an OSError, but the lamp (or something) DID answer: the
+        # network is fine, so say so rather than send the developer to check it.
+        reason = getattr(error, "reason", None) or error
+        raise SecureConnectionFailed(
+            f"something answered at {host}:{port} but the secure connection failed ({reason}): "
+            "check that the address is the lamp's and that nothing else answers on its port"
+        ) from error
+    except (OSError, asyncio.TimeoutError) as error:
+        raise Unreachable(_no_answer(host, port, error)) from error
     seen = pin_of(ws.transport.get_extra_info("ssl_object").getpeercert(binary_form=True))
     if seen != pin:
         await ws.close()

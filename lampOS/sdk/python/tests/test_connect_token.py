@@ -65,10 +65,10 @@ def test_a_pairing_wins_over_the_token(monkeypatch, tmp_path):
             keyring = alone(monkeypatch, tmp_path, fake, fake.mint_token(["light"]))
             # A pairing to a door nobody listens at: connect goes there, not to the control socket.
             keyring.remember(Pairing(lamp="lamp-x", name="x", client="c_1", grants=["light"], fp="00" * 32, host="127.0.0.1", port=1))
-            with pytest.raises(Exception) as caught:
+            with pytest.raises(errors.Unreachable) as caught:
                 await Lamp.connect(keyring=keyring)
             assert not isinstance(caught.value, errors.NotPaired)
-            assert not isinstance(caught.value, errors.LampError), repr(caught.value)
+            assert "no answer from 127.0.0.1:1" in str(caught.value), repr(caught.value)
 
     run(go())
 

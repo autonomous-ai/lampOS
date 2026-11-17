@@ -62,6 +62,28 @@ class WrongLamp(LampError):
     code = "wrong_lamp"
 
 
+class Unreachable(LampError):
+    """Nothing answered at the lamp's address: refused, no such name, no route or too slow.
+
+    Said in one line with the address and the system's own reason; like
+    `NotPaired` and `WrongLamp` it is the SDK's, not a code the lamp sends,
+    so it has no `WHAT_TO_DO` entry: the line carries its own advice.
+    """
+
+    code = "unreachable"
+
+
+class SecureConnectionFailed(LampError):
+    """Something answered at the lamp's address, but the secure (TLS) connection failed.
+
+    Not "no answer": the network works. Usually the address is another
+    machine's, or something that does not speak TLS answers on the lamp's port.
+    The SDK's own, like `Unreachable`, with no `WHAT_TO_DO` entry.
+    """
+
+    code = "tls_failed"
+
+
 def _class_name(code: str) -> str:
     return "".join(word.capitalize() for word in code.split("_")) + "Error"
 
