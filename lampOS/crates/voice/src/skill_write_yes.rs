@@ -115,6 +115,10 @@ pub struct Waiting {
     /// model ([`line_heard`]): its round is not forced to answer when that
     /// line was only the lamp's name ([`approve_forced_now`]).
     pub newest_line: u64,
+    /// When each request's words from the make's on were played to their
+    /// end, in monotonic µs ([`played_until`]): where the carry of a yes
+    /// counts from (`LAMP_SKILL_YES_CARRY`, #7148, [`asked_until`]).
+    pub played: VecDeque<(u64, u64)>,
 }
 
 /// A skill's task, or a made skill's code, just agreed to (#6749 A): its
@@ -200,6 +204,7 @@ fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> Str
             late_guarded: 0,
             name_only: Vec::new(),
             newest_line: 0,
+            played: VecDeque::new(),
         });
     });
     if remove {
@@ -564,18 +569,67 @@ pub fn awaited(now: Instant) -> bool {
 /// 13 Nov).
 pub fn answer_awaited(request: u64, now: Instant) -> bool {
     kept::waiting(|waiting| {
-        waiting.as_ref().is_some_and(|waiting| {
-            request > waiting.request
-                && now.saturating_duration_since(waiting.at) <= YES_WITHIN
-                && waiting
-                    .said
-                    .iter()
-                    .filter(|kept| kept.0 < request && stands_between(waiting, kept))
-                    .max_by_key(|(id, ..)| *id)
-                    .is_some_and(|(_, said, cut)| {
-                        !cut && crate::services::read_back_said(&waiting.asks.say_back, said)
-                    })
+        waiting
+            .as_ref()
+            .is_some_and(|waiting| say_back_before(waiting, request, now).is_some())
+    })
+}
+
+/// The request whose answer held the whole say-back a line in `request` at
+/// `now` would answer ([`answer_awaited`]); none, no yes is awaited.
+fn say_back_before(waiting: &Waiting, request: u64, now: Instant) -> Option<u64> {
+    if request <= waiting.request || now.saturating_duration_since(waiting.at) > YES_WITHIN {
+        return None;
+    }
+    waiting
+        .said
+        .iter()
+        .filter(|kept| kept.0 < request && stands_between(waiting, kept))
+        .max_by_key(|(id, ..)| *id)
+        .filter(|(_, said, cut)| {
+            !cut && crate::services::read_back_said(&waiting.asks.say_back, said)
         })
+        .map(|(id, ..)| *id)
+}
+
+/// The lamp's words in `request` play until `until_us` (monotonic µs,
+/// `second_provider::Did::Said`): kept while a yes waits, for the make's
+/// request and any after it, the latest end of each.
+pub fn played_until(request: u64, until_us: u64) {
+    kept::waiting(|waiting| {
+        let Some(waiting) = waiting
+            .as_mut()
+            .filter(|waiting| request >= waiting.request)
+        else {
+            return;
+        };
+        match waiting.played.iter_mut().find(|(id, _)| *id == request) {
+            Some((_, until)) => *until = (*until).max(until_us),
+            None => {
+                if waiting.played.len() == SAID_KEPT {
+                    waiting.played.pop_front();
+                }
+                waiting.played.push_back((request, until_us));
+            }
+        }
+    });
+}
+
+/// The lamp's question a line in `request` at `now` answers, while a
+/// skill's yes is awaited ([`answer_awaited`]): the request whose answer
+/// held the whole say-back, and when its words ended as played (monotonic
+/// µs, [`played_until`]). The carry of a yes counts its 45 s from there
+/// (`LAMP_SKILL_YES_CARRY`, #7148), as #6749 C's thread window does. None
+/// when no yes is awaited or that answer's play was never told.
+pub fn asked_until(request: u64, now: Instant) -> Option<(u64, u64)> {
+    kept::waiting(|waiting| {
+        let waiting = waiting.as_ref()?;
+        let asked = say_back_before(waiting, request, now)?;
+        waiting
+            .played
+            .iter()
+            .find(|(id, _)| *id == asked)
+            .map(|&(_, until)| (asked, until))
     })
 }
 
