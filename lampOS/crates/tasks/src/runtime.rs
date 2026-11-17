@@ -4693,9 +4693,25 @@ pub fn serve<C: Clock>(
     let one_session = (skill_tasks
         && crate::one_session::on(std::env::var(crate::one_session::SWITCH).ok().as_deref()))
     .then(|| {
+        let one = crate::one_session::OneSession::lamp(&config.dir)
+            .with_spoken_bound(SPOKEN_PANE_WAIT, stop.clone());
+        // `LAMP_TASKS_KEPT_SESSION` on (openharness#4393): the pane is the
+        // lamp's kept session once Harness keeps program sessions; an
+        // older Harness keeps the pane as before.
         Arc::new(
-            crate::one_session::OneSession::lamp(&config.dir)
-                .with_spoken_bound(SPOKEN_PANE_WAIT, stop.clone()),
+            if crate::one_session::on(
+                std::env::var(crate::one_session::KEPT_SWITCH)
+                    .ok()
+                    .as_deref(),
+            ) {
+                eprintln!(
+                    "tasks: one session: kept session on ({}=on), once Harness keeps program sessions",
+                    crate::one_session::KEPT_SWITCH
+                );
+                one.with_kept_session(config.dir.join(crate::one_session::TOKEN_FILE))
+            } else {
+                one
+            },
         )
     });
     if one_session.is_some() && std::env::var_os("HOME").is_none() {
