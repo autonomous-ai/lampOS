@@ -10476,7 +10476,10 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
     let token = rig.root.path().join("kept-session.token");
     lamp_tasks::one_session::token_file(&token).unwrap();
     let secret = fs::read_to_string(&token).unwrap();
-    assert_eq!(fs::metadata(&token).unwrap().permissions().mode() & 0o777, 0o600);
+    assert_eq!(
+        fs::metadata(&token).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
     rig.plan(json!({
         "capabilities":{"stdout":"{\"programSessions\":1}\n"},
         "ensure":{"stdout":format!("{}\n", json!({
@@ -10499,7 +10502,13 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
     let cli = rig.cli();
     assert_eq!(cli.program_sessions(), Some(true));
     assert_eq!(
-        cli.ensure_kept(EngineKind::Openclaw, "lamp-one-openclaw", &token, "/f", false),
+        cli.ensure_kept(
+            EngineKind::Openclaw,
+            "lamp-one-openclaw",
+            &token,
+            "/f",
+            false
+        ),
         Ok(Ensured {
             result: "resumed".into(),
             agent_id: AGENT.into(),
@@ -10508,21 +10517,47 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
             engine_session: Some("s".into())
         })
     );
-    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "New task t:\nGo."), Took::Taken("program:in-1".into()));
-    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::NotIdle);
-    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::EngineNotReady);
-    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::Timeout);
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "New task t:\nGo."),
+        Took::Taken("program:in-1".into())
+    );
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        Took::NotIdle
+    );
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        Took::EngineNotReady
+    );
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        Took::Timeout
+    );
     // Typed though timed out: that input, never typed again.
-    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::Taken("program:in-2".into()));
-    assert!(matches!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::Uncertain(_)));
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        Took::Taken("program:in-2".into())
+    );
+    assert!(matches!(
+        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        Took::Uncertain(_)
+    ));
     assert_eq!(
         cli.reply_kept("lamp-one-openclaw", &token, "x"),
         Took::NotSent("reply_not_yours".into())
     );
     // OpenClaw's TUI takes a first `!` or `/` as its own command.
-    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "  !rm x"), Took::Taken("program:in-3".into()));
     assert_eq!(
-        cli.wait_kept("lamp-one-openclaw", &token, "program:in-1", &AtomicBool::new(false)),
+        cli.reply_kept("lamp-one-openclaw", &token, "  !rm x"),
+        Took::Taken("program:in-3".into())
+    );
+    assert_eq!(
+        cli.wait_kept(
+            "lamp-one-openclaw",
+            &token,
+            "program:in-1",
+            &AtomicBool::new(false)
+        ),
         Ok(Some("needs-input".into()))
     );
     assert_eq!(cli.close_kept("lamp-one-openclaw", &token), Ok(()));
@@ -10532,13 +10567,23 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
         assert!(!call.to_string().contains(secret.trim()), "{call}");
         let args = call["args"].as_array().unwrap();
         if args[0] != "capabilities" {
-            let at = args.iter().position(|arg| arg == "--program-token-file").unwrap();
+            let at = args
+                .iter()
+                .position(|arg| arg == "--program-token-file")
+                .unwrap();
             assert_eq!(args[at + 1], path);
         }
     }
     assert_eq!(calls[1]["args"][0], "ensure");
-    let last_reply = calls.iter().rev().find(|call| call["args"][0] == "reply").unwrap();
-    assert_eq!(last_reply["args"].as_array().unwrap().last().unwrap(), "Task:   !rm x");
+    let last_reply = calls
+        .iter()
+        .rev()
+        .find(|call| call["args"][0] == "reply")
+        .unwrap();
+    assert_eq!(
+        last_reply["args"].as_array().unwrap().last().unwrap(),
+        "Task:   !rm x"
+    );
     // Harness's own 30 s hold is too short for the first reply after the
     // engine starts: 60 s is asked for.
     let held = last_reply["args"].as_array().unwrap();
@@ -10580,9 +10625,15 @@ fn a_reply_to_the_pane_reads_the_acknowledged_answer() {
         "wait":{"exit":0},
     }));
     let cli = rig.cli();
-    assert_eq!(cli.reply_to(MACHINE, AGENT, "New task t:\nGo."), Typed::Taken("program:in-1".into()));
+    assert_eq!(
+        cli.reply_to(MACHINE, AGENT, "New task t:\nGo."),
+        Typed::Taken("program:in-1".into())
+    );
     assert_eq!(cli.reply_to(MACHINE, AGENT, "x"), Typed::Cancelled);
-    assert_eq!(cli.reply_to(MACHINE, AGENT, "x"), Typed::Taken("program:in-2".into()));
+    assert_eq!(
+        cli.reply_to(MACHINE, AGENT, "x"),
+        Typed::Taken("program:in-2".into())
+    );
     assert_eq!(cli.reply_to(MACHINE, AGENT, "x"), Typed::Typed);
     assert_eq!(
         cli.wait_after(MACHINE, AGENT, "program:in-1", &AtomicBool::new(false)),
@@ -10590,6 +10641,9 @@ fn a_reply_to_the_pane_reads_the_acknowledged_answer() {
     );
     let calls = rig.calls();
     let wait = calls.last().unwrap()["args"].as_array().unwrap().clone();
-    assert!(wait.contains(&json!("--after")) && wait.contains(&json!("program:in-1")), "{wait:?}");
+    assert!(
+        wait.contains(&json!("--after")) && wait.contains(&json!("program:in-1")),
+        "{wait:?}"
+    );
     assert!(!wait.contains(&json!("--program-token-file")));
 }

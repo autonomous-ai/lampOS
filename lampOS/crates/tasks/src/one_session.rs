@@ -2039,7 +2039,10 @@ impl OneSession {
         // At a rotation the old conversation's key, deleted once `--fresh`
         // made a new one (Harness's close keeps it in OpenClaw's store).
         let old = fresh
-            .then(|| self.kept().map(|(agent, _, _)| (self.kept_session_key(&agent), agent)))
+            .then(|| {
+                self.kept()
+                    .map(|(agent, _, _)| (self.kept_session_key(&agent), agent))
+            })
             .flatten();
         let name = name_for(place.engine);
         // `ENGINE_NOT_READY` (the old engine still exiting after a crash,
@@ -2130,7 +2133,9 @@ impl OneSession {
         let input = match harness.reply_kept(name, token, OPEN_PROMPT) {
             Took::Taken(input) => input,
             other => {
-                eprintln!("tasks: one session: the kept session's first words not taken: {other:?}");
+                eprintln!(
+                    "tasks: one session: the kept session's first words not taken: {other:?}"
+                );
                 return;
             }
         };
@@ -2284,7 +2289,8 @@ impl Turn<'_> {
                     // lamp-tasks' own queue, tried again until its end.
                     Took::NotIdle | Took::EngineNotReady => {
                         if ended() || Instant::now() >= until {
-                            return self.fallback("the kept session stayed busy until the run's end");
+                            return self
+                                .fallback("the kept session stayed busy until the run's end");
                         }
                         std::thread::sleep(self.one.look);
                     }
@@ -2292,8 +2298,10 @@ impl Turn<'_> {
                     // again once (a died pane comes back resumed).
                     Took::NotRunning | Took::Timeout if !reopened => {
                         reopened = true;
-                        self.one
-                            .gone(&agent, "Harness did not take the words into the kept session");
+                        self.one.gone(
+                            &agent,
+                            "Harness did not take the words into the kept session",
+                        );
                     }
                     Took::NotRunning | Took::Timeout => {
                         return self.fallback("the kept session ensured again did not take them");
@@ -2306,7 +2314,8 @@ impl Turn<'_> {
                     Took::NotSent(code) if code == "reply_not_yours" && !reopened => {
                         reopened = true;
                         self.one.not_ours("NOT_YOURS");
-                        self.one.gone(&agent, "Harness says the kept session is not ours");
+                        self.one
+                            .gone(&agent, "Harness says the kept session is not ours");
                     }
                     Took::NotSent(code) => return self.fallback(&format!("harness reply: {code}")),
                     Took::Uncertain(code) => {
@@ -2357,7 +2366,8 @@ impl Turn<'_> {
                 // Not taken in Harness's bound, nothing typed: again.
                 Typed::Cancelled => {
                     if ended() || Instant::now() >= until {
-                        return self.fallback("the pane did not take the words until the run's end");
+                        return self
+                            .fallback("the pane did not take the words until the run's end");
                     }
                     std::thread::sleep(self.one.look);
                 }
@@ -2530,7 +2540,12 @@ impl Turn<'_> {
         cancel: &AtomicBool,
         before_close: &dyn Fn(),
     ) -> Ended {
-        let input = self.one.lock().pane.as_ref().and_then(|pane| pane.input.clone());
+        let input = self
+            .one
+            .lock()
+            .pane
+            .as_ref()
+            .and_then(|pane| pane.input.clone());
         let Some(input) = input else {
             return Ended::Failed("the kept session took no input for this turn".into());
         };
@@ -2579,8 +2594,7 @@ impl Turn<'_> {
                     );
                 }
                 Ok(Some(state)) => {
-                    self.one
-                        .gone(agent, &format!("Harness said it is {state}"));
+                    self.one.gone(agent, &format!("Harness said it is {state}"));
                     return Ended::Failed(format!("the run ended as Harness says {state}"));
                 }
                 Err(code) if code == "cancelled" => {

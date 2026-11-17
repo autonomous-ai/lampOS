@@ -986,7 +986,11 @@ fn an_openclaw_pane_is_never_rotated_by_count() {
     assert!(!rotation_due(EngineKind::Openclaw, u64::MAX, u64::MAX));
     assert!(rotation_due(EngineKind::Hermes, ROTATE_TURNS, 0));
     assert!(rotation_due(EngineKind::Hermes, 0, ROTATE_TOKENS));
-    assert!(!rotation_due(EngineKind::Hermes, ROTATE_TURNS - 1, ROTATE_TOKENS - 1));
+    assert!(!rotation_due(
+        EngineKind::Hermes,
+        ROTATE_TURNS - 1,
+        ROTATE_TOKENS - 1
+    ));
     let dir = tempfile::tempdir().unwrap();
     let one = kept_session(dir.path()).with_session_delete(Box::new(|_| Ok(())));
     let fake = Fake::default();
@@ -1921,9 +1925,15 @@ fn a_kept_session_whose_engine_died_after_a_start_is_resumed_not_removed() {
     let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
     again.open_if_due(&fake, &place());
     assert_eq!(again.agent(), Some(agent_of(1)));
-    assert!(!again.kept_signed_in(), "the adopt keeps the sign-in it was opened under");
+    assert!(
+        !again.kept_signed_in(),
+        "the adopt keeps the sign-in it was opened under"
+    );
     // Its engine died: let go by the turn, then the next look signed out.
-    again.gone(&agent_of(1), "Harness did not take the words into the kept session");
+    again.gone(
+        &agent_of(1),
+        "Harness did not take the words into the kept session",
+    );
     let harness = || Some(&fake);
     again.remove_if_due(&Looks::default(), key.as_ref(), true, &harness);
     assert_eq!(fake.count("close"), 0, "{:?}", fake.calls());
@@ -2021,10 +2031,14 @@ fn an_engine_not_ready_ensure_is_tried_again_shortly() {
     let dir = tempfile::tempdir().unwrap();
     let (_, fake) = kept_on(dir.path());
     // A first-turn bound well past the retries' (250 ms apart here).
-    let one = OneSession::new(Duration::from_secs(5), Duration::from_millis(5), Duration::from_secs(20))
-        .with_session_delete(Box::new(|_| Ok(())))
-        .with_state_file(dir.path().join(STATE_FILE))
-        .with_kept_session(dir.path().join(TOKEN_FILE));
+    let one = OneSession::new(
+        Duration::from_secs(5),
+        Duration::from_millis(5),
+        Duration::from_secs(20),
+    )
+    .with_session_delete(Box::new(|_| Ok(())))
+    .with_state_file(dir.path().join(STATE_FILE))
+    .with_kept_session(dir.path().join(TOKEN_FILE));
     fake.ensure_errors
         .lock()
         .unwrap()
