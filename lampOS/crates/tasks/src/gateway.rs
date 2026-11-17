@@ -60,6 +60,13 @@ pub trait Probe: Send {
     fn not_ready(&self) -> String {
         format!("the OpenClaw Gateway did not answer on 127.0.0.1:{PORT}")
     }
+
+    /// Whether the last look found the Gateway's port answering, though it
+    /// may not serve yet. A probe of the port alone is ready exactly when it
+    /// answers, so its wait needs no bound of its own for the port.
+    fn port_answered(&self) -> bool {
+        true
+    }
 }
 
 /// The real Gateway on loopback [`PORT`] ([`answers`]).
@@ -307,6 +314,10 @@ impl Probe for Serving {
         read
     }
 
+    fn port_answered(&self) -> bool {
+        self.port_answered
+    }
+
     fn not_ready(&self) -> String {
         if self.port_answered {
             format!(
@@ -425,6 +436,10 @@ pub struct Gateway {
     probe: Box<dyn Probe>,
     ready_within: Duration,
     ready_every: Duration,
+    /// How long the port alone is waited for, when shorter than
+    /// `ready_within`: a Gateway that never answers on its port is not
+    /// starting, so its wait ends here, as a spoken task's does (#6577).
+    port_within: Option<Duration>,
 }
 
 impl Gateway {
@@ -433,9 +448,20 @@ impl Gateway {
     }
 
     /// A skill's run's wait (#7170): until the Gateway serves its RPCs
-    /// ([`Serving::lamp`]), at most [`SERVING_WITHIN`].
+    /// ([`Serving::lamp`]), at most [`SERVING_WITHIN`]; but a Gateway whose
+    /// port has not answered by [`READY_WITHIN`] is given up then, as a
+    /// spoken task's is (#6577, lamp-fc4b, 17 Nov: a stopped Gateway held a
+    /// skill's run 240 s, and the person heard nothing all that time).
     pub fn serving() -> Self {
         Self::with_bounds(Box::new(Serving::lamp()), SERVING_WITHIN, READY_EVERY)
+            .with_port_within(READY_WITHIN)
+    }
+
+    /// With the port alone waited for at most `within`: past it, a Gateway
+    /// whose port never answered is given up, whatever the ready bound.
+    pub fn with_port_within(mut self, within: Duration) -> Self {
+        self.port_within = Some(within);
+        self
     }
 
     pub fn with_bounds(
@@ -447,6 +473,7 @@ impl Gateway {
             probe,
             ready_within,
             ready_every,
+            port_within: None,
         }
     }
 
@@ -470,10 +497,24 @@ impl Gateway {
         deadline: Instant,
         cancelled: &dyn Fn() -> bool,
     ) -> Result<(), String> {
-        let until = deadline.min(Instant::now() + self.ready_within);
+        let began = Instant::now();
+        let until = deadline.min(began + self.ready_within);
+        // Whether the port has answered in this wait: once it has, the
+        // Gateway is up or starting, and only `until` bounds it.
+        let mut port_seen = false;
         loop {
             if cancelled() {
                 return Err("the OpenClaw wait was cancelled".into());
+            }
+            if let Some(within) = self.port_within
+                && !port_seen
+                && began.elapsed() >= within
+            {
+                return Err(format!(
+                    "{} within {} s",
+                    self.probe.not_ready(),
+                    within.as_secs()
+                ));
             }
             if Instant::now() >= until {
                 return Err(format!(
@@ -481,9 +522,12 @@ impl Gateway {
                     self.probe.not_ready()
                 ));
             }
+            // A port look is bounded by its own short I/O bounds, so the
+            // port's bound is never overrun by more than one look.
             if self.probe.ready_until(until, cancelled) && !cancelled() && Instant::now() < until {
                 return Ok(());
             }
+            port_seen |= self.probe.port_answered();
             thread::sleep(
                 self.ready_every
                     .min(until.saturating_duration_since(Instant::now())),
@@ -1236,6 +1280,104 @@ mod tests {
             within,
             Duration::from_millis(1),
         )
+    }
+
+    /// #6577, lamp-fc4b, 17 Nov 18:53: a stopped Gateway never answers on
+    /// its port; a skill's run is given up at the port's bound, as a spoken
+    /// task is, not held to the serving bound, and no approvals read runs.
+    #[test]
+    fn a_gateway_whose_port_never_answers_is_given_up_at_the_ports_bound() {
+        let dir = tempfile::tempdir().unwrap();
+        let (argv, at) = read_script(dir.path(), Some(1));
+        let port = Fake::default();
+        let mut waited = serving(argv, &port, Duration::from_secs(20))
+            .with_port_within(Duration::from_millis(200));
+        let began = Instant::now();
+        let outcome = launch_with(Some(&mut waited), &launch(EngineKind::Openclaw), || {
+            panic!("never sent to a Gateway that does not answer")
+        });
+        assert!(
+            matches!(outcome, LaunchOutcome::NotSent { .. }),
+            "{outcome:?}"
+        );
+        assert!(
+            began.elapsed() < Duration::from_secs(5),
+            "given up at the port's bound, not the serving bound: {:?}",
+            began.elapsed()
+        );
+        assert_eq!(runs(&at), 0, "no approvals read without the port");
+    }
+
+    /// The port answering within its bound, the wait goes on to the serving
+    /// bound: a Gateway still starting (#7170) is not given up at the port's
+    /// bound, so a slow approvals read is waited out, and one never served
+    /// ends only at the serving bound.
+    #[test]
+    fn a_gateway_answering_on_its_port_is_waited_for_to_the_serving_bound() {
+        let dir = tempfile::tempdir().unwrap();
+        // Served from the fourth read, the reads spaced past the port's bound.
+        let (argv, at) = read_script(dir.path(), Some(4));
+        let port = Fake {
+            ready_from: Some(2),
+            ..Fake::default()
+        };
+        let mut waited = Gateway::with_bounds(
+            Box::new(Serving::new(
+                Box::new(port.clone()),
+                Box::new(ApprovalsRead::new(
+                    argv,
+                    Duration::from_secs(5),
+                    Duration::from_millis(150),
+                )),
+            )),
+            Duration::from_secs(20),
+            Duration::from_millis(1),
+        )
+        .with_port_within(Duration::from_millis(100));
+        let outcome = launch_with(Some(&mut waited), &launch(EngineKind::Openclaw), || {
+            assert_eq!(runs(&at), 4, "sent once the approvals read answered");
+            LaunchOutcome::Created {
+                agent_id: "x".into(),
+            }
+        });
+        assert!(
+            matches!(outcome, LaunchOutcome::Created { .. }),
+            "{outcome:?}"
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        let (argv, at) = read_script(dir.path(), None);
+        let port = Fake {
+            ready_from: Some(1),
+            ..Fake::default()
+        };
+        let mut waited = serving(argv, &port, Duration::from_millis(600))
+            .with_port_within(Duration::from_millis(100));
+        let began = Instant::now();
+        let outcome = launch_with(Some(&mut waited), &launch(EngineKind::Openclaw), || {
+            panic!("never sent before the approvals read answers")
+        });
+        assert!(
+            matches!(outcome, LaunchOutcome::NotSent { .. }),
+            "{outcome:?}"
+        );
+        assert!(
+            began.elapsed() >= Duration::from_millis(600),
+            "held to the serving bound once the port answered: {:?}",
+            began.elapsed()
+        );
+        // Read at least once: the port answered, so the read was tried (how
+        // often within 600 ms depends on how fast `sh` starts).
+        assert!(runs(&at) >= 1, "the approvals read was tried");
+    }
+
+    /// The lamp's skill-run wait has the port's bound of a spoken task.
+    #[test]
+    fn the_lamps_serving_wait_gives_up_a_silent_port_as_a_spoken_task_does() {
+        let waited = Gateway::serving();
+        assert_eq!(waited.port_within, Some(READY_WITHIN));
+        assert_eq!(waited.ready_within, SERVING_WITHIN);
+        assert!(READY_WITHIN < SERVING_WITHIN);
     }
 
     /// #7170, lamp-c0a4: a Gateway answering on its port but still
