@@ -4369,27 +4369,20 @@ fn the_product_holds_harness_at_its_pinned_version() {
     );
 }
 
-/// #7246: the product's lamp-tasks keeps one session for the lamp's default
-/// agent (`LAMP_TASKS_ONE_SESSION`), once, beside the switches it needs.
+/// #7246: the product's lamp-tasks leaves one session for the lamp's
+/// default agent (`LAMP_TASKS_ONE_SESSION`) off; its `reply_off` fallback
+/// is ready for a switch-on later. Each task keeps its own pane.
 #[test]
-fn the_product_keeps_one_session_for_the_lamps_agent() {
+fn the_product_leaves_one_session_off() {
     let tasks = install::PRODUCT
         .iter()
         .find(|(name, _)| *name == "lamp-tasks.service")
         .unwrap()
         .1;
-    let service = section(tasks, "Service");
-    let on = service
-        .iter()
-        .filter(|line| **line == "Environment=LAMP_TASKS_ONE_SESSION=on")
-        .count();
-    assert_eq!(on, 1, "the product's lamp-tasks keeps no one session");
-    for line in [
-        "Environment=LAMP_SKILL_TASKS=on",
-        "Environment=LAMP_SKILL_DEFAULT_AGENT=on",
-    ] {
-        assert!(service.contains(&line), "lamp-tasks lacks {line}");
-    }
+    assert!(
+        !tasks.contains("LAMP_TASKS_ONE_SESSION"),
+        "the product's lamp-tasks sets LAMP_TASKS_ONE_SESSION"
+    );
 }
 
 /// #811, from lamp-06c1: without Harness (its own installer's to put on the
