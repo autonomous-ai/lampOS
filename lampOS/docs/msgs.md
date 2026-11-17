@@ -628,6 +628,26 @@ lasts `CHAT_ANSWER_WITHIN` (60 s), the minute `lamp-cloud` waits for its
 answer before it ends the run, so one still queued after that is passed
 over, never answered (the reviewer on #1713).
 
+## The devices contract (#7470)
+
+The owner's desk and Hydrate bottles, reached through the cloud
+(`LAMP_DEVICES=on`, off unless set). The types live in `src/devices.rs`;
+`devices_topics()` and `declaration_of()` find their topics.
+
+| Type | Topic | Kind | Period / lifespan | Meaning |
+|---|---|---|---|---|
+| `DevicesAsk` | `devices/ask` | event | none / 10 s | One question or command by its `req_id`: `list`, `state` of a `device_id`, or a `command` to a desk, `goto_height` (60 to 132 cm) or `stop`. Published by the voice; `lamp-cloud` sends it up as `devices.list.get`, `devices.state.get` or `devices.command` |
+| `DevicesAnswer` | `devices/answer` | event | none / 30 s | The cloud's reply under the same `req_id`: `list` (the owner's devices), `state` (`height_cm`, `online`, `today_ml`, `sips_today`, `goal_ml`, each only when the cloud has it), `command` (`ok`, `refused` or `error`, and its reason for the journal), or `none` with why the lamp has no answer (`timeout`, `away`, `unlisted`, `busy`, `cancelled`). Published by `lamp-cloud` |
+| `DevicesEvent` | `devices/event` | event | none / 60 s | A device's own news from the cloud (`hydrate.sip`, `desk.height`): `device_id`, `device_type` (`desk` or `hydrate`), `event`, `at` and a small `data`. Published by `lamp-cloud` |
+
+`lamp-cloud` takes an ask only from the publisher `voice`, sends a desk
+command only to a desk and a state only for a device the cloud's last list
+gave it, and answers any other `unlisted` without sending. At most 8 asks wait
+and 20 are taken a minute (`busy`); a `stop` skips both, goes first, and
+cancels every command still waiting. An ask is sent once, never again after a
+reconnect: with the broker away it is answered `away`. `ok` to a command means
+it was handed to the desk, not that the desk moved: read `state` after.
+
 ## The reports contract
 
 Added by Jarvis on 2026-10-19 (#1683). The types live in `src/reports.rs`
