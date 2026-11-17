@@ -668,10 +668,22 @@ pub fn tool() -> lamp_gemini::Tool {
     } else {
         REMOVE_TOLD
     });
+    // A thing for the lamp to do at a time or on a repeat is a skill, never
+    // a reminder (`LAMP_SKILL_RECURRING_TOLD`, lamp-9adf, 17 Nov): told on
+    // the request, since with every switch on the description has no room.
+    let mut parameters = parameters_with(writes, tasks, code);
+    if crate::skill_recurring::on()
+        && let Some(request) = parameters["properties"]["request"]["description"]
+            .as_str()
+            .map(str::to_owned)
+    {
+        parameters["properties"]["request"]["description"] =
+            json!(format!("{request}{}", crate::skill_recurring::REQUEST_TOLD));
+    }
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
         description,
-        parameters: Some(parameters_with(writes, tasks, code)),
+        parameters: Some(parameters),
         silent: false,
     }
 }
@@ -7338,6 +7350,48 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             "boolean"
         );
         assert!(parameters.to_string().len() <= 4_096);
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_writes_here(None);
+        made_skill::set_scripts_here(None);
+    }
+
+    /// `LAMP_SKILL_RECURRING_TOLD` (lamp-9adf, 17 Nov: "every morning at
+    /// nine, read me my new emails" set a reminder and read the mail now):
+    /// with it, the function's request says a thing for the lamp to do at
+    /// a time or on a repeat is a skill, never a reminder, still within the
+    /// link's bounds with every switch on, the description unchanged; off,
+    /// as before.
+    #[test]
+    fn a_repeat_for_the_lamp_to_do_is_told_a_skill_with_its_switch_alone() {
+        crate::skill_recurring::set_on_here(Some(false));
+        let off = tool();
+        let request = |tool: &lamp_gemini::Tool| {
+            tool.parameters.as_ref().unwrap()["properties"]["request"]["description"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        };
+        assert!(!request(&off).contains("every morning at nine"));
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        crate::skill_recurring::set_on_here(Some(false));
+        let before = tool();
+        crate::skill_recurring::set_on_here(Some(true));
+        let all = tool();
+        assert_eq!(all.description, before.description);
+        assert!(all.description.len() <= 1_024, "{}", all.description.len());
+        let asked = request(&all);
+        assert!(
+            asked.ends_with(crate::skill_recurring::REQUEST_TOLD),
+            "{asked}"
+        );
+        assert!(
+            asked.contains("checks the processor temperature"),
+            "{asked}"
+        );
+        assert!(all.parameters.unwrap().to_string().len() <= 4_096);
+        crate::skill_recurring::set_on_here(None);
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_writes_here(None);
         made_skill::set_scripts_here(None);
