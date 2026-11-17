@@ -2189,7 +2189,8 @@ level face reads 0, to be checked on this lamp's YuNet on the row. A face
 too small for a turn, or turned past 60 degrees, has no pitch (not
 measured). Marks no head could make (a mark not a number, the eyes on one
 another, the mouth above the eyes with the nose below) read `LOST_DEG`,
-90 degrees down: outside the window, so a lost pitch never counts as
+90 degrees down (`pitch` π/2 radians on the bus; `pitch_deg` works in
+degrees, the message in radians): outside the window, so a lost pitch never counts as
 facing. The window the voice may use is `MAX_PITCH_UP_DEG` 20 to
 `MAX_PITCH_DOWN_DEG` 25 (`facing::pitch_within`); authored, to be set on
 the row.
