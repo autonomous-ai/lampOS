@@ -63,12 +63,9 @@ Environment=LAMP_OPENCLAW_ON_LAMP=on
 # A follow-up for a session --close-told already closed (#5978): it is found by its last ask with `harness show`
 # and reopened with `harness resume`, then the work is typed in, never a new session.
 Environment=LAMP_TASKS_RESUME_CLOSED=on
-# One session for the lamp's default agent (#7246, docs/tasks.md "One session for the lamp's default agent"): on an
-# OpenClaw default, every spoken task and skill run is typed into ONE Harness pane, not a pane each. Off: a pane per task.
+# One session for the lamp's default agent (#7246, #7507; docs/switches.md).
 Environment=LAMP_TASKS_ONE_SESSION=on
-# The one session as the lamp's kept session (openharness#4393, docs/tasks.md "The kept session"): with a Harness
-# that keeps program sessions (`harness capabilities`), opened with `harness ensure` and typed into with an
-# acknowledged `harness reply`, signed out too. An older Harness: the one session as before.
+# The one session as Harness's kept session (openharness#4393, #7507; docs/switches.md).
 Environment=LAMP_TASKS_KEPT_SESSION=on
 RuntimeDirectory=lampos-tasks
 RuntimeDirectoryMode=0700
