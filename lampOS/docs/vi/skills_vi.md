@@ -2304,8 +2304,19 @@ cả hai người viết.
   chạy được skill-start, nên lần chạy của nó bỏ `lamp-skills pack` của
   hướng dẫn; kiểm tra và sửa của giọng nói vẫn như cũ. Một `cannot:` được
   chuyển nguyên văn tới phương án dự phòng của #7234. Nhật ký ghi "the
-  lamp's agent is OpenClaw: handed over on the one run path". Khi tắt, chỉ
-  Hermes được giao lần tạo, như trên.
+  lamp's agent is OpenClaw: handed over on the one run path". Trên đèn
+  hoàn toàn không có agent (không có target `lamp`; #7375), lần tạo
+  DeepSeek giữ được vẫn là kết quả và các lời từ chối của chính brief giữ
+  nguyên, nhưng lần tạo mà agent lẽ ra nhận sẽ kết thúc bằng một câu, qua
+  giọng nói và trong `not_kept` của app: "I couldn't make that one: this
+  lamp has no agent set up to make it." (`AGENT_MISSING`). Đó là lần tạo
+  yêu cầu một dịch vụ đã liên kết (với `LAMP_AGENT_SERVICES`), được báo
+  ngay mà không hỏi DeepSeek, không bao giờ giữ thành một `do.task` không
+  agent nào chạy ("it asks for a linked service (<code>): no agent on the
+  lamp to make it: told so, DeepSeek not asked"); và mọi lần tạo khác mà
+  DeepSeek thất bại sau các lần sửa ("DeepSeek failed and there is no
+  agent on the lamp to hand it to: told so"). Khi tắt, chỉ Hermes được
+  giao lần tạo, như trên, và đèn không có agent thì DeepSeek tự tạo.
 - **Mạng của nó: `LAMP_MAKE_AGENT_NET`** (không unit nào đặt; yêu cầu của
   chủ sở hữu, 12/11, quyết định của first builder,
   12/11 19:14). Mặc định lần chạy giữ mạng, như agent của V1, và gọi mô hình qua
