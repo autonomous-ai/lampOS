@@ -2944,8 +2944,9 @@ cùng `written_fields_are_held_as_lamp_voice_holds_them` của `lamp-cloud`.
 
 ## Bắt đầu khi được nói với đèn (`LAMP_MADE_SKILL_SAID=on`, tắt)
 
-Tắt nếu không đặt `LAMP_MADE_SKILL_SAID=on`, và không có trong unit sản phẩm
-nào (#6526, thiết kế của người xây dựng đầu tiên). Một kỹ năng tạo tại đây,
+Tắt nếu không đặt `LAMP_MADE_SKILL_SAID=on`; bật trong sản phẩm, trong
+lamp-voice và trình quản lý của lamp-skills (#6526, thiết kế của người xây
+dựng đầu tiên). Một kỹ năng tạo tại đây,
 bằng giọng nói hay trong ứng dụng (`made_skill::keep_asked`), có thể bắt đầu
 khi người dùng nói một yêu cầu với đèn, không bao giờ theo chuyện trong
 phòng: "khi tôi đang làm việc hay họp, tôi nói với đèn là tôi bận, và nó
