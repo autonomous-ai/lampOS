@@ -1047,17 +1047,22 @@ impl Door {
                 .filter(|_| session.run_socket)
                 .map(|run| {
                     let fixed = run.fixed_write.clone().map(|held| (run.run.clone(), held));
-                    (run.skill.clone(), fixed)
+                    (run.skill.clone(), run.run.clone(), fixed)
                 });
-            let (Some((skill, fixed_write)), Some(services)) = (run, self.services.clone()) else {
+            let (Some((skill, run_id, fixed_write)), Some(services)) = (run, self.services.clone())
+            else {
                 return refuse(ErrorCode::NoGrant, crate::services::RUNS_ONLY.to_owned());
             };
             let write = matches!(op, Op::ServiceWrite { .. });
             let mut line = match &fixed_write {
-                Some((_, held)) if write && held.covers(args) => {
-                    crate::services::Services::line(&skill, write, held.service(), &held.args())
-                }
-                _ => crate::services::Services::line(&skill, write, service, args),
+                Some((_, held)) if write && held.covers(args) => crate::services::Services::line(
+                    &skill,
+                    &run_id,
+                    write,
+                    held.service(),
+                    &held.args(),
+                ),
+                _ => crate::services::Services::line(&skill, &run_id, write, service, args),
             };
             if let Some((run, _)) = fixed_write {
                 line = crate::services::Services::fixed_write(&line, &run);
@@ -4136,7 +4141,7 @@ mod tests {
         let asked: Value = serde_json::from_str(&served.join().unwrap()).unwrap();
         assert_eq!(
             asked,
-            json!({"op": "call", "name": "service_read", "skill": "mail-count",
+            json!({"op": "call", "name": "service_read", "skill": "mail-count", "run": "r1",
                 "args": {"what": "search", "query": "is:unread", "service": "gmail-app"}})
         );
         // Once the run ends, its connection holds nothing.
@@ -4253,7 +4258,7 @@ mod tests {
         );
         assert!(lines[0].get("fixed_write_run").is_none(), "{}", lines[0]);
         let given = json!({"op": "call", "name": "service_write", "skill": "mail-count",
-            "fixed_write_run": "r1",
+            "fixed_write_run": "r1", "run": "r1",
             "args": {"service": "gmail-app", "action": "send_mail", "to": ["boss@work.test"],
                      "subject": "In", "text": "I'm at my desk."}});
         assert_eq!(lines[1], given);
