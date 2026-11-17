@@ -5078,6 +5078,8 @@ impl Engine {
             // A write read back and waiting for its send goes too
             // (Thirteen's P2 on #5968).
             crate::services::forget_waiting();
+            // And an ask with the lamp's agent is never told (`agent_asks`).
+            crate::agent_asks::forget();
             if self.shared.remember_speaker {
                 crate::remember_speaker::forget();
                 if let Some(eyes) = &self.shared.enrollment_sight {

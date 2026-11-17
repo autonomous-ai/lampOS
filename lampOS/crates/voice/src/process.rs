@@ -2516,6 +2516,9 @@ fn second_route_worker_environment(
         // With the make on the one run path (#7245).
         crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
         crate::make_no_cannot::ENVIRONMENT,
+        // A live read or a hard ask handed to the lamp's agent (17 Nov).
+        crate::agent_asks::SERVICES_ENVIRONMENT,
+        crate::agent_asks::HARD_ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).
         crate::remark_about_it::ENVIRONMENT,
@@ -2831,6 +2834,8 @@ mod tests {
             crate::make_skill_agent::GUIDE_ENVIRONMENT,
             crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
             crate::make_no_cannot::ENVIRONMENT,
+            crate::agent_asks::SERVICES_ENVIRONMENT,
+            crate::agent_asks::HARD_ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
             crate::opens_further::ENVIRONMENT,
@@ -3905,6 +3910,8 @@ mod tests {
                     || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
                     || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
                     || name == crate::make_no_cannot::ENVIRONMENT
+                    || name == crate::agent_asks::SERVICES_ENVIRONMENT
+                    || name == crate::agent_asks::HARD_ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
                     || name == crate::opens_further::ENVIRONMENT
@@ -4078,6 +4085,7 @@ mod tests {
                     "LAMP_FIRST_SECONDS_QUIET=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
+                    "LAMP_HARD_ASKS_TO_AGENT=on",
                     "LAMP_HELD_WORDS_SEEN=on",
                     "LAMP_HISTORY_AFTER_NOTE=on",
                     "LAMP_HISTORY_KEEPS_CALLS=on",
@@ -4213,6 +4221,7 @@ mod tests {
                     "LAMP_SECOND_WHILE_THEY_APPLY=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
                     "LAMP_SERVICES_TOLD=on",
+                    "LAMP_SERVICES_TO_AGENT=on",
                     "LAMP_SERVICE_CONTACTS=on",
                     "LAMP_SERVICE_READ_IDS_KEPT=on",
                     "LAMP_SERVICE_RECORDS=on",

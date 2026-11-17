@@ -2444,6 +2444,11 @@ pub fn serve(
             crate::make_skill_agent::set_tasks_dir(place.directory.clone());
         }
     }
+    // A live ask handed to the lamp's agent (`LAMP_SERVICES_TO_AGENT`,
+    // `LAMP_HARD_ASKS_TO_AGENT`) goes through this worker's tasks part.
+    if let Some(place) = &files.tools.tasks {
+        crate::agent_asks::set_tasks_dir(place.directory.clone());
+    }
     if own_key_report(own_keys_on, config.hosted.own_deepseek.is_some()).is_some() {
         report_own_key(
             files.bus_root.as_deref(),
