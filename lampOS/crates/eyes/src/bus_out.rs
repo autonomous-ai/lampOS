@@ -832,6 +832,11 @@ impl BusOut {
         self.ids.last.get(index).copied()
     }
 
+    /// Whether `LAMP_EYES_PITCH_GAZE` is on ([`Ids::pitch_gaze`], #7442).
+    pub fn pitch_gaze(&self) -> bool {
+        self.ids.pitch_gaze
+    }
+
     /// A Blendshape V2 read's gaze ([`Ids::gazed`], #7442).
     pub fn gazed(&mut self, id: u32, looking: Option<bool>, at_us: u64) {
         self.ids.gazed(id, looking, at_us);
@@ -1045,9 +1050,11 @@ mod tests {
         };
         message(&faces, &[], PICTURE, &mut on, 0);
         let seen = message(&faces, &[], PICTURE, &mut on, 100);
-        // The fixture's nose sits a little low: a head tipped a little down.
+        // The fixture's nose sits a little high against its mouth, beside
+        // the level YuNet gives on the lamp (`facing::LEVEL_NOSE_DROP`): a
+        // head tipped a little up.
         let pitch = seen.faces[0].pitch.unwrap().to_degrees();
-        assert!((0.0..15.0).contains(&pitch), "{pitch}");
+        assert!((-15.0..0.0).contains(&pitch), "{pitch}");
         assert!(seen.faces[1].pitch.is_some());
         // Too small to measure: no pitch, as no yaw.
         assert_eq!(seen.faces[2].pitch, None);
