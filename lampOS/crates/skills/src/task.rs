@@ -1866,8 +1866,8 @@ mod tests {
 
     /// Heron's P1 on #7590: `net` never loads beside a private grant (a
     /// service's read or write, the camera, the microphone, what the lamp
-    /// says, its notes); each of them alone still loads, and `net` beside
-    /// the lamp's voice does too.
+    /// says, its notes, `look`); each of them alone still loads, and `net`
+    /// beside the lamp's voice, or `air`, does too.
     #[test]
     fn net_never_loads_beside_a_private_grant() {
         lamp_voice::skill_task_yes::set_net_here(Some(true));
@@ -1883,6 +1883,7 @@ mod tests {
             "microphone",
             "speech",
             "notes",
+            "look",
         ] {
             assert_eq!(of(&[private]).unwrap(), [private]);
             for pair in [[private, "net"], ["net", private]] {
@@ -1893,6 +1894,9 @@ mod tests {
         }
         assert_eq!(of(&["speak", "net"]).unwrap(), ["speak", "net"]);
         assert_eq!(of(&["light", "net"]).unwrap(), ["light", "net"]);
+        // `air` may sit beside `net`; `look` may not (the first builder's
+        // ruling on #7590, 18 Nov 02:01).
+        assert_eq!(of(&["air", "net"]).unwrap(), ["air", "net"]);
         set_agent_services_here(None);
         lamp_voice::skill_task_yes::set_net_here(None);
     }

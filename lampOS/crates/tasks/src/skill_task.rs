@@ -254,14 +254,17 @@ pub const NET_SWITCH: &str = "LAMP_TASK_NET";
 pub const NET_GRANT: &str = "net";
 /// The grants that reach what is the person's own: a linked service's
 /// read or write (`*-read`, `*-write`), the camera, the microphone, what
-/// the lamp says and its notes. A run granted [`NET_GRANT`] holds none of
-/// them (Heron's P1 on #7590): private data, untrusted text and a way out
-/// never share one run. A skill that needs both is two skills. Checked here ([`HandOver::check`]), at load by lamp-skills and
+/// the lamp says, its notes, and `look` (whether someone is there, so
+/// whether the house is empty: the first builder's ruling on #7590, 18 Nov
+/// 02:01). A run granted [`NET_GRANT`] holds none of them (Heron's P1 on
+/// #7590): private data, untrusted text and a way out never share one run.
+/// `air` is not one: its readings show who is there only coarsely and
+/// slowly, and may go out (the yes says so). A skill that needs both is two skills. Checked here ([`HandOver::check`]), at load by lamp-skills and
 /// the upload, and by lamp-control's yes.
-pub const PRIVATE_GRANTS: [&str; 4] = ["camera", "microphone", "speech", "notes"];
+pub const PRIVATE_GRANTS: [&str; 5] = ["camera", "microphone", "speech", "notes", "look"];
 /// Said when a skill's grants name [`NET_GRANT`] beside one of
 /// [`PRIVATE_GRANTS`] or a service's.
-pub const NET_BESIDE_PRIVATE: &str = "a skill that reaches the internet can't also use your linked services, the camera, the microphone, what the lamp says or its notes: make it two skills";
+pub const NET_BESIDE_PRIVATE: &str = "a skill that reaches the internet can't also use your linked services, the camera, the microphone, what the lamp says or its notes, or know whether someone is there: make it two skills";
 
 /// Whether `grant` is one a run granted [`NET_GRANT`] never holds:
 /// [`PRIVATE_GRANTS`], or any service's read or write.
@@ -7410,8 +7413,9 @@ mod tests {
 
     /// Heron's P1 on #7590: a hand-over granted `net` beside a private
     /// grant (a service's read or write, the camera, the microphone, what
-    /// the lamp says, its notes) is refused, nothing minted or run; each of
-    /// them alone still passes, and `net` beside the lamp's voice too.
+    /// the lamp says, its notes, `look`) is refused, nothing minted or run;
+    /// each of them alone still passes, and `net` beside the lamp's voice,
+    /// or `air`, too.
     #[test]
     fn a_hand_over_never_holds_net_beside_a_private_grant() {
         let parse = |grants: Value| {
@@ -7425,6 +7429,9 @@ mod tests {
             "microphone",
             "speech",
             "notes",
+            // Whether someone is there (the first builder's ruling on
+            // #7590, 18 Nov 02:01).
+            "look",
         ] {
             assert!(private_grant(private), "{private}");
             assert!(parse(json!([private])).is_ok(), "{private}");
@@ -7442,7 +7449,10 @@ mod tests {
         }
         assert!(parse(json!(["speak", NET_GRANT])).is_ok());
         assert!(parse(json!(["light", "speak", "body", NET_GRANT])).is_ok());
-        assert!(!private_grant("speak") && !private_grant(NET_GRANT) && !private_grant("look"));
+        assert!(!private_grant("speak") && !private_grant(NET_GRANT) && !private_grant("air"));
+        // `air` stays allowed beside `net` (the same ruling): its yes says
+        // the readings can go to the internet.
+        assert!(parse(json!(["air", NET_GRANT])).is_ok());
         // lamp-tasks refuses it before any token is asked for.
         let tokens = FakeTokens {
             net_yes: true,
