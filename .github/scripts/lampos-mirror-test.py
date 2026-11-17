@@ -161,7 +161,7 @@ class StoreTests(unittest.TestCase):
     def test_the_head_is_uploaded_to_be_asked_for_again(self):
         fake = FakeGcloud()
         M.Store(BUCKET, fake).upload(self.local, f"{M.STABLE}/{M.ENVELOPE}", M.MUTABLE_CACHE, clobber=True)
-        self.assertIn("--cache-control=no-cache", fake.writes()[0])
+        self.assertIn("--cache-control=no-cache, no-store, must-revalidate", fake.writes()[0])
         self.assertNotIn("--no-clobber", fake.writes()[0])
 
 
