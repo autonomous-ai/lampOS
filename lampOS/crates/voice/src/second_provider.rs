@@ -9776,6 +9776,9 @@ async fn spoken(
             // Each id with the eyes' boot, the known face's too: after the
             // eyes start again a passing id names someone else (#3037).
             let speakers = eyes.speakers_with_boot(begun, finishing);
+            // A held rename's short yes, with `LAMP_NAME_LEARN_FIX` (#7419).
+            let rename_speakers = renaming
+                .then(|| held_rename::yes_speakers(eyes, begun, finishing, shared.name_learn_fix));
             let (eyes, known) = (eyes.clone(), known.clone());
             let pair = tokio::task::spawn_blocking(move || eyes.known_with_boot(&known))
                 .await
@@ -9798,8 +9801,8 @@ async fn spoken(
                     crate::speaking_faces::saw_line(seen);
                 }
             }
-            if renaming {
-                held_rename::keep_sight(&shared, (request, speakers.clone(), pair.clone()));
+            if let Some(rename_speakers) = rename_speakers {
+                held_rename::keep_sight(&shared, (request, rename_speakers, pair.clone()));
             }
             if held && let Ok(mut hold) = shared.held_forget.lock() {
                 hold.sight = Some((request, speakers, pair));
