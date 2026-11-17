@@ -555,6 +555,15 @@ fn put_with(work: &Path, rules: &str, guide: bool) -> std::io::Result<MadeFolder
     Ok(made)
 }
 
+/// A live ask's folder in `work` (`crate::voice_ask`): a make's, its
+/// rules the ask's, its fresh home's config with the lamp's agent's
+/// connectors only when `services`.
+pub(crate) fn put_ask(work: &Path, rules: &str, services: bool) -> std::io::Result<MadeFolder> {
+    let made = fresh_home_for(work, services)?;
+    file_in(&made.fd, RULES_FILE, rules)?;
+    Ok(made)
+}
+
 /// #7245: a gateway agent's make's folder in `work`, `make-<run id>`,
 /// 0700, with the rules ([`without_check`]) and, when `guide`, the
 /// gateway's guide ([`gateway_guide`]), each 0600: no home, as the gateway
@@ -1479,6 +1488,10 @@ pub struct MakeHandOvers {
     /// `None`, every make to [`Self::runner`].
     pub one_path: Option<Arc<MakeGateway>>,
     pub caller: fn(Option<&lamp_ipc::caller::Caller>) -> bool,
+    /// A live spoken ask's line (`"op":"voice_ask"`, `crate::voice_ask`),
+    /// taken only with one of its switches on; `None`, refused `off` as
+    /// any line that is not a make's.
+    pub asks: Option<Arc<crate::voice_ask::Asks>>,
 }
 
 impl MakeHandOvers {
@@ -1495,13 +1508,30 @@ impl MakeHandOvers {
                 "keeps the network (LAMP_MAKE_AGENT_NET is not held)"
             }
         );
-        let runner = lamp_runner(home, held);
+        let runner: Arc<MakeHermes> = Arc::new(lamp_runner(home, held));
+        let switches = crate::voice_ask::Switches::of_env();
+        // A live ask on the same runner as a make; one with a linked
+        // service's grants always held off the network.
+        let asks = switches.any().then(|| {
+            eprintln!(
+                "[lamp-tasks] skill make: live asks for the lamp's agent are taken (hard asks {}, linked services {})",
+                switches.hard, switches.services
+            );
+            Arc::new(crate::voice_ask::Asks {
+                switches,
+                open: runner.clone(),
+                held: Arc::new(lamp_runner(home, true)),
+                tokens: Arc::new(crate::skill_task::ControlTokens::default()),
+                asking: AtomicBool::new(false),
+            })
+        });
         Self {
             socket: PathBuf::from(MAKE_SOCKET),
             work: runner.hermes.folder.clone(),
-            runner: Arc::new(runner),
+            runner,
             one_path: Some(Arc::new(MakeGateway::lamp(home, harness))),
             caller: caller_may,
+            asks,
         }
     }
 
@@ -1588,6 +1618,24 @@ impl MakeHandOvers {
                 return;
             }
         };
+        // A live ask has its own one place, beside a make's.
+        if crate::voice_ask::is_ask(&line) {
+            let answered = match &self.asks {
+                Some(asks) => crate::voice_ask::answer(&line, asks, &self.work, &mut || {
+                    write_answer(stream, &json!({"ok": true, "started": true}));
+                }),
+                None => refusal(
+                    "off",
+                    "an ask for the lamp's agent is off on this lamp (LAMP_HARD_ASKS_TO_AGENT, LAMP_SERVICES_TO_AGENT)",
+                ),
+            };
+            eprintln!(
+                "{}",
+                journal_line(&answered).replace("skill make:", "live ask:")
+            );
+            write_answer(stream, &answered);
+            return;
+        }
         if running
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_err()
@@ -2811,6 +2859,7 @@ mod tests {
             runner: Arc::new(writing(None)),
             one_path: None,
             caller: |_| true,
+            asks: None,
         }
         .start(true, stop.clone())
         .unwrap()
@@ -2853,6 +2902,7 @@ mod tests {
             runner: Arc::new(writing(Some("A"))),
             one_path: None,
             caller: |_| true,
+            asks: None,
         }
         .start(true, stop.clone())
         .unwrap()
@@ -2877,6 +2927,7 @@ mod tests {
             runner: Arc::new(writing(None)),
             one_path: None,
             caller: |_| true,
+            asks: None,
         }
         .start(false, Arc::default())
         .unwrap();
