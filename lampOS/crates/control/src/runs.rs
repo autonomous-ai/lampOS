@@ -53,6 +53,12 @@ pub trait SkillYes: Send + Sync {
     fn fixed_write(&self, _skill: &str) -> Option<FixedWrite> {
         None
     }
+    /// The grants of a live spoken ask's run (`LAMP_SERVICES_TO_AGENT`,
+    /// `task_yes::KeptYes::ask_grants`): linked service grants alone, or
+    /// why none is minted. None by default.
+    fn ask_grants(&self, _asked: &[String]) -> Result<BTreeSet<Grant>, String> {
+        Err(crate::task_yes::ASKS_OFF.to_owned())
+    }
 }
 
 /// A lamp that keeps no such yes yet: every mint is refused in words.
