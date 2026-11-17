@@ -11884,7 +11884,7 @@ impl Heeding {
             && !opens_nothing
             && !called
             && !someone_else
-            && !seen.other_voice
+            && !(self.no_face_renews && seen.other_voice)
             && renews_for_the_caller(&seen.speakers, &self.caller_faces, self.no_face_renews);
         if callers_follow_up {
             eprintln!(
