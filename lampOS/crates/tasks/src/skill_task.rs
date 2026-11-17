@@ -806,18 +806,25 @@ pub struct SkillRun {
 }
 
 /// What a run that tells its answer ([`tells_answer`]) is asked of its
-/// last answer: the lamp says it to the owner word for word.
+/// last answer: the lamp says it to the owner word for word, a short
+/// spoken answer (lamp-skills says at most about 400 characters of it,
+/// `lamp_skills::task::MOST_TOLD_CHARS`). One the skill already said
+/// aloud (through lamp-control's `say`) ends with a lone dash, which
+/// lamp-skills says nothing of, so it is never heard twice.
 pub const TELL_LINE: &str = "Your last answer is said aloud to the owner by the lamp, word for word: \
-     end with only what to tell them, in a few short plain sentences, with no list, link or markdown.";
+     end with only a short spoken answer, one to three plain sentences, with no list, link or \
+     markdown. If the skill already said it aloud through the lamp, end with only a single dash (-).";
 
 /// [`TELL_LINE`] for a run through a make's runner, which keeps no chat
 /// answer: what it writes to `answer` (its own folder's `answer.md`) is
-/// said instead.
+/// said instead; left empty when the skill already said it aloud, which
+/// tells nothing.
 pub fn tell_file_line(answer: &Path) -> String {
     format!(
         "What you write to the file {} is said aloud to the owner by the lamp, word for word: \
-         when you are done, write there only what to tell them, in a few short plain sentences, \
-         with no list, link or markdown.",
+         when you are done, write there only a short spoken answer, one to three plain \
+         sentences, with no list, link or markdown. If the skill already said it aloud through \
+         the lamp, leave that file empty.",
         answer.display()
     )
 }
