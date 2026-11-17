@@ -766,6 +766,17 @@ pub struct Observation {
     pub tools: u64,
 }
 
+/// A `harness reply` input id (openharness#4393), as Harness writes it:
+/// `program:<uuid>` for a program's input, so a `:` is allowed beside
+/// [`token`]'s characters. It goes to `wait --after` as one argument.
+fn input_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b':'))
+}
+
 fn token(value: &str, maximum: usize) -> bool {
     !value.is_empty()
         && value.len() <= maximum
@@ -2240,7 +2251,7 @@ impl Cli {
         input: &str,
         cancel: &AtomicBool,
     ) -> Result<Option<String>, String> {
-        if !self::token(name, 64) || !self::token(input, 128) {
+        if !self::token(name, 64) || !input_id(input) {
             return Err("invalid_input".into());
         }
         let reply = self
@@ -2280,7 +2291,7 @@ impl Cli {
         input: &str,
         cancel: &AtomicBool,
     ) -> Result<Option<String>, String> {
-        if !machine_id(machine) || !self::agent_id(agent) || !self::token(input, 128) {
+        if !machine_id(machine) || !self::agent_id(agent) || !input_id(input) {
             return Err("invalid_input".into());
         }
         let reply = self
@@ -6586,7 +6597,7 @@ fn timed_out(bytes: &[u8]) -> Took {
         Some(true) => Took::Timeout,
         Some(false) => reply["inputId"]
             .as_str()
-            .filter(|input| token(input, 128))
+            .filter(|input| input_id(input))
             .map_or_else(
                 || Took::Uncertain("reply_timeout_typed".into()),
                 |input| Took::Taken(input.to_owned()),
@@ -6604,7 +6615,7 @@ fn taken_input(bytes: &[u8]) -> Option<String> {
     }
     reply["inputId"]
         .as_str()
-        .filter(|input| token(input, 128))
+        .filter(|input| input_id(input))
         .map(str::to_owned)
 }
 
