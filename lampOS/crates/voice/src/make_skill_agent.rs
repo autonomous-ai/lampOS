@@ -451,12 +451,25 @@ impl Agent {
     /// Who the lamp's agent is, as the person calls it ("Hermes",
     /// "OpenClaw"), from the tasks part's targets; none without one.
     pub fn engine(&self) -> Option<&'static str> {
-        let answer = agent_tasks::ask(
+        self.lamp_agent().0
+    }
+
+    /// The lamp's agent ([`Agent::engine`]) and whether there is surely
+    /// none, from one targets ask (#7375): `(None, true)` only when the
+    /// tasks part answered its targets with no `lamp` one; down, slow or
+    /// refused, it is `(None, false)`, not known.
+    pub fn lamp_agent(&self) -> (Option<&'static str>, bool) {
+        let Some(answer) = agent_tasks::ask(
             &self.tasks.join("request.sock"),
             &json!({"op":"targets"}),
             Duration::from_millis(1_500),
-        )?;
-        agent_tasks::lamp_target_in(&answer)
+        ) else {
+            return (None, false);
+        };
+        (
+            agent_tasks::lamp_target_in(&answer),
+            agent_tasks::surely_no_lamp_target(&answer),
+        )
     }
 
     /// The lamp's agent when it is Hermes, the one engine a make is handed
@@ -732,7 +745,8 @@ pub(crate) mod tests {
     /// `engine` (none for no target; "old" for a build with no make
     /// socket; "not_held_off" for one whose run can't be held off;
     /// "no_namespace" for one whose wrapper has no make-home line; "busy"
-    /// for one making another; "run_failed" for a run that failed), and
+    /// for one making another; "run_failed" for a run that failed;
+    /// [`UNANSWERED`] for one that answers its targets `ok:false`), and
     /// its make run answers each make's rules with `answer(rules)`, or
     /// never with `None`. The lines it was sent are kept.
     pub(crate) struct StubTasks {
@@ -790,6 +804,27 @@ pub(crate) mod tests {
 
     type Answers = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 
+    /// The stub's engine for a tasks part that answers its targets
+    /// `ok:false` (#7375): whether the lamp has an agent is not known.
+    pub(crate) const UNANSWERED: &str = "unanswered";
+
+    /// An agent whose tasks part has no socket at all (down or
+    /// restarting, #7375), in a folder of its own.
+    pub(crate) fn no_socket() -> (Folder, Agent) {
+        let tasks = stub(None, Arc::new(|_: &str| None));
+        let dir = Folder(PathBuf::from(format!(
+            "{}-gone",
+            tasks.dir.path().display()
+        )));
+        let _ = std::fs::remove_dir_all(dir.path());
+        std::fs::create_dir_all(dir.path()).unwrap();
+        let agent = Agent {
+            tasks: dir.path().to_path_buf(),
+            ..tasks.agent()
+        };
+        (dir, agent)
+    }
+
     pub(crate) fn stub(engine: Option<&'static str>, answers: Answers) -> StubTasks {
         static MADE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let dir = Folder(PathBuf::from(format!(
@@ -817,6 +852,10 @@ pub(crate) mod tests {
                     let asked: Value = serde_json::from_str(&line).unwrap_or(Value::Null);
                     sent.lock().unwrap().push(asked.clone());
                     let answer = match asked["op"].as_str().unwrap_or_default() {
+                        // A tasks part that won't say its targets (#7375).
+                        "targets" if engine == Some(UNANSWERED) => {
+                            json!({"ok":false,"error":"busy","message":"busy"})
+                        }
                         "targets" => match engine {
                             Some(engine) => {
                                 let engine = match engine {
@@ -975,6 +1014,34 @@ pub(crate) mod tests {
                     .any(|line| line["op"] == "prepare")
             );
         }
+    }
+
+    /// #7375: one targets ask says the lamp's agent and whether there is
+    /// surely none; only an answered list with no `lamp` target is sure.
+    #[test]
+    fn the_lamp_agent_is_surely_none_only_when_the_targets_say_so() {
+        let none = stub(None, Arc::new(|_: &str| None));
+        assert_eq!(none.agent().lamp_agent(), (None, true));
+        let hermes = stub(Some("hermes"), Arc::new(|_: &str| None));
+        assert_eq!(hermes.agent().lamp_agent(), (Some("Hermes"), false));
+        let refused = stub(Some(UNANSWERED), Arc::new(|_: &str| None));
+        assert_eq!(refused.agent().lamp_agent(), (None, false));
+        assert_eq!(refused.agent().engine(), None);
+        let (_gone, agent) = no_socket();
+        assert_eq!(agent.lamp_agent(), (None, false));
+        assert_eq!(agent.engine(), None);
+        // One round trip per read.
+        let targets = |tasks: &StubTasks| {
+            tasks
+                .sent
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|line| line["op"] == "targets")
+                .count()
+        };
+        assert_eq!(targets(&none), 1);
+        assert_eq!(targets(&refused), 2);
     }
 
     #[test]

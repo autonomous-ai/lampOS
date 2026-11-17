@@ -5339,9 +5339,15 @@ the same code for both writers.
   asked, never kept as a `do.task` no agent runs ("it asks for a linked
   service (<code>): no agent on the lamp to make it: told so, DeepSeek not
   asked"); and any other make DeepSeek fails after its repairs ("DeepSeek
-  failed and there is no agent on the lamp to hand it to: told so"). Off,
-  only Hermes is handed a make, as above, and a lamp with no agent has
-  DeepSeek make it alone.
+  failed and there is no agent on the lamp to hand it to: told so"). Only
+  lamp-tasks answering its targets with no `lamp` one is no agent
+  (`agent_tasks::surely_no_lamp_target`, one targets ask a make,
+  `Agent::lamp_agent`): a targets read that fails (lamp-tasks down,
+  restarting, slow, or answering `ok:false`) is not known, never
+  `AGENT_MISSING`, and DeepSeek makes it alone with its repairs, as before
+  ("the tasks part didn't say its targets: DeepSeek makes it alone, as
+  before"). Off, only Hermes is handed a make, as above, and a lamp with
+  no agent has DeepSeek make it alone.
 - **Its network: `LAMP_MAKE_AGENT_NET`** (set in no unit; the owner's ask,
   12 Nov, the first builder's ruling, 12 Nov 19:14). By default
   the run keeps the network, as V1's agent did, and reaches the model at
