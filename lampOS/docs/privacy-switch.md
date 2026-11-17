@@ -480,7 +480,15 @@ over 4096 bytes or anything else is no: no face is read and nothing goes on
 a face is near, so a removed yes stops the reads within that and the one read
 already running. The journal says once each time the yes comes or goes. The
 eyes still look: the camera, the gaze, presence, who is there and the
-speaking read are unchanged. The voice's
+speaking read are unchanged. With `LAMP_EYES_PITCH_GAZE=on` (#7442) the
+eyes also compute, with no yes, only where the near face is looking, on the
+lamp, for the voice to decide whether a line was said to it: the
+Blendshape V2 model runs on the same 2 s timing, only its eye-look scores
+are kept to give `looking` on `humans/faces/tracked`, and every other score
+is dropped at once. The eyes write it nowhere: it lives only on the
+lamp's bus (its newest message in `/run`, gone at a reboot), no product
+service records or sends it off the lamp, and nothing of how the face
+seems is read (eyes.md, "Pitch and gaze"). The voice's
 onboarding writes it: with `LAMP_FACE_EXPRESSIONS_ASK=on` it asks once
 whether the lamp may notice whether people look happy or upset, to
 answer more warmly (never said aloud, no picture of a face kept), and keeps
