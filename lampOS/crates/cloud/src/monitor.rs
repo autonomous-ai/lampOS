@@ -9,7 +9,8 @@
 //!   On writes lamp-peek's drop-in and starts it; off stops it before the
 //!   result, so no page stays open once the app says off.
 //! - `monitor.get` (`{}`) reads the drop-in where the helper writes it:
-//!   `{"on": bool}`. Nothing is asked of anyone.
+//!   `{"on": bool}`, with since when and until when while on, or when it
+//!   last turned itself off ([`get`]). Nothing is asked of anyone.
 //! - `monitor.link` (`{"seal_to", "request_id"}`) asks lamp-peek's admin
 //!   socket for a one-time code, good once for 5 minutes, and answers the
 //!   link sealed to the app's one-time X25519 key, bound to this lamp's
@@ -19,6 +20,13 @@
 //!   `http://<host>.local/in#<code>`. The code rides only in the fragment, so
 //!   it is never in a request line; neither it nor the url is in a journal
 //!   line, an error or the clear part of the reply.
+//!
+//! While it is on, [`keep`] says so in the lamp's health (`dev monitor`,
+//! "on since 2 h 5 min ago, off by itself in 21 h 55 min"), and turns it off
+//! through the same helper once it has been on for [`DAY`] (#7432): the
+//! words anyone says to the lamp are not shown for longer than the owner
+//! is likely to remember. `monitor.get` says since when, and when it last
+//! turned itself off.
 use crate::control::{MUST_SEAL, NO_REQUEST_ID, NOT_SEALED};
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -26,7 +34,7 @@ use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 /// `on` takes [`KINDS`], beside `LAMP_CLOUD` and `LAMP_SETTINGS_CHANGE`.
 pub const ENVIRONMENT: &str = "LAMP_APP_MONITOR";
@@ -77,6 +85,27 @@ pub const CODE_LASTS_MS: u64 = 5 * 60 * 1_000;
 pub const OFF: &str = "the dev monitor is off on this lamp: turn it on first";
 pub const UNREACHED: &str = "the dev monitor did not answer on the lamp now";
 
+/// The dev monitor turns itself off this long after it was turned on
+/// (#7432), counted from its drop-in's time.
+pub const DAY: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// A shorter day, for a lamp row only: seconds, from 60 to a day.
+pub const DAY_ENVIRONMENT: &str = "LAMP_APP_MONITOR_DAY_S";
+
+/// Its item in the lamp's health (`docs/health.md`).
+pub const HEALTH_NAME: &str = "dev monitor";
+
+/// How often [`keep`] looks and says it: within lamp-health's 5 s stale
+/// time and the bus's 3 s lease.
+pub const LOOK_EVERY: Duration = Duration::from_secs(2);
+
+/// A turn-off the helper did not take is asked again after this.
+pub const TRY_AGAIN: Duration = Duration::from_secs(60);
+
+/// In lamp-cloud's state folder: when the dev monitor last turned itself
+/// off, in unix ms, until it is on again.
+pub const OFF_FILE: &str = "monitor-off";
+
 /// Where the switch is read, where a code is asked, and the device id each
 /// link is bound to.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -88,6 +117,18 @@ pub struct Place {
     pub wait: Duration,
     /// How long a socket not there yet is waited for ([`STARTING`]).
     pub starting: Duration,
+    /// How long it stays on: [`DAY`], or [`DAY_ENVIRONMENT`]'s.
+    pub day: Duration,
+    /// [`OFF_FILE`] in lamp-cloud's state folder, if it has one.
+    pub went_off: Option<PathBuf>,
+}
+
+/// [`DAY_ENVIRONMENT`]'s value: whole seconds from 60 to a day, else a day.
+pub fn day_from(value: Option<&str>) -> Duration {
+    value
+        .and_then(|seconds| seconds.parse::<u64>().ok())
+        .filter(|seconds| (60..=DAY.as_secs()).contains(seconds))
+        .map_or(DAY, Duration::from_secs)
 }
 
 /// Whether the kinds are taken: `LAMP_CLOUD`, `LAMP_SETTINGS_CHANGE` and
@@ -111,6 +152,9 @@ impl Place {
             device_id: device_id.to_owned(),
             wait: WAIT,
             starting: STARTING,
+            day: day_from(var(DAY_ENVIRONMENT).as_deref()),
+            went_off: std::env::var_os("STATE_DIRECTORY")
+                .map(|dir| PathBuf::from(dir).join(OFF_FILE)),
         })
     }
 
@@ -122,6 +166,25 @@ impl Place {
             .and_then(|file| file.take(1_024).read_to_string(&mut text))
             .is_ok()
             && text == DROPIN_TEXT
+    }
+
+    /// Since when it is on, in unix ms: its drop-in's time, while it is on.
+    pub fn since_ms(&self) -> Option<u64> {
+        if !self.on() {
+            return None;
+        }
+        let at = std::fs::metadata(&self.dropin).and_then(|meta| meta.modified());
+        Some(at.ok()?.duration_since(UNIX_EPOCH).ok()?.as_millis() as u64)
+    }
+
+    /// When it last turned itself off, in unix ms, if it has not been on
+    /// since.
+    pub fn went_off_ms(&self) -> Option<u64> {
+        std::fs::read_to_string(self.went_off.as_ref()?)
+            .ok()?
+            .trim()
+            .parse()
+            .ok()
     }
 }
 
@@ -138,9 +201,132 @@ pub fn line(data: &Value) -> Result<(String, Option<String>), String> {
     Ok((json!({ "monitor": on }).to_string(), request_id))
 }
 
-/// `monitor.get`: what the drop-in says, writing nothing.
+/// `monitor.get`: what the drop-in says, writing nothing. On, since when
+/// and when it turns itself off; off, when it last turned itself off, if
+/// it did and has not been on since.
 pub fn get(place: &Place) -> Value {
-    json!({"on": place.on()})
+    match (place.since_ms(), place.went_off_ms()) {
+        (Some(since), _) => json!({
+            "on": true,
+            "since_unix_ms": since,
+            "off_at_unix_ms": since.saturating_add(place.day.as_millis() as u64),
+        }),
+        (None, Some(at)) => json!({"on": false, "went_off_by_itself_unix_ms": at}),
+        (None, None) => json!({"on": false}),
+    }
+}
+
+/// What [`keep`] finds at one look.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Look {
+    Off,
+    /// On, what the lamp's health says, and whether its day is over.
+    On {
+        said: String,
+        due: bool,
+    },
+}
+
+/// The dev monitor on since `since_ms` (or off), at `now_ms`, with `day`.
+/// A clock set back before it was turned on counts as just on.
+pub fn look(since_ms: Option<u64>, day: Duration, now_ms: u64) -> Look {
+    let Some(since) = since_ms else {
+        return Look::Off;
+    };
+    let on_for = now_ms.saturating_sub(since);
+    let left = (day.as_millis() as u64).saturating_sub(on_for);
+    if left == 0 {
+        return Look::On {
+            said: format!("on since {} ago, turning itself off now", span(on_for)),
+            due: true,
+        };
+    }
+    Look::On {
+        said: format!(
+            "on since {} ago, off by itself in {}",
+            span(on_for),
+            span(left)
+        ),
+        due: false,
+    }
+}
+
+/// "3 h 12 min", "4 min": whole minutes, not rounded up.
+fn span(ms: u64) -> String {
+    let minutes = ms / 60_000;
+    if minutes < 60 {
+        format!("{minutes} min")
+    } else {
+        format!("{} h {} min", minutes / 60, minutes % 60)
+    }
+}
+
+/// Watches the dev monitor on a thread of its own for as long as lamp-cloud
+/// runs: while it is on, says so in the lamp's health every
+/// [`LOOK_EVERY`]; once it is off, says it stopped on purpose, so the item
+/// goes; once its day is over, asks root's helper at `helper` to turn it
+/// off, as the app's off does, and keeps when in [`OFF_FILE`].
+pub fn keep(place: Place, bus: Option<lamp_bus::Bus>, helper: PathBuf) {
+    use lamp_msgs::{Diagnostic, Level};
+    std::thread::spawn(move || {
+        let mut health = bus.and_then(|bus| {
+            bus.publisher_declared(
+                Diagnostic::TOPIC,
+                &Diagnostic::declaration(),
+                crate::lamp::SOURCE,
+            )
+            .ok()
+        });
+        let mut was_on = false;
+        let mut tried: Option<Instant> = None;
+        loop {
+            let report = match look(place.since_ms(), place.day, crate::chat::now_ms()) {
+                Look::On { said, due } => {
+                    // On again since it turned itself off: that is no
+                    // longer the news.
+                    if !was_on && let Some(file) = &place.went_off {
+                        let _ = std::fs::remove_file(file);
+                    }
+                    was_on = true;
+                    if due && tried.is_none_or(|at| at.elapsed() >= TRY_AGAIN) {
+                        tried = Some(Instant::now());
+                        turn_off(&place, &helper, crate::chat::now_ms(), &mut |line| {
+                            eprintln!("lamp-cloud: {line}")
+                        });
+                    }
+                    Some(Diagnostic::new(Level::Ok, HEALTH_NAME, &said))
+                }
+                Look::Off => {
+                    tried = None;
+                    std::mem::take(&mut was_on).then(|| Diagnostic::stopping(HEALTH_NAME))
+                }
+            };
+            if let (Some(publisher), Some(report)) = (health.as_mut(), report) {
+                let _ = publisher.publish_json(lamp_ipc::monotonic_us(), &report);
+            }
+            std::thread::sleep(LOOK_EVERY);
+        }
+    });
+}
+
+/// Its day over: off through root's helper at `helper`, as the app's
+/// `monitor.set {"on": false}`, and when kept for `monitor.get`.
+pub fn turn_off(place: &Place, helper: &Path, now_ms: u64, say: &mut dyn FnMut(&str)) {
+    let line = json!({"monitor": false}).to_string();
+    match crate::settings::ask(helper, &line, crate::settings::WAIT) {
+        Ok(done) => {
+            if let Some(file) = &place.went_off {
+                let _ = std::fs::write(file, now_ms.to_string());
+            }
+            say(&format!(
+                "the dev monitor was on for its day: turned off ({})",
+                done.unwrap_or_default()
+            ));
+        }
+        Err(why) => say(&format!(
+            "the dev monitor's day is over, but it was not turned off: {why}; asked again in a minute"
+        )),
+    }
 }
 
 /// `monitor.link` for the lamp named `host`: its reply's `data`, or the
@@ -272,6 +458,8 @@ mod tests {
             device_id: "d-42".into(),
             wait: WAIT,
             starting: STARTING,
+            day: DAY,
+            went_off: Some(dir.join(OFF_FILE)),
         };
         (place, connections)
     }
@@ -333,9 +521,104 @@ mod tests {
         let (place, _) = place(&dir, CODE);
         assert_eq!(get(&place), json!({"on": false}));
         std::fs::write(&place.dropin, DROPIN_TEXT).unwrap();
-        assert_eq!(get(&place), json!({"on": true}));
+        let got = get(&place);
+        assert_eq!(got["on"], json!(true));
+        let since = got["since_unix_ms"].as_u64().unwrap();
+        assert!(since.abs_diff(crate::chat::now_ms()) < 60_000, "{got}");
+        assert_eq!(got["off_at_unix_ms"], json!(since + 86_400_000));
         std::fs::write(&place.dropin, "[Service]\nEnvironment=LAMP_PEEK=on\n").unwrap();
         assert_eq!(get(&place), json!({"on": false}));
+        // Turned itself off: said until it is on again.
+        std::fs::write(dir.join(OFF_FILE), "1700000000000").unwrap();
+        assert_eq!(
+            get(&place),
+            json!({"on": false, "went_off_by_itself_unix_ms": 1_700_000_000_000u64})
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_day_is_a_day_unless_a_row_asks_for_a_shorter_one() {
+        assert_eq!(day_from(None), DAY);
+        assert_eq!(day_from(Some("300")), Duration::from_secs(300));
+        assert_eq!(day_from(Some("60")), Duration::from_secs(60));
+        for value in ["59", "86401", "0", "-5", "5m", ""] {
+            assert_eq!(day_from(Some(value)), DAY, "{value}");
+        }
+    }
+
+    #[test]
+    fn health_says_since_when_and_when_it_goes_off_by_itself() {
+        let hour = 3_600_000;
+        assert_eq!(look(None, DAY, 5 * hour), Look::Off);
+        assert_eq!(
+            look(Some(hour), DAY, hour + 3 * hour + 12 * 60_000),
+            Look::On {
+                said: "on since 3 h 12 min ago, off by itself in 20 h 48 min".into(),
+                due: false
+            }
+        );
+        assert_eq!(
+            look(Some(hour), DAY, hour + 59_999),
+            Look::On {
+                said: "on since 0 min ago, off by itself in 23 h 59 min".into(),
+                due: false
+            }
+        );
+        assert_eq!(
+            look(Some(hour), DAY, hour + 24 * hour),
+            Look::On {
+                said: "on since 24 h 0 min ago, turning itself off now".into(),
+                due: true
+            }
+        );
+        // A clock set back counts as just on, never as over.
+        assert!(matches!(
+            look(Some(5 * hour), DAY, hour),
+            Look::On { due: false, .. }
+        ));
+        assert!(matches!(
+            look(Some(0), Duration::from_secs(300), 300_000),
+            Look::On { due: true, .. }
+        ));
+    }
+
+    /// Its day over, the off goes to root's helper as the app's does, and
+    /// when is kept for `monitor.get`; a helper that refuses keeps nothing.
+    #[test]
+    fn a_day_over_turns_it_off_through_the_helper_and_keeps_when() {
+        let dir = folder("off");
+        let (place, _) = place(&dir, CODE);
+        let helper = dir.join("change.sock");
+        let listener = UnixListener::bind(&helper).unwrap();
+        let (heard, lines_in) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            for (n, stream) in listener.incoming().flatten().enumerate() {
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let _ = heard.send(line);
+                let reply = if n == 0 {
+                    r#"{"refused":"busy"}"#
+                } else {
+                    r#"{"done":{"on":false,"closed":true}}"#
+                };
+                let _ = writeln!(&stream, "{reply}");
+            }
+        });
+        let mut said = Vec::new();
+        turn_off(&place, &helper, 42, &mut |line| said.push(line.to_owned()));
+        assert_eq!(place.went_off_ms(), None);
+        turn_off(&place, &helper, 42, &mut |line| said.push(line.to_owned()));
+        assert_eq!(place.went_off_ms(), Some(42));
+        assert_eq!(lines_in.recv().unwrap(), "{\"monitor\":false}\n");
+        assert_eq!(lines_in.recv().unwrap(), "{\"monitor\":false}\n");
+        assert_eq!(
+            said,
+            [
+                "the dev monitor's day is over, but it was not turned off: busy; asked again in a minute",
+                r#"the dev monitor was on for its day: turned off ({"closed":true,"on":false})"#,
+            ]
+        );
         let _ = std::fs::remove_dir_all(dir);
     }
 
@@ -413,6 +696,8 @@ mod tests {
             device_id: "d-42".into(),
             wait: WAIT,
             starting: STARTING,
+            day: DAY,
+            went_off: None,
         };
         std::fs::write(&place.dropin, DROPIN_TEXT).unwrap();
         let late = std::thread::spawn(move || {
