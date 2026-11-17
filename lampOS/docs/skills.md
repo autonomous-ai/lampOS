@@ -5817,7 +5817,15 @@ lamp's agent when DeepSeek fails", "The app's MAKE IT too").
    above; the detail journaled) and the lamp says it too,
    `made_skill::not_made_line` (a plain line of its own, or "I couldn't
    make that: " and the model's own reason) as a say note in the conversation's language
-   (`not_made_in_their_language`). Every such note, made or not, begins
+   (`not_made_in_their_language`). That note tells the failure as this one
+   ask's outcome alone, never as making skills not working, and that a later
+   ask to make, remove, or turn a skill off or on calls `make_skill` again:
+   on lamp-9adf (17 Nov 21:37) one make not made was told on as "my
+   skill-making isn't working", kept in the thread as the lamp's words, and
+   later turns answered a made skill's turn-off, turn-on and remove from that
+   belief with no call (test
+   `made_skill::tests::a_make_not_made_is_told_as_that_one_makes_outcome`).
+   Every such note, made or not, begins
    `made_skill::ALREADY_DONE` ("This has happened already and nothing is
    left to do: call no tool, make_skill least of all; only speak"): on
    lamp-74ff, 10 Nov 17:43, the model took a made line's note as an ask
