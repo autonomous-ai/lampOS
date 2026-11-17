@@ -7585,11 +7585,13 @@ mod tests {
         assert_eq!(pane.opens.load(Ordering::Acquire), 1);
     }
 
-    /// The Reviewer-lead's #3 on #7258 (#7246): with the pane's rotation
-    /// due, a spoken task neither closes nor opens a pane on the worker;
-    /// the one-session thread rotates it.
+    /// The Reviewer-lead's #3 on #7258 (#7246): a spoken task never closes
+    /// or opens a pane on the worker. OpenClaw's one pane is never rotated
+    /// by count (openharness#4393: its gateway compacts the session), so
+    /// past the rotation's token bound the spoken task is still typed into
+    /// the same pane, with no close and no new.
     #[test]
-    fn with_a_rotation_due_the_spoken_path_neither_closes_nor_opens() {
+    fn past_the_token_bound_the_spoken_path_neither_closes_nor_opens() {
         let one = lamp_one();
         let pane = Pane::default();
         one.open_if_due(&pane, &pane_place());
@@ -7597,35 +7599,14 @@ mod tests {
         // Past the rotation's token bound.
         one.count_answer(&"x".repeat(4 * crate::one_session::ROTATE_TOKENS as usize));
         let spoken = spoken_to_the_lamp("task-1");
-        assert!(
-            pane_turn(&one, &[&spoken], None, false),
-            "held for the rotation"
-        );
-        let outcome = crate::one_session::spoken_launch(&one, &pane, &spoken);
-        assert_eq!(
-            outcome,
-            Some(LaunchOutcome::NotSent {
-                code: "busy".into()
-            })
-        );
-        assert_eq!(
-            pane.opens.load(Ordering::Acquire),
-            1,
-            "no new on the worker"
-        );
-        assert_eq!(
-            pane.closes.load(Ordering::Acquire),
-            0,
-            "no close on the worker"
-        );
+        assert!(!pane_turn(&one, &[&spoken], None, false), "not held");
+        assert!(matches!(
+            crate::one_session::spoken_launch(&one, &pane, &spoken),
+            Some(LaunchOutcome::Joined { .. })
+        ));
         one.open_if_due(&pane, &pane_place());
-        assert_eq!(
-            pane.closes.load(Ordering::Acquire),
-            1,
-            "the thread rotated it"
-        );
-        assert_eq!(pane.opens.load(Ordering::Acquire), 2);
-        assert!(!pane_turn(&one, &[&spoken], None, false));
+        assert_eq!(pane.opens.load(Ordering::Acquire), 1, "no new");
+        assert_eq!(pane.closes.load(Ordering::Acquire), 0, "no close");
     }
 
     /// Heron's H4 on #7258 (#7246): a spoken task whose words are never
