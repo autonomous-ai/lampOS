@@ -2170,3 +2170,27 @@ fn a_skill_change_beside_its_make_and_talk_about_skills_are_said_as_they_came() 
         assert!(went.notes.is_empty(), "{heard}: {went:?}");
     }
 }
+
+/// Twelve's adversarial P2 on #7587: "start my focus mode skill" ran
+/// through `use_skill`, and "Okay, the focus mode skill is on." after it
+/// stands, said as it came with no note. With no call it is held.
+#[test]
+fn a_skill_said_on_beside_its_use_skill_is_said_as_it_came() {
+    let heard = "Start my focus mode skill.";
+    let reply = "Okay, the focus mode skill is on.";
+    let went = skills(
+        true,
+        heard,
+        calling_with(crate::use_skill::NAME, json!({ "skill": "focus_mode" })),
+        vec![saying(reply)],
+    );
+    assert_eq!(went.said, said(&[reply]), "{went:?}");
+    assert_eq!(went.ran, [crate::use_skill::NAME], "{went:?}");
+    assert!(went.notes.is_empty(), "{went:?}");
+    let went = skills(true, heard, saying(reply), vec![saying(reply)]);
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+}

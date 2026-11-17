@@ -4405,7 +4405,12 @@ that. Could you ask me again?". One that says "skill" stands beside any
 `make_skill` call in the turn, whether it removed (`{"remove": NAME}`), turned
 off or on (`turn_off`, `turn_on`) or made, since their outcomes are told in
 the model's own words (`made_remove.rs`, `made_turn.rs`); the call isn't
-matched to the kind said. One that names no skill ("Moon time is removed.")
+matched to the kind said. One said turned on, enabled or started
+(`Claim::SkillOn`: "Okay, the focus mode skill is on.") stands beside a
+`use_skill` call too, and a skill asked by its name and run in code as round 1
+(`LAMP_SKILL_NAMED`) counts as one; removed, off and made still need a
+`make_skill`. Test: `action_claim::tests::a_skill_said_on_stands_beside_a_use_skill`,
+`second_provider::tests::action_claim::a_skill_said_on_beside_its_use_skill_is_said_as_it_came`. One that names no skill ("Moon time is removed.")
 stands beside any call, as a reminder cancelled may be said removed too. A
 remove's yes is its own `make_skill` call with the `approve_id`, so the
 removed line after it stands. Like the worded claims it never judges a line

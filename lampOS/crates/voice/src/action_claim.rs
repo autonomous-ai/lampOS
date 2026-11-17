@@ -161,7 +161,10 @@
 //! ("I removed the moon time skill.", "I've turned off the CloudFact
 //! skill."). One that says "skill" stands only beside a `make_skill` call in
 //! the turn ([`stands_on`]: any, whichever of remove, turn off or on, or
-//! make: their outcomes are told in the model's words); one that names no
+//! make: their outcomes are told in the model's words), and one turned on,
+//! enabled or started ([`Claim::SkillOn`]: "Okay, the focus mode skill is
+//! on.") beside a `use_skill` too, the in-code round of a skill asked by its
+//! name (`LAMP_SKILL_NAMED`) counted as one; one that names no
 //! skill ("Moon time is removed.") beside any call, as a reminder cancelled
 //! or a rule forgotten may be said so too. Like the worded runs it never
 //! judges a line the person asked as a question, whose reply may tell a
@@ -319,6 +322,12 @@ pub enum Claim {
     /// ([`SKILL_SAID`]: "Moon time is removed.", #7587): a `make_skill`
     /// makes it, and one that names no skill any call ([`stands_on`]).
     Skill,
+    /// A skill said turned on, enabled or started in the model's words
+    /// ("Okay, the focus mode skill is on."): a `make_skill` (its
+    /// `turn_on`) or a `use_skill` makes it, the in-code round of a skill
+    /// asked by its name counted as one (`second_provider`'s
+    /// `turn_called`); one that names no skill any call ([`stands_on`]).
+    SkillOn,
 }
 
 impl Claim {
@@ -342,6 +351,7 @@ impl Claim {
             Self::Forgot => false,
             Self::Snoozed => name == "snooze_reminder",
             Self::Made | Self::Skill => name == crate::made_skill::MAKE,
+            Self::SkillOn => name == crate::made_skill::MAKE || name == crate::use_skill::NAME,
             // A set turns nothing off (Thirteen's P3 on #6481).
             Self::OffOrDown => {
                 Self::LightOrVolume.made_by(name)
@@ -368,6 +378,7 @@ impl Claim {
             Self::Unplug => "preparing to be unplugged, staying on or turning off",
             Self::UnplugReady => "the lamp made safe to unplug",
             Self::Skill => "a skill removed, turned off or on, or made",
+            Self::SkillOn => "a skill turned on or started",
         }
     }
 
@@ -386,6 +397,7 @@ impl Claim {
             Self::Unplug => "unplug",
             Self::UnplugReady => "unplug ready",
             Self::Skill => "skill",
+            Self::SkillOn => "skill on",
         }
     }
 }
@@ -870,7 +882,8 @@ pub fn skill_claim(reply: &str, ended: bool) -> Option<Option<Claim>> {
 }
 
 /// Whether `reply` names a skill ("skill" or "skills" as a word): a
-/// [`Claim::Skill`] that does stands only beside a `make_skill`.
+/// [`Claim::Skill`] that does stands only beside a `make_skill`, a
+/// [`Claim::SkillOn`] beside a `make_skill` or a `use_skill`.
 fn names_a_skill(reply: &str) -> bool {
     normalised(reply)
         .split(|c: char| !c.is_alphanumeric())
@@ -898,7 +911,9 @@ pub fn stands_on<'a>(
         // `make_skill`, whichever it asked; one naming no skill ("Moon time
         // is removed.") beside any call, as a reminder or a rule removed
         // may be said so too.
-        Claim::Skill => {
+        // Turned on or started ([`Claim::SkillOn`]): a `use_skill` too,
+        // as a skill asked by its name runs (Twelve's adversarial P2).
+        Claim::Skill | Claim::SkillOn => {
             let named = names_a_skill(reply);
             calls
                 .into_iter()
@@ -2370,38 +2385,52 @@ const UNPLUGGED: [(&str, Claim); 36] = [
 /// "I deleted moon time."). "You have three skills.", "I can make a skill
 /// for that.", "CloudFact was never actually made." and "Is moon time
 /// removed?" are none.
-const SKILL_SAID: [(&str, Claim); 19] = [
+const SKILL_SAID: [(&str, Claim); 30] = [
     ("* is|was removed|deleted|uninstalled $", Claim::Skill),
     ("* has been removed|deleted|uninstalled $", Claim::Skill),
-    ("* is|was turned|switched off|on $", Claim::Skill),
+    ("* is|was turned|switched off $", Claim::Skill),
+    ("* is|was turned|switched on $", Claim::SkillOn),
     (
-        "* skill is|was removed|deleted|uninstalled|disabled|enabled|off|on|made|created $",
+        "* skill is|was removed|deleted|uninstalled|disabled|off|made|created $",
         Claim::Skill,
     ),
-    ("* skill is|was turned|switched off|on $", Claim::Skill),
-    ("* skill is|was now off|on $", Claim::Skill),
-    ("* skill is off|on now $", Claim::Skill),
-    ("* skill is back on $", Claim::Skill),
-    ("* skill is on again $", Claim::Skill),
     (
-        "* skill has been removed|deleted|uninstalled|disabled|enabled|made|created $",
+        "* skill is|was enabled|on|started|running $",
+        Claim::SkillOn,
+    ),
+    ("* skill is|was turned|switched off $", Claim::Skill),
+    ("* skill is|was turned|switched on $", Claim::SkillOn),
+    ("* skill is|was now off $", Claim::Skill),
+    ("* skill is|was now on $", Claim::SkillOn),
+    ("* skill is off now $", Claim::Skill),
+    ("* skill is on now $", Claim::SkillOn),
+    ("* skill is back on $", Claim::SkillOn),
+    ("* skill is on again $", Claim::SkillOn),
+    (
+        "* skill has been removed|deleted|uninstalled|disabled|made|created $",
         Claim::Skill,
     ),
-    ("* skill has been turned|switched off|on $", Claim::Skill),
+    ("* skill has been enabled|started $", Claim::SkillOn),
+    ("* skill has been turned|switched off $", Claim::Skill),
+    ("* skill has been turned|switched on $", Claim::SkillOn),
     ("i've|i removed|deleted|uninstalled * $", Claim::Skill),
     (
-        "i've|i removed|deleted|uninstalled|disabled|enabled|made|created * skill $",
+        "i've|i removed|deleted|uninstalled|disabled|made|created * skill $",
         Claim::Skill,
     ),
     (
-        "i have removed|deleted|uninstalled|disabled|enabled|made|created * skill $",
+        "i have removed|deleted|uninstalled|disabled|made|created * skill $",
         Claim::Skill,
     ),
-    ("i've|i turned|switched off|on * skill $", Claim::Skill),
-    ("i have turned|switched off|on * skill $", Claim::Skill),
-    ("i've|i turned|switched * skill off|on $", Claim::Skill),
-    ("i've|i turned|switched * skill back on $", Claim::Skill),
-    ("i've|i turned|switched * back on $", Claim::Skill),
+    ("i've|i turned|switched off * skill $", Claim::Skill),
+    ("i have turned|switched off * skill $", Claim::Skill),
+    ("i've|i turned|switched * skill off $", Claim::Skill),
+    ("i've|i enabled|started * skill $", Claim::SkillOn),
+    ("i've|i turned|switched on * skill $", Claim::SkillOn),
+    ("i have turned|switched on * skill $", Claim::SkillOn),
+    ("i've|i turned|switched * skill on $", Claim::SkillOn),
+    ("i've|i turned|switched * skill back on $", Claim::SkillOn),
+    ("i've|i turned|switched * back on $", Claim::SkillOn),
 ];
 
 /// A reminder said as snoozed (C68), read as [`WORDED`]'s runs are, bare or
@@ -4521,11 +4550,9 @@ pub(crate) mod tests {
             "CloudFact has been deleted.",
             "CloudFact is turned off.",
             "The moon time skill is off now.",
-            "The CloudFact skill is back on.",
             "Your moon time skill has been removed.",
             "I removed the moon time skill.",
             "I've turned off the CloudFact skill.",
-            "I turned the CloudFact skill back on.",
             "I made a moon time skill.",
             "Okay, I deleted moon time.",
         ] {
@@ -4579,6 +4606,76 @@ pub(crate) mod tests {
             Some(Some(Claim::Skill))
         );
         assert_eq!(skill_claim("Sure thing, here is", false), Some(None));
+    }
+
+    /// Twelve's adversarial P2 on #7587: "start my focus mode skill" runs
+    /// through `use_skill` (or the in-code round of a skill asked by its
+    /// name, counted as one), and "Okay, the focus mode skill is on." beside
+    /// it stands. Turned on or started stands beside a `make_skill` too;
+    /// with no call it is held. Removed, off and made still need a make.
+    #[test]
+    fn a_skill_said_on_stands_beside_a_use_skill() {
+        let used = serde_json::json!({ "skill": "focus_mode" });
+        let none = serde_json::Value::Null;
+        for reply in [
+            "Okay, the focus mode skill is on.",
+            "The CloudFact skill is back on.",
+            "I turned the CloudFact skill back on.",
+            "Your focus mode skill is started.",
+            "I've started the focus mode skill.",
+        ] {
+            assert_eq!(
+                claim_on(reply, true, false, false, false, true),
+                Some(Some(Claim::SkillOn)),
+                "{reply}"
+            );
+            assert!(
+                stands_on(
+                    Claim::SkillOn,
+                    reply,
+                    false,
+                    [(crate::use_skill::NAME, &used)],
+                    &[]
+                ),
+                "{reply}"
+            );
+            assert!(
+                stands_on(
+                    Claim::SkillOn,
+                    reply,
+                    false,
+                    [(crate::made_skill::MAKE, &none)],
+                    &[]
+                ),
+                "{reply}"
+            );
+            assert!(!stands_on(Claim::SkillOn, reply, false, [], &[]), "{reply}");
+            assert!(
+                !stands_on(
+                    Claim::SkillOn,
+                    reply,
+                    false,
+                    [("light_brighter", &none)],
+                    &[]
+                ),
+                "{reply}"
+            );
+        }
+        for reply in [
+            "I removed the moon time skill.",
+            "The moon time skill is off now.",
+        ] {
+            assert!(
+                !stands_on(
+                    Claim::Skill,
+                    reply,
+                    false,
+                    [(crate::use_skill::NAME, &used)],
+                    &[]
+                ),
+                "{reply}"
+            );
+        }
     }
 
     /// #7587: ordinary talk about skills, a true "never made", a question

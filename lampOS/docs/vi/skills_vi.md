@@ -1562,7 +1562,13 @@ cùng ghi chú, rồi đèn nói "Sorry, I didn't do that. Could you ask me agai
 Câu có chữ "skill" chỉ đứng được khi trong lượt có bất kỳ lời gọi `make_skill`
 nào, dù là gỡ (`{"remove": NAME}`), tắt hay bật (`turn_off`, `turn_on`) hay
 tạo, vì kết quả của chúng được nói bằng lời của mô hình (`made_remove.rs`,
-`made_turn.rs`); lời gọi không được so với loại được nói. Câu không gọi tên
+`made_turn.rs`); lời gọi không được so với loại được nói. Câu nói kỹ năng đã
+được bật hay khởi động (`Claim::SkillOn`: "Okay, the focus mode skill is
+on.") cũng đứng được bên cạnh một lời gọi `use_skill`, và một kỹ năng được gọi
+tên rồi chạy trong code ở vòng 1 (`LAMP_SKILL_NAMED`) được tính là một lời gọi
+như vậy; gỡ, tắt và tạo vẫn cần `make_skill`. Kiểm thử:
+`action_claim::tests::a_skill_said_on_stands_beside_a_use_skill`,
+`second_provider::tests::action_claim::a_skill_said_on_beside_its_use_skill_is_said_as_it_came`. Câu không gọi tên
 kỹ năng nào ("Moon time is removed.") đứng được bên cạnh bất kỳ lời gọi nào,
 vì một lời nhắc bị huỷ cũng có thể được nói là đã gỡ. Lời đồng ý gỡ là chính
 lời gọi `make_skill` có `approve_id`, nên câu "đã gỡ" sau đó được nói. Như các

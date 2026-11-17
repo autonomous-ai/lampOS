@@ -16741,6 +16741,14 @@ async fn answer(
         if made_said {
             turn_called.push((crate::made_skill::MAKE.to_owned(), Value::Null));
         }
+        // And a skill asked by its name, run in code as round 1
+        // (`LAMP_SKILL_NAMED`), is the turn's `use_skill`, whatever its
+        // function's name: "Okay, the focus mode skill is on." after it
+        // stands (`LAMP_ACTION_CLAIM_SKILLS`, Twelve's adversarial P2 on
+        // #7587).
+        if named_by_words {
+            turn_called.push((crate::use_skill::NAME.to_owned(), Value::Null));
+        }
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
         // is told one went unsaid beside other calls.
@@ -18033,7 +18041,10 @@ async fn answer(
                 // said that none of them carried, a kept light's always (the
                 // first builder's ruling on #5215): its note says so, never
                 // that nothing ran.
-                let skill_said = unmade == Some(crate::action_claim::Claim::Skill);
+                let skill_said = matches!(
+                    unmade,
+                    Some(crate::action_claim::Claim::Skill | crate::action_claim::Claim::SkillOn)
+                );
                 let limited = !forget_said
                     && !skill_said
                     && unmade.is_some_and(|kind| {
