@@ -1103,7 +1103,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_SKILL_LINK_NOTE` | A skill you made that reads a service you haven't linked tells you once where to link it in the app. |
 | `LAMP_SKILL_TASK_SURE` | A task a skill hands to the lamp's agent waits its turn, and you hear when it fails. |
 | `LAMP_SKILL_LINK_APP` | A skill that needs a service you haven't linked opens that service's Connect in the app for you. |
-| `LAMP_SKILL_WRITES` | A skill you made sends one fixed thing on its own, at most ten a day, and thirty for all your skills together, once you agree, then or later. |
+| `LAMP_SKILL_WRITES` | A skill you made sends one fixed thing on its own, up to 50 a day (200 for all), once you agree. |
 | `LAMP_SKILL_WRITE_AGENT` | Nothing you'd notice: a skill's fixed send goes through the lamp's agent, still only as you agreed. |
 | `LAMP_SKILL_TASKS` | A Store or computer skill hands a longer job to the lamp's agent, using only what you agreed it may use. |
 | `LAMP_MADE_SCRIPTS` | A skill the lamp makes for you can run its own code, once it tells you what it may use and you agree. |
