@@ -286,10 +286,13 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
                  their answer, approve_id \"{}\". Call make_skill with only that approve_id, \
                  answer: \"yes\" only if they agree, \"no\" if they decline or wait, \"unclear\" \
                  if you can't tell, \"new_ask\" if their line answers nothing asked but asks \
-                 something new (another skill named, another thing asked), and named: the skill \
-                 their line names, or \"none\". Nothing is removed but on their yes to this very \
-                 question, for this very skill.)",
-                waiting.asks.say_back, waiting.id
+                 something new (another skill named, another thing asked), and named \"{spoken}\" \
+                 if their line names this skill, another skill's name if it names another, or \
+                 \"none\". A line naming {spoken} answers this question, never new_ask. Nothing \
+                 is removed but on their yes to this very question, for this very skill.)",
+                waiting.asks.say_back,
+                waiting.id,
+                spoken = crate::made_skill::spoken_name(&waiting.asks.skill)
             ));
         }
         // Cut, and not heard whole since (#6715, the first builder's
@@ -324,13 +327,18 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
             crate::made_skill::spoken_name(&waiting.asks.skill),
             waiting.id,
             answer = if answer_forced(waiting) {
-                " For this one, always give answer with that approve_id: \"yes\" only if they \
-                 agree, \"no\" if they decline or wait, \"unclear\" if you can't tell, \
-                 \"new_ask\" if their line answers nothing asked but asks something new; left \
-                 out, it is read as unclear. Give named too: the skill their line names, or \
-                 \"none\"; a yes counts only for this skill."
+                format!(
+                    " For this one, always give answer with that approve_id: \"yes\" only if \
+                     they agree, \"no\" if they decline or wait, \"unclear\" if you can't tell, \
+                     \"new_ask\" if their line answers nothing asked but asks something new; \
+                     left out, it is read as unclear. Give named too: \"{spoken}\" if their line \
+                     names this skill, another skill's name if it names another, or \"none\"; a \
+                     line naming {spoken} answers it, never new_ask, and a yes counts only for \
+                     this skill.",
+                    spoken = crate::made_skill::spoken_name(&waiting.asks.skill)
+                )
             } else {
-                ""
+                String::new()
             }
         ))
     })
@@ -1826,6 +1834,61 @@ mod tests {
             approve(&id, 3, true, true, now, never)["error"],
             NOT_APPROVED
         );
+    }
+
+    /// #7561's row on lamp-9adf (17 Nov 23:4x): "Remove rain joke?", then
+    /// "Yes, remove rain joke." was answered `new_ask` and the wait was
+    /// dropped. A line naming the very skill asked about answers it: the
+    /// note tells the model so, with that skill's name to copy into
+    /// `named`, and a yes naming it, in any case, with hyphens,
+    /// underscores or spaces, is its yes. Another skill's name is still a
+    /// new ask.
+    #[test]
+    fn a_yes_naming_the_asked_skill_is_its_yes_never_a_new_ask() {
+        let rain = || Asks {
+            skill: "rain-joke".into(),
+            sha256: "b".repeat(64),
+            writes: Vec::new(),
+            say_back: "Remove rain joke?".into(),
+            grants: None,
+            code: false,
+            remove: true,
+        };
+        clear_for_test();
+        let now = Instant::now();
+        let id = wait_for_yes(rain(), 1, now);
+        lamp_said(1, "Remove rain joke?");
+        let note = waiting_note(2, now).unwrap();
+        assert!(note.contains("named \"rain joke\""), "{note}");
+        assert!(note.contains("never new_ask"), "{note}");
+        for named in ["rain joke", "Rain-Joke", "rain_joke", "RAIN JOKE skill"] {
+            assert_eq!(answered(&id, 2, Some("yes"), Some(named)), None, "{named}");
+            assert!(waits(&id), "{named}");
+        }
+        let told = answered(&id, 2, Some("yes"), Some("cloud joke")).unwrap();
+        assert_eq!(told["left"], "rain-joke", "{told}");
+        assert!(!waits(&id));
+        // A task's or an app's make's forced wait is told the same.
+        let id = wait_for_yes(
+            Asks {
+                remove: false,
+                grants: Some(vec!["camera".into()]),
+                skill: "photo-booth".into(),
+                say_back: "It uses the camera.".into(),
+                ..rain()
+            },
+            1,
+            now,
+        );
+        lamp_said(1, "It uses the camera.");
+        let note = waiting_note(2, now).unwrap();
+        assert!(
+            note.contains("named too: \"photo booth\" if their line names this skill"),
+            "{note}"
+        );
+        assert!(note.contains("never new_ask"), "{note}");
+        assert!(waits(&id));
+        clear_for_test();
     }
 
     /// #7545 on a task's wait too: photo booth's task said back, then a

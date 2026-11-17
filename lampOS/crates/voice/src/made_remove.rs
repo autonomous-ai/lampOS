@@ -298,8 +298,9 @@ pub fn then_wait(id: &str) -> String {
          agree. When they answer, call make_skill with only approve_id \"{id}\", answer \
          \"yes\" if they agree, \"no\" if they decline or wait, \"unclear\" if you can't tell, \
          \"new_ask\" if their line answers nothing asked but asks something new (another \
-         skill named, another thing asked), and named: the skill their line names, or \
-         \"none\". A yes removes only the skill asked about."
+         skill named, another thing asked), and named: the skill their line names (the name \
+         in the question, copied exactly, when it is that one), or \"none\". A line naming the \
+         skill asked about answers it, never new_ask. A yes removes only the skill asked about."
     )
 }
 
