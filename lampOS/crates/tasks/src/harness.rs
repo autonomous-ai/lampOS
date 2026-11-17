@@ -494,8 +494,13 @@ pub enum Took {
     Uncertain(String),
 }
 
-/// How long an acknowledged `harness reply` is given: Harness's own bound
-/// is 30 s by default, in two windows, and it answers `TIMEOUT` itself.
+/// How long Harness holds one kept-session `reply` for `taken`. Its own
+/// default is 30 s, and the first reply after the engine starts (TUI plus
+/// gateway coming up) took 26-34 s on lamp-c0a4; a later one takes a few
+/// seconds, so the longer hold costs nothing there.
+pub const REPLY_KEPT_HELD: Duration = Duration::from_secs(60);
+/// How long an acknowledged `harness reply` is given: past
+/// [`REPLY_KEPT_HELD`], so Harness answers `TIMEOUT` itself first.
 pub const REPLY_KEPT_TIMEOUT: Duration = Duration::from_secs(75);
 /// How long `harness ensure` is given: it starts the daemon and waits
 /// for the engine itself (OpenClaw's gateway, 27 to 50 s after a boot).
@@ -2213,6 +2218,8 @@ impl Cli {
                 name.into(),
                 "--program-token-file".into(),
                 token.into(),
+                "--timeout".into(),
+                format!("{}s", REPLY_KEPT_HELD.as_secs()).into(),
                 "--json".into(),
                 "--".into(),
                 words.as_ref().into(),
