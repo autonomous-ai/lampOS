@@ -410,7 +410,9 @@ links, replaced_by)`, khóa `(person, key)`, tạo `IF NOT EXISTS`,
   thái được giữ. Các trạng thái: `prepared`, `done`, `cancelled`, `refused`,
   `failed`, `timed_out`, `no_result`. `detail` là object tối đa 16 KiB.
 - `service_records {person, limit?}` liệt kê, thay đổi mới nhất trước, tối
-  đa 50. Với `about` (`LAMP_SERVICE_RECORDS_TOLD` của voice, các từ của một
+  đa 50. Với `key` (`record_source` của voice, lát 7), trả về đúng một bản
+  ghi có khóa đó của `person`, hoặc không có, không đọc `about` và `limit`.
+  Với `about` (`LAMP_SERVICE_RECORDS_TOLD` của voice, các từ của một
   lần recall), nó trả về các bản ghi khớp với những từ đó, bất kể cũ đến
   đâu: khớp nhiều từ nhất trước, rồi thay đổi mới nhất. Một từ khớp một từ
   của bản ghi (dịch vụ, hành động, lý do, id kết quả hay bất kỳ chữ nào của
@@ -643,6 +645,62 @@ riêng: dòng việc Harness (`LAMP_SERVICE_RECORDS_TASKS`, lát 3,
 - **Quay về bản cũ.** Chỉ dòng việc gọi tới, sau công tắc riêng của nó, nên
   voice cũ chỉ khác ở chỗ không có dữ kiện `linked_dropped` và không có
   dòng việc.
+
+### Tìm nguồn: `record_source` (lát 7, `LAMP_SERVICE_RECORDS_SOURCE` của voice, tắt)
+
+Khi `LAMP_SERVICE_RECORDS_SOURCE=on` cùng `LAMP_SERVICE_RECORDS=on` (chỉ
+tuyến thứ hai, `process::service_records_source_worker_environment`;
+`lamp-voice` `service_records::source`), mô hình được cấp
+`record_source {key}`: khi người hỏi thêm ngoài một dòng tóm tắt của bản
+ghi ("kể thêm đi", "nó nói gì?"), nó lấy thứ bản ghi trỏ tới từ dịch vụ
+đang giữ. Khi bật, recall đầy đủ cho `key` của mỗi bản ghi.
+
+- **Của ai.** Chỉ trả lời câu qua được kiểm tra chủ của dịch vụ
+  (`services::owner_of`), cho khóa của chính người đó: memory đọc bằng
+  `service_records {person, key}` (một bản ghi hoặc không; không đọc
+  `about` và `limit`), nên khóa của người khác, hay khóa đã bị quên, là
+  `not_yours`. Tin nhắn chữ từ app là `not_yours`.
+- **Ai nghe.** Cổng của bản ghi được kể (`services::records_in_full`):
+  phòng riêng, hoặc thấy chủ nói câu đó, một mình trong khung, đúng giọng.
+  Nếu không thì không lấy gì: `others_here`, kèm `BRIEF` của bản ghi được kể.
+- **Ở đâu.** Việc Harness (`task`, `source_ref` `{service:"lamp-tasks",
+  id:"<store>:<task>"}`) đọc từ lamp-tasks bằng `get_task`, rồi
+  `get_observation` của lần quan sát mới nhất: việc được nhờ, trạng thái,
+  kết quả và câu trả lời của agent. Việc lamp-tasks không còn giữ, hay kho
+  đã được đặt lại (`store_id` khác), là `no_longer_available`, kèm quy tắc
+  "nói thẳng như vậy; không bao giờ tả từ trí nhớ ngoài một dòng tóm tắt,
+  không bịa nó đã nói hay làm gì" (cũng có trong mô tả công cụ). Dòng của
+  agent có `session` thì không bao giờ lấy: `in_agent`, phiên nằm ở agent.
+  Mọi loại khác (bản ghi connector, lời nhắc, lệnh gọi của agent không có
+  phiên) được kể từ những gì bản ghi giữ (`from: "record"`): lamp-services
+  không có đọc theo result id, và `get` của lamp-schedule đánh dấu lời nhắc
+  đang chờ là đã đưa ra, nên không hỏi bên nào.
+- **Chỉ đọc.** Chỉ gửi `service_records`, `get_task` và `get_observation`;
+  không ghi hay xóa gì ở nguồn, và lệnh gọi ở ngoài journal, như một lệnh
+  gọi memory. Một nguồn lấy về đánh dấu yêu cầu của nó như một lần đọc dịch
+  vụ (`services::read_told`): không gì khác chạy trong yêu cầu đó ngoài một
+  lần đọc nữa (không giữ, không ghi), và lượt trao đổi bị ẩn khỏi luồng
+  (`Thread::private_for`), nên lời lamp nói về nó không bao giờ vào bản tóm
+  tắt đang chạy, cũng như ghi chú trò chuyện Days được giữ từ bản đó khi
+  `LAMP_CONVERSATION_SUMMARY=on`.
+- **Có giới hạn.** Tổng 4 s một lần gọi, 3 s mỗi lệnh gọi dịch vụ, tối đa 2
+  lệnh gọi dịch vụ trong một yêu cầu (tính cả lần đọc memory: lần gọi thứ
+  hai trong cùng yêu cầu là `too_many_this_turn`, và lần quan sát của việc
+  vượt quá hai được nói là `answer_unread`); chi tiết tối đa 1.500 byte,
+  đánh dấu bằng `DATA_NOTE` của dịch vụ. Vượt quá thì chỉ cắt trường dài
+  (`answer` của agent, `detail` của bản ghi, rồi `asked`), tại một ký tự và
+  ghi tên trong `cut`; các trường ngắn (`outcome`, `state`, `status`,
+  `service`, `action`) luôn được nói đủ. Nguồn không trả lời kịp là
+  `timed_out`.
+- **Trả lời.** `{found:true, kind, summary, from, detail:{text, note}}`,
+  hoặc `{found:false, reason}` với `no_longer_available`, `timed_out`,
+  `not_yours`, `in_agent`, `others_here` hay `too_many_this_turn`. Một dòng
+  journal mỗi lần gọi: tìm thấy hay không, lý do và thời gian, không một chữ.
+- **Quên.** Quên tất cả hay quên về một điều xóa dòng và con trỏ như trước
+  (lát 1); không đụng gì ở nguồn, và sau đó `record_source` không tìm thấy gì.
+- **Bản cũ.** lamp-memory cũ từ chối `key` (`deny_unknown_fields`): lần gọi
+  là `timed_out`. Tắt (công tắc nào cũng vậy) thì không cấp công cụ và
+  không ai chạy.
 
 ## Danh bạ dịch vụ (`service_contact`, `LAMP_SERVICE_CONTACTS` của voice)
 

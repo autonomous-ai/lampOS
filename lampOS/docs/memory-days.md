@@ -675,7 +675,8 @@ created `IF NOT EXISTS`, `user_version` unchanged.
   `detail` is an object of at most 16 KiB; `reason` is tidied to 200 bytes,
   `result_id` (the service's id of what was made, an event id) to 512.
 - `service_records {person, limit?}` lists them, the latest change first,
-  at most 50. With `about` (the voice's `LAMP_SERVICE_RECORDS_TOLD`, a
+  at most 50. With `key` (the voice's `record_source`, slice 7), the one
+  record of that key of `person`'s, or none, `about` and `limit` not read. With `about` (the voice's `LAMP_SERVICE_RECORDS_TOLD`, a
   recall's words), it gives instead the records those words match, whatever
   their age: the most words matched first, then the latest change. A word
   matches a record's word (service, action, reason, result id or any text of
@@ -908,6 +909,66 @@ switch: Harness task rows (`LAMP_SERVICE_RECORDS_TASKS`, slice 3,
   is never written (slice 3).
 - **Rollback.** Only the task rows call it, behind their own switch, so an
   older voice differs in having no `linked_dropped` fact and no task rows.
+
+### Find the source: `record_source` (slice 7, the voice's `LAMP_SERVICE_RECORDS_SOURCE`, off)
+
+With `LAMP_SERVICE_RECORDS_SOURCE=on` beside `LAMP_SERVICE_RECORDS=on` (the
+second route only, `process::service_records_source_worker_environment`;
+`lamp-voice` `service_records::source`), the model is offered
+`record_source {key}`: when the person asks for more than a record's
+one-line summary ("tell me more", "what did it say?"), it fetches what the
+record points to from the service that holds it. A recall in full gives
+each record's `key` while it is on.
+
+- **Whose.** Only a line that passes the services' owner check
+  (`services::owner_of`) is answered, for a key of that person's own: the
+  memory reads it with `service_records {person, key}` (one record or
+  none; `about` and `limit` not read), so another person's key, or one a
+  forget took, is `not_yours`. A text from the app is `not_yours`.
+- **Who hears.** The told records' gate (`services::records_in_full`): the
+  private room, or the owner seen saying the line alone in view in their
+  voice. Otherwise nothing is fetched: `others_here`, with the told
+  records' `BRIEF`.
+- **Where.** A Harness task (`task`, `source_ref` `{service:"lamp-tasks",
+  id:"<store>:<task>"}`) is read from lamp-tasks with `get_task`, then
+  `get_observation` of its newest observation: what was asked, its state,
+  its outcome and the agent's answer. A task lamp-tasks no longer holds, or
+  a store put back (another `store_id`), is `no_longer_available`, with the
+  rule "say so plainly; never describe it from memory beyond its one-line
+  summary, and never make up what it said or did" (in the tool's
+  description too). An agent's row naming a `session` is never fetched:
+  `in_agent`, the session lives in the agent. Every other kind (a
+  connector record, a reminder, an agent's call without a session) is told
+  from what its record holds (`from: "record"`): lamp-services has no read
+  by result id, and lamp-schedule's `get` marks a pending reminder offered,
+  so neither is asked.
+- **Reads only.** Only `service_records`, `get_task` and `get_observation`
+  are ever sent; no source is written to or deleted from, and the call is
+  kept out of the journal, as a memory call is. A source fetched marks its
+  request as a service read does (`services::read_told`): nothing else in
+  that request runs but another read (no keep, no write), and the
+  exchange is hidden from the thread (`Thread::private_for`), so the
+  lamp's words about it never reach the running summary, nor the Days talk
+  note it is kept as with `LAMP_CONVERSATION_SUMMARY=on`.
+- **Bounded.** 4 s a call in all, 3 s each service call, at most 2 service
+  calls in one request (the memory's read counted: a second call in the
+  same request is `too_many_this_turn`, and a task's observation past the
+  two is said `answer_unread`); the detail is at most 1,500 bytes, marked
+  with the services' `DATA_NOTE`. Over that, only the long field is cut
+  (the agent's `answer`, a record's `detail`, then what was `asked`), at a
+  character and named in `cut`; the short ones (`outcome`, `state`,
+  `status`, `service`, `action`) are always told whole. A source that does not answer in time is
+  `timed_out`.
+- **Answers.** `{found:true, kind, summary, from, detail:{text, note}}`, or
+  `{found:false, reason}` with `no_longer_available`, `timed_out`,
+  `not_yours`, `in_agent`, `others_here` or `too_many_this_turn`. One
+  journal line a call: found, the reason and the time, never a word.
+- **Forgets.** A forget everything or about a thing removes the row and its
+  pointer as before (slice 1); nothing at the source is touched, and
+  `record_source` then finds nothing.
+- **Older builds.** An older lamp-memory refuses `key`
+  (`deny_unknown_fields`): the call is `timed_out`. Off (either switch),
+  the tool is not offered and nobody runs it.
 
 ## Service contacts (`service_contact`, the voice's `LAMP_SERVICE_CONTACTS`)
 

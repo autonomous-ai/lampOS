@@ -360,6 +360,11 @@ enum Extra {
         limit: Option<u64>,
         #[serde(default)]
         about: Option<String>,
+        /// The one record of this key, or none (the voice's
+        /// `record_source`, `LAMP_SERVICE_RECORDS_SOURCE`); `about` and
+        /// `limit` are not read with it. An older build refuses the field.
+        #[serde(default)]
+        key: Option<String>,
     },
     /// `LAMP_SERVICE_RECORDS`: the records about a forget's key words
     /// removed (`Days::service_records_forget`).
@@ -1273,11 +1278,15 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
             person,
             limit,
             about,
+            key,
         } => {
             let limit = limit.unwrap_or(crate::service_records::LIST_MOST as u64) as usize;
-            let records = match about {
-                Some(about) => store.service_records_about(&one(person)?, &about, limit)?,
-                None => store.service_records(&one(person)?, limit)?,
+            let records = match (key, about) {
+                (Some(key), _) => store.service_record_keyed(&one(person)?, &key)?,
+                (None, about) => match about {
+                    Some(about) => store.service_records_about(&one(person)?, &about, limit)?,
+                    None => store.service_records(&one(person)?, limit)?,
+                },
             };
             json!({"ok":true,"records":records})
         }
