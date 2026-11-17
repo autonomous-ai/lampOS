@@ -12,9 +12,10 @@
 //! pending. The offer counts only once the lamp played the disclosure
 //! whole, every word of it uncut ([`lamp_said`], [`lamp_cut`], as a
 //! read-back's is checked: `services::read_back_said`); cut, interrupted or
-//! barged in, it is no offer. `look_at_my_desk` keeps the yes only in the
-//! very next turn after it ([`turn_began`]), and only for the owner's own
-//! spoken line:
+//! barged in, it is no offer; cut short by a newer line that answers its
+//! words in its place, it goes with them ([`answered_in_place`]).
+//! `look_at_my_desk` keeps the yes only in the very next turn after it
+//! ([`turn_began`]), and only for the owner's own spoken line:
 //! seen saying it or in their voice (`services::owners_yes_now`); with
 //! `LAMP_PRIVACY_ROOM`, where any heard line counts as the owner's, their
 //! voice by the judge (`services::owners_voice_now`), so a television's
@@ -212,6 +213,16 @@ impl Offer {
         *self = Self::default();
         answered
     }
+
+    /// The words of `from`, cut short, are answered in `to`'s place: an
+    /// offer given in `from` is `to`'s now, as if given there, so the replay
+    /// must play the disclosure whole and uncut itself, and the line after
+    /// `to` answers it. Any other offer is left as it is.
+    fn in_place(&mut self, from: u64, to: u64) {
+        if self.said_in == Some(from) {
+            self.said(to, self.disclosure);
+        }
+    }
 }
 
 /// The one offer pending, shared by the worker's two routes.
@@ -236,6 +247,19 @@ pub fn lamp_said(request: u64, words: &str) {
 pub fn lamp_cut(request: u64) {
     if let Ok(mut offer) = OFFERED.lock() {
         offer.cut_in(request);
+    }
+}
+
+/// Request `to` answers in its place the words of request `from` it cut
+/// short (`second_provider`: a held line's, or one that only declined with
+/// `LAMP_CUT_ASK_ANSWERED`), as `services::answered_in_place` keeps a
+/// write's read-back: an offer given in `from` goes with them, held to
+/// being played whole and uncut in `to`, and answered by the line after it
+/// (lamp-06c1, 17 Nov: a 0-word line cut the offer before any word of it,
+/// the replay played it whole, and the owner's yes found no offer).
+pub fn answered_in_place(from: u64, to: u64) {
+    if let Ok(mut offer) = OFFERED.lock() {
+        offer.in_place(from, to);
     }
 }
 
@@ -548,6 +572,53 @@ mod tests {
         assert!(!answered_after(&[(50, SEEN_DISCLOSURE)], None));
         // A cut of another turn changes nothing.
         assert!(answered_after(&[(50, SEEN_DISCLOSURE_POSTURE)], Some(49)));
+    }
+
+    /// lamp-06c1, 17 Nov 17:59: the offer in request 29 was cut by a 0-word
+    /// line, 30, before any word of it played; 30 was held and answered 29's
+    /// words in its place, playing the disclosure whole; the yes in 31 found
+    /// "no offer just before". `played`: what the lamp played in 30, `cut`:
+    /// whether 30's answer was cut, `from`: the request whose words 30
+    /// answers.
+    fn yes_after_replay(played: &str, cut: bool, from: u64) -> bool {
+        let mut offer = Offer::default();
+        offer.said(29, SEEN_DISCLOSURE);
+        offer.began(29);
+        offer.began(30);
+        offer.cut_in(29);
+        offer.in_place(from, 30);
+        offer.began(30);
+        offer.played(30, played);
+        if cut {
+            offer.cut_in(30);
+        }
+        // A late cut of the request answered in its place changes nothing.
+        offer.cut_in(29);
+        offer.began(31);
+        offer.answered_in(31)
+    }
+
+    #[test]
+    fn an_offer_answered_in_a_cut_lines_place_counts_played_whole() {
+        // Replayed whole in 30: the next yes counts, as the read-back's
+        // (`services::answered_in_place`).
+        assert!(yes_after_replay(SEEN_DISCLOSURE, false, 29));
+        // The replay itself cut, or played only in part: none.
+        assert!(!yes_after_replay(SEEN_DISCLOSURE, true, 29));
+        assert!(!yes_after_replay(&SEEN_DISCLOSURE[..80], false, 29));
+        // Another request's words answered in 30's place: the offer stays
+        // 29's, and 31 is no answer to it.
+        assert!(!yes_after_replay(SEEN_DISCLOSURE, false, 28));
+        // Nothing pending: nothing moves.
+        let mut none = Offer::default();
+        none.in_place(29, 30);
+        assert_eq!(none, Offer::default());
+        // An offer already answered in place keeps its own disclosure.
+        let mut posture = Offer::default();
+        posture.said(29, SEEN_DISCLOSURE_POSTURE);
+        posture.in_place(29, 30);
+        assert_eq!(posture.said_in, Some(30));
+        assert_eq!(posture.disclosure, SEEN_DISCLOSURE_POSTURE);
     }
 
     #[test]
