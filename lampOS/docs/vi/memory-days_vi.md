@@ -575,6 +575,45 @@ agent và nhắc nhở qua socket của chính nó (các lát sau), vì chỉ vo
   hết trước (quên tất cả, hoặc lệnh xoá của chính công tắc đó): lệnh quên
   một điều của bản cũ không đọc `summary`, nên không xoá được chúng.
 
+### Hộp chờ liên kết của voice (lát 2, dưới `LAMP_SERVICE_RECORDS`)
+
+Phía voice của đường ghi cho những bản ghi chỉ voice mới biết là của ai:
+việc Harness, lệnh ghi của agent và lời nhắc (các lát sau). Voice xếp hàng
+mỗi thay đổi thành một `service_record` có `source_kind`, `source_ref`,
+`summary` và `deed_unix_ms`, qua socket gốc của chính nó
+(`lamp-voice` `service_records::linked`). Hiện chưa có gì đưa vào: mỗi bên
+ghi đến cùng công tắc riêng (`LAMP_SERVICE_RECORDS_TASKS`, `_AGENT`,
+`_REMINDERS`), và khi `LAMP_SERVICE_RECORDS` tắt thì không giữ gì.
+
+- **Giới hạn riêng.** Tối đa 16 thay đổi chờ, tách khỏi 32 của bản ghi
+  connector, để một loạt tin việc hay lời nhắc không bao giờ đẩy mất bản ghi
+  của một lần gửi. Mỗi khóa một: thay đổi mới hơn của cùng người và khóa thay
+  cho cái đang chờ. Khi đầy, cái cũ nhất bị bỏ, được đếm từ lúc voice khởi
+  động là `linked_dropped` trong health của voice (một dữ kiện cạnh báo cáo,
+  mức không đổi, hiện khi đã có cái bị bỏ) và nói trong một dòng journal với
+  khóa, loại và số đếm, không một chữ nào của tóm tắt.
+- **Không bao giờ chờ.** Một lần đưa vào chỉ lấy khóa của hàng chờ; một
+  luồng ghi riêng (`linked-records`, tách khỏi luồng ghi bản ghi connector,
+  để không bên nào chờ việc tồn của bên kia) gửi khi khóa đã nhả, 2 s mỗi lần
+  ghi. Memory không trả lời thì thay đổi vẫn đứng đầu và được thử lại sau
+  1 s, gấp đôi tới 30 s, nói một lần; bị từ chối (`forgotten` hay lý do
+  khác) thì bỏ và nói lời từ chối, chỉ khóa và lỗi.
+- **Của ai.** Chỉ của người đã biết (id `p-`). Không có người, hay người
+  chưa biết, thì không giữ và không ghi gì: khác bản ghi connector, không có
+  đường lùi về chủ đèn.
+- **Kiểm trước khi chờ.** Khóa mà memory sẽ từ chối, dịch vụ hay hành động
+  để trống, hay `source_ref` không phải `{service, id, session?, computer?}`
+  (chữ không có ký tự điều khiển, `service` và `id` không trống, tối đa
+  512 byte) thì không bao giờ vào hàng chờ. Tóm tắt được gọn thành một dòng
+  và cắt ở ký tự trọn vẹn tới 160 byte.
+- **Lần quên thắng.** Quên tất cả, quên người, hay quên về một điều đều lấy
+  đi các thay đổi liên kết đang chờ của người đó (hay của mọi người) trước
+  khi gửi lần quên và lần nữa khi có trả lời, quên về một điều thì so với
+  dịch vụ, hành động và tóm tắt của thay đổi; memory từ chối việc làm trước
+  một lần quên (lát 1).
+- **Quay về bản cũ.** Chưa có gì gọi tới, nên voice cũ chỉ khác ở chỗ không
+  có dữ kiện `linked_dropped`.
+
 ## Danh bạ dịch vụ (`service_contact`, `LAMP_SERVICE_CONTACTS` của voice)
 
 Công tắc `LAMP_SERVICE_CONTACTS` của voice (mặc định tắt, bật trong sản
