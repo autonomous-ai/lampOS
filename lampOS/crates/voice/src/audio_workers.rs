@@ -853,11 +853,15 @@ fn capture_loop<D: CaptureDevice>(
                             start_requested_at_us,
                             started_at_us,
                         } => {
-                            reference.started(
+                            // Judged when the notice went into this socket,
+                            // so a capture stall is not the speaker's (#7420).
+                            let now = monotonic_us();
+                            reference.started_sent(
                                 playback_epoch,
                                 start_requested_at_us,
                                 started_at_us,
-                                monotonic_us(),
+                                link.control.taken_sent_at_us().unwrap_or(now),
+                                now,
                             )?;
                             primed_at = None;
                             if !microphone.is_running() && gap.is_none() {

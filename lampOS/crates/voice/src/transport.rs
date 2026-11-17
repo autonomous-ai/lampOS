@@ -57,6 +57,8 @@ pub struct Channel {
     /// ([`Self::receive_renewed`]), and the oldest.
     passed_run: u64,
     passed_oldest_us: u64,
+    /// The sender's stamp on the message last taken ([`Self::taken_sent_at_us`]).
+    taken_sent_at_us: Option<u64>,
     #[cfg(test)]
     probe: probe::Slot,
 }
@@ -104,6 +106,7 @@ impl Channel {
             late_oldest_us: 0,
             passed_run: 0,
             passed_oldest_us: 0,
+            taken_sent_at_us: None,
             #[cfg(test)]
             probe: probe::Slot::new(sender, peer),
         })
@@ -222,6 +225,14 @@ impl Channel {
     /// receive from a closed peer is only `WouldBlock`, and this changes no kind, only the text.
     fn named(&self, error: io::Error) -> io::Error {
         io::Error::new(error.kind(), format!("{}: {error}", self.name))
+    }
+
+    /// When the sender stamped the message `receive` last took, on the host's
+    /// monotonic clock: the moment it went into this socket. Read right after
+    /// a receive, it says how long the message waited for this end to look,
+    /// which is this end's own delay, not the sender's (#7420).
+    pub fn taken_sent_at_us(&self) -> Option<u64> {
+        self.taken_sent_at_us
     }
 
     pub fn receive<T: DeserializeOwned>(&mut self) -> io::Result<Option<T>> {
@@ -410,6 +421,7 @@ impl Channel {
             self.drop_stale_first = false;
             self.say_dropped("the next taken");
         }
+        self.taken_sent_at_us = Some(packet.sent_at_us);
         #[cfg(test)]
         self.probe
             .record(probe::Direction::Receive, packet.boot, packet.sequence);

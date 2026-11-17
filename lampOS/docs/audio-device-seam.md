@@ -139,6 +139,23 @@ outcome `speaker_lapsed`), and goes on. The capture side's late answer to a
 prime the lapse reset is dropped with one journal line, where it ended the
 worker (`InvalidStart`; Ten on #1214).
 
+**A start notice read late behind a capture stall** (#7420, lamp-c0a4 on
+17 November, during an agent's make). The capture worker checks the
+speaker's two start stamps (`ClockStarted`: the start call's request and
+completion) against `MAX_REFERENCE_AGE_US` (40 ms) and ends on
+`InvalidStart` when either is older. It judged them when it read the
+notice, so a 67 ms load stall in capture, with the notice already queued,
+made a speaker that had started on time look stale, and the voice exited.
+The stamps are now judged at the moment the notice went into capture's
+socket: the channel's own send stamp (`Channel::taken_sent_at_us`, on the
+same monotonic clock), never later than the read
+(`ReferenceAssembly::started_sent`). The time the notice waited is capture's
+own delay, bounded by the channel's age check. A speaker that started 40 ms
+or more before it sent the notice, or stamps after the send or the read,
+still end the worker. Tests: `reference.rs`,
+`a_start_read_late_behind_a_capture_stall_is_not_stale` and
+`a_start_already_old_when_sent_is_still_invalid`.
+
 Tests: `tests/speaker_lapse_worker.rs`, the worker's own loop on ALSA's
 `null` device (Linux only, so the ARM64 run): its turn's 100 ms lease left
 unrenewed for 200 ms and then the capture side ready, so that its next

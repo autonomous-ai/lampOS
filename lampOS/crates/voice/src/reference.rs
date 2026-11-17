@@ -270,13 +270,41 @@ impl ReferenceAssembly {
         completed_at: u64,
         now: u64,
     ) -> Result<()> {
+        self.started_sent(epoch, requested_at, completed_at, now, now)
+    }
+
+    /// [`Self::started`] for a start notice the speaker sent at `sent_at`
+    /// (the channel's own stamp, [`crate::transport::Channel::taken_sent_at_us`])
+    /// and capture took off its socket at `now`.
+    pub fn started_sent(
+        &mut self,
+        epoch: u64,
+        requested_at: u64,
+        completed_at: u64,
+        sent_at: u64,
+        now: u64,
+    ) -> Result<()> {
+        // The start stamps are judged at the moment the notice went into
+        // capture's socket, not at the moment capture read it (#7420). On
+        // lamp-c0a4 a load stall held capture 67 ms with the notice already
+        // queued, and the start read at `now` was 40 ms old: the voice exited
+        // on a speaker that had started on time. The time the notice waited
+        // in the socket is capture's own delay, and the channel bounds it
+        // with its own age check (100 ms, plus the receiver's measured hold
+        // up). A kernel receive timestamp is not used: on Linux it is on the
+        // realtime clock and needs a different receive call, and the
+        // sender's stamp on the same monotonic clock gives the same moment
+        // on a local socket. The 40 ms still guards a speaker that started
+        // long before it sent the notice, and a stamp after the send or
+        // after `now` is still refused.
+        let sent_at = sent_at.min(now);
         if epoch == 0
             || epoch != self.timing.playback_epoch
             || self.timing.clock_started_at_us.is_some()
             || requested_at < self.prime_observed_at_us
             || requested_at > completed_at
-            || !fresh(requested_at, now, MAX_REFERENCE_AGE_US)
-            || !fresh(completed_at, now, MAX_REFERENCE_AGE_US)
+            || !fresh(requested_at, sent_at, MAX_REFERENCE_AGE_US)
+            || !fresh(completed_at, sent_at, MAX_REFERENCE_AGE_US)
         {
             return Err(self.fault(Kind::InvalidStart, now).into());
         }
@@ -837,6 +865,54 @@ mod tests {
         assert_eq!(state.timing().clock_started_at_us, Some(12_000));
         assert_eq!(state.timing().capture_blocks_before_clock_start, 1);
         assert_eq!(state.timing().capture_blocks_processed, 2);
+    }
+
+    #[test]
+    fn a_start_read_late_behind_a_capture_stall_is_not_stale() {
+        // #7420, lamp-c0a4: the speaker started and sent its notice on time,
+        // and capture, held up by a load stall, read it 60 to 100 ms later.
+        for stall in [60_000, 67_000, 80_000, 100_000] {
+            let mut state = ReferenceAssembly::default();
+            let mut echo = EchoProcessor::new(false);
+            state.prime(prime(1, None), 10_002, 2, &mut echo).unwrap();
+            capture(&mut state, 11_000);
+            let sent = 12_600;
+            state
+                .started_sent(1, 12_000, 12_500, sent, sent + stall)
+                .unwrap();
+            assert_eq!(state.timing().clock_start_requested_at_us, Some(12_000));
+            assert_eq!(state.timing().clock_started_at_us, Some(12_500));
+            assert_eq!(state.timing().capture_blocks_before_clock_start, 1);
+        }
+    }
+
+    #[test]
+    fn a_start_already_old_when_sent_is_still_invalid() {
+        let mut state = ReferenceAssembly::default();
+        let mut echo = EchoProcessor::new(false);
+        state.prime(prime(1, None), 10_002, 2, &mut echo).unwrap();
+        capture(&mut state, 11_000);
+        for (request, completion, sent, now) in [
+            // The speaker started 40 ms and more before it sent the notice,
+            // and capture read it at once or behind a stall.
+            (12_000, 12_000, 52_000, 52_001),
+            (12_000, 12_000, 52_000, 132_000),
+            (12_000, 51_000, 52_000, 52_001), // Only the request is old.
+            // No stall: a stamp more than 40 ms before the read.
+            (12_000, 12_000, 60_000, 60_000),
+            // Stamped after the send, or after the read.
+            (12_000, 52_001, 52_000, 52_002),
+            (12_000, 52_003, 52_004, 52_002),
+        ] {
+            assert_fault(
+                state.started_sent(1, request, completion, sent, now),
+                Kind::InvalidStart,
+            );
+            assert_eq!(state.timing().clock_started_at_us, None);
+        }
+        state
+            .started_sent(1, 12_000, 12_000, 12_100, 90_000)
+            .unwrap();
     }
 
     #[test]
