@@ -483,8 +483,11 @@ as a person would:
   is told only for "wait", "pause" and "hold on". The second route leaves
   this part out for a line with a stop word and more asked ("Hold on, hey
   Lamp, make the light a little warmer"; `cut_in_told::ASKED_MORE`,
-  `stop_words::a_stop_and_more`): told it, that line was answered "Okay,
-  I'll stop." with no call 8 times in 29 core gates (#7285).
+  `stop_words::a_stop_and_more`, a stop that `wait_words::only_a_stop`
+  does not read as bare, so "Hold on a second, Lamp." still gets it):
+  told it, that line was answered "Okay, I'll stop." with no call 8 times
+  in 29 core gates (#7285). "Hold on, I'm thinking." says more than the
+  stop, so it is answered as said ("Sure, take your time.").
 - **Any other cut-in:** the reply's first words are a few that show it was
   heard ("Oh, sure —"), then the answer, with one example ("Oh, sure — it's
   four."), and the note says the character's rule against repetitive

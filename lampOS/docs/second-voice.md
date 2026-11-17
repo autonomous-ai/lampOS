@@ -2415,7 +2415,9 @@ order is kept. A written turn is the same from the chat on.
     other answer, and where it was before going back (#3997's cut-in
     proposal, `docs/not-speech.md`). A line with a stop word and more
     asked ("Hold on, hey Lamp, make the light a little warmer",
-    `stop_words::a_stop_and_more`) is told `cut_in_told::ASKED_MORE`
+    `stop_words::a_stop_and_more`: a stop that the answer wait's
+    `wait_words::only_a_stop` does not read as bare; "Hold on a second,
+    Lamp." is bare) is told `cut_in_told::ASKED_MORE`
     instead, the note without its stop sentence: told the whole, that line
     was answered "Okay, I'll stop." with no call 8 times in 29 core gates
     (#7285). The early words' chat chooses by its own words the same way
