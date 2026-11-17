@@ -312,6 +312,10 @@ Environment=LAMP_SESSION_FACT=on
 # look); and "that was weird", a builder's review tool whose marks the reset doesn't wipe (#1332's review).
 Environment=LAMP_TOOL_LEAD_IN=on
 Environment=LAMP_WAIT_KEEPS_ANSWER=on
+# A heard request answered only "One moment." or "Let me check." with nothing called is asked once to go on
+# (holding-answer.md, #4711), on Live and the second route alike: the coordinator passes `--holding-answer` to its
+# provider and second workers. The safety net for the "Let me check." dead-end (#7458); on in the product (17 Nov).
+Environment=LAMP_HOLDING_ANSWER=on
 Environment=LAMP_STOP_TOLD=on
 Environment=LAMP_ASKER_FIRST=record
 Environment=LAMP_NAMES=checked

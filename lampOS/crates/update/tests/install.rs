@@ -2057,6 +2057,29 @@ fn the_product_loosens_a_made_skill_alike_in_its_three_units() {
     }
 }
 
+/// A holding-only answer is asked once to go on in the product (#7458, the
+/// "Let me check." dead-end): `LAMP_HOLDING_ANSWER=on` once in
+/// `lamp-voice.service`, the one unit that reads it (`holding_answer::on`,
+/// and `--holding-answer` to its provider and second workers), and no other
+/// product unit names it.
+#[test]
+fn the_product_asks_a_holding_answer_to_go_on_in_the_voice_alone() {
+    let owner = "lamp-voice.service";
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_HOLDING_ANSWER=on")
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains("LAMP_HOLDING_ANSWER"))
+            .count();
+        assert_eq!(on, usize::from(*unit == owner), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+    assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
+}
+
 /// A made skill's write goes out after its owner's yes in the product
 /// (#6066, #6142): the owner's ask on 11 Nov, so the testers can try it.
 /// `LAMP_SKILL_WRITES=on` in the four units that read it, `lamp-services`
