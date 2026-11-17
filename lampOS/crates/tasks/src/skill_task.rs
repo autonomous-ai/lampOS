@@ -242,7 +242,7 @@ pub const SERVICE_GRANTS: &[&str] = &[
     "notion",
 ];
 /// The switch for the task grant [`NET_GRANT`] (`on` exactly; off unless
-/// set, in no product unit yet): with it, a run whose grants name `net` reaches
+/// set; on in the product units that read it, #7200): with it, a run whose grants name `net` reaches
 /// the public web on ports 80 and 443, held as every run ([`NET_ENV`]
 /// `run`) and given its own egress socket, started by the make's runner
 /// ([`crate::skill_make::net_runner`], [`crate::egress`]); without it,
