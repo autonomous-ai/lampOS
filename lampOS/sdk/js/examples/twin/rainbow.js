@@ -25,8 +25,9 @@ export function frameGap(limits) {
 // The 32 colours of a frame: the wheel, turned by `turns` (0 to 1).
 export const rainbowFrame = (count, turns) => Array.from({ length: count }, (_, k) => hue((k / count + turns) % 1));
 
-// What the lamp says that is the lamp's own light or state on top, or a pause in its ears: try again later, never stop.
-const LATER = new Set(['busy', 'rate', 'private', 'paused', 'asleep', 'quiet_hours', 'refused']);
+// What the lamp says that is the lamp's own light or state on top, or a pause in its ears, or its connection being made again (`closed`,
+// link.js): try again later, never stop.
+const LATER = new Set(['closed', 'busy', 'rate', 'private', 'paused', 'asleep', 'quiet_hours', 'refused']);
 
 // Starts the loop on `lamp` (the SDK's Lamp). `secondsPerTurn`: how long one turn of the wheel takes. Returns `{ stop(), stats(), ended }`;
 // `ended` resolves when the loop has ended (stopped, or by an answer that cannot be tried again: the reason is in `stats().ended`).

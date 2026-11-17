@@ -667,6 +667,11 @@ export class FakeLamp {
     for (const ws of this.wss.clients) if (this.subscribed.get(ws)?.has(event)) ws.send(frame);
   }
 
+  // The connection drops with no word, as a reset or a lost Wi-Fi does: each socket is ended at once, no close frame, no reason.
+  drop() {
+    for (const ws of this.wss.clients) ws.terminate();
+  }
+
   // The lamp restarts, as on every update: each connection closes (1012,
   // "service restart"), and pairings stay. A program connects again
   // (`Lamp.keepConnected`).
