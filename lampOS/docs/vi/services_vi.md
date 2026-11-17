@@ -2787,6 +2787,74 @@ qua một socket mở.
   `the_settings_written_follow_the_switch` của lamp-tasks, và
   `a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys` của lamp-setup.
 
+### Đọc qua tác tử của đèn (`LAMP_SERVICES_TO_AGENT`, tắt trừ khi bật)
+
+Quyết định của chủ đèn ngày 17/11: việc với các kết nối do tác tử của đèn
+làm, không bao giờ do mô hình riêng của tuyến thứ hai; và (~17:55) tác tử đó
+là tác tử mặc định của đèn, Hermes hoặc OpenClaw, không bao giờ cố định là
+Hermes. Với công tắc `on` trong lamp-voice, lamp-tasks và lamp-control (cùng
+`LAMP_SERVICES`, `LAMP_AGENT_SERVICES` và `LAMP_SKILL_TASKS` bật):
+
+- **Các cổng của giọng nói giữ trước.** Một `service_read` trên tuyến thứ hai
+  được gác đúng như trước (`services::gate`): nghe trực tiếp, dòng của chính
+  chủ đèn; khách, cả phòng, lượt chạy theo lịch hay tin nhắn bị từ chối như
+  trước, và không gì được chuyển đi.
+- **Giọng nói tự không đọc gì.** Lời người nói và yêu cầu của mô hình đi tới
+  socket tạo kỹ năng của lamp-tasks thành một dòng, `{"op":"voice_ask","ask",
+  "grants":["<code>-read"],"within_ms":120000}` (`agent_asks::hand`), trên một
+  luồng riêng. Mô hình được trả lời ngay và nói một câu chờ ngắn ("Để tôi
+  xem."). Mỗi lúc một yêu cầu.
+- **Tác tử** (`lamp_tasks::voice_ask`): tác tử mặc định của đèn, được chọn ở
+  mỗi yêu cầu như một lần tạo trên đường chạy chung chọn nó
+  (`skill_make::MakeGateway`, `HarnessRunner::make_agent`). Trên một đèn mặc
+  định là OpenClaw, một lần đọc bị từ chối `no_services` trước khi token nào
+  được cấp: Gateway của OpenClaw giữ mạng của đèn và không có máy chủ MCP
+  lamp-services hay token riêng cho từng lượt. Giọng nói nói một câu cố định,
+  "Your lamp's agent can't read your linked services yet, so I can't get that
+  for you." (`agent_asks::NO_SERVICES_LINE`), và tự không đọc gì; không gì rơi
+  về DeepSeek. Harness chưa xem mà mặc định của đèn (`runtime::lamp_default`,
+  bất kể `LAMP_SKILL_DEFAULT_AGENT`) không phải Hermes: từ chối `not_ready`,
+  không bao giờ chạy trên Hermes.
+- **Lượt chạy trên Hermes:** Hermes của đèn chạy như một lần tạo bằng giọng
+  nói, trong một thư mục và home mới của riêng nó (bộ nhớ và phiên của Hermes
+  bị ẩn), tách khỏi mạng, lời người nói trong tệp quy tắc, không bao giờ trong
+  đối số, kết thúc ở 120 s. lamp-control cấp token cho đúng một quyền đó
+  (`{"mint":{"ask":["gmail-read"],"run"}}`, như kỹ năng `voice-ask`; chỉ một
+  `-read`, không bao giờ `-write`), kết thúc cùng lượt chạy. Cấu hình home của
+  nó có `mcp_servers.lamp-services`.
+- **Riêng tư như một lần đọc, giữ trong mã.** Chỉ một lần đọc mà giọng nói sẽ
+  nói đầy đủ (`services::said_whole`) mới được chuyển đi; câu trả lời chỉ được
+  nói khi chủ đèn vẫn được thấy một mình (`say::NOT_ALONE`), nếu không là một
+  câu cố định (`agent_asks::NOT_ALONE_LINE`).
+- **Báo như lời của tác tử, không tin cậy.** Câu trả lời đi qua kênh `quoted`
+  của dịch vụ nói, kỹ năng `voice-ask` (`say::Words::Agent`, tối đa 640 byte).
+  Lượt chạy thất bại, bị từ chối hoặc quá hạn nói một câu cố định
+  (`agent_asks::FAILED_LINE`).
+- **Quên hay dừng thì bỏ.** Một lần quên (`services::forget_waiting`) hay một
+  lời dừng bỏ câu trả lời đang chờ (`agent_asks::forget`).
+
+Yêu cầu khó (`LAMP_HARD_ASKS_TO_AGENT`, [switches.md](../switches.md)) đi cùng
+đường, không quyền dịch vụ và không token, chỉ cho dòng của chính chủ đèn.
+Trên một đèn mặc định là OpenClaw, lượt đó là một lượt trong chính Gateway
+của chủ đèn, không phải một home mới: nó giữ workspace, bộ nhớ và các phiên
+của chủ đèn (cả bản ghi của lượt), và có các công cụ, kênh nhắn tin và mạng
+của Gateway. Nó chỉ được giữ ở mức trả lời bằng quy tắc của nó, không bằng
+sự cô lập (`voice_ask::ANSWER_ONLY`): không gửi, mua, đổi, xoá hay đăng gì,
+không dùng kênh nhắn tin nào, và nói điều cần làm thay vì làm. Câu trả lời có
+thể đến từ bộ nhớ của chủ đèn, nên lamp-tasks đánh dấu `"owner_alone":true`
+(`voice_ask::OWNER_ALONE`, P2 của AppOnly trên #7509) và nó chỉ được nói khi
+chủ đèn được thấy một mình, như một lần đọc đầy đủ (`say::NOT_ALONE`), nếu
+không là `agent_asks::NOT_ALONE_LINE`; câu trả lời của Hermes, từ một home
+mới, không bị giữ. Một lời dừng hay quên bỏ câu trả lời, nhưng lượt
+OpenClaw vẫn chạy tới 120 s (chưa có lệnh huỷ nào tới nó), và yêu cầu kế
+tiếp bị từ chối bận cho tới khi nó xong. `not_ready` được báo bằng câu chưa
+sẵn sàng của đèn (`made_skill::NOT_READY_LINE`).
+
+Kiểm thử: `agent_asks::tests` của lamp-voice, `voice_ask::tests` của
+lamp-tasks và các kiểm thử `harness`
+`a_read_on_an_openclaw_default_is_refused_plainly_and_nothing_runs` và
+`a_hermes_default_runs_the_lamps_hermes_and_an_unlooked_openclaw_is_not_ready`.
+
 ## Làm mới
 
 Một liên kết OAuth được gia hạn qua backend, như `connector_refresh.go` của V1

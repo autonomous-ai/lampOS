@@ -10953,7 +10953,7 @@ fn a_hard_ask_on_an_openclaw_default_is_its_one_turn_and_never_hermes() {
     );
     assert_eq!(
         answered,
-        json!({"ok": true, "answer": "It is about 384,400 km away."})
+        json!({"ok": true, "answer": "It is about 384,400 km away.", "owner_alone": true})
     );
     assert_eq!(told, 1);
     assert_eq!(
@@ -11008,7 +11008,7 @@ fn a_hard_ask_on_openclaw_with_no_answer_file_takes_its_chat_answer() {
     );
     assert_eq!(
         answered,
-        json!({"ok": true, "answer": "The moon is about 384,400 km away."})
+        json!({"ok": true, "answer": "The moon is about 384,400 km away.", "owner_alone": true})
     );
     assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
 }

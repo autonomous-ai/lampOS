@@ -2715,7 +2715,8 @@ lamp-tasks and lamp-control (and `LAMP_SERVICES`, `LAMP_AGENT_SERVICES` and
   missing: a held-off OpenClaw run (a namespace per turn, as Hermes's
   wrapper gives a make) and a per-run MCP entry its gateway reads. Harness
   not looked yet on a lamp whose default isn't Hermes: refused `not_ready`,
-  never run on Hermes.
+  never run on Hermes (the default as `runtime::lamp_default` reads it,
+  whatever `LAMP_SKILL_DEFAULT_AGENT` says).
 - **The run on Hermes:** the lamp's Hermes as a voice make
   runs, in a fresh folder and home of its own (its memory and sessions
   hidden), held off the network, the words in its rules file and never in
@@ -2774,7 +2775,21 @@ These are expected numbers, not measured on a lamp.
 Lines heard by the voice's own ask for the lamp's agent that is not a
 service's (`LAMP_HARD_ASKS_TO_AGENT`, [switches.md](switches.md)) take the
 same path with no grant and no token, only for the owner's own line (as a
-`service_read` is held, `services::owner_of`). Still open: that run keeps
+`service_read` is held, `services::owner_of`). On an OpenClaw default,
+that run is one turn in the owner's own Gateway, not a fresh home: it
+keeps the owner's workspace, memory and sessions (and the turn's
+transcript), and has the Gateway's tools, messaging channels and network.
+It is held to an answer by its rules, not by isolation
+(`voice_ask::ANSWER_ONLY`): send, buy, change, delete or post nothing, run
+nothing that does, use no messaging channel, and say what would be needed
+instead. Its answer may come from the owner's memory, so lamp-tasks marks
+it `"owner_alone":true` (`voice_ask::OWNER_ALONE`, AppOnly's P2 on #7509)
+and it is said only while the owner is seen alone, as a full read's is
+(`say::NOT_ALONE`), else `agent_asks::NOT_ALONE_LINE`; a Hermes hard ask's
+answer, from a fresh home, is not held. A stop or a forget drops the
+answer, but the OpenClaw turn runs on to its 120 s (no cancel reaches it
+yet), and the next ask is refused busy until it ends. `not_ready` is told
+the lamp's not-ready line (`made_skill::NOT_READY_LINE`). Still open: that run keeps
 the host network, the lamp's local ports included, until the net runner
 lands; and a service read already in the model's context could be handed
 on to it in the owner's words.

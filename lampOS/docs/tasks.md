@@ -3790,15 +3790,27 @@ make's. The agent is picked at each ask as a make with `"one_path":true`
 picks it (`skill_make::MakeGateway`, `HarnessRunner::make_agent`), with no
 line field: the lamp's Hermes takes it as below; a gateway agent
 (OpenClaw) takes a hard ask as one make turn (`MakeTurn`, `harness new
-openclaw` in a fresh `make-<run id>` folder with only `rules.md`, no home,
-environment or token), its answer `answer.md`, else the agent's final chat
+openclaw` in a fresh `make-<run id>` folder with only `rules.md`; no token
+and nothing in its environment from lamp-tasks). That is not isolation:
+the turn runs in the owner's own Gateway, with the owner's workspace,
+memory and sessions (it keeps the turn's transcript), and the Gateway's
+tools, messaging channels and network. It is held to an answer by its
+rules alone (`voice_ask::ANSWER_ONLY`, Heron's P2 on #7509): send, buy,
+change, delete or post nothing, run nothing that does, use no messaging
+channel, and say what would be needed instead. Hermes's rules keep "do
+what they asked": its fresh home has no channel and none of the owner's
+memory. Its answer carries `"owner_alone":true` (`voice_ask::OWNER_ALONE`,
+AppOnly's P2 on #7509): lamp-voice says it only while the owner is seen
+alone, as a full read's. Its answer is `answer.md`, else the agent's final chat
 answer when Harness didn't cut it (`voice_ask::run_answer`), held to 120 s
 from the ask's start (a make's turn gets its whole deadline from the
 hand-over; an ask's doesn't). A read on OpenClaw is refused `no_services`
 before any mint (its gateway keeps the network and has no per-run
 lamp-services MCP server or token yet; [services.md](services.md)). A
-Hermes pick while lamp-tasks' no-Harness read of the default
-(`runtime::lamp_default`) names another agent is refused `not_ready`. A
+Hermes pick while lamp-tasks' read of the lamp's default
+(`runtime::default_engine_of`: `lamp_default`, set with the lamp's engines
+whatever `LAMP_SKILL_DEFAULT_AGENT` says) names another agent is refused
+`not_ready`. A
 failed pick (a default agent that takes no run) is `run_failed`. With no
 grant it is taken only with `LAMP_HARD_ASKS_TO_AGENT=on`, on Hermes on
 the make's runner (the network as `LAMP_MAKE_AGENT_NET` says, the
