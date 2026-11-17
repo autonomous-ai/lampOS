@@ -28,6 +28,19 @@ async fn engine(
     chats: Vec<Vec<net::Result<ChatEvent>>>,
     tool_takes: Duration,
 ) -> (Engine, Arc<Script>, Calls) {
+    engine_going_on(on, heard, chats, tool_takes, &[]).await
+}
+
+/// [`engine`], with the requests in `going_on` let out only as the
+/// conversation going on (told `worker::CONVERSATION_ALONE`).
+async fn engine_going_on(
+    on: bool,
+    heard: &[&str],
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    tool_takes: Duration,
+    going_on: &[u64],
+) -> (Engine, Arc<Script>, Calls) {
+    let going_on = going_on.to_vec();
     let script = Arc::new(Script {
         heard: Mutex::new(heard.iter().map(|words| Ok((*words).to_owned())).collect()),
         chats: Mutex::new(chats.into()),
@@ -50,7 +63,12 @@ async fn engine(
         Arc::new(Instant::now),
     )
     .saying_when_down(true)
-    .doing_at_the_limit(on);
+    .doing_at_the_limit(on)
+    .noting_the_conversation_alone(Arc::new(move |request| {
+        going_on
+            .contains(&request)
+            .then_some(worker::CONVERSATION_ALONE)
+    }));
     engine.render_lines();
     tokio::time::timeout(Duration::from_secs(5), async {
         while engine
@@ -91,7 +109,9 @@ fn names(ran: &Calls) -> Vec<String> {
 /// At the limit: the first refused ask, plain, is done and answered with
 /// its own line in place of the limit line; the next is done with no chat
 /// asked at all. A line that is no plain ask hears the limit as before,
-/// and an ask its function refused hears it too, the function run once.
+/// with no chat asked either (Heron on #7612), and an ask its function
+/// refused hears it too, the function run once. [`LIMIT_TRY_AGAIN`] after
+/// the last refusal, a line asks the chat again.
 #[tokio::test]
 async fn at_the_limit_a_plain_ask_is_done_without_the_model() {
     let (mut engine, script, ran) = engine(
@@ -105,15 +125,8 @@ async fn at_the_limit_a_plain_ask_is_done_without_the_model() {
             "Lamp, what's the weather?",
             "Make it brighter.",
         ],
-        // "Quieter, please." asks no chat.
-        vec![
-            answered(),
-            limited(),
-            limited(),
-            limited(),
-            answered(),
-            answered(),
-        ],
+        // From "Quieter, please." on, no chat is asked until a minute on.
+        vec![answered(), limited(), answered(), answered()],
         Duration::ZERO,
     )
     .await;
@@ -143,10 +156,12 @@ async fn at_the_limit_a_plain_ask_is_done_without_the_model() {
         "already at the limit: no chat asked"
     );
 
-    // No plain ask: the limit line, the first of the run, as before.
+    // No plain ask: the limit line, the first of the run, as before, and
+    // no chat asked, as it would only be refused.
     let other = sent_with_down(&mut engine, 4).await;
     assert!(other.contains(&limit), "{other:?}");
     assert_eq!(names(&ran).len(), 2, "nothing run: {other:?}");
+    assert_eq!(script.asked.lock().unwrap().len(), 2, "no chat: {other:?}");
 
     // Refused by its function: the limit's own way (here quiet, named
     // within 5 min), and the function run once, not again after the chat.
@@ -157,13 +172,58 @@ async fn at_the_limit_a_plain_ask_is_done_without_the_model() {
         ["light_brighter", "volume_down", "light_cooler"]
     );
 
-    // The chat answers again: the limit is over, and the model is asked.
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        2,
+        "no chat: {refused:?}"
+    );
+
+    // A minute on, a line asks the chat again; it answers, the limit is
+    // over, and the model is asked.
+    tokio::time::pause();
+    tokio::time::advance(LIMIT_TRY_AGAIN).await;
+    tokio::time::resume();
     let back = sent_with_down(&mut engine, 6).await;
     assert!(back.contains(&"complete".to_owned()), "{back:?}");
     let after = sent_with_down(&mut engine, 7).await;
     assert!(after.contains(&"complete".to_owned()), "{after:?}");
     assert_eq!(names(&ran).len(), 3, "asked of the model: {after:?}");
-    assert_eq!(script.asked.lock().unwrap().len(), 6);
+    assert_eq!(script.asked.lock().unwrap().len(), 4);
+}
+
+/// At the limit, a line let out only as the conversation going on is not
+/// acted on without the model, which alone could judge it not for the
+/// lamp (Heron on #7612: "Louder." from the TV): refused, it hears the
+/// limit, and at the known limit nothing, with no chat asked. Named, the
+/// same words are done.
+#[tokio::test]
+async fn at_the_limit_only_a_line_said_to_the_lamp_is_done() {
+    let (mut engine, script, ran) = engine_going_on(
+        true,
+        &["What time is it?", "Louder.", "Louder.", "Lamp, louder."],
+        vec![answered(), limited()],
+        Duration::ZERO,
+        &[2, 3, 4],
+    )
+    .await;
+    sent_with_down(&mut engine, 1).await;
+    let refused = sent_with_down(&mut engine, 2).await;
+    assert!(
+        refused.contains(&format!("audio:{}", DOWN_LINE_LIMIT.len())),
+        "{refused:?}"
+    );
+    let known = sent_with_down(&mut engine, 3).await;
+    assert_eq!(known, ["down", "failed"]);
+    assert!(names(&ran).is_empty(), "not said to the lamp: nothing run");
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        2,
+        "no chat at the limit"
+    );
+    let named = sent_with_down(&mut engine, 4).await;
+    assert!(named.ends_with(&["down".to_owned(), "failed".to_owned()]));
+    assert_eq!(names(&ran), ["volume_up"]);
+    assert_eq!(script.asked.lock().unwrap().len(), 2);
 }
 
 /// With the switch off the limit is as it was: the plain ask hears the

@@ -114,6 +114,7 @@ mod tests {
             ("Switch off the light", Some(("light_off", json!({})))),
             ("Lights out.", Some(("light_off", json!({})))),
             ("Make it brighter.", Some(("light_brighter", json!({})))),
+            ("Brighter?", None),
             ("Lamp, it's too dark", None),
             ("Too dark.", Some(("light_brighter", json!({})))),
             ("Turn the light up.", Some(("light_brighter", json!({})))),

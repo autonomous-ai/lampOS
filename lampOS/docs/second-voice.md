@@ -645,11 +645,18 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   ("Brighter.", "Done.", "I'm already as dim as I go.", one of
   `action_claim::SAID_LINES`) from its clip, rendered with the fixed answers
   at start, since the relay renders no new speech at the limit; with none
-  kept, the change alone answers. It is tried at the run's refused chat,
-  and once the run is known to be the limit (`DownLine::limited`) before
-  any chat is asked, so the answer waits only on the speech to text and the
-  function (the host test holds the line's end to its first audio under
-  0.7 s with a 300 ms function). It sends `DownLineSaid` as the limit line
+  kept, the change alone answers. Only a line said to the lamp is done
+  so: one that names it, or one not let out only as the conversation going
+  on (told `CONVERSATION_ALONE` or `FOLLOW_UP_NOTE`), which only the model
+  could judge not for the lamp ("Louder." from the TV is left alone). It is
+  tried at the run's refused chat, and once the run is known to be the
+  limit (`DownLine::limited`: the last refusal was the limit, less than
+  `LIMIT_TRY_AGAIN`, 60 s, ago) before any chat is asked, so the answer
+  waits only on the speech to text and the function (the host test holds
+  the line's end to its first audio under 0.7 s with a 300 ms function).
+  At the known limit, any other line ends as the limit does with no chat
+  asked, since the relay would only refuse it; 60 s after the last refusal
+  a line asks the chat again, to find whether the limit has passed. It sends `DownLineSaid` as the limit line
   does, so no `turn_lost`, limit line or other line follows it, and it is
   still a refused turn to the coordinator. Any other line, or an ask its
   function refuses (run once, never again after the chat), hears the limit
