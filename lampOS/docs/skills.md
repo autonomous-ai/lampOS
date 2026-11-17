@@ -6614,17 +6614,25 @@ made skill is refused at install.
    speaking it (`Heeding::going_on_unseen`) starts no said start unless a
    face is in the eyes' newest look as the call comes
    (`Heeding::holds_said_start`, `bus_out::faces_in_view`; no eyes, or the
-   camera closed, is no face). A call of such a skill, itself or through
+   camera closed, is no face). So too a line let out as a short word said
+   to the lamp, a short sound said close to it, or a question about its
+   own work, with no call of its own (no name, no tap, no words calling
+   it; `Attention::played_on_no_call`, `worker::unseen_line`; the first
+   builder at 00:53 on 18 Nov): none shows it was said to the lamp, so a
+   short skill name said near it is talk only. The first line after the
+   lamp's own news answers it, and keeps its start. A call of such a skill, itself or through
    `use_skill` (`tools::starts_said`, by its card's `SAID_TO_YOU`; never a
    question about a skill), is then held as a call the rule holds
    (`Engine::holding_said_starts`): not run, and the model is told it was
    not done (`policy_holds::HELD`); it may still answer in words. A line
-   let out for its own sign (its name, a face turned to the lamp, said
-   close to it, an answer to the lamp's question) is not held, so "Lamp,
+   let out for its own sign (its name, a face turned to the lamp, an
+   answer to the lamp's question or its news) is not held, so "Lamp,
    I'm busy." from across the room still starts it. Structural only: no
    word of the line is matched. With the switch off nothing is installed
    and nothing changes. Tests:
    `a_said_start_is_held_on_a_line_only_going_on_with_no_face`,
+   `a_said_start_is_held_on_a_short_word_or_a_sound_said_close_with_no_name`,
+   `a_said_start_is_held_on_a_question_about_its_work_and_kept_after_its_news`,
    `a_held_said_start_is_not_run_and_the_model_is_told_so`,
    `a_said_start_is_found_by_its_card_itself_or_through_use_skill`.
 4. **Said back exactly as it does** (`Said::said_back`): "When you tell me
