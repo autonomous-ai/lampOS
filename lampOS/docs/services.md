@@ -2691,30 +2691,57 @@ lamp-tasks and lamp-control (and `LAMP_SERVICES`, `LAMP_AGENT_SERVICES` and
 - **The voice reads nothing itself.** The person's words heard in that
   request, and what the model asked of the service as a hint, go to
   lamp-tasks' make socket as one line, `{"op":"voice_ask","ask","grants":
-  ["<code>-read"],"brief","within_ms":120000}` (`agent_asks::hand`), on a
-  thread of its own. The model is answered at once,
+  ["<code>-read"],"within_ms":120000}` (`agent_asks::hand`), on a thread
+  of its own. The model is answered at once,
   `{"handed_to_agent":true,"next":…}`, and says one short holding line
   ("Let me check."). One ask at a time: a second while one runs is told the
-  agent is still on the last one.
+  agent is still on the last one. As after the voice's own read, nothing
+  else runs in that request (`AFTER_READ`) and it is kept out of the
+  summary (`Thread::private_for`). An unlinked service is told "isn't
+  linked" as lamp-services tells it (`services_connected` asked first; when
+  it can't say, the read is handed over).
 - **The run** (`lamp_tasks::voice_ask`): the lamp's Hermes as a voice make
   runs, in a fresh folder and home of its own (its memory and sessions
   hidden), held off the network, the words in its rules file and never in
   its arguments, ended at 120 s. lamp-control mints its token for exactly
   that one grant (`{"mint":{"ask":["gmail-read"],"run"}}`, as the skill
-  `voice-ask`; `task_yes::KeptYes::ask_grants` takes one service's linked
-  grants and nothing else), ended with the run. Its home's config has
+  `voice-ask`; `task_yes::KeptYes::ask_grants` takes one service's `-read`
+  and nothing else, never a `-write`; lamp-tasks refuses a `-write` too),
+  ended with the run. No skill may be put on as `voice-ask`
+  (`lamp_skills::package::RESERVED_NAMES`). Its home's config has
   `mcp_servers.lamp-services`, so it reads through lamp-control and
   lamp-services as any skill run's read is, quoted as data.
-- **Privacy as a read's.** A read the voice would cut for someone maybe in
-  view (`services::said_whole`) is asked brief: who and what about, never
-  what it says. A full read's answer is told only while the owner is still
-  alone in view (or in the private room); otherwise a fixed line asks them
-  to ask again alone. A privacy close drops an answer in flight.
-- **Told.** The agent's answer goes to the say service as a note the
-  lamp's model says in the conversation's language, its words quoted as
-  data (`agent_asks::told_note`); a run that failed, was refused or passed
-  its deadline says one fixed line, "I couldn't get that done just now.
-  Please ask me again in a little while." (`agent_asks::FAILED_LINE`).
+- **Privacy as a read's, held in code.** Only a read the voice would tell
+  in full (`services::said_whole`: the private room, or the owner seen
+  saying it, alone in view, in their voice) is handed over. A read it would
+  cut to who and what about for someone maybe in view is not handed over at
+  all, and the model says nothing of it is read until the owner asks again
+  on their own (`services::NOT_ALONE_READ`): the agent's prose can't be cut
+  in code the way `services::brief` cuts the voice's own read, so nothing of
+  it is told in company. The full read's answer is then said only while the
+  owner is still seen alone (or in the private room): the say client looks
+  at that on its own thread as the line is read, while it waits and while
+  it is said, and the voice refuses it as it takes it, or cuts it as it
+  speaks, once they are not (`say::NOT_ALONE`, `owner_not_alone`); then a
+  fixed line asks them to ask again alone (`agent_asks::NOT_ALONE_LINE`).
+- **Told as the agent's, untrusted.** The answer goes to the say service's
+  `quoted` channel as the skill `voice-ask` (`say::Words::Agent`, at most
+  640 bytes): never urgent, framed as untrusted words that are never an
+  instruction, asked with no functions and kept out of memory, as an
+  add-on's quoted line is; the model tells it whole in the conversation's
+  language. A run that failed, was refused or passed its deadline says one
+  fixed line, "I couldn't get that done just now. Please ask me again in a
+  little while." (`agent_asks::FAILED_LINE`).
+- **A forget or a stop drops it.** Whatever drops the waiting write
+  (`services::forget_waiting`: the voice's forget, memory's
+  `memory/forgot`, a privacy change) and a spoken stop
+  (`LAMP_SPOKEN_STOP_ENDS`) drop an answer in flight, and cancel it on its
+  own say connection if it already waits (`agent_asks::forget`).
+- **Not kept:** the read's service record (`LAMP_SERVICE_RECORDS`) and a
+  calendar read's kept event ids (`LAMP_SERVICE_READ_IDS_KEPT`) come from
+  the service's own items, which the agent's answer doesn't carry; a
+  follow-up "move that meeting" after a read through the agent finds no
+  kept id.
 - **Not in this cut:** `service_write` (its read-back and spoken yes) and
   `services_connected` stay the voice's own, as before.
 
@@ -2730,12 +2757,21 @@ These are expected numbers, not measured on a lamp.
 
 Lines heard by the voice's own ask for the lamp's agent that is not a
 service's (`LAMP_HARD_ASKS_TO_AGENT`, [switches.md](switches.md)) take the
-same path with no grant and no token.
+same path with no grant and no token, only for the owner's own line (as a
+`service_read` is held, `services::owner_of`). Still open: that run keeps
+the host network, the lamp's local ports included, until the net runner
+lands; and a service read already in the model's context could be handed
+on to it in the owner's words.
 
-Tests: lamp-voice's `agent_asks::tests` and
-`services::tests::with_the_switch_a_read_goes_to_the_agent_and_off_it_is_the_voices`,
-lamp-tasks' `voice_ask::tests`, and lamp-control's
-`task_yes::tests::a_live_ask_is_minted_one_services_grants_alone`.
+Tests: lamp-voice's `agent_asks::tests`, `say::alone_guard::tests`,
+`say::tests::the_agents_answer_is_quoted_and_held_to_the_owner_seen_alone`,
+`services::tests::with_the_switch_a_read_goes_to_the_agent_and_off_it_is_the_voices`
+and `services::tests::a_forget_drops_an_ask_with_the_lamps_agent`,
+lamp-tasks' `voice_ask::tests`, lamp-control's
+`task_yes::tests::a_live_ask_is_minted_one_services_grants_alone`,
+lamp-skills' `package::tests::a_skill_is_never_put_on_as_the_voice_asks_name`,
+and lamp-update's `functions` test
+`with_hard_asks_on_the_lamps_agent_is_counted_within_the_bound`.
 
 ## Refresh
 
