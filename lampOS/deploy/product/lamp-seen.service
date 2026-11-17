@@ -1,11 +1,10 @@
 # lampOS seen: what the lamp sees for its skills, eating, drinking, a break and posture, from the cloud
 # perception service on the owner's opt-in (lampOS/docs/seen.md, #6543). The product unit
 # (lampOS/docs/install.md): installed and enabled on every lamp, under the keeper (in lampos.target,
-# restarted on a crash and by an update), and off unless a drop-in sets
-#   [Service]
-#   Environment=LAMP_SEEN_ACTIVITY=on
-# Off, `serve` idles and touches nothing (no bus, no file, no socket), and `frame-link` removes the
-# frame link's file, so the eyes serve no link and keep no visits: the product is unchanged.
+# restarted on a crash and by an update), with LAMP_SEEN_ACTIVITY=on below (#6543's switch-on).
+# Nothing is sent until the owner's yes. Masked or with the switch unset, `serve` idles and touches
+# nothing (no bus, no file, no socket), and `frame-link` removes the frame link's file, so the eyes
+# serve no link and keep no visits.
 [Unit]
 Description=lampOS seen (lamp-seen)
 PartOf=lampos.target
@@ -20,6 +19,17 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
+# LAMP_SEEN_JOURNAL_LABELS stays unset: a diagnostics switch.
+# LAMP_SEEN_ACTIVITY: its why and rules are its row in docs/switches.md (#6543).
+Environment=LAMP_SEEN_ACTIVITY=on
+# LAMP_SEEN_POSTURE: its why and rules are its row in docs/switches.md (#6543).
+Environment=LAMP_SEEN_POSTURE=on
+# LAMP_SEEN_HOLDS_SITTING: its why and rules are its row in docs/switches.md (#6543).
+Environment=LAMP_SEEN_HOLDS_SITTING=on
+# LAMP_SEEN_BREAK_IS_STANDING: its why and rules are its row in docs/switches.md (#6543).
+Environment=LAMP_SEEN_BREAK_IS_STANDING=on
+# LAMP_SEEN_MORE_DOINGS: its why and rules are its row in docs/switches.md (#6543).
+Environment=LAMP_SEEN_MORE_DOINGS=on
 # As the eyes' user: the eyes take a frame link reader only in a folder of their own user's with no
 # group or other access (/run/lampos-eyes-frames, made by lampos.conf). lampos is also the bus's group
 # and the say socket's (the voice's LAMP_SAY_GROUP=lampos), so no other group is needed.

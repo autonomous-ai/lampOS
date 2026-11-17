@@ -25,6 +25,12 @@ StartLimitBurst=5
 [Service]
 Type=simple
 Environment=LAMP_CLOUD=on
+# LAMP_SEEN_ACTIVITY: its why and rules are its row in docs/switches.md (#6543).
+Environment=LAMP_SEEN_ACTIVITY=on
+# LAMP_SEEN_POSTURE: its why and rules are its row in docs/switches.md (#6543, #7551).
+Environment=LAMP_SEEN_POSTURE=on
+# LAMP_SEEN_MORE_DOINGS: its why and rules are its row in docs/switches.md (#6543, #7529).
+Environment=LAMP_SEEN_MORE_DOINGS=on
 # Each connection leaves the broker a will saying the lamp `offline` on its own channel, 30 s
 # after the connection is lost (WILL_DELAY_S; the session is kept 60 s, longer, so the delay
 # holds): the lamp's record shows it gone about 30 s after a stop and within about 2 min of a
