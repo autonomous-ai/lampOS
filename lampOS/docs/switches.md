@@ -1098,7 +1098,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_SKILL_RUNS_VOICE_SHARE` | Late in a busy day, skills' runs wait for tomorrow so the lamp still has the thinking to answer you. |
 | `lamp-tasks --push-watch` | Nothing you'd notice: the lamp hears that a task on your computer is done as it ends, not at its next check. |
 | `LAMP_SKILL_STATE_TOLD` | Ask the lamp whether a skill is on, off or resting, what it does, or when it last ran. |
-| `LAMP_SKILL_RECURRING_TOLD` | Ask the lamp to do something every morning at nine, like reading your new mail, and it makes a skill instead of setting a reminder. |
+| `LAMP_SKILL_RECURRING_TOLD` | Ask the lamp to do something every morning, like reading your mail, and it makes a skill, not a reminder. |
 | `LAMP_LEDGER_REFENCE` | A lamp whose timers stopped ringing after a restore rings them again, or says it couldn't set one. |
 
 ## What the census found
