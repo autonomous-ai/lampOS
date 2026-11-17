@@ -80,7 +80,16 @@ lamp also says once when the opt-in is turned off.
     is dropped;
   - when the gate closes for any reason, or the link closes or fails, which
     includes the camera's privacy close, everything goes: the connection,
-    its partial frame, the request in flight, the grant and the copy (wiped).
+    its partial frame, the request in flight, the grant and the copy (wiped);
+  - the link is read by a thread of its own (`Drained`), every 2 ms while a
+    frame is asked for, never by the serve loop: the camera closes a reader
+    that leaves a frame unread for 0.5 s (`ConsumerStalled`), its kernel
+    buffer holds about 16 KiB, and a full-look frame is several times that,
+    so a loop reading once a 100 ms tick, and longer while a frame is
+    scaled for sending, lost the link mid-burst (13 of 16 bursts on one
+    lamp). The thread copies the whole frame into one slot of its own; the
+    next step moves it into the copy above and wipes the slot, and a loss,
+    the gate closing or a stop wipes it too.
 
   Each copy goes to a `Sink`, the one place a frame would go to the server.
   Without the account it is `Discard`, and the copy is wiped right after;
