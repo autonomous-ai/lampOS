@@ -296,6 +296,28 @@ pub(super) fn waits(shared: &Shared) -> bool {
             .is_ok_and(|renames| renames.held.is_some() || renames.asked.is_some())
 }
 
+/// Who the eyes saw saying a line from `from` to `to` while a rename waits
+/// ([`keep_sight`]): [`crate::speaking_faces::SpeakingFaces::speakers_with_boot`].
+/// With `LAMP_NAME_LEARN_FIX` (`fix`), a line with no face read so is read
+/// again by the short-line rule (`LAMP_VOICE_SHORT_LINE_SPEAKER`'s,
+/// [`crate::speaking_faces::SpeakingFaces::short_line_speakers_with_boot`]):
+/// a one- or two-word yes spans under the three looks a line needs, so on
+/// lamp-52e6 the asker's yes was nobody's and the rename was dropped twice
+/// (#7419). Only the held rename's yes and its asked note read this; every
+/// other speaking read is as before.
+pub(super) fn yes_speakers(
+    eyes: &crate::speaking_faces::SpeakingFaces,
+    from: Instant,
+    to: Instant,
+    fix: bool,
+) -> crate::speaking_faces::Speakers {
+    let speakers = eyes.speakers_with_boot(from, to);
+    if fix && speakers.is_empty() {
+        return eyes.short_line_speakers_with_boot(from, to);
+    }
+    speakers
+}
+
 /// Keeps who the eyes saw saying `request`'s line for the held rename and
 /// the asked note.
 pub(super) fn keep_sight(shared: &Shared, sight: SightRead) {
@@ -693,6 +715,93 @@ mod tests {
             ..seen_turn(&yes, &asker, &theirs)
         };
         assert!(verdict(&someone_else).is_err());
+    }
+
+    /// The eyes' looks every 250 ms over 2 s under boot `b`, each the faces
+    /// `at(ms)` gives with their mouth reads; the line is the last 0.4 s, a
+    /// one-word "yes" spanning two looks.
+    fn short_yes_seen(
+        at: &dyn Fn(u64) -> Vec<(&'static str, lamp_msgs::SpeakingState)>,
+    ) -> (crate::speaking_faces::SpeakingFaces, Instant, Instant) {
+        let eyes = crate::speaking_faces::SpeakingFaces::default();
+        let start = Instant::now();
+        for (seq, ms) in (0..=2000u64).step_by(250).enumerate() {
+            let faces = lamp_msgs::Faces {
+                faces: at(ms)
+                    .into_iter()
+                    .map(|(id, state)| lamp_msgs::Face {
+                        id: id.to_owned(),
+                        xmin: 0.1,
+                        ymin: 0.1,
+                        xmax: 0.3,
+                        ymax: 0.4,
+                        confidence: 1.0,
+                        yaw: None,
+                        facing: Some(true),
+                        speaking: Some(lamp_msgs::Speaking {
+                            state,
+                            score: 0.9,
+                            from: None,
+                        }),
+                        follows: None,
+                    })
+                    .collect(),
+            };
+            eyes.look(
+                start + Duration::from_millis(ms),
+                Some((("b", seq as u64 + 1), &faces)),
+            );
+        }
+        (
+            eyes,
+            start + Duration::from_millis(1600),
+            start + Duration::from_millis(2000),
+        )
+    }
+
+    /// #7419: on lamp-52e6 the asker's one- or two-word yes was read with
+    /// no face speaking it (two looks, under the three a line needs) and
+    /// not by the one-face count either, so the held rename was dropped and
+    /// ran only on the third try. With `LAMP_NAME_LEARN_FIX` their face
+    /// still before it and read speaking in it says it, by the short-line
+    /// rule, and the rename runs on the first yes; another face's yes, or
+    /// nobody in view, still runs nothing.
+    #[test]
+    fn a_short_yes_from_the_askers_face_runs_the_rename_with_the_fix() {
+        use lamp_msgs::SpeakingState::{No, Yes};
+        let yes = said("Yes.", ASKED);
+        let asker = asker();
+        let known = || Some(("Tove".to_owned(), "b/f1".to_owned()));
+        let turn = |speakers: &crate::speaking_faces::Speakers| {
+            verdict(&YesTurn {
+                seen: Some((speakers, known())),
+                ..seen_turn(&yes, &asker, &[])
+            })
+        };
+        let in_line = |ms: u64| ms >= 1600;
+        // The asker, still through the lamp's question, says "yes".
+        let (eyes, from, to) =
+            short_yes_seen(&|ms| vec![("f1", if in_line(ms) { Yes } else { No })]);
+        let off = yes_speakers(&eyes, from, to, false);
+        assert!(off.is_empty(), "off: two looks, nobody's");
+        assert!(turn(&off).is_err(), "off: dropped, the #7419 failure");
+        let on = yes_speakers(&eyes, from, to, true);
+        assert_eq!(on, ["b/f1"]);
+        assert_eq!(turn(&on), Ok(()), "on: the rename runs on the first yes");
+        // Another face says the short yes, the asker still beside it.
+        let (eyes, from, to) =
+            short_yes_seen(&|ms| vec![("f1", No), ("f2", if in_line(ms) { Yes } else { No })]);
+        let other = yes_speakers(&eyes, from, to, true);
+        assert_eq!(other, ["b/f2"]);
+        assert_eq!(
+            turn(&other),
+            Err(("another face was seen saying the yes", true))
+        );
+        // Nobody in view: nobody's, and not alone in view either.
+        let (eyes, from, to) = short_yes_seen(&|_| Vec::new());
+        let nobody = yes_speakers(&eyes, from, to, true);
+        assert!(nobody.is_empty());
+        assert!(turn(&nobody).is_err());
     }
 
     /// Carried lines not read as theirs stay refused (the 29e7 requests 19
