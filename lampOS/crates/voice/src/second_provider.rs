@@ -10074,7 +10074,11 @@ async fn spoken(
             } else {
                 0
             };
-            heed(request, window, &text, continues_from, lead_us)
+            // A reply to a yes or no the lamp waits for is said to it
+            // (`LAMP_SAID_TO_ME`, #7442).
+            crate::said_to_me::awaiting_yes(a_yes_held(&shared), || {
+                heed(request, window, &text, continues_from, lead_us)
+            })
         }
         _ => None,
     };

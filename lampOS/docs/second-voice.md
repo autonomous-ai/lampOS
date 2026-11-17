@@ -5708,7 +5708,12 @@ after a take-over, but now for every turn:
   `LAMP_TURNED_FACE_SPEAKS` needs a still face read in at least half of 3
   looks, which a 0.5 s smack never has. One predicate,
   `said_to_me::judge`, read first in `worker::Heeding::silence_turned`:
-  the line is said to the lamp when its name is heard or written in it;
+  the line is said to the lamp when the lamp waits for a yes or no it
+  asked for (a held rename, forget or setup save, a read-back's send, a
+  skill's yes: the engine's `a_yes_held`, told to the judging by
+  `said_to_me::awaiting_yes`), so a bare "Yes." its mouth unread still
+  reaches `held_rename::take` and the other holds; when its name is heard
+  or written in it;
   when it is in a live conversation (the window), unless it is 0 to 2 words
   no face was seen speaking; or when a face turned to the lamp is facing it
   (head pitch from 20 degrees up to 25 degrees down, `said_to_me::PITCH_DEG`
