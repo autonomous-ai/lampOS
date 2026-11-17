@@ -228,11 +228,13 @@ impl PaneHarness for Fake {
             }
         };
         *kept = Some(agent.clone());
+        let agent_id_now = agent.clone();
         Ok(Ensured {
             result: result.into(),
             agent_id: agent,
             state: "idle".into(),
             why: None,
+            engine_session: Some(format!("agent:main:kept-{}", agent_id_now)),
         })
     }
     fn reply_kept(&self, name: &str, _: &Path, words: &str) -> Took {
@@ -267,7 +269,7 @@ impl PaneHarness for Fake {
         Ok((state != "none").then_some(state))
     }
     fn close_kept(&self, name: &str, _: &Path) -> Result<(), String> {
-        self.call(format!("close-forget {name}"));
+        self.call(format!("close-kept {name}"));
         *self.kept.lock().unwrap() = None;
         Ok(())
     }
@@ -1885,12 +1887,19 @@ fn the_kept_session_busy_or_not_running_is_waited_or_ensured_again() {
     ));
 }
 
-/// OpenClaw's kept session is not rotated by count; a sign-out closes it `--forget` and
-/// removes its token and record.
+/// OpenClaw's kept session is not rotated by count; a sign-out closes it,
+/// deletes its OpenClaw session by `ensure`'s `engineSession` (Harness's
+/// `close --forget` is not built), and removes its token and record.
 #[test]
 fn the_kept_session_is_never_rotated_and_a_sign_out_forgets_it() {
     let dir = tempfile::tempdir().unwrap();
+    let deleted = Arc::new(Mutex::new(Vec::new()));
+    let seen = deleted.clone();
     let (one, fake) = kept_on(dir.path());
+    let one = one.with_session_delete(Box::new(move |key| {
+        seen.lock().unwrap().push(key.to_owned());
+        Ok(())
+    }));
     for n in 0..=ROTATE_TURNS {
         one_turn(&one, &fake, &format!("task-{n}"));
     }
@@ -1901,8 +1910,35 @@ fn the_kept_session_is_never_rotated_and_a_sign_out_forgets_it() {
     assert_eq!(fake.count("close"), 0);
     one.drop_when_free("the lamp signed out");
     one.tend(&fake, &place(), &|| false);
-    assert_eq!(fake.count("close-forget"), 1);
+    assert_eq!(fake.count("close-kept"), 1);
+    assert_eq!(
+        *deleted.lock().unwrap(),
+        vec![format!("agent:main:kept-{}", agent_of(1))]
+    );
     assert!(!dir.path().join(TOKEN_FILE).exists());
     assert!(!dir.path().join(STATE_FILE).exists());
     assert_eq!(one.agent(), None);
+}
+
+/// A reply refused `NOT_YOURS`: the pane the old way at once (`harness
+/// new` and `reply`), and no `ensure` until the daemon starts again.
+#[test]
+fn a_kept_session_not_ours_sends_the_pane_the_old_way() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    fake.takes
+        .lock()
+        .unwrap()
+        .push_back(Took::NotSent("reply_not_yours".into()));
+    assert_eq!(
+        one_turn(&one, &fake, "task-1"),
+        Ended::Answered("answer to New task task-1:".into())
+    );
+    assert_eq!((fake.count("new"), fake.count("reply")), (1, 1));
+    one_turn(&one, &fake, "task-2");
+    assert_eq!(fake.count("ensure"), 1);
+    one.forget("Harness's daemon started");
+    one.open_if_due(&fake, &place());
+    assert_eq!(fake.count("capabilities"), 2, "asked again after a restart");
 }
