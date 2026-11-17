@@ -746,6 +746,8 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
                     sequence: 3310,
                     commit: "5b40a1523".into(),
                 }),
+                waiting: None,
+                asked: None,
             }),
             refused: None,
             engines: None,
@@ -898,6 +900,8 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
                     started_at_unix_ms: 5,
                     step_started_at_unix_ms: step,
                     target: None,
+                    waiting: None,
+                    asked: None,
                 }),
                 ..idle.clone()
             },

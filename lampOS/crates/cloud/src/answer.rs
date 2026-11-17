@@ -321,6 +321,24 @@ pub trait Lamp {
         Err(not_here("update.check"))
     }
 
+    /// Whether the owner's Update now is answered (#7517, `LAMP_UPDATE_NOW=on`
+    /// with `LAMP_APP_UPDATE=on`, `crate::update::Checks::ask_now`).
+    fn update_now_page(&self) -> bool {
+        false
+    }
+
+    /// The owner's Update now (#7517): lamp-cloud's mark, then one
+    /// `update/check` with `now`, at `now`.
+    fn ask_update_now(&mut self, _now: std::time::Instant) -> Result<(), String> {
+        Err(not_here("update.now"))
+    }
+
+    /// Whether the setup walk is under way, as the voice's
+    /// `onboarding/pending` says it (#4367): false while unknown.
+    fn walk_under_way(&self) -> bool {
+        false
+    }
+
     /// Whether the app may see and install the lamp's agents
     /// (`LAMP_APP_ENGINES=on` with `LAMP_APP_UPDATE=on`, #6240,
     /// `crate::update`).
@@ -396,7 +414,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 86] = [
+pub const KINDS: [(&str, Switch); 87] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -468,6 +486,8 @@ pub const KINDS: [(&str, Switch); 86] = [
     (crate::skill_secrets::KINDS[2], SKILL_SECRETS),
     ("update.status", |lamp| lamp.update_page()),
     ("update.check", |lamp| lamp.update_page()),
+    // The owner's Update now (#7517), with its own switch.
+    ("update.now", |lamp| lamp.update_now_page()),
     // The lamp's agents (#6240): a missing one installed from the app.
     ("engines.install", |lamp| lamp.engines_page()),
     // The lamp's default agent, chosen in the app (#6492).
@@ -979,6 +999,16 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             lamp.check_update(std::time::Instant::now(), retry)?;
             some(crate::update::started(status))
         }
+        // The owner's Update now (#7517): never during the setup walk; between
+        // rounds a round starts, and a round waiting for its quiet moment is
+        // taken over. lamp-update gives the voice its moment, then switches.
+        "update.now" if on(lamp, kind) => {
+            let status = crate::update::status(lamp.update_status(), lamp.engines_page())?
+                .unwrap_or_default();
+            crate::update::may_update_now(&status, lamp.walk_under_way())?;
+            lamp.ask_update_now(std::time::Instant::now())?;
+            some(crate::update::started(status))
+        }
         // The app's install of a missing agent (#6240): only one lamp-update
         // says is missing or failed, at most once a minute; the install
         // waits for lamp-update's next round and keeps its own rules.
@@ -1114,6 +1144,8 @@ pub mod tests {
         /// `update.check` asks on, and the checks asked (#4153).
         pub update_bus: Option<lamp_bus::Bus>,
         pub update_checks: crate::update::Checks,
+        /// The setup walk under way, as `onboarding/pending` would say (#7517).
+        pub walk: bool,
         pub restart: bool,
         pub shutdown: bool,
         /// What `account` says (`LAMP_SIGNED_OUT`).
@@ -1296,6 +1328,16 @@ pub mod tests {
             retry: Option<u64>,
         ) -> Result<(), String> {
             self.update_checks.ask(self.update_bus.as_ref(), now, retry)
+        }
+        fn update_now_page(&self) -> bool {
+            self.update_page && self.update_checks.now()
+        }
+        fn ask_update_now(&mut self, now: std::time::Instant) -> Result<(), String> {
+            self.update_checks
+                .ask_now(self.update_bus.as_ref(), now, 1_000)
+        }
+        fn walk_under_way(&self) -> bool {
+            self.walk
         }
         fn engines_page(&self) -> bool {
             self.update_page && self.update_checks.engines()
@@ -2303,6 +2345,105 @@ pub mod tests {
         }
     }
 
+    /// #7517: `update.now` is answered only with both switches on, is never
+    /// taken during the setup walk, writes lamp-cloud's mark before its one
+    /// `update/check` with `now`, takes over a round waiting for quiet, and
+    /// answers a second tap while an Update now round runs with
+    /// `a round is running`.
+    #[test]
+    fn the_owners_update_now_is_marked_and_asked_once_and_never_during_the_walk() {
+        let root = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(root.path()).unwrap();
+        let state = tempfile::tempdir().unwrap();
+        let mark = state.path().join("update-now");
+        let mut lamp = Fake {
+            update_bus: Some(lamp_bus::Bus::new(root.path()).unwrap()),
+            update_page: true,
+            ..lamp()
+        };
+        // Its own switch off: not on this lamp, and not in `can`.
+        assert_eq!(
+            answer(&mut lamp, "update.now", &json!({})),
+            Err(not_here("update.now"))
+        );
+        lamp.update_checks = crate::update::Checks::default().with_now(mark.clone());
+        let mut update = bus
+            .subscribe_typed(
+                lamp_msgs::UpdateCheck::TOPIC,
+                "update",
+                lamp_msgs::UpdateCheck::TYPE,
+            )
+            .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        // During the setup walk: refused, nothing marked or said.
+        lamp.walk = true;
+        assert_eq!(
+            answer(&mut lamp, "update.now", &json!({})),
+            Err(crate::update::WALK.to_owned())
+        );
+        assert!(!mark.exists());
+        assert!(update.recv(std::time::Duration::ZERO).unwrap().is_none());
+        lamp.walk = false;
+        // Between rounds: marked, then one check with `now`.
+        let started = answer(&mut lamp, "update.now", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(started["check"], "started");
+        let marked: Value = serde_json::from_slice(&std::fs::read(&mark).unwrap()).unwrap();
+        assert_eq!(marked, json!({"at_unix_ms": 1_000}));
+        let heard = update
+            .recv(std::time::Duration::from_secs(1))
+            .unwrap()
+            .expect("one check on the bus");
+        assert_eq!(
+            heard.parse::<lamp_msgs::UpdateCheck>().unwrap(),
+            lamp_msgs::UpdateCheck {
+                retry: None,
+                now: Some(true)
+            }
+        );
+        // A round waiting for its quiet moment is taken over, not held to
+        // the minute; one already asked now is running.
+        let mut says = bus
+            .publisher_declared(
+                lamp_msgs::UpdateStatus::TOPIC,
+                &lamp_msgs::UpdateStatus::declaration(),
+                "update",
+            )
+            .unwrap();
+        let mut round = lamp_msgs::UpdateRound {
+            started_at_unix_ms: 1,
+            step_started_at_unix_ms: 2,
+            waiting: Some(lamp_msgs::UpdateRound::WAITING_QUIET.into()),
+            ..Default::default()
+        };
+        let switching = |round: &lamp_msgs::UpdateRound| lamp_msgs::UpdateStatus {
+            running: None,
+            now: "switching".into(),
+            last: None,
+            harness: None,
+            round: Some(round.clone()),
+            engines: None,
+            refused: None,
+        };
+        says.publish_json(0, &switching(&round)).unwrap();
+        assert!(answer(&mut lamp, "update.now", &json!({})).is_ok());
+        round.asked = Some(lamp_msgs::UpdateRound::ASKED_NOW.into());
+        says.publish_json(0, &switching(&round)).unwrap();
+        assert_eq!(
+            answer(&mut lamp, "update.now", &json!({})),
+            Err(crate::update::RUNNING.to_owned())
+        );
+        // A round switching (no longer waiting) is running too.
+        round.asked = None;
+        round.waiting = None;
+        says.publish_json(0, &switching(&round)).unwrap();
+        assert_eq!(
+            answer(&mut lamp, "update.now", &json!({})),
+            Err(crate::update::RUNNING.to_owned())
+        );
+    }
+
     /// #4153: `update.check` is answered only with `LAMP_APP_UPDATE=on`,
     /// with `update.status`'s object and `"check": "started"` once a
     /// running lamp-update has the check. Refused, with what the app shows,
@@ -2436,7 +2577,10 @@ pub mod tests {
             .expect("the retry is on the bus");
         assert_eq!(
             heard.parse::<lamp_msgs::UpdateCheck>().unwrap(),
-            lamp_msgs::UpdateCheck { retry: Some(12226) }
+            lamp_msgs::UpdateCheck {
+                retry: Some(12226),
+                now: None
+            }
         );
     }
 

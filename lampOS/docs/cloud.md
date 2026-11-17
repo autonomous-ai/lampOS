@@ -201,6 +201,7 @@ lamp says so.
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
 | `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale", "round"?: {"started_at_unix_ms", "step_started_at_unix_ms", "target"?: {"sequence", "commit"}}}`, from lamp-update's kept `update/status`; `round` only while a round runs (#5473, "The round under way" below); `unknown` and nulls before lamp-update has said anything; with lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`, also `"harness"` ("Harness's install" below); with `LAMP_APP_ENGINES=on` here and in lamp-update, also `"engines": {"hermes": {"state", "version"?, "reason"?, "at_unix_ms"?}, "openclaw": {…}, ENGINE: {…}…, "default"?: ENGINE, "default_chosen_in_app"?: BOOL}`, every other engine the lamp's Harness has too ("The lamp's agents" below; `default` from lamp-tasks, left out when it is not reached, "The lamp's default agent" below). Without the switch, V1's "not on this lamp" |
 | `update.check` (`{}`, or `{"retry": SEQUENCE}` for a refused build, #6266) | with `LAMP_APP_UPDATE=on` (#4153, "Check for update" below): asks `lamp-update serve` for its next round now; a `retry` drops that build's refusal before the round, with the first update after setup on or off (#6800: with it on, the retry was heard and its refusal kept). `update.status`'s object with `"check": "started"`, or `failure` with `a round is running` (`now` is not `idle` or `unknown`), `asked less than a minute ago`, or `lamp-update is not listening for a check`. Without the switch, V1's "not on this lamp" |
+| `update.now` (`{}`) | with `LAMP_UPDATE_NOW=on` and `LAMP_APP_UPDATE=on` (#7517, "Update now" below): the owner's Update now. Between rounds it starts one; a round waiting for its quiet moment (`update.status`'s `round.waiting` `quiet`) is taken over. Either way the switch waits for no quiet moment, only the voice's moment to say so (`round.waiting` `give_way`, at most 10 s). `update.status`'s object with `"check": "started"`, or `failure` with `the lamp is being set up; it updates by itself once setup is done` (the walk under way), `a round is running` (any other moment of a round, or a second tap), `the lamp could not mark the ask; try again`, or `lamp-update is not listening for a check`. Without the switches, V1's "not on this lamp" |
 | `engines.install` (`{"engine": "hermes"}` or `"openclaw"`) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on` (#6240, "The lamp's agents" below): asks `lamp-update serve` to install a missing agent at its next round. `{"install": "started"}`, or `failure` with `no such agent on this lamp` (lamp-update says no such engine), `the agent is not missing or failed` (its `state` is not `not_installed` or `failed`), `asked less than a minute ago`, `not installable from the app on this build` (an agent this build has no installer for: any but Hermes and OpenClaw), or `lamp-update is not listening for a check`. Without the switches, V1's "not on this lamp" |
 | `engines.default` (`{"engine": "<engine>"}`, any engine Harness reports on the lamp) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on`, as `engines.install` (#6492, "The lamp's default agent" below): the owner's choice of the lamp's default agent, handed to lamp-tasks (`app_engine_default`). `{"default": "<engine>", "chosen_in_app": true}`, or `failure` with lamp-tasks' code and a `message` the app shows: `engine_unknown` (an empty or missing name, refused here before lamp-tasks is asked, or a name lamp-tasks does not know; "That isn't an agent this lamp knows."), `engine_not_installed` ("That engine isn't installed on the lamp."), `engine_default_unsaved` (lamp-tasks could not keep it), or `unreachable` and other codes ("The lamp could not be reached just now. Try again in a moment."). Without the switches, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
@@ -758,6 +759,65 @@ look starts none, and the app sees it on `update.status` (`now` stays
 `update.rs`'s tests, `app_contract.rs`'s
 `the_software_update_is_answered_from_lamp_updates_status`, and
 `lamp-update`'s `app_check` tests.
+
+### Update now (#7517, `update.now`, `LAMP_UPDATE_NOW`)
+
+With `LAMP_UPDATE_NOW=on` here and in `lamp-update` (and `LAMP_APP_UPDATE=on`),
+the app's Update now takes a build that waits for a quiet moment at once.
+
+- **Who may ask.** Only the lamp's own account channel, as every kind
+  (`online::commanded`: the whole `fa_channel` topic, which only the lamp's
+  signed-in account may publish to). The bus keeps no list of who may say
+  `update/check`, so lamp-cloud first writes its mark,
+  `{"at_unix_ms": <ms>}`, to `/var/lib/lampos-cloud/update-now`
+  (`lamp_msgs::UPDATE_NOW_FILE`, 0600, in its own 0700 state folder, which no
+  other part's unit may write), then says `update/check` with `"now": true`.
+  `lamp-update` takes `now` only with that mark beside it: a plain file in a
+  folder only its owner may write, at most 5 s old
+  (`UpdateCheck::NOW_WITHIN`), each mark once (`update_now::Marks`). Any
+  other `now` is a plain check, said in its journal with why.
+- **When.** Never during the setup walk (`onboarding/pending`'s `walk`):
+  the first update already runs before it (#6284), and the walk would be cut
+  mid-step. Between rounds it starts one, not held to the check's minute; a
+  round waiting for its quiet moment is taken over at its next look (once a
+  second). A second tap, or any other moment of a round, is
+  `a round is running`.
+- **What the round does.** Everything as any round (the lock, the signature
+  and refusals, the room on the disk, the reset and boot holds, the minute's
+  watch and its put-back), but no quiet moment: it gives the voice up to
+  10 s for 3 s of quiet (`round.waiting` `give_way`), then switches, quiet
+  or not. With someone near, the voice ends its own reply and says once, in
+  the owner's language, "I'm updating now. I'll be back in a minute." (vi
+  "Mình cập nhật phần mềm nhé, một phút nữa mình quay lại."); a line heard
+  meanwhile is answered with the same words and no chat. Nobody near, or
+  the lamp asleep or muted: nothing is said, and it switches as soon as the
+  voice is quiet (at once when muted).
+- **What the app reads.** `update.status`'s `round` gains `waiting`
+  (`quiet` while it waits for a quiet moment with the build installed
+  beside, `give_way` during the voice's moment, absent otherwise) and
+  `asked` (`now` for a round Update now asked for or took over). A wait for
+  quiet that ran out (an hour) ends `not-quiet` with `reason` `switching`,
+  its build still installed beside; Update now then starts a round that
+  switches at once. `update.started` and `update.ended` carry
+  `"asked": "now"` for such a round, from when it is seen. A put-back is
+  `update.ended`'s `rolled-back`, `build` the build it went back to.
+- **What survives.** Only the parts the build changes restart. Timers and
+  reminders are lamp-actions' on disk: one due while the parts restart is
+  kept pending and said when the voice is back, marked late, never dropped
+  (that is only 10 min past due, `TIMER_TOO_LATE_MS`; test
+  `a_timer_due_while_an_update_restarts_the_lamp_is_kept_and_said_late_after`).
+
+Tests: lamp-cloud's
+`the_owners_update_now_is_marked_and_asked_once_and_never_during_the_walk`,
+`update_now_starts_a_round_or_takes_over_a_wait_for_quiet_and_nothing_else`,
+`the_update_now_mark_is_written_whole_and_for_its_owner_alone` and
+`an_update_now_round_says_so_in_its_events`; lamp-update's
+`update_now::tests` (`a_now_check_counts_only_within_five_seconds_of_lamp_clouds_mark_and_once`,
+`a_bare_now_from_anywhere_else_is_a_plain_check`) and the round's
+`update_now_takes_over_a_wait_for_quiet_and_switches_within_ten_seconds_while_someone_talks`,
+`update_now_from_the_start_waits_only_for_the_voices_moment` and
+`without_update_now_a_talking_room_is_still_waited_for`; lamp-voice's
+`coordinator::give_way::tests`.
 
 ### The lamp's agents (#6240, `engines`)
 

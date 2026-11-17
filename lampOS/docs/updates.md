@@ -1556,6 +1556,9 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `placed N files of the product skills` | the build's skills written: in the switch, or alone when the build changes no part (`place_alone`). N counts the files written or put back this round (`product_skills::backs`), not the bundle's: one already the build's is only recorded, and a switch that writes none says nothing (9063 to 9276, 31 Oct: 4, `pose`'s two and `welcome-back`'s two) |
 | **The switch** (`switch`) | |
 | `waiting for a quiet moment: …` | once per wait, with why it isn't quiet yet |
+| `the owner asked to update now: the switch waits for no quiet moment` | the owner's Update now (#7517) started this round, or took over its wait for quiet |
+| `Update now: the voice gave way; switching` | an Update now round's moment for the voice ended in its 3 s of quiet: the switch goes on |
+| `Update now: no quiet in 10 s (…); switching anyway` | an Update now round's 10 s for the voice passed without 3 s of quiet: the switch goes on anyway |
 | `switching to build N` | the parts' switch begins |
 | `wrote …: the exit note install writes, which its unit was without` | a switch on a managed updater, before the reload: one of Cloud's fixed services, on the lamp or written by the round, had no `UNIT.d/exit-note.conf`, so `install`'s note is written (0644); one there is kept (#7135, "A part added over the air") |
 | `… is not written: …; the round goes on` | that exit note could not be written (its folder is a file, say); it is skipped, not listed as written, and the switch goes on (#7166) |
@@ -1694,6 +1697,30 @@ on lamp-e82d on 11 Nov.
    marker written and its unit ended with exit 0 is setup done and keeps
    the build ("One round", step 9, #6820); a setup that fails there still puts it
    back.
+
+### Update now (#7517, `LAMP_UPDATE_NOW`)
+
+With `LAMP_UPDATE_NOW=on` in `lamp-update`'s environment (off unless set),
+`serve` takes the owner's Update now: an `update/check` with `now`,
+vouched for by `lamp-cloud`'s mark (`/var/lib/lampos-cloud/update-now`, at
+most 5 s old, each once; `crate::update_now`). Between rounds it starts
+one, not held to the check's minute. During a round it is heard at each
+look of the quiet wait (step 7), where a plain check is dropped as before.
+
+A round Update now asked for, or took over, keeps every rule but the quiet
+moment: once, before its switch, it gives the voice
+`update_now::GIVE_WAY_QUIET` (3 s) of quiet, at most `GIVE_WAY_MOST` (10 s),
+watched afresh, so a voice talking with someone can say it is updating and
+end its turn; then it switches, quiet or not, and is not asked quiet again
+at the voice's own boundary. A lamp asleep or muted is quiet at once. The
+setup walk still holds it (lamp-cloud refuses Update now during the walk),
+and so do the reset journal and the first 180 s after a boot.
+`update/status`'s `round` says `waiting` (`quiet`, `give_way`) and `asked`
+(`now`). Journal lines: `the owner asked to update now: the switch waits
+for no quiet moment`, `Update now: the voice gave way; switching` or
+`Update now: no quiet in 10 s (…); switching anyway`, and `an Update now is
+taken as a plain check: …`. The app's side is [cloud.md](cloud.md), "Update
+now".
 
 ### lamp-update's own build on a product lamp
 
