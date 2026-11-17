@@ -285,7 +285,9 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
                 "(For you to know, not to answer: the lamp just asked them \"{}\" and waits for \
                  their answer, approve_id \"{}\". Call make_skill with only that approve_id and \
                  answer: \"yes\" only if they agree, \"no\" if they decline or wait, \"unclear\" \
-                 if you can't tell. Nothing is removed but on their yes.)",
+                 if you can't tell, \"new_ask\" if their line answers nothing asked but asks \
+                 something new (another skill named, another thing asked). Nothing is removed \
+                 but on their yes to this very question.)",
                 waiting.asks.say_back, waiting.id
             ));
         }
@@ -322,7 +324,8 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
             waiting.id,
             answer = if answer_forced(waiting) {
                 " For this one, always give answer with that approve_id: \"yes\" only if they \
-                 agree, \"no\" if they decline or wait, \"unclear\" if you can't tell; left \
+                 agree, \"no\" if they decline or wait, \"unclear\" if you can't tell, \
+                 \"new_ask\" if their line answers nothing asked but asks something new; left \
                  out, it is read as unclear."
             } else {
                 ""
@@ -571,8 +574,16 @@ pub fn answer_awaited(request: u64, now: Instant) -> bool {
 /// when the call is made ([`approve_force`]); the model decides what it
 /// says.
 pub const ANSWER: &str = "answer";
+/// The [`ANSWER`] for a line that answers nothing asked but asks
+/// something new: another skill named, another thing asked (lamp-9adf, 17
+/// Nov 18:12: "Remove mail count?", then "Lamp, remove the joke time
+/// skill", forced to a yes, no or unclear, was taken as the yes, and mail
+/// count was removed). The wait ends, nothing kept, and the new ask is
+/// answered ([`answered`]). Whether a line is one is the model's judgment,
+/// never a list of words.
+pub const NEW_ASK: &str = "new_ask";
 /// What [`ANSWER`] takes. Left out, it reads as `yes`, as before.
-pub const ANSWERS: [&str; 3] = ["yes", "no", "unclear"];
+pub const ANSWERS: [&str; 4] = ["yes", "no", "unclear", NEW_ASK];
 
 /// The force the second route's chat is given with a skill's tasks on and
 /// `make_skill` declared (`second_provider::net::Chat::forcing`, #6835
@@ -737,6 +748,26 @@ pub fn remove_unclear_next(spoken: &str) -> String {
          conversation's language: remove {spoken}, yes or no? Call nothing now."
     )
 }
+/// What the model is told when the line after a remove's question was a
+/// new ask ([`NEW_ASK`]): nothing removed, the skill left as it is, and
+/// the new ask answered as any line's.
+pub fn remove_left_next(spoken: &str) -> String {
+    format!(
+        "Nothing was removed: their line was a new ask, not an answer to the lamp's question. \
+         Say first, in a few words, in the conversation's language, that you left {spoken} as \
+         it is; then do what they asked in that line, as for any line."
+    )
+}
+/// What the model is told when the line after a say-back was a new ask
+/// ([`NEW_ASK`]): nothing agreed, and the new ask answered as any line's.
+pub fn new_ask_next(spoken: &str) -> String {
+    format!(
+        "Nothing was agreed: their line was a new ask, not an answer to the say-back, so \
+         {spoken} stays as it was and nothing runs or is sent for it. Say so first, in a few \
+         words, in the conversation's language; then do what they asked in that line, as for \
+         any line."
+    )
+}
 /// What the model is told when the person's answer was unclear, once.
 pub const UNCLEAR_NEXT: &str = "Nothing was agreed yet: their answer wasn't clear. Ask them \
      once, short, in the conversation's language, whether it may go ahead, yes or no. Call \
@@ -745,7 +776,8 @@ pub const UNCLEAR_NEXT: &str = "Nothing was agreed yet: their answer wasn't clea
 /// The person's `answer` ([`ANSWER`]) to the wait `id` in `request`, when
 /// it is not a yes: a no ends the wait and keeps nothing; an unclear one
 /// keeps nothing and asks once more, and a second unclear ends the wait as
-/// a no. What the model is told; none for a yes (or no answer given), so
+/// a no; a new ask ([`NEW_ASK`]) ends the wait, keeps nothing, and lets the
+/// model answer that line as any. What the model is told; none for a yes (or no answer given), so
 /// [`approve`] takes it with every guard, and none for an id not waiting.
 /// Read before the owner check: anyone's no or unclear (a guest's too)
 /// ends or re-asks the owner's wait, never keeping a yes. An answer
@@ -776,6 +808,22 @@ pub fn answered(id: &str, request: u64, answer: Option<&str>) -> Option<Value> {
         let skill = waiting.asks.skill.clone();
         let remove = waiting.asks.remove;
         let spoken = crate::made_skill::spoken_name(&skill);
+        // A new ask, not an answer (#6960, lamp-9adf 17 Nov): the wait
+        // ends with nothing kept, so no later yes can take it, and the
+        // line is answered as any line's.
+        if answer == NEW_ASK {
+            *kept = None;
+            eprintln!(
+                "lamp-voice: request {request}: the line after {skill}'s {} was a new ask, not an answer: nothing kept, the wait dropped",
+                if remove { "question" } else { "say-back" }
+            );
+            let next = if remove {
+                remove_left_next(&spoken)
+            } else {
+                new_ask_next(&spoken)
+            };
+            return Some(json!({ "approved": false, "left": skill, "next": next }));
+        }
         if answer == "unclear" && !waiting.unclear {
             waiting.unclear = true;
             eprintln!(
@@ -1684,6 +1732,42 @@ mod tests {
         assert_eq!(told["error"], NOT_APPROVED);
     }
 
+    /// A skill's task said back, then a line the model judges a new ask
+    /// (`new_ask`), not an answer to it: the wait ends with nothing agreed,
+    /// so no later yes takes it, and the model answers the new ask.
+    #[test]
+    fn a_new_ask_ends_a_tasks_wait_agreeing_nothing() {
+        clear_for_test();
+        let now = Instant::now();
+        let id = wait_for_yes(
+            Asks {
+                skill: "photo-booth".into(),
+                sha256: "a".repeat(64),
+                writes: Vec::new(),
+                say_back: "It uses the camera.".into(),
+                grants: Some(vec!["camera".into()]),
+                code: false,
+                remove: false,
+            },
+            1,
+            now,
+        );
+        lamp_said(1, "It uses the camera.");
+        assert!(approve_forced_now(now));
+        let told = answered(&id, 2, Some("new_ask")).unwrap();
+        assert_eq!(told["approved"], false, "{told}");
+        assert_eq!(told["left"], "photo-booth", "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("photo booth"), "{next}");
+        assert!(next.contains("what they asked"), "{next}");
+        assert!(!next.to_lowercase().contains("call nothing"), "{next}");
+        assert!(!awaited(now));
+        assert_eq!(
+            approve(&id, 3, true, true, now, never)["error"],
+            NOT_APPROVED
+        );
+    }
+
     /// Thirteen's HOLD on #6223 (App Only confirming): the app has no yes
     /// for a made skill's writes (lamp-cloud has no kind for
     /// `skill_write_approve`, the app nothing), so no line the voice's
@@ -1721,6 +1805,8 @@ mod tests {
             removed_next("moon fact"),
             remove_declined_next("moon fact"),
             remove_unclear_next("moon fact"),
+            remove_left_next("moon fact"),
+            new_ask_next("photo booth"),
         ];
         for line in &lines {
             let words: Vec<String> = line

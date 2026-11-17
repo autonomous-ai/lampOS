@@ -29,7 +29,10 @@
 //!   `make_skill_local::not_owners_yes_refused`). The person's next line
 //!   is made to call `make_skill` with its `approve_id` and their
 //!   `answer` (`skill_write_yes::approve_force`); yes, no or unclear is the
-//!   model's. On the yes, one that is on, its folder on the lamp the very
+//!   model's, and so is a line that answers nothing asked but asks
+//!   something new (`skill_write_yes::NEW_ASK`: "remove the joke time
+//!   skill" after "Remove mail count?"), which drops the wait, removes
+//!   nothing and is answered as any line's. On the yes, one that is on, its folder on the lamp the very
 //!   package made, is taken off by the manage helper's own
 //!   `{"remove": NAME}`, as the app's remove does, then it is dropped from
 //!   the made skills with its package ([`removed`]). A no
@@ -282,7 +285,9 @@ pub fn then_wait(id: &str) -> String {
     format!(
         "End there, asking nothing else and calling nothing now: nothing is removed until they \
          agree. When they answer, call make_skill with only approve_id \"{id}\" and answer \
-         \"yes\" if they agree, \"no\" if they decline or wait, \"unclear\" if you can't tell."
+         \"yes\" if they agree, \"no\" if they decline or wait, \"unclear\" if you can't tell, \
+         \"new_ask\" if their line answers nothing asked but asks something new (another \
+         skill named, another thing asked)."
     )
 }
 
@@ -742,6 +747,37 @@ pub(crate) mod tests {
         let again = yes::answered(&id, 5, None).unwrap();
         assert!(again["next"].as_str().unwrap().contains("moon fact stays"));
         assert!(!yes::awaited(now));
+        assert_eq!(names(&keeping.directory), ["moon-fact", "evening-dim"]);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf, 17 Nov 18:12: "Remove mail count?", then "remove the
+    /// joke time skill", a new ask naming another skill, was taken as the
+    /// yes and mail count was lost. Answered `new_ask` (the model's
+    /// judgment that the line answers nothing asked), the wait is dropped:
+    /// nothing is removed, no later yes can take it, and the model is told
+    /// to say it left it as it is, then answer the new ask.
+    #[test]
+    fn a_new_ask_after_the_question_drops_the_remove_and_keeps_it() {
+        let (root, keeping) = twelves_lamp("remove-new-ask");
+        let now = Instant::now();
+        let id = id_of(&asked(ask("moon fact", 1), &keeping, owner, now));
+        yes::lamp_said(1, "Remove moon fact?");
+        assert!(yes::approve_forced_now(now));
+        let told = yes::answered(&id, 2, Some("new_ask")).unwrap();
+        assert_eq!(told["approved"], false, "{told}");
+        assert_eq!(told["left"], "moon-fact", "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("left moon fact as it is"), "{next}");
+        assert!(next.contains("what they asked"), "{next}");
+        assert!(!next.to_lowercase().contains("call nothing"), "{next}");
+        assert!(!yes::awaited(now));
+        assert!(!yes::approve_forced_now(now));
+        assert!(yes::waiting_note(3, now).is_none());
+        let late = yes::approve(&id, 3, true, true, now, |_| {
+            panic!("nothing is removed after a new ask")
+        });
+        assert!(late.get("removed").is_none(), "{late}");
         assert_eq!(names(&keeping.directory), ["moon-fact", "evening-dim"]);
         let _ = std::fs::remove_dir_all(&root);
     }

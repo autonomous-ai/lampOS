@@ -1888,8 +1888,8 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   (`tool_choice`, `skill_write_yes::approve_force`, given wherever
   `make_skill` is declared, before every other force: with the switch off
   it forces only a made skill's remove's answer, "Removed by voice"),
-  whose `approve_id` form also takes `answer`: `yes`, `no` or `unclear`
-  (left out: `yes` for a voice make's writes or
+  whose `approve_id` form also takes `answer`: `yes`, `no`, `unclear` or
+  `new_ask` (left out: `yes` for a voice make's writes or
   code, as before; `unclear` for a skill's task or an app's make with
   code, so a forced call with no answer never keeps a yes). Code decides when; the model decides what (#6835 gap
   2, the first builder's option (b) on #6811; on lamp-52e6 on 13 Nov the
@@ -1913,12 +1913,17 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   keeps nothing, ends the wait and the lamp says it stays off
   (`skill_write_yes::DECLINED_NEXT`); `unclear` keeps nothing and the lamp
   asks once more (`UNCLEAR_NEXT`), and a second `unclear` ends the wait as
-  a `no` (`skill_write_yes::answered`). The forced round is told only
+  a `no` (`skill_write_yes::answered`); `new_ask`, a line that answers
+  nothing asked but asks something new (another skill named, another
+  thing asked), keeps nothing, ends the wait, and the model is told to say
+  NAME stays as it was, then to do what that line asked
+  (`skill_write_yes::new_ask_next`, for a remove `remove_left_next`), so a
+  new ask is never forced into a yes. The forced round is told only
   `approve_id` and `answer` of `make_skill`'s form, both required
   (`skill_write_yes::APPROVE_FIELDS`, #6921), so the forced call carries no
   make or edit beside the answer. A `no` or `unclear` is read before the
   owner check, so anyone's (a guest's too) ends or re-asks the owner's
-  wait and never keeps a yes; an `answer` outside these three reads as
+  wait and never keeps a yes; an `answer` outside these four reads as
   `no`; two answers in one line are taken in call order, each as its own.
   The journal: "the line after a
   skill's task said back whole: its first round must call make_skill",
@@ -4500,8 +4505,20 @@ code (`made_remove::asked`):
   only. The person's next
   line has its round 1 forced to `make_skill`
   (`skill_write_yes::approve_force`, as a skill's task's answer is), with
-  `approve_id` and `answer` (`yes`, `no` or `unclear`, left out read as
-  `unclear`): code decides when, the model what they answered.
+  `approve_id` and `answer` (`yes`, `no`, `unclear` or `new_ask`, left out
+  read as `unclear`): code decides when, the model what they answered.
+- **Only an answer to that question.** A line that answers nothing asked
+  but asks something new (another skill named, another thing asked) is
+  the model's `new_ask` (`skill_write_yes::NEW_ASK`), told in `answer`'s
+  parameter and in the note of the wait: the remove is dropped, nothing is
+  removed, and the model is told to say it left NAME as it is, then to do
+  what that line asked, as for any line
+  (`skill_write_yes::remove_left_next`); a later yes finds nothing
+  waiting. On lamp-9adf, 17 Nov 18:12, "Remove mail count?", then "Lamp,
+  remove the joke time skill" was forced to a yes, no or unclear, was
+  taken as the yes, and mail count was removed. The journal: "the line
+  after NAME's question was a new ask, not an answer: nothing kept, the
+  wait dropped".
 - **Removed only on the yes.** `yes` takes it off: one that is on, its
   folder in the skills folder gone on as that very package (its
   `.package.json`'s SHA-256 the one kept), through the manage helper's own
@@ -4547,7 +4564,11 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `second_provider::tests::remove_words`:
 `a_yes_after_remove_moon_fact_is_forced_and_removes_it`,
 `a_no_after_remove_moon_fact_keeps_it`,
-`no_force_before_the_question_is_said_whole`.
+`no_force_before_the_question_is_said_whole`,
+`the_forced_round_may_answer_that_the_line_is_a_new_ask`,
+`a_new_ask_after_remove_moon_fact_keeps_it_and_is_answered`; and
+`made_remove::tests::a_new_ask_after_the_question_drops_the_remove_and_keeps_it`,
+`skill_write_yes::tests::a_new_ask_ends_a_tasks_wait_agreeing_nothing`.
 
 **Turned off and on by voice** (#7445, with `LAMP_MADE_SKILL_OFF_SAID` on
 alone: on lamp-9adf, build 13252, "Lamp, turn off the coffee time skill"
