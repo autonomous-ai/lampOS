@@ -485,6 +485,91 @@ trường mới, và một lần ghi không nêu trường nào hoạt động n
   Memory cũ từ chối một `service_record` mang trường mới (trường yêu cầu của
   nó đóng), nên bên ghi chỉ gửi chúng khi công tắc của mình bật.
 
+### Bản ghi liên kết: `linked.sock` (lát 1b, `LAMP_MEMORY_LINKED_SOCKET`, tắt)
+
+Đường ghi builder đầu tiên chọn trên #6811 (16/11, 17:0x), dạng lai mà người
+dùng chọn: một socket hẹp, có kiểu, tự kiểm tra chủ, nằm cạnh socket chính,
+cho bản ghi đọc của agent từ lamp-services. Voice ghi bản ghi việc, ghi của
+agent và nhắc nhở qua socket của chính nó (các lát sau), vì chỉ voice nêu
+được người. Hiện chưa có ai ghi vào `linked.sock`.
+
+- **Công tắc.** `LAMP_MEMORY_LINKED_SOCKET` trong môi trường của lamp-memory:
+  `on` mở socket, cùng `--memory-days`; không đặt, rỗng hoặc `off` thì đóng
+  và không nói gì. Giá trị khác, hoặc `on` mà không có `--memory-days`, được
+  nói một lần trong journal và socket vẫn đóng (`server::linked_switch`,
+  `open_linked` trong `application.rs`). Tắt ở cả hai unit; không unit nào
+  đặt nó.
+- **Socket.** `linked.sock` cạnh `--socket`
+  (`/run/lampos-memory/linked.sock` trên lamp), quyền 0660, thuộc nhóm
+  `lampos-linked` trong `/etc/group` (điều kiện 4: nhóm nêu ai được ghi).
+  Được tạo như socket quên của app: dưới một tên riêng, đặt quyền và nhóm,
+  rồi mới chuyển vào chỗ. Không tạo được (không có nhóm đó, hoặc user của
+  memory không gán được nhóm) thì nói `the linked socket is not open: …` và
+  memory vẫn phục vụ. Muốn bật cần trước: trình cài đặt tạo nhóm
+  `lampos-linked`, đưa `lampos-memory` vào nhóm
+  (`SupplementaryGroups=lampos-linked` trong `lamp-memory.service`, để memory
+  gán được nhóm đó cho socket), và đặt công tắc trong `lamp-memory.service`.
+  lamp-services hiện chạy bằng root nên kết nối được dù thế nào: socket
+  không kiểm tra thông tin của bên kết nối, nên nhóm không thêm gì với
+  lamp-services và chỉ giữ mọi phần không phải root khác ở ngoài. Các unit chưa có gì trong số đó:
+  `SupplementaryGroups` nêu một nhóm chưa có sẽ làm unit không chạy.
+- **Một lệnh, `linked_record`.** Socket chỉ cho qua một object
+  `{"op":"linked_record",…}` có nêu `source_kind` (dạng chữ) và không có
+  `person` (`protocol::linked`); mọi thứ khác bị từ chối `not_allowed` (hoặc
+  `bad_kind`) và không bao giờ tới kho:
+
+  ```json
+  {"op":"linked_record","source_kind":"agent","task":"t-tasks-7","run":"run-1","n":0,
+   "action":"search_mail","status":"done","deed_unix_ms":1791892800000,
+   "summary":"Searched mail for the dentist",
+   "source_ref":{"service":"gmail","id":"res-1","session":"run-1"}}
+  ```
+
+  Mọi trường đều bắt buộc, và không nhận trường nào khác. `summary` phải
+  nói việc đã làm: thiếu thì `bad_request`, trống sau khi làm gọn thì
+  `empty` (`Days::linked_record_put`), nên hàng của agent luôn có những từ
+  mà lệnh quên một điều khớp được. Socket chính cũng nhận lệnh này. Một bản
+  ghi `agent` đưa thẳng vào kho (`service_record`) không có summary, hỏi
+  trước một lệnh quên một điều của chủ nó, bị từ chối `forgotten`
+  (`refuse_forgotten`): không có từ nào để khớp, kho không biết được nó
+  không phải bản ghi mà lệnh quên đó đã xoá.
+- **Memory tự tìm chủ** (điều kiện 1, `Days::linked_record_put`).
+  `source_kind` phải là `agent` (khác thì `bad_kind`: việc và nhắc nhở là
+  của voice). Chủ là người duy nhất đã biết (id `p-`) giữ một bản ghi `task`
+  có khoá `task` và `source_ref.session` là `run`. Không có hàng đó, hàng
+  của lượt chạy hay loại khác, hoặc hai người cùng giữ khoá đó: từ chối
+  `no_owner`, không giữ gì. Vậy bản ghi việc của voice (lát 3) phải mang id
+  lượt chạy skill trong `source_ref.session`.
+- **Bản ghi.** Được giữ cho chủ đó qua `service_record_put`, khoá
+  `a-<run>-<n>` (`bad_key` khi `run` hay `task` không tạo được khoá bản ghi,
+  hoặc `task` không phải khoá `t-`), `source_kind` là `agent`, dịch vụ là
+  `source_ref.service`, liên kết tới hàng việc (`links`), hỏi và làm lúc
+  `deed_unix_ms`, đổi theo đồng hồ của memory. Nhờ vậy mọi giới hạn của lát 1
+  vẫn giữ (điều kiện 5: tóm tắt 160 byte từ trường dịch vụ đã có, con trỏ
+  512 byte, giới hạn theo loại) và lần quên thắng theo thời điểm việc (điều
+  kiện 2): sau quên tất cả, hàng việc đã mất nên không có chủ; khi hàng đó
+  được ghi lại, việc làm trước lần quên vẫn bị từ chối `forgotten`. Thời
+  điểm việc sớm hơn đồng hồ của memory quá 5 s bị từ chối `bad_time`, để một
+  thời điểm tương lai không vượt qua được lần quên sau đó. Trả lời là
+  `{"ok":true,"status":…,"key":"a-<run>-<n>"}`.
+- **Bên ghi không bao giờ chờ lâu** (điều kiện 3). Một yêu cầu một kết nối,
+  `LINKED_PATIENCE` (250 ms) để gửi và 250 ms để nhận câu trả lời; rồi kết
+  nối kết thúc. Server phục vụ từng client một, nên bên ghi bị kẹt giữ các
+  lệnh gọi memory của voice tối đa 250 ms, không phải 2 s của socket chính.
+  Giới hạn và bỏ của chính bên ghi (cùng hộp chờ của nó) thuộc lát 4.
+- **Đếm bản bị bỏ.** Mỗi bản ghi không được giữ được đếm theo lý do
+  (`LinkedDrops`: `no_owner`, `forgotten`, `refused` cho mọi từ chối khác,
+  `late` khi yêu cầu không gửi hay câu trả lời không được nhận kịp) và nói
+  trong một dòng journal kèm số đếm, ví dụ `linked socket: linked_record
+  person=everyone refused error=no_owner; dropped: no_owner=1 forgotten=0
+  refused=0 late=0`. Không ghi nội dung nào.
+- **Quay về bản cũ.** Bản build cũ không có `linked.sock` và không có
+  `linked_record` (`unknown_op`); bản ghi đã giữ là hàng `agent` bình thường
+  mà bản cũ bỏ qua như lát 1 đã nói. Không quay về trước lát 1 khi công tắc
+  của một bên ghi liên kết đang bật, trừ khi các hàng liên kết đã được xoá
+  hết trước (quên tất cả, hoặc lệnh xoá của chính công tắc đó): lệnh quên
+  một điều của bản cũ không đọc `summary`, nên không xoá được chúng.
+
 ## Danh bạ dịch vụ (`service_contact`, `LAMP_SERVICE_CONTACTS` của voice)
 
 Công tắc `LAMP_SERVICE_CONTACTS` của voice (mặc định tắt, bật trong sản
