@@ -144,6 +144,7 @@ dịch vụ.
 | `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
 | `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
 | `LAMP_CALENDAR_EDITS=on` (bật trong `lamp-services.service` của sản phẩm từ 11/11) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_event` và `delete_event` của `service_write` trả lời "changing or cancelling a calendar event is off on this lamp" trước khi bất cứ gì được đọc, giữ hay gửi, và `tools.json` chỉ liệt kê `create_event` cho Google Calendar ("Đổi hoặc huỷ một sự kiện lịch", bên dưới) |
+| `LAMP_CALENDAR_EVENT_SEARCH=on` (dòng C132 của bảng theo dõi; tắt trong sản phẩm cho đến lần kiểm tra trên đèn) | `lamp-services`, cùng `LAMP_CALENDAR_EDITS=on` | Một lần đọc `events` của Calendar không nhận từ nào: `query` bị bỏ qua, và lần đọc liệt kê các sự kiện kế tiếp từ lúc bắt đầu, nên một sự kiện cách vài tuần hay nằm sau một ngày bận không bao giờ được tìm thấy để dời hay huỷ ("Tìm một sự kiện để dời hay huỷ", bên dưới) |
 | `LAMP_GMAIL_DRAFT_EDITS=on` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_draft` và `delete_draft` của `service_write` là action không biết, được trả lời bằng danh sách lệnh ghi của Gmail như mọi action khác ("gmail writes: send_mail …, save_draft …") trước khi bất cứ gì được đọc, giữ hay lưu, và `tools.json` chỉ liệt kê `send_mail` và `save_draft` cho Gmail ("Đổi hoặc xoá một bản nháp Gmail đã lưu", bên dưới) |
 | `LAMP_SERVICES_LINKED_TOOLS=on` (#6218, tắt trong sản phẩm cho đến khi chạy các hàng kiểm tra) | `lamp-services` | `tools.json` nêu mọi dịch vụ đèn có thể liên kết, dù đã liên kết hay chưa, cùng mọi trường của mọi lệnh đọc và ghi (khoảng 7,8 KB của yêu cầu gửi mô hình). Bật thì chỉ nêu các dịch vụ đã liên kết: mã của chúng trong enum `service`, dòng của chúng trong danh sách đọc và ghi, và chỉ các trường những dòng đó nêu (luôn có `service`, `what`, `action`, `send_id`, `said`). Hàm đọc hay ghi mà không dịch vụ đã liên kết nào có thì bị bỏ, nên khi chưa liên kết gì giọng nói chỉ được đưa `services_connected`, hàm này vẫn nói đèn có thể liên kết những gì. File được ghi lúc khởi động và ghi lại sau mỗi lần liên kết, huỷ liên kết và xoá hết trên socket quản trị, mỗi lần một lượt ghi dưới một khoá (danh sách mới nhất luôn thắng, file không bao giờ bị ghi dở); giọng nói đọc nó cho mỗi yêu cầu, nên liên kết có hiệu lực từ lượt sau. Đo offline trên lượt nói của sản phẩm: 49.064 B với mọi dịch vụ, 46.522 B với Gmail và Lịch, 45.539 B chỉ với Gmail, 43.249 B khi chưa liên kết gì. **Tắt trong mọi máy sản phẩm cho đến khi đạt một điều kiện riêng tư (bài đọc #6476):** file được khai báo cho mọi yêu cầu, dù ai nói, nên khi bật, dòng của khách, của phòng, dòng bị giữ, tin nhắn từ ứng dụng và lượt theo lịch đều thấy mã các dịch vụ đã liên kết, trong khi "Giọng nói được cho biết những gì đã liên kết" chỉ cho dòng của chủ biết. Chỉ bật sau khi các dòng không phải của chủ được đưa toàn bộ danh mục (hoặc chỉ `services_connected`), hoặc sau khi người phụ trách bộ nhớ và riêng tư chấp nhận bằng văn bản rằng tên dịch vụ đã liên kết đến mọi dòng, và dòng này nói rõ điều đó |
 | `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
@@ -1304,6 +1305,45 @@ ghi không còn chỗ cho chúng trong 1.024 byte mà liên kết của nó nh�
   Calendar: it was deleted or changed there, and nothing was changed. Say
   it's no longer there, and offer to create it again with create_event."
   (sau "not sent: " ở một lần gửi). Không gì được giữ.
+
+### Tìm một sự kiện để dời hay huỷ (`LAMP_CALENDAR_EVENT_SEARCH`)
+
+Dòng C132 của bảng theo dõi. Một sự kiện được tạo trong một cuộc nói chuyện
+trước không có `event_id` trong cuộc nói chuyện, nên "huỷ lịch nha sĩ của
+tôi" phải đọc lịch trước, mà một lần đọc `events` của Calendar không nhận từ
+nào: nó liệt kê các sự kiện kế tiếp từ lúc bắt đầu, nhiều nhất 10, và
+`LAMP_SERVICE_READ_IDS_KEPT` chỉ giữ 5 cái đầu. Một sự kiện cách vài tuần,
+hay nằm sau một ngày bận, không bao giờ có trong danh sách.
+
+Tắt trừ khi `LAMP_CALENDAR_EVENT_SEARCH=on` và `LAMP_CALENDAR_EDITS=on`
+trong `lamp-services` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn).
+Khi bật, một lần đọc `events` của Google Calendar có thể mang `query`, lời
+của người đó (một dòng, nhiều nhất 300 ký tự, như tìm kiếm của Gmail và
+Drive), được hỏi bằng `q` của chính Calendar (`reads::plan_with`):
+
+- **Một khoảng thời gian có giới hạn.** Từ `from` được hỏi, hoặc bây giờ,
+  không sớm hơn một ngày trước (`reads::EVENT_SEARCH_BACK_SECS`), đến `to`
+  được hỏi, hoặc 90 ngày sau lúc bắt đầu đó, không muộn hơn
+  (`reads::EVENT_SEARCH_AHEAD_SECS`); cả hai gửi theo UTC, câu trả lời vẫn
+  theo múi giờ của đèn. Một lúc kết thúc trước lúc bắt đầu bị từ chối trước
+  khi hỏi Calendar (`reads::EVENT_SEARCH_WINDOW`).
+- **Không có từ nào** thì lần đọc như trước, dù công tắc bật hay tắt. Khi
+  tắt, `query` không đổi gì.
+- **Điều mô hình được cho biết.** Trường `query` của `tools.json` nói rằng,
+  với `events` của `google_calendar`, đó là lời của người đó cho đúng một
+  sự kiện cần dời hay huỷ (`reads::CALENDAR_SEARCH_QUERY`); mô tả của chính
+  lần đọc, ở mức 1.024 byte, không đổi. Khi bật `LAMP_SERVICES_LINKED_TOOLS`
+  và chỉ liên kết lịch, lần đọc vẫn giữ trường `query`.
+- **Mọi thứ khác giữ nguyên.** Lần đọc là một lần đọc: chỉ của chủ đèn như
+  mọi lần đọc dịch vụ, được trích như dữ liệu, và quy tắc sau khi đọc ("Sau
+  một lần đọc", bên dưới) vẫn từ chối một lần ghi trong chính yêu cầu đó.
+  Khi bật `LAMP_SERVICE_READ_IDS_KEPT`, các sự kiện nó tìm thấy được giữ cho
+  yêu cầu kế tiếp của người hỏi (id, lịch, tiêu đề, thời gian, 5 cái đầu),
+  nên "ừ, huỷ đi" nêu sự kiện bằng id của nó, và thay đổi được đọc từ
+  Google, đọc lại và gửi khi nghe đồng ý như ở trên. `q` của Calendar cũng
+  khớp với mô tả, địa điểm hay khách mời của sự kiện, nhưng chỉ id, tiêu đề
+  và thời gian được giữ hay được nói. Lời đó chỉ đến lịch đã liên kết của
+  chính chủ đèn, và không có gì mới được lưu.
 
 ### Đổi hoặc xoá một bản nháp Gmail đã lưu (`LAMP_GMAIL_DRAFT_EDITS`)
 

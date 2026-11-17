@@ -10,8 +10,9 @@
 //! run: it holds no service token and reaches the services only through
 //! lamp-control's control socket with the run's one-run token.
 use lamp_services::{
-    CALENDAR_EDITS_ENVIRONMENT, DRAFT_EDITS_ENVIRONMENT, ENVIRONMENT, LINKED_TOOLS_ENVIRONMENT,
-    SKILL_READS_ENVIRONMENT, SKILL_TASKS_ENVIRONMENT, WRITE_ENVIRONMENT,
+    CALENDAR_EDITS_ENVIRONMENT, CALENDAR_EVENT_SEARCH_ENVIRONMENT, DRAFT_EDITS_ENVIRONMENT,
+    ENVIRONMENT, LINKED_TOOLS_ENVIRONMENT, SKILL_READS_ENVIRONMENT, SKILL_TASKS_ENVIRONMENT,
+    WRITE_ENVIRONMENT,
     mail::{self, Gmail},
     mcp_server,
     net::Https,
@@ -134,6 +135,16 @@ fn main() -> ExitCode {
     if calendar_edits {
         say("calendar edits on: an event changed or cancelled only on a spoken send");
     }
+    // Finding an event by the person's words, to move or cancel it (C132).
+    let event_search = calendar_edits
+        && on(std::env::var(CALENDAR_EVENT_SEARCH_ENVIRONMENT)
+            .ok()
+            .as_deref());
+    if event_search {
+        say(
+            "calendar search on: an events read may look for the person's words, a day back to 90 days on",
+        );
+    }
     // Changing and deleting a saved Gmail draft by its id, a write too.
     let draft_edits = write_on && on(std::env::var(DRAFT_EDITS_ENVIRONMENT).ok().as_deref());
     if draft_edits {
@@ -166,12 +177,14 @@ fn main() -> ExitCode {
         .with_skill_tasks(skill_tasks)
         .with_skill_write_agent(skill_write_agent)
         .with_calendar_edits(calendar_edits)
+        .with_calendar_event_search(event_search)
         .with_draft_edits(draft_edits)
         .with_skill_secrets(skill_secrets);
     let tools_dir = run.join("tools");
     let edits = tools::Edits {
         calendar: calendar_edits,
         drafts: draft_edits,
+        event_search,
     };
     let opened = (|| -> io::Result<(UnixListener, UnixListener)> {
         fs::create_dir_all(&tools_dir)?;
