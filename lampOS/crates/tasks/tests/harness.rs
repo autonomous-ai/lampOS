@@ -8329,15 +8329,20 @@ fn launcher_seen() -> lamp_tasks::skill_start::FileSeen {
 }
 
 /// What the launcher saw of run `task-1` (#7133): its folder's entries
-/// when it was live, lamp-tasks' answer to its claim.
+/// when it was live, lamp-tasks' answer to its claim, every byte it was
+/// sent after it, and the token the run's fence got on its fd 3 (#7024).
 struct Claimed {
     entries: Vec<String>,
     answer: String,
+    relayed: Vec<u8>,
+    fence_token: String,
 }
 
 /// The launcher for run `task-1`: once it is live, claims it on lamp-tasks'
-/// launcher side (a socket pair, as the launcher's connection), then says
-/// `then` (`started`, or nothing, as a fence that failed). With `claim`
+/// launcher side (a socket pair, as the launcher's connection), whose
+/// stand-in fence (#7024: lamp-tasks starts it, not the launcher) keeps
+/// its fd 3 token and says `then` on fd 4 (`started`, or nothing, as a
+/// fence that failed); then reads the relay to its end. With `claim`
 /// off, only waits to see it live. `None` when it never was live.
 fn launch_start(
     rig: &Rig,
@@ -8364,8 +8369,13 @@ fn launch_start(
                     return Some(Claimed {
                         entries,
                         answer: String::new(),
+                        relayed: Vec::new(),
+                        fence_token: String::new(),
                     });
                 }
+                let kept = tempfile::tempdir().unwrap();
+                let token_at = kept.path().join("token");
+                let fence_token_at = token_at.clone();
                 let (near, far) = std::os::unix::net::UnixStream::pair().unwrap();
                 let server = lamp_tasks::skill_start::Server {
                     socket: PathBuf::from("/unused"),
@@ -8374,6 +8384,17 @@ fn launch_start(
                     own_uid: 990,
                     launcher: TEST_LAUNCHER.into(),
                     started_within: Duration::from_secs(5),
+                    fence: Arc::new(move |_: &lamp_tasks::skill_start::Grant| {
+                        let mut fence = std::process::Command::new("/bin/sh");
+                        fence
+                            .args([
+                                "-c",
+                                r#"IFS= read -r t <&3; printf '%s' "$t" > "$0"; [ -z "$1" ] || printf '%s\n' "$1" >&4"#,
+                            ])
+                            .arg(&fence_token_at)
+                            .arg(then.unwrap_or_default());
+                        fence
+                    }),
                 };
                 let served = thread::spawn(move || server.one(far));
                 let read_answer = || {
@@ -8398,12 +8419,19 @@ fn launch_start(
                         .unwrap();
                     answer = read_answer();
                 }
-                if let Some(line) = then {
-                    (&near).write_all(format!("{line}\n").as_bytes()).unwrap();
+                let mut relayed = Vec::new();
+                if lamp_tasks::skill_start::parse_answer(&answer).is_ok() {
+                    let _ = (&near).read_to_end(&mut relayed);
                 }
                 drop(near);
                 served.join().unwrap();
-                return Some(Claimed { entries, answer });
+                let fence_token = fs::read_to_string(&token_at).unwrap_or_default();
+                return Some(Claimed {
+                    entries,
+                    answer,
+                    relayed,
+                    fence_token,
+                });
             }
             thread::sleep(Duration::from_millis(1));
         }
@@ -8470,7 +8498,9 @@ fn an_openclaw_gateway_default_runs_through_harness_new_like_hermes() {
             "no token or start in WORK"
         );
         let grant = lamp_tasks::skill_start::parse_answer(&claimed.answer).unwrap();
-        assert_eq!(grant.token, RUN_SECRET);
+        assert_eq!(claimed.fence_token, RUN_SECRET, "the fence's own");
+        assert!(!claimed.answer.contains(RUN_SECRET), "never the launcher's");
+        assert!(!String::from_utf8_lossy(&claimed.relayed).contains(RUN_SECRET));
         assert_eq!(grant.interpreter, "python3");
         assert_eq!(
             grant.script,
@@ -8557,8 +8587,9 @@ fn signed_out_a_gateway_default_is_taken_through_harness_not_refused() {
         .expect("a new");
     assert_eq!(new["args"][1], "openclaw");
     let claimed = launched.join().unwrap().expect("live before it ended");
-    let grant = lamp_tasks::skill_start::parse_answer(&claimed.answer).unwrap();
-    assert_eq!(grant.token, RUN_SECRET);
+    assert!(lamp_tasks::skill_start::parse_answer(&claimed.answer).is_ok());
+    assert_eq!(claimed.fence_token, RUN_SECRET, "the fence's own");
+    assert!(!claimed.answer.contains(RUN_SECRET), "never the launcher's");
     assert!(!runner.starts.is_live("task-1"), "not live after its end");
     assert_eq!(openclaw_json_under(rig.root.path()), Vec::<PathBuf>::new());
     nothing_left(&rig);
@@ -9516,8 +9547,10 @@ fn with_one_session_on_runs_share_one_pane_and_it_is_never_closed() {
             Some("Took the photo.")
         );
         let claimed = launched.join().unwrap().expect("live before it ended");
-        let grant = lamp_tasks::skill_start::parse_answer(&claimed.answer).unwrap();
-        assert_eq!(grant.token, RUN_SECRET);
+        assert!(lamp_tasks::skill_start::parse_answer(&claimed.answer).is_ok());
+        assert_eq!(claimed.fence_token, RUN_SECRET, "the fence's own");
+        assert!(!claimed.answer.contains(RUN_SECRET), "never the launcher's");
+        assert!(!String::from_utf8_lossy(&claimed.relayed).contains(RUN_SECRET));
         assert!(!runner.starts.is_live("task-1"), "not live after its end");
         nothing_left(&rig);
     }

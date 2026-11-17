@@ -2285,9 +2285,11 @@ pub type SkillHarnessSlot = std::sync::Arc<std::sync::OnceLock<SkillHarness>>;
 ///   - **A gateway default (OpenClaw):** no token file. The run is made
 ///     live in memory ([`crate::gateway::open_start`]), the Harness task
 ///     names only the skill-start launcher and the run's id, and the
-///     launcher claims the run's script and token once over lamp-tasks'
-///     socket and becomes the run's fence ([`crate::skill_start`]); the
-///     run is done only when its fence said `started`.
+///     launcher claims the run once over lamp-tasks' socket; lamp-tasks
+///     then runs the run's fence itself, outside the gateway's namespaces,
+///     the token on its fd 3, and relays its output and exit code to the
+///     launcher ([`crate::skill_start`], #7024); the run is done only when
+///     its fence said `started`.
 /// - **Its end:** `harness wait --any` on the one agent, asked again until
 ///   it ends or the run's deadline ([`SkillRun::deadline`]) cancels it.
 ///   At the deadline, `harness close --now` ([`crate::harness::Cli::close_now`]).

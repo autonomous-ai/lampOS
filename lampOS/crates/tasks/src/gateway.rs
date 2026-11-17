@@ -680,9 +680,10 @@ pub const INTERPRETER: &str = "python3";
 /// environment reaches them; and the run's folder is in `WORK`, which every
 /// agent in the gateway reads and writes, so nothing of the run's start is
 /// written there. The run is made live in `starts` with its grant (script,
-/// folders, lamp-control's socket, SDK, token) for the launcher
-/// ([`crate::skill_start`]) to claim once, and the Harness task
-/// ([`prompt`]) asks the agent to run the launcher with the run's id.
+/// folders, lamp-control's socket, SDK) and its token, kept in lamp-tasks'
+/// memory, for the launcher ([`crate::skill_start`]) to claim once; lamp-tasks
+/// then runs the fence itself and relays it to the launcher. The Harness
+/// task ([`prompt`]) asks the agent to run the launcher with the run's id.
 /// Refused before anything is made live for a fixed write.
 pub fn open_start(
     starts: &crate::skill_start::Starts,
@@ -711,8 +712,8 @@ pub fn open_start(
             run: folder.to_owned(),
             socket: env_of(SOCKET_ENV),
             pythonpath: env_of(PYTHONPATH_ENV),
-            token: token.to_owned(),
         },
+        token,
     )?;
     Ok((live, prompt(Path::new(crate::skill_start::LAUNCHER), run)))
 }
@@ -882,28 +883,36 @@ fn approvals_json() -> Result<String, String> {
     }
 }
 
-/// The `PATH` the skill's script is run with ([`FENCE_TEXT`]), and the
-/// launcher's fence: nothing of the gateway's.
+/// The `PATH` the skill's script is run with ([`FENCE_TEXT`]), and its
+/// fence's `unshare` ([`crate::skill_start::lamp_fence`]).
 pub const SCRIPT_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
 
-/// What a lamp's run hides of the gateway's namespace ([`FENCE_TEXT`]),
-/// naming no engine: all of `/var/lib` (the
-/// agents' state and config, such as OpenClaw's `openclaw.json` and its
-/// gateway token, lamp-tasks' Harness project with every other run, the
-/// other skills), the gateway's own `/var/tmp` and `/dev/shm`, and the
+/// What a lamp's run hides of lamp-tasks' own namespace, in which its
+/// fence is made (#7024, [`FENCE_TEXT`]), naming no engine: all of
+/// `/var/lib` (the agents' state and config, such as OpenClaw's
+/// `openclaw.json` and its gateway token, lamp-tasks' Harness project with
+/// every other run, the other skills), `/var/tmp` and `/dev/shm`, the
 /// skill-start launcher's socket folder
 /// ([`crate::skill_start::START_DIR`]), so a run's own script can't ask
-/// for another run's start. Only the run's folder and its skill's folder
-/// are shown again.
-pub const HIDDEN: [&str; 4] = [
+/// for another run's start, and lamp-tasks' runtime folder ([`TASKS_RUN`]:
+/// its own sockets and the Hermes runs' token files,
+/// [`crate::run_token_file::RUNS_DIR`]). Only the run's folder and its
+/// skill's folder are shown again.
+pub const HIDDEN: [&str; 5] = [
     "/var/lib",
     "/var/tmp",
     "/dev/shm",
     crate::skill_start::START_DIR,
+    TASKS_RUN,
 ];
 
-/// What the launcher runs in the run's own namespaces (`sh -c`, its
-/// arguments: the caller's uid and gid, the project, the run's folder, the
+/// lamp-tasks' runtime folder (its unit's `RuntimeDirectory`, 0700): its
+/// request, voice and app sockets, and [`crate::run_token_file::RUNS_DIR`].
+pub const TASKS_RUN: &str = "/run/lampos-tasks";
+
+/// What lamp-tasks runs in the run's own namespaces (#7024: a sibling of
+/// the gateway's, never inside it; `sh -c`, its arguments: lamp-tasks'
+/// uid and gid, the project, the run's folder, the
 /// skill's folder, lamp-control's socket, the SDK's path, the interpreter,
 /// the script, then the paths hidden), in order: no hidden path (nor the
 /// project) in a folder shown again; a fresh `/tmp` (none of the gateway's
@@ -913,13 +922,13 @@ pub const HIDDEN: [&str; 4] = [
 /// two folders moved back; then, in a user namespace of its own (no
 /// capability over these mounts, so nothing can be unmounted), the token
 /// read from fd 3 (a pipe, never an argument or the environment), fd 4
-/// (the launcher's socket) told `started` and closed, and the script run
+/// (a pipe lamp-tasks reads) told `started` and closed, and the script run
 /// with an environment of [`SCRIPT_PATH`], `HOME` the run's folder, the
 /// socket, the SDK and the token only. Any step that fails ends the fence
 /// before the script runs, and lamp-tasks never reads `started`. Every
-/// `mount` is `mount -n`: `/run` is read-only in the gateway's namespace
-/// (lamp-c0a4), so a mount that writes libmount's utab fails after it has
-/// mounted, and the fence would fail closed.
+/// `mount` is `mount -n`: no mount writes libmount's utab under `/run`
+/// (read-only in the gateway's namespace on lamp-c0a4, where the fence
+/// ran before #7024), so none fails after it has mounted.
 pub const FENCE_TEXT: &str = r#"u=$1 g=$2 p=$3 r=$4 k=$5 so=$6 py=$7 i=$8 s=$9
 shift 9
 no() { echo "the run's fence was not made ($1): the script was not run" >&2; exit 1; }
@@ -943,11 +952,14 @@ cd "$r" || no "the run's folder"
 exec unshare --user --map-user="$u" --map-group="$g" -- env -i PATH="$SCRIPT_PATH" HOME="$r" LAMP_CONTROL_SOCKET="$so" PYTHONPATH="$py" /bin/sh -c 'IFS= read -r t <&3 || exit 1; exec 3<&-; LAMP_CONTROL_TOKEN=$t; unset t; export LAMP_CONTROL_TOKEN; printf "started\n" >&4 || exit 1; exec 4>&-; exec "$@"' run "$i" "$s"
 "#;
 
-/// The launcher's `unshare` arguments for `grant` (its run's folder in the
-/// runs' project, its parent), the caller's `uid` and `gid`, and `hidden`
+/// The fence's `unshare` arguments for `grant` (its run's folder in the
+/// runs' project, its parent), lamp-tasks' `uid` and `gid`, and `hidden`
 /// covered ([`HIDDEN`] on a lamp): a user (root mapped), network (only
 /// `lo`), mount and PID namespace of its own, then [`FENCE_TEXT`] with its
-/// arguments. Never the token.
+/// arguments. Never the token. lamp-tasks starts it from its own
+/// namespaces ([`crate::skill_start::lamp_fence`]), so its PID namespace
+/// is a sibling of the gateway's: no gateway process has a pid for the
+/// script.
 pub fn fence_args(
     grant: &crate::skill_start::Grant,
     uid: u32,
@@ -1843,7 +1855,7 @@ mod tests {
         }
     }
 
-    /// The launcher's fence, run for real with `unshare`, `mount` and the
+    /// The run's fence, run for real with `unshare`, `mount` and the
     /// interpreter stood in for: what each was given, in order, the
     /// script's environment, and what the fence said on fd 4.
     struct Fenced {
@@ -1888,7 +1900,6 @@ mod tests {
             run: folder.clone(),
             socket: "/run/lampos-control/control.sock".into(),
             pythonpath: "/sdk".into(),
-            token: "run-secret".into(),
         };
         let hidden = vec![dir.path().join("state"), dir.path().join("absent")];
         Fenced {
@@ -1901,7 +1912,7 @@ mod tests {
         }
     }
 
-    /// The fence run as the launcher runs it ([`fence_args`]): the token
+    /// The fence run as lamp-tasks runs it ([`fence_args`]): the token
     /// on fd 3 through a pipe, fd 4 written to `said`.
     fn fence_it(at: &Fenced) -> std::process::Output {
         let hidden: Vec<&Path> = at.hidden.iter().map(PathBuf::as_path).collect();
@@ -1925,8 +1936,7 @@ mod tests {
         {
             use std::io::Write as _;
             let mut pipe = child.stdin.take().unwrap();
-            pipe.write_all(format!("{}\n", at.grant.token).as_bytes())
-                .unwrap();
+            pipe.write_all(b"run-secret\n").unwrap();
         }
         child.wait_with_output().unwrap()
     }

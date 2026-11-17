@@ -259,7 +259,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 fn main() {
     // The skill-start launcher (#7133): lamp-update's root-owned copy of
     // this binary at `skill_start::LAUNCHER`, or `lamp-tasks skill-start`.
-    // It asks lamp-tasks for a gateway run's start and becomes its fence.
+    // It claims a gateway run's start and relays the script lamp-tasks
+    // runs outside the gateway (#7024), exiting with its code.
     // First, before any argument is read: from the launcher's own program
     // it is the launcher whatever argv says, never lamp-tasks' commands.
     let argv: Vec<std::ffi::OsString> = std::env::args_os().collect();
@@ -267,7 +268,9 @@ fn main() {
         lamp_tasks::skill_start::launcher_args(lamp_tasks::skill_start::exe_is_launcher(), &argv)
     {
         let (status, why) = lamp_tasks::skill_start::launcher_main(&args);
-        eprintln!("skill-start: {why}");
+        if !why.is_empty() {
+            eprintln!("skill-start: {why}");
+        }
         std::process::exit(status);
     }
     // `lamp-tasks skill ...` (#5978): the lamp's own Hermes calling the

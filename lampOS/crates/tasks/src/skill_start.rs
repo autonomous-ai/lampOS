@@ -1,12 +1,16 @@
-//! The skill-start launcher (#7133, the reviewer's shape on #7135): how a
-//! skill's run on a gateway agent (OpenClaw) gets its script and token
-//! without either sitting in `WORK`, which every agent in the gateway can
-//! read and write (they all share `lampos` and the gateway's mounts).
+//! The skill-start launcher (#7133, the reviewer's shape on #7135; the
+//! script started outside the gateway, #7024): how a skill's run on a
+//! gateway agent (OpenClaw) gets its script run with its token, without
+//! either sitting in `WORK`, which every agent in the gateway can read and
+//! write (they all share `lampos` and the gateway's mounts), and without
+//! the script's process ever being seen from the gateway.
 //!
 //! - **The launcher** ([`LAUNCHER`]): a byte copy of lamp-tasks that
 //!   lamp-update installs root-owned (0755), the one path OpenClaw's exec
 //!   allow-list holds. Invoked as [`NAME`] (its file name, or `lamp-tasks
-//!   skill-start`), it is [`launcher_main`]: `skill-start <run-id>`.
+//!   skill-start`), it is [`launcher_main`]: `skill-start <run-id>`. It
+//!   claims the run, then only relays what lamp-tasks sends it: it never
+//!   gets the run's token and never starts the script.
 //! - **The socket** ([`START_SOCKET`], 0600, in [`START_DIR`]): lamp-tasks'
 //!   [`Server`]. The folder is made by systemd as the OpenClaw gateway
 //!   unit's `RuntimeDirectory` (0755, `lampos`'s,
@@ -33,34 +37,64 @@
 //!      same pid, that the pid is non-dumpable (its `/proc`
 //!      folder is root's) and still untraced ([`undumped_may`]).
 //!   3. Only then is the run claimed ([`Starts::claim`]) and its [`Grant`]
-//!      answered, one JSON line, or `{"error":"<words>"}`. Any refusal after
-//!      a live run's id was read ends that run's start for good
-//!      ([`Starts::refuse`]): it is never claimable again.
-//! - **The fence**: the launcher runs `crate::gateway::FENCE_TEXT` as the
-//!   run's `start` did, the token on fd 3 through a pipe (never an argument
-//!   or the environment), the socket kept open as fd 4. Just before the
-//!   script is exec'd, the fence writes [`STARTED`] to fd 4 and closes it;
-//!   lamp-tasks reads it on that connection ([`Live::ran`]).
+//!      answered, one JSON line (the script, its folders, the socket and
+//!      the SDK's path; never the token), or `{"error":"<words>"}`. Any
+//!      refusal after a live run's id was read ends that run's start for
+//!      good ([`Starts::refuse`]): it is never claimable again.
+//!   4. **The relay** ([`Frame`]): lamp-tasks starts the run's fence
+//!      itself and sends, on the same connection, the script's stdout and
+//!      stderr in chunks and then its exit code (or an error's words); the
+//!      launcher ([`relay`]) writes each chunk to its own stdout or stderr
+//!      and exits with that code, so the agent sees the script's output as
+//!      if the launcher had run it. The launcher sends nothing more: if its
+//!      connection closes (or it sends a byte) before the end, lamp-tasks
+//!      kills the fence and with it the script.
+//! - **The fence**: lamp-tasks (`lampos`, in its own namespaces, outside
+//!   the gateway's `unshare --map-root-user --mount --pid --mount-proc`)
+//!   runs `unshare` with [`crate::gateway::fence_args`]: a new user,
+//!   network, mount and PID namespace of the run's own, a sibling of the
+//!   gateway's, never inside it. The token goes on fd 3 through a pipe
+//!   from lamp-tasks' own memory (never an argument, the environment, a
+//!   file or the launcher's socket); fd 4 is a pipe lamp-tasks holds. Just
+//!   before the script is exec'd, the fence writes [`STARTED`] to fd 4 and
+//!   closes it; lamp-tasks reads it there ([`Live::ran`]), and kills a
+//!   fence that has not said it within [`STARTED_WITHIN`]. The fence is
+//!   killed too when its run ends ([`Live`]'s drop).
+//!
+//! Why the script's token is out of the gateway's reach though the script
+//! runs as the same kuid (`lampos`) as every agent there: `/proc/<pid>`
+//! (its `environ`, `mem`) and `ptrace` both name a process by its pid, and
+//! a process sees only the pids of its own PID namespace and those below
+//! it. The script's pid is in a namespace that is a sibling of the
+//! gateway's, so no process in the gateway has a pid for it at all: its
+//! `/proc` holds no entry for it and `ptrace`, `kill` and `pidfd_open`
+//! find nothing to name. Before #7024 the fence ran inside the gateway's
+//! PID namespace, its script dumpable, so any agent there could read its
+//! `environ` or attach to it and take `LAMP_CONTROL_TOKEN`.
 //!
 //! A sibling agent could race the launcher for a live run's id: through
-//! the launcher it gets only that run's own approved script, fenced, once,
-//! and the real run then fails closed. No token is ever in a file.
+//! the launcher it gets only that run's own approved script's output, run
+//! once, and the real run then fails closed. No token is ever in a file,
+//! and none ever reaches the gateway.
 //!
 //! Out of reach of these checks: code that already runs as `lampos`
 //! outside the fence in the gateway's namespace, and holds a launcher's
-//! socket fd (shared with it), could still race the grant on that fd. The
-//! exact exec allow-list and a static launcher keep such code out; the
-//! checks here do not.
+//! socket fd (shared with it), could still race the claim on that fd, and
+//! so read the script's output (never its token). The exact exec
+//! allow-list and a static launcher keep such code out; the checks here
+//! do not.
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::io::{self, Read, Write};
-use std::os::fd::{AsFd, AsRawFd, IntoRawFd, OwnedFd};
+use std::os::fd::{AsFd, AsRawFd, OwnedFd};
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -93,8 +127,16 @@ const CHECKED_SPACE: &str = "checked ";
 const QUEUED: &str = "bytes were queued after the run id before it was checked";
 /// How long the launcher's id, and lamp-tasks' answer, may take.
 pub const LINE_WITHIN: Duration = Duration::from_secs(5);
-/// How long after a claim the fence may take to say [`STARTED`].
+/// How long after a claim the fence may take to say [`STARTED`]; a fence
+/// that has not said it by then is killed.
 pub const STARTED_WITHIN: Duration = Duration::from_secs(60);
+/// How long one relay frame's write to the launcher may take: a launcher
+/// that stops reading for longer has its run killed.
+pub const RELAY_WRITE_WITHIN: Duration = Duration::from_secs(30);
+/// How long the fence's pipes are waited for once it has exited.
+const PIPES_AFTER_EXIT: Duration = Duration::from_secs(2);
+/// How often the relay looks at its fence between frames.
+const RELAY_TICK: Duration = Duration::from_millis(20);
 /// The longest run id taken (lamp-control's own bound).
 const MOST_ID_BYTES: usize = 64;
 /// The longest answer the launcher reads.
@@ -108,10 +150,12 @@ const ACCEPT_TICK: Duration = Duration::from_millis(20);
 /// #7133): a skill run waits at most this long after the folder is made.
 pub const BIND_AGAIN: Duration = Duration::from_secs(2);
 
-/// What a claimed run's launcher is given, one JSON line: its script and
-/// interpreter, its skill's folder, its run's folder, lamp-control's
-/// socket, the SDK's path and the run's token.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// A run's start as its fence is made from it, and as its launcher is
+/// told it was claimed, one JSON line: its script and interpreter, its
+/// skill's folder, its run's folder, lamp-control's socket and the SDK's
+/// path. Never the run's token (#7024): that stays in lamp-tasks
+/// ([`Starts::open`]) and goes only to the fence's fd 3.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Grant {
     pub script: PathBuf,
@@ -120,21 +164,6 @@ pub struct Grant {
     pub run: PathBuf,
     pub socket: String,
     pub pythonpath: String,
-    pub token: String,
-}
-
-impl std::fmt::Debug for Grant {
-    /// Never the token.
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Grant")
-            .field("script", &self.script)
-            .field("interpreter", &self.interpreter)
-            .field("skill", &self.skill)
-            .field("run", &self.run)
-            .field("socket", &self.socket)
-            .field("pythonpath", &self.pythonpath)
-            .finish_non_exhaustive()
-    }
 }
 
 /// A run id as taken on the socket: letters, digits and `-`, not empty,
@@ -147,6 +176,9 @@ fn plain_id(id: &str) -> bool {
 
 struct Entry {
     grant: Grant,
+    /// The run's token: only ever written to its fence's fd 3.
+    token: String,
+    fence: Fence,
     claimed: bool,
     started: bool,
     /// Why its start was refused, after which it is never claimed.
@@ -165,8 +197,9 @@ impl Starts {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
-    /// Run `id` live with `grant`, until the [`Live`] is dropped.
-    pub fn open(&self, id: &str, grant: Grant) -> Result<Live, String> {
+    /// Run `id` live with `grant` and its `token`, until the [`Live`] is
+    /// dropped.
+    pub fn open(&self, id: &str, grant: Grant, token: &str) -> Result<Live, String> {
         if !plain_id(id) {
             return Err("the run's id is not plain, so nothing was started".into());
         }
@@ -178,6 +211,8 @@ impl Starts {
             id.to_owned(),
             Entry {
                 grant,
+                token: token.to_owned(),
+                fence: Fence::default(),
                 claimed: false,
                 started: false,
                 refused: None,
@@ -189,9 +224,9 @@ impl Starts {
         })
     }
 
-    /// The grant of live run `id`, claimed now: refused for an id not
-    /// live and for one claimed already.
-    pub fn claim(&self, id: &str) -> Result<Grant, String> {
+    /// Live run `id`, claimed now: refused for an id not live and for one
+    /// claimed already.
+    pub fn claim(&self, id: &str) -> Result<Claimed, String> {
         let mut live = self.lock();
         let entry = live
             .get_mut(id)
@@ -203,7 +238,11 @@ impl Starts {
             return Err("that run's start was claimed already".into());
         }
         entry.claimed = true;
-        Ok(entry.grant.clone())
+        Ok(Claimed {
+            grant: entry.grant.clone(),
+            token: entry.token.clone(),
+            fence: entry.fence.clone(),
+        })
     }
 
     /// Live run `id`'s start refused for `why`: never claimed after, and
@@ -243,8 +282,83 @@ impl Starts {
     }
 }
 
+/// A claimed run: its grant, its token (for its fence's fd 3 only) and
+/// its fence's place, which the run's [`Live`] kills at the run's end.
+pub struct Claimed {
+    pub grant: Grant,
+    token: String,
+    fence: Fence,
+}
+
+/// A run's fence, once started: shared by its relay ([`Server::one`]) and
+/// its run's entry, so the run's end kills it however the relay is doing.
+#[derive(Clone, Default)]
+struct Fence(Arc<Mutex<FenceState>>);
+
+#[derive(Default)]
+struct FenceState {
+    child: Option<Child>,
+    /// The run ended: no fence is started from now on.
+    ended: bool,
+}
+
+impl Fence {
+    fn lock(&self) -> MutexGuard<'_, FenceState> {
+        self.0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// The fence started by `spawn`, unless its run has ended already.
+    fn start<T>(&self, spawn: impl FnOnce() -> io::Result<(Child, T)>) -> io::Result<T> {
+        let mut state = self.lock();
+        if state.ended {
+            return Err(io::Error::other("the run ended before its script started"));
+        }
+        let (child, rest) = spawn()?;
+        state.child = Some(child);
+        Ok(rest)
+    }
+
+    /// The fence killed, if it still runs: its process group, then its
+    /// `unshare` (`--kill-child`; its PID namespace's init dies with it,
+    /// and every process in that namespace with that).
+    fn kill(&self) {
+        kill_child(&mut self.lock());
+    }
+
+    /// The run ended: the fence killed and none started after.
+    fn end(&self) {
+        let mut state = self.lock();
+        state.ended = true;
+        kill_child(&mut state);
+    }
+
+    /// How the fence ended, once it has.
+    fn exited(&self) -> Option<ExitStatus> {
+        self.lock().child.as_mut()?.try_wait().ok().flatten()
+    }
+}
+
+fn kill_child(state: &mut FenceState) {
+    let Some(child) = state.child.as_mut() else {
+        return;
+    };
+    // Only one not reaped yet: its pid is still its own.
+    if matches!(child.try_wait(), Ok(None)) {
+        if let Some(pid) = i32::try_from(child.id())
+            .ok()
+            .and_then(rustix::process::Pid::from_raw)
+        {
+            let _ = rustix::process::kill_process_group(pid, rustix::process::Signal::KILL);
+        }
+        let _ = child.kill();
+    }
+}
+
 /// A live run's place in [`Starts`]; dropped (at the run's end, however it
-/// ends), the run is not live and any later claim is refused.
+/// ends), the run is not live, any later claim is refused, and its fence,
+/// if started, is killed.
 pub struct Live {
     starts: Starts,
     id: String,
@@ -264,7 +378,10 @@ impl Live {
 
 impl Drop for Live {
     fn drop(&mut self) {
-        self.starts.lock().remove(&self.id);
+        let entry = self.starts.lock().remove(&self.id);
+        if let Some(entry) = entry {
+            entry.fence.end();
+        }
     }
 }
 
@@ -688,6 +805,30 @@ pub fn peer_may(peers: &dyn Peers, pid: u32, launcher: &Path) -> Result<(), Stri
     untraced(peers, pid)
 }
 
+/// How a claimed run's fence is made: the command lamp-tasks starts, its
+/// fds 3 and 4, stdin and stdout/stderr set by [`spawn_fence`].
+pub type FenceCommand = Arc<dyn Fn(&Grant) -> Command + Send + Sync>;
+
+/// The lamp's fence for `grant`: `unshare` with
+/// [`crate::gateway::fence_args`] for lamp-tasks' own uid and gid and
+/// [`crate::gateway::HIDDEN`], an environment of
+/// [`crate::gateway::SCRIPT_PATH`] only, from `/`.
+pub fn lamp_fence(grant: &Grant) -> Command {
+    let hidden: Vec<&Path> = crate::gateway::HIDDEN.iter().map(Path::new).collect();
+    let mut command = Command::new("unshare");
+    command
+        .args(crate::gateway::fence_args(
+            grant,
+            rustix::process::getuid().as_raw(),
+            rustix::process::getgid().as_raw(),
+            &hidden,
+        ))
+        .env_clear()
+        .env("PATH", crate::gateway::SCRIPT_PATH)
+        .current_dir("/");
+    command
+}
+
 /// lamp-tasks' side of the launcher: [`START_SOCKET`] served.
 pub struct Server {
     pub socket: PathBuf,
@@ -697,10 +838,13 @@ pub struct Server {
     /// [`LAUNCHER`] on a lamp; another path only in tests.
     pub launcher: PathBuf,
     pub started_within: Duration,
+    /// [`lamp_fence`] on a lamp; a stand-in only in tests.
+    pub fence: FenceCommand,
 }
 
 impl Server {
-    /// The lamp's: [`START_SOCKET`], the kernel's view, [`LAUNCHER`].
+    /// The lamp's: [`START_SOCKET`], the kernel's view, [`LAUNCHER`],
+    /// [`lamp_fence`].
     pub fn lamp(starts: Starts) -> Self {
         Self {
             socket: PathBuf::from(START_SOCKET),
@@ -709,6 +853,7 @@ impl Server {
             own_uid: rustix::process::geteuid().as_raw(),
             launcher: PathBuf::from(LAUNCHER),
             started_within: STARTED_WITHIN,
+            fence: Arc::new(lamp_fence),
         }
     }
 
@@ -810,9 +955,10 @@ impl Server {
     /// One launcher's connection, in the module's order: its id read and
     /// its sender and image checked, [`CHECKED`]; its [`READY`] read and it
     /// checked non-dumpable and untraced; only then the run claimed and its
-    /// grant answered, one JSON line; then [`STARTED`] waited for on the
-    /// same connection. A refused peer gets no answer at all; after a live
-    /// run's id was read, any refusal ends that run's start
+    /// grant answered, one JSON line (never the token); then the run's
+    /// fence started here and relayed on the same connection
+    /// ([`Server::relay_run`]). A refused peer gets no answer at all; after
+    /// a live run's id was read, any refusal ends that run's start
     /// ([`Starts::refuse`]).
     pub fn one(&self, stream: UnixStream) {
         if stream.set_nonblocking(false).is_err()
@@ -882,15 +1028,15 @@ impl Server {
         if let Err(why) = ready {
             return silent(&why);
         }
-        let grant = match self.starts.claim(&id) {
-            Ok(grant) => grant,
+        let claimed = match self.starts.claim(&id) {
+            Ok(claimed) => claimed,
             Err(why) => {
                 self.starts.refuse(&id, &why);
                 eprintln!("[lamp-tasks] skill start: refused: {why}");
                 return answer(&error_line(&why));
             }
         };
-        let Ok(line) = serde_json::to_string(&grant) else {
+        let Ok(line) = serde_json::to_string(&claimed.grant) else {
             let why = "the run's start could not be written";
             self.starts.refuse(&id, why);
             return answer(&error_line(why));
@@ -903,15 +1049,250 @@ impl Server {
             return;
         }
         drop(line);
-        if stream.set_read_timeout(Some(self.started_within)).is_ok()
-            && read_line(&stream, STARTED.len()).is_ok_and(|line| line == STARTED)
-        {
-            self.starts.started(&id);
-            eprintln!("[lamp-tasks] skill start: run {id}'s script started");
-        } else {
-            eprintln!("[lamp-tasks] skill start: run {id}'s fence never said it started");
-        }
+        self.relay_run(&id, &stream, claimed);
     }
+
+    /// Claimed run `id`'s fence started here, outside the gateway
+    /// ([`spawn_fence`] with [`Server::fence`]), and relayed to its
+    /// launcher on `stream`: the script's stdout and stderr as they come,
+    /// then its exit code ([`Frame`]). [`STARTED`] on the fence's fd 4
+    /// marks the run started ([`Live::ran`]); a fence that has not said it
+    /// within [`Server::started_within`] is killed. The launcher's
+    /// connection closed, a byte from it, or a frame not written within
+    /// [`RELAY_WRITE_WITHIN`], and the fence is killed: its script never
+    /// runs on with no one to relay to.
+    fn relay_run(&self, id: &str, stream: &UnixStream, claimed: Claimed) {
+        let Claimed {
+            grant,
+            token,
+            fence,
+        } = claimed;
+        let fail = |why: &str| {
+            eprintln!("[lamp-tasks] skill start: run {id}'s fence was not started: {why}");
+            let _ = write_frame(stream, &Frame::Error(why.to_owned()));
+        };
+        if stream.set_write_timeout(Some(RELAY_WRITE_WITHIN)).is_err()
+            || stream.set_read_timeout(None).is_err()
+        {
+            return fail("the launcher's connection could not be kept");
+        }
+        let Ok(watched) = stream.try_clone() else {
+            return fail("the launcher's connection could not be watched");
+        };
+        let spawned = fence.start(|| {
+            let fenced = spawn_fence((self.fence)(&grant), &token)?;
+            Ok((fenced.child, (fenced.out, fenced.err, fenced.said)))
+        });
+        drop(token);
+        let (out, err, said) = match spawned {
+            Ok(pipes) => pipes,
+            Err(error) => return fail(&error.to_string()),
+        };
+        eprintln!("[lamp-tasks] skill start: run {id}'s fence started outside the gateway");
+        let (events, seen) = mpsc::channel();
+        pump(out, events.clone(), Event::Out);
+        pump(err, events.clone(), Event::Err);
+        let saying = events.clone();
+        let _ = std::thread::Builder::new()
+            .name("tasks-skill-start-said".into())
+            .spawn(move || {
+                let line = read_line(said, STARTED.len());
+                let _ = saying.send(Event::Said(line.is_ok_and(|line| line == STARTED)));
+            });
+        let _ = std::thread::Builder::new()
+            .name("tasks-skill-start-watch".into())
+            .spawn(move || {
+                let mut byte = [0u8; 1];
+                let _ = (&watched).read(&mut byte);
+                let _ = events.send(Event::Gone);
+            });
+        let begun = Instant::now();
+        let (mut shut, mut said, mut gone) = (0, None::<bool>, false);
+        let mut why: Option<&str> = None;
+        let mut exited_at: Option<Instant> = None;
+        let status = loop {
+            let mut frame = None;
+            match seen.recv_timeout(RELAY_TICK) {
+                Ok(Event::Out(bytes)) => frame = Some(Frame::Stdout(bytes)),
+                Ok(Event::Err(bytes)) => frame = Some(Frame::Stderr(bytes)),
+                Ok(Event::Shut) => shut += 1,
+                Ok(Event::Said(true)) => {
+                    said = Some(true);
+                    self.starts.started(id);
+                    eprintln!("[lamp-tasks] skill start: run {id}'s script started");
+                }
+                Ok(Event::Said(false)) => {
+                    said = Some(false);
+                    // Not the fence's word: whatever runs there is not ours.
+                    fence.kill();
+                }
+                Ok(Event::Gone) => {
+                    if !gone {
+                        gone = true;
+                        eprintln!(
+                            "[lamp-tasks] skill start: run {id}'s launcher left before its end: its fence killed"
+                        );
+                    }
+                    fence.kill();
+                }
+                Err(_) => {}
+            }
+            if let Some(frame) = frame
+                && !gone
+                && write_frame(stream, &frame).is_err()
+            {
+                gone = true;
+                eprintln!(
+                    "[lamp-tasks] skill start: run {id}'s launcher took no more: its fence killed"
+                );
+                fence.kill();
+            }
+            if said.is_none() && why.is_none() && begun.elapsed() >= self.started_within {
+                why = Some("the run's fence never said it started");
+                eprintln!("[lamp-tasks] skill start: run {id}'s fence never said it started");
+                fence.kill();
+            }
+            if let Some(status) = fence.exited() {
+                let at = *exited_at.get_or_insert_with(Instant::now);
+                if (shut >= 2 && said.is_some()) || at.elapsed() >= PIPES_AFTER_EXIT {
+                    break status;
+                }
+            }
+        };
+        if !gone {
+            let last = match why {
+                Some(why) => Frame::Error(why.to_owned()),
+                None => Frame::Exit(exit_code(status)),
+            };
+            let _ = write_frame(stream, &last);
+        }
+        // Wakes the watching thread.
+        let _ = stream.shutdown(std::net::Shutdown::Both);
+        eprintln!(
+            "[lamp-tasks] skill start: run {id}'s fence ended ({})",
+            exit_code(status)
+        );
+    }
+}
+
+/// What the relay's threads say to it.
+enum Event {
+    /// A chunk of the script's stdout.
+    Out(Vec<u8>),
+    /// A chunk of the script's stderr.
+    Err(Vec<u8>),
+    /// One of the two pipes ended.
+    Shut,
+    /// fd 4's line: whether it was [`STARTED`].
+    Said(bool),
+    /// The launcher's connection closed, or sent a byte.
+    Gone,
+}
+
+/// `from` read in chunks of at most [`MOST_FRAME_BYTES`] on a thread of its
+/// own, each sent as `kind`, then [`Event::Shut`].
+fn pump(mut from: impl Read + Send + 'static, to: mpsc::Sender<Event>, kind: fn(Vec<u8>) -> Event) {
+    let _ = std::thread::Builder::new()
+        .name("tasks-skill-start-pipe".into())
+        .spawn(move || {
+            let mut chunk = vec![0u8; MOST_FRAME_BYTES];
+            loop {
+                match from.read(&mut chunk) {
+                    Ok(0) => break,
+                    Ok(got) => {
+                        if to.send(kind(chunk[..got].to_vec())).is_err() {
+                            break;
+                        }
+                    }
+                    Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+                    Err(_) => break,
+                }
+            }
+            let _ = to.send(Event::Shut);
+        });
+}
+
+/// A process's exit as a shell says it: its code, or 128 and its signal.
+fn exit_code(status: ExitStatus) -> i32 {
+    use std::os::unix::process::ExitStatusExt;
+    status
+        .code()
+        .or_else(|| status.signal().map(|signal| 128 + signal))
+        .unwrap_or(1)
+}
+
+/// A fence started: its process, its stdout and stderr, and fd 4's
+/// reading end.
+pub struct Spawned {
+    pub child: Child,
+    pub out: std::process::ChildStdout,
+    pub err: std::process::ChildStderr,
+    pub said: std::fs::File,
+}
+
+/// `command` started as a run's fence: stdin `/dev/null`, stdout and stderr
+/// piped, a process group of its own, `token` (and a newline) in a pipe on
+/// its fd 3 and the writing end of a pipe lamp-tasks reads on its fd 4.
+/// Every other fd of lamp-tasks is close-on-exec, as Rust opens them, and
+/// both pipes are made close-on-exec too: only this child gets them, at 3
+/// and 4, never another child started meanwhile.
+#[allow(unsafe_code)]
+pub fn spawn_fence(mut command: Command, token: &str) -> io::Result<Spawned> {
+    use std::os::unix::process::CommandExt;
+    // std's pipes are close-on-exec (`pipe2(O_CLOEXEC)` on Linux).
+    let (token_reader, mut token_writer) = io::pipe()?;
+    let (said_reader, said_writer) = io::pipe()?;
+    // A token is far smaller than a pipe's buffer: never blocks.
+    token_writer.write_all(format!("{token}\n").as_bytes())?;
+    drop(token_writer);
+    let (at_3, at_4) = (token_reader.as_raw_fd(), said_writer.as_raw_fd());
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .process_group(0);
+    // SAFETY: the closure runs in the child between fork and exec, and
+    // calls only fcntl, dup2 and close, which are async-signal-safe; it
+    // allocates nothing and takes no lock.
+    unsafe {
+        command.pre_exec(move || place_at_3_and_4(at_3, at_4));
+    }
+    let mut child = command.spawn()?;
+    drop((token_reader, said_writer));
+    let (Some(out), Some(err)) = (child.stdout.take(), child.stderr.take()) else {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(io::Error::other("the fence's output was not piped"));
+    };
+    Ok(Spawned {
+        child,
+        out,
+        err,
+        said: std::fs::File::from(OwnedFd::from(said_reader)),
+    })
+}
+
+/// In a fence's child, before its exec: raw fds `token` and `said` (both
+/// close-on-exec, still open) duplicated at exactly 3 and 4, which stay
+/// open across the exec. Each is first copied above 9, so neither is
+/// overwritten by the other's `dup2` whatever their numbers were.
+#[allow(unsafe_code)]
+fn place_at_3_and_4(token: i32, said: i32) -> io::Result<()> {
+    use std::mem::ManuallyDrop;
+    use std::os::fd::{BorrowedFd, FromRawFd};
+    // SAFETY: both fds were opened by the parent before the fork and are
+    // open in this child; they are only borrowed for these calls.
+    let (token, said) = unsafe { (BorrowedFd::borrow_raw(token), BorrowedFd::borrow_raw(said)) };
+    let token = rustix::io::fcntl_dupfd_cloexec(token, 10)?;
+    let said = rustix::io::fcntl_dupfd_cloexec(said, 10)?;
+    for (from, at) in [(&token, 3), (&said, 4)] {
+        // SAFETY: `at` is only dup2's target, which it closes first if open;
+        // it is never closed here (`ManuallyDrop`), so it stays the child's.
+        let mut target = ManuallyDrop::new(unsafe { OwnedFd::from_raw_fd(at) });
+        // dup2 to another number clears close-on-exec on the copy.
+        rustix::io::dup2(from, &mut target)?;
+    }
+    Ok(())
 }
 
 /// Whether any byte is queued on `stream` already (peeked, not waited
@@ -948,7 +1329,7 @@ impl Drop for Counted {
 
 /// One line of at most `most` bytes, its `\n` taken off; read a byte at a
 /// time so nothing after it is taken.
-fn read_line(mut stream: &UnixStream, most: usize) -> io::Result<String> {
+fn read_line(mut stream: impl Read, most: usize) -> io::Result<String> {
     let mut line = Vec::new();
     let mut byte = [0u8; 1];
     loop {
@@ -1122,10 +1503,11 @@ pub fn parse_answer(line: &str) -> Result<Grant, String> {
 }
 
 /// The launcher: `skill-start <run-id>`. Refused (exit 2) before it
-/// connects anywhere by [`launcher_refusal`]; else asks lamp-tasks for the
-/// run's start over [`START_SOCKET`] ([`ask`]; exit 2 when it can't be made
-/// non-dumpable), then becomes the run's fence. Returns only with its exit
-/// status and why it did not.
+/// connects anywhere by [`launcher_refusal`]; else claims the run over
+/// [`START_SOCKET`] ([`ask`]; exit 2 when it can't be made non-dumpable),
+/// then relays the script lamp-tasks runs outside the gateway ([`relay`]).
+/// Its exit status, and why when it is not the script's own (empty words
+/// otherwise).
 pub fn launcher_main(args: &[OsString]) -> (i32, String) {
     use std::os::unix::ffi::OsStrExt;
     let names: Vec<OsString> = std::env::vars_os().map(|(name, _)| name).collect();
@@ -1139,7 +1521,7 @@ pub fn launcher_main(args: &[OsString]) -> (i32, String) {
 /// The launcher's side of the talk on `stream` (the module's order): `id`
 /// sent with its credentials; on [`CHECKED`] and its nonce, made
 /// non-dumpable (`undumpable`), and only then [`READY`] with that nonce
-/// sent and the grant read. Never
+/// sent and the grant (no token) read. Never
 /// ready unless non-dumpable: if that fails, nothing more is sent (exit 2).
 pub fn ask(
     stream: &UnixStream,
@@ -1169,21 +1551,26 @@ pub fn ask(
         .map_err(refused)
 }
 
-/// The launcher past its own checks: lamp-tasks asked for run `id`.
+/// The launcher past its own checks: lamp-tasks asked for run `id` on
+/// [`START_SOCKET`].
 fn launch(id: &str) -> (i32, String) {
-    // Fds 0-2 held, so the fence's fds land at 3 and 4.
-    while let Ok(null) = std::fs::File::open("/dev/null") {
-        if null.as_raw_fd() > 2 {
-            break;
-        }
-        let _ = null.into_raw_fd();
-    }
-    let stream = match UnixStream::connect(START_SOCKET) {
+    launch_at(Path::new(START_SOCKET), id)
+}
+
+/// The launcher's talk for run `id` on `socket` ([`START_SOCKET`] on a
+/// lamp): the run claimed ([`ask`]), then what lamp-tasks relays written
+/// to this process's stdout and stderr ([`relay`]) until the script's exit
+/// code, which it returns. The launcher never starts anything itself.
+pub fn launch_at(socket: &Path, id: &str) -> (i32, String) {
+    let stream = match UnixStream::connect(socket) {
         Ok(stream) => stream,
         Err(error) => {
             return (
                 1,
-                format!("lamp-tasks can't be reached on {START_SOCKET}: {error}"),
+                format!(
+                    "lamp-tasks can't be reached on {}: {error}",
+                    socket.display()
+                ),
             );
         }
     };
@@ -1192,96 +1579,150 @@ fn launch(id: &str) -> (i32, String) {
     {
         return (1, "lamp-tasks was not asked".into());
     }
-    let grant = match ask(&stream, id, undumpable) {
-        Ok(grant) => grant,
-        Err(refused) => return refused,
-    };
-    if stream.set_read_timeout(None).is_err() || stream.set_write_timeout(None).is_err() {
+    if let Err(refused) = ask(&stream, id, undumpable) {
+        return refused;
+    }
+    // From here lamp-tasks paces the run (its fence's start, the run's own
+    // deadline): no read is cut short.
+    if stream.set_read_timeout(None).is_err() {
         return (1, "the launcher socket could not be kept".into());
     }
-    match exec_fence(&grant, stream) {
-        Ok(never) => match never {},
-        Err(error) => (1, format!("the run's fence was not started: {error}")),
+    relay(&stream, io::stdout().lock(), io::stderr().lock())
+}
+
+/// The most bytes one relay frame carries.
+pub const MOST_FRAME_BYTES: usize = 16 * 1024;
+/// A frame's kind byte: a chunk of the script's stdout.
+const KIND_STDOUT: u8 = 1;
+/// A chunk of the script's stderr.
+const KIND_STDERR: u8 = 2;
+/// The script's exit code, 4 bytes (big-endian `i32`); the last frame.
+const KIND_EXIT: u8 = 3;
+/// Why the run did not end with an exit code, UTF-8 words; the last frame.
+const KIND_ERROR: u8 = 4;
+
+/// One frame lamp-tasks relays to the launcher after the claim: one kind
+/// byte, the payload's length as a big-endian `u32` (at most
+/// [`MOST_FRAME_BYTES`]), then the payload. [`Frame::Exit`] or
+/// [`Frame::Error`] is the last.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Frame {
+    Stdout(Vec<u8>),
+    Stderr(Vec<u8>),
+    Exit(i32),
+    Error(String),
+}
+
+impl Frame {
+    /// The frame's bytes; a payload over [`MOST_FRAME_BYTES`] is refused
+    /// (an error's words are cut to fit, at a character's edge).
+    pub fn encode(&self) -> io::Result<Vec<u8>> {
+        let (kind, payload): (u8, std::borrow::Cow<'_, [u8]>) = match self {
+            Self::Stdout(bytes) => (KIND_STDOUT, bytes.as_slice().into()),
+            Self::Stderr(bytes) => (KIND_STDERR, bytes.as_slice().into()),
+            Self::Exit(code) => (KIND_EXIT, code.to_be_bytes().to_vec().into()),
+            Self::Error(words) => {
+                let mut end = words.len().min(MOST_FRAME_BYTES);
+                while !words.is_char_boundary(end) {
+                    end -= 1;
+                }
+                (KIND_ERROR, words.as_bytes()[..end].into())
+            }
+        };
+        if payload.len() > MOST_FRAME_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "a relay frame over its bound",
+            ));
+        }
+        let len = u32::try_from(payload.len()).map_err(|_| io::ErrorKind::InvalidInput)?;
+        let mut bytes = Vec::with_capacity(5 + payload.len());
+        bytes.push(kind);
+        bytes.extend_from_slice(&len.to_be_bytes());
+        bytes.extend_from_slice(&payload);
+        Ok(bytes)
+    }
+
+    /// The next frame on `from`: `None` at its end between two frames; an
+    /// unknown kind, a length over [`MOST_FRAME_BYTES`], an exit code not 4
+    /// bytes, words not UTF-8 or a frame cut short is an error.
+    pub fn read(mut from: impl Read) -> io::Result<Option<Self>> {
+        let invalid = |why: &str| io::Error::new(io::ErrorKind::InvalidData, why.to_owned());
+        let mut head = [0u8; 5];
+        let mut got = 0;
+        while got < head.len() {
+            match from.read(&mut head[got..]) {
+                Ok(0) if got == 0 => return Ok(None),
+                Ok(0) => return Err(io::ErrorKind::UnexpectedEof.into()),
+                Ok(more) => got += more,
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+                Err(error) => return Err(error),
+            }
+        }
+        let [kind, a, b, c, d] = head;
+        let len = usize::try_from(u32::from_be_bytes([a, b, c, d]))
+            .map_err(|_| invalid("a relay frame over its bound"))?;
+        if len > MOST_FRAME_BYTES {
+            return Err(invalid("a relay frame over its bound"));
+        }
+        if !matches!(kind, KIND_STDOUT | KIND_STDERR | KIND_EXIT | KIND_ERROR) {
+            return Err(invalid("a relay frame of no known kind"));
+        }
+        if kind == KIND_EXIT && len != 4 {
+            return Err(invalid("an exit frame not of 4 bytes"));
+        }
+        let mut payload = vec![0u8; len];
+        from.read_exact(&mut payload)?;
+        Ok(Some(match kind {
+            KIND_STDOUT => Self::Stdout(payload),
+            KIND_STDERR => Self::Stderr(payload),
+            KIND_EXIT => Self::Exit(i32::from_be_bytes(
+                payload
+                    .try_into()
+                    .map_err(|_| invalid("an exit frame not of 4 bytes"))?,
+            )),
+            _ => Self::Error(
+                String::from_utf8(payload).map_err(|_| invalid("an error frame not UTF-8"))?,
+            ),
+        }))
     }
 }
 
-/// Every fd of this process above 4 made close-on-exec, so the fence gets
-/// fds 0-4 only, whatever its caller left open: the fds named in
-/// `/proc/self/fd` (`/dev/fd` off Linux) as read once.
-pub fn above_4_closed_at_exec() -> io::Result<()> {
-    let dir = if cfg!(target_os = "linux") {
-        "/proc/self/fd"
-    } else {
-        "/dev/fd"
-    };
-    let fds: Vec<i32> = std::fs::read_dir(dir)?
-        .filter_map(|entry| entry.ok()?.file_name().to_str()?.parse().ok())
-        .filter(|fd| *fd > 4)
-        .collect();
-    for fd in fds {
-        // The listing's own fd is closed by now: that one is skipped.
-        let _ = cloexec(fd);
+/// `frame` written to `to` whole.
+fn write_frame(mut to: impl Write, frame: &Frame) -> io::Result<()> {
+    to.write_all(&frame.encode()?)
+}
+
+/// The launcher's relay: frames read from `from` until the last, each
+/// chunk written (and flushed) to `out` or `err`. The exit status and why:
+/// [`Frame::Exit`]'s code (outside 0-255, 1) and no words; else 1 and why
+/// not, for an error frame, an end before the last frame, a frame not
+/// understood, or output that could not be written (the launcher then
+/// leaves, and lamp-tasks kills the run).
+pub fn relay(mut from: impl Read, mut out: impl Write, mut err: impl Write) -> (i32, String) {
+    loop {
+        let (to, bytes): (&mut dyn Write, Vec<u8>) = match Frame::read(&mut from) {
+            Ok(Some(Frame::Stdout(bytes))) => (&mut out, bytes),
+            Ok(Some(Frame::Stderr(bytes))) => (&mut err, bytes),
+            Ok(Some(Frame::Exit(code))) => {
+                return (
+                    if (0..=255).contains(&code) { code } else { 1 },
+                    String::new(),
+                );
+            }
+            Ok(Some(Frame::Error(words))) => {
+                return (
+                    1,
+                    format!("the skill's script did not run to its end: {words}"),
+                );
+            }
+            Ok(None) => return (1, "lamp-tasks ended the run before its end".into()),
+            Err(_) => return (1, "lamp-tasks' relay was not understood".into()),
+        };
+        if to.write_all(&bytes).and_then(|()| to.flush()).is_err() {
+            return (1, "the script's output could not be written".into());
+        }
     }
-    Ok(())
-}
-
-/// Raw `fd` marked close-on-exec, if it is open.
-#[allow(unsafe_code)]
-fn cloexec(fd: i32) -> io::Result<()> {
-    // SAFETY: the fd is only borrowed for the two fcntl calls and never
-    // closed here; the launcher is one thread, so it is not closed and
-    // reused meanwhile, and on a closed fd fcntl only fails (EBADF).
-    let fd = unsafe { std::os::fd::BorrowedFd::borrow_raw(fd) };
-    let flags = rustix::io::fcntl_getfd(fd)?;
-    Ok(rustix::io::fcntl_setfd(
-        fd,
-        flags | rustix::io::FdFlags::CLOEXEC,
-    )?)
-}
-
-/// `fd` duplicated at exactly `at` (3 or 4, both free: every fd this
-/// process opened is above, close-on-exec), inherited by the fence.
-fn place(fd: impl AsFd, at: i32) -> io::Result<OwnedFd> {
-    let placed = rustix::io::dup(fd)?;
-    if placed.as_raw_fd() != at {
-        return Err(io::Error::other(format!(
-            "fd {at} was not free for the fence"
-        )));
-    }
-    Ok(placed)
-}
-
-/// The run's fence exec'd: `unshare` with `crate::gateway::fence_args`,
-/// the token in a pipe on fd 3, the socket on fd 4, an environment of
-/// `crate::gateway::SCRIPT_PATH` only.
-fn exec_fence(grant: &Grant, stream: UnixStream) -> io::Result<std::convert::Infallible> {
-    use std::os::unix::process::CommandExt;
-    let (reader, writer) = rustix::pipe::pipe()?;
-    let mut writer = std::fs::File::from(writer);
-    writer.write_all(format!("{}\n", grant.token).as_bytes())?;
-    drop(writer);
-    // Above 4 first, the first ones closed, so the two places are free
-    // whatever the fds were.
-    let high_reader = rustix::io::fcntl_dupfd_cloexec(&reader, 10)?;
-    let high_stream = rustix::io::fcntl_dupfd_cloexec(&stream, 10)?;
-    drop((reader, stream));
-    let (reader, stream) = (high_reader, high_stream);
-    let token_fd = place(&reader, 3)?;
-    let socket_fd = place(&stream, 4)?;
-    above_4_closed_at_exec()?;
-    let hidden: Vec<&Path> = crate::gateway::HIDDEN.iter().map(Path::new).collect();
-    let error = std::process::Command::new("unshare")
-        .args(crate::gateway::fence_args(
-            grant,
-            rustix::process::getuid().as_raw(),
-            rustix::process::getgid().as_raw(),
-            &hidden,
-        ))
-        .env_clear()
-        .env("PATH", crate::gateway::SCRIPT_PATH)
-        .exec();
-    drop((token_fd, socket_fd));
-    Err(error)
 }
 
 #[cfg(test)]
@@ -1296,9 +1737,11 @@ mod tests {
             run: "/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-task-1".into(),
             socket: "/run/lampos-control/control.sock".into(),
             pythonpath: "/opt/lampOS/sdk".into(),
-            token: "secret-7133".into(),
         }
     }
+
+    /// The run's token in these tests.
+    const TOKEN: &str = "secret-7133";
 
     #[test]
     fn the_launchers_own_file_unread_is_taken_as_the_launcher_on_linux() {
@@ -1481,7 +1924,7 @@ mod tests {
     /// id is read, so it ends nothing).
     fn refused_in_talk(fake: Fake, words: &str) {
         let starts = Starts::default();
-        let live = starts.open("task-1", grant()).unwrap();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
         let answer = claim(&starts, fake, "task-1", Some(STARTED));
         assert!(parse_answer(&answer).is_err(), "no grant: {answer}");
         assert!(!starts.state("task-1").0, "nothing claimed");
@@ -1529,7 +1972,7 @@ mod tests {
         // The launcher itself gets it.
         assert_eq!(peer_why(&Fake::good()), Ok(()));
         let starts = Starts::default();
-        let _live = starts.open("task-1", grant()).unwrap();
+        let _live = starts.open("task-1", grant(), TOKEN).unwrap();
         assert_eq!(error_of(&claim(&starts, Fake::good(), "task-1", None)), "");
         assert_eq!(starts.state("task-1"), (true, false));
     }
@@ -1700,7 +2143,40 @@ mod tests {
         assert!(launcher_refusal(&os(&[&made]), env).is_ok());
     }
 
+    /// A stand-in fence, as lamp-tasks starts one ([`spawn_fence`]): the
+    /// token read from fd 3 and written to the file `$0`; `$1`, when not
+    /// empty, said on fd 4, which is then closed (kept open otherwise);
+    /// then `$2` run (by default: `out` on stdout, `err` on stderr, exit 3).
+    const FAKE_FENCE: &str = r#"IFS= read -r t <&3 || exit 9; exec 3<&-; printf '%s' "$t" > "$0"; [ -z "$1" ] || { printf '%s\n' "$1" >&4; exec 4>&-; }; eval "$2""#;
+    const FAKE_BODY: &str = "printf out; printf err >&2; exit 3";
+
+    /// [`FAKE_FENCE`] with the token written to `token_at`, `said` on fd 4
+    /// and `body` run.
+    fn fake_fence(token_at: &Path, said: Option<&str>, body: &str) -> FenceCommand {
+        let (token_at, said, body) = (
+            token_at.to_owned(),
+            said.unwrap_or_default().to_owned(),
+            body.to_owned(),
+        );
+        Arc::new(move |_: &Grant| {
+            let mut command = Command::new("/bin/sh");
+            command
+                .args(["-c", FAKE_FENCE])
+                .arg(&token_at)
+                .arg(&said)
+                .arg(&body);
+            command
+        })
+    }
+
+    /// lamp-tasks' side for `fake`, its fence saying `started` and
+    /// running [`FAKE_BODY`].
     fn server(starts: &Starts, fake: Fake) -> Server {
+        server_saying(starts, fake, Some(STARTED))
+    }
+
+    /// lamp-tasks' side for `fake`, its fence saying `said`.
+    fn server_saying(starts: &Starts, fake: Fake, said: Option<&str>) -> Server {
         Server {
             socket: PathBuf::from("/unused"),
             starts: starts.clone(),
@@ -1708,30 +2184,58 @@ mod tests {
             own_uid: OWN,
             launcher: LAUNCHER_AT.into(),
             started_within: Duration::from_secs(5),
+            fence: fake_fence(Path::new("/dev/null"), said, FAKE_BODY),
         }
     }
 
-    /// One launcher's claim of `id` from a peer `fake`, as [`ask`] talks:
-    /// its last answer line (the grant, an error, or nothing), then `then`
-    /// sent (`started`, or nothing) and the connection closed; returns once
-    /// lamp-tasks has done with it.
-    fn claim(starts: &Starts, fake: Fake, id: &str, then: Option<&str>) -> String {
+    /// One launcher's talk with `served`, as [`ask`] then [`relay`] talk.
+    struct Talk {
+        /// Its last answer line: the grant, an error, or nothing.
+        answer: String,
+        /// Every byte the launcher was sent.
+        heard: Vec<u8>,
+        /// After a grant: the relay's exit status and words, and what it
+        /// wrote to stdout and stderr.
+        relayed: Option<(i32, String, Vec<u8>, Vec<u8>)>,
+    }
+
+    /// A launcher's claim of `id` on `served`, relayed to its end; returns
+    /// once lamp-tasks has done with it.
+    fn talk(served: Server, id: &str) -> Talk {
         let (near, far) = UnixStream::pair().unwrap();
-        let served = server(starts, fake);
         let serving = std::thread::spawn(move || served.one(far));
+        let mut heard = Vec::new();
         write_line(&near, id).unwrap();
         let mut answer = read_line(&near, MOST_ANSWER_BYTES).unwrap_or_default();
+        heard.extend(format!("{answer}\n").bytes());
         if let Some(nonce) = answer.strip_prefix(CHECKED_SPACE).map(str::to_owned) {
             let _ = write_line(&near, &format!("{READY} {nonce}"));
             answer = read_line(&near, MOST_ANSWER_BYTES).unwrap_or_default();
+            heard.extend(format!("{answer}\n").bytes());
         }
-        if let Some(line) = then {
-            // A refused claim's connection may be closed already.
-            let _ = write_line(&near, line);
-        }
+        let relayed = parse_answer(&answer).is_ok().then(|| {
+            let mut rest = Vec::new();
+            let _ = (&near).read_to_end(&mut rest);
+            heard.extend(&rest);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let (code, why) = relay(&rest[..], &mut out, &mut err);
+            (code, why, out, err)
+        });
         drop(near);
         serving.join().unwrap();
-        answer
+        Talk {
+            answer,
+            heard,
+            relayed,
+        }
+    }
+
+    /// One launcher's claim of `id` from a peer `fake`, its fence saying
+    /// `then` on fd 4 (`started`, or nothing): its last answer line (the
+    /// grant, an error, or nothing); returns once lamp-tasks has done with
+    /// it.
+    fn claim(starts: &Starts, fake: Fake, id: &str, then: Option<&str>) -> String {
+        talk(server_saying(starts, fake, then), id).answer
     }
 
     fn error_of(answer: &str) -> String {
@@ -1746,7 +2250,7 @@ mod tests {
             error_of(&claim(&starts, Fake::good(), "task-9", None)),
             "no live skill run of this lamp has that id"
         );
-        let live = starts.open("task-1", grant()).unwrap();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
         drop(live);
         assert!(!starts.is_live("task-1"));
         assert_eq!(
@@ -1762,7 +2266,7 @@ mod tests {
     #[test]
     fn a_good_claim_answers_the_grant_once_and_a_second_is_refused() {
         let starts = Starts::default();
-        let live = starts.open("task-1", grant()).unwrap();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
         let answer = claim(&starts, Fake::good(), "task-1", None);
         let value: serde_json::Value = serde_json::from_str(&answer).unwrap();
         let keys: Vec<&str> = value
@@ -1781,10 +2285,10 @@ mod tests {
                 "run",
                 "script",
                 "skill",
-                "socket",
-                "token"
+                "socket"
             ]
         );
+        assert!(!answer.contains(TOKEN), "never the token");
         assert_eq!(parse_answer(&answer), Ok(grant()));
         assert_eq!(starts.state("task-1"), (true, false));
         assert_eq!(
@@ -1801,7 +2305,7 @@ mod tests {
     #[test]
     fn claimed_and_started_ran_and_claimed_alone_did_not() {
         let starts = Starts::default();
-        let live = starts.open("task-1", grant()).unwrap();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
         assert_eq!(live.ran(), Err(crate::gateway::NEVER_STARTED.into()));
         claim(&starts, Fake::good(), "task-1", None);
         assert_eq!(
@@ -1812,11 +2316,11 @@ mod tests {
             )
         );
         let starts = Starts::default();
-        let live = starts.open("task-1", grant()).unwrap();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
         claim(&starts, Fake::good(), "task-1", Some("nope"));
         assert!(live.ran().is_err(), "only the word started counts");
         let starts = Starts::default();
-        let live = starts.open("task-1", grant()).unwrap();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
         claim(&starts, Fake::good(), "task-1", Some(STARTED));
         assert_eq!(live.ran(), Ok(()));
         drop(live);
@@ -1833,7 +2337,10 @@ mod tests {
             Err("no live skill run of this lamp has that id".into())
         );
         assert!(parse_answer(r#"{"script":"/x"}"#).is_err());
-        assert!(!format!("{:?}", grant()).contains("secret-7133"));
+        // A grant with a token is not one: the launcher never takes one.
+        let mut with_token = serde_json::to_value(grant()).unwrap();
+        with_token["token"] = TOKEN.into();
+        assert!(parse_answer(&with_token.to_string()).is_err());
     }
 
     #[test]
@@ -1936,7 +2443,7 @@ mod tests {
             .iter()
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect();
-        assert!(words.iter().all(|word| !word.contains("secret-7133")));
+        assert!(words.iter().all(|word| !word.contains(TOKEN)));
         assert_eq!(&words[..3], ["--user", "--map-root-user", "--net"]);
         let fence = words.iter().position(|word| word == "fence").unwrap();
         assert_eq!(
@@ -2044,7 +2551,7 @@ mod tests {
     #[test]
     fn the_grant_comes_only_after_ready() {
         let starts = Starts::default();
-        let live = starts.open("task-1", grant()).unwrap();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
         let (near, far) = UnixStream::pair().unwrap();
         let served = server(&starts, Fake::good());
         let serving = std::thread::spawn(move || served.one(far));
@@ -2071,7 +2578,7 @@ mod tests {
         );
         // With ready, the grant.
         let starts = Starts::default();
-        let _live = starts.open("task-1", grant()).unwrap();
+        let _live = starts.open("task-1", grant(), TOKEN).unwrap();
         let answer = claim(&starts, Fake::good(), "task-1", None);
         assert_eq!(parse_answer(&answer), Ok(grant()));
     }
@@ -2082,7 +2589,7 @@ mod tests {
     #[test]
     fn a_ready_queued_before_checked_is_refused() {
         let starts = Starts::default();
-        let live = starts.open("task-1", grant()).unwrap();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
         let (near, far) = UnixStream::pair().unwrap();
         let served = server(&starts, Fake::good());
         let serving = std::thread::spawn(move || served.one(far));
@@ -2108,7 +2615,7 @@ mod tests {
     fn a_ready_with_a_wrong_or_no_nonce_is_refused() {
         for ready in [format!("{READY} 0000000000000000"), READY.to_owned()] {
             let starts = Starts::default();
-            let live = starts.open("task-1", grant()).unwrap();
+            let live = starts.open("task-1", grant(), TOKEN).unwrap();
             let (near, far) = UnixStream::pair().unwrap();
             let served = server(&starts, Fake::good());
             let serving = std::thread::spawn(move || served.one(far));
@@ -2179,54 +2686,38 @@ mod tests {
         assert_eq!(ready, None, "never ready");
         // Against lamp-tasks' own side, end to end.
         let starts = Starts::default();
-        let live = starts.open("task-1", grant()).unwrap();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
         let (near, far) = UnixStream::pair().unwrap();
         let served = server(&starts, Fake::good());
         let serving = std::thread::spawn(move || served.one(far));
         assert_eq!(ask(&near, "task-1", || Ok(())), Ok(grant()));
-        write_line(&near, STARTED).unwrap();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        assert_eq!(relay(&near, &mut out, &mut err), (3, String::new()));
+        assert_eq!((&out[..], &err[..]), (&b"out"[..], &b"err"[..]));
         drop(near);
         serving.join().unwrap();
         assert_eq!(live.ran(), Ok(()));
     }
 
+    /// The fence is made in lamp-tasks' own namespaces (#7024): it hides
+    /// the launcher's socket and lamp-tasks' own runtime folder, its
+    /// sockets and the Hermes runs' token files.
     #[test]
-    fn the_fence_hides_the_launchers_socket() {
+    fn the_fence_hides_the_launchers_socket_and_lamp_tasks_own_folder() {
         assert!(crate::gateway::HIDDEN.contains(&START_DIR));
-        assert!(
-            crate::gateway::HIDDEN
-                .iter()
-                .any(|hidden| Path::new(START_SOCKET).starts_with(hidden))
-        );
-    }
-
-    /// An fd the launcher's caller left open (not close-on-exec) never
-    /// reaches the fence's programs.
-    #[test]
-    fn fds_above_4_are_closed_at_the_fences_exec() {
-        let file = tempfile::tempfile().unwrap();
-        // Above 4 whatever the test runner left free (fds 3 and 4 may be),
-        // and inheritable, as a caller's stray fd is.
-        let open = rustix::io::fcntl_dupfd_cloexec(&file, 10).unwrap();
-        rustix::io::fcntl_setfd(&open, rustix::io::FdFlags::empty()).unwrap();
-        let fd = open.as_raw_fd();
-        assert!(fd > 4);
-        let sees = || {
-            std::process::Command::new("/bin/sh")
-                // By /dev/fd, not `<&N`: dash reads one digit there.
-                .args(["-c", &format!("[ -e /dev/fd/{fd} ]")])
-                .status()
-                .unwrap()
-                .success()
-        };
-        assert!(sees(), "inherited before");
-        above_4_closed_at_exec().unwrap();
-        assert!(!sees(), "closed at exec after");
-        assert!(
-            rustix::io::fcntl_getfd(&open)
-                .unwrap()
-                .contains(rustix::io::FdFlags::CLOEXEC)
-        );
+        for shown in [
+            START_SOCKET,
+            "/run/lampos-tasks/request.sock",
+            "/run/lampos-tasks/app.sock",
+            crate::run_token_file::RUNS_DIR,
+        ] {
+            assert!(
+                crate::gateway::HIDDEN
+                    .iter()
+                    .any(|hidden| Path::new(shown).starts_with(hidden)),
+                "{shown}"
+            );
+        }
     }
 
     fn mode(path: &Path) -> u32 {
@@ -2335,5 +2826,254 @@ mod tests {
         stop.store(true, Ordering::Release);
         serving.join().unwrap();
         assert!(!socket.exists(), "removed at the stop");
+    }
+
+    #[test]
+    fn relay_frames_round_trip_and_are_bounded() {
+        let frames = [
+            Frame::Stdout(b"hello\n".to_vec()),
+            Frame::Stderr(Vec::new()),
+            Frame::Stdout(vec![7; MOST_FRAME_BYTES]),
+            Frame::Exit(-3),
+            Frame::Exit(0),
+            Frame::Error("no fence".into()),
+        ];
+        let mut bytes = Vec::new();
+        for frame in &frames {
+            bytes.extend(frame.encode().unwrap());
+        }
+        let mut from = &bytes[..];
+        for frame in &frames {
+            assert_eq!(Frame::read(&mut from).unwrap().as_ref(), Some(frame));
+        }
+        assert_eq!(Frame::read(&mut from).unwrap(), None, "the end");
+        assert_eq!(
+            Frame::Exit(258).encode().unwrap(),
+            [3, 0, 0, 0, 4, 0, 0, 1, 2]
+        );
+        assert_eq!(
+            Frame::Stdout(b"ab".to_vec()).encode().unwrap(),
+            [1, 0, 0, 0, 2, b'a', b'b']
+        );
+        // Over the bound: never written, never read.
+        assert!(
+            Frame::Stdout(vec![0; MOST_FRAME_BYTES + 1])
+                .encode()
+                .is_err()
+        );
+        let long = "é".repeat(MOST_FRAME_BYTES);
+        let cut = Frame::Error(long).encode().unwrap();
+        assert!(cut.len() <= 5 + MOST_FRAME_BYTES);
+        assert!(matches!(Frame::read(&cut[..]), Ok(Some(Frame::Error(_)))));
+        let over = u32::try_from(MOST_FRAME_BYTES + 1).unwrap().to_be_bytes();
+        for bad in [
+            vec![1, over[0], over[1], over[2], over[3]],
+            vec![9, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0],
+            vec![3, 0, 0, 0, 3, 0, 0, 0],
+            vec![4, 0, 0, 0, 1, 0xff],
+            vec![1, 0, 0],
+            vec![1, 0, 0, 0, 4, b'a'],
+        ] {
+            assert!(Frame::read(&bad[..]).is_err(), "{bad:?}");
+        }
+    }
+
+    /// The launcher's side: each chunk to its own stream, in order, and the
+    /// exit code; an error's words, an early end or bytes not understood
+    /// are exit 1 in words.
+    #[test]
+    fn the_launchers_relay_writes_each_chunk_and_exits_with_the_code() {
+        let framed = |frames: &[Frame]| -> Vec<u8> {
+            frames.iter().flat_map(|f| f.encode().unwrap()).collect()
+        };
+        let run = |bytes: Vec<u8>| {
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let (code, why) = relay(&bytes[..], &mut out, &mut err);
+            (code, why, out, err)
+        };
+        let (code, why, out, err) = run(framed(&[
+            Frame::Stdout(b"a".to_vec()),
+            Frame::Stderr(b"b".to_vec()),
+            Frame::Stdout(b"c".to_vec()),
+            Frame::Exit(7),
+            Frame::Stdout(b"never".to_vec()),
+        ]));
+        assert_eq!((code, why.as_str()), (7, ""));
+        assert_eq!((&out[..], &err[..]), (&b"ac"[..], &b"b"[..]));
+        assert_eq!(run(framed(&[Frame::Exit(300)])).0, 1);
+        assert_eq!(run(framed(&[Frame::Exit(-1)])).0, 1);
+        let (code, why, ..) = run(framed(&[Frame::Error("no fence".into())]));
+        assert_eq!(code, 1);
+        assert!(why.ends_with("no fence"), "{why}");
+        let (code, why, out, _) = run(framed(&[Frame::Stdout(b"x".to_vec())]));
+        assert_eq!(
+            (code, why.as_str(), &out[..]),
+            (1, "lamp-tasks ended the run before its end", &b"x"[..])
+        );
+        let (code, why, ..) = run(vec![9, 0, 0, 0, 0]);
+        assert_eq!(
+            (code, why.as_str()),
+            (1, "lamp-tasks' relay was not understood")
+        );
+        // Output that can't be written: the launcher leaves.
+        struct Shut;
+        impl Write for Shut {
+            fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+                Err(io::ErrorKind::BrokenPipe.into())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let bytes = framed(&[Frame::Stdout(b"x".to_vec()), Frame::Exit(0)]);
+        assert_eq!(relay(&bytes[..], Shut, Vec::new()).0, 1);
+    }
+
+    /// #7024: lamp-tasks starts the fence itself, the token on its fd 3,
+    /// and the launcher only relays: not one byte it is sent holds the
+    /// token, while the fence got it; its output and exit code relayed.
+    #[test]
+    fn the_token_reaches_only_the_fence_never_the_launcher() {
+        let dir = tempfile::tempdir().unwrap();
+        let token_at = dir.path().join("token");
+        let starts = Starts::default();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
+        let served = Server {
+            fence: fake_fence(&token_at, Some(STARTED), FAKE_BODY),
+            ..server(&starts, Fake::good())
+        };
+        let talked = talk(served, "task-1");
+        assert_eq!(parse_answer(&talked.answer), Ok(grant()));
+        assert_eq!(std::fs::read_to_string(&token_at).unwrap(), TOKEN);
+        let heard = String::from_utf8_lossy(&talked.heard);
+        assert!(
+            !heard.contains(TOKEN),
+            "the launcher heard the token: {heard}"
+        );
+        assert_eq!(
+            talked.relayed,
+            Some((3, String::new(), b"out".to_vec(), b"err".to_vec()))
+        );
+        assert_eq!(live.ran(), Ok(()));
+    }
+
+    /// Waits until run `id` started, at most 10 s.
+    fn wait_started(starts: &Starts, id: &str) {
+        let until = Instant::now() + Duration::from_secs(10);
+        while !starts.state(id).1 {
+            assert!(Instant::now() < until, "never started");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    /// The launcher's connection closed before the script's end: the fence
+    /// is killed, not left running for no one.
+    #[test]
+    fn a_launcher_gone_before_the_end_kills_the_run() {
+        let starts = Starts::default();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
+        let served = Server {
+            fence: fake_fence(Path::new("/dev/null"), Some(STARTED), "exec sleep 30"),
+            ..server(&starts, Fake::good())
+        };
+        let (near, far) = UnixStream::pair().unwrap();
+        let begun = Instant::now();
+        let serving = std::thread::spawn(move || served.one(far));
+        assert_eq!(ask(&near, "task-1", || Ok(())), Ok(grant()));
+        wait_started(&starts, "task-1");
+        drop(near);
+        serving.join().unwrap();
+        assert!(
+            begun.elapsed() < Duration::from_secs(15),
+            "killed, not waited"
+        );
+        assert_eq!(live.ran(), Ok(()));
+    }
+
+    /// The run ended (its deadline, its stop): its fence is killed and the
+    /// launcher told the script's end (killed: 128 + 9).
+    #[test]
+    fn a_run_ended_kills_its_fence() {
+        let starts = Starts::default();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
+        let served = Server {
+            fence: fake_fence(Path::new("/dev/null"), Some(STARTED), "exec sleep 30"),
+            ..server(&starts, Fake::good())
+        };
+        let (near, far) = UnixStream::pair().unwrap();
+        let begun = Instant::now();
+        let serving = std::thread::spawn(move || served.one(far));
+        let launcher = std::thread::spawn(move || {
+            assert_eq!(ask(&near, "task-1", || Ok(())), Ok(grant()));
+            relay(&near, Vec::new(), Vec::new())
+        });
+        wait_started(&starts, "task-1");
+        drop(live);
+        assert_eq!(launcher.join().unwrap(), (137, String::new()));
+        serving.join().unwrap();
+        assert!(
+            begun.elapsed() < Duration::from_secs(15),
+            "killed, not waited"
+        );
+        // Ended before its claim: no fence is started at all.
+        let fence = Fence::default();
+        fence.end();
+        assert!(
+            fence
+                .start(|| -> io::Result<(Child, ())> { panic!("started") })
+                .is_err()
+        );
+    }
+
+    /// A fence that has not said [`STARTED`] in time is killed, and the run
+    /// fails closed as one whose fence failed.
+    #[test]
+    fn a_fence_that_never_says_started_is_killed() {
+        let starts = Starts::default();
+        let live = starts.open("task-1", grant(), TOKEN).unwrap();
+        let served = Server {
+            started_within: Duration::from_millis(300),
+            fence: fake_fence(Path::new("/dev/null"), None, "exec sleep 30"),
+            ..server(&starts, Fake::good())
+        };
+        let begun = Instant::now();
+        let talked = talk(served, "task-1");
+        assert!(
+            begun.elapsed() < Duration::from_secs(15),
+            "killed, not waited"
+        );
+        let (code, why, ..) = talked.relayed.unwrap();
+        assert_eq!(code, 1);
+        assert!(
+            why.ends_with("the run's fence never said it started"),
+            "{why}"
+        );
+        assert_eq!(live.ran(), Err(crate::gateway::FENCE_FAILED.into()));
+    }
+
+    /// The fence's fds 3 and 4 are the token's pipe and lamp-tasks'
+    /// `started` pipe, whatever lamp-tasks had at 3 and 4, and no other fd
+    /// of lamp-tasks reaches it.
+    #[test]
+    fn the_fence_gets_the_token_on_3_and_said_on_4_and_nothing_else() {
+        let held = tempfile::tempfile().unwrap();
+        let stray = rustix::io::fcntl_dupfd_cloexec(&held, 10).unwrap();
+        let mut command = Command::new("/bin/sh");
+        command.args([
+            "-c",
+            &format!(
+                r#"IFS= read -r t <&3; printf '%s|' "$t"; printf started >&4; [ -e /dev/fd/{} ] && printf leaked; true"#,
+                stray.as_raw_fd()
+            ),
+        ]);
+        let mut spawned = spawn_fence(command, TOKEN).unwrap();
+        let mut out = String::new();
+        spawned.out.read_to_string(&mut out).unwrap();
+        let mut said = String::new();
+        spawned.said.read_to_string(&mut said).unwrap();
+        assert!(spawned.child.wait().unwrap().success());
+        assert_eq!(out, format!("{TOKEN}|"));
+        assert_eq!(said, "started");
     }
 }
