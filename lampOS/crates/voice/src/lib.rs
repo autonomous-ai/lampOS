@@ -206,6 +206,7 @@ pub mod short_turns;
 pub mod sight;
 pub mod skill_about;
 pub mod skill_named;
+pub mod skill_recurring;
 pub mod skill_task_yes;
 pub mod skill_words;
 pub mod skill_write_yes;

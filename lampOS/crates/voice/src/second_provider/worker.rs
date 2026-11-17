@@ -1251,6 +1251,13 @@ pub fn services(
             crate::stop_words::KEYTERM_ENVIRONMENT
         );
     }
+    // The words of a skill's make listened for (lamp-9adf, 17 Nov).
+    if crate::second_provider::net::key_terms::skill_terms_on() {
+        eprintln!(
+            "lamp-voice second: listening asks for a skill's make as key terms ({})",
+            crate::second_provider::net::key_terms::SKILL_ENVIRONMENT
+        );
+    }
     Ok(net
         .asking_for_the_stop_words(stop_terms)
         .warming_the_chat(warm)
