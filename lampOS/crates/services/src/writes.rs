@@ -296,6 +296,43 @@ pub fn scope_missing(code: &str, args: &Value, entry: &Entry) -> Option<&'static
     (!scope_allows(entry, allowed.scopes)).then_some(allowed.what)
 }
 
+/// The actions `code` writes by, as the tools' description lists them: the
+/// words before each entry's fields in [`ACTIONS`] (`create_doc or
+/// create_file {..}` two), Google Calendar's [`CALENDAR_EDITS`] and Gmail's
+/// [`GMAIL_DRAFT_EDITS`] besides, and an MCP service's [`MCP_ACTIONS`].
+/// None for a service the lamp never writes, or one it doesn't know.
+pub fn actions(code: &str) -> Vec<&'static str> {
+    let Some(service) = catalog::service(code) else {
+        return Vec::new();
+    };
+    let mut listed: Vec<&'static str> = if service.mcp.is_some() {
+        vec![MCP_ACTIONS]
+    } else {
+        ACTIONS
+            .iter()
+            .filter(|(listed, _)| *listed == service.code)
+            .map(|(_, actions)| *actions)
+            .collect()
+    };
+    match service.code {
+        "google_calendar" => listed.push(CALENDAR_EDITS),
+        "gmail" => listed.push(GMAIL_DRAFT_EDITS),
+        _ => {}
+    }
+    listed
+        .into_iter()
+        .flat_map(reads::entries)
+        .flat_map(|entry| {
+            entry
+                .split(['{', '('])
+                .next()
+                .unwrap_or_default()
+                .split_whitespace()
+                .filter(|word| *word != "or")
+        })
+        .collect()
+}
+
 /// What a write on `code` does, for a refusal that doesn't name its action.
 pub fn what_written(code: &str) -> &'static str {
     SCOPES

@@ -272,7 +272,7 @@ pub const MCP_WHATS: &str = "tools, call {tool, arguments}";
 
 /// Each entry of a list of reads such as [`WHATS`]' (`attachment {id,
 /// name|index}` one entry), split at the commas outside braces.
-fn entries(listed: &str) -> impl Iterator<Item = &str> {
+pub(crate) fn entries(listed: &str) -> impl Iterator<Item = &str> {
     let mut depth = 0usize;
     listed
         .split(move |c: char| {

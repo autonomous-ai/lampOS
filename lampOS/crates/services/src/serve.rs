@@ -11,7 +11,7 @@ use crate::reads::{self, ANSWER_MOST, Asker, Plan};
 use crate::refresh::Backend;
 use crate::store::{Entry, Store};
 use crate::writes::{self, Action, Desk};
-use crate::{skill_secrets, skill_writes, spoken, tools};
+use crate::{run_calls, skill_secrets, skill_writes, spoken, tools};
 use serde_json::{Value, json};
 use std::{
     fmt,
@@ -305,6 +305,7 @@ pub fn parse_tool(line: &str) -> Result<(String, Value), String> {
                 skill_writes::APPROVED,
                 RUN_WAITING,
                 skill_secrets::NAMES_CALL,
+                run_calls::CALL,
             ]
             .contains(name)
         })
@@ -378,6 +379,10 @@ pub struct Services<H, M> {
     /// `skill-secrets` folder, set from the app and asked for by
     /// lamp-tasks for a run ([`skill_secrets`]); none off.
     pub skill_secrets: Option<skill_secrets::Secrets>,
+    /// `--run-calls` (the linked-service memory plan, slice 4): the last 64
+    /// calls across all skill runs, no content, for the voice's
+    /// `run_calls_since` ([`run_calls`]); none off.
+    pub run_calls: Option<run_calls::RunCalls>,
 }
 
 /// What a call to a service not linked is told, after its name: and where
@@ -490,6 +495,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             linked_tools_write: Mutex::new(()),
             desk: Desk::default(),
             skill_secrets: None,
+            run_calls: None,
         }
     }
 
@@ -580,6 +586,13 @@ impl<H: Http, M: Mail> Services<H, M> {
         self
     }
 
+    /// With `--run-calls` given or not: the last 64 calls across all skill
+    /// runs kept for the voice ([`run_calls`]).
+    pub fn with_run_calls(mut self, on: bool) -> Self {
+        self.run_calls = on.then(run_calls::RunCalls::default);
+        self
+    }
+
     /// With `LAMP_SKILL_WRITE_AGENT` as `on` gives it.
     pub fn with_skill_write_agent(mut self, on: bool) -> Self {
         self.skill_write_agent = on;
@@ -601,8 +614,76 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// its read-back with no `send_id`: only the person's spoken yes,
     /// through the voice, sends it, and the send counts against the skills'
     /// bounds. The service is named by its exact code, never by a name.
-    /// Anything else is refused and nothing is called.
+    /// Anything else is refused and nothing is called. With `--run-calls`,
+    /// each read or write the line names a skill and a run for is kept as
+    /// it was answered, never its content ([`Self::note_run_call`]).
     pub async fn run_tool(&self, line: &str) -> Value {
+        let answer = self.run_tool_answer(line).await;
+        self.note_run_call(line, &answer);
+        answer
+    }
+
+    /// A skill run's call kept for the voice (`--run-calls`): its run (the
+    /// line's `run`, lamp-control's), skill, tool, the catalog code it
+    /// names, its action (a read's `what`, a write's `action`, kept only as
+    /// one of the catalog's words for that service, [`run_calls::action_of`])
+    /// and how it was answered. Nothing else of the line or the answer is kept; with
+    /// the flag off, or a line not a read or a write naming a skill and a
+    /// run, nothing is.
+    fn note_run_call(&self, line: &str, answer: &Value) {
+        let Some(calls) = &self.run_calls else {
+            return;
+        };
+        let Ok(call) = serde_json::from_str::<Value>(line.trim_end_matches(['\r', '\n'])) else {
+            return;
+        };
+        let tool = match call.get("name").and_then(Value::as_str) {
+            Some(tools::READ) => tools::READ,
+            Some(tools::WRITE) => tools::WRITE,
+            _ => return,
+        };
+        let (Some(run), Some(skill)) = (
+            call.get("run").and_then(Value::as_str),
+            call.get("skill")
+                .and_then(Value::as_str)
+                .filter(|skill| skill_writes::skill_name_ok(skill)),
+        ) else {
+            return;
+        };
+        let args = call.get("args").cloned().unwrap_or_default();
+        let status = match (answer["ok"] == true, tool) {
+            (false, _) => run_calls::Status::Refused,
+            (true, tools::READ) => run_calls::Status::Read,
+            (true, _) if answer["result"]["held"] == true => run_calls::Status::Held,
+            (true, _) => run_calls::Status::Sent,
+        };
+        let action = args
+            .get(if tool == tools::READ {
+                "what"
+            } else {
+                "action"
+            })
+            .and_then(Value::as_str);
+        calls.note(run_calls::Noted {
+            run,
+            skill,
+            tool,
+            service: args
+                .get("service")
+                .and_then(Value::as_str)
+                .and_then(catalog::service)
+                .map(|service| service.code),
+            action,
+            status,
+            at_unix_ms: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| {
+                    u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
+                }),
+        });
+    }
+
+    async fn run_tool_answer(&self, line: &str) -> Value {
         let refused = |why: &str| json!({"ok": false, "error": why});
         let line = line.trim_end_matches(['\r', '\n']);
         let (name, args) = match parse_tool(line) {
@@ -1012,6 +1093,14 @@ impl<H: Http, M: Mail> Services<H, M> {
                 RUN_WAITING if asker == Asker::Owner && self.skill_tasks => {
                     Ok(self.run_waiting(Instant::now()))
                 }
+                // The voice's own: the last 64 calls across all skill runs,
+                // no content (`--run-calls`, the linked-service memory plan,
+                // slice 4). The run door and the skill door refuse it before
+                // here; this guard is the second.
+                run_calls::CALL if asker == Asker::Owner => match &self.run_calls {
+                    None => Err(run_calls::OFF.to_owned()),
+                    Some(calls) => run_calls::after_of(&args).map(|after| calls.since(after)),
+                },
                 // The voice's own: which keys an agent skill needs and has,
                 // names only, before its tool runs (`LAMP_SKILL_SECRETS`).
                 skill_secrets::NAMES_CALL if asker == Asker::Owner => {
@@ -3283,6 +3372,167 @@ mod tests {
         );
         assert!(services.desk.waiting());
         assert!(services.mail.sent.lock().unwrap().is_empty());
+    }
+
+    /// `--run-calls` (the linked-service memory plan, slice 4): each of a
+    /// skill run's reads and writes is kept as its run, skill, tool,
+    /// service, action and status, never its content, and the voice alone
+    /// pulls them with `run_calls_since`; off, nothing is kept and the call
+    /// is refused; a line naming no run keeps nothing.
+    #[test]
+    fn a_runs_calls_are_kept_without_content_for_the_voice() {
+        let dir = tempfile::tempdir().unwrap();
+        let since = |after: u64| {
+            json!({"op":"call","name":run_calls::CALL,"args":{"after":after}}).to_string()
+        };
+        let named = |name: &str, args: Value| {
+            json!({"op":"call","name":name,"args":args,"skill":"mail-count","run":"run-1"})
+                .to_string()
+        };
+        let link = |services: &Services<FakeHttp, FakeMail>| {
+            run(services.admin(&set_line(
+                "gmail",
+                json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+            )));
+        };
+        let read = json!({"service":"gmail","what":"recent","query":"from:mom"});
+        let draft = json!({"service":"gmail","action":"send_mail","to":["mom@home.test"],
+            "subject":"Dinner","text":"Home by 7"});
+        // Off: a run's read keeps nothing, and the voice's call is refused.
+        let off = services(dir.path(), "[]", true).with_skill_tasks(true);
+        link(&off);
+        assert_eq!(
+            run(off.run_tool(&named(tools::READ, read.clone())))["ok"],
+            true
+        );
+        assert_eq!(
+            run(off.tool(&since(0))),
+            json!({"ok": false, "error": run_calls::OFF})
+        );
+        let on = services(dir.path(), "[]", true)
+            .with_skill_tasks(true)
+            .with_run_calls(true);
+        link(&on);
+        assert_eq!(
+            run(on.run_tool(&named(tools::READ, read.clone())))["ok"],
+            true
+        );
+        assert_eq!(
+            run(on.run_tool(&named(tools::WRITE, draft.clone())))["ok"],
+            true
+        );
+        // A second write while one waits: refused, and kept as refused.
+        assert_eq!(
+            run(on.run_tool(&named(tools::WRITE, draft.clone())))["ok"],
+            false
+        );
+        // A name the lamp can't link: refused, kept with no service.
+        run(on.run_tool(&named(
+            tools::READ,
+            json!({"service":"Gmail","what":"recent"}),
+        )));
+        // Not a read or a write, or no run named: nothing kept.
+        run(on.run_tool(&named(tools::CONNECTED, json!({}))));
+        run(on.run_tool(&run_line(tools::READ, read.clone())));
+        let pulled = run(on.tool(&since(0)));
+        assert_eq!(pulled["ok"], true, "{pulled}");
+        let kept: Vec<Value> = pulled["result"]["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|call| {
+                let mut call = call.clone();
+                call.as_object_mut().unwrap().remove("at_unix_ms");
+                call
+            })
+            .collect();
+        assert_eq!(
+            kept,
+            [
+                json!({"n":1,"run":"run-1","skill":"mail-count","tool":"service_read",
+                    "service":"gmail","action":"recent","status":"read"}),
+                json!({"n":2,"run":"run-1","skill":"mail-count","tool":"service_write",
+                    "service":"gmail","action":"send_mail","status":"held"}),
+                json!({"n":3,"run":"run-1","skill":"mail-count","tool":"service_write",
+                    "service":"gmail","action":"send_mail","status":"refused"}),
+                json!({"n":4,"run":"run-1","skill":"mail-count","tool":"service_read",
+                    "service":null,"action":"other","status":"refused"}),
+            ]
+        );
+        let text = pulled.to_string();
+        for content in [
+            "from:mom",
+            "mom@home.test",
+            "Dinner",
+            "Home by 7",
+            "goodpassword",
+        ] {
+            assert!(!text.contains(content), "{content} in {text}");
+        }
+        assert_eq!(pulled["result"]["last"], 4);
+        assert_eq!(run(on.tool(&since(4)))["result"]["calls"], json!([]));
+        // The voice's alone: a run, or a made skill, can't pull them.
+        assert_eq!(
+            run(on.run_tool(&named(run_calls::CALL, json!({}))))["ok"],
+            false
+        );
+        assert_eq!(
+            run(on.with_skill_reads(true).skill_tool(&since(0)))["ok"],
+            false
+        );
+    }
+
+    /// Who may pull `run_calls_since` (Heron's P2 on #7481), door by door
+    /// with the ring on and a call in it: the run door (lamp-control's
+    /// `run_tool`) and the skill door (`skill_tool`, reads alone or with
+    /// writes) each refuse it with their own words, and so does the owner's
+    /// call path asked as a skill (the second guard behind the skill door);
+    /// the owner (the voice's tools socket) gets the ring.
+    #[test]
+    fn only_the_voice_pulls_run_calls() {
+        let dir = tempfile::tempdir().unwrap();
+        let since = json!({"op":"call","name":run_calls::CALL,"args":{"after":0}}).to_string();
+        let on = services(dir.path(), "[]", true)
+            .with_skill_tasks(true)
+            .with_skill_reads(true)
+            .with_run_calls(true);
+        run(on.admin(&set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+        )));
+        let read = json!({"op":"call","name":tools::READ,"skill":"mail-count","run":"run-1",
+            "args":{"service":"gmail","what":"recent"}})
+        .to_string();
+        assert_eq!(run(on.run_tool(&read))["ok"], true);
+        // The run door, as lamp-control sends a run's line: named skill and run.
+        let from_run = json!({"op":"call","name":run_calls::CALL,"skill":"mail-count",
+            "run":"run-1","args":{"after":0}})
+        .to_string();
+        assert_eq!(
+            run(on.run_tool(&from_run)),
+            json!({"ok": false, "error": RUN_READS_AND_WRITES_ONLY})
+        );
+        // The skill door, reads alone and with writes.
+        assert_eq!(
+            run(on.skill_tool(&since)),
+            json!({"ok": false, "error": SKILL_READS_ONLY})
+        );
+        let on = on.with_skill_writes(true);
+        assert_eq!(
+            run(on.skill_tool(&since)),
+            json!({"ok": false, "error": SKILL_READS_AND_WRITES_ONLY})
+        );
+        // Behind the skill door, asked as a skill: no such function.
+        assert_eq!(
+            run(on.tool_as(&since, Asker::Skill)),
+            json!({"ok": false, "error": "no such function"})
+        );
+        // The owner: the ring, the run's read in it.
+        let pulled = run(on.tool(&since));
+        assert_eq!(pulled["ok"], true, "{pulled}");
+        assert_eq!(pulled["result"]["calls"][0]["run"], "run-1");
+        assert_eq!(pulled["result"]["calls"][0]["action"], "recent");
+        assert_eq!(pulled["result"]["last"], 1);
     }
 
     /// #6432: the voice asks for a run's held write (its own call, with
