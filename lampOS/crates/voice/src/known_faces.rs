@@ -3539,11 +3539,42 @@ pub fn keep_owner_fresh(file: Option<PathBuf>, socket: Option<PathBuf>) {
 
 fn keep_owner_fresh_now(file: Option<PathBuf>, socket: Option<PathBuf>) {
     std::thread::spawn(move || {
+        let mut count_tries = 0;
         loop {
+            if count_tries < OWNER_COUNT_TRIES {
+                count_tries = if owner_counted(file.as_deref(), socket.as_deref()) {
+                    OWNER_COUNT_TRIES
+                } else {
+                    count_tries + 1
+                };
+            }
             refresh_owner(file.as_deref(), socket.as_deref());
             std::thread::sleep(OWNER_EVERY);
         }
     });
+}
+
+/// How many refreshes [`owner_counted`] is tried at, at most, while the
+/// eyes don't answer their names: five minutes at [`OWNER_EVERY`].
+const OWNER_COUNT_TRIES: u32 = 30;
+
+/// The start-up line that counts a lamp whose owner is the typed name only
+/// (`owner_link::startup_line`, #7501), said once the eyes answer their
+/// names; whether they did (none to ask is done too).
+fn owner_counted(file: Option<&Path>, socket: Option<&Path>) -> bool {
+    let Some(socket) = socket else {
+        return true;
+    };
+    let Some(Some(names)) = names_reached(socket) else {
+        return false;
+    };
+    let kept = file.and_then(crate::onboarding::owner_of);
+    if let Some(line) =
+        crate::owner_link::startup_line(crate::person::now().as_deref(), kept.as_deref(), &names)
+    {
+        eprintln!("{line}");
+    }
+    true
 }
 
 /// One refresh of [`owner_now`]: dropped if a forget came while the eyes

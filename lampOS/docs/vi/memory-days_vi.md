@@ -403,6 +403,11 @@ links, replaced_by)`, khóa `(person, key)`, tạo `IF NOT EXISTS`,
   (`person::owner_ids`). Một người quen không phải chủ không gửi lệnh nào
   cho id của chủ (quyết định của chủ ngày 11/11, sau khi lệnh quên tất cả
   của một khách trên lamp-06c1 xóa hết bản ghi và liên hệ của chủ).
+  Trên một đèn được thiết lập trước khi onboarding giữ `owner`, khuôn mặt của
+  chủ được giữ dưới một tên khác tên đã gõ không nằm trong `owner_ids`, nên
+  lệnh quên tất cả của nó không gửi gì cho id của tên đã gõ; sau khi chủ tự
+  liên kết bằng lời của chính họ (`LAMP_OWNER_LINK=on`, #7501,
+  [memory.md](../memory.md), "The owner's face and typed name") thì có.
   `service_contacts_forget` với `all: true` xóa mọi liên hệ
   thư của `person` như vậy.
 - **Bản ghi được hỏi trước một lần quên bị từ chối** `forgotten`: khi

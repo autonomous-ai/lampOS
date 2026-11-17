@@ -2418,7 +2418,15 @@ fn run_call_with_scope(
         // A yes to being named is taken only from the line's own admitted
         // scope, the named person's (#1997): none, revoked or narrowed to
         // the room is nobody's.
-        Route::Faces(socket, switches, onboarding) => {
+        Route::Faces(socket, switches, onboarding) => 'faces: {
+            // The owner's "I'm <the typed name>" from their own face kept
+            // under another name links that face as the owner in place of a
+            // rename (`LAMP_OWNER_LINK`, #7501); anything else goes on.
+            if let Some(told) =
+                crate::owner_link::taken(call, request, heard, lease, onboarding.as_deref())
+            {
+                break 'faces ("the owner link", told);
+            }
             let person = lease
                 .and_then(|lease| lease.scope())
                 .and_then(|scope| scope.person());

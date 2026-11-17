@@ -1591,6 +1591,43 @@ mod tests {
         )
     }
 
+    /// #7501, lamp-06c1 (17 Nov): set up before onboarding kept an owner,
+    /// the typed name and the face name differ and are both the owner's.
+    /// With no owner kept, the owner alone in view is "a known face that
+    /// isn't theirs", and their face's id is none of `owner_ids`; once
+    /// their face is linked as the owner (`onboarding::owner_linked`, read
+    /// back as `known_faces::owner_now`) they are named, and `owner_ids`
+    /// holds both ids. Made-up names.
+    #[test]
+    fn the_owners_face_under_another_name_is_theirs_only_once_linked() {
+        let dir = std::env::temp_dir().join(format!("lamp-person-link-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("name");
+        fs::write(&file, "Typed Name\n").unwrap();
+        set_for_test(Some(file));
+        let typed = crate::known_faces::memory_person("Typed Name");
+        let face = crate::known_faces::memory_person("Face Name");
+        let alone = |owners: &[String]| {
+            someone_else_now(owners, Some(1), Some("Face Name"), false, false, None)
+        };
+        // Before the link: the split.
+        crate::known_faces::owner_for_test(Some(None));
+        let (told, owners) = by_default_owner(now(), crate::known_faces::owner_now()).unwrap();
+        assert_eq!(told, "Typed Name");
+        assert_eq!(alone(&owners), Some("a known face that isn't theirs"));
+        assert_eq!(owner_ids(), std::slice::from_ref(&typed));
+        // Linked: named, and both ids are the owner's.
+        crate::known_faces::owner_for_test(Some(Some("Face Name".to_owned())));
+        let (told, owners) = by_default_owner(now(), crate::known_faces::owner_now()).unwrap();
+        assert_eq!(told, "Typed Name");
+        assert_eq!(alone(&owners), None);
+        assert_eq!(owner_ids(), [typed, face]);
+        crate::known_faces::owner_for_test(None);
+        set_for_test(None);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
     /// Friday's P2 on #4476, through `forget_with_everything` rather than
     /// `forget_if` alone: the name typed at setup "Robin Example", the face
     /// who_you_are kept as "Robin" (`owner_now`). The owner's marked "forget

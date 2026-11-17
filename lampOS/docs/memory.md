@@ -282,6 +282,58 @@ socket is refused before the eyes forget anything.
   and the room's unchanged; the narrow socket's refusals, modes and bus
   telling), and the protocols' `forget_person` unit tests.
 
+### The owner's face and typed name (#7501, `LAMP_OWNER_LINK`)
+
+On a lamp set up before onboarding kept an `owner` (29 Oct), or whose
+owner's face was saved outside "who you are", the owner is the typed name
+alone (`person::by_default_owner`, `person::owner_ids`). When the owner's
+face is kept under another name (the face name), its memory id is not one
+of the owner's, so the lamp treats one person as two: the name is held back
+("a known face that isn't theirs"), services read nothing in full outside
+the private room, and the owner's own "forget everything" under the face
+name leaves the typed name, place, voice print, tasks and every service
+record and contact under the typed name's id
+(`remember::owner_forgets_rows_of`). Seen on lamp-06c1 (build 13706).
+
+With `LAMP_OWNER_LINK=on` (off unless set, in no product unit; the second
+route only) the owner links the two by their own words. Their "I'm <the
+typed name>", which a known face giving another name already sends as
+`remember_my_face` (`LAMP_NAMES_RENAME_ASKED`), is taken as the link in
+place of a rename (`owner_link::taken`, `tools::run_call_with_scope`'s
+face route): the face name is posted as the owner
+(`onboarding::owner_linked`), and from the next owner refresh (within
+`OWNER_EVERY`, 10 s) `owner_ids` holds both ids. The name is then given, the
+owner's services reach both, and their forget everything clears the rows
+under both ids. Only when all of these hold (`owner_link::judge`), else the
+call goes on to the face paths as before and the journal says why, with no
+name:
+
+- a typed name, and no owner kept: set once, never over one;
+- the typed name in their own words this turn (`known_faces::said_by_them`);
+- the known face seen saying the line, alone in it and not by voice only
+  (`services::seen_saying_owner`); the private room grants nothing here;
+- the line's own scope that face's: never the room's, another person's, a
+  held one, one by the one-face rule, or one carried;
+- the one face in view (`known_faces::most_faces_lately`);
+- in the owner's enrolled voice, when they have a print
+  (`services::owners_voice_now`).
+
+Nothing is ever linked silently: the eyes keep no record of which face "who
+you are" saved, and the only face they know may be a guest's. A face
+forgotten drops the link as any owner (`known_faces::refresh_owner`), and a
+redo or a reset clears it.
+
+Whatever the switch, the voice says once a run, when the eyes first answer
+their names, `lamp-voice: owner: typed name only, no face linked (N known
+faces; LAMP_OWNER_LINK on|off)` when a typed name has no owner kept and no
+known face is kept under it (`owner_link::startup_line`), with no name, so
+the lamps in this state can be counted. Tests: `owner_link::tests`,
+`person::tests::the_owners_face_under_another_name_is_theirs_only_once_linked`,
+`remember::tests::the_owners_face_forgets_the_typed_names_rows_only_once_linked`,
+`onboarding::tests::the_owners_face_linked_is_kept_once_and_never_over_an_owner`.
+Not shown on a lamp yet: the row on lamp-06c1 (link, then a forget
+everything that leaves nothing of either name).
+
 ## On the disk
 
 This layout is the default. Enabling `--memory-days` imports it into one
