@@ -3065,6 +3065,26 @@ fn the_product_names_a_lone_known_face_by_the_one_face_count() {
     }
 }
 
+/// A quiet keep counts as a known person's own when their face is the only
+/// face in view, or the line is carried in their conversation, without the
+/// mouth seen (`LAMP_KEEP_QUIETLY_ONE_FACE`): the memory owner's call, 17
+/// Nov, "skip the mouth gate for memory". Beside the quiet keep it widens.
+#[test]
+fn the_product_keeps_quietly_for_a_lone_known_face() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_KEEP_QUIETLY=on",
+        "Environment=LAMP_KEEP_QUIETLY_ONE_FACE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// The lamp is a private room between it and its owner, with no ownership
 /// check (`LAMP_PRIVATE_ROOM`, the owner's call on 6 Nov).
 #[test]
