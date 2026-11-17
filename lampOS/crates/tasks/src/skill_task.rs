@@ -926,7 +926,7 @@ impl SkillRun {
     }
 
     /// [`Self::prompt`], and for a run that `tells` its last answer
-    /// ([`tells_answer`] with a runner that [`Runner::answers`]) the
+    /// ([`tells_answer`]: its runner [`Runner::answers`]) the
     /// [`TELL_LINE`]: the lamp says it to the owner as written.
     pub fn prompt_telling(hand: &HandOver, tells: bool) -> String {
         let prompt = Self::prompt(hand);
@@ -1154,17 +1154,19 @@ pub fn is_service_grant(grant: &str) -> bool {
     grant_known(grant) && !CONTROL_GRANTS.contains(&grant)
 }
 
-/// Whether a task's run tells what its agent found: with the agent's
-/// connectors on (`services`, `LAMP_AGENT_SERVICES`), a run granted a
-/// linked service's read (`gmail-read`). Its ended answer then carries the
-/// agent's last answer ([`told_answer`]), which lamp-skills says to the
-/// owner as a read's lines are said (`lamp_skills::service_read::tell`).
-/// Any other run's answer is `{"ok":true,"id":N}` alone, as before.
-pub fn tells_answer(services: bool, grants: &[String]) -> bool {
-    services
-        && grants
-            .iter()
-            .any(|grant| grant.ends_with("-read") && is_service_grant(grant))
+/// Whether a task's run tells what its agent found: every task's run
+/// whose `runner` keeps its agent's last answer ([`Runner::answers`],
+/// Harness's, a `net` run's by the one run path), whatever its grants (the
+/// owner: the agent's results are read freely, not only a linked
+/// service's). Its ended answer then carries the agent's last answer
+/// ([`told_answer`]), which lamp-skills says to the owner as exact words,
+/// as a read's lines are said (`lamp_skills::service_read::tell`), never a
+/// turn for the model. A fixed write's run never tells, nor a run through
+/// a runner that keeps no answer (Hermes's, a make's): their answer is
+/// `{"ok":true,"id":N}` alone, as before. Nothing here knows whether the
+/// run's own script already said something through lamp-control's `say`.
+pub fn tells_answer(runner: &dyn Runner) -> bool {
+    runner.answers()
 }
 
 /// The most of an agent's answer an ended run's answer carries, in bytes:
@@ -1282,8 +1284,9 @@ pub fn answer_for(
         .cloned()
         .collect();
     // Told only by a run whose reply can carry its agent's answer: one
-    // through a runner that keeps it (Harness's), never a fresh home's.
-    let tells = tells_answer(agent.services, &hand.grants) && runner.answers();
+    // through a runner that keeps it (Harness's, a `net` run's on the one
+    // run path), never a make's fresh home's.
+    let tells = tells_answer(runner);
     let mode = (false, tells);
     let told = run_on_token(&hand.skill, &asked, mode, tokens, runner, |run, token| {
         // `net` gets its way out only with lamp-control's yes naming it for
@@ -1342,6 +1345,10 @@ pub fn answer_for(
             made.env_file = Some(file);
             let names: Vec<String> = values.iter().map(|(name, _)| name.clone()).collect();
             made.prompt = SkillRun::prompt_with_keys(&hand, &names);
+            // A run that tells keeps its ask for a last answer fit to say.
+            if tells {
+                made.prompt = format!("{} {TELL_LINE}", made.prompt);
+            }
             eprintln!(
                 "[lamp-tasks] skill task: {} given {} key(s) in its environment file",
                 hand.skill,
@@ -4631,14 +4638,14 @@ mod tests {
     }
 
     /// What the agent found comes back in the ended run's answer, its
-    /// whitespace one space, only for a run granted a linked service's
-    /// read with the agent's connectors on, through a runner that keeps
-    /// it (Harness's); that run's words ask for a last answer fit to say
-    /// ([`TELL_LINE`]), and no other run's are (#7104 P3: a runner that
-    /// keeps no answer, a fresh home's too). Any other run's answer is as
-    /// before.
+    /// whitespace one space, for every run through a runner that keeps it
+    /// (Harness's), whatever its grants and with the agent's connectors on
+    /// or off (the owner: the agent's results are read freely); that run's
+    /// words ask for a last answer fit to say ([`TELL_LINE`]), and no other
+    /// run's are (#7104 P3: a runner that keeps no answer, a fresh home's
+    /// too), whose answer is as before.
     #[test]
-    fn a_service_reads_ended_answer_carries_what_its_agent_found() {
+    fn every_runs_ended_answer_carries_what_its_agent_found() {
         let read = |edit: &dyn Fn(&mut Value), services: bool, yes: &[&str]| {
             let tokens = FakeTokens {
                 yes: Some(yes.iter().map(|grant| grant.to_string()).collect()),
@@ -4657,25 +4664,15 @@ mod tests {
             assert_eq!(asked, told.get("answer").is_some(), "{told}");
             told
         };
+        let found = json!({"ok": true, "id": 0,
+                           "answer": "You have 12 unread messages. Two are from Ana."});
         let gmail = |line: &mut Value| line["grants"] = json!(["gmail-read"]);
-        assert_eq!(
-            read(&gmail, true, &["gmail-read"]),
-            json!({"ok": true, "id": 0,
-                   "answer": "You have 12 unread messages. Two are from Ana."})
-        );
-        assert_eq!(
-            read(&gmail, false, &["gmail-read"]),
-            json!({"ok": true, "id": 0})
-        );
+        assert_eq!(read(&gmail, true, &["gmail-read"]), found);
+        assert_eq!(read(&gmail, false, &["gmail-read"]), found);
         let send = |line: &mut Value| line["grants"] = json!(["gmail-write"]);
-        assert_eq!(
-            read(&send, true, &["gmail-write"]),
-            json!({"ok": true, "id": 0})
-        );
-        assert_eq!(
-            read(&|_| {}, true, &["camera", "light"]),
-            json!({"ok": true, "id": 0})
-        );
+        assert_eq!(read(&send, true, &["gmail-write"]), found);
+        assert_eq!(read(&|_| {}, true, &["camera", "light"]), found);
+        assert_eq!(read(&|_| {}, false, &["camera", "light"]), found);
         // A runner that keeps no answer (Hermes's): neither told nor asked.
         let tokens = FakeTokens {
             yes: Some(vec!["gmail-read".into()]),
@@ -4693,6 +4690,62 @@ mod tests {
         assert!(SkillRun::prompt_telling(&hand, true).ends_with(TELL_LINE));
         assert!(!SkillRun::prompt(&hand).contains(TELL_LINE));
         assert_eq!(told_answer(&"a ".repeat(4_000)).len(), MOST_TOLD_BYTES - 1);
+    }
+
+    /// A run granted `net` with the net grant on is a read of the web: it
+    /// tells what its agent found, as a service's read does, through a
+    /// runner that keeps it (the one run path's Harness), its words asking
+    /// for a last answer fit to say, a keyed one's too; through the make's
+    /// net runner, which keeps none, it tells nothing.
+    #[test]
+    fn a_net_runs_ended_answer_carries_what_its_agent_found() {
+        let work = tempfile::tempdir().unwrap();
+        let with_net = line(|value| value["grants"] = json!(["speak", NET_GRANT]));
+        let tokens = FakeTokens {
+            yes: Some(vec!["speak".into()]),
+            net_yes: true,
+            ..FakeTokens::default()
+        };
+        let ran = Answering("Bitcoin is at\n 91,204 dollars.", RefCell::default());
+        let agent = Agent {
+            net: Some(&ran),
+            work: Some(work.path()),
+            ..Default::default()
+        };
+        let held = runner(&tokens, Ok(0));
+        assert!(tells_answer(&ran) && !tells_answer(&held));
+        let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
+        assert_eq!(
+            told,
+            json!({"ok": true, "id": 0, "answer": "Bitcoin is at 91,204 dollars."})
+        );
+        assert!(ran.1.borrow()[0].ends_with(TELL_LINE));
+        // A keyed net run keeps its ask for an answer fit to say.
+        let keys = FakeKeys(Ok((vec![("COIN_KEY", "test-value-123")], vec![])));
+        let keyed = Agent {
+            net: Some(&ran),
+            work: Some(work.path()),
+            keys: Some(&keys),
+            ..Default::default()
+        };
+        let told = answer_agent(&with_net, true, skills(), &tokens, &held, &keyed);
+        assert_eq!(told["answer"], "Bitcoin is at 91,204 dollars.", "{told}");
+        let prompt = ran.1.borrow()[1].clone();
+        assert!(
+            prompt.contains("COIN_KEY") && prompt.ends_with(TELL_LINE),
+            "{prompt}"
+        );
+        // A net runner that keeps no answer (the make's): neither told nor
+        // asked.
+        let open = where_runner();
+        let make = Agent {
+            net: Some(&open),
+            work: Some(work.path()),
+            ..Default::default()
+        };
+        let told = answer_agent(&with_net, true, skills(), &tokens, &held, &make);
+        assert_eq!(told, json!({"ok": true, "id": 0}));
+        assert!(open.started.borrow().len() == 1);
     }
 
     fn runner(tokens: &FakeTokens, result: Result<u64, String>) -> FakeRunner<'_> {
