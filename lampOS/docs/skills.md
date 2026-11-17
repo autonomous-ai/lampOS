@@ -6600,6 +6600,33 @@ made skill is refused at install.
    not hold such words ("turning red now" after a lead-in, "I'll keep
    quiet"): its runs are the light's, volume's and Schedule's own, and
    widening them is not part of this.
+
+   **Only on a line said to the lamp** (#7448; the first builder at 20:55
+   on 17 Nov). A said start needs one of three: the lamp's name in the
+   line; a face in view seen speaking it; or a conversation going on with
+   a face in view. On lamp-9adf (17 Nov, #7448's row, request 18) "Ugh, I
+   am so busy today, nothing but meetings.", said with nobody in view
+   about 35 s after a said line, was let out only as the conversation
+   going on and turned the busy light on. So, on the second route, a line
+   let out only as the conversation going on (no name, no words calling
+   the lamp, no face turned to it, not said close to it, no answer to its
+   question; `Attention::played_only_as_going_on`) with no face seen
+   speaking it (`Heeding::going_on_unseen`) starts no said start unless a
+   face is in the eyes' newest look as the call comes
+   (`Heeding::holds_said_start`, `bus_out::faces_in_view`; no eyes, or the
+   camera closed, is no face). A call of such a skill, itself or through
+   `use_skill` (`tools::starts_said`, by its card's `SAID_TO_YOU`; never a
+   question about a skill), is then held as a call the rule holds
+   (`Engine::holding_said_starts`): not run, and the model is told it was
+   not done (`policy_holds::HELD`); it may still answer in words. A line
+   let out for its own sign (its name, a face turned to the lamp, said
+   close to it, an answer to the lamp's question) is not held, so "Lamp,
+   I'm busy." from across the room still starts it. Structural only: no
+   word of the line is matched. With the switch off nothing is installed
+   and nothing changes. Tests:
+   `a_said_start_is_held_on_a_line_only_going_on_with_no_face`,
+   `a_held_said_start_is_not_run_and_the_model_is_told_so`,
+   `a_said_start_is_found_by_its_card_itself_or_through_use_skill`.
 4. **Said back exactly as it does** (`Said::said_back`): "When you tell me
    you're busy, I'll turn red." (" at level N" before the stop when a
    level was asked), and it goes on at once, as a made skill does, with
