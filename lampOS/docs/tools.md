@@ -333,7 +333,9 @@ and none of the skills' own (`crate::use_skill`):
       skills are …");
     - a word not in its choice ("dance's choice is one of calm, upbeat,
       jazz.");
-    - any other key ("use_skill takes skill, choice and flag, not mood: …");
+    - any other key ("use_skill takes skill, choice and flag, not mood: …";
+      "skill, choice, flag and kind" for a shared stop that takes a kind,
+      #6543);
     - a choice or a yes for a skill that takes none ("check_my_work takes no
       choice."). An empty choice or a "no" there is nothing.
   - **As a skill's call in every other way:** it waits for the Policy's hold,
