@@ -14732,6 +14732,51 @@ async fn an_untied_line_begun_over_the_answer_is_not_told_it_cut_in() {
     }
 }
 
+/// #7285: the core gate's w2, "Hold on, hey Lamp, make the light a little
+/// warmer" said over a story, was told the cut-in note's stop sentence right
+/// before its words and answered "Okay, I'll stop." with no call. Its
+/// request now tells the note without that sentence, still last before the
+/// words; a line that only says "Hold on." keeps it.
+#[tokio::test]
+async fn a_mid_story_hold_on_with_an_ask_is_not_told_to_only_stop() {
+    let w2 = "Hold on, hey Lamp, make the light a little warmer.";
+    let told = asked_with(
+        w2,
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    let asked = &told[0];
+    assert_eq!(
+        asked[asked.len() - 2],
+        Message::system(crate::cut_in_told::ASKED_MORE),
+        "{asked:?}"
+    );
+    assert_eq!(asked.last(), Some(&Message::user(w2)));
+    assert!(
+        !asked.iter().any(|message| message
+            .words()
+            .is_some_and(|words| words.contains("I'll stop"))),
+        "{asked:?}"
+    );
+    let stop = asked_with(
+        "Hold on.",
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert_eq!(
+        stop[0][stop[0].len() - 2],
+        Message::system(crate::cut_in_told::NOTE),
+        "{:?}",
+        stop[0]
+    );
+}
+
 /// #1712, item 4 of the first builder's 20:15 (`LAMP_CUT_IN_TOLD`): a line
 /// begun over the lamp's audible answer is told it cut in, beside its
 /// words, as the Live route tells it; not without the switch, and the
@@ -17323,8 +17368,9 @@ async fn a_line_that_cuts_the_story_is_asked_with_the_story_as_heard() {
         "{story:?}"
     );
     assert!(!story.contains("ship"), "{story:?}");
+    // "Wait, who was he?" asks more than a wait: no stop sentence (#7285).
     assert!(
-        asked[1].contains(&Message::system(crate::cut_in_told::NOTE)),
+        asked[1].contains(&Message::system(crate::cut_in_told::ASKED_MORE)),
         "{:?}",
         asked[1]
     );
@@ -18893,7 +18939,8 @@ async fn prepared_music_calls_wait_for_final_admission_and_survive_only_matching
             "nothing dispatches before End and final words"
         );
         assert_eq!(
-            script.asked.lock().unwrap()[0].contains(&Message::system(crate::cut_in_told::NOTE)),
+            script.asked.lock().unwrap()[0]
+                .contains(&Message::system(crate::cut_in_told::ASKED_MORE)),
             cut_in,
             "the early chat already has its cut-in note: {mode}"
         );
@@ -18979,7 +19026,7 @@ async fn prepared_music_calls_wait_for_final_admission_and_survive_only_matching
             assert!(
                 asked
                     .iter()
-                    .all(|chat| chat.contains(&Message::system(crate::cut_in_told::NOTE)))
+                    .all(|chat| chat.contains(&Message::system(crate::cut_in_told::ASKED_MORE)))
             );
             assert!(!asked[0].contains(&Message::system(crate::provider_worker::CALLED_NOTE)));
             assert_eq!(

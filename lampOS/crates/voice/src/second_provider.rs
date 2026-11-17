@@ -11320,7 +11320,12 @@ async fn spoken(
         );
         Vec::new()
     } else {
+        // Its words choose the note: a stop word with an ask is not told
+        // the stop sentence (#7285).
         cut_in
+            .iter()
+            .map(|_| crate::cut_in_told::note(&text).to_owned())
+            .collect()
     };
     // The coordinator's marks, told as the Live route tells them (#1712).
     if !cut_in.is_empty() {
@@ -13435,9 +13440,14 @@ fn prepared_on(
             );
             // Its notes as round 1 tells them: the quiet note
             // (`LAMP_KEEP_QUIETLY`) before the cut-in's, the opening last.
+            // The cut-in's note as these words choose it (#7285).
             let notes: Vec<String> = crate::keep_quietly::note_for(scope, request)
                 .into_iter()
-                .chain(notes.iter().cloned())
+                .chain(
+                    notes
+                        .iter()
+                        .map(|_| crate::cut_in_told::note(&words).to_owned()),
+                )
                 .chain(opens)
                 .collect();
             Some(Prepared::begin(shared, scope, words, &notes, remembered))

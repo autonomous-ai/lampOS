@@ -480,7 +480,11 @@ as a person would:
   language, and nothing more. On the second route a stop or "enough" over
   its answer is already answered with `spoken_stop::LINE`
   (`LAMP_SPOKEN_STOP_ENDS`) and never reaches the model, so there this part
-  is told only for "wait", "pause" and "hold on".
+  is told only for "wait", "pause" and "hold on". The second route leaves
+  this part out for a line with a stop word and more asked ("Hold on, hey
+  Lamp, make the light a little warmer"; `cut_in_told::ASKED_MORE`,
+  `stop_words::a_stop_and_more`): told it, that line was answered "Okay,
+  I'll stop." with no call 8 times in 29 core gates (#7285).
 - **Any other cut-in:** the reply's first words are a few that show it was
   heard ("Oh, sure —"), then the answer, with one example ("Oh, sure — it's
   four."), and the note says the character's rule against repetitive
