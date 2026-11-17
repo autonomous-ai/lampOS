@@ -4509,9 +4509,12 @@ exactly, the default when unset), every task and run is its own
   (1 the next), so the lamp's first line can say it is finishing the
   earlier task. The voice's words for it are a follow-up.
 - **No reset after a skill run.** What a run read stays in the session
-  (one user in this phase, the lead's reason 2). The only fresh start is
-  the rotation: a new pane after 40 turns (`ROTATE_TURNS`) or 250k tokens
-  (`ROTATE_TOKENS`), as Hermes' gateway rotates (`runtimes/hermes/rotation.go`).
+  (one user in this phase, the lead's reason 2). OpenClaw's pane is never
+  rotated by count: its gateway compacts the session itself
+  (`agents.defaults.compaction`), so the lamp keeps one conversation
+  (`rotation_due`). Only an engine without compaction would get a new pane
+  after 40 turns (`ROTATE_TURNS`) or 250k tokens (`ROTATE_TOKENS`), as
+  Hermes' gateway rotates (`runtimes/hermes/rotation.go`).
   Harness shows no token count, so tokens are estimated at 4 characters
   a token from the words typed, the skill runs' answers read and the
   spoken tasks' answers the store read. The counts start at 0 when a pane
@@ -4663,7 +4666,8 @@ its `reply_off` fallback included.
   (a died pane comes back resumed), then the task fails as before. A skill
   run's end is `harness wait lamp-one-openclaw --after <inputId>` (0 idle,
   then `show` for the answer; 3 an ask, closed `--forget`; 4 gone).
-- **Rotation and removal.** A rotation (40 turns or 250k tokens) is
+- **Rotation and removal.** OpenClaw's kept session is not rotated by
+  count (it compacts itself); a rotation, where one is due, is
   `ensure --fresh`. A cancel, an ask no one answers, a sign-out or an engine
   switch is `harness close lamp-one-openclaw --program-token-file …
   --forget`, which deletes the conversation; a sign-out or an engine switch

@@ -59,9 +59,11 @@
 //!   so the pane is closed `--now` and opened again ([`OneSession::keep_open`]
 //!   or the next run), journaled. That cost is paid only then.
 //!
-//! - **Rotation only.** No reset after a run; a fresh pane after
-//!   [`ROTATE_TURNS`] turns or [`ROTATE_TOKENS`] tokens (estimated), as
-//!   Hermes' gateway rotates its sessions.
+//! - **Rotation only where the engine can't compact.** No reset after a
+//!   run. OpenClaw's pane is never rotated by count: its gateway compacts
+//!   the session itself ([`rotation_due`]). An engine without that gets a
+//!   fresh pane after [`ROTATE_TURNS`] turns or [`ROTATE_TOKENS`] tokens
+//!   (estimated), as Hermes' gateway rotates its sessions.
 //!
 //! Out of scope for phase 1 (#7246): a Hermes default's pane (its skill
 //! wrapper reads the run's token file once at its own start).
@@ -174,6 +176,21 @@ pub const ROTATE_TURNS: u64 = 40;
 /// estimated from the words typed and the answers read, 4 characters a
 /// token: a rough bound, not the engine's own count.
 pub const ROTATE_TOKENS: u64 = 250_000;
+
+/// Whether a pane on [`engine`] is due a fresh conversation after `turns`
+/// turns and ~`tokens` tokens. OpenClaw's gateway compacts its own
+/// sessions (`agents.defaults.compaction`), so its pane is never rotated
+/// by count: the lamp keeps one conversation and lets OpenClaw keep it
+/// small. Only an engine with no compaction of its own (Hermes, as its
+/// gateway rotates) gets [`ROTATE_TURNS`] / [`ROTATE_TOKENS`]. The
+/// tokens are counted from all words ever typed and read, not the
+/// context's size, so they would rotate a compacting engine for nothing.
+pub fn rotation_due(engine: EngineKind, turns: u64, tokens: u64) -> bool {
+    match engine {
+        EngineKind::Openclaw => false,
+        _ => turns >= ROTATE_TURNS || tokens >= ROTATE_TOKENS,
+    }
+}
 /// How often [`OneSession::keep_open`] looks again once the pane is open
 /// (each look asks the gateway): to see the default engine change.
 pub const KEEP_OPEN_WHILE_OPEN: Duration = Duration::from_secs(30);
@@ -373,7 +390,7 @@ impl Pane {
 
     /// Usable as it is at `place`: there, and no rotation due.
     fn fresh_at(&self, place: &Place) -> bool {
-        self.place.same_spot(place) && self.turns < ROTATE_TURNS && self.tokens < ROTATE_TOKENS
+        self.place.same_spot(place) && !rotation_due(self.place.engine, self.turns, self.tokens)
     }
 }
 
@@ -1626,8 +1643,7 @@ impl OneSession {
             match &inner.pane {
                 Some(pane)
                     if pane.place.same_spot(place)
-                        && pane.turns < ROTATE_TURNS
-                        && pane.tokens < ROTATE_TOKENS =>
+                        && !rotation_due(pane.place.engine, pane.turns, pane.tokens) =>
                 {
                     return Ok(pane.agent.clone());
                 }
