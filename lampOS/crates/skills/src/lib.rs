@@ -1269,6 +1269,117 @@ pub fn yield_notes(skills: &[Skill]) -> Vec<String> {
 /// (#3997: Head pat's seven).
 pub const MOST_SAY_LINES: usize = 16;
 
+/// Why a new skill's plain say or exact words with a `{field}` is not made:
+/// they are said as written ([`Skill::made_refuses`]).
+const COUNT_IN_A_TABLE: &str =
+    "a {field} is filled in a note only: say = { note = \"... {field} ...\" }";
+
+/// Why a new skill's note with braces that are no number slot is not made:
+/// one already on a lamp says them as written ([`Skill::made_refuses`]).
+const NOTE_BRACES: &str = "a note's braces are one {field} that every trigger running it tests \
+                           as a number with above, below or rise; any other brace is said as written";
+
+/// The longest field name a note's `{field}` may give.
+const MOST_COUNT_FIELD_BYTES: usize = 64;
+
+/// The most bytes a number filled in a note adds: [`MOST_COUNT`]'s digits.
+const MOST_COUNT_BYTES: usize = 7;
+
+/// The largest number a note says ([`whole`]): a count of a person's
+/// moments is far below it, so one above is a wrong reading, dropped.
+const MOST_COUNT: i64 = 1_000_000;
+
+/// A note's one number (#6543, B3): `{field}` names a number field of the
+/// topic whose reading fired the run, and the note is said with that
+/// reading's value there, as a whole number ("drink {drank_seen} this
+/// sitting" → "drink 2 this sitting"). Only a number is ever filled: every
+/// trigger that can run the note tests the field as a number (checked at
+/// load), and a reading whose field is missing, `null`, a word, negative,
+/// above [`MOST_COUNT`] or anything but a number drops the slot, so the note
+/// is said without it ("drink this sitting"), never with `{drank_seen}` or
+/// `None` in it. No word or label of a topic reaches a note this way. Read
+/// leniently ([`note_count`]): a note whose braces are anything else is said
+/// as written, as before slots, so a skill already on a lamp never stops
+/// loading for a brace; a new skill is refused it ([`Skill::made_refuses`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Count {
+    /// The field, as a trigger's `field` names it (a dot steps in).
+    pub field: String,
+    /// The note's words before the number, and after it.
+    before: String,
+    after: String,
+}
+
+impl Count {
+    /// The note with `reading`'s field in it, or, with no number there,
+    /// without it.
+    fn said(&self, reading: Option<&Value>) -> String {
+        match reading.and_then(|reading| whole(at(reading, &self.field))) {
+            Some(number) => format!("{}{number}{}", self.before, self.after),
+            None => self.without(),
+        }
+    }
+
+    /// The note as written, its `{field}` in it: what a note whose field no
+    /// trigger gives says ([`manifest`]).
+    fn written(&self) -> String {
+        format!("{}{{{}}}{}", self.before, self.field, self.after)
+    }
+
+    /// The note with its slot dropped: one space where the slot stood
+    /// between words, none at an end.
+    fn without(&self) -> String {
+        let (before, after) = (self.before.trim_end(), self.after.trim_start());
+        let spaced = self.before.len() != before.len() || self.after.len() != after.len();
+        if spaced && !before.is_empty() && !after.is_empty() {
+            format!("{before} {after}")
+        } else {
+            format!("{before}{after}")
+        }
+    }
+}
+
+/// A reading's value as a whole number, rounded down: the count as the topic
+/// holds it (a `_s` field stays whole seconds, which the model phrases).
+/// Anything but a finite number from 0 to [`MOST_COUNT`] is none.
+fn whole(value: &Value) -> Option<i64> {
+    let number = match value.as_i64() {
+        Some(number) => number,
+        None => value
+            .as_f64()
+            // Bounded first, so the whole number fits an i64.
+            .filter(|number| number.is_finite() && number.abs() <= MOST_COUNT as f64)?
+            .floor() as i64,
+    };
+    (0..=MOST_COUNT).contains(&number).then_some(number)
+}
+
+/// A note's slot, read leniently: a note with exactly one `{`, one `}` after
+/// it, a field name between them and words besides is a [`Count`]. Any
+/// other note is none, and is said as written, braces and all (a lone `}`,
+/// `{a short break}`, two slots, `{{`).
+fn note_count(note: &str) -> Option<Count> {
+    let open = note.find('{')?;
+    let close = note.find('}')?;
+    if close < open || note.matches('{').count() != 1 || note.matches('}').count() != 1 {
+        return None;
+    }
+    let field = &note[open + 1..close];
+    let named = field.len() <= MOST_COUNT_FIELD_BYTES
+        && field.split('.').all(|name| {
+            name.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+                && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        });
+    let count = Count {
+        field: field.to_owned(),
+        before: note[..open].to_owned(),
+        after: note[close + 1..].to_owned(),
+    };
+    let without = count.without();
+    (named && !without.trim().is_empty() && without.len() + MOST_COUNT_BYTES <= MOST_WORDS_BYTES)
+        .then_some(count)
+}
+
 /// What a `say` asks of the voice: a note it phrases, its exact words, or
 /// what it keeps; or one of several lines of words, picked as it runs.
 fn say_step(say: toml::Value) -> Result<Step, String> {
@@ -1374,14 +1485,21 @@ fn say_call(say: toml::Value) -> Result<(Call, Option<Vec<Words>>), String> {
             if question && exact {
                 return Err("say.question goes with a note, never exact words".into());
             }
+            // A note's one number from the reading that fired it (#6543,
+            // B3), read leniently: exact words, and a note with any other
+            // braces, are said as written.
             let mut lines: Vec<Words> = lines
                 .into_iter()
-                .map(|words| Words {
-                    words,
-                    exact,
-                    priority,
-                    expires_ms,
-                    question,
+                .map(|line| {
+                    let count = if exact { None } else { note_count(&line) };
+                    Words {
+                        words: count.as_ref().map_or(line, Count::without),
+                        exact,
+                        priority,
+                        expires_ms,
+                        question,
+                        count,
+                    }
                 })
                 .collect();
             let first = Call::Words(lines[0].clone());
@@ -2253,9 +2371,38 @@ impl Skill {
     /// A skill already on a lamp loads with that order read as no query,
     /// so a stricter check never strands it, nor holds the lamp's update
     /// back (build 10300's round on lamp-9adf, 5 Nov).
+    ///
+    /// Also a note's braces that are no number slot, and a `{field}` in a
+    /// plain say or exact words (#6543): a skill already on a lamp says them
+    /// as written ([`Count`]), and a new one is told its slot is never
+    /// filled.
     pub fn made_refuses(&self) -> Option<&'static str> {
+        self.read_refuses().or_else(|| self.note_refuses())
+    }
+
+    /// [`Skill::made_refuses`]'s read's `query` that is an order alone.
+    pub fn read_refuses(&self) -> Option<&'static str> {
         self.steps.iter().find_map(|(_, step)| match step {
             Step::Call(Call::ServiceRead(read)) => read.made_refuses(),
+            _ => None,
+        })
+    }
+
+    /// [`Skill::made_refuses`]'s braces said as written (#6543).
+    fn note_refuses(&self) -> Option<&'static str> {
+        let refuses = |words: &Words| {
+            if words.exact {
+                note_count(&words.words).map(|_| COUNT_IN_A_TABLE)
+            } else if words.count.is_none() && words.words.contains(['{', '}']) {
+                Some(NOTE_BRACES)
+            } else {
+                None
+            }
+        };
+        self.steps.iter().find_map(|(_, step)| match step {
+            Step::Call(Call::Say(note)) => note_count(note).map(|_| COUNT_IN_A_TABLE),
+            Step::Call(Call::Words(words)) => refuses(words),
+            Step::Lines(lines) => lines.iter().find_map(refuses),
             _ => None,
         })
     }
@@ -2529,6 +2676,14 @@ enum Test {
 }
 
 impl Test {
+    /// The field this tests as a number (`above`, `below`, or a `rise`'s).
+    fn number(&self) -> Option<&String> {
+        match self {
+            Self::Above(field, _) | Self::Below(field, _) | Self::Number(field) => Some(field),
+            _ => None,
+        }
+    }
+
     /// Whether `value` says a level test's field is not known: the field
     /// there and `null`, as the air part sends a CO2 its sensor does not
     /// know yet (`crates/air/src/lib.rs`'s `reading`). Such a message says
@@ -3024,6 +3179,9 @@ pub struct Words {
     /// `question = true`: a hello (a skill given `who`) whose note asks one
     /// question may ask it; the voice is told so (#5207).
     pub question: bool,
+    /// A note's one number from the reading that fired its run (#6543):
+    /// `words` is the note without it, and the run fills it ([`Count`]).
+    pub count: Option<Count>,
 }
 
 impl Words {
@@ -5423,7 +5581,7 @@ fn manifest(
     {
         return Err("a skill granted core = [\"sleep\"] has only rest steps and no tool".into());
     }
-    let skill = Skill {
+    let mut skill = Skill {
         name,
         description,
         when: None,
@@ -5512,6 +5670,41 @@ fn manifest(
             "not permitted: say.question is a hello's one question, only in a skill given who = true"
                 .into(),
         );
+    }
+    // A note's number is a number (#6543): every trigger that can run the
+    // note tests its field as a number, so no word or label of a topic is
+    // ever said through it, whichever trigger fired. An `each` trigger's
+    // field is an item's, not the message's, and a choice's run or a tool's
+    // has no reading of its own: none gives one. A note whose field no such
+    // trigger gives is said as written, braces and all, as before slots: a
+    // skill already on a lamp loads, and a new one is refused it
+    // ([`Skill::made_refuses`]).
+    let triggers = &skill.triggers;
+    for (on, step) in &mut skill.steps {
+        let lines: &mut [Words] = match step {
+            Step::Call(Call::Words(words)) => std::slice::from_mut(words),
+            Step::Lines(lines) => lines,
+            _ => &mut [],
+        };
+        for words in lines {
+            let Some(count) = &words.count else { continue };
+            let mut running = triggers
+                .iter()
+                .filter(|trigger| match on {
+                    None => true,
+                    Some(Only::Trigger(name)) => trigger.name.as_ref() == Some(name),
+                    Some(Only::Choice(_)) => false,
+                })
+                .peekable();
+            let numbered = running.peek().is_some()
+                && running.all(|trigger| {
+                    trigger.each.is_none() && trigger.test.number() == Some(&count.field)
+                });
+            if !numbered {
+                words.words = count.written();
+                words.count = None;
+            }
+        }
     }
     for (_, step) in &skill.steps {
         // A gesture's clip is picked as it runs; any clip needs the body.
@@ -10332,6 +10525,17 @@ fn calls(
         .flag
         .as_ref()
         .is_some_and(|flag| args[&flag.name] == true);
+    // A note's number, from the trigger's own message as it fired (#6543);
+    // a run with no trigger, or no number there, says the note without it.
+    let reading = trigger.and_then(|trigger| latest.get(&trigger.topic).map(|(value, _, _)| value));
+    let counted = |words: &Words| match &words.count {
+        Some(count) => Words {
+            words: count.said(reading),
+            count: None,
+            ..words.clone()
+        },
+        None => words.clone(),
+    };
     skill
         .steps
         .iter()
@@ -10356,6 +10560,7 @@ fn calls(
                     .flatten();
                 vec![Call::SayFrom(*source, task)]
             }
+            Step::Call(Call::Words(words)) => vec![Call::Words(counted(words))],
             Step::Call(other) => vec![other.clone()],
             Step::Lines(lines) => {
                 let mut picked = picked
@@ -10363,7 +10568,7 @@ fn calls(
                     .unwrap_or_else(|poisoned| poisoned.into_inner());
                 let line = next_line(now_us, lines.len(), picked.get(&skill.name).copied());
                 picked.insert(skill.name.clone(), line);
-                vec![Call::Words(lines[line].clone())]
+                vec![Call::Words(counted(&lines[line]))]
             }
             Step::Gesture { by, again } => {
                 let names: Vec<&String> =
@@ -11414,6 +11619,260 @@ mod tests {
             parse(body_ask(json!({ "move": clip }), Some("dance"))),
             json!({"move": clip, "source": "skill:dance", "priority": "skill"})
         );
+    }
+
+    /// #6543, B3: a note's one `{field}` is filled from the reading that
+    /// fired its run, as a whole number; with no number there it is said
+    /// without it. Read leniently: any other brace, and a field not every
+    /// trigger running the note tests as a number, is said as written, so a
+    /// skill already on a lamp still loads; a new one is refused it.
+    #[test]
+    fn a_note_says_one_number_from_the_reading_that_fired_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let load_raw = |name: &str, rest: &str| {
+            let skill = dir.path().join(name);
+            std::fs::create_dir_all(&skill).unwrap();
+            std::fs::write(
+                skill.join("SKILL.md"),
+                format!("---\nname: {name}\ndescription: A test.\n---\n"),
+            )
+            .unwrap();
+            std::fs::write(
+                skill.join("skill.toml"),
+                format!(
+                    "[permissions]\ntopics = [\"air/state\"]\nspeak = true\n\
+                     [ask]\npolicy = \"moment\"\n{rest}"
+                ),
+            )
+            .unwrap();
+            load(&skill)
+        };
+        let load_with = |name: &str, trigger: &str, say: &str| {
+            load_raw(
+                name,
+                &format!("[trigger]\ntopic = \"air/state\"\n{trigger}\n[[do]]\nsay = {say}\n"),
+            )
+        };
+        let above = "field = \"pm2_5\"\nabove = 1";
+        // Kept across runs, so a list's next run says another line.
+        let picked = std::sync::Mutex::new(HashMap::new());
+        let said_by = |skill: &Skill, trigger: Option<&Trigger>, reading: Option<Value>| {
+            let latest: HashMap<String, (Value, u64, Option<u64>)> = reading
+                .into_iter()
+                .map(|value| ("air/state".to_owned(), (value, 0, None)))
+                .collect();
+            let ran = calls(&latest, &picked, skill, trigger, 0, &json!({}), None);
+            let [Call::Words(words)] = ran.as_slice() else {
+                panic!("{ran:?}")
+            };
+            assert_eq!(words.count, None);
+            words.words.clone()
+        };
+        let said =
+            |skill: &Skill, reading: Option<Value>| said_by(skill, skill.triggers.first(), reading);
+        let skill = load_with(
+            "fill",
+            above,
+            r#"{ note = "Say {pm2_5} drinks this sitting, kindly." }"#,
+        )
+        .unwrap();
+        assert_eq!(skill.made_refuses(), None);
+        // Filled, a fraction rounded down, from the reading as it fired.
+        assert_eq!(
+            said(&skill, Some(json!({"pm2_5": 3}))),
+            "Say 3 drinks this sitting, kindly."
+        );
+        assert_eq!(
+            said(&skill, Some(json!({"pm2_5": 2.7}))),
+            "Say 2 drinks this sitting, kindly."
+        );
+        assert_eq!(
+            said(&skill, Some(json!({"pm2_5": 1_000_000}))),
+            "Say 1000000 drinks this sitting, kindly."
+        );
+        // Missing, null, a word, a bool, negative, huge or not finite: said
+        // without the number, never with the slot, "None" or "-3".
+        for reading in [
+            None,
+            Some(json!({})),
+            Some(json!({"pm2_5": null})),
+            Some(json!({"pm2_5": "three"})),
+            Some(json!({"pm2_5": true})),
+            Some(json!({"pm2_5": -3})),
+            Some(json!({"pm2_5": -0.5})),
+            Some(json!({"pm2_5": 1_000_001})),
+            Some(json!({"pm2_5": 1e300})),
+            Some(json!({"pm2_5": u64::MAX})),
+        ] {
+            assert_eq!(
+                said(&skill, reading.clone()),
+                "Say drinks this sitting, kindly.",
+                "{reading:?}"
+            );
+        }
+        // A tool's run has no reading: the note without its number.
+        let latest = HashMap::from([("air/state".to_owned(), (json!({"pm2_5": 3}), 0, None))]);
+        assert_eq!(
+            calls(&latest, &picked, &skill, None, 0, &json!({}), None),
+            [Call::Words(Words {
+                words: "Say drinks this sitting, kindly.".into(),
+                exact: false,
+                priority: SAY_PRIORITY,
+                expires_ms: SAY_EXPIRES_MS,
+                question: false,
+                count: None,
+            })]
+        );
+        // A slot at an end leaves no stray space; a list's lines each fill.
+        let lines = load_with(
+            "lines",
+            "field = \"pm2_5\"\nrise = { by = 1, within = \"1m\" }",
+            r#"{ note = ["{pm2_5} drinks so far.", "Drinks so far: {pm2_5}"] }"#,
+        )
+        .unwrap();
+        let mut both = BTreeSet::new();
+        for _ in 0..2 {
+            both.insert(said(&lines, Some(json!({"pm2_5": 4}))));
+        }
+        assert_eq!(
+            both,
+            BTreeSet::from(["4 drinks so far.".to_owned(), "Drinks so far: 4".to_owned()])
+        );
+        let without = said(&lines, Some(json!({})));
+        assert!(
+            ["drinks so far.", "Drinks so far:"].contains(&without.as_str()),
+            "{without}"
+        );
+        // No slot: the note as written, and the say as before.
+        let plain = load_with("plain", above, r#"{ note = "Have some water." }"#).unwrap();
+        assert_eq!(said(&plain, Some(json!({"pm2_5": 3}))), "Have some water.");
+        assert_eq!(plain.made_refuses(), None);
+        // Every trigger that can run the note gives the field: a step any
+        // trigger runs, with one testing another field, is said as written;
+        // a step only the testing trigger runs, or both testing it, fills.
+        let two = |name: &str, other: &str, on: &str| {
+            load_raw(
+                name,
+                &format!(
+                    "[[trigger]]\nname = \"a\"\ntopic = \"air/state\"\nfield = \"pm2_5\"\nabove = 1\n\
+                     [[trigger]]\nname = \"b\"\ntopic = \"air/state\"\n{other}\n\
+                     [[do]]\n{on}say = {{ note = \"It is {{pm2_5}} now.\" }}\n"
+                ),
+            )
+            .unwrap()
+        };
+        let reading = json!({"pm2_5": 7, "co2": 900});
+        let mixed = two("mixed", "field = \"co2\"\nabove = 800", "");
+        for trigger in &mixed.triggers {
+            assert_eq!(
+                said_by(&mixed, Some(trigger), Some(reading.clone())),
+                "It is {pm2_5} now."
+            );
+        }
+        assert_eq!(mixed.made_refuses(), Some(NOTE_BRACES));
+        let only = two("only", "field = \"co2\"\nabove = 800", "on = \"a\"\n");
+        assert_eq!(
+            said_by(&only, only.triggers.first(), Some(reading.clone())),
+            "It is 7 now."
+        );
+        assert_eq!(only.made_refuses(), None);
+        let both = two("both", "field = \"pm2_5\"\nbelow = 100", "");
+        for trigger in &both.triggers {
+            assert_eq!(
+                said_by(&both, Some(trigger), Some(reading.clone())),
+                "It is 7 now."
+            );
+        }
+        // Said as written, braces and all, as before slots: a skill already
+        // on a lamp loads; a new one is refused at make, pack or install.
+        for (trigger, say, written, why) in [
+            // A word field: a trigger tests it by equals, never as a number.
+            (
+                "field = \"label\"\nequals = \"smoke\"",
+                r#"{ note = "It is {label}." }"#,
+                "It is {label}.",
+                NOTE_BRACES,
+            ),
+            // A field no trigger tests.
+            (
+                above,
+                r#"{ note = "It is {label}." }"#,
+                "It is {label}.",
+                NOTE_BRACES,
+            ),
+            // An `each` trigger's field is an item's, not the reading's.
+            (
+                "each = \"items\"\nkey = \"id\"\nfield = \"pm2_5\"\nabove = 1",
+                r#"{ note = "It is {pm2_5}." }"#,
+                "It is {pm2_5}.",
+                NOTE_BRACES,
+            ),
+            (
+                above,
+                r#"{ text = "It is {pm2_5}." }"#,
+                "It is {pm2_5}.",
+                COUNT_IN_A_TABLE,
+            ),
+            (
+                above,
+                r#"{ note = "{pm2_5} and {pm2_5}" }"#,
+                "{pm2_5} and {pm2_5}",
+                NOTE_BRACES,
+            ),
+            (
+                above,
+                r#"{ note = "Take {a short break}." }"#,
+                "Take {a short break}.",
+                NOTE_BRACES,
+            ),
+            (
+                above,
+                r#"{ note = "It is {pm2_5." }"#,
+                "It is {pm2_5.",
+                NOTE_BRACES,
+            ),
+            (
+                above,
+                r#"{ note = "It is } here." }"#,
+                "It is } here.",
+                NOTE_BRACES,
+            ),
+            (
+                above,
+                r#"{ note = "A {{brace}} stays." }"#,
+                "A {{brace}} stays.",
+                NOTE_BRACES,
+            ),
+            (above, r#"{ note = "{pm2_5}" }"#, "{pm2_5}", NOTE_BRACES),
+        ] {
+            let Ok(skill) = load_with("written", trigger, say) else {
+                // An `each` with a number test may itself not load: then no
+                // slot could ever be filled from it either.
+                assert!(trigger.starts_with("each"), "{say}");
+                continue;
+            };
+            assert_eq!(said(&skill, Some(json!({"pm2_5": 3}))), written, "{say}");
+            assert_eq!(skill.made_refuses(), Some(why), "{say}");
+        }
+        // A plain say keeps its braces as words, and a new one is told a
+        // slot fills in a note only.
+        let say = load_with("say", above, r#""It is {pm2_5}.""#).unwrap();
+        let ran = calls(
+            &HashMap::new(),
+            &picked,
+            &say,
+            say.triggers.first(),
+            0,
+            &json!({}),
+            None,
+        );
+        assert_eq!(ran, [Call::Say("It is {pm2_5}.".into())]);
+        assert_eq!(say.made_refuses(), Some(COUNT_IN_A_TABLE));
+        // Exact words with braces that name no field are said as written,
+        // and made: no slot is meant there.
+        let exact = load_with("exact", above, r#"{ text = "A {{brace}} and }" }"#).unwrap();
+        assert_eq!(said(&exact, None), "A {{brace}} and }");
+        assert_eq!(exact.made_refuses(), None);
     }
 
     /// #939, (c): `say = { from = ... }` is a say of what the voice keeps,

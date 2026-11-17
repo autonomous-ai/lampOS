@@ -3978,3 +3978,58 @@ người đó quay lại sau `room/stood_up`, và thấy vươn vai không còn 
 Vì vậy Đứng dậy và Vươn vai giữ lời nhắc sau một lần thật sự đứng dậy, kể cả
 khi quay lại trong khoảng trống 2 phút của trigger, và không còn giữ sau một
 lần vươn vai tại bàn. Ca: `quiet-after-a-stand-up` của Vươn vai.
+
+## Một con số từ lần đọc trong ghi chú (#6543, B3)
+
+`note` của một bảng `say` có thể nêu một trường của chủ đề mà lần đọc của nó
+đã kích hoạt lần chạy, trong ngoặc nhọn, và ghi chú được nói với giá trị của
+lần đọc đó ở chỗ ấy: `say = { note = "They've had {drank_seen} drinks this sitting; suggest a short break." }`
+trên một trigger của `humans/doing_more` kiểm tra `drank_seen` thành "They've
+had 2 drinks this sitting; …" (`lamp_skills::Count`, `note_count`).
+
+- **Chỉ số, kiểm tra khi nạp.** Trường phải là trường mà mọi trigger có
+  thể chạy ghi chú đó đều kiểm tra như một số (`above`, `below` hoặc `rise`,
+  không trong `each`), nên con số là cùng một trường dù trigger nào kích
+  hoạt. Bước của một lựa chọn, trường được kiểm tra bằng `equals`, không
+  trigger nào kiểm tra, hoặc chỉ một số trigger chạy ghi chú kiểm tra, không
+  cho con số. Không chữ, tên hay nhãn nào của chủ đề đi vào ghi chú theo cách
+  này.
+- **Dành cho số đếm.** Chỗ trống dành cho một số đếm mà người nghe được nói
+  lại như số đếm: các bộ đếm theo lần ngồi của lamp-seen trên
+  `humans/doing_more` (`drank_seen`, `ate_seen`, `tired_seen`). Có thể nêu bất
+  kỳ trường số nào của chủ đề kỹ năng đọc, nhưng ghi chú không bao giờ nói số
+  về khuôn mặt, sự hiện diện hay khoảng cách (`humans/faces/tracked`,
+  `humans/presence`, độ gần), những số chỉ dùng để chọn bước; kỹ năng được
+  duyệt phải giữ điều đó.
+- **Số nguyên, từ 0 đến 1.000.000.** Giá trị được điền, làm tròn xuống, như
+  chủ đề giữ. Trường `_s` vẫn là giây nguyên (`tired_s_ago` 1800 là "1800");
+  mô hình diễn đạt ghi chú nên có thể nói "nửa tiếng", nhưng kỹ năng muốn
+  phút thì viết ghi chú theo giây hoặc đọc một trường tính bằng phút. Giá trị
+  âm, hoặc trên 1.000.000, là lần đọc sai: bị bỏ, không bao giờ nói "-3".
+- **Không có số, không có chỗ trống.** Trường thiếu, `null`, là chữ, là
+  boolean, ngoài khoảng, hoặc lần chạy không có lần đọc (của một tool): ghi
+  chú được nói không có nó, khoảng trắng quanh chỗ trống được thu lại. Ghi
+  chú không bao giờ mang `{drank_seen}` hay `None`.
+- **Đọc dễ dãi, chỉ từ chối kỹ năng mới.** Ghi chú chỉ là chỗ trống khi có
+  đúng một `{`, một `}` sau nó, tên trường ở giữa (chữ, số, `_` và dấu chấm)
+  và còn lời khác, và trường qua được kiểm tra ở trên. Mọi ghi chú khác được
+  nói như đã viết, cả ngoặc, như trước khi có chỗ trống: `}` lẻ,
+  `{a short break}`, hai chỗ trống, `{{`, hay trường mà các trigger không
+  cho. `say = "…"` trần và lời chính xác (`text`) cũng giữ ngoặc. Vì vậy kỹ
+  năng đã có trên đèn, làm bằng giọng nói, từ Store hay được đẩy lên, không
+  bao giờ ngừng nạp vì một dấu ngoặc. Kỹ năng mới bị giữ theo chỗ trống khi
+  làm, đóng gói và cài (`Skill::made_refuses`): ghi chú có ngoặc không phải
+  chỗ trống bị từ chối ("any other brace is said as written"), và
+  `{field}` trong `say` trần hay lời chính xác cũng vậy ("filled in a note
+  only").
+- **Theo lần ngồi.** Con số là giá trị chủ đề giữ khi trigger kích hoạt. Các
+  bộ đếm của lamp-seen tính theo lần ngồi, bị xóa khi có `room/stood_up`, khi
+  quên hoặc khi có người lạ (B4), nên kỹ năng viết "this sitting", không bao
+  giờ "today".
+- **Không đổi khi không dùng.** Ghi chú không có ngoặc vẫn là ghi chú như
+  trước. Chưa kỹ năng đi kèm nào có chỗ trống.
+
+Kiểm thử (`crates/skills/src/lib.rs`):
+`a_note_says_one_number_from_the_reading_that_fired_it`.
+
+Mô tả đầy đủ ở [skills.md](../skills.md), "A number from the reading in a note".

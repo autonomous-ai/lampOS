@@ -953,6 +953,58 @@ completion and carries the original transition's `start_before_us`. Its
 authored `expires` cannot extend that deadline, and changed definitions or
 an expired permit refuse the request before the Say socket write.
 
+### A number from the reading in a note (#6543, B3)
+
+A say table's `note` may name one field of the topic whose reading fired
+the run, in braces, and the note is said with that reading's value there:
+`say = { note = "They've had {drank_seen} drinks this sitting; suggest a short break." }`
+on a trigger of `humans/doing_more` that tests `drank_seen` reads "They've
+had 2 drinks this sitting; …" (`lamp_skills::Count`, `note_count`).
+
+- **Numbers only, checked at load.** The field must be one that every
+  trigger that can run the note tests as a number (`above`, `below` or
+  `rise`, never in `each`), so the number is the same field whichever
+  trigger fired. A choice's step, a field tested by `equals`, by no
+  trigger, or by only some of the triggers running the note, gives no
+  number. No word, name or label from a topic reaches a note this way.
+- **Meant for counts.** A slot is for a count the person would hear said
+  back as a count: lamp-seen's per-sitting counts on `humans/doing_more`
+  (`drank_seen`, `ate_seen`, `tired_seen`). Any number field of a topic the
+  skill reads could be named, but a note never says face, presence or
+  distance numbers (`humans/faces/tracked`, `humans/presence`, a nearness),
+  which only choose a step; a reviewed skill is held to that.
+- **A whole number, 0 to 1,000,000.** The value is filled rounded down, as
+  the topic holds it. A `_s` field stays whole seconds (`tired_s_ago` 1800 is
+  "1800"); the model phrases the note, so it may say "half an hour", but a
+  skill wanting minutes words its note around seconds or reads a minutes
+  field. A negative value, or one above 1,000,000, is a wrong reading:
+  dropped, never said as "-3".
+- **No number, no slot.** With the field missing, `null`, a word, a
+  boolean, out of range, or a run with no reading (a tool's), the note is
+  said without it, the space around the slot closed up: "They've had drinks
+  this sitting; …". A note never carries `{drank_seen}` or `None`.
+- **Read leniently, refused only for a new skill.** A note is a slot only
+  when it has exactly one `{`, one `}` after it, a field name between them
+  (letters, digits, `_` and dots) and words besides, and its field passes
+  the check above. Any other note is said as written, braces and all, as
+  before slots: a lone `}`, `{a short break}`, two slots, `{{`, or a field
+  the triggers do not give. A plain `say = "…"` and exact words (`text`)
+  keep their braces too. So a skill already on a lamp, made by voice, from
+  the Store or pushed, never stops loading for a brace. A new skill is held
+  to the slot at make, pack and install (`Skill::made_refuses`): a note
+  whose braces are no slot is refused ("any other brace is said as
+  written"), and so is a `{field}` in a plain say or exact words ("filled
+  in a note only").
+- **Per sitting.** The number is what the topic holds when the trigger
+  fires. lamp-seen's counts are per sitting, wiped on `room/stood_up`, a
+  forget or a stranger (B4), so a skill words it "this sitting", never
+  "today".
+- **Unchanged without it.** A note with no braces is the same note as
+  before. No shipped skill has a slot yet.
+
+Tests (`crates/skills/src/lib.rs`):
+`a_note_says_one_number_from_the_reading_that_fired_it`.
+
 ### Four additions to V2
 
 1. **A say service in the voice**: `say {skill, note or text, priority,

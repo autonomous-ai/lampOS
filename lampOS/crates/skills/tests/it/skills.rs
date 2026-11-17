@@ -1387,6 +1387,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
                 priority: 8,
                 expires_ms: 3_600_000,
                 question: false,
+                count: None,
             }),
             "speak",
         ),
