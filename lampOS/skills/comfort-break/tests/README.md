@@ -28,6 +28,12 @@ place or a need is `a_comfort_break_never_names_the_bathroom` in
 | `let-go-while-someone-else-stays` | 10:00, a second face in view from minute 115 to 160 | Pass: Nothing: held past its 30-minute `wait`, then let go |
 | `off-when-asked` | 10:00, `wellbeing_nudges(how = "off")` at a minute, 130 minutes | Pass: Nothing (`[stop]`) |
 
+Two drinks seen bringing it to an hour (`LAMP_YAWN_SOONER=on`, #6543) are
+`two_drinks_seen_bring_a_comfort_break_forward` in the same file: two or
+three drinks at an hour (its `[present]` too), one drink, none or the switch
+off at two hours (90 minutes), a second face in view at the hour held until
+they have been gone a minute.
+
 Without its `faces_at_most` condition, `held-while-someone-else-is-in-view`
 fails: the line is said at 120 minutes, with the second face in view.
 | `present-a-break-after-90-minutes` | `present = true` (`LAMP_NUDGES_PRESENT=on`, #5207): 10:00, 130 minutes alone, faces every 1.5 s from minute 85 to 100 | Pass: At 90 minutes, once |

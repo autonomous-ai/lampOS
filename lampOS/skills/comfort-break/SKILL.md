@@ -35,6 +35,10 @@ switch on it is on, after about an hour and a half rather than two hours,
 three times a day at most, and the wellbeing nudges share two an hour, never
 within half an hour of each other.
 
+With the lamp's `LAMP_YAWN_SOONER` switch on and the lamp noticing drinks
+from its desk pictures (#6543, with your okay), two drinks or more seen in
+the sitting bring it sooner: after about an hour. It never mentions them.
+
 If asked about it, the lamp says something like: "When you've sat a long
 while, and it's just us, I'll mention it's a good moment for a short break.
 Say 'not today' and I'll stop until tomorrow."

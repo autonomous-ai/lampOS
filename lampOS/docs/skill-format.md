@@ -183,8 +183,11 @@ Keys of a trigger:
 A `[[while]]` condition takes `topic`, `field`, `equals`, `not_equals`,
 `above`, `below`, `for`, `present = true` or `faces_at_most` (1 to 8) on
 `humans/faces/tracked`, `unknown = "holds"` or `unknown = "holds_stale"`
-(#6543: also holds on a value that has run out), and `through` with
-`broken_by`.
+(#6543: also holds on a value that has run out), `through` with
+`broken_by`, and, on an `above` without `for`, `sooner = { topic, field,
+above, above_to }` or a list of them: a lower `above` while that topic's
+field is above the line, the lowest holding winning; kept only with
+`LAMP_YAWN_SOONER=on` (#6543, A comfort break's two drinks).
 
 ### Steps: the actions
 

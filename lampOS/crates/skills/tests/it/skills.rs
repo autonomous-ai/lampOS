@@ -3665,6 +3665,88 @@ fn a_comfort_break_never_names_the_bathroom() {
     assert_eq!(skill.kind, SkillKind::Core);
 }
 
+/// #6543: two drinks or more seen in the sitting (`drank_seen` on
+/// `humans/doing_more`, the `seen_more` use) bring a comfort break forward,
+/// from two hours to one, with `LAMP_YAWN_SOONER=on`: its trigger's `sooner`
+/// and its `sitting_s` condition's together, the same with its `[present]`
+/// values (90 minutes to one hour). One drink, or the switch off, and it is
+/// two hours as before; someone else in view still holds it.
+#[test]
+fn two_drinks_seen_bring_a_comfort_break_forward() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/comfort-break");
+    let toml: toml::Value =
+        toml::from_str(&fs::read_to_string(folder.join("skill.toml")).unwrap()).unwrap();
+    assert!(
+        toml["permissions"]["topics"]
+            .as_array()
+            .unwrap()
+            .contains(&toml::Value::String("humans/doing_more".to_owned()))
+    );
+    const GUEST: &str = r#"{"faces":[{"id":"a","xmin":0.25,"ymin":0.25,"xmax":0.75,"ymax":0.5,"confidence":0.9},{"id":"b","xmin":0.8,"ymin":0.3,"xmax":0.9,"ymax":0.4,"confidence":0.9}]}"#;
+    // 10:00, alone at the desk, the voice resting; the faces every 1.5 s,
+    // each good for 2 s as the eyes say them (so `faces_at_most`'s minute can
+    // hold), the eyes' sitting and lamp-seen's count every 30 s; `guest` is
+    // when a second face is in view. When it turns to the face, in seconds.
+    let runs = |present: bool, sooner: bool, drank_seen: u32, guest: (u64, u64)| {
+        let mut skill = lamp_skills::load_with(&folder, present).unwrap();
+        // Off in its own file, on by its `[present]`: run it either way.
+        skill.enabled = true;
+        let mut engine = Engine::new(vec![skill], true);
+        if sooner {
+            engine = engine.sooner();
+        }
+        engine.clock(0, 0, 20_000 * 86_400_000 + 10 * 3_600_000);
+        let mut at = Vec::new();
+        let mut observe =
+            |engine: &mut Engine, ms: u64, topic: &str, payload: &str, expires: Option<u64>| {
+                let made = engine.observe(topic, ms * 1000, payload.as_bytes(), expires);
+                if made.iter().any(|run| !run.calls.is_empty()) {
+                    at.push(ms / 1000);
+                }
+            };
+        observe(
+            &mut engine,
+            0,
+            "voice/state",
+            r#"{"state":"resting"}"#,
+            None,
+        );
+        for ms in (0..=8_400_000).step_by(1500) {
+            let when = ms / 1000;
+            let faces = if (guest.0..guest.1).contains(&when) {
+                GUEST
+            } else {
+                FACE
+            };
+            observe(&mut engine, ms, Faces::TOPIC, faces, Some(2000));
+            if ms % 30_000 == 0 {
+                let seen = if when >= 1200 { drank_seen } else { 0 };
+                let more = format!(r#"{{"drank_seen":{seen}}}"#);
+                observe(&mut engine, ms, "humans/doing_more", &more, None);
+                let sitting = format!(r#"{{"state":"at_desk","sitting_s":{when}}}"#);
+                observe(&mut engine, ms, "room/activity", &sitting, None);
+            }
+        }
+        at
+    };
+    let alone = (0, 0);
+    for present in [false, true] {
+        let as_before = if present { 5400 } else { 7200 };
+        let after = |at: Vec<u64>, from: u64| {
+            assert_eq!(at.len(), 1, "once a sitting: {at:?}");
+            assert!((from..from + 90).contains(&at[0]), "{at:?}, from {from}");
+        };
+        after(runs(present, true, 2, alone), 3600);
+        after(runs(present, true, 3, alone), 3600);
+        after(runs(present, true, 1, alone), as_before);
+        after(runs(present, true, 0, alone), as_before);
+        after(runs(present, false, 2, alone), as_before);
+        // Someone else in view when the hour comes: held, said only once
+        // they have been gone a minute (`faces_at_most = 1`).
+        after(runs(present, true, 2, (3300, 4200)), 4260);
+    }
+}
+
 /// A meal check (#3504) asks one open question: it names no food or dish
 /// in its question, its `SKILL.md` or its `[stop]`, tells the voice to
 /// suggest no food, menu or place, and
