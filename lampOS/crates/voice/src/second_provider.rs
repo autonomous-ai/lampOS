@@ -1829,6 +1829,10 @@ struct Shared {
     /// A cut-in that ended the lamp's answer with no words is answered
     /// [`crate::cut_in_wordless::LINE`] (`LAMP_CUT_IN_WORDLESS_ASKS`).
     wordless_asks: bool,
+    /// The eyes' looks a wordless cut-in is read against: with no face seen
+    /// speaking it, it is not asked [`crate::cut_in_wordless::LINE`]
+    /// (`LAMP_SAID_TO_ME`, [`Engine::asking_wordless_only_seen_speaking`]).
+    wordless_eyes: Option<Arc<crate::speaking_faces::SpeakingFaces>>,
     /// When [`crate::cut_in_wordless::LINE`] was said last, by the engine's
     /// clock: not again within [`crate::cut_in_wordless::AGAIN_AFTER`].
     wordless_asked_at: Mutex<Option<Instant>>,
@@ -4015,6 +4019,25 @@ struct WordlessSaid {
 }
 
 impl Shared {
+    /// Whether wordless line `request`, heard from `begun` to `finishing`,
+    /// is left without [`crate::cut_in_wordless::LINE`]: with the eyes'
+    /// looks ([`Engine::asking_wordless_only_seen_speaking`]), no face was
+    /// seen speaking through it (`LAMP_SAID_TO_ME`, #7442: lamp-74ff,
+    /// 17 Nov, a lip smack over the lamp's answer ended it and was asked
+    /// "did anyone say something?"). Without the eyes' looks, as before.
+    fn wordless_unseen(&self, request: u64, begun: Instant, finishing: Instant) -> bool {
+        let unseen = self
+            .wordless_eyes
+            .as_ref()
+            .is_some_and(|eyes| !eyes.seen_speaking_between(begun, finishing, false));
+        if unseen {
+            eprintln!(
+                "lamp-voice second: request {request}: a cut-in with no words ended the lamp's answer, held: no face seen speaking it: left quiet and not counted (LAMP_SAID_TO_ME)"
+            );
+        }
+        unseen
+    }
+
     /// Whether wordless line `request` is left without
     /// [`crate::cut_in_wordless::LINE`] because a skill an earlier line
     /// asked for by voice is still being made, or its line is still to be
@@ -4759,6 +4782,7 @@ impl Engine {
                 language: crate::language::at_start(),
                 spoken_stop_ends: false,
                 wordless_asks: false,
+                wordless_eyes: None,
                 wordless_asked_at: Mutex::new(None),
                 wordless_resumes: false,
                 wordless_cuts: Mutex::default(),
@@ -6319,6 +6343,21 @@ impl Engine {
     pub fn asking_after_wordless_cut_ins(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.wordless_asks = on;
+        }
+        self
+    }
+
+    /// With `eyes`, a wordless cut-in through which they saw no face
+    /// speaking is not answered [`crate::cut_in_wordless::LINE`]
+    /// and not counted against its once in
+    /// [`crate::cut_in_wordless::AGAIN_AFTER`]: the lamp stays quiet
+    /// (`LAMP_SAID_TO_ME`, #7442). Before any turn only.
+    pub fn asking_wordless_only_seen_speaking(
+        mut self,
+        eyes: Option<Arc<crate::speaking_faces::SpeakingFaces>>,
+    ) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.wordless_eyes = eyes;
         }
         self
     }
@@ -10608,6 +10647,7 @@ async fn spoken(
             && heeded.is_none()
             && !shared.busy(request)
             && !shared.quiet_for_a_make(request)
+            && !shared.wordless_unseen(request, begun, finishing)
             && shared.wordless_asked_at.lock().is_ok_and(|mut at| {
                 let now = (shared.clock)();
                 let due = at.is_none_or(|at| {

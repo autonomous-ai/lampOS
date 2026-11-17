@@ -14667,6 +14667,73 @@ async fn a_wordless_cut_in_that_ended_the_answer_asks_one_short_question() {
     assert_eq!(asked.len(), 1);
 }
 
+/// #7442 (`LAMP_SAID_TO_ME`, lamp-74ff, 17 Nov: a lip smack over
+/// the lamp's answer ended it and was asked "did anyone say something?"):
+/// with no face seen speaking through a wordless cut-in (its mouth read
+/// still or never read), it is not asked and not counted, so a cut a face
+/// is seen speaking right after is still asked; a face seen speaking, or the
+/// switch off, asks as before.
+#[tokio::test]
+async fn a_wordless_cut_in_no_face_was_seen_speaking_is_not_asked() {
+    use lamp_msgs::SpeakingState::{No, Unknown, Yes};
+    let said = format!("said:{}", crate::cut_in_wordless::LINE);
+    async fn wordless(
+        engine: &mut Engine,
+        eyes: &crate::speaking_faces::SpeakingFaces,
+        request: u64,
+        mouth: lamp_msgs::SpeakingState,
+    ) -> Vec<String> {
+        engine.submit(start_marked(request, true, false, false));
+        engine.submit(audio(request, 1));
+        // The line's task begins, then the eyes look once through it.
+        for _ in 0..10 {
+            tokio::task::yield_now().await;
+        }
+        let faces = lamp_msgs::Faces {
+            faces: vec![lamp_msgs::Face {
+                id: "f1".into(),
+                xmin: 0.4,
+                ymin: 0.3,
+                xmax: 0.5,
+                ymax: 0.45,
+                confidence: 1.0,
+                yaw: Some(0.1),
+                facing: Some(true),
+                pitch: None,
+                looking: None,
+                speaking: Some(lamp_msgs::Speaking {
+                    state: mouth,
+                    score: 0.0,
+                    from: None,
+                }),
+                follows: None,
+            }],
+        };
+        eyes.look(Instant::now(), Some((("b", request), &faces)));
+        engine.submit(end(request));
+        turn(engine).await
+    }
+    for (on, mouth, asked) in [
+        (true, No, false),
+        (true, Yes, true),
+        (true, Unknown, false),
+        (false, No, true),
+    ] {
+        let (built, _, _) = scripted(Arc::new(Script::default()));
+        let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+        let mut engine = built
+            .asking_after_wordless_cut_ins(true)
+            .asking_wordless_only_seen_speaking(on.then(|| eyes.clone()));
+        let out = wordless(&mut engine, &eyes, 1, mouth).await;
+        assert_eq!(out.contains(&said), asked, "{on} {mouth:?}: {out:?}");
+        if !asked {
+            // Not counted: the next cut, a face seen speaking it, is asked.
+            let out = wordless(&mut engine, &eyes, 2, Yes).await;
+            assert!(out.contains(&said), "{out:?}");
+        }
+    }
+}
+
 /// A second knock that cuts the question, or one within the minute, leaves
 /// the lamp quiet: asked at most once in `cut_in_wordless::AGAIN_AFTER`.
 #[tokio::test]
