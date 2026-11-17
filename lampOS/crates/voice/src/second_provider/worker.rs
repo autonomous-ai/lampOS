@@ -3554,6 +3554,9 @@ pub fn serve(
             }
         }
     }
+    // The owner's app-paired computers' daily notes counts (C157,
+    // `LAMP_SERVICE_RECORDS_SDK=on`): a thread of its own; off, nothing.
+    crate::service_records::sdk_counts::start();
     // What memory holds that may fit a spoken turn's words (#2176 row 5c,
     // `LAMP_SECOND_MEMORY_HITS=on`, Days only, on in the product since the
     // memory owner's call of 4 Nov): searched within `HITS_WITHIN` and told

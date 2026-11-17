@@ -1181,6 +1181,7 @@ pub mod agent_rows;
 pub mod linked;
 pub mod redo;
 pub mod reminder_rows;
+pub mod sdk_counts;
 pub mod source;
 pub mod task_rows;
 pub mod told;
