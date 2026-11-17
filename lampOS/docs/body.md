@@ -1222,7 +1222,7 @@ after lamp-52e6's runs on #4501); off unless the unit sets
   (e.g. `elbow_pitch at 62 degrees`) as it happens, not only in the exit
   report, and the fold line says `it sat down hot` when one was for heat.
 - **A rest ends folded (`LAMP_BODY_STRAIN_REST_COOLS=on`, #7344).** Off
-  unless exactly `on`, set in no unit until its row on lamp-52e6; read only
+  unless exactly `on`, on in the product unit; read only
   with the guard on (`StrainGuard::rest_cools`). Off, a lamp sat down for
   any reason above stands again once its minute is over if a window is
   still open: the talk's `--awake-seconds`, a face in front of it, or
