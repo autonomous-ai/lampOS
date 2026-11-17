@@ -309,6 +309,39 @@ pub fn set_asks_here(on: Option<bool>) {
     ASKS_HERE.with(|here| here.set(on));
 }
 
+/// The switch for a made skill turned off and back on by voice (#7445: on
+/// lamp-9adf "turn off the coffee time skill" was asked "Remove coffee
+/// time?", since `make_skill` had only a remove for it): `on` only, off
+/// unless set, in no product unit. On, `make_skill` takes `turn_off` or
+/// `turn_on`, the name as heard, given alone, and its description tells a
+/// turn-off, a pause or a stop from a remove, so the model never reaches
+/// for the remove to turn one off (`crate::made_turn`): the owner's alone,
+/// set as the app's switch sets it, through the manage helper's own
+/// `{"off": NAME}` and `{"on": NAME}`. Off, the function's description and
+/// parameters, and every answer, are byte for byte as before. Read by the
+/// voice alone: set it in `lamp-voice`.
+pub const OFF_SAID_ENVIRONMENT: &str = "LAMP_MADE_SKILL_OFF_SAID";
+
+thread_local! {
+    /// [`OFF_SAID_ENVIRONMENT`] as a test of this thread sets it.
+    static OFF_SAID_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a made skill may be turned off and on by voice in this process.
+pub fn off_said_on() -> bool {
+    if let Some(on) = OFF_SAID_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(OFF_SAID_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`off_said_on`] for the calling thread alone, for tests; `None` reads
+/// the environment again. The product never calls it.
+#[doc(hidden)]
+pub fn set_off_said_here(on: Option<bool>) {
+    OFF_SAID_HERE.with(|here| here.set(on));
+}
+
 /// The most phrases a made skill's `asks` lists ([`made_asks`]): fewer than
 /// a Store skill's eight (`lamp_skills::MOST_ASKS`), each said back.
 pub const MOST_MADE_ASKS: usize = 3;

@@ -104,6 +104,7 @@ pub mod made_not_on;
 pub mod made_remove;
 pub mod made_run;
 pub mod made_skill;
+pub mod made_turn;
 pub mod make_no_cannot;
 pub mod make_skill_agent;
 pub mod make_skill_local;

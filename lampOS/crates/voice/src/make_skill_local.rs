@@ -652,7 +652,13 @@ pub fn tool() -> lamp_gemini::Tool {
     // and those made listed: the same function, its `remove`, `run` or
     // `made` alone; whether a line asks any, or a read-back, is the
     // model's judgment.
-    description.push_str(REMOVE_TOLD);
+    // With `LAMP_MADE_SKILL_OFF_SAID` on (#7445), the same sentence tells
+    // a turn-off, a pause or a stop from a remove, in as many bytes.
+    description.push_str(if made_skill::off_said_on() {
+        TURN_OFF_TOLD
+    } else {
+        REMOVE_TOLD
+    });
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
         description,
@@ -688,6 +694,17 @@ const CODE_REQUEST_TOLD: &str = " A made skill's own script may check what the l
 /// still fits the link's 1,024 bytes.
 pub const REMOVE_TOLD: &str = " To delete or remove a skill, call it with remove alone; to run \
      one they made now, run alone; to list those they made, made alone; say nothing first.";
+
+/// What [`tool`]'s description says in [`REMOVE_TOLD`]'s place with
+/// `LAMP_MADE_SKILL_OFF_SAID` on (#7445: on lamp-9adf "turn off the coffee
+/// time skill" called the remove, the only verb `make_skill` had for a
+/// made skill, and the lamp asked "Remove coffee time?"): turning one off,
+/// pausing or stopping it is `turn_off`, never a remove, and back on
+/// `turn_on`, beside the remove, the run and the list. The verbs are given
+/// to the model, which judges the meaning; with every switch on the
+/// description still fits the link's 1,024 bytes.
+pub const TURN_OFF_TOLD: &str = " To turn off, pause or stop one they made: turn_off alone, \
+     never remove; back on: turn_on; delete: remove; run now: run; list: made; say nothing first.";
 
 /// What [`tool`]'s description adds with a made skill's writes on.
 pub const READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
@@ -736,6 +753,22 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         "type": "string",
         "description": "Only when the person asks to delete or remove a skill: its name as they said it, given alone with no request."
     });
+    // A made skill turned off and back on by voice (#7445,
+    // [`crate::made_turn`], `LAMP_MADE_SKILL_OFF_SAID`): never a remove,
+    // which is then told as for good alone.
+    if made_skill::off_said_on() {
+        parameters["properties"][crate::made_remove::REMOVE]["description"] = json!(
+            "Only when the person asks to delete or remove a skill for good, never to turn one off, pause or stop it: its name as they said it, given alone with no request."
+        );
+        parameters["properties"][crate::made_turn::TURN_OFF] = json!({
+            "type": "string",
+            "description": "Only when the person asks to turn off, pause or stop a skill they made, which keeps it to turn back on: its name as they said it, given alone with no request. Never remove for this."
+        });
+        parameters["properties"][crate::made_turn::TURN_ON] = json!({
+            "type": "string",
+            "description": "Only when the person asks to turn a skill they made back on, or to resume it: its name as they said it, given alone with no request."
+        });
+    }
     // The skills the person made, listed by voice ([`crate::made_list`]):
     // how many, and the newest by name to the owner.
     parameters["properties"][crate::made_list::LIST] = json!({
@@ -3085,6 +3118,19 @@ pub fn answer(
                 ),
             },
         );
+    }
+    // A skill the person made, turned off or back on by voice (#7445,
+    // `LAMP_MADE_SKILL_OFF_SAID`): read before the remove, so a call that
+    // carries a turn-off is never a remove.
+    if made_skill::off_said_on() {
+        for (key, off) in [
+            (crate::made_turn::TURN_OFF, true),
+            (crate::made_turn::TURN_ON, false),
+        ] {
+            if let Some(name) = call.args[key].as_str() {
+                return crate::made_turn::asked_here(name, off, request, heard, lease);
+            }
+        }
     }
     // A skill the person made, removed by voice (#6960): matched in code
     // to their own made skills, asked once by its name, removed on the yes.
