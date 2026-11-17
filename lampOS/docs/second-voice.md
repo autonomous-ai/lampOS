@@ -5735,7 +5735,10 @@ after a take-over, but now for every turn:
   the mark). With the switch the half is of the looks its mouth was read
   (`speaking_faces::half_of_read`); a face out of view still counts
   against it and 3 looks are still needed. Every reader of
-  `SpeakingFaces::speakers` and `speakers_with_boot` takes it.
+  `SpeakingFaces::speakers`, `speakers_with_boot`, `turned_speakers` and
+  `turned_speakers_with_boot` (the near-facing admission, the carry by the
+  same speaker) takes it; for a turned face the looks that say nothing are
+  those where it was turned with its mouth unread.
 - **Two faces must stay to make the room busy** (`LAMP_TWO_FACES_HELD=on`,
   with `LAMP_NAME_OR_FOLLOW_UP`; Sixth's plan under the 24 Oct freeze). A
   thread of the worker's own reads every look the eyes publish

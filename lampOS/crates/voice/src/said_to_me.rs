@@ -15,7 +15,7 @@
 //! 3. **said to the lamp:** a face turned to it, facing (pitch inside
 //!    [`PITCH_DEG`] and not looking away, when the eyes say so), seen
 //!    speaking the line, and at least [`SHORT_WORDS`] + 1 words, or a
-//!    question, or an ask.
+//!    question (a `?` in it; no phrase list decides what a line means).
 //!
 //! Anything else loses those signs and is journaled `held: <reason>`
 //! ([`Held`]). A lip smack heard as one or two words while the owner faced
@@ -50,7 +50,7 @@ pub enum Held {
     /// No face turned to the lamp was seen speaking it.
     NotSeenSpeaking,
     /// A face seen speaking it, but [`SHORT_WORDS`] words or fewer, and no
-    /// question or ask.
+    /// `?`.
     Short,
 }
 
@@ -93,7 +93,7 @@ pub enum Said {
     Stands,
     /// In a live conversation and let out by it.
     InConversation,
-    /// Said to the lamp: facing, seen speaking, long enough or asking.
+    /// Said to the lamp: facing, seen speaking, long enough or a question.
     ToTheLamp,
     /// Not said to the lamp: the face and the conversation are no sign.
     Held(Held),
@@ -127,10 +127,7 @@ pub fn judge(line: Line<'_>) -> Said {
         Said::Held(Held::LookingAway)
     } else if !line.seen_speaking {
         Said::Held(Held::NotSeenSpeaking)
-    } else if words <= SHORT_WORDS
-        && !line.heard.contains('?')
-        && !crate::untied_going_on::asks_the_lamp(line.heard)
-    {
+    } else if words <= SHORT_WORDS && !line.heard.contains('?') {
         Said::Held(Held::Short)
     } else {
         Said::ToTheLamp
@@ -164,9 +161,9 @@ mod tests {
             judge(facing("Mm.", false)),
             Said::Held(Held::NotSeenSpeaking)
         );
-        // The same seen speaking: still a short line, no question or ask.
+        // The same seen speaking: still a short line, no `?`.
         assert_eq!(judge(facing("Mm.", true)), Said::Held(Held::Short));
-        // A short question or ask seen speaking: answered.
+        // A short question seen speaking: answered.
         assert_eq!(judge(facing("Weather today?", true)), Said::ToTheLamp);
         assert_eq!(judge(facing("What time is it", true)), Said::ToTheLamp);
         // Three words, not seen speaking: held.
