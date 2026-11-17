@@ -2018,11 +2018,19 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   owner alone, the lamp's one read turn) and is said once, the next time
   the owner is seen within 30 minutes (`NEWS_WAIT`), else dropped
   (`skipped: <why>`); at quiet hours it is dropped at once (`skipped:
-  quiet hours`), never held through them. With `LAMP_TOLD_WHEN_ASKED` on,
-  a run asked by voice and ready within five minutes has its quiet lifted
-  in the gate's own look (`LampRoom::seen`, `told_when_asked::quiet_holds`),
-  so those minutes are not quiet hours there and it is not dropped for
-  them. Before, the line waited up to
+  quiet hours`), never held through them. A run now asked by voice whose
+  answer, what its agent found or its failure, is ready within five
+  minutes of the ask has its quiet lifted for five minutes more, with
+  `LAMP_TOLD_WHEN_ASKED` or with this switch on (`quiet_ask`,
+  `lift_quiet`): the lift is in the gate's own look (`LampRoom::seen`,
+  `told_when_asked::quiet_holds`), so those minutes are not quiet hours
+  there, and neither a found answer nor news is held or dropped for them.
+  The product sets this switch and not `LAMP_TOLD_WHEN_ASKED`: on
+  lamp-9adf (18 Nov, 00:11) "Lamp, use my bitcoin price skill." had its
+  agent's answer kept and then held unsaid by quiet hours. The answer in
+  the asking conversation (`answers`) is the failure line's alone; what
+  the agent found still goes behind a read's gate, with the quiet lifted.
+  Before, the line waited up to
   an hour for one face alone and no voice, and on lamp-9adf (17 Nov, 21:11)
   "Fig facts is running now." was followed by nothing. Lines:
   `missing_secret` "<Skill>
