@@ -8036,6 +8036,7 @@ impl Engine {
                 late_by_ms,
                 also,
                 again,
+                ids,
                 ..
             } => {
                 // Deferred unless this route is the lamp's only voice and the
@@ -8060,6 +8061,12 @@ impl Engine {
                 if !self.begin(request, session) {
                     return;
                 }
+                // Each one its known creator set rang: their linked record
+                // (`LAMP_SERVICE_RECORDS_REMINDERS`).
+                crate::service_records::reminder_rows::said(
+                    &ids,
+                    crate::service_records::unix_ms(),
+                );
                 // Reminder data is not something to remember because it
                 // was said (as on the Live route).
                 crate::remember::keep_out(request);
