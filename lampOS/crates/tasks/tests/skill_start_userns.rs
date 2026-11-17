@@ -438,10 +438,11 @@ fn the_script_runs_outside_the_gateway_and_no_gateway_process_sees_it() {
             "--mount-proc",
             "/bin/sh",
             "-c",
-            r#"env "$2=$3" "$0" --exact userns_launcher --nocapture --test-threads 1 > "$4/out" & l=$!
-               while [ ! -e "$4/hostpid" ]; do sleep 0.05; done
-               env "$5=$4/hostpid" "$0" --exact userns_probe --nocapture --test-threads 1 > /dev/null
-               touch "$4/project/skill-task-1/go"
+            // `sh -c <text> <me> <role> <said> <base> <probe role>`: $0..$4.
+            r#"env "$1=$2" "$0" --exact userns_launcher --nocapture --test-threads 1 > "$3/out" & l=$!
+               while [ ! -e "$3/hostpid" ]; do sleep 0.05; done
+               env "$4=$3/hostpid" "$0" --exact userns_probe --nocapture --test-threads 1 > /dev/null
+               touch "$3/project/skill-task-1/go"
                wait $l"#,
         ])
         .arg(&me)
