@@ -2708,6 +2708,9 @@ fn owner<C: Clock>(
                     // On the voice's route only: the owner's "forget
                     // everything" (#6274).
                     let answer = if work.route == Route::Voice {
+                        // The kept session too: closed, its conversation
+                        // deleted, and a new one opened (openharness#4393).
+                        crate::one_session::forgotten();
                         match crate::session_index::forget(&session_index) {
                             Ok(forgotten) => {
                                 if forgotten {
