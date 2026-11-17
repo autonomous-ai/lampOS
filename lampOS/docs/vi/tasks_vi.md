@@ -1647,11 +1647,12 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   Gateway mà cổng chưa trả lời trong 60 s (`gateway::READY_WITHIN`, giới
   hạn của task nói) thì được hỏi một lần: nếu unit của nó
   (`lamp-openclaw-gateway.service`, `systemctl show
-  --property=ActiveState`, chỉ đọc, không bao giờ khởi động hay dừng) là
+  -p ActiveState --value`, chỉ đọc, tối đa 2 s, không bao giờ khởi động hay
+  dừng) là
   `active`, `activating` hoặc `reloading`, nó đang khởi động và được chờ
   tiếp ("tasks: the OpenClaw Gateway's port has not answered in 60 s, but
   its unit is up: waited for as it starts"); ngược lại, hoặc khi systemd
-  không trả lời được, nó đã dừng, và việc chờ dừng ở đó ("tasks: the
+  không trả lời được trong 2 s, nó đã dừng, và việc chờ dừng ở đó ("tasks: the
   OpenClaw Gateway did not answer on 127.0.0.1:18789 within 60 s"), không
   bao giờ giữ đến 240 s (#6577, lamp-fc4b, 17/11: một gateway đã dừng giữ
   lần chạy của skill 240 s). Mỗi lần đọc khởi động CLI của OpenClaw,
