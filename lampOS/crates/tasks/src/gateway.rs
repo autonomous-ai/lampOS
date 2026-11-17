@@ -1950,7 +1950,10 @@ mod tests {
         let hidden: Vec<&Path> = at.hidden.iter().map(PathBuf::as_path).collect();
         let mut child = Command::new("/bin/sh")
             .arg("-c")
-            .arg(r#"exec 3<&0 4>"$1" 0</dev/null; shift; exec unshare "$@""#)
+            // The soft core limit raised to the hard one first: with an
+            // inherited 0 (macOS' default), a fence without `ulimit -c 0`
+            // would still show `0` to the script.
+            .arg(r#"ulimit -S -c "$(ulimit -H -c)" 2>/dev/null; exec 3<&0 4>"$1" 0</dev/null; shift; exec unshare "$@""#)
             .arg("fd")
             .arg(&at.said)
             .args(fence_args(&at.grant, 990, 990, &hidden))
