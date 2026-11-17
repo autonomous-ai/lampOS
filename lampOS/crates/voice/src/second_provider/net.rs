@@ -8,6 +8,7 @@ use std::{fmt, sync::Arc, time::Duration};
 mod chat;
 mod gemini_tts;
 pub mod key_terms;
+mod public;
 pub mod routes;
 pub mod search;
 mod sentences;
@@ -21,6 +22,7 @@ pub use chat::{
     Narrow, ToolCall, cache_counts,
 };
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
+pub(crate) use public::get_public_json;
 pub use sentences::Sentences;
 pub use stt::{Early, QUIET_HELD_ENVIRONMENT, Replies, SttStream, check as stt_check};
 pub use tts::{
@@ -441,14 +443,18 @@ pub async fn get_json(url: &str, authorization: &str) -> Result<serde_json::Valu
     fetch_json(url, Some(authorization)).await
 }
 
-/// A JSON `GET` of a service that takes no key (Open-Meteo), bounded as
-/// [`get_json`] is.
-pub(crate) async fn get_public_json(url: &str) -> Result<serde_json::Value> {
-    fetch_json(url, None).await
-}
+/// The step a connection that didn't open names.
+const OPENING: &str = "connection";
 
 async fn fetch_json(url: &str, authorization: Option<&str>) -> Result<serde_json::Value> {
-    let client = http_client()?;
+    fetch_json_on(&http_client()?, url, authorization).await
+}
+
+async fn fetch_json_on(
+    client: &reqwest::Client,
+    url: &str,
+    authorization: Option<&str>,
+) -> Result<serde_json::Value> {
     let mut request = client.get(url);
     if let Some(authorization) = authorization {
         request = request.header("authorization", authorization);
@@ -456,7 +462,13 @@ async fn fetch_json(url: &str, authorization: Option<&str>) -> Result<serde_json
     let mut response = tokio::time::timeout(CONNECT + STALL, request.send())
         .await
         .map_err(|_| Error::Timeout("request"))?
-        .map_err(|_| Error::Transport("request"))?;
+        .map_err(|error| {
+            if error.is_connect() {
+                Error::Transport(OPENING)
+            } else {
+                Error::Transport("request")
+            }
+        })?;
     if !response.status().is_success() {
         return Err(Error::Status(response.status().as_u16()));
     }
