@@ -59,6 +59,8 @@ Environment=LAMP_AGENT_SERVICES=on
 Environment=LAMP_MADE_SCRIPTS=on
 Environment=LAMP_SKILL_WRITES=on
 Environment=LAMP_MADE_SKILL_LOOSE=on
+# #7233, docs/skills.md; owner, 16 Nov
+Environment=LAMP_MADE_SKILL_ASKS=on
 # The owner's approximate place from the app (#4333): owner.place and owner.place.clear, rounded to about a
 # kilometre and kept in the person's folder through `lamp-setup change`. The lead's yes on 3 Nov.
 Environment=LAMP_OWNER_PLACE=on

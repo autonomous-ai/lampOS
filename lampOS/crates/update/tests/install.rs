@@ -2418,6 +2418,70 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
     }
 }
 
+/// The skill flow's three switches (the owner, 16 Nov: "Every task must be
+/// doable; no 'couldn't' here"), each `on` once in the units whose part
+/// reads it and in no other: a made skill started by its own words
+/// (`LAMP_MADE_SKILL_ASKS`, #7233) in lamp-voice, which makes it, and the
+/// four that load it (lamp-skills, its manage helper, lamp-cloud's skills
+/// page and lamp-control's token), so such a skill is never refused at
+/// install, not loaded or listed as not loaded; a made skill not on never
+/// said on (`LAMP_MADE_NOT_ON_TOLD`, #7270) in lamp-voice alone; and a
+/// skill's task made sure of (`LAMP_SKILL_TASK_SURE`, #7239) in lamp-skills
+/// alone. A `cannot:` made a task for the lamp's agent
+/// (`LAMP_MAKE_NO_CANNOT`, #7234) stays off until its own row.
+#[test]
+fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
+    let switches: [(&str, &[&str]); 3] = [
+        (
+            lamp_voice::made_skill::ASKS_ENVIRONMENT,
+            &[
+                "lamp-voice.service",
+                "lamp-skills.service",
+                "lamp-skills-manage@.service",
+                "lamp-cloud.service",
+                "lamp-control.service",
+            ],
+        ),
+        (
+            lamp_voice::made_not_on::ENVIRONMENT,
+            &["lamp-voice.service"],
+        ),
+        (
+            lamp_skills::task_sure::ENVIRONMENT,
+            &["lamp-skills.service"],
+        ),
+    ];
+    assert_eq!(
+        switches.map(|(name, _)| name),
+        [
+            "LAMP_MADE_SKILL_ASKS",
+            "LAMP_MADE_NOT_ON_TOLD",
+            "LAMP_SKILL_TASK_SURE",
+        ]
+    );
+    for (name, owners) in switches {
+        let line = format!("Environment={name}=on");
+        for (unit, text) in install::PRODUCT {
+            let on = section(text, "Service")
+                .iter()
+                .filter(|set| **set == line)
+                .count();
+            let mentioned = text
+                .lines()
+                .filter(|set| !set.starts_with('#') && set.contains(name))
+                .count();
+            assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+            assert_eq!(mentioned, on, "{unit}: {name}");
+        }
+        for owner in owners {
+            assert!(
+                install::PRODUCT.iter().any(|(unit, _)| unit == owner),
+                "{owner} is not a product unit"
+            );
+        }
+    }
+}
+
 /// An uploaded `SKILL.md` runs through the lamp's agent (the owner's ruling,
 /// 13 Nov: the upload flow goes via the agent): `LAMP_UPLOAD_TO_AGENT` on,
 /// once, in the four units whose part reads it (lamp-cloud's upload,
@@ -2507,6 +2571,7 @@ fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
         lamp_voice::made_skill::LOOSE_ENVIRONMENT,
         lamp_voice::upload_agent::ENVIRONMENT,
         lamp_skills::PRESENT_ENVIRONMENT,
+        lamp_voice::made_skill::ASKS_ENVIRONMENT,
     ];
     assert_eq!(
         loading,
@@ -2517,6 +2582,7 @@ fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
             "LAMP_MADE_SKILL_LOOSE",
             "LAMP_UPLOAD_TO_AGENT",
             "LAMP_NUDGES_PRESENT",
+            "LAMP_MADE_SKILL_ASKS",
         ]
     );
     let service = |name: &str| {

@@ -2885,7 +2885,7 @@ for each run, and is answered once the run ends
   `bad_request`, `too_long` (over 8192 bytes), `no_token` (lamp-control gave
   no one-run token), `run_failed`, or `busy` (another skill's task is
   running: one runs at a time). With `LAMP_SKILL_TASK_SURE=on` in
-  lamp-skills (off unless set, in no product unit; docs/skills.md, "A
+  lamp-skills (off unless set, on in the product; docs/skills.md, "A
   skill's task"), lamp-skills says a refusal or a failed run to the owner
   as one fixed line behind a told answer's gate, never the task's words
   nor this message, and a run refused `busy` waits its turn in lamp-skills'
