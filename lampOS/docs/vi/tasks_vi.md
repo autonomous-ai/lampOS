@@ -1254,8 +1254,8 @@ năng tự tạo (`do.write`, docs/skills.md) như một lượt chạy
 
 Người xây dựng đầu tiên đồng ý lúc 19:44 (12/11). `LAMP_UPLOAD_TO_AGENT` bật
 trong sản phẩm từ 13/11 (phán quyết của chủ: luồng tải lên đi qua agent);
-`LAMP_TASK_NET` cũng bật trong sản phẩm (lamp-tasks, lamp-skills và manage helper,
-lamp-control, lamp-voice và lamp-cloud), nên lần chạy được cấp `net` với lời đồng ý bằng giọng
+`LAMP_TASK_NET` trong sản phẩm vẫn tắt cho tới khi qua các bước kiểm tra; khi bật, nó nằm trong lamp-tasks, lamp-skills và manage helper,
+lamp-control, lamp-voice và lamp-cloud, và lần chạy được cấp `net` với lời đồng ý bằng giọng
 nói của chủ tới được web công khai trên cổng 80 và 443, bị giữ như mọi lần chạy
 (quyết định của người xây dựng đầu tiên trên #7200: không bao giờ tới mạng của
 đèn hay các cổng cục bộ của nó; địa chỉ công khai của router trong nhà không bị
