@@ -267,6 +267,92 @@ pub fn never_read(code: &str) -> Option<&'static str> {
     (code == "gmail-app").then_some(GMAIL_APP_NO_READS)
 }
 
+/// What an MCP service reads, by `what`: its read tools, then one of them.
+pub const MCP_WHATS: &str = "tools, call {tool, arguments}";
+
+/// Each entry of a list of reads such as [`WHATS`]' (`attachment {id,
+/// name|index}` one entry), split at the commas outside braces.
+fn entries(listed: &str) -> impl Iterator<Item = &str> {
+    let mut depth = 0usize;
+    listed
+        .split(move |c: char| {
+            match c {
+                '{' => depth += 1,
+                '}' => depth = depth.saturating_sub(1),
+                _ => {}
+            }
+            c == ',' && depth == 0
+        })
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+}
+
+/// What `code` reads, by `what`, as the tools' description lists it.
+fn whats_of(code: &str) -> &'static str {
+    match catalog::service(code) {
+        Some(service) if service.mcp.is_some() => MCP_WHATS,
+        _ => WHATS
+            .iter()
+            .find(|(service, _)| *service == code)
+            .map_or("", |(_, whats)| *whats),
+    }
+}
+
+/// The kinds of read `code` takes as `what`, the one source the tools'
+/// schema and a refusal both name (#7498): the first word of each entry in
+/// [`WHATS`] (an MCP service's [`MCP_WHATS`]), and `get` for any service
+/// read over its HTTP API with a GET on its allow-list, but Gmail. None
+/// for a service the lamp never
+/// reads, or one it doesn't know.
+pub fn kinds(code: &str) -> Vec<&'static str> {
+    let Some(service) = catalog::service(code) else {
+        return Vec::new();
+    };
+    if never_read(code).is_some() {
+        return Vec::new();
+    }
+    let mut kinds: Vec<&'static str> = entries(whats_of(code))
+        .filter_map(|entry| entry.split([' ', '{']).next())
+        .filter(|kind| !kind.is_empty())
+        .collect();
+    let gets = service
+        .reads
+        .iter()
+        .any(|(method, _)| *method == Method::Get);
+    if service.mcp.is_none()
+        && service.api.is_some()
+        && gets
+        && code != "gmail"
+        && !kinds.contains(&"get")
+    {
+        kinds.push("get");
+    }
+    kinds
+}
+
+/// What a read whose `what` is none of `code`'s kinds is told: each kind
+/// it takes, the word alone, then what each needs, so the model's next
+/// call is a right one (#7498: on lamp-a63e on 17 Nov Gmail reads were
+/// refused four times, and only each retry with `search` answered).
+pub fn no_such_kind(code: &str) -> String {
+    let listed = whats_of(code);
+    let kinds = kinds(code);
+    let get = if kinds.contains(&"get") && !entries(listed).any(|entry| entry.starts_with("get")) {
+        "; or get {path, params}"
+    } else {
+        ""
+    };
+    format!(
+        "what is one of {code}'s kinds of read, the word alone: {}. {code} reads: {listed}{get}",
+        kinds.join(", ")
+    )
+}
+
+/// Whether `why` is [`no_such_kind`]'s refusal.
+pub fn is_no_such_kind(why: &str) -> bool {
+    why.starts_with("what is one of ") && why.contains("'s kinds of read, the word alone: ")
+}
+
 /// The lamp's own zone's IANA name, as the system has it now; nothing when
 /// it names none.
 pub(crate) fn zone_here() -> Option<String> {
@@ -515,11 +601,7 @@ pub fn page_id(entry: &Entry) -> &str {
 }
 
 fn unknown(code: &str) -> String {
-    let whats = WHATS
-        .iter()
-        .find(|(service, _)| *service == code)
-        .map_or("", |(_, whats)| *whats);
-    format!("{code} reads: {whats}; or get {{path, params}}")
+    no_such_kind(code)
 }
 
 /// Keys that are noise to a person: dropped from what is quoted.
@@ -1063,6 +1145,53 @@ mod tests {
         Entry::default()
     }
 
+    /// #7498: on lamp-a63e on 17 Nov a Gmail read with a `what` that is
+    /// none of Gmail's kinds was refused, and only each retry with
+    /// `search` answered. The refusal names each kind Gmail reads, the
+    /// word alone, and never `get`, which Gmail has not; every service's
+    /// refusal names its own kinds, and each kind it names is one its read
+    /// takes.
+    #[test]
+    fn a_what_none_of_a_services_kinds_is_told_its_kinds() {
+        assert_eq!(
+            kinds("gmail"),
+            ["recent", "search", "drafts", "message", "attachment"]
+        );
+        assert_eq!(kinds("google_calendar"), ["events", "get"]);
+        assert_eq!(kinds("ahrefs"), ["get"]);
+        assert!(kinds("gmail-app").is_empty() && kinds("no_such_service").is_empty());
+        let refused = plan("gmail", &json!({"what":"unread emails"}), &entry(), 0).unwrap_err();
+        assert!(
+            refused.starts_with(
+                "what is one of gmail's kinds of read, the word alone: recent, search, drafts, message, attachment. "
+            ),
+            "{refused}"
+        );
+        assert!(!refused.contains("get"), "{refused}");
+        assert!(is_no_such_kind(&refused));
+        for service in catalog::SERVICES {
+            let code = service.code;
+            if service.mcp.is_some() {
+                assert_eq!(kinds(code), ["tools", "call"], "{code}");
+                continue;
+            }
+            if kinds(code).is_empty() {
+                continue;
+            }
+            let refused = plan(code, &json!({"what":"unread"}), &entry(), 0).unwrap_err();
+            assert!(is_no_such_kind(&refused), "{code}: {refused}");
+            assert!(
+                refused.contains(&format!("the word alone: {}.", kinds(code).join(", "))),
+                "{code}: {refused}"
+            );
+            for kind in kinds(code) {
+                if let Err(why) = plan(code, &json!({"what": kind}), &entry(), 0) {
+                    assert!(!is_no_such_kind(&why), "{code} {kind}: {why}");
+                }
+            }
+        }
+    }
+
     /// lamp-9adf, 4 Nov: Calendar refused an event at
     /// `2026-11-05T09:00:00`, confirmed by the owner; a time needs its zone.
     #[test]
@@ -1126,7 +1255,7 @@ mod tests {
         assert_eq!(refused, unknown("google_calendar"));
         assert_eq!(
             refused,
-            "google_calendar reads: events {from, to, calendar, count}; or get {path, params}"
+            "what is one of google_calendar's kinds of read, the word alone: events, get. google_calendar reads: events {from, to, calendar, count}; or get {path, params}"
         );
         let (method, url, body) = http(
             plan(

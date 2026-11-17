@@ -806,7 +806,11 @@ scrubbed from any answer (each spelling, plain or URL-encoded).
 Each `service_read` has one journal line (`serve::read_said`, #5826): who
 asked, the service's code and the read's kind, and what became of it, as
 "lamp-services: the voice's service_read of gmail search: found 2". The
-kind is a `what` of lowercase letters and `_` only, else "another"; the
+kind is the `what` when it is one of the service's kinds of read
+(`reads::kinds`; with the service unknown, any service's), "no what" when
+there is none, else its shape alone (#7498): "a what of 16 characters, no
+service's kind" or "a what of 6 characters, another service's kind",
+never its words; the
 outcome is "found N" (the items quoted and left out), "none", "answered"
 (an MCP tool's), "refused: <why>" in fixed words (a send-only link, not
 linked, its link has expired, a service the lamp can't link, no id, no
@@ -2716,7 +2720,22 @@ and never taken from the executive's or a skill's folder.
   reason." It is at most 600 bytes, so the voice's own rule fits before it
   within the 1,024 its provider link takes.
 - **`service_read {service, what, …}`**: `what` and its arguments as in the
-  table above; the answer quoted, cut to who and what about when the owner
+  table above. Each service's kinds of read (`reads::kinds`: the first word
+  of each of its reads in the table, an MCP service's `tools` and `call`,
+  and `get` for a service read over its HTTP API with a GET on its
+  allow-list, never Gmail) are named on `what` itself, whatever the
+  description's cut keeps: an `enum` of every kind offered, and its
+  description "One kind of read, the word alone, of the named service's
+  own, never other words: gmail: recent, search, drafts, message,
+  attachment; google_calendar: events, get; …" (#7498: on lamp-a63e on 17
+  Nov Gmail reads with a `what` none of Gmail's kinds were refused four
+  times, and only each retry with `search` answered). A `what` none of the
+  service's kinds is refused before anything is asked of it, with the same
+  kinds, so the next call is right: "what is one of gmail's kinds of read,
+  the word alone: recent, search, drafts, message, attachment. gmail reads:
+  recent {count}, …" (`reads::no_such_kind`; an MCP service's alike). The
+  model's words are never matched against a list: only `what` is checked,
+  as one of the kinds. The answer is quoted, cut to who and what about when the owner
   may not be alone. A read in full also needs the line in the
   conversation's voice (`read_in_full`, a likeness of 0.55 or more), from
   the prints the product makes for the services alone
