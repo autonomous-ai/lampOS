@@ -4164,7 +4164,13 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   bảo tác vụ "sẽ chạy ngay", mô hình nói ở lần "desk check" kế tiếp rằng nó
   "đã được đồng ý và đang chạy" và không gọi gì). Trong phòng đông người, cái
   "có" được nghe trong 45 s của thread tính từ lúc kết thúc câu đọc lại như
-  đã phát, không phải từ lúc bắt đầu (#6749 C, docs/second-voice.md). Giới hạn (`task-asks.json` trong
+  đã phát, không phải từ lúc bắt đầu (#6749 C, docs/second-voice.md). Với
+  `LAMP_SKILL_YES_CARRY=on` (mặc định tắt, #7148), một cái "có" không thấy
+  khuôn mặt nào nói được mang theo như của người đã biết trong 45 s tính từ
+  chính lúc kết thúc đó, không phải từ lúc bắt đầu lượt trao đổi cuối của
+  họ, và một cái "có" ngắn được đọc bằng quy tắc câu ngắn (#7422); một
+  khuôn mặt khác hoặc khuôn mặt thứ hai trong khung hình vẫn bị từ chối
+  (docs/second-voice.md). Giới hạn (`task-asks.json` trong
   `--state-dir` của lamp-skills): một SHA-256 đã nói thì không hỏi lại
   trước một ngày; tối đa 3 lần hỏi đã nói cho mọi kỹ năng trong 24 giờ; lần
   không nói được thì thử lại sau ít nhất 10 phút, ở lần kích hoạt sau (một

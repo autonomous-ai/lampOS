@@ -1547,12 +1547,33 @@ impl Thread {
     /// ([`Self::lamp_for_named`]): such a conversation carries a line's keep
     /// only (`ScopeLease::carry_keep_only`, Heron's P2 on #5448).
     pub fn going_on_how(&self, request: u64, now: Instant) -> Option<(String, bool)> {
+        self.going_on_asked(request, now, None)
+    }
+
+    /// [`Self::going_on_how`], and with `asked` (the request whose answer
+    /// was the lamp's question, and when that answer ended as played), the
+    /// conversation's [`GOING_ON_FOR`] counts from that end, not the
+    /// exchange's start, when that exchange is the newest: a skill's yes
+    /// awaited after its say-back (`LAMP_SKILL_YES_CARRY`, #7148, as #6749
+    /// C's thread window). Any newer exchange is judged as before.
+    pub fn going_on_asked(
+        &self,
+        request: u64,
+        now: Instant,
+        asked: Option<(u64, Instant)>,
+    ) -> Option<(String, bool)> {
         self.exchanges
             .iter()
             .rev()
             .filter(|exchange| exchange.request != request)
             .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
-            .filter(|exchange| now.saturating_duration_since(exchange.at) <= GOING_ON_FOR)
+            .filter(|exchange| {
+                let from = match asked {
+                    Some((asked, ended)) if asked == exchange.request => exchange.at.max(ended),
+                    _ => exchange.at,
+                };
+                now.saturating_duration_since(from) <= GOING_ON_FOR
+            })
             .filter(|exchange| self.after_close(exchange))
             .and_then(|exchange| match (&exchange.whose, &exchange.named) {
                 (Some(whose), _) => Some((whose.clone(), false)),

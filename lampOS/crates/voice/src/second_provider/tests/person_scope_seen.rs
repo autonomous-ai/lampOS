@@ -635,12 +635,14 @@ async fn lines_known(
     let engine = engine.carrying_conversations_by(match &kept_thread {
         Some(kept) => {
             let kept = kept.clone();
-            Some(Arc::new(move |request: u64| {
-                kept.lock().unwrap().going_on_how(request, Instant::now())
+            Some(Arc::new(move |request: u64, asked| {
+                kept.lock()
+                    .unwrap()
+                    .going_on_asked(request, Instant::now(), asked)
             }))
         }
         None => going_on.map(|going_on| -> crate::second_provider::GoingOnWith {
-            Arc::new(move |_| going_on.then(|| (a.clone(), false)))
+            Arc::new(move |_, _| going_on.then(|| (a.clone(), false)))
         }),
     });
     let mut engine = engine

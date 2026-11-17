@@ -1001,6 +1001,14 @@ pub const PERSON_SCOPE_SEEN_ENVIRONMENT: &str = "LAMP_PERSON_SCOPE_SEEN";
 /// room's.
 pub const CONVERSATION_CARRIES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIES";
 
+/// With [`CONVERSATION_CARRIES_ENVIRONMENT`], while a skill's yes is
+/// awaited after its say-back (#6749 C), the line answering it is carried
+/// for 45 s from the end of that say-back as played, not from the exchange's
+/// start, and read by the short-line rule when no face was found saying it
+/// ([`Engine::carrying_skill_yes_from_question`], #7148). `on`, and nothing
+/// else; off, as before.
+pub const SKILL_YES_CARRY_ENVIRONMENT: &str = "LAMP_SKILL_YES_CARRY";
+
 /// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a carried line may save into
 /// the conversation's own scope: its `remember` runs as the carried person's
 /// and its exchange is journalled as theirs ([`Engine::saving_carried`],
@@ -2247,6 +2255,10 @@ struct Shared {
     /// the known person (a memory id) whose conversation is going on as
     /// request `request` is heard; none, off.
     carries: Option<GoingOnWith>,
+    /// With [`Self::carries`], a skill's awaited yes is carried from the
+    /// end of its say-back as played and read by the short-line rule
+    /// (`LAMP_SKILL_YES_CARRY`, [`Engine::carrying_skill_yes_from_question`]).
+    skill_yes_carry: bool,
     /// A carried line may save into the conversation's scope
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`Engine::saving_carried`]).
     carried_saves: bool,
@@ -2393,7 +2405,28 @@ pub(crate) type AnotherVoice = Arc<dyn Fn() -> bool + Send + Sync>;
 /// [`Shared::carries`]: the known person whose conversation is going on as a
 /// request is heard, and whether it was only opened by a room's line named
 /// for them, which carries a keep only ([`crate::thread::Thread::going_on_how`]).
-pub(crate) type GoingOnWith = Arc<dyn Fn(u64) -> Option<(String, bool)> + Send + Sync>;
+/// With the lamp's question it answers (its request, and when that answer
+/// ended as played: [`asked_for_carry`]), the 45 s count from there
+/// ([`crate::thread::Thread::going_on_asked`], #7148).
+pub(crate) type GoingOnWith =
+    Arc<dyn Fn(u64, Option<(u64, Instant)>) -> Option<(String, bool)> + Send + Sync>;
+
+/// The lamp's question a line in `request` answers, for the carry
+/// (`LAMP_SKILL_YES_CARRY`, #7148): with `on`, while a skill's yes is
+/// awaited after its say-back (#6749 C), that answer's request and when it
+/// ended as played, `played_us` read at `now_us` and `now`; a say-back
+/// still playing ends no sooner than `now`. None off, or with no yes
+/// awaited: the carry counts from the exchange, as before.
+fn asked_for_carry(
+    on: bool,
+    asked: impl FnOnce() -> Option<(u64, u64)>,
+    now_us: u64,
+    now: Instant,
+) -> Option<(u64, Instant)> {
+    let (request, played_us) = on.then(asked).flatten()?;
+    let ago = Duration::from_micros(now_us.saturating_sub(played_us));
+    Some((request, now.checked_sub(ago).unwrap_or(now)))
+}
 
 /// [`Shared::keeps_calls`]: request `request`'s turn ran function `name`
 /// with the arguments it is told with ([`kept_args`]), its result told as
@@ -2418,6 +2451,55 @@ fn no_other_shown(
         Some(another) => eyes.looked_between(begun, finishing) && !another(),
         None => eyes.no_other_face_in_view(face, begun, finishing),
     }
+}
+
+/// A known person's line read for the carry (#4339): no face found saying
+/// it, nobody else shown ([`no_other_shown`]), their own face in view
+/// through it or within [`CARRY_UNSEEN_WITHIN`] before it, and `going_on`
+/// (whose conversation the thread says is going on, asked only then) theirs.
+/// Whether that conversation carries a keep only; none, not carried.
+fn unseen_carry(
+    shared: &Shared,
+    eyes: &crate::speaking_faces::SpeakingFaces,
+    speakers: &crate::speaking_faces::Speakers,
+    own_face: Option<&str>,
+    (begun, finishing): (Instant, Instant),
+    person: &str,
+    going_on: impl FnOnce() -> Option<(String, bool)>,
+) -> Option<bool> {
+    let sighted = speakers.is_empty()
+        && no_other_shown(shared, eyes, own_face, begun, finishing)
+        && eyes.face_seen_between(
+            own_face,
+            begun.checked_sub(CARRY_UNSEEN_WITHIN).unwrap_or(begun),
+            finishing,
+        );
+    if !sighted {
+        return None;
+    }
+    going_on()
+        .filter(|(going_on, _)| going_on == person)
+        .map(|(_, keep_only)| keep_only)
+}
+
+/// Who was seen saying a line answering a skill's say-back
+/// (`LAMP_SKILL_YES_CARRY`, #7148): `speakers` as read; with `yes_awaited`
+/// and nobody found, the line read again by the short-line rule
+/// ([`crate::speaking_faces::SpeakingFaces::short_line_speakers_with_boot`],
+/// as #7422 reads a held rename's yes), so a one-word yes their face was
+/// read saying in under three looks is theirs, and another face's is that
+/// face's.
+fn skill_yes_speakers(
+    eyes: &crate::speaking_faces::SpeakingFaces,
+    speakers: crate::speaking_faces::Speakers,
+    yes_awaited: bool,
+    begun: Instant,
+    finishing: Instant,
+) -> crate::speaking_faces::Speakers {
+    if yes_awaited && speakers.is_empty() {
+        return eyes.short_line_speakers_with_boot(begun, finishing);
+    }
+    speakers
 }
 
 /// Why [`Engine::carrying_past_silent_where_heard`] leaves the switch
@@ -4932,6 +5014,7 @@ impl Engine {
                 enrollment_sight: None,
                 scope_seen: false,
                 carries: None,
+                skill_yes_carry: false,
                 carried_saves: false,
                 carried_memory: false,
                 held_words_seen: false,
@@ -5218,13 +5301,30 @@ impl Engine {
         // The process's own thread, read without waiting: a busy one is no
         // conversation shown, and the line the room's.
         self.carrying_conversations_by(on.then(|| -> GoingOnWith {
-            Arc::new(|request: u64| {
-                crate::thread::THREAD
-                    .try_lock()
-                    .ok()
-                    .and_then(|thread| thread.going_on_how(request, std::time::Instant::now()))
+            Arc::new(|request: u64, asked: Option<(u64, Instant)>| {
+                crate::thread::THREAD.try_lock().ok().and_then(|thread| {
+                    thread.going_on_asked(request, std::time::Instant::now(), asked)
+                })
             })
         }))
+    }
+
+    /// With [`Self::carrying_conversations`], while a skill's yes is awaited
+    /// after its say-back (#6749 C), the line answering it is carried for
+    /// the conversation's 45 s from the end of that say-back as played, not
+    /// from the exchange's start (`LAMP_SKILL_YES_CARRY=on`, #7148): an
+    /// agent's make and its say-back outlast 45 s, and the person's unseen
+    /// "Yes." 36 to 40 s after it was dropped as the room's (lamp-9adf,
+    /// 15 Nov). With no face found saying it, it is read again by the
+    /// short-line rule (#7422's `short_line_speakers_with_boot`): a one-word
+    /// yes spans under the three looks a line needs. Everything else of the
+    /// carry stays: no other face in view, their face in view through it or
+    /// within [`CARRY_UNSEEN_WITHIN`] before, and another face seen saying
+    /// it narrows it.
+    pub fn carrying_skill_yes_from_question(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.skill_yes_carry = on;
+        self
     }
 
     /// With [`Self::carrying_conversations`], a carried line's `remember`
@@ -9174,6 +9274,19 @@ async fn spoken(
             Some((eyes, known)) => {
                 let (speakers, pair, alone) =
                     line_sight(eyes, known, begun, finishing, shared.scope_seen).await;
+                // `LAMP_SKILL_YES_CARRY`: the lamp's question this line
+                // answers, while a skill's yes is awaited after its
+                // say-back (#7148); a short yes no face was found saying is
+                // read again by the short-line rule.
+                let yes_awaited = shared.skill_yes_carry
+                    && crate::skill_write_yes::answer_awaited(request, Instant::now());
+                let speakers = skill_yes_speakers(eyes, speakers, yes_awaited, begun, finishing);
+                let asked = asked_for_carry(
+                    yes_awaited,
+                    || crate::skill_write_yes::asked_until(request, Instant::now()),
+                    monotonic_us(),
+                    Instant::now(),
+                );
                 // `LAMP_SAME_VOICE_CONFIRMS`: their voice, their face the one
                 // face in view, is their face seen saying it. Marked so, as
                 // it only ever fills an empty reading (`by_voice`).
@@ -9234,20 +9347,21 @@ async fn spoken(
                     .filter(|(name, _)| crate::known_faces::memory_person(name) == person)
                     .map(|(_, face)| face.as_str());
                 let carried = shared.scope_seen
-                    && speakers.is_empty()
-                    && no_other_shown(&shared, eyes, own_face, begun, finishing)
-                    && eyes.face_seen_between(
+                    && unseen_carry(
+                        &shared,
+                        eyes,
+                        &speakers,
                         own_face,
-                        begun.checked_sub(CARRY_UNSEEN_WITHIN).unwrap_or(begun),
-                        finishing,
+                        (begun, finishing),
+                        &person,
+                        || {
+                            shared
+                                .carries
+                                .as_ref()
+                                .and_then(|going_on| going_on(request, asked))
+                        },
                     )
-                    && shared
-                        .carries
-                        .as_ref()
-                        .and_then(|going_on| going_on(request))
-                        .is_some_and(|(going_on, keep_only)| {
-                            going_on == person && carry_into(&shared, scope, &person, keep_only)
-                        });
+                    .is_some_and(|keep_only| carry_into(&shared, scope, &person, keep_only));
                 if carried {
                     carried_past_silent = shared.past_silent.is_some();
                     carried_face = own_face.map(str::to_owned);
@@ -9456,7 +9570,16 @@ async fn spoken(
         && shared.scope_seen
         && lease.admitted_person().is_none()
         && lease.scope().is_some_and(|scope| scope.person().is_none())
-        && let Some((person, keep_only)) = going_on(request)
+        && let Some((person, keep_only)) = going_on(
+            request,
+            // `LAMP_SKILL_YES_CARRY`: from the lamp's question (#7148).
+            asked_for_carry(
+                shared.skill_yes_carry,
+                || crate::skill_write_yes::asked_until(request, Instant::now()),
+                monotonic_us(),
+                Instant::now(),
+            ),
+        )
     {
         let (speakers, pair, _) = line_sight(eyes, known, begun, finishing, true).await;
         let face = pair
@@ -19697,6 +19820,10 @@ async fn answer(
                     let until = shared.said_through(samples.len(), monotonic_us());
                     if let Some(did) = &shared.did {
                         did(Did::Said(request, until));
+                    }
+                    // Where a skill's yes is carried from (#7148).
+                    if shared.skill_yes_carry {
+                        crate::skill_write_yes::played_until(request, until);
                     }
                 }
             }
