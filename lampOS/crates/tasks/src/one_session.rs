@@ -46,6 +46,13 @@
 //!   its default engine changed. `offline`, `unknown`, `starting` and
 //!   `installing` are waited on. Reopened once for a turn; a second
 //!   failure sends that run the per-run way, journaled.
+//! - **No reply, no pane for tasks.** Harness takes a reply only with the
+//!   person's `programs-reply` setting on, off by default. A reply refused
+//!   `REPLY_OFF` sends that task, and every later one until lamp-tasks
+//!   starts again, the per-task way, as with the switch off: its own
+//!   `harness new` with its words as `--message`, which needs no reply
+//!   ([`OneSession::takes_reply`]), journaled once. Any other refusal is
+//!   [`Sent::NotTyped`], never a second session.
 //! - **Cancel or deadline** ends the turn: Harness has no interrupt verb,
 //!   so the pane is closed `--now` and opened again ([`OneSession::keep_open`]
 //!   or the next run), journaled. That cost is paid only then.
@@ -330,6 +337,11 @@ pub struct OneSession {
     /// A spoken task's wait for the pane on the tasks-harness worker, and
     /// lamp-tasks' stop ([`OneSession::with_spoken_bound`]).
     spoken_bound: Option<(Duration, Arc<AtomicBool>)>,
+    /// Harness refused a reply with `REPLY_OFF` (the person's
+    /// `programs-reply` setting off, as on a fresh lamp): every task from
+    /// then on goes the per-task way, until lamp-tasks starts again
+    /// ([`OneSession::takes_reply`]).
+    no_reply: AtomicBool,
 }
 
 /// Why a run can't have the pane.
@@ -353,6 +365,11 @@ pub enum Sent {
     NotTyped(String),
     /// Harness may have typed them: never typed again, the run fails.
     Uncertain(String),
+    /// Harness takes no reply here (`reply_off`: the person's
+    /// `programs-reply` setting off): nothing typed, so the task goes the
+    /// per-task way, its own `harness new` with its words as `--message`,
+    /// as with the switch off ([`OneSession::takes_reply`]).
+    NoReply,
 }
 
 /// The lamp's one session, set once by `runtime::serve` with the switch
@@ -454,6 +471,10 @@ pub fn lamp_key(slot: &crate::skill_task::SkillHarnessSlot) -> Option<String> {
 /// the lamp's own machine and default engine, as the pane open now is,
 /// and no session the person named.
 pub fn for_the_pane(one: &OneSession, launch: &Launch) -> Option<Place> {
+    // Harness takes no reply here: every task the per-task way.
+    if !one.takes_reply() {
+        return None;
+    }
     let place = one.place().or_else(|| one.lock().home.clone())?;
     (shares(place.engine)
         && launch.session.is_none()
@@ -469,7 +490,8 @@ pub fn for_the_pane(one: &OneSession, launch: &Launch) -> Option<Place> {
 /// store watches the pane as any session the person already had, and
 /// never closes it. `None`: the per-run way, only when the task is not
 /// for the lamp's shared engine (or the lamp's place was never known: no
-/// agent ready, A3's guard). A pane not open yet is opened in the queue;
+/// agent ready, A3's guard), or Harness takes no reply here (`reply_off`,
+/// [`OneSession::takes_reply`]). A pane not open yet is opened in the queue;
 /// one that could not take it fails the task `not_sent`, never a second
 /// session.
 pub fn spoken_launch(
@@ -549,6 +571,9 @@ pub fn spoken_launch(
         Sent::NotTyped(_) => Some(LaunchOutcome::NotSent {
             code: "busy".into(),
         }),
+        // Harness takes no reply here: the task's own `harness new`, as
+        // with the switch off (nothing was typed).
+        Sent::NoReply => None,
     }
 }
 
@@ -623,6 +648,25 @@ impl OneSession {
             look,
             open_idle_within,
             spoken_bound: None,
+            no_reply: AtomicBool::new(false),
+        }
+    }
+
+    /// Whether the pane may be typed into: false once Harness refused a
+    /// reply with `REPLY_OFF` (the person's `programs-reply` setting off),
+    /// until lamp-tasks starts again. Then every task goes the per-task
+    /// way, as with the switch off.
+    pub fn takes_reply(&self) -> bool {
+        !self.no_reply.load(Ordering::Acquire)
+    }
+
+    /// Harness refused a reply with `REPLY_OFF`: noted for the process's
+    /// life, journaled the first time only.
+    fn no_reply_here(&self) {
+        if !self.no_reply.swap(true, Ordering::AcqRel) {
+            eprintln!(
+                "tasks: one session: Harness takes no reply here (reply_off); each task gets its own pane"
+            );
         }
     }
 
@@ -1616,6 +1660,10 @@ impl Turn<'_> {
         until: Instant,
         ended: &dyn Fn() -> bool,
     ) -> Sent {
+        // Harness took no reply before: not tried again.
+        if !self.one.takes_reply() {
+            return Sent::NoReply;
+        }
         let text = format!("{}\n{words}", header(&self.id));
         let mut reopened = false;
         loop {
@@ -1695,6 +1743,12 @@ impl Turn<'_> {
                         .gone(&agent, "Harness said the pane is not running");
                 }
                 Typed::NotRunning => return self.fallback("the reopened pane is not running"),
+                // The person's `programs-reply` setting off: the per-task
+                // way for this task and every later one.
+                Typed::NotSent(code) if code == "reply_off" => {
+                    self.one.no_reply_here();
+                    return Sent::NoReply;
+                }
                 Typed::NotSent(code) => return self.fallback(&format!("harness reply: {code}")),
                 Typed::Uncertain(code) => {
                     // The words may have reached the pane.

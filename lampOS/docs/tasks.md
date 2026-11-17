@@ -4249,8 +4249,9 @@ exactly, the default when unset), every task and run is its own
   own `harness new` only when it is not for the pane (another machine or
   engine than the lamp's own default, or a session the person named); a
   skill run only when it is not for OpenClaw as the gateway default agent
-  (a Hermes default, say) or Harness is called as an agent. Work for the
-  pane never falls back to its own `new`.
+  (a Hermes default, say) or Harness is called as an agent. Both also go
+  the per-run way once Harness takes no reply here (`reply_off`, below).
+  Otherwise work for the pane never falls back to its own `new`.
 - **Held while the lamp's place is not known.** A spoken task that may be
   for the pane while the lamp's place is not known yet (just after a
   start, or with Harness's daemon down; signed in or out alike) is not
@@ -4299,6 +4300,20 @@ exactly, the default when unset), every task and run is its own
   typed only once `show` reads the pane idle with its last words taken
   (no `told`, or `told.taken`): Harness queues words typed before that,
   which would mix two tasks. The pane is never closed at a task's end.
+- **Harness takes no reply here (`reply_off`).** Harness takes a reply
+  only with the person's `programs-reply` setting on (`harness settings`,
+  off by default, so off on a customer's fresh lamp). A reply refused
+  `REPLY_OFF` (exit 5, `reply_off`) types nothing, so that task goes the
+  per-task way, exactly as with the switch off: its own `harness new`
+  with its words as `--task`, which needs no reply (a skill run its own
+  `new` in `skill-<run id>` and `close` at its end; a spoken task its own
+  launch). It is not failed and not `busy`. lamp-tasks remembers it until
+  it starts again (`OneSession::takes_reply`): every later task goes the
+  per-task way at once, with no reply tried and no wait for the pane, and
+  the first time is journaled `tasks: one session: Harness takes no reply
+  here (reply_off); each task gets its own pane`. The pane itself stays
+  open. Any other refused reply (`reply_failed`, a busy, gone or not
+  ready pane) is as before: no second session.
 - **A spoken task's turn.** The store watches the pane as a session the
   person already had (`Joined`) and never closes it. The store reads the
   pane for the task only once its words were seen taken. Not seen taken
@@ -4392,7 +4407,8 @@ exactly, the default when unset), every task and run is its own
   or `not closed after <task>'s turn was cancelled: <why>`;
   `<task>'s turn asks something; closed --now, opened again next`;
   `<task>'s turn ended unanswered; the pane is closed next`; `found <id>
-  an uncertain new made`;
+  an uncertain new made`; `Harness takes no reply here (reply_off); each
+  task gets its own pane` (once per lamp-tasks start);
   `let go: Harness's daemon started` or `let go: Harness's daemon
   restarted`; `the lamp signed out; its pane is removed`; `dropped <id>
   (<why>)`. Per task and per skill run: `tasks: <task>: turn accepted in
@@ -4534,7 +4550,9 @@ transcript readers (openharness `cli/src/engines/devin/`). So `ps`, `show` and
   (`EngineKind::typed_after`, `Cli::first_message`).
   - **The person's switch.** Harness takes the reply only with the
     person's `programs-reply` switch on (`harness settings`, off by
-    default).
+    default). The one session's replies need it too: with it off, each
+    task gets its own pane (`reply_off`, "One session for the lamp's
+    default agent").
   - **Not typed in.** The harness is started either way, so a task not
     typed in is uncertain, never sent again: `reply_off` (the switch is
     off), `reply_not_idle`, `reply_not_running` or `reply_failed` (the

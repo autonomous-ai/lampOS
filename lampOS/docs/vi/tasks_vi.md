@@ -1699,8 +1699,9 @@ một byte (`crates/tasks/src/one_session.rs`).
   chỉ khi nó không dành cho pane (máy hoặc engine khác với mặc định của
   chính đèn, hoặc người dùng nêu một phiên); lần chạy kỹ năng chỉ khi nó
   không dành cho OpenClaw là agent mặc định của gateway (ví dụ mặc định
-  Hermes) hoặc Harness được gọi với tư cách agent. Việc dành cho pane
-  không bao giờ lùi về `new` riêng.
+  Hermes) hoặc Harness được gọi với tư cách agent. Cả hai cũng đi đường
+  riêng khi Harness không nhận reply ở đây (`reply_off`, bên dưới). Ngoài
+  ra việc dành cho pane không bao giờ lùi về `new` riêng.
 - **Giữ lại khi chưa biết vị trí của đèn.** Việc nói có thể dành cho pane
   trong lúc vị trí của đèn chưa được biết (ngay sau khi khởi động, hoặc
   khi daemon của Harness không chạy; đăng nhập hay đăng xuất đều vậy)
@@ -1750,6 +1751,20 @@ một byte (`crates/tasks/src/one_session.rs`).
   gõ khi `show` đọc pane rảnh và lời trước đã được nhận (không có `told`,
   hoặc `told.taken`): Harness xếp hàng lời gõ trước lúc đó, sẽ trộn hai
   việc. Pane không bao giờ bị đóng khi một việc xong.
+- **Harness không nhận reply ở đây (`reply_off`).** Harness chỉ nhận reply
+  khi cài đặt `programs-reply` của người dùng bật (`harness settings`, mặc
+  định tắt, nên tắt trên đèn mới của khách hàng). Reply bị từ chối
+  `REPLY_OFF` (exit 5, `reply_off`) không gõ gì, nên việc đó đi đường
+  riêng, đúng như khi công tắc tắt: `harness new` riêng với lời của nó là
+  `--task`, không cần reply (lần chạy kỹ năng có `new` riêng trong
+  `skill-<run id>` và `close` khi xong; việc nói có lần giao riêng). Việc
+  không bị thất bại và không `busy`. lamp-tasks nhớ điều này tới khi nó
+  khởi động lại (`OneSession::takes_reply`): mọi việc sau đi đường riêng
+  ngay, không thử reply và không chờ pane, và lần đầu được ghi journal
+  `tasks: one session: Harness takes no reply here (reply_off); each task
+  gets its own pane`. Bản thân pane vẫn mở. Mọi lần từ chối reply khác
+  (`reply_failed`, pane bận, mất hoặc chưa sẵn sàng) vẫn như trước: không
+  có phiên thứ hai.
 - **Lượt của việc nói.** Store theo dõi pane như một phiên người dùng đã
   có (`Joined`) và không bao giờ đóng nó. Store chỉ đọc pane cho việc đó
   khi lời của việc đã được thấy là đã nhận. Không thấy nhận trong 120 s
@@ -1845,7 +1860,8 @@ một byte (`crates/tasks/src/one_session.rs`).
   hoặc `not closed after <task>'s turn was cancelled: <why>`;
   `<task>'s turn asks something; closed --now, opened again next`;
   `<task>'s turn ended unanswered; the pane is closed next`; `found <id>
-  an uncertain new made`;
+  an uncertain new made`; `Harness takes no reply here (reply_off); each
+  task gets its own pane` (một lần mỗi lần lamp-tasks khởi động);
   `let go: Harness's daemon started` hoặc `let go: Harness's daemon
   restarted`; `the lamp signed out; its pane is removed`; `dropped <id>
   (<why>)`. Mỗi việc và mỗi lần chạy kỹ năng: `tasks: <task>: turn
