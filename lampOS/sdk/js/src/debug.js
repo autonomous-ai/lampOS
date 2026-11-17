@@ -26,8 +26,9 @@ export const SUMMARISED = new Set(['text', 'prompt', 'data', 'jpeg']);
 // an MCP client keeps of stderr: a registered phrase and a `phrase.heard`
 // phrase, events' fields, and a refusal's `why`.
 export const SHOWN = new Set([
-  // hello's lamp: the owner's language (en, vi, ja, zh, ko).
+  // hello's lamp: the owner's language (en, vi, ja, zh, ko), and the lamp's build (143+ab12cd34ef56, the text the app shows).
   'language',
+  'build',
   // A skill run's `service.read` / `service.write`: the service's code (its
   // grants, `<code>-read` / `<code>-write`, show in `grants`).
   'service',

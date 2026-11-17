@@ -1350,6 +1350,11 @@
                 "language": {
                   "description": "The owner's language (en, vi, ja, zh or ko), from the lamp's setup, so a program's own lines can follow it; en when the owner has not chosen one. Lamps from before this say none: read it as en.",
                   "enum": ["en", "vi", "ja", "zh", "ko"]
+                },
+                "build": {
+                  "description": "The lamp's build, the same text the owner's app shows: its update sequence, a plus sign and the first twelve of its commit (143+ab12cd34ef56), so a bug report can quote it. Only in hello's answer, after the signature check: never in the welcome, which any connection gets before it is known. Not there on a lamp that has none to say (one from before this, or one without its update state): read it as unknown, never as a value.",
+                  "type": "string",
+                  "pattern": "^[0-9]+\\+[0-9a-fA-F]+$"
                 }
               },
               "required": [

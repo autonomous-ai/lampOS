@@ -17,6 +17,7 @@ pub mod agent;
 pub mod body_info;
 pub mod body_lease;
 pub mod body_state;
+pub mod build;
 pub mod camera;
 pub mod cert;
 pub mod feelings;

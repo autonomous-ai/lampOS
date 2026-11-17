@@ -126,7 +126,7 @@ async function main() {
     }
   } else if (command === 'hello') {
     const lamp = await Lamp.connect(arg);
-    console.log(`${lamp.info.id}: grants ${lamp.grants.join(', ')}`);
+    console.log(`${lamp.info.id}: ${lamp.build ? `build ${lamp.build}, ` : ''}grants ${lamp.grants.join(', ')}`);
     await lamp.close();
   } else {
     console.error(USAGE);

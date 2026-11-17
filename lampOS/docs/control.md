@@ -375,11 +375,22 @@ first start, and the client pins it at pairing.
 on every connection is a welcome, carrying a nonce of 32 random bytes made for
 that connection, which pairing's proof and hello's signature cover:
 `{"ev":"welcome","at":"…","nonce":"<base64>","lamp":{"id":"lamp-75c9","name":"…","v":1,"language":"en"}}`.
-The hello's answer carries the same `lamp`. `language` is the owner's language (`en`, `vi`,
+The hello's answer carries the same `lamp` (and, when known, `build`: below). `language` is the owner's language (`en`, `vi`,
 `ja`, `zh` or `ko`) from the file the setup writes (`/etc/lampOS/setup/language`, or the
 file `LAMP_LANGUAGE_FILE` names), read at each welcome and hello, so a change shows on the
 next connection; a missing, empty or unknown value says `en`, as the voice reads it
 (`crate::language`). A program's own lines follow it (`lamp.language` in the SDKs).
+**The build** (#5299, decided on #7415): the hello's `lamp` also carries `build`, **only in hello's
+answer, after the signature check, never in the welcome** (the welcome goes to any connection
+on the network before it is paired or signed, and must not tell a stranger which build a lamp
+runs; Heron's P2 on #7528), the text the owner's app shows, `<update sequence>+<first twelve of the commit>` (`143+ab12cd34ef56`), so a
+developer can quote it in a bug report (`lamp.build` in the SDKs; `lamp hello` prints it).
+`lamp-control` reads it once, at its start, from `lamp-update`'s `state.json` (root's, 0600),
+which its unit hands in as the credential `build` (`LoadCredential=`, as `lamp-cloud.service`
+does, with a blank `SetCredential=` fallback so a lamp without the file still starts). With
+no state, a blank credential or a state that names no installed build, `build` is not in
+`lamp` at all: never null and never a made-up value, and an older SDK ignores the field
+(`crate::build`).
 - A request: `{"id": 7, "op": "...", ...}`. `id` is the client's, a whole
   number, echoed as `re`. Every op but `pair` and `hello` needs `hello`
   first on the connection.
