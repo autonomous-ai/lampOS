@@ -8352,6 +8352,7 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::ReminderDeferred { .. }
         | ProviderOutput::InputDiscarded { .. }
         | ProviderOutput::OwnershipAssumed { .. }
+        | ProviderOutput::MadeRunNow { .. }
         | ProviderOutput::Ended { .. } => None,
         ProviderOutput::Started { request, .. }
         | ProviderOutput::Audio { request, .. }
@@ -19194,6 +19195,17 @@ async fn answer(
                     || (crate::sleep_asked::is_tool(&call.name)
                         && answer.told == crate::sleep_asked::told(false)))
                     && !shared.emit(ProviderOutput::SleepAsked { request }).await
+                {
+                    return Err(Stop::Gone);
+                }
+                // A made skill run now by the owner's voice: kept by the
+                // coordinator, whose say service lets its failure answer
+                // this conversation (#7363); this process's record is never
+                // read there (El's P1).
+                if let Some(skill) = crate::made_run::ran_of(&answer.told)
+                    && !shared
+                        .emit(ProviderOutput::MadeRunNow { request, skill })
+                        .await
                 {
                     return Err(Stop::Gone);
                 }

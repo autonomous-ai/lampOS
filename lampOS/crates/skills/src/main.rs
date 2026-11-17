@@ -5850,57 +5850,108 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             }
             _ => tried.failed(),
         };
-        // What its agent found, or with the switch on, why it didn't run
-        // (once: a refusal or the not-ready line said above is that). Its
-        // failure is said in the conversation that asked for the run while
-        // it goes on, else as news (`lamp_skills::service_read::tell_failed`).
-        let asking = sure && lamp_skills::task_sure::in_asking_conversation(asked_at, unix_ms());
-        let told = match (found.take(), failed) {
-            (Some(lines), _) => Some((lines, "what its agent found", None)),
-            (None, Some(line)) if refused.is_none() => {
-                Some((vec![], "what became of its run", Some(line)))
-            }
-            (None, _) => None,
-        };
-        if let Some((lines, what, failed)) = told {
-            // Kept as waiting till its end, so a restart that drops it
-            // unsaid leaves a line at the next start (#7180).
-            let began = unix_ms();
-            if let Some(state) = &state
-                && let Err(error) = lamp_skills::task::telling_begins(state, &skill, began)
-            {
-                eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {error}");
-            }
-            // Asked by the owner's voice and ready within five minutes: the
-            // quiet lifted for it, for five minutes more (#7180).
-            if let Some(asked) = asked {
-                let ready = unix_ms();
-                let after = ready.saturating_sub(asked) / 1000;
-                match lamp_voice::told_when_asked::lifted_until(asked, ready) {
-                    Some(until) => {
-                        room.quiet_lifted = Some(until);
-                        eprintln!(
-                            "lamp-skills: skill:{skill}: do.task: {what}: told in quiet hours too, its owner asked by voice {after} s before ({})",
-                            lamp_voice::told_when_asked::ENVIRONMENT
-                        );
-                    }
-                    None => eprintln!(
-                        "lamp-skills: skill:{skill}: do.task: {what}: its quiet holds, ready {after} s after its owner's ask, past five minutes"
-                    ),
-                }
-            }
-            let told = match &failed {
-                Some(line) => lamp_skills::service_read::tell_failed(line, asking, &mut room),
-                None => lamp_skills::service_read::tell(&lines, &mut room),
-            };
-            eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {told}");
-            if let Some(state) = &state
-                && let Err(error) = lamp_skills::task::telling_ends(state, &skill, began)
-            {
-                eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {error}");
-            }
-        }
+        let state = state.as_deref();
+        let found = found.take();
+        tell_its_run(
+            &skill,
+            found,
+            failed,
+            refused.is_some(),
+            asked,
+            asked_at,
+            sure,
+            state,
+            &mut room,
+        );
     });
+}
+
+/// What [`hand_task`] tells of its run, once it ended, on its thread: what
+/// its agent found, behind a read's gate; or, with `LAMP_SKILL_TASK_SURE`
+/// on (`sure`), why it didn't run (`failed`), unless a refusal was said
+/// (`refused`). The failure is said in the conversation that asked for the
+/// run while it goes on, a run now its owner asked by voice at `asked_at`
+/// (`lamp_skills::task_sure::in_asking_conversation`), else as news
+/// (`lamp_skills::service_read::tell_failed`, #7363). `asked`: that ask
+/// with `LAMP_TOLD_WHEN_ASKED` on, which lifts the quiet (#7180). The
+/// journal's words, or none when nothing was told.
+#[allow(clippy::too_many_arguments)]
+fn tell_its_run(
+    skill: &str,
+    found: Option<Vec<String>>,
+    failed: Option<String>,
+    refused: bool,
+    asked: Option<u64>,
+    asked_at: Option<u64>,
+    sure: bool,
+    state: Option<&Path>,
+    room: &mut LampRoom,
+) -> Option<String> {
+    let asking = sure && lamp_skills::task_sure::in_asking_conversation(asked_at, unix_ms());
+    let (lines, what, failed) = match (found, failed) {
+        (Some(lines), _) => (lines, "what its agent found", None),
+        (None, Some(line)) if !refused => (vec![], "what became of its run", Some(line)),
+        (None, _) => return None,
+    };
+    // Kept as waiting till its end, so a restart that drops it
+    // unsaid leaves a line at the next start (#7180).
+    let began = unix_ms();
+    if let Some(state) = state
+        && let Err(error) = lamp_skills::task::telling_begins(state, skill, began)
+    {
+        eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {error}");
+    }
+    // Asked by the owner's voice and ready within five minutes: the
+    // quiet lifted for it, for five minutes more (#7180).
+    if let Some(asked) = asked {
+        let ready = unix_ms();
+        let after = ready.saturating_sub(asked) / 1000;
+        match lamp_voice::told_when_asked::lifted_until(asked, ready) {
+            Some(until) => {
+                room.quiet_lifted = Some(until);
+                eprintln!(
+                    "lamp-skills: skill:{skill}: do.task: {what}: told in quiet hours too, its owner asked by voice {after} s before ({})",
+                    lamp_voice::told_when_asked::ENVIRONMENT
+                );
+            }
+            None => eprintln!(
+                "lamp-skills: skill:{skill}: do.task: {what}: its quiet holds, ready {after} s after its owner's ask, past five minutes"
+            ),
+        }
+    }
+    let told = match &failed {
+        Some(line) => lamp_skills::service_read::tell_failed(line, asking, room),
+        None => lamp_skills::service_read::tell(&lines, room),
+    };
+    eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {told}");
+    if let Some(state) = state
+        && let Err(error) = lamp_skills::task::telling_ends(state, skill, began)
+    {
+        eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {error}");
+    }
+    Some(told)
+}
+
+/// What [`LampRoom::answer`]'s say `outcome` (`say`'s words, after "say: ")
+/// means for its failure line (#7363, El's P3): Ok when it was said, or
+/// may have been (`begun`, or its outcome lost while it was queued: a
+/// timeout, the voice ending without one), so news never says it twice;
+/// Err, said as news, only when the voice surely never played it: expired,
+/// refused or dropped before it began.
+fn answer_outcome(outcome: &str, begun: bool) -> Result<(), String> {
+    let Some(said) = outcome.strip_prefix("say: ") else {
+        return Ok(());
+    };
+    if said == "spoken" || begun {
+        return Ok(());
+    }
+    if ["expired", "refused", "dropped"]
+        .iter()
+        .any(|unsaid| said.starts_with(unsaid))
+    {
+        return Err(said.to_owned());
+    }
+    Ok(())
 }
 
 /// lamp-skills' hand-overs to lamp-tasks under way, a task's or a fixed
@@ -6187,13 +6238,14 @@ impl lamp_skills::service_read::Room for LampRoom {
                             "priority": lamp_skills::SAY_PRIORITY});
         let mut begun = false;
         let outcome = say(&self.say, "say", &self.skill, asking, &[], || begun = true);
-        match outcome.strip_prefix("say: ") {
-            Some("spoken") => Ok(()),
-            // Begun and cut: heard in part, never said again as news.
-            Some(_) if begun => Ok(()),
-            Some(other) => Err(other.to_owned()),
-            None => Err(outcome),
+        let answered = answer_outcome(&outcome, begun);
+        if answered.is_ok() && outcome != "say: spoken" && !begun {
+            eprintln!(
+                "lamp-skills: skill:{}: its answer's outcome is not known ({outcome}); never said again as news",
+                self.skill
+            );
         }
+        answered
     }
 
     fn link_note(&mut self) -> Option<bool> {
@@ -6655,6 +6707,116 @@ mod tests {
         room.quiet_lifted = Some(unix_ms() + 60_000);
         assert!(!room.seen().quiet, "asked by voice, it is lifted");
         assert_eq!(task_room("morning-mail", &step(None), &runner).quiet, None);
+    }
+
+    /// #7363 (El's P2): `hand_task`'s telling of a run now its owner asked
+    /// by voice, whose hand-over failed (lamp-tasks not reached, Heron's
+    /// case). Within the asking conversation the failure goes straight to
+    /// the voice as exact words with `answers`, at once: nobody in view and
+    /// the lamp's quiet hours hold nothing. Past it, with the switch off, or
+    /// played by no one, it is news, and at quiet hours it is dropped.
+    #[test]
+    fn a_failed_run_now_is_answered_in_its_conversation_else_news() {
+        let dir = tempfile::Builder::new()
+            .prefix("an")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let say_path = dir.path().join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&say_path).unwrap();
+        // The voice: each ask read and answered with `outcome`, in turn.
+        let (asks, asked) = std::sync::mpsc::channel();
+        let voice = std::thread::spawn(move || {
+            for outcome in ["spoken", "expired"] {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let mut stream = &stream;
+                if outcome == "spoken" {
+                    writeln!(stream, "{}", json!({"event": "begun", "at_us": 1})).unwrap();
+                }
+                writeln!(stream, "{}", json!({"outcome": outcome})).unwrap();
+                asks.send(serde_json::from_str::<serde_json::Value>(&line).unwrap())
+                    .unwrap();
+            }
+        });
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        // No faces said: nobody in view, and no gate of a read's opens.
+        let mut room = LampRoom {
+            skill: "fig-facts".into(),
+            say: say_path,
+            services: dir.path().join("call.sock"),
+            bus,
+            // No owner's face enrolled: news is given up at once here (its
+            // quiet-hours drop is `service_read`'s test), never answered.
+            known_file: None,
+            owner: None,
+            local_time: None,
+            quiet: None,
+            quiet_lifted: None,
+        };
+        let not_taken = Err(lamp_skills::service_write::Unrun::NotTaken(
+            "lamp-tasks couldn't be reached".into(),
+        ));
+        let line = lamp_skills::task_sure::failed_line("fig-facts", &not_taken);
+        assert_eq!(line.as_deref(), Some("Fig facts couldn't run this time."));
+        // The run as `run_now_call` marks it, and `hand_task` takes it.
+        lamp_skills::task::asked_by_voice("fig-facts", unix_ms() - 2_000);
+        let asked_at = lamp_skills::task::take_asked_by_voice("fig-facts");
+        let tell = |room: &mut LampRoom, asked_at, sure| {
+            let began = Instant::now();
+            let told = tell_its_run(
+                "fig-facts",
+                None,
+                line.clone(),
+                false,
+                None,
+                asked_at,
+                sure,
+                None,
+                room,
+            );
+            (told.unwrap(), began.elapsed())
+        };
+        let (told, took) = tell(&mut room, asked_at, true);
+        assert_eq!(told, "said in the asking conversation");
+        assert!(took < Duration::from_secs(5), "at once, no gate: {took:?}");
+        let ask = asked.recv().unwrap();
+        assert_eq!(ask["text"], "Fig facts couldn't run this time.");
+        assert_eq!(
+            (ask["exact"].clone(), ask["answers"].clone()),
+            (json!(true), json!(true))
+        );
+        assert_eq!(ask["skill"], "fig-facts");
+        // Not played (expired): news, behind the gate, never answered.
+        let (told, _) = tell(&mut room, asked_at, true);
+        assert_eq!(
+            told,
+            "not said in the asking conversation (expired), so as news: skipped: no owner's face enrolled"
+        );
+        assert_eq!(asked.recv().unwrap()["answers"], true);
+        voice.join().unwrap();
+        // Past the conversation, or the switch off: news at once, the voice
+        // never asked (its socket is gone).
+        let late = Some(unix_ms() - 60_000);
+        const NEWS_GIVEN_UP: &str = "skipped: no owner's face enrolled";
+        assert_eq!(tell(&mut room, late, true).0, NEWS_GIVEN_UP);
+        assert_eq!(tell(&mut room, asked_at, false).0, NEWS_GIVEN_UP);
+        // A lost outcome while it was queued may have been said: never
+        // again as news (El's P3); only a sure unplayed one is.
+        assert_eq!(answer_outcome("say: spoken", false), Ok(()));
+        assert_eq!(
+            answer_outcome("say: dropped (user_interrupted)", true),
+            Ok(())
+        );
+        assert_eq!(answer_outcome("say: expired", false), Err("expired".into()));
+        assert!(answer_outcome("say: refused (the lamp is muted)", false).is_err());
+        assert!(answer_outcome("say: dropped (asker gone)", false).is_err());
+        for lost in [
+            "say: the voice ended without an outcome",
+            "say: the voice's say service was not reached (Resource temporarily unavailable)",
+        ] {
+            assert_eq!(answer_outcome(lost, false), Ok(()), "{lost}");
+        }
     }
 
     /// #5288's gate: a line on `voice/heard`, an event the bus keeps no

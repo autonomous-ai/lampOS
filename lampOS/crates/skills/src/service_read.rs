@@ -569,7 +569,11 @@ pub trait Room {
     fn waits(&mut self, _why: &str) {}
     /// Says `text` as exact words as the answer to the conversation that
     /// asked the run (`lamp_voice::made_run::answers_now`), with no gate of
-    /// a read's: Ok once it began. The default: never, said as news.
+    /// a read's: Ok once it began, or whenever it may have (its outcome
+    /// lost: the say socket timed out or closed with the line queued), so it
+    /// is never said twice; Err only when the voice surely never played it
+    /// (expired, refused, or let go unbegun), and it is then said as news.
+    /// The default: never, said as news.
     fn answer(&mut self, _text: &str) -> Result<(), String> {
         Err("no conversation to answer here".into())
     }
