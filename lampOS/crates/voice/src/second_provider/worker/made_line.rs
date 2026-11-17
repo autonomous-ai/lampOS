@@ -88,6 +88,12 @@ async fn a_cut_code_makes_say_back_goes_to_the_say_service_whole() {
             remove: false,
         };
         crate::skill_write_yes::wait_for_yes(asks, 3, std::time::Instant::now());
+        // Its cut line as a code make's is (`made_skill::cut_code_line`).
+        crate::make_skill_local::set_said_line(format!(
+            "I made evening dim.{} {}",
+            crate::made_skill::code_said_as(&["camera".to_owned()], false),
+            crate::made_skill::CUT_ASK_AGAIN
+        ));
         answer
     };
     let running = made_running(3, work, move |line| {

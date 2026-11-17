@@ -2312,6 +2312,13 @@ pub fn take_said_line() -> Option<String> {
     MADE_LINE.with(|kept| kept.take())
 }
 
+/// Tests: the line [`take_said_line`] gives next on this thread, as a make
+/// of another kind (one with code, cut) would leave it.
+#[cfg(test)]
+pub fn set_said_line(line: String) {
+    MADE_LINE.with(|kept| kept.replace(Some(line)));
+}
+
 /// The one short line of a make that kept `made`, `on` or not; or not
 /// made and why: the line [`told`] gives the model, as written. One that
 /// sends or writes, made and on, is [`made_skill::cut_write_line`]: this
