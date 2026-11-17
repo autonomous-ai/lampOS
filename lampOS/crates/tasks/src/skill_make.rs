@@ -2163,6 +2163,10 @@ mod tests {
         let whole = "~~~~toml\na = 1\n```\n~~~\nb = 2\n~~~~\n```md\n---\nname: x\n---\n```";
         assert_eq!(skill_blocks(whole).len(), 2);
         assert!(make_answer(&made.path, Some((whole, false))).is_some());
+        // A bare ``` inside a `~~~~` block is its body, and the bare `~~~~`
+        // ends it: the `md` block after it is the skill's `SKILL.md`.
+        let mixed = "~~~~toml\na = 1\n```\n~~~~\n```md\n---\nname: x\n---\n```";
+        assert!(make_answer(&made.path, Some((mixed, false))).is_some());
         // Never closed: a ``` is not its end, so all that follows is its
         // body and no `SKILL.md` was written.
         let open = "~~~~toml\na = 1\n```\n```\n---\nname: x\n---\n```";
