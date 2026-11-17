@@ -2477,6 +2477,17 @@ impl<P: Persistence> Engine<P> {
                     "tasks: task {task_id} takes over the session of {} earlier one(s)",
                     before - next.tasks.len()
                 );
+                // A receipt for a task given away here (the voice told its
+                // answer while this one was being typed) no longer
+                // describes the store: dropped, as a replaced read's is
+                // (`watch_read`), never a store that fails its own check.
+                if next
+                    .last_receipt
+                    .as_ref()
+                    .is_some_and(|receipt| receipt_effect(&next, &receipt.request).is_err())
+                {
+                    next.last_receipt = None;
+                }
             }
         }
         let index = find(&next, task_id)?;
@@ -4375,6 +4386,52 @@ mod tests {
         engine.begin_close(&clock(13)).unwrap().unwrap();
         queued(&mut engine, 20);
         assert!(engine.begin_launch(&clock(20)).unwrap().is_none());
+    }
+
+    /// Seen on lamp-c0a4 (openharness#4393): the voice told the first
+    /// task's answer while the follow-up was being typed into its session.
+    /// The receipt then named the task the follow-up took over; the store
+    /// failed its own check and lamp-tasks exited. The receipt is dropped.
+    #[test]
+    fn a_follow_up_takes_over_a_session_told_while_it_was_typed() {
+        let (mut engine, memory) = opened();
+        let first = accepted(&mut engine, 0);
+        let job = request_read(&mut engine, first, 10);
+        let mut answer = data("A poem about coffee, in poem.txt.");
+        answer.ask = Some("Write a two-line poem about coffee.".into());
+        engine.finish_observation(&job, answer, &clock(10)).unwrap();
+        let observation = engine.state.tasks[0]
+            .read
+            .as_ref()
+            .unwrap()
+            .observation_id
+            .unwrap();
+        engine
+            .handle(&claim(&engine, first, observation), &clock(11), true)
+            .unwrap();
+        let second = queued(&mut engine, 20);
+        engine.begin_launch(&clock(20)).unwrap().unwrap();
+        engine
+            .handle(
+                &acknowledgement(&engine, first, observation),
+                &clock(21),
+                true,
+            )
+            .unwrap();
+        engine
+            .finish_launch(
+                second,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                    session: None,
+                },
+                &clock(22),
+            )
+            .unwrap();
+        assert!(engine.state.tasks.iter().all(|task| task.id != first));
+        assert!(engine.state.last_receipt.is_none());
+        assert_eq!(stored(&memory).tasks.len(), 1);
+        assert!(engine.state.check().is_ok());
     }
 
     /// #1390: the harness this lamp started is closed once its answer is told,
