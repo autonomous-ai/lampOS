@@ -38,10 +38,17 @@ const CUT: &str = "cut: ";
 /// unplugging you" (#4595): `app`, `plug`, or `none` with
 /// `prepare_to_unplug` offered.
 const UNPLUG: &str = "unplug: ";
+/// `lamp-services`' tools folder in the catalogs' folder: on a lamp it is
+/// `lamp_voice::services::FOLDER`, and the product's `LAMP_SERVICES=on`
+/// tells its three functions (#7433: without it this run counted three
+/// fewer than a lamp's voice tells).
+const SERVICES: &str = "services";
 
 /// The lamp's own functions a product lamp's chat request offers now, on the
 /// product's route (`LAMP_VOICE_ROUTE=second`, bound
-/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 27 (with
+/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 30 (lamp-services'
+/// `services_connected`, `service_read` and `service_write` since
+/// `LAMP_SERVICES` is on in the product, and before them 27, with
 /// onboarding's two and memory's `forget_everything` since 25 Oct,
 /// reports' `reports_stop` and `reports_state` since #2862, a made
 /// skill's `make_skill` since fourteen-P15 (its `put_on_made_skill` gone
@@ -54,20 +61,20 @@ const UNPLUG: &str = "unplug: ";
 /// the product, #5750, and Harness's `harness_status` since
 /// `LAMP_TASKS_HARNESS_STATUS` is on in the product, #6061, and the asked
 /// sleep's `go_to_sleep` since `LAMP_SLEEP_ASKED` is on in the product,
-/// #6853: 45, and 48 with the route's 3; a real lamp also has lamp-services'
-/// 3 and the weather, which this run doesn't count, so the bound is 64
-/// since #7433), the
+/// #6853), the
 /// actions part's 17 and the skills' 1: `use_skill`, which reaches every
 /// skill's function (`LAMP_USE_SKILL=on` since #2826; Dance's `dance`,
 /// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,
 /// were 3 before it; the FAQ's `lamp_help` since #5790, Light show's
 /// `light_show` since #5745, Light scenes' `light_scene` and Point the
-/// light's `point_light` since #5744), before the
-/// search and the look. However many skills
+/// light's `point_light` since #5744): 48, and 52 with the route's 4 (the
+/// search, its fetch, the weather and the look), past the bound of 48 it
+/// had until #7433, which left out the fetch, the time elsewhere,
+/// `reports_state` and the weather on every lamp. However many skills
 /// are installed, the skills' stay 1. The test prints this split. A change
 /// to it is a change to what every session is told: say in its pull
 /// request what is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 45;
+const PRODUCT_FUNCTIONS: usize = 48;
 
 /// Every `Environment=` of a voice unit's `[Service]`.
 fn voice_environment(unit: &str) -> Vec<(String, String)> {
@@ -96,7 +103,17 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
     if std::env::var_os(CATALOGS).is_none() {
         return;
     }
-    let flags = lamp_voice::tools::arguments_from_environment();
+    let mut flags = lamp_voice::tools::arguments_from_environment();
+    // lamp-services' folder as a lamp has it, here beside the catalogs.
+    if let Some(at) = flags
+        .iter()
+        .position(|flag| flag == lamp_voice::services::FLAG)
+    {
+        flags[at + 1] = std::path::Path::new(&std::env::var_os(CATALOGS).unwrap())
+            .join(SERVICES)
+            .to_string_lossy()
+            .into_owned();
+    }
     let (settings, rest) = lamp_voice::tools::take(&flags).unwrap();
     assert!(rest.is_empty(), "{rest:?}");
     if let Some(socket) = &settings.memory {
@@ -111,13 +128,22 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
     }
     // The product's route (LAMP_VOICE_ROUTE=second): its chat requests add
     // the web search's functions, LAMP_SECOND_SEARCH=deepseek's two.
-    let search =
+    let mut search =
         match std::env::var(lamp_voice::second_provider::worker::SEARCH_ENVIRONMENT).as_deref() {
             Ok("deepseek") => lamp_voice::second_provider::net::search::Search::deepseek("test")
                 .unwrap()
                 .declarations(),
             _ => Vec::new(),
         };
+    // The weather's, beside the search's, as the worker adds it
+    // (`LAMP_SECOND_WEATHER=on` in the product; #7433).
+    if lamp_voice::second_provider::net::weather::on(
+        std::env::var(lamp_voice::second_provider::net::weather::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    ) {
+        search.push(lamp_voice::second_provider::net::weather::declaration());
+    }
     // A spoken turn's look, as the worker offers it: with a full look and
     // the eyes' look file (#2905); the product sets both (#2791's product half).
     let look = lamp_voice::sight::full_look_file().is_some()
@@ -193,6 +219,21 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
         // catalog keeps prepare-unplug, as this fixture does.
         .map(|name| lamp_skills::load(&installed.path().join(name)).unwrap())
         .collect();
+    // lamp-services' catalog, as its folder lists it on a lamp: the voice
+    // takes only its three names from it.
+    let services = folder.path().join(SERVICES);
+    std::fs::create_dir(&services).unwrap();
+    std::fs::write(
+        services.join(lamp_voice::tools::CATALOG_FILE),
+        serde_json::json!({
+            "tools": lamp_voice::services::NAMES
+                .iter()
+                .map(|name| serde_json::json!({"name": name, "description": "A linked service."}))
+                .collect::<Vec<_>>()
+        })
+        .to_string(),
+    )
+    .unwrap();
     let beside = folder.path().join(lamp_voice::tools::SKILLS_DIR);
     std::fs::create_dir(&beside).unwrap();
     std::fs::write(
@@ -285,6 +326,7 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
     let routes_own = [
         lamp_voice::second_provider::net::search::NAME,
         lamp_voice::second_provider::net::search::FETCH,
+        lamp_voice::second_provider::net::weather::NAME,
         lamp_voice::second_provider::LOOK_CALL,
     ];
     let lamps: Vec<&String> = chat
