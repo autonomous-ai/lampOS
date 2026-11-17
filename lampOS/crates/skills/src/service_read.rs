@@ -90,6 +90,9 @@ pub const STEADY: Duration = Duration::from_secs(5);
 pub const VOICE_WITHIN: Duration = Duration::from_secs(60);
 /// How often the gate is looked at while it waits.
 pub const POLL: Duration = Duration::from_millis(250);
+/// A shut gate's changed reason is said at most this often while it
+/// waits ([`Room::waits`]): a gate flapping each look says one a second.
+pub const SAY_WHY_EVERY: Duration = Duration::from_secs(1);
 /// What the lamp says, and only this, when someone comes mid-read.
 pub const STOP_LINE: &str = "I'll tell you the rest later.";
 /// How long after one read ended before another may begin, so a second
@@ -559,9 +562,10 @@ pub trait Room {
         None
     }
     /// The gate found shut as a read or a told answer begins to wait for
-    /// it: once a wait, with the gate's words, for the journal (#7180: a
-    /// told answer in quiet hours waited unsaid with no line). The
-    /// default keeps nothing.
+    /// it, with the gate's words, for the journal (#7180: a told answer in
+    /// quiet hours waited unsaid with no line); and again each time its
+    /// reason changes while it waits, at most once each
+    /// [`SAY_WHY_EVERY`]. The default keeps nothing.
     fn waits(&mut self, _why: &str) {}
 }
 
@@ -626,7 +630,10 @@ fn wait_for_gate<R: Room>(room: &mut R) -> Result<Option<Taken<'static>>, String
     let turns = room.turns();
     let mut steady: Option<u64> = None;
     let mut last = Closed::Nobody;
-    let mut said_why = false;
+    // The reason last said and when: each change said once, at most one a
+    // second, never each look (lamp-9adf, 17 Nov: a wait kept its first
+    // reason only).
+    let mut said: Option<(Closed, u64)> = None;
     let taken = loop {
         let now = room.now_ms();
         // Another read's turn closes the gate as the room does, under the
@@ -641,8 +648,14 @@ fn wait_for_gate<R: Room>(room: &mut R) -> Result<Option<Taken<'static>>, String
             Err(why) => {
                 steady = None;
                 last = why;
-                if !said_why {
-                    said_why = true;
+                let due = match said {
+                    None => true,
+                    Some((before, at)) => {
+                        before != why && now.saturating_sub(at) >= SAY_WHY_EVERY.as_millis() as u64
+                    }
+                };
+                if due {
+                    said = Some((why, now));
                     room.waits(why.words());
                 }
             }
@@ -1449,6 +1462,47 @@ mod tests {
         let mut lamp = Lamp::new(vec![alone()], json!({}));
         assert_eq!(tell(&lines, &mut lamp), "told 1");
         assert!(lamp.waits.is_empty());
+    }
+
+    /// Each change of the gate's reason is said once, not only the first
+    /// (lamp-9adf, 17 Nov: a failed run's line waited ten minutes with the
+    /// owner's photo up, and the journal kept only "the owner not in
+    /// view"): nobody, then a voice heard, held, then the owner alone says
+    /// the two and is told. A reason that changes under a second after the
+    /// last said waits for that second; a gate flapping each look says at
+    /// most one reason a second.
+    #[test]
+    fn a_wait_for_the_gate_says_each_change_of_its_reason() {
+        let lines = vec!["None urgent.".to_owned()];
+        let mut nobody = alone();
+        nobody.faces = Some(0);
+        let mut heard = alone();
+        heard.heard_ago = Some(Duration::from_secs(1));
+        let mut seen = vec![nobody.clone(); 4];
+        seen.extend(vec![heard.clone(); 8]);
+        seen.push(alone());
+        let mut lamp = Lamp::new(seen, json!({}));
+        assert_eq!(tell(&lines, &mut lamp), "told 1");
+        assert_eq!(lamp.waits, ["the owner not in view", "a voice heard"]);
+        // A voice heard a look after nobody: said a second after nobody.
+        let mut seen = vec![nobody.clone()];
+        seen.extend(vec![heard.clone(); 8]);
+        seen.push(alone());
+        let mut lamp = Lamp::new(seen, json!({}));
+        assert_eq!(tell(&lines, &mut lamp), "told 1");
+        assert_eq!(lamp.waits, ["the owner not in view", "a voice heard"]);
+        // Flapping each look for a minute: one reason a second at most.
+        let mut seen = Vec::new();
+        for _ in 0..120 {
+            seen.push(nobody.clone());
+            seen.push(heard.clone());
+        }
+        seen.push(alone());
+        let mut lamp = Lamp::new(seen, json!({}));
+        assert_eq!(tell(&lines, &mut lamp), "told 1");
+        let seconds = (240 * POLL.as_millis() / 1_000) as usize;
+        assert!(lamp.waits.len() > 2, "{:?}", lamp.waits);
+        assert!(lamp.waits.len() <= seconds + 1, "{:?}", lamp.waits);
     }
 
     /// A failed run's line (`LAMP_SKILL_TASK_SURE`,

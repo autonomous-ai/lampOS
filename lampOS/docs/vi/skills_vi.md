@@ -1987,7 +1987,10 @@ carries N bytes of its agent's answer`, hoặc `no agent's answer`; #7180).
 Khi bắt đầu chờ mà cổng đang đóng, dù là một lần đọc hay một câu trả lời cần
 nói, nhật ký ghi một lần kèm lý do (`skill:<name>: waits for its gate: quiet
 hours`, `Room::waits`), để câu trả lời bị giữ trong giờ yên lặng vẫn để lại
-một dòng (#7180). Kết thúc vẫn được ghi như trước (`told N`, hoặc `skipped:
+một dòng (#7180); mỗi lần lý do đó đổi trong lúc chờ, nhật ký ghi thêm một
+lần, tối đa một dòng mỗi giây (`service_read::SAY_WHY_EVERY`), không bao giờ
+ghi ở mỗi lần nhìn, để một lần chờ kéo dài cho thấy điều kiện nào đang giữ
+(lamp-9adf, 17 Nov). Kết thúc vẫn được ghi như trước (`told N`, hoặc `skipped:
 quiet hours` sau một giờ); trong lúc chờ nó được giữ trong
 `task-telling.json` của thư mục state (tên skill và lúc bắt đầu chờ, không
 bao giờ có lời của nó), nên câu trả lời bị bỏ dở vì lamp-skills khởi động
