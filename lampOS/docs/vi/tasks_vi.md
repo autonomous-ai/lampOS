@@ -1781,13 +1781,12 @@ Không dòng nào trong số này tự ghi tên engine theo lời của lamp-tas
 default agent` khi Harness báo stopped, hoặc `not known (harness show: …)`
 khi không đọc được câu trả lời. Hermes và OpenClaw đều như vậy.
 
-### Một phiên cho agent mặc định của đèn (#7246, `LAMP_TASKS_ONE_SESSION`, tắt trong sản phẩm)
+### Một phiên cho agent mặc định của đèn (#7246, `LAMP_TASKS_ONE_SESSION=on` trong unit lamp-tasks của sản phẩm)
 
 Giai đoạn 1 của #7246, thiết kế cuối của lead: agent mặc định của đèn giữ
 MỘT pane Harness, và mọi việc nói cùng mọi lần chạy kỹ năng là một tin
-nhắn gõ vào pane đó. Công tắc tắt trong sản phẩm: unit lamp-tasks của sản
-phẩm (`deploy/product/lamp-tasks.service`) không đặt nó, và đường lùi
-`reply_off` bên dưới đã sẵn sàng để bật sau. Khi tắt (mọi giá trị khác `on` đúng
+nhắn gõ vào pane đó. Công tắc bật trong unit lamp-tasks của sản phẩm
+(`deploy/product/lamp-tasks.service`). Khi tắt (mọi giá trị khác `on` đúng
 nguyên văn, mặc định khi không đặt), mỗi việc và mỗi lần chạy vẫn là
 `harness new` riêng như trên, tức các pane theo từng việc như cũ, không đổi
 một byte (`crates/tasks/src/one_session.rs`).
