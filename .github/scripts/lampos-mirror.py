@@ -54,7 +54,7 @@ MODEL_URL = re.compile(
 # A versioned object is never rewritten, so it may be cached for good; the
 # head manifest is rewritten in place and must be asked for again every time.
 IMMUTABLE_CACHE = "public, max-age=31536000, immutable"
-MUTABLE_CACHE = "no-cache"
+MUTABLE_CACHE = "no-cache, no-store, must-revalidate"
 MOST_ENVELOPE = 512 * 1024
 MOST_FILE = 2 * 1024 * 1024 * 1024
 RETRY_PAUSES = (5, 15, 30)
