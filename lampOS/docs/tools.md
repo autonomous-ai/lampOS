@@ -554,6 +554,38 @@ remember ([memory.md](memory.md#what-a-person-teaches-and-corrects-813)):
 Without the switch none of these is declared and a call of one of these
 names is not the memory's.
 
+## `desk_height` and `water_today`, the owner's devices (#7470)
+
+With `LAMP_DEVICES=on` (off unless set, in no unit until a row on a real
+desk; [switches.md](switches.md)) a session is told of two functions with no
+argument, only for the person who asks: `desk_height` ("what height is my
+desk") and `water_today` ("how much have I drunk today", from the owner's
+smart bottle). Reads only: nothing here moves a desk. Off, neither is
+declared and a call to either is refused as any unknown function.
+
+The voice (`crates/voice/src/devices_tools.rs`) puts a list, then a state of
+each device it needs, on `devices/ask` as the publisher `voice`; `lamp-cloud`
+sends them to the cloud and puts the answers on `devices/answer`
+([msgs.md](msgs.md), "The devices contract"; [cloud.md](cloud.md), "The
+owner's desk and Hydrate bottles"). The voice waits at most 5 s for the whole call, the list
+and the state together (one deadline, not one each; `lamp-cloud` itself gives the
+cloud 8 s, and a late answer is dropped), keeps the list 10 minutes (a repeat
+is one round trip; a device `lamp-cloud` does not know, or a kept list with no
+desk or bottle in it, drops it and the list is read again),
+and takes no device from speech: only one the cloud's list gave. The function
+runs off the turn, as the other slow routes do, on both routes.
+
+What the model is told is a fact and a `say`, in a few English words to be
+said in the person's language (as `reports_stop`): "Your desk is at 112
+centimetres.", "You've had 1.2 litres today, of 2 litres." (the bottle drunk
+from most, if there are several). A reading the cloud has not got is said as
+not known, never made up: "I don't know the desk's height yet.", "The desk
+isn't answering. It may be switched off." (the cloud says `online: false`),
+"I don't know how much you've had yet."; no device, "I can't find a desk of
+yours."; no answer, "I couldn't reach the desk." or "I'm not online right
+now, so I can't reach your devices." The Hydrate never speaks unasked: these
+functions answer a question and the sips (`devices/event`) are not told.
+
 ## `reports_stop`, a system function
 
 With `LAMP_REPORTS=on` in the voice unit (the worker's `--reports-stop`,

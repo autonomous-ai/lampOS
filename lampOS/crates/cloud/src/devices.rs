@@ -72,6 +72,8 @@ pub const ANSWER_WITHIN_MS: u64 = 8_000;
 /// The most other publishers the journal names, once each.
 const REFUSED_NAMED: usize = 8;
 const MINUTE_MS: u64 = 60_000;
+/// The most publisher boots remembered for `seq`.
+const MOST_BOOTS: usize = 256;
 
 /// What became of an ask heard on `devices/ask`.
 #[derive(Debug, PartialEq, Eq)]
@@ -146,6 +148,11 @@ impl Bridge {
         let key = (source.to_owned(), boot.to_owned());
         if self.last.get(&key).is_some_and(|last| seq <= *last) {
             return Taken::Again;
+        }
+        // A voice call makes a publisher of its own, so a boot a call: the
+        // memory of them is bounded.
+        if self.last.len() >= MOST_BOOTS {
+            self.last.clear();
         }
         self.last.insert(key, seq);
         if self.out.contains_key(&ask.req_id) || self.waiting.iter().any(|w| w.req_id == ask.req_id)
@@ -554,6 +561,27 @@ impl Link {
         if self.asks.is_none() {
             self.asks = bus
                 .subscribe_typed(DevicesAsk::TOPIC, crate::lamp::SOURCE, DevicesAsk::TYPE)
+                .ok();
+        }
+        // The answers' and news' publishers exist before the first ask, so
+        // a voice listening for the answer finds them (a late publisher is
+        // found only on the subscriber's next rescan).
+        if self.answers.is_none() {
+            self.answers = bus
+                .publisher_declared(
+                    DevicesAnswer::TOPIC,
+                    &DevicesAnswer::declaration(),
+                    crate::lamp::SOURCE,
+                )
+                .ok();
+        }
+        if self.events.is_none() {
+            self.events = bus
+                .publisher_declared(
+                    DevicesEvent::TOPIC,
+                    &DevicesEvent::declaration(),
+                    crate::lamp::SOURCE,
+                )
                 .ok();
         }
         let mut lines = Vec::new();

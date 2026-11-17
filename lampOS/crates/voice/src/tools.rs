@@ -243,6 +243,9 @@ pub struct Settings {
     /// The person may stop health and crash reports by voice
     /// ([`crate::reports_stop`], `LAMP_REPORTS=on`, #1683).
     pub reports_stop: bool,
+    /// The owner's desk and Hydrate bottles read by voice
+    /// ([`crate::devices_tools`], `LAMP_DEVICES=on`, #7470).
+    pub devices: bool,
     /// Typed local recording offers for an explicitly spoken request.
     pub requested_audio: bool,
     /// The person may put the lamp to sleep by voice
@@ -322,6 +325,11 @@ pub fn arguments_from_environment() -> Vec<String> {
     ));
     flags.extend(crate::reports_stop::arguments(
         std::env::var(crate::reports_stop::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    ));
+    flags.extend(crate::devices_tools::arguments(
+        std::env::var(crate::devices_tools::ENVIRONMENT)
             .ok()
             .as_deref(),
     ));
@@ -546,6 +554,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         && flag == crate::reports_stop::FLAG
     {
         settings.reports_stop = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::devices_tools::FLAG
+    {
+        settings.devices = true;
         flags = rest;
     }
     if let [flag, rest @ ..] = flags
@@ -915,6 +929,9 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
         tools.push(crate::reports_stop::tool());
         tools.push(crate::reports_stop::state_tool());
     }
+    if settings.devices {
+        tools.extend(crate::devices_tools::tools());
+    }
     if settings.sleep_asked {
         tools.push(crate::sleep_asked::tool());
     }
@@ -987,7 +1004,7 @@ pub fn is_skills(settings: &Settings, route: &Route) -> bool {
 }
 
 /// A name the voice routes itself, whether or not it is switched on.
-fn voices_own(name: &str) -> bool {
+pub(crate) fn voices_own(name: &str) -> bool {
     name == NOT_FOR_ME
         || name == THE_TIME
         || crate::remember::is_tool(name)
@@ -999,6 +1016,7 @@ fn voices_own(name: &str) -> bool {
         || name == crate::use_skill::NAME
         || crate::reports_stop::is_tool(name)
         || crate::reports_stop::is_state_tool(name)
+        || crate::devices_tools::is_tool(name)
         || crate::sleep_asked::is_tool(name)
         || crate::seen_yes::is_tool(name)
         || crate::services::is_tool(name)
@@ -1111,6 +1129,10 @@ pub enum Route {
     /// Whether reports are sent, and who stopped them and when, read from
     /// `lamp-cloud`'s `reports/state`: answered here, at once.
     ReportsState,
+    /// The owner's desk or bottle read through `lamp-cloud` on the bus
+    /// ([`crate::devices_tools`]): waits for the cloud, so it runs off the
+    /// turn like the other slow routes.
+    Devices(crate::devices_tools::Read),
     /// A skill named in a call of `use_skill` ([`crate::use_skill`]), with
     /// the settings that find it: made the skill's own call when it is run.
     UseSkill(Box<Settings>),
@@ -1253,6 +1275,13 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     if crate::seen_yes::is_tool(name) {
         return if settings.seen_activity {
             Route::SeenActivity(settings.seen_posture)
+        } else {
+            Route::Nobody
+        };
+    }
+    if let Some(read) = crate::devices_tools::read_of(name) {
+        return if settings.devices {
+            Route::Devices(read)
         } else {
             Route::Nobody
         };
@@ -2552,6 +2581,27 @@ fn run_call_with_scope(
         }
         Route::Mark(session) => ("the marks", crate::marked::run(session, call, heard)),
         Route::Onboarding(file) => ("the onboarding", crate::onboarding::run(file, call)),
+        Route::Devices(read) => (
+            "the devices",
+            // The kept list is copied out and back: the lock is never held
+            // across the wait for the cloud.
+            {
+                let mut cache = crate::devices_tools::CACHE
+                    .lock()
+                    .map(|cache| cache.clone())
+                    .unwrap_or_default();
+                let told = crate::devices_tools::run(
+                    &mut crate::devices_tools::Bus::of_the_lamp(),
+                    &mut cache,
+                    *read,
+                    crate::devices_tools::ANSWER_WITHIN,
+                );
+                if let Ok(mut kept) = crate::devices_tools::CACHE.lock() {
+                    *kept = cache;
+                }
+                told
+            },
+        ),
         Route::ReportsStop(held) => (
             "the reports",
             crate::reports_stop::run(
@@ -3415,6 +3465,7 @@ mod tests {
             mark: Some("/var/lib/lampos-voice/session".into()),
             onboarding: Some("/var/lib/lampos-voice/onboarding.json".into()),
             reports_stop: true,
+            devices: false,
         };
         let mut tools = declared(&settings);
         tools.push(crate::attention::name_tool());
@@ -3752,6 +3803,7 @@ mod tests {
                 mark: None,
                 onboarding: None,
                 reports_stop: false,
+                devices: false,
             }
         );
         assert_eq!(rest, ["--session", "7"]);
