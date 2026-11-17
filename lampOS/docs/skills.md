@@ -3698,8 +3698,9 @@ gone ([switches.md](switches.md)). What happens:
      (`task_yes_forget`) deletes its notes; a heard "forget everything"
      sends lamp-control `notes_forget_skills`, deleting every made skill's
      notes. A notes grant written under another name (`note`, or `notes`
-     or `note` then `-` or `_` and a word, as `notes-write`) is written as
-     `notes` before the check (`made_skill::notes_granted`; c0a4, 18 Nov:
+     or `note` then `-`, `_` or `:` and a word, any case, as `notes-write`;
+     the list on one line or several, comments allowed) is written as
+     `notes` on one line before the check (`made_skill::notes_granted`; c0a4, 18 Nov:
      OpenClaw asked for `notes-write`); no other grant is renamed or
      added. Off, byte for byte as before.
    - **Offered to the voice** (#6749 B): with the switch on, the

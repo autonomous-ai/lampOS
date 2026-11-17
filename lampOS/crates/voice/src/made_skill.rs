@@ -3295,16 +3295,26 @@ pub fn notes_granted(text: &str) -> String {
     if !notes_on() {
         return text.to_owned();
     }
+    // `note` or `notes`, any case, alone or then `-`, `_` or `:` and a
+    // word of letters, digits, `-` or `_` (`notes-write`, `Notes_Read`,
+    // `notes:write`, `notes-read-write`, `notes-v2`).
     fn of_notes(grant: &str) -> bool {
+        let grant = grant.to_ascii_lowercase();
         grant != "notes"
             && (grant == "note"
                 || ["notes", "note"].iter().any(|stem| {
                     grant.strip_prefix(stem).is_some_and(|rest| {
                         rest.len() > 1
-                            && (rest.starts_with('-') || rest.starts_with('_'))
-                            && rest[1..].chars().all(|c| c.is_ascii_alphabetic())
+                            && rest.starts_with(['-', '_', ':'])
+                            && rest[1..]
+                                .chars()
+                                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
                     })
                 }))
+    }
+    // A line without its trailing comment: a grant's name holds no `#`.
+    fn uncommented(line: &str) -> &str {
+        line.split('#').next().unwrap_or(line).trim_end()
     }
     let Ok(table) = toml::from_str::<toml::Table>(text) else {
         return text.to_owned();
@@ -3329,7 +3339,9 @@ pub fn notes_granted(text: &str) -> String {
             expected.push(grant);
         }
     }
-    // The one line that starts the top-level `grants`, written on one line.
+    // The one line that starts the top-level `grants`, and the line its
+    // list ends on: one line, or several as an agent writes them (lamp-c0a4,
+    // 18 Nov 03:27: OpenClaw's `notes-write` given back as it came).
     let lines: Vec<&str> = text.lines().collect();
     let at: Vec<usize> = lines
         .iter()
@@ -3344,15 +3356,18 @@ pub fn notes_granted(text: &str) -> String {
     let [at] = at[..] else {
         return text.to_owned();
     };
-    if !lines[at].trim_end().ends_with(']') {
+    // A grant's name holds no `]`: the list ends on the first line from
+    // `at` that ends with one.
+    let Some(end) = (at..lines.len()).find(|&line| uncommented(lines[line]).ends_with(']')) else {
         return text.to_owned();
-    }
+    };
     let quoted: Vec<String> = expected
         .iter()
         .map(|grant| Value::from(*grant).to_string())
         .collect();
-    let mut written: Vec<String> = lines.iter().map(|line| (*line).to_owned()).collect();
-    written[at] = format!("grants = [{}]", quoted.join(", "));
+    let mut written: Vec<String> = lines[..at].iter().map(|line| (*line).to_owned()).collect();
+    written.push(format!("grants = [{}]", quoted.join(", ")));
+    written.extend(lines[end + 1..].iter().map(|line| (*line).to_owned()));
     let mut tidied = written.join("\n");
     if text.ends_with('\n') {
         tidied.push('\n');
@@ -10711,13 +10726,31 @@ mod tests {
             "grants = [\"notebook\"]\n",
             "grants = [\"notes-\"]\n",
             "grants = [\"camera\", \"gmail-read\"]\n",
-            "grants = [\"notes-write-2\"]\n",
+            "grants = [\"notes write\"]\n",
         ] {
             assert_eq!(notes_granted(kept), kept);
         }
-        // Grants over several lines are given back as they came.
-        let spread = "grants = [\n  \"notes-write\",\n]\n";
-        assert_eq!(notes_granted(spread), spread);
+        // Grants over several lines, as OpenClaw writes them (c0a4, 18 Nov
+        // 03:27), are taken too, written on one line.
+        let spread = "name = \"fruit\"\ngrants = [\n  \"speak\",\n  \"notes-write\",\n]\n[[do]]\nsay = { text = \"Hi.\" }\n";
+        assert_eq!(
+            notes_granted(spread),
+            "name = \"fruit\"\ngrants = [\"speak\", \"notes\"]\n[[do]]\nsay = { text = \"Hi.\" }\n"
+        );
+        // A comment on the list's lines is no end of it (the adversarial
+        // read's P2a), and other spellings of notes are notes (its P2b).
+        let commented = "grants = [ # the code's\n  \"Notes:Write\", # its list\n  \"speak\",\n] # mine\n[[do]]\nsay = { text = \"Hi.\" }\n";
+        assert_eq!(
+            notes_granted(commented),
+            "grants = [\"notes\", \"speak\"]\n[[do]]\nsay = { text = \"Hi.\" }\n"
+        );
+        for spelled in ["notes-read-write", "notes-v2", "NOTE", "note_keep"] {
+            let one = format!("grants = [\"{spelled}\"]\n");
+            assert_eq!(notes_granted(&one), "grants = [\"notes\"]\n", "{spelled}");
+        }
+        // A list whose end can't be found is given back as it came.
+        let open = "grants = [\n  \"notes-write\",\n";
+        assert_eq!(notes_granted(open), open);
         set_notes_here(None);
     }
 

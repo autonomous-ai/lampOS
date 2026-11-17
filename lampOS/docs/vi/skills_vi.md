@@ -709,8 +709,10 @@ sau:
      lại. Gỡ một kỹ năng (`task_yes_forget`) xóa ghi chú của nó; một câu
      "forget everything" được nghe sẽ gửi lamp-control `notes_forget_skills`,
      xóa ghi chú của mọi kỹ năng tự tạo. Một quyền ghi chú viết dưới tên
-     khác (`note`, hoặc `notes` hay `note` rồi `-` hoặc `_` và một từ, như
-     `notes-write`) được viết lại thành `notes` trước khi kiểm tra
+     khác (`note`, hoặc `notes` hay `note` rồi `-`, `_` hoặc `:` và một từ, hoa
+     hay thường, như `notes-write`; danh sách trên một hay nhiều dòng, có thể
+     kèm chú thích) được viết lại thành `notes` trên một dòng trước khi kiểm
+     tra
      (`made_skill::notes_granted`; c0a4, 18/11: OpenClaw xin
      `notes-write`); không quyền nào khác bị đổi tên hay thêm vào. Khi tắt,
      giữ nguyên từng byte như trước.
