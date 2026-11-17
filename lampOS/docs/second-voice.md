@@ -2288,7 +2288,19 @@ order is kept. A written turn is the same from the chat on.
   step." with no `volume_down` call in 4 of 14 action lines, and nothing
   changed. Only a call that ran and answered with no error and no keep
   refused is kept, never `more_functions`, and never one declined, held,
-  refused, or of a due reminder's or an add-on's quoted line. The calls go with
+  refused, or of a due reminder's or an add-on's quoted line. A call
+  answered with an error is kept bare as failed then
+  (`second_provider::FAILED_THEN`), never told as a call: the lamp's
+  words of its turn are followed by a system note,
+  `second_provider::failed_then_note`, "(For you to know: in that turn
+  <names> answered with an error. What you said there was about that one
+  try, never how things stand now: for a new ask, call the function
+  again, and say you couldn't reach or do something only when a call in
+  your own turn failed.)". On lamp-9adf at 13929 (17 Nov 23:20) three
+  asks in a row, sunrise in Hanoi, VnExpress's headlines and Apple's
+  stock, got `calls=none` and "I couldn't reach … just now", the
+  weather's own failure words carried in the history as the lamp's words
+  alone, a search never tried included. The calls go with
   the exchange the lamp's words were filed under, so they are told only
   to that scope's turns; a request with no kept words keeps none, and a
   forget drops them. They are not written to the thread file (an older

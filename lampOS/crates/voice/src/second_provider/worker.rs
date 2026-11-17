@@ -13740,9 +13740,12 @@ pub(crate) const KEPT_CALL_RESULT: &str = "(done earlier; its result was not kep
 /// arguments it was kept with, `second_provider::kept_args`; no words),
 /// each call's result as [`KEPT_CALL_RESULT`], or a service write's status
 /// ([`crate::thread::KeptCall::result`]), as a chat round with calls
-/// goes. The person's words, or the note, stay first.
+/// goes. The person's words, or the note, stay first. A call kept as
+/// failed then (`second_provider::FAILED_THEN`) is not told as a call: a
+/// note after the lamp's words says it failed that one try
+/// (`second_provider::failed_then_note`).
 fn messages_marked(
-    exchange: crate::thread::Recent,
+    mut exchange: crate::thread::Recent,
     cut: Option<&str>,
     keeps_calls: bool,
 ) -> Vec<Message> {
@@ -13761,6 +13764,16 @@ fn messages_marked(
     } else if exchange.room {
         messages.push(Message::system(SAID_IN_THE_ROOM.to_owned()));
     }
+    // Calls kept as failed then are told only as a note after the words
+    // (`second_provider::failed_then_note`), never as calls.
+    let (failed, calls): (Vec<_>, Vec<_>) = std::mem::take(&mut exchange.calls)
+        .into_iter()
+        .partition(|call| call.result == Some(crate::second_provider::FAILED_THEN));
+    let failed_note = (keeps_calls && !failed.is_empty()).then(|| {
+        let names: Vec<&str> = failed.iter().map(|call| call.name.as_str()).collect();
+        crate::second_provider::failed_then_note(&names)
+    });
+    exchange.calls = calls;
     if keeps_calls && !exchange.calls.is_empty() {
         let results: Vec<&str> = exchange
             .calls
@@ -13789,6 +13802,7 @@ fn messages_marked(
     // A cut answer kept as heard, marked where it stopped, so "go on" picks
     // up from there (`LAMP_CUT_IN_TOLD`).
     messages.extend(cut.map(Message::system));
+    messages.extend(failed_note.map(Message::system));
     messages
 }
 
@@ -23735,6 +23749,82 @@ mod tests {
         assert_eq!(
             messages_marked(plain(), None, true),
             [Message::user("Hi."), Message::assistant("Hello.")]
+        );
+    }
+
+    /// lamp-9adf at 13929 (17 Nov 23:20): a lookup that failed earlier was
+    /// carried as words alone, "I couldn't reach … just now", and three
+    /// later asks got `calls=none` and the same words. A call kept as
+    /// failed then is never told as a call: the lamp's words are followed
+    /// by a note that the failure was that one try, and a call beside it
+    /// that ran is told as before. Off, words only.
+    #[test]
+    fn a_failed_call_is_told_after_the_words_as_that_one_try() {
+        let failed = |id: &str, name: &str| crate::thread::KeptCall {
+            id: id.into(),
+            name: name.into(),
+            args: serde_json::json!({}),
+            result: Some(crate::second_provider::FAILED_THEN),
+        };
+        let sunrise = || crate::thread::Recent {
+            person: "Lamp, when is sunrise in Hanoi?".into(),
+            lamp: "I couldn't reach the weather just now.".into(),
+            calls: vec![failed("kept-4-0", "weather")],
+            ..crate::thread::Recent::default()
+        };
+        let note = crate::second_provider::failed_then_note(&["weather"]);
+        assert!(note.contains("weather") && note.contains("that one try"));
+        assert_eq!(
+            messages_marked(sunrise(), None, true),
+            [
+                Message::user("Lamp, when is sunrise in Hanoi?"),
+                Message::assistant("I couldn't reach the weather just now."),
+                Message::system(note.clone()),
+            ]
+        );
+        assert_eq!(
+            messages_marked(sunrise(), None, false),
+            [
+                Message::user("Lamp, when is sunrise in Hanoi?"),
+                Message::assistant("I couldn't reach the weather just now."),
+            ],
+            "off: words only, as before"
+        );
+        let both = crate::thread::Recent {
+            person: "Quieter, and the news?".into(),
+            lamp: "Quieter. I couldn't find the news.".into(),
+            calls: vec![
+                crate::thread::KeptCall {
+                    id: "kept-5-0".into(),
+                    name: "volume_down".into(),
+                    args: serde_json::json!({}),
+                    result: None,
+                },
+                failed("kept-5-1", "web_search"),
+                failed("kept-5-2", "fetch_page"),
+            ],
+            ..crate::thread::Recent::default()
+        };
+        assert_eq!(
+            messages_marked(both, None, true),
+            [
+                Message::user("Quieter, and the news?"),
+                Message::assistant_calls(
+                    None,
+                    &[crate::second_provider::net::ToolCall {
+                        id: "kept-5-0".into(),
+                        name: "volume_down".into(),
+                        args: serde_json::json!({}),
+                        extra: None,
+                    }]
+                ),
+                Message::tool("kept-5-0", KEPT_CALL_RESULT),
+                Message::assistant("Quieter. I couldn't find the news."),
+                Message::system(crate::second_provider::failed_then_note(&[
+                    "web_search",
+                    "fetch_page"
+                ])),
+            ]
         );
     }
 

@@ -484,6 +484,28 @@ pub(crate) const WRITE_PREPARED: &str = "(done earlier: prepared, nothing sent; 
 pub(crate) const WRITE_DONE: &str = "(done earlier: done by the service. The rest of its result was not kept. A new write needs its own call.)";
 pub(crate) const WRITE_NOT_DONE: &str = "(done earlier: not done. The rest of its result was not kept. A new write needs its own call.)";
 
+/// What a call answered with an error is kept as, bare, for a later turn's
+/// history (`LAMP_HISTORY_KEEPS_CALLS`): never told as a call, only as the
+/// note after its turn's words, [`failed_then_note`]
+/// (`worker::messages_marked`).
+pub(crate) const FAILED_THEN: &str = "(failed then)";
+
+/// Told after the lamp's words of an earlier turn in which `names` were
+/// answered with an error: that failure was that one try, never how things
+/// stand now. On lamp-9adf at 13929 (17 Nov 23:20) "what time is sunrise
+/// tomorrow in Hanoi?", "the top headlines on VnExpress" and "how is Apple
+/// stock doing today?" each got `calls=none` and "I couldn't reach …
+/// just now", in the weather's own failure words ("the weather couldn't be
+/// reached just now"): the history kept the lamp's failure line as words
+/// alone, and the model carried it as a lasting state, a search it never
+/// tried included.
+pub(crate) fn failed_then_note(names: &[&str]) -> String {
+    format!(
+        "(For you to know: in that turn {} answered with an error. What you said there was about that one try, never how things stand now: for a new ask, call the function again, and say you couldn't reach or do something only when a call in your own turn failed.)",
+        names.join(", ")
+    )
+}
+
 /// What a kept call's result is told as in a later turn's history
 /// (`LAMP_HISTORY_KEEPS_CALLS`, [`crate::thread::KeptCall::result`]): a
 /// service write's status by its answer `told`, prepared
@@ -19194,6 +19216,23 @@ async fn answer(
                         &call.name,
                         &args,
                         kept_result(&call.name, &answer.told),
+                    );
+                }
+                // A call answered with an error is kept bare as failed
+                // then ([`FAILED_THEN`]), told later only as a note after
+                // its turn's words that it was that one try
+                // ([`failed_then_note`]), never as a lasting state
+                // (lamp-9adf at 13929, 17 Nov: "I couldn't reach … just
+                // now" with `calls=none`, three asks in a row).
+                if answer.told.get("error").is_some()
+                    && call.name != worker::MORE
+                    && let Some(keep) = &shared.keeps_calls
+                {
+                    keep(
+                        request,
+                        &call.name,
+                        &serde_json::Value::Object(serde_json::Map::new()),
+                        Some(FAILED_THEN),
                     );
                 }
                 messages.push(Message::tool(call.id.clone(), answer.told.to_string()));
