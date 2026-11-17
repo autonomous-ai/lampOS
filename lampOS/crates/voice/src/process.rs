@@ -2522,6 +2522,8 @@ fn second_route_worker_environment(
         crate::known_faces::RENAME_YES_ENVIRONMENT,
         // The owner's name kept on the paths that lost it on lamp-74ff (#7331).
         crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
+        // The owner's face linked to the typed name by their own words (#7501).
+        crate::owner_link::ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_config::OWN_KEYS_ENV,
         // The owner's place for a question that needs one, and cleared
@@ -2814,6 +2816,7 @@ mod tests {
             crate::known_faces::RENAME_ASKED_ENVIRONMENT,
             crate::known_faces::RENAME_YES_ENVIRONMENT,
             crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
+            crate::owner_link::ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -3881,6 +3884,7 @@ mod tests {
                     || name == crate::known_faces::RENAME_ASKED_ENVIRONMENT
                     || name == crate::known_faces::RENAME_YES_ENVIRONMENT
                     || name == crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT
+                    || name == crate::owner_link::ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
                     || name == crate::owner_place::ENVIRONMENT
                     || name == lamp_msgs::chosen_voice::ENVIRONMENT
@@ -4067,6 +4071,7 @@ mod tests {
                     "LAMP_ONE_AS_LAMP=on",
                     "LAMP_ONE_FACE_REMINDERS=on",
                     "LAMP_OPENS_FURTHER=on",
+                    "LAMP_OWNER_LINK=on",
                     "LAMP_OWNER_PLACE=on",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",

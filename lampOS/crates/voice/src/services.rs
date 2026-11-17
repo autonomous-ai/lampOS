@@ -1828,6 +1828,13 @@ pub(crate) fn owners_voice_now(request: u64) -> bool {
         .is_some_and(|alike| alike >= crate::same_voice::SERVICES_SAME_FROM)
 }
 
+/// Whether the owner of memory id `owner` has an enrolled voice print
+/// (`LAMP_SAME_VOICE_FOR=services`, `crate::owner_voice`): the owner's link
+/// is then held to it too (`owner_link::taken`, #7501).
+pub(crate) fn owner_has_print(owner: &str) -> bool {
+    crate::owner_voice::enrolled(owner).is_some()
+}
+
 /// Whether a heard line (`heard`: someone spoke it) is the owner's own,
 /// seen: in the private room (`private_room`) any heard line; outside it,
 /// the owner (`owner`, [`owner_of`]) seen saying it (`seen`, the eyes'

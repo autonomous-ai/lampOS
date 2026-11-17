@@ -69,6 +69,14 @@ can see who is asking.", and nothing is called, for reads and writes alike. A re
 lamp's own, a text) is told `NOT_HEARD` and nothing is called either, so
 under privacy, with the microphone off, no service is fetched.
 
+A lamp set up before onboarding kept an `owner` has the typed name as its
+only owner: when the owner's face is kept under another name, their own
+line is "a guest's" here and nothing is read or written for them outside
+the private room. With `LAMP_OWNER_LINK=on` (off unless set, #7501) their
+own "I'm <the typed name>", alone in view and seen saying it, links that
+face as the owner, and `person::owner_ids` holds both ids
+([memory.md](memory.md), "The owner's face and typed name").
+
 The face in view says who is at the lamp; it doesn't say who spoke (a
 partner off camera speaks in the owner's lease). So a line counts as the
 owner's for a write or a full read only on positive evidence: the owner's
