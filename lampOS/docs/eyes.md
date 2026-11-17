@@ -2162,7 +2162,41 @@ process, shows there before any trial waits for it. For each face:
   60 degrees in the middle of the picture, more toward its edges, where
   the lens shows a straight face turned). A face narrower than 7.5% of
   the picture, or with an eye or the nose outside it, has neither: it
-  counts for nothing either way.
+  counts for nothing either way;
+- with `LAMP_EYES_PITCH_GAZE=on` (#7442, off unless set), **how far the
+  head is tipped** (`pitch`, radians, positive down as ROS has it) and,
+  for one face, **whether its eyes look toward the lamp** (`looking`).
+  Off, both are left out and the message is as before.
+
+#### Pitch and gaze (`LAMP_EYES_PITCH_GAZE=on`, #7442)
+
+**Pitch** ([`facing::pitch_deg`](../crates/eyes/src/facing.rs)) comes from
+the same five marks as the turn: the nose's drop below the point between
+the eyes, square to the eye line (a head tilted over reads the same), over
+the eyes' distance, which is first taken back by the turn's cosine (a
+turned head's eyes look closer together, which is not a nose dropping).
+A head tipped by `t` gives `r = 0.57 cos t + 0.5 sin t`, solved for `t`:
+the nose sits 0.57 eye distances below the eyes on a level face
+(`LEVEL_NOSE_DROP`, from InsightFace's ArcFace five-point template, the
+mean frontal face recognisers align to: that template reads level within
+2 degrees) and its tip 0.5 in front of them (`NOSE_DEPTH`, a guess). So a
+level face reads 0, and the zero is set by `LEVEL_NOSE_DROP`, to be
+checked on this lamp's YuNet on the row. A face too small for a turn, or
+turned past 60 degrees, has no pitch. Known ceiling: `r` peaks about 41
+degrees down, so a head bowed past about 57 degrees reads back inside the
+window. The window the voice may use is `MAX_PITCH_UP_DEG` 20 to
+`MAX_PITCH_DOWN_DEG` 25 (`facing::pitch_within`); authored, to be set on
+the row.
+
+**Looking** ([`blendshapes::looking`](../crates/eyes/src/blendshapes.rs))
+is read from the Blendshape V2 scores the seems read already makes (no new
+model): false when either eye's `eyeLookDown`, `eyeLookIn` or `eyeLookOut`
+is 0.5 or more (MediaPipe's order of the 52, 11-16), true otherwise;
+`eyeLookUp` is not read. It is said only for the face that read ran on,
+for 2.5 s after its frame (`LOOKING_LASTS_US`: one read every 2 s and its
+thread's time), so it needs `--seems-blendshapes` and the face-expressions
+yes the seems read needs. Every other face, or no read, leaves it out:
+unknown, not away.
 
 ### Who counts as someone at the lamp (`LAMP_FACES_AT_DESK_ONLY=on`)
 
