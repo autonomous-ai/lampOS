@@ -10539,6 +10539,11 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
     assert_eq!(calls[1]["args"][0], "ensure");
     let last_reply = calls.iter().rev().find(|call| call["args"][0] == "reply").unwrap();
     assert_eq!(last_reply["args"].as_array().unwrap().last().unwrap(), "Task:   !rm x");
+    // Harness's own 30 s hold is too short for the first reply after the
+    // engine starts: 60 s is asked for.
+    let held = last_reply["args"].as_array().unwrap();
+    let at = held.iter().position(|arg| arg == "--timeout").unwrap();
+    assert_eq!(held[at + 1], "60s");
     let close = calls.last().unwrap()["args"].as_array().unwrap().clone();
     assert_eq!(close[0], "close");
     assert!(!close.contains(&json!("--forget")), "not built yet");
