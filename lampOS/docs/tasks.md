@@ -3981,13 +3981,16 @@ file:
   In the run's own user, network (only `lo`), IPC, mount and PID
   namespaces, the fence mounts a fresh 256 MiB `/tmp`, makes the script's own empty home in
   it, binds the run's folder, the skill's folder and lamp-control's socket
-  aside, covers the Harness project and `/run`, `/var/lib`, `/var/tmp`,
-  `/dev/shm` and `/etc/lampOS` (`gateway::HIDDEN`: at least what the
-  gateway's namespace hid, so the launcher's socket, lamp-tasks' own
-  folder and every other lamp service's sockets and files go too) with
-  1 MiB tmpfs (64 MiB writable ones on `/var/tmp` and `/dev/shm`, as the
-  gateway's namespace gives), and moves the two folders and the socket
-  back. Every tmpfs has a size: the script owns them, and what fills them
+  aside, covers `/run`, `/var/lib`, `/var/tmp`, `/dev/shm` and
+  `/etc/lampOS` (`gateway::HIDDEN`: at least what the gateway's namespace
+  hid, so the launcher's socket, lamp-tasks' own folder and every other
+  lamp service's sockets and files go too) with 1 MiB tmpfs (64 MiB
+  writable ones on `/var/tmp` and `/dev/shm`, as the gateway's namespace
+  gives), then the Harness project with a 1 MiB tmpfs too (after them,
+  its place made again first: on a lamp the project,
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks`, is under `/var/lib`, whose
+  tmpfs would otherwise cover the project's), and moves the two folders
+  and the socket back. Every tmpfs has a size: the script owns them, and what fills them
   is RAM. It then makes the skill's folder read-only (keeping the flags
   its bind had), and the project and the 1 MiB tmpfs too, so the script
   writes only its run's folder, `/tmp`, `/var/tmp` and `/dev/shm`. No

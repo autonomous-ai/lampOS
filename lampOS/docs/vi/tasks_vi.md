@@ -1437,12 +1437,16 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   `lo`), IPC, mount và PID riêng của lần chạy, rào mount một `/tmp` mới
   256 MiB, tạo
   trong đó một home rỗng riêng cho script, bind thư mục của lần chạy, thư
-  mục kỹ năng và socket của lamp-control sang một bên, phủ project Harness
-  và `/run`, `/var/lib`, `/var/tmp`, `/dev/shm` và `/etc/lampOS`
+  mục kỹ năng và socket của lamp-control sang một bên, phủ `/run`,
+  `/var/lib`, `/var/tmp`, `/dev/shm` và `/etc/lampOS`
   (`gateway::HIDDEN`: ít nhất những gì namespace của gateway đã ẩn, nên
   socket của launcher, thư mục riêng của lamp-tasks và mọi socket, file của
   các dịch vụ khác của đèn cũng bị ẩn) bằng tmpfs 1 MiB (tmpfs ghi được
-  64 MiB trên `/var/tmp` và `/dev/shm`, như namespace của gateway), rồi
+  64 MiB trên `/var/tmp` và `/dev/shm`, như namespace của gateway), sau đó
+  phủ project Harness bằng một tmpfs 1 MiB nữa (sau chúng, chỗ của project
+  được tạo lại trước: trên đèn, project
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks` nằm dưới `/var/lib`, nếu
+  không thì tmpfs của `/var/lib` sẽ phủ lên tmpfs của project), rồi
   chuyển hai thư mục và socket về chỗ cũ. Mọi tmpfs đều có kích thước:
   script sở hữu chúng, và thứ lấp đầy chúng là RAM. Sau đó rào đặt thư mục
   kỹ năng thành chỉ đọc (giữ các cờ bind của nó), rồi cả project và các

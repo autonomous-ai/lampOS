@@ -937,10 +937,12 @@ pub const TASKS_RUN: &str = "/run/lampos-tasks";
 /// of 256 MiB (none of the gateway's files, a staging no other process
 /// reaches) and in it the script's own empty home; the run's folder
 /// (resolved), the skill's folder and lamp-control's socket (when it is
-/// there) bound aside there; a 1 MiB tmpfs over the project (every other
-/// run's folder gone) and over each hidden path that is there, but a
-/// writable 64 MiB one on `/var/tmp` and `/dev/shm`, as the gateway's
-/// namespace gives (every tmpfs sized: the script owns them, and RAM is
+/// there) bound aside there; a 1 MiB tmpfs over each hidden path that is
+/// there, but a writable 64 MiB one on `/var/tmp` and `/dev/shm`, as the
+/// gateway's namespace gives, then (its place made again first) a 1 MiB
+/// one over the project (every other run's folder gone), after them: on a
+/// lamp the project is under `/var/lib`, whose tmpfs would otherwise cover
+/// the project's (every tmpfs sized: the script owns them, and RAM is
 /// what fills them); the two folders and the socket moved back; the
 /// skill's folder made read-only (with the flags its bind had, as a user
 /// namespace may only add flags), then the project and each hidden tmpfs
@@ -988,7 +990,6 @@ mount -n --bind "$k" "$t2" || no "the skill's folder"
 sk=
 [ ! -S "$so" ] || sk=$(mktemp /tmp/lampos-socket.XXXXXX) || no "lamp-control's socket"
 [ -z "$sk" ] || mount -n --bind "$so" "$sk" || no "lamp-control's socket"
-mount -n -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec tmpfs "$p" || no "the project"
 for h in "$@"; do
   [ -e "$h" ] || continue
   case $h in
@@ -996,6 +997,8 @@ for h in "$@"; do
     *) mount -n -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec tmpfs "$h" || no "$h" ;;
   esac
 done
+mkdir -p "$p" || no "the project's place"
+mount -n -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec tmpfs "$p" || no "the project"
 mkdir -p "$k" "$r" || no "the folders"
 mount -n --move "$t2" "$k" || no "the skill's folder back"
 mount -n --move "$t1" "$r" || no "the run's folder back"
@@ -2137,12 +2140,14 @@ mod tests {
         assert!(lines[3].starts_with(&format!("mount -n --bind {d}/skills/s /tmp/lampos-skill.")));
         assert_eq!(
             lines[4],
-            format!("mount -n -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec tmpfs {d}/project")
-        );
-        assert_eq!(
-            lines[5],
             format!("mount -n -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec tmpfs {d}/state"),
             "the absent one skipped"
+        );
+        // The project after the hidden paths: on a lamp it is under
+        // `/var/lib`, whose tmpfs would otherwise cover the project's.
+        assert_eq!(
+            lines[5],
+            format!("mount -n -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec tmpfs {d}/project")
         );
         assert!(lines[6].starts_with("mount -n --move /tmp/lampos-skill."));
         assert!(lines[6].ends_with(&format!(" {d}/skills/s")));

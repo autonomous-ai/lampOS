@@ -904,3 +904,95 @@ fn the_fence_runs_only_the_run_folder_lamp_tasks_saw() {
     assert!(out.stdout.is_empty(), "{out:?}");
     assert_eq!(said, "");
 }
+
+/// Found on lamp-c0a4: the runs' project is under a hidden path
+/// (`/var/lib/lampos-tasks/harnesses/lamp-tasks`, under `/var/lib`), as is
+/// the skill's folder (`/var/lib/lampOS/skills/<skill>`). The fence covered
+/// the project before the hidden paths, so `/var/lib`'s tmpfs covered the
+/// project's and making it read-only failed: the fence ended before
+/// `started` and the run never started. Here the project and the skill's
+/// folder are under a hidden stand-in (`<base>/var-lib`): the script runs,
+/// writes its run's folder only, and reads neither another run's folder
+/// nor a file beside the project in the hidden path.
+#[test]
+fn the_fence_runs_a_project_inside_a_hidden_path() {
+    if let Some(reason) = skip_reason() {
+        println!("skipped: {reason}");
+        return;
+    }
+    let base = tempfile::Builder::new()
+        .prefix("ss7024lib")
+        .tempdir_in(target_tmp())
+        .unwrap();
+    let var_lib = base.path().join("var-lib");
+    let project = var_lib.join("lampos-tasks/harnesses/lamp-tasks");
+    let run = project.join("skill-task-1");
+    let other = project.join("skill-task-2");
+    let skill = var_lib.join("lampOS/skills/plum");
+    for folder in [&run, &other, &skill] {
+        std::fs::create_dir_all(folder).unwrap();
+    }
+    std::fs::write(other.join("notes"), "other-run-7024").unwrap();
+    std::fs::write(var_lib.join("lampos-tasks/state"), "state-7024").unwrap();
+    let script = skill.join("main.sh");
+    std::fs::write(
+        &script,
+        format!(
+            "echo script-ran\n\
+             touch written-here && echo run-folder-written\n\
+             touch {p}/x 2>/dev/null && echo project-written || echo project-read-only\n\
+             touch {v}/x 2>/dev/null && echo hidden-written || echo hidden-read-only\n\
+             cat {p}/skill-task-2/notes 2>/dev/null || echo unread-other-run\n\
+             cat {v}/lampos-tasks/state 2>/dev/null || echo unread-state\n",
+            p = project.display(),
+            v = var_lib.display(),
+        ),
+    )
+    .unwrap();
+    let grant = Grant {
+        script: script.clone(),
+        interpreter: "/bin/sh".into(),
+        skill: skill.clone(),
+        run: run.clone(),
+        socket: "/nowhere/control.sock".into(),
+        pythonpath: "/sdk".into(),
+    };
+    let args = lamp_tasks::gateway::fence_args(
+        &grant,
+        rustix::process::getuid().as_raw(),
+        rustix::process::getgid().as_raw(),
+        &[var_lib.as_path()],
+    );
+    let said = base.path().join("said");
+    let mut child = Command::new("/bin/sh")
+        .arg("-c")
+        .arg(r#"exec 3<&0 4>"$1" 0</dev/null; shift; exec unshare "$@""#)
+        .arg("fd")
+        .arg(&said)
+        .args(args)
+        .env_clear()
+        .env("PATH", lamp_tasks::gateway::SCRIPT_PATH)
+        .current_dir("/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    {
+        use std::io::Write as _;
+        child.stdin.take().unwrap().write_all(b"t\n").unwrap();
+    }
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        std::fs::read_to_string(&said).unwrap_or_default(),
+        "started\n"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "script-ran\nrun-folder-written\nproject-read-only\nhidden-read-only\n\
+         unread-other-run\nunread-state\n"
+    );
+    assert!(run.join("written-here").exists());
+    assert!(!project.join("x").exists() && !var_lib.join("x").exists());
+}
