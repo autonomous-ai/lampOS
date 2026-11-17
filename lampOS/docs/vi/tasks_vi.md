@@ -1918,6 +1918,28 @@ một byte (`crates/tasks/src/one_session.rs`).
   chưa tính là đã nói. Câu trả lời vẫn chưa nói 60 s sau khi được đọc
   (`UNTOLD_CLOSE_MS`), hoặc được đọc ở lần khởi động trước, cũng nhả pane.
   Rồi hàng đợi đi tiếp.
+- **Câu trả lời chưa nói vẫn còn sau khi bị tiếp quản (#7600).** Lượt kế
+  tiếp vào cùng agent và tiếp quản phiên của nó trong store
+  (`finish_launch`, ghi journal `tasks: task <B> takes over the session of
+  <n> earlier one(s)`). Khi `LAMP_TASKS_ONE_SESSION` bật, một việc trước
+  có câu trả lời mới nhất đã giữ mà vẫn chưa nói thì được giữ lại, không
+  bị xoá: câu trả lời idle có chữ, chưa có lần nói nào được nhận (hoặc
+  lần phát vẫn đang chạy), chưa được giọng nói kể bằng lời của nó, và
+  được giữ trong lần khởi động này tối đa 24 giờ trước
+  (`WATCH_AT_MOST_MS`). Việc đó được đánh dấu đã trao đi (`close.state`
+  `handed_on`): không bao giờ được đọc, theo dõi, đẩy hay đóng nữa, và
+  một `observe` cho nó bị từ chối, vì phiên giờ là của việc sau. Giọng
+  nói vẫn liệt kê nó và nói nó một lần, như mọi câu trả lời đã xong mới
+  nhất (lamp-voice `read_once_with`, khoá `<store>:<task>:<observation>`).
+  Khi đã nói, lần vào phiên kế tiếp xoá nó như trước; việc từ lần khởi
+  động trước cũng bị xoá. Nó được tính trong 16 việc của store, và khi
+  store đầy thì việc đã xong cũ nhất nhường chỗ, như trước. Ghi journal `tasks: task
+  <B> joins the session of <n> earlier one(s) whose answer is still
+  untold: kept for the voice`. Store giữ một việc như vậy được ghi với
+  schema 8, mà bản build trước sẽ để sang một bên. Khi tắt (mỗi việc một
+  phiên), không có gì thay đổi.
+  - **Test:** `engine::tests::a_joining_turn_keeps_an_earlier_answer_still_untold`,
+    `a_joining_turn_drops_an_earlier_told_answer`.
 - **Việc nói kết thúc mà không có câu trả lời.** Việc nói kết thúc không
   có câu trả lời (bị huỷ, hoặc một câu hỏi không ai trả lời) vẫn giữ pane.
   Luồng `one-session` sau đó đóng pane `--now`, xoá cuộc hội thoại
