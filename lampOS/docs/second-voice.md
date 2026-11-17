@@ -712,16 +712,18 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   none (`deepseek-v4-pro`, DeepSeek's pricing page) is never sent one: a
   look asked of it is told it saw nothing (`Services::sees`).
 - **Web search** (`LAMP_SECOND_SEARCH`, `net/search.rs`), declared to the
-  model beside the lamp's tools, within this route's own bound of 48
+  model beside the lamp's tools, within this route's own bound of 64
   functions (`second_provider::MAX_TOOLS`; Live's is 32, Gemini Live's own;
-  the chat models take more, DeepSeek's API up to 128), cut
+  the chat models take more, DeepSeek's API up to 128; it was 48 until
+  17 Nov, when a product lamp's 52 left out the fetch, the time elsewhere,
+  `reports_state` and the weather on every turn, #7433), cut
   in the order `worker::chat_cut` declares: the fetch, the time elsewhere,
   `reports_state` with `LAMP_REPORTS=on`, the skills' functions not a core
   skill's (the last first), the weather with `LAMP_SECOND_WEATHER=on`, then
   the search, and never a core skill's
   function, `use_skill`, `reports_stop` or the actions part's (#2614,
   #2644, `worker::chat_tools`). What is cut is said once, on a plain
-  journal line (`past the bound of 48, left out: …`). On lamp-4ace on 22 Oct the lamp's own,
+  journal line (`past the bound of 64, left out: …`). On lamp-4ace on 22 Oct the lamp's own,
   its skills' and the search's came to 37, and Live's bound had left out the time, the
   light scenes and the search; at 37 the chat's first answer began a median 856 ms after
   it was asked against 1031 ms at 32 (6 and 210 requests, the request 5% larger, its
@@ -6242,10 +6244,10 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
   (`second_provider::LOOK_CALL`, `worker::chat_tools` with `look`; texts
   are not) and told "When you would look, call take_a_look"
-  (`worker::LOOK_CALL_NOTE`). It is one of the core within the route's bound of 48:
+  (`worker::LOOK_CALL_NOTE`). It is one of the core within the route's bound of 64:
   a list at the bound before it keeps it, and the bound cuts the next in
   its order instead (`fetch_page` first), said once as every cut is
-  (`past the bound of 48, left out: …`). Added after the bound before, a
+  (`past the bound of 64, left out: …`). Added after the bound before, a
   list already at it left the look out and said nothing (the first builder
   on #2602, 22 Oct 12:3x, from lamp-75c9's runs that morning).
   The call asks the coordinator for the turn's full look (`LookAsked`, as a
