@@ -40,7 +40,7 @@ struct OpensState {
 }
 
 impl Opens {
-    fn telling(told: OpeningTold) -> Self {
+    pub(crate) fn telling(told: OpeningTold) -> Self {
         Self(Arc::new(OpensState {
             told: Some(told),
             ..OpensState::default()
