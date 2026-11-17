@@ -97,8 +97,8 @@ fn the_photobooth_file_becomes_an_agent_skill_with_camera_light_speak_and_net() 
         line,
         "I added photo booth from a file, not from the Skills Store, and it's on: only when you \
          ask for it, the lamp's agent follows the file, and it changes the light, speaks and \
-         plays sounds, uses the camera and reaches the internet. The first time it runs, I'll \
-         ask you to agree."
+         plays sounds, uses the camera and reaches the public internet. The first time it runs, \
+         I'll ask you to agree."
     );
     // Going on records no yes: its first run asks it.
     let said = went_on(&made, &grants, |_| {
@@ -217,7 +217,7 @@ fn an_agent_skills_first_run_asks_the_yes_and_an_agreed_one_runs() {
         next.contains("comes from a file added in the app"),
         "{next}"
     );
-    assert!(next.contains("reaches the internet"), "{next}");
+    assert!(next.contains("reaches the public internet"), "{next}");
     assert!(next.contains("It runs only once you agree."), "{next}");
     assert!(
         first_run_with(
