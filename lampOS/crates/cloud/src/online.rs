@@ -262,6 +262,7 @@ pub fn reply(
                     || crate::settings::KEYS_KINDS.contains(&kind.as_str())
                     || crate::settings::PLACE_KINDS.contains(&kind.as_str())
                     || crate::settings::VOICE_KINDS.contains(&kind.as_str())
+                    || kind == crate::settings::PREVIEW_KIND
                     || kind == crate::settings::WIFI_KIND
                     || crate::services::connector_kind(&kind).is_some()
                     || crate::upload::id_of(&kind).is_some())
