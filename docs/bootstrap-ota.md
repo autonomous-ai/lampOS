@@ -243,8 +243,11 @@ One-time provisioning script run on a fresh Raspberry Pi. Executes stages sequen
 
 **Quick install from CDN:**
 ```bash
-curl -fsSL https://cdn.autonomous.ai/os/install.sh | sudo bash
+curl -fsSL https://cdn.autonomous.ai/os/install.sh | sudo DEVICE_TYPE=lamp bash
 ```
+
+`DEVICE_TYPE` is required. Replace `lamp` with the target device class, and set it
+after `sudo` so it reaches the installer rather than the download command.
 
 ### Stage Overview
 
