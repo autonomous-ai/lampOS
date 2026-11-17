@@ -403,6 +403,7 @@ pub fn make_run_with(
         env_file: None,
         answer: Default::default(),
         net: false,
+        tells: false,
     }
 }
 
@@ -1284,11 +1285,61 @@ impl Runner for MakeHermes {
         Ok(())
     }
 
+    /// A task's run that tells ([`SkillRun::tells`]) keeps what its agent
+    /// wrote to its own folder's [`ANSWER_FILE`] ([`Self::tell_words`]), as
+    /// a make's answer is read: Hermes's chat answer goes nowhere here.
+    /// Never a make's: its answer is its own.
+    fn answers(&self) -> bool {
+        true
+    }
+
+    fn tell_words(&self, start_in: Option<&Path>) -> String {
+        match start_in {
+            Some(folder) => crate::skill_task::tell_file_line(&folder.join(ANSWER_FILE)),
+            None => crate::skill_task::TELL_LINE.to_owned(),
+        }
+    }
+
     /// With [`MakeHermes::egress`], the run's egress socket is made for its
     /// own folder (`make-<run id>`) before Hermes starts and removed when
     /// it ends, whatever the end; nothing piped through it outlives the
-    /// run's deadline.
+    /// run's deadline. A run that tells and ended well has its agent's
+    /// answer read from that folder, before the folder is removed.
     fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
+        let ran = self.run_held(run, end_token);
+        if ran.is_ok() {
+            keep_told_answer(run);
+        }
+        ran
+    }
+}
+
+/// A task's run that tells ([`SkillRun::tells`]) and ended well, through a
+/// make's runner: what its agent wrote to its own folder's [`ANSWER_FILE`]
+/// kept as its answer ([`SkillRun::answer`]), read as a make's answer is
+/// ([`answer_in`]: a regular file, never through a link, not empty, at most
+/// [`MOST_ANSWER_BYTES`]). Nothing for any other run.
+pub(crate) fn keep_told_answer(run: &SkillRun) {
+    let Some(folder) = run.start_in.as_deref().filter(|_| run.tells) else {
+        return;
+    };
+    let answer = answer_in(folder);
+    // Its length only, never its words (#7180).
+    eprintln!(
+        "[lamp-tasks] skill task {}: its agent's answer: {}",
+        run.run,
+        answer.as_ref().map_or_else(
+            || format!("none in its {ANSWER_FILE}"),
+            |answer| format!("{} bytes kept", answer.len())
+        )
+    );
+    if let Some(answer) = answer {
+        let _ = run.answer.set(answer);
+    }
+}
+
+impl MakeHermes {
+    fn run_held(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
         self.ready()?;
         let Some(grant) = &self.egress else {
             return self.hermes.run(run, end_token);
@@ -1373,12 +1424,22 @@ impl Runner for NetRunner {
         }
     }
 
-    /// By the one run path, as the lamp's Harness runner keeps its agent's
-    /// last answer, so a `net` run tells what it found
-    /// ([`crate::skill_task::tells_answer`]); the make's net runner keeps
-    /// none.
+    /// As the runner it goes through keeps its agent's last answer, so a
+    /// `net` run tells what it found ([`crate::skill_task::tells_answer`]):
+    /// by the one run path the lamp's Harness runner, from its chat; else
+    /// the make's net runner, from the run's own `answer.md`.
     fn answers(&self) -> bool {
-        self.by_one_path().is_some_and(Runner::answers)
+        match self.by_one_path() {
+            Some(harness) => harness.answers(),
+            None => self.make.answers(),
+        }
+    }
+
+    fn tell_words(&self, start_in: Option<&Path>) -> String {
+        match self.by_one_path() {
+            Some(harness) => harness.tell_words(start_in),
+            None => self.make.tell_words(start_in),
+        }
     }
 
     fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
@@ -1611,12 +1672,14 @@ mod tests {
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::fs::PermissionsExt;
 
-    /// A `net` run's runner keeps its agent's answer, so the run tells it,
-    /// only by the one run path (the lamp's Harness runner); the make's net
-    /// runner keeps none.
+    /// A `net` run's runner keeps its agent's answer either way, so the run
+    /// tells it: by the one run path the lamp's Harness runner, asked for a
+    /// last chat answer fit to say; else the make's net runner, asked to
+    /// write it to the run's own `answer.md`.
     #[test]
-    fn a_net_runner_keeps_an_answer_only_by_the_one_run_path() {
+    fn a_net_runner_keeps_an_answer_by_either_path() {
         let home = Path::new("/var/lib/lampos-tasks");
+        let folder = Path::new("/w/make-r1");
         let mut harness = crate::skill_task::HarnessRunner::lamp(home, Default::default());
         harness.default_agent = true;
         let by_path = NetRunner {
@@ -1624,6 +1687,10 @@ mod tests {
             one_path: Some(Arc::new(harness)),
         };
         assert!(by_path.answers());
+        assert_eq!(
+            by_path.tell_words(Some(folder)),
+            crate::skill_task::TELL_LINE
+        );
         let mut off = crate::skill_task::HarnessRunner::lamp(home, Default::default());
         off.default_agent = false;
         for runner in [
@@ -1636,8 +1703,56 @@ mod tests {
                 one_path: None,
             },
         ] {
-            assert!(!runner.answers());
+            assert!(runner.answers());
+            assert_eq!(
+                runner.tell_words(Some(folder)),
+                crate::skill_task::tell_file_line(&folder.join(ANSWER_FILE))
+            );
         }
+        assert!(lamp_runner(home, true).answers() && lamp_runner(home, false).answers());
+    }
+
+    /// A make's runner (an agent skill's, a keyed run's, a `net` run's off
+    /// the one run path) keeps what a task's run that tells wrote to its own
+    /// folder's `answer.md` once it ended well; a run that doesn't tell (a
+    /// make's own) keeps nothing, nor one that failed.
+    #[test]
+    fn a_makes_runner_keeps_a_telling_runs_answer_from_its_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let work = dir.path().join("work");
+        let folder = work.join("make-r1");
+        std::fs::create_dir_all(&folder).unwrap();
+        let net = format!("{}{}", WRAPPER_NET_LINES[0], WRAPPER_NET_LINES[1]);
+        let marked =
+            format!("#!/bin/sh\n{WRAPPER_HOME_LINE}unset T\n{net}--pid hermes-ns \"$@\"\n");
+        let runner = |end: &str| {
+            let (w, n) = namespace(dir.path(), &marked, NS_HOME_LINE);
+            let mut runner = lamp_runner(dir.path(), false);
+            runner.hermes.program = PathBuf::from("/bin/sh");
+            runner.hermes.args = vec![
+                "-c".into(),
+                format!("printf 'Bitcoin is at 91,204 dollars.' > {ANSWER_FILE}; {end}"),
+                "sh".into(),
+            ];
+            runner.hermes.folder = work.clone();
+            runner.make_work = work.clone();
+            runner.hermes.tick = Duration::from_millis(10);
+            (runner.wrapper, runner.ns) = (w, n);
+            runner
+        };
+        let ran = |tells: bool, end: &str| {
+            let _ = std::fs::remove_file(folder.join(ANSWER_FILE));
+            let mut run = make_run(&folder, Duration::from_secs(5));
+            run.tells = tells;
+            let ended = runner(end).run(&run, &|| {});
+            (ended, run.answer.get().cloned())
+        };
+        assert_eq!(
+            ran(true, "exit 0"),
+            (Ok(0), Some("Bitcoin is at 91,204 dollars.".to_owned()))
+        );
+        assert_eq!(ran(false, "exit 0"), (Ok(0), None));
+        assert!(matches!(ran(true, "exit 3"), (Err(_), None)));
     }
 
     fn line(rules: &str, within_ms: u64) -> Vec<u8> {

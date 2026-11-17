@@ -7478,6 +7478,7 @@ fn skill_run(deadline: Duration) -> SkillRun {
         env_file: None,
         answer: Default::default(),
         net: false,
+        tells: false,
     }
 }
 
