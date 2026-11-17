@@ -319,6 +319,13 @@ struct BudgetFile {
     /// (#5207, Fourteen's finding on #5208).
     #[serde(default)]
     give_back_unsaid: bool,
+    /// The most runs the group starts a local day between its skills,
+    /// counted from the lamp's local day start as `most_a_day` is (#6543).
+    per_day: Option<u32>,
+    /// A `follows` word of a member counts as one of the group's runs: it
+    /// spends the group's hour, day and gap, and waits for them (#6543).
+    #[serde(default)]
+    follows_count: bool,
 }
 
 /// `[rest]`: after `after_ignored` runs in a row that nobody noticed within
@@ -341,6 +348,8 @@ pub struct Rest {
 pub const MOST_A_DAY_AT_MOST: u32 = 24;
 /// The most runs an hour a group may share.
 pub const PER_HOUR_AT_MOST: u32 = 6;
+/// The most runs a day a group may share (#6543).
+pub const PER_DAY_AT_MOST: u32 = 48;
 /// The least `[budget] gap` a skill may name.
 const BUDGET_GAP_LEAST_US: u64 = 60_000_000;
 /// How long after a run a look or a movement counts as noticing it, when
@@ -2187,6 +2196,12 @@ pub struct Skill {
     /// With `[budget] give_back_unsaid = true`: a run of its group that
     /// said nothing gives its place in the hour back ([`Engine::unsaid`]).
     pub budget_gives_back: bool,
+    /// With `[budget] per_day`: the most runs its group starts a local day,
+    /// as this skill names it (#6543).
+    pub budget_per_day: Option<u32>,
+    /// With `[budget] follows_count = true`: its group counts a `follows`
+    /// word of a member as one of its runs (#6543).
+    pub budget_follows_count: bool,
     /// When it rests after runs nobody noticed.
     pub rest: Option<Rest>,
     /// The function that snoozes it or turns it off (#1685).
@@ -4467,24 +4482,37 @@ fn manifest(
             if !(1..=PER_HOUR_AT_MOST).contains(&budget.per_hour) {
                 return Err(format!("[budget] per_hour is 1 to {PER_HOUR_AT_MOST}"));
             }
-            Some((
-                budget.group,
-                budget.per_hour,
-                budget.gap,
-                budget.give_back_unsaid,
-            ))
-        }
-    };
-    let (budget, budget_gap_us, budget_gives_back) = match budget {
-        None => (None, 0, false),
-        Some((group, per_hour, gap, gives_back)) => {
-            let gap_us = gap.as_deref().map(duration_us).transpose()?.unwrap_or(0);
-            if gap.is_some() && !(BUDGET_GAP_LEAST_US..=HOUR_US).contains(&gap_us) {
-                return Err("[budget] gap is 1m to 1h".into());
+            if budget
+                .per_day
+                .is_some_and(|most| !(1..=PER_DAY_AT_MOST).contains(&most))
+            {
+                return Err(format!("[budget] per_day is 1 to {PER_DAY_AT_MOST}"));
             }
-            (Some((group, per_hour)), gap_us, gives_back)
+            Some(budget)
         }
     };
+    let (budget, budget_gap_us, budget_gives_back, budget_per_day, budget_follows_count) =
+        match budget {
+            None => (None, 0, false, None, false),
+            Some(budget) => {
+                let gap_us = budget
+                    .gap
+                    .as_deref()
+                    .map(duration_us)
+                    .transpose()?
+                    .unwrap_or(0);
+                if budget.gap.is_some() && !(BUDGET_GAP_LEAST_US..=HOUR_US).contains(&gap_us) {
+                    return Err("[budget] gap is 1m to 1h".into());
+                }
+                (
+                    Some((budget.group, budget.per_hour)),
+                    gap_us,
+                    budget.give_back_unsaid,
+                    budget.per_day,
+                    budget.follows_count,
+                )
+            }
+        };
     let rest = match file.rest {
         None => None,
         Some(rest) => {
@@ -5424,6 +5452,8 @@ fn manifest(
         budget,
         budget_gap_us,
         budget_gives_back,
+        budget_per_day,
+        budget_follows_count,
         rest,
         stop,
         steps,
@@ -6104,6 +6134,8 @@ pub fn shed_made_manners(skill: &mut Skill, folder: &Path) {
             group == MANNERS_GROUP && *per_hour == MANNERS_PER_HOUR
         }) && skill.budget_gap_us == 0
             && !skill.budget_gives_back
+            && skill.budget_per_day.is_none()
+            && !skill.budget_follows_count
             && skill.stop.is_none();
     let lamp_most = skill.most_a_day == Some(MANNERS_MOST_A_DAY);
     if !(lamp_budget || lamp_most) || !made_by_ask(skill, folder) {
@@ -6577,6 +6609,9 @@ pub struct Engine {
     clock: Option<(i32, u64, u64)>,
     /// The runs each skill with `most_a_day` started: its day and how many.
     day_runs: HashMap<String, (i64, u32)>,
+    /// The runs each group with a `[budget] per_day` started: its day and
+    /// how many (#6543).
+    group_day: HashMap<String, (i64, u32)>,
     /// When each group's runs began, within the last hour, by group.
     group_runs: HashMap<String, std::collections::VecDeque<u64>>,
     /// By group, each member waiting for its hour: since when, and when it
@@ -6762,6 +6797,34 @@ fn nudged(
 
 /// The local day `now_us` is in: its date with the local time known, else
 /// a day of the engine's own clock.
+/// The most runs a day `group` starts, the least any member names
+/// (`[budget] per_day`, #6543), as its hour is the least `per_hour`.
+fn group_per_day(skills: &[Skill], group: &str) -> Option<u32> {
+    skills
+        .iter()
+        .filter(|skill| {
+            skill
+                .budget
+                .as_ref()
+                .is_some_and(|(named, _)| named == group)
+        })
+        .filter_map(|skill| skill.budget_per_day)
+        .min()
+}
+
+/// Whether `group` counts its members' `follows` words as its runs: any
+/// member naming `[budget] follows_count = true` (#6543), as one naming
+/// `give_back_unsaid` gives back for all.
+fn group_follows_count(skills: &[Skill], group: &str) -> bool {
+    skills.iter().any(|skill| {
+        skill.budget_follows_count
+            && skill
+                .budget
+                .as_ref()
+                .is_some_and(|(named, _)| named == group)
+    })
+}
+
 fn day_of(clock: Option<(i32, u64, u64)>, now_us: u64) -> i64 {
     match clock {
         Some((offset, at_us, unix_ms)) => {
@@ -6863,6 +6926,7 @@ impl Engine {
             ask_policy: false,
             clock: None,
             day_runs: HashMap::new(),
+            group_day: HashMap::new(),
             group_runs: HashMap::new(),
             budget_waits: HashMap::new(),
             word_windows: HashMap::new(),
@@ -7049,6 +7113,11 @@ impl Engine {
                 limits.groups.entry(group.clone()).or_default().began_us = began;
             }
         }
+        for (group, (on, count)) in &self.group_day {
+            if *on == day {
+                limits.groups.entry(group.clone()).or_default().day = Some((*on, *count));
+            }
+        }
         for (group, waits) in &self.budget_waits {
             let waits: BTreeMap<String, (u64, u64)> = waits
                 .iter()
@@ -7092,6 +7161,12 @@ impl Engine {
             }
         }
         for (group, kept) in limits.groups {
+            if let Some((on, count)) = kept.day {
+                let now = self.group_day.entry(group.clone()).or_insert((on, 0));
+                if now.0 == on {
+                    now.1 = now.1.max(count);
+                }
+            }
             if !kept.began_us.is_empty() {
                 let began = self.group_runs.entry(group.clone()).or_default();
                 began.extend(kept.began_us);
@@ -7741,6 +7816,12 @@ impl Engine {
             && let Some(at) = began.iter().position(|at| *at == spent.at_us)
         {
             began.remove(at);
+        }
+        if let Some(group) = &spent.group
+            && let Some((on, count)) = self.group_day.get_mut(group)
+            && *on == day_of(self.clock, spent.at_us)
+        {
+            *count = count.saturating_sub(1);
         }
         if self.group_ran.get(skill) == Some(&spent.at_us) {
             match spent.group_ran {
@@ -9071,6 +9152,15 @@ impl Engine {
                     None => !silent(trigger.name.as_ref()),
                     Some((other, _)) => silent(Some(other)),
                 };
+                // Its group's limits count the nudges, and with `[budget]
+                // follows_count = true` named by a member a `follows` word
+                // too (#6543): the day's most and the rest count as before.
+                let counted = nudge
+                    || (trigger.follows.is_some()
+                        && skill
+                            .budget
+                            .as_ref()
+                            .is_some_and(|(group, _)| group_follows_count(&self.skills, group)));
                 if let Some(most) = skill.most_a_day.filter(|most| {
                     nudge
                         && self
@@ -9085,6 +9175,29 @@ impl Engine {
                         "most",
                         now_us,
                         || format!("its {most} a day already run"),
+                    );
+                    continue;
+                }
+                // Past its group's day (#6543): spent, as the skill's own
+                // day's most is.
+                if let Some((group, most)) = skill
+                    .budget
+                    .as_ref()
+                    .filter(|_| counted)
+                    .and_then(|(group, _)| Some((group, group_per_day(&self.skills, group)?)))
+                    .filter(|(group, most)| {
+                        self.group_day
+                            .get(*group)
+                            .is_some_and(|(on, count)| *on == day && count >= most)
+                    })
+                {
+                    dropped(
+                        &mut self.dropped,
+                        watch,
+                        &skill.name,
+                        "budget-day",
+                        now_us,
+                        || format!("its {group} group's {most} a day already run"),
                     );
                     continue;
                 }
@@ -9204,7 +9317,7 @@ impl Engine {
                     skill
                         .budget
                         .as_ref()
-                        .filter(|_| nudge)
+                        .filter(|_| counted)
                         .is_some_and(|(group, _)| {
                             let limit = self
                                 .skills
@@ -9228,7 +9341,7 @@ impl Engine {
                 let gap_left = skill
                     .budget
                     .as_ref()
-                    .filter(|_| nudge)
+                    .filter(|_| counted)
                     .and_then(|(group, _)| {
                         let gap_us = self
                             .skills
@@ -9254,7 +9367,7 @@ impl Engine {
                 let behind = skill
                     .budget
                     .as_ref()
-                    .filter(|_| nudge)
+                    .filter(|_| counted)
                     .is_some_and(|(group, _)| {
                         self.budget_waits.get(group).is_some_and(|waits| {
                             let mine = waits.get(&skill.name).map_or(now_us, |(first, _)| *first);
@@ -9606,7 +9719,7 @@ impl Engine {
                                 group: skill
                                     .budget
                                     .as_ref()
-                                    .filter(|_| nudge)
+                                    .filter(|_| counted)
                                     .map(|(group, _)| group.clone()),
                                 nudge: None,
                             },
@@ -9647,7 +9760,14 @@ impl Engine {
                         // A word after a nudge: its say is not the nudge's.
                         self.unsaid_from.remove(&skill.name);
                     }
-                    if let Some((group, _)) = skill.budget.as_ref().filter(|_| nudge) {
+                    if let Some((group, _)) = skill.budget.as_ref().filter(|_| counted) {
+                        if group_per_day(&self.skills, group).is_some() {
+                            let count = self.group_day.entry(group.clone()).or_insert((day, 0));
+                            if count.0 != day {
+                                *count = (day, 0);
+                            }
+                            count.1 += 1;
+                        }
                         let began = self.group_runs.entry(group.clone()).or_default();
                         began.retain(|at| now_us.saturating_sub(*at) < HOUR_US);
                         began.push_back(now_us);

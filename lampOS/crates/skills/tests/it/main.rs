@@ -7,6 +7,7 @@ mod call_wait;
 mod daily_engine;
 mod faq;
 mod format;
+mod group_day;
 mod holds;
 mod journal_output;
 mod made;
