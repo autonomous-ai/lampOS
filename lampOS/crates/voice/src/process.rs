@@ -1390,6 +1390,10 @@ fn worker_command(
             role,
             var(crate::ring_night::ENVIRONMENT).as_deref(),
         ))
+        .envs(ring_update_worker_environment(
+            role,
+            var(crate::ring_update::ENVIRONMENT).as_deref(),
+        ))
         .envs(rest_through_sounds_worker_environment(
             role,
             var(crate::second_provider::REST_THROUGH_SOUNDS_ENVIRONMENT).as_deref(),
@@ -2804,6 +2808,16 @@ fn night_worker_environment(
         .then_some((crate::ring_night::ENVIRONMENT, "on"))
 }
 
+// An update on the ring (#7516), the same narrow way: the exact `on`, to
+// the ring only, which shapes its resting face while a build comes.
+fn ring_update_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "ring" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::ring_update::ENVIRONMENT, "on"))
+}
+
 // Resting through sounds at night (#1672, #4285), the same narrow way: the
 // exact `on`, to the second route only, which holds back its answer to the
 // lamp's name alone while Expression says the night's sleep rests so.
@@ -4034,6 +4048,7 @@ mod tests {
                     lamp_body::unplug::ENVIRONMENT,
                     lamp_msgs::SHUTDOWN_SWITCH,
                     crate::ring_night::ENVIRONMENT,
+                    crate::ring_update::ENVIRONMENT,
                     crate::second_provider::REST_THROUGH_SOUNDS_ENVIRONMENT,
                     crate::person::OWNER_ONLY_ENVIRONMENT,
                     crate::known_faces::AT_DESK_ENVIRONMENT,
@@ -4507,6 +4522,7 @@ mod tests {
                 vec![
                     "LAMP_DID_RING=on",
                     "LAMP_NIGHT_ASLEEP_FACE=on",
+                    "LAMP_RING_UPDATE=on",
                     "LAMP_SHUTDOWN=on",
                     "LAMP_UNPLUG=on",
                 ],
