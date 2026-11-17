@@ -97,7 +97,7 @@ differs. Folders are what the unit makes or names.
 | services | `lamp-services --store /var/lib/lampos-services --run /run/lampos-services` (on in the product unit, `LAMP_SERVICES=on`, with writes, `LAMP_SERVICES_WRITE=on`, since 4 Nov, and Google Calendar's moves and cancels, `LAMP_CALENDAR_EDITS=on`, since 11 Nov; `services.md`) | root, group lampos, no capability | `/var/lib/lampos-services/` (0700, its `StateDirectory`; the reset plan wipes it); `/run/lampos-services/` (0750) | setup's `backend.json` and the voice's key, through `LoadCredential=`, for a token's refresh | `admin.sock` (`lamp-cloud` only), `tools/` with `tools.json` and `call.sock` (the voice only) |
 | control | `lamp-control serve` (off unless `LAMP_CONTROL=on`, `control.md`) | lampos | `/var/lib/lampos-control/` (0700, its `StateDirectory`: certificate, key, paired computers); `/run/lampos-control/` (0700, the admin socket) | none | TCP 7731 (WebSocket over TLS, paired computers only); `admin.sock`; the body's `mood.sock`, the voice's `say.sock`, the bus |
 | peek | `lamp-peek` (the owner's dev monitor, #5883: off unless `LAMP_PEEK=monitor`, which the app's `monitor.set` writes as a drop-in; outside `lampos.target`, `lamp-peek.service` is `WantedBy=multi-user.target` once setup's marker exists, `peek.md`) | lampos | `/run/lampos-peek/` (0700, the admin socket) | none | TCP 80 to the local network only, while on; `admin.sock`; reads the bus |
-| seen | `lamp-seen frame-link`, then `lamp-seen serve` (off unless `LAMP_SEEN_ACTIVITY=on`, `seen.md`); in the target before the eyes | lampos | `/var/lib/lampos-seen/` (0700, its `StateDirectory`, passed as `--state-folder`: the line said back; the reset plan wipes it); `/run/lampos-seen/` (0700, kept until the lamp restarts: the frame link's boots, `frame-link.env`, which the eyes read by `--frame-link-boots`, and `eyes-visits.env`) | setup's `backend.json` and the voice's key, through `LoadCredential=`; the opt-in, `/var/lib/lampOS/consent/seen-activity.json`, read only (the reset plan removes it) | the bus (`humans/doing`, `humans/doing_seen`, `humans/posture`, `light/mark`); the voice's `say.sock`; the eyes' frame link; the perception service, with the switch and the opt-in |
+| seen | `lamp-seen frame-link`, then `lamp-seen serve` (off unless `LAMP_SEEN_ACTIVITY=on`, which the unit sets, `seen.md`); in the target before the eyes | lampos | `/var/lib/lampos-seen/` (0700, its `StateDirectory`, passed as `--state-folder`: the line said back; the reset plan wipes it); `/run/lampos-seen/` (0700, kept until the lamp restarts: the frame link's boots, `frame-link.env`, which the eyes read by `--frame-link-boots`, and `eyes-visits.env`) | setup's `backend.json` and the voice's key, through `LoadCredential=`; the opt-in, `/var/lib/lampOS/consent/seen-activity.json`, read only (the reset plan removes it) | the bus (`humans/doing`, `humans/doing_seen`, `humans/posture`, `light/mark`); the voice's `say.sock`; the eyes' frame link; the perception service, with the switch and the opt-in |
 | cloud | `lamp-cloud --bus-root /run/lampos-bus` (on in the product, `LAMP_CLOUD=on` in its unit since #1815, `cloud.md`) | lampos | `/var/lib/lampos-cloud/` (0700, its `StateDirectory`) | setup's `backend.json`, the voice's key and update's `state.json`, through `LoadCredential=` | the company broker and the backend's ping; reads the bus |
 | records | `lamp-records check` (a timer, hourly) | root | `/run/lamp-records/` | `/etc/lampOS/records.json`, which install places (`deploy/product/settings/records.json`; it does nothing without it) | `last.json` |
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
@@ -297,15 +297,18 @@ would take a Live session past its 32, and its marks, called only after its look
 other installable skills, which their owner puts on; and Laugh glance,
 parked (#1669). A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
-product lamp has 45 functions of its own: the voice's own 27 (with
+product lamp has 50 functions of its own: the voice's own 32 (with
 `LAMP_REPORTS=on`, #2862, `reports_stop` and `reports_state` among them,
+`LAMP_SERVICES=on`'s `services_connected`, `service_read` and `service_write`,
 and `LAMP_MEMORY_ROLE=on`'s `set_role` and `end_role` since 9 Nov, and
-`LAMP_SLEEP_ASKED=on`'s `go_to_sleep` since #6853), the
+`LAMP_SLEEP_ASKED=on`'s `go_to_sleep` since #6853, and `LAMP_SEEN_ACTIVITY=on`'s
+`look_at_my_desk` and `stop_looking_at_my_desk` since #6543, its
+`offer_desk_noticing` only with `LAMP_SEEN_VOICE_OFFER=on`, off in the product), the
 actions part's 17 and `use_skill`, reaching Dance's `dance` and Pose's
 `set_pose`, which comes with the product since #4135 (`PRODUCT_FUNCTIONS` in
 `crates/update/tests/functions.rs`, which fails if one is left out or the
-count changes). On the product's route a chat request takes 48
-(`second_provider::MAX_TOOLS`), and each offers every one, with the
+count changes). On the product's route a chat request takes 64
+(`second_provider::MAX_TOOLS`, 48 until #7433), and each offers every one, with the
 search's `web_search` and `fetch_page`
 (`a_product_lamp_declares_every_function_it_has_within_the_bound`,
 `a_product_chat_request_offers_dance_at_the_bound`). At the bound a core

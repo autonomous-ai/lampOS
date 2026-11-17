@@ -9084,3 +9084,73 @@ fn with_sysstat_on_nothing_kept_is_removed() {
     assert!(sysstat_removal(&lamp).is_empty());
     assert!(folder.join("sa18").exists());
 }
+
+/// Cloud perception is on in the product (#6543's switch-on): lamp-seen
+/// with activity, posture, the held sitting, the stand-up break and the
+/// more doings; the voice's yes and offer, and the app's consent key, read
+/// the same `LAMP_SEEN_ACTIVITY`, and lamp-cloud's `seen_more` grant its own
+/// `LAMP_SEEN_MORE_DOINGS` (#7529); lamp-skills' `sooner`. The journal's
+/// labels stay a diagnostics switch, in no unit, and the voice's own offer
+/// (`LAMP_SEEN_VOICE_OFFER`) is in none either.
+#[test]
+fn the_product_sees_with_cloud_perception() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    for (name, lines) in [
+        (
+            "lamp-seen.service",
+            &[
+                "Environment=LAMP_SEEN_ACTIVITY=on",
+                "Environment=LAMP_SEEN_POSTURE=on",
+                "Environment=LAMP_SEEN_HOLDS_SITTING=on",
+                "Environment=LAMP_SEEN_BREAK_IS_STANDING=on",
+                "Environment=LAMP_SEEN_MORE_DOINGS=on",
+            ][..],
+        ),
+        (
+            "lamp-voice.service",
+            &[
+                "Environment=LAMP_SEEN_ACTIVITY=on",
+                "Environment=LAMP_SEEN_POSTURE=on",
+            ][..],
+        ),
+        (
+            "lamp-cloud.service",
+            &[
+                "Environment=LAMP_SEEN_ACTIVITY=on",
+                "Environment=LAMP_SEEN_POSTURE=on",
+                "Environment=LAMP_SEEN_MORE_DOINGS=on",
+            ][..],
+        ),
+        (
+            "lamp-skills.service",
+            &["Environment=LAMP_YAWN_SOONER=on"][..],
+        ),
+    ] {
+        let service = section(unit(name), "Service");
+        for line in lines {
+            assert_eq!(
+                service.iter().filter(|set| *set == line).count(),
+                1,
+                "{name} lacks {line}"
+            );
+        }
+    }
+    for (name, _) in install::PRODUCT {
+        assert!(
+            !unit(name).contains("LAMP_SEEN_JOURNAL_LABELS=on"),
+            "{name} sets the journal's labels"
+        );
+        // The voice's own offer stays off: the yes comes from the app
+        // (the first builder on #7506).
+        assert!(
+            !unit(name).contains("LAMP_SEEN_VOICE_OFFER"),
+            "{name} sets the voice's offer"
+        );
+    }
+}
