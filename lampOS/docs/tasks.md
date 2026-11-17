@@ -3991,8 +3991,10 @@ one runner (a fresh home per run, the token as a file) with no new rules:
     in lamp-tasks' hand-over (`HandOver::check`, `bad_request`, nothing
     minted). A skill that needs both is two skills.
   - A `net` run sees only its own skill's folder, never another skill's:
-    lamp-tasks names it in the run's own folder, `make-<run id>/skill-folder`
-    (`egress::OWN_SKILL_FILE`), and the namespace script stages that folder
+    lamp-tasks names it beside the run's egress socket in its private 0700
+    folder, `/run/lampos-tasks/egress/<egress name>.folder` (0600, made new
+    with the socket by `Grant::open_for`, removed with it), which no run can
+    see or write (Heron's P3 at `2533a4f02b`; `egress::OWN_SKILL_FILE`), and the namespace script stages that folder
     alone of `/var/lib/lampOS/skills` and `skills-dev`
     (`hermes_install::OWN_SKILL_LINES`); a script without that line
     (`egress::NS_OWN_SKILL_LINE`) gets no `net` run (`no_net`). Of lamp-tasks'

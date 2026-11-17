@@ -731,6 +731,49 @@ fn the_egress_socket_lives_only_while_its_run_does() {
         .unwrap();
     assert!(!left.exists());
     drop(served);
+    // Heron's P3 at 2533a4f02b: the skill's folder named beside the
+    // socket in this private folder, 0600, removed with it; one there
+    // already, or a link in its place, refuses the run, nothing served;
+    // one left by an ended lamp-tasks is swept.
+    let skill = Path::new("/var/lib/lampOS/skills/web-glow");
+    let served = grant
+        .open_for(
+            "skill-task-7",
+            Instant::now() + Duration::from_secs(60),
+            skill,
+        )
+        .unwrap();
+    let named = grant.folder_file("skill-task-7");
+    assert_eq!(named, grant.dir.join("skill-task-7.folder"));
+    assert_eq!(
+        std::fs::read_to_string(&named).unwrap(),
+        "/var/lib/lampOS/skills/web-glow\n"
+    );
+    assert_eq!(mode(&named), 0o600);
+    drop(served);
+    assert!(!named.exists());
+    assert_eq!(std::fs::read_dir(&grant.dir).unwrap().count(), 0);
+    let until = Instant::now() + Duration::from_secs(60);
+    // One left over, or a link left in its place: swept at the open, never
+    // followed, and made new.
+    std::fs::write(grant.folder_file("skill-task-8"), "/elsewhere\n").unwrap();
+    std::fs::create_dir_all(dir.path().join("other")).unwrap();
+    let target = dir.path().join("other/target");
+    std::os::unix::fs::symlink(&target, grant.folder_file("skill-task-9")).unwrap();
+    let served = grant.open_for("skill-task-8", until, skill).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(grant.folder_file("skill-task-8")).unwrap(),
+        "/var/lib/lampOS/skills/web-glow\n"
+    );
+    assert!(std::fs::symlink_metadata(grant.folder_file("skill-task-9")).is_err());
+    assert!(!target.exists());
+    drop(served);
+    // Something there it can't sweep (a folder): refused, the socket
+    // removed, nothing served.
+    std::fs::create_dir(grant.folder_file("skill-task-10")).unwrap();
+    assert!(grant.open_for("skill-task-10", until, skill).is_err());
+    assert!(!grant.socket("skill-task-10").exists());
+    std::fs::remove_dir(grant.folder_file("skill-task-10")).unwrap();
     // A folder that isn't private: refused.
     std::fs::set_permissions(&grant.dir, std::fs::Permissions::from_mode(0o755)).unwrap();
     assert!(
@@ -753,8 +796,7 @@ fn the_names_agree_with_the_namespace_script() {
     assert!(source.contains(NS_LINE), "{NS_LINE}");
     assert!(source.contains(NS_SKILL_LINE), "{NS_SKILL_LINE}");
     assert!(source.contains(NS_OWN_SKILL_LINE), "{NS_OWN_SKILL_LINE}");
-    assert!(NS_OWN_SKILL_LINE.contains(&format!("/{OWN_SKILL_FILE} ")));
-    assert!(NS_OWN_SKILL_LINE.contains(crate::skill_make::FOLDER_HEAD));
+    assert!(NS_OWN_SKILL_LINE.contains(&format!("{EGRESS_DIR}/${EGRESS_ENV}{OWN_SKILL_FILE} ")));
     assert!(source.contains("--egress \\\"$V\\\""));
     assert!(plain_name("make-task-1") && plain_name("skill-task-1"));
     assert!(!plain_name("skill-") && !plain_name("other-task-1") && !plain_name("skill-A"));
