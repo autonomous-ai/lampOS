@@ -2496,6 +2496,8 @@ fn second_route_worker_environment(
         crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT,
         // A wordless call only on a sure hearing (#5385).
         crate::second_provider::wordless_call::ENVIRONMENT,
+        // A plain light or volume ask done at the usage limit (#7346).
+        crate::second_provider::limit_local::ENVIRONMENT,
         crate::second_provider::OWN_ECHO_ENVIRONMENT,
         crate::second_provider::FACE_NAME_ENVIRONMENT,
         crate::second_provider::STT_WARM_ENVIRONMENT,
@@ -2924,6 +2926,7 @@ mod tests {
             lamp_msgs::NameHeard::NEAR_ENVIRONMENT,
             crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT,
             crate::second_provider::wordless_call::ENVIRONMENT,
+            crate::second_provider::limit_local::ENVIRONMENT,
             crate::second_provider::OWN_ECHO_ENVIRONMENT,
             crate::second_provider::FACE_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
@@ -4030,6 +4033,7 @@ mod tests {
                     || name == lamp_msgs::NameHeard::NEAR_ENVIRONMENT
                     || name == crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT
                     || name == crate::second_provider::wordless_call::ENVIRONMENT
+                    || name == crate::second_provider::limit_local::ENVIRONMENT
                     || name == crate::second_provider::OWN_ECHO_ENVIRONMENT
                     || name == crate::second_provider::FACE_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
@@ -4203,6 +4207,7 @@ mod tests {
                     "LAMP_LATE_ANSWER_LET_GO=on",
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
+                    "LAMP_LIMIT_LOCAL_ASKS=on",
                     "LAMP_MADE_NOT_ON_TOLD=on",
                     "LAMP_MAKE_AGENT_GUIDE=on",
                     "LAMP_MAKE_AGENT_ONE_PATH=on",
