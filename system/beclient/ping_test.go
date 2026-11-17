@@ -113,4 +113,14 @@ func TestPingBodyMQTTTLS(t *testing.T) {
 	if string(body["mqtt_tls"]) != "true" {
 		t.Fatalf("mqtt_tls = %s, want true", body["mqtt_tls"])
 	}
+	if _, ok := body["mqtt_tls_failing"]; ok {
+		t.Fatalf("mqtt_tls_failing must be absent unless set: %v", body)
+	}
+
+	if _, err := c.Ping(cfg.BackendKey(), PingPayload{Status: "online", MQTTTLS: true, MQTTTLSSwitch: true, MQTTTLSFailing: true}); err != nil {
+		t.Fatalf("ping: %v", err)
+	}
+	if string(body["mqtt_tls_switch"]) != "true" || string(body["mqtt_tls_failing"]) != "true" {
+		t.Fatalf("mqtt_tls_switch = %s, mqtt_tls_failing = %s, want true", body["mqtt_tls_switch"], body["mqtt_tls_failing"])
+	}
 }
