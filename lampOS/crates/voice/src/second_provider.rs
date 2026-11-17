@@ -811,6 +811,11 @@ pub(crate) const ANSWER_AGAIN_LINE: &str = "Sorry, could you say that again?";
 /// model's `not_for_me` on the one word left it unanswered (#5961).
 pub const CUT_ASK_ANSWERED_ENVIRONMENT: &str = "LAMP_CUT_ASK_ANSWERED";
 
+/// `LAMP_LATE_ANSWER_LET_GO=on` ([`Engine::letting_go_late_answers`]): an
+/// ask whose turn ended on its holding line is left out of later turns'
+/// history. Exactly `on`; off unless set.
+pub const LATE_ANSWER_LET_GO_ENVIRONMENT: &str = "LAMP_LATE_ANSWER_LET_GO";
+
 /// What a turn of short answers is said when its calls' own lines differ
 /// ("Brighter." with "Quieter."): one line, never two (#2877).
 pub(crate) const SHORT_DONE_TOGETHER: &str = "Done.";
@@ -2118,6 +2123,14 @@ struct Shared {
     /// its words are joined into a later line or answered in a held line's
     /// place ([`Engine::unsaying_joined`]).
     unsay_joined: Option<Arc<dyn Fn(u64) + Send + Sync>>,
+    /// Marks a request whose turn ended on its holding line in the thread,
+    /// so later turns are not told it (`LAMP_LATE_ANSWER_LET_GO`,
+    /// [`Engine::letting_go_late_answers`]); none, off.
+    late_answer_let_go: Option<Arc<dyn Fn(u64) + Send + Sync>>,
+    /// With [`Self::late_answer_let_go`], the request whose turn said words
+    /// and then called functions, with no words said since: it stands on its
+    /// holding line until a later round speaks or its turn ends.
+    holding_line: Mutex<Option<u64>>,
     /// The answer's first piece goes once this many words have come
     /// ([`Engine::cutting_first_words`]).
     first_words: Option<usize>,
@@ -4843,6 +4856,8 @@ impl Engine {
                 asked_last: Mutex::new(None),
                 same_speaker: None,
                 unsay_joined: None,
+                late_answer_let_go: None,
+                holding_line: Mutex::new(None),
                 first_words: None,
                 speaking: None,
                 held_forget: Mutex::new(HeldForgets::default()),
@@ -6219,6 +6234,55 @@ impl Engine {
             shared.unsay_joined = Some(unsay);
         }
         self
+    }
+
+    /// `LAMP_LATE_ANSWER_LET_GO=on` ([`LATE_ANSWER_LET_GO_ENVIRONMENT`]): a
+    /// turn that said words, then called functions, and ended (cut by a
+    /// newer line, stopped, or retired) before any words after that round,
+    /// is marked in this process's thread as left on its holding line
+    /// ([`crate::thread::Thread::left_on_holding_line`]), so no later turn
+    /// is told its ask as an exchange answered by "Let me search that."
+    /// (lamp-9adf, 17 Nov: an ask cut on its holding line was answered
+    /// inside the next ask's make turn). Off, nothing is marked. Before
+    /// any turn only.
+    pub fn letting_go_late_answers(self, on: bool) -> Self {
+        self.letting_go_late_answers_by(on.then(|| -> Arc<dyn Fn(u64) + Send + Sync> {
+            Arc::new(crate::thread::left_on_holding_line)
+        }))
+    }
+
+    /// [`Self::letting_go_late_answers`] with `let_go` given each request
+    /// left on its holding line; none, off.
+    pub(crate) fn letting_go_late_answers_by(
+        mut self,
+        let_go: Option<Arc<dyn Fn(u64) + Send + Sync>>,
+    ) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.late_answer_let_go = let_go;
+        }
+        self
+    }
+
+    /// With [`Self::letting_go_late_answers`], a request up to `through`
+    /// whose turn stands on its holding line is ended so: it is marked.
+    /// The journal says so, with no words.
+    fn let_go_holding_line(&self, through: u64) {
+        let Some(let_go) = self.shared.late_answer_let_go.as_ref() else {
+            return;
+        };
+        let Some(request) = self
+            .shared
+            .holding_line
+            .lock()
+            .ok()
+            .and_then(|mut holding| holding.take_if(|request| *request <= through))
+        else {
+            return;
+        };
+        let_go(request);
+        eprintln!(
+            "lamp-voice second: request {request}: ended on its holding line, its function round unanswered; left out of later turns' history (LAMP_LATE_ANSWER_LET_GO)"
+        );
     }
 
     /// A line the rule held as unclear (another script, a number alone, a
@@ -7903,6 +7967,7 @@ impl Engine {
             );
         }
         self.let_go_cut("a stop came after it");
+        self.let_go_holding_line(through);
         // Nor do its words heard and not yet asked go on in a chain
         // ([`Self::chain_heard`]).
         if let Ok(mut last) = self.shared.heard_last.lock() {
@@ -8127,6 +8192,7 @@ impl Engine {
     /// race result were searched, then ended by the next line, which was
     /// held, and were never said).
     fn cut_short(&self, through: u64) {
+        self.let_go_holding_line(through);
         let Some(carried) = self
             .shared
             .in_flight
@@ -18469,6 +18535,14 @@ async fn answer(
                 );
                 queue.push(shared.fixed(CHECKING).to_owned()).await?;
             }
+            // Words said, then these calls: the turn stands on its holding
+            // line until a later round speaks (`LAMP_LATE_ANSWER_LET_GO`).
+            if shared.late_answer_let_go.is_some()
+                && queue.started
+                && let Ok(mut holding) = shared.holding_line.lock()
+            {
+                *holding = Some(request);
+            }
             let round_at = messages.len();
             messages.push(Message::assistant_calls_with(
                 Some(text),
@@ -19625,6 +19699,11 @@ async fn answer(
     let gave_up = matches!(ended, Err(Stop::GaveUp));
     let last = match ended {
         Ok(_) => {
+            // Answered to its end: not left on a holding line
+            // (`LAMP_LATE_ANSWER_LET_GO`).
+            if let Ok(mut line) = shared.holding_line.lock() {
+                line.take_if(|on_hold| *on_hold == request);
+            }
             // Sent whole: its unplayed rest can be said again after a
             // wordless cut (`LAMP_CUT_IN_WORDLESS_RESUMES`).
             if let Ok(mut whole) = shared.said_whole.lock() {
@@ -19874,6 +19953,13 @@ impl Queue<'_> {
         }
         self.started = true;
         self.pieces += 1;
+        // Words after its calls: no longer on its holding line
+        // (`LAMP_LATE_ANSWER_LET_GO`).
+        if self.shared.late_answer_let_go.is_some()
+            && let Ok(mut holding) = self.shared.holding_line.lock()
+        {
+            holding.take_if(|request| *request == self.request);
+        }
         // As the saying half tells its pieces: the announcement's text is
         // never one of them.
         if text != ANNOUNCEMENT {

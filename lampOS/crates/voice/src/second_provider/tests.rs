@@ -12153,6 +12153,196 @@ async fn words_cut_short_by_a_line_let_out_are_let_go() {
     );
 }
 
+/// The ask, holding line and make line of the lamp-9adf rig (path B).
+const LATE_ASK: &str = "How many dong is one US dollar?";
+const LATE_HOLDING: &str = "Let me search that.";
+const LATE_ANSWER: &str = "One US dollar is about 25,000 dong.";
+const LATE_MAKE: &str = "Make a skill that tells me a joke every morning.";
+
+/// lamp-9adf (path B), 17 Nov 18:18: "How many dong is one US dollar?" is
+/// answered with a holding line, "Let me search that.", and a `web_search`;
+/// a make line from the same person, begun once the holding line has
+/// played, cuts it (no `heard_of_cut`). With `answered`, the search answers
+/// at once and its answer is said to the turn's end before the make line;
+/// without, the search outlasts the gap and is let go. Request 1's output
+/// is kept in the thread as the worker keeps it, and the make's chat is
+/// given the history as the worker gives it (`worker::system_message`).
+/// `let_go`: `LAMP_LATE_ANSWER_LET_GO` (`Engine::letting_go_late_answers`).
+/// The product unit's switches otherwise: `LAMP_HISTORY_KEEPS_CALLS`,
+/// `LAMP_SAID_AS_HEARD`, `LAMP_CUT_IN_TOLD`, `LAMP_JOIN_CUT_WORDS` (judged
+/// not joined: path A, the ask joined into the make line, is not this rig's)
+/// and `LAMP_CUT_ASK_ANSWERED`, all on. Gives the make's chat, as asked,
+/// and what the make's turn said.
+async fn holding_line_rig(let_go: bool, answered: bool) -> (Vec<Message>, Vec<String>) {
+    let _one = crate::provider_worker::tests::one_thread();
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    // Set as the worker sets it at start (`serve`), and put back.
+    let keeps_calls_was =
+        super::worker::HISTORY_KEEPS_CALLS.swap(true, std::sync::atomic::Ordering::AcqRel);
+    let mut chats = vec![vec![
+        text(LATE_HOLDING),
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            "web_search",
+            json!({"query": "USD to VND"}),
+        )])),
+        Ok(ChatEvent::Done),
+    ]];
+    if answered {
+        chats.push(vec![text(LATE_ANSWER), Ok(ChatEvent::Done)]);
+    }
+    chats.push(vec![
+        text("Okay, I'll make a morning joke skill."),
+        Ok(ChatEvent::Done),
+    ]);
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(LATE_ASK.to_owned()), Ok(LATE_MAKE.to_owned())].into()),
+        chats: Mutex::new(chats.into()),
+        ..Script::default()
+    });
+    let (searching, searched) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+        let searching = searching.clone();
+        Box::pin(async move {
+            let _ = searching.send(());
+            // Longer than the gap before the make line: never answered.
+            if !answered {
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+            json!({"results": []})
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| super::worker::system_message("SYSTEM", None, "", None, None)),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .keeping_calls(true)
+    .holding_hand_on(true)
+    .telling_cut_ins(true)
+    // Not joined (path A is not what this rig is about): with `Same`, the
+    // rig (no playback reported) joins the ask into the make line too.
+    .joining_cut_words(Arc::new(|_, _| {
+        Joined::Not("path B alone: not joined".to_owned())
+    }))
+    .answering_cut_words_a_decline_leaves(true)
+    .letting_go_late_answers(let_go);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    // Request 1's output is kept in the thread as the worker keeps it:
+    // until its holding line has played and its search is running, or,
+    // answered, until its turn is complete.
+    let mut held_said = false;
+    let mut search_running = false;
+    let mut complete = false;
+    while !(held_said && search_running && (complete || !answered)) {
+        search_running |= searched.try_recv().is_ok();
+        if let Ok(event) = tokio::time::timeout(Duration::from_millis(20), engine.next()).await {
+            match &event {
+                ProviderOutput::Transcript {
+                    request: Some(1),
+                    text,
+                    ..
+                } => held_said |= text.contains("search"),
+                ProviderOutput::TurnComplete { request: 1, .. } => complete = true,
+                _ => {}
+            }
+            super::worker::keep(&event, None);
+        }
+    }
+    // The make line, begun after the holding line played (no `heard_of_cut`).
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let mut said = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the turn ends");
+        super::worker::keep(&event, None);
+        match event {
+            ProviderOutput::Transcript {
+                request: Some(2),
+                text,
+                ..
+            } if !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { request: 2, .. } => break,
+            _ => {}
+        }
+    }
+    super::worker::HISTORY_KEEPS_CALLS.store(keeps_calls_was, std::sync::atomic::Ordering::Release);
+    let asked = script.asked.lock().unwrap().clone();
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    assert_eq!(asked.len(), if answered { 3 } else { 2 }, "{asked:#?}");
+    let make = asked.last().unwrap().clone();
+    // Not path A: the make line is asked alone, not joined with the ask.
+    assert_eq!(make.last().unwrap(), &Message::user(LATE_MAKE), "{make:#?}");
+    (make, said)
+}
+
+/// Whether any of `messages` but the last (the line asked) tells `words`,
+/// in the system message's thread text or as a message.
+fn told_before_the_line(messages: &[Message], words: &str) -> bool {
+    messages[..messages.len() - 1]
+        .iter()
+        .any(|message| format!("{message:?}").contains(words))
+}
+
+/// lamp-9adf (path B, Fourteen's edge run, 17 Nov 18:18): the ask cut on
+/// its holding line stayed in the thread with only "Let me search that."
+/// for its answer, so the make's chat was given it, in the system
+/// message's thread text and as an exchange, with no mark it was never
+/// answered, and the model answered it about 25 s later inside the make's
+/// turn. With `LAMP_LATE_ANSWER_LET_GO=on` the exchange is left out of the
+/// make's history entirely: neither the ask nor the holding line reaches
+/// its model.
+#[tokio::test]
+async fn an_ask_left_on_its_holding_line_is_not_given_to_the_next_turn_as_unanswered() {
+    let (make, said) = holding_line_rig(true, false).await;
+    assert!(
+        !told_before_the_line(&make, LATE_ASK),
+        "request 1's ask, left on its holding line, is given to request 2: {make:#?}"
+    );
+    assert!(!told_before_the_line(&make, LATE_HOLDING), "{make:#?}");
+    assert_eq!(said, ["Okay, I'll make a morning joke skill."]);
+}
+
+/// The switch off: byte for byte as before, the ask left on its holding
+/// line is given to the next turn as an exchange answered by the holding
+/// line (what lamp-9adf did on 17 Nov).
+#[tokio::test]
+async fn with_the_switch_off_an_ask_left_on_its_holding_line_is_still_given_to_the_next_turn() {
+    let (make, _) = holding_line_rig(false, false).await;
+    let at = make
+        .iter()
+        .position(|message| message == &Message::user(LATE_ASK))
+        .unwrap_or_else(|| panic!("{make:#?}"));
+    assert_eq!(make[at + 1], Message::assistant(LATE_HOLDING), "{make:#?}");
+    assert!(format!("{:?}", make[0]).contains(LATE_ASK), "{make:#?}");
+}
+
+/// The switch on, an ask whose search answered and whose answer was said
+/// to its turn's end keeps its exchange: the next turn is given it whole.
+#[tokio::test]
+async fn an_ask_answered_after_its_search_is_still_given_to_the_next_turn() {
+    let (make, said) = holding_line_rig(true, true).await;
+    let at = make
+        .iter()
+        .position(|message| message == &Message::user(LATE_ASK))
+        .unwrap_or_else(|| panic!("{make:#?}"));
+    assert!(
+        make[at + 1..]
+            .iter()
+            .any(|message| format!("{message:?}").contains(LATE_ANSWER)),
+        "{make:#?}"
+    );
+    assert_eq!(said, ["Okay, I'll make a morning joke skill."]);
+}
+
 /// #5961 (lamp-52e6, 10 Nov 09:5x, core w3): an 8-word ask still being
 /// searched for is cut by a 1-word line let out, with no face seen in a busy
 /// room, so the two are not joined; the second line's chat gives

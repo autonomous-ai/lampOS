@@ -139,6 +139,11 @@ struct Exchange {
     /// back from the file, an answer that ends in
     /// [`crate::said_as_heard::CUT`]. Not kept in the file (#1505).
     cut: bool,
+    /// Its turn ended on its holding line, its function round never
+    /// answered (`LAMP_LATE_ANSWER_LET_GO=on`, [`Thread::left_on_holding_line`]):
+    /// left out of what a later turn is told, so its ask is never answered
+    /// inside another's turn. Never kept in the file (#1505).
+    let_go: bool,
     /// The memory id of the known person it was with; `None`: the room's.
     whose: Option<String>,
     /// The note the lamp was given in writing for it, when it began the
@@ -236,6 +241,10 @@ pub struct Thread {
     /// A request whose exchange the last close covers even if it opens
     /// after it ([`Self::close_conversation_with`]).
     closed_request: Option<u64>,
+    /// The newest [`LINES`] requests left on their holding line before
+    /// their exchange opened ([`Self::left_on_holding_line`]): each is let
+    /// go as it opens.
+    let_go: VecDeque<u64>,
 }
 
 /// What stands for the lamp's words in a request a connected service's
@@ -352,6 +361,13 @@ pub fn unsay(request: u64) {
     }
 }
 
+/// [`Thread::left_on_holding_line`] on this process's thread.
+pub fn left_on_holding_line(request: u64) {
+    if let Ok(mut thread) = THREAD.lock() {
+        thread.left_on_holding_line(request);
+    }
+}
+
 /// Onboarding's sentence (#1803) is `request`, or with `None` a new line
 /// is not it: [`Thread::count_only`] on this process's thread.
 pub fn count_only(request: Option<u64>) {
@@ -414,6 +430,7 @@ impl Thread {
             private: VecDeque::new(),
             closed_at: None,
             closed_request: None,
+            let_go: VecDeque::new(),
         }
     }
 
@@ -662,6 +679,9 @@ impl Thread {
             .filter(|exchange| {
                 now.saturating_duration_since(exchange.at) <= REMEMBERED_FOR
                     && (exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
+                    // Let go (`LAMP_LATE_ANSWER_LET_GO`): not told after a
+                    // restart either.
+                    && !exchange.let_go
             })
             .map(|exchange| Kept {
                 at_unix_ms: wall_ms
@@ -739,6 +759,7 @@ impl Thread {
                 summarized: false,
                 folded: None,
                 held: false,
+                let_go: false,
                 whose: kept.whose,
                 written: kept.written.map(|text| {
                     let mut written = String::new();
@@ -1085,6 +1106,7 @@ impl Thread {
                 held: false,
                 unheard: false,
                 cut: false,
+                let_go: self.let_go.contains(&request),
                 whose,
                 written,
                 calls,
@@ -1272,6 +1294,35 @@ impl Thread {
         self.changed = true;
     }
 
+    /// `LAMP_LATE_ANSWER_LET_GO=on` (`Engine::letting_go_late_answers`):
+    /// `request`'s turn ended, cut by a newer line or otherwise, on its
+    /// holding line, the words it said before calling a function, with no
+    /// words after that function's round. Its exchange stays (the person's
+    /// line is still journalled, and the conversation goes on as it did),
+    /// but is left out of every later turn's history: the messages, the
+    /// thread's text and the running summary, and the file. Told as an
+    /// exchange answered only by "Let me search that.", the ask was
+    /// answered by the next turn's model inside that turn (lamp-9adf,
+    /// 17 Nov). A person who still wants it asks again. One whose exchange
+    /// has not opened yet is let go as it opens.
+    pub fn left_on_holding_line(&mut self, request: u64) {
+        if let Some(exchange) = self
+            .exchanges
+            .iter_mut()
+            .rev()
+            .find(|exchange| exchange.request == request)
+        {
+            exchange.let_go = true;
+            self.changed = true;
+        }
+        if !self.let_go.contains(&request) {
+            if self.let_go.len() == LINES {
+                self.let_go.pop_front();
+            }
+            self.let_go.push_back(request);
+        }
+    }
+
     /// The lamp's words for `request` are only `said`, what was played of its
     /// answer before a line or a Stop cut it (`LAMP_SAID_AS_HEARD`,
     /// [`crate::said_as_heard`]), and nothing more of that answer is kept.
@@ -1324,6 +1375,7 @@ impl Thread {
         self.lines.clear();
         self.calling.clear();
         self.kept_for.clear();
+        self.let_go.clear();
         self.note = None;
         self.heard.clear();
         self.heard_at = None;
@@ -1802,6 +1854,7 @@ impl Thread {
                 .filter(|&index| {
                     let exchange = &self.exchanges[index];
                     !exchange.summarized
+                        && !exchange.let_go
                         && (exchange.lamp.chars().any(char::is_alphanumeric)
                             || !exchange.person.trim().is_empty())
                 })
@@ -1850,6 +1903,7 @@ impl Thread {
                     && exchange.at <= until
                     && !exchange.summarized
                     && !exchange.held
+                    && !exchange.let_go
                     && (exchange.lamp.chars().any(char::is_alphanumeric)
                         || !exchange.person.trim().is_empty())
             })
@@ -2015,6 +2069,7 @@ impl Thread {
                 exchange.whose.as_deref() == scope
                     && now.saturating_duration_since(exchange.at) <= within
                     && (exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
+                    && !exchange.let_go
             })
             .take(most)
             .filter(|(_, exchange)| !Self::in_note(exchange, lineage))
@@ -2129,6 +2184,7 @@ impl Thread {
                 (theirs || rooms || kept_theirs)
                     && now.saturating_duration_since(exchange.at) <= within
                     && (exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
+                    && !exchange.let_go
             })
             .take(most)
             .filter(|(_, exchange)| {
@@ -2186,10 +2242,13 @@ impl Thread {
         // aloud. Told back to it, it is what it does next. One cut before any
         // of it played (`unheard`) is told, for the person's words (the
         // reviewer on #2145).
+        // One left on its holding line (`LAMP_LATE_ANSWER_LET_GO`) is
+        // never told: its ask would be answered in this turn.
         let told = |exchange: &&Exchange| {
             exchange.whose.as_deref() == scope
                 && now.saturating_duration_since(exchange.at) <= REMEMBERED_FOR
                 && (exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
+                && !exchange.let_go
         };
         let newest = self.exchanges.iter().rev().find(told)?;
         let note = note(now.saturating_duration_since(newest.at));
@@ -3264,6 +3323,51 @@ mod tests {
         let finished = thread.finished(2, at(5));
         assert_eq!(finished.len(), 1);
         assert_eq!(finished[0].request, 2);
+    }
+
+    /// `LAMP_LATE_ANSWER_LET_GO`: an exchange whose turn ended on its
+    /// holding line is told to no later turn, as history, thread text,
+    /// running summary or file; the person's line is still journalled, and
+    /// an exchange marked before it opened is let go as it opens.
+    #[test]
+    fn an_exchange_left_on_its_holding_line_is_told_to_no_later_turn() {
+        let mut thread = Thread::new();
+        let start = Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        let within = Duration::from_secs(300);
+        thread.person("What time is it?", true, at(1));
+        thread.lamp(1, "It's three.", at(2));
+        thread.person("How many dong is one US dollar?", true, at(3));
+        thread.lamp(2, "Let me search that.", at(4));
+        thread.left_on_holding_line(2);
+        thread.left_on_holding_line(3);
+        thread.person("Tell me a joke.", true, at(5));
+        thread.lamp(3, "Let me find one.", at(6));
+        let recent = thread.recent(at(7), within, 6);
+        assert_eq!(recent.len(), 1, "{recent:?}");
+        assert_eq!(recent[0].person, "What time is it?");
+        let recalled = thread.recall(at(7), ROOM).unwrap();
+        assert!(!recalled.contains("dong") && !recalled.contains("joke"));
+        assert!(recalled.contains("It's three."), "{recalled}");
+        assert_eq!(thread.recent_picks_for(None, at(7), within, 6, None), [0]);
+        let saved = thread.save(at(7), SystemTime::now()).unwrap();
+        assert!(
+            !saved.contains("dong") && !saved.contains("joke"),
+            "{saved}"
+        );
+        assert!(
+            thread
+                .summary_rest(None, at(7))
+                .iter()
+                .all(|(request, _, _)| *request == 1)
+        );
+        // Still handed on to the memory's journal.
+        assert_eq!(thread.finished(3, at(7)).len(), 3);
+        // Not marked: told as before.
+        let mut kept = Thread::new();
+        kept.person("How many dong is one US dollar?", true, at(3));
+        kept.lamp(2, "Let me search that.", at(4));
+        assert_eq!(kept.recent(at(7), within, 6).len(), 1);
     }
 
     /// `LAMP_SAID_AS_HEARD`: an answer a line cut after its first words is
