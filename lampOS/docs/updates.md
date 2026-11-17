@@ -1555,7 +1555,8 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | **lamp-update's own build** (`climb`, `own`, `own_switch`) | |
 | `lamp-update's own build is not switched: …` | a self-switch or climb couldn't be set up: the parts' outcome stands |
 | `lamp-update's own switch waits: the settings writer was refreshed and has not proved itself yet` | a writer not yet proved is a switch's only way back, so the switch waits for it |
-| `lamp-update's build … was put back after a reboot came in its minutes: it is tried once more, and a second put-back is final` | #2810 |
+| `lamp-update's build … was put back after a reboot came in its minutes: it is tried once more, and a second put-back is final` | #2810. Since #6901 a build put back on the boot its switch began on is tried once more too, on a later boot or a day after its put-back (`own::PUT_BACK_RETRY_AFTER`, by the time `self-put-back` notes; a line from an older `lamp-update-back` has no time, and then only a later boot counts). A second put-back is final, until the owner's retry |
+| `the owner asked to retry: lamp-update's build … refused here is let go once more` | the owner's retry from the app (#6825) lets every refused lamp-update binary go, so a build that needs a newer updater can climb again (#6901). One already tried once more is still final if it is put back again, until the owner asks again |
 | `lamp-update switches to its build …; it must confirm itself within 10 min` | before a self-switch's or a climb's end |
 | **The folders kept** (`prune`, after the end) | |
 | `build folders are kept because the installed units cannot be read: …` | nothing is removed |
@@ -1742,7 +1743,7 @@ build could carry it units or settings.
    `self.json` is there and lamp-update is not `active`/`running`, or 10 min
    (`own::DEADLINE`) have passed since the link moved, it points
    `update/current` at the old build again, adds the new binary's SHA-256 to
-   `self-refused` (never switched to again), removes `self.json`, logs a
+   `self-refused` (not switched to again, but for the one more try below), removes `self.json`, logs a
    round's end, `self-put-back`, and runs `systemctl reset-failed` and
    `restart --no-block lamp-update`. Otherwise it ends, having changed
    nothing. So the old updater's `update/status` says `self-put-back` as the

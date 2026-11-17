@@ -250,6 +250,23 @@ pub fn drop_refusals(
         say("a retry of a refused build: another lamp-update is at work, so it is a plain check");
         return;
     };
+    // The owner's retry also lets go a lamp-update binary refused here, so a
+    // build that needs a newer updater can climb again (#6901): today's
+    // refusal of a build is dropped below, and a refused updater would
+    // otherwise keep the build waiting for one that never comes.
+    match crate::own::owner_retry(records.folder()) {
+        Ok(let_go) => {
+            for build in let_go {
+                say(&format!(
+                    "the owner asked to retry: lamp-update's build {} refused here is let go once more",
+                    &build[..build.len().min(12)]
+                ));
+            }
+        }
+        Err(error) => say(&format!(
+            "the refused lamp-update builds could not be let go: {error}"
+        )),
+    }
     let Ok(mut state) = records.state(say) else {
         return;
     };
@@ -513,6 +530,30 @@ mod tests {
         cloud.publish_json(0, &UpdateCheck::default()).unwrap();
         assert!(check.asked(later));
         assert!(check.take_retries().is_empty());
+    }
+
+    /// #6901: the owner's retry also lets go a lamp-update binary refused
+    /// on this lamp, and says so, so a build that needs a newer updater can
+    /// climb again.
+    #[test]
+    fn the_owners_retry_lets_a_refused_updater_go() {
+        let folder = tempfile::tempdir().unwrap();
+        let records = crate::records::Records::new(folder.path().to_path_buf());
+        let refused = "c".repeat(64);
+        std::fs::write(folder.path().join("self-refused"), format!("{refused}\n")).unwrap();
+        assert_eq!(crate::own::refused(folder.path()), vec![refused.clone()]);
+        let mut told = Vec::new();
+        drop_refusals(&records, &[13584], &mut |line| told.push(line.to_owned()));
+        assert!(crate::own::refused(folder.path()).is_empty(), "{told:?}");
+        assert!(
+            told.iter()
+                .any(|line| line.contains("cccccccccccc refused here is let go once more")),
+            "{told:?}"
+        );
+        // No retry asked: nothing is let go.
+        std::fs::write(folder.path().join("self-refused"), format!("{refused}\n")).unwrap();
+        drop_refusals(&records, &[], &mut |_| {});
+        assert_eq!(crate::own::refused(folder.path()), vec![refused]);
     }
 
     /// #6800: with the first update after setup on, the owner's retry wakes
