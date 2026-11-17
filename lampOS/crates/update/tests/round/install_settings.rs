@@ -150,6 +150,34 @@ fn a_lamps_own_pins_survive_a_round_and_gain_the_builds_new_keys() {
     assert_ne!(lamp.state()["settings"][PINS], sha(&lamp.read(PINS)));
 }
 
+/// #7123: lamp-4ace's hand-set pins (no `reset` and no `privacy`)
+/// gain the build's privacy section, as install adds it, and
+/// never the product's `reset` line, which names the product's wiring.
+#[test]
+fn a_lamps_own_pins_without_a_reset_line_gain_privacy_and_never_the_builds_reset() {
+    let mut lamp = installed_applying();
+    let own = include_str!("../../../../deploy/lamp-4ace/controls-pins.json");
+    assert!(!object(own).contains_key("reset") && !object(own).contains_key("privacy"));
+    assert!(object(&setting_text(PINS)).contains_key("reset"));
+    changed_on_lamp(&lamp, PINS, own);
+    publish_with_settings(&mut lamp, |_| {});
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    let pins = object(&lamp.read(PINS));
+    assert!(!pins.contains_key("reset"), "{pins:?}");
+    assert_eq!(pins["privacy"], object(&setting_text(PINS))["privacy"]);
+    let mut without = pins.clone();
+    without.remove("privacy");
+    assert_eq!(without, object(own));
+    assert!(
+        lamp.said.iter().any(|line| line
+            == &format!(
+                "merged {PINS}: added the build's privacy; this lamp's own values are kept"
+            )),
+        "{:?}",
+        lamp.said
+    );
+}
+
 #[test]
 fn an_expression_changed_on_the_lamp_is_kept_whole_and_said() {
     let mut lamp = installed_applying();
