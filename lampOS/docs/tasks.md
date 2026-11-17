@@ -3948,8 +3948,12 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   with one line, `internet:` and what it looks up, never `cannot:`. The
   voice then makes it one task for the lamp's agent: asked for by its
   words, an agent skill granted `net`, whose first ask reads it back and
-  waits for the owner's spoken yes before any run; on a trigger, never
-  granted `net` (docs/skills.md, "With `LAMP_TASK_NET=on`, what only the
+  waits for the owner's spoken yes before any run; on a trigger ("check
+  the Bitcoin price every day at 9 and tell me"), by the owner's ruling of
+  17 Nov, a made agent task on it granted `net`, said back and waiting for
+  the spoken yes, which lamp-control keeps with `net` in it. Its run at
+  the trigger is checked as any `net` run: no kept yes naming `net`, no
+  egress socket (docs/skills.md, "With `LAMP_TASK_NET=on`, what only the
   internet tells is a task for the agent").
 - **A `net` run's way out** (`crate::egress`, the design note on #7200,
   Heron's answers): every run is held, `net` or not. A `net` run goes

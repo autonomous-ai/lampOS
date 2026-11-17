@@ -2791,9 +2791,9 @@ fn no_cannot(
 /// one task for the lamp's agent ([`agent_task`]), whatever
 /// `LAMP_MAKE_NO_CANNOT`: asked for by its words, an agent skill granted
 /// `net` that reads back and waits for the yes at its first ask; on a
-/// trigger, the reason a skill that runs on its own can't have the internet
-/// ([`crate::make_no_cannot::Uncovered::NetMade`]). Any other make, `made`
-/// as it is.
+/// trigger, a made task for the agent on it, granted `net` (the owner's
+/// ruling, 17 Nov), said back and waiting for the spoken yes. Any other
+/// make, `made` as it is.
 fn net_made(
     made: Result<Made, Refused>,
     needs_net: &std::cell::Cell<bool>,
@@ -8903,16 +8903,79 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// The owner's first make (lamp-9adf, 17 Nov), on a time: policy
-    /// unchanged, a skill that runs on its own is never granted `net`; the
-    /// person hears why and what to ask instead, nothing is kept, and the
+    /// The owner's first make (lamp-9adf, 17 Nov), on a time, and the
+    /// owner's ruling of 17 Nov: a skill that runs on its own trigger may
+    /// have `net` with `LAMP_TASK_NET` on. Kept as a made task for the
+    /// lamp's agent on its trigger, granted `net` and `speak`, said back as
+    /// one that reaches the internet, and waiting for the spoken yes. The
     /// journal names neither the request nor the model's words.
     #[test]
-    fn with_task_net_a_timed_web_make_is_told_why_and_kept_nowhere() {
+    fn with_task_net_a_timed_web_make_is_kept_on_its_trigger_granted_net() {
         net_make_here(Some(true));
         let (root, keeping) = keeping("net-timed");
-        let (url, served) = service(vec![
+        let (url, served) = service_sent(vec![
             (200, "internet: the Bitcoin price".to_owned()),
+            (
+                200,
+                plant_answer("net, speak").replace("plant-check", "bitcoin-daily"),
+            ),
+        ]);
+        let request = "check the Bitcoin price every day at eight in the morning and tell me";
+        let told = make(request, &keeping, chat_at(url), NOW);
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 2, "{told}");
+        assert!(
+            sent[1].contains("You choose, for a lamp, when a skill runs and what it needs"),
+            "{}",
+            sent[1]
+        );
+        assert_eq!(told["made"], "bitcoin-daily", "{told}");
+        assert_eq!(told["code_waits_for_yes"], true, "{told}");
+        assert_eq!(told["on"], false, "{told}");
+        let grants = ["net".to_owned(), "speak".to_owned()];
+        let description = told["description"].as_str().unwrap();
+        assert!(
+            description.contains(&format!("hands one task to the lamp's agent: “{request}”")),
+            "{description}"
+        );
+        let uses = crate::skill_task_yes::uses_said(&grants);
+        assert!(uses.contains("reaches the internet"), "{uses}");
+        assert!(
+            description.ends_with(&format!(
+                "The lamp's agent does it, and {uses}. It runs only once you agree."
+            )),
+            "{description}"
+        );
+        let next = told["next"].as_str().unwrap();
+        assert!(
+            next.contains("\"I can have the lamp's agent do that, as bitcoin daily: every day"),
+            "{next}"
+        );
+        assert!(!next.contains("I made"), "{next}");
+        let entries = made_skill::entries(&keeping.directory);
+        let [entry] = entries.as_slice() else {
+            panic!("{entries:?}")
+        };
+        assert_eq!(entry["uses"]["grants"], json!(grants), "{entry}");
+        assert_eq!(entry["uses"]["agent_task"], true, "{entry}");
+        assert!(take_said_line().is_some_and(|line| !line.contains("Bitcoin")));
+        net_make_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The switch off: a make whose one more call names `net` on a trigger
+    /// (`LAMP_MAKE_NO_CANNOT` on, the model's `cannot:`) is still refused
+    /// with its reason, and nothing is kept.
+    #[test]
+    fn with_task_net_off_a_timed_net_make_is_still_refused_net_off() {
+        no_cannot_here(Some(true));
+        crate::skill_task_yes::set_net_here(Some(false));
+        let (root, keeping) = keeping("net-timed-off");
+        let (url, served) = service(vec![
+            (
+                200,
+                "cannot: I can't do that yet: checking a price.".to_owned(),
+            ),
             (200, plant_answer("net, speak")),
         ]);
         let request = "check the Bitcoin price every day at eight in the morning and tell me";
@@ -8925,12 +8988,12 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             "local:1:1",
         );
         assert_eq!(served.join().unwrap(), 2);
-        let net_made = crate::make_no_cannot::Uncovered::NetMade.line();
-        assert_eq!(made, Err(Refused(net_made.clone(), None)));
-        assert_eq!(made_skill::not_made_line(&net_made), net_made);
+        let net_off = crate::make_no_cannot::Uncovered::NetOff.line();
+        assert_eq!(made, Err(Refused(net_off, None)));
         assert!(!line.contains("Bitcoin"), "{line}");
         assert!(made_skill::entries(&keeping.directory).is_empty());
-        net_make_here(None);
+        crate::skill_task_yes::set_net_here(None);
+        no_cannot_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
 

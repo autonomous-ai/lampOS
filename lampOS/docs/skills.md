@@ -5256,10 +5256,13 @@ the same code for both writers.
   The first time you ask, I'll read it back and wait for your yes."; its
   first ask reads it back and waits for the spoken yes, and its run
   reaches the public web as docs/tasks.md, "An agent skill's run and the
-  `net` grant", has it. On a trigger ("every day at nine"), it is never
-  granted `net` (`net_made`, below), and the person hears why and to ask
-  for it by a few words instead; nothing is kept. Off, the prompt is as
-  before, byte for byte.
+  `net` grant", has it. On a trigger ("check the Bitcoin price every day
+  at 9 and tell me"), it can have the internet too, by the owner's ruling
+  of 17 Nov: kept as a made agent task on its trigger granted `net` and
+  `speak` (below, "On a trigger"), said back with "it reaches the
+  internet", and waiting for the spoken yes. Its run gets its way out only
+  with that kept yes, as any `net` run (docs/tasks.md). Off, the prompt is
+  as before, byte for byte.
 - **The agent's own `cannot:` is never said as it wrote it.** The lamp says
   its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`);
   with `LAMP_MAKE_NO_CANNOT=on` its words are dropped all the same and the
@@ -5283,7 +5286,10 @@ the same code for both writers.
   line heard; the read-back bounds this, because the owner agrees to
   exactly the words said back. Its
   grants are checked against the ones there are (`make_no_cannot::covered`):
-  `light` or `speak` (`make_no_cannot::FALLBACK_GRANTS`); the camera only
+  `light` or `speak` (`make_no_cannot::FALLBACK_GRANTS`); `net` with
+  `LAMP_TASK_NET=on`, asked for or on a trigger (the owner's ruling of 17
+  Nov), and only beside the lamp's own `scripts/agent.py`
+  (`made_skill::code_held`, `put_on_scripts`); the camera only
   for a task asked for by its phrase, run right then, as a regular made
   skill may have it (`ASKED_CAMERA`; the first builder's ruling on #7261),
   never on a trigger (`WATCHING_GRANTS`: the camera and `look`); never the
@@ -5352,10 +5358,6 @@ the same code for both writers.
     - `net` with `LAMP_TASK_NET` off (`net_off`): "I can't make that one
       yet: it needs the internet, and skills on this lamp can't use the
       internet yet."
-    - `net` on a trigger (`net_made`): "I can't make that one yet: it needs the
-      internet, which a skill that runs on its own can't have yet. Ask me to
-      make it for when you say a few words instead, and the lamp's agent
-      will do it each time you say them."
     - A service with `LAMP_AGENT_SERVICES` off (`services_off`): "I can't
       make that one yet: it needs your linked services, and skills on this
       lamp can't use them yet."

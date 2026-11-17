@@ -4035,7 +4035,9 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
 /// alone, `task = { task = "what it does", run = "scripts/main.py" }`
 /// (#6305's `do.task`), its words plain and at most [`MOST_TASK_CHARS`],
 /// its `run` a Python file under [`SCRIPTS_FOLDER`]; and a `grants` list of
-/// [`GRANTS`] (none when it has no list), each once. No write beside it:
+/// [`GRANTS`] (none when it has no list), each once, and `net` beside them
+/// for the lamp's own task for its agent ([`agent_task`]) with
+/// `LAMP_TASK_NET` on. No write beside it:
 /// the person's yes is to its code, not to a send. Its grants, or why not.
 fn code_held(
     table: &toml::Table,
@@ -4105,7 +4107,14 @@ fn code_held(
             // A linked service's grant, only for a service task for the
             // lamp's agent (`LAMP_AGENT_SERVICES`, #6432's ruling).
             let service = agent_services_here() && service_grant(grant).is_some();
-            if !service && !GRANTS.iter().any(|(name, _)| *name == grant) {
+            // The internet, only for the lamp's own task for its agent
+            // with `LAMP_TASK_NET` on, on its trigger too (the owner's
+            // ruling, 17 Nov); its run reaches the web only with the
+            // owner's kept yes. Never for code a model wrote.
+            let net = grant == crate::skill_task_yes::NET.0
+                && crate::skill_task_yes::net_on()
+                && agent_task(table);
+            if !service && !net && !GRANTS.iter().any(|(name, _)| *name == grant) {
                 eprintln!(
                     "lamp-voice: a made skill's code asks for a grant the lamp doesn't have: {}",
                     named(grant)
@@ -7351,7 +7360,8 @@ pub fn put_on_cap(text: &str) -> Result<(String, Uses), Refused> {
 /// its code, as [`files`] took it (a script's name and ending, plain text,
 /// at most [`MOST_SCRIPT_BYTES`] each, [`MOST_SCRIPTS`] and
 /// [`MOST_SCRIPTS_BYTES`] in all), only with [`SCRIPTS_ENVIRONMENT`] on, and
-/// matched to its `task` step ([`code_matches`]).
+/// matched to its `task` step ([`code_matches`]); granted `net`, only the
+/// lamp's own agent script ([`agent_script_only`]).
 pub fn put_on_scripts<'a>(
     toml: &str,
     uses: &Uses,
@@ -7384,6 +7394,17 @@ pub fn put_on_scripts<'a>(
     }
     if scripts.iter().map(|(_, text)| text.len()).sum::<usize>() > MOST_SCRIPTS_BYTES {
         return Err(scripts_not_held("more code than a made skill may carry"));
+    }
+    // The internet only for the lamp's own task for its agent: its one
+    // script the lamp's own, byte for byte, never code a model wrote at
+    // that path ([`agent_script_only`]).
+    if uses
+        .grants
+        .iter()
+        .any(|grant| grant == crate::skill_task_yes::NET.0)
+        && !agent_script_only(&scripts)
+    {
+        return Err(scripts_not_held("the internet for code of its own"));
     }
     let files = Files {
         toml: toml.to_owned(),
