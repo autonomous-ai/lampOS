@@ -4749,12 +4749,29 @@ pub fn forget_all_notes_soon() {
     if !notes_on() {
         return;
     }
-    std::thread::spawn(|| {
-        let control = Path::new(crate::skill_task_yes::CONTROL_SOCKET);
-        if let Err(why) = forget_all_notes_by(control) {
+    let control = control_socket();
+    std::thread::spawn(move || {
+        if let Err(why) = forget_all_notes_by(&control) {
             eprintln!("lamp-voice: made skills' notes were not forgotten: {why}");
         }
     });
+}
+
+#[cfg(test)]
+thread_local! {
+    /// lamp-control's socket as a test of this thread sets it.
+    static CONTROL_HERE: std::cell::RefCell<Option<std::path::PathBuf>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// lamp-control's socket [`forget_all_notes_soon`] asks: its own, or a
+/// test's fake.
+fn control_socket() -> std::path::PathBuf {
+    #[cfg(test)]
+    if let Some(here) = CONTROL_HERE.with(|here| here.borrow().clone()) {
+        return here;
+    }
+    std::path::PathBuf::from(crate::skill_task_yes::CONTROL_SOCKET)
 }
 
 /// Words that tell the person a kept note is a file they can open
@@ -10500,6 +10517,55 @@ mod tests {
         assert_eq!(forget_all_notes_by(&socket), Ok(()));
         let line: serde_json::Value = serde_json::from_str(&served.join().unwrap()).unwrap();
         assert_eq!(line, serde_json::json!({"notes_forget_skills": true}));
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    // #7245: "forget everything" heard asks lamp-control once to forget
+    // every made skill's notes with LAMP_MADE_NOTES on, and never with it
+    // off.
+    #[test]
+    fn forget_everything_asks_control_once_only_with_notes_on() {
+        use std::io::{BufRead as _, Write as _};
+        let socket =
+            std::env::temp_dir().join(format!("lamp-voice-7245-soon-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        CONTROL_HERE.with(|here| *here.borrow_mut() = Some(socket.clone()));
+        // Every line the fake lamp-control reads within `wait`.
+        let read_for = |wait: Duration| {
+            let until = std::time::Instant::now() + wait;
+            let mut lines = Vec::new();
+            while std::time::Instant::now() < until {
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        stream.set_nonblocking(false).unwrap();
+                        let mut line = String::new();
+                        std::io::BufReader::new(&stream)
+                            .read_line(&mut line)
+                            .unwrap();
+                        (&stream).write_all(b"{\"forgot\":1}\n").unwrap();
+                        lines.push(serde_json::from_str::<serde_json::Value>(&line).unwrap());
+                    }
+                    Err(_) => std::thread::sleep(Duration::from_millis(5)),
+                }
+            }
+            lines
+        };
+        set_notes_here(Some(false));
+        forget_all_notes_soon();
+        assert_eq!(
+            read_for(Duration::from_millis(300)),
+            Vec::<serde_json::Value>::new()
+        );
+        set_notes_here(Some(true));
+        forget_all_notes_soon();
+        assert_eq!(
+            read_for(Duration::from_millis(1500)),
+            [serde_json::json!({"notes_forget_skills": true})]
+        );
+        set_notes_here(None);
+        CONTROL_HERE.with(|here| *here.borrow_mut() = None);
         let _ = std::fs::remove_file(&socket);
     }
 
