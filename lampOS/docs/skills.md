@@ -1700,7 +1700,7 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   `speech`), once each, never `skills` (a script never puts skills on the
   lamp). With `LAMP_TASK_NET=on` (on in the product, #7200: in lamp-tasks, lamp-skills
   and its manage helper, lamp-control, lamp-voice and lamp-cloud's skills page) one more, `net`
-  ("reaches the internet"): the run, held like every run, reaches the
+  ("reaches the public internet"): the run, held like every run, reaches the
   public web on ports 80 and 443 through its own egress socket (a proxy
   and DNS inside the run, every address checked by lamp-tasks: never the
   lamp's own networks (the router's home address among them) or the
