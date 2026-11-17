@@ -1383,7 +1383,9 @@ sau:
     `a_cut_code_makes_say_back_through_the_say_service_forces_the_next_yes`,
     `a_cut_code_makes_say_back_goes_to_the_say_service_whole`,
     `a_cut_voice_makes_say_back_is_told_word_for_word`). Các lần ghi của một
-    lần tạo vẫn dùng `made_skill::cut_write_line`.
+    lần tạo, kể cả một lần tạo có mã mà cũng gửi, vẫn dùng
+    `made_skill::cut_write_line`: chỉ câu mã bị cắt
+    (`made_skill::cut_code_line`) được thay.
     Trong lúc
     đang tạo, hoặc câu của
     nó chưa được nói (`make_skill_local::Pending`), và tối đa 2 phút sau

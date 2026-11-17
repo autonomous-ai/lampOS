@@ -199,9 +199,14 @@ pub fn wait_for_yes_noted(asks: Asks, request: u64, now: Instant) -> String {
 /// 22:39, the combo build, #7245) the cut line ("ask me for it again") went
 /// as a note in the conversation's language, the model said it in 136
 /// chars, the say-back was never heard whole, and the "yes" after it was
-/// told to hear it again: nothing was forced or kept. None for no wait of
-/// `request`'s, or one whose line stays the cut turn's own.
-pub fn said_by_the_say_service(request: u64) -> Option<String> {
+/// told to hear it again: nothing was forced or kept. Only in place of
+/// the cut turn's code line `cut` (`made_skill::cut_code_line`): a code
+/// make that also sends keeps `made_skill::cut_write_line`, which says it
+/// sends nothing yet, never a say-back silent on what it sends. None for
+/// no wait of `request`'s, or one whose line stays the cut turn's own.
+pub fn said_by_the_say_service(request: u64, cut: &str) -> Option<String> {
+    let code_line = cut.contains(crate::made_skill::CUT_ASK_AGAIN)
+        || cut.ends_with(crate::made_skill::CUT_CODE_UNSAID);
     kept::waiting(|waiting| {
         let waiting = waiting
             .as_mut()
@@ -210,7 +215,8 @@ pub fn said_by_the_say_service(request: u64) -> Option<String> {
         eprintln!(
             "lamp-voice: request {request}: its made skill's say-back goes through the say service: the next line must answer its wait"
         );
-        (waiting.asks.code && !waiting.asks.remove).then(|| said_back_line(&waiting.asks))
+        (code_line && waiting.asks.code && !waiting.asks.remove)
+            .then(|| said_back_line(&waiting.asks))
     })
 }
 
@@ -1494,6 +1500,9 @@ mod tests {
     const SAY_BACK: &str =
         "mails mai@example.com from your Gmail, subject “Leaving”, saying “I'm leaving now.”";
 
+    /// How a cut code make's own line ends (`made_skill::cut_code_line`).
+    const CUT: &str = crate::made_skill::CUT_CODE_UNSAID;
+
     fn asks(skill: &str, writes: &[Value]) -> Asks {
         Asks {
             skill: skill.to_owned(),
@@ -1764,10 +1773,10 @@ mod tests {
         };
         let id = wait_for_yes(code.clone(), 1, now);
         assert!(
-            said_by_the_say_service(2).is_none(),
+            said_by_the_say_service(2, CUT).is_none(),
             "another request's make"
         );
-        assert!(said_by_the_say_service(1).is_some());
+        assert!(said_by_the_say_service(1, CUT).is_some());
         lamp_said(2, SAY_BACK);
         assert!(answer_awaited(3, now));
         assert!(approve_forced_now(now), "the yes of request 3 is forced");
@@ -1804,7 +1813,7 @@ mod tests {
             ..asks("fruit-notes", &[])
         };
         let id = wait_for_yes(code.clone(), 3, now);
-        let line = said_by_the_say_service(3).expect("a code make's say-back is said whole");
+        let line = said_by_the_say_service(3, CUT).expect("a code make's say-back is said whole");
         assert!(
             line.starts_with("I made fruit notes. The lamp's model wrote its code"),
             "{line}"
@@ -1840,10 +1849,10 @@ mod tests {
         // cut line is its own again, never the second's say-back.
         wait_for_yes(code.clone(), 8, now);
         wait_for_yes(code.clone(), 9, now);
-        assert_eq!(said_by_the_say_service(8), None);
+        assert_eq!(said_by_the_say_service(8, CUT), None);
         // Past the yes window the say-back's line forces nothing.
         let late = now + YES_WITHIN + Duration::from_secs(1);
-        lamp_said(10, &said_by_the_say_service(9).unwrap());
+        lamp_said(10, &said_by_the_say_service(9, CUT).unwrap());
         assert!(approve_forced_now(now));
         assert!(!approve_forced_now(late));
         // A task for the lamp's agent alike, its own head.
@@ -1854,7 +1863,7 @@ mod tests {
             ..code.clone()
         };
         wait_for_yes(agent, 11, now);
-        let line = said_by_the_say_service(11).unwrap();
+        let line = said_by_the_say_service(11, CUT).unwrap();
         assert!(
             line.starts_with("I can have the lamp's agent do fruit notes. The lamp's agent"),
             "{line}"
@@ -1865,7 +1874,17 @@ mod tests {
         );
         // A make's writes keep the cut turn's own line (never forced).
         wait_for_yes(asks("leaving-mail", &[]), 12, now);
-        assert_eq!(said_by_the_say_service(12), None);
+        assert_eq!(said_by_the_say_service(12, CUT), None);
+        // So does a code make that also sends: its cut line is
+        // `cut_write_line`, never swapped for a say-back silent on what it
+        // sends.
+        wait_for_yes(code.clone(), 13, now);
+        let write_line = format!(
+            "I made fruit notes.{} {}",
+            crate::made_skill::WAITS_FOR_YES,
+            crate::made_skill::CUT_WRITE_UNSAID
+        );
+        assert_eq!(said_by_the_say_service(13, &write_line), None);
     }
 
     /// App Only's P1 on #6142: a say-back cut, summed up or missing a
