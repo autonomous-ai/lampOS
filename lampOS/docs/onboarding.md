@@ -793,6 +793,21 @@ key, and reads past the new field. Tests:
 `the_face_is_asked_for_once_more_after_a_name_only_walk`,
 `the_face_asked_for_once_more_is_never_asked_a_third_time`.
 
+### The owner's face linked to the typed name (#7501)
+
+`owner` is set only by the face save that ends "who you are" (and the face
+asked for once more, under the name told). A lamp set up before the field
+(29 Oct), or one whose owner's face was saved later under another name, has
+none, and nothing fills it in silently. With `LAMP_OWNER_LINK=on` (off unless
+set) the owner's own "I'm <the typed name>", alone in view and seen saying
+it, posts `{"owner_linked": "<face name>"}` to the mailbox
+(`onboarding::owner_linked`); the walk keeps it as `owner` only while it
+keeps none, trimmed, at most 64 bytes, and never over one, so a second link
+or a link after setup's own save changes nothing. It is then an owner like
+any other: dropped when the face is forgotten, moved by a rename, cleared by
+a redo or a reset. The guards and the start-up line that counts the lamps in
+this state are in [memory.md](memory.md), "The owner's face and typed name".
+
 ### While the model service refuses (#4265)
 
 With `LAMP_SECOND_REFUSED_HOLD=on`, while the model service refuses the

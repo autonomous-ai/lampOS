@@ -90,6 +90,14 @@ một kỹ năng hay của chính đèn, một tin nhắn văn bản) được b
 cũng không gì được gọi, nên khi ở chế độ riêng tư, micro tắt, không dịch vụ
 nào được lấy dữ liệu.
 
+Một đèn được thiết lập trước khi onboarding giữ `owner` chỉ có tên gõ lúc
+setup làm chủ: khi khuôn mặt của chủ đèn được giữ dưới một tên khác, câu nói
+của chính họ bị coi là «của khách» ở đây, và ngoài phòng riêng không gì được
+đọc hay ghi cho họ. Với `LAMP_OWNER_LINK=on` (tắt trừ khi được bật, #7501),
+câu «I'm <tên đã gõ>» của chính họ, khi chỉ có một mình trong khung và được
+thấy đang nói, liên kết khuôn mặt đó làm chủ đèn, và `person::owner_ids` giữ
+cả hai id ([memory.md](../memory.md), "The owner's face and typed name").
+
 Khuôn mặt trong tầm nhìn cho biết ai đang ở tại đèn; nó không cho biết ai đã
 nói (một người thân nói ngoài khung hình vẫn nằm trong lease của chủ đèn). Vì
 vậy một câu chỉ được tính là của chủ đèn cho một lần ghi hay một lần đọc đầy

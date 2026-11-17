@@ -19244,6 +19244,18 @@ mod tests {
         room: bool,
         speaker: &str,
     ) -> Vec<Value> {
+        services_forgotten_on_forget_everything_kept(name, room, speaker, Some("Owner"))
+    }
+
+    /// [`services_forgotten_on_forget_everything`] with the owner kept with
+    /// their face `kept` (`known_faces::owner_now`), none on a lamp set up
+    /// before onboarding kept one (#7501).
+    fn services_forgotten_on_forget_everything_kept(
+        name: &str,
+        room: bool,
+        speaker: &str,
+        kept: Option<&str>,
+    ) -> Vec<Value> {
         let dir = std::env::temp_dir().join(format!("lamp-remember-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
@@ -19251,7 +19263,7 @@ mod tests {
         std::fs::write(&file, "Owner Example\n").unwrap();
         crate::person::set_for_test(Some(file));
         crate::person::set_private_room_for_test(Some(room));
-        crate::known_faces::owner_for_test(Some(Some("Owner".to_owned())));
+        crate::known_faces::owner_for_test(Some(kept.map(str::to_owned)));
         crate::service_records::on_for_test(true);
         crate::service_contacts::on_for_test(true);
         crate::service_records::forgot(None);
@@ -19316,6 +19328,36 @@ mod tests {
                 first.as_str(),
                 "{op} under the first owner id"
             );
+            assert_eq!(sent["all"], true, "{op} takes every row");
+        }
+    }
+
+    /// #7501, lamp-06c1 (17 Nov): set up before onboarding kept an owner,
+    /// the owner's face is kept under the face name, their records and
+    /// contacts under the typed name's id. With no owner kept, their face's
+    /// forget everything leaves every row of the typed name's; once their
+    /// face is linked as the owner (`onboarding::owner_linked`), it removes
+    /// every record and contact under the typed name's id too.
+    #[test]
+    fn the_owners_face_forgets_the_typed_names_rows_only_once_linked() {
+        let face = crate::known_faces::memory_person("Face Name");
+        let typed = crate::known_faces::memory_person("Owner Example");
+        assert_ne!(face, typed);
+        let before =
+            services_forgotten_on_forget_everything_kept("forget-all-unlinked", true, &face, None);
+        assert!(before.is_empty(), "the split leaves the rows: {before:?}");
+        let after = services_forgotten_on_forget_everything_kept(
+            "forget-all-linked",
+            true,
+            &face,
+            Some("Face Name"),
+        );
+        for op in ["service_records_forget", "service_contacts_forget"] {
+            let sent = after
+                .iter()
+                .find(|request| request["op"] == op)
+                .unwrap_or_else(|| panic!("no {op}: {after:?}"));
+            assert_eq!(sent["person"], typed.as_str(), "{op} under the typed id");
             assert_eq!(sent["all"], true, "{op} takes every row");
         }
     }

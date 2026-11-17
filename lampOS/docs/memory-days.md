@@ -693,6 +693,11 @@ created `IF NOT EXISTS`, `user_version` unchanged.
   not the owner sends none for the owner's id (the owner's call of 11 Nov,
   after a guest's forget everything on lamp-06c1 removed every record and
   contact of the owner's).
+  On a lamp set up before onboarding kept an `owner`, the owner's face kept
+  under another name than the typed one is not one of `owner_ids`, so its
+  forget everything sends none for the typed name's id; once linked by the
+  owner's own words (`LAMP_OWNER_LINK=on`, #7501, [memory.md](memory.md),
+  "The owner's face and typed name") it does.
 - **A put asked before a forget is refused** `forgotten`: one whose
   `asked_unix_ms` is before the person's latest `forget_all` or
   `forget_person` (or everyone's `forget_all`), kept in
