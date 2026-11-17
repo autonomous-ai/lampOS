@@ -1710,7 +1710,7 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   (`lamp_voice::skill_task_yes::GRANTS`: `body`, `light`, `speak`, `look`,
   `hear`, `sound`, `air`, `device`, `camera`, `microphone`, `notes`,
   `speech`), once each, never `skills` (a script never puts skills on the
-  lamp). With `LAMP_TASK_NET=on` (off in the product until its checks; once on, in lamp-tasks, lamp-skills
+  lamp). With `LAMP_TASK_NET=on` (on in the product, #7200: in lamp-tasks, lamp-skills
   and its manage helper, lamp-control, lamp-voice and lamp-cloud's skills page) one more, `net`
   ("reaches the internet"): the run, held like every run, reaches the
   public web on ports 80 and 443 through its own egress socket (a proxy
@@ -6245,7 +6245,7 @@ The owner's ask (12 Nov: a `SKILL.md` uploaded from the app runs through
 the lamp's agent, as V1's did); the first builder's yes at 19:44. On in
 the product since 13 Nov (the owner's ruling: the upload flow goes via the
 agent), set in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
-`lamp-skills-manage@`; with `LAMP_TASK_NET` on (off in the product until its checks), a file
+`lamp-skills-manage@`; with `LAMP_TASK_NET` on (on in the product, #7200), a file
 that reaches the internet is granted `net` (the public web on 80 and 443
 alone), asked the owner's spoken yes at its first run. With lamp-update's
 one run path on (`LAMP_SKILL_DEFAULT_AGENT`, on in the product) a run
@@ -6278,8 +6278,8 @@ bytes, as above):
   selfie) and `net` (an `http://` or `https://` link, a webhook, or a web
   API, URL or endpoint the file says to fetch, call, post, send, get or
   the like: a bare "API" or "URL" is not enough), never
-  more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on` (off
-  in the product until its checks); off, such a file is refused ("it reaches the internet, which a skill's
+  more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on` (on
+  in the product, #7200); off, such a file is refused ("it reaches the internet, which a skill's
   task can't on this lamp").
 - **A linked service it uses gets that service's grants** (the owner's
   ruling, 13 Nov: anything that touches the connectors goes to the lamp's
