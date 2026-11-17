@@ -4423,26 +4423,33 @@ fn the_product_holds_harness_at_its_pinned_version() {
     );
 }
 
-/// #7246: the product's lamp-tasks leaves one session for the lamp's
-/// default agent (`LAMP_TASKS_ONE_SESSION`) off; its `reply_off` fallback
-/// is ready for a switch-on later. Each task keeps its own pane.
+/// #7246: the product's lamp-tasks keeps one session for the lamp's default
+/// agent (`LAMP_TASKS_ONE_SESSION`), once, beside the switches it needs.
 #[test]
-fn the_product_leaves_one_session_off() {
+fn the_product_keeps_one_session_for_the_lamps_agent() {
     let tasks = install::PRODUCT
         .iter()
         .find(|(name, _)| *name == "lamp-tasks.service")
         .unwrap()
         .1;
-    assert!(
-        !tasks.contains("LAMP_TASKS_ONE_SESSION"),
-        "the product's lamp-tasks sets LAMP_TASKS_ONE_SESSION"
-    );
+    let service = section(tasks, "Service");
+    let on = service
+        .iter()
+        .filter(|line| **line == "Environment=LAMP_TASKS_ONE_SESSION=on")
+        .count();
+    assert_eq!(on, 1, "the product's lamp-tasks keeps no one session");
+    for line in [
+        "Environment=LAMP_SKILL_TASKS=on",
+        "Environment=LAMP_SKILL_DEFAULT_AGENT=on",
+    ] {
+        assert!(service.contains(&line), "lamp-tasks lacks {line}");
+    }
 }
 
-/// openharness#4393: the product's lamp-tasks has the kept session on
-/// (`LAMP_TASKS_KEPT_SESSION`), once; it is live only once the one session
-/// it needs is switched on (#7246's DEFAULT-ON), and on an older Harness it
-/// is the one session as before.
+/// openharness#4393: the product's lamp-tasks keeps the one session as
+/// the lamp's kept session (`LAMP_TASKS_KEPT_SESSION`), once, beside the
+/// one session it needs; on an older Harness it is the one session as
+/// before.
 #[test]
 fn the_product_keeps_the_one_session_as_the_kept_session() {
     let tasks = install::PRODUCT
@@ -4453,7 +4460,7 @@ fn the_product_keeps_the_one_session_as_the_kept_session() {
     let service = section(tasks, "Service");
     let on = |line: &str| service.iter().filter(|said| **said == line).count();
     assert_eq!(on("Environment=LAMP_TASKS_KEPT_SESSION=on"), 1);
-    assert_eq!(on("Environment=LAMP_TASKS_ONE_SESSION=on"), 0);
+    assert_eq!(on("Environment=LAMP_TASKS_ONE_SESSION=on"), 1);
 }
 
 /// #811, from lamp-06c1: without Harness (its own installer's to put on the
