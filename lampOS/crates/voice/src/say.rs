@@ -90,6 +90,13 @@
 //!   With `"quiet": true` (#5999, a skill's fixed line) it also waits, as a
 //!   say, while anyone is heard and for its priority's quiet since the last
 //!   turn ([`may_play_exact_after`]).
+//! - **Another of the lamp's voices** (#7485, the app's voice preview):
+//!   with exact `text` only, `voice` names one of the lamp's voices
+//!   (`lamp_msgs::chosen_voice::ELEVENLABS_VOICES`), and that line alone is
+//!   rendered in it ([`tts_cache::TtsCache::render_once_in`]), the words as
+//!   sent, never kept; the voice in use stays. Empty is the voice in use;
+//!   another name, or `voice` with anything but exact text, is refused.
+//!   It plays as any exact line does.
 //! - **A paired computer's clip** (the local leader's 3 Nov, lamp-control's
 //!   `sound` of a clip it keeps): in place of the words, `clip` is the
 //!   absolute path of a WAV under lamp-control's clips folder
@@ -561,6 +568,9 @@ pub struct LineMeta {
     pub by: Option<String>,
     /// Its words and where they came from, kept as they are rendered.
     pub said: Option<(String, lamp_msgs::LineSource)>,
+    /// Another of the lamp's voices an exact `text` is said in, by name
+    /// (`voice`, the app's voice preview, #7485): that line only.
+    pub voice: Option<String>,
 }
 
 impl Request {
@@ -664,6 +674,11 @@ struct Wire {
     /// its name, so that the lamp can say whose words they were (#4209).
     #[serde(default)]
     by: Option<String>,
+    /// Another of the lamp's voices, by name, for an exact `text` only
+    /// (the app's voice preview, #7485): that line is rendered in it, and
+    /// the voice in use stays. Empty is the voice in use.
+    #[serde(default)]
+    voice: Option<String>,
     /// A note to be told who is at the lamp (#2825): only with `note`.
     #[serde(default)]
     who: bool,
@@ -954,6 +969,15 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     if wire.quiet && !matches!(words, Words::Exact(_)) {
         return Err("quiet goes only with exact".into());
     }
+    // Another of the lamp's voices (#7485): an exact text's only, one of
+    // the lamp's names; empty is the voice in use.
+    let voice = match wire.voice.as_deref() {
+        None => None,
+        Some(_) if !matches!(words, Words::Exact(_)) => {
+            return Err("voice goes only with exact text".into());
+        }
+        Some(voice) => lamp_msgs::chosen_voice::fit_voice(voice)?,
+    };
     let priority = wire.priority.unwrap_or(NORMAL_PRIORITY);
     if priority > 9 {
         return Err("priority is 0 to 9".into());
@@ -976,6 +1000,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
         line: LineMeta {
             by: wire.by,
             said: None,
+            voice,
         },
         quiet: wire.quiet,
     })
@@ -1938,6 +1963,7 @@ impl Says {
         says.waiting[0].request.line = LineMeta {
             by: by.map(str::to_owned),
             said: Some((text.to_owned(), source)),
+            voice: None,
         };
         (says, answered)
     }
@@ -2654,7 +2680,12 @@ fn serve_client(
                     request.words = Words::Sound(recordings.cached(text)?);
                 }
                 Words::Exact(text) => {
-                    let (samples, said) = recordings.rendered(text)?;
+                    let (samples, said) = match request.line.voice.as_deref() {
+                        // The app's voice preview (#7485): the words as
+                        // sent, in that voice, never the owner's fixed line.
+                        Some(voice) => (recordings.rendered_in(text, voice)?, text.as_str()),
+                        None => recordings.rendered(text)?,
+                    };
                     request.line.said = Some((said.to_owned(), lamp_msgs::LineSource::Exact));
                     request.words = Words::ExactSound {
                         samples,
@@ -3113,6 +3144,15 @@ impl Recordings {
             }
             None => cache.render_once(text).map(|samples| (samples, text)),
         }
+    }
+
+    /// An exact `text` rendered now in the lamp's voice named `voice`, never
+    /// kept (the app's voice preview, #7485), or why not.
+    pub fn rendered_in(&self, text: &str, voice: &str) -> Result<Vec<i16>, String> {
+        self.cache
+            .as_ref()
+            .ok_or_else(|| "the speech service is off (no speech cache)".to_owned())?
+            .render_once_in(text, voice)
     }
 
     /// The samples of a cached `text`, kept or rendered now, or why not:
@@ -4248,6 +4288,95 @@ mod tests {
             english.rendered("Build passed.").unwrap();
         }
         assert_eq!(renders.load(Ordering::Relaxed), 3, "other words never kept");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #7485: the app's voice preview asks an exact text in another of the
+    /// lamp's voices, by name. Only with exact text, only one of the lamp's
+    /// names; empty is the voice in use.
+    #[test]
+    fn a_voice_is_taken_for_an_exact_text_only_and_only_one_of_the_lamps() {
+        let asked = parse(
+            r#"{"skill":"voice-preview","text":"Hi there.","exact":true,"voice":"Adam","expires_in_ms":15000}"#,
+        )
+        .unwrap();
+        assert_eq!(asked.words, Words::Exact("Hi there.".into()));
+        assert_eq!(asked.line.voice.as_deref(), Some("Adam"));
+        let own = parse(
+            r#"{"skill":"voice-preview","text":"Hi there.","exact":true,"voice":"","expires_in_ms":15000}"#,
+        )
+        .unwrap();
+        assert_eq!(own.line.voice, None, "empty is the voice in use");
+        for (line, why) in [
+            (
+                r#"{"skill":"x","text":"Hi.","voice":"Adam","expires_in_ms":1}"#,
+                "voice goes only with exact text",
+            ),
+            (
+                r#"{"skill":"x","note":"greet","voice":"Adam","expires_in_ms":1}"#,
+                "voice goes only with exact text",
+            ),
+            (
+                r#"{"skill":"x","text":"Hi.","exact":true,"voice":"NotAVoice","expires_in_ms":1}"#,
+                "voice must be one of the lamp's voices, such as Rachel",
+            ),
+        ] {
+            assert_eq!(parse(line).unwrap_err(), why, "{line}");
+        }
+    }
+
+    /// #7485: a line in another voice is rendered in that voice, the words as
+    /// sent (never the owner's fixed line), and never kept; a speech service
+    /// that speaks only its own voice refuses it with why.
+    #[test]
+    fn a_line_in_another_voice_is_rendered_in_it_and_never_kept() {
+        use std::sync::Mutex;
+        let dir = std::env::temp_dir().join(format!("lamp-say-voice-in-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let asked: Arc<Mutex<Vec<(String, String)>>> = Arc::default();
+        let seen = asked.clone();
+        let cache = tts_cache::TtsCache::new(
+            dir.clone(),
+            "Rachel",
+            crate::language::SPEECH_MODEL,
+            "en",
+            Box::new(|_: &str| Ok(vec![1; 2_400])),
+        );
+        let speaks = Recordings::none().with_cache(Some(Arc::new(cache.speaking_in(Box::new(
+            move |text: &str, voice: &str| {
+                seen.lock()
+                    .unwrap()
+                    .push((text.to_owned(), voice.to_owned()));
+                Ok(vec![9; 2_400])
+            },
+        )))));
+        let pat = "Hehe, that tickles.";
+        assert_eq!(speaks.rendered_in(pat, "Adam").unwrap(), vec![9; 2_400]);
+        assert_eq!(speaks.rendered_in(pat, "Adam").unwrap(), vec![9; 2_400]);
+        assert_eq!(
+            *asked.lock().unwrap(),
+            vec![(pat.to_owned(), "Adam".to_owned()); 2],
+            "rendered each time, in that voice"
+        );
+        assert!(
+            fs::read_dir(&dir).map_or(true, |mut files| files.next().is_none()),
+            "nothing kept"
+        );
+        let own_only = Recordings::none().with_cache(Some(Arc::new(tts_cache::TtsCache::new(
+            dir.clone(),
+            "Rachel",
+            crate::language::SPEECH_MODEL,
+            "en",
+            Box::new(|_: &str| Ok(vec![1; 2_400])),
+        ))));
+        assert_eq!(
+            own_only.rendered_in(pat, "Adam").unwrap_err(),
+            "this lamp's speech service speaks in its own voice only"
+        );
+        assert_eq!(
+            Recordings::none().rendered_in(pat, "Adam").unwrap_err(),
+            "the speech service is off (no speech cache)"
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 
