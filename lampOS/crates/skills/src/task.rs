@@ -1074,6 +1074,21 @@ fn telling_change(
         .map_err(|error| format!("its told answers' list: {error}"))
 }
 
+/// What the lamp says once, in exact words, when a run its owner asked by
+/// voice waits for OpenClaw's Gateway past lamp-tasks' bound (#7354,
+/// `lamp_tasks::gateway::WAIT_TOLD_AFTER`), as after a Gateway restart:
+/// the lamp is not ready, so it says so instead of going silent.
+pub const GATEWAY_WAIT_LINE: &str = "One moment, I'm getting ready.";
+
+/// Whether `line`, read on lamp-tasks' hand-over connection, is its word
+/// that the run waits for OpenClaw's Gateway
+/// (`lamp_tasks::skill_task::WAITING_LINE`, #7354), not its answer: the
+/// answer is read after it.
+pub fn waits(line: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(line.trim())
+        .is_ok_and(|line| line.get("ok").is_none() && line["waiting"] == "gateway")
+}
+
 /// lamp-tasks' answer to a hand-over line, as the journal says it: its
 /// task's number, or its refusal's code and words.
 pub fn answered(answer: &str) -> Result<String, String> {
@@ -1525,6 +1540,21 @@ mod tests {
             telling_dropped(state),
             Ok(vec![("read-mail".to_owned(), 30)])
         );
+    }
+
+    /// lamp-tasks' waiting line (#7354) is read past, never taken for the
+    /// run's answer, and its spoken line fits the say service.
+    #[test]
+    fn lamp_tasks_waiting_line_is_no_answer() {
+        assert!(waits(lamp_tasks::skill_task::WAITING_LINE));
+        assert!(waits(&format!(
+            "{}\n",
+            lamp_tasks::skill_task::WAITING_LINE
+        )));
+        assert!(!waits(r#"{"ok":true,"id":3}"#));
+        assert!(!waits(r#"{"ok":false,"error":"busy","message":"x"}"#));
+        assert!(!waits(""));
+        assert!(GATEWAY_WAIT_LINE.len() <= lamp_voice::say::MOST_WORDS_BYTES);
     }
 
     /// A run now asked by voice is found once, by its own hand-over; none

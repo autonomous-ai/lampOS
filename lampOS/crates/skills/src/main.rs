@@ -3165,9 +3165,9 @@ fn run_now_call(
     // Its told answer may lift the quiet (#7180): a run now is the
     // owner's own spoken ask, the voice's alone ([`listen`]); marked only
     // for a run with a task, whose own hand-over takes it.
-    if lamp_voice::told_when_asked::on()
-        && run.calls.iter().any(|call| matches!(call, Call::Task(_)))
-    {
+    // Marked either way: a run asked by voice may be told waiting for the
+    // lamp's agent too (#7354); the quiet is lifted only with its switch.
+    if run.calls.iter().any(|call| matches!(call, Call::Task(_))) {
         lamp_skills::task::asked_by_voice(&skill, now_ms);
     }
     eprintln!("lamp-skills: skill:{skill}: run now, as its owner asked by voice");
@@ -5746,13 +5746,45 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
         let refused = std::cell::Cell::new(None);
         let not_ready = std::cell::Cell::new(None);
         let tried = lamp_skills::task_sure::Tried::default();
+        // Its run waits for OpenClaw's Gateway (#7354, lamp-tasks'
+        // `LAMP_TASKS_GATEWAY_WAIT_TOLD`): said once, in exact words, for a
+        // run its owner asked by voice; a trigger's run says nothing.
+        let wait_told = || {
+            let Some(asked) = asked else {
+                eprintln!(
+                    "lamp-skills: skill:{skill}: do.task: its run waits for the lamp's agent to get ready; not said: not asked by voice"
+                );
+                return;
+            };
+            let asking = match gateway_wait_asking(
+                &room,
+                asked,
+                unix_ms(),
+                lamp_voice::told_when_asked::on(),
+            ) {
+                Ok(asking) => asking,
+                Err(why) => {
+                    eprintln!(
+                        "lamp-skills: skill:{skill}: do.task: its run waits for the lamp's agent to get ready; not said: {why}"
+                    );
+                    return;
+                }
+            };
+            let (say_socket, skill) = (say_socket.clone(), skill.clone());
+            std::thread::spawn(move || {
+                let said = say(&say_socket, "say", &skill, asking, &[], || {});
+                eprintln!(
+                    "lamp-skills: skill:{skill}: do.task: its run waits for the lamp's agent to get ready: {said}"
+                );
+            });
+        };
         let send = |socket: &Path, line: &str| {
             // With `LAMP_SKILL_RUNS_VOICE_SHARE` set (#7342), the relay's day
             // used and the agent's chat tokens around the run, for
             // measuring a run's share of the day on a lamp. Numbers only.
             let metered = lamp_skills::relay_share::on();
             let before = metered.then(lamp_skills::relay_share::read_here).flatten();
-            let sent = hand_over(socket, line);
+            let sent = hand_over(socket, line, wait_told);
             if metered {
                 let after = lamp_skills::relay_share::read_here();
                 eprintln!(
@@ -5861,8 +5893,9 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
                 eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {error}");
             }
             // Asked by the owner's voice and ready within five minutes: the
-            // quiet lifted for it, for five minutes more (#7180).
-            if let Some(asked) = asked {
+            // quiet lifted for it, for five minutes more (#7180), only with
+            // its switch on (a run now is marked asked either way, #7354).
+            if let Some(asked) = asked.filter(|_| lamp_voice::told_when_asked::on()) {
                 let ready = unix_ms();
                 let after = ready.saturating_sub(asked) / 1000;
                 match lamp_voice::told_when_asked::lifted_until(asked, ready) {
@@ -5887,6 +5920,34 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             }
         }
     });
+}
+
+/// How long the waiting line may wait to be said (#7354): a "getting
+/// ready" said after the run has begun would be stale.
+const GATEWAY_WAIT_EXPIRES_MS: u64 = 8_000;
+
+/// The say request of the waiting line for a run its owner asked by voice
+/// at `asked` (#7354, [`lamp_skills::task::GATEWAY_WAIT_LINE`]), or why it
+/// is not said: held by the lamp's quiet hours or the skill's own exactly
+/// as the run's told answer is ([`LampRoom::quiet_at`]), lifted only with
+/// `lifts` (`lamp_voice::told_when_asked::on()`) within its five minutes.
+fn gateway_wait_asking(
+    room: &LampRoom,
+    asked: u64,
+    now_ms: u64,
+    lifts: bool,
+) -> Result<serde_json::Value, &'static str> {
+    let lifted = lifts
+        .then(|| lamp_voice::told_when_asked::lifted_until(asked, now_ms))
+        .flatten();
+    if room.quiet_at(now_ms, lifted) {
+        return Err("quiet hours");
+    }
+    Ok(
+        json!({"text": lamp_skills::task::GATEWAY_WAIT_LINE, "exact": true,
+              "priority": lamp_skills::SAY_PRIORITY,
+              "expires_in_ms": GATEWAY_WAIT_EXPIRES_MS}),
+    )
 }
 
 /// lamp-skills' hand-overs to lamp-tasks under way, a task's or a fixed
@@ -5924,18 +5985,30 @@ impl Drop for Handing {
 /// when the run ends, at most [`lamp_skills::task::RUN_MOST`] later. Not
 /// connected, nothing was taken; a line written and no answer read, the
 /// run may have begun.
-fn hand_over(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
+fn hand_over(
+    socket: &Path,
+    line: &str,
+    mut waiting: impl FnMut(),
+) -> Result<String, lamp_skills::service_write::Unrun> {
     use lamp_skills::service_write::Unrun;
     let _handing = Handing::begin();
     let stream = UnixStream::connect(socket)
         .map_err(|error| Unrun::NotTaken(format!("lamp-tasks couldn't be reached: {error}")))?;
-    let exchange = || -> io::Result<String> {
+    let mut exchange = || -> io::Result<String> {
         stream.set_write_timeout(Some(Duration::from_secs(5)))?;
         stream.set_read_timeout(Some(lamp_skills::task::RUN_MOST))?;
         (&stream).write_all(format!("{line}\n").as_bytes())?;
-        let mut answer = String::new();
-        BufReader::new((&stream).take(8_192)).read_line(&mut answer)?;
-        Ok(answer)
+        let mut lines = BufReader::new((&stream).take(8_192));
+        loop {
+            let mut answer = String::new();
+            lines.read_line(&mut answer)?;
+            // lamp-tasks' word that the run waits for OpenClaw's Gateway
+            // (#7354), never its answer: told, then the answer is read.
+            if !lamp_skills::task::waits(&answer) {
+                return Ok(answer);
+            }
+            waiting();
+        }
     };
     exchange().map_err(|error| Unrun::Unknown(format!("lamp-tasks' answer never came: {error}")))
 }
@@ -5996,7 +6069,7 @@ fn write_service(
 /// connected, nothing was taken; a line written and no answer read, the
 /// run may have begun.
 fn hand_write_over(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
-    lamp_skills::service_write::agent_answered(&hand_over(socket, line)?)
+    lamp_skills::service_write::agent_answered(&hand_over(socket, line, || {})?)
 }
 
 /// `skill`'s fixed write sent straight on `lamp-services`' tools socket
@@ -6049,6 +6122,23 @@ struct LampRoom {
     quiet_lifted: Option<u64>,
 }
 
+impl LampRoom {
+    /// Whether the lamp's quiet hours or the skill's own hold at `now_ms`
+    /// (not known, quiet), unless `lifted` until a later time (#7180,
+    /// `lamp_voice::told_when_asked`): the one rule of a told answer
+    /// ([`Self::seen`]) and of the waiting line (#7354, [`gateway_wait_asking`]).
+    fn quiet_at(&self, now_ms: u64, lifted: Option<u64>) -> bool {
+        let quiet = self.local_time.as_ref().is_none_or(|local| {
+            let minute = local.minute_of_day(now_ms);
+            lamp_local_time::quiet_hours(minute)
+                || self.quiet.is_some_and(|(from, to)| {
+                    lamp_local_time::QuietWindow { from, to }.contains(minute)
+                })
+        });
+        lamp_voice::told_when_asked::quiet_holds(quiet, lifted, now_ms)
+    }
+}
+
 impl lamp_skills::service_read::Room for LampRoom {
     fn seen(&mut self) -> lamp_skills::service_read::Seen {
         let now_ms = unix_ms();
@@ -6086,15 +6176,7 @@ impl lamp_skills::service_read::Room for LampRoom {
             .flatten()
             .and_then(|message| message.parse::<Pause>().ok())
             .is_some_and(|pause| pause.paused);
-        // The lamp's quiet hours and the skill's own; not known, quiet.
-        let quiet = self.local_time.as_ref().is_none_or(|local| {
-            let minute = local.minute_of_day(now_ms);
-            lamp_local_time::quiet_hours(minute)
-                || self.quiet.is_some_and(|(from, to)| {
-                    lamp_local_time::QuietWindow { from, to }.contains(minute)
-                })
-        });
-        let quiet = lamp_voice::told_when_asked::quiet_holds(quiet, self.quiet_lifted, now_ms);
+        let quiet = self.quiet_at(now_ms, self.quiet_lifted);
         lamp_skills::service_read::Seen {
             owner_known: self.owner.is_some() && self.known_file.is_some(),
             faces,
@@ -6600,6 +6682,87 @@ mod tests {
         room.quiet_lifted = Some(unix_ms() + 60_000);
         assert!(!room.seen().quiet, "asked by voice, it is lifted");
         assert_eq!(task_room("morning-mail", &step(None), &runner).quiet, None);
+    }
+
+    /// #7354: lamp-tasks' waiting line is read past on the hand-over
+    /// connection: `waiting` is called once, and the answer after it is
+    /// the one returned.
+    #[test]
+    fn hand_over_reads_past_the_waiting_line_to_its_answer() {
+        let dir = tempfile::Builder::new()
+            .prefix("hw")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let path = dir.path().join("tasks.sock");
+        let listener = UnixListener::bind(&path).unwrap();
+        let served = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            (&stream)
+                .write_all(
+                    format!(
+                        "{}\n{{\"ok\":true,\"id\":7}}\n",
+                        lamp_tasks::skill_task::WAITING_LINE
+                    )
+                    .as_bytes(),
+                )
+                .unwrap();
+            line
+        });
+        let mut waited = 0;
+        let answer = hand_over(&path, r#"{"skill":"x"}"#, || waited += 1).unwrap();
+        assert_eq!(served.join().unwrap(), "{\"skill\":\"x\"}\n");
+        assert_eq!(waited, 1, "the waiting line is told once");
+        assert_eq!(answer.trim(), r#"{"ok":true,"id":7}"#);
+    }
+
+    /// #7354: the waiting line is held as the run's told answer is: not
+    /// said in quiet hours (nor in the skill's own), unless the owner's
+    /// spoken ask lifts it with its switch on; said outside them, briefly.
+    #[test]
+    fn the_waiting_line_keeps_the_answers_quiet() {
+        let dir = tempfile::Builder::new()
+            .prefix("wq")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let room = |quiet| LampRoom {
+            skill: "morning-mail".into(),
+            say: dir.path().join("say.sock"),
+            services: dir.path().join("call.sock"),
+            bus: Bus::new(dir.path().join("bus")).unwrap(),
+            known_file: None,
+            owner: None,
+            local_time: Some(Arc::new(lamp_local_time::LocalTime::Offset(0))),
+            quiet,
+            quiet_lifted: None,
+        };
+        let at = |hour: u64| hour * 3_600_000;
+        let plain = room(None);
+        // 23:00 is in the lamp's quiet hours: held, with no lift.
+        let night = at(23);
+        assert_eq!(
+            gateway_wait_asking(&plain, night - 1_000, night, false),
+            Err("quiet hours")
+        );
+        // Lifted only with its switch, within five minutes of the ask.
+        assert!(gateway_wait_asking(&plain, night - 1_000, night, true).is_ok());
+        assert_eq!(
+            gateway_wait_asking(&plain, night - 600_000, night, true),
+            Err("quiet hours")
+        );
+        // Noon: said, in exact words, held to 8 s.
+        let noon = at(12);
+        let asking = gateway_wait_asking(&plain, noon - 1_000, noon, false).unwrap();
+        assert_eq!(asking["text"], lamp_skills::task::GATEWAY_WAIT_LINE);
+        assert_eq!(asking["exact"], true);
+        assert_eq!(asking["expires_in_ms"], 8_000);
+        // The skill's own [quiet] holds it too.
+        let own = room(Some((11 * 60, 13 * 60)));
+        assert_eq!(
+            gateway_wait_asking(&own, noon - 1_000, noon, false),
+            Err("quiet hours")
+        );
     }
 
     /// #5288's gate: a line on `voice/heard`, an event the bus keeps no

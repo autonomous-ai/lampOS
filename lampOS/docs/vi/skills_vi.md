@@ -4032,7 +4032,24 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   tra SHA-256 và grant. Token một lần
   (#6304, lamp-control đúc từ cái "có" nó giữ,
   `lamp_control::task_yes::yes_for_token`) và kết quả qua Task news là của
-  #6304 và #6306.
+  #6304 và #6306. Trước câu trả lời, lamp-tasks có thể ghi một dòng
+  `{"waiting":"gateway"}` (#7354, khi lamp-tasks đặt
+  `LAMP_TASKS_GATEWAY_WAIT_TOLD=on`): lần chạy vẫn còn chờ gateway của
+  OpenClaw 5 s sau khi bắt đầu, như ngay sau khi gateway khởi động lại.
+  lamp-skills đọc qua dòng đó tới câu trả lời (`task::waits`), và với lần
+  chạy do chủ nhân nhờ bằng giọng nói (chạy ngay) thì cho đèn nói "One
+  moment, I'm getting ready." một lần, đúng nguyên văn, trên socket say
+  với mức ưu tiên say của kỹ năng (`task::GATEWAY_WAIT_LINE`), có ghi
+  journal (`do.task: its run waits for the lamp's agent to get ready:
+  spoken`); lần chạy do trigger thì không nói gì ("not said: not asked by
+  voice"). Câu này theo đúng giờ yên lặng của câu trả lời được kể của lần
+  chạy: trong giờ yên lặng của đèn hoặc `[quiet]` riêng của kỹ năng, nó
+  bị giữ lại như câu trả lời ("not said: quiet hours"), chỉ được mở như
+  câu trả lời (`LAMP_TOLD_WHEN_ASKED=on`, trong vòng năm phút sau lời
+  nhờ). Nó hết hạn 8 s sau khi được gửi tới socket say
+  (`expires_in_ms: 8000`), nên câu "getting ready" cũ không bao giờ được
+  nói trễ quá 8 s; gateway sẵn sàng trong 8 s đó thì câu vẫn có thể được
+  nói ngay lúc lần chạy bắt đầu.
 
 ## Chủ đề người ở bàn đang làm gì (#6543, chưa có bên phát)
 

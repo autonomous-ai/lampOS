@@ -78,6 +78,11 @@ impl Probe for Loopback {
 /// start took about 3 minutes. Four minutes, of the run's 14
 /// (`skill_task::RUN_LIFETIME`), so a run held to the end still has 10.
 pub const SERVING_WITHIN: Duration = Duration::from_secs(240);
+/// How long a skill's run waits on the Gateway before lamp-skills is told
+/// it waits ([`Gateway::before_launch_telling`], #7354): a Gateway start
+/// already read ([`Serving`]) is waited for well within it, so only a
+/// start's first read (about 10 s even warm), add or longer is told.
+pub const WAIT_TOLD_AFTER: Duration = Duration::from_secs(5);
 /// The Gateway's own approvals read, run through lamp-update's OpenClaw
 /// wrapper: `openclaw` then lamp-update's `#@fence-get` data
 /// ([`GatewayAgent::fence_get`]) with `{ms}` filled. It asks the running
@@ -489,6 +494,31 @@ impl Gateway {
                     .min(until.saturating_duration_since(Instant::now())),
             );
         }
+    }
+
+    /// [`Self::before_launch_until`], with `waiting` called once, on a
+    /// thread of its own, when the wait is still going `after` it began
+    /// (#7354): so the person can be told the lamp is getting ready while
+    /// a just-restarted Gateway starts. Nothing more: the wait, its bounds
+    /// and its outcome are [`Self::before_launch_until`]'s.
+    pub fn before_launch_telling(
+        &mut self,
+        deadline: Instant,
+        cancelled: &dyn Fn() -> bool,
+        after: Duration,
+        waiting: &(dyn Fn() + Sync),
+    ) -> Result<(), String> {
+        let (done, wait) = std::sync::mpsc::channel::<()>();
+        thread::scope(|scope| {
+            scope.spawn(move || {
+                if wait.recv_timeout(after) == Err(std::sync::mpsc::RecvTimeoutError::Timeout) {
+                    waiting();
+                }
+            });
+            let waited = self.before_launch_until(deadline, cancelled);
+            drop(done);
+            waited
+        })
     }
 }
 
@@ -1165,6 +1195,67 @@ mod tests {
         assert_eq!(*other.looks.lock().unwrap(), 0);
     }
 
+    /// #7354: a wait still going past its bound is told once, on its own
+    /// thread, while it goes on; one over before the bound, or a ready
+    /// Gateway, is never told.
+    #[test]
+    fn a_wait_past_its_bound_is_told_once_and_a_short_one_never() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let told = AtomicU32::new(0);
+        let tell = || {
+            told.fetch_add(1, Ordering::SeqCst);
+        };
+        // Ready from the 40th look, 5 ms apart: about 200 ms of waiting.
+        let slow = Fake {
+            ready_from: Some(40),
+            ..Fake::default()
+        };
+        let mut waited = Gateway::with_bounds(
+            Box::new(slow.clone()),
+            Duration::from_secs(10),
+            Duration::from_millis(5),
+        );
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let after = Duration::from_millis(30);
+        assert_eq!(
+            waited.before_launch_telling(deadline, &|| false, after, &tell),
+            Ok(())
+        );
+        assert_eq!(told.load(Ordering::SeqCst), 1, "told once while it waited");
+        // A Gateway ready at once: not told, not even after the bound.
+        let ready = Fake {
+            ready_from: Some(1),
+            ..Fake::default()
+        };
+        let mut quick = Gateway::with_bounds(
+            Box::new(ready),
+            Duration::from_secs(10),
+            Duration::from_millis(5),
+        );
+        assert_eq!(
+            quick.before_launch_telling(deadline, &|| false, after, &tell),
+            Ok(())
+        );
+        thread::sleep(after * 3);
+        assert_eq!(
+            told.load(Ordering::SeqCst),
+            1,
+            "a ready Gateway is not told"
+        );
+        // One that never answers is told too, and still not sent.
+        let mut never = Gateway::with_bounds(
+            Box::new(Fake::default()),
+            Duration::from_millis(150),
+            Duration::from_millis(5),
+        );
+        assert!(
+            never
+                .before_launch_telling(deadline, &|| false, after, &tell)
+                .is_err()
+        );
+        assert_eq!(told.load(Ordering::SeqCst), 2);
+    }
+
     /// #6226: a Gateway that never answers: no `new`, the hand-over not
     /// sent with a code the person is told, within the bound.
     #[test]
@@ -1756,6 +1847,7 @@ mod tests {
             write: false,
             not_made: Default::default(),
             net: false,
+            waiting: None,
         }
     }
 

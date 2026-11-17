@@ -34,7 +34,9 @@
 //!   for every agent.
 //! - **The socket** ([`HandOvers`]): with the switch on, `serve` binds
 //!   [`HAND_OVER_SOCKET`] for lamp-skills alone, one line a connection,
-//!   one run at a time (another is refused `busy`).
+//!   one run at a time (another is refused `busy`). One answer line back;
+//!   with [`WAIT_TOLD_SWITCH`] on, it may be preceded by one
+//!   [`WAITING_LINE`] (#7354).
 //! - **A run that never reached its agent** (#6835 gap 1): Harness keeps a
 //!   pane whose engine exited before it was ready as a shell (agent
 //!   "Terminal", the same id), and `wait` reads it idle. After the end,
@@ -798,6 +800,11 @@ pub struct SkillRun {
     /// one run path the Harness runner gives it its own egress socket,
     /// `skill-<run id>`, or refuses it ([`HarnessRunner::egress`]).
     pub net: bool,
+    /// Called once when the run's wait for OpenClaw's Gateway is still
+    /// going after [`crate::gateway::WAIT_TOLD_AFTER`] (#7354): with
+    /// [`WAIT_TOLD_SWITCH`] on, it tells lamp-skills ([`WAITING_LINE`]).
+    /// None: nothing is told.
+    pub waiting: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
 }
 
 /// What a run that tells its answer ([`tells_answer`]) is asked of its
@@ -847,6 +854,7 @@ impl std::fmt::Debug for SkillRun {
             // Never the answer, only its length.
             .field("answer", &self.answer.get().map(|answer| answer.len()))
             .field("net", &self.net)
+            .field("waiting", &self.waiting.is_some())
             .finish()
     }
 }
@@ -882,6 +890,7 @@ impl SkillRun {
             env_file: None,
             answer: std::sync::OnceLock::new(),
             net: false,
+            waiting: None,
         }
     }
 
@@ -1118,6 +1127,9 @@ pub struct Agent<'a> {
     /// With `LAMP_SKILL_SECRETS` on, where a run's keys are asked
     /// ([`crate::skill_keys::Keys`]); none: no run is given a key.
     pub keys: Option<&'a dyn crate::skill_keys::Keys>,
+    /// With [`WAIT_TOLD_SWITCH`] on, a task's run's [`SkillRun::waiting`]
+    /// (#7354): its connection told [`WAITING_LINE`] once. None: not told.
+    pub waiting: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
 }
 
 /// A run's keys asked for `hand` through `keys`: the set values, or the
@@ -1306,6 +1318,7 @@ pub fn answer_for(
             token,
         );
         made.net = keeps_net;
+        made.waiting = agent.waiting.clone();
         // Its own folder and fresh home, removed however it ends, as a
         // make's: `make-<run id>`, by which the one run path's wrapper finds
         // it for a run granted `net` (#7200).
@@ -3440,9 +3453,20 @@ impl Runner for HarnessRunner {
                 .is_some_and(|stop| stop.load(Ordering::Acquire))
         };
         let until = began + run.deadline;
+        // A wait still going after WAIT_TOLD_AFTER is told once (#7354), so
+        // the lamp can say it is getting ready; the wait itself is the same.
+        let waited = |gateway: &mut crate::gateway::Gateway| match &run.waiting {
+            Some(waiting) => gateway.before_launch_telling(
+                until,
+                &stopped,
+                crate::gateway::WAIT_TOLD_AFTER,
+                &**waiting,
+            ),
+            None => gateway.before_launch_until(until, &stopped),
+        };
         if engine == EngineKind::Openclaw
             && let Some(gateway) = gateway.as_mut()
-            && let Err(why) = gateway.before_launch_until(until, &stopped)
+            && let Err(why) = waited(gateway)
         {
             eprintln!("tasks: {why}; the hand-over is not sent");
             return Err(format!(
@@ -4006,6 +4030,15 @@ pub fn run_line(run: &str, state: &str, took_secs: u64, seen: &AgentSeen) -> Str
 /// 0700), the socket 0600 as its others: lamp-skills (run as `lampos`)
 /// names it with `--tasks-socket` or `LAMP_SKILLS_TASKS_SOCKET` (#6346).
 pub const HAND_OVER_SOCKET: &str = "/run/lampos-tasks/skill-task.sock";
+/// `on` exactly: a task's run whose wait for OpenClaw's Gateway goes past
+/// [`crate::gateway::WAIT_TOLD_AFTER`] has [`WAITING_LINE`] written once on
+/// its hand-over connection, before its answer (#7354); lamp-skills then
+/// has the lamp say it is getting ready, for a run its owner asked by
+/// voice. Off (unset), nothing but the answer is written, as before.
+pub const WAIT_TOLD_SWITCH: &str = "LAMP_TASKS_GATEWAY_WAIT_TOLD";
+/// The line a waiting run's connection is told, before its answer (#7354):
+/// never an answer (no `ok`), so a reader that knows it reads on.
+pub const WAITING_LINE: &str = r#"{"waiting":"gateway"}"#;
 /// The one unit whose lines are taken: lamp-skills, run as lamp-tasks'
 /// own user, as the kernel names the caller.
 pub const CALLER_UNIT: &str = "lamp-skills.service";
@@ -4049,6 +4082,9 @@ pub struct HandOvers {
     /// With `LAMP_SKILL_SECRETS` on, where a run's keys are asked
     /// ([`Agent::keys`]).
     pub keys: Option<std::sync::Arc<dyn crate::skill_keys::Keys + Send + Sync>>,
+    /// [`WAIT_TOLD_SWITCH`] on: a run's long Gateway wait has
+    /// [`WAITING_LINE`] written once on its connection (#7354).
+    pub wait_told: bool,
 }
 
 /// What a second run is told while one runs.
@@ -4103,6 +4139,12 @@ impl HandOvers {
                 "[lamp-tasks] skill task: a skill's keys on (LAMP_SKILL_SECRETS=on): a run is given the ones added in the app, in an environment file read once"
             );
         }
+        let wait_told = on(std::env::var(WAIT_TOLD_SWITCH).ok().as_deref());
+        if wait_told {
+            eprintln!(
+                "[lamp-tasks] skill task: a long gateway wait is told (LAMP_TASKS_GATEWAY_WAIT_TOLD=on)"
+            );
+        }
         Self {
             socket: PathBuf::from(HAND_OVER_SOCKET),
             skills: PathBuf::from(SKILLS),
@@ -4125,6 +4167,7 @@ impl HandOvers {
                 std::sync::Arc::new(crate::skill_keys::ServicesKeys::default())
                     as std::sync::Arc<dyn crate::skill_keys::Keys + Send + Sync>
             }),
+            wait_told,
         }
     }
 
@@ -4236,6 +4279,26 @@ impl HandOvers {
             return;
         }
         let place = Place(running);
+        // With WAIT_TOLD_SWITCH on, a run's Gateway wait is told once on
+        // this connection (#7354); a caller gone is only said.
+        let waiting = self
+            .wait_told
+            .then(|| stream.try_clone().ok())
+            .flatten()
+            .map(|stream| {
+                let told = std::sync::atomic::AtomicBool::new(false);
+                std::sync::Arc::new(move || {
+                    if !told.swap(true, Ordering::AcqRel) {
+                        eprintln!(
+                            "[lamp-tasks] skill task: its run waits for OpenClaw's Gateway past {} s, told to lamp-skills",
+                            crate::gateway::WAIT_TOLD_AFTER.as_secs()
+                        );
+                        if let Err(error) = (&stream).write_all(format!("{WAITING_LINE}\n").as_bytes()) {
+                            eprintln!("[lamp-tasks] skill task: its wait was not told: {error}");
+                        }
+                    }
+                }) as std::sync::Arc<dyn Fn() + Send + Sync>
+            });
         let agent = Agent {
             net: self.net.as_deref().map(|net| net as &dyn Runner),
             held: self.held.as_deref().map(|held| held as &dyn Runner),
@@ -4245,6 +4308,7 @@ impl HandOvers {
                 .keys
                 .as_deref()
                 .map(|keys| keys as &dyn crate::skill_keys::Keys),
+            waiting,
         };
         let answered = answer_agent(
             &line,
@@ -5487,16 +5551,23 @@ mod tests {
             .unwrap()
     }
 
-    fn served(
-        runner: HeldRunner,
-        caller: fn(Option<&lamp_ipc::caller::Caller>) -> bool,
-    ) -> (
+    type Served = (
         tempfile::TempDir,
         PathBuf,
         std::sync::Arc<std::sync::atomic::AtomicBool>,
         std::sync::Arc<SharedTokens>,
         std::thread::JoinHandle<()>,
-    ) {
+    );
+
+    fn served(runner: HeldRunner, caller: fn(Option<&lamp_ipc::caller::Caller>) -> bool) -> Served {
+        served_with(runner, caller, false)
+    }
+
+    fn served_with(
+        runner: impl Runner + Send + Sync + 'static,
+        caller: fn(Option<&lamp_ipc::caller::Caller>) -> bool,
+        wait_told: bool,
+    ) -> Served {
         let dir = private();
         let socket = dir.path().join("skill-task.sock");
         let tokens = std::sync::Arc::new(SharedTokens::default());
@@ -5511,6 +5582,7 @@ mod tests {
             held: None,
             work: None,
             keys: None,
+            wait_told,
         }
         .start(true, stop.clone())
         .unwrap()
@@ -5575,6 +5647,51 @@ mod tests {
         assert!(!socket.exists(), "the socket is removed at the stop");
     }
 
+    /// A runner whose Gateway wait passes [`crate::gateway::WAIT_TOLD_AFTER`]:
+    /// the run's `waiting` called as `Gateway::before_launch_telling` calls
+    /// it (twice here, to show it is written once), then its answer.
+    struct LongWaitRunner;
+
+    impl Runner for LongWaitRunner {
+        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+            if let Some(waiting) = &run.waiting {
+                waiting();
+                waiting();
+            }
+            Ok(5)
+        }
+    }
+
+    /// #7354: with [`WAIT_TOLD_SWITCH`] on, a run whose Gateway wait passes
+    /// the bound has [`WAITING_LINE`] once on its connection, then its
+    /// answer; off, only the answer.
+    #[test]
+    fn a_long_gateway_wait_is_told_on_the_socket_only_with_the_switch() {
+        let read_all = |socket: &Path| {
+            let mut stream = UnixStream::connect(socket).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(10)))
+                .unwrap();
+            stream.write_all(&line(|_| {})).unwrap();
+            stream.write_all(b"\n").unwrap();
+            let mut all = String::new();
+            std::io::Read::read_to_string(&mut stream, &mut all).unwrap();
+            all
+        };
+        for (on, told) in [
+            (
+                true,
+                format!("{WAITING_LINE}\n{}\n", json!({"ok": true, "id": 5})),
+            ),
+            (false, format!("{}\n", json!({"ok": true, "id": 5}))),
+        ] {
+            let (_dir, socket, stop, _tokens, handle) = served_with(LongWaitRunner, |_| true, on);
+            assert_eq!(read_all(&socket), told, "switch on: {on}");
+            stop.store(true, Ordering::Release);
+            handle.join().unwrap();
+        }
+    }
+
     #[test]
     fn a_second_run_while_one_runs_is_refused_busy() {
         let (runner, began, release) = held(3);
@@ -5613,6 +5730,7 @@ mod tests {
             held: None,
             work: None,
             keys: None,
+            wait_told: false,
         }
         .start(false, std::sync::Arc::default())
         .unwrap();
@@ -7149,6 +7267,7 @@ mod tests {
                 work: Some(work.path()),
                 services: false,
                 keys: None,
+                waiting: None,
             };
             let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
             match code {
@@ -7180,6 +7299,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            waiting: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &held, &agent);
         assert_eq!(told["ok"], true, "{told}");
@@ -7237,6 +7357,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            waiting: None,
         };
         let told = answer_agent(&with_net, true, skills(), &no_net_yes, &held, &agent);
         assert_eq!(told["error"], "no_token", "{told}");
@@ -7254,6 +7375,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            waiting: None,
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
         assert_eq!(told, json!({"ok": true, "id": 0}), "{told}");
@@ -7359,6 +7481,7 @@ mod tests {
             work: Some(&work),
             services: false,
             keys: None,
+            waiting: None,
         };
         let sockets = || std::fs::read_dir(&egress).map_or(0, |dir| dir.count());
         let ran = || seen.with_extension("env").exists();
@@ -7442,6 +7565,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            waiting: None,
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
         assert_eq!(told["ok"], true, "{told}");
@@ -7478,6 +7602,7 @@ mod tests {
             work: None,
             services: false,
             keys: None,
+            waiting: None,
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &bare);
         assert_eq!(told["error"], "run_failed", "{told}");
@@ -7544,6 +7669,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            waiting: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &agent);
         assert_eq!(told["ok"], true, "{told}");
@@ -7584,6 +7710,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            waiting: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &bare);
         assert_eq!(told["message"], NO_FRESH_HOME, "{told}");
@@ -7608,6 +7735,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            waiting: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &lineless);
         assert_eq!(told["message"], NO_RUN_NAMESPACE, "{told}");
@@ -7671,6 +7799,7 @@ mod tests {
                 work: Some(work.path()),
                 services,
                 keys: None,
+                waiting: None,
             };
             let told = answer_agent(line, true, skills(), &tokens, &runner, &agent);
             assert_eq!(told["ok"], true, "{told}");
@@ -7772,6 +7901,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: Some(&keys),
+            waiting: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &agent);
         assert_eq!(told["ok"], true, "{told}");

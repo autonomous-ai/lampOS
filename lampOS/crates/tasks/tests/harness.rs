@@ -7478,6 +7478,7 @@ fn skill_run(deadline: Duration) -> SkillRun {
         env_file: None,
         answer: Default::default(),
         net: false,
+        waiting: None,
     }
 }
 
@@ -9254,6 +9255,80 @@ fn an_openclaw_default_skill_run_waits_for_the_gateway_before_new() {
     let calls = rig.calls();
     let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
     assert_eq!(new["args"][1], "hermes");
+    nothing_left(&rig);
+}
+
+/// #7354: a skill's run whose wait for OpenClaw's Gateway goes past
+/// `gateway::WAIT_TOLD_AFTER` tells its `waiting` once, while it still
+/// waits (as after a Gateway restart); a Gateway ready at once tells
+/// nothing, and the run goes on as before.
+#[test]
+fn a_skill_runs_long_gateway_wait_is_told_once() {
+    let openclaw_runner = |rig: &Rig| {
+        let gateway_ns = rig.root.path().join("openclaw-ns");
+        fs::write(
+            &gateway_ns,
+            format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+        )
+        .unwrap();
+        one_path_runner(
+            rig,
+            EngineKind::Openclaw,
+            &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+            Some("#!/bin/sh\n"),
+        )
+    };
+    let counted = || {
+        let told = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let tell = told.clone();
+        let waiting: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
+            tell.fetch_add(1, Ordering::SeqCst);
+        });
+        (told, waiting)
+    };
+
+    // Ready at once: nothing told, and the run goes on.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let (runner, _) = with_gateway(
+        &rig,
+        openclaw_runner(&rig),
+        EngineKind::Openclaw,
+        Some(1),
+        Duration::from_secs(10),
+    );
+    let watched = launch_start(&rig, &runner.starts, true, Some("started"));
+    let (told, waiting) = counted();
+    let mut run = skill_run(Duration::from_secs(20));
+    run.waiting = Some(waiting);
+    assert_eq!(runner.run(&run, &|| {}), Ok(0));
+    assert!(watched.join().unwrap().is_some());
+    assert_eq!(
+        told.load(Ordering::SeqCst),
+        0,
+        "a ready Gateway is not told"
+    );
+    nothing_left(&rig);
+
+    // Not serving past the bound: told once while it waits, then refused
+    // at the wait's own bound as before.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let within = lamp_tasks::gateway::WAIT_TOLD_AFTER + Duration::from_millis(600);
+    let (runner, _) = with_gateway(
+        &rig,
+        openclaw_runner(&rig),
+        EngineKind::Openclaw,
+        None,
+        within,
+    );
+    let (told, waiting) = counted();
+    let mut run = skill_run(Duration::from_secs(20));
+    run.waiting = Some(waiting);
+    let said = runner.run(&run, &|| {}).unwrap_err();
+    assert!(said.contains(lamp_tasks::gateway::NOT_READY), "{said}");
+    assert_eq!(told.load(Ordering::SeqCst), 1, "told once while it waited");
+    assert!(!run.started.load(Ordering::Acquire));
     nothing_left(&rig);
 }
 

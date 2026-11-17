@@ -403,6 +403,7 @@ pub fn make_run_with(
         env_file: None,
         answer: Default::default(),
         net: false,
+        waiting: None,
     }
 }
 

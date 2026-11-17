@@ -4341,6 +4341,27 @@ file:
   trigger's run says nothing. A refusal for no lamp target of its own is not told so, as it
   also stands for Hermes on the lamp being off. Test:
   `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`.
+- **A long gateway wait is said (#7354).** Right after a gateway
+  restart, that wait can last minutes (lamp-c0a4: restart at 20:18:35,
+  approvals read served at 20:20:59, OpenClaw's own startup about
+  165 s), and a person who asked a skill by voice heard nothing. With
+  `LAMP_TASKS_GATEWAY_WAIT_TOLD=on` (`skill_task::WAIT_TOLD_SWITCH`, off
+  unless set), a run whose wait (port, approvals read and the allow-list
+  add below) is still going 5 s after it began
+  (`gateway::WAIT_TOLD_AFTER`, `Gateway::before_launch_telling`) has one
+  line written on its hand-over connection before its answer,
+  `{"waiting":"gateway"}` (`skill_task::WAITING_LINE`), at most once a
+  run, journaled ("[lamp-tasks] skill task: its run waits for OpenClaw's
+  Gateway past 5 s, told to lamp-skills"). lamp-skills reads past it to
+  the answer and, for a run its owner asked by voice (a run now), has the
+  lamp say "One moment, I'm getting ready." once, in exact words
+  (`lamp_skills::task::GATEWAY_WAIT_LINE`); a trigger's run says nothing.
+  In quiet hours (the lamp's or the skill's own `[quiet]`) it is held,
+  like the run's told answer, and lifted only as the answer is
+  (`LAMP_TOLD_WHEN_ASKED=on`, within five minutes of the ask); it expires
+  8 s after it is asked to be said, so it is never said late.
+  The wait itself, its bounds and its outcome are unchanged: no new wait
+  and no retry. Off, only the answer is written, as before.
 - **A fixed write is refused.** A task with no script (a fixed write) is
   refused before anything is made live: "a fixed write is not taken by a
   gateway agent, so nothing was started".

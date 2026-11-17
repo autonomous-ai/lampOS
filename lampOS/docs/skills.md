@@ -2044,6 +2044,22 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   and the folder's SHA-256, #6304, minted from lamp-control's kept yes
   alone, `lamp_control::task_yes::yes_for_token`) and its result as Task
   news are #6306's and #6304's. The journal keeps the outcome, never the task's words.
+  Before its answer, lamp-tasks may write one `{"waiting":"gateway"}`
+  line (#7354, its `LAMP_TASKS_GATEWAY_WAIT_TOLD=on`): the run still waits
+  for OpenClaw's gateway 5 s after it began, as right after a gateway
+  restart. lamp-skills reads past it to the answer (`task::waits`), and
+  for a run its owner asked by voice (a run now) has the lamp say "One
+  moment, I'm getting ready." once, in exact words on the say socket at
+  the skill's say priority (`task::GATEWAY_WAIT_LINE`), journaled
+  (`do.task: its run waits for the lamp's agent to get ready: spoken`); a
+  trigger's run says nothing ("not said: not asked by voice"). It keeps
+  the run's told answer's quiet: in the lamp's quiet hours or the skill's
+  own `[quiet]`, it is held like the answer ("not said: quiet hours"),
+  lifted only as the answer is (`LAMP_TOLD_WHEN_ASKED=on`, within five
+  minutes of the ask). It expires 8 s after it is asked of the say socket
+  (`expires_in_ms: 8000`), so a stale "getting ready" is never said more
+  than 8 s late; a gateway ready inside those 8 s can still have it said
+  just as the run starts.
 
 ### Core and installable skills
 

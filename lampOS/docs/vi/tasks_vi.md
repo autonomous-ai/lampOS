@@ -1661,6 +1661,29 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   thì không được nói như vậy, vì nó cũng có nghĩa là Hermes trên đèn đang
   tắt. Test:
   `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`.
+- **Chờ gateway lâu thì đèn nói ra (#7354).** Ngay sau khi gateway khởi
+  động lại, lần chờ đó có thể kéo dài vài phút (lamp-c0a4: khởi động lại
+  lúc 20:18:35, lệnh đọc approvals được phục vụ lúc 20:20:59, phần khởi
+  động của chính OpenClaw khoảng 165 s), và người vừa nhờ một skill bằng
+  giọng nói không nghe thấy gì. Với `LAMP_TASKS_GATEWAY_WAIT_TOLD=on`
+  (`skill_task::WAIT_TOLD_SWITCH`, tắt nếu không đặt), một lần chạy mà
+  lần chờ (cổng, lệnh đọc approvals và lệnh thêm vào allow-list bên dưới)
+  vẫn còn 5 s sau khi bắt đầu (`gateway::WAIT_TOLD_AFTER`,
+  `Gateway::before_launch_telling`) được ghi một dòng trên kết nối giao
+  việc của nó trước câu trả lời, `{"waiting":"gateway"}`
+  (`skill_task::WAITING_LINE`), nhiều nhất một lần mỗi lần chạy, có ghi
+  journal ("[lamp-tasks] skill task: its run waits for OpenClaw's Gateway
+  past 5 s, told to lamp-skills"). lamp-skills đọc qua dòng đó tới câu trả
+  lời và, với lần chạy do chủ nhân nhờ bằng giọng nói (chạy ngay), cho đèn
+  nói "One moment, I'm getting ready." một lần, đúng nguyên văn
+  (`lamp_skills::task::GATEWAY_WAIT_LINE`); lần chạy do trigger thì không
+  nói gì. Trong giờ yên lặng (của đèn hoặc `[quiet]` riêng của kỹ năng)
+  câu này bị giữ lại, như câu trả lời được kể của lần chạy, và chỉ được
+  mở như câu trả lời (`LAMP_TOLD_WHEN_ASKED=on`, trong vòng năm phút sau
+  lời nhờ); nó hết hạn 8 s sau khi được yêu cầu nói, nên không bao giờ
+  được nói muộn. Bản thân lần chờ, các giới hạn và kết quả của nó không đổi:
+  không thêm lần chờ và không thử lại. Tắt thì chỉ câu trả lời được ghi,
+  như trước.
 - **Ghi cố định bị từ chối.** Task không có script (một ghi cố định) bị
   từ chối trước khi bất cứ gì được đặt sống: "a fixed write is not taken
   by a gateway agent, so nothing was started".
