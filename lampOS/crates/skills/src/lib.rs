@@ -445,8 +445,19 @@ pub const ON_FILE: &str = "on";
 /// while its name is here ([`Engine::picture_refused`]), and the Store
 /// installs a package that asks it only once it is.
 pub const CAMERA_FILE: &str = "camera";
+/// The file in `--state-dir` beside [`CAMERA_FILE`] that keeps the owner's
+/// yes to a skill hearing [`SEEN_MORE_TOPIC`] (#6543, the `seen_more` use):
+/// one name a line, written only by the manage helper
+/// ([`package::seen_more`]), as the camera's. A skill, core or not, that
+/// names the topic receives nothing from it while its name is not here: no
+/// trigger, no `[[while]]`, no `sooner` reads it ([`Engine::reread_seen_more`]).
+pub const SEEN_MORE_FILE: &str = "seen_more";
+/// What the owner's [`SEEN_MORE_FILE`] yes gives: tiredness, desk work and
+/// celebrating (`lamp_msgs::HumanDoingMore`, `LAMP_SEEN_MORE_DOINGS=on`).
+pub const SEEN_MORE_TOPIC: &str = lamp_msgs::HumanDoingMore::TOPIC;
 
-/// The names kept in `file` ([`OFF_FILE`], [`ON_FILE`] or [`CAMERA_FILE`]),
+/// The names kept in `file` ([`OFF_FILE`], [`ON_FILE`], [`CAMERA_FILE`] or
+/// [`SEEN_MORE_FILE`]),
 /// one a line; a line that is not a skill's name is passed over, and no
 /// file is none. The one reader of each, for the running program and the
 /// manage helper.
@@ -478,9 +489,9 @@ pub fn read_names(file: &Path) -> std::io::Result<BTreeSet<String>> {
 /// then moved over it, and the folder synced, so a power cut leaves the
 /// old file or the new one whole, never an empty one, and the move itself
 /// holds (the reviewer's P3 on #1837, as #1732's daily journal does). The
-/// one writer of [`OFF_FILE`], [`ON_FILE`] and [`CAMERA_FILE`]: a
-/// `[stop]`'s off and on, and the app's ([`package::turn`],
-/// [`package::camera`]). Root's helper writes it in a folder
+/// one writer of [`OFF_FILE`], [`ON_FILE`], [`CAMERA_FILE`] and
+/// [`SEEN_MORE_FILE`]: a `[stop]`'s off and on, and the app's
+/// ([`package::turn`], [`package::camera`], [`package::seen_more`]). Root's helper writes it in a folder
 /// another user owns (the reviewer's P2 on #2878), so the file beside is
 /// only ever made new (`O_CREAT | O_EXCL`, which never follows a link): a
 /// file left there by a cut-off run is removed first, and a link there is
@@ -6835,6 +6846,20 @@ pub struct Run {
     pub from: Option<(usize, Option<String>)>,
 }
 
+/// The newest values `$skill` may read: every topic's, but
+/// [`SEEN_MORE_TOPIC`]'s only with the owner's `seen_more` yes for it
+/// ([`SEEN_MORE_FILE`]). Field by field, so it borrows beside a `&mut` of
+/// another of the engine's fields.
+macro_rules! seen {
+    ($engine:ident, $skill:expr) => {
+        if $engine.seen_more.contains(&$skill.name) {
+            &$engine.latest
+        } else {
+            &$engine.latest_without_more
+        }
+    };
+}
+
 pub struct Engine {
     generation: Arc<()>,
     skills: Vec<Skill>,
@@ -6843,6 +6868,18 @@ pub struct Engine {
     watches: HashMap<(String, usize), Watch>,
     /// The newest value of each topic: when it came and how long it lasts.
     latest: HashMap<String, (Value, u64, Option<u64>)>,
+    /// `latest` but [`SEEN_MORE_TOPIC`]: what a skill without the owner's
+    /// `seen_more` yes reads (`seen!`), so it receives nothing from that
+    /// topic.
+    latest_without_more: HashMap<String, (Value, u64, Option<u64>)>,
+    /// The skills the owner said yes to hearing [`SEEN_MORE_TOPIC`], kept
+    /// in [`SEEN_MORE_FILE`] beside the off file: read at the start and
+    /// again with the off file ([`Engine::reread_seen_more`]). None without
+    /// a state folder.
+    seen_more: BTreeSet<String>,
+    /// The skills whose refusal of [`SEEN_MORE_TOPIC`] the journal said,
+    /// once each until a yes is given.
+    seen_more_said: BTreeSet<String>,
     /// Since when each skill's condition has held, by skill and condition.
     holding: HashMap<(String, usize), u64>,
     /// When each skill's tool last ran, by skill.
@@ -7166,6 +7203,9 @@ impl Engine {
             skills: skills.into_iter().filter(|skill| skill.enabled).collect(),
             watches: HashMap::new(),
             latest: HashMap::new(),
+            latest_without_more: HashMap::new(),
+            seen_more: BTreeSet::new(),
+            seen_more_said: BTreeSet::new(),
             holding: HashMap::new(),
             tool_ran: HashMap::new(),
             heard: Heard::default(),
@@ -7243,7 +7283,7 @@ impl Engine {
                     continue;
                 };
                 let key = (skill.name.clone(), index);
-                let now = Self::lowered(&self.latest, condition, true, now_us);
+                let now = Self::lowered(seen!(self, skill), condition, true, now_us);
                 let was = self.lowered.get(&key).copied();
                 let line = match (was, now) {
                     (None, None) => continue,
@@ -7689,7 +7729,84 @@ impl Engine {
         let file = dir.join(OFF_FILE);
         self.off = read_names(&file).map_err(|error| format!("{}: {error}", file.display()))?;
         self.off_file = Some(file);
+        // The owner's seen_more yeses beside it, kept across a restart: one
+        // that can't be read gives none.
+        let more = dir.join(SEEN_MORE_FILE);
+        self.seen_more = read_names(&more).unwrap_or_else(|error| {
+            eprintln!(
+                "lamp-skills: the seen_more yeses not read from {}: {error}",
+                more.display()
+            );
+            BTreeSet::new()
+        });
         Ok(self.off.iter().cloned().collect())
+    }
+
+    /// The owner's yeses to hearing [`SEEN_MORE_TOPIC`] read again from
+    /// [`SEEN_MORE_FILE`] beside the off file, which the app's
+    /// `skills.seen_more` changes there ([`package::seen_more`]), as the
+    /// off file is read again: `None` when they did not change, or can't be
+    /// read (kept as they were). A skill whose yes was taken back lets go
+    /// at once of what it held on the topic: its `[[while]]` clocks on it
+    /// begin again, and a trigger on it no longer holds, a run held until it
+    /// ends being ended (the runs returned).
+    pub fn reread_seen_more(&mut self) -> Option<Vec<Run>> {
+        let file = self.off_file.as_ref()?.with_file_name(SEEN_MORE_FILE);
+        let yes = match read_names(&file) {
+            Ok(yes) if yes != self.seen_more => yes,
+            Ok(_) => return None,
+            Err(error) => {
+                eprintln!(
+                    "lamp-skills: the seen_more yeses not read again from {}: {error}",
+                    file.display()
+                );
+                return None;
+            }
+        };
+        let taken: BTreeSet<String> = self.seen_more.difference(&yes).cloned().collect();
+        self.seen_more = yes;
+        // A yes given: a later no is said again.
+        self.seen_more_said
+            .retain(|name| !self.seen_more.contains(name));
+        let mut ends = Vec::new();
+        for skill in self
+            .skills
+            .iter()
+            .filter(|skill| taken.contains(&skill.name))
+        {
+            for (index, condition) in skill.conditions.iter().enumerate() {
+                if condition.topic == SEEN_MORE_TOPIC {
+                    self.holding.remove(&(skill.name.clone(), index));
+                }
+            }
+            for (index, trigger) in skill.triggers.iter().enumerate() {
+                if trigger.topic != SEEN_MORE_TOPIC {
+                    continue;
+                }
+                if let Some(watch) = self.watches.get_mut(&(skill.name.clone(), index)) {
+                    if std::mem::take(&mut watch.open) {
+                        ends.push(Run {
+                            generation: None,
+                            skill: skill.name.clone(),
+                            events: Vec::new(),
+                            calls: vec![Call::Ends],
+                            ask: None,
+                            queue: false,
+                            from: None,
+                        });
+                    }
+                    watch.since_us = None;
+                    watch.last_held_us = None;
+                }
+            }
+        }
+        Some(ends)
+    }
+
+    /// Whether `skill` hears [`SEEN_MORE_TOPIC`]: only with the owner's yes
+    /// kept for its name ([`SEEN_MORE_FILE`]), a core skill's too.
+    pub fn hears_more(&self, skill: &str) -> bool {
+        self.seen_more.contains(skill)
     }
 
     /// The skills turned off read again from where they are kept, which
@@ -7977,7 +8094,7 @@ impl Engine {
             {
                 spent.nudge = Some(self.nudges.get(&skill.name).copied());
             }
-            nudged(&mut self.nudges, &self.latest, skill, now_us);
+            nudged(&mut self.nudges, seen!(self, skill), skill, now_us);
             if skill.reads_a_service() {
                 read_made(&mut self.reads, self.clock, &skill.name, now_us);
             }
@@ -8152,7 +8269,7 @@ impl Engine {
                 let Some(watch) = self.watches.get_mut(&(skill.name.clone(), index)) else {
                     continue;
                 };
-                let Some((_, at_us, lifespan_us)) = self.latest.get(&trigger.topic) else {
+                let Some((_, at_us, lifespan_us)) = seen!(self, skill).get(&trigger.topic) else {
                     continue;
                 };
                 // Messages that do not know its field, passed over, are no
@@ -8375,7 +8492,7 @@ impl Engine {
         for skill in &self.skills {
             for (index, trigger) in skill.triggers.iter().enumerate() {
                 if let (Some((list, key)), Some((value, _, _))) =
-                    (&trigger.each, self.latest.get(&trigger.topic))
+                    (&trigger.each, seen!(self, skill).get(&trigger.topic))
                 {
                     self.watches
                         .entry((skill.name.clone(), index))
@@ -8772,7 +8889,7 @@ impl Engine {
                 return false;
             }
             rose(index, trigger)
-                && Self::fresh(&self.latest, &trigger.topic, now_us).is_some_and(|value| {
+                && Self::fresh(seen!(self, skill), &trigger.topic, now_us).is_some_and(|value| {
                     match (&trigger.each, item) {
                         (Some((list, key)), Some(name)) => at(value, list)
                             .as_array()
@@ -8799,9 +8916,16 @@ impl Engine {
                 .then_some(None)?,
         };
         let run_item = run.from.as_ref().and_then(|(_, item)| item.as_deref());
-        Self::conditions_hold(&self.latest, &self.holding, self.sooner, skill, now_us).then(|| {
+        Self::conditions_hold(
+            seen!(self, skill),
+            &self.holding,
+            self.sooner,
+            skill,
+            now_us,
+        )
+        .then(|| {
             calls(
-                &self.latest,
+                seen!(self, skill),
                 &self.picked,
                 skill,
                 trigger,
@@ -8824,15 +8948,22 @@ impl Engine {
             {
                 continue;
             }
-            let conditions =
-                Self::conditions_hold(&self.latest, &self.holding, self.sooner, skill, now_us);
+            let conditions = Self::conditions_hold(
+                seen!(self, skill),
+                &self.holding,
+                self.sooner,
+                skill,
+                now_us,
+            );
             for (index, trigger) in skill.triggers.iter().enumerate() {
                 if trigger.when == When::Changes
                     && (!conditions
-                        || Self::fresh(&self.latest, &trigger.topic, now_us).is_none_or(|value| {
-                            Changes::selected_inputs_valid(skill, trigger, value)
-                                && !(trigger.test.holds(value) && chooses(skill, value))
-                        }))
+                        || Self::fresh(seen!(self, skill), &trigger.topic, now_us).is_none_or(
+                            |value| {
+                                Changes::selected_inputs_valid(skill, trigger, value)
+                                    && !(trigger.test.holds(value) && chooses(skill, value))
+                            },
+                        ))
                     && let Some(watch) = self.watches.get_mut(&(skill.name.clone(), index))
                 {
                     watch.changes.eligible = false;
@@ -8906,7 +9037,29 @@ impl Engine {
             .is_some_and(|(_, at, _)| *at <= now_us && now_us - *at < ROUTINE_VOICE_FRESH_US);
         self.latest
             .insert(topic.to_owned(), (value.clone(), now_us, lifespan_us));
+        let more = topic == SEEN_MORE_TOPIC;
+        if more {
+            // A skill that names it without the owner's seen_more yes
+            // receives nothing from it, said once a skill (#6543).
+            for skill in &self.skills {
+                if !self.seen_more.contains(&skill.name)
+                    && skill.permissions.topics.iter().any(|named| named == topic)
+                    && self.seen_more_said.insert(skill.name.clone())
+                {
+                    eprintln!(
+                        "lamp-skills: skill:{}: {topic} not given to it: the owner hasn't said yes to its seen_more",
+                        skill.name
+                    );
+                }
+            }
+        } else {
+            self.latest_without_more
+                .insert(topic.to_owned(), (value.clone(), now_us, lifespan_us));
+        }
         for skill in &self.skills {
+            if more && !self.seen_more.contains(&skill.name) {
+                continue;
+            }
             for (index, condition) in skill.conditions.iter().enumerate() {
                 if condition.topic != topic {
                     continue;
@@ -9004,7 +9157,7 @@ impl Engine {
                         .or_default()
                         .ran_us = Some(now_us);
                 }
-                if trigger.topic != topic {
+                if trigger.topic != topic || (more && !self.seen_more.contains(&skill.name)) {
                     continue;
                 }
                 if trigger.when == When::Changes
@@ -9086,14 +9239,14 @@ impl Engine {
                     watch.items = Some(items);
                     for name in came {
                         if !Self::conditions_hold(
-                            &self.latest,
+                            seen!(self, skill),
                             &self.holding,
                             self.sooner,
                             skill,
                             now_us,
                         ) {
                             let unmet = Self::unmet(
-                                &self.latest,
+                                seen!(self, skill),
                                 &self.holding,
                                 self.sooner,
                                 skill,
@@ -9120,7 +9273,7 @@ impl Engine {
                             question(skill),
                             || {
                                 calls(
-                                    &self.latest,
+                                    seen!(self, skill),
                                     &self.picked,
                                     skill,
                                     Some(trigger),
@@ -9248,7 +9401,7 @@ impl Engine {
                     .iter()
                     .filter(|sooner| {
                         self.sooner
-                            && Self::fresh(&self.latest, &sooner.topic, now_us)
+                            && Self::fresh(seen!(self, skill), &sooner.topic, now_us)
                                 .is_some_and(|value| sooner.test.holds(value))
                     })
                     .map(|sooner| sooner.for_us)
@@ -9536,7 +9689,7 @@ impl Engine {
                 // anyway, so it goes on as without the key.
                 if let Some(by) = stood_in
                     && Self::conditions_hold(
-                        &self.latest,
+                        seen!(self, skill),
                         &self.holding,
                         self.sooner,
                         skill,
@@ -9674,7 +9827,13 @@ impl Engine {
                     dropped(&mut self.dropped, watch, &skill.name, gate, now_us, || why);
                     continue;
                 }
-                if !Self::conditions_hold(&self.latest, &self.holding, self.sooner, skill, now_us) {
+                if !Self::conditions_hold(
+                    seen!(self, skill),
+                    &self.holding,
+                    self.sooner,
+                    skill,
+                    now_us,
+                ) {
                     // Held back by a condition (someone talking): with a
                     // `wait`, the chance is kept while the trigger holds,
                     // and taken at its next message once they hold.
@@ -9686,7 +9845,8 @@ impl Engine {
                         // A chance kept waiting says so, once a hold: a
                         // matured spell waiting out a talk left no line for
                         // up to its whole `wait` (#6592).
-                        let (latest, holding, sooner) = (&self.latest, &self.holding, self.sooner);
+                        let (latest, holding, sooner) =
+                            (seen!(self, skill), &self.holding, self.sooner);
                         dropped(
                             &mut self.dropped,
                             watch,
@@ -9738,7 +9898,7 @@ impl Engine {
                             why = format!(
                                 "{why} (held by {})",
                                 Self::held_back(
-                                    &self.latest,
+                                    seen!(self, skill),
                                     &self.holding,
                                     self.sooner,
                                     skill,
@@ -9767,8 +9927,13 @@ impl Engine {
                     // which #3007 gives every trigger with a `wait`, not
                     // here: it must not be said twice.
                     if trigger.wait_us == 0 && !(once && trigger.once_per_day) {
-                        let unmet =
-                            Self::unmet(&self.latest, &self.holding, self.sooner, skill, now_us);
+                        let unmet = Self::unmet(
+                            seen!(self, skill),
+                            &self.holding,
+                            self.sooner,
+                            skill,
+                            now_us,
+                        );
                         dropped(
                             &mut self.dropped,
                             watch,
@@ -9782,7 +9947,7 @@ impl Engine {
                 }
                 watch.waiting_us = None;
                 if trigger.when == When::Changes
-                    && (Self::fresh(&self.latest, topic, now_us).is_none()
+                    && (Self::fresh(seen!(self, skill), topic, now_us).is_none()
                         || !watch.changes.observe(&trigger.changes, &value))
                 {
                     continue;
@@ -10044,7 +10209,7 @@ impl Engine {
                         if let Some(spent) = self.unwritten.get_mut(&skill.name) {
                             spent.nudge = Some(self.nudges.get(&skill.name).copied());
                         }
-                        nudged(&mut self.nudges, &self.latest, skill, now_us);
+                        nudged(&mut self.nudges, seen!(self, skill), skill, now_us);
                     }
                     // Its end is told even if the Policy says no: with no
                     // run holding anything, the program lets it pass.
@@ -10060,7 +10225,7 @@ impl Engine {
                     question,
                     || {
                         calls(
-                            &self.latest,
+                            seen!(self, skill),
                             &self.picked,
                             skill,
                             Some(trigger),
@@ -10187,7 +10352,13 @@ impl Engine {
             return Err("Requested audio is disabled or has no spoken context.".into());
         }
         arguments(skill, args)?;
-        if !Self::conditions_hold(&self.latest, &self.holding, self.sooner, skill, now_us) {
+        if !Self::conditions_hold(
+            seen!(self, skill),
+            &self.holding,
+            self.sooner,
+            skill,
+            now_us,
+        ) {
             return Err("I can't do that just now.".into());
         }
         let ran = self.tool_ran.get(&skill.name).copied();
@@ -10220,7 +10391,15 @@ impl Engine {
                 skill,
                 self.told_history(
                     skill,
-                    calls(&self.latest, &self.picked, skill, None, now_us, args, None),
+                    calls(
+                        seen!(self, skill),
+                        &self.picked,
+                        skill,
+                        None,
+                        now_us,
+                        args,
+                        None,
+                    ),
                     now_us,
                 ),
                 args,
@@ -10260,7 +10439,7 @@ impl Engine {
             _ => None,
         };
         let calls = calls(
-            &self.latest,
+            seen!(self, skill),
             &self.picked,
             skill,
             trigger,

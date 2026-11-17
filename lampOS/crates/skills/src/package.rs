@@ -1039,7 +1039,7 @@ fn functions_said(skills: &[Skill]) -> String {
 /// another skill there has. What a killed install or remove left is
 /// deleted first ([`swept`]). With `state`, the running program's state
 /// folder, the owner's yes to the camera kept for its name is taken away
-/// before it goes in ([`moved_in`]).
+/// before it goes in, and its seen_more ([`moved_in`]).
 pub fn install(skills: &Path, state: Option<&Path>, from: &Path) -> Result<String, String> {
     if !fs::metadata(skills).is_ok_and(|meta| meta.is_dir()) {
         return Err(format!("no skills folder at {}", skills.display()));
@@ -2399,6 +2399,13 @@ fn moved_in(
         } else if yes.remove(name) {
             super::keep_names(&file, &yes).map_err(failed)?;
         }
+        // The owner's yes to its seen_more likewise (#6543): a Store update
+        // keeps it, any other install takes it away. A package never needs
+        // it to go on: without it, the skill only receives nothing from
+        // `humans/doing_more`.
+        if !from_store {
+            forget_seen_more(state, name).map_err(|why| format!("not installed: {why}"))?;
+        }
     }
     let failed = |error: io::Error| format!("not installed: {}: {error}", target.display());
     match &replaced {
@@ -2450,8 +2457,9 @@ fn moved_in(
 /// Removes the installable skill `name` from `skills` and says so. A core
 /// skill is refused: it comes with the lamp. With `state`, the running
 /// program's state folder, the owner's yes to its camera is taken back
-/// first ([`super::CAMERA_FILE`]), so a skill put on again by that name
-/// asks again.
+/// first ([`super::CAMERA_FILE`]), and its seen_more
+/// ([`super::SEEN_MORE_FILE`]), so a skill put on again by that name asks
+/// again.
 pub fn remove(skills: &Path, state: Option<&Path>, name: &str) -> Result<String, String> {
     match taken_off(skills, state, name, None, None)? {
         None => Ok(removed_said(name)),
@@ -2507,6 +2515,59 @@ pub fn camera(
     } else {
         format!("{name} may not see the camera's picture")
     })
+}
+
+/// The owner's yes to the skill `name` hearing `humans/doing_more`
+/// ([`super::SEEN_MORE_TOPIC`]: tiredness, desk work and celebrating, the
+/// app's `seen_more`, #6543) kept, or with `allow` false taken back, in
+/// `state`'s [`super::SEEN_MORE_FILE`], as [`camera`] keeps the camera's:
+/// written whole by [`super::keep_names`] under the skills folder's lock
+/// (waited for at most `wait`). The skill need not be on the lamp yet. The
+/// running program reads the file again with the off file
+/// ([`super::Engine::reread_seen_more`]); a skill that names the topic
+/// without the yes receives nothing from it, a core skill's too.
+pub fn seen_more(
+    skills: &Path,
+    state: &Path,
+    name: &str,
+    allow: bool,
+    wait: Duration,
+) -> Result<String, String> {
+    if !skill_name_ok(name) {
+        return Err(format!(
+            "{name:?} is not a skill's name: 1 to 64 lowercase letters, digits and hyphens"
+        ));
+    }
+    let _held = locked_within(skills, wait)?;
+    let file = state.join(super::SEEN_MORE_FILE);
+    let failed = |error: io::Error| format!("{}: {error}", file.display());
+    let mut yes = super::read_names(&file).map_err(failed)?;
+    let changed = if allow {
+        yes.insert(name.to_owned())
+    } else {
+        yes.remove(name)
+    };
+    if changed {
+        super::keep_names(&file, &yes).map_err(failed)?;
+    }
+    Ok(if allow {
+        format!("{name} may know when you looked tired, worked or celebrated")
+    } else {
+        format!("{name} may not know when you looked tired, worked or celebrated")
+    })
+}
+
+/// The owner's seen_more yes for `name` taken back in `state`, with the
+/// skills folder's lock held by the caller: a remove's and an install's,
+/// as the camera's is, so a skill put on again by that name asks again.
+fn forget_seen_more(state: &Path, name: &str) -> Result<(), String> {
+    let file = state.join(super::SEEN_MORE_FILE);
+    let failed = |error: io::Error| format!("{}: {error}", file.display());
+    let mut yes = super::read_names(&file).map_err(failed)?;
+    if yes.remove(name) {
+        super::keep_names(&file, &yes).map_err(failed)?;
+    }
+    Ok(())
 }
 
 /// Why the skill `name`, granted `permissions`, can't be turned off, or
@@ -2678,6 +2739,8 @@ fn taken_off(
         if yes.remove(name) {
             super::keep_names(&file, &yes).map_err(failed)?;
         }
+        // And its seen_more (#6543), the same way.
+        forget_seen_more(state, name).map_err(|why| format!("not removed: {why}"))?;
         // And the owner's yes to its task (#6305), likewise: lamp-control
         // keeps it, so it is asked to take it back. lamp-control off or not
         // reached removes the skill still (no task runs without it), and
@@ -3061,7 +3124,7 @@ pub const ASKED_MOST: u64 = 4_096;
 pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
     {\"install\": {\"url\": URL, \"sha256\": HASH, \"name\": NAME, \"version\": VERSION}}, all but url optional, \
     {\"install_made\": SHA256}, {\"off\": NAME}, {\"on\": NAME}, {\"camera\": NAME}, {\"camera_off\": NAME}, \
-    {\"task_asks\": NAME} or {\"forget_counts\": {}}";
+    {\"seen_more\": NAME}, {\"seen_more_off\": NAME}, {\"task_asks\": NAME} or {\"forget_counts\": {}}";
 
 /// The folder of the skill `name`: the skills folder's, else, with `dev`,
 /// the developer folder's (pushed); and whether it is pushed.
@@ -3169,6 +3232,9 @@ pub fn task_asks(
 ///   skill seeing the camera's picture given or taken back in the app
 ///   (#3504's piece C), kept in `state` by [`camera`]; the Store installs
 ///   a package that asks the camera only once it is given;
+/// - `{"seen_more": NAME}` or `{"seen_more_off": NAME}`, the owner's yes to
+///   the skill hearing `humans/doing_more` given or taken back in the app
+///   (#6543), kept in `state` by [`seen_more`];
 /// - `{"forget_counts": {}}`, the person's no to reports (`lamp-cloud`'s
 ///   health report, "Skills, counted"): the skills' run totals in `state`
 ///   ([`crate::usage::forget`]) and the voice's made-skill counts in `made`
@@ -3262,6 +3328,18 @@ pub fn asked(
                     }
                     (None, Some(serde_json::Value::String(name))) => {
                         camera(skills, state, name, false, lock_wait)
+                    }
+                    _ => Err(NOT_A_REQUEST.to_owned()),
+                }
+            }
+            // The owner's yes to tiredness, desk work and celebrating.
+            _ if only("seen_more").or(only("seen_more_off")).is_some() => {
+                match (only("seen_more"), only("seen_more_off")) {
+                    (Some(serde_json::Value::String(name)), None) => {
+                        seen_more(skills, state, name, true, lock_wait)
+                    }
+                    (None, Some(serde_json::Value::String(name))) => {
+                        seen_more(skills, state, name, false, lock_wait)
                     }
                     _ => Err(NOT_A_REQUEST.to_owned()),
                 }
