@@ -5838,23 +5838,26 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             // the voice says in its own words, behind a read's gate, the
             // next time the owner is seen within half an hour (#6577).
             _ => match not_started.take() {
-                Some(note)
-                    if refused.is_none()
-                        && lamp_skills::task::not_started_told(
-                            asked.is_some(),
-                            NOT_STARTED_TOLD.load(std::sync::atomic::Ordering::SeqCst),
-                            unix_ms(),
-                        ) =>
-                {
-                    NOT_STARTED_TOLD.store(unix_ms(), std::sync::atomic::Ordering::SeqCst);
-                    let told = lamp_skills::service_read::tell_note(
-                        &note,
-                        lamp_skills::service_read::REFUSAL_WAIT,
-                        &mut room,
-                    );
-                    eprintln!(
-                        "lamp-skills: skill:{skill}: do.task: refused as its agent isn't running: {told}"
-                    );
+                Some(note) if refused.is_none() => {
+                    let now = unix_ms();
+                    let what = "refused as its agent isn't running";
+                    match take_not_started_turn(asked.is_some(), now) {
+                        Some(previous) => {
+                            lift_quiet_for_ask(&mut room, &skill, asked, what, now);
+                            let told = lamp_skills::service_read::tell_note(
+                                &note,
+                                lamp_skills::service_read::REFUSAL_WAIT,
+                                &mut room,
+                            );
+                            if !told.starts_with("told") {
+                                give_back_not_started_turn(previous, now);
+                            }
+                            eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {told}");
+                        }
+                        None => eprintln!(
+                            "lamp-skills: skill:{skill}: do.task: {what}: not told, one was told within six hours"
+                        ),
+                    }
                     let _ = tried.failed();
                     None
                 }
@@ -5877,24 +5880,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             {
                 eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {error}");
             }
-            // Asked by the owner's voice and ready within five minutes: the
-            // quiet lifted for it, for five minutes more (#7180).
-            if let Some(asked) = asked {
-                let ready = unix_ms();
-                let after = ready.saturating_sub(asked) / 1000;
-                match lamp_voice::told_when_asked::lifted_until(asked, ready) {
-                    Some(until) => {
-                        room.quiet_lifted = Some(until);
-                        eprintln!(
-                            "lamp-skills: skill:{skill}: do.task: {what}: told in quiet hours too, its owner asked by voice {after} s before ({})",
-                            lamp_voice::told_when_asked::ENVIRONMENT
-                        );
-                    }
-                    None => eprintln!(
-                        "lamp-skills: skill:{skill}: do.task: {what}: its quiet holds, ready {after} s after its owner's ask, past five minutes"
-                    ),
-                }
-            }
+            lift_quiet_for_ask(&mut room, &skill, asked, what, unix_ms());
             let told = lamp_skills::service_read::tell(&lines, &mut room);
             eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {told}");
             if let Some(state) = &state
@@ -5911,13 +5897,63 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
 /// task is refused while one is ([`run_now_refused`]): on lamp-9adf, 15
 /// Nov at 21:40, a run now was said to be running while another skill's
 /// write held lamp-tasks, which then refused it as busy.
+static HANDING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// What a run now's refusal says while another hand-over is under way.
 /// When a refusal as the lamp's agent isn't running was last told, unix
 /// ms, 0 for none ([`lamp_skills::task::not_started_told`]).
 static NOT_STARTED_TOLD: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-static HANDING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+/// Asked by the owner's voice (`asked`, unix ms) and ready at `ready_ms`
+/// within five minutes of it: `room`'s quiet lifted for five minutes more
+/// (#7180), for a told answer or a refusal (#6577: SubDarren's P2 on
+/// #7588). `what` names it for the journal.
+fn lift_quiet_for_ask(
+    room: &mut LampRoom,
+    skill: &str,
+    asked: Option<u64>,
+    what: &str,
+    ready_ms: u64,
+) {
+    let Some(asked) = asked else {
+        return;
+    };
+    let after = ready_ms.saturating_sub(asked) / 1000;
+    match lamp_voice::told_when_asked::lifted_until(asked, ready_ms) {
+        Some(until) => {
+            room.quiet_lifted = Some(until);
+            eprintln!(
+                "lamp-skills: skill:{skill}: do.task: {what}: told in quiet hours too, its owner asked by voice {after} s before ({})",
+                lamp_voice::told_when_asked::ENVIRONMENT
+            );
+        }
+        None => eprintln!(
+            "lamp-skills: skill:{skill}: do.task: {what}: its quiet holds, ready {after} s after its owner's ask, past five minutes"
+        ),
+    }
+}
 
-/// What a run now's refusal says while another hand-over is under way.
+/// Takes the lamp-wide turn to tell a refusal as the lamp's agent isn't
+/// running ([`NOT_STARTED_TOLD`]) at `now_ms`, in one step, so two
+/// triggers refused at once tell it once: the stamp it replaced, or none
+/// when it isn't told now ([`lamp_skills::task::not_started_told`]).
+fn take_not_started_turn(asked_by_voice: bool, now_ms: u64) -> Option<u64> {
+    use std::sync::atomic::Ordering::SeqCst;
+    NOT_STARTED_TOLD
+        .fetch_update(SeqCst, SeqCst, |last| {
+            lamp_skills::task::not_started_told(asked_by_voice, last, now_ms).then_some(now_ms)
+        })
+        .ok()
+}
+
+/// Gives back a turn [`take_not_started_turn`] took at `now_ms` when its
+/// note wasn't said (the owner not seen in time), so the next refusal is
+/// told; a later turn taken since is kept.
+fn give_back_not_started_turn(previous: u64, now_ms: u64) {
+    use std::sync::atomic::Ordering::SeqCst;
+    let _ = NOT_STARTED_TOLD.compare_exchange(now_ms, previous, SeqCst, SeqCst);
+}
+
 const HANDING_BUSY: &str =
     "another skill's task is running on the lamp now, and one runs at a time";
 
@@ -6633,6 +6669,62 @@ mod tests {
         room.quiet_lifted = Some(unix_ms() + 60_000);
         assert!(!room.seen().quiet, "asked by voice, it is lifted");
         assert_eq!(task_room("morning-mail", &step(None), &runner).quiet, None);
+    }
+
+    /// #6577 (SubDarren's P2 on #7588): a refusal of a run the owner asked
+    /// for by voice lifts the quiet as a told answer does, within five
+    /// minutes of the ask, and a trigger's run never; and the lamp-wide turn
+    /// to tell a trigger's refusal is taken once, given back when its note
+    /// wasn't said.
+    #[test]
+    fn a_voice_asked_refusal_is_told_in_quiet_hours_and_a_turn_taken_once() {
+        use lamp_skills::service_read::Room;
+        let dir = tempfile::Builder::new()
+            .prefix("hq")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let mut room = LampRoom {
+            skill: "morning-mail".into(),
+            say: dir.path().join("say.sock"),
+            services: dir.path().join("call.sock"),
+            bus,
+            known_file: None,
+            owner: None,
+            local_time: None,
+            quiet: None,
+            quiet_lifted: None,
+        };
+        // No local time is quiet.
+        assert!(room.seen().quiet);
+        let now = unix_ms();
+        lift_quiet_for_ask(&mut room, "morning-mail", None, "refused", now);
+        assert!(room.seen().quiet, "a trigger's run keeps the quiet");
+        lift_quiet_for_ask(
+            &mut room,
+            "morning-mail",
+            Some(now - 400_000),
+            "refused",
+            now,
+        );
+        assert!(room.seen().quiet, "asked past five minutes before");
+        lift_quiet_for_ask(
+            &mut room,
+            "morning-mail",
+            Some(now - 70_000),
+            "refused",
+            now,
+        );
+        assert!(!room.seen().quiet, "asked by voice 70 s before: lifted");
+        // The turn: one trigger's refusal of two at once, given back unsaid.
+        let at = 50 * 3_600_000;
+        NOT_STARTED_TOLD.store(0, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(take_not_started_turn(false, at), Some(0));
+        assert_eq!(take_not_started_turn(false, at), None);
+        give_back_not_started_turn(0, at);
+        assert_eq!(take_not_started_turn(false, at + 1), Some(0));
+        assert_eq!(take_not_started_turn(true, at + 2), Some(at + 1));
+        NOT_STARTED_TOLD.store(0, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// #5288's gate: a line on `voice/heard`, an event the bus keeps no

@@ -1662,7 +1662,8 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   (`task::not_started_note`: chỉ tên đọc được của kỹ năng và lời cố định,
   không bao giờ là message của lamp-tasks), sau cổng và lượt của một lần
   đọc, vào lần tới chủ nhân được thấy trong vòng 30 phút
-  (`service_read::REFUSAL_WAIT`), rồi bỏ; lần chạy do trigger thì tối đa
+  (`service_read::REFUSAL_WAIT`), rồi bỏ (lần chạy nhờ bằng giọng nói được
+  bỏ giờ yên lặng cho nó, như một câu trả lời được kể, #7180); lần chạy do trigger thì tối đa
   một lần mỗi sáu giờ trên cả đèn (`task::NOT_STARTED_QUIET_MS`), để kỹ
   năng chạy mỗi giờ không nói vậy mỗi giờ (#6577: trên lamp-fc4b ngày 17/11
   một Gateway đã dừng từ chối lần chạy của một kỹ năng và không gì được

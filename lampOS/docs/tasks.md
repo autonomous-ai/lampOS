@@ -4332,7 +4332,8 @@ file:
   now" (`task::not_started_note`: only the skill's spoken name and fixed
   words, never lamp-tasks' message), behind a read's gate and turn, the
   next time the owner is seen within 30 minutes
-  (`service_read::REFUSAL_WAIT`), then dropped; a trigger's run at most
+  (`service_read::REFUSAL_WAIT`), then dropped (a run asked by voice lifts
+  the quiet hours for it, as a told answer does, #7180); a trigger's run at most
   once in six hours lamp-wide (`task::NOT_STARTED_QUIET_MS`), so an hourly
   skill doesn't say so every hour (#6577: on lamp-fc4b on 17
   Nov a stopped Gateway refused a skill's run and nothing was said). With
