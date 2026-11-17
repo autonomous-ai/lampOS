@@ -1361,7 +1361,16 @@ sau:
     agree before it sends anything. I couldn't tell you just now what it
     sends, so it sends nothing yet." (không có chữ nào để nhắc lại, không có
     "yes"; kiểm thử
-    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). Trong lúc
+    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). Một kỹ
+    năng có mã riêng mà câu đọc lại được nói như vậy sẽ chờ như một lần tạo
+    từ ứng dụng có mã (`skill_write_yes::said_by_the_say_service`, #7245):
+    không vòng mô hình nào thấy câu trả lời của lần tạo, nên câu tiếp theo
+    của người dùng sau câu đọc lại đã nói trọn bị buộc trả lời việc chờ
+    (`skill_write_yes::approve_force`); trên c0a4 (17/11 19:43) một lần tạo
+    OpenClaw 116 s kéo dài quá lượt của nó và lời "yes" sau câu đọc lại
+    không gọi gì (kiểm thử
+    `a_voice_makes_yes_after_its_say_back_through_the_say_service_is_forced`).
+    Trong lúc
     đang tạo, hoặc câu của
     nó chưa được nói (`make_skill_local::Pending`), và tối đa 2 phút sau
     lời gọi (`make_skill_local::MAKE_WITHIN`, thời gian dài nhất một lần
