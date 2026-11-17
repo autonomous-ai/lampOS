@@ -252,6 +252,13 @@ pub fn reply(
     let reply = match parse(payload).ok()? {
         Command::Info => identity.info(now),
         Command::Data { kind, data } => {
+            // The cloud's reply or news for the devices (#7470): taken by
+            // the bridge, never answered to the cloud.
+            if crate::devices::is_down(&kind)
+                && lamp.devices_down(&kind, &data, crate::chat::now_ms())
+            {
+                return None;
+            }
             let answered = answer(lamp, &kind, &data);
             if answered.is_ok() && QUIET_WHEN_DONE.contains(&kind.as_str()) {
                 return None;
@@ -768,6 +775,8 @@ async fn session(
         let services = lamp.services();
         // Skills added from a file: their results go on the same tick.
         let uploads = lamp.upload();
+        // The desk and Hydrate bridge (#7470), with its switch.
+        let devices_on = lamp.devices_on();
         let polled = {
             let poll = events.poll();
             tokio::pin!(poll);
@@ -787,7 +796,7 @@ async fn session(
                         back_to_tcp = true;
                         break None;
                     }
-                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() => {
+                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() || devices_on => {
                         let me = identity.borrow().clone();
                         // A skill installed or made that needs a connector
                         // not linked (#6059): only while connected, best
@@ -875,6 +884,19 @@ async fn session(
                                     }
                                     say.line(&events.handed(round, which));
                                 }
+                            }
+                        }
+                        if devices_on {
+                            // The voice's asks for a desk or a Hydrate: sent
+                            // once, never kept for a reconnect, and its stop
+                            // first (`crate::devices`).
+                            let polled = lamp.devices(crate::chat::now_ms(), connected);
+                            for line in polled.lines {
+                                say.line(&line);
+                            }
+                            for send in polled.sends {
+                                let event = me.data(&now(), send.kind, &Ok(Some(send.data))).to_string();
+                                handed.publish(&client, account.fd_channel.as_str(), event, None);
                             }
                         }
                         if texting {

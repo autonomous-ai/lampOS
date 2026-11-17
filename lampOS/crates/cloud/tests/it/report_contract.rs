@@ -192,6 +192,7 @@ fn the_apps_switch_reads_the_agreed_reply_and_its_refusal() {
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,

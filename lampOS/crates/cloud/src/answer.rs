@@ -119,6 +119,21 @@ pub trait Lamp {
     fn unasked_sent(&mut self) -> u64 {
         0
     }
+    /// Whether the desk and Hydrate bridge is on (`LAMP_DEVICES=on`, #7470,
+    /// `crate::devices`): the session looks at it each tick only then.
+    fn devices_on(&self) -> bool {
+        false
+    }
+    /// The bridge's tick at `now_ms`: the voice's asks taken off the bus,
+    /// what is due to go up, and the answers put back. Nothing when off.
+    fn devices(&mut self, _now_ms: u64, _connected: bool) -> crate::devices::Polled {
+        crate::devices::Polled::default()
+    }
+    /// One `devices.*` kind from the cloud: whether the bridge took it
+    /// (always `false` when off, so the kind is refused as any unknown one).
+    fn devices_down(&mut self, _kind: &str, _data: &Value, _now_ms: u64) -> bool {
+        false
+    }
     /// Health and crash reports (#1683, `crate::reports`): there only with
     /// `LAMP_CLOUD=on` and `LAMP_REPORTS=on`.
     fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {

@@ -354,6 +354,8 @@ fn main() -> ExitCode {
         // The owner's dev monitor (#5883): only with LAMP_APP_MONITOR=on and
         // LAMP_SETTINGS_CHANGE=on, each link sealed to this lamp's device id.
         monitor: lamp_cloud::monitor::Place::from_environment(&account.device_id),
+        // The owner's desk and Hydrate bottles (#7470): only with LAMP_DEVICES=on.
+        devices: lamp_cloud::devices::on_from_environment().then(Default::default),
     };
     // `can` names skills.make only while lamp-voice's maker has a computer (fourteen-P15).
     if let Some(socket) = &lamp.make_skill {
@@ -408,6 +410,7 @@ fn main() -> ExitCode {
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
     };
