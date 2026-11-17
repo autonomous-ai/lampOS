@@ -947,13 +947,16 @@ rest by itself and then stands as ever:
 5. **A stop holds; nothing falls.** A load, tracking, status or drift stop
    inside the recovery holds all five where they are, torque kept on
    (`kept_holding` in the report). With the arm raised the run stays up: it
-   says `ARM_HELD`, gives way to a hand on the arm and follows it, and starts
-   again once the arm is folded and still. The head is watched meanwhile: a
+   says `ARM_HELD`, holds the arm **softly** (its force `GIVE_WAY_FORCE`,
+   12%, from the first read of the wait) so that a hand can move it and, if
+   its weight pulls, it sinks slowly instead of locking or falling, follows
+   the hand (held again where the hand takes it), and starts again once the
+   arm is folded and still, the run's force put back first. It is soft from
+   the start, not after a push: on lamp-4ace (16 Nov) a hand could not move
+   an arm held at 30%, and the push was never felt as load, so the lamp
+   waited for a hand that could not come. The head is watched meanwhile: a
    head joint pushed over its load bound stops pushing, held where it is; a
-   hot one is let go (it falls at most onto the arm); the arm is kept. A held
-   arm that reaches 62 degrees, or that nobody has folded by `WAIT_ASKING`
-   (10 min), is let down slowly: its force drops to `GIVE_WAY_FORCE` (12%)
-   and stays there, so it sinks under its own weight. With the arm already
+   hot one is let go (it falls at most onto the arm), once. With the arm already
    resting the run ends held, as before, and systemd's start limit bounds
    the retries. The base and the roll keep inside one turn by their own
    stored limits; a head or base joint found more than half a turn from
@@ -966,20 +969,19 @@ rest by itself and then stands as ever:
    shoulder pushed far back; the shoulder 167 with the arm back past its
    stand). A position-mode goal across that seam would drive it the long way
    round, through the arm, so it is never given one. The lamp holds the arm
-   where it lies, says `ARM_WRAPPED`, and waits for a hand: a joint carried
-   off its goal is held again where it is (`WRAP_FOLLOW`, a goal step at a
-   time); one pushed over `GIVE_WAY_LOAD` for two reads without moving has its
-   force lowered to `GIVE_WAY_FORCE` so the hand can move it, put back once the
-   load eases. A read that jumps the short way round the seam, within the
-   same reach a read is judged by, is the seam crossed, not a bad read; it
-   is taken once a second read agrees. On the first read across, the
-   joint's force drops to `GIVE_WAY_FORCE` at once and stays there while
-   the goal in the register is across the seam from the read, and for
-   `GIVE_WAY_EASED_READS` reads after; on the read that confirms the
-   crossing the joint is held where it reads, and that hold is trusted at
-   once (`crossed`): a goal left across the seam would drive the joint the
-   long way the moment the hand let go. A head joint let go for heat while
-   the arm is held is let go once. Folded and still for a second, it takes hold and starts; the
+   where it lies, softly (`GIVE_WAY_FORCE`, as in 5), says `ARM_WRAPPED`,
+   and waits for a hand: a joint carried off its goal is held again where it
+   is (`WRAP_FOLLOW`, a goal step at a time). A read that jumps the short
+   way round the seam, within the same reach a read is judged by, is the
+   seam crossed, not a bad read; it is taken once a second read agrees. On
+   the read that confirms the crossing the joint is held where it reads, and
+   that hold is trusted at once (`crossed`): a goal left across the seam
+   would drive the joint the long way the moment the hand let go. (Under
+   `--give-way` outside this wait, a joint pushed over `GIVE_WAY_LOAD` for
+   two reads has its force lowered to `GIVE_WAY_FORCE` and put back once the
+   load eases; a first read across the seam keeps it lowered while the
+   register's goal is across, and for `GIVE_WAY_EASED_READS` reads after.)
+   Folded and still for a second, it takes hold and starts; the
    head and the base then wake home from anywhere, as after a fold.
    Multi-turn self-recovery (angle limits 0/0) is not done: a later
    `--recover-wrap` may add it after a bench proof.

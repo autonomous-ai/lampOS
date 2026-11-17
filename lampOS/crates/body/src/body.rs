@@ -4649,14 +4649,35 @@ fn wait_in_range<P: PortIo, R: Runtime>(
     // over `GIVE_WAY_LOAD`, whether its force is lowered now, and reads in
     // a row its load has eased since.
     let (mut pushed, mut yielding, mut eased) = ([0u8; 2], [false; 2], [0u8; 2]);
-    // Reads in a row a held arm joint has been at `Standing::TEMPERATURE`,
-    // and whether the arm has been let down slowly for it.
-    let (mut arm_hot, mut let_down) = (0u8, false);
     // Steps in a row a commanded joint still held (a head tipped up,
     // #2938) has read over its load bound, and at its temperature bound.
     let (mut held_over, mut held_hot) = ([0u8; 3], [0u8; 3]);
     // Head joints let go for heat while the arm is held (`follow_arm`).
     let mut let_go: Vec<Joint> = Vec::new();
+    // A held arm is held softly from the first read (#5693): its force is
+    // `GIVE_WAY_FORCE` for the whole wait, so a hand can move it and, if
+    // its weight pulls, it sinks slowly instead of locking or falling. On
+    // lamp-4ace (16 Nov) a hand could not move an arm held at 300, and
+    // the push was never felt as load, so the lamp waited for a hand that
+    // could not come. `follow_hand` holds it where the hand takes it; the
+    // run's force goes back before the arm is taken hold of.
+    let soft_arm = wait.follow_arm && wait.follow_force.is_some();
+    let soften = |bus: &mut Bus<'_, P, R>, report: &mut BodyReport| {
+        for joint in ARM {
+            if bus
+                .write_acknowledged(joint, &force_write(joint, GIVE_WAY_FORCE), true)
+                .is_ok()
+            {
+                report.force_writes += 1;
+            }
+        }
+        eprintln!(
+            "lamp-body: the held arm is held softly at force {GIVE_WAY_FORCE}, so that a hand can move it"
+        );
+    };
+    if soft_arm {
+        soften(bus, report);
+    }
     loop {
         let late = bus.runtime.now() >= asked_since + WAIT_ASKING;
         let (every, say) = if late {
@@ -4748,46 +4769,14 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                         });
                     }
                 }
-                // A held arm too warm (`Standing::TEMPERATURE`), or one
-                // nobody has folded by `WAIT_ASKING`, is let down slowly:
-                // its force drops to `GIVE_WAY_FORCE` and stays there, so it
-                // sinks under its own weight instead of holding on hot or
-                // for good (the Reviewer-lead on #6836).
-                if wait.follow_arm && wait.follow_force.is_some() && !let_down {
-                    let hot = ARM
-                        .iter()
-                        .any(|joint| now[joint.index()].temperature >= Standing::TEMPERATURE);
-                    arm_hot = if hot { arm_hot.saturating_add(1) } else { 0 };
-                    if arm_hot >= limits.temperature_steps.max(1) || late {
-                        for joint in ARM {
-                            if bus
-                                .write_acknowledged(
-                                    joint,
-                                    &force_write(joint, GIVE_WAY_FORCE),
-                                    true,
-                                )
-                                .is_ok()
-                            {
-                                report.force_writes += 1;
-                            }
-                        }
-                        let_down = true;
-                        eprintln!(
-                            "lamp-body: the held arm is let down slowly at force {GIVE_WAY_FORCE} ({})",
-                            if late {
-                                "nobody folded it"
-                            } else {
-                                "it is too warm"
-                            }
-                        );
-                    }
-                }
                 let pose = COMMANDED.map(|joint| now[joint.index()].position);
                 if wait.follow_arm {
+                    // The arm is soft already (`soft_arm`): `follow_hand`
+                    // only follows the hand, it does not work the force.
                     follow_hand(
                         bus,
                         report,
-                        if let_down { None } else { wait.follow_force },
+                        if soft_arm { None } else { wait.follow_force },
                         &now,
                         pose,
                         (&mut pushed, &mut yielding, &mut eased),
@@ -4817,11 +4806,11 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                     });
                 in_range = if inside { in_range + 1 } else { 0 };
                 if in_range >= IN_RANGE_READS && !bus.runtime.recovery_inhibited() {
-                    // The force a yielding joint was lowered to goes back
-                    // before the run takes the arm as its own.
+                    // The force a soft or yielding joint was lowered to goes
+                    // back before the run takes the arm as its own.
                     if let Some(force) = wait.follow_force {
                         for (index, joint) in ARM.iter().enumerate() {
-                            if yielding[index]
+                            if (soft_arm || yielding[index])
                                 && bus
                                     .write_acknowledged(*joint, &force_write(*joint, force), true)
                                     .is_ok()
@@ -4833,10 +4822,14 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                     }
                     match take_hold(bus, report, &wait.joints, &now) {
                         Ok(_) => return Ok(()),
-                        // Let go again, and waited for again.
+                        // Let go again, and waited for again; a soft arm
+                        // is soft again.
                         Err(_) => {
                             holding = wait.joints.clone();
                             in_range = 0;
+                            if soft_arm {
+                                soften(bus, report);
+                            }
                         }
                     }
                 }

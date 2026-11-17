@@ -19025,12 +19025,12 @@ fn a_wrapped_arm_is_held_asked_for_and_stands_once_a_hand_folds_it() {
     }
 }
 
-/// A hand pushing the held, wrapped arm without moving it (the elbow's load
-/// over `GIVE_WAY_LOAD` from 10 s): its force limit is lowered to
-/// `GIVE_WAY_FORCE` so the hand can move it, and put back once the load has
-/// eased; torque is never written off.
+/// A held, wrapped arm is soft from the first read of its wait: its force
+/// limit is `GIVE_WAY_FORCE` so a hand can move it, not lowered only once
+/// a push is felt (a hand pushing without moving it, the elbow's load over
+/// `GIVE_WAY_LOAD` from 10 s, changes nothing); torque is never written off.
 #[test]
-fn a_held_wrapped_arm_gives_way_to_a_hand_that_pushes_it() {
+fn a_held_wrapped_arm_is_soft_for_a_hand_from_the_start() {
     let found = [2_035, 3_441, 218, 2_035, 2_478];
     let powered = powered_up(found, |lamp| {
         lamp.strains
@@ -19043,9 +19043,12 @@ fn a_held_wrapped_arm_gives_way_to_a_hand_that_pushes_it() {
         .filter(|(id, address, _)| *id == 3 && *address == 48)
         .map(|(id, _, bytes)| (*id, u16::from_le_bytes([bytes[0], bytes[1]])))
         .collect();
+    // The run's force first, then soft for the whole wait (lamp-4ace, 16
+    // Nov: a hand could not move an arm held at 300); a push changes
+    // nothing, and nothing puts the force back while the arm waits.
     assert_eq!(
         force,
-        vec![(3, 600), (3, GIVE_WAY_FORCE), (3, 600)],
+        vec![(3, 600), (3, GIVE_WAY_FORCE)],
         "{:?}",
         lamp.registers
     );
