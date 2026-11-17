@@ -1153,6 +1153,11 @@ pub fn run_write_waiting(folder: &Path) -> Option<crate::run_write_yes::RunWrite
 pub fn forget_waiting() {
     // So do the events a calendar read kept (`LAMP_SERVICE_READ_IDS_KEPT`).
     crate::service_read_ids::forget();
+    // And an ask with the lamp's agent, its answer never told, and
+    // cancelled if it already waits to be said (`agent_asks`; Heron's P2 4
+    // on #7509): every caller of this, the thread's forget, memory's and a
+    // privacy change, drops it.
+    crate::agent_asks::forget();
     if kept::pending(Option::take).is_some() {
         eprintln!("lamp-voice: a waiting write is dropped: forgotten, or a privacy change");
     }
@@ -2268,10 +2273,13 @@ pub fn run(
     // held, on the second route alone; the voice reads nothing itself, and
     // its model says one holding line.
     if call.name == READ && judge.is_some() && crate::agent_asks::services_on() {
-        let whole = said_whole(private_room, seen_owner, owner_alone, || {
-            owner_likeness(judge.as_ref(), request, owner.as_deref())
-        });
-        return (read_by_agent(&call, request, whole, now), true);
+        let whole = || {
+            said_whole(private_room, seen_owner, owner_alone, || {
+                owner_likeness(judge.as_ref(), request, owner.as_deref())
+            })
+        };
+        let linked = || linked_codes(folder);
+        return (read_by_agent(&call, request, linked, whole, now), true);
     }
     // A mail's names filled in from the owner's saved contacts, before it
     // is prepared (`LAMP_SERVICE_CONTACTS`): the read-back says the
@@ -2386,10 +2394,41 @@ pub fn read_grant(service: &str) -> Option<String> {
 /// with the reads handed to the agent.
 pub const NO_SUCH_SERVICE: &str = "Not done: that is not one of the services the lamp knows. Call services_connected and ask again with one it names.";
 
+/// What the model is told of a read the voice would cut for someone maybe
+/// in view, with the reads handed to the agent: nothing of it is read or
+/// told until the owner asks again on their own (Heron's P2 1 on #7509:
+/// the agent's words can't be cut to who and what about in code, as
+/// [`brief`] cuts the voice's own read).
+pub const NOT_ALONE_READ: &str = "Not read: I can't tell the lamp's owner is on their own and asking (someone else may be in view, or I couldn't see or hear it was them), so nothing of it is read now. Say so in a few words; they can ask again on their own, facing the lamp.";
+
+/// Whether `service`'s read grant code is among the `linked` codes
+/// (`services_connected`'s): a linked pair's code as its service's
+/// (`gmail-app` as `gmail`), as [`read_grant`] names them.
+fn linked_among(service: &str, linked: &[String]) -> bool {
+    let code = |name: &str| {
+        name.strip_suffix("-app")
+            .or_else(|| name.strip_suffix("-api"))
+            .unwrap_or(name)
+            .to_owned()
+    };
+    let asked = code(service);
+    linked.iter().any(|linked| code(linked) == asked)
+}
+
 /// A read gated through, handed to the lamp's agent with its service's
 /// read grant ([`crate::agent_asks::hand`]): the person's words heard in
-/// `request` and what the model asked for, told brief unless `whole`.
-fn read_by_agent(call: &ToolCall, request: u64, whole: bool, now: Instant) -> Value {
+/// `request` and what the model asked for. Only a known service, linked
+/// (`linked`, `services_connected`'s codes; unknown, it is handed over),
+/// and a read told in full (`whole`, [`said_whole`]): told then only while
+/// the owner is still seen alone. Handed over, it is a read of `request`
+/// as the voice's own is ([`after_read`], `Thread::private_for`).
+fn read_by_agent(
+    call: &ToolCall,
+    request: u64,
+    linked: impl FnOnce() -> Option<Vec<String>>,
+    whole: impl FnOnce() -> bool,
+    now: Instant,
+) -> Value {
     let service = call
         .args
         .get("service")
@@ -2398,6 +2437,21 @@ fn read_by_agent(call: &ToolCall, request: u64, whole: bool, now: Instant) -> Va
     let Some(grant) = read_grant(service) else {
         return json!({ "error": NO_SUCH_SERVICE });
     };
+    // An unlinked service is told so, as lamp-services tells the voice's
+    // own read (Heron's P3 on #7509).
+    if linked().is_some_and(|linked| !linked_among(service, &linked)) {
+        let name = lamp_services::catalog::service(service).map_or(service, |known| known.name);
+        eprintln!(
+            "lamp-voice: request {request}: a read of {service}: not linked; not handed to the lamp's agent"
+        );
+        return json!({ "error": format!("{name} {}", lamp_services::serve::NOT_LINKED) });
+    }
+    if !whole() {
+        eprintln!(
+            "lamp-voice: request {request}: a read of {service} can't be told in full here: not handed to the lamp's agent"
+        );
+        return json!({ "error": NOT_ALONE_READ });
+    }
     let heard = crate::thread::THREAD
         .lock()
         .ok()
@@ -2407,17 +2461,21 @@ fn read_by_agent(call: &ToolCall, request: u64, whole: bool, now: Instant) -> Va
     let told = crate::agent_asks::hand(crate::agent_asks::Asked {
         ask: crate::agent_asks::ask_words(heard.as_deref(), Some(&model)),
         grants: vec![grant],
-        brief: !whole,
-        whole_read: whole,
+        owner_alone: true,
     });
+    let taken = told.get("error").is_none();
     eprintln!(
         "lamp-voice: request {request}: a read of {service} handed to the lamp's agent{}",
-        if told.get("error").is_some() {
-            ": not taken"
-        } else {
-            ""
-        }
+        if taken { "" } else { ": not taken" }
     );
+    // What follows the voice's own read (Heron's P2 8 on #7509): nothing
+    // else runs in this request, and it is kept out of the summary.
+    if taken {
+        read_answered(request);
+        if let Ok(mut thread) = crate::thread::THREAD.lock() {
+            thread.private_for(request);
+        }
+    }
     told
 }
 
@@ -5061,19 +5119,27 @@ mod tests {
         });
         crate::agent_asks::set_tasks_dir(tasks.clone());
         crate::agent_asks::set_on_here(Some((true, false)));
-        let (folder, calls) = services_saying("to-agent-on", quoted);
+        // lamp-services says only what is linked: Gmail, by its other name.
+        let (folder, calls) = services_saying(
+            "to-agent-on",
+            json!({"connected":[{"service":"gmail","name":"Gmail"}]}),
+        );
         let (told, answered) = run(&folder, &read, 7_302, true, None);
         assert!(answered, "{told}");
         assert_eq!(told["handed_to_agent"], true, "{told}");
         assert_eq!(told["next"], crate::agent_asks::HOLDING_NEXT, "{told}");
-        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+        // Asked what is linked, never read by the voice.
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
         let line = seen
             .recv_timeout(std::time::Duration::from_secs(5))
             .unwrap();
         assert_eq!(line["op"], "voice_ask");
         assert_eq!(line["grants"], json!(["gmail-read"]));
-        // The private room reads in full.
-        assert_eq!(line["brief"], false);
+        // No brief read is ever asked (Heron's P2 1 on #7509).
+        assert!(line.get("brief").is_none(), "{line}");
+        // What follows the voice's own read follows it too (P2 8): nothing
+        // else runs in the request.
+        assert!(after_read(7_302));
         // A read the gate refuses (not heard live) is refused, not handed.
         let (told, _) = run(&folder, &read, 7_303, false, None);
         assert_eq!(told["error"], NOT_HEARD, "{told}");
@@ -5088,8 +5154,39 @@ mod tests {
         );
         assert_eq!(read_grant("figma-api").as_deref(), Some("figma-read"));
         assert_eq!(read_grant("nothing"), None);
+        // Not linked (Heron's P3): told so as lamp-services tells it, by
+        // its catalog name, and nothing handed over.
+        let now = Instant::now();
+        let not_linked = read_by_agent(&read, 7_304, || Some(vec!["github".into()]), || true, now);
+        assert_eq!(
+            not_linked["error"],
+            format!(
+                "Gmail with Google sign-in {}",
+                lamp_services::serve::NOT_LINKED
+            ),
+            "{not_linked}"
+        );
+        assert!(!after_read(7_304));
+        assert!(linked_among("gmail-app", &["gmail".into()]));
+        assert!(linked_among("figma", &["figma-api".into()]));
+        assert!(!linked_among("gmail", &["github".into()]));
+        // A read that would be cut for someone maybe in view (P2 1): not
+        // handed over at all, and nothing of it told.
+        let in_company = read_by_agent(&read, 7_305, || None, || false, now);
+        assert_eq!(in_company["error"], NOT_ALONE_READ, "{in_company}");
+        assert!(!after_read(7_305));
         std::fs::remove_dir_all(folder).unwrap();
         let _ = std::fs::remove_dir_all(tasks);
+    }
+
+    /// Heron's P2 4 on #7509: whatever drops the waiting write (the
+    /// thread's forget, memory's, a privacy change) drops an ask with the
+    /// lamp's agent too.
+    #[test]
+    fn a_forget_drops_an_ask_with_the_lamps_agent() {
+        let before = crate::agent_asks::forgets();
+        forget_waiting();
+        assert_eq!(crate::agent_asks::forgets(), before + 1);
     }
 
     /// The private room (P2 on #5569): the second route still prepares a
