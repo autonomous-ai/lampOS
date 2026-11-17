@@ -186,6 +186,13 @@ mod tests {
             // Says why they stop it: answered as said ("Sure, take your
             // time."), not with the set "Okay, I'll stop.".
             ("Hold on, I'm thinking.", ASKED_MORE),
+            // A question after the stop is answered (#7613, the reviewer's
+            // HOLD).
+            ("Wait, is there a story?", ASKED_MORE),
+            ("Wait, is that the one?", ASKED_MORE),
+            ("Hold on, is that it?", ASKED_MORE),
+            ("Wait, is it now?", ASKED_MORE),
+            ("Wait, is there one?", ASKED_MORE),
             ("Hold on.", NOTE),
             ("Wait, wait.", NOTE),
             ("Wait a sec.", NOTE),

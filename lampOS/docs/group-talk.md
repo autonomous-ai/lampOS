@@ -246,7 +246,10 @@ everything `on` does, and:
   nothing more that asks. That covers "Stop.", "Okay, stop it, please.",
   "Hold on.", "Wait." and, with the lamp's name or a short time, "Hold on
   a second, Lamp." and "Wait a sec." (`WITH_A_STOP`; the second route's
-  cut-in note reads a bare stop by the same predicate, #7285). The sound is let go and never asked of the model,
+  cut-in note reads a bare stop by the same predicate, #7285). A line
+  that ends in "?", or has a question word (is, what, can, …) after its
+  first stop word, asks and takes the turn: "Wait, is there a story?",
+  "Hold on, is that it" (#7613). The sound is let go and never asked of the model,
   and the answer it waits for is stopped on the next pass, as a stop said
   over the lamp's speech stops it (`hand_control_cancel` with
   `spoken_stop`). It's recorded as `input_let_go_answer_waits` with `why:
