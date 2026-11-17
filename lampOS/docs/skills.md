@@ -4387,6 +4387,37 @@ and put on. Any other turn claiming a make with no call is still held. Test:
 `second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`,
 `a_not_made_notes_made_claim_is_held`.
 
+A skill said removed, turned off or on, or made with no call behind it is
+never said either (`LAMP_ACTION_CLAIM_SKILLS=on`, #7587; on in the product's
+`lamp-voice.service`, and nothing without `LAMP_ACTION_CLAIM_CHECKED`). On
+lamp-9adf "remove the moon time skill" was heard as "… moon time scale" and
+answered "Moon time is removed." with no `make_skill` call, and after a failed
+make "CloudFact is removed." with none: both skills stayed. With the switch, a
+reply that opens, bare or after a lead-in, with a skill's state said in the
+model's words (`action_claim::SKILL_SAID`): a name of at most three words
+removed, deleted or uninstalled, or turned or switched off or on ("Moon time
+is removed.", "CloudFact has been deleted."), a skill so named said removed,
+off, on or made ("The moon time skill is off now."), or the lamp saying it did
+so ("I removed the moon time skill.", "I've turned off the CloudFact skill."),
+closing at its sentence's end and never on a '?', is held like any claimed
+action: asked once more with the same note, then said as "Sorry, I didn't do
+that. Could you ask me again?". One that says "skill" stands beside any
+`make_skill` call in the turn, whether it removed (`{"remove": NAME}`), turned
+off or on (`turn_off`, `turn_on`) or made, since their outcomes are told in
+the model's own words (`made_remove.rs`, `made_turn.rs`); the call isn't
+matched to the kind said. One that names no skill ("Moon time is removed.")
+stands beside any call, as a reminder cancelled may be said removed too. A
+remove's yes is its own `make_skill` call with the `approve_id`, so the
+removed line after it stands. Like the worded claims it never judges a line
+the person asked as a question, whose reply may tell a true state. "You have
+three skills.", "I can make a skill for that." and "CloudFact was never
+actually made." are no claims. Only English replies are read, and only the
+reply's opening sentence. Tests:
+`action_claim::tests::a_skill_said_removed_with_no_make_is_a_claim`,
+`talk_about_skills_is_no_skill_claim`,
+`second_provider::tests::action_claim::a_skill_said_removed_with_no_make_is_asked_again_then_not_done`,
+`a_skill_change_beside_its_make_and_talk_about_skills_are_said_as_they_came`.
+
 A made skill with code of its own that is not on is never said to be on
 (`LAMP_MADE_NOT_ON_TOLD=on`, #7270; off unless set, in no unit;
 `crate::made_not_on`). On lamp-9adf (16 Nov, build 13383) a voice make the

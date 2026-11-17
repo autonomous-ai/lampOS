@@ -2707,6 +2707,24 @@ fn the_product_never_says_an_action_no_call_made() {
     );
 }
 
+/// A reply saying a skill was removed, turned off or on, or made with no
+/// `make_skill` call is never said as it is (`LAMP_ACTION_CLAIM_SKILLS`,
+/// #7587): on lamp-9adf "Moon time is removed." and "CloudFact is
+/// removed." came with no call, and both skills stayed.
+#[test]
+fn the_product_never_says_a_skill_change_no_call_made() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_ACTION_CLAIM_SKILLS=on"),
+        "the voice lacks LAMP_ACTION_CLAIM_SKILLS"
+    );
+}
+
 /// A line that is only an installed skill's name said plainly ("photo
 /// booth", "run photo booth") calls that skill in code as round 1
 /// (`LAMP_SKILL_NAMED`, #6772, #6782): on lamp-52e6 at 12587 (13 Nov)

@@ -1763,6 +1763,8 @@ struct Shared {
     made_not_on: bool,
     /// [`Engine::checking_doing_claims`] (#7285).
     doing_claims: bool,
+    /// [`Engine::checking_skill_claims`] (#7587).
+    skill_claims: bool,
     /// With the make's one run path ([`Engine::waiting_on_one_path`],
     /// #7371): how long after its waiting line a make with no answer yet
     /// says [`crate::make_skill_agent::LONG_WAIT_LINE`], once; none is
@@ -4722,6 +4724,7 @@ impl Engine {
                 worded_claims: false,
                 made_not_on: false,
                 doing_claims: false,
+                skill_claims: false,
                 one_path_wait: None,
                 no_words_again: false,
                 answer_again: false,
@@ -6024,6 +6027,20 @@ impl Engine {
     pub fn checking_doing_claims(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.doing_claims = on;
+        }
+        self
+    }
+
+    /// `LAMP_ACTION_CLAIM_SKILLS=on` ([`crate::action_claim::skill_claim`],
+    /// #7587), beside [`Engine::checking_action_claims`]: a reply that says
+    /// a skill was removed, turned off or on, or made in the model's words
+    /// ("Moon time is removed.") is held and judged as a claim: with no
+    /// `make_skill` in the turn (or, naming no skill, no call at all) asked
+    /// again once, then said not done. Never on a line the person asked as
+    /// a question. Nothing without the claim check. Before any turn only.
+    pub fn checking_skill_claims(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.skill_claims = on;
         }
         self
     }
@@ -16031,6 +16048,10 @@ async fn answer(
     // Whether a light act told as under way is a claim (#7285,
     // `LAMP_ACTION_CLAIM_DOING`): read from the reply alone.
     let doing_turn = shared.doing_claims;
+    // Whether a skill's state said is a claim (#7587,
+    // `LAMP_ACTION_CLAIM_SKILLS`): never on a line asked as a question,
+    // whose reply may tell a true state ("Moon time is off.").
+    let skills_turn = shared.skill_claims && !crate::action_claim::asked_as_a_question(&said);
     // Whether the line asks to read something back: then a `list_reminders`
     // may back a time a worded claim says (the Reviewer-lead's P2 on #5737).
     let read_asked = crate::action_claim::worded_as_a_question(&said);
@@ -17324,6 +17345,7 @@ async fn answer(
                                     worded_turn,
                                     forget_turn,
                                     doing_turn,
+                                    skills_turn,
                                 ) {
                                     Some(None) => action_held.take().unwrap_or_default(),
                                     Some(Some(kind))
@@ -17965,6 +17987,7 @@ async fn answer(
                     worded_turn,
                     forget_turn,
                     doing_turn,
+                    skills_turn,
                 )
                 .flatten()
                 .filter(|kind| {
@@ -18010,7 +18033,9 @@ async fn answer(
                 // said that none of them carried, a kept light's always (the
                 // first builder's ruling on #5215): its note says so, never
                 // that nothing ran.
+                let skill_said = unmade == Some(crate::action_claim::Claim::Skill);
                 let limited = !forget_said
+                    && !skill_said
                     && unmade.is_some_and(|kind| {
                         kind == crate::action_claim::Claim::LightKept
                             || crate::action_claim::worded_limit(&held).is_some()
@@ -18019,6 +18044,8 @@ async fn answer(
                 // Whether only the worded claims found it: the journal says so.
                 let worded = if limited {
                     ", in other words: LAMP_ACTION_CLAIM_WORDED, a said limit no call carried"
+                } else if skill_said {
+                    ", a skill's state said: LAMP_ACTION_CLAIM_SKILLS"
                 } else if doing_turn
                     && !forget_said
                     && crate::action_claim::claim_as(&held, true, worded_turn)

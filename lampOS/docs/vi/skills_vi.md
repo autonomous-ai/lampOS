@@ -1543,6 +1543,38 @@ lại. Kiểm thử:
 `second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`,
 `a_not_made_notes_made_claim_is_held`.
 
+Một câu nói kỹ năng đã bị gỡ, tắt, bật hay đã tạo mà không có lời gọi nào
+đứng sau cũng không bao giờ được nói (`LAMP_ACTION_CLAIM_SKILLS=on`, #7587;
+bật trong `lamp-voice.service` của sản phẩm, và không làm gì nếu thiếu
+`LAMP_ACTION_CLAIM_CHECKED`). Trên lamp-9adf câu "remove the moon time skill"
+bị nghe thành "… moon time scale" và được đáp "Moon time is removed." mà không
+có lời gọi `make_skill`, và sau một lần tạo thất bại thì "CloudFact is
+removed." cũng không có lời gọi nào: cả hai kỹ năng vẫn còn. Khi bật công tắc,
+câu trả lời mở đầu, trần hoặc sau một lời dẫn, bằng trạng thái của một kỹ năng
+nói theo lời của mô hình (`action_claim::SKILL_SAID`): một cái tên tối đa ba từ
+bị gỡ, xoá hay gỡ cài đặt, hoặc được tắt hay bật ("Moon time is removed.",
+"CloudFact has been deleted."), một kỹ năng gọi rõ là "skill" được nói là đã
+gỡ, tắt, bật hay đã tạo ("The moon time skill is off now."), hoặc đèn nói
+mình đã làm vậy ("I removed the moon time skill.", "I've turned off the
+CloudFact skill."), kết thúc ở cuối câu và không bao giờ với dấu '?', bị giữ
+lại như mọi hành động được nói là đã làm: mô hình được hỏi lại một lần với
+cùng ghi chú, rồi đèn nói "Sorry, I didn't do that. Could you ask me again?".
+Câu có chữ "skill" chỉ đứng được khi trong lượt có bất kỳ lời gọi `make_skill`
+nào, dù là gỡ (`{"remove": NAME}`), tắt hay bật (`turn_off`, `turn_on`) hay
+tạo, vì kết quả của chúng được nói bằng lời của mô hình (`made_remove.rs`,
+`made_turn.rs`); lời gọi không được so với loại được nói. Câu không gọi tên
+kỹ năng nào ("Moon time is removed.") đứng được bên cạnh bất kỳ lời gọi nào,
+vì một lời nhắc bị huỷ cũng có thể được nói là đã gỡ. Lời đồng ý gỡ là chính
+lời gọi `make_skill` có `approve_id`, nên câu "đã gỡ" sau đó được nói. Như các
+lời nói theo cách riêng, nó không bao giờ xét một câu người dùng hỏi dạng câu
+hỏi, vì câu trả lời có thể kể một trạng thái đúng. "You have three skills.",
+"I can make a skill for that." và "CloudFact was never actually made." không
+phải lời nói đã làm. Chỉ đọc câu trả lời tiếng Anh, và chỉ câu mở đầu. Kiểm
+thử: `action_claim::tests::a_skill_said_removed_with_no_make_is_a_claim`,
+`talk_about_skills_is_no_skill_claim`,
+`second_provider::tests::action_claim::a_skill_said_removed_with_no_make_is_asked_again_then_not_done`,
+`a_skill_change_beside_its_make_and_talk_about_skills_are_said_as_they_came`.
+
 Một kỹ năng tự tạo có code riêng mà chưa bật thì không bao giờ được nói là đã
 bật (`LAMP_MADE_NOT_ON_TOLD=on`, #7270; tắt trừ khi được đặt, không có trong
 unit nào; `crate::made_not_on`). Trên lamp-9adf (16/11, bản 13383) một lần tạo

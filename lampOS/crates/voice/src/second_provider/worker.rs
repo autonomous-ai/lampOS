@@ -4344,6 +4344,21 @@ pub fn serve(
         );
     }
     engine = engine.checking_doing_claims(action_claims && doing_claims);
+    // And a skill said removed, turned off or on, or made with no call
+    // behind it ("Moon time is removed."; `LAMP_ACTION_CLAIM_SKILLS=on`,
+    // #7587), only beside the check above.
+    let skill_claims = crate::action_claim::skills_on();
+    if skill_claims {
+        eprintln!(
+            "{}",
+            if action_claims {
+                "lamp-voice second: a reply saying a skill was removed, turned off or on, or made with no call is held the same way (LAMP_ACTION_CLAIM_SKILLS)"
+            } else {
+                "lamp-voice second: LAMP_ACTION_CLAIM_SKILLS does nothing without LAMP_ACTION_CLAIM_CHECKED"
+            }
+        );
+    }
+    engine = engine.checking_skill_claims(action_claims && skill_claims);
     engine = engine.waiting_on_one_path(
         crate::make_skill_agent::one_path_on().then_some(crate::make_skill_agent::LONG_WAIT_AFTER),
     );
