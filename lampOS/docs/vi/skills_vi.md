@@ -1715,8 +1715,8 @@ hàm giọng nói đã có, như việc gỡ. Một câu xin điều nào là do
 đoán, không bao giờ theo danh sách từ: câu cuối của mô tả hàm thành "To
 turn off, pause or stop one they made: turn_off alone, never remove; back
 on: turn_on; delete: remove; run now: run; list: made; say nothing first."
-(`make_skill_local::TURN_OFF_TOLD`, cùng số byte với câu nó thay, nên khi
-bật mọi công tắc vẫn nằm trong 1.024 byte của liên kết), tham số
+(`make_skill_local::TURN_OFF_TOLD`, 151 byte so với 149 byte của câu nó
+thay, nên khi bật mọi công tắc vẫn nằm trong 1.024 byte của liên kết), tham số
 `turn_off` nói "turn off, pause or stop a skill they made, which keeps it
 to turn back on ... Never remove for this", và tham số `remove` nói "delete
 or remove a skill for good, never to turn one off, pause or stop it". Lời
@@ -1744,7 +1744,11 @@ thành gỡ. Sau đó, trong code (`made_turn::asked`):
   hoặc rằng NAME đã bật lại. Một lần bị từ chối được nói là không tắt/bật,
   và vì sao.
 - **Gỡ vẫn hỏi trước.** "Remove coffee time?" và câu "có" của chủ đèn, như
-  ở trên (#6960).
+  ở trên (#6960). Một lần tắt hay bật chính kỹ năng đó bỏ việc gỡ của nó
+  còn đang chờ (`skill_write_yes::drop_remove_of`), dù có tắt/bật được hay
+  không: "Remove coffee time?", "no, just turn it off" không để lại ghi chú
+  chờ nào nêu tên nó, và một câu "có" sau đó không gỡ gì. Việc gỡ một kỹ
+  năng khác vẫn giữ.
 - **Không thêm vòng gọi nào.** Việc khớp đọc hai thư mục cục bộ, rồi một
   dòng tới helper quản lý qua socket cục bộ của nó, tối đa 8 giây.
 
@@ -1757,7 +1761,10 @@ Kiểm thử: `made_turn::tests::turn_off_sets_the_off_state_and_removes_nothing
 `only_their_own_made_skill_on_the_lamp_is_turned`,
 `a_refusal_is_said_not_turned`, `switch_off_is_byte_for_byte_as_before`,
 `switch_on_tells_a_turn_off_from_a_remove_within_the_bounds`,
-`remove_still_waits_for_its_yes`; và
+`remove_still_waits_for_its_yes`, `a_turn_drops_a_remove_of_the_same_skill`,
+`switch_on_a_turn_call_is_routed_as_a_turn` và
+`switch_on_a_turn_off_with_a_remove_is_a_turn_off` (qua
+`make_skill_local::answer`); và
 `made::a_made_skill_is_turned_off_and_on_by_voice_as_the_apps_switch` của
 lamp-skills, qua helper quản lý thật.
 
