@@ -98,7 +98,8 @@ pub fn on(value: Option<&str>) -> bool {
 /// environment: `on` exactly ([`on`]), and only with [`SWITCH`] on. On,
 /// and Harness keeping program sessions (`harness capabilities`), the pane
 /// is the lamp's own kept session: opened with `harness ensure`, typed into
-/// with an acknowledged `reply`, closed with `close --forget`. Else, or off,
+/// with an acknowledged `reply`, closed with `close` and its OpenClaw
+/// session deleted. Else, or off,
 /// the pane is as before.
 pub const KEPT_SWITCH: &str = "LAMP_TASKS_KEPT_SESSION";
 /// The kept session's token file, in lamp-tasks' state folder: 0600, this
@@ -288,7 +289,8 @@ pub trait PaneHarness {
     ) -> Result<Option<String>, String> {
         Err("unsupported".into())
     }
-    /// `harness close --forget` of it ([`Cli::close_kept`]).
+    /// `harness close` of it with the token ([`Cli::close_kept`]); its
+    /// conversation stays in the engine's store.
     fn close_kept(&self, _name: &str, _token: &Path) -> Result<(), String> {
         Err("unsupported".into())
     }
@@ -375,6 +377,9 @@ struct Pane {
     /// The input the kept session last took (`harness reply`'s `inputId`),
     /// for `harness wait --after`.
     input: Option<String>,
+    /// The kept session's engine session (`harness ensure`'s
+    /// `engineSession`), deleted from OpenClaw's store when it is closed.
+    session: Option<String>,
 }
 impl Pane {
     fn new(agent: &str, place: &Place, kept: bool) -> Self {
@@ -385,6 +390,7 @@ impl Pane {
             tokens: 0,
             kept,
             input: None,
+            session: None,
         }
     }
 
@@ -880,6 +886,57 @@ impl OneSession {
             .is_some_and(|kept| kept["kept"].as_bool() == Some(true))
     }
 
+    /// The kept session `agent`'s OpenClaw session key: `harness ensure`'s
+    /// `engineSession`, from the pane or the kept record, else Harness's
+    /// usual `agent:main:harness-<id>`.
+    fn kept_session_key(&self, agent: &str) -> String {
+        let from_pane = self
+            .lock()
+            .pane
+            .as_ref()
+            .filter(|pane| pane.agent == agent)
+            .and_then(|pane| pane.session.clone());
+        from_pane
+            .or_else(|| {
+                let text = std::fs::read_to_string(self.state_file.as_ref()?).ok()?;
+                let kept: serde_json::Value = serde_json::from_str(&text).ok()?;
+                (kept["agent"] == agent)
+                    .then(|| kept["session"].as_str().map(str::to_owned))
+                    .flatten()
+            })
+            .unwrap_or_else(|| openclaw_session_key(agent))
+    }
+
+    /// The kept session `agent` closed by us: its record forgotten, and
+    /// its conversation deleted from OpenClaw's own store by its engine
+    /// session, since Harness's close keeps it (`close --forget` is not
+    /// built yet, openharness#4393).
+    fn kept_closed(&self, agent: &str, engine: EngineKind) {
+        let key = self.kept_session_key(agent);
+        self.closed_by_us(agent, engine, false);
+        if engine == EngineKind::Openclaw
+            && let Err(code) = (self.delete_session)(&key)
+        {
+            eprintln!(
+                "tasks: one session: the kept session {}'s OpenClaw session not deleted: {code}",
+                short(agent)
+            );
+        }
+    }
+
+    /// Harness says the kept session is not ours (`NAME_TAKEN`,
+    /// `NOT_YOURS`): the pane the old way until Harness's daemon starts
+    /// again, and the kept record forgotten (lamp-tasks can't touch it).
+    fn not_ours(&self, code: &str) {
+        self.lock().programs = Some(false);
+        if self.kept_is_program()
+            && let Some(file) = &self.state_file
+        {
+            let _ = std::fs::remove_file(file);
+        }
+        eprintln!("tasks: one session: Harness says {code}; the pane the old way next");
+    }
+
     /// Whether the pane may be typed into: false once Harness refused a
     /// reply with `REPLY_OFF` (the person's `programs-reply` setting off),
     /// until lamp-tasks starts again. Then every task goes the per-task
@@ -935,7 +992,8 @@ impl OneSession {
     }
 
     /// [`OneSession::drop_pane`]; for the kept session (openharness#4393)
-    /// `harness close --forget`, which deletes its conversation, and with
+    /// `harness close`, and its conversation deleted from OpenClaw's store
+    /// by its engine session, and with
     /// `token` its token file too (a sign-out, an engine switch; not a turn
     /// that ended unanswered). A kept session not closed is tried again at
     /// the next look, never let go with its conversation still there.
@@ -966,7 +1024,7 @@ impl OneSession {
                 self.lock().drop_due = Some(why.to_owned());
                 return;
             }
-            self.closed_by_us(&agent, kind, false);
+            self.kept_closed(&agent, kind);
             if token {
                 self.forget_token();
             }
@@ -1070,14 +1128,16 @@ impl OneSession {
         let Some(file) = &self.state_file else {
             return;
         };
-        let (signed_in, program) = {
+        let (signed_in, program, session) = {
             let inner = self.lock();
+            let pane = inner
+                .pane
+                .as_ref()
+                .filter(|pane| pane.kept && pane.agent == agent);
             (
                 !inner.signed_out,
-                inner
-                    .pane
-                    .as_ref()
-                    .is_some_and(|pane| pane.kept && pane.agent == agent),
+                pane.is_some(),
+                pane.and_then(|pane| pane.session.clone()),
             )
         };
         let text = serde_json::json!({
@@ -1086,6 +1146,7 @@ impl OneSession {
             "engine": place.engine.argument(),
             "signed_in": signed_in,
             "kept": program,
+            "session": session,
         })
         .to_string();
         if let Err(error) = crate::hermes_config::replace(file, &text) {
@@ -1670,7 +1731,8 @@ impl OneSession {
         };
         // The kept session rotated is left to `harness ensure --fresh`,
         // which closes it and starts a new conversation; moved (another
-        // machine or engine), it is closed `--forget` and its token removed.
+        // machine or engine), it is closed, its conversation deleted and its
+        // token removed.
         let stale = match stale {
             Some(pane) if pane.kept => {
                 if !pane.place.same_spot(place)
@@ -1682,7 +1744,7 @@ impl OneSession {
                             short(&pane.agent)
                         );
                     }
-                    self.closed_by_us(&pane.agent, pane.place.engine, false);
+                    self.kept_closed(&pane.agent, pane.place.engine);
                     self.forget_token();
                 }
                 None
@@ -1921,6 +1983,11 @@ impl OneSession {
             return Err(self.open_failed(&format!("its token file: {why}")));
         }
         let fresh = self.lock().reopen_why.as_deref() == Some("its rotation");
+        // At a rotation the old conversation's key, deleted once `--fresh`
+        // made a new one (Harness's close keeps it in OpenClaw's store).
+        let old = fresh
+            .then(|| self.kept().map(|(agent, _, _)| (self.kept_session_key(&agent), agent)))
+            .flatten();
         let name = name_for(place.engine);
         let ensured = match harness.ensure_kept(place.engine, &name, token, &place.folder, fresh) {
             Ok(ensured) => ensured,
@@ -1928,7 +1995,7 @@ impl OneSession {
                 return Err(self.not_ready("harness ensure: engine_not_ready"));
             }
             Err(code) if code == "name_taken" || code == "not_yours" => {
-                self.lock().programs = Some(false);
+                self.not_ours(&code);
                 return Err(self.open_failed(&format!(
                     "harness ensure: {code}; the pane the old way next"
                 )));
@@ -1941,7 +2008,19 @@ impl OneSession {
             }
         };
         let agent = ensured.agent_id.clone();
-        self.lock().pane = Some(Pane::new(&agent, place, true));
+        let mut pane = Pane::new(&agent, place, true);
+        pane.session = ensured.engine_session.clone();
+        self.lock().pane = Some(pane);
+        if let Some((key, old)) = old
+            && old != agent
+            && place.engine == EngineKind::Openclaw
+            && let Err(code) = (self.delete_session)(&key)
+        {
+            eprintln!(
+                "tasks: one session: the rotated kept session {}'s OpenClaw session not deleted: {code}",
+                short(&old)
+            );
+        }
         // Kept at once: the record says the kept session, so a sign-out
         // while lamp-tasks is down still removes it.
         self.keep(&agent, place);
@@ -2156,6 +2235,12 @@ impl Turn<'_> {
                     Took::NotSent(code) if code == "reply_off" => {
                         self.one.no_reply_here();
                         return Sent::NoReply;
+                    }
+                    // Not ours: the pane the old way, opened at once once.
+                    Took::NotSent(code) if code == "reply_not_yours" && !reopened => {
+                        reopened = true;
+                        self.one.not_ours("NOT_YOURS");
+                        self.one.gone(&agent, "Harness says the kept session is not ours");
                     }
                     Took::NotSent(code) => return self.fallback(&format!("harness reply: {code}")),
                     Took::Uncertain(code) => {
@@ -2381,10 +2466,10 @@ impl Turn<'_> {
                 },
                 Ok(Some(state)) if state == "needs-input" => {
                     let _ = harness.close_kept(name, token);
-                    self.one.closed_by_us(agent, EngineKind::Openclaw, false);
+                    self.one.kept_closed(agent, EngineKind::Openclaw);
                     self.one.gone(agent, "its turn asked something");
                     eprintln!(
-                        "tasks: one session: {}'s turn asks something; the kept session closed --forget, ensured again next",
+                        "tasks: one session: {}'s turn asks something; the kept session closed and its conversation deleted, ensured again next",
                         self.id
                     );
                     return Ended::Failed(
@@ -2416,11 +2501,12 @@ impl Turn<'_> {
     }
 
     fn cancelled(&self, harness: &dyn PaneHarness, machine: &str, agent: &str) -> Ended {
-        // The kept session: closed `--forget`, ensured anew next.
+        // The kept session: closed, its conversation deleted, ensured anew
+        // next.
         let closed = match self.one.kept_now(agent) {
             Some((name, token)) => {
                 let closed = harness.close_kept(&name, &token).map(|()| Closed::Closed);
-                self.one.closed_by_us(agent, EngineKind::Openclaw, false);
+                self.one.kept_closed(agent, EngineKind::Openclaw);
                 closed
             }
             None => {

@@ -10487,7 +10487,11 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
             {"stdout":"{\"state\":\"taken\",\"inputId\":\"in-1\",\"takenAt\":1}\n"},
             {"stdout":"{\"error\":\"NOT_IDLE\",\"code\":\"NOT_IDLE\"}\n","exit":5},
             {"stdout":"{\"error\":\"ENGINE_NOT_READY\"}\n","exit":5},
-            {"stdout":"","exit":124}
+            {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":true}\n","exit":124},
+            {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":false,\"inputId\":\"in-2\"}\n","exit":124},
+            {"stdout":"","exit":124},
+            {"stdout":"{\"error\":\"NOT_YOURS\"}\n","exit":5},
+            {"stdout":"{\"state\":\"taken\",\"inputId\":\"in-3\"}\n"}
         ]},
         "wait":{"exit":3},
         "close":{"stdout":"{\"ok\":true}\n"},
@@ -10500,13 +10504,23 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
             result: "resumed".into(),
             agent_id: AGENT.into(),
             state: "idle".into(),
-            why: None
+            why: None,
+            engine_session: Some("s".into())
         })
     );
     assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "New task t:\nGo."), Took::Taken("in-1".into()));
     assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::NotIdle);
     assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::EngineNotReady);
     assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::Timeout);
+    // Typed though timed out: that input, never typed again.
+    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::Taken("in-2".into()));
+    assert!(matches!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::Uncertain(_)));
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        Took::NotSent("reply_not_yours".into())
+    );
+    // OpenClaw's TUI takes a first `!` or `/` as its own command.
+    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "  !rm x"), Took::Taken("in-3".into()));
     assert_eq!(
         cli.wait_kept("lamp-one-openclaw", &token, "in-1", &AtomicBool::new(false)),
         Ok(Some("needs-input".into()))
@@ -10523,8 +10537,21 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
         }
     }
     assert_eq!(calls[1]["args"][0], "ensure");
-    assert!(calls.last().unwrap()["args"].as_array().unwrap().contains(&json!("--forget")));
-    // An older Harness refuses the verb: no program sessions.
-    rig.plan(json!({"capabilities":{"stdout":"","stderr":"unknown command\n","exit":1}}));
+    let last_reply = calls.iter().rev().find(|call| call["args"][0] == "reply").unwrap();
+    assert_eq!(last_reply["args"].as_array().unwrap().last().unwrap(), "Task:   !rm x");
+    let close = calls.last().unwrap()["args"].as_array().unwrap().clone();
+    assert_eq!(close[0], "close");
+    assert!(!close.contains(&json!("--forget")), "not built yet");
+    // No `capabilities` verb: `ensure --help` naming the token flag says yes.
+    rig.plan(json!({
+        "capabilities":{"stdout":"","stderr":"unknown command\n","exit":1},
+        "ensure":{"stdout":"Usage: harness ensure [options]\n  --program-token-file <path>\n"}
+    }));
+    assert_eq!(rig.cli().program_sessions(), Some(true));
+    // Neither: an older Harness, no program sessions.
+    rig.plan(json!({
+        "capabilities":{"stdout":"","stderr":"unknown command\n","exit":1},
+        "ensure":{"stdout":"","stderr":"unknown command\n","exit":1}
+    }));
     assert_eq!(rig.cli().program_sessions(), Some(false));
 }
