@@ -82,6 +82,52 @@ pub(crate) fn set_on_here(on: Option<bool>) {
     ON_HERE.with(|here| here.set(on));
 }
 
+/// How the make's answer begins for a request that needs the internet when
+/// it runs, with [`net_by_agent`] (the owner's Bitcoin price, lamp-9adf, 17
+/// Nov): one line, no blocks, then what it looks up. The model judges that
+/// a request needs the internet; the lamp makes it one task for its agent
+/// with [`made`], whatever the `LAMP_MAKE_NO_CANNOT` switch, so the one more
+/// call picks its grants (`net` among them) and when it runs, and
+/// [`covered`] gives `net` only to a task asked for by its words.
+pub const NEEDS_NET: &str = "internet:";
+
+/// Whether a make's model is told to answer [`NEEDS_NET`] for what only the
+/// internet tells: `LAMP_TASK_NET` on (`crate::skill_task_yes::net_on`), a
+/// made skill's code and a skill's tasks on (as [`made`] needs), and
+/// `LAMP_UPLOAD_TO_AGENT` on, which a task asked for by its words is kept
+/// as. Off, the make's prompt and answers are as before: what only the
+/// internet tells is the model's `cannot:`.
+pub fn net_by_agent() -> bool {
+    crate::skill_task_yes::net_on()
+        && made_skill::scripts_on()
+        && crate::skill_task_yes::on()
+        && crate::upload_agent::on()
+}
+
+/// Whether the lamp makes tasks for its agent here, so a made skill whose
+/// one `do.task` runs the lamp's own [`RUN`] is read as one
+/// (`made_skill`): the switch on, or [`net_by_agent`], whose makes of what
+/// only the internet tells are such tasks.
+pub fn agent_tasks_made() -> bool {
+    on() || net_by_agent()
+}
+
+/// Whether `answer` is the model's [`NEEDS_NET`] line: it begins so, in any
+/// case, and holds no fenced block.
+pub fn says_needs_net(answer: &str) -> bool {
+    answer
+        .trim_start()
+        .get(..NEEDS_NET.len())
+        .is_some_and(|head| head.eq_ignore_ascii_case(NEEDS_NET))
+        && !answer.contains("```")
+        && !answer.contains("~~~")
+}
+
+/// What a make whose model answered [`NEEDS_NET`] is refused as until the
+/// lamp makes it one task for its agent: never said, as [`made`]'s outcome
+/// takes its place.
+pub const NEEDS_NET_HELD: &str = "it needs the internet, which only the lamp's agent can reach";
+
 /// The one file a task skill made here runs: the lamp's own, never a
 /// model's, which only says to the agent that the task is its own to do.
 pub const RUN: &str = "scripts/agent.py";
@@ -1252,6 +1298,54 @@ mod tests {
         ] {
             assert_eq!(uncovered.line(), said, "{}", uncovered.class());
         }
+    }
+
+    /// The owner's Bitcoin price (lamp-9adf, 17 Nov): the model's word that
+    /// a request needs the internet is one line, no blocks, in any case;
+    /// the lamp asks for it only with `LAMP_TASK_NET` and what its task
+    /// needs on, and reads the lamp's own task form as one only then too.
+    #[test]
+    fn the_internet_line_is_one_line_and_asked_for_only_with_the_net_switch() {
+        for said in [
+            "internet: the Bitcoin price",
+            "  Internet: the weather forecast\n",
+            "INTERNET:",
+        ] {
+            assert!(says_needs_net(said), "{said}");
+        }
+        for said in [
+            "cannot: I can't do that yet: checking prices.",
+            "It needs the internet: the price",
+            "internet: the price\n```skill.toml\n```",
+            "internet: the price\n~~~\n~~~",
+            "",
+        ] {
+            assert!(!says_needs_net(said), "{said}");
+        }
+        let all = |on: Option<bool>| {
+            crate::skill_task_yes::set_net_here(on);
+            made_skill::set_scripts_here(on);
+            crate::skill_task_yes::set_on_here(on);
+            crate::upload_agent::set_on_here(on);
+        };
+        all(Some(true));
+        set_on_here(Some(false));
+        assert!(net_by_agent() && agent_tasks_made());
+        for off in 0..4 {
+            all(Some(true));
+            match off {
+                0 => crate::skill_task_yes::set_net_here(Some(false)),
+                1 => made_skill::set_scripts_here(Some(false)),
+                2 => crate::skill_task_yes::set_on_here(Some(false)),
+                _ => crate::upload_agent::set_on_here(Some(false)),
+            }
+            assert!(!net_by_agent(), "{off}");
+            assert!(!agent_tasks_made(), "{off}");
+        }
+        set_on_here(Some(true));
+        assert!(agent_tasks_made());
+        set_on_here(None);
+        all(None);
     }
 
     #[test]
