@@ -2729,7 +2729,10 @@ and never taken from the executive's or a skill's folder.
   own, never other words: gmail: recent, search, drafts, message,
   attachment; google_calendar: events, get; …" (#7498: on lamp-a63e on 17
   Nov Gmail reads with a `what` none of Gmail's kinds were refused four
-  times, and only each retry with `search` answered). A `what` none of the
+  times, and only each retry with `search` answered). With no kind offered
+  (only a send-only `gmail-app` linked, under
+  `LAMP_SERVICES_LINKED_TOOLS=on`), `what` names no empty `enum`, and its
+  read hears how to link Gmail for reading. A `what` none of the
   service's kinds is refused before anything is asked of it, with the same
   kinds, so the next call is right: "what is one of gmail's kinds of read,
   the word alone: recent, search, drafts, message, attachment. gmail reads:
