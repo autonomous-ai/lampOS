@@ -2009,13 +2009,14 @@ grant" như trước.
 **Điều agent tìm thấy được nói cho chủ** (quy tắc làm skill nói "quay về
 thành tin task của đèn" nhưng chưa có đường nào: trên lamp-9adf, 15/11,
 build 13135, `morning-unread-mail` đọc Gmail 19 lần, kết thúc idle, và
-không nói gì). Một lần chạy được cấp quyền đọc một dịch vụ đã liên kết kết
-thúc với câu trả lời cuối của agent trong câu trả lời của lamp-tasks
-(docs/vi/tasks_vi.md, "Điều agent tìm thấy"; `LAMP_AGENT_SERVICES=on`
-trong lamp-tasks, như trong sản phẩm), chỉ qua một runner giữ câu trả lời
-đó (của Harness: lần chạy khởi động không có Harness hay trong home mới
+không nói gì). Mọi lần chạy task, dù được cấp quyền gì (đọc một dịch vụ đã
+liên kết, đọc web qua `net`, hay không gì; chủ đèn, 17/11), kết thúc với
+câu trả lời cuối của agent trong câu trả lời của lamp-tasks
+(docs/vi/tasks_vi.md, "Điều agent tìm thấy"), chỉ qua một runner giữ câu
+trả lời đó (của Harness, của một lần chạy `net` theo đường chạy duy nhất:
+lần chạy khởi động không có Harness hay trong home mới của việc làm skill
 không giữ câu trả lời nào, nên không bao giờ được bảo rằng câu trả lời của
-nó sẽ được nói), và `lamp-skills` nói nó cho chủ như
+nó sẽ được nói; lần chạy ghi cố định không bao giờ nói), và `lamp-skills` nói nó cho chủ như
 các dòng của một `do.read` (`service_read::tell`): sau cùng một cổng (chỉ
 khuôn mặt đã biết của chủ trong tầm nhìn và ổn định 5 giây, không có giọng
 nói trong một phút, không riêng tư, không tạm dừng, không trong giờ yên
