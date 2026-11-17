@@ -3340,14 +3340,15 @@ impl Cli {
     }
 
     /// [`Cli::shown_agent`], and the agent's last answer that same `show`
-    /// gives, as [`Cli::observe`] reads it (`--chars 4000`): none when the
+    /// gives, as [`Cli::observe`] reads it (`--chars 4000`), with whether
+    /// Harness says it cut that answer short (`truncated`): none when the
     /// reply isn't one `observe` takes. Read once, after a skill's run ends,
     /// so its answer can be told (`skill_task::SkillRun::answer`).
     pub fn shown_end(
         &self,
         machine: &str,
         agent_id: &str,
-    ) -> Result<(String, Option<String>), String> {
+    ) -> Result<(String, Option<(String, bool)>), String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
@@ -3374,7 +3375,7 @@ impl Cli {
         let agent =
             shown_agent(&reply.stdout, agent_id).ok_or_else(|| "show_invalid_reply".to_owned())?;
         let answer = match parse_show(&reply.stdout, agent_id) {
-            Ok((observation, _)) => Some(observation.answer),
+            Ok((observation, _)) => Some((observation.answer, observation.truncated)),
             // Its code only (#7180): the agent named, its answer not read.
             Err(code) => {
                 eprintln!(
