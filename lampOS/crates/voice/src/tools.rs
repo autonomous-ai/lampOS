@@ -865,6 +865,30 @@ pub fn skill_tools(settings: &Settings) -> Vec<Tool> {
     skills_after(settings, &core_tools(settings))
 }
 
+/// Whether a call, by its name and arguments, starts a skill made to start
+/// on what the person tells the lamp ([`crate::made_skill::is_said`],
+/// #6526): a call of it, or of `use_skill` naming it. Never a question
+/// about a skill ([`crate::skill_about`]), which runs none, and never with
+/// `LAMP_MADE_SKILL_SAID` off. Reads the skills' catalogs.
+pub fn starts_said(settings: &Settings, name: &str, args: &Value) -> bool {
+    if !crate::made_skill::said_on() {
+        return false;
+    }
+    let skill = if name == crate::use_skill::NAME {
+        if crate::skill_about::on() && args.get(crate::skill_about::ABOUT).is_some() {
+            return false;
+        }
+        args.get("skill").and_then(Value::as_str)
+    } else {
+        Some(name)
+    };
+    skill.is_some_and(|skill| {
+        skill_tools(settings)
+            .iter()
+            .any(|tool| tool.name == skill && crate::made_skill::is_said(&tool.description))
+    })
+}
+
 fn skills_after(settings: &Settings, told: &[Tool]) -> Vec<Tool> {
     // The skills' after the executive's: a name already told stays its, and
     // a name the skills' own folder gives is its ([`skills_folders`]).
@@ -5879,6 +5903,58 @@ mod tests {
         let (whom, (_, answered)) = run_call(&route(&settings, &juggle.name), &juggle, 7, true);
         assert_eq!((whom, answered), (crate::use_skill::NAME, true));
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #7448: a call starts a said start when it calls a skill whose card
+    /// is a said start's ([`crate::made_skill::is_said`]), itself or through
+    /// `use_skill`, with `LAMP_MADE_SKILL_SAID` on; never another skill, a
+    /// question about one, or with the switch off.
+    #[test]
+    fn a_said_start_is_found_by_its_card_itself_or_through_use_skill() {
+        let dir = schedule_directory("ssd");
+        let said = format!(
+            "Use it when they say they're busy{}it turns the light red.",
+            crate::made_skill::SAID_TO_YOU
+        );
+        std::fs::write(
+            dir.join(CATALOG_FILE),
+            json!({"tools":[
+                {"name":"written_busy_light","description":said},
+                {"name":"dance","description":"Dance."}]})
+            .to_string(),
+        )
+        .unwrap();
+        let settings = Settings {
+            skills: Some(dir.clone()),
+            use_skill: true,
+            ..Default::default()
+        };
+        let through = |skill: &str| json!({"skill": skill});
+        crate::made_skill::set_said_here(Some(true));
+        crate::skill_about::set_on_here(Some(true));
+        assert!(starts_said(&settings, "written_busy_light", &json!({})));
+        assert!(starts_said(
+            &settings,
+            crate::use_skill::NAME,
+            &through("written_busy_light")
+        ));
+        assert!(!starts_said(&settings, "dance", &json!({})));
+        assert!(!starts_said(
+            &settings,
+            crate::use_skill::NAME,
+            &through("dance")
+        ));
+        assert!(!starts_said(
+            &settings,
+            crate::use_skill::NAME,
+            &json!({"skill": "written_busy_light", crate::skill_about::ABOUT: "state"})
+        ));
+        assert!(!starts_said(&settings, crate::use_skill::NAME, &json!({})));
+        crate::made_skill::set_said_here(Some(false));
+        assert!(!starts_said(&settings, "written_busy_light", &json!({})));
+        crate::made_skill::set_said_here(None);
+        crate::skill_about::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A reader's P2 on #5505: a search skill (look-for-things' `[search]`,

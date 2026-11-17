@@ -3041,6 +3041,35 @@ chối khi cài.
    ("turning red now" sau lời mở đầu, "I'll keep quiet"): các mẫu của nó
    là của ánh sáng, âm lượng và Schedule, và mở rộng chúng không nằm trong
    thay đổi này.
+
+   **Chỉ với câu nói với đèn** (#7448; người xây dựng đầu tiên lúc 20:55
+   ngày 17/11). Một kỹ năng bắt đầu khi được nói cần một trong ba điều: tên
+   của đèn trong câu; một khuôn mặt trong tầm nhìn được thấy đang nói câu
+   đó; hoặc một cuộc trò chuyện đang diễn ra với một khuôn mặt trong tầm
+   nhìn. Trên lamp-9adf (17/11, lượt thử của #7448, yêu cầu 18) "Ugh, I am
+   so busy today, nothing but meetings.", nói khi không có ai trong tầm
+   nhìn khoảng 35 giây sau một câu nói với đèn, được cho qua chỉ như cuộc
+   trò chuyện đang diễn ra và đã bật đèn bận. Vì vậy, trên tuyến thứ hai,
+   một câu được cho qua chỉ như cuộc trò chuyện đang diễn ra (không có tên,
+   không có lời gọi đèn, không có khuôn mặt quay về đèn, không nói gần đèn,
+   không trả lời câu hỏi của đèn; `Attention::played_only_as_going_on`) mà
+   không có khuôn mặt nào được thấy đang nói (`Heeding::going_on_unseen`)
+   không bắt đầu kỹ năng loại này, trừ khi có một khuôn mặt trong lần nhìn
+   mới nhất của mắt lúc lời gọi đến (`Heeding::holds_said_start`,
+   `bus_out::faces_in_view`; không có mắt, hoặc camera đóng, là không có
+   khuôn mặt). Khi đó lời gọi kỹ năng đó, trực tiếp hoặc qua `use_skill`
+   (`tools::starts_said`, theo `SAID_TO_YOU` trong thẻ của nó; không bao
+   giờ là câu hỏi về một kỹ năng), bị giữ như một lời gọi mà quy tắc giữ
+   (`Engine::holding_said_starts`): không chạy, và mô hình được báo là chưa
+   làm (`policy_holds::HELD`); nó vẫn có thể trả lời bằng lời. Một câu được
+   cho qua vì dấu hiệu riêng của nó (tên của đèn, khuôn mặt quay về đèn,
+   nói gần đèn, trả lời câu hỏi của đèn) không bị giữ, nên "Lamp, I'm
+   busy." từ bên kia phòng vẫn bắt đầu nó. Chỉ dựa trên cấu trúc: không từ
+   nào của câu được so khớp. Khi tắt công tắc, không gì được cài và không
+   gì thay đổi. Kiểm thử:
+   `a_said_start_is_held_on_a_line_only_going_on_with_no_face`,
+   `a_held_said_start_is_not_run_and_the_model_is_told_so`,
+   `a_said_start_is_found_by_its_card_itself_or_through_use_skill`.
 4. **Nói lại đúng điều nó làm** (`Said::said_back`): "When you tell me
    you're busy, I'll turn red." (thêm " at level N" trước dấu chấm khi có
    yêu cầu mức sáng), rồi nó được bật ngay như một kỹ năng tự tạo, với
