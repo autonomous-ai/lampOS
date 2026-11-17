@@ -1555,6 +1555,11 @@ pub type ReadBackAsked = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 /// The call a heard line plainly asks for by an installed skill's name, as
 /// its name and arguments, or none (`crate::skill_named::heard`, #6772).
 pub type SkillNamed = Arc<dyn Fn(&str) -> Option<(String, Value)> + Send + Sync>;
+
+/// The person's skills, made and installed, and those turned off, read
+/// when a turn's skill claims are judged (`LAMP_ACTION_CLAIM_SKILLS`,
+/// #7587): [`crate::action_claim::KnownSkills`].
+pub type SkillNames = Arc<dyn Fn() -> crate::action_claim::KnownSkills + Send + Sync>;
 /// An installed skill's own ask phrases, by its function's name
 /// (`crate::tools::skill_asks`, #5749): what a called skill's recording
 /// may play for besides a line that asks to play.
@@ -1765,6 +1770,8 @@ struct Shared {
     doing_claims: bool,
     /// [`Engine::checking_skill_claims`] (#7587).
     skill_claims: bool,
+    /// [`Engine::knowing_skill_names`] (#7587).
+    skill_names: Option<SkillNames>,
     /// With the make's one run path ([`Engine::waiting_on_one_path`],
     /// #7371): how long after its waiting line a make with no answer yet
     /// says [`crate::make_skill_agent::LONG_WAIT_LINE`], once; none is
@@ -4725,6 +4732,7 @@ impl Engine {
                 made_not_on: false,
                 doing_claims: false,
                 skill_claims: false,
+                skill_names: None,
                 one_path_wait: None,
                 no_words_again: false,
                 answer_again: false,
@@ -6041,6 +6049,20 @@ impl Engine {
     pub fn checking_skill_claims(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.skill_claims = on;
+        }
+        self
+    }
+
+    /// Where [`Engine::checking_skill_claims`] reads the person's skills'
+    /// names, and those turned off: a skill said changed with no "skill" in
+    /// its words ("Moon time is removed.") is a claim only when it names
+    /// one, and one said off that is off already is none (El's P2 on
+    /// #7601).
+    /// Read once a turn the claims are judged, local files only. Before
+    /// any turn only.
+    pub fn knowing_skill_names(mut self, names: SkillNames) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.skill_names = Some(names);
         }
         self
     }
@@ -16049,9 +16071,21 @@ async fn answer(
     // `LAMP_ACTION_CLAIM_DOING`): read from the reply alone.
     let doing_turn = shared.doing_claims;
     // Whether a skill's state said is a claim (#7587,
-    // `LAMP_ACTION_CLAIM_SKILLS`): never on a line asked as a question,
-    // whose reply may tell a true state ("Moon time is off.").
-    let skills_turn = shared.skill_claims && !crate::action_claim::asked_as_a_question(&said);
+    // `LAMP_ACTION_CLAIM_SKILLS`): only on a line that asks for a skill's
+    // change, never one asked as a question, whose reply may tell a true
+    // state ("Moon time is off."; El's P2 on #7601). With the person's
+    // skills' names, read once here: a claim with no "skill" counts only
+    // when it names one of them.
+    let skill_names: Option<crate::action_claim::KnownSkills> = (shared.skill_claims
+        && crate::action_claim::asks_a_skill_change(&said)
+        && !crate::action_claim::asked_as_a_question(&said))
+    .then(|| {
+        shared
+            .skill_names
+            .as_ref()
+            .map(|names| names())
+            .unwrap_or_default()
+    });
     // Whether the line asks to read something back: then a `list_reminders`
     // may back a time a worded claim says (the Reviewer-lead's P2 on #5737).
     let read_asked = crate::action_claim::worded_as_a_question(&said);
@@ -16620,6 +16654,11 @@ async fn answer(
                 args,
             });
         let named_by_words = named_call.is_some();
+        // The skill the heard words ran in code, by its function's name, for
+        // a start said after it (`LAMP_ACTION_CLAIM_SKILLS`, #7587).
+        let named_skill: Option<String> = named_call
+            .as_ref()
+            .map(|call| crate::skill_named::function_of(&call.name, &call.args).to_owned());
         let mut skill_ran: Option<((String, Value), Value)> = None;
         if let Some(call) = &named_call {
             let function = crate::skill_named::function_of(&call.name, &call.args);
@@ -16746,8 +16785,11 @@ async fn answer(
         // function's name: "Okay, the focus mode skill is on." after it
         // stands (`LAMP_ACTION_CLAIM_SKILLS`, Twelve's adversarial P2 on
         // #7587).
-        if named_by_words {
-            turn_called.push((crate::use_skill::NAME.to_owned(), Value::Null));
+        if let Some(skill) = &named_skill {
+            turn_called.push((
+                crate::use_skill::NAME.to_owned(),
+                serde_json::json!({ "skill": skill }),
+            ));
         }
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
@@ -17353,7 +17395,7 @@ async fn answer(
                                     worded_turn,
                                     forget_turn,
                                     doing_turn,
-                                    skills_turn,
+                                    skill_names.as_ref(),
                                 ) {
                                     Some(None) => action_held.take().unwrap_or_default(),
                                     Some(Some(kind))
@@ -17995,7 +18037,7 @@ async fn answer(
                     worded_turn,
                     forget_turn,
                     doing_turn,
-                    skills_turn,
+                    skill_names.as_ref(),
                 )
                 .flatten()
                 .filter(|kind| {
@@ -18043,7 +18085,11 @@ async fn answer(
                 // that nothing ran.
                 let skill_said = matches!(
                     unmade,
-                    Some(crate::action_claim::Claim::Skill | crate::action_claim::Claim::SkillOn)
+                    Some(
+                        crate::action_claim::Claim::Skill
+                            | crate::action_claim::Claim::SkillOn
+                            | crate::action_claim::Claim::SkillStarted
+                    )
                 );
                 let limited = !forget_said
                     && !skill_said

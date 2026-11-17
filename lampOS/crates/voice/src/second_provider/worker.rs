@@ -4359,6 +4359,24 @@ pub fn serve(
         );
     }
     engine = engine.checking_skill_claims(action_claims && skill_claims);
+    if action_claims && skill_claims {
+        // The person's skills, made and installed, read from the lamp's own
+        // folders when a turn's claims are judged (El's P2 on #7601).
+        // And those turned off, in `lamp-skills`' `off` file.
+        let keeping = crate::made_skill::Keeping::when(true);
+        engine = engine.knowing_skill_names(Arc::new(move || crate::action_claim::KnownSkills {
+            names: keeping
+                .as_ref()
+                .map(crate::made_remove::names)
+                .unwrap_or_default(),
+            off: crate::skill_about::turned_off(std::path::Path::new(
+                crate::skill_about::STATE_DIR,
+            ))
+            .unwrap_or_default()
+            .into_iter()
+            .collect(),
+        }));
+    }
     engine = engine.waiting_on_one_path(
         crate::make_skill_agent::one_path_on().then_some(crate::make_skill_agent::LONG_WAIT_AFTER),
     );

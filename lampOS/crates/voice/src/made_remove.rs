@@ -179,6 +179,18 @@ fn others(keeping: &Keeping, made: &[(String, String)]) -> Vec<String> {
     others
 }
 
+/// Every skill's name on the lamp, made or not: what a skill claim with no
+/// "skill" in its words must name to count
+/// (`action_claim::known_skill`, #7587).
+pub fn names(keeping: &Keeping) -> Vec<String> {
+    let made = made(keeping);
+    let others = others(keeping, &made);
+    made.into_iter()
+        .map(|(name, _)| name)
+        .chain(others)
+        .collect()
+}
+
 /// Whether every word of `short` lies inside `long`'s words, in a row
 /// ("moon" in "moon fact"), and `long` has more.
 fn inside(short: &str, long: &str) -> bool {
