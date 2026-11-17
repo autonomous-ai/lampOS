@@ -7060,13 +7060,33 @@ impl Said {
     }
 
     /// Its card's description, what the voice's model reads in its
-    /// `use_skill` line: the `when` line first, so a short line keeps it.
+    /// `use_skill` line: the `when` line first, so a short line keeps it,
+    /// then [`SAID_TO_YOU`], which tells the model the person's telling is
+    /// the ask, and marks the line as a said start's ([`is_said`]).
     fn description(&self) -> String {
         format!(
-            "Use it {}, a request said to you, never talk in the room: it turns the light {}.",
+            "Use it {}{SAID_TO_YOU}it turns the light {}.",
             self.when, self.colour
         )
     }
+}
+
+/// What a said start's description says after its `when` line
+/// ([`Said::description`]). On lamp-9adf (17 Nov, #7448's row) "a request
+/// said to you, never talk in the room" lost to the model's own reading of
+/// "Lamp, I'm busy.": a plain statement, not a request, answered in words
+/// ("I'll keep quiet and let you work.") with no call, 4 times in 4. So it
+/// says the person's telling is the ask, and talk the lamp only overhears
+/// is not.
+pub const SAID_TO_YOU: &str = ", said to you, never talk in the room you only overhear; their \
+                               telling you so is the ask, even a plain statement with nothing \
+                               asked: ";
+
+/// Whether a skill's description is a said start's ([`SAID_TO_YOU`]): what
+/// `use_skill` tells the voice's model of such skills, with
+/// [`SAID_ENVIRONMENT`] on (`crate::use_skill`).
+pub fn is_said(description: &str) -> bool {
+    description.contains(SAID_TO_YOU)
 }
 
 /// A said start in the making model's answer (#6526): none when its
@@ -13414,8 +13434,9 @@ light = { colour = "green", level = 3, for = "20s" }
         let section = crate::use_skill::section(std::slice::from_ref(&tool), &Default::default());
         assert!(
             section.contains(
-                "- written_busy: Use it when they say they're busy or in a meeting, a request \
-                 said to you, never talk in the room: it turns the light red.\n"
+                "- written_busy: Use it when they say they're busy or in a meeting, said to you, \
+                 never talk in the room you only overhear; their telling you so is the ask, even \
+                 a plain statement with nothing asked: it turns the light red.\n"
             ),
             "{section}"
         );
