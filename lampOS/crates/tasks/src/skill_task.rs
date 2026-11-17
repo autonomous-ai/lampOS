@@ -3566,7 +3566,7 @@ impl HarnessRunner {
                 return Some(Err(format!("Harness didn't start the run ({code})")));
             }
             // Nothing typed: the per-run way, its own `harness new` with
-            // the run's words as `--message`, as with the switch off.
+            // the run's words as `--task`, as with the switch off.
             Sent::NoReply => return None,
         }
         let cancel = std::sync::atomic::AtomicBool::new(false);
