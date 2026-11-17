@@ -1415,23 +1415,39 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   nào, và lần chạy không bị nhận.
 - **Nhận lần chạy.** Id phải là một lần chạy gateway đang sống của
   lamp-tasks này, chưa bị nhận. lamp-tasks trả lời một dòng JSON,
-  `{script, interpreter, skill, run, socket, pythonpath, token}`, và đánh
-  dấu lần chạy đã được nhận. Lần nhận thứ hai bị từ chối ("that run's
+  `{script, interpreter, skill, run, socket, pythonpath}` (không bao giờ có
+  token, token ở lại trong bộ nhớ của lamp-tasks, #7024), và đánh dấu lần
+  chạy đã được nhận. Lần nhận thứ hai bị từ chối ("that run's
   start was claimed already"), id không sống cũng vậy ("no live skill run
   of this lamp has that id"). Khi lần chạy kết thúc, nó không còn sống.
 - **Rào** (`gateway::FENCE_TEXT`, chạy bởi `unshare` với
-  `gateway::fence_args`). Token đến trên fd 3 qua một pipe, không bao giờ
-  trong đối số hay môi trường. Socket vẫn mở ở fd 4. Trong các namespace
-  user, mạng (chỉ `lo`), mount và PID riêng của lần chạy, rào mount một
-  `/tmp` mới, bind thư mục của lần chạy và thư mục kỹ năng sang một bên,
-  phủ project Harness và `/var/lib`, `/var/tmp`, `/dev/shm`
-  (`gateway::HIDDEN`) bằng tmpfs 0700, rồi chuyển hai thư mục về chỗ cũ.
-  Mọi mount đều là `mount -n`, vì `/run` chỉ đọc trong namespace của
-  OpenClaw. Sau đó, trong một user namespace riêng, nó đọc token từ fd 3,
-  ghi `started` vào fd 4 rồi đóng fd đó, và exec script với
+  `gateway::fence_args`). Chính lamp-tasks khởi động rào
+  (`skill_start::lamp_fence`, #7024), nên PID namespace của nó là anh em
+  với của gateway và không tiến trình nào của gateway có pid cho script;
+  launcher chỉ chuyển tiếp stdout, stderr và mã thoát của nó. Token đến
+  trên fd 3 qua một pipe từ bộ nhớ của lamp-tasks, không bao giờ trong
+  đối số hay môi trường. fd 4 là một pipe lamp-tasks đọc. Trước hết rào
+  từ chối thư mục của lần chạy nếu nó không phải thư mục thật hoặc là một
+  link (mọi agent của gateway đều ghi được project), và nếu đường dẫn thật
+  của nó không phải đường dẫn thật của project cộng tên nó; rào bind chính
+  đường dẫn thật đó. Trong các namespace user, mạng (chỉ `lo`), mount và
+  PID riêng của lần chạy, rào mount một `/tmp` mới, tạo trong đó một home
+  rỗng riêng cho script, bind thư mục của lần chạy và thư mục kỹ năng sang
+  một bên, phủ project Harness và `/var/lib`, `/var/tmp`, `/dev/shm`,
+  `/run/lampos-skill-start` và `/run/lampos-tasks` (`gateway::HIDDEN`)
+  bằng tmpfs 0700, rồi chuyển hai thư mục về chỗ cũ. Mọi mount đều là
+  `mount -n`, nên không mount nào ghi utab của libmount dưới `/run`. Rào
+  đặt `ulimit -c 0` (không có file core). Sau đó, trong một user namespace
+  riêng, nó đọc token từ fd 3, ghi `started` vào fd 4 rồi đóng fd đó, và
+  exec script trong thư mục của lần chạy với
   `PATH=/usr/local/bin:/usr/bin:/bin` (`gateway::SCRIPT_PATH`), `HOME` là
-  thư mục của lần chạy, cùng socket, SDK và token, không gì khác. Bước nào
-  lỗi cũng kết thúc rào trước khi script chạy.
+  home mới đó (không bao giờ là thư mục của lần chạy: Python sẽ chạy các
+  file `.pth` mà một agent của gateway đặt dưới `$HOME/.local`, và output
+  của script quay về gateway), `PYTHONNOUSERSITE=1`, cùng socket, SDK và
+  token, không gì khác. Trình thông dịch Python còn được thêm `-s` (không
+  có user site-packages); không bao giờ `-I` hay `-E`, vì chúng bỏ
+  `PYTHONPATH` của SDK. Bước nào lỗi cũng kết thúc rào trước khi script
+  chạy.
 - **Đóng khi lỗi** (`gateway::start_ran`). Khi Harness báo lần chạy kết
   thúc tốt, nó chỉ được tính là xong khi launcher đã nhận nó và rào đã
   báo `started`. Chưa bao giờ được nhận: "the default agent never started

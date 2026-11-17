@@ -209,14 +209,39 @@ const LAUNCHER_ROLE: &str = "LAMP_TASKS_USERNS_LAUNCHER";
 const PROBE_ROLE: &str = "LAMP_TASKS_USERNS_PROBE";
 
 /// The launcher, when this binary runs as one in the gateway: claims the
-/// run and relays it, exiting with the script's code.
+/// run and relays it, exiting with the script's code, as
+/// `skill_start::launch_at` does, but saying the answer it was given on
+/// stderr (the grant as JSON again: `parse_answer` refuses unknown fields,
+/// so it is all the line carried), so the test can look for the token in
+/// it.
 #[test]
 fn userns_launcher() {
     let Ok(said) = std::env::var(LAUNCHER_ROLE) else {
         return;
     };
     let (socket, id) = said.split_once('\n').expect("socket and id");
-    let (code, why) = lamp_tasks::skill_start::launch_at(Path::new(socket), id);
+    let stream = std::os::unix::net::UnixStream::connect(socket).expect("lamp-tasks reached");
+    stream
+        .set_read_timeout(Some(lamp_tasks::skill_start::LINE_WITHIN))
+        .unwrap();
+    stream
+        .set_write_timeout(Some(lamp_tasks::skill_start::LINE_WITHIN))
+        .unwrap();
+    let undumpable = || {
+        rustix::process::set_dumpable_behavior(rustix::process::DumpableBehavior::NotDumpable)
+            .map_err(std::io::Error::from)
+    };
+    let grant = match lamp_tasks::skill_start::ask(&stream, id, undumpable) {
+        Ok(grant) => grant,
+        Err((code, why)) => {
+            eprintln!("skill-start: {why}");
+            std::process::exit(code);
+        }
+    };
+    eprintln!("answer: {}", serde_json::to_string(&grant).unwrap());
+    stream.set_read_timeout(None).unwrap();
+    let (code, why) =
+        lamp_tasks::skill_start::relay(&stream, std::io::stdout().lock(), std::io::stderr().lock());
     if !why.is_empty() {
         eprintln!("skill-start: {why}");
     }
@@ -347,18 +372,38 @@ fn wait_for(path: &Path) {
     }
 }
 
+/// What a run beside the gateway gave ([`run_beside_gateway`]).
+struct Beside {
+    /// The launcher's stdout: the test harness's own lines, and the
+    /// script's, relayed.
+    out: String,
+    /// The launcher's stderr: its `answer:` line, and the script's stderr,
+    /// relayed.
+    err: String,
+}
+
+/// The token lamp-tasks gives the run; never anywhere the gateway reads.
+const TOKEN: &str = "secret-7024";
+
 /// #7024 on the real kernel: lamp-tasks (this process) serves the launcher
-/// socket and starts the run's fence itself with the real `fence_args`; the
-/// launcher runs in a gateway made as OpenClaw's. The script got its
-/// token on fd 3; from inside the gateway no process names the script, its
-/// host pid is not there (`kill`, `environ` and, with strace, `ptrace` all
-/// fail); its output and exit code reach the gateway through the launcher.
-#[test]
-fn the_script_runs_outside_the_gateway_and_no_gateway_process_sees_it() {
-    if let Some(reason) = skip_reason() {
-        println!("skipped: {reason}");
-        return;
-    }
+/// socket and starts the run's fence itself with the real `fence_args`, for
+/// `script_text` in the skill's folder as `script_name`, run by
+/// `interpreter`; the launcher runs in a gateway made as OpenClaw's.
+/// `plant` is given the run's folder first, as a gateway agent could write
+/// it. Checked here, for every run: the script got the token (in its own
+/// environment, seen from the host); from inside the gateway no process
+/// names the script, its host pid is not there (`kill`, `environ` and,
+/// with strace, `ptrace` all fail); its code reaches the gateway through
+/// the launcher; and the token is in none of what the gateway gets: the
+/// launcher's stdout, its stderr, the answer it was given, or the run's
+/// folder. The script must print, touch `up` in its working folder (the
+/// run's), wait for `go` there, and exit 7.
+fn run_beside_gateway(
+    interpreter: &str,
+    script_name: &str,
+    script_text: &str,
+    plant: impl FnOnce(&Path),
+) -> Beside {
     // Not under /tmp: the fence puts a tmpfs of its own over /tmp.
     let base = tempfile::Builder::new()
         .prefix("ss7024")
@@ -375,28 +420,20 @@ fn the_script_runs_outside_the_gateway_and_no_gateway_process_sees_it() {
     for folder in [&run, &skill, &hidden] {
         std::fs::create_dir_all(folder).unwrap();
     }
-    let script = skill.join("main.sh");
-    std::fs::write(
-        &script,
-        "printf '%s' \"$LAMP_CONTROL_TOKEN\" > \"$HOME/token\"\n\
-         echo script-ran\n\
-         touch \"$HOME/up\"\n\
-         while [ ! -e \"$HOME/go\" ]; do sleep 0.05; done\n\
-         exit 7\n",
-    )
-    .unwrap();
-    let token = "secret-7024";
+    plant(&run);
+    let script = skill.join(script_name);
+    std::fs::write(&script, script_text).unwrap();
     let id = lamp_tasks::skill_task::run_id();
     let starts = Starts::default();
     let grant = Grant {
         script: script.clone(),
-        interpreter: "/bin/sh".into(),
+        interpreter: interpreter.into(),
         skill: skill.clone(),
         run: run.clone(),
         socket: "/run/lampos-control/control.sock".into(),
         pythonpath: "/sdk".into(),
     };
-    let live = starts.open(&id, grant, token).unwrap();
+    let live = starts.open(&id, grant, TOKEN).unwrap();
     let fence_hidden = hidden.clone();
     let server = Server {
         socket: socket.clone(),
@@ -439,7 +476,7 @@ fn the_script_runs_outside_the_gateway_and_no_gateway_process_sees_it() {
             "/bin/sh",
             "-c",
             // `sh -c <text> <me> <role> <said> <base> <probe role>`: $0..$4.
-            r#"env "$1=$2" "$0" --exact userns_launcher --nocapture --test-threads 1 > "$3/out" & l=$!
+            r#"env "$1=$2" "$0" --exact userns_launcher --nocapture --test-threads 1 > "$3/out" 2> "$3/err" & l=$!
                while [ ! -e "$3/hostpid" ]; do sleep 0.05; done
                env "$4=$3/hostpid" "$0" --exact userns_probe --nocapture --test-threads 1 > /dev/null
                touch "$3/project/skill-task-1/go"
@@ -453,13 +490,20 @@ fn the_script_runs_outside_the_gateway_and_no_gateway_process_sees_it() {
         .spawn()
         .unwrap();
     wait_for(&run.join("up"));
-    let interpreter_argv = ["/bin/sh", script.to_str().unwrap()];
-    let host_pid = pid_of(&interpreter_argv).expect("the script's host pid");
+    // A Python script is run with `-s` (no user site-packages).
+    let script_arg = script.to_str().unwrap();
+    let interpreter_argv: Vec<&str> = if interpreter.starts_with("python") {
+        vec![interpreter, "-s", script_arg]
+    } else {
+        vec![interpreter, script_arg]
+    };
+    let host_pid = pid_of(&interpreter_argv).expect("the script's host pid, run as expected");
     // From the host (lamp-tasks' side) the script is there, its token in
-    // its environment: the pid is the right one.
+    // its environment: the pid is the right one, and the token reached it
+    // (on fd 3: never written anywhere by this test).
     let environ = std::fs::read(format!("/proc/{host_pid}/environ")).unwrap_or_default();
     assert!(
-        String::from_utf8_lossy(&environ).contains(token),
+        String::from_utf8_lossy(&environ).contains(&format!("LAMP_CONTROL_TOKEN={TOKEN}\0")),
         "the script's own environment"
     );
     // Whole before it is there: written aside, then renamed.
@@ -484,11 +528,150 @@ fn the_script_runs_outside_the_gateway_and_no_gateway_process_sees_it() {
     if host_pid > 1000 {
         assert!(found.contains("named=false\n"), "{found}");
     }
-    assert_eq!(std::fs::read_to_string(run.join("token")).unwrap(), token);
-    assert_eq!(status.code(), Some(7), "the script's code, relayed");
-    // The launcher's stdout: the test harness's own lines, and the
-    // script's, relayed.
     let out = std::fs::read_to_string(base_path.join("out")).unwrap_or_default();
-    assert!(out.contains("script-ran\n"), "{out}");
+    let err = std::fs::read_to_string(base_path.join("err")).unwrap_or_default();
+    assert_eq!(
+        status.code(),
+        Some(7),
+        "the script's code, relayed: {out}{err}"
+    );
     assert_eq!(live.ran(), Ok(()));
+    // The relay route: nothing the gateway gets carries the token.
+    let answer = err
+        .lines()
+        .find_map(|line| line.strip_prefix("answer: "))
+        .unwrap_or_else(|| panic!("the launcher's answer line: {err}"));
+    assert!(answer.contains("\"interpreter\""), "{answer}");
+    for (what, text) in [
+        ("stdout", out.as_str()),
+        ("stderr", err.as_str()),
+        ("answer", answer),
+    ] {
+        assert!(
+            !text.contains(TOKEN),
+            "the token in the launcher's {what}: {text}"
+        );
+    }
+    for entry in walk(&run) {
+        let text = std::fs::read(&entry).unwrap_or_default();
+        assert!(
+            !String::from_utf8_lossy(&text).contains(TOKEN),
+            "the token in the run's folder: {}",
+            entry.display()
+        );
+    }
+    Beside { out, err }
+}
+
+/// Every file under `folder`, not following links.
+fn walk(folder: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    let mut todo = vec![folder.to_owned()];
+    while let Some(at) = todo.pop() {
+        for entry in std::fs::read_dir(&at).into_iter().flatten().flatten() {
+            match entry.file_type() {
+                Ok(kind) if kind.is_dir() => todo.push(entry.path()),
+                Ok(kind) if kind.is_file() => files.push(entry.path()),
+                _ => {}
+            }
+        }
+    }
+    files
+}
+
+/// #7024: the script runs outside the gateway, no gateway process sees
+/// it, and its home is the fence's own, not the run's folder.
+#[test]
+fn the_script_runs_outside_the_gateway_and_no_gateway_process_sees_it() {
+    if let Some(reason) = skip_reason() {
+        println!("skipped: {reason}");
+        return;
+    }
+    let ran = run_beside_gateway(
+        "/bin/sh",
+        "main.sh",
+        "[ -n \"$LAMP_CONTROL_TOKEN\" ] && echo token-given\n\
+         echo script-ran\n\
+         echo \"home=$HOME\"\n\
+         echo \"core=$(ulimit -c)\"\n\
+         touch up\n\
+         while [ ! -e go ]; do sleep 0.05; done\n\
+         exit 7\n",
+        |_| {},
+    );
+    for line in [
+        "script-ran\n",
+        "token-given\n",
+        "home=/tmp/lampos-home.",
+        "core=0\n",
+    ] {
+        assert!(ran.out.contains(line), "{line}: {}", ran.out);
+    }
+}
+
+/// The interpreter's `major.minor`, as the fence's `PATH` finds `python3`.
+fn python_version() -> Option<String> {
+    let out = Command::new("python3")
+        .args(["-c", "import sys; print('%d.%d' % sys.version_info[:2])"])
+        .env_clear()
+        .env("PATH", lamp_tasks::gateway::SCRIPT_PATH)
+        .output()
+        .ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+}
+
+/// #7024's adversarial read: a gateway agent plants a `.pth` in the user
+/// site-packages under the run's folder (the script's `HOME` before the
+/// fix), printing the token to stdout and stderr, which the launcher
+/// relays to the gateway. The Python script gets no user site (`-s`,
+/// `PYTHONNOUSERSITE=1`) and a home of the fence's own, so the `.pth` never
+/// runs and the token is not relayed.
+#[test]
+fn a_planted_pth_in_the_run_folder_never_relays_the_token() {
+    if let Some(reason) = skip_reason() {
+        println!("skipped: {reason}");
+        return;
+    }
+    let Some(version) = python_version() else {
+        println!(
+            "skipped: no python3 on {}",
+            lamp_tasks::gateway::SCRIPT_PATH
+        );
+        return;
+    };
+    let ran = run_beside_gateway(
+        "python3",
+        "main.py",
+        "import os, sys, time\n\
+         print('script-ran')\n\
+         print('token-given' if os.environ.get('LAMP_CONTROL_TOKEN') else 'no-token')\n\
+         print('home=' + os.environ.get('HOME', ''))\n\
+         print('no_user_site=%d' % sys.flags.no_user_site)\n\
+         sys.stdout.flush()\n\
+         open('up', 'w').close()\n\
+         while not os.path.exists('go'):\n    time.sleep(0.05)\n\
+         sys.exit(7)\n",
+        |run| {
+            let site = run.join(format!(".local/lib/python{version}/site-packages"));
+            std::fs::create_dir_all(&site).unwrap();
+            std::fs::write(
+                site.join("zz7024.pth"),
+                "import os, sys; t = os.environ.get('LAMP_CONTROL_TOKEN', ''); \
+                 sys.stdout.write('pth-ran ' + t + '\\n'); sys.stderr.write('pth-ran ' + t + '\\n')\n",
+            )
+            .unwrap();
+        },
+    );
+    for line in [
+        "script-ran\n",
+        "token-given\n",
+        "home=/tmp/lampos-home.",
+        "no_user_site=1\n",
+    ] {
+        assert!(ran.out.contains(line), "{line}: {}", ran.out);
+    }
+    assert!(!ran.out.contains("pth-ran"), "{}", ran.out);
+    assert!(!ran.err.contains("pth-ran"), "{}", ran.err);
 }

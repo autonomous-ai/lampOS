@@ -3961,23 +3961,36 @@ file:
   refused peer gets no reply at all, and the run is not claimed.
 - **The claim.** The id must be a live gateway run of this lamp-tasks,
   not claimed yet. lamp-tasks answers one JSON line,
-  `{script, interpreter, skill, run, socket, pythonpath, token}`, and marks
-  the run claimed. A second claim is refused ("that run's start was
+  `{script, interpreter, skill, run, socket, pythonpath}` (never the token,
+  which stays in lamp-tasks' memory, #7024), and marks the run claimed. A second claim is refused ("that run's start was
   claimed already"), and so is an id that isn't live ("no live skill run
   of this lamp has that id"). Once the run ends, it is not live.
 - **The fence** (`gateway::FENCE_TEXT`, run by `unshare` with
-  `gateway::fence_args`). The token comes on fd 3 through a pipe, never in
-  an argument or the environment. The socket stays open as fd 4. In the
+  `gateway::fence_args`). lamp-tasks starts it itself
+  (`skill_start::lamp_fence`, #7024), so its PID namespace is a sibling of
+  the gateway's and no gateway process has a pid for the script; the
+  launcher only relays its stdout, stderr and exit code. The token comes
+  on fd 3 through a pipe from lamp-tasks' memory, never in an argument or
+  the environment. fd 4 is a pipe lamp-tasks reads. The fence first
+  refuses a run's folder that is not a real folder or is a link (every
+  gateway agent can write the project), and one whose real path is not
+  the project's real path and its name; it binds that real path. In the
   run's own user, network (only `lo`), mount and PID namespaces, the fence
-  mounts a fresh `/tmp`, binds the run's folder and the skill's folder
-  aside, covers the Harness project and `/var/lib`, `/var/tmp` and
-  `/dev/shm` (`gateway::HIDDEN`) with 0700 tmpfs, and moves the two
-  folders back. Every mount is `mount -n`, because `/run` is read-only in
-  OpenClaw's namespace. Then, in a user namespace of its own, it reads the
-  token from fd 3, writes `started` to fd 4 and closes it, and execs the
-  script with `PATH=/usr/local/bin:/usr/bin:/bin` (`gateway::SCRIPT_PATH`),
-  `HOME` the run's folder, the socket, the SDK and the token only. Any
-  step that fails ends the fence before the script runs.
+  mounts a fresh `/tmp`, makes the script's own empty home in it, binds the
+  run's folder and the skill's folder aside, covers the Harness project
+  and `/var/lib`, `/var/tmp`, `/dev/shm`, `/run/lampos-skill-start` and
+  `/run/lampos-tasks` (`gateway::HIDDEN`) with 0700 tmpfs, and moves the
+  two folders back. Every mount is `mount -n`, so none writes libmount's
+  utab under `/run`. It sets `ulimit -c 0` (no core file). Then, in a user
+  namespace of its own, it reads the token from fd 3, writes `started` to
+  fd 4 and closes it, and execs the script in the run's folder with
+  `PATH=/usr/local/bin:/usr/bin:/bin` (`gateway::SCRIPT_PATH`), `HOME` the
+  fresh home (never the run's folder: Python would run `.pth` files a
+  gateway agent put under `$HOME/.local`, and the script's output goes
+  back to the gateway), `PYTHONNOUSERSITE=1`, the socket, the SDK and the
+  token only. A Python interpreter also gets `-s` (no user
+  site-packages); never `-I` or `-E`, which would drop the SDK's
+  `PYTHONPATH`. Any step that fails ends the fence before the script runs.
 - **Fails closed** (`gateway::start_ran`). When Harness says the run ended
   well, it counts as done only when the launcher claimed it and the fence
   said `started`. Never claimed: "the default agent never started the

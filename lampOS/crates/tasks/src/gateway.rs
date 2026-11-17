@@ -914,17 +914,26 @@ pub const TASKS_RUN: &str = "/run/lampos-tasks";
 /// the gateway's, never inside it; `sh -c`, its arguments: lamp-tasks'
 /// uid and gid, the project, the run's folder, the
 /// skill's folder, lamp-control's socket, the SDK's path, the interpreter,
-/// the script, then the paths hidden), in order: no hidden path (nor the
-/// project) in a folder shown again; a fresh `/tmp` (none of the gateway's
-/// files, a staging no other process reaches); the run's folder and the
+/// the script, then the paths hidden), in order: the run's folder a real
+/// folder, not a link (every gateway agent writes the project, so it could
+/// put a link there), and its real path the project's real path and its
+/// name, that resolved path the one checked and bound; no hidden path (nor
+/// the project) in a folder shown again; a fresh `/tmp` (none of the
+/// gateway's files, a staging no other process reaches) and in it the
+/// script's own empty home; the run's folder (resolved) and the
 /// skill's folder bound aside there; a 0700 tmpfs over the project (every
 /// other run's folder gone) and over each hidden path that is there; the
-/// two folders moved back; then, in a user namespace of its own (no
+/// two folders moved back; no core file (`ulimit -c 0`, soft and hard);
+/// then, in a user namespace of its own (no
 /// capability over these mounts, so nothing can be unmounted), the token
 /// read from fd 3 (a pipe, never an argument or the environment), fd 4
 /// (a pipe lamp-tasks reads) told `started` and closed, and the script run
-/// with an environment of [`SCRIPT_PATH`], `HOME` the run's folder, the
-/// socket, the SDK and the token only. Any step that fails ends the fence
+/// with an environment of [`SCRIPT_PATH`], `HOME` that fresh home (never
+/// the run's folder, which the gateway writes: Python reads `.pth` files
+/// from `$HOME/.local`), `PYTHONNOUSERSITE=1`, the socket, the SDK and the
+/// token only, and a Python interpreter given `-s` too (no user
+/// site-packages; never `-I` or `-E`, which drop `PYTHONPATH`, the SDK).
+/// Any step that fails ends the fence
 /// before the script runs, and lamp-tasks never reads `started`. Every
 /// `mount` is `mount -n`: no mount writes libmount's utab under `/run`
 /// (read-only in the gateway's namespace on lamp-c0a4, where the fence
@@ -932,12 +941,16 @@ pub const TASKS_RUN: &str = "/run/lampos-tasks";
 pub const FENCE_TEXT: &str = r#"u=$1 g=$2 p=$3 r=$4 k=$5 so=$6 py=$7 i=$8 s=$9
 shift 9
 no() { echo "the run's fence was not made ($1): the script was not run" >&2; exit 1; }
+[ -d "$r" ] && [ ! -L "$r" ] || no "the run's folder is not a folder"
+rr=$(cd -P "$r" && pwd -P) && pr=$(cd -P "$p" && pwd -P) || no "the run's folder's path"
+[ "$rr" = "$pr/${r##*/}" ] || no "the run's folder is not in the project"
 for w in "$p" "$@"; do
-  case "$w/" in "$k"/* | "$r"/*) no "$w is in a folder shown again" ;; esac
+  case "$w/" in "$k"/* | "$r"/* | "$rr"/*) no "$w is in a folder shown again" ;; esac
 done
 mount -n -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp || no /tmp
 t1=$(mktemp -d /tmp/lampos-run.XXXXXX) && t2=$(mktemp -d /tmp/lampos-skill.XXXXXX) || no staging
-mount -n --bind "$r" "$t1" || no "the run's folder"
+hm=$(mktemp -d /tmp/lampos-home.XXXXXX) || no "the script's home"
+mount -n --bind "$rr" "$t1" || no "the run's folder"
 mount -n --bind "$k" "$t2" || no "the skill's folder"
 mount -n -t tmpfs -o mode=0700 tmpfs "$p" || no "the project"
 for h in "$@"; do
@@ -949,7 +962,9 @@ mount -n --move "$t2" "$k" || no "the skill's folder back"
 mount -n --move "$t1" "$r" || no "the run's folder back"
 rmdir "$t1" "$t2" || no "the staging"
 cd "$r" || no "the run's folder"
-exec unshare --user --map-user="$u" --map-group="$g" -- env -i PATH="$SCRIPT_PATH" HOME="$r" LAMP_CONTROL_SOCKET="$so" PYTHONPATH="$py" /bin/sh -c 'IFS= read -r t <&3 || exit 1; exec 3<&-; LAMP_CONTROL_TOKEN=$t; unset t; export LAMP_CONTROL_TOKEN; printf "started\n" >&4 || exit 1; exec 4>&-; exec "$@"' run "$i" "$s"
+ulimit -c 0 || no "no core"
+case "${i##*/}" in python*) set -- "$i" -s "$s" ;; *) set -- "$i" "$s" ;; esac
+exec unshare --user --map-user="$u" --map-group="$g" -- env -i PATH="$SCRIPT_PATH" HOME="$hm" PYTHONNOUSERSITE=1 LAMP_CONTROL_SOCKET="$so" PYTHONPATH="$py" /bin/sh -c 'IFS= read -r t <&3 || exit 1; exec 3<&-; LAMP_CONTROL_TOKEN=$t; unset t; export LAMP_CONTROL_TOKEN; printf "started\n" >&4 || exit 1; exec 4>&-; exec "$@"' run "$@"
 "#;
 
 /// The fence's `unshare` arguments for `grant` (its run's folder in the
@@ -1820,6 +1835,22 @@ mod tests {
         for name in [SOCKET_ENV, PYTHONPATH_ENV, crate::skill_task::TOKEN_ENV] {
             assert!(FENCE_TEXT.contains(name), "{name}");
         }
+        // #7024: no user site-packages (both ways, never -I or -E, which
+        // drop the SDK's PYTHONPATH), a home the gateway can't write, the
+        // run's folder bound only as the real folder checked, no core.
+        for part in [
+            " PYTHONNOUSERSITE=1 ",
+            "set -- \"$i\" -s \"$s\"",
+            " HOME=\"$hm\" ",
+            "[ ! -L \"$r\" ]",
+            "mount -n --bind \"$rr\" \"$t1\"",
+            "ulimit -c 0 || no ",
+        ] {
+            assert!(FENCE_TEXT.contains(part), "{part}");
+        }
+        for part in ["HOME=\"$r\"", " -I ", " -E ", "--bind \"$r\""] {
+            assert!(!FENCE_TEXT.contains(part), "{part}");
+        }
     }
 
     /// Stand-ins for `unshare` (logs its arguments, then runs its program)
@@ -1886,8 +1917,9 @@ mod tests {
         std::fs::write(
             &python,
             format!(
-                "#!/bin/sh\nprintf 'python3 %s|%s|%s|%s|%s|%s|%s|%s\\n' \"$*\" \"$LAMP_CONTROL_TOKEN\" \
-                 \"$LAMP_CONTROL_SOCKET\" \"$PYTHONPATH\" \"$HOME\" \"$PATH\" \"${{LAMP_HERMES_TOKEN-none}}\" \"$(pwd)\" >> {}\n",
+                "#!/bin/sh\nprintf 'python3 %s|%s|%s|%s|%s|%s|%s|%s|%s|%s\\n' \"$*\" \"$LAMP_CONTROL_TOKEN\" \
+                 \"$LAMP_CONTROL_SOCKET\" \"$PYTHONPATH\" \"$HOME\" \"$PATH\" \"${{LAMP_HERMES_TOKEN-none}}\" \
+                 \"${{PYTHONNOUSERSITE-none}}\" \"$(ulimit -c)\" \"$(pwd)\" >> {}\n",
                 log.display()
             ),
         )
@@ -1961,8 +1993,11 @@ mod tests {
             lines[1],
             "mount -n -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp"
         );
+        // The run's folder bound by its real path, the one checked.
+        let real = at.folder.canonicalize().unwrap();
         assert!(lines[2].starts_with(&format!(
-            "mount -n --bind {d}/project/skill-task-1 /tmp/lampos-run."
+            "mount -n --bind {} /tmp/lampos-run.",
+            real.display()
         )));
         assert!(lines[3].starts_with(&format!("mount -n --bind {d}/skills/s /tmp/lampos-skill.")));
         assert_eq!(
@@ -1984,18 +2019,53 @@ mod tests {
             "{log}"
         );
         assert!(!lines[8].contains("run-secret"), "the token in no argument");
+        let ran: Vec<&str> = lines[9].split('|').collect();
+        assert_eq!(ran.len(), 10, "{log}");
         assert!(
-            lines[9].ends_with("/project/skill-task-1"),
+            ran[9].ends_with("/project/skill-task-1"),
             "the run's folder: {log}"
         );
+        // Its home: the fence's own (here, with `mount` stood in for, made
+        // in the host's /tmp), never the run's folder.
+        let home = ran[4];
+        assert!(home.starts_with("/tmp/lampos-home."), "{log}");
+        let _ = std::fs::remove_dir(home);
         assert_eq!(
-            lines[9].rsplit_once('|').unwrap().0,
-            format!(
-                "python3 {d}/skills/s/main.py|run-secret|/run/lampos-control/control.sock|/sdk|\
-                 {d}/project/skill-task-1|/usr/local/bin:/usr/bin:/bin|none"
-            ),
+            [&ran[..4], &ran[5..9]].concat(),
+            [
+                format!("python3 -s {d}/skills/s/main.py").as_str(),
+                "run-secret",
+                "/run/lampos-control/control.sock",
+                "/sdk",
+                "/usr/local/bin:/usr/bin:/bin",
+                "none",
+                "1",
+                "0",
+            ],
+            "-s, PYTHONNOUSERSITE=1 and no core: {log}"
+        );
+    }
+
+    /// The run's folder swapped for a link (any gateway agent writes the
+    /// project): refused before any mount, so `mount --bind` never follows
+    /// it to a folder of lamp-tasks' namespace.
+    #[test]
+    fn a_run_folder_that_is_a_link_ends_the_start_before_any_mount() {
+        let _one = ONE_START.lock().unwrap_or_else(|held| held.into_inner());
+        let at = fenced();
+        std::fs::remove_dir(&at.folder).unwrap();
+        std::os::unix::fs::symlink(at.dir.path().join("state"), &at.folder).unwrap();
+        let out = fence_it(&at);
+        assert_eq!(out.status.code(), Some(1), "{out:?}");
+        let said = String::from_utf8_lossy(&out.stderr);
+        assert!(said.contains("the run's folder is not a folder"), "{said}");
+        let log = std::fs::read_to_string(&at.log).unwrap_or_default();
+        assert!(
+            !log.lines()
+                .any(|line| line.starts_with("mount ") || line.starts_with("python3 ")),
             "{log}"
         );
+        assert_eq!(std::fs::read_to_string(&at.said).unwrap(), "");
     }
 
     #[test]
