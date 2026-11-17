@@ -485,7 +485,14 @@ Environment=LAMP_PEEK=monitor
   the lamp's own interface the request came to (its address and prefix, read
   with `getifaddrs`; never a /0; #7208: the office LAN, 172.168.20.0/24, is
   no RFC1918 range), IPv4 mapped in IPv6 read as IPv4, gets 403 and nothing
-  of the lamp. `Host` must be the
+  of the lamp. glibc's `getifaddrs` reads the interface list over a netlink
+  socket, so the unit's `RestrictAddressFamilies=` allows `AF_NETLINK` beside
+  `AF_INET AF_INET6 AF_UNIX`; without it the list is unreadable, no prefix is
+  found and a same-subnet peer outside those ranges is refused (#7456). Each
+  refusal writes one journal line, `lamp-peek: monitor peer <peer> refused,
+  local <address>, prefix /<n>` (or `no prefix (no interface holds the local
+  address)`, or `no prefix (interface list unreadable: <error>)`), and
+  nothing more. `Host` must be the
   lamp's host name, its `.local` name (`/proc/sys/kernel/hostname`), or the
   address the request came to, with or without a port; any other name gets
   403 (DNS rebinding). Both checks come before anything else, on every path.
