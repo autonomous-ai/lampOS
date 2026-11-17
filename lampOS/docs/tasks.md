@@ -4593,6 +4593,26 @@ exactly, the default when unset), every task and run is its own
   yet. An answer still untold 60 s after it was read (`UNTOLD_CLOSE_MS`),
   or read in an earlier boot, lets the pane go too. Then the queue goes
   on.
+- **An untold answer outlives the takeover (#7600).** The next turn
+  joins the same agent and takes over its session in the store
+  (`finish_launch`, journaled `tasks: task <B> takes over the session of
+  <n> earlier one(s)`). With `LAMP_TASKS_ONE_SESSION` on, an earlier task
+  whose newest kept answer is still untold is kept, not dropped: an idle
+  answer with words, no telling claimed (or its playout still under way),
+  not told in the voice's own words, kept in this boot at most 24 h ago
+  (`WATCH_AT_MOST_MS`). It is marked given on (`close.state` `handed_on`):
+  never read, followed, pushed or closed again, and an `observe` of it is
+  refused, since its session is the later task's. The voice still lists
+  it and tells it once, as any newest settled answer (lamp-voice
+  `read_once_with`, key `<store>:<task>:<observation>`). Once told, the
+  next join drops it as before; one from an earlier boot is dropped too.
+  It counts toward the store's 16 tasks, and a full store lets the oldest
+  spent task give way, as before. Journaled `tasks: task <B> joins the session of <n>
+  earlier one(s) whose answer is still untold: kept for the voice`. A
+  store holding one is written as schema 8, which a build before sets
+  aside. Off (a session a task), nothing changes.
+  - **Tests:** `engine::tests::a_joining_turn_keeps_an_earlier_answer_still_untold`,
+    `a_joining_turn_drops_an_earlier_told_answer`.
 - **A spoken task that ends unanswered.** A spoken task that ends with no
   answer (cancelled, or an ask nobody answered) keeps the pane held. The
   `one-session` thread then closes it `--now`, deletes its OpenClaw
