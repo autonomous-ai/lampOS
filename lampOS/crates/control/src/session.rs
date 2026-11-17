@@ -623,6 +623,11 @@ impl Door {
         self
     }
 
+    /// The computers' own notes, if kept.
+    pub fn notes(&self) -> Option<&crate::notes::Notes> {
+        self.notes.as_ref()
+    }
+
     /// The computers' own notes kept under `folder` (the state folder's
     /// `notes`).
     pub fn with_notes_folder(mut self, folder: PathBuf) -> Self {
