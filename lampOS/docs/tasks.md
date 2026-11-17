@@ -3864,6 +3864,17 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   and a skill has one yes, so an agreed check is the owner's yes to `net`
   for the folder as it is. Off, `net` is refused as an unknown grant
   (`bad_request`) before any token.
+- **A skill made by voice or in the app that needs the internet**
+  (lamp-voice with `LAMP_TASK_NET`, `LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`
+  and `LAMP_UPLOAD_TO_AGENT` on, `make_no_cannot::net_by_agent`): the
+  make's prompt, which is also the rules file of an agent's make here
+  (`skill_make`), tells the model to answer what only the internet tells
+  with one line, `internet:` and what it looks up, never `cannot:`. The
+  voice then makes it one task for the lamp's agent: asked for by its
+  words, an agent skill granted `net`, whose first ask reads it back and
+  waits for the owner's spoken yes before any run; on a trigger, never
+  granted `net` (docs/skills.md, "With `LAMP_TASK_NET=on`, what only the
+  internet tells is a task for the agent").
 - **A `net` run's way out** (`crate::egress`, the design note on #7200,
   Heron's answers): every run is held, `net` or not. A `net` run goes
   through `skill_make::net_runner(home)`: the held runner

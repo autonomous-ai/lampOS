@@ -1864,10 +1864,12 @@ pub fn agent_said(grants: &[String]) -> String {
 }
 
 /// Whether the made `table` is a task for the lamp's agent: with
-/// `LAMP_MAKE_NO_CANNOT` on, a `do.task` step whose `run` is the lamp's
-/// own [`crate::make_no_cannot::RUN`]. Off, never.
+/// `LAMP_MAKE_NO_CANNOT` on, or a make of what only the internet tells
+/// (`LAMP_TASK_NET`, [`crate::make_no_cannot::agent_tasks_made`]), a
+/// `do.task` step whose `run` is the lamp's own
+/// [`crate::make_no_cannot::RUN`]. Off, never.
 fn agent_task(table: &toml::Table) -> bool {
-    crate::make_no_cannot::on()
+    crate::make_no_cannot::agent_tasks_made()
         && AGENT_SCRIPT.with(|ours| ours.get()).unwrap_or(true)
         && table
             .get("do")
@@ -5146,7 +5148,7 @@ fn task_plainly(step: &toml::Value) -> Option<String> {
     let words = words.trim_end_matches(['.', '!', '?']);
     // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`), as a skill's
     // `do.task` is read back.
-    let agents = crate::make_no_cannot::on()
+    let agents = crate::make_no_cannot::agent_tasks_made()
         && task.get("run").and_then(toml::Value::as_str) == Some(crate::make_no_cannot::RUN);
     (!words.is_empty()
         && words.chars().count() <= MOST_TASK_CHARS
