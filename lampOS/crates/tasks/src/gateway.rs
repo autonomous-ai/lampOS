@@ -888,58 +888,66 @@ fn approvals_json() -> Result<String, String> {
 pub const SCRIPT_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
 
 /// What a lamp's run hides of lamp-tasks' own namespace, in which its
-/// fence is made (#7024, [`FENCE_TEXT`]), naming no engine: all of
-/// `/var/lib` (the agents' state and config, such as OpenClaw's
-/// `openclaw.json` and its gateway token, lamp-tasks' Harness project with
-/// every other run, the other skills), `/var/tmp` and `/dev/shm`, the
-/// skill-start launcher's socket folder
-/// ([`crate::skill_start::START_DIR`]), so a run's own script can't ask
-/// for another run's start, and lamp-tasks' runtime folder ([`TASKS_RUN`]:
-/// its own sockets and the Hermes runs' token files,
-/// [`crate::run_token_file::RUNS_DIR`]). Only the run's folder and its
-/// skill's folder are shown again.
-pub const HIDDEN: [&str; 5] = [
-    "/var/lib",
-    "/var/tmp",
-    "/dev/shm",
-    crate::skill_start::START_DIR,
-    TASKS_RUN,
-];
+/// fence is made (#7024, [`FENCE_TEXT`]), naming no engine: at least what
+/// the gateway's namespace hid from the script before #7024 (lamp-update's
+/// `hermes_install::OVERLAID` and `PRIVATE`): all of `/run` (every lamp
+/// service's sockets and runtime files, among them the skill-start
+/// launcher's socket folder ([`crate::skill_start::START_DIR`]), so a run's
+/// own script can't ask for another run's start, and lamp-tasks' runtime
+/// folder ([`TASKS_RUN`]: its own sockets and the Hermes runs' token files,
+/// [`crate::run_token_file::RUNS_DIR`])), all of `/var/lib` (the agents'
+/// state and config, such as OpenClaw's `openclaw.json` and its gateway
+/// token, lamp-tasks' Harness project with every other run, the other
+/// skills), `/var/tmp`, `/dev/shm` and the lamp's own settings
+/// (`/etc/lampOS`). Only the run's folder, its skill's folder and
+/// lamp-control's socket are shown again. `/etc/resolv.conf` is not: the
+/// fence's network has only `lo`, so no name server is reachable anyway.
+pub const HIDDEN: [&str; 5] = ["/run", "/var/lib", "/var/tmp", "/dev/shm", "/etc/lampOS"];
 
 /// lamp-tasks' runtime folder (its unit's `RuntimeDirectory`, 0700): its
 /// request, voice and app sockets, and [`crate::run_token_file::RUNS_DIR`].
+/// Under `/run`, so hidden with it ([`HIDDEN`]).
 pub const TASKS_RUN: &str = "/run/lampos-tasks";
 
 /// What lamp-tasks runs in the run's own namespaces (#7024: a sibling of
 /// the gateway's, never inside it; `sh -c`, its arguments: lamp-tasks'
-/// uid and gid, the project, the run's folder, the
-/// skill's folder, lamp-control's socket, the SDK's path, the interpreter,
-/// the script, then the paths hidden), in order: the run's folder a real
-/// folder, not a link (every gateway agent writes the project, so it could
-/// put a link there), and its real path the project's real path and its
-/// name, that resolved path the one checked and bound; no hidden path (nor
-/// the project) in a folder shown again; a fresh `/tmp` (none of the
-/// gateway's files, a staging no other process reaches) and in it the
-/// script's own empty home; the run's folder (resolved) and the
-/// skill's folder bound aside there; a 0700 tmpfs over the project (every
-/// other run's folder gone) and over each hidden path that is there; the
-/// two folders moved back; no core file (`ulimit -c 0`, soft and hard);
-/// then, in a user namespace of its own (no
-/// capability over these mounts, so nothing can be unmounted), the token
-/// read from fd 3 (a pipe, never an argument or the environment), fd 4
-/// (a pipe lamp-tasks reads) told `started` and closed, and the script run
-/// with an environment of [`SCRIPT_PATH`], `HOME` that fresh home (never
-/// the run's folder, which the gateway writes: Python reads `.pth` files
-/// from `$HOME/.local`), `PYTHONNOUSERSITE=1`, the socket, the SDK and the
-/// token only, and a Python interpreter given `-s` too (no user
+/// uid and gid, the project, the run's folder, the run's folder's
+/// `dev:inode` as lamp-tasks saw it ([`fence_args`]), the skill's folder,
+/// lamp-control's socket, the SDK's path, the interpreter, the script,
+/// then the paths hidden), in order: the run's folder a real folder, not a
+/// link (every gateway agent writes the project, so it could put a link
+/// there), and its real path the project's real path and its name, that
+/// resolved path the one checked and bound, and the folder bound the one
+/// lamp-tasks saw (its `dev:inode`: a link swapped in between the check
+/// and the bind is followed by `mount --bind`, so it is caught there); no
+/// hidden path (nor the project) in a folder shown again; a fresh `/tmp`
+/// (none of the gateway's files, a staging no other process reaches) and
+/// in it the script's own empty home; the run's folder (resolved), the
+/// skill's folder and lamp-control's socket (when it is there) bound aside
+/// there; a 0700 tmpfs over the project (every other run's folder gone)
+/// and over each hidden path that is there; the two folders and the
+/// socket moved back; `/dev/null` bound over every camera, microphone,
+/// speaker, serial, I2C, SPI, GPIO, HID, framebuffer and GPU device, as
+/// the gateway's namespace does (lamp-update's `hermes_install::DEVICES`:
+/// under `--map-root-user` lamp-tasks' groups can't be dropped); no core
+/// file (`ulimit -c 0`, soft and hard); then, in a user namespace of its
+/// own (no capability over these mounts, so nothing can be unmounted), the
+/// token read from fd 3 (a pipe, never an argument or the environment),
+/// the interpreter found, fd 4 (a pipe lamp-tasks reads) told `started`
+/// and closed, and the script run with an environment of [`SCRIPT_PATH`],
+/// `HOME` that fresh home (never the run's folder, which the gateway
+/// writes: Python reads `.pth` files from `$HOME/.local`),
+/// `PYTHONNOUSERSITE=1`, `PYTHONSAFEPATH=1` (no working folder on
+/// `sys.path`, for a `-c` or `-m` the script starts), the socket, the SDK
+/// and the token only, and a Python interpreter given `-s` too (no user
 /// site-packages; never `-I` or `-E`, which drop `PYTHONPATH`, the SDK).
-/// Any step that fails ends the fence
-/// before the script runs, and lamp-tasks never reads `started`. Every
-/// `mount` is `mount -n`: no mount writes libmount's utab under `/run`
-/// (read-only in the gateway's namespace on lamp-c0a4, where the fence
-/// ran before #7024), so none fails after it has mounted.
-pub const FENCE_TEXT: &str = r#"u=$1 g=$2 p=$3 r=$4 k=$5 so=$6 py=$7 i=$8 s=$9
-shift 9
+/// Any step that fails ends the fence before the script runs, and
+/// lamp-tasks never reads `started`. Every `mount` is `mount -n`: no mount
+/// writes libmount's utab under `/run` (read-only in the gateway's
+/// namespace on lamp-c0a4, where the fence ran before #7024), so none
+/// fails after it has mounted.
+pub const FENCE_TEXT: &str = r#"u=$1 g=$2 p=$3 r=$4 ri=$5 k=$6 so=$7 py=$8 i=$9 s=${10}
+shift 10
 no() { echo "the run's fence was not made ($1): the script was not run" >&2; exit 1; }
 [ -d "$r" ] && [ ! -L "$r" ] || no "the run's folder is not a folder"
 rr=$(cd -P "$r" && pwd -P) && pr=$(cd -P "$p" && pwd -P) || no "the run's folder's path"
@@ -951,7 +959,11 @@ mount -n -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp || no /tmp
 t1=$(mktemp -d /tmp/lampos-run.XXXXXX) && t2=$(mktemp -d /tmp/lampos-skill.XXXXXX) || no staging
 hm=$(mktemp -d /tmp/lampos-home.XXXXXX) || no "the script's home"
 mount -n --bind "$rr" "$t1" || no "the run's folder"
+[ "$(stat -c %d:%i "$t1")" = "$ri" ] || no "the run's folder is not the one checked"
 mount -n --bind "$k" "$t2" || no "the skill's folder"
+sk=
+[ ! -S "$so" ] || sk=$(mktemp /tmp/lampos-socket.XXXXXX) || no "lamp-control's socket"
+[ -z "$sk" ] || mount -n --bind "$so" "$sk" || no "lamp-control's socket"
 mount -n -t tmpfs -o mode=0700 tmpfs "$p" || no "the project"
 for h in "$@"; do
   [ -e "$h" ] || continue
@@ -961,20 +973,28 @@ mkdir -p "$k" "$r" || no "the folders"
 mount -n --move "$t2" "$k" || no "the skill's folder back"
 mount -n --move "$t1" "$r" || no "the run's folder back"
 rmdir "$t1" "$t2" || no "the staging"
+if [ -n "$sk" ] && [ ! -e "$so" ]; then mkdir -p "${so%/*}" && touch "$so" || no "lamp-control's socket's place"; fi
+[ -z "$sk" ] || mount -n --move "$sk" "$so" || no "lamp-control's socket back"
+[ -z "$sk" ] || rm -f "$sk" || no "the socket's staging"
+for d in /dev/video* /dev/media* /dev/v4l-subdev* /dev/snd/* /dev/ttyACM* /dev/ttyUSB* /dev/ttyS* /dev/ttyAMA* /dev/i2c-* /dev/spidev* /dev/gpiochip* /dev/hidraw* /dev/fb* /dev/dri/*; do
+  [ -c "$d" ] || continue
+  mount -n --bind /dev/null "$d" || no "$d"
+done
 cd "$r" || no "the run's folder"
 ulimit -c 0 || no "no core"
 case "${i##*/}" in python*) set -- "$i" -s "$s" ;; *) set -- "$i" "$s" ;; esac
-exec unshare --user --map-user="$u" --map-group="$g" -- env -i PATH="$SCRIPT_PATH" HOME="$hm" PYTHONNOUSERSITE=1 LAMP_CONTROL_SOCKET="$so" PYTHONPATH="$py" /bin/sh -c 'IFS= read -r t <&3 || exit 1; exec 3<&-; LAMP_CONTROL_TOKEN=$t; unset t; export LAMP_CONTROL_TOKEN; printf "started\n" >&4 || exit 1; exec 4>&-; exec "$@"' run "$@"
+exec unshare --user --map-user="$u" --map-group="$g" -- env -i PATH="$SCRIPT_PATH" HOME="$hm" PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 LAMP_CONTROL_SOCKET="$so" PYTHONPATH="$py" /bin/sh -c 'IFS= read -r t <&3 || exit 1; exec 3<&-; command -v "$1" >/dev/null || { echo "no interpreter $1: the script was not run" >&2; exit 127; }; LAMP_CONTROL_TOKEN=$t; unset t; export LAMP_CONTROL_TOKEN; printf "started\n" >&4 || exit 1; exec 4>&-; exec "$@"' run "$@"
 "#;
 
 /// The fence's `unshare` arguments for `grant` (its run's folder in the
 /// runs' project, its parent), lamp-tasks' `uid` and `gid`, and `hidden`
 /// covered ([`HIDDEN`] on a lamp): a user (root mapped), network (only
 /// `lo`), mount and PID namespace of its own, then [`FENCE_TEXT`] with its
-/// arguments. Never the token. lamp-tasks starts it from its own
-/// namespaces ([`crate::skill_start::lamp_fence`]), so its PID namespace
-/// is a sibling of the gateway's: no gateway process has a pid for the
-/// script.
+/// arguments, among them the run's folder's `dev:inode` as seen here
+/// ([`run_seen`]), which the fence's bound folder must have. Never the
+/// token. lamp-tasks starts it from its own namespaces
+/// ([`crate::skill_start::lamp_fence`]), so its PID namespace is a sibling
+/// of the gateway's: no gateway process has a pid for the script.
 pub fn fence_args(
     grant: &crate::skill_start::Grant,
     uid: u32,
@@ -1005,6 +1025,7 @@ pub fn fence_args(
     args.push(gid.to_string().into());
     args.push(project.into());
     args.push(grant.run.clone().into());
+    args.push(run_seen(&grant.run).into());
     args.push(grant.skill.clone().into());
     args.push((&grant.socket).into());
     args.push((&grant.pythonpath).into());
@@ -1012,6 +1033,18 @@ pub fn fence_args(
     args.push(grant.script.clone().into());
     args.extend(hidden.iter().map(|path| path.as_os_str().to_owned()));
     args
+}
+
+/// The run's folder's `dev:inode` as `stat -c %d:%i` says it, the entry
+/// itself (a link is not followed, so a link's never matches the folder
+/// bound through it); `-` when it can't be read, which matches nothing,
+/// so the fence then ends before the script runs.
+pub fn run_seen(run: &Path) -> String {
+    use std::os::unix::fs::MetadataExt as _;
+    std::fs::symlink_metadata(run).map_or_else(
+        |_| "-".into(),
+        |meta| format!("{}:{}", meta.dev(), meta.ino()),
+    )
 }
 
 /// The Harness task's words for a gateway agent's run: the launcher with
@@ -1814,6 +1847,18 @@ mod tests {
             "/var/lib/lampos-tasks/harnesses/lamp-tasks",
             "/var/lib/lampOS/skills",
             "/var/lib/lampOS/skills-dev",
+            // At least what the gateway's namespace hid (#7024's read):
+            // lamp services' sockets and files under /run, and the lamp's
+            // own settings.
+            "/run/lampos-seen/frame-link.env",
+            "/run/lampos-control/admin.sock",
+            "/run/lampos-setup-keys/keys.sock",
+            "/run/lampos-skill-start/start.sock",
+            "/run/lampos-tasks/request.sock",
+            "/run/credentials",
+            "/etc/lampOS/cloud.env",
+            "/var/tmp/x",
+            "/dev/shm/x",
         ] {
             assert!(
                 HIDDEN.iter().any(|h| Path::new(shown).starts_with(h)),
@@ -1840,7 +1885,14 @@ mod tests {
         // run's folder bound only as the real folder checked, no core.
         for part in [
             " PYTHONNOUSERSITE=1 ",
+            " PYTHONSAFEPATH=1 ",
             "set -- \"$i\" -s \"$s\"",
+            "[ \"$(stat -c %d:%i \"$t1\")\" = \"$ri\" ] || no ",
+            "mount -n --bind /dev/null \"$d\" || no ",
+            "/dev/video* ",
+            "/dev/snd/* ",
+            "/dev/ttyACM* ",
+            "/dev/gpiochip* ",
             " HOME=\"$hm\" ",
             "[ ! -L \"$r\" ]",
             "mount -n --bind \"$rr\" \"$t1\"",
@@ -1851,17 +1903,29 @@ mod tests {
         for part in ["HOME=\"$r\"", " -I ", " -E ", "--bind \"$r\""] {
             assert!(!FENCE_TEXT.contains(part), "{part}");
         }
+        // The interpreter is found before `started` is said, and the bound
+        // folder checked right after its bind.
+        let found = FENCE_TEXT.find("command -v \"$1\"").unwrap();
+        assert!(found < FENCE_TEXT.find("printf \"started").unwrap());
+        let bind = FENCE_TEXT.find("mount -n --bind \"$rr\"").unwrap();
+        let checked = FENCE_TEXT.find("stat -c %d:%i").unwrap();
+        assert!(bind < checked && checked < FENCE_TEXT.find("mount -n --bind \"$k\"").unwrap());
     }
 
-    /// Stand-ins for `unshare` (logs its arguments, then runs its program)
-    /// and `mount` (logs its arguments; fails when its last one is the path
-    /// in `<dir>/fail`) in `<dir>/bin`, each logging to `log`.
+    /// Stand-ins for `unshare` (logs its arguments, then runs its program),
+    /// `mount` (logs its arguments; fails when its last one is the path in
+    /// `<dir>/fail`), each logging to `log`, and `stat` (says what
+    /// `<dir>/seen` holds) in `<dir>/bin`.
     fn stubs(dir: &Path, log: &Path) {
         let bin = dir.join("bin");
         std::fs::create_dir_all(&bin).unwrap();
         let log = log.display();
         let fail = dir.join("fail");
+        let seen = dir.join("seen");
         for (name, text) in [
+            // With `mount` stood in for, nothing is bound: the run's
+            // folder's `dev:inode` is what `<dir>/seen` holds.
+            ("stat", format!("#!/bin/sh\ncat {}\n", seen.display())),
             (
                 "unshare",
                 format!(
@@ -1917,9 +1981,9 @@ mod tests {
         std::fs::write(
             &python,
             format!(
-                "#!/bin/sh\nprintf 'python3 %s|%s|%s|%s|%s|%s|%s|%s|%s|%s\\n' \"$*\" \"$LAMP_CONTROL_TOKEN\" \
+                "#!/bin/sh\nprintf 'python3 %s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\\n' \"$*\" \"$LAMP_CONTROL_TOKEN\" \
                  \"$LAMP_CONTROL_SOCKET\" \"$PYTHONPATH\" \"$HOME\" \"$PATH\" \"${{LAMP_HERMES_TOKEN-none}}\" \
-                 \"${{PYTHONNOUSERSITE-none}}\" \"$(ulimit -c)\" \"$(pwd)\" >> {}\n",
+                 \"${{PYTHONNOUSERSITE-none}}\" \"${{PYTHONSAFEPATH-none}}\" \"$(ulimit -c)\" \"$(ulimit -H -c)\" \"$(pwd)\" >> {}\n",
                 log.display()
             ),
         )
@@ -1934,6 +1998,7 @@ mod tests {
             pythonpath: "/sdk".into(),
         };
         let hidden = vec![dir.path().join("state"), dir.path().join("absent")];
+        std::fs::write(dir.path().join("seen"), run_seen(&folder)).unwrap();
         Fenced {
             said: dir.path().join("said"),
             dir,
@@ -1952,7 +2017,9 @@ mod tests {
             .arg("-c")
             // The soft core limit raised to the hard one first: with an
             // inherited 0 (macOS' default), a fence without `ulimit -c 0`
-            // would still show `0` to the script.
+            // would still show `0` to the script. The hard one is left as
+            // inherited (`unlimited` on macOS and most hosts), so only the
+            // fence makes it 0.
             .arg(r#"ulimit -S -c "$(ulimit -H -c)" 2>/dev/null; exec 3<&0 4>"$1" 0</dev/null; shift; exec unshare "$@""#)
             .arg("fd")
             .arg(&at.said)
@@ -1985,7 +2052,12 @@ mod tests {
         assert!(out.status.success(), "{out:?}");
         assert_eq!(std::fs::read_to_string(&at.said).unwrap(), "started\n");
         let log = std::fs::read_to_string(&at.log).unwrap();
-        let lines: Vec<&str> = log.lines().collect();
+        // The host's own devices hidden (`/dev/null` bound over each): as
+        // many as this host has, so left out of the count.
+        let lines: Vec<&str> = log
+            .lines()
+            .filter(|line| !line.starts_with("mount -n --bind /dev/null /dev/"))
+            .collect();
         assert_eq!(lines.len(), 10, "{log}");
         assert!(
             lines[0].starts_with("unshare --user --map-root-user --net --mount --pid --fork "),
@@ -2023,9 +2095,9 @@ mod tests {
         );
         assert!(!lines[8].contains("run-secret"), "the token in no argument");
         let ran: Vec<&str> = lines[9].split('|').collect();
-        assert_eq!(ran.len(), 10, "{log}");
+        assert_eq!(ran.len(), 12, "{log}");
         assert!(
-            ran[9].ends_with("/project/skill-task-1"),
+            ran[11].ends_with("/project/skill-task-1"),
             "the run's folder: {log}"
         );
         // Its home: the fence's own (here, with `mount` stood in for, made
@@ -2034,7 +2106,7 @@ mod tests {
         assert!(home.starts_with("/tmp/lampos-home."), "{log}");
         let _ = std::fs::remove_dir(home);
         assert_eq!(
-            [&ran[..4], &ran[5..9]].concat(),
+            [&ran[..4], &ran[5..11]].concat(),
             [
                 format!("python3 -s {d}/skills/s/main.py").as_str(),
                 "run-secret",
@@ -2043,10 +2115,57 @@ mod tests {
                 "/usr/local/bin:/usr/bin:/bin",
                 "none",
                 "1",
+                "1",
+                "0",
                 "0",
             ],
-            "-s, PYTHONNOUSERSITE=1 and no core: {log}"
+            "-s, PYTHONNOUSERSITE=1, PYTHONSAFEPATH=1 and no core, soft or hard: {log}"
         );
+    }
+
+    /// #7024's read: the run's folder swapped (for a link to a folder of
+    /// lamp-tasks' namespace) after the fence checked it and before its
+    /// bind. `mount --bind` follows the link, so the folder bound is not
+    /// the one lamp-tasks saw: the fence ends before anything else is
+    /// shown or the script runs.
+    #[test]
+    fn a_run_folder_swapped_after_its_check_ends_the_start_after_its_bind() {
+        let _one = ONE_START.lock().unwrap_or_else(|held| held.into_inner());
+        let at = fenced();
+        // What the bind found: another folder's `dev:inode`.
+        let other = run_seen(&at.dir.path().join("state"));
+        assert_ne!(other, run_seen(&at.folder));
+        std::fs::write(at.dir.path().join("seen"), other).unwrap();
+        let out = fence_it(&at);
+        assert_eq!(out.status.code(), Some(1), "{out:?}");
+        let said = String::from_utf8_lossy(&out.stderr);
+        assert!(said.contains("is not the one checked"), "{said}");
+        let log = std::fs::read_to_string(&at.log).unwrap();
+        let mounts: Vec<&str> = log.lines().filter(|l| l.starts_with("mount ")).collect();
+        assert_eq!(mounts.len(), 2, "only /tmp and the run's folder: {log}");
+        assert!(mounts[1].starts_with("mount -n --bind "), "{log}");
+        assert!(
+            !log.lines().any(|line| line.starts_with("python3 ")
+                || line.starts_with("unshare --user --map-user")),
+            "{log}"
+        );
+        assert_eq!(std::fs::read_to_string(&at.said).unwrap(), "");
+        // And a run's folder lamp-tasks could not see matches nothing.
+        assert_eq!(run_seen(&at.dir.path().join("absent")), "-");
+    }
+
+    /// #7024's read: an interpreter that is not there ends the fence before
+    /// it says `started`, so lamp-tasks fails the run closed.
+    #[test]
+    fn a_missing_interpreter_ends_the_start_before_started() {
+        let _one = ONE_START.lock().unwrap_or_else(|held| held.into_inner());
+        let mut at = fenced();
+        at.grant.interpreter = at.dir.path().join("bin/python9").display().to_string();
+        let out = fence_it(&at);
+        assert_eq!(out.status.code(), Some(127), "{out:?}");
+        let said = String::from_utf8_lossy(&out.stderr);
+        assert!(said.contains("no interpreter"), "{said}");
+        assert_eq!(std::fs::read_to_string(&at.said).unwrap(), "");
     }
 
     /// The run's folder swapped for a link (any gateway agent writes the

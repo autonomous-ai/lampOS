@@ -348,18 +348,22 @@ impl Peers for TestLauncher {
     }
 }
 
-/// The host pid of the process whose arguments are exactly `argv`.
-fn pid_of(argv: &[&str]) -> Option<u32> {
-    let want: Vec<u8> = argv
-        .iter()
-        .flat_map(|arg| [arg.as_bytes(), b"\0"].concat())
-        .collect();
+/// The host pid of the process whose last argument is `script`: the
+/// interpreter running it, whatever its options (so a fence that drops
+/// `-s` still has its script found, and fails on what the script did, not
+/// here). The fence's own `unshare` ends with the hidden paths, and the
+/// steps between exec into the interpreter.
+fn pid_of(script: &str) -> Option<u32> {
+    let want = [script.as_bytes(), b"\0"].concat();
     std::fs::read_dir("/proc")
         .ok()?
         .flatten()
         .find_map(|entry| {
             let pid = entry.file_name().to_string_lossy().parse::<u32>().ok()?;
-            (std::fs::read(entry.path().join("cmdline")).ok()? == want).then_some(pid)
+            let line = std::fs::read(entry.path().join("cmdline")).ok()?;
+            (line.ends_with(&want)
+                && (line.len() == want.len() || line[line.len() - want.len() - 1] == 0))
+                .then_some(pid)
         })
 }
 
@@ -384,13 +388,20 @@ struct Beside {
 
 /// The token lamp-tasks gives the run; never anywhere the gateway reads.
 const TOKEN: &str = "secret-7024";
+/// What a lamp service's file under the `/run` stand-in holds.
+const RUN_SECRET: &str = "run-file-7024";
+/// What a settings file under the `/etc/lampOS` stand-in holds.
+const ETC_SECRET: &str = "etc-file-7024";
 
 /// #7024 on the real kernel: lamp-tasks (this process) serves the launcher
 /// socket and starts the run's fence itself with the real `fence_args`, for
 /// `script_text` in the skill's folder as `script_name`, run by
 /// `interpreter`; the launcher runs in a gateway made as OpenClaw's.
 /// `plant` is given the run's folder first, as a gateway agent could write
-/// it. Checked here, for every run: the script got the token (in its own
+/// it. Stand-ins for `/run` (`<base>/run`: a lamp service's file, lamp-control's
+/// socket and its owner socket beside it) and `/etc/lampOS`
+/// (`<base>/etc-lampOS`), each holding a file this uid can read, are hidden
+/// as the lamp's are; `@BASE@` in `script_text` is `<base>`. Checked here, for every run: the script got the token (in its own
 /// environment, seen from the host); from inside the gateway no process
 /// names the script, its host pid is not there (`kill`, `environ` and,
 /// with strace, `ptrace` all fail); its code reaches the gateway through
@@ -417,12 +428,40 @@ fn run_beside_gateway(
     let run = base_path.join("project/skill-task-1");
     let skill = base_path.join("skill");
     let hidden = base_path.join("hidden");
-    for folder in [&run, &skill, &hidden] {
+    let run_standin = base_path.join("run");
+    let etc_standin = base_path.join("etc-lampOS");
+    for folder in [
+        &run,
+        &skill,
+        &hidden,
+        &run_standin.join("lampos-seen"),
+        &run_standin.join("lampos-control"),
+        &etc_standin,
+    ] {
         std::fs::create_dir_all(folder).unwrap();
     }
+    for (file, text) in [
+        (run_standin.join("lampos-seen/frame-link.env"), RUN_SECRET),
+        (etc_standin.join("cloud.env"), ETC_SECRET),
+    ] {
+        std::fs::write(&file, text).unwrap();
+        std::fs::set_permissions(&file, std::os::unix::fs::PermissionsExt::from_mode(0o644))
+            .unwrap();
+        // Readable here, by the uid the script runs as.
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), text);
+    }
+    let control = run_standin.join("lampos-control/control.sock");
+    let _control = std::os::unix::net::UnixListener::bind(&control).unwrap();
+    let _admin =
+        std::os::unix::net::UnixListener::bind(run_standin.join("lampos-control/admin.sock"))
+            .unwrap();
     plant(&run);
     let script = skill.join(script_name);
-    std::fs::write(&script, script_text).unwrap();
+    std::fs::write(
+        &script,
+        script_text.replace("@BASE@", base_path.to_str().unwrap()),
+    )
+    .unwrap();
     let id = lamp_tasks::skill_task::run_id();
     let starts = Starts::default();
     let grant = Grant {
@@ -430,11 +469,11 @@ fn run_beside_gateway(
         interpreter: interpreter.into(),
         skill: skill.clone(),
         run: run.clone(),
-        socket: "/run/lampos-control/control.sock".into(),
+        socket: control.to_str().unwrap().into(),
         pythonpath: "/sdk".into(),
     };
     let live = starts.open(&id, grant, TOKEN).unwrap();
-    let fence_hidden = hidden.clone();
+    let fence_hidden = [hidden.clone(), run_standin.clone(), etc_standin.clone()];
     let server = Server {
         socket: socket.clone(),
         starts: starts.clone(),
@@ -449,7 +488,10 @@ fn run_beside_gateway(
                     grant,
                     rustix::process::getuid().as_raw(),
                     rustix::process::getgid().as_raw(),
-                    &[fence_hidden.as_path()],
+                    &fence_hidden
+                        .iter()
+                        .map(PathBuf::as_path)
+                        .collect::<Vec<_>>(),
                 ))
                 .env_clear()
                 .env("PATH", lamp_tasks::gateway::SCRIPT_PATH)
@@ -490,14 +532,7 @@ fn run_beside_gateway(
         .spawn()
         .unwrap();
     wait_for(&run.join("up"));
-    // A Python script is run with `-s` (no user site-packages).
-    let script_arg = script.to_str().unwrap();
-    let interpreter_argv: Vec<&str> = if interpreter.starts_with("python") {
-        vec![interpreter, "-s", script_arg]
-    } else {
-        vec![interpreter, script_arg]
-    };
-    let host_pid = pid_of(&interpreter_argv).expect("the script's host pid, run as expected");
+    let host_pid = pid_of(script.to_str().unwrap()).expect("the script's host pid");
     // From the host (lamp-tasks' side) the script is there, its token in
     // its environment: the pid is the right one, and the token reached it
     // (on fd 3: never written anywhere by this test).
@@ -551,6 +586,12 @@ fn run_beside_gateway(
             !text.contains(TOKEN),
             "the token in the launcher's {what}: {text}"
         );
+        for secret in [RUN_SECRET, ETC_SECRET] {
+            assert!(
+                !text.contains(secret),
+                "{secret} in the launcher's {what}: {text}"
+            );
+        }
     }
     for entry in walk(&run) {
         let text = std::fs::read(&entry).unwrap_or_default();
@@ -594,6 +635,7 @@ fn the_script_runs_outside_the_gateway_and_no_gateway_process_sees_it() {
          echo script-ran\n\
          echo \"home=$HOME\"\n\
          echo \"core=$(ulimit -c)\"\n\
+         echo \"hardcore=$(ulimit -H -c)\"\n\
          touch up\n\
          while [ ! -e go ]; do sleep 0.05; done\n\
          exit 7\n",
@@ -604,6 +646,7 @@ fn the_script_runs_outside_the_gateway_and_no_gateway_process_sees_it() {
         "token-given\n",
         "home=/tmp/lampos-home.",
         "core=0\n",
+        "hardcore=0\n",
     ] {
         assert!(ran.out.contains(line), "{line}: {}", ran.out);
     }
@@ -649,6 +692,10 @@ fn a_planted_pth_in_the_run_folder_never_relays_the_token() {
          print('token-given' if os.environ.get('LAMP_CONTROL_TOKEN') else 'no-token')\n\
          print('home=' + os.environ.get('HOME', ''))\n\
          print('no_user_site=%d' % sys.flags.no_user_site)\n\
+         import socket\n\
+         c = socket.socket(socket.AF_UNIX)\n\
+         c.connect(os.environ['LAMP_CONTROL_SOCKET'])\n\
+         print('socket-connected')\n\
          sys.stdout.flush()\n\
          open('up', 'w').close()\n\
          while not os.path.exists('go'):\n    time.sleep(0.05)\n\
@@ -669,9 +716,54 @@ fn a_planted_pth_in_the_run_folder_never_relays_the_token() {
         "token-given\n",
         "home=/tmp/lampos-home.",
         "no_user_site=1\n",
+        "socket-connected\n",
     ] {
         assert!(ran.out.contains(line), "{line}: {}", ran.out);
     }
     assert!(!ran.out.contains("pth-ran"), "{}", ran.out);
     assert!(!ran.err.contains("pth-ran"), "{}", ran.err);
+}
+
+/// #7024's adversarial read: the script sees no more of the lamp than it
+/// did in the gateway's namespace, which showed an empty `/run` and
+/// `/etc/lampOS` and no camera, mic or serial device: a file this uid can
+/// read under each stand-in is not there for the script, nor is
+/// lamp-control's owner socket; lamp-control's own socket is, and each
+/// device this host has is `/dev/null`.
+#[test]
+fn the_script_reads_nothing_under_run_or_etc_lampos_and_no_device() {
+    if let Some(reason) = skip_reason() {
+        println!("skipped: {reason}");
+        return;
+    }
+    let ran = run_beside_gateway(
+        "/bin/sh",
+        "main.sh",
+        "cat @BASE@/run/lampos-seen/frame-link.env 2>/dev/null || echo unread-run\n\
+         cat @BASE@/etc-lampOS/cloud.env 2>/dev/null || echo unread-etc\n\
+         echo \"run=$(ls -A @BASE@/run | tr '\\n' ' ')\"\n\
+         echo \"control=$(ls -A @BASE@/run/lampos-control | tr '\\n' ' ')\"\n\
+         echo \"etc=$(ls -A @BASE@/etc-lampOS | tr '\\n' ' ')\"\n\
+         [ -S \"$LAMP_CONTROL_SOCKET\" ] && echo socket-shown\n\
+         for d in /dev/video* /dev/snd/* /dev/ttyS* /dev/ttyACM* /dev/ttyUSB* /dev/i2c-* /dev/gpiochip* /dev/fb*; do\n\
+           [ -c \"$d\" ] || continue\n\
+           if [ \"$(stat -Lc %t:%T \"$d\")\" = 1:3 ]; then echo \"hidden-device $d\"; else echo \"shown-device $d\"; fi\n\
+         done\n\
+         touch up\n\
+         while [ ! -e go ]; do sleep 0.05; done\n\
+         exit 7\n",
+        |_| {},
+    );
+    println!("the script said: {}", ran.out);
+    for line in [
+        "unread-run\n",
+        "unread-etc\n",
+        "run=lampos-control \n",
+        "control=control.sock \n",
+        "etc=\n",
+        "socket-shown\n",
+    ] {
+        assert!(ran.out.contains(line), "{line}: {}", ran.out);
+    }
+    assert!(!ran.out.contains("shown-device"), "{}", ran.out);
 }

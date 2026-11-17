@@ -2374,7 +2374,7 @@ mod tests {
     fn the_fences_last_shell_takes_the_token_on_fd_3_and_says_started_on_fd_4() {
         let inner = crate::gateway::FENCE_TEXT
             .split_once("/bin/sh -c '")
-            .and_then(|(_, rest)| rest.split_once("' run \"$i\" \"$s\""))
+            .and_then(|(_, rest)| rest.split_once("' run \"$@\""))
             .unwrap()
             .0;
         let dir = tempfile::tempdir().unwrap();
@@ -2428,9 +2428,13 @@ mod tests {
             .map(str::trim_start)
             .filter(|line| line.starts_with("mount ") || line.contains("|| mount "))
             .collect();
-        assert_eq!(mounts.len(), 7, "{mounts:?}");
+        assert_eq!(mounts.len(), 10, "{mounts:?}");
         for line in mounts {
-            assert!(line.starts_with("mount -n "), "{line}");
+            assert_eq!(
+                line.matches("mount ").count(),
+                line.matches("mount -n ").count(),
+                "{line}"
+            );
         }
     }
 
@@ -2453,6 +2457,9 @@ mod tests {
                 "990",
                 "/var/lib/lampos-tasks/harnesses/lamp-tasks",
                 "/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-task-1",
+                // The run's folder's `dev:inode`: none here, so `-`, which
+                // no bound folder matches.
+                "-",
                 "/var/lib/lampOS/skills/photo-booth",
                 "/run/lampos-control/control.sock",
                 "/opt/lampOS/sdk",
@@ -2701,11 +2708,11 @@ mod tests {
 
     /// The fence is made in lamp-tasks' own namespaces (#7024): it hides
     /// the launcher's socket and lamp-tasks' own runtime folder, its
-    /// sockets and the Hermes runs' token files.
+    /// sockets and the Hermes runs' token files (all of `/run`).
     #[test]
     fn the_fence_hides_the_launchers_socket_and_lamp_tasks_own_folder() {
-        assert!(crate::gateway::HIDDEN.contains(&START_DIR));
         for shown in [
+            START_DIR,
             START_SOCKET,
             "/run/lampos-tasks/request.sock",
             "/run/lampos-tasks/app.sock",

@@ -1430,21 +1430,31 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   từ chối thư mục của lần chạy nếu nó không phải thư mục thật hoặc là một
   link (mọi agent của gateway đều ghi được project), và nếu đường dẫn thật
   của nó không phải đường dẫn thật của project cộng tên nó; rào bind chính
-  đường dẫn thật đó. Trong các namespace user, mạng (chỉ `lo`), mount và
-  PID riêng của lần chạy, rào mount một `/tmp` mới, tạo trong đó một home
-  rỗng riêng cho script, bind thư mục của lần chạy và thư mục kỹ năng sang
-  một bên, phủ project Harness và `/var/lib`, `/var/tmp`, `/dev/shm`,
-  `/run/lampos-skill-start` và `/run/lampos-tasks` (`gateway::HIDDEN`)
-  bằng tmpfs 0700, rồi chuyển hai thư mục về chỗ cũ. Mọi mount đều là
-  `mount -n`, nên không mount nào ghi utab của libmount dưới `/run`. Rào
-  đặt `ulimit -c 0` (không có file core). Sau đó, trong một user namespace
-  riêng, nó đọc token từ fd 3, ghi `started` vào fd 4 rồi đóng fd đó, và
-  exec script trong thư mục của lần chạy với
+  đường dẫn thật đó, rồi từ chối thư mục đã bind nếu `dev:inode` của nó
+  (`stat -c %d:%i`) không phải cái lamp-tasks đã thấy cho thư mục của lần
+  chạy trước khi rào bắt đầu (`gateway::run_seen`), nên một link bị tráo
+  vào sau bước kiểm tra sẽ bị bắt. Trong các namespace user, mạng (chỉ
+  `lo`), mount và PID riêng của lần chạy, rào mount một `/tmp` mới, tạo
+  trong đó một home rỗng riêng cho script, bind thư mục của lần chạy, thư
+  mục kỹ năng và socket của lamp-control sang một bên, phủ project Harness
+  và `/run`, `/var/lib`, `/var/tmp`, `/dev/shm` và `/etc/lampOS`
+  (`gateway::HIDDEN`: ít nhất những gì namespace của gateway đã ẩn, nên
+  socket của launcher, thư mục riêng của lamp-tasks và mọi socket, file của
+  các dịch vụ khác của đèn cũng bị ẩn) bằng tmpfs 0700, rồi chuyển hai thư
+  mục và socket về chỗ cũ. Không hiện `resolv.conf`: mạng của rào chỉ có
+  `lo`. Rào bind `/dev/null` đè lên mọi thiết bị camera, micro, loa, cổng
+  serial, I2C, SPI, GPIO, HID, framebuffer và GPU, như namespace của
+  gateway. Mọi mount đều là `mount -n`, nên không mount nào ghi utab của
+  libmount dưới `/run`. Rào đặt `ulimit -c 0` (không có file core, cả giới
+  hạn mềm lẫn cứng). Sau đó, trong một user namespace riêng, nó đọc token
+  từ fd 3, dừng nếu không có trình thông dịch, ghi `started` vào fd 4 rồi
+  đóng fd đó, và exec script trong thư mục của lần chạy với
   `PATH=/usr/local/bin:/usr/bin:/bin` (`gateway::SCRIPT_PATH`), `HOME` là
   home mới đó (không bao giờ là thư mục của lần chạy: Python sẽ chạy các
   file `.pth` mà một agent của gateway đặt dưới `$HOME/.local`, và output
-  của script quay về gateway), `PYTHONNOUSERSITE=1`, cùng socket, SDK và
-  token, không gì khác. Trình thông dịch Python còn được thêm `-s` (không
+  của script quay về gateway), `PYTHONNOUSERSITE=1`, `PYTHONSAFEPATH=1`
+  (không đưa thư mục làm việc vào `sys.path` cho một `-c` hay `-m` mà
+  script khởi động), cùng socket, SDK và token, không gì khác. Trình thông dịch Python còn được thêm `-s` (không
   có user site-packages); không bao giờ `-I` hay `-E`, vì chúng bỏ
   `PYTHONPATH` của SDK. Bước nào lỗi cũng kết thúc rào trước khi script
   chạy.

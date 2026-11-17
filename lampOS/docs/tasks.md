@@ -3974,21 +3974,32 @@ file:
   the environment. fd 4 is a pipe lamp-tasks reads. The fence first
   refuses a run's folder that is not a real folder or is a link (every
   gateway agent can write the project), and one whose real path is not
-  the project's real path and its name; it binds that real path. In the
-  run's own user, network (only `lo`), mount and PID namespaces, the fence
-  mounts a fresh `/tmp`, makes the script's own empty home in it, binds the
-  run's folder and the skill's folder aside, covers the Harness project
-  and `/var/lib`, `/var/tmp`, `/dev/shm`, `/run/lampos-skill-start` and
-  `/run/lampos-tasks` (`gateway::HIDDEN`) with 0700 tmpfs, and moves the
-  two folders back. Every mount is `mount -n`, so none writes libmount's
-  utab under `/run`. It sets `ulimit -c 0` (no core file). Then, in a user
-  namespace of its own, it reads the token from fd 3, writes `started` to
-  fd 4 and closes it, and execs the script in the run's folder with
+  the project's real path and its name; it binds that real path, and then
+  refuses a bound folder whose `dev:inode` (`stat -c %d:%i`) is not the
+  one lamp-tasks saw for the run's folder before the fence started
+  (`gateway::run_seen`), so a link swapped in after the check is caught.
+  In the run's own user, network (only `lo`), mount and PID namespaces,
+  the fence mounts a fresh `/tmp`, makes the script's own empty home in
+  it, binds the run's folder, the skill's folder and lamp-control's socket
+  aside, covers the Harness project and `/run`, `/var/lib`, `/var/tmp`,
+  `/dev/shm` and `/etc/lampOS` (`gateway::HIDDEN`: at least what the
+  gateway's namespace hid, so the launcher's socket, lamp-tasks' own
+  folder and every other lamp service's sockets and files go too) with
+  0700 tmpfs, and moves the two folders and the socket back. No
+  `resolv.conf` is shown: the fence's network has only `lo`. It binds
+  `/dev/null` over each camera, microphone, speaker, serial, I2C, SPI,
+  GPIO, HID, framebuffer and GPU device, as the gateway's namespace does.
+  Every mount is `mount -n`, so none writes libmount's utab under `/run`.
+  It sets `ulimit -c 0` (no core file, soft and hard limit). Then, in a
+  user namespace of its own, it reads the token from fd 3, ends if the
+  interpreter is not there, writes `started` to fd 4 and closes it, and
+  execs the script in the run's folder with
   `PATH=/usr/local/bin:/usr/bin:/bin` (`gateway::SCRIPT_PATH`), `HOME` the
   fresh home (never the run's folder: Python would run `.pth` files a
   gateway agent put under `$HOME/.local`, and the script's output goes
-  back to the gateway), `PYTHONNOUSERSITE=1`, the socket, the SDK and the
-  token only. A Python interpreter also gets `-s` (no user
+  back to the gateway), `PYTHONNOUSERSITE=1`, `PYTHONSAFEPATH=1` (no
+  working folder on `sys.path` for a `-c` or `-m` the script starts), the
+  socket, the SDK and the token only. A Python interpreter also gets `-s` (no user
   site-packages); never `-I` or `-E`, which would drop the SDK's
   `PYTHONPATH`. Any step that fails ends the fence before the script runs.
 - **Fails closed** (`gateway::start_ran`). When Harness says the run ended
