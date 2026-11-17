@@ -137,7 +137,32 @@ on 17 Nov 2026 (`lampos` 0.2.0); the address you gave shows here as `HOST`.
 | `lamp: wrong_lamp: the certificate at HOST is not the lamp's: …` (the two fingerprints follow) | Something answered at that address, but not the lamp with that pin. | Check the address; check the pin is from this lamp's screen. |
 | `lamp: not_paired: no pairing here for that lamp: run `lamp pair` first` | `lamp hello` (or a program) ran before a pairing was kept on this computer. | Pair first. |
 | A Python traceback ending in `ConnectionRefusedError: [Errno 111] Connect call failed ('HOST', PORT)` | Nothing listens at that address and port: the owner has not turned developer access on, or the address is wrong. | Ask the owner to turn developer access on; check the address. |
+| A traceback ending in `OSError: [Errno 65] No route to host`, on a Mac | macOS's Local Network privacy setting can stop Python from reaching the lamp: `ping` and `nc -vz HOST 7731` from Terminal work, yet Python never appears in the setting, so you are never asked (seen with python.org Python 3.12). | Open System Settings, Privacy & Security, **Local Network**, and turn on Python if it is listed. If it is not, relay through `nc`, which Terminal may use: see "On a Mac when Python is not listed" below. |
 | A traceback ending in `socket.gaierror: [Errno -2] Name or service not known` | The computer cannot resolve the lamp's name. | Use the lamp's IP address, and check the computer is on the lamp's network. |
+
+### On a Mac when Python is not listed
+
+Allowing your terminal does not carry over to Python started from it. Relay
+through `nc`, which Terminal may use. Run this in Terminal and keep it open;
+it takes one connection at a time (`HOST` is the lamp's name or IP address):
+
+```sh
+LAMP=HOST
+F=/tmp/lamp-relay.fifo; rm -f "$F"; mkfifo "$F"
+while true; do nc -l 127.0.0.1 17731 < "$F" | nc "$LAMP" 7731 > "$F"; done
+```
+
+Then pair and connect through it, from another Terminal window:
+
+```sh
+lamp pair CODE --pin PIN --host 127.0.0.1 --port 17731
+lamp hello
+```
+
+The relay passes TLS through untouched, so the pin check still holds end to
+end. Pairing, `lamp hello`, `say` and full sessions worked through it on the
+SDK builder's Mac. A program that reconnects right after closing can be
+refused for about half a second while the loop restarts: retry once.
 
 The lamp's own refusals come back in the same shape. From
 [sdk/GUIDE.md](../../sdk/GUIDE.md), "Connect, pair, limits":
