@@ -10484,14 +10484,14 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
             "engineSession":"s","state":"idle"
         }))},
         "reply":{"each":[
-            {"stdout":"{\"state\":\"taken\",\"inputId\":\"in-1\",\"takenAt\":1}\n"},
+            {"stdout":"{\"state\":\"taken\",\"inputId\":\"program:in-1\",\"takenAt\":\"2026-11-17T04:59:27.216Z\"}\n"},
             {"stdout":"{\"error\":\"NOT_IDLE\",\"code\":\"NOT_IDLE\"}\n","exit":5},
             {"stdout":"{\"error\":\"ENGINE_NOT_READY\"}\n","exit":5},
             {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":true}\n","exit":124},
-            {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":false,\"inputId\":\"in-2\"}\n","exit":124},
+            {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":false,\"inputId\":\"program:in-2\"}\n","exit":124},
             {"stdout":"","exit":124},
             {"stdout":"{\"error\":\"NOT_YOURS\"}\n","exit":5},
-            {"stdout":"{\"state\":\"taken\",\"inputId\":\"in-3\"}\n"}
+            {"stdout":"{\"state\":\"taken\",\"inputId\":\"program:in-3\"}\n"}
         ]},
         "wait":{"exit":3},
         "close":{"stdout":"{\"ok\":true}\n"},
@@ -10508,21 +10508,21 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
             engine_session: Some("s".into())
         })
     );
-    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "New task t:\nGo."), Took::Taken("in-1".into()));
+    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "New task t:\nGo."), Took::Taken("program:in-1".into()));
     assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::NotIdle);
     assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::EngineNotReady);
     assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::Timeout);
     // Typed though timed out: that input, never typed again.
-    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::Taken("in-2".into()));
+    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::Taken("program:in-2".into()));
     assert!(matches!(cli.reply_kept("lamp-one-openclaw", &token, "x"), Took::Uncertain(_)));
     assert_eq!(
         cli.reply_kept("lamp-one-openclaw", &token, "x"),
         Took::NotSent("reply_not_yours".into())
     );
     // OpenClaw's TUI takes a first `!` or `/` as its own command.
-    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "  !rm x"), Took::Taken("in-3".into()));
+    assert_eq!(cli.reply_kept("lamp-one-openclaw", &token, "  !rm x"), Took::Taken("program:in-3".into()));
     assert_eq!(
-        cli.wait_kept("lamp-one-openclaw", &token, "in-1", &AtomicBool::new(false)),
+        cli.wait_kept("lamp-one-openclaw", &token, "program:in-1", &AtomicBool::new(false)),
         Ok(Some("needs-input".into()))
     );
     assert_eq!(cli.close_kept("lamp-one-openclaw", &token), Ok(()));
@@ -10567,24 +10567,24 @@ fn a_reply_to_the_pane_reads_the_acknowledged_answer() {
     rig.config.as_person = true;
     rig.plan(json!({
         "reply":{"each":[
-            {"stdout":"{\"state\":\"taken\",\"inputId\":\"in-1\"}\n"},
+            {"stdout":"{\"state\":\"taken\",\"inputId\":\"program:in-1\"}\n"},
             {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":true}\n","exit":124},
-            {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":false,\"inputId\":\"in-2\"}\n","exit":124},
+            {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":false,\"inputId\":\"program:in-2\"}\n","exit":124},
             {"stdout":format!("{}\n", json!({"ok":true,"id":AGENT,"state":"queued"}))}
         ]},
         "wait":{"exit":0},
     }));
     let cli = rig.cli();
-    assert_eq!(cli.reply_to(MACHINE, AGENT, "New task t:\nGo."), Typed::Taken("in-1".into()));
+    assert_eq!(cli.reply_to(MACHINE, AGENT, "New task t:\nGo."), Typed::Taken("program:in-1".into()));
     assert_eq!(cli.reply_to(MACHINE, AGENT, "x"), Typed::Cancelled);
-    assert_eq!(cli.reply_to(MACHINE, AGENT, "x"), Typed::Taken("in-2".into()));
+    assert_eq!(cli.reply_to(MACHINE, AGENT, "x"), Typed::Taken("program:in-2".into()));
     assert_eq!(cli.reply_to(MACHINE, AGENT, "x"), Typed::Typed);
     assert_eq!(
-        cli.wait_after(MACHINE, AGENT, "in-1", &AtomicBool::new(false)),
+        cli.wait_after(MACHINE, AGENT, "program:in-1", &AtomicBool::new(false)),
         Ok(Some("idle".into()))
     );
     let calls = rig.calls();
     let wait = calls.last().unwrap()["args"].as_array().unwrap().clone();
-    assert!(wait.contains(&json!("--after")) && wait.contains(&json!("in-1")), "{wait:?}");
+    assert!(wait.contains(&json!("--after")) && wait.contains(&json!("program:in-1")), "{wait:?}");
     assert!(!wait.contains(&json!("--program-token-file")));
 }
