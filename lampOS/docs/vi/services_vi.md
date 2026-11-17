@@ -862,7 +862,11 @@ mọi câu trả lời (mọi cách viết, thuần hay mã hoá URL).
 Mỗi `service_read` có một dòng nhật ký (`serve::read_said`, #5826): ai hỏi,
 mã dịch vụ và loại đọc, và kết quả ra sao, như
 "lamp-services: the voice's service_read of gmail search: found 2". Loại
-đọc là một `what` chỉ gồm chữ thường và `_`, nếu không thì "another"; kết
+đọc là chính `what` khi nó là một trong các loại đọc của dịch vụ
+(`reads::kinds`; khi không biết dịch vụ, của bất kỳ dịch vụ nào), "no what"
+khi không có, nếu không thì chỉ hình dạng của nó (#7498): "a what of 16
+characters, no service's kind" hoặc "a what of 6 characters, another
+service's kind", không bao giờ là chữ của nó; kết
 quả là "found N" (số mục được trích dẫn và bị bỏ ra), "none", "answered"
 (của một công cụ MCP), "refused: <lý do>" bằng các chữ cố định (a send-only
 link, not linked, its link has expired, a service the lamp can't link, no
@@ -2830,7 +2834,25 @@ không bao giờ lấy từ thư mục của executive hay của một kỹ năn
   reason." Nó tối đa 600 byte, để quy tắc riêng của giọng nói vừa trước nó
   trong 1,024 byte mà liên kết nhà cung cấp nhận.
 - **`service_read {service, what, …}`**: `what` và các đối số của nó như
-  trong bảng ở trên; câu trả lời được trích dẫn, rút gọn còn ai gửi và về
+  trong bảng ở trên. Các loại đọc của mỗi dịch vụ (`reads::kinds`: chữ đầu
+  của mỗi lần đọc của nó trong bảng, `tools` và `call` của một dịch vụ MCP,
+  và `get` cho một dịch vụ đọc qua HTTP API có một GET trong danh sách cho
+  phép, không bao giờ cho Gmail) được nêu ngay trên `what`, dù phần mô tả bị
+  cắt giữ lại gì: một `enum` gồm mọi loại được đưa ra, và mô tả của nó "One
+  kind of read, the word alone, of the named service's own, never other
+  words: gmail: recent, search, drafts, message, attachment;
+  google_calendar: events, get; …" (#7498: trên lamp-a63e ngày 17 Nov các
+  lần đọc Gmail với một `what` không thuộc loại nào của Gmail bị từ chối bốn
+  lần, và chỉ mỗi lần thử lại với `search` mới có trả lời). Khi không có
+  loại nào được đưa ra (chỉ `gmail-app` chỉ-gửi được liên kết, với
+  `LAMP_SERVICES_LINKED_TOOLS=on`), `what` không có `enum` rỗng, và lần đọc
+  của nó nghe cách liên kết Gmail để đọc. Một `what` không thuộc loại nào
+  của dịch vụ bị từ chối trước khi hỏi dịch vụ, với cùng các loại đó, để
+  lần gọi sau đúng: "what is one of gmail's kinds of read, the word alone:
+  recent, search, drafts, message, attachment. gmail reads: recent {count},
+  …" (`reads::no_such_kind`; của một dịch vụ MCP cũng vậy). Lời của mô hình
+  không bao giờ được so với một danh sách: chỉ `what` được kiểm tra, như
+  một trong các loại. Câu trả lời được trích dẫn, rút gọn còn ai gửi và về
   việc gì khi chủ đèn có thể không ở một mình. Một lần đọc đầy đủ còn cần câu
   nói bằng giọng của cuộc trò chuyện (`read_in_full`, độ giống từ 0.55 trở
   lên), từ các mẫu giọng mà sản phẩm chỉ tạo cho các dịch vụ
