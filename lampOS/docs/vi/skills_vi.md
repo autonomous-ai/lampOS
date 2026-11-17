@@ -1594,9 +1594,11 @@ xét, từ các tệp của chính đèn. Chỉ đọc câu trả lời tiếng 
 `a_bare_state_naming_no_skill_is_said_as_it_came`,
 `a_skill_said_off_that_is_off_already_is_said_as_it_came`,
 `a_skill_said_removed_beside_only_a_light_call_is_held`,
-`second_provider::tests::skill_named_words::a_skill_named_runs_call_backs_its_start_and_off_is_unchanged`. Câu không gọi tên
-kỹ năng nào ("Moon time is removed.") đứng được bên cạnh bất kỳ lời gọi nào,
-vì một lời nhắc bị huỷ cũng có thể được nói là đã gỡ. Lời đồng ý gỡ là chính
+`second_provider::tests::skill_named_words::a_skill_named_runs_call_backs_its_start_and_off_is_unchanged`. Câu có cả chủ ngữ
+không phải tên một kỹ năng đã tạo ("The reminder is removed.") không bao giờ
+bị giữ, vì một lời nhắc bị huỷ cũng có thể được nói là đã gỡ. Một lời gọi
+gọi tên kỹ năng khi tham số chứa tên đó hoặc gần với nó theo đúng cách lời
+gọi tự tìm kỹ năng ("cloud fax" tắt CloudFact, "moon fax" chạy moon fact). Lời đồng ý gỡ là chính
 lời gọi `make_skill` có `approve_id`, nên câu "đã gỡ" sau đó được nói. Như các
 lời nói theo cách riêng, nó không bao giờ xét một câu người dùng hỏi dạng câu
 hỏi, vì câu trả lời có thể kể một trạng thái đúng. "You have three skills.",

@@ -354,9 +354,10 @@ impl Claim {
             // refused or empty one removed nothing (Thirteen's P2-1 on #5942).
             Self::Forgot => false,
             Self::Snoozed => name == "snooze_reminder",
-            Self::Made | Self::Skill => name == crate::made_skill::MAKE,
-            Self::SkillOn => name == crate::made_skill::MAKE,
-            Self::SkillStarted => name == crate::made_skill::MAKE || name == crate::use_skill::NAME,
+            Self::Made => name == crate::made_skill::MAKE,
+            // Judged by [`stands_on`] alone, by the call's kind and skill
+            // ([`backs_skill`]), never by its name.
+            Self::Skill | Self::SkillOn | Self::SkillStarted => false,
             // A set turns nothing off (Thirteen's P3 on #6481).
             Self::OffOrDown => {
                 Self::LightOrVolume.made_by(name)
@@ -898,7 +899,8 @@ enum SkillAct {
 
 /// The act `kind`, found by [`SKILL_SAID`] or [`BARE_SKILL_SAID`] in
 /// `reply`, says: [`Claim::SkillOn`] on, [`Claim::SkillStarted`] started,
-/// and a [`Claim::Skill`] removed, off or made by its first such word.
+/// and a [`Claim::Skill`] removed, off or made by the reply's first such
+/// word.
 fn skill_act(kind: Claim, reply: &str) -> Option<SkillAct> {
     match kind {
         Claim::SkillOn => Some(SkillAct::On),
@@ -965,12 +967,17 @@ const AFTER_A_NAME: [&str; 8] = [
 /// ("The moon time skill is off."), or after "I", "I've" or "I have", its
 /// verb and an "off" or "on" ("I've turned off the CloudFact skill.", "I
 /// turned the CloudFact skill back on."), to "skill", "off" or "on"; "the",
-/// "my", "your", "skill" and "app" ([`AROUND_A_NAME`]) and a trailing
-/// "earlier" or "already" ([`AFTER_A_NAME`]) left out. Never a part of it.
+/// "my", "your", "skill" and "app" ([`AROUND_A_NAME`]) left out at its
+/// edges ("walk the dog" stays whole), and trailing words said after a name
+/// ([`AFTER_A_NAME`]: "earlier", "already", "yesterday", "before", "just",
+/// "now", "again", "back") left out. Never a part of it. A spaced " - " and
+/// an ellipsis end a clause too.
 fn claim_subject(reply: &str) -> Vec<String> {
-    let text = normalised(reply);
+    let text = normalised(reply).replace(" - ", ". ");
     let Some(clause) = text
-        .split(['.', '!', '?', ',', ';', ':', '\u{2014}', '\u{2013}'])
+        .split([
+            '.', '!', '?', ',', ';', ':', '\u{2014}', '\u{2013}', '\u{2026}',
+        ])
         .map(|clause| {
             clause
                 .split(|c: char| !c.is_alphanumeric() && c != '\'' && c != '-' && c != '_')
@@ -998,17 +1005,18 @@ fn claim_subject(reply: &str) -> Vec<String> {
             .copied()
             .collect(),
     };
-    while subject
-        .last()
-        .is_some_and(|word| AFTER_A_NAME.contains(word))
-    {
-        subject.pop();
+    loop {
+        match subject.as_slice() {
+            [first, ..] if AROUND_A_NAME.contains(first) => {
+                subject.remove(0);
+            }
+            [.., last] if AROUND_A_NAME.contains(last) || AFTER_A_NAME.contains(last) => {
+                subject.pop();
+            }
+            _ => break,
+        }
     }
-    subject
-        .into_iter()
-        .filter(|word| !AROUND_A_NAME.contains(word))
-        .map(str::to_owned)
-        .collect()
+    subject.into_iter().map(str::to_owned).collect()
 }
 
 /// The made skill of `names` the claim in `reply` is about: its whole
@@ -1027,7 +1035,7 @@ fn made_named<'a>(reply: &str, names: &'a [String]) -> Option<&'a str> {
 
 /// Whether `reply` claims a made skill's state changed with no call behind
 /// it yet ([`SKILL_SAID`] or [`BARE_SKILL_SAID`], as [`claim`] says it; the
-/// rule of #7601, the manager's and Twelve's): only when its first sentence
+/// rule of #7601, the manager's and Twelve's): only when its claim's clause
 /// names one of the person's made skills by its exact name
 /// ([`made_named`]), never a core, installed or near one. A skill said off
 /// that is off already, or on that is on (not in `known.off`), tells a true
@@ -1059,12 +1067,18 @@ pub fn skill_claim(reply: &str, ended: bool, known: &KnownSkills) -> Option<Opti
     }
 }
 
-/// Whether the call's argument `arg` holds the skill `reply`'s claim is
-/// about: its whole subject ([`claim_subject`]), [`flat`], inside `arg`'s
-/// ("moon time scale" holds "moon time").
+/// Whether the call's argument `arg` names the skill `reply`'s claim is
+/// about, its whole subject ([`claim_subject`], equal to a made skill's
+/// name when the claim was held): [`flat`] inside `arg`'s ("moon time
+/// scale" holds "moon time"), or near it as the call itself found the
+/// skill (`made_remove::apart` and `near`: "cloud fax" turns CloudFact off,
+/// "moon fax" runs moon fact; the coordinator's P1 on 718c0112dd).
 fn holds_the_name(reply: &str, arg: &str) -> bool {
-    let subject = flat(&claim_subject(reply).concat());
-    !subject.is_empty() && flat(arg).contains(&subject)
+    let subject = claim_subject(reply).join(" ");
+    let flat_subject = flat(&subject);
+    !flat_subject.is_empty()
+        && (flat(arg).contains(&flat_subject)
+            || crate::made_remove::near(crate::made_remove::apart(arg, &subject), &subject))
 }
 
 /// Whether `reply` asks for a skill's change: a remove, a turn off or on,
@@ -1095,13 +1109,13 @@ pub fn asks_a_skill_change(said: &str) -> bool {
 }
 
 /// Whether a call of `name` with `args` backs `kind`, a made skill's state
-/// `reply` says (the rule of #7601): removed, off, on or made, a
-/// `make_skill` whose argument holds the skill's name ([`holds_the_name`]),
-/// or a yes (`approve_id`, a remove's or a make's, whose name the waiting
-/// ask carries), or for made and on a make the lamp's own note told
-/// (`second_provider`'s `made_skill_said`, no arguments); started, a
-/// `make_skill` or `use_skill` whose `run` or `skill` holds it. Any other
-/// call backs none.
+/// `reply` says (the rule of #7601): removed, off or on, a `make_skill`
+/// whose argument names the skill ([`holds_the_name`]), or a yes
+/// (`approve_id`, a remove's or a make's, whose name the waiting ask
+/// carries), or for on a make the lamp's own note told (`second_provider`'s
+/// `made_skill_said`, no arguments); started, a `make_skill` or `use_skill`
+/// whose `run` or `skill` names it. Made is never held, so never asked.
+/// Any other call backs none.
 fn backs_skill(kind: Claim, reply: &str, name: &str, args: &serde_json::Value) -> bool {
     let act = skill_act(kind, reply);
     let holds = |key: &str| {
@@ -1117,8 +1131,8 @@ fn backs_skill(kind: Claim, reply: &str, name: &str, args: &serde_json::Value) -
     }
     match act {
         Some(SkillAct::Started) => holds(crate::made_run::RUN),
-        Some(SkillAct::Removed | SkillAct::Off | SkillAct::On | SkillAct::Made) => {
-            args.is_null() && matches!(act, Some(SkillAct::On | SkillAct::Made))
+        Some(SkillAct::Removed | SkillAct::Off | SkillAct::On) => {
+            args.is_null() && act == Some(SkillAct::On)
                 || args[crate::skill_write_yes::APPROVE_ID].as_str().is_some()
                 || args.as_object().is_some_and(|args| {
                     args.values()
@@ -1126,7 +1140,7 @@ fn backs_skill(kind: Claim, reply: &str, name: &str, args: &serde_json::Value) -
                         .any(|arg| holds_the_name(reply, arg))
                 })
         }
-        None => false,
+        Some(SkillAct::Made) | None => false,
     }
 }
 
@@ -4782,6 +4796,8 @@ pub(crate) mod tests {
                 "reminders",
                 "stretch",
                 "fan",
+                "moon-fact",
+                "walk the dog",
             ]
             .map(str::to_owned)
             .to_vec(),
@@ -4955,6 +4971,71 @@ pub(crate) mod tests {
                 "{reply}"
             );
         }
+    }
+
+    #[test]
+    fn a_misheard_skill_arg_backs_the_claim_as_the_call_found_it() {
+        // The coordinator's P1 on 718c0112dd: made_turn and made_run find
+        // the made skill near the heard words, so "cloud fax" really turns
+        // CloudFact off and "moon fax" really runs moon fact.
+        let mut names = known();
+        names.off = vec!["cloudfact".to_owned()];
+        let off = serde_json::json!({ "turn_off": "cloud fax" });
+        let run = serde_json::json!({ "run": "moon fax" });
+        let far = serde_json::json!({ "turn_off": "stove" });
+        let off_said = "Okay, CloudFact is turned off.";
+        assert_eq!(
+            claim_on(off_said, true, false, false, false, Some(&known())),
+            Some(Some(Claim::Skill)),
+            "{off_said}"
+        );
+        assert!(stands_on(
+            Claim::Skill,
+            off_said,
+            false,
+            [(crate::made_skill::MAKE, &off)],
+            &[]
+        ));
+        assert!(!stands_on(
+            Claim::Skill,
+            off_said,
+            false,
+            [(crate::made_skill::MAKE, &far)],
+            &[]
+        ));
+        let run_said = "I've started the moon fact skill.";
+        assert_eq!(
+            claim_on(run_said, true, false, false, false, Some(&names)),
+            Some(Some(Claim::SkillStarted)),
+            "{run_said}"
+        );
+        assert!(stands_on(
+            Claim::SkillStarted,
+            run_said,
+            false,
+            [(crate::made_skill::MAKE, &run)],
+            &[]
+        ));
+    }
+
+    #[test]
+    fn a_subject_keeps_inner_words_and_ends_at_a_dash_or_ellipsis() {
+        let names = known();
+        let walk = "Okay, the walk the dog skill is removed.";
+        assert_eq!(claim_subject(walk), ["walk", "the", "dog"]);
+        assert_eq!(
+            claim_on(walk, true, false, false, false, Some(&names)),
+            Some(Some(Claim::Skill)),
+            "{walk}"
+        );
+        assert_eq!(
+            claim_subject("Okay - moon time is removed."),
+            ["moon", "time"]
+        );
+        assert_eq!(
+            claim_subject("Hmm\u{2026} moon time is removed now."),
+            ["moon", "time"]
+        );
     }
 
     /// Started or running stands beside a `use_skill` or `make_skill` run

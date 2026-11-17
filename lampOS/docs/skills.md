@@ -4436,8 +4436,11 @@ and only the reply's opening sentence. Tests:
 `a_bare_state_naming_no_skill_is_said_as_it_came`,
 `a_skill_said_off_that_is_off_already_is_said_as_it_came`,
 `a_skill_said_removed_beside_only_a_light_call_is_held`,
-`second_provider::tests::skill_named_words::a_skill_named_runs_call_backs_its_start_and_off_is_unchanged`. One that names no skill ("Moon time is removed.")
-stands beside any call, as a reminder cancelled may be said removed too. A
+`second_provider::tests::skill_named_words::a_skill_named_runs_call_backs_its_start_and_off_is_unchanged`. One whose whole subject is no made skill's name
+("The reminder is removed.") is never held, as a reminder cancelled may be
+said removed too. A call names the skill when its argument holds the name
+or is near it the way the call itself finds a skill ("cloud fax" turns
+CloudFact off, "moon fax" runs moon fact). A
 remove's yes is its own `make_skill` call with the `approve_id`, so the
 removed line after it stands. Like the worded claims it never judges a line
 the person asked as a question, whose reply may tell a true state. "You have
