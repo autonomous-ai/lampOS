@@ -4012,6 +4012,7 @@ impl ToolDesk {
                         | Route::Mark(_)
                         | Route::Onboarding(_)
                         | Route::ReportsStop(_)
+                        | Route::Devices(_)
                         | Route::Sleep
                         | Route::SeenActivity(_)
                 ))
@@ -4191,6 +4192,7 @@ impl ToolDesk {
             | Route::Mark(_)
             | Route::Onboarding(_)
             | Route::ReportsStop(_)
+            | Route::Devices(_)
             | Route::SeenActivity(_))
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
@@ -4207,6 +4209,7 @@ impl ToolDesk {
             | Route::Mark(_)
             | Route::Onboarding(_)
             | Route::ReportsStop(_)
+            | Route::Devices(_)
             | Route::SeenActivity(_)
             | Route::Nobody => {
                 let (sent, sent_us) = tell(&crate::tools::unavailable());
@@ -4259,6 +4262,7 @@ impl ToolDesk {
                     | Route::Faces(..)
                     | Route::Mark(_)
                     | Route::ReportsStop(_)
+                    | Route::Devices(_)
                     | Route::SeenActivity(_)
             )
         {
