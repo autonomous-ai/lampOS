@@ -921,7 +921,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_MAKE_AGENT_GUIDE` | The lamp's helper agent checks and fixes a skill it makes before handing it back. |
 | `LAMP_MAKE_AGENT_ONE_PATH` | A skill the lamp can't make on the first try goes to its helper agent on OpenClaw too. |
 | `LAMP_MAKE_NO_CANNOT` | A skill the lamp can't build itself goes to its agent as a task once you agree, or you hear why it can't. |
-| `LAMP_SERVICES_TO_AGENT` | Ask the lamp about your mail or calendar and its agent reads it for you, then the lamp tells you what it found. |
+| `LAMP_SERVICES_TO_AGENT` | Ask the lamp about your mail or calendar and its agent reads it, then the lamp tells you what it found. |
 | `LAMP_HARD_ASKS_TO_AGENT` | A question the lamp can't answer at once goes to its agent, and the lamp tells you the answer when it's ready. |
 | `LAMP_MEMORY_EARLY_WORDS` | If the lamp recognises you partway through a talk, what you said earlier in it is remembered as yours. |
 | `LAMP_MEMORY_FOLLOWS_FACE` | Save your face mid-chat and what the lamp saw you say just before is remembered as yours. |
