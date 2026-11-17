@@ -4241,8 +4241,9 @@ gone ([switches.md](switches.md)). What happens:
     was told to hear it again, so nothing was forced or kept (tests
     `a_cut_code_makes_say_back_through_the_say_service_forces_the_next_yes`,
     `a_cut_code_makes_say_back_goes_to_the_say_service_whole`,
-    `a_cut_voice_makes_say_back_is_told_word_for_word`). A make's writes
-    keep `made_skill::cut_write_line`.
+    `a_cut_voice_makes_say_back_is_told_word_for_word`). A make's writes,
+    a code make that also sends included, keep `made_skill::cut_write_line`:
+    only the cut code line (`made_skill::cut_code_line`) is replaced.
     While the make is under way, or its line is still to be said
     (`make_skill_local::Pending`), and for at most 2 minutes after its call
     (`make_skill_local::MAKE_WITHIN`, the longest a make goes on; the line's

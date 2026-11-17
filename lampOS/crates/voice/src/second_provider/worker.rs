@@ -6054,9 +6054,10 @@ fn made_running(
         );
         // No model round saw the make's answer, so its wait is an app
         // make's: the line after the say-back must answer it (#7245).
-        // A make with code is said back word for word in its place, so the
-        // yes after it is heard whole is forced.
-        let line = crate::skill_write_yes::said_by_the_say_service(request).unwrap_or(line);
+        // A make with code is said back word for word in place of its cut
+        // code line, so the yes after it is heard whole is forced; one that
+        // also sends keeps its cut write line.
+        let line = crate::skill_write_yes::said_by_the_say_service(request, &line).unwrap_or(line);
         let saying = std::thread::Builder::new()
             .name("lamp-voice-made-line".into())
             .spawn(move || {
