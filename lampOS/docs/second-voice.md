@@ -2445,7 +2445,11 @@ order is kept. A written turn is the same from the chat on.
     line is still to be said, for at most `make_skill_local::MAKE_WITHIN`
     (2 minutes) after its call (`Shared::quiet_for_a_make`, lamp-9adf, 11
     Nov; skills.md, "A cut while it is made"): then the lamp stays quiet,
-    with `LAMP_CUT_IN_WORDLESS_RESUMES` too. A cut-in whose
+    with `LAMP_CUT_IN_WORDLESS_RESUMES` too. With `LAMP_SAID_TO_ME` the
+    question is asked only when a face was seen speaking through the cut;
+    otherwise the lamp stays quiet and the cut is not counted against its
+    once a minute (`Shared::wordless_unseen`, #7442: a lip smack over the
+    answer on lamp-74ff). A cut-in whose
     final words came back empty but had words on the way is taken as that
     stop when they are one, and otherwise is neither (#4938). Neither is asked
     of the model; both are rendered ahead (`FixedClips`) and played at once
@@ -5697,6 +5701,39 @@ after a take-over, but now for every turn:
   goes on as the conversation, before the face is read, and stays carried.
   Risk: the owner turned to the lamp and asking, whose mouth the eyes read
   still through the whole line, needs its name or a follow-up.
+- **A line is answered when it was said to the lamp** (`LAMP_SAID_TO_ME=on`,
+  #7442; needs `LAMP_EYES_SPEAKING`). On lamp-74ff on 17 Nov lip smacks,
+  heard as 1 to 3 words while the owner faced the lamp, were answered as
+  `someone is turned to the lamp` though `no face was seen speaking it`;
+  `LAMP_TURNED_FACE_SPEAKS` needs a still face read in at least half of 3
+  looks, which a 0.5 s smack never has. One predicate,
+  `said_to_me::judge`, read first in `worker::Heeding::silence_turned`:
+  the line is said to the lamp when its name is heard or written in it;
+  when it is in a live conversation (the window), unless it is 0 to 2 words
+  no face was seen speaking; or when a face turned to the lamp is facing it
+  (pitch inside -25..+20 degrees and not looking away, when the eyes give
+  them; unknown blocks nothing, and the eyes give neither yet) and is seen
+  speaking it (one `yes` in a look of the line,
+  `SpeakingFaces::seen_speaking_between`; a mouth never read is not seen
+  speaking), with 3 words or more, a question or an ask. Otherwise the face
+  and the conversation are no sign, for every use of them in `attention`,
+  and the journal says `request N: not said to the lamp, held: <reason>`
+  (`not facing (pitch)`, `looking away`, `no face seen speaking it`, `a
+  short line`). A tap, near or addressed still lets a line out.
+  `LAMP_TURNED_FACE_SPEAKS` holds a subset of it. Risk: someone at the lamp
+  whose mouth the eyes cannot read, or who says one word that is no
+  question, needs its name.
+- **Who spoke a line, from the looks its mouth was read**
+  (`LAMP_SPEAKING_READ_LOOKS=on`, #7442, #7419). A face is a line's speaker
+  when it read `yes` in at least half of the line's looks
+  (`speaking_faces::half_of`); a look where the eyes tracked it but left its
+  mouth `unknown` counted against it, so a face read `yes` 3 times, `no` 3
+  and unread twice in 8 looks was journaled `no face was seen speaking it`
+  while the faces topic had it speaking (Seventh: 21 of 23 such lines had
+  the mark). With the switch the half is of the looks its mouth was read
+  (`speaking_faces::half_of_read`); a face out of view still counts
+  against it and 3 looks are still needed. Every reader of
+  `SpeakingFaces::speakers` and `speakers_with_boot` takes it.
 - **Two faces must stay to make the room busy** (`LAMP_TWO_FACES_HELD=on`,
   with `LAMP_NAME_OR_FOLLOW_UP`; Sixth's plan under the 24 Oct freeze). A
   thread of the worker's own reads every look the eyes publish

@@ -2504,6 +2504,8 @@ fn second_route_worker_environment(
         crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::speaking_faces::EYES_ENVIRONMENT,
+        crate::speaking_faces::READ_LOOKS_ENVIRONMENT,
+        crate::said_to_me::ENVIRONMENT,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
         // A line asking to remember the person's face, with their name,
         // calls remember_my_face (the owner's try on lamp-4ace, 23 Oct).
@@ -2801,6 +2803,8 @@ mod tests {
             crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
             crate::speaking_faces::EYES_ENVIRONMENT,
+            crate::speaking_faces::READ_LOOKS_ENVIRONMENT,
+            crate::said_to_me::ENVIRONMENT,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
             crate::known_faces::ASKED_ENVIRONMENT,
             crate::known_faces::RECORD_TOLD_ENVIRONMENT,
@@ -3865,6 +3869,8 @@ mod tests {
                     || name == crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
+                    || name == crate::speaking_faces::READ_LOOKS_ENVIRONMENT
+                    || name == crate::said_to_me::ENVIRONMENT
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
                     || name == crate::known_faces::ASKED_ENVIRONMENT
                     || name == crate::known_faces::RECORD_TOLD_ENVIRONMENT
@@ -4071,6 +4077,7 @@ mod tests {
                     "LAMP_REMARK_ABOUT_IT=on",
                     "LAMP_REMINDERS_ASKED=on",
                     "LAMP_REST_THROUGH_SOUNDS=on",
+                    "LAMP_SAID_TO_ME=on",
                     "LAMP_SAME_SPEAKER_CARRIES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
                     "LAMP_SCHEDULE_ASKED=on",
@@ -4127,6 +4134,7 @@ mod tests {
                     "LAMP_SKILL_KEYTERM=on",
                     "LAMP_SKILL_NAMED=on",
                     "LAMP_SKILL_RECURRING_TOLD=on",
+                    "LAMP_SPEAKING_READ_LOOKS=on",
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
