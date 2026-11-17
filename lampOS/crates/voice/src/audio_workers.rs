@@ -1624,6 +1624,63 @@ impl ReferenceOutput {
 // `speech` and `output` are the caller's, so that an end at the voice's
 // Stop found through a refused reference link (#4332) reports and records
 // its reset as the loop's own Stop does.
+/// Takes the next speech chunk off the data socket when none is pending: validated, its authority
+/// installed, and it becomes the pending chunk. Once at the top of a pass, and again before each
+/// further block a software queue's pass writes, so that a block of speech already waiting is
+/// written and never a block of silence in its place.
+#[allow(clippy::too_many_arguments)]
+fn receive_chunk(
+    channels: &mut WorkerChannels,
+    speaker: &mut Speaker,
+    output: &mut ReferenceOutput,
+    speech: &mut SpeechPlayback,
+    recording: &mut Option<Recording>,
+    pending: &mut Option<PendingChunk>,
+    last_sequence: &mut u64,
+    flush_count: &mut u64,
+) -> Result<()> {
+    if pending.is_none()
+        && let Some(chunk) = channels.data.receive::<SpeakerChunk>()?
+    {
+        if chunk.samples.is_empty()
+            || chunk.samples.len() > RENDER_SAMPLES
+            || chunk.chunk_sequence <= *last_sequence
+            || (chunk.end_of_speech && chunk.samples.len() != RENDER_SAMPLES)
+        {
+            return Err(io::Error::other("invalid speaker chunk size/sequence/final block").into());
+        }
+        *last_sequence = chunk.chunk_sequence;
+        match speaker.install(chunk.snapshot) {
+            Ok(()) => supersede_speech(
+                channels,
+                speaker,
+                speech,
+                chunk.snapshot,
+                output.privacy,
+                *flush_count,
+            )?,
+            Err(error) if old_interaction_error(error.as_ref()) => {}
+            // Installed before the check underran (#3697); reset below.
+            Err(error) if underran(error.as_ref()) => underrun(
+                channels,
+                speaker,
+                output,
+                flush_count,
+                speech.unfinished_owner(),
+                speech,
+                pending,
+                recording,
+            )?,
+            Err(error) => return Err(error),
+        }
+        if report_discard(channels, speaker, output, flush_count, recording)? {
+            report_speech_reset(channels, speech)?;
+        }
+        *pending = Some(PendingChunk { chunk, offset: 0 });
+    }
+    Ok(())
+}
+
 fn speaker_loop(
     channels: &mut WorkerChannels,
     speaker: &mut Speaker,
@@ -1993,53 +2050,39 @@ fn speaker_loop(
                     .map_or_else(monotonic_us, |s| s.observed_at_us),
             })?;
         }
-        if pending.is_none()
-            && let Some(chunk) = channels.data.receive::<SpeakerChunk>()?
-        {
-            if chunk.samples.is_empty()
-                || chunk.samples.len() > RENDER_SAMPLES
-                || chunk.chunk_sequence <= last_sequence
-                || (chunk.end_of_speech && chunk.samples.len() != RENDER_SAMPLES)
-            {
-                return Err(
-                    io::Error::other("invalid speaker chunk size/sequence/final block").into(),
-                );
-            }
-            last_sequence = chunk.chunk_sequence;
-            match speaker.install(chunk.snapshot) {
-                Ok(()) => supersede_speech(
-                    channels,
-                    speaker,
-                    speech,
-                    chunk.snapshot,
-                    output.privacy,
-                    flush_count,
-                )?,
-                Err(error) if old_interaction_error(error.as_ref()) => {}
-                // Installed before the check underran (#3697); reset below.
-                Err(error) if underran(error.as_ref()) => underrun(
+        receive_chunk(
                     channels,
                     speaker,
                     output,
-                    &mut flush_count,
-                    speech.unfinished_owner(),
                     speech,
-                    &mut pending,
                     recording,
-                )?,
-                Err(error) => return Err(error),
-            }
-            if report_discard(channels, speaker, output, &mut flush_count, recording)? {
-                report_speech_reset(channels, speech)?;
-            }
-            pending = Some(PendingChunk { chunk, offset: 0 });
-        }
-        // Aim for 10..20 ms. Provider pacing must not stop the physical clock:
+            &mut pending,
+            &mut last_sequence,
+            &mut flush_count,
+        )?;
+        // Aim for 10..20 ms (a software queue: 20..30 ms, `write_ahead_frames`). Provider pacing must not stop the physical clock:
         // accept real zero-only PCM if speech is unavailable, and report that
         // delivery gap without consuming or completing any missing speech.
-        let writable_block = speaker
-            .last_poll()
-            .is_some_and(|status| status.tracked_authorized_frames <= RENDER_SAMPLES);
+        // A pass writes again while the queue is below its target, at most `blocks_per_pass` blocks
+        // (a software queue: two; ALSA: exactly one, as ever), each time reading the queue anew: on
+        // a macOS runner a 2 ms sleep comes back after ~10 ms (C5b-1c), so a pass that writes one
+        // block cannot keep a queue draining 24 frames a millisecond.
+        for block in 0..speaker.blocks_per_pass() {
+            if block > 0 {
+                receive_chunk(
+                    channels,
+                    speaker,
+                    output,
+                    speech,
+                    recording,
+                    &mut pending,
+                    &mut last_sequence,
+                    &mut flush_count,
+                )?;
+            }
+            let writable_block = speaker.last_poll().is_some_and(|status| {
+                status.tracked_authorized_frames <= speaker.write_ahead_frames()
+            });
         if speaker.clock_started() && writable_block {
             output.times.clock_pass();
             let mut wrote_speech = false;
@@ -2092,7 +2135,7 @@ fn speaker_loop(
                             pending = None;
                             stall_pass.done();
                             finish_tick(tick);
-                            continue;
+                                continue 'tick;
                         }
                         if written.frames > 0 {
                             wrote_speech = true;
@@ -2110,7 +2153,8 @@ fn speaker_loop(
                                 written,
                                 RenderPayload::Speech {
                                     owner,
-                                    samples: partial.chunk.samples[partial.offset..end].to_vec(),
+                                        samples: partial.chunk.samples[partial.offset..end]
+                                            .to_vec(),
                                 },
                             )?;
                             output.times.add_send(send_started.elapsed());
@@ -2255,6 +2299,9 @@ fn speaker_loop(
                         channels.control.send(gap)?;
                     }
                 }
+            }
+            } else {
+                break;
             }
         }
         output.times.work_done();
