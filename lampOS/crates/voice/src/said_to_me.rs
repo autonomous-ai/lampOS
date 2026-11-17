@@ -11,7 +11,9 @@
 //! A line is let out when:
 //! 1. **named:** the lamp's name is heard or written in it;
 //! 2. **in a live conversation** (its window): unless it is 0 to
-//!    [`SHORT_WORDS`] words with no face seen speaking it;
+//!    [`SHORT_WORDS`] words, no face seen speaking it and a face in view
+//!    read silent (no face, no eyes or a mouth never read is unknown, and
+//!    unknown blocks nothing: the first builder's HOLD on #7457);
 //! 3. **said to the lamp:** a face turned to it, facing (pitch inside
 //!    [`PITCH_DEG`] and not looking away, when the eyes say so), seen
 //!    speaking the line, and at least [`SHORT_WORDS`] + 1 words, or a
@@ -109,6 +111,11 @@ pub struct Line<'a> {
     /// A face seen speaking it: some face read `yes` in a look of it
     /// (`speaking_faces::SpeakingFaces::seen_speaking_between`).
     pub seen_speaking: bool,
+    /// A face in view read silent through it: some look of it had a face
+    /// whose mouth read `no`, and no face read `yes`
+    /// (`speaking_faces::SpeakingFaces::read_silent_between`). No face, no
+    /// eyes or a mouth never read is not: unknown blocks nothing.
+    pub read_silent: bool,
 }
 
 /// What [`judge`] says of a line.
@@ -134,7 +141,7 @@ pub fn judge(line: Line<'_>) -> Said {
         return Said::Stands;
     }
     if line.going_on {
-        return if words <= SHORT_WORDS && !line.seen_speaking {
+        return if words <= SHORT_WORDS && !line.seen_speaking && line.read_silent {
             Said::Held(Held::NotSeenSpeaking)
         } else {
             Said::InConversation
@@ -215,12 +222,21 @@ mod tests {
         assert_eq!(judge(level), Said::ToTheLamp);
         // In a live conversation: answered, but a short line needs a face
         // seen speaking it.
+        // A face in view, read speaking or read silent.
         let going_on = |heard, seen_speaking| Line {
             heard,
             going_on: true,
             seen_speaking,
+            read_silent: !seen_speaking,
             ..Line::default()
         };
+        // No face read at all: unknown, so a short reply stands.
+        let unknown = Line {
+            heard: "Pasta.",
+            going_on: true,
+            ..Line::default()
+        };
+        assert_eq!(judge(unknown), Said::InConversation);
         assert_eq!(
             judge(going_on("And tomorrow in Hanoi?", false)),
             Said::InConversation
