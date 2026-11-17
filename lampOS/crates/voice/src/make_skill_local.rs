@@ -861,13 +861,13 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         parameters["properties"][crate::skill_write_yes::ANSWER] = json!({
             "type": "string",
             "enum": crate::skill_write_yes::ANSWERS,
-            "description": "With approve_id only: what the person's words answered the say-back, in any words: yes when they agree, no when they decline or wait, unclear when you can't tell, new_ask when their line answers nothing asked but asks something new (another skill named, another thing asked), which you then answer. Left out: yes for a made skill's writes or code, unclear for a skill's task."
+            "description": "With approve_id only: what the person's words answered the say-back, in any words: yes when they agree, no when they decline or wait, unclear when you can't tell, new_ask when their line answers nothing asked but asks something new (another skill named, another thing asked), which you then answer; a line naming the skill asked about answers it, never new_ask. Left out: yes for a made skill's writes or code, unclear for a skill's task."
         });
         // The skill the person's line names (#7545): a yes is taken only
         // for the skill waiting, matched in code.
         parameters["properties"][crate::skill_write_yes::NAMED] = json!({
             "type": "string",
-            "description": "With approve_id only: the skill their line names, its name alone as they said it, or none if it names no skill. A yes counts only for the skill asked about."
+            "description": "With approve_id only: the skill their line names, or none if it names no skill. When it is the skill asked about, copy that skill's name exactly as the note gives it. A yes counts only for the skill asked about."
         });
         parameters["required"] = json!([]);
     }

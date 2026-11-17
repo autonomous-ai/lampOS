@@ -314,6 +314,9 @@ fn the_forced_round_may_answer_that_the_line_is_a_new_ask() {
     let told = answer["description"].as_str().unwrap();
     assert!(told.contains("new_ask"), "{told}");
     assert!(told.contains("another skill"), "{told}");
+    // #7561's row: a line naming the skill asked about answers it.
+    assert!(told.contains("never new_ask"), "{told}");
+    assert!(named.contains("copy"), "{named}");
     // The note each later line is told of the wait says so too.
     let note = yes::waiting_note(1, Instant::now()).unwrap();
     assert!(note.contains("\"new_ask\""), "{note}");
