@@ -884,12 +884,14 @@ fn approvals_json() -> Result<String, String> {
 }
 
 /// The address space the skill's script may map, in KiB (`ulimit -v`,
-/// [`FENCE_TEXT`]): 768 MiB. The fence's own writable tmpfs (`/tmp`
-/// 256 MiB, `/var/tmp` and `/dev/shm` 64 MiB each) add at most 384 MiB,
-/// so a script stays well under lamp-tasks' `MemoryHigh=2100M` (no swap on
-/// a lamp). A cgroup cap is not open to lamp-tasks (`lampos`, no
+/// [`FENCE_TEXT`]): 1536 MiB, as glibc reserves about 64 MiB of address
+/// space for each thread's malloc arena (and OpenBLAS or numpy more), so a
+/// smaller cap fails a threaded script long before it uses that much RAM.
+/// The fence's own writable tmpfs (`/tmp` 256 MiB, `/var/tmp` and
+/// `/dev/shm` 64 MiB each) add at most 384 MiB: about 1.9 GiB at worst,
+/// under lamp-tasks' `MemoryHigh=2100M` (no swap on a lamp). A cgroup cap is not open to lamp-tasks (`lampos`, no
 /// delegation); `ulimit -v` is, and Python, its threads and the SDK fit.
-pub const SCRIPT_MEMORY_KB: &str = "786432";
+pub const SCRIPT_MEMORY_KB: &str = "1572864";
 
 /// The `PATH` the skill's script is run with ([`FENCE_TEXT`]), and its
 /// fence's `unshare` ([`crate::skill_start::lamp_fence`]).

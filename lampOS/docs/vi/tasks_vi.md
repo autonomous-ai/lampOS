@@ -1452,9 +1452,12 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   serial, I2C, SPI, GPIO, HID, framebuffer và GPU, như namespace của
   gateway. Mọi mount đều là `mount -n`, nên không mount nào ghi utab của
   libmount dưới `/run`. Rào đặt `ulimit -c 0` (không có file core, cả giới
-  hạn mềm lẫn cứng), giới hạn không gian địa chỉ của script ở 768 MiB
-  (`ulimit -v`, `gateway::SCRIPT_MEMORY_KB`; cộng 384 MiB tmpfs ghi được
-  vẫn dưới xa `MemoryHigh=2100M` của lamp-tasks, và đèn không có swap), và
+  hạn mềm lẫn cứng), giới hạn không gian địa chỉ của script ở 1536 MiB
+  (`ulimit -v`, `gateway::SCRIPT_MEMORY_KB`: glibc giữ trước khoảng 64 MiB
+  không gian địa chỉ cho arena malloc của mỗi luồng, nên giới hạn nhỏ hơn
+  làm hỏng script nhiều luồng; cộng 384 MiB tmpfs ghi được, trường hợp
+  xấu nhất khoảng 1,9 GiB, vẫn dưới `MemoryHigh=2100M` của lamp-tasks, và
+  đèn không có swap), và
   chạy nó với độ nice 10 (`nice -n 10`). Không có hạn mức CPU như unit của
   gateway (`CPUQuota=100%`): việc đó cần một cgroup mà `lampos` không tạo
   được, còn `ulimit -t` sẽ kết thúc một lần chạy dài. Sau đó, trong một user namespace riêng, nó đọc token

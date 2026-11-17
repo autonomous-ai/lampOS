@@ -3996,9 +3996,11 @@ file:
   GPIO, HID, framebuffer and GPU device, as the gateway's namespace does.
   Every mount is `mount -n`, so none writes libmount's utab under `/run`.
   It sets `ulimit -c 0` (no core file, soft and hard limit), caps the
-  script's address space at 768 MiB (`ulimit -v`,
-  `gateway::SCRIPT_MEMORY_KB`; with the 384 MiB of writable tmpfs it stays
-  well under lamp-tasks' `MemoryHigh=2100M`, and a lamp has no swap), and
+  script's address space at 1536 MiB (`ulimit -v`,
+  `gateway::SCRIPT_MEMORY_KB`: glibc reserves about 64 MiB of address
+  space per thread's malloc arena, so a smaller cap fails threaded
+  scripts; with the 384 MiB of writable tmpfs the worst case is about
+  1.9 GiB, under lamp-tasks' `MemoryHigh=2100M`, and a lamp has no swap), and
   runs it at niceness 10 (`nice -n 10`). It gets no CPU quota as the
   gateway's unit has (`CPUQuota=100%`): that needs a cgroup, which
   `lampos` can't make, and `ulimit -t` would end a long run. Then, in a

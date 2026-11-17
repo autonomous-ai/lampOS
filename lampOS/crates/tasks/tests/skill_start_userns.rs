@@ -692,6 +692,13 @@ fn a_planted_pth_in_the_run_folder_never_relays_the_token() {
          print('token-given' if os.environ.get('LAMP_CONTROL_TOKEN') else 'no-token')\n\
          print('home=' + os.environ.get('HOME', ''))\n\
          print('no_user_site=%d' % sys.flags.no_user_site)\n\
+         import threading\n\
+         def work(out):\n    out.append([bytearray(64 * 1024) for _ in range(64)])\n\
+         got = []\n\
+         threads = [threading.Thread(target=work, args=(got,)) for _ in range(8)]\n\
+         [t.start() for t in threads]\n\
+         [t.join() for t in threads]\n\
+         print('threads=%d' % len(got))\n\
          import socket\n\
          c = socket.socket(socket.AF_UNIX)\n\
          c.connect(os.environ['LAMP_CONTROL_SOCKET'])\n\
@@ -717,6 +724,8 @@ fn a_planted_pth_in_the_run_folder_never_relays_the_token() {
         "home=/tmp/lampos-home.",
         "no_user_site=1\n",
         "socket-connected\n",
+        // Eight threads, each with its own malloc arena, under the cap.
+        "threads=8\n",
     ] {
         assert!(ran.out.contains(line), "{line}: {}", ran.out);
     }
