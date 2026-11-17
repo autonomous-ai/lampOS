@@ -4275,8 +4275,16 @@ gone ([switches.md](switches.md)). What happens:
     `made_skill::cut_write_line`, "I made leaving mail. It waits for you to
     agree before it sends anything. I couldn't tell you just now what it
     sends, so it sends nothing yet." (no word to repeat, no "yes"; test
-    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). While the
-    make is under way, or its line is still to be said
+    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). A skill
+    with code of its own whose say-back is said so waits as an app's make
+    with code does (`skill_write_yes::said_by_the_say_service`, #7245): no
+    model round saw the make's answer, so the person's next line after the
+    say-back said whole is forced to answer the wait
+    (`skill_write_yes::approve_force`); on c0a4 (17 Nov 19:43) a 116 s
+    OpenClaw make outlived its turn and the "yes" after its say-back called
+    nothing (test
+    `a_voice_makes_yes_after_its_say_back_through_the_say_service_is_forced`).
+    While the make is under way, or its line is still to be said
     (`make_skill_local::Pending`), and for at most 2 minutes after its call
     (`make_skill_local::MAKE_WITHIN`, the longest a make goes on; the line's
     say may wait up to an hour, and the question is not held that long:
