@@ -292,8 +292,10 @@ These tests do not establish a real stable promotion or lamp acceptance.
 After a promotion, the `mirror-cdn` job (`.github/scripts/lampos-mirror.py`)
 puts the same build on `https://cdn.autonomous.ai/lampos/stable/`. It is off
 until repository variable `LAMPOS_CDN_MIRROR` is exactly `on`, and a failure
-in it never fails the promotion: the GitHub stable feed above stays the one
-lamps read until a lamp is pointed at the CDN one.
+in it never fails the promotion. A lamp installed or imaged with the product
+unit since #6256 (F2) reads this feed, so when the mirror fails such a lamp
+keeps the build it has until a later promotion is mirrored; a lamp installed
+before reads the GitHub stable feed above.
 
 The job builds `lamp-update` from its own commit and never runs an updater
 it downloads. It reads the stable envelope, refuses it unless its files
