@@ -872,8 +872,9 @@ queues each change as a `service_record` with `source_kind`, `source_ref`,
 `summary` and `deed_unix_ms`, over its own root socket
 (`lamp-voice` `service_records::linked`). Each writer comes with its own
 switch: Harness task rows (`LAMP_SERVICE_RECORDS_TASKS`, slice 3,
-[tasks.md](tasks.md)); agent and reminder rows later (`_AGENT`,
-`_REMINDERS`). With `LAMP_SERVICE_RECORDS` off nothing is kept.
+[tasks.md](tasks.md)); reminder rows (`LAMP_SERVICE_RECORDS_REMINDERS`,
+[schedule.md](schedule.md)); agent rows later (`_AGENT`). With
+`LAMP_SERVICE_RECORDS` off nothing is kept.
 
 - **Its own bound.** At most 16 changes wait, apart from the connector
   records' 32, so a burst of task or reminder news never pushes out a

@@ -228,6 +228,7 @@ async fn a_reminders_holding_words_grant_nothing_and_the_next_heard_request_stil
             late_by_ms: Some(0),
             also: Vec::new(),
             again: false,
+            ids: Vec::new(),
         })
         .unwrap();
     assert!(

@@ -22,8 +22,9 @@
 //!   records' own), and the memory refuses a deed from before a forget.
 //! - **Off.** With `LAMP_SERVICE_RECORDS` off nothing is kept
 //!   ([`Put::Off`]). Each writer comes with its own switch: Harness task
-//!   rows (`LAMP_SERVICE_RECORDS_TASKS`, [`super::task_rows`]); agent and
-//!   reminder rows in later slices (`_AGENT`, `_REMINDERS`).
+//!   rows (`LAMP_SERVICE_RECORDS_TASKS`, [`super::task_rows`]); reminder
+//!   rows (`LAMP_SERVICE_RECORDS_REMINDERS`, [`super::reminder_rows`]);
+//!   agent rows in a later slice (`_AGENT`).
 use super::{Status, tidy};
 use serde_json::{Value, json};
 use std::collections::VecDeque;
@@ -290,6 +291,7 @@ pub fn unsent(person: Option<&str>) {
             .retain(|change| person.is_some_and(|person| change.person != person));
     });
     super::task_rows::forgot(person);
+    super::reminder_rows::forgot(person);
 }
 
 /// A forget about a thing of `person`'s is about to be sent, or was
@@ -297,6 +299,7 @@ pub fn unsent(person: Option<&str>) {
 /// `matches` go.
 pub fn unsent_about(person: &str, matches: impl Fn(&str) -> bool) {
     super::task_rows::forgot_about(person, &matches);
+    super::reminder_rows::forgot_about(person, &matches);
     kept::outbox(|outbox| {
         outbox.waiting.retain(|change| {
             change.person != person

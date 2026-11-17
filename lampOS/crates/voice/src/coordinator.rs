@@ -15743,6 +15743,13 @@ fn commit_reminder_turn(
         late_by_ms: offer.late_by_ms,
         also: offer.also_texts(),
         again: offer.again,
+        ids: if crate::service_records::reminder_rows::asked() {
+            std::iter::once(offer.token.key.id)
+                .chain(offer.also.iter().map(|joined| joined.token.key.id))
+                .collect()
+        } else {
+            Vec::new()
+        },
     };
     current.reminder = Some(reminders.admitted(
         offer,

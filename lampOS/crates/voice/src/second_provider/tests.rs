@@ -5409,6 +5409,7 @@ async fn a_reminder_is_deferred_as_the_fixture_does() {
         late_by_ms: None,
         also: Vec::new(),
         again: false,
+        ids: Vec::new(),
     });
     assert_eq!(turn(&mut engine).await, ["deferred:Disabled"]);
 }
@@ -5449,6 +5450,7 @@ fn reminder(request: u64, text: &str) -> ProviderInput {
         late_by_ms: None,
         also: Vec::new(),
         again: false,
+        ids: Vec::new(),
     }
 }
 
