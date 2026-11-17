@@ -3783,17 +3783,23 @@ to Hermes alone (`HarnessRunner`, above).
 The owner's rulings of 17 Nov: a linked service's live read, and an ask the
 second route's model can't do, go to the lamp's agent. The make socket takes
 a second kind of line from lamp-voice, `{"op":"voice_ask","ask","grants",
-"brief","within_ms"}` (`lamp_tasks::voice_ask`), answered as a make is
+"within_ms"}` (`lamp_tasks::voice_ask`), answered as a make is
 (`started`, then `answer` or a refusal), with its own one place beside a
 make's. With no grant it is taken only with `LAMP_HARD_ASKS_TO_AGENT=on`,
-on the make's runner (the network as `LAMP_MAKE_AGENT_NET` says); with one
-service's `<code>-read` grant only with `LAMP_SERVICES_TO_AGENT=on` and
+on the make's runner (the network as `LAMP_MAKE_AGENT_NET` says, the
+lamp's local ports included until the net runner lands; lamp-voice sends it
+only for the owner's own line); with one service's `<code>-read` grant (a
+read only: a `-write` or a second grant is refused `bad_request`, and
+lamp-control never mints one for an ask) only with `LAMP_SERVICES_TO_AGENT=on` and
 `LAMP_AGENT_SERVICES=on`, held off the network, on a token lamp-control
 mints for exactly that grant (`{"mint":{"ask":[...]}}`), its fresh home's
 config with `mcp_servers.lamp-services`. Either way a fresh folder and home
 of its own, the person's words in its rules file (never its arguments), its
 answer read from `answer.md`, whitespace folded and at most 3,000 bytes,
 the folder removed and the token ended however it ends, at most 120 s.
+On a lamp whose makes take the one run path (`LAMP_MAKE_AGENT_ONE_PATH`),
+an ask with a grant has no held-off runner and is refused `not_held_off`,
+and the voice says its fixed failure line: it fails closed.
 Off, the line is refused `off` and makes are as before
 ([services.md](services.md), "Reads through the lamp's agent";
 [switches.md](switches.md)).
