@@ -861,7 +861,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         parameters["properties"][crate::skill_write_yes::ANSWER] = json!({
             "type": "string",
             "enum": crate::skill_write_yes::ANSWERS,
-            "description": "With approve_id only: what the person's words answered the say-back, in any words: yes when they agree, no when they decline or wait, unclear when you can't tell. Left out: yes for a made skill's writes or code, unclear for a skill's task."
+            "description": "With approve_id only: what the person's words answered the say-back, in any words: yes when they agree, no when they decline or wait, unclear when you can't tell, new_ask when their line answers nothing asked but asks something new (another skill named, another thing asked), which you then answer. Left out: yes for a made skill's writes or code, unclear for a skill's task."
         });
         parameters["required"] = json!([]);
     }
