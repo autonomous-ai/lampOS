@@ -475,7 +475,13 @@ impl Agent {
     }
 
     pub fn hermes(&self) -> Option<&'static str> {
-        let engine = self.engine()?;
+        self.takes(self.engine()?)
+    }
+
+    /// [`Agent::hermes`] for the lamp's agent `engine`, as [`Agent::engine`]
+    /// gave it: so a make asks the tasks part once, and tells a lamp with
+    /// no agent ([`Agent::engine`] none) from one whose agent isn't taken.
+    pub fn takes(&self, engine: &'static str) -> Option<&'static str> {
         if engine == MAKE_ENGINE {
             return Some(engine);
         }

@@ -5329,8 +5329,19 @@ the same code for both writers.
   path"). OpenClaw can run only skill-start, so its run skips the guide's
   `lamp-skills pack`; the voice's checks and repairs are the same. A
   `cannot:` goes on verbatim to #7234's fallback. The journal says "the
-  lamp's agent is OpenClaw: handed over on the one run path". Off, only
-  Hermes is handed a make, as above.
+  lamp's agent is OpenClaw: handed over on the one run path". On a lamp
+  with no agent at all (no `lamp` target; #7375), a make DeepSeek keeps
+  is the make and the brief's own refusals stay as they are, but a make
+  the agent would have taken ends in one sentence, by voice and in the
+  app's `not_kept`: "I couldn't make that one: this lamp has no agent set
+  up to make it." (`AGENT_MISSING`). That is a make asking for a linked
+  service (with `LAMP_AGENT_SERVICES`), told at once with DeepSeek not
+  asked, never kept as a `do.task` no agent runs ("it asks for a linked
+  service (<code>): no agent on the lamp to make it: told so, DeepSeek not
+  asked"); and any other make DeepSeek fails after its repairs ("DeepSeek
+  failed and there is no agent on the lamp to hand it to: told so"). Off,
+  only Hermes is handed a make, as above, and a lamp with no agent has
+  DeepSeek make it alone.
 - **Its network: `LAMP_MAKE_AGENT_NET`** (set in no unit; the owner's ask,
   12 Nov, the first builder's ruling, 12 Nov 19:14). By default
   the run keeps the network, as V1's agent did, and reaches the model at
