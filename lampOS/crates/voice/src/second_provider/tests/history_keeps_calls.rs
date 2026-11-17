@@ -1,8 +1,9 @@
 //! `LAMP_HISTORY_KEEPS_CALLS` on the second route: the functions a turn ran
 //! are handed to the thread, so a later turn is told them with its words
 //! (`worker::messages_told`). Only calls that ran and were not refused: a
-//! decline, a call answered with an error or a keep not kept is not handed
-//! on, and with the switch off nothing is.
+//! decline or a keep not kept is not handed on, a call answered with an
+//! error only as failed then (`FAILED_THEN`), and with the switch off
+//! nothing is.
 use super::*;
 
 /// What each call is told here: a light or volume change done, a failure,
@@ -13,6 +14,7 @@ fn told(name: &str) -> Value {
             json!({"error": "I asked for it but could not confirm my light changed."})
         }
         "remember" => json!({"remembered": false, "note": "Not kept."}),
+        "weather" => json!({"error": "the weather couldn't be reached just now"}),
         // A write prepared: its read-back, the person's words in it.
         "service_write" => json!({
             "read_back": "Send an email from me@home.test to ann@b.test. Subject: \"Hi\". It says: \"Home by 7\". Shall I send it?",
@@ -36,7 +38,9 @@ fn handed_on(
         .collect()
 }
 
-/// [`handed_on`], each with the arguments it is told with.
+/// [`handed_on`], each with the arguments it is told with; a call handed
+/// on as failed then (`FAILED_THEN`) is left out: these are the calls told
+/// later as calls.
 fn handed_on_with(
     on: bool,
     heard: &str,
@@ -44,6 +48,7 @@ fn handed_on_with(
 ) -> Vec<(u64, String, Value)> {
     handed_on_told(on, heard, rounds)
         .into_iter()
+        .filter(|(_, _, _, told)| *told != Some(FAILED_THEN))
         .map(|(request, name, args, _)| (request, name, args))
         .collect()
 }
@@ -125,11 +130,13 @@ fn a_call_that_ran_is_handed_to_the_thread() {
 }
 
 /// A call that failed, or a keep refused, ran but did nothing: never told
-/// later as done. The one beside them that did is.
+/// later as done. The one that failed is handed on bare as failed then
+/// (`FAILED_THEN`), told only as a note after the words; the keep refused
+/// not at all; the one beside them that did as done.
 #[test]
-fn a_call_that_did_nothing_is_not_handed_on() {
+fn a_call_that_did_nothing_is_not_handed_on_as_done() {
     assert_eq!(
-        handed_on(
+        handed_on_told(
             true,
             "Warmer, and remember I like it warm.",
             vec![
@@ -137,7 +144,48 @@ fn a_call_that_did_nothing_is_not_handed_on() {
                 saying("Done."),
             ],
         ),
-        [(1, "light_dimmer".to_owned())]
+        [
+            (1, "light_warmer".to_owned(), json!({}), Some(FAILED_THEN)),
+            (1, "light_dimmer".to_owned(), json!({}), None),
+        ]
+    );
+}
+
+/// lamp-9adf at 13929 (17 Nov 23:20): after a lookup failed, three later
+/// asks got `calls=none` and "I couldn't reach … just now", the failure
+/// carried in the history as the lamp's words alone. A call answered with
+/// an error is handed on, bare whatever it was asked with (a place, a
+/// query: the person's words), as failed then; off, nothing is.
+#[test]
+fn a_call_answered_with_an_error_is_handed_on_as_failed_then() {
+    let rounds = || {
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c0",
+                    "weather",
+                    json!({"place": "Hanoi", "day": "tomorrow"}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            saying("I couldn't reach the weather just now."),
+        ]
+    };
+    assert_eq!(
+        handed_on_told(
+            true,
+            "Lamp, what's the weather in Hanoi tomorrow?",
+            rounds()
+        ),
+        [(1, "weather".to_owned(), json!({}), Some(FAILED_THEN))]
+    );
+    assert!(
+        handed_on_told(
+            false,
+            "Lamp, what's the weather in Hanoi tomorrow?",
+            rounds()
+        )
+        .is_empty()
     );
 }
 
