@@ -782,6 +782,17 @@ pub fn chat_key_refused(report: lamp_msgs::Diagnostic, refused: bool) -> lamp_ms
     out.with("refused", "key")
 }
 
+/// The voice's report with the linked records it could not save because
+/// their outbox was full (the linked-service memory plan, slice 2): a fact,
+/// `linked_dropped`, beside it once any went, its level unchanged.
+pub fn linked_dropped(report: lamp_msgs::Diagnostic, dropped: u64) -> lamp_msgs::Diagnostic {
+    if dropped == 0 {
+        report
+    } else {
+        report.with("linked_dropped", dropped)
+    }
+}
+
 /// The voice's report with the lamp signed out
 /// (`LAMP_SIGNED_OUT`): a warning that the lamp needs setting up again.
 pub fn signed_out(report: lamp_msgs::Diagnostic, signed_out: bool) -> lamp_msgs::Diagnostic {
@@ -1400,6 +1411,7 @@ impl BusOut {
             self.ring_off,
         );
         let report = signed_out(report, self.signed_out);
+        let report = linked_dropped(report, crate::service_records::linked::dropped());
         let _ = self.health.publish_json(now_us, &report);
         if let Some(link) = &mut self.link {
             let _ = link.publish_json(now_us, &link_state(link_up, down_for, refusal));
@@ -1792,6 +1804,24 @@ mod tests {
                     .ends_with("cannot reach the speech service, and keeps trying"),
             "{}",
             down.message
+        );
+    }
+
+    /// Linked records dropped from their full outbox are a fact in the
+    /// voice's health, `linked_dropped`, and change nothing else; none
+    /// dropped, the report is as it was.
+    #[test]
+    fn linked_records_dropped_are_a_fact_in_the_health() {
+        let well = health(true, 0, None, None);
+        assert_eq!(linked_dropped(well.clone(), 0), well);
+        let dropped = linked_dropped(well.clone(), 3);
+        assert_eq!(dropped.level, well.level);
+        assert_eq!(dropped.message, well.message);
+        assert!(
+            dropped
+                .values
+                .iter()
+                .any(|fact| fact.key == "linked_dropped" && fact.value == "3")
         );
     }
 

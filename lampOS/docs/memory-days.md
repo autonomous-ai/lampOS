@@ -857,6 +857,46 @@ name the person. Nothing writes to `linked.sock` yet.
   (forget-all, or the switch's own clear): an older build's forget about a
   thing doesn't read `summary`, so it can't take them.
 
+### The voice's linked outbox (slice 2, under `LAMP_SERVICE_RECORDS`)
+
+The voice's side of the write path for the records only it can name the
+person of: Harness tasks, agent writes and reminders (later slices). It
+queues each change as a `service_record` with `source_kind`, `source_ref`,
+`summary` and `deed_unix_ms`, over its own root socket
+(`lamp-voice` `service_records::linked`). Nothing puts to it yet: each
+writer comes with its own switch (`LAMP_SERVICE_RECORDS_TASKS`, `_AGENT`,
+`_REMINDERS`), and with `LAMP_SERVICE_RECORDS` off nothing is kept.
+
+- **Its own bound.** At most 16 changes wait, apart from the connector
+  records' 32, so a burst of task or reminder news never pushes out a
+  send's record. One a key: a newer change of the same person and key
+  replaces the one waiting. Full, the oldest goes, counted since the voice
+  started as `linked_dropped` in the voice's health (a fact beside its
+  report, its level unchanged, shown once any went) and said in one
+  journal line with its key, kind and the count, never a word of the
+  summary.
+- **Never waits.** A put takes only the queue's lock; a writer thread of
+  its own (`linked-records`, apart from the connector records' writer, so
+  neither waits on the other's backlog) sends with the lock free, 2 s a
+  write. Memory down, the change stays first and is tried again after 1 s,
+  doubling to 30 s, said once; refused (`forgotten` or any other), it goes
+  and the refusal is said, its key and error only.
+- **Whose.** Only a known person's (`p-` ids). With no person, or one not
+  known, nothing is kept or written: unlike a connector record there is no
+  fallback to the lamp's owner.
+- **Checked before it waits.** A key the memory would refuse, a service or
+  action left empty, or a `source_ref` that is not
+  `{service, id, session?, computer?}` (texts without control characters,
+  `service` and `id` not empty, at most 512 bytes) is never queued. The
+  summary is tidied to one line and cut at a whole character to 160 bytes.
+- **Forgets win.** A forget everything, of the person, or about a thing,
+  takes that person's (or everyone's) waiting linked changes before it is
+  sent and again when answered, matching a forget about a thing on the
+  change's service, action and summary; the memory refuses a deed from
+  before a forget (slice 1).
+- **Rollback.** Nothing calls it, so an older voice differs only in having
+  no `linked_dropped` fact.
+
 ## Service contacts (`service_contact`, the voice's `LAMP_SERVICE_CONTACTS`)
 
 The voice's `LAMP_SERVICE_CONTACTS` (off by default, on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064, beside
