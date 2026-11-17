@@ -259,10 +259,11 @@ pub const EGRESS_DIR: &str = "/run/lampos-tasks/egress";
 /// nothing another run left there can be read and sent (Heron's P2 at
 /// `2533a4f02b`); and only its own skill's folder of [`SKILLS`] and
 /// [`PUSHED`], never another skill's (Heron's P3 on #7590, made required
-/// by the first builder). lamp-tasks names that folder, one line, in the run's own
-/// folder, `<work>/lamp/make-<run id>/skill-folder`
-/// (`lamp_tasks::egress::OWN_SKILL_FILE`), found by the run's id as its
-/// egress socket is. A file that is missing, a link, or names anything but
+/// by the first builder). lamp-tasks names that folder, one line, beside the run's
+/// egress socket in its private folder, [`EGRESS_DIR`]`/<name>.folder`
+/// (`lamp_tasks::egress::OWN_SKILL_FILE`, 0600, made with the socket and
+/// removed with it), which no run can see or write (Heron's P3 at
+/// `2533a4f02b`); read here before `/run` is hidden. A file that is missing, a link, or names anything but
 /// one plain folder directly in [`SKILLS`] or [`PUSHED`] ends the run
 /// before anything of it runs. `K` (or `P`) is then that folder alone and
 /// the other emptied, so the staging, moving back and read-only remount
@@ -277,7 +278,7 @@ macro_rules! own_skill_lines {
          \x20 [ -n \"$W\" ] || fail \"a run granted net has no work folder\"\n\
          \x20 Z=$W/lamp/make-${LAMP_NS_EGRESS#*-}\n\
          \x20 [ -d \"$Z\" ] && [ ! -L \"$Z\" ] && [ ! -L \"$W/lamp\" ] || fail \"a run granted net has no folder of its own\"\n\
-         \x20 O=$W/lamp/make-${LAMP_NS_EGRESS#*-}/skill-folder N=\n\
+         \x20 O=/run/lampos-tasks/egress/$LAMP_NS_EGRESS.folder N=\n\
          \x20 [ -f \"$O\" ] && [ ! -L \"$O\" ] && [ ! -L \"${O%/*}\" ] && read -r N < \"$O\" || fail \"a run granted net names no skill folder of its own\"\n\
          \x20 case ${N##*/} in ''|*[!abcdefghijklmnopqrstuvwxyz0123456789_-]*) fail \"a run granted net names no plain skill folder\" ;; esac\n\
          \x20 case $N in\n\
@@ -800,7 +801,7 @@ const TASKS_EDITS: [(&str, &str); 9] = [
          # read-only, opens port 53 in the run's own network, names 127.0.0.1 in resolv.conf and starts the relay with a web\n\
          # proxy on 127.0.0.1:3128 and DNS on 127.0.0.1:53 through it: lamp-tasks lets out only the public web on 80 and 443.\n\
          # It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there.\n\
-         # A run granted net sees only its own skill's folder of those and the skills, named in its run's folder,\n\
+         # A run granted net sees only its own skill's folder of those and the skills, named beside its egress socket,\n\
          # and only its own run's folder of the work folder, over an empty tmpfs.\n",
     ),
     (
