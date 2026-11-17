@@ -84,7 +84,20 @@ pub const ANSWERS_WITHIN: std::time::Duration = crate::thread::GOING_ON_FOR;
 static RAN_NOW: std::sync::Mutex<Vec<(String, std::time::Instant)>> =
     std::sync::Mutex::new(Vec::new());
 
-/// `skill` run now by the owner's voice at `at`.
+/// The made skill a call's answer `told` says was run now ([`asked`]'s
+/// `{"run": NAME, "ran": true}`), if any: the worker tells the coordinator
+/// (`ProviderOutput::MadeRunNow`), which keeps it ([`ran_now`]) where the
+/// say service reads it. Never kept in the worker's own process, which
+/// the say service never reads (El's P1 on #7363).
+pub fn ran_of(told: &Value) -> Option<String> {
+    (told["ran"] == true)
+        .then(|| told[RUN].as_str().map(str::to_owned))
+        .flatten()
+        .filter(|skill| !skill.is_empty())
+}
+
+/// `skill` run now by the owner's voice at `at`: the coordinator's alone,
+/// told by the worker ([`ran_of`]).
 pub(crate) fn ran_now(skill: &str, at: std::time::Instant) {
     let mut ran = RAN_NOW.lock().unwrap_or_else(|poison| poison.into_inner());
     ran.retain(|(name, when)| {
@@ -94,7 +107,10 @@ pub(crate) fn ran_now(skill: &str, at: std::time::Instant) {
 }
 
 /// Whether `skill`'s line may answer the conversation that ran it at `now`:
-/// run now by the owner's voice within [`ANSWERS_WITHIN`].
+/// run now by the owner's voice within [`ANSWERS_WITHIN`]. Keyed by the
+/// skill's name alone: any say-socket caller naming it then is let through
+/// as its answer, with exact words only, the trust `prepare-unplug`'s lines
+/// have (El's P3 on #7363).
 pub fn answers_now(skill: &str, now: std::time::Instant) -> bool {
     RAN_NOW
         .lock()
@@ -240,7 +256,6 @@ pub fn asked(
     }
     match run(&made) {
         Ok(says) => {
-            ran_now(&made, std::time::Instant::now());
             eprintln!("lamp-voice: request {request}: a made skill run now, as its owner asked");
             json!({
                 RUN: made,
@@ -414,6 +429,8 @@ mod tests {
             assert_eq!(ran, [name], "{heard}: {told}");
             assert_eq!(told[RUN], name, "{told}");
             assert_eq!(told["ran"], true, "{told}");
+            // What the worker tells the coordinator of it (#7363).
+            assert_eq!(ran_of(&told).as_deref(), Some(name), "{told}");
             assert!(!speaks_itself(&told), "{told}");
             let next = told["next"].as_str().unwrap();
             assert!(next.contains("is running now"), "{next}");
@@ -468,6 +485,7 @@ mod tests {
                 |_| Err(why.to_owned()),
             );
             assert_eq!(told["error"], why, "{told}");
+            assert_eq!(ran_of(&told), None, "a refused run is no run");
             let next = told["next"].as_str().unwrap();
             assert!(next.contains("unread mail didn't run now"), "{next}");
             assert!(next.contains(why), "{next}");

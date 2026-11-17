@@ -1356,6 +1356,51 @@ fn the_unplug_skills_exact_line_answers_the_conversation_it_is_in() {
     assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
 }
 
+/// #7363 (El's P1): on the product's second route a made skill is run now
+/// in the worker's process, and the say service reads the run in the
+/// coordinator's. The worker tells it as `MadeRunNow`, over the wire, and
+/// only once the coordinator has kept it does the skill's failure line,
+/// asked as the answer, play through the conversation going on. Before
+/// that it waits as any exact line.
+#[test]
+fn a_run_made_in_the_worker_lets_its_failure_answer_the_conversation() {
+    let skill = "fig-facts-worker-7363";
+    let mut owner = resting_owner();
+    let (mut reply, mut trace) = (None, SessionState::default());
+    let admission = InputAdmission::default();
+    let (mut says, answered) = crate::say::Says::answers_exact_for_test(skill, vec![400; 480]);
+    let talking = crate::say::SoundNow {
+        conversing: true,
+        ..sound_now(&mut owner, &reply, &admission, &says)
+    };
+    assert!(
+        !take_exact(&mut says, &talking, &mut owner, &mut reply, &mut trace),
+        "no run kept here yet: it waits for the conversation"
+    );
+    assert!(answered.try_recv().is_err(), "still waiting");
+    // The worker's side: the run's own answer to the model, as `made_run`
+    // makes it, told the coordinator over the worker's channel.
+    let told = json!({crate::made_run::RUN: skill, "ran": true, "says": false});
+    let output = ProviderOutput::MadeRunNow {
+        request: 40,
+        skill: crate::made_run::ran_of(&told).unwrap(),
+    };
+    let wire = serde_json::to_string(&output).unwrap();
+    let ProviderOutput::MadeRunNow {
+        request,
+        skill: got,
+    } = serde_json::from_str::<ProviderOutput>(&wire).unwrap()
+    else {
+        panic!("{wire}");
+    };
+    // The coordinator's side keeps it.
+    made_run_now(request, &got, &mut trace).unwrap();
+    assert!(take_exact(
+        &mut says, &talking, &mut owner, &mut reply, &mut trace
+    ));
+    assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
+}
+
 /// #7060 (case B on lamp-52e6: "unplug", the fold, the ask, "No."): the
 /// "No." was still the voice model's turn in flight, queued but not yet
 /// played, when the skill's stay line came. The line answers the
