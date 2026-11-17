@@ -149,6 +149,7 @@ fn the_skills_page_reads_the_agreed_reply_and_its_refusal() {
         manage: root.join("m.sock"),
         store: false,
         addons: false,
+        seen_more: false,
         link: None,
     }));
     let started = Instant::now();
@@ -284,6 +285,7 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
         manage,
         store: false,
         addons: false,
+        seen_more: false,
         link: None,
     }));
     let before = sent(&mut real)["data"]["skills"].as_array().unwrap().len();
@@ -400,6 +402,7 @@ fn a_skill_from_a_package_is_listed_with_its_sha256_and_version() {
         manage: root.join("m.sock"),
         store: false,
         addons: false,
+        seen_more: false,
         link: None,
     }));
     let rows = |real: &mut Real| sent(real)["data"]["skills"].as_array().unwrap().clone();
@@ -455,5 +458,159 @@ fn a_skill_from_a_package_is_listed_with_its_sha256_and_version() {
     // Put on again from a folder: no package, so none.
     install(&folder, None, &source).unwrap();
     assert!(tutor(&mut real)["sha256"].is_null());
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// #6543: the owner's seen_more yes copies the camera's. With
+/// `LAMP_SEEN_MORE_DOINGS` off in lamp-cloud's unit the page is as before:
+/// no row carries `seen_more_allowed`, `can` doesn't name
+/// `skills.seen_more` and it is not answered. On, only a row that names
+/// `humans/doing_more` carries it, false until the owner says yes through
+/// the manage helper, and the reply says what was kept; the rows are
+/// otherwise the same bytes as with the switch off.
+#[test]
+fn the_seen_more_yes_is_on_the_page_only_with_its_switch_and_set_as_the_camera() {
+    let root = PathBuf::from(format!("/tmp/lcsm-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let folder = root.join("skills");
+    copied(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../skills"),
+        &folder,
+    );
+    let tired = folder.join("tired-glow");
+    fs::create_dir_all(&tired).unwrap();
+    fs::write(
+        tired.join("SKILL.md"),
+        "---\nname: tired-glow\ndescription: A warm light when you look tired.\n---\n",
+    )
+    .unwrap();
+    fs::write(
+        tired.join("skill.toml"),
+        "[trigger]\ntopic = \"humans/doing_more\"\nfield = \"tired_seen\"\nabove = 0\n\
+         [ask]\npolicy = \"nudge\"\n[[do]]\nlight = { colour = \"warm\" }\n\
+         [permissions]\ntopics = [\"humans/doing_more\"]\nlight = true\n",
+    )
+    .unwrap();
+    let manage = root.join("m.sock");
+    let listener = UnixListener::bind(&manage).unwrap();
+    let served = folder.clone();
+    let state = root.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming().flatten() {
+            let _ = lamp_skills::package::asked(
+                &served,
+                &served.join("no-made"),
+                &state,
+                lamp_skills::package::ASKED_LOCK_WAIT,
+                None,
+                None,
+                &stream,
+                &stream,
+            );
+        }
+    });
+    let places = |seen_more: bool| skills::Places {
+        folder: folder.clone(),
+        off: root.join("off"),
+        manage: manage.clone(),
+        store: false,
+        addons: false,
+        seen_more,
+        link: None,
+    };
+    let mut off = real(Some(places(false)));
+    let mut on = real(Some(places(true)));
+    let rows = |page: &Value| page["data"]["skills"].as_array().unwrap().clone();
+    let allowed = |page: &Value| {
+        rows(page)
+            .into_iter()
+            .find(|row| row["name"] == "tired-glow")
+            .unwrap()
+            .get("seen_more_allowed")
+            .cloned()
+    };
+    let without_field = |page: &Value| {
+        let mut rows = rows(page);
+        for row in &mut rows {
+            row.as_object_mut().unwrap().remove("seen_more_allowed");
+        }
+        serde_json::to_string(&rows).unwrap()
+    };
+
+    // Off: as before.
+    let listed = sent(&mut off);
+    assert!(
+        !listed.to_string().contains("seen_more_allowed"),
+        "{listed}"
+    );
+    let can = lamp_cloud::answer::can(&off);
+    assert!(can.contains(&"skills.camera") && !can.contains(&"skills.seen_more"));
+    let refused = asked(
+        &mut off,
+        "skills.seen_more",
+        &json!({"name": "tired-glow", "allow": true}),
+    );
+    assert_eq!(refused["error"], not_here("skills.seen_more"));
+    assert!(!root.join(lamp_skills::SEEN_MORE_FILE).exists());
+
+    // On: the one row that names the topic says no yes yet.
+    let can_on = lamp_cloud::answer::can(&on);
+    assert!(can_on.contains(&"skills.seen_more"));
+    assert_eq!(
+        can_on
+            .iter()
+            .filter(|kind| **kind != "skills.seen_more")
+            .collect::<Vec<_>>(),
+        can.iter().collect::<Vec<_>>(),
+        "only the one kind more"
+    );
+    let page = sent(&mut on);
+    assert_eq!(allowed(&page), Some(json!(false)));
+    assert_eq!(
+        rows(&page)
+            .iter()
+            .filter(|row| row.get("seen_more_allowed").is_some())
+            .count(),
+        1,
+        "no shipped skill carries it"
+    );
+    assert_eq!(without_field(&page), without_field(&listed));
+
+    // The yes given and taken back, as the camera's.
+    let given = asked(
+        &mut on,
+        "skills.seen_more",
+        &json!({"name": "tired-glow", "allow": true}),
+    );
+    assert_eq!(given["status"], "success", "{given}");
+    assert_eq!(allowed(&given), Some(json!(true)));
+    assert_eq!(
+        given["data"]["seen_more"],
+        json!({"name": "tired-glow", "allowed": true})
+    );
+    assert_eq!(
+        fs::read_to_string(root.join(lamp_skills::SEEN_MORE_FILE)).unwrap(),
+        "tired-glow\n"
+    );
+    // The switch off, the page is still as before with the yes kept.
+    let still = sent(&mut off);
+    assert!(!still.to_string().contains("seen_more_allowed"));
+    assert_eq!(without_field(&still), without_field(&listed));
+    let back = asked(
+        &mut on,
+        "skills.seen_more",
+        &json!({"name": "tired-glow", "allow": false}),
+    );
+    assert_eq!(allowed(&back), Some(json!(false)));
+    assert_eq!(
+        back["data"]["seen_more"],
+        json!({"name": "tired-glow", "allowed": false})
+    );
+    let bad = asked(
+        &mut on,
+        "skills.seen_more",
+        &json!({"name": "tired-glow", "allow": "yes"}),
+    );
+    assert_eq!(bad["error"], "allow must be true or false");
     let _ = fs::remove_dir_all(&root);
 }

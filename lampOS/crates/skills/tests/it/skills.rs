@@ -2743,6 +2743,7 @@ fn a_list_of_sooners_brings_the_trigger_to_the_shortest_holding() {
         ));
         messages.sort_by_key(|message| message.0);
         let mut engine = Engine::new(vec![load(skill).unwrap()], true).sooner();
+        let _yes = seen_more_yes(&mut engine, &["stretch-break"]);
         let mut at = Vec::new();
         for (when, topic, payload) in &messages {
             if !engine
@@ -2846,6 +2847,7 @@ fn a_whiles_sooner_lowers_its_own_above_to_the_lowest_holding() {
     let runs = |on: bool, sitting_s: u32, drank_seen: u32, ate_seen: u32| {
         let engine = Engine::new(vec![skill.clone()], true);
         let mut engine = if on { engine.sooner() } else { engine };
+        let _yes = seen_more_yes(&mut engine, &["comfort"]);
         engine.observe(
             "humans/doing_more",
             1_000_000,
@@ -2875,6 +2877,7 @@ fn a_whiles_sooner_lowers_its_own_above_to_the_lowest_holding() {
 
     // The journal: once lowered, nothing on the same, once back.
     let mut engine = Engine::new(vec![skill.clone()], true).sooner();
+    let _yes = seen_more_yes(&mut engine, &["comfort"]);
     engine.observe("room/activity", 0, br#"{"sitting_s":100}"#, None);
     assert!(engine.take_dropped().is_empty());
     engine.observe("humans/doing_more", 1_000_000, br#"{"drank_seen":2}"#, None);
@@ -2909,6 +2912,7 @@ fn a_whiles_sooner_lowers_its_own_above_to_the_lowest_holding() {
     );
     // Off: no line.
     let mut off = Engine::new(vec![skill.clone()], true);
+    let _off_yes = seen_more_yes(&mut off, &["comfort"]);
     off.observe("humans/doing_more", 1_000_000, br#"{"drank_seen":2}"#, None);
     assert!(off.take_dropped().is_empty());
 
@@ -2927,6 +2931,7 @@ fn a_whiles_sooner_lowers_its_own_above_to_the_lowest_holding() {
     .unwrap();
     let allowed = |skill: &lamp_skills::Skill, drank_seen: u32| {
         let mut engine = Engine::new(vec![skill.clone()], true).sooner();
+        let _yes = seen_more_yes(&mut engine, &["comfort"]);
         engine.observe(
             "humans/doing_more",
             0,
@@ -8573,6 +8578,124 @@ fn the_tools_socket_lost_is_made_again_and_the_folder_gone_ends_lamp_skills() {
     std::io::Read::read_to_string(&mut child.stderr.take().unwrap(), &mut said).unwrap();
     assert!(said.contains("is gone; ending"), "{said}");
     assert!(!tools.exists(), "not made again by lamp-skills");
+}
+
+/// #6543: `humans/doing_more` reaches a skill only with the owner's
+/// seen_more yes for it, kept by name beside the off file: without it no
+/// trigger on it holds and no `[[while]]` reads it (it reads as a topic that
+/// has said nothing yet); with it, both do; a yes taken back holds from the
+/// next read of the file, and a yes kept holds across a restart. Another
+/// skill's yes gives nothing, and a skill that doesn't name the topic is as
+/// before.
+#[test]
+fn humans_doing_more_reaches_a_skill_only_with_the_owners_seen_more_yes() {
+    let dir = tempfile::tempdir().unwrap();
+    let reads = "[permissions]\ntopics = [\"humans/doing_more\"]\nlight = true\n";
+    let tired = "topic = \"humans/doing_more\"\nfield = \"tired_seen\"\nabove = 0\n";
+    let resting = load(&skill_with(
+        dir.path(),
+        "rest-now",
+        &format!(
+            "needs = [\"light\"]\ntool = \"rest_now\"\n[[while]]\n{tired}\
+             [[do]]\nlight = {{ colour = \"warm\" }}\n{reads}"
+        ),
+    ))
+    .unwrap();
+    let noticing = load(&skill_with(
+        dir.path(),
+        "tired-glow",
+        &format!(
+            "[trigger]\n{tired}[ask]\npolicy = \"nudge\"\n[[do]]\n\
+             light = {{ colour = \"warm\" }}\n{reads}"
+        ),
+    ))
+    .unwrap();
+    let plain = load(&skill_with(
+        dir.path(),
+        "sitting-glow",
+        "needs = [\"light\"]\ntool = \"sitting_glow\"\n[[while]]\ntopic = \"room/activity\"\n\
+         field = \"sitting_s\"\nabove = 0\n[[do]]\nlight = { colour = \"warm\" }\n\
+         [permissions]\ntopics = [\"room/activity\"]\nlight = true\n",
+    ))
+    .unwrap();
+    let skills = vec![resting, noticing, plain];
+    let state = tempfile::tempdir().unwrap();
+    let kept = state.path().join(lamp_skills::SEEN_MORE_FILE);
+    let keep = |names: &[&str]| {
+        let names = names.iter().map(|name| (*name).to_owned()).collect();
+        lamp_skills::keep_names(&kept, &names).unwrap();
+    };
+    const S: u64 = 1_000_000;
+    let mut at = 0;
+    let mut tired_now = |engine: &mut Engine, seen: u32| {
+        at += S;
+        let runs = engine.observe(
+            "humans/doing_more",
+            at,
+            format!(r#"{{"tired_seen":{seen}}}"#).as_bytes(),
+            None,
+        );
+        let glowed = runs.iter().any(|run| run.skill == "tired-glow");
+        let rested = engine
+            .tool("rest_now", &serde_json::json!({}), at + 1)
+            .is_ok();
+        (glowed, rested)
+    };
+
+    // Another skill's yes only: nothing from it.
+    keep(&["someone-else"]);
+    let mut engine = Engine::new(skills.clone(), true);
+    engine.keep_off_in(state.path()).unwrap();
+    engine.observe("room/activity", 0, br#"{"sitting_s":60}"#, None);
+    assert!(!engine.hears_more("rest-now"));
+    assert_eq!(tired_now(&mut engine, 0), (false, false));
+    assert_eq!(tired_now(&mut engine, 1), (false, false), "no yes: refused");
+    assert!(
+        engine
+            .tool("sitting_glow", &serde_json::json!({}), 10 * S)
+            .is_ok(),
+        "a skill that doesn't name it is as before"
+    );
+    assert!(engine.reread_seen_more().is_none(), "unchanged");
+
+    // The yes given: read again, both hear it. The tools file is the same.
+    let tools = lamp_skills::tools_file(engine.skills());
+    keep(&["rest-now", "tired-glow"]);
+    assert_eq!(engine.reread_seen_more().map(|ends| ends.len()), Some(0));
+    assert_eq!(lamp_skills::tools_file(engine.skills()), tools);
+    assert!(engine.hears_more("rest-now") && engine.hears_more("tired-glow"));
+    assert_eq!(tired_now(&mut engine, 0), (false, false));
+    assert_eq!(tired_now(&mut engine, 1), (true, true), "with the yes");
+
+    // Taken back: nothing from the next read on, the while too.
+    keep(&[]);
+    assert!(engine.reread_seen_more().is_some());
+    assert!(
+        engine
+            .tool("rest_now", &serde_json::json!({}), 20 * S)
+            .is_err(),
+        "the value it had is no longer its"
+    );
+    assert_eq!(tired_now(&mut engine, 0), (false, false));
+    assert_eq!(tired_now(&mut engine, 1), (false, false), "taken back");
+
+    // Kept across a restart.
+    keep(&["rest-now"]);
+    let mut started = Engine::new(skills, true);
+    started.keep_off_in(state.path()).unwrap();
+    assert!(started.hears_more("rest-now") && !started.hears_more("tired-glow"));
+    assert_eq!(tired_now(&mut started, 1), (false, true));
+}
+
+/// The owner's seen_more yes to `names` kept in a state folder of its own,
+/// as the app's `skills.seen_more` keeps it (#6543), and read by `engine`:
+/// the folder, to be kept while the engine runs.
+fn seen_more_yes(engine: &mut Engine, names: &[&str]) -> tempfile::TempDir {
+    let state = tempfile::tempdir().unwrap();
+    let names = names.iter().map(|name| (*name).to_owned()).collect();
+    lamp_skills::keep_names(&state.path().join(lamp_skills::SEEN_MORE_FILE), &names).unwrap();
+    engine.keep_off_in(state.path()).unwrap();
+    state
 }
 
 /// A state folder in `root` with the owner's yes to `names`' camera kept,

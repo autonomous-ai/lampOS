@@ -397,6 +397,11 @@ pub const KINDS: [(&str, Switch); 77] = [
     ("skills.off", |lamp| lamp.skills().is_some()),
     ("skills.on", |lamp| lamp.skills().is_some()),
     ("skills.camera", |lamp| lamp.skills().is_some()),
+    // The owner's yes to tiredness, desk work and celebrating (#6543):
+    // named only while the lamp says them (`LAMP_SEEN_MORE_DOINGS=on`).
+    ("skills.seen_more", |lamp| {
+        lamp.skills().is_some_and(|places| places.seen_more)
+    }),
     ("skills.install", |lamp| {
         lamp.skills().is_some_and(|places| places.store)
     }),
@@ -805,6 +810,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         "skills.camera" if on(lamp, kind) => {
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::camera(&places, data).map(Some)
+        }
+        // The owner's yes to a skill hearing tiredness, desk work and
+        // celebrating (#6543), kept as the camera's: the page as it now is.
+        "skills.seen_more" if on(lamp, kind) => {
+            let places = lamp.skills().ok_or_else(|| not_here(kind))?;
+            crate::skills::seen_more(&places, data).map(Some)
         }
         // Guard mode on or off from the owner's app (#2562), as
         // `skills.remove` goes: handed to lamp-skills' call socket, which
@@ -2576,6 +2587,7 @@ pub mod tests {
             manage: std::path::PathBuf::from("/nowhere/manage.sock"),
             store,
             addons: false,
+            seen_more: false,
             link: None,
         }
     }
