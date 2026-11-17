@@ -4326,10 +4326,23 @@ file:
   said once in exact words, "I'm still getting ready. Give me a minute and
   ask me again." (lamp-skills' `task::not_ready_line`), only within 180 s
   of the lamp's start (`/proc/uptime`, `skill_words::NOT_READY_WITHIN_MS`);
-  past it, or with no time read, the run's failure is told as before. A
-  trigger's run says nothing. A refusal for no lamp target of its own is not told so, as it
-  also stands for Hermes on the lamp being off. Test:
-  `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`.
+  past it, or with no time read, or for a trigger's run, it is told once
+  as a note the voice says in its own words and the person's language,
+  "{Skill} couldn't start because the lamp's agent isn't running right
+  now" (`task::not_started_note`: only the skill's spoken name and fixed
+  words, never lamp-tasks' message), behind a read's gate and turn, the
+  next time the owner is seen within 30 minutes
+  (`service_read::REFUSAL_WAIT`), then dropped; a trigger's run at most
+  once in six hours lamp-wide (`task::NOT_STARTED_QUIET_MS`), so an hourly
+  skill doesn't say so every hour (#6577: on lamp-fc4b on 17
+  Nov a stopped Gateway refused a skill's run and nothing was said). With
+  `LAMP_SKILL_TASK_SURE` on, that note is said in place of the run's failed
+  line, never with it. A refusal for no lamp target of its own is not told
+  so, as it also stands for Hermes on the lamp being off. Tests:
+  `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`,
+  `task::tests::a_run_refused_as_the_agent_is_not_running_is_a_note`,
+  `task::tests::a_triggers_refused_runs_are_told_once_in_six_hours`,
+  `service_read::tests::a_refused_run_is_told_once_when_the_owner_comes_within_half_an_hour`.
 - **A fixed write is refused.** A task with no script (a fixed write) is
   refused before anything is made live: "a fixed write is not taken by a
   gateway agent, so nothing was started".

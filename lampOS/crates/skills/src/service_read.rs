@@ -545,6 +545,11 @@ pub trait Room {
     fn read(&mut self, args: &Value) -> Result<Value, String>;
     /// Says `text` as exact words: Ok once it was said whole.
     fn say(&mut self, text: &str) -> Result<(), String>;
+    /// Asks the voice to say `note` in its own words, in the person's
+    /// language (#6577): Ok once it was said. None by default.
+    fn say_note(&mut self, _note: &str) -> Result<(), String> {
+        Err("no note can be said here".into())
+    }
     /// With [`LINK_NOTE_ENVIRONMENT`] on and somewhere to keep it: whether
     /// this skill was told already that its service isn't linked. `None`,
     /// the default: nothing is told, as before.
@@ -618,10 +623,42 @@ pub fn tell(lines: &[String], room: &mut impl Room) -> String {
     outcome
 }
 
+/// How long a skill's run's refusal waits for the gate (#6577, the first
+/// builder): said once, the next time the owner is seen within it, then
+/// dropped.
+pub const REFUSAL_WAIT: Duration = Duration::from_secs(30 * 60);
+
+/// A skill's run lamp-tasks refused, told to the owner as a note the voice
+/// says in its own words (`note`, [`Room::say_note`]), behind a read's gate
+/// and turn, waiting at most `within` for it ([`REFUSAL_WAIT`]). The
+/// journal's words: `told`, `skipped: <why>` or `not said: <why>`.
+pub fn tell_note(note: &str, within: Duration, room: &mut impl Room) -> String {
+    let taken = match wait_for_gate_within(room, within) {
+        Ok(taken) => taken,
+        Err(skipped) => return skipped,
+    };
+    let outcome = match room.say_note(note) {
+        Ok(()) => "told".to_owned(),
+        Err(why) => format!("not said: {why}"),
+    };
+    if let Some(taken) = taken {
+        taken.end(room.now_ms());
+    }
+    outcome
+}
+
 /// Waits up to [`WAIT`] for the gate to stay open [`STEADY`] and the
 /// lamp's turn: the turn taken (none with no [`Room::turns`]), or why it
 /// was skipped, for the journal.
 fn wait_for_gate<R: Room>(room: &mut R) -> Result<Option<Taken<'static>>, String> {
+    wait_for_gate_within(room, WAIT)
+}
+
+/// [`wait_for_gate`], at most `within`.
+fn wait_for_gate_within<R: Room>(
+    room: &mut R,
+    within: Duration,
+) -> Result<Option<Taken<'static>>, String> {
     let began = room.now_ms();
     let turns = room.turns();
     let mut steady: Option<u64> = None;
@@ -661,7 +698,7 @@ fn wait_for_gate<R: Room>(room: &mut R) -> Result<Option<Taken<'static>>, String
                 }
             }
         }
-        if now.saturating_sub(began) >= WAIT.as_millis() as u64 {
+        if now.saturating_sub(began) >= within.as_millis() as u64 {
             return Err(format!("skipped: {}", last.words()));
         }
         room.wait(POLL);
@@ -909,6 +946,11 @@ mod tests {
             self.said_at.push(self.now);
             Ok(())
         }
+        fn say_note(&mut self, note: &str) -> Result<(), String> {
+            self.said.push(format!("note: {note}"));
+            self.said_at.push(self.now);
+            Ok(())
+        }
         fn link_note(&mut self) -> Option<bool> {
             self.noted
         }
@@ -926,6 +968,44 @@ mod tests {
     /// A turn of its own for a test, as the lamp's one [`TURNS`] is.
     fn turns() -> &'static Turns {
         Box::leak(Box::new(Turns::new()))
+    }
+
+    /// #6577 (the first builder's (b)): a skill's run refused while the
+    /// room is empty is said once, as a note, when the owner is seen within
+    /// [`REFUSAL_WAIT`]; nobody in that time, nothing is said, and the wait
+    /// ends there, not at a read's hour.
+    #[test]
+    fn a_refused_run_is_told_once_when_the_owner_comes_within_half_an_hour() {
+        let nobody = Seen {
+            faces: Some(0),
+            owner_in_view: false,
+            ..alone()
+        };
+        // Ten minutes of an empty room, then the owner alone.
+        let empty = (10 * 60_000 / POLL.as_millis()) as usize;
+        let mut seen = vec![nobody.clone(); empty];
+        seen.push(alone());
+        let turns = turns();
+        let mut lamp = Lamp::new(seen, json!({}));
+        lamp.turns = Some(turns);
+        assert_eq!(tell_note("Say it.", REFUSAL_WAIT, &mut lamp), "told");
+        assert_eq!(lamp.said, ["note: Say it."]);
+        assert!(lamp.said_at[0] >= 1_000 + 10 * 60_000, "{:?}", lamp.said_at);
+        assert_eq!(lamp.waits, ["the owner not in view"]);
+        assert!(lamp.reads.is_empty(), "nothing is read");
+        assert!(!turns.free(lamp.now), "the turn is given back as it ended");
+        // Nobody for the whole half hour: never said, given up at it.
+        let mut empty = Lamp::new(vec![nobody], json!({}));
+        assert_eq!(
+            tell_note("Say it.", REFUSAL_WAIT, &mut empty),
+            "skipped: the owner not in view"
+        );
+        assert!(empty.said.is_empty());
+        let waited = empty.now - 1_000;
+        assert!(
+            (REFUSAL_WAIT.as_millis() as u64..WAIT.as_millis() as u64).contains(&waited),
+            "{waited}"
+        );
     }
 
     /// What a skill's task's agent found is said behind a read's gate: the

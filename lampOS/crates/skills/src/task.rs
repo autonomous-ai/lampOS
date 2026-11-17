@@ -1206,10 +1206,85 @@ pub fn not_ready_line(
         .then_some(lamp_voice::skill_words::NOT_READY_LINE)
 }
 
+/// The note the voice says, in its own words and the person's language,
+/// when lamp-tasks refused `skill`'s run as the lamp's agent not running
+/// ([`NOT_READY_SAID`] in its `answer`) and [`not_ready_line`] says nothing:
+/// a trigger's run, or one past the lamp's start (#6577, lamp-fc4b, 17 Nov:
+/// a stopped Gateway refused a skill's run and the person heard nothing).
+/// Only the skill's spoken name and fixed words reach the model, never
+/// lamp-tasks' message or the task's words. None for any other answer.
+pub fn not_started_note(skill: &str, answer: &str) -> Option<String> {
+    let answer: serde_json::Value = serde_json::from_str(answer.trim()).ok()?;
+    let refused = answer.get("ok").and_then(serde_json::Value::as_bool) == Some(false);
+    let message = answer.get("message")?.as_str()?;
+    (refused && NOT_READY_SAID.iter().any(|said| message.contains(said))).then(|| {
+        format!(
+            "Tell the person in one short sentence, in the language you speak with them, that {} couldn't start because the lamp's agent isn't running right now. Say nothing else.",
+            crate::task_sure::spoken_name(skill)
+        )
+    })
+}
+
+/// A trigger's runs refused while the lamp's agent stays down tell
+/// [`not_started_note`] at most once in this long, lamp-wide, so a skill
+/// that runs every hour doesn't say so every hour; a run the person asked
+/// for by voice is always told.
+pub const NOT_STARTED_QUIET_MS: u64 = 6 * 3_600_000;
+
+/// Whether a [`not_started_note`] is told now (`now_ms`): asked by voice,
+/// or a trigger's run with none told lamp-wide in [`NOT_STARTED_QUIET_MS`]
+/// (`last_told_ms`, the last one told, 0 for none).
+pub fn not_started_told(asked_by_voice: bool, last_told_ms: u64, now_ms: u64) -> bool {
+    asked_by_voice
+        || last_told_ms == 0
+        || now_ms.saturating_sub(last_told_ms) >= NOT_STARTED_QUIET_MS
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// #6577: a run refused as the lamp's agent isn't running is told as a
+    /// note naming the skill, whoever asked and however long the lamp has
+    /// been up; lamp-tasks' message never reaches it, and any other answer
+    /// is no note.
+    #[test]
+    fn a_run_refused_as_the_agent_is_not_running_is_a_note() {
+        for message in [
+            "Harness didn't start the run (openclaw_gateway_not_ready)",
+            "Harness didn't start the run (harness_not_running)",
+        ] {
+            let answer = json!({"ok": false, "error": "run_failed", "message": message});
+            let note = not_started_note("morning-mail", &answer.to_string()).unwrap();
+            assert!(note.contains("Morning mail couldn't start"), "{note}");
+            assert!(!note.contains("Harness"), "{note}");
+        }
+        for answer in [
+            json!({"ok": false, "error": "run_failed", "message": "Harness failed"}),
+            json!({"ok": false, "error": "no_net"}),
+            json!({"ok": true, "message": "openclaw_gateway_not_ready"}),
+        ] {
+            assert_eq!(not_started_note("morning-mail", &answer.to_string()), None);
+        }
+        assert_eq!(not_started_note("morning-mail", "not json"), None);
+    }
+
+    /// #6577: a trigger's refused run is told once in six hours, lamp-wide;
+    /// one asked by voice always.
+    #[test]
+    fn a_triggers_refused_runs_are_told_once_in_six_hours() {
+        let now = 100 * 3_600_000;
+        assert!(not_started_told(false, 0, now));
+        assert!(!not_started_told(false, now - 3_600_000, now));
+        assert!(!not_started_told(
+            false,
+            now - NOT_STARTED_QUIET_MS + 1,
+            now
+        ));
+        assert!(not_started_told(false, now - NOT_STARTED_QUIET_MS, now));
+        assert!(not_started_told(true, now - 1, now));
+    }
 
     /// A run the person asked for, refused as the lamp is still getting
     /// ready (its Gateway, Harness not running), is told the not-ready

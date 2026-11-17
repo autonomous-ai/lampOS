@@ -5733,6 +5733,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
         let found = std::cell::Cell::new(None);
         let refused = std::cell::Cell::new(None);
         let not_ready = std::cell::Cell::new(None);
+        let not_started = std::cell::Cell::new(None);
         let tried = lamp_skills::task_sure::Tried::default();
         let send = |socket: &Path, line: &str| {
             // With `LAMP_SKILL_RUNS_VOICE_SHARE` set (#7342), the relay's day
@@ -5771,6 +5772,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
                 asked.is_some(),
                 lamp_voice::skill_words::since_boot_ms(),
             ));
+            not_started.set(lamp_skills::task::not_started_note(&skill, &answer));
             lamp_skills::service_write::agent_answered(&answer)
         };
         // Each try afresh: one that returns before `send` keeps nothing of
@@ -5779,6 +5781,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             found.set(None);
             refused.set(None);
             not_ready.set(None);
+            not_started.set(None);
             tried.once(|| {
                 lamp_skills::task::hand(
                     &skill,
@@ -5830,7 +5833,33 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
                 let _ = tried.failed();
                 None
             }
-            _ => tried.failed(),
+            // Refused as its agent isn't running, and not said so above (a
+            // trigger's run, or past the lamp's start): told once, as a note
+            // the voice says in its own words, behind a read's gate, the
+            // next time the owner is seen within half an hour (#6577).
+            _ => match not_started.take() {
+                Some(note)
+                    if refused.is_none()
+                        && lamp_skills::task::not_started_told(
+                            asked.is_some(),
+                            NOT_STARTED_TOLD.load(std::sync::atomic::Ordering::SeqCst),
+                            unix_ms(),
+                        ) =>
+                {
+                    NOT_STARTED_TOLD.store(unix_ms(), std::sync::atomic::Ordering::SeqCst);
+                    let told = lamp_skills::service_read::tell_note(
+                        &note,
+                        lamp_skills::service_read::REFUSAL_WAIT,
+                        &mut room,
+                    );
+                    eprintln!(
+                        "lamp-skills: skill:{skill}: do.task: refused as its agent isn't running: {told}"
+                    );
+                    let _ = tried.failed();
+                    None
+                }
+                _ => tried.failed(),
+            },
         };
         // What its agent found, or with the switch on, why it didn't run
         // (once: a refusal or the not-ready line said above is that).
@@ -5882,6 +5911,10 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
 /// task is refused while one is ([`run_now_refused`]): on lamp-9adf, 15
 /// Nov at 21:40, a run now was said to be running while another skill's
 /// write held lamp-tasks, which then refused it as busy.
+/// When a refusal as the lamp's agent isn't running was last told, unix
+/// ms, 0 for none ([`lamp_skills::task::not_started_told`]).
+static NOT_STARTED_TOLD: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 static HANDING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// What a run now's refusal says while another hand-over is under way.
@@ -6132,6 +6165,18 @@ impl lamp_skills::service_read::Room for LampRoom {
             Ok(answer["result"].clone())
         } else {
             Err(answer["error"].as_str().unwrap_or("refused").to_owned())
+        }
+    }
+
+    fn say_note(&mut self, note: &str) -> Result<(), String> {
+        // Only fixed words and a skill's name: nothing read is in it.
+        let asking = json!({"note": note, "priority": lamp_skills::SAY_PRIORITY,
+                            "expires_in_ms": 60_000});
+        let outcome = say(&self.say, "say", &self.skill, asking, &[], || {});
+        match outcome.strip_prefix("say: ") {
+            Some("spoken") => Ok(()),
+            Some(other) => Err(other.to_owned()),
+            None => Err(outcome),
         }
     }
 

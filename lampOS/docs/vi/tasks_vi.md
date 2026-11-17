@@ -1656,11 +1656,24 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   a minute and ask me again." (`task::not_ready_line` của lamp-skills), chỉ
   trong 180 s sau khi đèn khởi động (`/proc/uptime`,
   `skill_words::NOT_READY_WITHIN_MS`); quá mức đó, hoặc không đọc được thời
-  gian, lỗi của lần chạy được nói như trước. Lần chạy do trigger thì không
-  nói gì. Lời từ chối vì đèn chưa có target riêng
-  thì không được nói như vậy, vì nó cũng có nghĩa là Hermes trên đèn đang
-  tắt. Test:
-  `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`.
+  gian, hoặc với lần chạy do trigger, nó được nói một lần dưới dạng một
+  note mà giọng nói tự diễn đạt bằng ngôn ngữ của người dùng, "{Skill}
+  couldn't start because the lamp's agent isn't running right now"
+  (`task::not_started_note`: chỉ tên đọc được của kỹ năng và lời cố định,
+  không bao giờ là message của lamp-tasks), sau cổng và lượt của một lần
+  đọc, vào lần tới chủ nhân được thấy trong vòng 30 phút
+  (`service_read::REFUSAL_WAIT`), rồi bỏ; lần chạy do trigger thì tối đa
+  một lần mỗi sáu giờ trên cả đèn (`task::NOT_STARTED_QUIET_MS`), để kỹ
+  năng chạy mỗi giờ không nói vậy mỗi giờ (#6577: trên lamp-fc4b ngày 17/11
+  một Gateway đã dừng từ chối lần chạy của một kỹ năng và không gì được
+  nói). Khi bật `LAMP_SKILL_TASK_SURE`, note đó được nói thay cho câu báo
+  lỗi của lần chạy, không bao giờ cùng nó. Lời từ chối vì đèn chưa có
+  target riêng thì không được nói như vậy, vì nó cũng có nghĩa là Hermes
+  trên đèn đang tắt. Test:
+  `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`,
+  `task::tests::a_run_refused_as_the_agent_is_not_running_is_a_note`,
+  `task::tests::a_triggers_refused_runs_are_told_once_in_six_hours`,
+  `service_read::tests::a_refused_run_is_told_once_when_the_owner_comes_within_half_an_hour`.
 - **Ghi cố định bị từ chối.** Task không có script (một ghi cố định) bị
   từ chối trước khi bất cứ gì được đặt sống: "a fixed write is not taken
   by a gateway agent, so nothing was started".
