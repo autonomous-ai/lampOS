@@ -475,13 +475,18 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   arrives (`net/sentences.rs`). The voice never says list markup (Queue
   #6811, lamp-9adf, 17 Nov: a web answer was said "this week: - New
   CEO… - Analysts…"): a `- `, `* `, `• `, `1. ` or `1) ` at a line's
-  start, the reply's start or after a sentence's break (`.`, `!`, `?`,
-  `…`, `:` or `;` and a space) is taken out as a pause, the item before
+  start or the reply's start is taken out as a pause, the item before
   it ending as a sentence (a `.` added when it has no stop or comma).
-  A hyphen inside a word or number (`e-mail`, `25-30`, `-5`) and a dash
-  inside a sentence are kept. A word at a piece's end that may still be
-  a marker (`1`, `1.`, `-`) waits for the next piece. Always on, every
-  voice; the lamp's words get the same text. It is whole at `[DONE]`, or at the
+  After a sentence's break inside a line (`.`, `!`, `?`, `…`, `:` or `;`
+  and a space) only a `- `, `* ` or `• ` is: a number there is said, as
+  it may be the answer ("The answer is: 2.", "Gate: 12."), and so is a
+  `-` before a number ("Temperature: - 5 degrees"). One marker a break;
+  a second right after it is said. A hyphen inside a word or number
+  (`e-mail`, `25-30`, `-5`) and a dash inside a sentence are kept. Each
+  word is decided once, when the whitespace after it has come (a `-`
+  after a break also waits for the word after it), so the text is the
+  same however the stream is cut into pieces. Always on, every voice;
+  the lamp's words get the same text. It is whole at `[DONE]`, or at the
   stream's end after a chunk with a `finish_reason`; a stream that ends
   before either was cut, and fails the turn (`TurnFailed`, as any chat
   failure) rather than leaving a half answer as the whole one. A turn's
