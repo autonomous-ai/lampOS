@@ -324,10 +324,12 @@ back into the flow.
    (subscription-mode `.env` — see §1), and the bridge restarts into
    subscription auth. Fallback: if the token line was not captured but the CLI
    saved `~/.claude/.credentials.json`, that also counts as success — presync
-   accepts either signal. Before the restart,
-   `session.json` is deleted so the bridge starts a fresh session: a session
-   created under the gateway model fails under the new account ("issue with the
-   selected model").
+   accepts either signal. When presync switches `.env` between gateway auth
+   (`ANTHROPIC_BASE_URL` present) and subscription auth, `EnsureOnboarding`
+   deletes `session.json` before the restart so the bridge starts a fresh
+   session: a session created under the gateway model fails under the new
+   account ("issue with the selected model"). This covers both this MQTT login
+   and the web Settings login (`/api/device/runtime-login`).
 
 Non-claudecode runtimes answer `claudecode_login` with a one-shot failure
 ("claude login not supported on … backend"). MQTT contract details:

@@ -186,3 +186,25 @@ func TestDropBridgeSessionRemovesFile(t *testing.T) {
 	// A missing file is fine (first login, or already reset).
 	dropBridgeSession(path)
 }
+
+// The auth mode decides whether an existing session can be resumed.
+func TestEnvAuthMode(t *testing.T) {
+	dir := t.TempDir()
+	if got := envAuthMode(filepath.Join(dir, "missing.env")); got != "" {
+		t.Fatalf("missing file = %q, want empty", got)
+	}
+	gateway := filepath.Join(dir, "gateway.env")
+	if err := os.WriteFile(gateway, []byte("# managed\nANTHROPIC_BASE_URL=https://example.test\nANTHROPIC_API_KEY=x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := envAuthMode(gateway); got != "gateway" {
+		t.Fatalf("gateway env = %q", got)
+	}
+	sub := filepath.Join(dir, "sub.env")
+	if err := os.WriteFile(sub, []byte("# Subscription auth: ANTHROPIC_* omitted on purpose\nCLAUDE_CODE_OAUTH_TOKEN=x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := envAuthMode(sub); got != "subscription" {
+		t.Fatalf("subscription env = %q", got)
+	}
+}

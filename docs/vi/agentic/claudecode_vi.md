@@ -317,9 +317,12 @@ Thiết bị có thể xác thực bằng **Claude subscription của chính use
    (`.env` ở subscription-mode — xem §1), và bridge restart vào subscription
    auth. Fallback: nếu dòng token không được bắt nhưng CLI đã lưu
    `~/.claude/.credentials.json`, cái đó cũng tính là thành công — presync
-   chấp nhận một trong hai tín hiệu. Trước khi restart,
-   `session.json` bị xoá để bridge mở session mới: session tạo dưới model gateway
-   sẽ lỗi khi chạy bằng tài khoản mới ("issue with the selected model").
+   chấp nhận một trong hai tín hiệu. Khi presync đổi `.env` giữa auth qua gateway
+   (có `ANTHROPIC_BASE_URL`) và auth bằng subscription, `EnsureOnboarding` xoá
+   `session.json` trước khi restart để bridge mở session mới: session tạo dưới
+   model gateway sẽ lỗi khi chạy bằng tài khoản mới ("issue with the selected
+   model"). Việc này áp dụng cho cả login qua MQTT này lẫn login trong Settings
+   trên web (`/api/device/runtime-login`).
 
 Runtime không phải claudecode trả lời `claudecode_login` bằng một failure
 one-shot ("claude login not supported on … backend"). Chi tiết hợp đồng MQTT:

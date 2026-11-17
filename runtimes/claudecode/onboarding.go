@@ -117,6 +117,7 @@ var presyncStateFiles = []string{
 // os-server boot / config change (server/config_watch.go).
 func (s *ClaudeCodeService) EnsureOnboarding() error {
 	before := hashFiles(presyncStateFiles)
+	authBefore := envAuthMode(EnvFile)
 	if err := s.runPresync(); err != nil {
 		if s.config.LLMMode() != "" {
 			return fmt.Errorf("apply LLM configuration: %w", err)
@@ -125,6 +126,13 @@ func (s *ClaudeCodeService) EnsureOnboarding() error {
 		slog.Warn("claudecode presync failed, continuing", "component", "claudecode", "error", err)
 	}
 	presyncChanged := hashFiles(presyncStateFiles) != before
+	if authAfter := envAuthMode(EnvFile); authBefore != "" && authAfter != authBefore {
+		// A session created under the gateway model fails under a Claude account
+		// ("issue with the selected model"), and the reverse; start fresh instead.
+		slog.Info("claudecode auth mode changed — starting a new session", "component", "claudecode", "from", authBefore, "to", authAfter)
+		s.sessionUUID.Store("")
+		dropBridgeSession(bridgeSessionFile)
+	}
 
 	// Seed KNOWLEDGE.md from the embedded template only if absent (living doc —
 	// never overwrite), then make sure every CLAUDE.md @import target exists so

@@ -176,10 +176,6 @@ func (s *ClaudeCodeService) adoptOAuthToken(token string) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 	slog.Info("claude login: adopting subscription auth", "component", "claudecode-login", "token_captured", token != "")
-	// A session created under the gateway model fails under the new account
-	// ("issue with the selected model"); start fresh instead of resuming it.
-	s.sessionUUID.Store("")
-	dropBridgeSession(bridgeSessionFile)
 	if err := s.EnsureOnboarding(); err != nil {
 		return fmt.Errorf("apply subscription auth: %w", err)
 	}
@@ -193,10 +189,26 @@ var bridgeSessionFile = claudecodeHome + "/session.json"
 // spawns claude without --resume.
 func dropBridgeSession(path string) {
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		slog.Warn("claude login: remove bridge session failed", "component", "claudecode-login", "error", err)
+		slog.Warn("remove bridge session failed", "component", "claudecode", "error", err)
 		return
 	}
-	slog.Info("claude login: bridge session reset for the new account", "component", "claudecode-login")
+	slog.Info("bridge session reset for the new account", "component", "claudecode")
+}
+
+// envAuthMode reports how the presync .env authenticates Claude Code: "gateway"
+// (ANTHROPIC_* to the Autonomous gateway), "subscription" (Claude account), or
+// "" when the file is absent.
+func envAuthMode(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "ANTHROPIC_BASE_URL=") {
+			return "gateway"
+		}
+	}
+	return "subscription"
 }
 
 // loginScan is what scanLoginOutput extracted from the CLI stream.
