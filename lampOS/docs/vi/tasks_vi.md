@@ -1434,19 +1434,30 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   (`stat -c %d:%i`) không phải cái lamp-tasks đã thấy cho thư mục của lần
   chạy trước khi rào bắt đầu (`gateway::run_seen`), nên một link bị tráo
   vào sau bước kiểm tra sẽ bị bắt. Trong các namespace user, mạng (chỉ
-  `lo`), mount và PID riêng của lần chạy, rào mount một `/tmp` mới, tạo
+  `lo`), IPC, mount và PID riêng của lần chạy, rào mount một `/tmp` mới
+  256 MiB, tạo
   trong đó một home rỗng riêng cho script, bind thư mục của lần chạy, thư
   mục kỹ năng và socket của lamp-control sang một bên, phủ project Harness
   và `/run`, `/var/lib`, `/var/tmp`, `/dev/shm` và `/etc/lampOS`
   (`gateway::HIDDEN`: ít nhất những gì namespace của gateway đã ẩn, nên
   socket của launcher, thư mục riêng của lamp-tasks và mọi socket, file của
-  các dịch vụ khác của đèn cũng bị ẩn) bằng tmpfs 0700, rồi chuyển hai thư
-  mục và socket về chỗ cũ. Không hiện `resolv.conf`: mạng của rào chỉ có
+  các dịch vụ khác của đèn cũng bị ẩn) bằng tmpfs 1 MiB (tmpfs ghi được
+  64 MiB trên `/var/tmp` và `/dev/shm`, như namespace của gateway), rồi
+  chuyển hai thư mục và socket về chỗ cũ. Mọi tmpfs đều có kích thước:
+  script sở hữu chúng, và thứ lấp đầy chúng là RAM. Sau đó rào đặt thư mục
+  kỹ năng thành chỉ đọc (giữ các cờ bind của nó), rồi cả project và các
+  tmpfs 1 MiB, nên script chỉ ghi được thư mục của lần chạy, `/tmp`,
+  `/var/tmp` và `/dev/shm`. Không hiện `resolv.conf`: mạng của rào chỉ có
   `lo`. Rào bind `/dev/null` đè lên mọi thiết bị camera, micro, loa, cổng
   serial, I2C, SPI, GPIO, HID, framebuffer và GPU, như namespace của
   gateway. Mọi mount đều là `mount -n`, nên không mount nào ghi utab của
   libmount dưới `/run`. Rào đặt `ulimit -c 0` (không có file core, cả giới
-  hạn mềm lẫn cứng). Sau đó, trong một user namespace riêng, nó đọc token
+  hạn mềm lẫn cứng), giới hạn không gian địa chỉ của script ở 768 MiB
+  (`ulimit -v`, `gateway::SCRIPT_MEMORY_KB`; cộng 384 MiB tmpfs ghi được
+  vẫn dưới xa `MemoryHigh=2100M` của lamp-tasks, và đèn không có swap), và
+  chạy nó với độ nice 10 (`nice -n 10`). Không có hạn mức CPU như unit của
+  gateway (`CPUQuota=100%`): việc đó cần một cgroup mà `lampos` không tạo
+  được, còn `ulimit -t` sẽ kết thúc một lần chạy dài. Sau đó, trong một user namespace riêng, nó đọc token
   từ fd 3, dừng nếu không có trình thông dịch, ghi `started` vào fd 4 rồi
   đóng fd đó, và exec script trong thư mục của lần chạy với
   `PATH=/usr/local/bin:/usr/bin:/bin` (`gateway::SCRIPT_PATH`), `HOME` là

@@ -64,7 +64,8 @@ pub const SKILLS: &str = "/var/lib/lampOS/skills";
 /// The skills the owner's own paired computer pushed (`lamp_skills::PUSHED_DIR`),
 /// beside [`SKILLS`] under the same parent: the one other place a skill's
 /// folder may be, shown read-only to a skill's run alone
-/// (`lamp_update::hermes_install::PUSHED`).
+/// (`lamp_update::hermes_install::PUSHED`; an OpenClaw run's fence binds
+/// the skill's folder read-only too, [`crate::gateway::FENCE_TEXT`]).
 pub const PUSHED: &str = "/var/lib/lampOS/skills-dev";
 /// [`PUSHED`]'s folder name, beside the skills root a check is given.
 pub const PUSHED_NAME: &str = "skills-dev";

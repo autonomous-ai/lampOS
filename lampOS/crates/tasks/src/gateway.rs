@@ -883,6 +883,14 @@ fn approvals_json() -> Result<String, String> {
     }
 }
 
+/// The address space the skill's script may map, in KiB (`ulimit -v`,
+/// [`FENCE_TEXT`]): 768 MiB. The fence's own writable tmpfs (`/tmp`
+/// 256 MiB, `/var/tmp` and `/dev/shm` 64 MiB each) add at most 384 MiB,
+/// so a script stays well under lamp-tasks' `MemoryHigh=2100M` (no swap on
+/// a lamp). A cgroup cap is not open to lamp-tasks (`lampos`, no
+/// delegation); `ulimit -v` is, and Python, its threads and the SDK fit.
+pub const SCRIPT_MEMORY_KB: &str = "786432";
+
 /// The `PATH` the skill's script is run with ([`FENCE_TEXT`]), and its
 /// fence's `unshare` ([`crate::skill_start::lamp_fence`]).
 pub const SCRIPT_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
@@ -921,16 +929,26 @@ pub const TASKS_RUN: &str = "/run/lampos-tasks";
 /// lamp-tasks saw (its `dev:inode`: a link swapped in between the check
 /// and the bind is followed by `mount --bind`, so it is caught there); no
 /// hidden path (nor the project) in a folder shown again; a fresh `/tmp`
-/// (none of the gateway's files, a staging no other process reaches) and
-/// in it the script's own empty home; the run's folder (resolved), the
-/// skill's folder and lamp-control's socket (when it is there) bound aside
-/// there; a 0700 tmpfs over the project (every other run's folder gone)
-/// and over each hidden path that is there; the two folders and the
-/// socket moved back; `/dev/null` bound over every camera, microphone,
+/// of 256 MiB (none of the gateway's files, a staging no other process
+/// reaches) and in it the script's own empty home; the run's folder
+/// (resolved), the skill's folder and lamp-control's socket (when it is
+/// there) bound aside there; a 1 MiB tmpfs over the project (every other
+/// run's folder gone) and over each hidden path that is there, but a
+/// writable 64 MiB one on `/var/tmp` and `/dev/shm`, as the gateway's
+/// namespace gives (every tmpfs sized: the script owns them, and RAM is
+/// what fills them); the two folders and the socket moved back; the
+/// skill's folder made read-only (with the flags its bind had, as a user
+/// namespace may only add flags), then the project and each hidden tmpfs
+/// but those two, so the script writes only its run's folder and its own
+/// `/tmp`, `/var/tmp` and `/dev/shm`; `/dev/null` bound over every camera, microphone,
 /// speaker, serial, I2C, SPI, GPIO, HID, framebuffer and GPU device, as
 /// the gateway's namespace does (lamp-update's `hermes_install::DEVICES`:
 /// under `--map-root-user` lamp-tasks' groups can't be dropped); no core
-/// file (`ulimit -c 0`, soft and hard); then, in a user namespace of its
+/// file (`ulimit -c 0`, soft and hard); its address space capped
+/// ([`SCRIPT_MEMORY_KB`], `ulimit -v`) and its CPU niceness 10 (`nice -n
+/// 10`: below lamp-tasks and the lamp's services; a CPU quota as the
+/// gateway's unit has needs a cgroup, which `lampos` can't make, and
+/// `ulimit -t` would end a long run); then, in a user namespace of its
 /// own (no capability over these mounts, so nothing can be unmounted), the
 /// token read from fd 3 (a pipe, never an argument or the environment),
 /// the interpreter found, fd 4 (a pipe lamp-tasks reads) told `started`
@@ -946,16 +964,17 @@ pub const TASKS_RUN: &str = "/run/lampos-tasks";
 /// writes libmount's utab under `/run` (read-only in the gateway's
 /// namespace on lamp-c0a4, where the fence ran before #7024), so none
 /// fails after it has mounted.
-pub const FENCE_TEXT: &str = r#"u=$1 g=$2 p=$3 r=$4 ri=$5 k=$6 so=$7 py=$8 i=$9 s=${10}
-shift 10
+pub const FENCE_TEXT: &str = r#"u=$1 g=$2 p=$3 r=$4 ri=$5 k=$6 so=$7 py=$8 i=$9 s=${10} mv=${11}
+shift 11
 no() { echo "the run's fence was not made ($1): the script was not run" >&2; exit 1; }
+ro() { o=$(findmnt -no VFS-OPTIONS -M "$1") || no "$1's options"; o=${o#r[ow]}; mount -n -o "remount,bind,ro$o" "$1" || no "$1 read-only"; }
 [ -d "$r" ] && [ ! -L "$r" ] || no "the run's folder is not a folder"
 rr=$(cd -P "$r" && pwd -P) && pr=$(cd -P "$p" && pwd -P) || no "the run's folder's path"
 [ "$rr" = "$pr/${r##*/}" ] || no "the run's folder is not in the project"
 for w in "$p" "$@"; do
   case "$w/" in "$k"/* | "$r"/* | "$rr"/*) no "$w is in a folder shown again" ;; esac
 done
-mount -n -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp || no /tmp
+mount -n -t tmpfs -o size=256m,mode=1777,nosuid,nodev tmpfs /tmp || no /tmp
 t1=$(mktemp -d /tmp/lampos-run.XXXXXX) && t2=$(mktemp -d /tmp/lampos-skill.XXXXXX) || no staging
 hm=$(mktemp -d /tmp/lampos-home.XXXXXX) || no "the script's home"
 mount -n --bind "$rr" "$t1" || no "the run's folder"
@@ -964,10 +983,13 @@ mount -n --bind "$k" "$t2" || no "the skill's folder"
 sk=
 [ ! -S "$so" ] || sk=$(mktemp /tmp/lampos-socket.XXXXXX) || no "lamp-control's socket"
 [ -z "$sk" ] || mount -n --bind "$so" "$sk" || no "lamp-control's socket"
-mount -n -t tmpfs -o mode=0700 tmpfs "$p" || no "the project"
+mount -n -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec tmpfs "$p" || no "the project"
 for h in "$@"; do
   [ -e "$h" ] || continue
-  mount -n -t tmpfs -o mode=0700 tmpfs "$h" || no "$h"
+  case $h in
+    /var/tmp | /dev/shm) mount -n -t tmpfs -o size=64m,mode=1777,nosuid,nodev tmpfs "$h" || no "$h" ;;
+    *) mount -n -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec tmpfs "$h" || no "$h" ;;
+  esac
 done
 mkdir -p "$k" "$r" || no "the folders"
 mount -n --move "$t2" "$k" || no "the skill's folder back"
@@ -976,20 +998,28 @@ rmdir "$t1" "$t2" || no "the staging"
 if [ -n "$sk" ] && [ ! -e "$so" ]; then mkdir -p "${so%/*}" && touch "$so" || no "lamp-control's socket's place"; fi
 [ -z "$sk" ] || mount -n --move "$sk" "$so" || no "lamp-control's socket back"
 [ -z "$sk" ] || rm -f "$sk" || no "the socket's staging"
+ro "$k"
+mount -n -o remount,bind,ro,nosuid,nodev,noexec "$p" || no "the project read-only"
+for h in "$@"; do
+  case $h in /var/tmp | /dev/shm) continue ;; esac
+  [ -e "$h" ] || continue
+  mount -n -o remount,bind,ro,nosuid,nodev,noexec "$h" || no "$h read-only"
+done
 for d in /dev/video* /dev/media* /dev/v4l-subdev* /dev/snd/* /dev/ttyACM* /dev/ttyUSB* /dev/ttyS* /dev/ttyAMA* /dev/i2c-* /dev/spidev* /dev/gpiochip* /dev/hidraw* /dev/fb* /dev/dri/*; do
   [ -c "$d" ] || continue
   mount -n --bind /dev/null "$d" || no "$d"
 done
 cd "$r" || no "the run's folder"
 ulimit -c 0 || no "no core"
+ulimit -v "$mv" || no "no memory cap"
 case "${i##*/}" in python*) set -- "$i" -s "$s" ;; *) set -- "$i" "$s" ;; esac
-exec unshare --user --map-user="$u" --map-group="$g" -- env -i PATH="$SCRIPT_PATH" HOME="$hm" PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 LAMP_CONTROL_SOCKET="$so" PYTHONPATH="$py" /bin/sh -c 'IFS= read -r t <&3 || exit 1; exec 3<&-; command -v "$1" >/dev/null || { echo "no interpreter $1: the script was not run" >&2; exit 127; }; LAMP_CONTROL_TOKEN=$t; unset t; export LAMP_CONTROL_TOKEN; printf "started\n" >&4 || exit 1; exec 4>&-; exec "$@"' run "$@"
+exec nice -n 10 unshare --user --map-user="$u" --map-group="$g" -- env -i PATH="$SCRIPT_PATH" HOME="$hm" PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 LAMP_CONTROL_SOCKET="$so" PYTHONPATH="$py" /bin/sh -c 'IFS= read -r t <&3 || exit 1; exec 3<&-; command -v "$1" >/dev/null || { echo "no interpreter $1: the script was not run" >&2; exit 127; }; LAMP_CONTROL_TOKEN=$t; unset t; export LAMP_CONTROL_TOKEN; printf "started\n" >&4 || exit 1; exec 4>&-; exec "$@"' run "$@"
 "#;
 
 /// The fence's `unshare` arguments for `grant` (its run's folder in the
 /// runs' project, its parent), lamp-tasks' `uid` and `gid`, and `hidden`
 /// covered ([`HIDDEN`] on a lamp): a user (root mapped), network (only
-/// `lo`), mount and PID namespace of its own, then [`FENCE_TEXT`] with its
+/// `lo`), IPC, mount and PID namespace of its own, then [`FENCE_TEXT`] with its
 /// arguments, among them the run's folder's `dev:inode` as seen here
 /// ([`run_seen`]), which the fence's bound folder must have. Never the
 /// token. lamp-tasks starts it from its own namespaces
@@ -1006,6 +1036,7 @@ pub fn fence_args(
         "--user",
         "--map-root-user",
         "--net",
+        "--ipc",
         "--mount",
         "--pid",
         "--fork",
@@ -1031,6 +1062,7 @@ pub fn fence_args(
     args.push((&grant.pythonpath).into());
     args.push((&grant.interpreter).into());
     args.push(grant.script.clone().into());
+    args.push(SCRIPT_MEMORY_KB.into());
     args.extend(hidden.iter().map(|path| path.as_os_str().to_owned()));
     args
 }
@@ -1875,7 +1907,11 @@ mod tests {
                 assert!(line.contains("|| no "), "{line}");
             }
         }
-        assert_eq!(FENCE_TEXT.matches("exec unshare").count(), 1);
+        assert_eq!(FENCE_TEXT.matches("exec nice -n 10 unshare").count(), 1);
+        // Every tmpfs the fence mounts has a size.
+        for line in FENCE_TEXT.lines().filter(|line| line.contains("-t tmpfs")) {
+            assert!(line.contains(" -o size="), "{line}");
+        }
         assert!(!FENCE_TEXT.contains("exec python3") && !FENCE_TEXT.contains("exec \"$i\""));
         for name in [SOCKET_ENV, PYTHONPATH_ENV, crate::skill_task::TOKEN_ENV] {
             assert!(FENCE_TEXT.contains(name), "{name}");
@@ -1889,6 +1925,10 @@ mod tests {
             "set -- \"$i\" -s \"$s\"",
             "[ \"$(stat -c %d:%i \"$t1\")\" = \"$ri\" ] || no ",
             "mount -n --bind /dev/null \"$d\" || no ",
+            "ro \"$k\"\n",
+            "ulimit -v \"$mv\" || no ",
+            "exec nice -n 10 unshare ",
+            "size=256m,",
             "/dev/video* ",
             "/dev/snd/* ",
             "/dev/ttyACM* ",
@@ -1914,8 +1954,9 @@ mod tests {
 
     /// Stand-ins for `unshare` (logs its arguments, then runs its program),
     /// `mount` (logs its arguments; fails when its last one is the path in
-    /// `<dir>/fail`), each logging to `log`, and `stat` (says what
-    /// `<dir>/seen` holds) in `<dir>/bin`.
+    /// `<dir>/fail`), each logging to `log`, `stat` (says what
+    /// `<dir>/seen` holds) and `findmnt` (says a lamp's options) in
+    /// `<dir>/bin`.
     fn stubs(dir: &Path, log: &Path) {
         let bin = dir.join("bin");
         std::fs::create_dir_all(&bin).unwrap();
@@ -1926,6 +1967,11 @@ mod tests {
             // With `mount` stood in for, nothing is bound: the run's
             // folder's `dev:inode` is what `<dir>/seen` holds.
             ("stat", format!("#!/bin/sh\ncat {}\n", seen.display())),
+            // The options of the skill's folder's bind, as a lamp's are.
+            (
+                "findmnt",
+                "#!/bin/sh\necho rw,nosuid,nodev,relatime\n".to_owned(),
+            ),
             (
                 "unshare",
                 format!(
@@ -1981,9 +2027,9 @@ mod tests {
         std::fs::write(
             &python,
             format!(
-                "#!/bin/sh\nprintf 'python3 %s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\\n' \"$*\" \"$LAMP_CONTROL_TOKEN\" \
+                "#!/bin/sh\nprintf 'python3 %s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\\n' \"$*\" \"$LAMP_CONTROL_TOKEN\" \
                  \"$LAMP_CONTROL_SOCKET\" \"$PYTHONPATH\" \"$HOME\" \"$PATH\" \"${{LAMP_HERMES_TOKEN-none}}\" \
-                 \"${{PYTHONNOUSERSITE-none}}\" \"${{PYTHONSAFEPATH-none}}\" \"$(ulimit -c)\" \"$(ulimit -H -c)\" \"$(pwd)\" >> {}\n",
+                 \"${{PYTHONNOUSERSITE-none}}\" \"${{PYTHONSAFEPATH-none}}\" \"$(ulimit -c)\" \"$(ulimit -H -c)\" \"$(ulimit -v)\" \"$(ps -o nice= -p $$ | tr -d ' ')\" \"$(pwd)\" >> {}\n",
                 log.display()
             ),
         )
@@ -2013,6 +2059,13 @@ mod tests {
     /// on fd 3 through a pipe, fd 4 written to `said`.
     fn fence_it(at: &Fenced) -> std::process::Output {
         let hidden: Vec<&Path> = at.hidden.iter().map(PathBuf::as_path).collect();
+        let mut args = fence_args(&at.grant, 990, 990, &hidden);
+        if cfg!(target_os = "macos") {
+            // macOS refuses any `ulimit -v` but `unlimited`; Linux (the
+            // lamp, CI) runs the cap as given.
+            let cap = args.iter().position(|arg| arg == SCRIPT_MEMORY_KB).unwrap();
+            args[cap] = "unlimited".into();
+        }
         let mut child = Command::new("/bin/sh")
             .arg("-c")
             // The soft core limit raised to the hard one first: with an
@@ -2023,7 +2076,7 @@ mod tests {
             .arg(r#"ulimit -S -c "$(ulimit -H -c)" 2>/dev/null; exec 3<&0 4>"$1" 0</dev/null; shift; exec unshare "$@""#)
             .arg("fd")
             .arg(&at.said)
-            .args(fence_args(&at.grant, 990, 990, &hidden))
+            .args(args)
             .env_clear()
             .env(
                 "PATH",
@@ -2058,15 +2111,16 @@ mod tests {
             .lines()
             .filter(|line| !line.starts_with("mount -n --bind /dev/null /dev/"))
             .collect();
-        assert_eq!(lines.len(), 10, "{log}");
+        assert_eq!(lines.len(), 13, "{log}");
         assert!(
-            lines[0].starts_with("unshare --user --map-root-user --net --mount --pid --fork "),
+            lines[0]
+                .starts_with("unshare --user --map-root-user --net --ipc --mount --pid --fork "),
             "{log}"
         );
         assert!(!lines[0].contains("run-secret"), "the token in no argument");
         assert_eq!(
             lines[1],
-            "mount -n -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp"
+            "mount -n -t tmpfs -o size=256m,mode=1777,nosuid,nodev tmpfs /tmp"
         );
         // The run's folder bound by its real path, the one checked.
         let real = at.folder.canonicalize().unwrap();
@@ -2077,27 +2131,40 @@ mod tests {
         assert!(lines[3].starts_with(&format!("mount -n --bind {d}/skills/s /tmp/lampos-skill.")));
         assert_eq!(
             lines[4],
-            format!("mount -n -t tmpfs -o mode=0700 tmpfs {d}/project")
+            format!("mount -n -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec tmpfs {d}/project")
         );
         assert_eq!(
             lines[5],
-            format!("mount -n -t tmpfs -o mode=0700 tmpfs {d}/state"),
+            format!("mount -n -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec tmpfs {d}/state"),
             "the absent one skipped"
         );
         assert!(lines[6].starts_with("mount -n --move /tmp/lampos-skill."));
         assert!(lines[6].ends_with(&format!(" {d}/skills/s")));
         assert!(lines[7].starts_with("mount -n --move /tmp/lampos-run."));
         assert!(lines[7].ends_with(&format!(" {d}/project/skill-task-1")));
-        assert!(lines[8].starts_with("unshare --user --map-user="), "{log}");
+        // The skill's folder read-only with the flags it had; the project
+        // and each hidden path read-only too, once all is in place.
+        assert_eq!(
+            &lines[8..11],
+            [
+                format!("mount -n -o remount,bind,ro,nosuid,nodev,relatime {d}/skills/s"),
+                format!("mount -n -o remount,bind,ro,nosuid,nodev,noexec {d}/project"),
+                format!("mount -n -o remount,bind,ro,nosuid,nodev,noexec {d}/state"),
+            ]
+        );
+        assert!(lines[11].starts_with("unshare --user --map-user="), "{log}");
         assert!(
-            lines[8].contains(" -- env -i PATH=/usr/local/bin:/usr/bin:/bin "),
+            lines[11].contains(" -- env -i PATH=/usr/local/bin:/usr/bin:/bin "),
             "{log}"
         );
-        assert!(!lines[8].contains("run-secret"), "the token in no argument");
-        let ran: Vec<&str> = lines[9].split('|').collect();
-        assert_eq!(ran.len(), 12, "{log}");
         assert!(
-            ran[11].ends_with("/project/skill-task-1"),
+            !lines[11].contains("run-secret"),
+            "the token in no argument"
+        );
+        let ran: Vec<&str> = lines[12].split('|').collect();
+        assert_eq!(ran.len(), 14, "{log}");
+        assert!(
+            ran[13].ends_with("/project/skill-task-1"),
             "the run's folder: {log}"
         );
         // Its home: the fence's own (here, with `mount` stood in for, made
@@ -2106,7 +2173,7 @@ mod tests {
         assert!(home.starts_with("/tmp/lampos-home."), "{log}");
         let _ = std::fs::remove_dir(home);
         assert_eq!(
-            [&ran[..4], &ran[5..11]].concat(),
+            [&ran[..4], &ran[5..13]].concat(),
             [
                 format!("python3 -s {d}/skills/s/main.py").as_str(),
                 "run-secret",
@@ -2118,8 +2185,14 @@ mod tests {
                 "1",
                 "0",
                 "0",
+                if cfg!(target_os = "macos") {
+                    "unlimited"
+                } else {
+                    SCRIPT_MEMORY_KB
+                },
+                "10",
             ],
-            "-s, PYTHONNOUSERSITE=1, PYTHONSAFEPATH=1 and no core, soft or hard: {log}"
+            "-s, PYTHONNOUSERSITE=1, PYTHONSAFEPATH=1, no core (soft or hard), the memory cap and nice 10: {log}"
         );
     }
 

@@ -2426,9 +2426,9 @@ mod tests {
         let mounts: Vec<&str> = crate::gateway::FENCE_TEXT
             .lines()
             .map(str::trim_start)
-            .filter(|line| line.starts_with("mount ") || line.contains("|| mount "))
+            .filter(|line| line.contains("mount "))
             .collect();
-        assert_eq!(mounts.len(), 10, "{mounts:?}");
+        assert_eq!(mounts.len(), 14, "{mounts:?}");
         for line in mounts {
             assert_eq!(
                 line.matches("mount ").count(),
@@ -2465,6 +2465,7 @@ mod tests {
                 "/opt/lampOS/sdk",
                 "python3",
                 "/var/lib/lampOS/skills/photo-booth/scripts/main.py",
+                crate::gateway::SCRIPT_MEMORY_KB,
                 "/var/lib",
             ]
         );

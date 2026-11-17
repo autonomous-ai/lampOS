@@ -745,6 +745,14 @@ fn the_script_reads_nothing_under_run_or_etc_lampos_and_no_device() {
          echo \"control=$(ls -A @BASE@/run/lampos-control | tr '\\n' ' ')\"\n\
          echo \"etc=$(ls -A @BASE@/etc-lampOS | tr '\\n' ' ')\"\n\
          [ -S \"$LAMP_CONTROL_SOCKET\" ] && echo socket-shown\n\
+         touch \"${0%/*}/written\" 2>/dev/null && echo skill-written || echo skill-read-only\n\
+         touch @BASE@/run/x 2>/dev/null && echo run-written || echo run-read-only\n\
+         touch @BASE@/project/x 2>/dev/null && echo project-written || echo project-read-only\n\
+         touch written-here && echo run-folder-written\n\
+         dd if=/dev/zero of=/tmp/big bs=1M count=300 2>/dev/null\n\
+         echo \"tmp-mib=$(($(wc -c < /tmp/big) / 1048576))\"\n\
+         rm -f /tmp/big\n\
+         echo \"as=$(ulimit -v) nice=$(cut -d' ' -f19 /proc/$$/stat)\"\n\
          for d in /dev/video* /dev/snd/* /dev/ttyS* /dev/ttyACM* /dev/ttyUSB* /dev/i2c-* /dev/gpiochip* /dev/fb*; do\n\
            [ -c \"$d\" ] || continue\n\
            if [ \"$(stat -Lc %t:%T \"$d\")\" = 1:3 ]; then echo \"hidden-device $d\"; else echo \"shown-device $d\"; fi\n\
@@ -762,8 +770,99 @@ fn the_script_reads_nothing_under_run_or_etc_lampos_and_no_device() {
         "control=control.sock \n",
         "etc=\n",
         "socket-shown\n",
+        "skill-read-only\n",
+        "run-read-only\n",
+        "project-read-only\n",
+        "run-folder-written\n",
+        &format!("as={} nice=10\n", lamp_tasks::gateway::SCRIPT_MEMORY_KB),
     ] {
         assert!(ran.out.contains(line), "{line}: {}", ran.out);
     }
     assert!(!ran.out.contains("shown-device"), "{}", ran.out);
+    // /tmp is 256 MiB: a 300 MiB write stops there.
+    let tmp: u32 = ran
+        .out
+        .lines()
+        .find_map(|line| line.strip_prefix("tmp-mib="))
+        .and_then(|mib| mib.parse().ok())
+        .unwrap_or_else(|| panic!("tmp-mib: {}", ran.out));
+    assert!((200..=256).contains(&tmp), "{tmp} MiB in /tmp");
+}
+
+/// #7024's read, on the real kernel: the fence compares the folder it
+/// bound with the run's folder's `dev:inode` as lamp-tasks saw it
+/// (`gateway::run_seen`, `stat -c %d:%i` in the fence). With the one
+/// lamp-tasks saw, the script runs; with another folder's (what the bind
+/// finds when a link was swapped in after the check), the fence ends
+/// before `started` and the script never runs.
+#[test]
+fn the_fence_runs_only_the_run_folder_lamp_tasks_saw() {
+    if let Some(reason) = skip_reason() {
+        println!("skipped: {reason}");
+        return;
+    }
+    let base = tempfile::Builder::new()
+        .prefix("ss7024ino")
+        .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
+        .unwrap();
+    let run = base.path().join("project/skill-task-1");
+    let skill = base.path().join("skill");
+    let hidden = base.path().join("hidden");
+    for folder in [&run, &skill, &hidden] {
+        std::fs::create_dir_all(folder).unwrap();
+    }
+    let script = skill.join("main.sh");
+    std::fs::write(&script, "echo script-ran\n").unwrap();
+    let grant = Grant {
+        script: script.clone(),
+        interpreter: "/bin/sh".into(),
+        skill: skill.clone(),
+        run: run.clone(),
+        socket: "/nowhere/control.sock".into(),
+        pythonpath: "/sdk".into(),
+    };
+    let fence = |seen: String| {
+        let mut args = lamp_tasks::gateway::fence_args(
+            &grant,
+            rustix::process::getuid().as_raw(),
+            rustix::process::getgid().as_raw(),
+            &[hidden.as_path()],
+        );
+        let at = args
+            .iter()
+            .position(|arg| *arg == *lamp_tasks::gateway::run_seen(&run))
+            .expect("the run's dev:inode among the arguments");
+        args[at] = seen.into();
+        let said = base.path().join("said");
+        let mut child = Command::new("/bin/sh")
+            .arg("-c")
+            .arg(r#"exec 3<&0 4>"$1" 0</dev/null; shift; exec unshare "$@""#)
+            .arg("fd")
+            .arg(&said)
+            .args(args)
+            .env_clear()
+            .env("PATH", lamp_tasks::gateway::SCRIPT_PATH)
+            .current_dir("/")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        {
+            use std::io::Write as _;
+            child.stdin.take().unwrap().write_all(b"t\n").unwrap();
+        }
+        let out = child.wait_with_output().unwrap();
+        (out, std::fs::read_to_string(&said).unwrap_or_default())
+    };
+    let (out, said) = fence(lamp_tasks::gateway::run_seen(&run));
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "script-ran\n");
+    assert_eq!(said, "started\n");
+    let (out, said) = fence(lamp_tasks::gateway::run_seen(&skill));
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("is not the one checked"), "{err}");
+    assert!(out.stdout.is_empty(), "{out:?}");
+    assert_eq!(said, "");
 }
