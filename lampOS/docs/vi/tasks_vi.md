@@ -2076,6 +2076,46 @@ Việc tiếp theo: #7260 (proposal: in the one session, a skill's run keeps the
   `close`), token của mỗi lần chạy kỹ năng được kết thúc và thư mục bị xoá,
   và một việc báo `queued` khi việc khác đang làm.
 
+### Phiên được giữ (openharness#4393, `LAMP_TASKS_KEPT_SESSION=on` trong unit lamp-tasks của sản phẩm)
+
+Khi `LAMP_TASKS_ONE_SESSION` bật, pane duy nhất có thể là phiên được giữ
+của chính đèn, một phiên Harness do chương trình sở hữu, mà Harness nhận
+reply không cần đăng nhập và không cần cài đặt `programs-reply`
+(`crates/tasks/src/one_session.rs`). Công tắc bật trong unit lamp-tasks của
+sản phẩm và phụ thuộc Harness: ở lần mở đầu tiên của phiên duy nhất, và lại
+sau khi daemon của Harness khởi động lại, lamp-tasks hỏi
+`harness capabilities --json`. Chỉ khi `programSessions` từ 1 trở lên thì
+pane mới là phiên được giữ; Harness cũ từ chối lệnh này, và phiên duy nhất
+y như trên, kể cả đường lùi `reply_off`.
+
+- **Token.** `kept-session.token` trong thư mục store của lamp-tasks: 0600,
+  của user này, 32 byte ngẫu nhiên dạng hex, tạo một lần và giữ qua các lần
+  khởi động lại (chỉ tạo lại khi không phải file thường 0600 từ 32 byte trở
+  lên). Chỉ đường dẫn được truyền, qua `--program-token-file`; nội dung
+  không nằm trong tham số, dòng journal hay môi trường nào.
+- **Mở.** `harness ensure openclaw <folder> --name lamp-one-openclaw
+  --program-token-file … --json`: `live`, `resumed` (pane đã chết, sau khi
+  khởi động lại) hoặc `new`. Phiên mới nhận câu mở đầu bằng một reply có
+  xác nhận và lượt đó được chờ. Pane cũ mở theo cách trước giữ tên đó, nên
+  được đóng và xoá hội thoại trước. `ENGINE_NOT_READY` thử lại sau 60 s, gấp
+  đôi tới 10 phút; `NAME_TAKEN` hoặc `NOT_YOURS` đưa pane về cách cũ cho tới
+  khi daemon khởi động lại.
+- **Mỗi việc.** `harness reply lamp-one-openclaw --program-token-file …
+  --json -- <dòng đầu và lời>`, chỉ trả về khi engine đã nhận
+  (`{"state":"taken","inputId"}`); chỉ khi đó lượt mới được đếm, và việc nói
+  được join mà không cần nhìn `show`. `NOT_IDLE` và `ENGINE_NOT_READY` giữ
+  việc trong hàng đợi của lamp-tasks, thử lại tới hạn của nó; `NOT_RUNNING`
+  hoặc `TIMEOUT` ensure lại một lần (pane đã chết quay lại dạng resumed),
+  rồi việc thất bại như trước. Kết thúc của một lần chạy kỹ năng là
+  `harness wait lamp-one-openclaw --after <inputId>` (0 rảnh, rồi `show` lấy
+  câu trả lời; 3 có câu hỏi, đóng `--forget`; 4 đã mất).
+- **Xoay vòng và gỡ bỏ.** Xoay vòng (40 lượt hoặc 250k token) là
+  `ensure --fresh`. Huỷ, câu hỏi không ai trả lời, đăng xuất hoặc đổi engine
+  là `harness close lamp-one-openclaw --program-token-file … --forget`, xoá
+  hội thoại; đăng xuất hoặc đổi engine xoá cả file token. Phiên chưa đóng
+  được thì thử lại ở lần nhìn sau, và trong lúc đó không mở pane nào.
+  Factory reset xoá thư mục store, cả token.
+
 ### Giới hạn được chấp nhận cho thứ Hai: grant của kỹ năng đang chạy trong gateway
 
 Được chấp nhận cho đợt phát hành thứ Hai theo #6882 (a) (first builder,

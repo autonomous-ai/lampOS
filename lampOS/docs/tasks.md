@@ -4629,6 +4629,48 @@ Follow-up: #7260 (proposal: in the one session, a skill's run keeps the reach of
   `close`), each skill run's token ended and folder gone, and a task said
   `queued` while another works.
 
+### The kept session (openharness#4393, `LAMP_TASKS_KEPT_SESSION=on` in the product's lamp-tasks unit)
+
+With `LAMP_TASKS_ONE_SESSION` on, the one pane can be the lamp's own kept
+session, a Harness session a program owns, which Harness takes replies for
+with no sign-in and no `programs-reply` setting
+(`crates/tasks/src/one_session.rs`). It is on in the product's lamp-tasks
+unit and gated on Harness: at the one session's first open, and again after
+Harness's daemon starts again, lamp-tasks asks `harness capabilities --json`.
+Only with `programSessions` 1 or more is the pane the kept session; an
+older Harness refuses the verb, and the one session is exactly as above,
+its `reply_off` fallback included.
+
+- **Token.** `kept-session.token` in lamp-tasks' store folder: 0600, this
+  user's, 32 random bytes as hex, made once and kept across restarts (made
+  again only when it is not a plain 0600 file of 32 bytes or more). Only its
+  path is passed, as `--program-token-file`; its text is in no argument,
+  journal line or environment.
+- **Open.** `harness ensure openclaw <folder> --name lamp-one-openclaw
+  --program-token-file … --json`: `live`, `resumed` (a pane that died, a
+  reboot) or `new`. A new one is given the open's first words with an
+  acknowledged reply and its turn waited for. A pane the old way kept holds
+  the name, so it is closed and its conversation deleted first.
+  `ENGINE_NOT_READY` is tried again after 60 s, doubling to 10 min;
+  `NAME_TAKEN` or `NOT_YOURS` sends the pane the old way until the daemon
+  starts again.
+- **Each task.** `harness reply lamp-one-openclaw --program-token-file …
+  --json -- <header and words>`, which returns only once the engine took
+  them (`{"state":"taken","inputId"}`); only then is the turn counted, and
+  a spoken task joined with no look at `show`. `NOT_IDLE` and
+  `ENGINE_NOT_READY` keep the task in lamp-tasks' own queue, tried again
+  until its end; `NOT_RUNNING` or `TIMEOUT` ensures the session again once
+  (a died pane comes back resumed), then the task fails as before. A skill
+  run's end is `harness wait lamp-one-openclaw --after <inputId>` (0 idle,
+  then `show` for the answer; 3 an ask, closed `--forget`; 4 gone).
+- **Rotation and removal.** A rotation (40 turns or 250k tokens) is
+  `ensure --fresh`. A cancel, an ask no one answers, a sign-out or an engine
+  switch is `harness close lamp-one-openclaw --program-token-file …
+  --forget`, which deletes the conversation; a sign-out or an engine switch
+  removes the token file too. One not closed is tried again at the next
+  look, and no pane is opened meanwhile. A factory reset wipes the store
+  folder, token included.
+
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 
 Accepted for Monday's ship as #6882 (a) (the first builder, #7133,

@@ -4439,6 +4439,23 @@ fn the_product_leaves_one_session_off() {
     );
 }
 
+/// openharness#4393: the product's lamp-tasks has the kept session on
+/// (`LAMP_TASKS_KEPT_SESSION`), once; it is live only once the one session
+/// it needs is switched on (#7246's DEFAULT-ON), and on an older Harness it
+/// is the one session as before.
+#[test]
+fn the_product_keeps_the_one_session_as_the_kept_session() {
+    let tasks = install::PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-tasks.service")
+        .unwrap()
+        .1;
+    let service = section(tasks, "Service");
+    let on = |line: &str| service.iter().filter(|said| **said == line).count();
+    assert_eq!(on("Environment=LAMP_TASKS_KEPT_SESSION=on"), 1);
+    assert_eq!(on("Environment=LAMP_TASKS_ONE_SESSION=on"), 0);
+}
+
 /// #811, from lamp-06c1: without Harness (its own installer's to put on the
 /// lamp), the tasks part is skipped by its unit's condition rather than
 /// failing ten times; the install says Harness is missing.
