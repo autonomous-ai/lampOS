@@ -4015,7 +4015,7 @@ impl ToolDesk {
                         | Route::Devices(_)
                         | Route::DeskStop
                         | Route::Sleep
-                        | Route::SeenActivity(_)
+                        | Route::SeenActivity(..)
                 ))
         {
             let (sent, sent_us) = tell(&crate::tools::declined());
@@ -4195,7 +4195,7 @@ impl ToolDesk {
             | Route::ReportsStop(_)
             | Route::Devices(_)
             | Route::DeskStop
-            | Route::SeenActivity(_))
+            | Route::SeenActivity(..))
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
                 self.run(provider, lineage, call, route, called_us, memory, false);
@@ -4213,7 +4213,7 @@ impl ToolDesk {
             | Route::ReportsStop(_)
             | Route::Devices(_)
             | Route::DeskStop
-            | Route::SeenActivity(_)
+            | Route::SeenActivity(..)
             | Route::AgentAsk
             | Route::Nobody => {
                 let (sent, sent_us) = tell(&crate::tools::unavailable());
@@ -4266,7 +4266,7 @@ impl ToolDesk {
                     | Route::Faces(..)
                     | Route::Mark(_)
                     | Route::ReportsStop(_)
-                    | Route::SeenActivity(_)
+                    | Route::SeenActivity(..)
             )
         {
             self.acted = Some(request);
@@ -7001,7 +7001,7 @@ fn rise_in(
 /// P3 on #6912).
 fn withdraws(route: &crate::tools::Route, name: &str) -> bool {
     matches!(route, crate::tools::Route::ReportsStop(_))
-        || (matches!(route, crate::tools::Route::SeenActivity(_)) && name == crate::seen_yes::STOP)
+        || (matches!(route, crate::tools::Route::SeenActivity(..)) && name == crate::seen_yes::STOP)
 }
 
 #[cfg(test)]
@@ -7013,15 +7013,15 @@ mod withdraws_tests {
         use crate::tools::Route;
         assert!(super::withdraws(&Route::ReportsStop(false), "stop_reports"));
         assert!(super::withdraws(
-            &Route::SeenActivity(false),
+            &Route::SeenActivity(false, false),
             crate::seen_yes::STOP
         ));
         assert!(!super::withdraws(
-            &Route::SeenActivity(false),
+            &Route::SeenActivity(false, false),
             crate::seen_yes::LOOK
         ));
         assert!(!super::withdraws(
-            &Route::SeenActivity(false),
+            &Route::SeenActivity(false, false),
             crate::seen_yes::OFFER
         ));
         assert!(!super::withdraws(&Route::Clock, crate::seen_yes::STOP));

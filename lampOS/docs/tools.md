@@ -621,11 +621,15 @@ a skill cut for it is named on the setup line (#1706).
 
 The switch declares two functions, `reports_stop` and `reports_state`
 (below), so a session is told two more than without it. The product's
-unit sets it: a product lamp's chat request offers 45 of the lamp's own
+unit sets it: a product lamp's chat request offers 50 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
-voice's own 27 with these two among them (and `set_role` and `end_role`
+voice's own 32 with these two among them (and lamp-services' three since
+`LAMP_SERVICES` is on in the product, `set_role` and `end_role`
 since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov, and `go_to_sleep`
-since `LAMP_SLEEP_ASKED` is on in the product, #6853), the actions part's
+since `LAMP_SLEEP_ASKED` is on in the product, #6853, and seen activity's
+`look_at_my_desk` and `stop_looking_at_my_desk` since `LAMP_SEEN_ACTIVITY` is
+on in the product, #6543; its `offer_desk_noticing` only with
+`LAMP_SEEN_VOICE_OFFER=on`, off in the product), the actions part's
 17 and `use_skill`, which reaches Dance's `dance` and Pose's `set_pose`
 (#4135, #2826), Light show's `light_show` (#5745), and Light scenes'
 `light_scene` and Point the light's `point_light` (#5744). At the bound a core skill's function is never the one cut (the
@@ -637,8 +641,9 @@ skills' functions that are not a core skill's, the last first (the skills'
 tools file lists them by name, `lamp_skills::tools_file`), then the
 weather, then the search (`chat_cut`). A Live session's bound is 32
 (`lamp_gemini::MAX_TOOLS`); the second route's chat requests have their
-own, 48 (`second_provider::MAX_TOOLS`, 22 Oct: Live's bound had left out
-the time, the light scenes and the search on lamp-4ace). On the product's
+own, 64 (`second_provider::MAX_TOOLS`, 48 from 22 Oct, when Live's bound
+had left out the time, the light scenes and the search on lamp-4ace, until
+#7433, when a product lamp's 52 were past it). On the product's
 chat route nothing is left out: its skills are one function, `use_skill`
 (`LAMP_USE_SKILL=on` since #2826), however many are installed. With the
 switch off and installable skills added it was past 48 (lamp-9adf, 6 Nov:
@@ -648,7 +653,7 @@ left, so its last are left out, and the cut then takes `reports_state`;
 `reports_stop` and `dance` stay in both. With `LAMP_USE_SKILL=on`, `use_skill` carries every
 core skill, so it is a core name and never the one cut. Whatever is cut is
 said once, at start, on a plain journal line naming the bound (`past the
-bound of 32, left out: …` on Live, 48 on the chat route); only the lamp's own
+bound of 32, left out: …` on Live, 64 on the chat route); only the lamp's own
 and core skills' functions alone past it are an error line (`alone are past
 the bound of 32; left out: …`). Tests:
 `with_reports_on_dance_stays_at_the_bound`
