@@ -1387,6 +1387,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
                 priority: 8,
                 expires_ms: 3_600_000,
                 question: false,
+                may_end_unsaid: false,
                 count: None,
             }),
             "speak",
@@ -13669,6 +13670,60 @@ fn a_says_question_needs_a_note_and_who() {
         let skill = skill_with(dir.path(), name, &toml(permissions, say));
         let error = load(&skill).unwrap_err();
         assert!(error.contains(why), "{name}: {error}");
+    }
+}
+
+/// #6543: `say.may_end_unsaid` goes with a note only, as true or false;
+/// exact words or a word are refused. No shipped skill opts in, so no lamp
+/// says otherwise than before.
+#[test]
+fn a_says_may_end_unsaid_needs_a_note_and_no_shipped_skill_has_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = |say: &str| {
+        format!(
+            "[permissions]\ntopics = [\"room/presence\"]\nspeak = true\n[trigger]\ntopic = \"room/presence\"\nfield = \"present\"\nequals = true\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\nsay = {say}\n"
+        )
+    };
+    for (name, say) in [
+        (
+            "fine",
+            r#"{ note = "Ask if they want water.", may_end_unsaid = true }"#,
+        ),
+        (
+            "off",
+            r#"{ note = "Ask if they want water.", may_end_unsaid = false }"#,
+        ),
+        (
+            "lines",
+            r#"{ note = ["Ask.", "Offer."], may_end_unsaid = true }"#,
+        ),
+    ] {
+        load(&skill_with(dir.path(), name, &toml(say))).unwrap();
+    }
+    for (name, say, why) in [
+        (
+            "exact",
+            r#"{ text = "Water?", may_end_unsaid = true }"#,
+            "goes with a note",
+        ),
+        (
+            "word",
+            r#"{ note = "Ask.", may_end_unsaid = "yes" }"#,
+            "true or false",
+        ),
+    ] {
+        let error = load(&skill_with(dir.path(), name, &toml(say))).unwrap_err();
+        assert!(error.contains(why), "{name}: {error}");
+    }
+    for entry in fs::read_dir(skills_root()).unwrap().flatten() {
+        let Ok(file) = fs::read_to_string(entry.path().join("skill.toml")) else {
+            continue;
+        };
+        assert!(
+            !file.contains("may_end_unsaid"),
+            "{} opts in to may_end_unsaid",
+            entry.path().display()
+        );
     }
 }
 
