@@ -472,7 +472,16 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   session is told them when it opens, so the executive's actions come and
   go with the executive (one that starts after the voice is not missed).
   The answer is read as server-sent events and cut into sentences as it
-  arrives (`net/sentences.rs`). It is whole at `[DONE]`, or at the
+  arrives (`net/sentences.rs`). The voice never says list markup (Queue
+  #6811, lamp-9adf, 17 Nov: a web answer was said "this week: - New
+  CEO… - Analysts…"): a `- `, `* `, `• `, `1. ` or `1) ` at a line's
+  start, the reply's start or after a sentence's break (`.`, `!`, `?`,
+  `…`, `:` or `;` and a space) is taken out as a pause, the item before
+  it ending as a sentence (a `.` added when it has no stop or comma).
+  A hyphen inside a word or number (`e-mail`, `25-30`, `-5`) and a dash
+  inside a sentence are kept. A word at a piece's end that may still be
+  a marker (`1`, `1.`, `-`) waits for the next piece. Always on, every
+  voice; the lamp's words get the same text. It is whole at `[DONE]`, or at the
   stream's end after a chunk with a `finish_reason`; a stream that ends
   before either was cut, and fails the turn (`TurnFailed`, as any chat
   failure) rather than leaving a half answer as the whole one. A turn's
@@ -736,6 +745,13 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
     is `POST <deepseek>/v1/tools/fetch` with `{"url"}`; the page's title and
     its Markdown cut at 2,000 characters go back. $0.75 a thousand
     successful calls of each from 1 Nov 2026; 5 a second an account.
+    `fetch_page` is told it reads a page a search found, so the model is
+    never steered to an address it writes itself. `web_search`'s
+    description says that asked what a site or page says, the model
+    searches for it at once and answers from what it finds, never offering
+    to search or asking first (Queue #6811, lamp-9adf, 17 Nov: "what does
+    the front page of the BBC say right now?" got "I can't browse… Want me
+    to search for the latest BBC headlines instead?").
   - **Prices** (Migrate's finding 5 on #3997: on lamp-29e7 on 30 Oct a
     searched $399 was given as the ErgoChair Pro's price, and argued for when
     the person said the page showed $499). `web_search`'s description says a
