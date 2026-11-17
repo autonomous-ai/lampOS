@@ -1767,8 +1767,9 @@ With the switch:
     every other guard stand, and nothing is renamed without the yes to the
     question asked again. On lamp-74ff a line began over the question,
     none of it played, and the rename was dropped in silence
-    (`a_rename_question_cut_before_its_name_keeps_the_hold`). With the
-    same switch, a yes no face was read saying is read again by the
+    (`a_rename_question_cut_before_its_name_keeps_the_hold`). With
+    `LAMP_RENAME_SHORT_YES` too (off in the product until its ROW with a
+    person), a yes no face was read saying is read again by the
     short-line rule of `LAMP_VOICE_SHORT_LINE_SPEAKER` (whether or not that
     switch is on; `held_rename::yes_speakers`,
     `SpeakingFaces::short_line_speakers_with_boot`): a one- or two-word

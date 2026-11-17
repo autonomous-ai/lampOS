@@ -296,9 +296,21 @@ pub(super) fn waits(shared: &Shared) -> bool {
             .is_ok_and(|renames| renames.held.is_some() || renames.asked.is_some())
 }
 
+/// Where the short yes is read again ([`yes_speakers`]): `on` only, and
+/// only with `LAMP_NAME_LEARN_FIX` (#7419). Off in the product until its
+/// ROW with a person: a kiosk face is never read speaking, so no rig can
+/// show it (row-7422a's LIVE-READ on lamp-52e6, 17 Nov: `no` in 12 of 12).
+pub const SHORT_YES_ENVIRONMENT: &str = super::RENAME_SHORT_YES_ENVIRONMENT;
+
+/// Whether [`SHORT_YES_ENVIRONMENT`] is `on`, and nothing else.
+pub(super) fn short_yes_from_environment() -> bool {
+    std::env::var(SHORT_YES_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// Who the eyes saw saying a line from `from` to `to` while a rename waits
 /// ([`keep_sight`]): [`crate::speaking_faces::SpeakingFaces::speakers_with_boot`].
-/// With `LAMP_NAME_LEARN_FIX` (`fix`), a line with no face read so is read
+/// With `LAMP_NAME_LEARN_FIX` and [`SHORT_YES_ENVIRONMENT`] (`fix`), a line
+/// with no face read so is read
 /// again by the short-line rule (`LAMP_VOICE_SHORT_LINE_SPEAKER`'s,
 /// [`crate::speaking_faces::SpeakingFaces::short_line_speakers_with_boot`]):
 /// a one- or two-word yes spans under the three looks a line needs, so on
@@ -738,6 +750,8 @@ mod tests {
                         confidence: 1.0,
                         yaw: None,
                         facing: Some(true),
+                        pitch: None,
+                        looking: None,
                         speaking: Some(lamp_msgs::Speaking {
                             state,
                             score: 0.9,
