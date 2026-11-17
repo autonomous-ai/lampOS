@@ -3490,8 +3490,9 @@ thư mục và home mới mỗi lần chạy, dữ liệu Hermes của người 
 trọng từ tệp: `camera`, `light`, `speak`, `sound`, và `net` khi tệp có một liên
 kết `http(s)://`, một webhook, hoặc bảo gọi, lấy hay gửi tới một API web hay URL;
 chỉ nhắc "API" hay "URL" thì chưa đủ (cần `LAMP_TASK_NET=on`, bật trong sản phẩm, #7200). `net` không bao giờ đi cùng
-camera, micro, những gì đèn nói, ghi chú hay quyền của dịch vụ liên kết (P1 của Heron trên #7590): tệp như vậy bị từ chối
-bằng lời rõ ràng, không giữ gì; kỹ năng cần cả hai thì là hai kỹ năng. Đèn nói lại các quyền khi bật.
+camera, micro, những gì đèn nói, ghi chú, `look` (có ai ở đó không; quyết định của người xây dựng đầu tiên trên #7590) hay quyền của dịch vụ liên kết (P1 của Heron trên #7590): tệp như vậy bị từ chối
+bằng lời rõ ràng, không giữ gì; kỹ năng cần cả hai thì là hai kỹ năng. `air` được đi cùng `net`, và lời nói lại khi đó thêm
+"so its air readings can go to the internet". Đèn nói lại các quyền khi bật.
 Chỉ đèn, giọng (kể cả âm thanh nó phát) và thân thì bật ngay (giọng nói ghi lời đồng ý với
 lamp-control); `sound` (nghe các loại âm thanh), micro, camera, gửi đi hoặc `net` thì hỏi lời đồng ý bằng
 giọng nói một lần, ở lần chạy đầu. Khóa hay token không bao giờ được nói ra,

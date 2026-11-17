@@ -732,16 +732,16 @@ mod tests {
     }
 
     /// Heron's P1 on #7590: no yes is kept for `net` beside a private
-    /// grant (the camera, the microphone, what the lamp says, its notes, a
-    /// service's read or write); each alone still is, and `net` beside the
-    /// lamp's voice too.
+    /// grant (the camera, the microphone, what the lamp says, its notes,
+    /// `look`, a service's read or write); each alone still is, and `net`
+    /// beside the lamp's voice, or `air`, too.
     #[test]
     fn no_yes_names_net_beside_a_private_grant() {
         lamp_voice::skill_task_yes::set_net_here(Some(true));
         let of = |grants: &[&str]| {
             grants_ok(&grants.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>())
         };
-        for private in ["camera", "microphone", "speech", "notes"] {
+        for private in ["camera", "microphone", "speech", "notes", "look"] {
             assert_eq!(of(&[private]), Ok(()), "{private}");
             for pair in [[private, "net"], ["net", private]] {
                 let why = of(&pair).unwrap_err();
@@ -756,6 +756,9 @@ mod tests {
         assert!(of(&["gmail-read", "net"]).is_err());
         assert_eq!(of(&["speak", "net"]), Ok(()));
         assert_eq!(of(&["light", "speak", "net"]), Ok(()));
+        // `air` may sit beside `net` (the first builder's ruling on #7590,
+        // 18 Nov 02:01); `look`, above, may not.
+        assert_eq!(of(&["air", "net"]), Ok(()));
         lamp_voice::skill_task_yes::set_net_here(None);
     }
 
