@@ -4701,6 +4701,19 @@ in and signed out.
   switch removes the token file too. One not closed is tried again at the
   next look, and no pane is opened meanwhile. A factory reset wipes the
   store folder, token included.
+- **Forget, and a long idle: dropped, and a new one opened.** The owner's
+  "forget everything" (`ForgetSessions`, #6274) drops the kept session as
+  a sign-out does, once nothing holds it: `harness close`, then
+  `sessions.delete` of its `engineSession`, then its token file removed,
+  so the next task recalls nothing (`one_session::forgotten`). A kept
+  session left with no task for 2 h (`KEPT_IDLE_MAX`, from its open or its
+  last turn) is dropped the same way, since OpenClaw's is never rotated by
+  count. Either way the keep-open loop opens a new one (a new agent id and
+  token, so a new OpenClaw session) in the same look, right after the
+  drop, not at the next task. Journal: `the kept session dropped (the
+  owner asked to forget); a new one opens` (or `(no task for 120 min)`),
+  `dropped the kept session <id> (…); its conversation forgotten`, then
+  `kept session new <id> (openclaw, …) in <ms> ms`.
 
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 

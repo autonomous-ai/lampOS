@@ -1088,6 +1088,43 @@ impl PaneHarness for &Fake {
     fn live_in(&self, machine: &str, folder: &str) -> Result<Vec<String>, String> {
         (**self).live_in(machine, folder)
     }
+    fn program_sessions(&self) -> Option<bool> {
+        (**self).program_sessions()
+    }
+    fn ensure_kept(
+        &self,
+        engine: EngineKind,
+        name: &str,
+        token: &Path,
+        folder: &str,
+        fresh: bool,
+    ) -> Result<Ensured, String> {
+        (**self).ensure_kept(engine, name, token, folder, fresh)
+    }
+    fn reply_kept(&self, name: &str, token: &Path, words: &str) -> Took {
+        (**self).reply_kept(name, token, words)
+    }
+    fn wait_kept(
+        &self,
+        name: &str,
+        token: &Path,
+        input: &str,
+        cancel: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        (**self).wait_kept(name, token, input, cancel)
+    }
+    fn wait_after(
+        &self,
+        machine: &str,
+        agent: &str,
+        input: &str,
+        cancel: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        (**self).wait_after(machine, agent, input, cancel)
+    }
+    fn close_kept(&self, name: &str, token: &Path) -> Result<(), String> {
+        (**self).close_kept(name, token)
+    }
 }
 
 /// No agent ready (a fresh or signed-out lamp, OpenClaw not set up): no
@@ -1974,6 +2011,75 @@ fn the_kept_session_is_never_rotated_and_a_sign_out_forgets_it() {
     assert!(!dir.path().join(TOKEN_FILE).exists());
     assert!(!dir.path().join(STATE_FILE).exists());
     assert_eq!(one.agent(), None);
+}
+
+/// The keep-open loop's one step: removals, then the look.
+fn keep_open_step(one: &OneSession, fake: &Fake, looks: &mut Looks) {
+    let place_now = || -> Result<(&Fake, Place), String> { Ok((fake, place())) };
+    one.remove_if_due(looks, None, false, &|| Some(fake));
+    one.look(looks, Instant::now(), None, &place_now);
+}
+
+/// The owner's "forget everything" (#6274, openharness#4393): the kept
+/// session is closed, its OpenClaw session deleted and its token removed,
+/// as at a sign-out, and a new one, with a new token, is opened in the
+/// same keep-open step, with no task.
+#[test]
+fn a_forget_closes_the_kept_session_and_opens_a_new_one_at_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let deleted = Arc::new(Mutex::new(Vec::new()));
+    let seen = deleted.clone();
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_session_delete(Box::new(move |key| {
+        seen.lock().unwrap().push(key.to_owned());
+        Ok(())
+    }));
+    let mut looks = Looks::default();
+    keep_open_step(&one, &fake, &mut looks);
+    one_turn(&one, &fake, "task-1");
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    let token = std::fs::read(dir.path().join(TOKEN_FILE)).unwrap();
+    one.forget_conversation();
+    keep_open_step(&one, &fake, &mut looks);
+    assert_eq!(fake.count("close-kept"), 1);
+    assert_eq!(
+        *deleted.lock().unwrap(),
+        vec![format!("agent:main:kept-{}", agent_of(1))]
+    );
+    assert_ne!(
+        std::fs::read(dir.path().join(TOKEN_FILE)).unwrap(),
+        token,
+        "the old token removed, a new one made"
+    );
+    assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
+    assert_eq!(fake.count("ensure"), 2);
+}
+
+/// A kept session left with no task for [`KEPT_IDLE_MAX`] is dropped the
+/// same way (closed, deleted, token removed) and a fresh one opened.
+#[test]
+fn a_kept_session_left_idle_is_dropped_and_a_fresh_one_opened() {
+    let dir = tempfile::tempdir().unwrap();
+    let deleted = Arc::new(Mutex::new(Vec::new()));
+    let seen = deleted.clone();
+    let (mut one, fake) = kept_on(dir.path());
+    one = one.with_session_delete(Box::new(move |key| {
+        seen.lock().unwrap().push(key.to_owned());
+        Ok(())
+    }));
+    assert_eq!(KEPT_IDLE_MAX, Duration::from_secs(2 * 60 * 60));
+    let mut looks = Looks::default();
+    keep_open_step(&one, &fake, &mut looks);
+    keep_open_step(&one, &fake, &mut looks);
+    assert_eq!(fake.count("close-kept"), 0, "not idle long enough");
+    one.kept_idle_max = Duration::ZERO;
+    keep_open_step(&one, &fake, &mut looks);
+    assert_eq!(fake.count("close-kept"), 1);
+    assert_eq!(
+        *deleted.lock().unwrap(),
+        vec![format!("agent:main:kept-{}", agent_of(1))]
+    );
+    assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
 }
 
 /// A reply refused `NOT_YOURS`: the pane the old way at once (`harness

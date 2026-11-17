@@ -2149,6 +2149,19 @@ khi đăng xuất.
   engine xoá cả file token. Phiên chưa đóng được thì thử lại ở lần nhìn sau,
   và trong lúc đó không mở pane nào. Factory reset xoá thư mục store, cả
   token.
+- **Quên, và rảnh lâu: bị gỡ, rồi mở phiên mới.** Lệnh "quên hết" của chủ
+  đèn (`ForgetSessions`, #6274) gỡ phiên được giữ như khi đăng xuất, khi
+  không còn gì giữ nó: `harness close`, rồi `sessions.delete` với
+  `engineSession` của nó, rồi xoá file token, để việc tiếp theo không nhớ
+  gì (`one_session::forgotten`). Phiên được giữ không có việc nào trong 2 h
+  (`KEPT_IDLE_MAX`, tính từ lúc mở hoặc lượt cuối) cũng bị gỡ cùng cách, vì
+  phiên của OpenClaw không bao giờ bị xoay theo số lượt. Cả hai trường hợp,
+  vòng keep-open mở một phiên mới (agent id và token mới, nên là một phiên
+  OpenClaw mới) ngay trong cùng lần nhìn, ngay sau khi gỡ, không đợi tới
+  việc tiếp theo. Journal: `the kept session dropped (the owner asked to
+  forget); a new one opens` (hoặc `(no task for 120 min)`), `dropped the
+  kept session <id> (…); its conversation forgotten`, rồi `kept session new
+  <id> (openclaw, …) in <ms> ms`.
 
 ### Giới hạn được chấp nhận cho thứ Hai: grant của kỹ năng đang chạy trong gateway
 
