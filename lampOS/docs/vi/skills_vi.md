@@ -2042,7 +2042,7 @@ agent found: told N`), và trước đó câu trả lời của lamp-tasks mang 
 nhiêu câu trả lời của agent, chỉ độ dài (`do.task: lamp-tasks' answer
 carries N bytes of its agent's answer`, hoặc `no agent's answer`; #7180).
 Khi bắt đầu chờ mà cổng đang đóng, dù là một lần đọc hay một câu trả lời cần
-nói, nhật ký ghi một lần kèm lý do (`skill:<name>: waits for its gate: quiet
+nói, nhật ký ghi kèm lý do (`skill:<name>: waits for its gate: quiet
 hours`, `Room::waits`), để câu trả lời bị giữ trong giờ yên lặng vẫn để lại
 một dòng (#7180); mỗi lần lý do đó đổi trong lúc chờ, nhật ký ghi thêm một
 lần, tối đa một dòng mỗi giây (`service_read::SAY_WHY_EVERY`), không bao giờ
@@ -3940,10 +3940,31 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   bật trong sản phẩm; `task_sure`), thêm hai điều. **Lần chạy
   thất bại được nói ra** (`task_sure::failed_line`): khi lamp-tasks trả lời
   `ok:false`, hoặc không có trả lời, đèn nói với chủ đèn một câu ngắn cố
-  định, sau cổng của câu trả lời cần nói (dưới: chủ đèn một mình, giờ yên
-  lặng, lượt đọc duy nhất của đèn; `LAMP_TOLD_WHEN_ASKED` bỏ giờ yên lặng
-  như với câu trả lời của agent), không bao giờ là lời của tác vụ hay lời
-  của lamp-tasks: `missing_secret` "<Skill> couldn't run: it needs a key added in the app, on its page.";
+  định, không bao giờ là lời của tác vụ hay lời của lamp-tasks
+  (`service_read::tell_failed`, quyết định của first builder lúc 21:25 trên
+  #7363). **Trong cuộc trò chuyện đã yêu cầu lần chạy** (một lần chạy ngay
+  mà chủ đèn yêu cầu bằng giọng nói, câu sẵn sàng trong vòng 45 giây sau
+  lời yêu cầu, `task_sure::in_asking_conversation`), câu được nói ngay lúc
+  đó, như câu trả lời của cuộc trò chuyện ấy, giống cách "<skill> is running
+  now" đã được nói: lời chính xác gửi tới dịch vụ say với `"answers": true`,
+  không qua cổng của lần đọc (không cần khuôn mặt, không cần một phút yên
+  lặng). Giọng nói chỉ cho câu như vậy đi qua cuộc trò chuyện đang diễn ra,
+  như các câu của unplug (`Says::exact_answers`), khi bản ghi riêng của nó
+  cho thấy chủ đèn đã chạy ngay kỹ năng đó bằng giọng nói trong vòng 45 giây
+  (`made_run::answers_now`, `ANSWERS_WITHIN`, `GOING_ON_FOR` của thread);
+  nếu không, câu chờ như mọi câu chính xác khác; `answers` chỉ đi với text
+  chính xác. Nhật ký ghi `do.task: what became of its run: said in the
+  asking conversation`. **Ngoài ra, đó là tin tức** (`service_read::tell_news`):
+  lần chạy của trigger, câu sẵn sàng muộn hơn, hoặc câu giọng nói không nói
+  như câu trả lời (`not said in the asking conversation (<why>), so as
+  news: …`) chờ sau cổng của câu trả lời cần nói (dưới: chủ đèn một mình,
+  lượt đọc duy nhất của đèn) và được nói một lần, lần tới chủ đèn được thấy
+  trong vòng 30 phút (`NEWS_WAIT`), nếu không thì bỏ (`skipped: <why>`);
+  vào giờ yên lặng thì bỏ ngay (`skipped: quiet hours`), không bao giờ giữ
+  qua giờ yên lặng (`LAMP_TOLD_WHEN_ASKED` vẫn bỏ giờ yên lặng cho lần chạy
+  được yêu cầu bằng giọng nói). Trước đây câu chờ tới một giờ để có đúng
+  một khuôn mặt và không có giọng nói, và trên lamp-9adf (17/11, 21:11) sau
+  "Fig facts is running now." không có gì nữa. Các câu: `missing_secret` "<Skill> couldn't run: it needs a key added in the app, on its page.";
   mọi lời từ chối khác trước khi agent bắt đầu, hoặc không tới được
   lamp-tasks, "<Skill> couldn't run this time."; `run_failed`, không có trả
   lời hay mọi thứ khác "<Skill> didn't finish this time.". Nhật ký ghi

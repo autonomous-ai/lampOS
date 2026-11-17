@@ -3,14 +3,20 @@
 //! lamp-tasks ([`crate::task::hand`]) ended with nothing said.
 //!
 //! - **A run that failed is told** ([`failed_line`]): lamp-tasks' `ok:false`
-//!   answer, or none, is said to the owner as one short fixed line, behind
-//!   a told answer's gate (`crate::service_read::tell`, so quiet hours and
-//!   the rest hold it), never the task's words nor lamp-tasks' own. A key
+//!   answer, or none, is said to the owner as one short fixed line, never
+//!   the task's words nor lamp-tasks' own. A key
 //!   not added (`missing_secret`) says what to do in the app; any other
 //!   refusal before its agent began says it couldn't run, and a run that
 //!   began and failed, or whose answer never came, that it didn't finish.
 //!   Before, only the journal had it, even after the voice said "<skill>
-//!   is running now" (`lamp_voice::made_run`).
+//!   is running now" (`lamp_voice::made_run`). A run the owner asked for
+//!   by voice whose line is ready within the conversation that asked
+//!   ([`in_asking_conversation`]) is said then, as that conversation's
+//!   answer, with no read's gate (`crate::service_read::tell_failed`);
+//!   any other is news, said once the next time the owner is seen within
+//!   30 minutes and dropped at quiet hours
+//!   (`crate::service_read::tell_news`; the first builder's 21:25 on
+//!   #7363).
 //! - **A run refused `busy` waits its turn** ([`Line`], [`hand_in_turn`]):
 //!   lamp-tasks runs one skill's task at a time and refuses another as
 //!   `busy` (`lamp_tasks::skill_task::BUSY`), and the run was taken back off
@@ -114,6 +120,18 @@ pub fn failed_line(skill: &str, sent: &Result<String, Unrun>) -> Option<String> 
         "off" | "bad_request" | "too_long" | "no_token" | "not_started" | "no_secrets" => not_run(),
         _ => not_finished(),
     }
+}
+
+/// Whether a failed run's line, ready at `ready_ms`, is said as the answer
+/// in the conversation that asked for it (the first builder's 21:25 on
+/// #7363): the owner asked by voice at `asked_ms` (a run now,
+/// `crate::task::asked_by_voice`) within
+/// [`lamp_voice::made_run::ANSWERS_WITHIN`] before, as "<skill> is running
+/// now" was said. Not asked by voice, or later: it is news
+/// (`crate::service_read::tell_news`). Unix ms both.
+pub fn in_asking_conversation(asked_ms: Option<u64>, ready_ms: u64) -> bool {
+    let within = lamp_voice::made_run::ANSWERS_WITHIN.as_millis() as u64;
+    asked_ms.is_some_and(|asked| ready_ms >= asked && ready_ms - asked <= within)
 }
 
 /// Whether lamp-tasks refused the run `busy`: another skill's runs.
@@ -435,6 +453,22 @@ mod tests {
 
     fn refused(code: &str, message: &str) -> Result<String, Unrun> {
         Ok(serde_json::json!({"ok": false, "error": code, "message": message}).to_string())
+    }
+
+    /// #7363: a failed run's line is the asking conversation's answer only
+    /// for a run the owner asked by voice, ready within the conversation
+    /// (45 s, the voice's going on); later, or a trigger's run, it is news.
+    #[test]
+    fn a_failed_line_answers_only_the_conversation_still_going_on() {
+        let asked = 1_000_000;
+        assert!(in_asking_conversation(Some(asked), asked));
+        assert!(in_asking_conversation(Some(asked), asked + 45_000));
+        assert!(!in_asking_conversation(Some(asked), asked + 45_001));
+        assert!(!in_asking_conversation(None, asked), "a trigger's run");
+        assert!(
+            !in_asking_conversation(Some(asked), asked - 1),
+            "a clock gone back"
+        );
     }
 
     /// Every way lamp-tasks' answer says a run failed is one fixed line:
