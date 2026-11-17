@@ -1350,7 +1350,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        (`HARNESS_TMUX_METADATA_URL`), grid (`HARNESS_GRID_METADATA_URL`) and
        hn (`HARNESS_TUI_MANIFEST_URL`). Byte-for-byte copies of them and of
        the installer itself (`https://cdn.autonomous.ai/harness/cli/install.sh`)
-       are under `deploy/harness/`, copied on 13 Nov 2026, and compiled in
+       are under `deploy/harness/`, copied on 13 Nov 2026 (the four
+       manifests again on 17 Nov 2026, when Harness's CDN had moved the files
+       they name from `storage.googleapis.com` to `cdn.autonomous.ai`, #6256
+       F7, #7423: a lamp downloads those files), and compiled in
        (`product::INSTALLER`, `product::MANIFESTS`), each with its
        SHA-256. Every pinned install, the build's own pin or the env pair,
        checks all five against their SHA-256s before anything runs
