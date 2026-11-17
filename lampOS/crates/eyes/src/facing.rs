@@ -63,11 +63,18 @@ pub fn yaw_deg(marks: &[(f32, f32); 5]) -> Option<f32> {
 }
 
 /// How far below the eye line the nose sits on a level face, as a share of
-/// the distance between the eyes: the zero of [`pitch_deg`]. From the
-/// five-point template faces are aligned to for recognition (InsightFace's
-/// ArcFace 112x112: eyes at y 51.70 and 51.50, 35.24 apart, nose at 71.74),
-/// itself a mean of frontal faces. Not yet checked on this lamp's YuNet.
-pub const LEVEL_NOSE_DROP: f32 = 0.57;
+/// the distance between the eyes: the zero of [`pitch_deg`]. Set on this
+/// lamp's YuNet: row-7442a, lamp-52e6, 17 Nov, a person facing the lamp
+/// level read Q1-Q5 medians 7.8-17.6 degrees down (12.65, 9.1, 9.2, 7.75,
+/// 17.65; 234 looks, pooled median 10.75) with the 0.57 of the five-point
+/// template faces are aligned to for recognition (InsightFace's ArcFace
+/// 112x112: eyes at y 51.70 and 51.50, 35.24 apart, nose at 71.74). YuNet
+/// puts the nose lower than that template: the nose drop that the model
+/// gives a face tipped 10.75 degrees, against the mouth's unchanged level,
+/// is `1.15 (0.57 + 0.5 tan 10.75) / (1.15 + 0.2 tan 10.75)` = 0.644, so
+/// 0.64, and that face now reads within a degree of 0. The template itself
+/// then reads about 10 degrees up.
+pub const LEVEL_NOSE_DROP: f32 = 0.64;
 /// How far in front of the eyes the nose's tip stands, as a share of the
 /// distance between them: a head tipped down swings it down, tipped up,
 /// up. An anthropometric guess (about 30 mm against 63 mm), for the row.
@@ -274,7 +281,8 @@ mod tests {
     #[test]
     fn a_level_face_reads_no_pitch_and_a_nose_low_reads_head_down() {
         assert!(pitch_deg(&tipped(0.0)).unwrap().abs() < 0.01);
-        // The ArcFace template itself reads level: the zero's source.
+        // The ArcFace template, the zero before row-7442a, now reads about
+        // 10 degrees up: YuNet on the lamp puts the nose lower.
         let template = [
             (38.29, 51.70),
             (73.53, 51.50),
@@ -283,7 +291,7 @@ mod tests {
             (70.73, 92.20),
         ];
         let level = pitch_deg(&template).unwrap();
-        assert!(level.abs() < 2.0, "{level}");
+        assert!((-12.0..-8.0).contains(&level), "{level}");
         for tip in [-30.0, -20.0, -10.0, 10.0, 20.0, 30.0] {
             let read = pitch_deg(&tipped(tip)).unwrap();
             assert!((read - tip).abs() < 0.01, "{tip}: {read}");
@@ -300,6 +308,27 @@ mod tests {
         assert!(!pitch_within(pitch_deg(&tipped(-25.0)).unwrap()));
         assert!(pitch_within(pitch_deg(&tipped(15.0)).unwrap()));
         assert!(pitch_within(pitch_deg(&tipped(-15.0)).unwrap()));
+    }
+
+    /// Row-7442a on lamp-52e6 (17 Nov): a face facing the lamp level read a
+    /// pooled median of 10.75 degrees down with the template's nose drop
+    /// (0.57). Those marks, made by the model with 0.57 at 10.75 degrees,
+    /// now read within 3 degrees of level.
+    #[test]
+    fn the_rows_level_face_reads_level() {
+        let (sin, cos) = 10.75f32.to_radians().sin_cos();
+        let nose = 40.0 * (0.57 * cos + NOSE_DEPTH * sin);
+        let mouth = 40.0 * (LEVEL_MOUTH_DROP * cos + MOUTH_DEPTH * sin);
+        let measured = [
+            (30.0, 40.0),
+            (70.0, 40.0),
+            (50.0, 40.0 + nose),
+            (35.0, 40.0 + mouth),
+            (65.0, 40.0 + mouth),
+        ];
+        let read = pitch_deg(&measured).unwrap();
+        assert!(read.abs() < 3.0, "{read}");
+        assert!(pitch_within(read));
     }
 
     /// The Reviewer-lead's P3 on #7450: the nose alone folds past about 41

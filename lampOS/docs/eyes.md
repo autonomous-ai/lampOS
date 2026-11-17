@@ -2174,18 +2174,23 @@ process, shows there before any trial waits for it. For each face:
 the same five marks as the turn: the nose's drop `r` and the mouth
 corners' midpoint's drop `m` below the point between the eyes, square to
 the eye line (a head tilted over reads the same). A head tipped by `t`
-gives `r = 0.57 cos t + 0.5 sin t` and `m = 1.15 cos t + 0.2 sin t`; the
+gives `r = 0.64 cos t + 0.5 sin t` and `m = 1.15 cos t + 0.2 sin t`; the
 two are solved for `cos t` and `sin t`, and `t` is their angle. That has
 one answer for every bow, so a phone's deep bow (60, 75 degrees) reads
 deeper, never back inside the window as the nose alone did past about 41
 degrees (the Reviewer-lead's P3 on #7450). Only the ratio counts, so the
 face's size and a turn's narrowing fall out. On a level face the nose sits
-0.57 eye distances below the eyes and the mouth corners 1.15
-(`LEVEL_NOSE_DROP`, `LEVEL_MOUTH_DROP`, from InsightFace's ArcFace
-five-point template, the mean frontal face recognisers align to: that
-template reads level within 2 degrees); the nose's tip stands 0.5 in front
-of the eyes and the mouth 0.2 (`NOSE_DEPTH`, `MOUTH_DEPTH`, guesses). So a
-level face reads 0, to be checked on this lamp's YuNet on the row. A face
+0.64 eye distances below the eyes and the mouth corners 1.15
+(`LEVEL_NOSE_DROP`, `LEVEL_MOUTH_DROP`). The mouth's is InsightFace's
+ArcFace five-point template, the mean frontal face recognisers align to;
+the nose's was that template's 0.57 until row-7442a (lamp-52e6, 17 Nov):
+a person facing the lamp level read Q1-Q5 medians 7.8-17.6 degrees down
+(pooled median 10.75 over 234 looks), since YuNet puts the nose lower. The
+nose drop the model gives a face tipped 10.75 degrees, against the mouth's
+level, is `1.15 (0.57 + 0.5 tan 10.75) / (1.15 + 0.2 tan 10.75)` = 0.644,
+so 0.64: that face now reads within a degree of 0, and the template itself
+about 10 degrees up. The nose's tip stands 0.5 in front of the eyes and
+the mouth 0.2 (`NOSE_DEPTH`, `MOUTH_DEPTH`, guesses). A face
 too small for a turn, or turned past 60 degrees, has no pitch (not
 measured). Marks no head could make (a mark not a number, the eyes on one
 another, the mouth above the eyes with the nose below) read `LOST_DEG`,
@@ -2201,9 +2206,19 @@ model): false when either eye's `eyeLookDown`, `eyeLookIn` or `eyeLookOut`
 is 0.5 or more (MediaPipe's order of the 52, 11-16), true otherwise;
 `eyeLookUp` is not read. It is said only for the face that read ran on,
 for 2.5 s after its frame (`LOOKING_LASTS_US`: one read every 2 s and its
-thread's time), so it needs `--seems-blendshapes` and the face-expressions
-yes the seems read needs. Every other face, or no read, leaves it out:
-unknown, not away.
+thread's time), so it needs `--seems-blendshapes`. It works on every lamp,
+the face-expressions yes or not (the lead's call on #7442): with no yes,
+the Blendshape V2 read still runs on the near face on the same timing, but
+gaze-only (`seems::Due::GazeOnly`, `blendshapes::from_scores`): only the
+eye-look scores are read, for `looking`, and every other score is dropped
+at once, with no kind: nothing on `humans/seems`, nothing in
+`--seems-log`, no count in the minute's journal line, and the yawn's own
+read and count (`LAMP_EYES_YAWN`) still need the yes. `looking` goes only
+on `humans/faces/tracked`, on the lamp's bus; no product reader stores or
+sends it. With the yes, the read is
+the full seems read as before. With the switch off and no yes, no read
+runs, as before. Every other face, or no read, leaves it out: unknown,
+not away.
 
 ### Who counts as someone at the lamp (`LAMP_FACES_AT_DESK_ONLY=on`)
 
@@ -2555,7 +2570,10 @@ the lamp never says how anyone looks (#1671; the first builder's 14:04).
   (`seems::face_expressions_yes`). Missing, unreadable, over 4096 bytes or
   anything else is no: no face is read, by either reader, nothing goes on
   `humans/seems` or into `--seems-log`, and the ask comes again 2 s later.
-  The journal says once each time the yes comes or goes. The eyes still
+  With `LAMP_EYES_PITCH_GAZE=on`, Blendshape V2 still reads where the near
+  face looks, and only that, for `looking` ("Pitch and gaze" above).
+  The journal says once each time the yes comes or goes, and with that
+  switch that only where the face looks is read. The eyes still
   look, follow faces and say who is there. Who writes the file:
   privacy-switch.md, "Face reads stay off without a yes".
 - **The journal** says only how many reads there were in the last minute,

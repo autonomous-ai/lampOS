@@ -19,7 +19,7 @@ file, made new each start (0600, in a folder of the owner's only), as one JSON l
 numbers: the rule's verdict, the cells past the bar and, per cell, its change over its
 noise and its change in greys after its row's median change; no grey, pixel or picture,
 and it stops after 20 minutes or 50 MB. A test flag: no unit lampOS deploys passes it
-(off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once;\n{\"close_receipt\":N} after it asks for N on eyes/camera_closed (LAMP_BUS=on) once the\ncamera is shut, with whether its last stop released the device. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there, and `tellable` beside it holds the names\nof those who said yes to being named in Who was here ({\"visits_yes\":\"NAME\"} on the\nsocket, taken only from the face at the lamp now; {\"visits_no\":\"NAME\"} takes it back). With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --sight-from-look on (with --full-look and --sight-file), the sight file's 320-across\nframe is encoded from the look's own decoded picture instead of the full frame being decoded\nand shrunk again (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the largest face's mouth is read each look\n(with --mouth-diagnostics on, the journal says how open, each look), and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given); with LAMP_EYES_SPEAKING_ALL_FACES=on, up to three faces' mouths, largest first,\nwhile the look's meshing stays within 200 ms (off unless set). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture, and only while the lamp's yes (for everyone it sees) is kept\nin /var/lib/lampOS/consent/face-expressions.json ({\"face_expressions\":\"yes\"}; none, no\nread: the eyes still look); the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\nWith --seems-log (with --seems or --seems-blendshapes), each read is also written to that\nfile (0600) as its time, kind, confidence and reader, nothing of whose face, up to 20,000\nlines, for the measure; lamp-seems-measure counts it against a labelled session and\nremoves both (off unless given; #1671).\nWith --seems-blendshapes (the pinned Blendshape V2 model, with --mouth-model), the same is\nread from the mesh's points: the smiles, frowns and sneers of the near face, said and\njournaled the same way and with the same yes, each read naming its reader, so both may run\nside by side (off unless given; #1671). This read then runs on its own thread, from the\npoints of the look's own mesh of that face (or of that thread's mesh of its crop, for another\nface), and no look waits on it. With LAMP_SEEMS_BROW_LOW=on, it also names a face negative with\nthe brows drawn down at or over 0.80 and the smiles under 0.3 (off unless set; #2132).\nWith LAMP_REMEMBER_SPEAKER=on (with --recogniser, LAMP_BUS and LAMP_EYES_SPEAKING),\nlive enrollment requires the internal remember_speaker operation and an existing print\nof the face seen speaking that line; plain live remember is refused (off unless set).\nWith LAMP_FACE_FULL_CROP=on (with --recogniser), faces are remembered and recognised from the\nframe at its own size, and the one known is held through a miss for 4 s after their last\nmatch, unless an unknown face is near; the camera closed lets them go at once (off unless set; #3126).\nWith LAMP_FACE_KNOWN_HOLD=on (with --recogniser), the one known is held the same way without\nthat crop (off unless set; #4493). While held, the known file is kept as it was, its time renewed.\nWith LAMP_FACE_REFOUND=on (with --recogniser and LAMP_EYES_SPEAKING), a near face whose passing id\nhas no print read for it yet is recognised at once, and again at most every 0.5 s while\nits alignment or print fails (off unless set; #4486). With both it and LAMP_FACE_KNOWN_HOLD on, a new\npassing id that follows the held face's (the one lost id beside it) carries the hold once a\nprint of it passes 0.30 (unprinted, it lets go as any new id), and humans/faces/tracked says\nwhich id it follows (#4885).\nWith LAMP_EYES_MOUTH_FULL_LOOK=on (with --full-look and --mouth-model), the mouths are cut\nfrom the frame at its own size and their eye distance counted in its pixels (off unless set; #1711).\nWith LAMP_EYES_YAWN=on (with --mouth-model, --seems-blendshapes and LAMP_ACTIVITY), the largest\nface's yawns are counted into the sitting, as yawns on room/activity: its mouth held wide for\n1.5 s with no smile and the brows not raised, and only while the face-expressions yes is kept; a\ncount only (off unless set; #3709).\nWith LAMP_EYES_PITCH_GAZE=on (with LAMP_BUS=on), each face on humans/faces/tracked also says how far\nits head is tipped (pitch, from the five marks), and the face the Blendshape V2 seems read ran on\nwhether its eyes look toward the lamp (looking), for 2.5 s after its frame (off unless set; #7442).\nWith --photo-dir (the eyes' own folder, with --recogniser), {\"remember\":\"NAME\",\"photo\":\"FILE\"}\non the who socket takes the one face in that JPEG in the folder and removes the file once\nread (no picture is kept); the face is kept unconfirmed until its person says yes at the\nlamp, and deleted if not (off unless given).\nWith LAMP_TURN_TO_ANSWERED=on (with LAMP_BUS=on and LAMP_EYES_SPEAKING=on), as the voice\nbegins an answer (voice/state on the bus), the one face seen speaking just before is the\none sent to --body-socket until the answer ends; while it is out of view nothing is sent (off unless given; #1810).\nWith --mouth-diagnostics on (off by default), one numeric journal record per look explains\nthe largest detection's speaking decision. Requires LAMP_BUS=on and LAMP_EYES_SPEAKING=on;\nnever enables inference and records no IDs, landmarks, images, sound or words.\nWith --camera-helper (the camera's helper's socket, #2892), after three opens in a row that did\nnot open, while seeing is permitted, the helper is asked, on a thread of its own, to re-authorize\nthe camera's USB device, then at most once a minute while they go on failing, and its answer\nis said in the journal (off unless given).\nWith --frames-socket, one reader at a time (its owner's; a second is refused) that says its size,\n640x480 or 1280x720, gets every frame the camera makes while it is connected, as the camera\nmade it (MJPEG, never decoded for this), each as its length (4 bytes, big-endian) and its JPEG:\nthe camera runs at that size at 25 fps then, with 4 buffers, and at its own size again when\nthe reader goes; each frame goes whole through a writer that holds two at most, a frame\npast that dropped, never the reader, so the eyes never wait (off unless given). With\nLAMP_EYES_FAST_STREAM=on and no --frames-socket, the frames are served at\n/run/lampos-eyes/frames.sock, where lamp-control looks by default (off unless set).\nWith --frame-link (a socket in a directory of this user's with no group or other access)\nand --frame-link-boots (the file lamp-seen frame-link keeps, this user's, 0600 or 0640, in a\nfolder with no other access; its two boots are read there at start, never from the command\nline, and with no file no link is served), the eyes serve the camera's private frame link\n(lamp_camera::frames) to lamp-seen, its perception reader: only a peer the kernel names as\nlamp-seen.service run as this user is taken (SO_PEERCRED and its cgroup), any other is\nrefused and counted; one frame per request, copied only for a reader that asked, each with\nits camera grant; bound only while the camera is permitted and closed, with any frame in\ntransit, when that ends, the journal saying the reader was cut; a reader that leaves a\nframe unread for 0.5 s is dropped, never waited for (off unless given; #6543).\n\nlamp-eyes reauthorize-camera --usb VENDOR:PRODUCT[@TOPOLOGY] is that helper, run as root by its\nsocket for each connection: it checks the device at that port is that camera, or with no port\nfinds the one USB device with those ids on any port (none or two: refused), writes its\nauthorized 0 then 1, as an unplug and a plug would, at most once a minute, answers one line,\nand reads nothing from whoever connected.\n";
+(off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once;\n{\"close_receipt\":N} after it asks for N on eyes/camera_closed (LAMP_BUS=on) once the\ncamera is shut, with whether its last stop released the device. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there, and `tellable` beside it holds the names\nof those who said yes to being named in Who was here ({\"visits_yes\":\"NAME\"} on the\nsocket, taken only from the face at the lamp now; {\"visits_no\":\"NAME\"} takes it back). With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --sight-from-look on (with --full-look and --sight-file), the sight file's 320-across\nframe is encoded from the look's own decoded picture instead of the full frame being decoded\nand shrunk again (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the largest face's mouth is read each look\n(with --mouth-diagnostics on, the journal says how open, each look), and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given); with LAMP_EYES_SPEAKING_ALL_FACES=on, up to three faces' mouths, largest first,\nwhile the look's meshing stays within 200 ms (off unless set). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture, and only while the lamp's yes (for everyone it sees) is kept\nin /var/lib/lampOS/consent/face-expressions.json ({\"face_expressions\":\"yes\"}; none, no\nread: the eyes still look); the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\nWith --seems-log (with --seems or --seems-blendshapes), each read is also written to that\nfile (0600) as its time, kind, confidence and reader, nothing of whose face, up to 20,000\nlines, for the measure; lamp-seems-measure counts it against a labelled session and\nremoves both (off unless given; #1671).\nWith --seems-blendshapes (the pinned Blendshape V2 model, with --mouth-model), the same is\nread from the mesh's points: the smiles, frowns and sneers of the near face, said and\njournaled the same way and with the same yes, each read naming its reader, so both may run\nside by side (off unless given; #1671). This read then runs on its own thread, from the\npoints of the look's own mesh of that face (or of that thread's mesh of its crop, for another\nface), and no look waits on it. With LAMP_SEEMS_BROW_LOW=on, it also names a face negative with\nthe brows drawn down at or over 0.80 and the smiles under 0.3 (off unless set; #2132).\nWith LAMP_REMEMBER_SPEAKER=on (with --recogniser, LAMP_BUS and LAMP_EYES_SPEAKING),\nlive enrollment requires the internal remember_speaker operation and an existing print\nof the face seen speaking that line; plain live remember is refused (off unless set).\nWith LAMP_FACE_FULL_CROP=on (with --recogniser), faces are remembered and recognised from the\nframe at its own size, and the one known is held through a miss for 4 s after their last\nmatch, unless an unknown face is near; the camera closed lets them go at once (off unless set; #3126).\nWith LAMP_FACE_KNOWN_HOLD=on (with --recogniser), the one known is held the same way without\nthat crop (off unless set; #4493). While held, the known file is kept as it was, its time renewed.\nWith LAMP_FACE_REFOUND=on (with --recogniser and LAMP_EYES_SPEAKING), a near face whose passing id\nhas no print read for it yet is recognised at once, and again at most every 0.5 s while\nits alignment or print fails (off unless set; #4486). With both it and LAMP_FACE_KNOWN_HOLD on, a new\npassing id that follows the held face's (the one lost id beside it) carries the hold once a\nprint of it passes 0.30 (unprinted, it lets go as any new id), and humans/faces/tracked says\nwhich id it follows (#4885).\nWith LAMP_EYES_MOUTH_FULL_LOOK=on (with --full-look and --mouth-model), the mouths are cut\nfrom the frame at its own size and their eye distance counted in its pixels (off unless set; #1711).\nWith LAMP_EYES_YAWN=on (with --mouth-model, --seems-blendshapes and LAMP_ACTIVITY), the largest\nface's yawns are counted into the sitting, as yawns on room/activity: its mouth held wide for\n1.5 s with no smile and the brows not raised, and only while the face-expressions yes is kept; a\ncount only (off unless set; #3709).\nWith LAMP_EYES_PITCH_GAZE=on (with LAMP_BUS=on), each face on humans/faces/tracked also says how far\nits head is tipped (pitch, from the five marks), and the face the Blendshape V2 seems read ran on\nwhether its eyes look toward the lamp (looking), for 2.5 s after its frame; with no face-expressions\nyes that read still runs on the same timing for looking only, every other score dropped at once:\nnothing on humans/seems, in --seems-log or toward a yawn (off unless set; #7442).\nWith --photo-dir (the eyes' own folder, with --recogniser), {\"remember\":\"NAME\",\"photo\":\"FILE\"}\non the who socket takes the one face in that JPEG in the folder and removes the file once\nread (no picture is kept); the face is kept unconfirmed until its person says yes at the\nlamp, and deleted if not (off unless given).\nWith LAMP_TURN_TO_ANSWERED=on (with LAMP_BUS=on and LAMP_EYES_SPEAKING=on), as the voice\nbegins an answer (voice/state on the bus), the one face seen speaking just before is the\none sent to --body-socket until the answer ends; while it is out of view nothing is sent (off unless given; #1810).\nWith --mouth-diagnostics on (off by default), one numeric journal record per look explains\nthe largest detection's speaking decision. Requires LAMP_BUS=on and LAMP_EYES_SPEAKING=on;\nnever enables inference and records no IDs, landmarks, images, sound or words.\nWith --camera-helper (the camera's helper's socket, #2892), after three opens in a row that did\nnot open, while seeing is permitted, the helper is asked, on a thread of its own, to re-authorize\nthe camera's USB device, then at most once a minute while they go on failing, and its answer\nis said in the journal (off unless given).\nWith --frames-socket, one reader at a time (its owner's; a second is refused) that says its size,\n640x480 or 1280x720, gets every frame the camera makes while it is connected, as the camera\nmade it (MJPEG, never decoded for this), each as its length (4 bytes, big-endian) and its JPEG:\nthe camera runs at that size at 25 fps then, with 4 buffers, and at its own size again when\nthe reader goes; each frame goes whole through a writer that holds two at most, a frame\npast that dropped, never the reader, so the eyes never wait (off unless given). With\nLAMP_EYES_FAST_STREAM=on and no --frames-socket, the frames are served at\n/run/lampos-eyes/frames.sock, where lamp-control looks by default (off unless set).\nWith --frame-link (a socket in a directory of this user's with no group or other access)\nand --frame-link-boots (the file lamp-seen frame-link keeps, this user's, 0600 or 0640, in a\nfolder with no other access; its two boots are read there at start, never from the command\nline, and with no file no link is served), the eyes serve the camera's private frame link\n(lamp_camera::frames) to lamp-seen, its perception reader: only a peer the kernel names as\nlamp-seen.service run as this user is taken (SO_PEERCRED and its cgroup), any other is\nrefused and counted; one frame per request, copied only for a reader that asked, each with\nits camera grant; bound only while the camera is permitted and closed, with any frame in\ntransit, when that ends, the journal saying the reader was cut; a reader that leaves a\nframe unread for 0.5 s is dropped, never waited for (off unless given; #6543).\n\nlamp-eyes reauthorize-camera --usb VENDOR:PRODUCT[@TOPOLOGY] is that helper, run as root by its\nsocket for each connection: it checks the device at that port is that camera, or with no port\nfinds the one USB device with those ids on any port (none or two: refused), writes its\nauthorized 0 then 1, as an unplug and a plug would, at most once a minute, answers one line,\nand reads nothing from whoever connected.\n";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Usb {
@@ -995,16 +995,24 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     // two run side by side for the measure (the first builder, 09:51).
     /// One read's outcome, how long it took, when its face was seen, and
     /// for Blendshape V2 that face's passing id and whether its eyes looked
-    /// toward the lamp (`looking`, #7442).
+    /// toward the lamp (`looking`, #7442). A gaze-only read (no yes, with
+    /// LAMP_EYES_PITCH_GAZE=on) is `Ok(None)`: no kind, only `looking`.
     type SeemsRead = (
-        Result<lamp_msgs::HumanSeems, String>,
+        Result<Option<lamp_msgs::HumanSeems>, String>,
         Duration,
         u64,
         Option<(u32, Option<bool>)>,
     );
     /// One face offered to the seems worker: the look's mesh points or its
-    /// crop, the eye line, when it was seen and its passing id.
-    type SeemsOffer = (lamp_eyes::blendshapes::Input, (f32, f32), u64, Option<u32>);
+    /// crop, the eye line, when it was seen, its passing id, and whether
+    /// the read is gaze-only (`seems::Due::GazeOnly`, #7442).
+    type SeemsOffer = (
+        lamp_eyes::blendshapes::Input,
+        (f32, f32),
+        u64,
+        Option<u32>,
+        bool,
+    );
     enum Reader {
         FerPlus(lamp_eyes::seems::Reader),
         /// On its own thread: the look offers the face's mesh points, or
@@ -1038,7 +1046,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         let mut mesh = load_mesh()?.ok_or("--seems-blendshapes needs --mouth-model")?;
         let (latest, done) = lamp_eyes::latest::worker(
             "eyes-seems",
-            move |(input, eye_line, at_us, id): SeemsOffer| -> SeemsRead {
+            move |(input, eye_line, at_us, id, gaze_only): SeemsOffer| -> SeemsRead {
                 let began = Instant::now();
                 let landmarks = match input {
                     lamp_eyes::blendshapes::Input::Landmarks(landmarks) => Ok(landmarks),
@@ -1051,7 +1059,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     let points = lamp_eyes::blendshapes::points(&landmarks, eye_line)
                         .ok_or("no face to read")?;
                     let (read, gaze) = reader
-                        .read_looking(&points)
+                        .read_looking(&points, gaze_only)
                         .map_err(|error| error.to_string())?;
                     looking = gaze;
                     Ok(read)
@@ -3106,6 +3114,18 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         let mut read_this_look = false;
                         // The face the seems worker reads for how it seems.
                         let mut seems_face = None;
+                        // Whether that read is gaze-only (#7442).
+                        let mut gaze_only = false;
+                        // What the journal says once the yes is missing:
+                        // with the gaze switch, where the near face looks is
+                        // still read (#7442).
+                        let no_yes_said = if arguments.seems_blendshapes.is_some()
+                            && bus_out.as_ref().is_some_and(|bus| bus.pitch_gaze())
+                        {
+                            "no face is read for how it seems; with LAMP_EYES_PITCH_GAZE=on, only where the near face looks, for looking, nothing kept or said of it"
+                        } else {
+                            "no face is read"
+                        };
                         for seems in seems.iter_mut() {
                             // A far face, its eyes too close together to
                             // read, gets no read rather than `unsure`.
@@ -3113,11 +3133,18 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 &faces,
                                 picture.filled.1.max(1) as f32,
                             );
+                            // With LAMP_EYES_PITCH_GAZE=on and no yes, a
+                            // Blendshape V2 read due still runs on the same
+                            // timing, for where the face looks only (#7442).
+                            let gaze = matches!(seems.reader, Reader::Blendshapes { .. })
+                                && bus_out.as_ref().is_some_and(|bus| bus.pitch_gaze());
+                            let mut this_gaze_only = false;
                             let due = !read_this_look
                                 && near.is_some()
-                                && match lamp_eyes::seems::due(
+                                && match lamp_eyes::seems::due_gaze(
                                     seems.read_at,
                                     std::path::Path::new(lamp_eyes::seems::FACE_EXPRESSIONS_FILE),
+                                    gaze,
                                 ) {
                                     lamp_eyes::seems::Due::NotYet => false,
                                     lamp_eyes::seems::Due::NoYes => {
@@ -3125,12 +3152,23 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                         seems.read_at = Some(Instant::now());
                                         if face_yes_told != Some(false) {
                                             eprintln!(
-                                                "lamp-eyes: no yes to face reads in {}: no face is read",
+                                                "lamp-eyes: no yes to face reads in {}: {no_yes_said}",
                                                 lamp_eyes::seems::FACE_EXPRESSIONS_FILE
                                             );
                                             face_yes_told = Some(false);
                                         }
                                         false
+                                    }
+                                    lamp_eyes::seems::Due::GazeOnly => {
+                                        if face_yes_told != Some(false) {
+                                            eprintln!(
+                                                "lamp-eyes: no yes to face reads in {}: {no_yes_said}",
+                                                lamp_eyes::seems::FACE_EXPRESSIONS_FILE
+                                            );
+                                            face_yes_told = Some(false);
+                                        }
+                                        this_gaze_only = true;
+                                        true
                                     }
                                     lamp_eyes::seems::Due::Now => {
                                         if face_yes_told != Some(true) {
@@ -3168,12 +3206,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                         let read = aligned
                                             .map(|aligned| reader.read(&aligned))
                                             .unwrap_or_else(|| Err("no face to read".into()))
+                                            .map(Some)
                                             .map_err(|error| error.to_string());
                                         reads.push((read, began.elapsed(), at_us, None));
                                     }
                                     // Offered below.
                                     Reader::Blendshapes { .. } => {
                                         seems_face = Some((index, face));
+                                        gaze_only = this_gaze_only;
                                     }
                                 }
                             }
@@ -3190,7 +3230,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     bus.gazed(id, looking, at_us);
                                 }
                                 match read {
-                                    Ok(read) => {
+                                    // Gaze-only (#7442): `looking` above and
+                                    // nothing else, never said, logged or
+                                    // counted.
+                                    Ok(None) => {}
+                                    Ok(Some(read)) => {
                                         seems.reads += 1;
                                         seems.spent += took;
                                         seems.longest = seems.longest.max(took);
@@ -3257,7 +3301,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             {
                                 Some((input, eye_line)) => {
                                     let id = bus_out.as_ref().and_then(|bus| bus.id_at(index));
-                                    latest.offer((input, eye_line, lamp_ipc::monotonic_us(), id));
+                                    latest.offer((input, eye_line, lamp_ipc::monotonic_us(), id, gaze_only));
                                 }
                                 None => {
                                     eprintln!("lamp-eyes: the face was not read: no face to read");
