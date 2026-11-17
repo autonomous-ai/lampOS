@@ -308,8 +308,8 @@ lần chạy, và được trả lời khi lần chạy kết thúc
 - **Điều agent tìm thấy** (`tells_answer`): mọi lần chạy task, dù được cấp
   quyền gì (chủ đèn, 17/11: kết quả của agent được đọc tự do, không chỉ
   của dịch vụ đã liên kết), qua một runner giữ câu trả lời của agent
-  (`Runner::answers`: runner của Harness, trừ lần chạy nó khởi động không
-  có Harness; `NetRunner` của một lần chạy `net` theo đường chạy duy nhất,
+  (`Runner::answers`: runner của Harness, dù lần chạy sau đó đi đường nào,
+  vì đường đó được đọc lại lúc lần chạy bắt đầu; `NetRunner` của một lần chạy `net` theo đường chạy duy nhất,
   vì nó đi qua runner Harness đó) mà kết thúc tốt sẽ trả lời
   `{"ok":true,"id":N,"answer":"..."}`, là câu trả lời cuối của agent theo
   lệnh `show` lúc kết thúc lần chạy (`--chars 4000`, `Cli::shown_end`; với
@@ -333,7 +333,13 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   tối đa 20 KiB; `its agent's answer: N bytes kept` hoặc `none in its
   answer.md`), nên nó được nói như của Harness. Lần chạy ghi cố định không
   bao giờ nói, lần chạy runner của Harness khởi động không có Harness cũng
-  vậy. lamp-skills nói chúng cho chủ nguyên văn, không bao giờ thành một lượt
+  vậy: lời giao việc của nó cũng kết thúc bằng `TELL_LINE`, nhưng nó không
+  giữ câu trả lời nào (`nothing`). Khi đọc một lần lúc giao việc, đường đó
+  đã làm mất một câu trả lời đã giữ: trên lamp-9adf, 18/11, 46 giây sau khi
+  lamp-tasks khởi động lại, lần chạy `net` của một skill tải lên đọc là
+  không có Harness lúc giao việc, đi qua Harness lúc bắt đầu (`answer=894`,
+  `894 bytes kept`) và ghi `nothing: not a run that tells`; cùng skill đó
+  đã nói 45 byte lúc 03:06. lamp-skills nói chúng cho chủ nguyên văn, không bao giờ thành một lượt
   của model, nên chữ từ web mở không bao giờ là chỉ dẫn (docs/vi/skills_vi.md,
   "Dịch vụ đã liên kết thành task cho agent của đèn"), tối đa khoảng 400 ký
   tự (`MOST_TOLD_CHARS`, người xây dựng đầu tiên trên #7591), cắt ở dấu kết
@@ -360,6 +366,7 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   ra nó mất ở đâu. Test:
   `every_runs_ended_answer_carries_what_its_agent_found`,
   `a_net_runs_ended_answer_carries_what_its_agent_found`,
+  `a_harness_runner_tells_whatever_path_its_hand_over_reads`,
   `an_agent_skills_and_a_keyed_runs_ended_answers_carry_what_their_agent_found`,
   `skill_make::tests::a_net_runner_keeps_an_answer_by_either_path`,
   `skill_make::tests::a_makes_runner_keeps_a_telling_runs_answer_from_its_folder`,
