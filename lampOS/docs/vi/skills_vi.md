@@ -2216,10 +2216,6 @@ cả hai người viết.
     - `net` khi `LAMP_TASK_NET` tắt (`net_off`): "I can't make that one yet:
       it needs the internet, and skills on this lamp can't use the internet
       yet."
-    - `net` theo trigger (`net_made`): "I can't make that one yet: it needs the
-      internet, which a skill that runs on its own can't have yet. Ask me to
-      make it for when you say a few words instead, and the lamp's agent
-      will do it each time you say them."
     - Một dịch vụ khi `LAMP_AGENT_SERVICES` tắt (`services_off`): "I can't
       make that one yet: it needs your linked services, and skills on this
       lamp can't use them yet."

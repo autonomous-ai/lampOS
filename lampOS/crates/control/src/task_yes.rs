@@ -651,6 +651,70 @@ mod tests {
         lamp_voice::skill_task_yes::set_net_here(None);
     }
 
+    /// The owner's ruling (17 Nov): a task for the lamp's agent made on its
+    /// own trigger, granted `net` (`lamp_voice::make_no_cannot::skill_text`).
+    /// Before the owner's yes, lamp-tasks' check for its run (`net_agreed`,
+    /// the only way its egress socket is made) is not agreed; a yes without
+    /// `net` is not one to it; the kept yes with `net` is, and the run's
+    /// token still never names `net`.
+    #[test]
+    fn a_timed_made_tasks_net_is_agreed_only_after_its_kept_yes() {
+        use crate::runs::SkillYes as _;
+        let dir = folder("net-timed");
+        let state = dir.join("state");
+        let skills = dir.join("skills");
+        std::fs::create_dir_all(&state).unwrap();
+        let folder = skills.join("bitcoin-daily");
+        std::fs::create_dir_all(folder.join("scripts")).unwrap();
+        let block = "[permissions]\ntopics = [\"clock/local\"]\n\n[trigger]\n\
+                     topic = \"clock/local\"\nfield = \"known\"\nequals = true\n\
+                     rearm = \"ends\"\nduring = { from = \"09:00\", to = \"09:01\" }";
+        let text = lamp_voice::make_no_cannot::skill_text(
+            "bitcoin-daily",
+            &["net".to_owned(), "speak".to_owned()],
+            block,
+            "check the Bitcoin price every day at 9 and tell me",
+        );
+        for written in text.split("```").skip(1).step_by(2) {
+            let (name, body) = written.split_once('\n').unwrap();
+            std::fs::write(folder.join(name), body).unwrap();
+        }
+        lamp_voice::skill_task_yes::set_net_here(Some(true));
+        let sha256 = lamp_skills::task::folder_sha256(&folder).unwrap();
+        let st = Some(state.as_path());
+        let line =
+            |grants: Value| json!({"name": "bitcoin-daily", "sha256": sha256, "grants": grants});
+        let check = || {
+            answer(
+                st,
+                &asked(CHECK, line(json!(["net", "speak"]))),
+                false,
+                true,
+                0,
+            )
+        };
+        let record = |grants: Value| answer(st, &asked(RECORD, line(grants)), true, true, 5);
+        assert_eq!(check(), Some(json!({"agreed": false, "why": "waiting"})));
+        assert_eq!(record(json!(["speak"])), Some(json!({"recorded": true})));
+        assert_eq!(check(), Some(json!({"agreed": false, "why": "changed"})));
+        assert_eq!(
+            record(json!(["net", "speak"])),
+            Some(json!({"recorded": true}))
+        );
+        assert_eq!(check(), Some(json!({"agreed": true})));
+        let kept = KeptYes {
+            state: state.clone(),
+            skills: skills.clone(),
+            on: true,
+            write_agent: false,
+        };
+        assert_eq!(
+            kept.grants("bitcoin-daily").unwrap(),
+            BTreeSet::from([Grant::Speak])
+        );
+        lamp_voice::skill_task_yes::set_net_here(None);
+    }
+
     fn task_skill(skills: &Path, name: &str, grants: &str) -> std::path::PathBuf {
         let folder = skills.join(name);
         std::fs::create_dir_all(folder.join("scripts")).unwrap();

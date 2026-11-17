@@ -1850,6 +1850,63 @@ mod tests {
         set_made_here(None);
     }
 
+    /// The owner's ruling (17 Nov): a task for the lamp's agent made by
+    /// voice on its own trigger ("check the Bitcoin price every day at 9
+    /// and tell me"), granted `net` with LAMP_TASK_NET on, loads as a made
+    /// skill with code: its trigger, its one task running the lamp's own
+    /// script, `net` among its grants. The switch off, it doesn't load.
+    #[test]
+    fn a_made_timed_task_granted_net_loads_only_with_its_switch() {
+        use lamp_voice::make_no_cannot as no_cannot;
+        let block = "[permissions]\ntopics = [\"clock/local\"]\n\n[trigger]\n\
+                     topic = \"clock/local\"\nfield = \"known\"\nequals = true\n\
+                     rearm = \"ends\"\nduring = { from = \"09:00\", to = \"09:01\" }";
+        let words = "check the Bitcoin price every day at 9 and tell me";
+        let grants = ["net".to_owned(), "speak".to_owned()];
+        let text = no_cannot::skill_text("bitcoin-daily", &grants, block, words);
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("bitcoin-daily");
+        fs::create_dir_all(folder.join(SCRIPTS)).unwrap();
+        // Its three fenced blocks, each a file named on its fence's line.
+        for written in text.split("```").skip(1).step_by(2) {
+            let (name, body) = written.split_once('\n').unwrap();
+            let body = if name == "SKILL.md" {
+                body.replacen("\n---\n", "\nmade: here\n---\n", 1)
+            } else {
+                body.to_owned()
+            };
+            fs::write(folder.join(name), body).unwrap();
+        }
+        assert!(folder.join(no_cannot::RUN).is_file());
+        let installed = package::Installed {
+            sha256: "ab".repeat(32),
+            manifest: package::Manifest {
+                format: 1,
+                name: "bitcoin-daily".into(),
+                version: "1.0.0".into(),
+                files: Vec::new(),
+            },
+            from_store: false,
+        };
+        fs::write(
+            folder.join(package::INSTALLED_FROM),
+            serde_json::to_vec(&installed).unwrap(),
+        )
+        .unwrap();
+        set_made_here(Some(true));
+        lamp_voice::skill_task_yes::set_net_here(Some(true));
+        let skill = crate::load(&folder).unwrap();
+        assert_eq!(skill.grants, grants);
+        assert_eq!(skill.triggers.len(), 1);
+        assert_eq!(skill.task_step().unwrap().run, no_cannot::RUN);
+        assert!(made_with_code(&folder, false));
+        assert!(origin_refuses(&folder, false).is_none());
+        lamp_voice::skill_task_yes::set_net_here(Some(false));
+        assert!(crate::load(&folder).is_err());
+        lamp_voice::skill_task_yes::set_net_here(None);
+        set_made_here(None);
+    }
+
     /// lamp-control at `path`, answering each of `answers` in turn, one a
     /// connection: the lines it was asked.
     fn control(
