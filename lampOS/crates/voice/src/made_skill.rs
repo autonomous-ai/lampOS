@@ -9586,10 +9586,17 @@ pub fn not_made_in_their_language(line: &str) -> String {
 }
 
 /// What [`not_made_in_their_language`] tells the model after
-/// [`ALREADY_DONE`], before the quoted line.
+/// [`ALREADY_DONE`], before the quoted line. It is this one make's outcome
+/// alone (Fourteen on lamp-9adf, 17 Nov 21:37: one make not made was told
+/// on as "my skill-making isn't working", kept in the thread as the lamp's
+/// words, and later turns answered a made skill's turn-off, turn-on and
+/// remove from that belief with no call).
 const NOT_MADE_TOLD: &str = "Tell the person this, in the language of the conversation, every \
                              part of it, leaving nothing out: that the skill wasn't made, why, \
-                             and what to try. Add nothing else: ";
+                             and what to try. It is this one ask's outcome alone: say it of this \
+                             skill, never that making skills isn't working; a later ask to make, \
+                             remove, or turn a skill off or on calls make_skill again. Add \
+                             nothing else: ";
 
 /// Whether `note` is the lamp's note of a skill made: it opens on
 /// [`ALREADY_DONE`] and isn't [`not_made_in_their_language`]'s note of
@@ -12408,6 +12415,32 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(!tells_made(&note), "{note}");
         assert!(tells_made(&in_their_language("I made x, and it's on.")));
         assert!(!tells_made("I made x, and it's on."));
+    }
+
+    /// Fourteen on lamp-9adf, 17 Nov 21:37–21:57: one make not made ("I
+    /// can't do that yet: hearing what is said") was told on as "my
+    /// skill-making isn't working", and later turns kept that belief: a
+    /// made skill's turn-off was answered "CloudFact was never actually
+    /// made" with no call. The note of a make not made tells it as that one
+    /// make's outcome, never as making, removing or turning skills off or on
+    /// not working, and still opens on what [`tells_made`] reads.
+    #[test]
+    fn a_make_not_made_is_told_as_that_one_makes_outcome() {
+        let line = not_made_line("I can't do that yet: hearing what is said");
+        let note = not_made_in_their_language(&line);
+        assert!(note.contains("this one ask's outcome alone"), "{note}");
+        assert!(
+            note.contains("never that making skills isn't working"),
+            "{note}"
+        );
+        assert!(
+            note.contains(
+                "a later ask to make, remove, or turn a skill off or on calls make_skill"
+            ),
+            "{note}"
+        );
+        assert!(note.ends_with(&format!("\"{line}\"")), "{note}");
+        assert!(!tells_made(&note), "{note}");
     }
 
     /// With reads on, a read refused as unsaid goes back with lines that
