@@ -3462,6 +3462,8 @@ mod tests {
                 // A round names a newer target only once it has read one: a
                 // `checking` that finds the lamp current never does.
                 target: (now != "checking").then(|| build(813)),
+                waiting: None,
+                asked: None,
             }),
         }
     }

@@ -161,6 +161,10 @@ pub struct Telling {
     began_unix_ms: Option<u64>,
     step_began_unix_ms: u64,
     target: Option<UpdateBuild>,
+    /// What the round waits for before it switches (#7517), and whether
+    /// the owner's Update now asked for it.
+    waiting: Option<&'static str>,
+    asked_now: bool,
     /// The lamp's agents (#6240), with `LAMP_APP_ENGINES=on`.
     engines: Option<Engines>,
 }
@@ -264,6 +268,8 @@ impl Telling {
             began_unix_ms: None,
             step_began_unix_ms: 0,
             target: None,
+            waiting: None,
+            asked_now: false,
             engines,
         }
     }
@@ -275,6 +281,9 @@ impl Telling {
 
     /// [`Telling::phase`], begun at `at_unix_ms`.
     pub fn phase_at(&mut self, now: &'static str, at_unix_ms: u64) {
+        if self.phase != Some(now) {
+            self.waiting = None;
+        }
         self.phase = Some(now);
         self.began_unix_ms.get_or_insert(at_unix_ms);
         self.step_began_unix_ms = at_unix_ms;
@@ -294,6 +303,28 @@ impl Telling {
         self.tell_round();
     }
 
+    /// What the round waits for before it switches (#7517): one of
+    /// `UpdateRound::WAITING_QUIET` or `WAITING_GIVE_WAY`, or none once it
+    /// switches. Said at once when it changes; outside a round neither said
+    /// nor kept.
+    pub fn waiting(&mut self, waiting: Option<&'static str>) {
+        if self.phase.is_none() || self.waiting == waiting {
+            return;
+        }
+        self.waiting = waiting;
+        self.tell_round();
+    }
+
+    /// The owner's Update now asked for this round, or took it over while it
+    /// waited (#7517): said at once, and kept to the round's end.
+    pub fn asked_now(&mut self) {
+        if self.phase.is_none() || self.asked_now {
+            return;
+        }
+        self.asked_now = true;
+        self.tell_round();
+    }
+
     /// Where the round is now, with when it and its phase began and its
     /// target.
     fn tell_round(&mut self) {
@@ -304,6 +335,8 @@ impl Telling {
             started_at_unix_ms: began,
             step_started_at_unix_ms: self.step_began_unix_ms.max(began),
             target: self.target.clone(),
+            waiting: self.waiting.map(str::to_owned),
+            asked: self.asked_now.then(|| UpdateRound::ASKED_NOW.to_owned()),
         };
         let status = status_with(
             &self.records,
@@ -324,6 +357,8 @@ impl Telling {
             self.began_unix_ms.take(),
         ));
         self.target = None;
+        self.waiting = None;
+        self.asked_now = false;
         let status = status_with(
             &self.records,
             "idle",
@@ -341,6 +376,8 @@ impl Telling {
         self.phase = None;
         self.began_unix_ms = None;
         self.target = None;
+        self.waiting = None;
+        self.asked_now = false;
         let status = status(&self.records, "idle", self.last.as_ref(), None);
         self.tell(status);
     }
@@ -612,6 +649,8 @@ mod tests {
                 started_at_unix_ms: 1_000,
                 step_started_at_unix_ms: 1_000,
                 target: None,
+                waiting: None,
+                asked: None,
             })
         );
         telling.target(&two);
@@ -648,6 +687,8 @@ mod tests {
                 started_at_unix_ms: 20_000,
                 step_started_at_unix_ms: 20_000,
                 target: None,
+                waiting: None,
+                asked: None,
             })
         );
         telling.ended(&Outcome::UpToDate(10_580), 21_000);
