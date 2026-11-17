@@ -2587,7 +2587,7 @@ thêm từ tệp, viết trong ứng dụng, từ Store hay đã cài giữ nguy
    theo SHA-256 của thư mục (`task::folder_sha256`) giữ như lúc cài:
    - `[budget] group = "wellbeing"` với `per_hour = 1`
      (`made_skill::MANNERS_GROUP`, `MANNERS_PER_HOUR`), không có `gap`,
-     `give_back_unsaid` hay `[stop]`: không còn chung giờ và khoảng cách
+     `give_back_unsaid`, `per_day`, `follows_count` hay `[stop]`: không còn chung giờ và khoảng cách
      với các lời nhắc;
    - `most_a_day = 3` (`made_skill::MANNERS_MOST_A_DAY`).
 
@@ -3276,6 +3276,15 @@ Bảng đầy đủ các khóa trigger ở [skills.md](../skills.md).
 
 Bảng đầy đủ các khóa `[[while]]` ở [skills.md](../skills.md).
 
+## Giới hạn ngày của nhóm và lời tiếp theo (`[budget] per_day`, `follows_count`, #6543)
+
+| Khóa | Ý nghĩa |
+|------|---------|
+| `per_day` | Tùy chọn, 1 tới 48 (`PER_DAY_AT_MOST`): các kỹ năng của nhóm tự bắt đầu nhiều nhất chừng đó lần một ngày địa phương, chung cho cả nhóm, theo `per_day` nhỏ nhất mà một thành viên ghi. Đếm từ đầu ngày địa phương của đèn như `most_a_day` (khi chưa biết giờ địa phương thì theo ngày của đồng hồ đơn điệu), và được giữ bên cạnh các lần giữ qua một lần khởi động lại ngắn trong cùng lần khởi động máy, như số lần của `most_a_day`. Cơ hội của một thành viên quá mức đó bị dùng mất, như ở `most_a_day` của chính nó (nhật ký: `its GROUP group's N a day already run`, cổng `budget-day`); ngày địa phương sau nhóm bắt đầu lại. `unsaid` không trả lại gì của ngày (như `most_a_day`), một `do.write` chờ lời đồng ý trả lại số đếm của nó. Không có khóa thì như trước (khoảng "sáu lần một ngày tất cả" của thiết kế phản ứng, một khóa thay cho việc chia `most_a_day`). |
+| `follows_count = true` | Tùy chọn, một thành viên bất kỳ ghi là đủ: lời `follows` của một thành viên là một lần chạy của nhóm, được đếm vào giờ, `per_day` và `gap` của nhóm, bị chúng cản, và chờ tới lượt (ai tới trước được trước) như mọi thành viên; `most_a_day` và `[rest]` vẫn không đếm nó. Không có khóa thì lời `follows` thuộc về lần chạy kia, như trước (`trigger.follows`). |
+
+Kiểm thử (`crates/skills/tests/it/group_day.rs`): `a_groups_day_caps_its_runs_across_its_skills_and_begins_again_at_midnight`, `a_groups_day_stays_at_its_most_after_a_restart`, `a_follow_up_counts_toward_its_group_only_when_the_group_says_so`, `per_day_is_bounded_and_both_keys_are_off_by_default`. Bảng đầy đủ các khóa `[budget]` ở [skills.md](../skills.md).
+
 ## Khi nào màn trình diễn đèn dừng (`do.show`, #5744)
 
 Một màn trình diễn đèn (Light show, #1679) dừng trước khung kế tiếp, được
@@ -3531,7 +3540,8 @@ trong lần ngồi.
   (thứ một lệnh dừng không có `all` dừng), tạm hoãn còn chưa hết, và
   `[rest]` (lời nhắc cuối, còn đang được xét hay không và những gì đã thấy
   người ta để ý tới lúc đó, số lời nhắc liên tiếp không ai để ý, và nghỉ tới
-  lúc nào); theo nhóm `[budget]`, các lần chạy trong giờ qua và các thành
+  lúc nào); theo nhóm `[budget]`, các lần chạy trong giờ qua, số lần chạy
+  trong ngày địa phương này cho `per_day` (kèm ngày đó, #6543) và các thành
   viên còn chờ tới lượt (ai tới trước được trước). Mọi thời điểm trong đó
   theo đồng hồ đơn điệu, nên vẫn đúng sau lần khởi động lại. Ghi ngay khi
   bất kỳ thứ nào đổi, trừ lúc một thành viên đang chờ bị cản lần cuối: thứ
