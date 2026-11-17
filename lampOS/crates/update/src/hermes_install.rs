@@ -253,10 +253,13 @@ pub const EGRESS_ENV: &str = "LAMP_NS_EGRESS";
 pub const EGRESS_DIR: &str = "/run/lampos-tasks/egress";
 
 /// The lines [`NS`] runs, with [`TASKS_SWITCH`] on, before it stages the
-/// skills: a run granted `net` ([`NET_ENV`] `run` and [`EGRESS_ENV`] set)
-/// sees only its own skill's folder of [`SKILLS`] and [`PUSHED`], never
-/// another skill's (Heron's P3 on #7590, made required by the first
-/// builder). lamp-tasks names that folder, one line, in the run's own
+/// work folder and the skills: a run granted `net` ([`NET_ENV`] `run` and
+/// [`EGRESS_ENV`] set) sees only its own run's folder of the work folder,
+/// `<work>/lamp/make-<run id>` (`Z`), over an empty tmpfs on the rest, so
+/// nothing another run left there can be read and sent (Heron's P2 at
+/// `2533a4f02b`); and only its own skill's folder of [`SKILLS`] and
+/// [`PUSHED`], never another skill's (Heron's P3 on #7590, made required
+/// by the first builder). lamp-tasks names that folder, one line, in the run's own
 /// folder, `<work>/lamp/make-<run id>/skill-folder`
 /// (`lamp_tasks::egress::OWN_SKILL_FILE`), found by the run's id as its
 /// egress socket is. A file that is missing, a link, or names anything but
@@ -267,10 +270,13 @@ pub const EGRESS_DIR: &str = "/run/lampos-tasks/egress";
 /// `/var/lib`.
 macro_rules! own_skill_lines {
     () => {
-        "if [ \"${LAMP_NS_NET-}\" = run ] && [ -n \"${LAMP_NS_EGRESS-}\" ]; then\n\
+        "Z=\n\
+         if [ \"${LAMP_NS_NET-}\" = run ] && [ -n \"${LAMP_NS_EGRESS-}\" ]; then\n\
          \x20 case $LAMP_NS_EGRESS in skill-?*|make-?*) ;; *) fail \"LAMP_NS_EGRESS is not a run's folder\" ;; esac\n\
          \x20 case $LAMP_NS_EGRESS in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) fail \"LAMP_NS_EGRESS is not a run's folder\" ;; esac\n\
          \x20 [ -n \"$W\" ] || fail \"a run granted net has no work folder\"\n\
+         \x20 Z=$W/lamp/make-${LAMP_NS_EGRESS#*-}\n\
+         \x20 [ -d \"$Z\" ] && [ ! -L \"$Z\" ] && [ ! -L \"$W/lamp\" ] || fail \"a run granted net has no folder of its own\"\n\
          \x20 O=$W/lamp/make-${LAMP_NS_EGRESS#*-}/skill-folder N=\n\
          \x20 [ -f \"$O\" ] && [ ! -L \"$O\" ] && [ ! -L \"${O%/*}\" ] && read -r N < \"$O\" || fail \"a run granted net names no skill folder of its own\"\n\
          \x20 case ${N##*/} in ''|*[!abcdefghijklmnopqrstuvwxyz0123456789_-]*) fail \"a run granted net names no plain skill folder\" ;; esac\n\
@@ -782,7 +788,7 @@ const SKILLS_EDITS: [(&str, &str); 6] = [
 /// other way (Harness's panes) never sees it. A run granted `net` sees
 /// only its own skill's folder of the skills and those pushed
 /// ([`OWN_SKILL_LINES`]).
-const TASKS_EDITS: [(&str, &str); 8] = [
+const TASKS_EDITS: [(&str, &str); 9] = [
     (
         "# where these mounts are locked. Any step failing ends it before Hermes runs.\n",
         "# where these mounts are locked. Any step failing ends it before Hermes runs.\n\
@@ -794,7 +800,8 @@ const TASKS_EDITS: [(&str, &str); 8] = [
          # read-only, opens port 53 in the run's own network, names 127.0.0.1 in resolv.conf and starts the relay with a web\n\
          # proxy on 127.0.0.1:3128 and DNS on 127.0.0.1:53 through it: lamp-tasks lets out only the public web on 80 and 443.\n\
          # It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there.\n\
-         # A run granted net sees only its own skill's folder of those and the skills, named in its run's folder.\n",
+         # A run granted net sees only its own skill's folder of those and the skills, named in its run's folder,\n\
+         # and only its own run's folder of the work folder, over an empty tmpfs.\n",
     ),
     (
         " S=/tmp/.lampos-ns\n",
@@ -859,11 +866,16 @@ const TASKS_EDITS: [(&str, &str); 8] = [
         ),
     ),
     (
-        "if [ -d \"$K\" ]; then mount --bind \"$K\" \"$S/k\" || fail \"no $K\"; else K=; fi\n",
+        "if [ -d \"$W\" ]; then mount --bind \"$W\" \"$S/w\" || fail \"no $W\"; else W=; fi\n",
         concat!(
             own_skill_lines!(),
-            "if [ -d \"$K\" ]; then mount --bind \"$K\" \"$S/k\" || fail \"no $K\"; else K=; fi\n"
+            "if [ -d \"$W\" ]; then mount --bind \"${Z:-$W}\" \"$S/w\" || fail \"no $W\"; else W=; fi\n"
         ),
+    ),
+    (
+        "if [ -n \"$W\" ]; then mkdir -p \"$W\" && mount --move \"$S/w\" \"$W\" || fail \"$W not shown\"; fi\n",
+        "if [ -n \"$W\" ] && [ -n \"$Z\" ]; then mkdir -p \"$W\" && mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W\" && mkdir -p \"$Z\" && mount --move \"$S/w\" \"$Z\" || fail \"$Z not shown\"\n\
+         elif [ -n \"$W\" ]; then mkdir -p \"$W\" && mount --move \"$S/w\" \"$W\" || fail \"$W not shown\"; fi\n",
     ),
 ];
 

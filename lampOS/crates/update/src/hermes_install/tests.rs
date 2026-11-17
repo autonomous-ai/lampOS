@@ -4271,6 +4271,29 @@ fn a_net_run_shows_its_egress_socket_opens_53_and_names_127_0_0_1() {
     ];
     let places: Vec<usize> = order.iter().map(|line| find(line)).collect();
     assert!(places.windows(2).all(|two| two[0] < two[1]), "{lines:#?}");
+    // Heron's P2 at 2533a4f02b: of the work folder, only its own run's
+    // folder is staged; an empty tmpfs covers the rest (where an ordinary
+    // run may have left another skill's data), and the run's folder is
+    // moved back onto it.
+    let work_at = at(WORK);
+    let run_at = format!("{work_at}/lamp/make-task-1-2-3");
+    fs::write(format!("{work_at}/left-by-another-run"), "mail").unwrap();
+    let work_order = [
+        format!("mount --bind {run_at} {stage}/w"),
+        format!("mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {work_at}"),
+        format!("mkdir -p {run_at}"),
+        format!("mount --move {stage}/w {run_at}"),
+    ];
+    let places: Vec<usize> = work_order.iter().map(|line| find(line)).collect();
+    assert!(places.windows(2).all(|two| two[0] < two[1]), "{lines:#?}");
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains(&format!("--bind {work_at} "))
+                || line.contains("left-by-another-run")
+                || line == &format!("mount --move {stage}/w {work_at}")),
+        "{lines:#?}"
+    );
     // Only its own skill's folder staged and shown, read-only; never the
     // skills' whole folder.
     let skills_at = at(SKILLS);
@@ -4377,7 +4400,7 @@ fn a_net_run_sees_only_its_own_skills_folder() {
     }
     let run = |net: Option<&str>, egress: &str| {
         let script = format!(
-            "fail() {{ echo \"fail: $1\"; exit 1; }}\nW={w} K={k} P={p}\n{OWN_SKILL_LINES}echo \"K=$K P=$P\"\n",
+            "fail() {{ echo \"fail: $1\"; exit 1; }}\nW={w} K={k} P={p}\n{OWN_SKILL_LINES}echo \"K=$K P=$P Z=$Z\"\n",
             w = w.display(),
             k = k.display(),
             p = p.display(),
@@ -4401,14 +4424,15 @@ fn a_net_run_sees_only_its_own_skills_folder() {
     let (k_shown, p_shown) = (k.display().to_string(), p.display().to_string());
     name("r1", &format!("{k_shown}/mine"));
     // Its own folder alone, by the one run path's name and by the make's.
-    let own = format!("K={k_shown}/mine P=");
+    let w_shown = w.display().to_string();
+    let own = format!("K={k_shown}/mine P= Z={w_shown}/lamp/make-r1");
     assert_eq!(run(Some("run"), "skill-r1"), own);
     assert_eq!(run(Some("run"), "make-r1"), own);
     // A pushed skill's: the lamp's skills hidden whole.
     name("r2", &format!("{p_shown}/pushed-one"));
     assert_eq!(
         run(Some("run"), "skill-r2"),
-        format!("K= P={p_shown}/pushed-one")
+        format!("K= P={p_shown}/pushed-one Z={w_shown}/lamp/make-r2")
     );
     // No name, a name past the skills, a link or no folder: the run ends.
     assert!(run(Some("run"), "skill-r9").starts_with("fail: "));
@@ -4429,7 +4453,7 @@ fn a_net_run_sees_only_its_own_skills_folder() {
     assert!(run(Some("run"), "other-r1").starts_with("fail: "));
     assert!(run(Some("run"), "skill-R1").starts_with("fail: "));
     // No `net`: every skill, as before.
-    let every = format!("K={k_shown} P={p_shown}");
+    let every = format!("K={k_shown} P={p_shown} Z=");
     assert_eq!(run(None, "skill-r1"), every);
     assert_eq!(run(Some("run"), ""), every);
     // In both namespace scripts, before the skills are staged and after the
@@ -4442,10 +4466,11 @@ fn a_net_run_sees_only_its_own_skills_folder() {
     for text in [ns_text(true, true), ns_text(false, true), agent] {
         assert_eq!(text.matches(OWN_SKILL_LINES).count(), 1);
         let lines = text.find(OWN_SKILL_LINES).unwrap();
-        let work = text.find("mount --bind \"$W\" \"$S/w\"").unwrap();
+        let work = text.find("mount --bind \"${Z:-$W}\" \"$S/w\"").unwrap();
         let staged = text.find("mount --bind \"$K\" \"$S/k\"").unwrap();
         let pushed = text.find("mount --bind \"$P\" \"$S/p\"").unwrap();
-        assert!(work < lines && lines < staged && staged < pushed);
+        assert!(lines < work && work < staged && staged < pushed);
+        assert!(text.contains("mount --bind \"${Z:-$W}\" \"$S/w\""));
     }
     assert!(!ns_text(true, false).contains(OWN_SKILL_LINES));
 }

@@ -1381,6 +1381,10 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
     trong `/var/lib/lampOS/skills` và `skills-dev`
     (`hermes_install::OWN_SKILL_LINES`); script không có dòng đó
     (`egress::NS_OWN_SKILL_LINE`) thì không nhận lần chạy `net` (`no_net`).
+    Trong thư mục làm việc của lamp-tasks, nó chỉ thấy thư mục lần chạy của
+    chính nó, `lamp/make-<run id>`, trên một tmpfs rỗng phủ phần còn lại,
+    nên không đọc và gửi đi được gì lần chạy khác để lại ở đó (P2 của Heron
+    tại `2533a4f02b`).
   - Không có giới hạn byte cho lưu lượng của lần chạy `net` ngoài 16 đường
     ống, 60 s nhàn rỗi và hạn chót của lần chạy.
   - Câu hỏi DNS của lần chạy `net` đi tới resolver của đèn, thường là router
