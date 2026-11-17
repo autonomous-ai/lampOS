@@ -3802,7 +3802,7 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   một grant của lamp-control (`body`, `light`, `speak`, `look`, `hear`,
   `sound`, `air`, `device`, `camera`, `microphone`, `notes`, `speech`), mỗi
   mục một lần, không bao giờ `skills`. Với `LAMP_TASK_NET=on` (bật trong sản
-  phẩm) thêm một mục, `net` ("reaches the internet"): lần chạy, bị giữ như mọi
+  phẩm) thêm một mục, `net` ("reaches the public internet"): lần chạy, bị giữ như mọi
   lần chạy, tới được web công khai trên cổng 80 và 443 qua socket lối ra riêng,
   không bao giờ tới các mạng của chính đèn (có cả địa chỉ trong nhà của router)
   hay các cổng cục bộ của đèn, dù địa chỉ công khai của router không bị chặn và

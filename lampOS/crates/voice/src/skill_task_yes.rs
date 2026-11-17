@@ -155,7 +155,7 @@ pub const NET_ENVIRONMENT: &str = "LAMP_TASK_NET";
 /// The task grant that keeps the run on the lamp's network (with
 /// [`NET_ENVIRONMENT`] on): never one of lamp-control's own, so it is never
 /// in a one-run token; lamp-tasks reads it from the hand-over.
-pub const NET: (&str, &str) = ("net", "reaches the internet");
+pub const NET: (&str, &str) = ("net", "reaches the public internet");
 
 thread_local! {
     /// The network grant's switch as a test of this thread sets it (other
