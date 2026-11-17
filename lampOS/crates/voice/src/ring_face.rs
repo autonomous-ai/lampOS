@@ -172,6 +172,22 @@ impl Lit {
             _ => LEVEL_GLOW[index - 1].0 / LEVEL_GLOW[index].0,
         }
     }
+
+    /// How bright, from 1 to [`LEVELS`].
+    pub fn level(&self) -> u8 {
+        self.level
+    }
+
+    /// One level brighter, as a share of this light's glow: the next level
+    /// up's over this one's, or at the top only the breath's own rise
+    /// (#7516's swell).
+    pub fn step_up_share(&self) -> f32 {
+        let index = usize::from(self.level.clamp(1, LEVELS)) - 1;
+        match LEVEL_GLOW.get(index + 1) {
+            Some(up) => up.0 / LEVEL_GLOW[index].0,
+            None => (LEVEL_GLOW[index].0 + LEVEL_GLOW[index].1) / LEVEL_GLOW[index].0,
+        }
+    }
 }
 
 /// The quietest and the loudest block that move the face, in dBFS.

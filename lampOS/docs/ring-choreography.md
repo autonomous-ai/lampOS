@@ -521,6 +521,68 @@ light on); Expression's
 `the_nights_sleep_says_asleep_for_the_rings_face_until_it_wakes`
 (`alive_engine.rs`). Not shown on a lamp.
 
+### An update on the ring (#7516)
+
+Whenever the lamp updates, before or after onboarding, the person can see it
+on the ring. With `LAMP_RING_UPDATE=on` in the voice's unit (passed to its
+ring worker only; off unless set), the ring worker reads lamp-update's
+`update/status` (fresh, not stale) and Expression's `expression/state` four
+times a second, on a thread of its own (`ring_update::RingUpdate`), and
+shapes **only the resting frame**, as the night's sleep does. So what
+already decides the ring decides it too: a turn's faces paint over it, the
+privacy switch and a mute blank it, and a shutdown's or reset's warning and
+the unplug picture come first.
+
+| State | When | Look | Numbers |
+|---|---|---|---|
+| Updating | `update/status` says the round brings a newer build (`UpdateStatus::brings_a_build`: `fetching`, `switching`, `watching`, `restoring`, or `checking` with a newer `round.target`) | The resting breath slows and deepens | One breath every 10 s (`BREATH_US`; the plain one is 5.2 s), the face's own breath on that clock, and from level 2 up the whole face goes down to half its light (`BREATH_LOW`) at the breath's low and back. Every pixel in the person's colour, nothing added |
+| Done | Once, after a round ends `switched`, `held` or `self-switched` | One slow swell of the person's own light | Up one level over 1 s, held 0.5 s, back over 1.5 s (3 s in all, `CUE_US`); at level 5 only by its breath's own rise (`Lit::step_up_share`) |
+| Failed or put back | Once, after `rolled-back`, or after `refused` or `failed` for a round this voice saw bringing a build | One slow dip | Down to a third of the light over 1.5 s and back over 1.5 s (`DIP_LOW`). No red: the app says what went wrong |
+
+- **Never brighter than the person's light,** except the done swell's one
+  level, and never a blink. At level 1 the ring is already only a step or
+  two of each channel, and anything dimmer breaks into the patchwork the
+  ember avoids, so there nothing is dimmed: the updating breath only slows,
+  and the failed dip holds the breath out for its 3 s.
+- **Not drawn** while Expression says the lamp is asleep (the night's
+  sleep), over the person's light off (the ember), while a tap's listening
+  face is over the light, or while a light someone asked for holds the
+  ring (a request's colour, pattern, fade or pixels: a skill's, a scene's,
+  a paired computer's). A hand's sleep and the privacy switch stop or blank
+  the ring, so nothing is drawn there either.
+- **A look waits, or is dropped.** One due while the lamp is asleep,
+  muted, talking, or its light off waits, and is drawn once the ring rests
+  on the person's light again, unless 12 hours have passed since the round
+  ended (`DUE_FOR_MS`). One due while a light someone asked for holds the
+  ring is dropped: whoever holds the light keeps it.
+- **Once per round, across restarts.** The switch restarts the voice, so
+  the ring goes dark for a few seconds and the waking face covers most of
+  it. A look is drawn only over a ring that painted its rest the frame
+  before, and only after the round's end (`last.at_unix_ms`, which every
+  saying of the end carries, read back after lamp-update's own restart
+  too) is kept in `/var/lib/lampOS/voice/update-cue`
+  (`{"ended_at_unix_ms": N}`, written beside and renamed, by the reading
+  thread, never the ring's loop). A voice started after it reads the file
+  and draws nothing for that end. A file that can't be written is said in
+  the journal and the look is drawn all the same, once in that voice.
+- **How often a person sees it.** One update shows a few minutes of slow
+  breath while it fetches and installs, then one 3 s look. A build refused
+  before anything is fetched shows nothing, so a lamp that refuses the same
+  build every 15 minutes never dips.
+- **Said in the journal** (`lamp-voice ring: update look: …`), once per
+  change and never per frame: `updating breath shown` (once a round),
+  `done drawn`, `failed drawn`, `… dropped, a light holds the ring`,
+  `… dropped, 12 h after the round`.
+
+Tests: `ring_update`'s
+`a_cue_due_asleep_is_drawn_once_on_waking_and_never_after_12_h` (the first
+builder's ask), `a_look_is_kept_before_it_is_drawn_and_never_drawn_again_after_a_restart`,
+`the_breath_shows_while_a_build_comes_and_one_look_after`,
+`a_failure_dips_only_for_a_round_that_brought_a_build`,
+`a_look_due_while_a_light_holds_the_ring_is_dropped`,
+`its_looks_stay_under_the_light_but_the_one_level_swell` and
+`the_kept_end_reads_back`. Not shown on a lamp.
+
 ### The reset's red (#5929)
 
 While the reset button is held, the ring worker reads its time from
