@@ -885,12 +885,16 @@ impl Days {
     /// [`LIST_MOST`]). A word matches a record's word lower case, without
     /// accents, as its singular, or as the start of a longer one
     /// ("octavia" finds `octaviab@example.com`); small words ("the",
-    /// "that", "did") match nothing.
+    /// "that", "did") match nothing. With `linked_most` (the voice's
+    /// `LAMP_SERVICE_RECORDS_LINKED_TOLD`), past that many linked records
+    /// (any `source_kind` but `voice`) the rest are skipped before the
+    /// limit, so later linked records never push a connector one out.
     pub fn service_records_about(
         &self,
         person: &Person,
         about: &str,
         limit: usize,
+        linked_most: Option<usize>,
     ) -> Result<Vec<Value>> {
         owner_only(person)?;
         let wanted: Vec<String> = folded(about)
@@ -901,9 +905,9 @@ impl Days {
         if wanted.is_empty() {
             return Ok(Vec::new());
         }
-        let mut scored: Vec<(usize, i64, i64, String)> = {
+        let mut scored: Vec<(usize, i64, i64, String, bool)> = {
             let mut statement = self.db.prepare(
-                &format!("SELECT key, {TEXT_SQL}, detail, changed_unix_ms, asked_unix_ms FROM service_records WHERE person=?1"),
+                &format!("SELECT key, {TEXT_SQL}, detail, changed_unix_ms, asked_unix_ms, source_kind!='voice' FROM service_records WHERE person=?1"),
             )?;
             let rows = statement.query_map([person.as_str()], |r| {
                 let mut text: String = r.get(1)?;
@@ -917,11 +921,12 @@ impl Days {
                     text,
                     r.get::<_, i64>(3)?,
                     r.get::<_, i64>(4)?,
+                    r.get::<_, bool>(5)?,
                 ))
             })?;
             let mut scored = Vec::new();
             for row in rows {
-                let (key, text, changed, asked) = row?;
+                let (key, text, changed, asked, linked) = row?;
                 let text = folded(&text);
                 let words: Vec<String> = text
                     .split(|c: char| !c.is_alphanumeric())
@@ -938,15 +943,22 @@ impl Days {
                     })
                     .count();
                 if score > 0 {
-                    scored.push((score, changed, asked, key));
+                    scored.push((score, changed, asked, key, linked));
                 }
             }
             scored
         };
         scored.sort_by(|a, b| (b.0, b.1, b.2, &a.3).cmp(&(a.0, a.1, a.2, &b.3)));
+        if let Some(most) = linked_most {
+            let mut linked = 0;
+            scored.retain(|row| {
+                linked += usize::from(row.4);
+                !row.4 || linked <= most
+            });
+        }
         scored.truncate(limit.min(LIST_MOST));
         let mut found = Vec::new();
-        for (_, _, _, key) in scored {
+        for (_, _, _, key, _) in scored {
             let mut statement = self.db.prepare_cached(&format!(
                 "SELECT {COLUMNS} FROM service_records WHERE person=?1 AND key=?2"
             ))?;
@@ -1623,6 +1635,49 @@ mod tests {
         assert_eq!(listed.len(), 2);
         assert_eq!(listed[0]["key"], "k2");
         assert_eq!(listed[1]["key"], "k1");
+    }
+
+    /// A recall with `linked_most` (the voice's linked records told): ten
+    /// linked records that match as well and changed later than the one
+    /// connector record never push it out of the limit; at most
+    /// `linked_most` linked ones come back (Jarvis's P2 on #7572).
+    #[test]
+    fn a_recalls_linked_most_keeps_room_for_connector_records() {
+        let (scratch, mut store) = Scratch::new("about-linked-most");
+        send(&mut store, put(OWNER, "cal", "done", "", NOW));
+        drop(store);
+        {
+            let db = database(&scratch);
+            for n in 0..10u64 {
+                db.execute(
+                    "INSERT INTO service_records(person,key,service,action,status,asked_unix_ms,changed_unix_ms,source_kind,source_ref,summary) VALUES(?1,?2,'lamp_tasks','task_settled','done',?3,?3,'task','{\"service\":\"s\",\"id\":\"i\"}',?4)",
+                    rusqlite::params![
+                        OWNER,
+                        format!("t{n}"),
+                        (NOW + 1 + n) as i64,
+                        format!("Hamburger party plan {n}")
+                    ],
+                )
+                .unwrap();
+            }
+        }
+        let mut store = scratch.open();
+        let found = send(
+            &mut store,
+            json!({"op":"service_records","person":OWNER,"about":"the hamburger party","limit":10,"linked_most":3}),
+        );
+        let found = found["records"].as_array().expect("records").clone();
+        assert!(found.iter().any(|r| r["key"] == "cal"), "{found:?}");
+        let linked = found.iter().filter(|r| r["source_kind"] != "voice");
+        assert_eq!(linked.count(), 3, "{found:?}");
+        // Without it, as before: the ten later linked records fill the ten.
+        let found = send(
+            &mut store,
+            json!({"op":"service_records","person":OWNER,"about":"the hamburger party","limit":10}),
+        );
+        let found = found["records"].as_array().unwrap();
+        assert_eq!(found.len(), 10);
+        assert!(found.iter().all(|r| r["key"] != "cal"), "{found:?}");
     }
 
     /// A linked put: `kind` with a source and a summary, done at `deed`.

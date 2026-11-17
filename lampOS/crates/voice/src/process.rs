@@ -1196,6 +1196,10 @@ fn worker_command(
             role,
             var(crate::service_records::sdk_counts::ENVIRONMENT).as_deref(),
         ))
+        .envs(service_records_linked_told_worker_environment(
+            role,
+            var(crate::service_records::told::LINKED_ENVIRONMENT).as_deref(),
+        ))
         .envs(service_read_ids_worker_environment(
             role,
             var(crate::service_read_ids::ENVIRONMENT).as_deref(),
@@ -1968,6 +1972,18 @@ fn service_records_sdk_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::service_records::sdk_counts::ENVIRONMENT, "on"))
+}
+
+// Linked records told (the linked-service memory plan, slice 8), passed
+// the same narrow way: the exact `on`, to the second route alone, where
+// the records are told. It acts only beside `LAMP_SERVICE_RECORDS_TOLD`
+// (`service_records::told::linked_on`).
+fn service_records_linked_told_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_records::told::LINKED_ENVIRONMENT, "on"))
 }
 
 // A calendar read's event ids kept for the next request (tracker row
@@ -3550,6 +3566,12 @@ mod tests {
                         "LAMP_SERVICE_RECORDS_REMINDERS",
                         ["second"].as_slice(),
                     ),
+                    // Linked records told: the second route alone.
+                    (
+                        service_records_linked_told_worker_environment,
+                        "LAMP_SERVICE_RECORDS_LINKED_TOLD",
+                        ["second"].as_slice(),
+                    ),
                     // A record's source fetched: the second route alone.
                     (
                         service_records_source_worker_environment,
@@ -4074,6 +4096,7 @@ mod tests {
                     crate::service_records::source::ENVIRONMENT,
                     crate::service_records::agent_rows::ENVIRONMENT,
                     crate::service_records::sdk_counts::ENVIRONMENT,
+                    crate::service_records::told::LINKED_ENVIRONMENT,
                     crate::service_read_ids::ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::keep_quietly::ENVIRONMENT,
@@ -4530,6 +4553,7 @@ mod tests {
                     "LAMP_SERVICE_READ_IDS_KEPT=on",
                     "LAMP_SERVICE_RECORDS=on",
                     "LAMP_SERVICE_RECORDS_AGENT=on",
+                    "LAMP_SERVICE_RECORDS_LINKED_TOLD=on",
                     "LAMP_SERVICE_RECORDS_REMINDERS=on",
                     "LAMP_SERVICE_RECORDS_SDK=on",
                     "LAMP_SERVICE_RECORDS_SOURCE=on",
