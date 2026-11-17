@@ -1390,7 +1390,7 @@ fn serve(
                 // read as no query, the latest (build 10300's refused round
                 // on lamp-9adf, 5 Nov). Its name alone, never the query.
                 for skill in skills.iter().filter(|skill| {
-                    skill.made_refuses().is_some() && order_said.insert(skill.name.clone())
+                    skill.read_refuses().is_some() && order_said.insert(skill.name.clone())
                 }) {
                     eprintln!(
                         "lamp-skills: {}: its read's query is an order, read as no query: the latest",
@@ -6541,6 +6541,7 @@ mod tests {
                 priority: 5,
                 expires_ms: 60_000,
                 question,
+                count: None,
             })
         };
         let first = say_ask(&words(true), true, false).unwrap();
@@ -7593,6 +7594,7 @@ mod tests {
             priority: 5,
             expires_ms: 60_000,
             question: false,
+            count: None,
         });
         let ask = say_ask(&words, true, true).unwrap();
         assert_eq!(
@@ -7621,6 +7623,7 @@ mod tests {
                 priority: 8,
                 expires_ms: 60_000,
                 question: false,
+                count: None,
             })
         };
         assert_eq!(say_ask(&note, true, false).unwrap()["who"], true);
@@ -7786,6 +7789,7 @@ mod tests {
                 priority: 8,
                 expires_ms: 3_600_000,
                 question: false,
+                count: None,
             }),
             Call::Words(lamp_skills::Words {
                 words: "Greet them briefly.".into(),
@@ -7793,6 +7797,7 @@ mod tests {
                 priority: 8,
                 expires_ms: 3_600_000,
                 question: false,
+                count: None,
             }),
             Call::Cue,
         ] {
