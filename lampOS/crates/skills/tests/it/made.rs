@@ -531,6 +531,69 @@ fn a_made_skill_goes_on_through_the_helper_with_no_yes() {
     assert_eq!(again.as_deref(), Ok("evening-dim"));
 }
 
+/// End to end (#7445): a made skill turned off and back on by voice is
+/// turned by the real manage helper exactly as the app's switch turns it
+/// (`lamp_voice::made_turn::turned_by_helper`, its own `{"off": NAME}`
+/// and `{"on": NAME}`): kept in the state folder's `off`, then taken out
+/// of it, the skill still on the lamp and still made, never removed.
+#[test]
+fn a_made_skill_is_turned_off_and_on_by_voice_as_the_apps_switch() {
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    let state = dir.path().join("state");
+    fs::create_dir_all(&skills).unwrap();
+    fs::create_dir_all(&state).unwrap();
+    let made = keep(&answer(TOML, "evening-dim"), false, "local:7", &keeping).unwrap();
+    let socket = dir.path().join("manage.sock");
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    let (served, helper_made, helper_state) =
+        (skills.clone(), keeping.directory.clone(), state.clone());
+    let helper = std::thread::spawn(move || {
+        (0..3)
+            .map(|_| {
+                let (stream, _) = listener.accept().unwrap();
+                asked_helper(
+                    &served,
+                    &helper_made,
+                    &helper_state,
+                    std::time::Duration::from_secs(2),
+                    None,
+                    None,
+                    &stream,
+                    &stream,
+                )
+                .unwrap()
+            })
+            .collect::<Vec<bool>>()
+    });
+    let on = lamp_voice::made_skill::put_on_within(
+        &keeping.directory,
+        &socket,
+        &made.sha256,
+        now_ms(),
+        std::time::Duration::from_secs(60),
+    );
+    assert_eq!(on.as_deref(), Ok("evening-dim"));
+    lamp_voice::made_turn::turned_by_helper(&socket, "evening-dim", true).unwrap();
+    assert_eq!(
+        fs::read_to_string(state.join(lamp_skills::OFF_FILE)).unwrap(),
+        "evening-dim\n"
+    );
+    assert!(skills.join("evening-dim").join("skill.toml").is_file());
+    lamp_voice::made_turn::turned_by_helper(&socket, "evening-dim", false).unwrap();
+    assert_eq!(
+        fs::read_to_string(state.join(lamp_skills::OFF_FILE)).unwrap(),
+        ""
+    );
+    assert_eq!(helper.join().unwrap(), [true, true, true]);
+    assert!(skills.join("evening-dim").join("skill.toml").is_file());
+    assert!(
+        lamp_voice::made_skill::kept_on_named(&keeping.directory, "evening-dim").is_some(),
+        "still made"
+    );
+}
+
 /// The manage helper puts a made skill on only as the voice's own
 /// `put_on` marks it: within `GOES_ON_WITHIN` of its mark, by the helper's
 /// clock, and not on already. A kept one never marked, one marked too long

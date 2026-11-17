@@ -1334,7 +1334,8 @@ sau:
    tên đã có một tên trống trước khi đóng gói, ở trên), hoặc bị từ chối vì lý do khác ("the lamp's check
    didn't let it on"). Không bao giờ chạy khi chưa bật `LAMP_MAKE_SKILL`.
    Việc gỡ một kỹ năng đã tạo (gỡ trong ứng dụng, hoặc `{"off": NAME}`) vẫn
-   như cũ; bằng giọng nói, xem "Gỡ bằng giọng nói" bên dưới.
+   như cũ; bằng giọng nói, xem "Gỡ bằng giọng nói" và "Tắt và bật lại bằng
+   giọng nói" bên dưới.
 9. **Thời gian chờ** (P3 của Reviewer-lead trên #4914): lời gọi giữ lượt tối
    đa 30 giây một lần hỏi, với một lần thử lại sau lỗi; các lần sửa sau khi
    bị từ chối chỉ bắt đầu khi thêm một lần hỏi vẫn kết thúc trong
@@ -1701,6 +1702,63 @@ Kiểm thử: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact
 `a_yes_after_remove_moon_fact_is_forced_and_removes_it`,
 `a_no_after_remove_moon_fact_keeps_it`,
 `no_force_before_the_question_is_said_whole`.
+
+**Tắt và bật lại bằng giọng nói** (#7445, chỉ khi bật
+`LAMP_MADE_SKILL_OFF_SAID`: trên lamp-9adf, bản 13252, "Lamp, turn off the
+coffee time skill" gọi `remove` của `make_skill`, động từ duy nhất nó có cho
+một kỹ năng đã tạo, và đèn hỏi "Remove coffee time?": một câu "có" sẽ làm
+mất hẳn kỹ năng). Kỹ năng do người dùng tạo được tắt, tạm dừng hay ngưng qua
+chính `make_skill`, chỉ với `turn_off`, và bật lại chỉ với `turn_on`: tên
+như đã nghe (`made_turn::TURN_OFF`, `made_turn::TURN_ON`), là tham số của
+hàm giọng nói đã có, như việc gỡ. Một câu xin điều nào là do mô hình phán
+đoán, không bao giờ theo danh sách từ: câu cuối của mô tả hàm thành "To
+turn off, pause or stop one they made: turn_off alone, never remove; back
+on: turn_on; delete: remove; run now: run; list: made; say nothing first."
+(`make_skill_local::TURN_OFF_TOLD`, cùng số byte với câu nó thay, nên khi
+bật mọi công tắc vẫn nằm trong 1.024 byte của liên kết), tham số
+`turn_off` nói "turn off, pause or stop a skill they made, which keeps it
+to turn back on ... Never remove for this", và tham số `remove` nói "delete
+or remove a skill for good, never to turn one off, pause or stop it". Lời
+gọi mang một yêu cầu tắt được đọc trước việc gỡ, nên tắt không bao giờ
+thành gỡ. Sau đó, trong code (`made_turn::asked`):
+- **Chỉ của chủ đèn, và được nói ra.** Một lượt không ai nói thì không đổi
+  gì; một câu không phải của chủ (`services::owner_hears`, như khi chạy)
+  không đổi gì và không nêu tên kỹ năng nào ("only the lamp's owner can
+  turn a skill they made off or on by voice").
+- **Chỉ kỹ năng của chính người đó.** Tên được khớp như khi gỡ
+  (`made_remove::found`); một kỹ năng họ không tạo, vài kỹ năng gần như
+  nhau, hay không có cái nào gần, đều được nói ra, như khi chạy. Một kỹ
+  năng hiện không có trên đèn, hoặc thư mục của nó ở đó không phải gói đã
+  tạo, được nói là không tắt/bật, và vì sao.
+- **Như công tắc của ứng dụng.** Nó được tắt hay bật bằng chính
+  `{"off": NAME}` hoặc `{"on": NAME}` của helper quản lý
+  (`made_turn::turned_by_helper`), đúng những dòng mà công tắc trong ứng
+  dụng gửi (`skills.off` và `skills.on` của `lamp-cloud`), lưu trong tệp
+  `off` của lamp-skills, được giữ qua một vòng cập nhật và một lần khởi
+  động lại. Nó vẫn là kỹ năng đã tạo, vẫn trên đèn, và không có gì phải
+  chờ: không cần "có", vì không mất gì và "turn it back on" hoàn tác nó.
+  Mô hình được bảo nói, vài từ, bằng ngôn ngữ của cuộc trò chuyện, rằng
+  NAME đã tắt và họ có thể nói bật lại bất cứ lúc nào ("Coffee time is off.
+  Say turn it back on whenever you like."), không bao giờ nói là đã gỡ;
+  hoặc rằng NAME đã bật lại. Một lần bị từ chối được nói là không tắt/bật,
+  và vì sao.
+- **Gỡ vẫn hỏi trước.** "Remove coffee time?" và câu "có" của chủ đèn, như
+  ở trên (#6960).
+- **Không thêm vòng gọi nào.** Việc khớp đọc hai thư mục cục bộ, rồi một
+  dòng tới helper quản lý qua socket cục bộ của nó, tối đa 8 giây.
+
+Khi tắt (chưa đặt, hoặc khác `on`), mô tả và tham số của `make_skill`, và
+mọi câu trả lời, giữ nguyên từng byte như trước.
+
+Kiểm thử: `made_turn::tests::turn_off_sets_the_off_state_and_removes_nothing`,
+`turn_on_clears_the_off_state`, `the_helper_is_asked_the_apps_off_and_on`,
+`a_stranger_cant_turn_one_off_or_on`,
+`only_their_own_made_skill_on_the_lamp_is_turned`,
+`a_refusal_is_said_not_turned`, `switch_off_is_byte_for_byte_as_before`,
+`switch_on_tells_a_turn_off_from_a_remove_within_the_bounds`,
+`remove_still_waits_for_its_yes`; và
+`made::a_made_skill_is_turned_off_and_on_by_voice_as_the_apps_switch` của
+lamp-skills, qua helper quản lý thật.
 
 **Liệt kê bằng giọng nói** (lamp-9adf, 15/11, bản 13162: "which skills have
 you made for me?" không gọi hàm nào và được trả lời từ vài lượt gần nhất,

@@ -820,8 +820,10 @@ pub const MADE_CANT_CHECK: &str = "The lamp can't check its other skills right n
 /// down?" called `make_skill` for the list of those they made, and a skill
 /// added from a file was said not to be there): the list of those they
 /// made (`made`), whatever it says, and a run, a remove or a read-back
-/// (`run`, `remove`, `read_back`) that refused, found none or found another
-/// (`error`) with no yes awaited. Never a make, a clash's choice or a yes.
+/// (`run`, `remove`, `read_back`), or with `LAMP_MADE_SKILL_OFF_SAID` on a
+/// turn off or on (`turn_off`, `turn_on`, #7445), that refused, found none
+/// or found another (`error`) with no yes awaited. Never a make, a clash's
+/// choice or a yes.
 pub fn tells_their_skills(args: &Value, told: &Value) -> bool {
     if *told == crate::tools::unavailable() {
         return false;
@@ -835,7 +837,12 @@ pub fn tells_their_skills(args: &Value, told: &Value) -> bool {
         crate::make_skill_local::READ_BACK,
     ]
     .iter()
-    .any(|key| args[*key].is_string());
+    .any(|key| args[*key].is_string())
+        // A turn-off or a turn back on (#7445), with its switch on alone.
+        || (crate::made_skill::off_said_on()
+            && [crate::made_turn::TURN_OFF, crate::made_turn::TURN_ON]
+                .iter()
+                .any(|key| args[*key].is_string()));
     named
         && told.get("error").is_some()
         && told.get(crate::skill_write_yes::APPROVE_ID).is_none()
