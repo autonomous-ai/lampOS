@@ -212,8 +212,52 @@ class Writers(unittest.TestCase):
             self.assertEqual(cli("READ-OK %s no row needed" % EARLIER, HEAD, EARLIER), "no-row-needed")
             self.assertEqual(cli("READ-OK %s no row needed" % EARLIER, HEAD), "none")
             self.assertEqual(cli("READ-OK %s no row needed" % HEAD, "--switch-on", HEAD), "none")
+            self.assertEqual(cli("ROW #7016 %s" % OTHER + WHOLE, "--switch-on", HEAD), "row-stale " + OTHER[:10])
+            self.assertEqual(cli("ROW #7016 %s" % HEAD + WHOLE, "--switch-on", HEAD), "row")
         finally:
             os.unlink(path)
+
+
+# 17 Nov (train 1009, #7364): a switch-on's ROW that names a commit counts only at the head or an earlier same-patch head.
+class SwitchOnHead(unittest.TestCase):
+    def test_the_1009_case_is_stale(self):
+        head = "467781a23991c56cfbc6ba37578188494a23950c"
+        body = "ROW #7364 9e6e84abcd5107f471e0e27592cd1ebd0228e145 on lamp-9adf build 13252: PASS" + J
+        self.assertEqual(rows([c("writer-a", body)], head, W, "7364", switch_on=True), "row-stale 9e6e84abcd")
+
+    def test_a_row_at_the_head_or_a_same_patch_head_counts(self):
+        for sha in (HEAD, HEAD[:10], EARLIER, EARLIER[:7]):
+            self.assertEqual(rows([c("writer-a", "ROW #7016 %s" % sha + WHOLE)], [HEAD, EARLIER], W, "7016", switch_on=True),
+                             "row", sha)
+
+    def test_another_patchs_commit_is_stale_in_every_form(self):
+        for body in ("ROW #7016 %s" % OTHER, "ROW 7016 %s" % OTHER[:10], "**ROW #7016** `%s`" % OTHER[:12],
+                     "**ROW #7016 %s**" % OTHER, "ROW #7016 at %s" % OTHER[:10]):
+            self.assertEqual(rows([c("writer-a", body + WHOLE)], HEAD, W, "7016", switch_on=True),
+                             "row-stale " + OTHER[:10], body)
+
+    def test_a_row_naming_no_commit_counts_as_before(self):
+        for body in ("ROW #7016", "ROW 7016:", "**ROW** #7016", "ROW #7016 12701"):
+            self.assertEqual(rows([c("writer-a", body + WHOLE)], HEAD, W, "7016", switch_on=True), "row", body)
+
+    def test_a_newer_row_at_the_head_lifts_a_stale_one(self):
+        stale = c("writer-a", "ROW #7016 %s" % OTHER + WHOLE)
+        self.assertEqual(rows([stale, c("writer-b", "ROW #7016 %s" % HEAD + WHOLE)], HEAD, W, "7016", switch_on=True), "row")
+        self.assertEqual(rows([stale, c("writer-b", "Fifth, 09:51 GMT+7: lamp row for #7016" + WHOLE)], HEAD, W, "7016",
+                              switch_on=True), "row")
+
+    def test_a_stale_row_is_not_a_part_short_row(self):
+        # An incomplete row at the head says what it lacks; a stale one alone says it is stale.
+        stale = c("writer-a", "ROW #7016 %s" % OTHER + WHOLE)
+        self.assertEqual(rows([stale, c("writer-b", "ROW #7016 %s on build 12701" % HEAD)], HEAD, W, "7016", switch_on=True),
+                         "row-incomplete lamp,journal")
+
+    def test_a_failed_stale_row_is_no_row(self):
+        body = "ROW #7016 %s on lamp-52e6 build 12701: FAIL" % OTHER + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7016", switch_on=True), "none")
+
+    def test_without_a_switch_on_nothing_changes(self):
+        self.assertEqual(rows([c("writer-a", "ROW #7016 %s" % OTHER + WHOLE)], HEAD, W, "7016"), "row")
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@
 #                  prefix of one), saying "no row needed" (docs, tests, or code behind a switch that's off);
 #   row-incomplete MISSING  a row of this PR (and no "no row needed" that carries it) that lacks lamp, build or journal
 #                  (15:40 below), MISSING the parts it lacks, comma-separated ("lamp,journal");
+#   row-stale SHA  with --switch-on, only whole rows whose ROW line names another patch's commit, SHA (17 Nov below);
 #   none           neither.
 # A ROW, a "lamp row for" or a "no row needed" on a quoted line ("> …") or inside a fenced code block is someone else's
 # text and never counts (markers.py's quoted). Only comments from writers count (markers.py's --writers /
@@ -31,6 +32,13 @@
 # with at least one digit (c0a4, 52e6, 06c1, 4ace, 75c9, cb94, 9adf, a0ae, 0c89), so a part's name (lamp-body,
 # lamp-eyes, lamp-seen, lamp-test) is none; and a build's five digits follow "build", "installed" or "on" (bold or
 # backticks between: "installed **12987**", "on 13000"), so a bare number ("20000 counts", "12345 ms") is none.
+# 17 Nov (the first builder, train 1009): #7364, a switch-on, rode on a ROW at 9e6e84abcd while its head was 467781a239,
+# another patch, because a ROW was matched by its PR's number alone. With --switch-on, a ROW line that names a commit
+# right after its PR's number ("ROW #7364 9e6e84abcd… on lamp-9adf …") counts only if that commit is one of the heads
+# (the head, or an earlier head with the same patch), as a READ-OK's does. A whole row naming another patch's commit is
+# stale: its row ran on other code, and a carry is said by posting the ROW again at the head. A row short of a part says
+# what it lacks first, as before. A ROW line that names no commit, and Fifth's "lamp row for #N", count as before;
+# without --switch-on nothing changes.
 import json, os, re, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -53,6 +61,17 @@ def lamp_row_re(pr):
 def row_line_re(pr):
     """ROW, then this PR's number, with or without "#" (bold allowed around either)."""
     return re.compile(r"\**ROW\b\**[ \t]+\**#?%s(?![\d])" % re.escape(str(pr)))
+
+
+# The commit a ROW line names right after its PR's number (bold, a backtick or "at" allowed before it).
+NAMED_SHA = re.compile(r"\**[ \t]+(?:at[ \t]+)?[*`]*([0-9a-f]{7,40})(?![0-9A-Za-z])")
+
+
+def named_sha(body, pr):
+    """The commit a ROW line names after its PR's number, or None when it names none."""
+    m = row_line_re(pr).match(body)
+    s = NAMED_SHA.match(body, m.end()) if m else None
+    return s.group(1) if s else None
 
 
 def failed(body):
@@ -114,18 +133,26 @@ def rows(items, heads, writers, pr=None, switch_on=False):
     patch. switch_on: the PR turns a switch on, so "no row needed" doesn't carry it. Returns "row", "no-row-needed",
     "row-incomplete <parts>" (the newest incomplete row's) or "none"."""
     heads = [heads] if isinstance(heads, str) else [h for h in heads if h]
-    found, short = "none", None
+    found, short, stale = "none", None, None
     for c in items:
         if c.get("pr_body") or not is_writer(c, writers):
             continue
         lacks = has_row(c, pr)
+        # A whole row of a switch-on at another patch is stale; one short of a part says what it lacks first.
+        if lacks == [] and switch_on:
+            sha = named_sha(c["body"].lstrip(), pr)
+            if sha and not names_commit(sha, heads):
+                stale = sha
+                continue
         if lacks == []:
             return "row"
         if lacks:
             short = lacks
         if not switch_on and says_no_row(c, heads):
             found = "no-row-needed"
-    return "row-incomplete " + ",".join(short) if found == "none" and short else found
+    if found == "none" and short:
+        return "row-incomplete " + ",".join(short)
+    return "row-stale " + stale[:10] if found == "none" and stale else found
 
 
 def main():
