@@ -122,6 +122,7 @@ connected apps.
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
 | `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
 | `LAMP_CALENDAR_EDITS=on` (on in the product's `lamp-services.service` since 11 Nov) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_event` and `delete_event` answer "changing or cancelling a calendar event is off on this lamp" before anything is read, held or sent, and `tools.json` lists only `create_event` for Google Calendar ("Changing or cancelling a calendar event", below) |
+| `LAMP_CALENDAR_EVENT_SEARCH=on` (tracker row C132; off in the product until its lamp check) | `lamp-services`, with `LAMP_CALENDAR_EDITS=on` | A Calendar `events` read takes no words: a `query` is ignored, and the read lists the next events from its start, so an event weeks away or behind a busy day is never found to move or cancel ("Finding an event to move or cancel", below) |
 | `LAMP_GMAIL_DRAFT_EDITS=on` (off in the product until its lamp check) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_draft` and `delete_draft` are unknown actions, answered with Gmail's list of writes as any other ("gmail writes: send_mail …, save_draft …") before anything is read, held or saved, and `tools.json` lists only `send_mail` and `save_draft` for Gmail ("Changing or deleting a saved Gmail draft", below) |
 | `LAMP_SERVICES_LINKED_TOOLS=on` (#6218, off in the product until its rows) | `lamp-services` | `tools.json` names every service the lamp can link, linked or not, with every read's and write's fields (about 7.8 KB of the voice's request). On, it names only the linked ones: their codes in the `service` enums, their lines in what each reads and writes, and only the fields those lines name (`service`, `what`, `action`, `send_id`, `said` always). A read or a write no linked service has is left out, so with nothing linked the voice is offered `services_connected` alone, which still says what the lamp can link. It is written at start and again after each link, unlink and wipe on the admin socket, one write at a time under a lock (the newest list always wins, and the file is never torn), and the voice reads it for each request, so a link counts from the next turn. Measured offline on the product's spoken turn: 49,064 B with every service, 46,522 B with Gmail and Calendar, 45,539 B with Gmail alone, 43,249 B with nothing linked. **Off in every product unit until a privacy condition is met (#6476 read):** the file is declared on every request, whoever speaks, so with the switch on a guest's line, the room's, a held one, an app text and a scheduled turn would see the linked codes, where "The voice is told what is linked" keeps them to the owner's line. It is turned on only after non-owner lines are given the whole catalog (or `services_connected` alone), or after the memory and privacy owner accepts in writing that linked names reach every line, with this row saying so |
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
@@ -1234,6 +1235,43 @@ them within the 1,024 bytes its link takes.
   was deleted or changed there, and nothing was changed. Say it's no longer
   there, and offer to create it again with create_event." (after "not sent:
   " on a send). Nothing is held.
+
+### Finding an event to move or cancel (`LAMP_CALENDAR_EVENT_SEARCH`)
+
+Tracker row C132. An event made in an earlier conversation has no
+`event_id` in the talk, so "cancel my dentist" reads the calendar first,
+and a Calendar `events` read took no words: it listed the next events from
+its start, at most 10, and `LAMP_SERVICE_READ_IDS_KEPT` keeps only the
+first 5. An event weeks away, or behind a busy day, was never in the list.
+
+Off unless `LAMP_CALENDAR_EVENT_SEARCH=on` and `LAMP_CALENDAR_EDITS=on` in
+`lamp-services` (off in the product until its lamp check). On, a Google
+Calendar `events` read may carry `query`, the person's words (one line, at
+most 300 characters, as Gmail's and Drive's searches take them), asked as
+Calendar's own `q` (`reads::plan_with`):
+
+- **A bounded window.** From the asked `from`, or now, never more than a day
+  ago (`reads::EVENT_SEARCH_BACK_SECS`), to the asked `to`, or 90 days after
+  that start, never later (`reads::EVENT_SEARCH_AHEAD_SECS`); both sent in
+  UTC, the answer still in the lamp's own zone. An end before its start is
+  refused before Calendar is asked (`reads::EVENT_SEARCH_WINDOW`).
+- **Without words** a read is as before, switch on or off. Off, a `query`
+  changes nothing.
+- **What the model is told.** `tools.json`'s `query` field says it, for
+  `google_calendar` events, is the person's words for the one event to move
+  or cancel (`reads::CALENDAR_SEARCH_QUERY`); the read's own description,
+  at its 1,024 bytes, is unchanged. With `LAMP_SERVICES_LINKED_TOOLS` on and
+  only the calendar linked, the read keeps its `query` field.
+- **Everything else stays.** The read is a read: owner-only as every
+  service read, quoted as data, and the after-read rule ("After a read",
+  below) still refuses a write in its own request. With
+  `LAMP_SERVICE_READ_IDS_KEPT` on, the events it finds are kept for the
+  asker's next request (id, calendar, title, time, the first 5), so "yes,
+  cancel it" names the event by its id, and the edit is read from Google,
+  read back and sent on a yes as above. Calendar's `q` also matches an
+  event's description, place or guests, but only id, title and time are
+  kept or told. The words reach only the owner's own linked calendar, and
+  nothing new is stored.
 
 ### Changing or deleting a saved Gmail draft (`LAMP_GMAIL_DRAFT_EDITS`)
 

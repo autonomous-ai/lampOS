@@ -595,6 +595,7 @@ fn the_field_names_draft_edits_only_when_listed() {
             lamp_services::tools::Edits {
                 calendar: true,
                 drafts,
+                ..Default::default()
             },
         )
         .unwrap();

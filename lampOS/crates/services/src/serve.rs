@@ -362,6 +362,11 @@ pub struct Services<H, M> {
     /// `LAMP_CALENDAR_EDITS=on`: a Google Calendar event may be changed or
     /// cancelled by its id, read back and sent as any write.
     pub calendar_edits: bool,
+    /// `LAMP_CALENDAR_EVENT_SEARCH=on` (tracker row C132), with
+    /// [`Services::calendar_edits`]: a Google Calendar `events` read may
+    /// search by the person's words over a bounded window
+    /// (`reads::plan_with`).
+    pub calendar_event_search: bool,
     /// `LAMP_GMAIL_DRAFT_EDITS=on`: a saved Gmail draft may be changed or
     /// deleted by its id, read back and saved as any draft.
     pub draft_edits: bool,
@@ -485,6 +490,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             skill_write_agent: false,
             fixed_runs: Mutex::new(std::collections::VecDeque::new()),
             calendar_edits: false,
+            calendar_event_search: false,
             draft_edits: false,
             linked_tools: None,
             linked_tools_write: Mutex::new(()),
@@ -799,6 +805,12 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// With `LAMP_CALENDAR_EDITS` as `on` gives it.
     pub fn with_calendar_edits(mut self, on: bool) -> Self {
         self.calendar_edits = on;
+        self
+    }
+
+    /// With `LAMP_CALENDAR_EVENT_SEARCH` as `on` (and calendar edits) gives it.
+    pub fn with_calendar_event_search(mut self, on: bool) -> Self {
+        self.calendar_event_search = on;
         self
     }
 
@@ -1878,8 +1890,14 @@ impl<H: Http, M: Mail> Services<H, M> {
                 }
             });
         }
-        let plan = reads::plan(service.code, args, &entry, crate::now_secs())
-            .map_err(|why| (Stage::Asked, why))?;
+        let plan = reads::plan_with(
+            service.code,
+            args,
+            &entry,
+            crate::now_secs(),
+            self.calendar_event_search,
+        )
+        .map_err(|why| (Stage::Asked, why))?;
         self.read_planned(service, &entry, plan, asker)
             .await
             .map(|quoted| reads::drive_none_told(service.code, args, quoted))
@@ -7313,6 +7331,31 @@ mod tests {
         );
         assert_eq!(create["ok"], true, "{create}");
         assert!(services.desk.waiting());
+    }
+
+    /// Tracker row C132: with `LAMP_CALENDAR_EVENT_SEARCH` on, the
+    /// services' calendar read asks Calendar for the person's words over a
+    /// bounded window; off, the same read asks as it always did.
+    #[test]
+    fn a_calendar_read_searches_by_words_only_with_its_switch() {
+        let read = json!({"service":"google_calendar","what":"events","query":"dentist"});
+        for search in [false, true] {
+            let dir = tempfile::tempdir().unwrap();
+            let services =
+                calendar(dir.path(), EVENTS_SCOPE, true).with_calendar_event_search(search);
+            services.http.answer(200, r#"{"items":[]}"#);
+            let answer = run(services.tool(&read_line(read.clone())));
+            assert_eq!(answer["ok"], true, "{answer}");
+            let calls = services.http.calls();
+            assert_eq!(calls.len(), 1, "{calls:?}");
+            let url = &calls[0].url;
+            assert!(
+                url.starts_with("https://www.googleapis.com/calendar/v3/calendars/primary/events?"),
+                "{url}"
+            );
+            assert_eq!(url.contains("&q=dentist"), search, "{url}");
+            assert_eq!(url.contains("&timeMax="), search, "{url}");
+        }
     }
 
     /// Gmail linked with an app password, writes on and its draft edits as
