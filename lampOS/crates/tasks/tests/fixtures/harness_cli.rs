@@ -306,18 +306,28 @@ pub fn main() -> io::Result<()> {
 /// cannot continue) moves to `closed`, so `wait --after` still finds the
 /// input it took. A token is checked as the daemon checks it: a regular
 /// file, not a link, opened once and its open file's metadata read, owned
-/// by the caller, mode 0600 exactly, and 32 bytes or more once surrounding
-/// whitespace is taken off; only its SHA-256 is kept.
+/// by the caller, no group or other permission bits (so 0600 and 0400
+/// pass), and 32 bytes or more once surrounding whitespace is taken off;
+/// only its SHA-256 is kept. A taken input is `program:<uuid v4>` with
+/// `takenAt` in ISO-8601 UTC, as Harness p4393.4 says on a lamp.
 ///
 /// What a test drives, from the step: `ensure` with `"starting": true`
-/// leaves the engine starting (`ensure` never refuses `ENGINE_NOT_READY`;
-/// `reply` does, unless its step says `"ready": true`); with `"why": TEXT`
+/// leaves the engine starting, and `reply` refuses `ENGINE_NOT_READY`
+/// unless its step says `"ready": true`; `ensure` with `"not_ready": true`
+/// refuses `ENGINE_NOT_READY` itself, as while a crashed engine is still
+/// exiting, and changes nothing; with `"crashed": true` the engine of a
+/// live session crashed and the same id is resumed, never a new one; with
+/// `"engine_session": TEXT` a hermes engine has reported its id (until then
+/// hermes says `null`; openclaw always says `agent:main:harness-<id>`);
+/// with `"why": TEXT`
 /// the engine cannot continue a closed session and a new one starts; with
 /// `"daemon_start_ms": N` the daemon was down and started in N ms. `reply`
 /// with `"timeout": "cancelled"` types nothing, with `"timeout": "typed"`
 /// types and is not seen to start. `wait` with `"ends": "person" |
 /// "stopped" | "timeout"` ends so. `"exits": {"CODE": N}` sets a refusal's
-/// exit.
+/// exit. Without a token, `ensure`, `resume`, `reply` and `close` on a
+/// program-owned harness are `NOT_YOURS`; `resume` is answered only to
+/// refuse.
 mod program {
     use serde_json::{Value, json};
     use sha2::{Digest, Sha256};
@@ -426,7 +436,7 @@ mod program {
             refusal(
                 "BAD_TOKEN_FILE",
                 format!(
-                    "{path}: {why}. A program token file is a regular file of yours, mode 0600, holding 32 or more bytes."
+                    "{path}: {why}. A program token file is a regular file of yours, with no group or other permissions, holding 32 or more bytes."
                 ),
             )
         };
@@ -444,9 +454,11 @@ mod program {
         if meta.uid() != rustix::process::geteuid().as_raw() {
             return Err(bad("it is not owned by you"));
         }
-        if meta.mode() & 0o777 != 0o600 {
+        // As upstream: only group or other bits are refused, so 0400 and
+        // 0600 both pass.
+        if meta.mode() & 0o077 != 0 {
             return Err(bad(&format!(
-                "its mode is {:o}, not 0600",
+                "its mode is {:o}, open to group or others",
                 meta.mode() & 0o777
             )));
         }
@@ -467,6 +479,30 @@ mod program {
             .collect())
     }
 
+    fn not_yours(name: &str) -> Refusal {
+        refusal(
+            "NOT_YOURS",
+            format!("\"{name}\" is not a harness this token owns."),
+        )
+    }
+
+    /// The token's SHA-256 ([`token_hash`]); with no token given, `NOT_YOURS`
+    /// for a harness `name` a program owns.
+    fn hash_for(state: &Value, args: &[String], name: Option<&str>) -> Result<String, Refusal> {
+        if flag(args, "--program-token-file").is_none()
+            && let Some(name) = name
+            && state["sessions"].get(name).is_some()
+        {
+            return Err(refusal(
+                "NOT_YOURS",
+                format!(
+                    "\"{name}\" is owned by a program; this call gave no --program-token-file."
+                ),
+            ));
+        }
+        token_hash(args)
+    }
+
     /// The program's harness `name`: `UNKNOWN_HARNESS` when there is none,
     /// `NOT_YOURS` when another token holds it.
     fn owned<'a>(state: &'a mut Value, name: &str, hash: &str) -> Result<&'a mut Value, Refusal> {
@@ -479,12 +515,54 @@ mod program {
             )
         })?;
         if session["tokenSha256"] != hash {
-            return Err(refusal(
-                "NOT_YOURS",
-                format!("\"{name}\" is not a harness this token owns."),
-            ));
+            return Err(not_yours(name));
         }
         Ok(session)
+    }
+
+    /// A taken input's id as Harness gives it: `program:` and a random
+    /// UUID v4.
+    fn input_id() -> io::Result<String> {
+        let mut bytes = [0u8; 16];
+        getrandom::fill(&mut bytes).map_err(|_| io::Error::other("no random bytes"))?;
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+        Ok(format!(
+            "program:{}-{}-{}-{}-{}",
+            &hex[..8],
+            &hex[8..12],
+            &hex[12..16],
+            &hex[16..20],
+            &hex[20..]
+        ))
+    }
+
+    /// Now as JavaScript's `toISOString` writes it,
+    /// `2026-11-17T04:59:27.216Z`.
+    fn iso_now() -> String {
+        let since = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default();
+        let (secs, millis) = (since.as_secs() as i64, since.subsec_millis());
+        let (days, of_day) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
+        // A civil date from days since 1970: eras of 400 years that begin
+        // on 1 March.
+        let z = days + 719_468;
+        let era = z.div_euclid(146_097);
+        let of_era = z - era * 146_097;
+        let year_of_era = (of_era - of_era / 1_460 + of_era / 36_524 - of_era / 146_096) / 365;
+        let of_year = of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+        let mp = (5 * of_year + 2) / 153;
+        let day = of_year - (153 * mp + 2) / 5 + 1;
+        let month = if mp < 10 { mp + 3 } else { mp - 9 };
+        let year = year_of_era + era * 400 + i64::from(month <= 2);
+        format!(
+            "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{millis:03}Z",
+            of_day / 3_600,
+            of_day % 3_600 / 60,
+            of_day % 60
+        )
     }
 
     fn next(state: &mut Value, counter: &str) -> u64 {
@@ -550,7 +628,7 @@ mod program {
         let usage = || refusal("USAGE", "Name the harness.");
         match operation {
             "ensure" => {
-                let hash = token_hash(args)?;
+                let hash = hash_for(state, args, flag(args, "--name"))?;
                 let name = flag(args, "--name").ok_or_else(usage)?.to_owned();
                 let engine = first_word(args)
                     .ok_or_else(|| {
@@ -579,13 +657,27 @@ mod program {
                         ));
                     }
                 }
+                // A crashed engine still exiting: refused, nothing changed.
+                if step["not_ready"] == true {
+                    return Err(refusal(
+                        "ENGINE_NOT_READY",
+                        format!(
+                            "{name}'s last engine is still stopping; nothing was started. Try harness ensure again."
+                        ),
+                    ));
+                }
                 let why = step["why"].as_str();
                 let up = if step["starting"] == true {
                     "starting"
                 } else {
                     "idle"
                 };
-                let (result, session) = match held {
+                let (result, mut session) = match held {
+                    // A crashed engine: the same id resumed, never a new one.
+                    Some(mut held) if !fresh && step["crashed"] == true => {
+                        held["state"] = json!(up);
+                        ("resumed", held)
+                    }
                     Some(held) if !fresh && held["state"] != "stopped" => ("live", held),
                     Some(mut held) if !fresh && why.is_none() => {
                         held["state"] = json!(up);
@@ -597,14 +689,24 @@ mod program {
                             retire(state, held);
                         }
                         let id = next(state, "nextId");
-                        let conversation = next(state, "nextEngineSession");
+                        let id = format!("{id:08x}-0000-4000-8000-{id:012x}");
+                        // openclaw's full session key from the first answer;
+                        // hermes's id only once the engine reports one.
+                        let conversation = match engine.as_str() {
+                            "openclaw" => json!(format!("agent:main:harness-{id}")),
+                            "hermes" => Value::Null,
+                            _ => json!(format!(
+                                "{engine}-session-{}",
+                                next(state, "nextEngineSession")
+                            )),
+                        };
                         (
                             "new",
                             json!({
-                                "id":format!("{id:08x}-0000-4000-8000-{id:012x}"),
+                                "id":id,
                                 "name":name,
                                 "engine":engine,
-                                "engineSession":format!("{engine}-session-{conversation}"),
+                                "engineSession":conversation,
                                 "state":up,
                                 "tokenSha256":hash,
                                 "inputs":[],
@@ -612,6 +714,11 @@ mod program {
                         )
                     }
                 };
+                if let (Some(reported), "hermes") =
+                    (step["engine_session"].as_str(), engine.as_str())
+                {
+                    session["engineSession"] = json!(reported);
+                }
                 state["sessions"][&name] = session.clone();
                 // The contract's three: one at work or with the person is
                 // working, as far as `ensure` says.
@@ -633,8 +740,8 @@ mod program {
                 Ok((answer, 0))
             }
             "reply" => {
-                let hash = token_hash(args)?;
                 let name = first_word(args).ok_or_else(usage)?.to_owned();
+                let hash = hash_for(state, args, Some(&name))?;
                 let text = args
                     .iter()
                     .position(|arg| arg == "--")
@@ -690,12 +797,13 @@ mod program {
                         )
                     });
                 }
-                let input = next(state, "nextInput");
-                let input_id = format!("in-{input}");
+                let input_id = input_id()
+                    .map_err(|_| refusal("FAILED", "No random bytes for an input id."))?;
+                let taken_at = iso_now();
                 let session = &mut state["sessions"][&name];
                 session["state"] = json!("working");
                 if let Some(inputs) = session["inputs"].as_array_mut() {
-                    inputs.push(json!({"inputId":input_id,"text":text}));
+                    inputs.push(json!({"inputId":input_id,"takenAt":taken_at,"text":text}));
                 }
                 if step["timeout"] == "typed" {
                     return Err(Refusal {
@@ -708,7 +816,10 @@ mod program {
                         )
                     });
                 }
-                Ok((json!({"state":"taken","inputId":input_id}), 0))
+                Ok((
+                    json!({"state":"taken","inputId":input_id,"takenAt":taken_at}),
+                    0,
+                ))
             }
             // The plain `harness wait --json` reply (`parse_wait`): the rows
             // that ended, by exit 0 idle, 3 the person, 4 stopped, 124 none.
@@ -751,10 +862,7 @@ mod program {
                     return Err(unknown());
                 }
                 if hash.is_some_and(|hash| holder["tokenSha256"] != hash.as_str()) {
-                    return Err(refusal(
-                        "NOT_YOURS",
-                        format!("\"{name}\" is not a harness this token owns."),
-                    ));
+                    return Err(not_yours(&name));
                 }
                 let id = holder["id"].clone();
                 let (end, exit) = match step["ends"].as_str() {
@@ -774,8 +882,8 @@ mod program {
             }
             // Today's `close --json` reply, unchanged.
             "close" => {
-                let hash = token_hash(args)?;
                 let name = first_word(args).ok_or_else(usage)?.to_owned();
+                let hash = hash_for(state, args, Some(&name))?;
                 let session = owned(state, &name, &hash)?;
                 session["state"] = json!("stopped");
                 Ok((
@@ -784,6 +892,17 @@ mod program {
                         "effect":"Its conversation is kept; the person can resume it.","next":[],
                     }),
                     0,
+                ))
+            }
+            // `resume` of a program-owned harness is the program's own:
+            // refused without its token, and with it pointed to `ensure`.
+            "resume" => {
+                let name = first_word(args).ok_or_else(usage)?.to_owned();
+                let hash = hash_for(state, args, Some(&name))?;
+                owned(state, &name, &hash)?;
+                Err(refusal(
+                    "USAGE",
+                    "This stand-in resumes a program's harness only by harness ensure.",
                 ))
             }
             _ => Err(refusal("USAGE", "Unknown program-session verb.")),

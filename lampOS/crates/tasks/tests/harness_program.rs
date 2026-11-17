@@ -3,7 +3,7 @@
 //! `wait --after` and `close`, run as the fixture binary itself, as the
 //! Harness builder answered the contract. No installed Harness, daemon,
 //! account or agent is invoked.
-use lamp_tasks::harness::parse_wait;
+use lamp_tasks::harness::{iso_unix_ms, parse_wait};
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -364,9 +364,9 @@ fn ensure_another_engine_on_a_held_name_is_name_taken() {
     );
 }
 
-/// `ensure` never refuses `ENGINE_NOT_READY`: it says `starting`. A reply
-/// before the engine is ready is refused and types nothing, so the first
-/// input is not lost once it is.
+/// `ensure` on a starting engine says `starting`. A reply before the
+/// engine is ready is refused and types nothing, so the first input is not
+/// lost once it is.
 #[test]
 fn ensure_says_starting_and_reply_waits_for_the_engine() {
     let rig = Rig::new(json!({
@@ -383,6 +383,102 @@ fn ensure_says_starting_and_reply_waits_for_the_engine() {
     );
     rig.plan(json!({"reply":{"program":true,"ready":true}}));
     rig.taken("task");
+}
+
+/// While a crashed engine is still exiting, `ensure` itself refuses
+/// `ENGINE_NOT_READY` (exit 5, exactly `{"error","detail"}`) and changes
+/// nothing; the next `ensure` resumes it.
+#[test]
+fn ensure_refuses_engine_not_ready_while_the_engine_exits() {
+    let rig = Rig::program();
+    let first = rig.ensure(&[]).1;
+    rig.close(&[]);
+    let before = rig.sessions();
+    rig.plan(json!({"ensure":{"program":true,"not_ready":true}}));
+    let (exit, said) = rig.ensure(&[]);
+    assert_eq!((exit, refusal(&said)), (5, "ENGINE_NOT_READY"));
+    assert_eq!(said.as_object().unwrap().len(), 2, "{said}");
+    assert_eq!(
+        said["detail"],
+        "lamp's last engine is still stopping; nothing was started. Try harness ensure again."
+    );
+    assert_eq!(rig.sessions(), before);
+    rig.plan(json!({"ensure":{"program":true}}));
+    let (exit, again) = rig.ensure(&[]);
+    assert_eq!(
+        (exit, &again["result"], &again["id"]),
+        (0, &json!("resumed"), &first["id"]),
+        "{again}"
+    );
+}
+
+/// After a crash, `ensure` resumes the same id and conversation; while the
+/// crashed engine still exits it refuses rather than start a new id.
+#[test]
+fn ensure_after_a_crash_resumes_the_same_id() {
+    let rig = Rig::program();
+    let first = rig.ensure(&[]).1;
+    rig.taken("task");
+    rig.plan(json!({"ensure":{"program":true,"not_ready":true}}));
+    let (exit, said) = rig.ensure(&[]);
+    assert_eq!((exit, refusal(&said)), (5, "ENGINE_NOT_READY"));
+    rig.plan(json!({"ensure":{"program":true,"crashed":true},"reply":{"program":true}}));
+    let (exit, again) = rig.ensure(&[]);
+    assert_eq!(exit, 0, "{again}");
+    assert_eq!(
+        (
+            &again["result"],
+            &again["id"],
+            &again["engineSession"],
+            &again["state"]
+        ),
+        (
+            &json!("resumed"),
+            &first["id"],
+            &first["engineSession"],
+            &json!("idle")
+        )
+    );
+    assert!(rig.sessions()["closed"].is_null(), "{}", rig.sessions());
+    rig.taken("again");
+}
+
+/// openclaw's `engineSession` is the full key `agent:main:harness-<id>`
+/// from the first `new` answer on.
+#[test]
+fn openclaw_engine_session_is_the_full_key() {
+    let rig = Rig::program();
+    let (exit, first) = rig.ensure(&[]);
+    assert_eq!(exit, 0, "{first}");
+    let key = format!("agent:main:harness-{}", first["id"].as_str().unwrap());
+    assert_eq!(first["engineSession"], key.as_str());
+    assert_eq!(rig.ensure(&[]).1["engineSession"], key.as_str());
+    rig.close(&[]);
+    assert_eq!(rig.ensure(&[]).1["engineSession"], key.as_str());
+}
+
+/// hermes's `engineSession` is `null` until the engine reports its id.
+#[test]
+fn hermes_engine_session_is_null_until_reported() {
+    let rig = Rig::program();
+    let (exit, first) = rig.ensure_as("hermes", "desk", "token", &[]);
+    assert_eq!(
+        (exit, &first["engineSession"]),
+        (0, &Value::Null),
+        "{first}"
+    );
+    rig.plan(json!({"ensure":{"program":true,"engine_session":"20261117_045927_ab12cd"}}));
+    let (exit, said) = rig.ensure_as("hermes", "desk", "token", &[]);
+    assert_eq!(
+        (exit, &said["result"], &said["engineSession"]),
+        (0, &json!("live"), &json!("20261117_045927_ab12cd")),
+        "{said}"
+    );
+    rig.plan(json!({"ensure":{"program":true}}));
+    assert_eq!(
+        rig.ensure_as("hermes", "desk", "token", &[]).1["engineSession"],
+        "20261117_045927_ab12cd"
+    );
 }
 
 /// Eight `ensure` calls released at once with one name and token give one
@@ -423,7 +519,8 @@ fn reply_is_taken_then_not_idle_until_wait_says_idle() {
     let (exit, taken) = rig.reply("first task");
     assert_eq!(exit, 0, "{taken}");
     let first = taken["inputId"].as_str().unwrap().to_owned();
-    assert_eq!(taken, json!({"state":"taken","inputId":first}));
+    let at = taken["takenAt"].as_str().unwrap().to_owned();
+    assert_eq!(taken, json!({"state":"taken","inputId":first,"takenAt":at}));
 
     let (exit, busy) = rig.reply("second task");
     assert_eq!((exit, refusal(&busy)), (5, "NOT_IDLE"));
@@ -441,6 +538,52 @@ fn reply_is_taken_then_not_idle_until_wait_says_idle() {
     assert_eq!(inputs[0]["text"], "first task");
     assert_eq!(inputs[1]["text"], "second task");
     assert_eq!(inputs.as_array().unwrap().len(), 2, "{inputs}");
+}
+
+/// A taken input's id is `program:<uuid v4>`, as Harness p4393.4 gives it,
+/// and a new one each time.
+#[test]
+fn reply_input_id_is_program_and_a_uuid() {
+    let rig = Rig::program();
+    rig.ensure(&[]);
+    let first = rig.taken("task");
+    assert!(
+        first.starts_with("program:") && first.contains(':'),
+        "{first}"
+    );
+    let uuid = &first["program:".len()..];
+    assert_eq!(uuid.len(), 36, "{first}");
+    assert!(
+        uuid.char_indices().all(|(at, c)| match at {
+            8 | 13 | 18 | 23 => c == '-',
+            14 => c == '4',
+            _ => c.is_ascii_hexdigit() && !c.is_ascii_uppercase(),
+        }),
+        "{first}"
+    );
+    assert_eq!(rig.wait(&first).0, 0);
+    assert_ne!(rig.taken("again"), first);
+}
+
+/// `takenAt` is RFC 3339 UTC as JavaScript writes it, and about now.
+#[test]
+fn reply_taken_at_is_rfc3339_now() {
+    let rig = Rig::program();
+    rig.ensure(&[]);
+    let now = || {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+    };
+    let before = now();
+    let (exit, said) = rig.reply("task");
+    let after = now();
+    assert_eq!(exit, 0, "{said}");
+    let at = said["takenAt"].as_str().expect("a takenAt");
+    assert_eq!(at.len(), 24, "{at}");
+    let ms = iso_unix_ms(at).unwrap_or_else(|| panic!("not RFC 3339: {at}"));
+    assert!((before..=after).contains(&ms), "{before} {ms} {after}");
 }
 
 /// While the session waits for the person, a reply is never taken.
@@ -506,6 +649,7 @@ fn reply_timeout_typed_gives_the_input_to_follow() {
     assert_eq!((exit, refusal(&said)), (124, "TIMEOUT"));
     assert_eq!(said["cancelled"], false);
     let input = said["inputId"].as_str().expect("an inputId").to_owned();
+    assert!(input.starts_with("program:"), "{input}");
     let (exit, said) = rig.wait(&input);
     assert_eq!(
         parsed(exit, &said, &id),
@@ -526,6 +670,46 @@ fn reply_and_close_with_another_token_are_not_yours() {
     assert_eq!(
         (&session["state"], &session["inputs"]),
         (&json!("idle"), &json!([]))
+    );
+}
+
+/// Without the token, `reply` to a program-owned harness is `NOT_YOURS`.
+#[test]
+fn reply_without_the_token_is_not_yours() {
+    let rig = Rig::program();
+    rig.ensure(&[]);
+    let (exit, said) = rig.run(&["reply", "lamp", "--json", "--", "task"]);
+    assert_eq!((exit, refusal(&said)), (5, "NOT_YOURS"));
+    assert_eq!(rig.sessions()["sessions"]["lamp"]["inputs"], json!([]));
+}
+
+/// Without the token, `close` of a program-owned harness is `NOT_YOURS`.
+#[test]
+fn close_without_the_token_is_not_yours() {
+    let rig = Rig::program();
+    rig.ensure(&[]);
+    let (exit, said) = rig.run(&["close", "lamp", "--json"]);
+    assert_eq!((exit, refusal(&said)), (5, "NOT_YOURS"));
+    assert_eq!(rig.sessions()["sessions"]["lamp"]["state"], "idle");
+}
+
+/// Without the token, resuming a program-owned harness, by `resume` or by
+/// `ensure`, is `NOT_YOURS`.
+#[test]
+fn resume_without_the_token_is_not_yours() {
+    let rig = Rig::new(json!({
+        "ensure":{"program":true},"close":{"program":true},"resume":{"program":true},
+    }));
+    let first = rig.ensure(&[]).1;
+    rig.close(&[]);
+    let (exit, said) = rig.run(&["resume", "lamp", "--json"]);
+    assert_eq!((exit, refusal(&said)), (5, "NOT_YOURS"));
+    let (exit, said) = rig.run(&["ensure", "openclaw", "--name", "lamp", "--json"]);
+    assert_eq!((exit, refusal(&said)), (5, "NOT_YOURS"));
+    let held = &rig.sessions()["sessions"]["lamp"];
+    assert_eq!(
+        (&held["id"], &held["state"]),
+        (&first["id"], &json!("stopped"))
     );
 }
 
@@ -580,13 +764,17 @@ fn wait_on_a_closed_session_is_stopped() {
 #[test]
 fn wait_after_an_unknown_input_is_unknown_input() {
     let rig = Rig::program();
-    let (exit, said) = rig.wait("in-1");
+    let never = "program:00000000-0000-4000-8000-000000000001";
+    let (exit, said) = rig.wait(never);
     assert_eq!((exit, refusal(&said)), (1, "UNKNOWN_INPUT"));
-    assert_eq!(said["detail"], "No harness here took an input in-1.");
+    assert_eq!(
+        said["detail"],
+        format!("No harness here took an input {never}.")
+    );
     rig.ensure(&[]);
     rig.ensure_as("openclaw", "desk", "token", &[]);
     let input = rig.taken("task");
-    let (exit, said) = rig.wait("in-99");
+    let (exit, said) = rig.wait("program:00000000-0000-4000-8000-000000000099");
     assert_eq!((exit, refusal(&said)), (1, "UNKNOWN_INPUT"));
     let (exit, said) = rig.run(&["wait", "desk", "--after", &input, "--json"]);
     assert_eq!((exit, refusal(&said)), (1, "UNKNOWN_INPUT"));
@@ -636,10 +824,10 @@ fn close_of_an_unknown_name_is_unknown_harness() {
     assert_eq!((exit, refusal(&said)), (1, "UNKNOWN_HARNESS"));
 }
 
-/// Not 0600 (0644, 0640, 0400), under 32 bytes once whitespace is taken
-/// off, a link to a good file, a folder, or missing: `BAD_TOKEN_FILE`
-/// (exit 5) from every verb that takes a token, and nothing kept. Exactly
-/// 32 bytes is enough.
+/// Group or other bits (0644, 0640, 0604), under 32 bytes once whitespace
+/// is taken off, a link to a good file, a folder, or missing:
+/// `BAD_TOKEN_FILE` (exit 5) from every verb that takes a token, and
+/// nothing kept. Exactly 32 bytes is enough.
 #[test]
 fn bad_token_file_is_refused() {
     let rig = Rig::program();
@@ -651,7 +839,7 @@ fn bad_token_file_is_refused() {
     let bad = [
         rig.token("open", TOKEN, 0o644),
         rig.token("group", TOKEN, 0o640),
-        rig.token("read-only", TOKEN, 0o400),
+        rig.token("other-read", TOKEN, 0o604),
         rig.token("short", &TOKEN[..31], 0o600),
         rig.token("padded", &padded, 0o600),
         link,
@@ -686,6 +874,38 @@ fn bad_token_file_is_refused() {
     }
     assert_eq!(rig.sessions()["sessions"], json!({}));
     assert_eq!(rig.ensure(&[]).0, 0);
+}
+
+/// As upstream, only group or other bits are refused: 0400 is accepted, as
+/// 0600 is, and 0640 is refused.
+#[test]
+fn token_mode_refuses_only_group_or_other_bits() {
+    let rig = Rig::program();
+    let read_only = rig.token("read-only", TOKEN, 0o400);
+    let (exit, said) = rig.run(&[
+        "ensure",
+        "openclaw",
+        "--name",
+        "lamp",
+        "--program-token-file",
+        &read_only,
+        "--json",
+    ]);
+    assert_eq!((exit, &said["result"]), (0, &json!("new")), "{said}");
+    // The same token, so the same owner, in either mode.
+    assert_eq!(rig.ensure(&[]).1["result"], "live");
+    let group = rig.token("group", TOKEN, 0o640);
+    let (exit, said) = rig.run(&[
+        "ensure",
+        "openclaw",
+        "--name",
+        "lamp",
+        "--program-token-file",
+        &group,
+        "--json",
+    ]);
+    assert_eq!((exit, refusal(&said)), (5, "BAD_TOKEN_FILE"));
+    assert!(said["detail"].as_str().unwrap().contains("640"), "{said}");
 }
 
 /// A link is refused even to the program's own good token, which works
