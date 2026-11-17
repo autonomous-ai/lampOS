@@ -52,6 +52,9 @@ Environment=LAMP_UNPLUG=on
 # body.md "How lively it moves"); set on Body, Expression, Skills and Voice together. lamp-52e6 15 Nov, row-6893h:
 # level 5 PASS (https://github.com/autonomous-ai/lampOS/issues/6893#issuecomment-6885667954).
 Environment=LAMP_BODY_ENERGY=on
+# Someone at the lamp (room/presence) keeps a standing lamp up, at most 15 quiet minutes and never with a warm arm; its
+# shifts at rest come every 20 to 60 s and sag the arm toward its fold, livelier after talk (#7301, body.md).
+Environment=LAMP_BODY_PRESENCE=on
 EnvironmentFile=/etc/lampOS/body/lamp.env
 # --speed 300, Tuning::SPEED_CAP (24 Oct; energy level 1, Tuning::ENERGY_SPEED_CAP is 800 for LAMP_BODY_ENERGY levels): Expression's offsets, the mood poses and gaze moves reach the head at this
 # rate, with the software acceleration six times it (720 -> 1800 counts/s^2); leans keep their 1.5 s and the arm's stand
