@@ -1597,8 +1597,9 @@ skill" đi tới một read-back không tìm thấy "moon-fax", vì `make_skill`
 không có gì nói tới việc gỡ và read-back chỉ nhận đúng tên). Kỹ năng do
 người dùng tạo được gỡ qua chính `make_skill`, chỉ với `remove`: tên như đã
 nghe (`made_remove::REMOVE`). Đó là một tham số của hàm giọng nói đã có,
-không bao giờ là một hàm riêng, vì giọng nói đã ở mức 48 hàm
-(`lamp_gemini::MAX_TOOLS`). Một câu có xin gỡ kỹ năng hay không là do mô
+không bao giờ là một hàm riêng, vì giọng nói giữ ít hàm (giới hạn của
+tuyến thứ hai, `second_provider::MAX_TOOLS`, đã đầy ở mức 48 khi phần này
+được làm; từ #7433 là 64). Một câu có xin gỡ kỹ năng hay không là do mô
 hình phán đoán, theo mô tả của hàm ("To delete or remove a skill, call
 it with remove alone; to run one they made now, run alone; to list those
 they made, made alone; say nothing first.", câu của việc chạy và việc liệt

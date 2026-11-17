@@ -243,7 +243,13 @@ pub const JOIN_WAIT: Duration = Duration::from_millis(300);
 /// from 00:35 on, and the web search too after the look became one of the
 /// core at 15:42: "what's the weather in Hanoi" was answered from the
 /// lamp's own place, with no search (the owner at the lamp, 16:0x).
-pub const MAX_TOOLS: usize = 48;
+/// It was 48 until 17 Nov: by then a product lamp's spoken turn had 52
+/// (the voice's own 30 with lamp-services' 3, the actions part's 17,
+/// `use_skill`, and the search, its fetch, the weather and the look), so
+/// every turn left out the fetch, the time elsewhere, `reports_state` and
+/// the weather (lamp-9adf's bound line on #7448, #7433). 64 keeps them with
+/// room for what is switched on next, within DeepSeek's 128.
+pub const MAX_TOOLS: usize = 64;
 /// How often it asks again meanwhile.
 const JOIN_POLL: Duration = Duration::from_millis(25);
 /// How soon after the cut line's end a line must begin to be joined with
