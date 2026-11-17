@@ -46,10 +46,6 @@ Environment=LAMP_MADE_SKILL_LOOSE=on
 # the file kept whole and followed by Hermes in a fresh home, its grants read from it and said back. The same line
 # in lamp-cloud, lamp-voice, lamp-skills and lamp-skills-manage@.
 Environment=LAMP_UPLOAD_TO_AGENT=on
-# A skill's task that reaches the internet (docs/tasks.md, "An agent skill's run and the `net` grant"): `net`
-# read as a task grant for the voice's say-back. The same line in lamp-tasks, lamp-skills, lamp-control,
-# lamp-voice and lamp-cloud.
-Environment=LAMP_TASK_NET=on
 # Wellbeing nudges at a present spacing and Comfort break (#5207): the skills' [present] values, as lamp-skills
 # loads them, so the app's on and off act on the skills as they run. The same line in lamp-skills.service and lamp-cloud.service.
 Environment=LAMP_NUDGES_PRESENT=on

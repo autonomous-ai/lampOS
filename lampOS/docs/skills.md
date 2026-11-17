@@ -1693,8 +1693,8 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   (`lamp_voice::skill_task_yes::GRANTS`: `body`, `light`, `speak`, `look`,
   `hear`, `sound`, `air`, `device`, `camera`, `microphone`, `notes`,
   `speech`), once each, never `skills` (a script never puts skills on the
-  lamp). With `LAMP_TASK_NET=on` (on in the product: lamp-tasks, lamp-skills and
-  its manage helper, lamp-control, lamp-voice and lamp-cloud's skills page) one more, `net`
+  lamp). With `LAMP_TASK_NET=on` (off in the product until its checks; once on, in lamp-tasks, lamp-skills
+  and its manage helper, lamp-control, lamp-voice and lamp-cloud's skills page) one more, `net`
   ("reaches the internet"): the run, held like every run, reaches the
   public web on ports 80 and 443 through its own egress socket (a proxy
   and DNS inside the run, every address checked by lamp-tasks: never the
@@ -5992,7 +5992,7 @@ The owner's ask (12 Nov: a `SKILL.md` uploaded from the app runs through
 the lamp's agent, as V1's did); the first builder's yes at 19:44. On in
 the product since 13 Nov (the owner's ruling: the upload flow goes via the
 agent), set in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
-`lamp-skills-manage@`; `LAMP_TASK_NET` is on in the product too, so a file
+`lamp-skills-manage@`; with `LAMP_TASK_NET` on (off in the product until its checks), a file
 that reaches the internet is granted `net` (the public web on 80 and 443
 alone), asked the owner's spoken yes at its first run. With lamp-update's
 one run path on (`LAMP_SKILL_DEFAULT_AGENT`, on in the product) a run
