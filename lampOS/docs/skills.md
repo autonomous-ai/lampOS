@@ -4523,7 +4523,12 @@ code (`made_remove::asked`):
   one asked about, whatever label the model gave the line. A forced
   wait's `yes` with no `named` reads as `unclear`. The same holds for a
   skill's task and an app's make with code, whose forced form is the
-  same. The journal: "… was a new ask, not an answer (a yes naming
+  same. The note of the wait gives the waiting skill's name to copy into
+  `named` ("named \"rain joke\" if their line names this skill") and says
+  a line naming that skill answers the question, never `new_ask`: on
+  lamp-9adf (#7561's row, 17 Nov 23:4x) "Yes, remove rain joke." after
+  "Remove rain joke?" was answered `new_ask` and the wait dropped. The
+  name matches in any case, with hyphens, underscores or spaces alike. The journal: "… was a new ask, not an answer (a yes naming
   OTHER, not NAME): nothing kept, the wait dropped", or "a yes to NAME's
   wait named no skill: read as unclear".
 - **Only an answer to that question.** A line that answers nothing asked
@@ -4596,7 +4601,8 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `a_yes_naming_another_skill_removes_nothing`,
 `a_yes_is_taken_only_for_the_asked_skill`,
 `skill_write_yes::tests::a_new_ask_ends_a_tasks_wait_agreeing_nothing`,
-`a_yes_naming_another_skill_agrees_nothing_on_a_tasks_wait`.
+`a_yes_naming_another_skill_agrees_nothing_on_a_tasks_wait`,
+`a_yes_naming_the_asked_skill_is_its_yes_never_a_new_ask`.
 
 **Turned off and on by voice** (#7445, with `LAMP_MADE_SKILL_OFF_SAID` on
 alone: on lamp-9adf, build 13252, "Lamp, turn off the coffee time skill"

@@ -1668,7 +1668,14 @@ một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong 
   không bao giờ gỡ kỹ năng nào khác ngoài kỹ năng đã hỏi, dù mô hình gán
   nhãn gì cho câu đó. Một `yes` của việc chờ bị buộc mà không có `named`
   được đọc là `unclear`. Điều này cũng đúng với task của kỹ năng và lần tạo
-  có code từ ứng dụng, vì form bị buộc của chúng là một. Journal: "… was a
+  có code từ ứng dụng, vì form bị buộc của chúng là một. Ghi chú của việc
+  chờ đưa tên kỹ năng đang chờ để chép vào `named` ("named \"rain joke\" if
+  their line names this skill") và nói rằng một câu nhắc tới kỹ năng đó là
+  câu trả lời cho câu hỏi, không bao giờ là `new_ask`: trên lamp-9adf (hàng
+  kiểm thử của #7561, 23:4x ngày 17/11) câu "Yes, remove rain joke." sau
+  "Remove rain joke?" bị trả lời `new_ask` và việc chờ bị bỏ. Tên khớp
+  không phân biệt hoa thường, gạch nối, gạch dưới hay khoảng trắng đều như
+  nhau. Journal: "… was a
   new ask, not an answer (a yes naming OTHER, not NAME): nothing kept, the
   wait dropped", hoặc "a yes to NAME's wait named no skill: read as
   unclear".
@@ -1741,7 +1748,8 @@ Kiểm thử: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact
 `a_yes_naming_another_skill_removes_nothing`,
 `a_yes_is_taken_only_for_the_asked_skill`,
 `skill_write_yes::tests::a_new_ask_ends_a_tasks_wait_agreeing_nothing`,
-`a_yes_naming_another_skill_agrees_nothing_on_a_tasks_wait`.
+`a_yes_naming_another_skill_agrees_nothing_on_a_tasks_wait`,
+`a_yes_naming_the_asked_skill_is_its_yes_never_a_new_ask`.
 
 **Tắt và bật lại bằng giọng nói** (#7445, chỉ khi bật
 `LAMP_MADE_SKILL_OFF_SAID`: trên lamp-9adf, bản 13252, "Lamp, turn off the
