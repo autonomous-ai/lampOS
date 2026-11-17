@@ -452,6 +452,43 @@ pub enum Typed {
     Uncertain(String),
 }
 
+/// What `harness ensure --json` said of the lamp's kept session
+/// (`LAMP_TASKS_KEPT_SESSION`, openharness#4393): how it stands now.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Ensured {
+    /// `live`, `resumed` or `new`.
+    pub result: String,
+    pub agent_id: String,
+    /// `idle`, `working` or `starting`.
+    pub state: String,
+    /// Why a `new` and not a `resumed`, when Harness says.
+    pub why: Option<String>,
+}
+
+/// How a `harness reply` with the program's token went (openharness#4393):
+/// it returns only once the engine took the words, or says why not.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Took {
+    /// The engine took the words, as this input.
+    Taken(String),
+    /// The session is busy with a turn (`NOT_IDLE`): nothing typed.
+    NotIdle,
+    /// The session is not running (`NOT_RUNNING`).
+    NotRunning,
+    /// The engine is not ready yet (`ENGINE_NOT_READY`): nothing typed.
+    EngineNotReady,
+    /// Not taken within Harness's own bound (`TIMEOUT`, exit 124).
+    Timeout,
+    /// Nothing typed, with why.
+    NotSent(String),
+    /// Our own call did not end in an answer: the words may be there.
+    Uncertain(String),
+}
+
+/// How long `harness ensure` is given: it starts the daemon and waits
+/// for the engine itself (OpenClaw's gateway, 27 to 50 s after a boot).
+pub const ENSURE_TIMEOUT: Duration = Duration::from_secs(120);
+
 /// How closing one harness this lamp started went (#1390).
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -2018,6 +2055,186 @@ impl Cli {
             Err(error) if error.spawned => Typed::Uncertain("reply_uncertain".into()),
             Err(error) => Typed::NotSent(format!("reply_{}", error.code)),
         }
+    }
+
+    /// `LAMP_TASKS_KEPT_SESSION` (openharness#4393): whether this Harness
+    /// keeps sessions a program owns, from `harness capabilities --json`
+    /// (`programSessions` 1 or more). An older Harness has no such verb and
+    /// refuses it: `Some(false)`. `None` when it could not be asked (a
+    /// timeout, a spawn failure), so it is asked again at the next open.
+    pub fn program_sessions(&self) -> Option<bool> {
+        let reply = self
+            .run(
+                &["capabilities".into(), "--json".into()],
+                self.config.read_timeout,
+            )
+            .ok()?;
+        if !reply.success {
+            return Some(false);
+        }
+        let read = serde_json::from_slice::<Value>(&reply.stdout).ok()?;
+        Some(read["programSessions"].as_u64().is_some_and(|n| n >= 1))
+    }
+
+    /// `harness ensure <engine> <folder> --name <name> --program-token-file
+    /// <token> [--fresh] --json` (openharness#4393): the lamp's kept
+    /// session by its name and the token's hash, live, resumed or new;
+    /// `--fresh` closes the old one and starts a new conversation. The
+    /// token's path only is passed, never its text, and nothing goes in the
+    /// environment. Refusals by Harness's code, lower-cased
+    /// (`engine_not_ready`, `name_taken`, `bad_token_file`, `not_yours`).
+    pub fn ensure_kept(
+        &self,
+        engine: EngineKind,
+        name: &str,
+        token: &Path,
+        folder: &str,
+        fresh: bool,
+    ) -> Result<Ensured, String> {
+        if !self::token(name, 64) {
+            return Err("invalid_name".into());
+        }
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let mut args: Vec<OsString> = vec![
+            "ensure".into(),
+            engine.argument().into(),
+            folder.into(),
+            "--name".into(),
+            name.into(),
+            "--program-token-file".into(),
+            token.into(),
+        ];
+        if fresh {
+            args.push("--fresh".into());
+        }
+        args.push("--json".into());
+        let reply = self
+            .run(&args, ENSURE_TIMEOUT)
+            .map_err(|error| format!("ensure_{}", error.code))?;
+        if !reply.success {
+            return Err(program_refusal(&reply.stdout, reply.code, "ensure_failed"));
+        }
+        parse_ensured(&reply.stdout, name).ok_or_else(|| "ensure_unreadable".into())
+    }
+
+    /// `harness reply <name> --program-token-file <token> --json --
+    /// <words>` (openharness#4393): returns once the engine took the words
+    /// (`{"state":"taken","inputId"}`), or why not. One try under the
+    /// operation lock; never typed twice here.
+    pub fn reply_kept(&self, name: &str, token: &Path, words: &str) -> Took {
+        if !self::token(name, 64) {
+            return Took::NotSent("invalid_name".into());
+        }
+        if words.trim().is_empty()
+            || words.len() > MAX_PROMPT_BYTES
+            || words.starts_with("--")
+            || words.contains('\0')
+        {
+            return Took::NotSent("invalid_prompt".into());
+        }
+        let Ok(_guard) = self.operation.try_lock() else {
+            return Took::NotSent("busy".into());
+        };
+        let reply = self.run(
+            &[
+                "reply".into(),
+                name.into(),
+                "--program-token-file".into(),
+                token.into(),
+                "--json".into(),
+                "--".into(),
+                words.into(),
+            ],
+            self.config.launch_timeout,
+        );
+        match reply {
+            Ok(reply) if reply.success => match taken_input(&reply.stdout) {
+                Some(input) => Took::Taken(input),
+                // Exit 0 with no `taken`: the words may be there.
+                None => Took::Uncertain("reply_uncertain".into()),
+            },
+            Ok(reply) => match program_refusal(&reply.stdout, reply.code, "reply_failed").as_str()
+            {
+                "not_idle" => Took::NotIdle,
+                "not_running" => Took::NotRunning,
+                "engine_not_ready" => Took::EngineNotReady,
+                "timeout" => Took::Timeout,
+                "reply_off" => Took::NotSent("reply_off".into()),
+                refused => Took::NotSent(format!("reply_{refused}")),
+            },
+            Err(error) if error.spawned => Took::Uncertain("reply_uncertain".into()),
+            Err(error) => Took::NotSent(format!("reply_{}", error.code)),
+        }
+    }
+
+    /// `harness wait <name> --program-token-file <token> --after <input>
+    /// --timeout <s> --json` (openharness#4393): held until the first idle
+    /// after that input was taken. `idle` (exit 0), `needs-input` (3) or
+    /// `gone` (4); `None` when Harness's own hold passed (124). Never takes
+    /// the operation lock; `cancel` ends it early, as `cancelled`.
+    pub fn wait_kept(
+        &self,
+        name: &str,
+        token: &Path,
+        input: &str,
+        cancel: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        if !self::token(name, 64) || !self::token(input, 128) {
+            return Err("invalid_input".into());
+        }
+        let reply = self
+            .run_cancellable(
+                &[
+                    "wait".into(),
+                    name.into(),
+                    "--program-token-file".into(),
+                    token.into(),
+                    "--after".into(),
+                    input.into(),
+                    "--timeout".into(),
+                    format!("{}s", WAIT_HELD.as_secs()).into(),
+                    "--json".into(),
+                ],
+                WAIT_HELD + WAIT_SLACK,
+                STDOUT_LIMIT,
+                Some(cancel),
+            )
+            .map_err(|error| error.code.to_string())?;
+        match reply.code {
+            Some(0) => Ok(Some("idle".into())),
+            Some(3) => Ok(Some("needs-input".into())),
+            Some(4) => Ok(Some("gone".into())),
+            Some(124) => Ok(None),
+            _ => Err(program_refusal(&reply.stdout, reply.code, "wait_failed")),
+        }
+    }
+
+    /// `harness close <name> --program-token-file <token> --forget --json`
+    /// (openharness#4393): the kept session closed and its conversation
+    /// deleted, the engine's own session too where Harness can. One
+    /// Harness no longer has (`UNKNOWN_HARNESS`, `GONE`) is closed already.
+    pub fn close_kept(&self, name: &str, token: &Path) -> Result<(), String> {
+        if !self::token(name, 64) {
+            return Err("invalid_name".into());
+        }
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run(
+                &[
+                    "close".into(),
+                    name.into(),
+                    "--program-token-file".into(),
+                    token.into(),
+                    "--forget".into(),
+                    "--json".into(),
+                ],
+                CLOSE_BUDGET,
+            )
+            .map_err(|error| format!("close_{}", error.code))?;
+        if reply.success || gone(&reply.stdout) {
+            return Ok(());
+        }
+        Err(program_refusal(&reply.stdout, reply.code, "close_failed"))
     }
 
     /// A look at the session the person named (#6274), found as a named
@@ -6197,6 +6414,56 @@ fn resume_refusal(bytes: &[u8]) -> &'static str {
         Some("RESUME_UNCONFIRMED") => "session_resume_unconfirmed",
         _ => "session_closed",
     }
+}
+
+/// A refused or failed program-session verb (openharness#4393), by
+/// Harness's code (`error`, else `code`) lower-cased: `not_idle`,
+/// `engine_not_ready`, `name_taken`, …; exit 124 with none is `timeout`;
+/// any other is `otherwise`.
+fn program_refusal(bytes: &[u8], exit: Option<i32>, otherwise: &str) -> String {
+    let reply = serde_json::from_slice::<Value>(bytes).unwrap_or_default();
+    match reply["error"].as_str().or(reply["code"].as_str()) {
+        Some(code) if error_code(code) != "?" => code.to_ascii_lowercase(),
+        _ if exit == Some(124) => "timeout".into(),
+        _ => otherwise.into(),
+    }
+}
+
+/// What a `harness ensure --json` that exited 0 says of the session named
+/// `name`: its `result`, `id` and `state`, read leniently (an answer with
+/// another name, an id that isn't one, or a `result` not known is none).
+fn parse_ensured(bytes: &[u8], name: &str) -> Option<Ensured> {
+    let reply = serde_json::from_slice::<Value>(bytes).ok()?;
+    if reply["name"].as_str().is_some_and(|said| said != name) {
+        return None;
+    }
+    let result = reply["result"].as_str()?;
+    if !matches!(result, "live" | "resumed" | "new") {
+        return None;
+    }
+    let id = reply["id"].as_str().filter(|id| agent_id(id))?;
+    let state = reply["state"].as_str().filter(|state| token(state, 32))?;
+    Some(Ensured {
+        result: result.to_owned(),
+        agent_id: id.to_owned(),
+        state: state.to_owned(),
+        why: reply["why"]
+            .as_str()
+            .map(|why| cut_at_word(why, MOST_LOOK_ABOUT_CHARS)),
+    })
+}
+
+/// The input id of a `harness reply --json` the engine took
+/// (`{"state":"taken","inputId"}`), else none.
+fn taken_input(bytes: &[u8]) -> Option<String> {
+    let reply = serde_json::from_slice::<Value>(bytes).ok()?;
+    if reply["state"] != "taken" {
+        return None;
+    }
+    reply["inputId"]
+        .as_str()
+        .filter(|input| token(input, 128))
+        .map(str::to_owned)
 }
 
 /// A refused or failed `harness reply`, by Harness's code.
