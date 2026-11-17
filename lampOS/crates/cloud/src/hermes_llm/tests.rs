@@ -271,6 +271,7 @@ async fn either_switch_alone_starts_the_listener() {
         // this task, and dropped with it.
         let serving = serve_when(
             on_from(hermes, openclaw),
+            false,
             0,
             Some(dir.path()),
             None,
@@ -552,15 +553,60 @@ async fn the_meter_keeps_the_day_used_and_every_chat_still_goes() {
     assert_eq!(relay_share::read(dir.path()).unwrap().used, None);
 }
 
-/// Off (no meter): the same answer, byte for byte, and nothing kept.
+/// Off, the folder given and the header said: the same answer, byte for
+/// byte, and nothing kept; on, the same forwarder keeps it (Twelve's P3 3
+/// on #7538: the off guard is held by a test that can fail).
 #[tokio::test]
 async fn without_the_meter_nothing_is_kept() {
-    let dir = tempfile::tempdir().unwrap();
-    let base = metered_relay(vec![(200, Some("0.990"), "text/event-stream", STREAMED)]).await;
-    let address = metered_forwarder(&base, None).await;
-    let (status, _, answer) = ask(address, &chat(Some(TOKEN), ASKED)).await;
-    assert_eq!((status, answer.as_slice()), (200, STREAMED.as_bytes()));
-    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    for on in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let base = metered_relay(vec![(200, Some("0.990"), "text/event-stream", STREAMED)]).await;
+        let listener = Forwarder::bind(0).await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let forwarder = Forwarder::new(&base, KEY, TOKEN)
+            .unwrap()
+            .metered(on, dir.path());
+        tokio::spawn(Arc::new(forwarder).serve(listener));
+        let (status, _, answer) = ask(address, &chat(Some(TOKEN), ASKED)).await;
+        assert_eq!((status, answer.as_slice()), (200, STREAMED.as_bytes()));
+        let kept = std::fs::read_dir(dir.path()).unwrap().count();
+        assert_eq!(kept, usize::from(on), "metered {on}");
+    }
+}
+
+/// The meter's own switch, as `run` reads it, reaches the forwarder
+/// `serve_when` starts: off, it says nothing of a reading; on, it does.
+#[tokio::test]
+async fn the_meter_is_started_only_with_its_own_switch() {
+    for metered in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let (said, mut lines) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let mut say = |line: &str| {
+            let _ = said.send(line.to_owned());
+        };
+        let serving = serve_when(true, metered, 0, Some(dir.path()), None, KEY, &mut say);
+        let look = async {
+            let mut told = Vec::new();
+            while let Ok(Some(line)) =
+                tokio::time::timeout(Duration::from_millis(300), lines.recv()).await
+            {
+                told.push(line);
+            }
+            told
+        };
+        let told = tokio::select! {
+            () = serving => unreachable!("the forwarder never returns"),
+            told = look => told,
+        };
+        assert!(
+            told[0].starts_with("the Hermes forwarder listens on "),
+            "{told:?}"
+        );
+        let keeps = told
+            .iter()
+            .any(|line| line.contains("keeps the relay's day used"));
+        assert_eq!(keeps, metered, "{told:?}");
+    }
 }
 
 #[test]
@@ -583,4 +629,99 @@ fn a_streams_usage_is_found_across_its_pieces_and_a_chats_line_is_numbers() {
     let mut whole = Usage::new("application/json");
     whole.feed(WHOLE.as_bytes());
     assert_eq!(whole.end().unwrap()["completion_tokens"], 5);
+}
+
+/// The models list asked with no body, as an agent asks it at a run's start.
+fn models() -> Vec<u8> {
+    format!("GET {MODELS_PATH} HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\n\r\n").into_bytes()
+}
+
+/// #7538's P2 (blue, Twelve): only the metered chat route may say "no day
+/// limit". A models list with no header after a chat that said 0.9 leaves
+/// 0.9, and so does a chat whose header can't be read as text; a value
+/// read from the models list still counts.
+#[tokio::test]
+async fn only_a_chat_with_no_header_says_the_day_is_not_limited() {
+    use lamp_skills::relay_share;
+    let dir = tempfile::tempdir().unwrap();
+    let base = metered_relay(vec![
+        (200, Some("0.900"), "application/json", WHOLE),
+        (200, None, "application/json", "{\"data\":[]}"),
+        (200, Some("0.9\u{e9}"), "application/json", WHOLE),
+        (200, Some("0.950"), "application/json", "{\"data\":[]}"),
+        (200, None, "application/json", WHOLE),
+    ])
+    .await;
+    let address = metered_forwarder(&base, Some(dir.path())).await;
+    let used = || relay_share::read(dir.path()).unwrap().used;
+    assert_eq!(ask(address, &chat(Some(TOKEN), ASKED)).await.0, 200);
+    assert_eq!(used(), Some(0.9));
+    assert_eq!(ask(address, &models()).await.0, 200);
+    assert_eq!(used(), Some(0.9), "a models list with no header");
+    assert_eq!(ask(address, &chat(Some(TOKEN), ASKED)).await.0, 200);
+    assert_eq!(used(), Some(0.9), "a header that isn't text");
+    assert_eq!(ask(address, &models()).await.0, 200);
+    assert_eq!(used(), Some(0.95), "a models list that says");
+    assert_eq!(ask(address, &chat(Some(TOKEN), ASKED)).await.0, 200);
+    assert_eq!(used(), None, "a chat with no header: not limited");
+}
+
+/// A stand-in relay that answers each connection on a task of its own, the
+/// `n`th accepted with `answers[n]`: its `X-Usage-Day-Used` and how long it
+/// waits before its body's second half.
+async fn overlapping_relay(answers: Vec<(&'static str, u64)>) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        for (used, wait_ms) in answers {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            tokio::spawn(async move {
+                let mut bytes = Vec::new();
+                let mut chunk = [0u8; 4096];
+                let end = loop {
+                    if let Some(end) = find_head_end(&bytes) {
+                        break end;
+                    }
+                    let read = stream.read(&mut chunk).await.unwrap();
+                    assert!(read > 0);
+                    bytes.extend_from_slice(&chunk[..read]);
+                };
+                while bytes.len() < end + 4 + ASKED.len() {
+                    let read = stream.read(&mut chunk).await.unwrap();
+                    bytes.extend_from_slice(&chunk[..read]);
+                }
+                let head = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
+                     X-Usage-Day-Used: {used}\r\nTransfer-Encoding: chunked\r\n\
+                     Connection: close\r\n\r\n"
+                );
+                stream.write_all(head.as_bytes()).await.unwrap();
+                let (one, two) = WHOLE.split_at(WHOLE.len() / 2);
+                for (piece, wait) in [(one, wait_ms), (two, 0)] {
+                    let framed = format!("{:x}\r\n{piece}\r\n", piece.len());
+                    stream.write_all(framed.as_bytes()).await.unwrap();
+                    stream.flush().await.unwrap();
+                    tokio::time::sleep(Duration::from_millis(wait)).await;
+                }
+                stream.write_all(b"0\r\n\r\n").await.unwrap();
+            });
+        }
+    });
+    format!("http://{address}/api/v1/ai/v1/deepseek")
+}
+
+/// Twelve's P3 1: a long answer that began at 0.40 and ends after a short
+/// one that said 0.55 leaves 0.55: the header is taken as it arrives, not
+/// when its answer ends.
+#[tokio::test]
+async fn the_newest_header_wins_over_a_longer_answer_begun_before_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = overlapping_relay(vec![("0.400", 600), ("0.550", 0)]).await;
+    let address = metered_forwarder(&base, Some(dir.path())).await;
+    let long = tokio::spawn(async move { ask(address, &chat(Some(TOKEN), ASKED)).await.0 });
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(ask(address, &chat(Some(TOKEN), ASKED)).await.0, 200);
+    assert_eq!(long.await.unwrap(), 200);
+    let kept = lamp_skills::relay_share::read(dir.path()).unwrap();
+    assert_eq!((kept.used, kept.answers), (Some(0.55), 2));
 }
