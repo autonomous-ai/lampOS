@@ -44,6 +44,8 @@ Environment=LAMP_AGENT_SERVICES=on
 Environment=LAMP_MADE_SKILL_LOOSE=on
 # #7233, docs/skills.md; owner, 16 Nov
 Environment=LAMP_MADE_SKILL_ASKS=on
+# #6526, docs/skills.md; first builder, 17 Nov
+Environment=LAMP_MADE_SKILL_SAID=on
 # An uploaded SKILL.md run by the lamp's agent (the owner's ruling, 13 Nov; docs/skills.md "Run by the lamp's agent"):
 # the file kept whole and followed by Hermes in a fresh home, its grants read from it and said back. The same line
 # in lamp-cloud, lamp-voice, lamp-skills and lamp-skills-manage@.
