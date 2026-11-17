@@ -35,6 +35,9 @@ const MOST_PUBLISHERS: usize = 32;
 /// A path taken by another socket is passed over this many times.
 const TRIES: usize = 8;
 
+/// The number in the next subscriber socket's name, counted per process.
+static BOUND: AtomicU64 = AtomicU64::new(0);
+
 /// Notices kept for a caller that has not asked for them: the oldest goes
 /// when there are more.
 const MOST_NOTICES: usize = 32;
@@ -209,7 +212,6 @@ impl Subscriber {
         subscriber: &str,
         expects: Option<&str>,
     ) -> io::Result<Self> {
-        static BOUND: AtomicU64 = AtomicU64::new(0);
         name::topic(topic)?;
         name::subscriber(subscriber)?;
         if let Some(expects) = expects {
@@ -1007,6 +1009,70 @@ mod tests {
         assert!(subscriber.recv(Duration::ZERO).unwrap().is_none());
         assert_eq!(subscriber.repeated(), 0);
         drop(subscriber);
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// A socket file that nobody is bound to, as a process leaves it when
+    /// it exec's or is killed before its subscribers' Drop.
+    fn dead_socket(path: &std::path::Path) {
+        drop(UnixDatagram::bind(path).unwrap());
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn a_subscriber_takes_over_names_left_by_an_earlier_image_of_its_pid() {
+        let root = std::env::temp_dir().join(format!("lbd{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let bus = Bus::new(&root).unwrap();
+        let subs = root.join("update/check/subs");
+        crate::make_directory(&subs, 0o755).unwrap();
+        // Every name this process's next subscribers can take is already
+        // there, as after an exec that kept the pid (#7439). Other tests
+        // count up too, so this covers far more than the next eight.
+        let from = BOUND.load(Ordering::Relaxed);
+        for number in from..from + 256 {
+            dead_socket(&subs.join(format!("stale.{}.{number}.sock", process::id())));
+        }
+        let first = bus.subscribe("update/check", "stale").unwrap();
+        let second = bus.subscribe("update/check", "stale").unwrap();
+        assert!(first.path.exists() && second.path.exists());
+        assert_ne!(first.path, second.path);
+        let mut publisher = bus.publisher("update/check", Kind::Event, "app").unwrap();
+        assert_eq!(publisher.publish_json(1, &1).unwrap().delivered, 2);
+        drop((first, second, publisher));
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_name_somebody_is_bound_to_is_never_taken_over() {
+        let root = std::env::temp_dir().join(format!("lbl{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let bus = Bus::new(&root).unwrap();
+        // Two subscribers in one process: both stay, each with its own file.
+        let mut one = bus.subscribe("update/check", "live").unwrap();
+        let mut two = bus.subscribe("update/check", "live").unwrap();
+        let mut publisher = bus.publisher("update/check", Kind::Event, "app").unwrap();
+        assert_eq!(publisher.publish_json(1, &1).unwrap().delivered, 2);
+        let wait = Duration::from_secs(5);
+        assert!(one.recv(wait).unwrap().is_some());
+        assert!(two.recv(wait).unwrap().is_some());
+        assert!(one.path.exists() && two.path.exists());
+        // Names held by live sockets are passed over and left as they are.
+        let subs = root.join("update/check/subs");
+        let from = BOUND.load(Ordering::Relaxed);
+        let held: Vec<_> = (from..from + 256)
+            .map(|number| {
+                let path = subs.join(format!("held.{}.{number}.sock", process::id()));
+                (UnixDatagram::bind(&path).unwrap(), path)
+            })
+            .collect();
+        let Err(error) = bus.subscribe("update/check", "held") else {
+            panic!("a name somebody is bound to was taken");
+        };
+        assert!(error.to_string().contains("no free socket name"), "{error}");
+        assert!(held.iter().all(|(_, path)| path.exists()));
+        assert!(one.path.exists() && two.path.exists());
+        drop((one, two, publisher, held));
         fs::remove_dir_all(&root).unwrap();
     }
 }
