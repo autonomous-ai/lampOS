@@ -57,29 +57,15 @@ fn boot_identity() -> io::Result<String> {
     Ok(text.trim().to_owned())
 }
 
-/// Off Linux there is no `/proc`: the boot session uuid (`kern.bootsessionuuid`), which changes at
-/// every boot too and is the id lamp-body and lamp-sim already use on macOS, so a voice and the
-/// lamp-sim beside it judge each other's stamps by the same clock. Asked once.
+/// Off Linux there is no `/proc`: the bus's boot id (`lamp_bus::kernel_boot_id`), which on macOS is the
+/// boot session uuid (`kern.bootsessionuuid`), the id lamp-body and lamp-sim use there too. One
+/// source, so the id Controls stamps and the one the bus judges it by cannot drift apart. None
+/// where the id could not be read: then the start says so, as it did.
 #[cfg(not(target_os = "linux"))]
 fn boot_identity() -> io::Result<String> {
-    use std::sync::OnceLock;
-    static ASKED: OnceLock<Result<String, String>> = OnceLock::new();
-    ASKED
-        .get_or_init(|| {
-            let out = std::process::Command::new("/usr/sbin/sysctl")
-                .args(["-n", "kern.bootsessionuuid"])
-                .output()
-                .map_err(|error| format!("the boot session id could not be asked: {error}"))?;
-            let text = String::from_utf8(out.stdout)
-                .map_err(|_| "the boot session id is not text".to_owned())?;
-            let text = text.trim();
-            if !out.status.success() || text.is_empty() {
-                return Err("the boot session id is unavailable".to_owned());
-            }
-            Ok(text.to_owned())
-        })
-        .clone()
-        .map_err(io::Error::other)
+    lamp_bus::kernel_boot_id()
+        .map(str::to_owned)
+        .ok_or_else(|| io::Error::other("the boot session id is unavailable"))
 }
 
 pub fn clock_id(given: Option<&str>) -> io::Result<String> {
@@ -542,5 +528,16 @@ mod clock_id_tests {
         assert!(!first.is_empty() && first.len() <= 128, "{first:?}");
         assert_eq!(clock_id(Some(&first)).unwrap(), first);
         assert_eq!(clock_id(None).unwrap(), first);
+    }
+
+    /// One source for the Mac's boot id: what Controls stamps (`clock_id(None)`) is the bus's
+    /// own boot id (`kern.bootsessionuuid`) byte for byte, so the bus judges Controls' stamps by it.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn on_a_mac_controls_clock_id_is_the_buss_boot_id() {
+        assert_eq!(
+            Some(clock_id(None).unwrap().as_str()),
+            lamp_bus::kernel_boot_id()
+        );
     }
 }

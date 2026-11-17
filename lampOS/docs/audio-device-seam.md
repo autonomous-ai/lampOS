@@ -386,7 +386,10 @@ the bus; with no publisher the privacy worker reports its source expired and the
 on a Linux laptop: "privacy switch unreadable: physical privacy source expired", exit 1). Off Linux
 `lamp_controls::runtime::clock_id(None)` is the macOS boot session uuid (`kern.bootsessionuuid`, the
 id lamp-sim and lamp-body use there), where it read `/proc` before and ended the start with a bare
-"No such file or directory".
+"No such file or directory"; it and the bus's own boot id (`lamp_bus::kernel_boot_id`) are now the
+one read, so on a Mac the Controls state is judged by CLOCK_MONOTONIC, not by the wall clock, which
+on a slow runner had lost its 50 ms freshness ("privacy switch unreadable") after `listening_ready`
+([privacy-switch.md](privacy-switch.md)).
 
 **A Mac start is not proven yet.** The `sim-macos` job's step proves the four refusals (a host
 microphone, the bus microphone, a missing speaker, a host card are each refused by name, with no

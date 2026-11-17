@@ -84,11 +84,12 @@ characters it picked when it was made, `seq` its count on this topic from 1,
 `at_us` the caller's monotonic clock in microseconds, `at_unix_ms` the wall
 clock, `expires_ms` (optional) how long after its stamp the value means
 anything, and `clock` (optional, last) the kernel's boot id
-(`/proc/sys/kernel/random/boot_id`), said only by a publisher that has told
+(`/proc/sys/kernel/random/boot_id`; on a Mac the boot session uuid,
+`kern.bootsessionuuid`), said only by a publisher that has told
 the bus its `at_us` is CLOCK_MONOTONIC (`Publisher::stamp_monotonic_clock`).
 The bus never guesses that: only the caller knows what its `at_us` is, so a
-publisher that does not call it, or whose bus knows no boot id (macOS),
-says no `clock`. A build from before `clock` passes the field over as it
+publisher that does not call it, or whose bus knows no boot id (a platform
+with none, or a read that failed), says no `clock`. A build from before `clock` passes the field over as it
 does any field it does not know, and reads the rest as before; a header
 without it reads to a new build as one with no clock. Controls' state
 publisher says it whenever Controls' stamp clock is this boot's (queue
