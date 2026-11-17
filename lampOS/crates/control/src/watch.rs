@@ -697,6 +697,35 @@ impl Watch {
         self.private
     }
 
+    /// The person's own light, to glow once in when a new computer is let in
+    /// (`LAMP_CONTROL_PAIR_CUE`), or none when a cue would be out of place: the
+    /// lamp is private, paused, asleep or talking, its light is off or not
+    /// known, or the ring is showing something other than that light (a
+    /// computer's or a skill's, which a cue never takes over). The level is
+    /// at least a pulse's own least ([`lamp_msgs::LightPattern::PULSE_LEAST_LEVEL`]).
+    pub fn cue_light(&self) -> Option<lamp_msgs::Light> {
+        if self.private || self.paused || self.asleep || self.talking {
+            return None;
+        }
+        let mut light: lamp_msgs::Light = serde_json::from_value(self.light.clone()).ok()?;
+        if !light.on || !lamp_msgs::Light::COLOURS.contains(&light.colour.as_str()) {
+            return None;
+        }
+        // The ring draws something else over the person's light: leave it.
+        if let Some(shows) = &self.shows
+            && (shows["on"] != json!(light.on)
+                || shows["colour"] != json!(light.colour)
+                || shows["level"] != json!(light.level))
+        {
+            return None;
+        }
+        light.level = light.level.clamp(
+            lamp_msgs::LightPattern::PULSE_LEAST_LEVEL,
+            lamp_msgs::Light::BRIGHTEST,
+        );
+        Some(light)
+    }
+
     /// Whether the person's volume mute is on (`speaker/volume`): false until
     /// lamp-actions says it, so a speaker stream asks the lamp, not a guess.
     pub fn muted(&self) -> bool {
@@ -1238,6 +1267,96 @@ mod tests {
             watch.state(StateKind::Presence),
             json!({"count": 1, "near": 0.3, "facing": true})
         );
+    }
+
+    /// The pairing cue's light (#7471): the person's own, raised to a pulse's
+    /// least level, and none when anything is in the way.
+    #[test]
+    fn the_pairing_cue_takes_the_persons_own_light_and_none_when_a_cue_is_out_of_place() {
+        let mut watch = Watch::new();
+        assert!(watch.cue_light().is_none(), "no light known yet");
+        watch.take(
+            "light/state",
+            &json!({"on": true, "colour": "warm", "level": 1}),
+            S,
+        );
+        let cue = watch.cue_light().unwrap();
+        assert_eq!((cue.colour.as_str(), cue.level, cue.on), ("warm", 2, true));
+        watch.take(
+            "light/state",
+            &json!({"on": true, "colour": "pink", "level": 4}),
+            S,
+        );
+        let cue = watch.cue_light().unwrap();
+        assert_eq!((cue.colour.as_str(), cue.level), ("pink", 4));
+        // The ring draws that same light: still a cue; another light over it: none.
+        watch.take(
+            "light/drawn",
+            &json!({"on": true, "colour": "pink", "level": 4}),
+            S,
+        );
+        assert!(watch.cue_light().is_some());
+        watch.take(
+            "light/drawn",
+            &json!({"on": true, "colour": "red", "level": 3}),
+            S,
+        );
+        assert!(
+            watch.cue_light().is_none(),
+            "a computer's or a skill's light is never taken over"
+        );
+        watch.take(
+            "light/drawn",
+            &json!({"on": true, "colour": "pink", "level": 4}),
+            S,
+        );
+        // The light off, or a colour that is not one of the ten: none.
+        watch.take(
+            "light/state",
+            &json!({"on": false, "colour": "pink", "level": 4}),
+            S,
+        );
+        assert!(watch.cue_light().is_none());
+        watch.take(
+            "light/state",
+            &json!({"on": true, "colour": "mauve", "level": 4}),
+            S,
+        );
+        assert!(watch.cue_light().is_none());
+        watch.take(
+            "light/state",
+            &json!({"on": true, "colour": "pink", "level": 4}),
+            S,
+        );
+        assert!(watch.cue_light().is_some());
+        // Private, paused, asleep or talking: none, and back when each ends.
+        for (topic, on, off) in [
+            (
+                "voice/privacy",
+                json!({"permitted": false}),
+                json!({"permitted": true}),
+            ),
+            (
+                "lamp/pause",
+                json!({"paused": true}),
+                json!({"paused": false}),
+            ),
+            (
+                "voice/mute",
+                json!({"muted": true, "reason": "sleep"}),
+                json!({"muted": false}),
+            ),
+            (
+                "voice/state",
+                json!({"state": "listening"}),
+                json!({"state": "resting"}),
+            ),
+        ] {
+            watch.take(topic, &on, S);
+            assert!(watch.cue_light().is_none(), "{topic}: no cue");
+            watch.take(topic, &off, S);
+            assert!(watch.cue_light().is_some(), "{topic}: a cue again");
+        }
     }
 
     #[test]
