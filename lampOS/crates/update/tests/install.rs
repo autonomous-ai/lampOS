@@ -2422,8 +2422,7 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
 /// 13 Nov: the upload flow goes via the agent): `LAMP_UPLOAD_TO_AGENT` on,
 /// once, in the four units whose part reads it (lamp-cloud's upload,
 /// lamp-voice's keep, lamp-skills' load and its manage helper's install),
-/// each beside what it needs, and in no other; `LAMP_TASK_NET` stays off,
-/// in no unit.
+/// each beside what it needs, and in no other.
 #[test]
 fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
     let readers: [(&str, &[&str]); 4] = [
@@ -2465,10 +2464,6 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
             usize::from(needs.is_some()),
             "{unit}"
         );
-        assert!(
-            !service.iter().any(|line| line.contains("LAMP_TASK_NET")),
-            "{unit} sets LAMP_TASK_NET"
-        );
         let Some(needs) = needs else {
             continue;
         };
@@ -2496,8 +2491,8 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
 /// grants (`task::grants_of`), a made skill's own code and an uploaded
 /// agent skill (`task::origin_refuses`), a write step, a made skill's
 /// lamp-written limits left out (`shed_made_manners`) and a skill's
-/// `[present]` values. Each is set `on` once in both units, and the
-/// network grant (`LAMP_TASK_NET`, read by `grants_of` too) in neither.
+/// `[present]` values. Each is set `on` once in both units, and so is the
+/// network grant (`LAMP_TASK_NET`, read by `grants_of` too, #7200).
 #[test]
 fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
     let loading = [
@@ -2537,9 +2532,49 @@ fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
             );
         }
         let net = lamp_voice::skill_task_yes::NET_ENVIRONMENT;
+        assert_eq!(
+            lines
+                .iter()
+                .filter(|line| **line == format!("Environment={net}=on"))
+                .count(),
+            1,
+            "{unit} lacks {net}"
+        );
+    }
+}
+
+/// A skill's task reaches the public web on 80 and 443 with its owner's
+/// spoken yes (#7200, the first builder's three checks): `LAMP_TASK_NET=on`
+/// once in the six units whose part reads it, and no other product unit
+/// names it: `lamp-tasks` (the run's egress socket, `skill_task::NET_SWITCH`),
+/// `lamp-skills` and its manage helper (`net` loaded as a task grant and
+/// said back), `lamp-control` (`net` kept in the owner's yes, never in a
+/// token), `lamp-voice` (`skill_task_yes::NET_ENVIRONMENT`, said back and
+/// asked) and `lamp-cloud` (the skills page loads with lamp-skills' loader).
+#[test]
+fn the_product_lets_a_skills_task_reach_the_public_web() {
+    let name = lamp_voice::skill_task_yes::NET_ENVIRONMENT;
+    assert_eq!(name, "LAMP_TASK_NET");
+    let switch = format!("Environment={name}=on");
+    let readers = [
+        "lamp-tasks.service",
+        "lamp-skills.service",
+        "lamp-skills-manage@.service",
+        "lamp-control.service",
+        "lamp-voice.service",
+        "lamp-cloud.service",
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = text.lines().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(readers.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit} names {name}");
+    }
+    for reader in readers {
         assert!(
-            !lines.iter().any(|line| line.contains(net)),
-            "{unit} sets {net}"
+            install::PRODUCT.iter().any(|(unit, _)| *unit == reader),
+            "{reader} is not a product unit"
         );
     }
 }

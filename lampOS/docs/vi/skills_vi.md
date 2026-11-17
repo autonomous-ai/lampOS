@@ -3322,7 +3322,7 @@ Yêu cầu của chủ (12/11): một `SKILL.md` tải lên từ app chạy qua 
 đèn, như V1; người xây dựng đầu tiên đồng ý lúc 19:44. Bật trong sản phẩm từ
 13/11 (phán quyết của chủ: luồng tải lên đi qua agent), đặt trong
 `lamp-voice`, `lamp-cloud`, `lamp-skills` và `lamp-skills-manage@`;
-khi `LAMP_TASK_NET` bật (trong sản phẩm vẫn tắt cho tới khi qua các bước kiểm tra), tệp cần tới internet được cấp `net` (chỉ web công khai trên cổng 80 và 443; các mạng của chính đèn bị đóng, còn địa chỉ công khai của router thì không bị chặn),
+khi `LAMP_TASK_NET` bật (bật trong sản phẩm, #7200), tệp cần tới internet được cấp `net` (chỉ web công khai trên cổng 80 và 443; các mạng của chính đèn bị đóng, còn địa chỉ công khai của router thì không bị chặn),
 hỏi lời đồng ý bằng giọng nói của chủ ở lần chạy đầu. Khi đường chạy chung của lamp-update bật
 (`LAMP_SKILL_DEFAULT_AGENT`, bật trong sản phẩm), lần chạy có `net` đi qua Harness, lối ra
 và home mới được tìm theo run id, hoặc bị từ chối `no_net` và được nói thành lời; lần chạy
@@ -3337,7 +3337,7 @@ tệp được giữ nguyên là `scripts/SKILL.md`; kỹ năng là một công 
 thư mục và home mới mỗi lần chạy, dữ liệu Hermes của người dùng bị ẩn, token riêng của lần chạy). Quyền được đọc thận
 trọng từ tệp: `camera`, `light`, `speak`, `sound`, và `net` khi tệp có một liên
 kết `http(s)://`, một webhook, hoặc bảo gọi, lấy hay gửi tới một API web hay URL;
-chỉ nhắc "API" hay "URL" thì chưa đủ (cần `LAMP_TASK_NET=on`, trong sản phẩm vẫn tắt cho tới khi qua các bước kiểm tra). Đèn nói lại các quyền khi bật.
+chỉ nhắc "API" hay "URL" thì chưa đủ (cần `LAMP_TASK_NET=on`, bật trong sản phẩm, #7200). Đèn nói lại các quyền khi bật.
 Chỉ đèn, giọng (kể cả âm thanh nó phát) và thân thì bật ngay (giọng nói ghi lời đồng ý với
 lamp-control); `sound` (nghe các loại âm thanh), micro, camera, gửi đi hoặc `net` thì hỏi lời đồng ý bằng
 giọng nói một lần, ở lần chạy đầu. Khóa hay token không bao giờ được nói ra,
