@@ -4230,6 +4230,19 @@ gone ([switches.md](switches.md)). What happens:
     OpenClaw make outlived its turn and the "yes" after its say-back called
     nothing (test
     `a_voice_makes_yes_after_its_say_back_through_the_say_service_is_forced`).
+    Its line there is its say-back word for word, "I made fruit notes. The
+    lamp's model wrote its code, and that code may use … It waits for you
+    to agree before it runs any code." (a task for the lamp's agent: "I can
+    have the lamp's agent do …" and its own say-back), never the cut turn's
+    "ask me for it again", and the say service tells the model to say it
+    word for word as an app's make's (`app_make::say_note`): on c0a4 (17
+    Nov 22:39) that cut line went as a note in the person's words, was said
+    in 136 chars, the say-back was never heard whole, and the "yes" after it
+    was told to hear it again, so nothing was forced or kept (tests
+    `a_cut_code_makes_say_back_through_the_say_service_forces_the_next_yes`,
+    `a_cut_code_makes_say_back_goes_to_the_say_service_whole`,
+    `a_cut_voice_makes_say_back_is_told_word_for_word`). A make's writes
+    keep `made_skill::cut_write_line`.
     While the make is under way, or its line is still to be said
     (`make_skill_local::Pending`), and for at most 2 minutes after its call
     (`make_skill_local::MAKE_WITHIN`, the longest a make goes on; the line's

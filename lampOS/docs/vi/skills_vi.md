@@ -1370,6 +1370,20 @@ sau:
     OpenClaw 116 s kéo dài quá lượt của nó và lời "yes" sau câu đọc lại
     không gọi gì (kiểm thử
     `a_voice_makes_yes_after_its_say_back_through_the_say_service_is_forced`).
+    Câu được nói ở đó là câu đọc lại của nó, nguyên văn, "I made fruit
+    notes. The lamp's model wrote its code, and that code may use … It waits
+    for you to agree before it runs any code." (một việc cho agent của đèn:
+    "I can have the lamp's agent do …" và câu đọc lại của nó), không bao giờ
+    là câu "ask me for it again" của lượt bị cắt, và dịch vụ nói bảo mô hình
+    nói nguyên văn như với lần tạo từ ứng dụng (`app_make::say_note`): trên
+    c0a4 (17/11 22:39) câu của lượt bị cắt đi dưới dạng note theo lời của
+    người dùng, được nói trong 136 ký tự, câu đọc lại chưa bao giờ được nghe
+    trọn, và lời "yes" sau đó được bảo nghe lại câu đọc lại, nên không gì bị
+    buộc hay được giữ (kiểm thử
+    `a_cut_code_makes_say_back_through_the_say_service_forces_the_next_yes`,
+    `a_cut_code_makes_say_back_goes_to_the_say_service_whole`,
+    `a_cut_voice_makes_say_back_is_told_word_for_word`). Các lần ghi của một
+    lần tạo vẫn dùng `made_skill::cut_write_line`.
     Trong lúc
     đang tạo, hoặc câu của
     nó chưa được nói (`make_skill_local::Pending`), và tối đa 2 phút sau

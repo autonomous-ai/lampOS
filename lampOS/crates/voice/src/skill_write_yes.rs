@@ -186,21 +186,43 @@ pub fn wait_for_yes_noted(asks: Asks, request: u64, now: Instant) -> String {
 /// next line is forced to answer it ([`approve_force`]). On c0a4 (17 Nov
 /// 19:43, build 13838, #7245) a 116 s OpenClaw make outlived its turn, its
 /// say-back was said so, and the "yes" after it was told the approve_id but
-/// called nothing, so the skill was never kept. Whether one was.
-pub fn said_by_the_say_service(request: u64) -> bool {
+/// called nothing, so the skill was never kept.
+///
+/// For a make with code of its own (or a task for the lamp's agent), the
+/// line the say service is given in place of the cut turn's own
+/// ([`said_back_line`]): its say-back word for word, as an app's make's is,
+/// so the next line is forced once it was heard whole. On c0a4 (17 Nov
+/// 22:39, the combo build, #7245) the cut line ("ask me for it again") went
+/// as a note in the conversation's language, the model said it in 136
+/// chars, the say-back was never heard whole, and the "yes" after it was
+/// told to hear it again: nothing was forced or kept. None for no wait of
+/// `request`'s, or one whose line stays the cut turn's own.
+pub fn said_by_the_say_service(request: u64) -> Option<String> {
     kept::waiting(|waiting| {
-        let Some(waiting) = waiting
+        let waiting = waiting
             .as_mut()
-            .filter(|waiting| waiting.request == request)
-        else {
-            return false;
-        };
+            .filter(|waiting| waiting.request == request)?;
         waiting.noted = true;
         eprintln!(
             "lamp-voice: request {request}: its made skill's say-back goes through the say service: the next line must answer its wait"
         );
-        true
+        (waiting.asks.code && !waiting.asks.remove).then(|| said_back_line(&waiting.asks))
     })
+}
+
+/// The line a cut make's code wait is said back in through the say
+/// service ([`said_by_the_say_service`]): its name, then its say-back
+/// whole, ending as the say-back ends, which `app_make::say_note` tells
+/// the model to say word for word (`made_skill::RUNS_AFTER_YES`, or
+/// `made_skill::RUNS_ONCE_AGREED` for a task for the lamp's agent).
+fn said_back_line(asks: &Asks) -> String {
+    let name = crate::made_skill::spoken_name(&asks.skill);
+    let say_back = asks.say_back.trim();
+    if say_back.ends_with(crate::made_skill::RUNS_ONCE_AGREED.trim()) {
+        format!("I can have the lamp's agent do {name}. {say_back}")
+    } else {
+        format!("I made {name}. {say_back}")
+    }
 }
 
 fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> String {
@@ -1687,8 +1709,11 @@ mod tests {
             ..asks("fruit-note", &[])
         };
         let id = wait_for_yes(code.clone(), 1, now);
-        assert!(!said_by_the_say_service(2), "another request's make");
-        assert!(said_by_the_say_service(1));
+        assert!(
+            said_by_the_say_service(2).is_none(),
+            "another request's make"
+        );
+        assert!(said_by_the_say_service(1).is_some());
         lamp_said(2, SAY_BACK);
         assert!(answer_awaited(3, now));
         assert!(approve_forced_now(now), "the yes of request 3 is forced");
@@ -1699,6 +1724,94 @@ mod tests {
         wait_for_yes(code, 4, now);
         lamp_said(4, SAY_BACK);
         assert!(!approve_forced_now(now));
+    }
+
+    /// #7245, c0a4 17 Nov 22:39 (the combo build): a voice make with code
+    /// (62.9 s on OpenClaw) outlived its turn, request 3, so its wait began
+    /// with nothing of request 3's kept toward it. Its say-back went through
+    /// the say service as request 4, a turn of its own with no heard line,
+    /// and the "yes" of request 5 must be forced to answer it. The say
+    /// service is given the say-back word for word, ending as it ends, so
+    /// the model says it whole: never the cut turn's "ask me for it again",
+    /// which went as a note in the person's language, was said in 136
+    /// chars, and left the say-back unheard, the yes told to hear it again,
+    /// and nothing forced or kept.
+    #[test]
+    fn a_cut_code_makes_say_back_through_the_say_service_forces_the_next_yes() {
+        let now = Instant::now();
+        let grants = vec!["camera".to_owned()];
+        let code = Asks {
+            say_back: crate::made_skill::code_said_as(&grants, false)
+                .trim()
+                .to_owned(),
+            grants: Some(grants),
+            code: true,
+            writes: Vec::new(),
+            ..asks("fruit-notes", &[])
+        };
+        let id = wait_for_yes(code.clone(), 3, now);
+        let line = said_by_the_say_service(3).expect("a code make's say-back is said whole");
+        assert!(
+            line.starts_with("I made fruit notes. The lamp's model wrote its code"),
+            "{line}"
+        );
+        assert!(line.ends_with(&code.say_back), "{line}");
+        assert!(
+            line.ends_with(crate::made_skill::RUNS_AFTER_YES.trim()),
+            "{line}"
+        );
+        // Request 4, the say service's own turn with no heard line, kept
+        // only a summary (the cut turn's line in the person's words, as on
+        // c0a4): not forced, and the next line is told to say it again.
+        lamp_said(4, "I made fruit notes. It isn't on yet, just ask me again.");
+        assert!(!approve_forced_now(now), "a summary is no say-back");
+        let note = waiting_note(5, now).unwrap();
+        assert!(!note.contains(&id) && note.contains("was cut"), "{note}");
+        // Said word for word: the yes of request 6 is forced.
+        lamp_said(5, &line);
+        assert!(approve_forced_now(now), "the yes of request 6 is forced");
+        let note = waiting_note(6, now).unwrap();
+        assert!(note.contains(&id), "{note}");
+        assert!(note.contains("always give answer"), "{note}");
+        // Cut by a barge-in while it was said: not forced.
+        lamp_cut(5);
+        assert!(!approve_forced_now(now), "a cut say-back is no say-back");
+        // Said whole again, then a "no": the wait ends, nothing kept.
+        lamp_said(6, &line);
+        assert!(approve_forced_now(now));
+        let no = answered(&id, 7, Some("no")).unwrap();
+        assert_eq!(no["approved"], false, "{no}");
+        assert!(!waits(&id) && !approve_forced_now(now));
+        // A second make while one waits takes the wait: the first make's
+        // cut line is its own again, never the second's say-back.
+        wait_for_yes(code.clone(), 8, now);
+        wait_for_yes(code.clone(), 9, now);
+        assert_eq!(said_by_the_say_service(8), None);
+        // Past the yes window the say-back's line forces nothing.
+        let late = now + YES_WITHIN + Duration::from_secs(1);
+        lamp_said(10, &said_by_the_say_service(9).unwrap());
+        assert!(approve_forced_now(now));
+        assert!(!approve_forced_now(late));
+        // A task for the lamp's agent alike, its own head.
+        let agent = Asks {
+            say_back: crate::made_skill::agent_said(&["camera".to_owned()])
+                .trim()
+                .to_owned(),
+            ..code.clone()
+        };
+        wait_for_yes(agent, 11, now);
+        let line = said_by_the_say_service(11).unwrap();
+        assert!(
+            line.starts_with("I can have the lamp's agent do fruit notes. The lamp's agent"),
+            "{line}"
+        );
+        assert!(
+            line.ends_with(crate::made_skill::RUNS_ONCE_AGREED.trim()),
+            "{line}"
+        );
+        // A make's writes keep the cut turn's own line (never forced).
+        wait_for_yes(asks("leaving-mail", &[]), 12, now);
+        assert_eq!(said_by_the_say_service(12), None);
     }
 
     /// App Only's P1 on #6142: a say-back cut, summed up or missing a
