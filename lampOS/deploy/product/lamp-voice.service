@@ -321,6 +321,10 @@ Environment=LAMP_SPOKEN_TO=on
 Environment=LAMP_BUSY_FOLLOW_UP_RENEWS=on
 # LAMP_TURNED_FACE_SPEAKS: its why and rules are its row in docs/switches.md (#7297).
 Environment=LAMP_TURNED_FACE_SPEAKS=on
+# LAMP_SAID_TO_ME: its why and rules are its row in docs/switches.md (#7442).
+Environment=LAMP_SAID_TO_ME=on
+# LAMP_SPEAKING_READ_LOOKS: its why and rules are its row in docs/switches.md (#7442, #7419).
+Environment=LAMP_SPEAKING_READ_LOOKS=on
 # LAMP_ONE_AS_LAMP: its why and rules are its row in docs/switches.md (#4710).
 Environment=LAMP_ONE_AS_LAMP=on
 Environment=LAMP_FIRST_WORDS=kept
