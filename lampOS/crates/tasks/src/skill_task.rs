@@ -632,6 +632,13 @@ pub trait Tokens {
     fn net_agreed(&self, _skill: &str, _sha256: &str, _grants: &[String]) -> bool {
         false
     }
+    /// A token for a live spoken ask's run `run` (`crate::voice_ask`,
+    /// `LAMP_SERVICES_TO_AGENT`): lamp-control mints exactly the linked
+    /// service `grants` asked, under its switch, or refuses. None by
+    /// default.
+    fn mint_ask(&self, _grants: &[String], _run: &str) -> Result<Minted, String> {
+        Err("no live ask's token on this lamp".into())
+    }
 }
 
 /// No lamp-control token: every run is refused.
@@ -688,18 +695,46 @@ impl ControlTokens {
 const MOST_ANSWER_BYTES: u64 = 64 * 1024;
 
 impl Tokens for ControlTokens {
+    fn mint_ask(&self, grants: &[String], run: &str) -> Result<Minted, String> {
+        self.mint_asked(
+            &json!({"mint": {
+                "ask": grants,
+                "run": run,
+                "expires_in_ms": RUN_LIFETIME.as_millis() as u64,
+            }}),
+            run,
+        )
+    }
+
     fn mint(&self, skill: &str, run: &str) -> Result<Minted, String> {
-        let asked = json!({"mint": {
-            "skill": skill,
-            "run": run,
-            "expires_in_ms": RUN_LIFETIME.as_millis() as u64,
-        }});
+        self.mint_asked(
+            &json!({"mint": {
+                "skill": skill,
+                "run": run,
+                "expires_in_ms": RUN_LIFETIME.as_millis() as u64,
+            }}),
+            run,
+        )
+    }
+
+    fn net_agreed(&self, skill: &str, sha256: &str, grants: &[String]) -> bool {
+        self.net_agreed_asked(skill, sha256, grants)
+    }
+
+    fn end(&self, run: &str) {
+        self.end_asked(run);
+    }
+}
+
+impl ControlTokens {
+    /// One mint `asked` for run `run`: the token and the grants it names.
+    fn mint_asked(&self, asked: &Value, run: &str) -> Result<Minted, String> {
         // Once asked, a token may be live though its answer was lost: end
         // the run on any failure (an end is safe twice, or for no run).
-        let answer = match self.ask(&asked) {
+        let answer = match self.ask(asked) {
             Ok(answer) => answer,
             Err(why) => {
-                self.end(run);
+                self.end_asked(run);
                 return Err(why);
             }
         };
@@ -722,7 +757,7 @@ impl Tokens for ControlTokens {
                 grants,
             }),
             _ => {
-                self.end(run);
+                self.end_asked(run);
                 Err("lamp-control's token answer is not one this lamp-tasks reads".into())
             }
         }
@@ -734,7 +769,7 @@ impl Tokens for ControlTokens {
     /// folder lamp-control hashed itself and the grants it declares, and a
     /// skill has one yes, so an agreed check for the line's SHA-256 and
     /// grants is the owner's yes to `net` for the folder as it is.
-    fn net_agreed(&self, skill: &str, sha256: &str, grants: &[String]) -> bool {
+    fn net_agreed_asked(&self, skill: &str, sha256: &str, grants: &[String]) -> bool {
         grants.iter().any(|grant| grant == NET_GRANT)
             && self
                 .ask(
@@ -743,7 +778,7 @@ impl Tokens for ControlTokens {
                 .is_ok_and(|answer| answer["agreed"] == true)
     }
 
-    fn end(&self, run: &str) {
+    fn end_asked(&self, run: &str) {
         if let Err(why) = self.ask(&json!({"end": {"run": run}})) {
             // The token still ends at its own time (RUN_LIFETIME, 14 minutes at most).
             eprintln!("[lamp-tasks] skill task: ending run {run}: {why}");
