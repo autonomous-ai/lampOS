@@ -1998,16 +1998,31 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   only while its own record says the owner ran that skill now by voice
   within 45 s (`made_run::answers_now`, `ANSWERS_WITHIN`, the thread's
   `GOING_ON_FOR`); otherwise it waits as any exact line; `answers` goes
-  only with exact text. The journal says `do.task: what became of its
-  run: said in the asking conversation`. **Otherwise it is news**
+  only with exact text. That record is kept in the coordinator, where the
+  say service reads it: on the second route the run is made in the
+  worker's process, which tells the coordinator `MadeRunNow` (skill name
+  only, `made_run::ran_of`) over its channel, and the coordinator keeps
+  it (`made_run_now`, trace `made_run_now`); the Live worker tells it
+  the same way (El's P1 on #7363). The record is keyed by the skill's
+  name alone, so any say-socket caller naming that skill within those
+  45 s is let through as its answer: exact words only, the same trust as
+  `prepare-unplug`'s lines. The journal says `do.task: what became of its
+  run: said in the asking conversation`. A line the voice may have said
+  but whose outcome was lost (the say socket timed out or closed with it
+  queued) counts as said and is never said again as news; only one surely
+  never played (`expired`, `refused`, or `dropped` before it began) falls
+  to news (`answer_outcome`). **Otherwise it is news**
   (`service_read::tell_news`): a trigger's run, a line ready later, or one
   the voice didn't say as the answer (`not said in the asking conversation
   (<why>), so as news: …`) waits behind a told answer's gate (below: the
   owner alone, the lamp's one read turn) and is said once, the next time
   the owner is seen within 30 minutes (`NEWS_WAIT`), else dropped
   (`skipped: <why>`); at quiet hours it is dropped at once (`skipped:
-  quiet hours`), never held through them (`LAMP_TOLD_WHEN_ASKED` still
-  lifts the quiet for a run asked by voice). Before, the line waited up to
+  quiet hours`), never held through them. With `LAMP_TOLD_WHEN_ASKED` on,
+  a run asked by voice and ready within five minutes has its quiet lifted
+  in the gate's own look (`LampRoom::seen`, `told_when_asked::quiet_holds`),
+  so those minutes are not quiet hours there and it is not dropped for
+  them. Before, the line waited up to
   an hour for one face alone and no voice, and on lamp-9adf (17 Nov, 21:11)
   "Fig facts is running now." was followed by nothing. Lines:
   `missing_secret` "<Skill>

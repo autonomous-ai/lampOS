@@ -871,6 +871,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         // A fixture keeps no input and never reports one.
         | ProviderOutput::InputDiscarded { .. }
         | ProviderOutput::OwnershipAssumed { .. }
+        | ProviderOutput::MadeRunNow { .. }
         | ProviderOutput::Ended { .. } => None,
         ProviderOutput::Started { request, .. }
         | ProviderOutput::Audio { request, .. }

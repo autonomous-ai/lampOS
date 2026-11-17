@@ -3943,16 +3943,29 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   cho thấy chủ đèn đã chạy ngay kỹ năng đó bằng giọng nói trong vòng 45 giây
   (`made_run::answers_now`, `ANSWERS_WITHIN`, `GOING_ON_FOR` của thread);
   nếu không, câu chờ như mọi câu chính xác khác; `answers` chỉ đi với text
-  chính xác. Nhật ký ghi `do.task: what became of its run: said in the
-  asking conversation`. **Ngoài ra, đó là tin tức** (`service_read::tell_news`):
+  chính xác. Bản ghi đó được giữ ở coordinator, nơi dịch vụ say đọc nó: ở
+  route thứ hai, lần chạy diễn ra trong tiến trình của worker, worker báo
+  coordinator `MadeRunNow` (chỉ tên kỹ năng, `made_run::ran_of`) qua kênh
+  của nó, và coordinator giữ lại (`made_run_now`, trace `made_run_now`);
+  worker Live báo cùng cách (P1 của El trên #7363). Bản ghi chỉ theo tên
+  kỹ năng, nên mọi bên gọi say socket nêu tên kỹ năng đó trong 45 giây ấy
+  đều được cho qua như câu trả lời: chỉ lời chính xác, cùng mức tin cậy như
+  các câu của `prepare-unplug`. Nhật ký ghi `do.task: what became of its
+  run: said in the asking conversation`. Câu mà giọng nói có thể đã nói
+  nhưng mất kết quả (say socket hết thời gian chờ hoặc đóng khi câu còn
+  trong hàng) được tính là đã nói và không bao giờ nói lại như tin tức;
+  chỉ câu chắc chắn chưa phát (`expired`, `refused`, hoặc `dropped` trước
+  khi bắt đầu) mới thành tin tức (`answer_outcome`). **Ngoài ra, đó là tin tức** (`service_read::tell_news`):
   lần chạy của trigger, câu sẵn sàng muộn hơn, hoặc câu giọng nói không nói
   như câu trả lời (`not said in the asking conversation (<why>), so as
   news: …`) chờ sau cổng của câu trả lời cần nói (dưới: chủ đèn một mình,
   lượt đọc duy nhất của đèn) và được nói một lần, lần tới chủ đèn được thấy
   trong vòng 30 phút (`NEWS_WAIT`), nếu không thì bỏ (`skipped: <why>`);
   vào giờ yên lặng thì bỏ ngay (`skipped: quiet hours`), không bao giờ giữ
-  qua giờ yên lặng (`LAMP_TOLD_WHEN_ASKED` vẫn bỏ giờ yên lặng cho lần chạy
-  được yêu cầu bằng giọng nói). Trước đây câu chờ tới một giờ để có đúng
+  qua giờ yên lặng. Khi `LAMP_TOLD_WHEN_ASKED` bật, lần chạy được yêu cầu
+  bằng giọng nói và sẵn sàng trong năm phút được bỏ giờ yên lặng ngay trong
+  lần nhìn của cổng (`LampRoom::seen`, `told_when_asked::quiet_holds`), nên
+  những phút đó không phải giờ yên lặng ở đó và câu không bị bỏ vì chúng. Trước đây câu chờ tới một giờ để có đúng
   một khuôn mặt và không có giọng nói, và trên lamp-9adf (17/11, 21:11) sau
   "Fig facts is running now." không có gì nữa. Các câu: `missing_secret` "<Skill> couldn't run: it needs a key added in the app, on its page.";
   mọi lời từ chối khác trước khi agent bắt đầu, hoặc không tới được

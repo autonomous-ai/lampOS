@@ -4299,6 +4299,7 @@ fn observe_provider_output(
         ProviderOutput::Unclear { .. }
         | ProviderOutput::LookAsked { .. }
         | ProviderOutput::SleepAsked { .. }
+        | ProviderOutput::MadeRunNow { .. }
         | ProviderOutput::ServiceCalled { .. }
         | ProviderOutput::StepCallHeard { .. }
         | ProviderOutput::StopAnswered { .. }
@@ -9015,6 +9016,11 @@ fn conversation_with_gate_inner(
                         request,
                         trace,
                     )?;
+                }
+                // A made skill run now by the owner's voice, in the worker's
+                // process: kept here, where the say service reads it (#7363).
+                ProviderOutput::MadeRunNow { request, skill } => {
+                    made_run_now(request, &skill, trace)?;
                 }
                 ProviderOutput::SleepAsked { request } => {
                     // With `LAMP_SLEEP_LINE=on` and the line kept (#3748
@@ -14795,6 +14801,19 @@ fn skill_sound_now(gates: SoundGates<'_>, says: &crate::say::Says) -> crate::say
             .lock()
             .is_ok_and(|thread| thread.going_on(std::time::Instant::now())),
     }
+}
+
+/// A made skill the worker ran now for `request`, as its owner asked by
+/// voice (`ProviderOutput::MadeRunNow`): kept in this process, where the say
+/// service reads it (`made_run::answers_now`), so its failure line may
+/// answer that conversation (#7363, El's P1: the worker's own record is
+/// never read here). The trace has the skill's name only.
+fn made_run_now(request: u64, skill: &str, trace: &mut SessionState) -> Result<()> {
+    crate::made_run::ran_now(skill, std::time::Instant::now());
+    record(
+        trace,
+        json!({"kind":"made_run_now","request":request,"skill":skill}),
+    )
 }
 
 /// What the ring is told of the turn in hand, from what plays in it. The

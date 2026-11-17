@@ -1169,6 +1169,15 @@ pub enum ProviderOutput {
     SleepAsked {
         request: u64,
     },
+    /// A made skill was run now for `request`, as its owner asked by voice
+    /// (`crate::made_run`, a call's answer `"ran": true`): the coordinator
+    /// keeps it ([`crate::made_run::ran_now`]), as its say service reads it
+    /// there, never in this process (El's P1 on #7363). Sent once a call;
+    /// owed even for a retired request, as the run was made.
+    MadeRunNow {
+        request: u64,
+        skill: String,
+    },
     /// The model called a linked service's function
     /// ([`crate::services::NAMES`]: `service_read` and the rest) for
     /// `request` on the second route, so its own "Let me look." in that
@@ -1584,6 +1593,8 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
             // About a retired request by definition, and still owed.
             | ProviderOutput::InputDiscarded { .. }
             | ProviderOutput::OwnershipAssumed { .. }
+            // A run made: the coordinator keeps it whatever the turn.
+            | ProviderOutput::MadeRunNow { .. }
             | ProviderOutput::Ended { .. } => None,
             ProviderOutput::Transcript { request, .. } => *request,
             ProviderOutput::Started { request, .. }
@@ -2398,6 +2409,9 @@ async fn serve_with_visual<C: Connect>(
                 }
                 for sleep in desk.take_sleeps() {
                     output.push_back(Outbound::Output(sleep));
+                }
+                for ran in desk.take_made_runs() {
+                    output.push_back(Outbound::Output(ran));
                 }
                 // Each call answered, for the first-output record when
                 // there is one (#799); let go when there is none.
@@ -3794,6 +3808,9 @@ struct ToolDesk {
     /// Requests whose `go_to_sleep` was answered with the line to say, since
     /// the worker last took them (#3748).
     sleeps: Vec<u64>,
+    /// Made skills run now by voice, since the worker last took them
+    /// ([`ProviderOutput::MadeRunNow`]).
+    made_runs: Vec<ProviderOutput>,
 }
 /// The longest a skill tool's look is owed after its answer: it begins
 /// within `LOOK_BEGINS_WITHIN` and waits `STILL_WAIT` for its still.
@@ -3891,6 +3908,7 @@ impl ToolDesk {
             looks: Vec::new(),
             news: Vec::new(),
             sleeps: Vec::new(),
+            made_runs: Vec::new(),
         }
     }
     /// The requests ended because they asked again for an action held,
@@ -4672,6 +4690,13 @@ impl ToolDesk {
                 };
                 self.looks.push((done.request, done.session.get(), dropped));
             }
+            // A made skill run now: the coordinator keeps it (#7363).
+            if let Some(skill) = crate::made_run::ran_of(&done.told) {
+                self.made_runs.push(ProviderOutput::MadeRunNow {
+                    request: done.request,
+                    skill,
+                });
+            }
             // A finished task's news the model now has: the tasks part is
             // told it was heard only once that turn is heard whole (#1390).
             if taken && let Some(key) = &done.news {
@@ -4729,6 +4754,10 @@ impl ToolDesk {
             .into_iter()
             .map(|request| ProviderOutput::SleepAsked { request })
             .collect()
+    }
+    /// The made skills run now since the last take (#7363).
+    fn take_made_runs(&mut self) -> Vec<ProviderOutput> {
+        std::mem::take(&mut self.made_runs)
     }
     fn take_looks(&mut self) -> Vec<(u64, u64, Option<String>)> {
         std::mem::take(&mut self.looks)

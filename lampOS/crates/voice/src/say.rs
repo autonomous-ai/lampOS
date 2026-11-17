@@ -1990,6 +1990,18 @@ impl Says {
         (says, answered)
     }
 
+    /// For a test of the voice's loop: `skill`'s exact line asked as the
+    /// answer to the conversation that ran it now (#7363), rendered already.
+    #[cfg(test)]
+    pub(crate) fn answers_exact_for_test(
+        skill: &str,
+        samples: Vec<i16>,
+    ) -> (Self, mpsc::Receiver<Answer>) {
+        let (mut says, answered) = Self::exact_for_test(skill, samples);
+        says.waiting[0].request.answers = true;
+        (says, answered)
+    }
+
     /// For a test of the voice's loop: one skill's step's exact line at
     /// `priority`, asked `quiet` (#5999), rendered already.
     #[cfg(test)]
