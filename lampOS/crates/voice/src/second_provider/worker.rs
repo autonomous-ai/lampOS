@@ -6052,6 +6052,9 @@ fn made_running(
         eprintln!(
             "lamp-voice second: request {request}: its turn was cut while make_skill ran: the made skill's line is said through the say service"
         );
+        // No model round saw the make's answer, so its wait is an app
+        // make's: the line after the say-back must answer it (#7245).
+        crate::skill_write_yes::said_by_the_say_service(request);
         let saying = std::thread::Builder::new()
             .name("lamp-voice-made-line".into())
             .spawn(move || {
