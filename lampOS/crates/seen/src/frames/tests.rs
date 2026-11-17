@@ -185,7 +185,7 @@ fn the_gate_closing_with_a_request_out_drops_everything() {
         Closed::PrivacyClosed,
         Closed::PrivacyUnknown,
         Closed::Nobody,
-        Closed::Stranger,
+        Closed::PresenceUnknown,
         Closed::Asleep,
     ] {
         let mut taker = Taker::new(Fake::default());
@@ -405,8 +405,8 @@ mod marked {
         );
         assert!(sink.holds_mark());
         assert_eq!(
-            taker.step(Err(Closed::Stranger), 10 + FRESH_US + 10, &mut sink),
-            Step::Dropped(Closed::Stranger)
+            taker.step(Err(Closed::Nobody), 10 + FRESH_US + 10, &mut sink),
+            Step::Dropped(Closed::Nobody)
         );
         assert!(!sink.holds_mark(), "let go on the gate's close");
         assert!(!taker.holds_anything());

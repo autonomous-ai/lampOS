@@ -38,16 +38,13 @@
 //!   and activity's retreat after busy bursts and failures.
 //! - [`wire`]: V1's WebSocket messages for activity and pose, as types.
 //! - [`watch`]: the bus readings the gate is built from.
-//! - [`pause`]: a stranger reading on the same tracked face pauses the gate
-//!   (nothing sent, nothing said) instead of ending the sitting; anything
-//!   else, or 5 s, wipes what the pause kept.
-//! - [`keep`]: any other short closing (the face lost, a reading gone
-//!   stale) keeps the posture window and the doing timers, unsaid, for up
-//!   to 120 s; standing up, a forget, the opt-in off, the privacy, sleep and
-//!   a stranger still wipe at once.
-//! - [`hold`]: with `LAMP_SEEN_HOLDS_SITTING=on`, the owner's recognised
-//!   sitting goes on without the face while the newest pose answer sees a
-//!   close person, for at most 10 min since the face was last recognised.
+//! - [`keep`]: a short closing (the face lost, a reading gone stale) keeps
+//!   the posture window and the doing timers, unsaid, for up to 120 s;
+//!   standing up, a forget, the opt-in off, the privacy and sleep still
+//!   wipe at once. There is no stranger check (the owner's word on #6543).
+//! - [`hold`]: with `LAMP_SEEN_HOLDS_SITTING=on`, the sitting goes on
+//!   without the face while the newest pose answer sees a close person,
+//!   for at most 10 min since the gate was last open on a face.
 //! - [`pose`]: posture (phase 3): one frame every 30 s to the pose model,
 //!   one socket each, its RULA score kept as this sitting's rolling window
 //!   and said on `humans/posture`; off unless `LAMP_SEEN_POSTURE=on`, and
@@ -66,10 +63,11 @@ pub mod link;
 pub mod mark;
 pub mod opt_in;
 pub mod outlet;
-pub mod pause;
 pub mod pose;
 pub mod said_back;
 pub mod scale;
+#[cfg(test)]
+pub(crate) mod scene;
 pub mod sitting;
 pub mod watch;
 pub mod wire;

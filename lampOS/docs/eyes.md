@@ -3476,9 +3476,9 @@ link, as before. The file is never an `EnvironmentFile=`: the boots are
 in neither the eyes' environment nor their command line. Beside it,
 `lamp-seen frame-link` keeps `/run/lampos-seen/eyes-visits.env`, only
 `LAMP_EYES_VISITS=--visits on`, which the unit loads (`EnvironmentFile=-`)
-and puts on the line: `humans/familiar` for `lamp-seen`'s stranger check
-only, a level with no name, face or picture (the first builder's yes on
-#6543); with the switch off it is removed and the eyes run without it. The
+and puts on the line: `humans/familiar`, a level with no name, face or
+picture (the first builder's yes on #6543), once for `lamp-seen`'s
+stranger check, which is gone (seen.md, "No stranger check"); with the switch off it is removed and the eyes run without it. The
 folder `/run/lampos-eyes-frames` is made 0700 `lampos` by `lampos.conf`;
 `lamp-seen` runs as `lampos` too, so it may connect. The eyes take a new
 link only at their next start.

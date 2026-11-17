@@ -281,7 +281,6 @@ fn the_window_resets_whenever_the_gate_closes_or_on_standing_up() {
         Closed::PresenceUnknown,
         Closed::Asleep,
         Closed::SleepUnknown,
-        Closed::Stranger,
         Closed::Nobody,
         Closed::NoOptIn,
         Closed::NotSaidYet,
@@ -543,24 +542,22 @@ fn said_while_the_gate_is_open_and_not_after() {
 
 /// What one step of `serve` came to.
 struct Served {
-    verdict: crate::pause::Verdict,
     plan: crate::keep::Plan,
     posture: Option<HumanPosture>,
     doing: Option<lamp_msgs::HumanDoing>,
 }
 
-/// One step of `serve` at `now` (`main.rs`): the pause, the keep, posture
+/// One step of `serve` at `now` (`main.rs`): the keep, posture
 /// and the sitting's timers together, and what is said this step.
 fn as_serve(
     pose: &mut Pose,
     sitting: &mut Option<crate::sitting::Sitting>,
     keep: &mut crate::keep::Keep,
-    scene: &mut crate::pause::tests::Scene,
+    scene: &mut crate::scene::Scene,
     now: u64,
     stood_up: bool,
 ) -> Served {
-    let verdict = scene.step(now);
-    let verdict = crate::pause::after_stood_up(&mut scene.pause, verdict, stood_up);
+    scene.renew(now);
     let inputs = scene.readings.inputs(scene.opted_in, true, now);
     let on_track = scene.readings.on_track(now);
     let gate = crate::gate::may_request(&inputs);
@@ -575,8 +572,6 @@ fn as_serve(
         now_us: now,
         inputs: &inputs,
         seen: &on_track,
-        verdict,
-        pause_lost: scene.pause.lost(),
         stood_up,
         forgot: false,
         posture_gate: gate,
@@ -593,8 +588,8 @@ fn as_serve(
     if desk.is_ok() && sitting.is_none() {
         *sitting = Some(crate::sitting::Sitting::new(now));
     }
-    let held = verdict.paused || plan.sitting.holds();
-    let posture = if verdict.paused || plan.posture.holds() {
+    let held = plan.sitting.holds();
+    let posture = if plan.posture.holds() {
         pose.hold(now);
         None
     } else {
@@ -605,7 +600,6 @@ fn as_serve(
         .filter(|_| !held)
         .map(|sitting| sitting.doing(now));
     Served {
-        verdict,
         plan,
         posture,
         doing,
@@ -620,16 +614,15 @@ fn sat_and_drank(
     Pose,
     Option<crate::sitting::Sitting>,
     crate::keep::Keep,
-    crate::pause::tests::Scene,
+    crate::scene::Scene,
 ) {
-    use crate::pause::tests::Scene;
+    use crate::scene::Scene;
     let mut pose = pose(mock);
     let mut sitting = None;
     let mut keep = crate::keep::Keep::default();
     let mut scene = Scene::owner_at(0);
     for at in [0, 30 * S, 60 * S] {
         scene.faces(&[("f1", 0.4)], at);
-        scene.known(at);
         as_serve(&mut pose, &mut sitting, &mut keep, &mut scene, at, false);
         send(&mut pose, at);
         settle(&mut pose, at, Ok(()));
@@ -644,63 +637,48 @@ fn sat_and_drank(
 }
 
 #[test]
-fn known_misread_known_within_5_s_keeps_the_window_and_the_drink() {
+fn the_owner_read_as_another_face_keeps_the_window_and_the_drink() {
+    // lamp-06c1, run 6: the owner, the lamp angled to the side, read as a
+    // stranger three times, and each wiped the window and lost a drink.
+    // No stranger check: a second face, or the owner under a new id, goes
+    // on as before.
     let mock = Mock::start(vec![Reply::Ergo(Some(slumped()))]);
     let (mut pose, mut sitting, mut keep, mut scene) = sat_and_drank(&mock);
-    // The owner looks down at 89 s: paused, through the posture due at 90 s.
-    scene.stranger(89 * S);
-    for at in [89 * S, 90 * S, 91 * S, 92 * S] {
-        scene.faces(&[("f1", 0.42)], at);
-        let served = as_serve(&mut pose, &mut sitting, &mut keep, &mut scene, at, false);
-        assert!(served.verdict.paused && !served.verdict.wipe, "{at}");
-        assert_eq!(
-            (served.posture, served.doing),
-            (None, None),
-            "nothing said while paused: {at}"
-        );
-        assert!(!pose.ready(at), "no frame taken while paused");
-    }
-    assert_eq!(pose.samples(), 3, "the window kept, in memory");
-    // Recognised again at 93 s on the same face: the sitting goes on.
-    scene.faces(&[("f1", 0.4)], 93 * S);
-    scene.known(93 * S);
+    scene.faces(&[("f1", 0.4), ("f2", 0.1)], 89 * S);
+    let two = as_serve(
+        &mut pose,
+        &mut sitting,
+        &mut keep,
+        &mut scene,
+        89 * S,
+        false,
+    );
+    assert_eq!(two.plan.hard, None);
+    assert_eq!(pose.samples(), 3, "the window kept");
+    scene.faces(&[("f6", 0.4)], 90 * S);
     let served = as_serve(
         &mut pose,
         &mut sitting,
         &mut keep,
         &mut scene,
-        93 * S,
+        90 * S,
         false,
     );
-    assert_eq!(served.verdict, crate::pause::Verdict::default());
-    let posture = served.posture.expect("said at once, the 90 s one owed");
-    assert_eq!(posture.window_s, 93, "the window from 0 s, not reset");
+    assert_eq!(served.plan.hard, None);
+    let posture = served.posture.expect("the 90 s posture said");
+    assert_eq!(posture.window_s, 90, "the window from 0 s, not reset");
     assert!(posture.bad_share > 0.0, "the slumped samples kept");
     assert_eq!(
         served.doing.unwrap().drank_s_ago,
-        33,
+        30,
         "the drink at 60 s kept"
     );
 }
 
 #[test]
-fn the_privacy_during_a_pause_wipes_and_says_nothing() {
+fn the_privacy_wipes_and_says_nothing() {
     let mock = Mock::start(vec![Reply::Ergo(Some(slumped()))]);
     let (mut pose, mut sitting, mut keep, mut scene) = sat_and_drank(&mock);
-    scene.faces(&[("f1", 0.4)], 89 * S);
-    scene.stranger(89 * S);
-    assert!(
-        as_serve(
-            &mut pose,
-            &mut sitting,
-            &mut keep,
-            &mut scene,
-            89 * S,
-            false
-        )
-        .verdict
-        .paused
-    );
     let resets = pose.counts().resets;
     scene.privacy = false;
     for at in [90 * S, 95 * S, 120 * S] {
@@ -710,10 +688,10 @@ fn the_privacy_during_a_pause_wipes_and_says_nothing() {
         assert_eq!(pose.samples(), 0, "wiped: {at}");
     }
     assert_eq!(pose.counts().resets, resets + 1);
-    // Open again, recognised: a fresh window and timers, nothing carried.
+    // Open again: a fresh posture window, nothing slumped carried; the
+    // doing timers never ended on the privacy alone (`keep.rs`).
     scene.privacy = true;
     scene.faces(&[("f1", 0.4)], 121 * S);
-    scene.known(121 * S);
     let served = as_serve(
         &mut pose,
         &mut sitting,
@@ -723,7 +701,7 @@ fn the_privacy_during_a_pause_wipes_and_says_nothing() {
         false,
     );
     assert_eq!(served.posture, None, "no sample in the fresh window yet");
-    assert_eq!(served.doing.unwrap().drank_s_ago, 0, "from the new arrival");
+    assert_eq!(served.doing.unwrap().drank_s_ago, 61, "the sitting goes on");
     send(&mut pose, 121 * S);
     let said = settle(&mut pose, 121 * S, Ok(()));
     assert_eq!(
@@ -738,7 +716,7 @@ fn the_privacy_during_a_pause_wipes_and_says_nothing() {
 }
 
 /// The face lost from 61 s for `away` seconds, then back under the passing
-/// id `id` and recognised: what is said when the gate opens again.
+/// id `id`: what is said when the gate opens again.
 fn lost_for(away: u64, id: &str) -> (Pose, Served) {
     let mock = Mock::start(vec![Reply::Ergo(Some(slumped()))]);
     let (mut pose, mut sitting, mut keep, mut scene) = sat_and_drank(&mock);
@@ -756,7 +734,6 @@ fn lost_for(away: u64, id: &str) -> (Pose, Served) {
     }
     let back = (61 + away) * S;
     scene.faces(&[(id, 0.4)], back);
-    scene.known(back);
     let served = as_serve(&mut pose, &mut sitting, &mut keep, &mut scene, back, false);
     (pose, served)
 }
@@ -808,9 +785,8 @@ fn the_face_lost_130_s_wipes() {
 
 #[test]
 fn another_face_back_within_120_s_takes_nothing_on() {
-    // Back 30 s later under another passing id and recognised: the eyes'
-    // level says someone remembered, not who, so nothing slumped and no
-    // drink carries over.
+    // Back 30 s later under another passing id: whose face it is is not
+    // known, so nothing slumped and no drink carries over.
     let (pose, served) = lost_for(30, "f4");
     assert_eq!(
         served.plan.posture,

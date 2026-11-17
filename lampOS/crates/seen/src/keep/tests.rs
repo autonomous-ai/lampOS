@@ -1,13 +1,12 @@
-//! The keep's rules, read from the bus as `serve` reads it, with the pause
-//! stepped as `serve` steps it ([`crate::pause::tests::Scene`]).
+//! The keep's rules, read from the bus as `serve` reads it
+//! ([`crate::scene::Scene`]).
 use super::*;
-use crate::pause::tests::{MS, S, Scene};
+use crate::scene::{S, Scene};
 
 /// One step of `serve`'s keep at `at`, with posture said and a sitting
 /// under way.
 fn plan(scene: &mut Scene, keep: &mut Keep, at: u64, stood_up: bool, forgot: bool) -> Plan {
-    let verdict = scene.step(at);
-    let verdict = pause::after_stood_up(&mut scene.pause, verdict, stood_up);
+    scene.renew(at);
     let inputs = scene.readings.inputs(scene.opted_in, true, at);
     let seen = scene.readings.on_track(at);
     let gate = crate::gate::may_request(&inputs);
@@ -22,8 +21,6 @@ fn plan(scene: &mut Scene, keep: &mut Keep, at: u64, stood_up: bool, forgot: boo
         now_us: at,
         inputs: &inputs,
         seen: &seen,
-        verdict,
-        pause_lost: scene.pause.lost(),
         stood_up,
         forgot,
         posture_gate: gate,
@@ -37,10 +34,9 @@ fn owner(scene: &mut Scene, keep: &mut Keep, at: u64) -> Plan {
     owner_as(scene, keep, "f1", at)
 }
 
-/// A remembered face `id` alone in view and recognised at `at`.
+/// A face `id` alone in view at `at`.
 fn owner_as(scene: &mut Scene, keep: &mut Keep, id: &str, at: u64) -> Plan {
     scene.faces(&[(id, 0.4)], at);
-    scene.known(at);
     plan(scene, keep, at, false, false)
 }
 
@@ -60,15 +56,11 @@ fn the_face_lost_30_s_then_back_and_recognised_goes_on() {
         assert_eq!((still.posture, still.sitting), (Step::Kept, Step::Kept));
         assert!(still.posture.holds() && still.sitting.holds());
     }
-    // Back on the same passing id: closed until the recogniser says a
-    // level said after it came.
+    // Back on the same passing id: open at once, no recogniser's level
+    // waited for.
     scene.faces(&[("f1", 0.4)], 32 * S);
-    let back = plan(&mut scene, &mut keep, 32 * S, false, false);
-    assert_eq!(scene.gate(32 * S), Err(crate::gate::Closed::Stranger));
-    assert_eq!((back.posture, back.sitting), (Step::Kept, Step::Kept));
-    scene.known(32 * S + 500 * MS);
-    let open = plan(&mut scene, &mut keep, 32 * S + 500 * MS, false, false);
-    assert_eq!(scene.gate(32 * S + 500 * MS), Ok(()));
+    let open = plan(&mut scene, &mut keep, 32 * S, false, false);
+    assert_eq!(scene.gate(32 * S), Ok(()));
     assert_eq!((open.posture, open.sitting), (Step::Resumed, Step::Resumed));
     assert_eq!(
         open.posture.line("posture's window", "open").unwrap(),
@@ -79,8 +71,7 @@ fn the_face_lost_30_s_then_back_and_recognised_goes_on() {
 
 #[test]
 fn a_second_remembered_person_within_120_s_starts_afresh() {
-    // The owner (f1) leaves; another remembered person (f7) sits down 30 s
-    // later and is recognised: `humans/familiar` gives only a level, so the
+    // The owner (f1) leaves; another person (f7) sits down 30 s later: the
     // window and timers kept for f1 are wiped, never taken on by f7.
     let mut scene = Scene::owner_at(0);
     let mut keep = Keep::default();
@@ -89,11 +80,8 @@ fn a_second_remembered_person_within_120_s_starts_afresh() {
     let lost = plan(&mut scene, &mut keep, 2 * S, false, false);
     assert_eq!((lost.posture, lost.sitting), (Step::Began, Step::Began));
     scene.faces(&[("f7", 0.4)], 32 * S);
-    let back = plan(&mut scene, &mut keep, 32 * S, false, false);
-    assert_eq!((back.posture, back.sitting), (Step::Kept, Step::Kept));
-    scene.known(32 * S + 500 * MS);
-    let other = plan(&mut scene, &mut keep, 32 * S + 500 * MS, false, false);
-    assert_eq!(scene.gate(32 * S + 500 * MS), Ok(()));
+    let other = plan(&mut scene, &mut keep, 32 * S, false, false);
+    assert_eq!(scene.gate(32 * S), Ok(()));
     assert_eq!(other.hard, None);
     assert_eq!(
         (other.posture, other.sitting),
@@ -214,69 +202,22 @@ fn the_privacy_after_the_face_was_lost_still_wipes_at_once() {
 }
 
 #[test]
-fn a_stranger_confirmed_wipes_at_once() {
-    // A second face in view.
+fn a_second_face_or_a_guest_goes_on() {
+    // No stranger check (the owner's word on #6543): a second face beside
+    // the owner closes and wipes nothing.
     let mut scene = Scene::owner_at(0);
     let mut keep = Keep::default();
     owner(&mut scene, &mut keep, S);
     scene.faces(&[("f1", 0.4), ("f2", 0.1)], 2 * S);
     let two = plan(&mut scene, &mut keep, 2 * S, false, false);
-    assert_eq!(two.hard, Some(Hard::Stranger));
-    assert_eq!(two.posture, Step::Wiped(Why::Hard(Hard::Stranger)));
-    assert_eq!(two.sitting, Step::Wiped(Why::Hard(Hard::Stranger)));
-    // The face lost, then another sits down and is read as nobody
-    // remembered: kept while not known, wiped once the reading says so.
-    let mut scene = Scene::owner_at(0);
-    let mut keep = Keep::default();
-    owner(&mut scene, &mut keep, S);
-    scene.faces(&[], 2 * S);
-    assert!(
-        plan(&mut scene, &mut keep, 2 * S, false, false)
-            .sitting
-            .holds()
-    );
+    assert_eq!(two.hard, None);
+    assert_eq!((two.posture, two.sitting), (Step::Open, Step::Open));
+    // The owner turned away and read under a new id in the same step: the
+    // gate stays open, so nothing kept and nothing wiped.
     scene.faces(&[("f9", 0.4)], 3 * S);
-    assert!(
-        plan(&mut scene, &mut keep, 3 * S, false, false)
-            .sitting
-            .holds()
-    );
-    scene.stranger(4 * S);
-    scene.faces(&[("f9", 0.4)], 4 * S);
-    let them = plan(&mut scene, &mut keep, 4 * S, false, false);
-    assert_eq!(them.sitting, Step::Wiped(Why::Hard(Hard::Stranger)));
-    assert_eq!(them.posture, Step::Wiped(Why::Hard(Hard::Stranger)));
-}
-
-#[test]
-fn a_misread_past_5_s_still_wipes_at_once() {
-    let mut scene = Scene::owner_at(0);
-    let mut keep = Keep::default();
-    owner(&mut scene, &mut keep, S);
-    scene.faces(&[("f1", 0.4)], 2 * S);
-    scene.stranger(2 * S);
-    let paused = plan(&mut scene, &mut keep, 2 * S, false, false);
-    assert_eq!((paused.posture, paused.sitting), (Step::Open, Step::Open));
-    scene.faces(&[("f1", 0.4)], 7 * S);
-    let past = plan(&mut scene, &mut keep, 7 * S, false, false);
-    assert!(past.posture.wipes() && past.sitting.wipes(), "{past:?}");
-}
-
-#[test]
-fn the_face_lost_during_a_pause_is_kept() {
-    let mut scene = Scene::owner_at(0);
-    let mut keep = Keep::default();
-    owner(&mut scene, &mut keep, S);
-    scene.faces(&[("f1", 0.4)], 2 * S);
-    scene.stranger(2 * S);
-    plan(&mut scene, &mut keep, 2 * S, false, false);
-    assert!(scene.pause.paused());
-    // pause.rs: no face wipes what the pause kept; the outer keep holds it.
-    scene.faces(&[], 3 * S);
-    let lost = plan(&mut scene, &mut keep, 3 * S, false, false);
-    assert!(scene.pause.lost());
-    assert_eq!(lost.hard, None);
-    assert_eq!((lost.posture, lost.sitting), (Step::Began, Step::Began));
+    let them = plan(&mut scene, &mut keep, 3 * S, false, false);
+    assert_eq!(them.hard, None);
+    assert_eq!((them.posture, them.sitting), (Step::Open, Step::Open));
 }
 
 #[test]
@@ -298,13 +239,11 @@ fn standing_up_or_a_forget_wipes_at_once() {
     let mut scene = Scene::owner_at(0);
     let mut keep = Keep::default();
     scene.faces(&[("f1", 0.4)], S);
-    scene.known(S);
     let open_up = plan(&mut scene, &mut keep, S, true, false);
     assert!(open_up.sitting.wipes());
     let mut scene = Scene::owner_at(0);
     let mut keep = Keep::default();
     scene.faces(&[("f1", 0.4)], S);
-    scene.known(S);
     let forgot = plan(&mut scene, &mut keep, S, false, true);
     assert_eq!(forgot.sitting, Step::Wiped(Why::Hard(Hard::Forgot)));
 }
