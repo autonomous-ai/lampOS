@@ -149,6 +149,17 @@ pub fn near(apart: usize, name: &str) -> bool {
     apart * 4 <= words_of(name).concat().chars().count()
 }
 
+/// Whether the words `named` (the skill a person's line names, as the
+/// model gave it, `skill_write_yes::NAMED`) name the skill `name` itself:
+/// the whole of them, as a made skill's name is written ([`words_of`]),
+/// [`near`] the whole name ("moon fax" is moon fact). Never a run inside
+/// longer words, so "moon fact" is not "moon", nor "evening dim" "moon
+/// fact" (#7545). Spelling only: no word is judged by what it means.
+pub fn same_name(named: &str, name: &str) -> bool {
+    let named = words_of(named).concat();
+    !named.is_empty() && near(distance(&named, &words_of(name).concat()), name)
+}
+
 /// The person's made skills (the made skills' index), each name once with
 /// its package's SHA-256, the newest kept for a name.
 fn made(keeping: &Keeping) -> Vec<(String, String)> {
@@ -284,10 +295,11 @@ pub(crate) fn said_or(names: &[String]) -> String {
 pub fn then_wait(id: &str) -> String {
     format!(
         "End there, asking nothing else and calling nothing now: nothing is removed until they \
-         agree. When they answer, call make_skill with only approve_id \"{id}\" and answer \
+         agree. When they answer, call make_skill with only approve_id \"{id}\", answer \
          \"yes\" if they agree, \"no\" if they decline or wait, \"unclear\" if you can't tell, \
          \"new_ask\" if their line answers nothing asked but asks something new (another \
-         skill named, another thing asked)."
+         skill named, another thing asked), and named: the skill their line names, or \
+         \"none\". A yes removes only the skill asked about."
     )
 }
 
@@ -696,7 +708,7 @@ pub(crate) mod tests {
         let id = id_of(&asked(ask("moon-fax", 1), &keeping, owner, now));
         yes::lamp_said(1, "Remove moon fact?");
         assert!(yes::approve_forced_now(now), "the next line must answer it");
-        assert_eq!(yes::answered(&id, 2, Some("yes")), None);
+        assert_eq!(yes::answered(&id, 2, Some("yes"), Some("moon fax")), None);
         assert_eq!(
             crate::make_skill_local::not_owners_yes_refused(&id, || true),
             None
@@ -729,7 +741,7 @@ pub(crate) mod tests {
         let now = Instant::now();
         let id = id_of(&asked(ask("moon fact", 1), &keeping, owner, now));
         yes::lamp_said(1, "Remove moon fact?");
-        let told = yes::answered(&id, 2, Some("no")).unwrap();
+        let told = yes::answered(&id, 2, Some("no"), None).unwrap();
         assert_eq!(told["approved"], false);
         let next = told["next"].as_str().unwrap();
         assert!(next.contains("moon fact stays"), "{next}");
@@ -738,13 +750,13 @@ pub(crate) mod tests {
 
         let id = id_of(&asked(ask("moon fact", 3), &keeping, owner, now));
         yes::lamp_said(3, "Remove moon fact?");
-        let once = yes::answered(&id, 4, Some("unclear")).unwrap();
+        let once = yes::answered(&id, 4, Some("unclear"), None).unwrap();
         assert!(
             once["next"].as_str().unwrap().contains("remove moon fact"),
             "{once}"
         );
         assert!(yes::awaited(now));
-        let again = yes::answered(&id, 5, None).unwrap();
+        let again = yes::answered(&id, 5, None, None).unwrap();
         assert!(again["next"].as_str().unwrap().contains("moon fact stays"));
         assert!(!yes::awaited(now));
         assert_eq!(names(&keeping.directory), ["moon-fact", "evening-dim"]);
@@ -764,7 +776,7 @@ pub(crate) mod tests {
         let id = id_of(&asked(ask("moon fact", 1), &keeping, owner, now));
         yes::lamp_said(1, "Remove moon fact?");
         assert!(yes::approve_forced_now(now));
-        let told = yes::answered(&id, 2, Some("new_ask")).unwrap();
+        let told = yes::answered(&id, 2, Some("new_ask"), None).unwrap();
         assert_eq!(told["approved"], false, "{told}");
         assert_eq!(told["left"], "moon-fact", "{told}");
         let next = told["next"].as_str().unwrap();
@@ -780,6 +792,66 @@ pub(crate) mod tests {
         assert!(late.get("removed").is_none(), "{late}");
         assert_eq!(names(&keeping.directory), ["moon-fact", "evening-dim"]);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's and El's HOLDs on #7561 (#7545's P1 in code): "Remove
+    /// moon fact?", then "remove the evening dim skill" labelled `yes` by
+    /// the model, but with the skill the line names, evening dim, which is
+    /// not the one asked about. The yes is bound to its skill: read as a
+    /// new ask, nothing is removed, the wait is dropped, no later yes can
+    /// take it, and the model is told it left moon fact as it is.
+    #[test]
+    fn a_yes_naming_another_skill_removes_nothing() {
+        let (root, keeping) = twelves_lamp("remove-yes-other");
+        let now = Instant::now();
+        let id = id_of(&asked(ask("moon fact", 1), &keeping, owner, now));
+        yes::lamp_said(1, "Remove moon fact?");
+        assert!(yes::approve_forced_now(now));
+        let told = yes::answered(&id, 2, Some("yes"), Some("evening dim")).unwrap();
+        assert_eq!(told["approved"], false, "{told}");
+        assert_eq!(told["left"], "moon-fact", "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("left moon fact as it is"), "{next}");
+        assert!(!yes::awaited(now));
+        let late = yes::approve(&id, 3, true, true, now, |_| {
+            panic!("a yes naming another skill removes nothing")
+        });
+        assert!(late.get("removed").is_none(), "{late}");
+        assert_eq!(names(&keeping.directory), ["moon-fact", "evening-dim"]);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A yes naming the asked skill, as heard ("moon fax") or by no name
+    /// at all (`none`), is its yes; a forced yes with no name given reads
+    /// as unclear and asks once more, never removing on a yes the model
+    /// didn't bind; a name that is only part of a longer one is no match.
+    #[test]
+    fn a_yes_is_taken_only_for_the_asked_skill() {
+        for (named, taken) in [
+            (Some("moon fax"), true),
+            (Some("Moon Fact"), true),
+            (Some(yes::NAMED_NONE), true),
+            (Some("moon"), false),
+            (Some("evening dim"), false),
+            (None, false),
+        ] {
+            let (root, keeping) = twelves_lamp("remove-yes-bound");
+            let now = Instant::now();
+            let id = id_of(&asked(ask("moon fact", 1), &keeping, owner, now));
+            yes::lamp_said(1, "Remove moon fact?");
+            let told = yes::answered(&id, 2, Some("yes"), named);
+            assert_eq!(told.is_none(), taken, "{named:?}: {told:?}");
+            if named.is_none() {
+                let next = told.unwrap()["next"].as_str().unwrap().to_owned();
+                assert!(next.contains("remove moon fact, yes or no"), "{next}");
+                assert!(yes::awaited(now), "unclear asks once more");
+            }
+            yes::clear_for_test();
+            let _ = std::fs::remove_dir_all(&root);
+        }
+        assert!(same_name("my moon fact skill", "moon-fact"));
+        assert!(!same_name("moon fact", "moon"));
+        assert!(!same_name("", "moon-fact"));
     }
 
     /// A visitor's yes removes nothing: the wait is dropped, as every made

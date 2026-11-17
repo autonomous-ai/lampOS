@@ -1654,9 +1654,35 @@ một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong 
   khi không có gì chờ thì không hỏi câu đó là của ai, vì cái "có" chỉ là
   của chủ đèn. Câu tiếp theo của người
   dùng bị buộc vòng 1 gọi `make_skill` (`skill_write_yes::approve_force`,
-  như câu trả lời cho task của kỹ năng), với `approve_id` và `answer`
-  (`yes`, `no` hoặc `unclear`, bỏ trống thì đọc là `unclear`): code quyết
-  định khi nào, mô hình quyết định họ đã trả lời gì.
+  như câu trả lời cho task của kỹ năng), với `approve_id`, `answer`
+  (`yes`, `no`, `unclear` hoặc `new_ask`, bỏ trống thì đọc là `unclear`)
+  và `named`: code quyết định khi nào, mô hình quyết định họ đã trả lời gì.
+- **Cái "có" gắn với kỹ năng của nó** (#7545, HOLD của Twelve và El trên
+  #7561). Form bị buộc nhận thêm `named` (`skill_write_yes::NAMED`): kỹ
+  năng mà câu của người dùng nhắc tới, chỉ tên của nó như họ nói, hoặc
+  `none`. Mô hình điền nó; code đọc một `yes` mà `named` không phải `none`
+  cũng không phải chính tên kỹ năng đang chờ (`made_remove::same_name`:
+  cả tên, viết như tên một kỹ năng đã tạo, sai không quá một phần tư số
+  chữ cái, không bao giờ là một đoạn nằm trong các từ dài hơn, nên "moon
+  fact" không phải "moon") là một `new_ask` (bên dưới), nên một cái "có"
+  không bao giờ gỡ kỹ năng nào khác ngoài kỹ năng đã hỏi, dù mô hình gán
+  nhãn gì cho câu đó. Một `yes` của việc chờ bị buộc mà không có `named`
+  được đọc là `unclear`. Điều này cũng đúng với task của kỹ năng và lần tạo
+  có code từ ứng dụng, vì form bị buộc của chúng là một. Journal: "… was a
+  new ask, not an answer (a yes naming OTHER, not NAME): nothing kept, the
+  wait dropped", hoặc "a yes to NAME's wait named no skill: read as
+  unclear".
+- **Chỉ là câu trả lời cho câu hỏi đó.** Một câu không trả lời điều gì đã
+  hỏi mà hỏi một điều mới (nhắc tới kỹ năng khác, hỏi điều khác) là
+  `new_ask` của mô hình (`skill_write_yes::NEW_ASK`), được nói trong mô tả
+  tham số `answer` và trong ghi chú của việc chờ: việc gỡ bị bỏ, không gì bị
+  gỡ, và mô hình được bảo nói rằng nó để NAME như cũ, rồi làm điều câu đó
+  hỏi, như với mọi câu (`skill_write_yes::remove_left_next`); một cái "có"
+  sau đó không tìm thấy gì đang chờ. Trên lamp-9adf, 18:12 ngày 17/11,
+  "Remove mail count?", rồi "Lamp, remove the joke time skill" bị buộc
+  thành yes, no hoặc unclear, bị nhận là cái "có", và mail count bị gỡ.
+  Journal: "the line after NAME's question was a new ask, not an answer:
+  nothing kept, the wait dropped".
 - **Chỉ gỡ khi có "có".** `yes` gỡ nó: cái đang bật, mà thư mục của nó
   trong thư mục kỹ năng được bật từ đúng gói đó (SHA-256 trong
   `.package.json` của nó là cái đã giữ), qua chính `{"remove": NAME}` của
@@ -1671,7 +1697,11 @@ một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong 
   tên và SHA-256 đó thì được nói là chưa gỡ. Đã gỡ khỏi đèn mà không ghi
   được `made.json` thì đèn nói NAME "is off the lamp, but still listed
   among the skills they made", và journal cũng ghi vậy (`"still_listed"`). Đèn nói "NAME is removed."
-  (`skill_write_yes::removed_next`). `no` giữ nó và kết thúc việc chờ
+  (`skill_write_yes::removed_next`); nếu cùng câu đó hỏi thêm ("Yes, and
+  remove the joke one too", P2 của El trên #7561), mô hình làm điều đó
+  ngay trong lượt, như với mọi câu, nên nó không bao giờ bị mất: việc gỡ
+  khác có câu hỏi và việc chờ riêng, và không gì khác bị gỡ khi chưa có cái
+  "có" của riêng nó. `no` giữ nó và kết thúc việc chờ
   ("NAME stays", `remove_declined_next`); `unclear` hỏi lại một lần, ngắn,
   "remove NAME, yes or no?" (`remove_unclear_next`), và `unclear` lần hai
   giữ nó.
@@ -1702,7 +1732,16 @@ Kiểm thử: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact
 `second_provider::tests::remove_words`:
 `a_yes_after_remove_moon_fact_is_forced_and_removes_it`,
 `a_no_after_remove_moon_fact_keeps_it`,
-`no_force_before_the_question_is_said_whole`.
+`no_force_before_the_question_is_said_whole`,
+`the_forced_round_may_answer_that_the_line_is_a_new_ask`,
+`a_new_ask_after_remove_moon_fact_keeps_it_and_is_answered`,
+`a_yes_naming_another_skill_removes_nothing_and_is_answered`,
+`a_yes_with_a_second_remove_removes_the_asked_one_and_asks_the_other`; và
+`made_remove::tests::a_new_ask_after_the_question_drops_the_remove_and_keeps_it`,
+`a_yes_naming_another_skill_removes_nothing`,
+`a_yes_is_taken_only_for_the_asked_skill`,
+`skill_write_yes::tests::a_new_ask_ends_a_tasks_wait_agreeing_nothing`,
+`a_yes_naming_another_skill_agrees_nothing_on_a_tasks_wait`.
 
 **Tắt và bật lại bằng giọng nói** (#7445, chỉ khi bật
 `LAMP_MADE_SKILL_OFF_SAID`: trên lamp-9adf, bản 13252, "Lamp, turn off the
@@ -3958,7 +3997,7 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   `make_skill` được khai báo, trước mọi lực buộc khác: công tắc tắt thì nó
   chỉ buộc câu trả lời cho việc gỡ một kỹ năng đã tạo, "Gỡ bằng giọng
   nói"), mà
-  form `approve_id` của nó nhận thêm `answer`: `yes`, `no` hoặc `unclear` (bỏ trống: `yes` với
+  form `approve_id` của nó nhận thêm `answer`: `yes`, `no`, `unclear` hoặc `new_ask` (bỏ trống: `yes` với
   thao tác ghi hay code của lần tạo bằng giọng nói, như trước; `unclear` với task
   của kỹ năng hay lần tạo có code từ ứng dụng, để một lời gọi bị ép mà không có câu trả lời không bao giờ
   giữ một lời đồng ý). Code quyết định khi nào; mô hình quyết định cái gì
@@ -3982,13 +4021,22 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   việc duyệt với mọi cổng ở trên; `no` không giữ gì, kết thúc việc chờ và
   đèn nói nó vẫn tắt (`skill_write_yes::DECLINED_NEXT`); `unclear` không
   giữ gì và đèn hỏi lại một lần (`UNCLEAR_NEXT`), và `unclear` lần hai kết
-  thúc việc chờ như một `no` (`skill_write_yes::answered`). Vòng bị buộc
-  chỉ được nói `approve_id` và `answer` trong form của `make_skill`, cả hai
+  thúc việc chờ như một `no` (`skill_write_yes::answered`); `new_ask`, một
+  câu không trả lời điều gì đã hỏi mà hỏi điều mới (nhắc tới kỹ năng khác,
+  hỏi điều khác), không giữ gì, kết thúc việc chờ, và mô hình được bảo nói
+  NAME vẫn như cũ, rồi làm điều câu đó hỏi (`skill_write_yes::new_ask_next`,
+  với việc gỡ là `remove_left_next`), nên một yêu cầu mới không bao giờ bị
+  ép thành cái "có". Một `yes` gắn với kỹ năng của nó (#7545): `named`, kỹ
+  năng câu đó nhắc tới hoặc `none`, phải là chính tên kỹ năng đang chờ hoặc
+  `none`, nếu không cái "có" được đọc là `new_ask`; một `yes` bị buộc mà
+  không có `named` được đọc là `unclear` ("Gỡ bằng giọng nói", "Cái "có"
+  gắn với kỹ năng của nó"). Vòng bị buộc
+  chỉ được nói `approve_id`, `answer` và `named` trong form của `make_skill`, cả ba
   bắt buộc (`skill_write_yes::APPROVE_FIELDS`, #6921), nên lời gọi bị buộc
   không mang theo việc tạo hay sửa nào bên cạnh câu trả lời. `no` hoặc
   `unclear` được đọc trước bước kiểm tra chủ đèn, nên của bất kỳ ai (cả
   khách) cũng kết thúc hoặc hỏi lại việc chờ của chủ đèn và không bao giờ
-  giữ một lời đồng ý; một `answer` ngoài ba giá trị này được đọc là `no`;
+  giữ một lời đồng ý; một `answer` ngoài bốn giá trị này được đọc là `no`;
   hai câu trả lời trong một dòng được xử lý theo thứ tự gọi, mỗi cái riêng.
   Journal: "the
   line after a skill's task said back whole: its first round must call
