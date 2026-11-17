@@ -107,6 +107,14 @@ pub struct Waiting {
     /// How many heard turns past [`YES_WITHIN`] have been guarded against
     /// saying it is on (#7270, [`late_guarded`]).
     pub late_guarded: u8,
+    /// Later requests whose line, as the model was asked it, was only the
+    /// lamp's name or no words at all ([`line_heard`]), at most
+    /// [`SAID_KEPT`]: no answer is taken in one, and the wait goes on.
+    pub name_only: Vec<u64>,
+    /// The newest later request whose line the second route asks of the
+    /// model ([`line_heard`]): its round is not forced to answer when that
+    /// line was only the lamp's name ([`approve_forced_now`]).
+    pub newest_line: u64,
 }
 
 /// A skill's task, or a made skill's code, just agreed to (#6749 A): its
@@ -190,6 +198,8 @@ fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> Str
             noted,
             unclear: false,
             late_guarded: 0,
+            name_only: Vec::new(),
+            newest_line: 0,
         });
     });
     if remove {
@@ -258,6 +268,16 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
         let waiting = waiting.as_ref().filter(|waiting| {
             request > waiting.request && now.saturating_duration_since(waiting.at) <= YES_WITHIN
         })?;
+        // Only the lamp's name ([`line_heard`]): no answer to it, so no
+        // approve_id either, and the wait goes on for the next line.
+        if name_only_line(waiting, request) {
+            return Some(format!(
+                "(For you to know, not to answer: the lamp still waits for their answer to what \
+                 it just said back about the skill {}. This line was only your name, which \
+                 answers nothing: answer the call as you would, and don't call make_skill now.)",
+                crate::made_skill::spoken_name(&waiting.asks.skill)
+            ));
+        }
         // A remove (#6960): the lamp asked its one question, and the
         // person's answer is the call's, whatever it is.
         if waiting.asks.remove {
@@ -622,11 +642,44 @@ fn stands_between(waiting: &Waiting, kept: &(u64, String, bool)) -> bool {
     !(*id > waiting.request && *cut && said.is_empty())
 }
 
+/// Whether the line of `request` was only the lamp's name, or no words at
+/// all, as the model was asked it ([`line_heard`]).
+fn name_only_line(waiting: &Waiting, request: u64) -> bool {
+    waiting.name_only.contains(&request)
+}
+
+/// The second route asks the model the line of `request`; `name_only`:
+/// as asked, it is only the lamp's name, or no words at all
+/// (`second_provider`, the same line told it was a call). While a yes is
+/// awaited, such a line answers nothing (lamp-9adf, 17 Nov 13:58: an app's
+/// make with code said back, then a lone "Hello?" heard as the name was
+/// asked as a call, its round forced to answer, and the model's yes put
+/// the Gmail-reading code on): no answer to the wait is taken in it, yes,
+/// no or unclear ([`approve`], [`answered`]), its round is not forced
+/// ([`approve_forced_now`]), the note gives no approve_id
+/// ([`waiting_note`]), and the wait goes on for the next line. State, not
+/// words: the route already judged the line a call.
+pub fn line_heard(request: u64, name_only: bool) {
+    kept::waiting(|waiting| {
+        let Some(waiting) = waiting.as_mut().filter(|waiting| request > waiting.request) else {
+            return;
+        };
+        waiting.newest_line = waiting.newest_line.max(request);
+        if name_only && !waiting.name_only.contains(&request) {
+            if waiting.name_only.len() == SAID_KEPT {
+                waiting.name_only.remove(0);
+            }
+            waiting.name_only.push(request);
+        }
+    });
+}
+
 /// Whether [`approve_force`] forces a request at `now`.
 pub fn approve_forced_now(now: Instant) -> bool {
     kept::waiting(|waiting| {
         waiting.as_ref().is_some_and(|waiting| {
             answer_forced(waiting)
+                && !name_only_line(waiting, waiting.newest_line)
                 && now.saturating_duration_since(waiting.at) <= YES_WITHIN
                 && waiting
                     .said
@@ -640,6 +693,21 @@ pub fn approve_forced_now(now: Instant) -> bool {
                     })
         })
     })
+}
+
+/// What the model is told of an answer to a wait in a line that was only
+/// the lamp's name ([`line_heard`]): nothing taken, and it still waits.
+pub const NAME_ONLY_NOT_TAKEN: &str = "Not taken: that line was only your name, no answer to \
+     what you said back. Nothing changed, and it still waits for their answer. Answer the call \
+     only, in a few words, and call nothing.";
+
+/// [`NAME_ONLY_NOT_TAKEN`] told, and journaled, for `skill`'s wait in
+/// `request`.
+fn name_only_not_taken(request: u64, skill: &str) -> Value {
+    eprintln!(
+        "lamp-voice: request {request}: an answer to {skill}'s say-back not taken: its line was only the lamp's name; the wait goes on (#6307)"
+    );
+    json!({ "approved": false, "error": NAME_ONLY_NOT_TAKEN })
 }
 
 /// What the model is told when the person declined the say-back.
@@ -682,6 +750,11 @@ pub fn answered(id: &str, request: u64, answer: Option<&str>) -> Option<Value> {
     }
     kept::waiting(|kept| {
         let waiting = kept.as_mut().filter(|waiting| waiting.id == id)?;
+        // Only the lamp's name ([`line_heard`]): no answer at all, the wait
+        // as it was.
+        if name_only_line(waiting, request) {
+            return Some(name_only_not_taken(request, &waiting.asks.skill));
+        }
         // Left out: a yes for a made skill's writes or code, as before;
         // for a skill's task or an app's make with code, whose approval
         // call code forces whatever the person said ([`approve_force`]),
@@ -1017,6 +1090,7 @@ pub fn approve(
     }
     enum Took {
         Nothing,
+        NameOnly(Value),
         NotSaid(String, String, Kind, String),
         Waiting(Box<Waiting>),
     }
@@ -1024,6 +1098,11 @@ pub fn approve(
         let Some(waiting) = kept.as_ref().filter(|waiting| waiting.id == id) else {
             return Took::Nothing;
         };
+        // Only the lamp's name ([`line_heard`]): never the yes, and the
+        // wait goes on.
+        if name_only_line(waiting, request) {
+            return Took::NameOnly(name_only_not_taken(request, &waiting.asks.skill));
+        }
         if refused(waiting, request, heard, now).is_none()
             && sends_here
             && !said_whole_before(waiting, request)
@@ -1050,6 +1129,7 @@ pub fn approve(
             eprintln!("lamp-voice: request {request}: a made skill's yes found nothing waiting");
             return json!({ "error": NOT_APPROVED });
         }
+        Took::NameOnly(told) => return told,
         Took::NotSaid(id, say_back, kind, line) => {
             eprintln!("{line}");
             let (error, say, wait) = match kind {
