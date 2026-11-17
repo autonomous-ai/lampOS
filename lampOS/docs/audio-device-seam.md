@@ -262,6 +262,21 @@ by 13:21 that day (the first builder on #1178). lamp-cb94 took it at 07:21 UTC,
 with Twelve watching an hour of `NRestarts`, the reference statuses, run
 ends, mute and the kernel's mmc and usb lines.
 
+Starting a stream is not recovered, with one narrow exception (#7420). On a
+loaded lamp the capture worker was held up about 67 ms and took the
+speaker's clock-start notice late; its stamps were past the 40 ms
+(`MAX_REFERENCE_AGE_US`), the worker ended on `InvalidStart`, and the voice
+with it. Capture-clocked, the reference is paired with the capture by count
+through the ring the prime filled; the start's stamps feed only the delay
+hint. So with `--reference-clock capture --reference-recovery bounded` a
+start taken late is used and counted (`late_starts` in the recovery counts,
+and one `lamp-voice:` stderr line saying how late), up to the policy's 1 s
+untrusted bound. Every other start check stands: wrong or zero epoch, a
+second start, a request before the prime, a request after its completion,
+and a completion later than the notice was taken. With the fixed margin the
+start sets the count's origin, and with recovery off any doubt is a fault:
+there it is 40 ms, as before.
+
 Tests: `tests/capture_hold_worker.rs`'s
 `a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded`
 (Linux only, so the ARM64 run), the worker's own loop and sockets:

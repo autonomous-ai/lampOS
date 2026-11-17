@@ -53,6 +53,10 @@ struct Session {
     privacy_at: Option<u64>,
     /// The capture block before which the speaker restarts its clock.
     restart_at: Option<u64>,
+    /// How long before the session began the speaker was primed and started
+    /// its clock: the worker was held up and took the start notice that
+    /// much late.
+    start_taken_late_us: u64,
     /// The detector's score for every capture block: 0.9 is someone
     /// speaking throughout, 0.0 an empty room.
     score: f32,
@@ -108,6 +112,7 @@ impl Session {
             capture_late: Box::new(|_| 0),
             privacy_at: None,
             restart_at: None,
+            start_taken_late_us: 0,
             score: 0.9,
         }
     }
@@ -124,12 +129,11 @@ impl Session {
             queued_frames: PRIME_FRAMES,
             discarded,
         };
+        let primed_at = START - self.start_taken_late_us;
         state
-            .prime(prime(1, None, START), START + 2, 2, &mut echo)
+            .prime(prime(1, None, primed_at), primed_at + 2, 2, &mut echo)
             .unwrap();
-        state
-            .started(1, START + 10, START + 20, START + 30)
-            .unwrap();
+        let started = state.started(1, primed_at + 10, primed_at + 20, START + 30);
         let period = 10_000.0 / (1.0 + self.skew_ppm * 1e-6);
         let mut run = Run {
             blocks: 0,
@@ -140,6 +144,11 @@ impl Session {
             trusted_blocks: 0,
             timing: ReferenceTiming::default(),
         };
+        if let Err(error) = started {
+            run.fault = Some(error.downcast_ref::<ReferenceFault>().unwrap().reason);
+            run.timing = state.timing();
+            return run;
+        }
         // Packets of the current epoch: number, first cursor, when it began.
         let (mut epoch, mut packet, mut epoch_start, mut cursor) = (1, 0_u64, START, 480_u64);
         let mut sent_in_all = 0_u64;
@@ -761,6 +770,80 @@ fn a_speaker_that_restarts_its_clock_is_a_cold_canceller_too() {
     // The speaker's restart is its own; it spends none of the reseed budget.
     assert_eq!(run.reseeds, 0);
     assert_eq!(run.timing.playback_epoch, 2);
+}
+
+/// A load stall of the issue's length between the prime and the start
+/// notice being taken.
+const LATE_START_US: u64 = 67_000;
+
+#[test]
+fn a_start_notice_taken_late_under_a_stall_is_taken_and_counted() {
+    // Capture-clocked, the reference is paired by count through the ring
+    // the prime filled; the start's stamps only feed the delay hint. Taken
+    // late, it pairs exactly as an on-time one, and the stream runs.
+    let mut state = recovering();
+    let mut session = Session::new(98.0, 3_000);
+    session.sound = true;
+    session.start_taken_late_us = LATE_START_US;
+    let run = session.run(&mut state);
+    assert_eq!((run.blocks, run.fault), (3_000, None), "{:?}", run.causes());
+    assert!(run.statuses.is_empty(), "{:?}", run.causes());
+    assert!(run.bypassed.is_empty() && run.reseeds == 0);
+    assert_eq!(run.trusted_blocks, 3_000);
+    assert_eq!(run.timing.capture_blocks_processed, 3_000);
+    let counts = run.timing.recovery.unwrap();
+    assert_eq!(counts.late_starts, 1, "{counts:?}");
+    assert_eq!((counts.degradations, counts.skipped_frames), (0, 0));
+}
+
+#[test]
+fn a_late_start_notice_is_still_a_fault_where_its_stamps_align_the_stream() {
+    // The fixed margin measures its origin from the start, so a late one is
+    // what it always was even with recovery. Without recovery nothing is.
+    for mut state in [
+        ReferenceAssembly::recentring(Policy::BOUNDED),
+        ReferenceAssembly::capture_clocked(),
+    ] {
+        let mut session = Session::new(98.0, 100);
+        session.start_taken_late_us = LATE_START_US;
+        let run = session.run(&mut state);
+        assert_eq!((run.blocks, run.fault), (0, Some(Kind::InvalidStart)));
+        assert!(run.timing.clock_started_at_us.is_none());
+    }
+}
+
+#[test]
+fn a_start_notice_older_than_recovery_allows_is_still_a_fault() {
+    let mut state = recovering();
+    let mut session = Session::new(98.0, 100);
+    session.start_taken_late_us = Policy::BOUNDED.untrusted_deadline_us;
+    let run = session.run(&mut state);
+    assert_eq!((run.blocks, run.fault), (0, Some(Kind::InvalidStart)));
+    assert_eq!(run.timing.recovery.unwrap().late_starts, 0);
+}
+
+#[test]
+fn a_start_notice_completed_after_it_was_taken_is_a_fault() {
+    let mut state = recovering();
+    let mut echo = EchoProcessor::new(false);
+    let prime = ClockPrimed {
+        playback_epoch: 1,
+        privacy_generation: 2,
+        accepted_zero_frames: PRIME_FRAMES,
+        accepted_at_us: START,
+        queue_observed_at_us: START + 1,
+        queued_frames: PRIME_FRAMES,
+        discarded: None,
+    };
+    state.prime(prime, START + 2, 2, &mut echo).unwrap();
+    let error = state
+        .started(1, START + 10, START + 50, START + 30)
+        .unwrap_err();
+    assert_eq!(
+        error.downcast_ref::<ReferenceFault>().unwrap().reason,
+        Kind::InvalidStart
+    );
+    assert!(state.timing().clock_started_at_us.is_none());
 }
 
 #[test]
