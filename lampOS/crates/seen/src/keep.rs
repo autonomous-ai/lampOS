@@ -7,45 +7,34 @@
 //! On a live person the gate closed four times in eight minutes on brief
 //! misreads and a face lost for a moment (lamp-06c1, run 3), and each
 //! closing forgot the posture window, so with three samples wanted it was
-//! almost never said. The pause on a misread ([`crate::pause`]) keeps them
-//! for at most 5 s on the same tracked face; this is the longer, outer keep
-//! around it.
+//! almost never said. There is no stranger check any more (the owner's
+//! word on #6543), so a misread, a second face or a guest closes nothing.
 //!
 //! - **Wiped at once** ([`Hard`]): `room/stood_up`, a forget
 //!   (`memory/forgot`), the opt-in off, the privacy closed (the slide, or
-//!   the voice muting capture), the lamp asleep, a stranger (a second face
-//!   in view, or a fresh "nobody remembered" reading on the one face in
-//!   view, said after it came, outside a pause), and the pause's own wipes
-//!   (5 s paused, a new id, a box jump, a resume far from where it paused).
-//!   The doing timers keep their own rule for the privacy, sleep and the
-//!   opt-in: a sitting does not end on them (it never did), except when a
-//!   pause wipes for them.
+//!   the voice muting capture), and the lamp asleep. The doing timers keep
+//!   their own rule for the privacy, sleep and the opt-in: a sitting does
+//!   not end on them (it never did).
 //! - **Kept, for at most [`KEEP_US`]**: any other closing, so nobody in
-//!   view, the face lost, a new face not yet recognised, a reading gone
-//!   stale (presence, the privacy lease, sleep not known), and a pause
-//!   ended by the face going out of view or a reading lapsing
-//!   ([`crate::pause::Pause::lost`]).
+//!   view, the face lost, and a reading gone stale (presence, the privacy
+//!   lease, sleep not known).
 //! - **Nothing is sent or said while kept.** The gate stays as it is: no
 //!   frame is asked of the camera, a request under way is stopped and its
 //!   answer dropped, and no `humans/posture`, `humans/doing` or
 //!   `humans/doing_seen` is said from what is kept.
-//! - **Goes on** only when the gate opens again, which wants the
-//!   recogniser's own fresh level said after the face now in view came
-//!   ([`crate::watch`]), and only on the face it was kept for: the passing
+//! - **Goes on** only when the gate opens again, and only on the face it
+//!   was kept for: the passing
 //!   id of the one face in view the last step it was open is kept with it
 //!   ([`Away`]), and the gate opening on any other id wipes it
 //!   ([`Why::OtherFace`]), so a second remembered person within the 120 s
 //!   never takes on the first one's window or timers (the Reviewer-lead's
-//!   P2 on #7251). `humans/familiar` is only a level, for whoever the eyes
-//!   recognise now, with no person id or name: it cannot say a new id is
-//!   the same remembered person, so a face back under a new id (as the
-//!   eyes give one coming back into view, `follows` included) starts
-//!   afresh. Past [`KEEP_US`] closed, both are wiped as before.
+//!   P2 on #7251). A face back under a new id (as the eyes give one coming
+//!   back into view, `follows` included) starts afresh. Past [`KEEP_US`]
+//!   closed, both are wiped as before.
 //!   The posture window's samples older than its ten minutes still age out.
 //! - **The journal** says when each is kept, goes on, or is wiped, and why
 //!   (the gate's word): no id, no box.
 use crate::gate::{Closed, Inputs};
-use crate::pause::{self, Verdict};
 use crate::watch::OnTrack;
 
 /// The longest a closing keeps the sitting's windows.
@@ -59,11 +48,6 @@ pub enum Hard {
     OptInOff,
     PrivacyClosed,
     Asleep,
-    /// A second face, or a fresh stranger reading on the one face in view
-    /// outside a pause.
-    Stranger,
-    /// The pause on a misread wiped by its own rules.
-    PauseWiped,
 }
 
 impl Hard {
@@ -74,18 +58,13 @@ impl Hard {
             Hard::OptInOff => "no_opt_in",
             Hard::PrivacyClosed => "privacy_closed",
             Hard::Asleep => "asleep",
-            Hard::Stranger => "stranger",
-            Hard::PauseWiped => "pause_wiped",
         }
     }
 
     /// Whether it ends the sitting's doing timers too: the privacy, sleep
     /// and the opt-in never ended a sitting on their own.
     fn ends_sitting(self) -> bool {
-        matches!(
-            self,
-            Hard::StoodUp | Hard::Forgot | Hard::Stranger | Hard::PauseWiped
-        )
+        matches!(self, Hard::StoodUp | Hard::Forgot)
     }
 }
 
@@ -97,16 +76,11 @@ pub struct Now<'a> {
     pub inputs: &'a Inputs,
     /// The one face in view ([`crate::watch::Readings::on_track`]).
     pub seen: &'a OnTrack,
-    /// The pause's verdict, after `room/stood_up`
-    /// ([`pause::after_stood_up`]).
-    pub verdict: Verdict,
-    /// [`crate::pause::Pause::lost`] this step.
-    pub pause_lost: bool,
     pub stood_up: bool,
     pub forgot: bool,
     /// Posture's gate ([`crate::pose::gate`]).
     pub posture_gate: Result<(), Closed>,
-    /// The desk's lines (`serve`'s `desk`: presence and stranger only).
+    /// The desk's line (`serve`'s `desk`: presence only).
     pub desk: Result<(), Closed>,
     /// Posture's window is being watched ([`crate::pose::Pose::watching`]).
     pub watching: bool,
@@ -127,12 +101,6 @@ pub fn hard(now: &Now<'_>) -> Option<Hard> {
         Some(Hard::PrivacyClosed)
     } else if inputs.asleep == Some(true) {
         Some(Hard::Asleep)
-    } else if inputs.faces.is_some_and(|faces| faces > 1)
-        || (now.seen.stranger && !now.verdict.paused)
-    {
-        Some(Hard::Stranger)
-    } else if now.verdict.wipe && !now.pause_lost {
-        Some(Hard::PauseWiped)
     } else {
         None
     }
@@ -277,16 +245,13 @@ impl Keep {
     pub fn step(&mut self, now: &Now<'_>) -> Plan {
         let hard = hard(now);
         let face = now.seen.track.as_ref().map(|track| track.id.as_str());
-        // A pause holds both itself; its end, wiped or not, is read here.
-        let posture_closed = now.posture_gate.is_err() && !now.verdict.paused;
+        let posture_closed = now.posture_gate.is_err();
         let posture = self
             .posture
             .step(now.now_us, posture_closed, hard, now.watching, face);
-        // The sitting ends, as before, only on the desk's own lines (nobody
-        // or a stranger) outside a pause; a pause's wipe for the privacy,
-        // sleep or the opt-in still ends it, as it did.
-        let sitting_closed = pause::ends_sitting(now.verdict, false, now.desk);
-        let sitting_hard = hard.filter(|hard| hard.ends_sitting() || now.verdict.wipe);
+        // The sitting ends, as before, only on the desk's own line (nobody).
+        let sitting_closed = matches!(now.desk, Err(Closed::Nobody));
+        let sitting_hard = hard.filter(|hard| hard.ends_sitting());
         let sitting =
             self.sitting
                 .step(now.now_us, sitting_closed, sitting_hard, now.sitting, face);

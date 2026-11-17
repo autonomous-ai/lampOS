@@ -53,15 +53,16 @@ pub const LOOK: &str = "look_at_my_desk";
 /// The function the model calls on a "stop looking".
 pub const STOP: &str = "stop_looking_at_my_desk";
 
-/// What the lamp says before any yes, the PM's wording on #6543: what it
+/// What the lamp says before any yes, the PM's wording on #6543 with the
+/// lead's "you or anyone else" (#1711, no stranger check): what it
 /// notices, that pictures go to Autonomous's server to be recognised and
 /// are deleted once checked, that the light shows each send, and that a
 /// stop works any time. "Deleted once they're checked" waits on the
 /// backend's written retention confirmation before the switch goes on
 /// (#6912).
-pub const SEEN_DISCLOSURE: &str = "I can notice when you eat, drink or take a break, so my reminders fit better. To do that, while you're at the desk I'd send a few pictures from my camera to Autonomous's server to be recognised, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?";
+pub const SEEN_DISCLOSURE: &str = "I can notice when you eat, drink or take a break, so my reminders fit better. To do that, while you or anyone else is at the desk I'd send a few pictures from my camera to Autonomous's server to be recognised, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?";
 /// [`SEEN_DISCLOSURE`] with posture on.
-pub const SEEN_DISCLOSURE_POSTURE: &str = "I can notice when you eat, drink or take a break, and how you're sitting, so my reminders fit better. To do that, while you're at the desk I'd send a few pictures from my camera to Autonomous's server to be recognised, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?";
+pub const SEEN_DISCLOSURE_POSTURE: &str = "I can notice when you eat, drink or take a break, and how you're sitting, so my reminders fit better. To do that, while you or anyone else is at the desk I'd send a few pictures from my camera to Autonomous's server to be recognised, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?";
 
 /// Told with the disclosure.
 pub const OFFER_SAY: &str = "Say exactly the words in \"say\", and nothing else, then wait for their answer. Only a plain yes in their very next words is a yes: then call look_at_my_desk.";
