@@ -3830,8 +3830,8 @@ lamp-tasks, the hand-over socket also takes a made skill's fixed write
 
 The first builder's yes at 19:44 (12 Nov). `LAMP_UPLOAD_TO_AGENT` is on in
 the product since 13 Nov (the owner's ruling: the upload flow goes via the
-agent; docs/skills.md, "Run by the lamp's agent"); `LAMP_TASK_NET` is on
-in the product too, in the six units below, so a run granted `net` with the
+agent; docs/skills.md, "Run by the lamp's agent"); `LAMP_TASK_NET`, off in
+the product until its checks, goes in the six units below once on, so a run granted `net` with the
 owner's spoken yes reaches the public web on ports 80 and 443, held like
 every run (the first builder's decision on #7200: never the lamp's
 networks or its local ports; the home router's public address isn't

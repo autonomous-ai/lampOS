@@ -2343,13 +2343,8 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
 /// 13 Nov: the upload flow goes via the agent): `LAMP_UPLOAD_TO_AGENT` on,
 /// once, in the four units whose part reads it (lamp-cloud's upload,
 /// lamp-voice's keep, lamp-skills' load and its manage helper's install),
-/// each beside what it needs, and in no other. Its `net` grant, "reaches
-/// the internet" with the owner's spoken yes, is on too: `LAMP_TASK_NET=on`
-/// once in the six units whose part reads it (lamp-tasks' runner,
-/// lamp-skills' load and its manage helper's say-back, lamp-control's kept
-/// yes, lamp-voice's say-back and lamp-cloud's skills page, which loads
-/// with lamp-skills' loader), each but lamp-cloud's beside
-/// `LAMP_SKILL_TASKS`, and no other product unit names it.
+/// each beside what it needs, and in no other; `LAMP_TASK_NET` stays off,
+/// in no unit.
 #[test]
 fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
     let readers: [(&str, &[&str]); 4] = [
@@ -2377,39 +2372,8 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
             ],
         ),
     ];
-    let net = [
-        "lamp-tasks.service",
-        "lamp-skills.service",
-        "lamp-skills-manage@.service",
-        "lamp-control.service",
-        "lamp-voice.service",
-        "lamp-cloud.service",
-    ];
     for (unit, text) in install::PRODUCT {
         let service = section(text, "Service");
-        let net_on = usize::from(net.contains(unit));
-        assert_eq!(
-            service
-                .iter()
-                .filter(|line| **line == "Environment=LAMP_TASK_NET=on")
-                .count(),
-            net_on,
-            "{unit}: LAMP_TASK_NET=on"
-        );
-        assert_eq!(
-            service
-                .iter()
-                .filter(|line| line.contains("LAMP_TASK_NET"))
-                .count(),
-            net_on,
-            "{unit} names LAMP_TASK_NET"
-        );
-        if net_on == 1 && *unit != "lamp-cloud.service" {
-            assert!(
-                service.contains(&"Environment=LAMP_SKILL_TASKS=on"),
-                "{unit} lacks LAMP_SKILL_TASKS"
-            );
-        }
         let needs = readers
             .iter()
             .find(|(name, _)| name == unit)
@@ -2422,6 +2386,10 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
             usize::from(needs.is_some()),
             "{unit}"
         );
+        assert!(
+            !service.iter().any(|line| line.contains("LAMP_TASK_NET")),
+            "{unit} sets LAMP_TASK_NET"
+        );
         let Some(needs) = needs else {
             continue;
         };
@@ -2433,7 +2401,7 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
             );
         }
     }
-    for unit in readers.iter().map(|(unit, _)| *unit).chain(net) {
+    for (unit, _) in readers {
         assert!(
             install::PRODUCT.iter().any(|(name, _)| *name == unit),
             "{unit} is not a product unit"
@@ -2449,9 +2417,8 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
 /// grants (`task::grants_of`), a made skill's own code and an uploaded
 /// agent skill (`task::origin_refuses`), a write step, a made skill's
 /// lamp-written limits left out (`shed_made_manners`) and a skill's
-/// `[present]` values. Each is set `on` once in both units, and so is the
-/// network grant (`LAMP_TASK_NET`, read by `grants_of` too; on in the
-/// product with #7200, so a `net` skill loads on the page as it runs).
+/// `[present]` values. Each is set `on` once in both units, and the
+/// network grant (`LAMP_TASK_NET`, read by `grants_of` too) in neither.
 #[test]
 fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
     let loading = [
@@ -2491,14 +2458,9 @@ fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
             );
         }
         let net = lamp_voice::skill_task_yes::NET_ENVIRONMENT;
-        assert_eq!(
-            lines.iter().filter(|line| line.contains(net)).count(),
-            1,
-            "{unit} names {net} but once"
-        );
         assert!(
-            lines.contains(&format!("Environment={net}=on").as_str()),
-            "{unit} lacks {net}=on"
+            !lines.iter().any(|line| line.contains(net)),
+            "{unit} sets {net}"
         );
     }
 }
