@@ -4350,6 +4350,20 @@ pub fn serve(
         );
     }
     engine = engine.saying_at_once(say_at_once);
+    // At the usage limit, a plain light or volume ask done with no model
+    // (`LAMP_LIMIT_LOCAL_ASKS=on`, #7346): its words are matched in English,
+    // and its lines are the acting part's English ones.
+    let limit_local = crate::second_provider::limit_local::on();
+    if limit_local && language.is_none() {
+        eprintln!(
+            "lamp-voice second: at the usage limit, a plain light or volume ask is done without the model (LAMP_LIMIT_LOCAL_ASKS)"
+        );
+    } else if limit_local {
+        eprintln!(
+            "lamp-voice second: the asks done without the model at the usage limit are English, and the owner's language is {language:?}; the limit is said as without LAMP_LIMIT_LOCAL_ASKS"
+        );
+    }
+    engine = engine.doing_at_the_limit(limit_local && language.is_none());
     // A line that only asks to keep something, kept plainly, answered at
     // once with no second round (`LAMP_KEEP_ANSWERS_AT_ONCE=on`, C59). In
     // an owner's language, only from its clip rendered ahead in it.

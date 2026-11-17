@@ -6605,6 +6605,10 @@ fn conversation_with_gate_inner(
     // `LAMP_VOICE_DAY_SHED` (#7664): the lamp's day as the worker read it
     // on the relay's answers, looked at once a second at most.
     let mut day_look = crate::day_shed::Look::from_environment();
+    // With `LAMP_LIMIT_LOCAL_ASKS=on` (#7346): a spoken line is not held for
+    // 429s alone, so the route can do a plain light or volume ask without
+    // the model; its own down line keeps the room's other lines quiet.
+    let limit_local = model_refusing::limit_local_on();
     let mut model_refusing = model_refusing::ModelRefusing::default();
     // With `LAMP_SIGNED_OUT=on`: the login no longer accepted is said, and
     // turns wait for a new one.
@@ -10871,8 +10875,10 @@ fn conversation_with_gate_inner(
                         trace,
                     )?;
                     let held_signed_out = signed_out.holds();
-                    let held_refused =
-                        held_signed_out || (refused_hold && model_refusing.holds(monotonic_us()));
+                    let held_refused = held_signed_out
+                        || (refused_hold
+                            && model_refusing.holds(monotonic_us())
+                            && !(limit_local && model_refusing.only_rate_limited()));
                     let Some(provider_session) = cloud.ready_session().filter(|_| {
                         provider_control_empty && !submission_draining && !held_refused
                     }) else {
