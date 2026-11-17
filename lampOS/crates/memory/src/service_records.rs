@@ -68,8 +68,10 @@ const LINKS_MOST: usize = 8;
 /// one ([`Days::service_records_forget`]).
 pub const FORGOT_ABOUT_HELD: usize = 64;
 /// A record's source kinds, as the wire and the table write them: the
-/// voice's connector records, then the linked kinds.
-pub const SOURCE_KINDS: [&str; 4] = ["voice", "task", "agent", "reminder"];
+/// voice's connector records, then the linked kinds; `sdk` is a paired
+/// computer's daily count of its notes' changes (tracker row C157), a
+/// count only ([`sdk_count_ok`]).
+pub const SOURCE_KINDS: [&str; 5] = ["voice", "task", "agent", "reminder", "sdk"];
 /// The most records of one linked kind (not `voice`) a person keeps,
 /// inside [`MOST_PER_PERSON`]. Past it that kind's record changed longest
 /// ago goes.
@@ -90,7 +92,7 @@ const SOURCE_REF_FIELDS: [&str; 4] = ["service", "id", "session", "computer"];
 const ADDED_COLUMNS: [(&str, &str); 4] = [
     (
         "source_kind",
-        "ALTER TABLE service_records ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'voice' CHECK(source_kind IN ('voice','task','agent','reminder'))",
+        "ALTER TABLE service_records ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'voice' CHECK(source_kind IN ('voice','task','agent','reminder','sdk'))",
     ),
     (
         "source_ref",
@@ -106,7 +108,8 @@ const ADDED_COLUMNS: [(&str, &str); 4] = [
     ),
 ];
 
-/// Adds [`ADDED_COLUMNS`] the table lacks (`pragma table_info`), then
+/// Adds [`ADDED_COLUMNS`] the table lacks (`pragma table_info`), widens a
+/// slice-1 `source_kind` CHECK to take `sdk` ([`allow_sdk`]), then makes
 /// their index, in one transaction: run at every open after `days.sql`,
 /// so it is idempotent; `user_version` stays 1.
 pub(crate) fn migrate(db: &mut Connection) -> Result<()> {
@@ -122,10 +125,76 @@ pub(crate) fn migrate(db: &mut Connection) -> Result<()> {
             tx.execute_batch(alter)?;
         }
     }
+    allow_sdk(&tx)?;
     tx.execute_batch(
         "CREATE INDEX IF NOT EXISTS service_records_kind ON service_records(person,source_kind,changed_unix_ms);",
     )?;
     tx.commit()?;
+    Ok(())
+}
+
+/// The `source_kind` CHECK slice 1 (`1dfa0be70a`) added, without `sdk`,
+/// as SQLite stores it in the table's `sql`, and the one that replaces it.
+const SLICE_1_KIND_CHECK: &str = "CHECK(source_kind IN ('voice','task','agent','reminder'))";
+const KIND_CHECK: &str = "CHECK(source_kind IN ('voice','task','agent','reminder','sdk'))";
+
+/// A table that opened on slice 1 keeps that slice's `source_kind` CHECK,
+/// which refuses every `sdk` row (AppOnly's P2 on #7574): SQLite cannot
+/// change a CHECK in place, so the table is rebuilt inside `tx`, the way
+/// SQLite's own guide does it: a new table from the stored `sql` with the
+/// CHECK widened, every row copied, the old one dropped and the new one
+/// renamed, then its indexes and triggers made again from their stored
+/// `sql`. The rows are counted before and after, and any difference
+/// fails the open (the transaction is rolled back). A table whose `sql`
+/// has no slice-1 CHECK (a fresh one, or one already rebuilt) is left as
+/// it is.
+fn allow_sdk(tx: &Transaction) -> Result<()> {
+    let table: String = tx.query_row(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='service_records'",
+        [],
+        |r| r.get(0),
+    )?;
+    if !table.contains(SLICE_1_KIND_CHECK) {
+        return Ok(());
+    }
+    let rebuilt = table.replacen(SLICE_1_KIND_CHECK, KIND_CHECK, 1).replacen(
+        "service_records",
+        "service_records_rebuilt",
+        1,
+    );
+    let parts: Vec<String> = {
+        let mut statement = tx.prepare(
+            "SELECT sql FROM sqlite_master WHERE tbl_name='service_records' AND type IN ('index','trigger') AND sql IS NOT NULL ORDER BY type,name",
+        )?;
+        statement
+            .query_map([], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    let count = |tx: &Transaction, table: &str| -> Result<u64> {
+        Ok(tx.query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))?)
+    };
+    let before = count(tx, "service_records")?;
+    tx.execute_batch("DROP TABLE IF EXISTS service_records_rebuilt")?;
+    tx.execute_batch(&rebuilt)?;
+    tx.execute_batch("INSERT INTO service_records_rebuilt SELECT * FROM service_records")?;
+    if count(tx, "service_records_rebuilt")? != before {
+        return Err(Error::new(
+            "storage",
+            "the service records rebuild lost rows",
+        ));
+    }
+    tx.execute_batch(
+        "DROP TABLE service_records; ALTER TABLE service_records_rebuilt RENAME TO service_records;",
+    )?;
+    for part in parts {
+        tx.execute_batch(&part)?;
+    }
+    if count(tx, "service_records")? != before {
+        return Err(Error::new(
+            "storage",
+            "the service records rebuild lost rows",
+        ));
+    }
     Ok(())
 }
 
@@ -193,6 +262,35 @@ fn kind_of(record: &RecordIn) -> Result<&str> {
         Err(Error::new(
             "bad_kind",
             "the record's source kind is unknown",
+        ))
+    }
+}
+
+/// An `sdk` record is a count and nothing else (tracker row C157, the
+/// first builder's yes of 17 Nov): service `sdk`, action `notes_changed`,
+/// status `done`, with no detail, reason, result id or links, so no key or
+/// value of a computer's notes can ever be stored under it; its summary is
+/// the voice's one line of the count.
+fn sdk_count_ok(record: &RecordIn) -> Result<()> {
+    let empty_detail = match &record.detail {
+        None | Some(Value::Null) => true,
+        Some(Value::Object(object)) => object.is_empty(),
+        Some(_) => false,
+    };
+    if record.service == "sdk"
+        && record.action == "notes_changed"
+        && record.status == "done"
+        && empty_detail
+        && record.reason.is_empty()
+        && record.result_id.is_empty()
+        && record.links.is_empty()
+        && record.replaced_by.is_empty()
+    {
+        Ok(())
+    } else {
+        Err(Error::new(
+            "bad_detail",
+            "an sdk record is a count only: service sdk, action notes_changed, status done, nothing else",
         ))
     }
 }
@@ -461,6 +559,9 @@ impl Days {
         let reason = store::tidy(&record.reason, REASON_BYTES);
         let result_id = store::tidy(&record.result_id, RESULT_ID_BYTES);
         let kind = kind_of(record)?;
+        if kind == "sdk" {
+            sdk_count_ok(record)?;
+        }
         let source_ref = source_ref_of(kind, record.source_ref.as_ref())?;
         let summary = record
             .summary
@@ -498,6 +599,22 @@ impl Days {
             ));
         }
         let status = match kept.map(|(status, _)| status) {
+            // A day's count: its later puts carry the day's higher count,
+            // so its summary, pointer, deed and changed time follow them.
+            Some(kept) if kind == "sdk" => {
+                tx.execute(
+                    "UPDATE service_records SET changed_unix_ms=max(changed_unix_ms,?3),source_ref=coalesce(?4,source_ref),summary=coalesce(?5,summary),deed_unix_ms=coalesce(?6,deed_unix_ms) WHERE person=?1 AND key=?2",
+                    params![
+                        person.as_str(),
+                        record.key,
+                        record.changed_unix_ms,
+                        source_ref,
+                        summary,
+                        deed
+                    ],
+                )?;
+                kept
+            }
             Some(kept) if kept != "prepared" => {
                 // Final: only who replaced it may still be said.
                 if !record.replaced_by.is_empty() {
@@ -1974,7 +2091,7 @@ mod tests {
         let mut unnamed = agent_read("t-tasks-7", "run-1", 0, NOW);
         unnamed.as_object_mut().unwrap().remove("source_kind");
         assert_eq!(send(&mut store, unnamed)["error"], "bad_request");
-        for kind in ["task", "reminder", "voice", "mail", ""] {
+        for kind in ["task", "reminder", "sdk", "voice", "mail", ""] {
             let mut other = agent_read("t-tasks-7", "run-1", 0, NOW);
             other["source_kind"] = json!(kind);
             assert_eq!(send(&mut store, other)["error"], "bad_kind", "{kind}");
@@ -2250,5 +2367,193 @@ mod tests {
         );
         assert!(keyed(&mut store, OWNER, "t-s-2").is_empty());
         assert_eq!(keyed(&mut store, OTHER, "t-s-3").len(), 1);
+    }
+
+    /// A paired computer's day of notes changes (`sdk`, tracker row C157).
+    fn sdk(key: &str, count: u32, deed: u64) -> Value {
+        json!({
+            "op": "service_record",
+            "person": OWNER,
+            "key": key,
+            "service": "sdk",
+            "action": "notes_changed",
+            "status": "done",
+            "asked_unix_ms": deed,
+            "changed_unix_ms": deed,
+            "source_kind": "sdk",
+            "source_ref": {"service": "sdk", "id": "c_0123456789abcdef", "computer": "Dev laptop"},
+            "summary": format!("The paired computer Dev laptop changed its notes {count} times on 2026-11-17"),
+            "deed_unix_ms": deed,
+        })
+    }
+
+    /// One `sdk` row a computer a day: a later put of the same key carries
+    /// the higher count, kept in place (done is not final for a count).
+    #[test]
+    fn an_sdk_row_is_one_a_day_and_its_count_follows_each_put() {
+        let (_scratch, mut store) = Scratch::new("sdk-day");
+        let first = send(&mut store, sdk("s-c_0123456789abcdef-20261117", 1, NOW));
+        assert_eq!(first["ok"], true, "{first}");
+        let second = send(
+            &mut store,
+            sdk("s-c_0123456789abcdef-20261117", 4, NOW + 60_000),
+        );
+        assert_eq!(second["ok"], true, "{second}");
+        let kept = records(&mut store, OWNER);
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        assert_eq!(kept[0]["source_kind"], "sdk");
+        assert_eq!(kept[0]["status"], "done");
+        assert!(
+            kept[0]["summary"].as_str().unwrap().contains("4 times"),
+            "{kept:?}"
+        );
+        send(
+            &mut store,
+            sdk("s-c_0123456789abcdef-20261118", 2, NOW + 86_400_000),
+        );
+        assert_eq!(records(&mut store, OWNER).len(), 2);
+    }
+
+    /// An `sdk` row is a count only: any detail, reason, result id, link,
+    /// other service, action or status is refused, so no key or value of a
+    /// computer's notes can be stored under it.
+    #[test]
+    fn an_sdk_row_with_anything_but_a_count_is_refused() {
+        let (_scratch, mut store) = Scratch::new("sdk-count-only");
+        let tries = [
+            ("detail", json!({"key": "secret_token"})),
+            ("reason", json!("secret_token")),
+            ("result_id", json!("secret_token")),
+            ("links", json!(["k1"])),
+            ("service", json!("gmail")),
+            ("action", json!("notes_set")),
+            ("status", json!("prepared")),
+        ];
+        for (field, value) in tries {
+            let mut asked = sdk("s-c_0123456789abcdef-20261117", 1, NOW);
+            asked[field] = value;
+            let answer = send(&mut store, asked);
+            assert_eq!(answer["error"], "bad_detail", "{field}: {answer}");
+        }
+        assert!(records(&mut store, OWNER).is_empty());
+    }
+
+    /// Forget everything drops the `sdk` rows, and a count from before the
+    /// forget is not kept again (C157, the first builder's 17 Nov).
+    #[test]
+    fn forget_all_drops_the_sdk_rows() {
+        let (_scratch, mut store) = Scratch::new("sdk-forget");
+        send(&mut store, sdk("s-c_0123456789abcdef-20261117", 3, NOW));
+        assert_eq!(records(&mut store, OWNER).len(), 1);
+        let forgot = send_at(
+            &mut store,
+            json!({"op":"forget_all","person":OWNER}),
+            NOW + 1_000,
+        );
+        assert_eq!(forgot["ok"], true, "{forgot}");
+        assert!(records(&mut store, OWNER).is_empty());
+        let late = send(&mut store, sdk("s-c_0123456789abcdef-20261117", 3, NOW));
+        assert_eq!(late["error"], "forgotten", "{late}");
+        assert!(records(&mut store, OWNER).is_empty());
+    }
+
+    /// The slice-1 schema (`1dfa0be70a`): `days.sql`, then its four
+    /// `ALTER`s, whose `source_kind` CHECK lacks `sdk`, and its index.
+    const SLICE_1_ALTERS: &str = "ALTER TABLE service_records ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'voice' CHECK(source_kind IN ('voice','task','agent','reminder'));
+        ALTER TABLE service_records ADD COLUMN source_ref TEXT NOT NULL DEFAULT '{}';
+        ALTER TABLE service_records ADD COLUMN summary TEXT NOT NULL DEFAULT '';
+        ALTER TABLE service_records ADD COLUMN deed_unix_ms INTEGER;
+        CREATE INDEX IF NOT EXISTS service_records_kind ON service_records(person,source_kind,changed_unix_ms);";
+
+    fn table_sql(db: &rusqlite::Connection) -> String {
+        db.query_row(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='service_records'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
+    fn table_parts(db: &rusqlite::Connection) -> Vec<(String, String, Option<String>)> {
+        let mut statement = db
+            .prepare("SELECT type,name,sql FROM sqlite_master WHERE tbl_name='service_records' ORDER BY type,name")
+            .unwrap();
+        statement
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .unwrap()
+    }
+
+    /// A database opened on slice 1 (its `source_kind` CHECK without
+    /// `sdk`, AppOnly's P2 on #7574) is rebuilt on open: its voice row is
+    /// kept as it was, its indexes are made again, and an `sdk` put works.
+    /// A second open changes nothing.
+    #[test]
+    fn a_slice_1_table_takes_an_sdk_row_after_the_open() {
+        let (scratch, store) = Scratch::new("slice-1");
+        drop(store);
+        fs::remove_dir_all(&scratch.0).unwrap();
+        crate::store::private_dir(&scratch.0).unwrap();
+        {
+            let db = database(&scratch);
+            db.execute_batch(include_str!("days.sql")).unwrap();
+            db.execute_batch(SLICE_1_ALTERS).unwrap();
+            assert!(!table_sql(&db).contains("'sdk'"));
+            db.execute_batch(&format!(
+                "INSERT INTO settings(key,value) VALUES('import_complete',1); PRAGMA user_version=1;
+                 INSERT INTO people(person) VALUES('{OWNER}');
+                 INSERT INTO service_records(person,key,service,action,status,reason,detail,result_id,asked_unix_ms,changed_unix_ms,links,replaced_by,source_kind,source_ref,summary,deed_unix_ms)
+                 VALUES('{OWNER}','old','gmail','send_mail','done','','{{\"subject\":\"Sunday\"}}','',{NOW},{NOW},'[]','','voice','{{}}','Mail to Lan',{NOW});"
+            ))
+            .unwrap();
+        }
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(
+            scratch.0.join(crate::days::DATABASE),
+            fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+        let mut store = scratch.open();
+        let put = send(&mut store, sdk("s-c_0123456789abcdef-20261117", 2, NOW));
+        assert_eq!(put["ok"], true, "{put}");
+        let kept = records(&mut store, OWNER);
+        assert_eq!(kept.len(), 2, "{kept:?}");
+        let old = kept.iter().find(|r| r["key"] == "old").unwrap();
+        assert_eq!(old["source_kind"], "voice");
+        assert_eq!(old["summary"], "Mail to Lan");
+        assert_eq!(old["detail"]["subject"], "Sunday");
+        assert_eq!(old["deed_unix_ms"], NOW);
+        drop(store);
+        let db = database(&scratch);
+        let once = table_parts(&db);
+        assert!(table_sql(&db).contains("'sdk'"), "{once:?}");
+        for index in ["service_records_by", "service_records_kind"] {
+            assert!(once.iter().any(|(_, name, _)| name == index), "{once:?}");
+        }
+        drop(db);
+        drop(scratch.open());
+        let db = database(&scratch);
+        assert_eq!(table_parts(&db), once);
+        let rows: u64 = db
+            .query_row("SELECT count(*) FROM service_records", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rows, 2);
+    }
+
+    /// A fresh database's table already allows `sdk`: opening it twice
+    /// leaves the table, its indexes and its sql as they were.
+    #[test]
+    fn a_fresh_table_is_not_rebuilt() {
+        let (scratch, mut store) = Scratch::new("fresh-sdk");
+        let put = send(&mut store, sdk("s-c_0123456789abcdef-20261117", 1, NOW));
+        assert_eq!(put["ok"], true, "{put}");
+        drop(store);
+        let before = table_parts(&database(&scratch));
+        assert!(before.iter().any(
+            |(kind, _, sql)| kind == "table" && sql.as_deref().unwrap_or("").contains("'sdk'")
+        ));
+        drop(scratch.open());
+        assert_eq!(table_parts(&database(&scratch)), before);
     }
 }

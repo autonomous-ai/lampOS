@@ -30,6 +30,7 @@ pub mod lease;
 pub mod microphone;
 pub mod motion_done;
 pub mod notes;
+pub mod paired_by;
 pub mod pairing;
 pub mod parts;
 pub mod protocol;
