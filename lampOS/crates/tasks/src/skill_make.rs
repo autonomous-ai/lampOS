@@ -500,14 +500,6 @@ pub(crate) struct MadeFolder {
     fd: rustix::fd::OwnedFd,
 }
 
-impl MadeFolder {
-    /// `text` as the new file `name` in this folder (0600, never through a
-    /// link, never one there).
-    pub(crate) fn write(&self, name: &str, text: &str) -> std::io::Result<()> {
-        file_in(&self.fd, name, text)
-    }
-}
-
 impl Drop for MadeFolder {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.path);
@@ -1313,7 +1305,7 @@ impl Runner for MakeHermes {
             .ok_or_else(|| "a run granted net has no folder of its own".to_owned())?;
         let until = std::time::Instant::now() + run.deadline;
         let served = grant
-            .open(name, until)
+            .open_for(name, until, &run.folder)
             .map_err(|error| format!("the run's way out was not made: {}", error.kind()))?;
         let mut hermes = self.hermes.clone();
         hermes

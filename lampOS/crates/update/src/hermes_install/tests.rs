@@ -4155,7 +4155,11 @@ fn a_net_run_shows_its_egress_socket_opens_53_and_names_127_0_0_1() {
     for id in ["1-2-3", "9"] {
         let run_folder = format!("{}/lamp/make-task-{id}", at(WORK));
         fs::create_dir_all(&run_folder).unwrap();
-        fs::write(format!("{run_folder}/skill-folder"), format!("{own}\n")).unwrap();
+        fs::write(
+            at(&format!("{EGRESS_DIR}/make-task-{id}.folder")),
+            format!("{own}\n"),
+        )
+        .unwrap();
     }
     let uid_map = folder.path().join("uid_map");
     fs::write(&uid_map, "         0        996          1\n").unwrap();
@@ -4395,12 +4399,15 @@ fn a_net_run_sees_only_its_own_skills_folder() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     let (w, k, p) = (root.join("w"), root.join("skills"), root.join("pushed"));
+    let private = root.join("egress");
+    fs::create_dir_all(&private).unwrap();
     for folder in [k.join("mine"), k.join("other"), p.join("pushed-one")] {
         fs::create_dir_all(folder).unwrap();
     }
     let run = |net: Option<&str>, egress: &str| {
         let script = format!(
-            "fail() {{ echo \"fail: $1\"; exit 1; }}\nW={w} K={k} P={p}\n{OWN_SKILL_LINES}echo \"K=$K P=$P Z=$Z\"\n",
+            "fail() {{ echo \"fail: $1\"; exit 1; }}\nW={w} K={k} P={p}\n{}echo \"K=$K P=$P Z=$Z\"\n",
+            OWN_SKILL_LINES.replace(EGRESS_DIR, &private.to_string_lossy()),
             w = w.display(),
             k = k.display(),
             p = p.display(),
@@ -4416,10 +4423,19 @@ fn a_net_run_sees_only_its_own_skills_folder() {
         let out = command.output().unwrap();
         String::from_utf8_lossy(&out.stdout).trim().to_owned()
     };
+    // lamp-tasks names it beside the run's egress socket, `skill-<id>` on
+    // the one run path and `make-<id>` without; the run's own folder holds
+    // no such file (Heron's P3 at 2533a4f02b).
     let name = |id: &str, folder: &str| {
         let at = w.join("lamp").join(format!("make-{id}"));
         fs::create_dir_all(&at).unwrap();
-        fs::write(at.join("skill-folder"), format!("{folder}\n")).unwrap();
+        for head in ["skill", "make"] {
+            fs::write(
+                private.join(format!("{head}-{id}.folder")),
+                format!("{folder}\n"),
+            )
+            .unwrap();
+        }
     };
     let (k_shown, p_shown) = (k.display().to_string(), p.display().to_string());
     name("r1", &format!("{k_shown}/mine"));
@@ -4436,6 +4452,15 @@ fn a_net_run_sees_only_its_own_skills_folder() {
     );
     // No name, a name past the skills, a link or no folder: the run ends.
     assert!(run(Some("run"), "skill-r9").starts_with("fail: "));
+    // A name left in the run's own folder, which other runs can write, is
+    // never read: only the one beside its egress socket.
+    fs::create_dir_all(w.join("lamp/make-r8")).unwrap();
+    fs::write(
+        w.join("lamp/make-r8/skill-folder"),
+        format!("{k_shown}/other\n"),
+    )
+    .unwrap();
+    assert!(run(Some("run"), "skill-r8").starts_with("fail: "));
     symlink(k.join("other"), k.join("linked")).unwrap();
     for (id, folder) in [
         ("r3", "/etc".to_owned()),
