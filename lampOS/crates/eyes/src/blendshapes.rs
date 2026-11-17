@@ -45,6 +45,22 @@ const NOSE_SNEER: [usize; 2] = [50, 51];
 const BROW_DOWN: [usize; 2] = [1, 2];
 /// `browInnerUp`, one score for both: raised in surprise (`yawn`).
 const BROW_INNER_UP: usize = 3;
+/// Where the eyes look, each eye's left and right (#7442): `eyeLookDown`,
+/// `eyeLookIn` and `eyeLookOut`, in MediaPipe's order of the 52 (ARKit's
+/// names, not its alphabetical order): `kBlendshapeNames` in
+/// `mediapipe/tasks/cc/vision/face_landmarker/face_blendshapes_graph.cc`,
+/// 9-10 `eyeBlink`, 11-12 `eyeLookDown`, 13-14 `eyeLookIn`, 15-16
+/// `eyeLookOut`, 17-18 `eyeLookUp` (not read: a face looking up at the
+/// lamp from below still looks at it). The frowns, smiles, sneers and
+/// brows above are read at the same order's places.
+const EYE_LOOK_DOWN: [usize; 2] = [11, 12];
+const EYE_LOOK_IN: [usize; 2] = [13, 14];
+const EYE_LOOK_OUT: [usize; 2] = [15, 16];
+/// Either eye looking down, in or out at or over this is not looking at
+/// the lamp ([`looking`]). Authored (#7442's design), to be set on the row.
+pub const LOOK_DOWN_FROM: f32 = 0.5;
+pub const LOOK_IN_FROM: f32 = 0.5;
+pub const LOOK_OUT_FROM: f32 = 0.5;
 /// With `LAMP_SEEMS_BROW_LOW=on`, a face is also `negative` with the brows
 /// drawn down at or over [`BROW_LOW_FROM`] and the smiles under
 /// [`BROW_LOW_SMILE_UNDER`], its confidence the brows' (#2132). The frowns
@@ -118,6 +134,22 @@ pub fn judge_with(scores: &[f32], brow_low: bool) -> Option<HumanSeems> {
     })
 }
 
+/// Whether the eyes look toward the lamp (#7442): not when either eye looks
+/// down, in or out at or over its line, the left and right eye each on its
+/// own (one eye's `In` is the other's `Out` for a glance to one side, so
+/// the rule holds mirrored). `None` for scores that aren't 52 numbers.
+pub fn looking(scores: &[f32]) -> Option<bool> {
+    if scores.len() != SCORES || scores.iter().any(|score| !score.is_finite()) {
+        return None;
+    }
+    let away = |pair: [usize; 2], from: f32| pair.iter().any(|&at| scores[at] >= from);
+    Some(
+        !(away(EYE_LOOK_DOWN, LOOK_DOWN_FROM)
+            || away(EYE_LOOK_IN, LOOK_IN_FROM)
+            || away(EYE_LOOK_OUT, LOOK_OUT_FROM)),
+    )
+}
+
 pub struct Reader {
     plan: Arc<TypedRunnableModel>,
     brow_low: bool,
@@ -175,8 +207,15 @@ impl Reader {
 
     /// How the face whose [`points`] these are seems.
     pub fn read(&self, points: &[f32]) -> Result<HumanSeems> {
-        judge_with(&self.scores(points)?, self.brow_low)
-            .ok_or_else(|| "the model gave no 52 scores".into())
+        self.read_looking(points).map(|(read, _)| read)
+    }
+
+    /// [`Self::read`], and from the same scores whether the eyes look
+    /// toward the lamp ([`looking`], #7442).
+    pub fn read_looking(&self, points: &[f32]) -> Result<(HumanSeems, Option<bool>)> {
+        let scores = self.scores(points)?;
+        let read = judge_with(&scores, self.brow_low).ok_or("the model gave no 52 scores")?;
+        Ok((read, looking(&scores)))
     }
 }
 
@@ -222,6 +261,24 @@ mod tests {
             out[at] = score;
         }
         out
+    }
+
+    /// #7442: eyes looking down, in or out at the line, either eye, are
+    /// not looking at the lamp; under it, or looking up, they are.
+    #[test]
+    fn eyes_looking_down_or_aside_are_not_looking_at_the_lamp() {
+        assert_eq!(looking(&scores(&[])), Some(true));
+        assert_eq!(looking(&scores(&[(11, 0.49), (12, 0.49)])), Some(true));
+        assert_eq!(looking(&scores(&[(17, 0.9), (18, 0.9)])), Some(true));
+        // Blinking is not looking away.
+        assert_eq!(looking(&scores(&[(9, 1.0), (10, 1.0)])), Some(true));
+        for at in [11, 12, 13, 14, 15, 16] {
+            assert_eq!(looking(&scores(&[(at, 0.5)])), Some(false), "{at}");
+        }
+        // A glance to one side: one eye in, the other out.
+        assert_eq!(looking(&scores(&[(13, 0.6), (16, 0.6)])), Some(false));
+        assert_eq!(looking(&[0.0; 51]), None);
+        assert_eq!(looking(&scores(&[(11, f32::NAN)])), None);
     }
 
     /// A yawn's two scores: the smiles' mean and the inner brows (#3709).
