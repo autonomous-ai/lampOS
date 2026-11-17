@@ -3815,6 +3815,22 @@ pub fn serve(
     } else {
         None
     };
+    // A wordless cut-in no face was seen speaking is not asked who spoke
+    // (`LAMP_SAID_TO_ME=on`, #7442): the faces read above, or a
+    // reader of its own.
+    let said_to_me_on = crate::said_to_me::on();
+    let mut wordless_eyes = enrollment_eyes.clone().filter(|_| said_to_me_on);
+    let _wordless_reader = if said_to_me_on && wordless_eyes.is_none() {
+        files.bus_root.as_deref().and_then(|root| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let reader = crate::speaking_faces::read_from(eyes.clone(), root)?;
+            wordless_eyes = Some(eyes);
+            Some(reader)
+        })
+    } else {
+        None
+    };
+    engine = engine.asking_wordless_only_seen_speaking(wordless_eyes);
     engine = engine.remembering_speaker(remember_speaker, enrollment_eyes);
     if let (Some(early), Some(search)) = (early, search) {
         engine = engine.hearing_words(Arc::new(move |request, heard| {
@@ -4949,6 +4965,18 @@ pub fn serve(
             );
             if let Ok(mut heeding) = heeding.lock() {
                 heeding.needing_the_turned_face_to_speak();
+                heeding.opening_the_eyes(files.bus_root.as_deref());
+            }
+        }
+        // A line is answered when it was said to the lamp: named, in a live
+        // conversation, or facing it and seen speaking it, not a short
+        // remark (`LAMP_SAID_TO_ME=on`, `crate::said_to_me`).
+        if crate::said_to_me::on() {
+            eprintln!(
+                "lamp-voice second: a line is answered named, in a live conversation (0-2 words only seen spoken), or facing the lamp and seen speaking it with 3 words or more, a question or an ask; a wordless cut-in no face was seen speaking is not asked who spoke (LAMP_SAID_TO_ME)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.hearing_only_said_to_me();
                 heeding.opening_the_eyes(files.bus_root.as_deref());
             }
         }
@@ -7286,6 +7314,8 @@ pub(crate) struct Heeding {
     /// sign, for the room ([`crate::room_told::RoomTold::face_not_speaking`]).
     turned_face_speaks: bool,
     face_not_speaking: Option<u64>,
+    /// `LAMP_SAID_TO_ME=on` ([`Self::hearing_only_said_to_me`]).
+    said_to_me: bool,
     /// `LAMP_NAME_OR_FOLLOW_UP=on` ([`Self::needing_name_or_follow_up`]).
     name_or_follow_up: bool,
     /// `LAMP_TWO_FACES_HELD=on` ([`Self::holding_two_faces`]): the eyes'
@@ -7748,6 +7778,17 @@ fn speakers_between(
     let Some((eyes, _)) = eyes else {
         return Default::default();
     };
+    match line_between(began_us, ended_us) {
+        Some((from, to)) => (
+            eyes.speakers_with_boot(from, to),
+            eyes.turned_speakers_with_boot(from, to),
+        ),
+        None => Default::default(),
+    }
+}
+
+/// `began_us..ended_us`, by this process's monotonic clock, as instants.
+fn line_between(began_us: u64, ended_us: u64) -> Option<(Instant, Instant)> {
     let (now, now_us) = (Instant::now(), monotonic_us());
     let at = |us: u64| {
         if us >= now_us {
@@ -7756,13 +7797,23 @@ fn speakers_between(
             now.checked_sub(Duration::from_micros(now_us - us))
         }
     };
-    match (at(began_us), at(ended_us)) {
-        (Some(from), Some(to)) => (
-            eyes.speakers_with_boot(from, to),
-            eyes.turned_speakers_with_boot(from, to),
-        ),
-        _ => Default::default(),
-    }
+    Some((at(began_us)?, at(ended_us)?))
+}
+
+/// Whether `eyes` saw a face (one turned to the lamp, with `turned`) speaking
+/// from `began_us` to `ended_us`
+/// ([`crate::speaking_faces::SpeakingFaces::seen_speaking_between`]); never
+/// without them.
+fn seen_speaking_between(
+    eyes: Option<&(
+        Arc<crate::speaking_faces::SpeakingFaces>,
+        Option<crate::speaking_faces::Reader>,
+    )>,
+    (began_us, ended_us): (u64, u64),
+    turned: bool,
+) -> bool {
+    eyes.zip(line_between(began_us, ended_us))
+        .is_some_and(|((eyes, _), (from, to))| eyes.seen_speaking_between(from, to, turned))
 }
 
 /// Whether `eyes` saw only silent faces turned to the lamp from `began_us`
@@ -7782,18 +7833,10 @@ fn turned_only_silent(
     let Some((eyes, _)) = eyes else {
         return false;
     };
-    let (now, now_us) = (Instant::now(), monotonic_us());
-    let at = |us: u64| {
-        if us >= now_us {
-            now.checked_add(Duration::from_micros(us - now_us))
-        } else {
-            now.checked_sub(Duration::from_micros(now_us - us))
-        }
-    };
-    match (at(began_us), at(ended_us)) {
-        (Some(from), Some(to)) if unread_spoils => eyes.turned_only_silent(from, to),
-        (Some(from), Some(to)) => eyes.turned_not_seen_speaking(from, to),
-        _ => false,
+    match line_between(began_us, ended_us) {
+        Some((from, to)) if unread_spoils => eyes.turned_only_silent(from, to),
+        Some((from, to)) => eyes.turned_not_seen_speaking(from, to),
+        None => false,
     }
 }
 
@@ -8378,6 +8421,7 @@ impl Heeding {
             held_in_conversation_us: None,
             turned_speaking: false,
             turned_face_speaks: false,
+            said_to_me: false,
             face_not_speaking: None,
             name_or_follow_up: false,
             faces_held: None,
@@ -8827,6 +8871,13 @@ impl Heeding {
     /// (`LAMP_TURNED_FACE_SPEAKS=on`, [`Self::silence_turned`]).
     pub(crate) fn needing_the_turned_face_to_speak(&mut self) {
         self.turned_face_speaks = true;
+    }
+
+    /// A line not said to the lamp ([`crate::said_to_me::judge`]) has no
+    /// face and no conversation as its sign (`LAMP_SAID_TO_ME=on`,
+    /// [`Self::not_said_to_me`]).
+    pub(crate) fn hearing_only_said_to_me(&mut self) {
+        self.said_to_me = true;
     }
 
     /// With people talking at a desk, a line is the lamp's by its name, a
@@ -10459,7 +10510,7 @@ impl Heeding {
         mut signs: Signs,
     ) -> Option<&'static str> {
         self.keep_the_name_in_its_line(request, said, &mut signs);
-        self.silence_turned(request, said, &mut signs);
+        self.silence_turned(request, said, heard, &mut signs);
         let verdict = self.judge(request, said, heard, signs.clone());
         self.held_since_start_by(verdict, heard);
         if self.said_lately.len() == SAID_KEPT {
@@ -10559,7 +10610,14 @@ impl Heeding {
     /// With no speaking read (`LAMP_EYES_SPEAKING` off, or the turned
     /// mouths never read), the face is a sign as before: fail open, so a
     /// person alone at a lamp whose eyes can't read mouths is still answered.
-    fn silence_turned(&mut self, request: u64, said: (u64, u64), signs: &mut Signs) {
+    ///
+    /// `LAMP_SAID_TO_ME` ([`Self::not_said_to_me`]) first: what it holds
+    /// loses the face and the conversation as signs, and the rules below
+    /// are not read (they hold a subset of it).
+    fn silence_turned(&mut self, request: u64, said: (u64, u64), heard: &str, signs: &mut Signs) {
+        if self.not_said_to_me(request, said, heard, signs) {
+            return;
+        }
         if signs.turned != Some(true) {
             return;
         }
@@ -10587,6 +10645,48 @@ impl Heeding {
             signs.turned = Some(false);
             self.face_not_speaking = Some(request);
         }
+    }
+
+    /// `LAMP_SAID_TO_ME=on` ([`crate::said_to_me::judge`]): whether the line
+    /// is held as not said to the lamp, its face and conversation then no
+    /// sign. The face's pitch and gaze are not on the eyes' faces yet, so
+    /// they are given as unknown, which blocks nothing.
+    fn not_said_to_me(
+        &mut self,
+        request: u64,
+        said: (u64, u64),
+        heard: &str,
+        signs: &mut Signs,
+    ) -> bool {
+        if !self.said_to_me {
+            return false;
+        }
+        let turned = signs.turned == Some(true);
+        let line = crate::said_to_me::Line {
+            heard,
+            name_heard: !signs.names.is_empty(),
+            going_on: signs.going_on,
+            turned,
+            pitch_deg: None,
+            looking: None,
+            // In a conversation any face speaking it; else the turned one.
+            seen_speaking: seen_speaking_between(
+                self.eyes.as_ref(),
+                said,
+                turned && !signs.going_on,
+            ),
+        };
+        let crate::said_to_me::Said::Held(held) = crate::said_to_me::judge(line) else {
+            return false;
+        };
+        eprintln!(
+            "lamp-voice second: request {request}: not said to the lamp, {}: {} words, no name; the face and the conversation are no sign (LAMP_SAID_TO_ME)",
+            held.reason(),
+            heard.split_whitespace().count()
+        );
+        signs.turned = Some(false);
+        signs.going_on = false;
+        true
     }
 
     /// `LAMP_TURNED_SPEAKING`: the only faces turned to the lamp were seen
@@ -27511,6 +27611,85 @@ mod tests {
         assert_eq!(
             judged(true, false, Room::Busy, &still),
             Some(crate::attention::BUSY_UNCALLED)
+        );
+    }
+
+    /// `LAMP_SAID_TO_ME` (#7442, lamp-74ff, 17 Nov: a lip smack heard as
+    /// one or two words while the owner faced the lamp was answered as
+    /// "someone is turned to the lamp"). With the switch, a line facing the
+    /// lamp is let out only when the turned face is seen speaking it and it
+    /// has three words or more, a question or an ask; a lip smack is held in
+    /// one look or five, `LAMP_TURNED_FACE_SPEAKS` on or off, and so is a
+    /// mouth never read. The lamp's name lets it out; the switch off as
+    /// before. In a live conversation a short line needs a face seen
+    /// speaking it, a longer one does not.
+    #[test]
+    fn with_said_to_me_a_line_facing_the_lamp_needs_its_face_seen_speaking() {
+        use crate::room_told::Room;
+        use lamp_msgs::SpeakingState::{No, Unknown, Yes};
+        let judged = |on: bool,
+                      face_speaks: bool,
+                      states: &[Option<lamp_msgs::SpeakingState>],
+                      (looks, going_on): (u64, bool),
+                      words: &str| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            turned_face_looks(&eyes, now, 200, states, &mut 0);
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.seeing_speaking_faces(eyes, None);
+            if on {
+                heeding.hearing_only_said_to_me();
+            }
+            if face_speaks {
+                heeding.needing_the_turned_face_to_speak();
+            }
+            // One look (a 0.5 s smack) or all five.
+            let ended_us = now_us + 200_000 + (looks - 1) * 400_000 + 100_000;
+            let signs = super::Signs {
+                going_on,
+                ..turned_signs(Room::Unknown)
+            };
+            let verdict = heeding.heed_signs(9, (now_us, ended_us), words, signs);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        let (still, speaking) = ([Some(No)], [Some(Yes), Some(No)]);
+        for looks in [1, 5] {
+            let facing = (looks, false);
+            for face_speaks in [false, true] {
+                for smack in ["Mm.", "Uh huh."] {
+                    assert!(
+                        judged(true, face_speaks, &still, facing, smack).is_some(),
+                        "{smack} in {looks} looks, LAMP_TURNED_FACE_SPEAKS {face_speaks}"
+                    );
+                }
+            }
+            assert_eq!(judged(false, false, &still, facing, "Mm."), None, "off");
+            let held = |states: &[_], words| judged(true, false, states, facing, words).is_some();
+            assert!(held(&[Some(Unknown)], "Mm."), "a mouth never read");
+            assert!(held(&speaking, "Mm."), "seen speaking, a short remark");
+            assert!(!held(&speaking, "Weather today?"), "a short question");
+            assert!(!held(&speaking, "What time is it"), "four words");
+            assert!(
+                held(&still, "What time is it"),
+                "four words, not seen speaking"
+            );
+            assert!(!held(&still, "Lamp, hi."), "its name");
+        }
+        // In a live conversation, facing: a short line no face was seen
+        // speaking has neither sign, so held; seen speaking, or longer, out.
+        let going_on = (5, true);
+        assert!(judged(true, false, &still, going_on, "Uh huh.").is_some());
+        assert_eq!(
+            judged(false, false, &still, going_on, "Uh huh."),
+            None,
+            "off"
+        );
+        assert_eq!(judged(true, false, &speaking, going_on, "Uh huh."), None);
+        assert_eq!(
+            judged(true, false, &still, going_on, "And tomorrow in Hanoi?"),
+            None
         );
     }
 
