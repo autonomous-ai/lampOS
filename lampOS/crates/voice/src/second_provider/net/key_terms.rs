@@ -43,17 +43,47 @@ pub fn known() -> Vec<String> {
 }
 
 /// What a stream listens for after the lamp's name: the unit's words
-/// (`fixed`), then the owner's place's names from the app, with
+/// (`fixed`), then the words of a skill's make with [`SKILL_ENVIRONMENT`]
+/// on ([`SKILL_TERMS`]), then the owner's place's names from the app, with
 /// `LAMP_OWNER_PLACE=on` (`crate::owner_place::terms`, #4333), then the
 /// names the lamp knows ([`known`]), each once.
 pub fn listening(fixed: &[String]) -> Vec<String> {
+    listening_with(fixed, skill_terms_on())
+}
+
+/// [`listening`], with the words of a skill's make (`skill`) or without.
+fn listening_with(fixed: &[String], skill: bool) -> Vec<String> {
     gather(
         fixed
             .iter()
             .cloned()
+            .chain(
+                SKILL_TERMS
+                    .iter()
+                    .filter(|_| skill)
+                    .map(|term| (*term).to_owned()),
+            )
             .chain(crate::owner_place::terms())
             .chain(known()),
     )
+}
+
+/// `on` only; off unless set. Speech to text listens for the words a
+/// skill's make is asked with ([`SKILL_TERMS`]), after the unit's own. On
+/// lamp-9adf on 17 Nov the owner's "Lamp, make a skill: every morning at
+/// nine, read me my new emails" was written four times without the word,
+/// "Make me a skew every real morning" and "Plan. Acne rescue s 9AM" among
+/// them, and the model then read the mail now and set a daily reminder of
+/// the words; typed in the app, the same ask made the skill.
+pub const SKILL_ENVIRONMENT: &str = "LAMP_SKILL_KEYTERM";
+
+/// The words listened for with [`SKILL_ENVIRONMENT`]: few, as Deepgram
+/// advises, and plain ([`gather`] keeps each once, within [`MOST`]).
+pub const SKILL_TERMS: [&str; 3] = ["skill", "make a skill", "new skill"];
+
+/// Whether [`SKILL_ENVIRONMENT`] is on in this process.
+pub fn skill_terms_on() -> bool {
+    on(std::env::var(SKILL_ENVIRONMENT).ok().as_deref())
 }
 
 /// Whether the switch is on: `on`, and nothing else.
@@ -177,6 +207,34 @@ mod tests {
             )
         });
         assert_eq!(gather(many).len(), MOST);
+    }
+
+    /// With the skill switch, the words of a make come after the unit's
+    /// own and before the names; each once, and within the bound with the
+    /// unit's own words at theirs.
+    #[test]
+    fn the_words_of_a_skills_make_follow_the_units_own_with_the_switch() {
+        let fixed = ["Hanoi", "Skill"].map(String::from);
+        if NAMES.get().is_none() {
+            assert_eq!(listening_with(&fixed, false), fixed);
+            assert_eq!(
+                listening_with(&fixed, true),
+                ["Hanoi", "Skill", "make a skill", "new skill"]
+            );
+        }
+        for term in SKILL_TERMS {
+            assert_eq!(gather([term.to_owned()]), [term], "{term}");
+        }
+        let full: Vec<String> = (0..crate::second_config::MOST_KEY_TERMS)
+            .map(|n| format!("Place {}", char::from(b'a' + n as u8)))
+            .collect();
+        let heard = listening_with(&full, true);
+        assert!(heard.len() <= MOST, "{}", heard.len());
+        assert!(
+            SKILL_TERMS
+                .iter()
+                .all(|term| heard.iter().any(|said| said == term))
+        );
     }
 
     #[test]

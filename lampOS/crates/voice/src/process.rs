@@ -2437,6 +2437,10 @@ fn second_route_worker_environment(
         // A skill made by this worker's own chat (Fourteen's proposal on #4710),
         // the only maker since 3 Nov.
         crate::made_skill::ENVIRONMENT,
+        // A recurring thing for the lamp to do told a skill, and listening
+        // for a make's words (lamp-9adf, 17 Nov).
+        crate::skill_recurring::ENVIRONMENT,
+        crate::second_provider::net::key_terms::SKILL_ENVIRONMENT,
         // A make it didn't make handed to the lamp's agent (#6059's proposal).
         crate::make_skill_agent::ENVIRONMENT,
         // With the lamp's skill-creator guide given to that agent (13 Nov).
@@ -2742,6 +2746,8 @@ mod tests {
             crate::untied_going_on::GRACE_ENVIRONMENT,
             crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT,
             crate::made_skill::ENVIRONMENT,
+            crate::skill_recurring::ENVIRONMENT,
+            crate::second_provider::net::key_terms::SKILL_ENVIRONMENT,
             crate::make_skill_agent::ENVIRONMENT,
             crate::make_skill_agent::GUIDE_ENVIRONMENT,
             crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
@@ -3803,6 +3809,8 @@ mod tests {
                     || name == crate::untied_going_on::GRACE_ENVIRONMENT
                     || name == crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT
                     || name == crate::made_skill::ENVIRONMENT
+                    || name == crate::skill_recurring::ENVIRONMENT
+                    || name == crate::second_provider::net::key_terms::SKILL_ENVIRONMENT
                     || name == crate::make_skill_agent::ENVIRONMENT
                     || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
                     || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
@@ -4111,7 +4119,9 @@ mod tests {
                     "LAMP_SERVICE_REDO=on",
                     "LAMP_SHORT_DONE=on",
                     "LAMP_SKILL_ASKED=on",
+                    "LAMP_SKILL_KEYTERM=on",
                     "LAMP_SKILL_NAMED=on",
+                    "LAMP_SKILL_RECURRING_TOLD=on",
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
