@@ -3682,8 +3682,10 @@ impl Runner for HarnessRunner {
         let cancel = AtomicBool::new(false);
         // A voice make's turn gets its whole deadline from the hand-over
         // (#7245, lamp-c0a4 17:53: Harness's hand-over took 40 of 90 s and
-        // OpenClaw had no time left to write). A skill's run is unchanged.
-        let deadline = if self.makes {
+        // OpenClaw had no time left to write). A skill's run is unchanged,
+        // and so is a live spoken ask's (`crate::voice_ask`): the person
+        // waits on it, so it is held to its deadline from its start.
+        let deadline = if self.makes && run.skill != crate::voice_ask::SKILL {
             run.deadline
         } else {
             run.deadline.saturating_sub(began.elapsed())
@@ -3830,18 +3832,23 @@ impl Runner for HarnessRunner {
                 // A make's answer is its folder's `answer.md`, read before
                 // its guard removes the folder (#7245), or, with none, its
                 // chat answer when that is a make's answer: a `cannot:` line
-                // or a skill's files (`make_answer`, #7427).
+                // or a skill's files (`make_answer`, #7427); a live spoken
+                // ask's (`crate::voice_ask`), any chat answer Harness didn't
+                // cut, held to a make's answer's bound (`voice_ask::run_answer`).
                 // Failing closed: a gateway agent's run whose launcher
                 // never claimed its start, or whose fence never said it
                 // started the script, never ran the skill's script.
                 let ended = if self.makes {
+                    let chat = answer
+                        .as_ref()
+                        .map(|(text, truncated)| (text.as_str(), *truncated));
+                    let taken = if run.skill == crate::voice_ask::SKILL {
+                        crate::voice_ask::run_answer(&started.folder, chat)
+                    } else {
+                        crate::skill_make::make_answer(&started.folder, chat)
+                    };
                     if ended.is_ok()
-                        && let Some((text, from)) = crate::skill_make::make_answer(
-                            &started.folder,
-                            answer
-                                .as_ref()
-                                .map(|(text, truncated)| (text.as_str(), *truncated)),
-                        )
+                        && let Some((text, from)) = taken
                     {
                         if from == crate::skill_make::AnswerFrom::Chat {
                             eprintln!(

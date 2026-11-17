@@ -10872,3 +10872,251 @@ fn a_reply_to_the_pane_reads_the_acknowledged_answer() {
     );
     assert!(!wait.contains(&json!("--program-token-file")));
 }
+
+/// lamp-control's tokens for a live ask on a gateway agent: never asked
+/// (a hard ask has no grant, and a read is refused before any mint).
+#[derive(Default)]
+struct NoMint(Mutex<Vec<String>>);
+
+impl skill_task::Tokens for NoMint {
+    fn mint(&self, skill: &str, _: &str) -> Result<skill_task::Minted, String> {
+        self.0.lock().unwrap().push(skill.to_owned());
+        Err("not asked".into())
+    }
+    fn mint_ask(&self, grants: &[String], _: &str) -> Result<skill_task::Minted, String> {
+        self.0.lock().unwrap().push(grants.join(","));
+        Err("not asked".into())
+    }
+    fn end(&self, run: &str) {
+        self.0.lock().unwrap().push(format!("end {run}"));
+    }
+}
+
+/// The owner's ruling of 17 Nov ~17:55: a live ask goes to the lamp's
+/// default agent, never pinned to Hermes. `gateway`'s pick and turn, the
+/// lamp's Hermes stand-in for both of its runners, both switches on.
+fn voice_asks(
+    gateway: lamp_tasks::skill_make::MakeGateway,
+    hermes: &Arc<MakeHermesStandIn>,
+    tokens: &Arc<NoMint>,
+    default: Option<EngineKind>,
+) -> lamp_tasks::voice_ask::Asks {
+    lamp_tasks::voice_ask::Asks {
+        switches: lamp_tasks::voice_ask::Switches {
+            hard: true,
+            services: true,
+        },
+        open: hermes.clone(),
+        held: hermes.clone(),
+        agent: Some(Arc::new(gateway)),
+        default_engine: Box::new(move || default),
+        tokens: tokens.clone(),
+        asking: AtomicBool::new(false),
+    }
+}
+
+fn voice_ask_line(ask: &str, grants: &[&str], within_ms: u64) -> Vec<u8> {
+    serde_json::to_vec(&json!({"op":"voice_ask","ask":ask,"grants":grants,"within_ms":within_ms}))
+        .unwrap()
+}
+
+/// A hard ask on a lamp whose default agent is an OpenClaw gateway agent
+/// is one `harness new openclaw` in a fresh `make-*` folder, with the
+/// person's words only in its `rules.md` (never in Harness's arguments),
+/// no token and nothing of the lamp's Hermes; its `answer.md` is told,
+/// folded; its session closed and its folder gone.
+#[test]
+fn a_hard_ask_on_an_openclaw_default_is_its_one_turn_and_never_hermes() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true,"write_answer":"It is about\n384,400 km away."},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let hermes = Arc::new(MakeHermesStandIn::default());
+    let tokens = Arc::new(NoMint::default());
+    let asks = voice_asks(
+        make_gateway(&rig, EngineKind::Openclaw, true),
+        &hermes,
+        &tokens,
+        Some(EngineKind::Openclaw),
+    );
+    let mut told = 0;
+    let answered = lamp_tasks::voice_ask::answer(
+        &voice_ask_line("how far is the moon, worked out", &[], 20_000),
+        &asks,
+        &work,
+        &mut || told += 1,
+    );
+    assert_eq!(
+        answered,
+        json!({"ok": true, "answer": "It is about 384,400 km away."})
+    );
+    assert_eq!(told, 1);
+    assert_eq!(
+        hermes.0.load(Ordering::Acquire),
+        0,
+        "never the lamp's Hermes"
+    );
+    assert!(tokens.0.lock().unwrap().is_empty(), "no token");
+    let news = calls_of_verb(&rig, "new");
+    assert_eq!(news.len(), 1, "exactly one harness new");
+    assert_eq!(news[0]["args"][1], "openclaw");
+    let folder = PathBuf::from(news[0]["args"][4].as_str().unwrap());
+    assert_eq!(folder.parent(), Some(work.as_path()));
+    for call in rig.calls() {
+        assert!(!call.to_string().contains("moon"), "{call}");
+    }
+    assert_eq!(calls_of_verb(&rig, "close").len(), 1);
+    assert_eq!(
+        fs::read_dir(&work).unwrap().count(),
+        0,
+        "the folder is gone"
+    );
+}
+
+/// OpenClaw put a make's answer in chat alone on lamp-c0a4 (#7427): an ask
+/// with no `answer.md` takes the agent's final chat answer, folded.
+#[test]
+fn a_hard_ask_on_openclaw_with_no_answer_file_takes_its_chat_answer() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":step(json!({"id":AGENT,"state":"stopped","ask":null,
+            "answer":"The moon is\nabout 384,400 km away.","truncated":false,"tools":1})),
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let hermes = Arc::new(MakeHermesStandIn::default());
+    let tokens = Arc::new(NoMint::default());
+    let asks = voice_asks(
+        make_gateway(&rig, EngineKind::Openclaw, true),
+        &hermes,
+        &tokens,
+        Some(EngineKind::Openclaw),
+    );
+    let answered = lamp_tasks::voice_ask::answer(
+        &voice_ask_line("how far is the moon", &[], 20_000),
+        &asks,
+        &work,
+        &mut || {},
+    );
+    assert_eq!(
+        answered,
+        json!({"ok": true, "answer": "The moon is about 384,400 km away."})
+    );
+    assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+}
+
+/// A linked service's read on an OpenClaw default is refused `no_services`
+/// in plain words: its gateway can't be held off the network or given the
+/// lamp's services for one run yet. Nothing is minted, started or run, on
+/// OpenClaw or the lamp's Hermes.
+#[test]
+fn a_read_on_an_openclaw_default_is_refused_plainly_and_nothing_runs() {
+    let rig = Rig::new();
+    rig.plan(json!({"machines":{"default":true}}));
+    let work = make_work(&rig);
+    let hermes = Arc::new(MakeHermesStandIn::default());
+    let tokens = Arc::new(NoMint::default());
+    let asks = voice_asks(
+        make_gateway(&rig, EngineKind::Openclaw, true),
+        &hermes,
+        &tokens,
+        Some(EngineKind::Openclaw),
+    );
+    let mut told = 0;
+    let answered = lamp_tasks::voice_ask::answer(
+        &voice_ask_line("read me my latest emails", &["gmail-read"], 20_000),
+        &asks,
+        &work,
+        &mut || told += 1,
+    );
+    assert_eq!(answered["error"], lamp_tasks::voice_ask::NO_SERVICES);
+    let why = answered["message"].as_str().unwrap();
+    assert!(
+        why.starts_with("the lamp's default agent (openclaw) can't be held off the network"),
+        "{why}"
+    );
+    assert_eq!(told, 0);
+    assert_eq!(hermes.0.load(Ordering::Acquire), 0);
+    assert!(tokens.0.lock().unwrap().is_empty(), "nothing minted");
+    assert!(calls_of_verb(&rig, "new").is_empty());
+    assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+}
+
+/// The ask's 120 s are counted from its start on OpenClaw too, never
+/// renewed at the hand-over as a make's are: a slow `harness new` leaves
+/// the ask ended at its deadline.
+#[test]
+fn an_ask_on_openclaw_is_held_to_its_deadline_from_its_start() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true,"write_answer":"ANSWER","delay_ms":2500},
+        "wait":{"stdout":waited("stopped", AGENT),"delay_ms":2000},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let hermes = Arc::new(MakeHermesStandIn::default());
+    let tokens = Arc::new(NoMint::default());
+    let asks = voice_asks(
+        make_gateway(&rig, EngineKind::Openclaw, true),
+        &hermes,
+        &tokens,
+        Some(EngineKind::Openclaw),
+    );
+    let began = Instant::now();
+    let answered =
+        lamp_tasks::voice_ask::answer(&voice_ask_line("x", &[], 3_000), &asks, &work, &mut || {});
+    assert_eq!(answered["error"], "run_failed", "{answered}");
+    assert!(
+        began.elapsed() < Duration::from_secs(5),
+        "{:?}",
+        began.elapsed()
+    );
+    assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+}
+
+/// A Hermes default keeps the lamp's Hermes as a make's (`MakeHermes`),
+/// with no Harness call; with Harness not looked yet on a lamp whose
+/// default is OpenClaw, the ask is refused `not_ready`, never run on
+/// Hermes.
+#[test]
+fn a_hermes_default_runs_the_lamps_hermes_and_an_unlooked_openclaw_is_not_ready() {
+    let rig = Rig::new();
+    rig.plan(json!({"machines":{"default":true}}));
+    let work = make_work(&rig);
+    let hermes = Arc::new(MakeHermesStandIn::default());
+    let tokens = Arc::new(NoMint::default());
+    let asks = voice_asks(
+        make_gateway(&rig, EngineKind::Hermes, false),
+        &hermes,
+        &tokens,
+        Some(EngineKind::Hermes),
+    );
+    let answered =
+        lamp_tasks::voice_ask::answer(&voice_ask_line("x", &[], 20_000), &asks, &work, &mut || {});
+    assert_eq!(answered, json!({"ok": true, "answer": "HERMES"}));
+    assert_eq!(hermes.0.load(Ordering::Acquire), 1);
+    assert!(calls_of_verb(&rig, "new").is_empty());
+    // Harness not set up yet: the pick is the lamp's Hermes, but the
+    // lamp's default agent is OpenClaw.
+    let unlooked = lamp_tasks::skill_make::MakeGateway::of(Arc::new({
+        let mut runner = HarnessRunner::lamp(rig.root.path(), SkillHarnessSlot::default());
+        runner.makes = true;
+        runner
+    }));
+    let asks = voice_asks(unlooked, &hermes, &tokens, Some(EngineKind::Openclaw));
+    let answered =
+        lamp_tasks::voice_ask::answer(&voice_ask_line("x", &[], 20_000), &asks, &work, &mut || {});
+    assert_eq!(answered["error"], lamp_tasks::skill_make::NOT_READY);
+    assert_eq!(hermes.0.load(Ordering::Acquire), 1, "Hermes not run again");
+    assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+}

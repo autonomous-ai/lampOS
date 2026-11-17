@@ -3781,19 +3781,34 @@ to Hermes alone (`HarnessRunner`, above).
 ### A live spoken ask on the make socket (`voice_ask`, off unless set)
 
 The owner's rulings of 17 Nov: a linked service's live read, and an ask the
-second route's model can't do, go to the lamp's agent. The make socket takes
+second route's model can't do, go to the lamp's agent, the lamp's default
+(Hermes or OpenClaw, ~17:55), never pinned to Hermes. The make socket takes
 a second kind of line from lamp-voice, `{"op":"voice_ask","ask","grants",
 "within_ms"}` (`lamp_tasks::voice_ask`), answered as a make is
 (`started`, then `answer` or a refusal), with its own one place beside a
-make's. With no grant it is taken only with `LAMP_HARD_ASKS_TO_AGENT=on`,
-on the make's runner (the network as `LAMP_MAKE_AGENT_NET` says, the
+make's. The agent is picked at each ask as a make with `"one_path":true`
+picks it (`skill_make::MakeGateway`, `HarnessRunner::make_agent`), with no
+line field: the lamp's Hermes takes it as below; a gateway agent
+(OpenClaw) takes a hard ask as one make turn (`MakeTurn`, `harness new
+openclaw` in a fresh `make-<run id>` folder with only `rules.md`, no home,
+environment or token), its answer `answer.md`, else the agent's final chat
+answer when Harness didn't cut it (`voice_ask::run_answer`), held to 120 s
+from the ask's start (a make's turn gets its whole deadline from the
+hand-over; an ask's doesn't). A read on OpenClaw is refused `no_services`
+before any mint (its gateway keeps the network and has no per-run
+lamp-services MCP server or token yet; [services.md](services.md)). A
+Hermes pick while lamp-tasks' no-Harness read of the default
+(`runtime::lamp_default`) names another agent is refused `not_ready`. A
+failed pick (a default agent that takes no run) is `run_failed`. With no
+grant it is taken only with `LAMP_HARD_ASKS_TO_AGENT=on`, on Hermes on
+the make's runner (the network as `LAMP_MAKE_AGENT_NET` says, the
 lamp's local ports included until the net runner lands; lamp-voice sends it
 only for the owner's own line); with one service's `<code>-read` grant (a
 read only: a `-write` or a second grant is refused `bad_request`, and
 lamp-control never mints one for an ask) only with `LAMP_SERVICES_TO_AGENT=on` and
 `LAMP_AGENT_SERVICES=on`, held off the network, on a token lamp-control
 mints for exactly that grant (`{"mint":{"ask":[...]}}`), its fresh home's
-config with `mcp_servers.lamp-services`. Either way a fresh folder and home
+config with `mcp_servers.lamp-services`. On Hermes, either way a fresh folder and home
 of its own, the person's words in its rules file (never its arguments), its
 answer read from `answer.md`, whitespace folded and at most 3,000 bytes,
 the folder removed and the token ended however it ends, at most 120 s.

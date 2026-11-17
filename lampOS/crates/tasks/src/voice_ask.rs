@@ -1,13 +1,14 @@
 //! A live spoken ask handed to the lamp's agent (the owner's rulings,
-//! 17 Nov: connector work goes to Hermes, never the second route's own
-//! model; and an ask that model can't do goes there too, never a spoken
-//! "I can't"). lamp-voice sends one line on the make socket
-//! ([`crate::skill_make::MAKE_SOCKET`], lamp-voice alone as root):
-//! `{"op":"voice_ask","ask","grants","within_ms"}`, answered as a
+//! 17 Nov: connector work goes to the lamp's agent, never the second
+//! route's own model; an ask that model can't do goes there too, never a
+//! spoken "I can't"; and the agent is the lamp's default, Hermes or
+//! OpenClaw, never pinned to Hermes). lamp-voice sends one line on the
+//! make socket ([`crate::skill_make::MAKE_SOCKET`], lamp-voice alone as
+//! root): `{"op":"voice_ask","ask","grants","within_ms"}`, answered as a
 //! make is: `{"ok":true,"started":true}` once the run is about to start,
 //! then `{"ok":true,"answer"}`, or one refusal (`off`, `bad_request`,
-//! `too_long`, `busy`, `no_token`, `not_held_off`, `no_namespace`,
-//! `run_failed`, `no_answer`).
+//! `too_long`, `busy`, `not_ready`, `no_services`, `no_token`,
+//! `not_held_off`, `no_namespace`, `run_failed`, `no_answer`).
 //!
 //! - **Two switches, each `on` exactly, off unless set**: [`HARD_SWITCH`]
 //!   (`LAMP_HARD_ASKS_TO_AGENT`) takes an ask with no grant;
@@ -15,12 +16,22 @@
 //!   `LAMP_AGENT_SERVICES`) one with a linked service's grants. Off, the
 //!   line is refused `off` and nothing runs; the make socket's makes are as
 //!   before, byte for byte.
-//! - **The run is a make's** (`crate::skill_make`): the lamp's Hermes in
-//!   its namespace, a fresh folder and home of its own (never Hermes's
-//!   memory or sessions), removed however it ends, ended at `within_ms`
-//!   (at most [`MOST_WITHIN`]). The person's words go in the folder's
-//!   rules file, quoted as data, never in the run's arguments; the agent
-//!   writes what the lamp tells them to the answer file.
+//! - **The agent is the lamp's default**, picked at each ask as a voice
+//!   make on the one run path picks it ([`crate::skill_make::MakeGateway`],
+//!   `HarnessRunner::make_agent`: its wrapper's data and
+//!   `default_agent_takes_runs`). The lamp's Hermes runs it as a make does
+//!   (`crate::skill_make::MakeHermes`): its namespace, a fresh folder and
+//!   home of its own (never Hermes's memory or sessions). A gateway agent
+//!   (OpenClaw) takes it as one make turn through Harness
+//!   (`harness new openclaw` in the ask's folder, `MakeTurn`), no token.
+//!   A Hermes pick on a lamp whose default agent isn't Hermes (Harness
+//!   hasn't looked yet) is refused `not_ready`, never run on Hermes.
+//!   Either way the folder is removed however it ends, the run ended at
+//!   `within_ms` (at most [`MOST_WITHIN`], counted from the hand-over's
+//!   start on OpenClaw too). The person's words go in the folder's rules
+//!   file, quoted as data, never in the run's arguments; the agent writes
+//!   what the lamp tells them to the answer file (OpenClaw: else its final
+//!   chat answer, as bounded).
 //! - **A service's read grant** (`<code>-read`, one, never a `-write` in
 //!   this cut): minted by lamp-control for this run alone
 //!   (`{"mint":{"ask":[...]}}`, as the skill [`SKILL`]), held to exactly
@@ -29,8 +40,14 @@
 //!   runner a held make uses): a mail's words can't send anything anywhere.
 //!   The voice hands over only a read it would tell in full; it never asks
 //!   for a brief one (someone else may be in view: nothing is handed over).
+//!   OpenClaw can't take one yet: its gateway keeps the network and has no
+//!   per-run MCP server or token, so the read is refused `no_services`
+//!   ([`NO_SERVICES`]) before any token is minted, never run open and never
+//!   handed to another model.
 //! - **One ask at a time**, beside a make: a second is refused `busy`.
+use crate::harness::EngineKind;
 use crate::protocol::refusal;
+use crate::skill_make::{MakeAgent, MakeGateway, NOT_READY, NOT_READY_LINE};
 use crate::skill_task::{CONTROL_SOCKET, Runner, SOCKET_ENV, TOKEN_ENV, Tokens};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -61,6 +78,18 @@ pub const LEAST_WITHIN: Duration = crate::skill_make::LEAST_WITHIN;
 pub const MOST_WITHIN: Duration = crate::skill_make::MOST_WITHIN;
 /// What a second ask is told while one runs.
 pub const BUSY: &str = "the lamp's agent is already on an ask; one is taken at a time";
+/// The refusal's code of a linked service's read on a lamp whose default
+/// agent can't be held off the network or given the lamp's services for
+/// one run (a gateway agent, OpenClaw, today).
+pub const NO_SERVICES: &str = "no_services";
+
+/// Why [`NO_SERVICES`]: what OpenClaw is missing for a read, in plain words.
+pub fn no_services(engine: EngineKind) -> String {
+    format!(
+        "the lamp's default agent ({}) can't be held off the network or given the lamp's services for one run yet (its gateway keeps the network and has no per-run lamp-services MCP server or token), so a linked service's read is not handed to it and nothing was started",
+        engine.argument()
+    )
+}
 
 /// Which asks are taken here.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -219,14 +248,24 @@ pub fn prompt(folder: &Path) -> String {
     )
 }
 
-/// What runs an ask: the lamp's Hermes as a make runs (`open`, the network
-/// as `LAMP_MAKE_AGENT_NET` says), the same held off the network for an
-/// ask with a service's grants (`held`), lamp-control's tokens, and the one
-/// ask at a time.
+/// What runs an ask: the lamp's default agent as `agent` picks it; for the
+/// lamp's Hermes, as a make runs (`open`, the network as
+/// `LAMP_MAKE_AGENT_NET` says), the same held off the network for an ask
+/// with a service's grants (`held`); for a gateway agent, `agent`'s one
+/// turn. lamp-control's tokens, and the one ask at a time.
 pub struct Asks {
     pub switches: Switches,
     pub open: Arc<dyn Runner + Send + Sync>,
     pub held: Arc<dyn Runner + Send + Sync>,
+    /// The lamp's default agent, picked at each ask as a make on the one
+    /// run path picks it ([`MakeGateway::pick`]), and a gateway agent's one
+    /// turn ([`MakeGateway`]'s `Runner`); `None`, the lamp's Hermes.
+    pub agent: Option<Arc<MakeGateway>>,
+    /// The lamp's default agent as lamp-tasks reads it with no Harness
+    /// (`runtime::lamp_default`, the no-Harness runs' own), read at each
+    /// ask: a Hermes pick while it names another agent is refused
+    /// [`NOT_READY`] (Harness hasn't looked yet), never run on Hermes.
+    pub default_engine: Box<dyn Fn() -> Option<EngineKind> + Send + Sync>,
     pub tokens: Arc<dyn Tokens + Send + Sync>,
     pub asking: AtomicBool,
 }
@@ -258,6 +297,20 @@ pub fn answer(line: &[u8], asks: &Asks, work: &Path, started: &mut dyn FnMut()) 
     }
     let _place = Place(&asks.asking);
     let services = !ask.grants.is_empty();
+    match pick(asks) {
+        Ok(MakeAgent::Hermes) => {}
+        Ok(MakeAgent::Gateway(engine)) if services => {
+            return refusal(NO_SERVICES, &no_services(engine));
+        }
+        Ok(MakeAgent::Gateway(_)) => {
+            // Picked by `pick`, so there.
+            let Some(gateway) = asks.agent.as_deref() else {
+                return refusal("run_failed", "the lamp's default agent can't be reached");
+            };
+            return on_gateway(&ask, gateway, work, started);
+        }
+        Err(refused) => return refused,
+    }
     let runner: &dyn Runner = if services { &*asks.held } else { &*asks.open };
     if let Err(why) = runner.ready() {
         return refusal(not_started(&why), &why);
@@ -306,13 +359,103 @@ pub fn answer(line: &[u8], asks: &Asks, work: &Path, started: &mut dyn FnMut()) 
     drop(folder);
     match ran {
         Err(why) => refusal(not_started(&why), &why),
-        Ok(_) => match read
-            .map(|text| crate::skill_task::told_answer(&text))
-            .filter(|text| !text.is_empty())
+        Ok(_) => told(read),
+    }
+}
+
+/// The lamp's default agent for an ask now ([`Asks::agent`]), or its
+/// refusal: a Hermes pick on a lamp whose default isn't Hermes is
+/// [`NOT_READY`], never a Hermes run.
+fn pick(asks: &Asks) -> Result<MakeAgent, Value> {
+    let Some(agent) = &asks.agent else {
+        return Ok(MakeAgent::Hermes);
+    };
+    match (agent.pick)() {
+        Ok(MakeAgent::Hermes)
+            if (asks.default_engine)().is_some_and(|engine| engine != EngineKind::Hermes) =>
         {
-            Some(text) => json!({"ok": true, "answer": text}),
-            None => refusal("no_answer", "the lamp's agent wrote no answer"),
-        },
+            Err(refusal(NOT_READY, NOT_READY_LINE))
+        }
+        Ok(picked) => Ok(picked),
+        Err(why) => Err(refusal("run_failed", &why)),
+    }
+}
+
+/// An ask on a gateway agent (OpenClaw), no grant: its folder with only
+/// the rules made in `work`, `started` told, the one turn sent in that
+/// folder ([`crate::skill_make::MakeTurn`]: no home, no environment, no
+/// token), its answer taken (`answer.md`, else the agent's final chat
+/// answer, both read by the runner before its session closes) and the
+/// folder removed however it ends.
+fn on_gateway(
+    ask: &AskLine,
+    gateway: &MakeGateway,
+    work: &Path,
+    started: &mut dyn FnMut(),
+) -> Value {
+    if let Err(why) = gateway.ready() {
+        return refusal(not_started(&why), &why);
+    }
+    let folder = match crate::skill_make::put_ask_on_gateway(work, &ask.rules()) {
+        Ok(folder) => folder,
+        Err(error) => {
+            return refusal(
+                "run_failed",
+                &format!("the ask's folder was not made: {error}"),
+            );
+        }
+    };
+    let mut run = crate::skill_make::make_run(&folder.path, ask.within());
+    run.skill = SKILL.into();
+    run.prompt = prompt(&folder.path);
+    run.env = Vec::new();
+    started();
+    let ran = gateway.run(&run, &|| {});
+    let read = run
+        .answer
+        .get()
+        .cloned()
+        .or_else(|| crate::skill_make::answer_in(&folder.path));
+    drop(folder);
+    match ran {
+        Err(why) if crate::skill_make::not_ready(&why) => {
+            eprintln!("[lamp-tasks] live ask: not ready: {why}");
+            refusal(NOT_READY, NOT_READY_LINE)
+        }
+        Err(why) => refusal(not_started(&why), &why),
+        Ok(_) => told(read),
+    }
+}
+
+/// A gateway agent's ask's answer, read by its runner before its session
+/// closes: its folder's `answer.md` whenever there is one; else the
+/// agent's final chat answer `chat` when Harness didn't cut it short, not
+/// empty and at most a make's answer's bound (as #7427 takes a make's, but
+/// an ask's answer is plain sentences, never a skill's files).
+pub(crate) fn run_answer(
+    folder: &Path,
+    chat: Option<(&str, bool)>,
+) -> Option<(String, crate::skill_make::AnswerFrom)> {
+    if let Some(text) = crate::skill_make::answer_in(folder) {
+        return Some((text, crate::skill_make::AnswerFrom::File));
+    }
+    chat.filter(|(text, truncated)| {
+        !truncated
+            && !text.trim().is_empty()
+            && text.len() as u64 <= crate::skill_make::MOST_ANSWER_BYTES
+    })
+    .map(|(text, _)| (text.to_owned(), crate::skill_make::AnswerFrom::Chat))
+}
+
+/// The ask's answer as told: its words folded and bounded
+/// ([`crate::skill_task::told_answer`]), never empty.
+fn told(read: Option<String>) -> Value {
+    match read
+        .map(|text| crate::skill_task::told_answer(&text))
+        .filter(|text| !text.is_empty())
+    {
+        Some(text) => json!({"ok": true, "answer": text}),
+        None => refusal("no_answer", "the lamp's agent wrote no answer"),
     }
 }
 
@@ -410,9 +553,195 @@ mod tests {
             switches,
             open,
             held,
+            agent: None,
+            default_engine: Box::new(|| None),
             tokens,
             asking: AtomicBool::new(false),
         }
+    }
+
+    /// One turn as the test saw it: its skill, environment, words and
+    /// deadline.
+    type TurnSeen = (String, Vec<(&'static str, String)>, String, Duration);
+
+    /// A gateway agent's one turn as the test saw it: writes `answer` to
+    /// the ask's folder and keeps the run.
+    #[derive(Default)]
+    struct Turn {
+        answer: Option<&'static str>,
+        seen: Mutex<Vec<TurnSeen>>,
+    }
+
+    impl crate::skill_make::MakeTurn for Turn {
+        fn make_turn(&self, run: &SkillRun) -> Result<u64, String> {
+            let folder = run.start_in.clone().unwrap();
+            if let Some(answer) = self.answer {
+                std::fs::write(folder.join(crate::skill_make::ANSWER_FILE), answer).unwrap();
+            }
+            self.seen.lock().unwrap().push((
+                run.skill.clone(),
+                run.env.clone(),
+                run.prompt.clone(),
+                run.deadline,
+            ));
+            Ok(0)
+        }
+    }
+
+    /// `asks` with the lamp's default agent picked as `picked` (counted),
+    /// a gateway agent's turn `turn`, and `default` as lamp-tasks reads
+    /// the lamp's default with no Harness.
+    fn picking(
+        mut asks: Asks,
+        picked: Result<MakeAgent, String>,
+        turn: Arc<Turn>,
+        default: Option<EngineKind>,
+        picks: Arc<std::sync::atomic::AtomicUsize>,
+    ) -> Asks {
+        asks.agent = Some(Arc::new(MakeGateway {
+            pick: Box::new(move || {
+                picks.fetch_add(1, Ordering::AcqRel);
+                picked.clone()
+            }),
+            turn,
+        }));
+        asks.default_engine = Box::new(move || default);
+        asks
+    }
+
+    /// The owner's ruling (17 Nov ~17:55): the lamp's default agent, never
+    /// pinned to Hermes. Hermes the default: the lamp's Hermes runners as
+    /// before. OpenClaw the default: its one turn for a hard ask, with the
+    /// words only in its rules and no home, environment or token; a read
+    /// refused `no_services` before any mint. Harness not looked yet on an
+    /// OpenClaw lamp: `not_ready`. A pick that fails: `run_failed`.
+    #[test]
+    fn an_ask_goes_to_the_lamps_default_agent() {
+        let dir = work();
+        let code = |told: &Value| told["error"].as_str().unwrap_or_default().to_owned();
+        let picks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        // Hermes.
+        let (open, held, turn) = (
+            Arc::new(Agent {
+                answer: Some("Open."),
+                ..Default::default()
+            }),
+            Arc::new(Agent {
+                answer: Some("Held."),
+                ..Default::default()
+            }),
+            Arc::new(Turn::default()),
+        );
+        let tokens = Arc::new(Minting::default());
+        let hermes = picking(
+            asks(open.clone(), held.clone(), tokens.clone(), on()),
+            Ok(MakeAgent::Hermes),
+            turn.clone(),
+            Some(EngineKind::Hermes),
+            picks.clone(),
+        );
+        let told = answer(&line("x", &[]), &hermes, dir.path(), &mut || {});
+        assert_eq!(told["answer"], "Open.");
+        let told = answer(&line("x", &["gmail-read"]), &hermes, dir.path(), &mut || {});
+        assert_eq!(told["answer"], "Held.");
+        assert!(turn.seen.lock().unwrap().is_empty());
+        // OpenClaw.
+        let turn = Arc::new(Turn {
+            answer: Some("Forty\n two."),
+            ..Default::default()
+        });
+        let (open, held) = (Arc::new(Agent::default()), Arc::new(Agent::default()));
+        let tokens = Arc::new(Minting::default());
+        let openclaw = picking(
+            asks(open.clone(), held.clone(), tokens.clone(), on()),
+            Ok(MakeAgent::Gateway(EngineKind::Openclaw)),
+            turn.clone(),
+            Some(EngineKind::Openclaw),
+            picks.clone(),
+        );
+        let mut started = 0;
+        let told = answer(
+            &line("what is six times seven", &[]),
+            &openclaw,
+            dir.path(),
+            &mut || started += 1,
+        );
+        assert_eq!(told, json!({"ok": true, "answer": "Forty two."}));
+        assert_eq!(started, 1);
+        {
+            let seen = turn.seen.lock().unwrap();
+            let (skill, env, prompt, deadline) = &seen[0];
+            assert_eq!(skill, SKILL);
+            assert!(env.is_empty(), "{env:?}");
+            assert!(!prompt.contains("seven"), "{prompt}");
+            assert_eq!(*deadline, Duration::from_millis(5_000));
+        }
+        let told = answer(
+            &line("read me my mail", &["gmail-read"]),
+            &openclaw,
+            dir.path(),
+            &mut || started += 1,
+        );
+        assert_eq!(code(&told), NO_SERVICES);
+        assert!(
+            told["message"]
+                .as_str()
+                .unwrap()
+                .contains("can't be held off the network"),
+            "{told}"
+        );
+        assert_eq!(started, 1, "nothing started for the read");
+        assert!(tokens.asked.lock().unwrap().is_empty(), "nothing minted");
+        assert_eq!(turn.seen.lock().unwrap().len(), 1);
+        assert!(open.seen.lock().unwrap().is_empty() && held.seen.lock().unwrap().is_empty());
+        // OpenClaw the lamp's default, Harness not looked yet.
+        let unlooked = picking(
+            asks(open.clone(), held.clone(), tokens.clone(), on()),
+            Ok(MakeAgent::Hermes),
+            turn.clone(),
+            Some(EngineKind::Openclaw),
+            picks.clone(),
+        );
+        assert_eq!(
+            code(&answer(&line("x", &[]), &unlooked, dir.path(), &mut || {})),
+            crate::skill_make::NOT_READY
+        );
+        assert!(open.seen.lock().unwrap().is_empty());
+        let failing = picking(
+            asks(open.clone(), held.clone(), tokens.clone(), on()),
+            Err("neither".into()),
+            turn.clone(),
+            None,
+            picks.clone(),
+        );
+        assert_eq!(
+            code(&answer(&line("x", &[]), &failing, dir.path(), &mut || {})),
+            "run_failed"
+        );
+        assert!(open.seen.lock().unwrap().is_empty());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+        // The switches off: refused `off` as before, no agent even picked.
+        let before = picks.load(Ordering::Acquire);
+        let off = picking(
+            asks(
+                open.clone(),
+                held.clone(),
+                tokens.clone(),
+                Switches::default(),
+            ),
+            Ok(MakeAgent::Gateway(EngineKind::Openclaw)),
+            turn.clone(),
+            Some(EngineKind::Openclaw),
+            picks.clone(),
+        );
+        for grants in [&[][..], &["gmail-read"][..]] {
+            assert_eq!(
+                code(&answer(&line("x", grants), &off, dir.path(), &mut || {})),
+                "off"
+            );
+        }
+        assert_eq!(picks.load(Ordering::Acquire), before);
+        assert_eq!(turn.seen.lock().unwrap().len(), 1);
     }
 
     fn work() -> tempfile::TempDir {
@@ -589,6 +918,22 @@ mod tests {
         );
         assert!(is_ask(&line("x", &[])));
         assert!(!is_ask(br#"{"op":"skill_make"}"#));
+    }
+
+    /// OpenClaw's answer: `answer.md` first, else a chat answer Harness
+    /// didn't cut, never an empty or an oversized one.
+    #[test]
+    fn a_gateway_asks_answer_is_its_file_else_its_whole_chat() {
+        use crate::skill_make::AnswerFrom::{Chat, File};
+        let dir = work();
+        let chat = |text: &str, cut| run_answer(dir.path(), Some((text, cut)));
+        assert_eq!(chat("Six.", false), Some(("Six.".into(), Chat)));
+        assert_eq!(chat("Six and", true), None);
+        assert_eq!(chat("  ", false), None);
+        let long = "x".repeat(crate::skill_make::MOST_ANSWER_BYTES as usize + 1);
+        assert_eq!(chat(&long, false), None);
+        std::fs::write(dir.path().join(crate::skill_make::ANSWER_FILE), "Seven.").unwrap();
+        assert_eq!(chat("Six.", false), Some(("Seven.".into(), File)));
     }
 
     #[test]
