@@ -856,7 +856,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_VOICE_LOCK_CODE` | The lamp keeps its voice's code in memory, so a busy memory card can't freeze it mid-answer. |
 | `LAMP_PRIVACY_RIDES_STALL` | A split-second freeze of the lamp cuts its answer but no longer ends the voice and mutes it. |
 | `LAMP_NIGHT_ASLEEP_FACE` | Asleep at night with the light off, the lamp shows the same soft warm glow as when you put it to sleep. |
-| `LAMP_RING_UPDATE` | While the lamp updates, its light breathes slower; when it's done it glows up once, and if the update didn't take it dims once. |
+| `LAMP_RING_UPDATE` | While the lamp updates, its light breathes slower, then glows up once if it took or dims once if not. |
 | `LAMP_NIGHT_STAYS_FOLDED` | Asleep at night, the lamp stays curled up while people talk nearby; its name or a tap still wakes it. |
 | `LAMP_RING_STOP_ENDS_IT` | Say "stop" over a timer's ring and it stays stopped, instead of ringing once more. |
 | `LAMP_REMINDER_PULSE` | While the microphones are off, the lamp's light pulses softly once a minute when a reminder is due. |
