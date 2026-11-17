@@ -916,6 +916,23 @@ impl Lamp for Real {
         self.update_checks.ask(self.bus.as_ref(), now, retry)
     }
 
+    fn update_now_page(&self) -> bool {
+        self.update_page && self.update_checks.now()
+    }
+
+    fn ask_update_now(&mut self, now: Instant) -> Result<(), String> {
+        let at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_millis() as u64);
+        self.update_checks.ask_now(self.bus.as_ref(), now, at)
+    }
+
+    fn walk_under_way(&self) -> bool {
+        self.latest(lamp_msgs::OnboardingPending::TOPIC)
+            .and_then(|message| message.parse::<lamp_msgs::OnboardingPending>().ok())
+            .is_some_and(|pending| pending.walk)
+    }
+
     fn engines_page(&self) -> bool {
         self.update_page && self.update_checks.engines()
     }

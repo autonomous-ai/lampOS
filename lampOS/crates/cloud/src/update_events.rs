@@ -127,6 +127,10 @@ struct Round {
     end: Option<End>,
     #[serde(default)]
     ended_acked: bool,
+    /// The owner's Update now asked for it, or took it over (#7517): said
+    /// as `"asked": "now"` in its events from when it is seen.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    asked_now: bool,
 }
 
 impl Round {
@@ -223,6 +227,11 @@ impl Events {
             .iter_mut()
             .filter(|round| round.end.is_none())
         {
+            if status.round.as_ref().is_some_and(|now| {
+                status.now != "idle" && now.started_at_unix_ms == round.round && now.asked_now()
+            }) {
+                round.asked_now = true;
+            }
             if let Some(last) = status.last.as_ref().filter(|last| ends(round.round, last)) {
                 round.end = Some(End {
                     outcome: outcome_name(&last.outcome).to_owned(),
@@ -256,6 +265,7 @@ impl Events {
                 started_acked: false,
                 end: None,
                 ended_acked: false,
+                asked_now: now.asked_now(),
             });
         }
         self.kept.rounds.retain(|round| !round.done());
@@ -273,31 +283,31 @@ impl Events {
         for round in &self.kept.rounds {
             let flying = |which| self.flying.contains(&(round.round, which));
             if !round.started_acked && !flying(Which::Started) {
-                due.push((
-                    round.round,
-                    Which::Started,
-                    json!({
-                        "round": round.round,
-                        "from": round.from,
-                        "to": round.to,
-                        "at": round.at,
-                    }),
-                ));
+                let mut data = json!({
+                    "round": round.round,
+                    "from": round.from,
+                    "to": round.to,
+                    "at": round.at,
+                });
+                if round.asked_now {
+                    data["asked"] = json!(lamp_msgs::UpdateRound::ASKED_NOW);
+                }
+                due.push((round.round, Which::Started, data));
             }
             if let Some(end) = &round.end
                 && !round.ended_acked
                 && !flying(Which::Ended)
             {
-                due.push((
-                    round.round,
-                    Which::Ended,
-                    json!({
-                        "round": round.round,
-                        "outcome": end.outcome,
-                        "build": end.build,
-                        "at": end.at,
-                    }),
-                ));
+                let mut data = json!({
+                    "round": round.round,
+                    "outcome": end.outcome,
+                    "build": end.build,
+                    "at": end.at,
+                });
+                if round.asked_now {
+                    data["asked"] = json!(lamp_msgs::UpdateRound::ASKED_NOW);
+                }
+                due.push((round.round, Which::Ended, data));
             }
         }
         due
@@ -388,6 +398,8 @@ mod tests {
                 // the helper's `checking` hasn't yet (an up-to-date round's
                 // never does).
                 target: (now != "checking").then(|| built(813)),
+                waiting: None,
+                asked: None,
             }),
         }
     }
@@ -537,6 +549,25 @@ mod tests {
     /// The data holds the round, typed builds, a fixed outcome and times:
     /// no other key, and a build that is not digits, hex and `+` is cut to
     /// its sequence.
+    /// #7517: a round the owner's Update now asked for, or took over, says
+    /// `"asked": "now"` in its events from when that is seen; a plain round
+    /// never does.
+    #[test]
+    fn an_update_now_round_says_so_in_its_events() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut events = Events::new(dir.path().join(FILE));
+        let fetching = status("fetching", 812, BEFORE);
+        events.look(Instant::now(), R + 1_500, || Some(fetching.clone()));
+        assert!(events.due()[0].2.get("asked").is_none());
+        let mut taken = status("switching", 812, BEFORE);
+        if let Some(round) = taken.round.as_mut() {
+            round.asked = Some(lamp_msgs::UpdateRound::ASKED_NOW.into());
+        }
+        events.look(Instant::now() + EVERY, R + 3_000, || Some(taken));
+        let due = events.due();
+        assert_eq!(due[0].2["asked"], "now");
+    }
+
     #[test]
     fn the_data_holds_nothing_personal() {
         let dir = tempfile::tempdir().unwrap();

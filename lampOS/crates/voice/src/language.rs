@@ -174,6 +174,27 @@ pub const UNPLUG_ASK_OFF: &str =
     "My arm is folded. Shall I turn myself off now? Say yes, and I will.";
 pub const UNPLUG_UPDATING: &str = "I'm in the middle of an update, so I can't turn myself off yet. I'll get back up; ask me again once it's done.";
 
+/// What the lamp says when the owner's Update now (#7517) finds someone
+/// talking with it: once, before the switch restarts it.
+pub const UPDATING_NOW: &str = "I'm updating now. I'll be back in a minute.";
+
+/// [`UPDATING_NOW`] in Vietnamese, Japanese, Chinese and Korean. Kept out of
+/// [`FIXED_LINES`]: it is said through the model's route as written, never
+/// from the speech cache.
+const UPDATING_NOW_WORDS: [&str; 4] = [
+    "Mình cập nhật phần mềm nhé, một phút nữa mình quay lại.",
+    "今からソフトウェアを更新します。1分ほどで戻ります。",
+    "我现在要更新软件，一分钟后回来。",
+    "지금 소프트웨어를 업데이트할게요. 1분 뒤에 돌아올게요.",
+];
+
+/// [`UPDATING_NOW`] in `language`, English for none.
+pub fn updating_now(language: Option<Language>) -> &'static str {
+    language.map_or(UPDATING_NOW, |language| {
+        UPDATING_NOW_WORDS[language.column()]
+    })
+}
+
 /// What a lamp woken by its name says in place of its "hm?"
 /// (`LAMP_SLEEP_HEARS_NAME=on`, migrate-P2, the design owner on #4877): only
 /// from the speech cache ([`crate::say::tts_cache::TtsCache::wake_line`]).

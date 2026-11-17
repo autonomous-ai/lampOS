@@ -72,6 +72,7 @@ use cleanup::{Failures as ShutdownFailures, Stage as CleanupStage};
 mod early_end;
 pub mod early_finalize;
 mod endpoint;
+mod give_way;
 mod hand;
 mod holding;
 mod key_refusals;
@@ -6614,6 +6615,8 @@ fn conversation_with_gate_inner(
     // turns wait for a new one.
     let signed_out_line = signed_out::switched_on();
     let mut signed_out = signed_out::SignedOut::from_environment();
+    // The owner's Update now (#7517): lamp-update's moment for the voice.
+    let mut give_way = give_way::GiveWay::from_environment();
     // When the lamp was last speaking, and the turn that took the place of
     // another: neither a word after its own nor one that cut in is a sound.
     let mut last_spoke_us: Option<u64> = None;
@@ -7648,6 +7651,7 @@ fn conversation_with_gate_inner(
             crate::scenario_clock::elapse_in_pass(Duration::from_micros(stall_us))?;
         }
         signed_out.read(clock);
+        give_way.read(clock);
         if cloud.available() {
             if link_down_since.take().is_some() {
                 // Not after the service's line: the internet never left.
@@ -8423,6 +8427,22 @@ fn conversation_with_gate_inner(
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
             last_publish = monotonic_us();
+        }
+        // The owner's Update now (#7517): a reply of the lamp's own being
+        // spoken ends, so it says it is updating before lamp-update restarts
+        // it. A person's line under way is answered with those words instead.
+        if give_way.owed(true)
+            && !paused
+            && privacy_state == PrivacyState::Allowed
+            && reply.as_ref().is_some_and(|current| current.had_audio)
+        {
+            cancel_reply(owner, reply, trace, "update_give_way")?;
+            provider_queue.clear();
+            speaker_pending = None;
+            snapshot = owner.snapshot(now())?;
+            rig.publish(snapshot)?;
+            last_publish = monotonic_us();
+            last_speech_us = last_speech_us.max(clock);
         }
         let can_open = privacy_state == PrivacyState::Allowed;
         // A fresh Allowed arriving at the deadline cannot bypass the bound.
@@ -11012,6 +11032,7 @@ fn conversation_with_gate_inner(
                         reply.as_ref(),
                         snapshot.microphone_generation(),
                         onboarding.is_some(),
+                        give_way.active_line(),
                     );
                     // A line begun in a computer's turn is a call, as a tap
                     // is: told to the worker's rule right after its Start.
@@ -11268,6 +11289,7 @@ fn conversation_with_gate_inner(
                                     reply.as_ref(),
                                     snapshot.microphone_generation(),
                                     onboarding.is_some(),
+                                    give_way.active_line(),
                                 );
                                 if took_over {
                                     took_over_turn =
@@ -12822,6 +12844,44 @@ fn conversation_with_gate_inner(
                 last_publish = monotonic_us();
                 back_owed_since = None;
             }
+        }
+        // The owner's Update now (#7517): once a round, to someone near, the
+        // lamp says it is updating, in the owner's words, before lamp-update
+        // restarts it. Nobody near: nothing.
+        let give_way_near = give_way::near(
+            reply.is_some() || admission.owns_stream(),
+            Some(last_speech_us.max(said_at_us.unwrap_or(0))).filter(|at| *at > 0),
+            clock,
+        );
+        if give_way.owed(give_way_near)
+            && reply.is_none()
+            && provider_queue.is_empty()
+            && speaker_pending.is_none()
+            && !admission.owns_stream()
+            && !submission_draining
+            && !paused
+            && playback_mask.available(clock)
+            && snapshot.listening_ready(now())
+            && owner.snapshot(now())?.microphone_permission() == Permission::Allowed
+            && let Some(note) = give_way::GiveWay::line()
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
+        {
+            snapshot = commit_written_turn(
+                owner,
+                reply,
+                &mut provider_queue,
+                &note,
+                false,
+                "update_give_way",
+                provider_session,
+                rig.playout_start_now(),
+                trace,
+                |state| rig.publish(state),
+            )?;
+            last_publish = monotonic_us();
+            lamp_began = reply.as_ref().map(|current| current.owner.turn());
+            give_way.said();
+            record(trace, json!({"kind":"update_give_way_said","at_us":clock}))?;
         }
         // "I've been signed out." (`LAMP_SIGNED_OUT`): once a spell, unasked,
         // to someone at the lamp, when nothing holds it and the room is quiet.
@@ -17112,9 +17172,11 @@ fn tell_walk(
     reply: Option<&Reply>,
     privacy_generation: u64,
     walk: bool,
+    give_way: Option<String>,
 ) {
-    // A lamp with no walk at all (no onboarding) has nothing to tell.
-    if !walk {
+    // A lamp with no walk at all (no onboarding) has nothing to tell, but
+    // the owner's Update now's moment (#7517), told the same way.
+    if !walk && give_way.is_none() {
         return;
     }
     // A local-only turn (#830) sends nothing.
@@ -17124,7 +17186,7 @@ fn tell_walk(
     // The first update's hold (#6284) is told as the walk is: with each
     // turn while it holds, and once as it ends.
     let on = crate::onboarding::under_way_now();
-    let updating = crate::onboarding::updating_line();
+    let updating = crate::onboarding::updating_line().or(give_way);
     let now = (current.owner.turn(), on || updating.is_some());
     if walk_to_tell(*told, now) {
         *told = Some(now);

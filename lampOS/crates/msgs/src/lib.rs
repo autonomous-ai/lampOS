@@ -1918,12 +1918,43 @@ impl UpdateStatus {
 /// being installed, and in `restoring` still the build that was tried. Times are
 /// the lamp's clock in Unix milliseconds; the step's is never before the
 /// round's.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UpdateRound {
     pub started_at_unix_ms: u64,
     pub step_started_at_unix_ms: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<UpdateBuild>,
+    /// What the round waits for before it switches (#7517), with `now`
+    /// `switching`: [`UpdateRound::WAITING_QUIET`] while it waits for a
+    /// quiet moment with the new build installed beside, and
+    /// [`UpdateRound::WAITING_GIVE_WAY`] while an Update now round gives the
+    /// voice its moment to say so. Absent once it switches, and before.
+    /// An older reader passes over it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waiting: Option<String>,
+    /// [`UpdateRound::ASKED_NOW`] for a round the owner's Update now asked
+    /// for, or took over while it waited (#7517); absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asked: Option<String>,
+}
+
+impl UpdateRound {
+    /// `waiting` while the round waits for a quiet moment (#7517).
+    pub const WAITING_QUIET: &str = "quiet";
+    /// `waiting` while an Update now round gives way to the voice (#7517).
+    pub const WAITING_GIVE_WAY: &str = "give_way";
+    /// `asked` for a round of the owner's Update now (#7517).
+    pub const ASKED_NOW: &str = "now";
+
+    /// Whether this round is one the owner's Update now asked for.
+    pub fn asked_now(&self) -> bool {
+        self.asked.as_deref() == Some(Self::ASKED_NOW)
+    }
+
+    /// Whether this round is giving way to the voice before its switch.
+    pub fn giving_way(&self) -> bool {
+        self.waiting.as_deref() == Some(Self::WAITING_GIVE_WAY)
+    }
 }
 
 /// Where Harness's install on the lamp is (#5197), as lamp-update's
@@ -2169,7 +2200,21 @@ pub struct UpdateCheck {
     /// does not know it reads a plain check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry: Option<u64>,
+    /// The owner's Update now (#7517, `update.now`): the round switches
+    /// without waiting for a quiet moment. lamp-update takes it as now only
+    /// with lamp-cloud's own mark beside it ([`UPDATE_NOW_FILE`], at most
+    /// [`UpdateCheck::NOW_WITHIN`] old); any other is a plain check. Absent
+    /// for a plain check; an older lamp-update reads a plain check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub now: Option<bool>,
 }
+
+/// lamp-cloud's mark of the owner's Update now (#7517): `{"at_unix_ms": <ms>}`,
+/// written in lamp-cloud's own state folder (0700, which no other part may
+/// write) just before it says `update/check` with `now`. lamp-update takes a
+/// `now` check only while this is at most [`UpdateCheck::NOW_WITHIN`] old,
+/// since the bus has no list of who may say a topic.
+pub const UPDATE_NOW_FILE: &str = "/var/lib/lampos-cloud/update-now";
 
 impl UpdateCheck {
     pub const TYPE: &str = "lamp_msgs/UpdateCheck";
@@ -2178,6 +2223,9 @@ impl UpdateCheck {
     /// The least time between two checks that start a round, on either
     /// side: lamp-cloud refuses an ask sooner, and `serve` drops one.
     pub const AGAIN_AFTER: Duration = Duration::from_secs(60);
+    /// How old lamp-cloud's mark ([`UPDATE_NOW_FILE`]) may be for a `now`
+    /// check to count as the owner's Update now (#7517).
+    pub const NOW_WITHIN: Duration = Duration::from_secs(5);
 
     /// A stream with no period: nothing is kept, so a lamp-update that
     /// starts later never takes an old ask for a new one.
@@ -4260,7 +4308,13 @@ mod tests {
     #[test]
     fn an_update_check_is_an_empty_stream_and_nothing_is_kept() {
         round_trip(&UpdateCheck::default(), "{}");
-        round_trip(&UpdateCheck { retry: Some(12226) }, "{\"retry\":12226}");
+        round_trip(
+            &UpdateCheck {
+                retry: Some(12226),
+                now: None,
+            },
+            "{\"retry\":12226}",
+        );
         let declared = UpdateCheck::declaration();
         assert_eq!(
             (declared.type_name.as_str(), declared.kind),
@@ -4296,6 +4350,8 @@ mod tests {
                     sequence: 10_580,
                     commit: "e3b6593873".into(),
                 }),
+                waiting: None,
+                asked: None,
             }),
             ..idle.clone()
         };
@@ -4307,6 +4363,8 @@ mod tests {
                 started_at_unix_ms: 1_000,
                 step_started_at_unix_ms: 1_000,
                 target: None,
+                waiting: None,
+                asked: None,
             }),
             ..idle
         };
@@ -4729,6 +4787,8 @@ mod update_status_tests {
                 started_at_unix_ms: 1,
                 step_started_at_unix_ms: 1,
                 target: target.map(build),
+                waiting: None,
+                asked: None,
             }),
         }
     }
