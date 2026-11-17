@@ -5324,11 +5324,17 @@ the same code for both writers.
   90 s from the ask) says "It's taking a bit longer, but I'm still on it."
   (`make_skill_agent::LONG_WAIT_LINE`) once, never again; the journal says
   "the make has no answer 85 s after its waiting line: its one long-wait
-  line is said". No line repeats. The lamp shows thinking between the
+  line is said". No line repeats. Through the say service (no voice turn
+  waiting on the make) only the waiting line is said, never the long-wait
+  line: with no turn there is no thinking look to hold. A make that runs
+  out its time (`make_skill_agent::MAKE_WITHIN`, 120 s) says the long-wait
+  line at about 90 s and its failure line at about 120 s: two lines about
+  30 s apart, as meant, not a fault. The lamp shows thinking between the
   waiting line and the result: once each waiting line's audio is sent its
   generation completes (`GenerationComplete`, then `MakeWaiting`), so its
   playback ends and ring and body show the thinking look
-  (`ring_wire::RingPhase::Waiting`) until the next audio. Off: today's line,
+  (`ring_wire::RingPhase::Waiting`) until the next audio; the answer then
+  plays under a new playback to its end and the turn settles. Off: today's line,
   and no second. Tests: `the_one_path_waiting_line_says_how_long`,
   `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`,
   `a_one_path_makes_waiting_line_completes_its_generation_after_its_audio`
