@@ -2885,9 +2885,13 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    không có `[trigger]`, không `[ask]` và không topic; các bước như luật ở
    trên. Prompt nói kỹ năng chưa nghe được lời trong phòng "other than the
    words the person names to start it", và luật dịch vụ của agent cũng nhắc
-   đến chúng. Chúng thay cho kiểu bắt đầu `[said]` (`LAMP_MADE_SKILL_SAID`),
-   không được nói khi switch này bật. Brief nói "one [trigger] as listed, or
-   asks as above".
+   đến chúng. Brief nói "one [trigger] as listed, or asks as above". Khi
+   `LAMP_MADE_SKILL_SAID=on` cũng bật, cả hai kiểu bắt đầu đều được nói:
+   luật `[said]`, rồi luật này; prompt nói kỹ năng chưa nghe được lời trong
+   phòng "other than a request told to the lamp (a [said] start) or the
+   words the person names to start it (asks), both below", và brief nói
+   "one [trigger] listed, [said]/asks as above", viết ngắn để brief dài
+   nhất với mọi switch bật vẫn trong 1.160 byte.
 2. **Cap giữ** (`made_skill::made_asks`, trong `held`): một mảng 1 đến 3
    chuỗi, mỗi chuỗi tối đa 60 ký tự, 2 đến 8 từ gồm chữ, số và dấu nháy
    đơn, cách nhau một dấu cách (như lamp-skills nhận asks của mọi kỹ năng),

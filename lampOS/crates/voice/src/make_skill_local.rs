@@ -238,8 +238,16 @@ fn system_for(reads: bool, agent: bool) -> String {
     // prompt is as before.
     // Its own words (the owner, 16 Nov: "no 'couldn't' here"), told only
     // with their switch, in place of a [said] start: on, a skill may start
-    // when the person says the words they name for it, with any step.
-    let (hear, said) = if made_skill::asks_on() {
+    // when the person says the words they name for it, with any step. With
+    // both switches on, both are told (#6526): a request told to the lamp
+    // as a [said] start, and the words named to start it as asks.
+    let (hear, said) = if made_skill::asks_on() && made_skill::said_on() {
+        (
+            "hear what is said in the room, other than a request told to the lamp (a [said] \
+             start) or the words the person names to start it (asks), both below",
+            format!("\n{}\n{}", made_skill::SAID_RULES, made_skill::ASKS_RULES),
+        )
+    } else if made_skill::asks_on() {
         (
             "hear what is said in the room, other than the words the person names to start it \
              (asks, below)",
@@ -6794,10 +6802,11 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         assert!(!off.0.contains("asks ="), "{}", off.0);
         made_skill::set_asks_here(Some(true));
-        made_skill::set_said_here(Some(true));
+        made_skill::set_said_here(Some(false));
         let on = system_with(false);
         assert!(on.ends_with(made_skill::ASKS_RULES), "{on}");
         assert!(!on.contains(made_skill::SAID_RULES), "{on}");
+        assert!(!on.contains("[said]"), "{on}");
         assert!(
             on.contains(
                 "A skill can't yet hear what is said in the room, other than the words the \
@@ -6815,6 +6824,101 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(brief.contains("or asks as above"), "{brief}");
         assert!(brief.len() <= made_skill::MOST_BRIEF_BYTES);
         made_skill::set_scripts_here(None);
+        made_skill::set_said_here(None);
+        made_skill::set_asks_here(None);
+    }
+
+    /// #6526 with the person's own words on too: with `LAMP_MADE_SKILL_SAID`
+    /// and `LAMP_MADE_SKILL_ASKS` both on, the making model is told both
+    /// starts (a [said] start's rules, then the asks'), the room's talk
+    /// alone out of reach, and the brief points to both, the longest still
+    /// within [`made_skill::MOST_BRIEF_BYTES`]. Each switch alone tells and
+    /// points to its own start only, as before.
+    #[test]
+    fn a_said_start_and_asks_are_both_told_with_both_switches() {
+        let request = "when I tell you I'm busy, turn red";
+        let longest = "x".repeat(made_skill::MOST_REQUEST_BYTES);
+        let said_alone = "A skill can't yet hear what is said in the room (a request told to the \
+                          lamp is a [said] start, below), know who";
+        let asks_alone = "A skill can't yet hear what is said in the room, other than the words \
+                          the person names to start it (asks, below), know who";
+        // Each alone: its own rules last, its own words, the other's absent.
+        made_skill::set_asks_here(Some(false));
+        made_skill::set_said_here(Some(true));
+        let said = system_with(false);
+        assert!(
+            said.ends_with(&format!("\n{}", made_skill::SAID_RULES)),
+            "{said}"
+        );
+        assert!(said.contains(said_alone), "{said}");
+        assert!(!said.contains(made_skill::ASKS_RULES), "{said}");
+        let brief = made_skill::brief(request).unwrap();
+        assert!(
+            brief.contains("; one [trigger] as listed or [said] as above, with"),
+            "{brief}"
+        );
+        made_skill::set_asks_here(Some(true));
+        made_skill::set_said_here(Some(false));
+        let asks = system_with(false);
+        assert!(
+            asks.ends_with(&format!("\n{}", made_skill::ASKS_RULES)),
+            "{asks}"
+        );
+        assert!(asks.contains(asks_alone), "{asks}");
+        assert!(!asks.contains(made_skill::SAID_RULES), "{asks}");
+        let brief = made_skill::brief(request).unwrap();
+        assert!(
+            brief.contains("; one [trigger] as listed, or asks as above, with"),
+            "{brief}"
+        );
+        // Both: both rules, the said start's first, and both named.
+        made_skill::set_said_here(Some(true));
+        let both = system_with(false);
+        assert!(
+            both.ends_with(&format!(
+                "\n{}\n{}",
+                made_skill::SAID_RULES,
+                made_skill::ASKS_RULES
+            )),
+            "{both}"
+        );
+        assert!(
+            both.contains(
+                "A skill can't yet hear what is said in the room, other than a request told to \
+                 the lamp (a [said] start) or the words the person names to start it (asks), \
+                 both below, know who"
+            ),
+            "{both}"
+        );
+        assert!(
+            !both.contains(said_alone) && !both.contains(asks_alone),
+            "{both}"
+        );
+        let brief = made_skill::brief(request).unwrap();
+        assert!(
+            brief.contains("; one [trigger] listed, [said]/asks as above, with"),
+            "{brief}"
+        );
+        // The longest brief within its bound with everything it may point
+        // to on: reads, writes, code or a task for the lamp's agent.
+        for writes in [false, true] {
+            made_skill::set_writes_here(Some(writes));
+            for scripts in [false, true] {
+                made_skill::set_scripts_here(Some(scripts));
+                for (reads, agent) in [(false, false), (true, false), (true, true)] {
+                    let brief = made_skill::brief_for(&longest, reads, agent).unwrap();
+                    assert!(brief.contains("[said]/asks as above"), "{brief}");
+                    assert!(
+                        brief.len() <= made_skill::MOST_BRIEF_BYTES,
+                        "{} > {}",
+                        brief.len(),
+                        made_skill::MOST_BRIEF_BYTES
+                    );
+                }
+            }
+        }
+        made_skill::set_scripts_here(None);
+        made_skill::set_writes_here(None);
         made_skill::set_said_here(None);
         made_skill::set_asks_here(None);
     }
