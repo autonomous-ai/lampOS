@@ -1290,6 +1290,7 @@ fn serve(
         while let Ok(event) = done.try_recv() {
             let skill = event.skill.clone();
             let unwritten = lamp_skills::service_write::waiting(&event.why);
+            let ended_unsaid = lamp_skills::ended_unsaid(&event.why);
             publish(&mut out, event);
             // A write waiting for the owner's yes made nothing: what its
             // start spent is given back (#6066, lamp-9adf 12 Nov).
@@ -1299,13 +1300,24 @@ fn serve(
                 );
             }
             // A trigger's run that said nothing gives its place in its
-            // group's hour back, where the group says so (#5207).
-            if runs.unsaid(&skill)
-                && let Some(group) = engine.unsaid(&skill, clock::now_us())
-            {
-                eprintln!(
-                    "lamp-skills: {skill} said nothing: its place in the {group} group's hour is given back"
-                );
+            // group's hour back, where the group says so (#5207). One whose
+            // note the voice let go as its moment passed (#6543) gives back
+            // all its start spent, as an unsent write does.
+            if runs.unsaid(&skill) {
+                if ended_unsaid && engine.unwritten(&skill) {
+                    eprintln!(
+                        "lamp-skills: {skill}'s note ended unsaid: its group's hour, cooldown, day's count and rest are given back"
+                    );
+                } else if let Some(group) = engine.unsaid(&skill, clock::now_us()) {
+                    eprintln!(
+                        "lamp-skills: {skill} said nothing: its place in the {group} group's hour is given back"
+                    );
+                }
+            }
+            // Any other end keeps its start: nothing is left to give back
+            // later (#6543).
+            if !unwritten && !ended_unsaid {
+                engine.kept(&skill);
             }
             // A read done waits only for its local day (#5288).
             engine.done(&skill);
@@ -6608,6 +6620,7 @@ mod tests {
                 priority: 5,
                 expires_ms: 60_000,
                 question,
+                may_end_unsaid: false,
                 count: None,
             })
         };
@@ -7661,6 +7674,7 @@ mod tests {
             priority: 5,
             expires_ms: 60_000,
             question: false,
+            may_end_unsaid: false,
             count: None,
         });
         let ask = say_ask(&words, true, true).unwrap();
@@ -7690,6 +7704,7 @@ mod tests {
                 priority: 8,
                 expires_ms: 60_000,
                 question: false,
+                may_end_unsaid: false,
                 count: None,
             })
         };
@@ -7856,6 +7871,7 @@ mod tests {
                 priority: 8,
                 expires_ms: 3_600_000,
                 question: false,
+                may_end_unsaid: false,
                 count: None,
             }),
             Call::Words(lamp_skills::Words {
@@ -7864,6 +7880,7 @@ mod tests {
                 priority: 8,
                 expires_ms: 3_600_000,
                 question: false,
+                may_end_unsaid: false,
                 count: None,
             }),
             Call::Cue,

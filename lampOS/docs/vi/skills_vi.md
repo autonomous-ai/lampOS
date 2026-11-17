@@ -3298,6 +3298,14 @@ Bảng đầy đủ các khóa `[[while]]` ở [skills.md](../skills.md).
 
 Kiểm thử (`crates/skills/tests/it/group_day.rs`): `a_groups_day_caps_its_runs_across_its_skills_and_begins_again_at_midnight`, `a_groups_day_stays_at_its_most_after_a_restart`, `a_follow_up_counts_toward_its_group_only_when_the_group_says_so`, `per_day_is_bounded_and_both_keys_are_off_by_default`. Bảng đầy đủ các khóa `[budget]` ở [skills.md](../skills.md).
 
+## Câu của kỹ năng có thể kết thúc mà không nói (`say.may_end_unsaid`, #6543)
+
+| Khóa | Bắt buộc | Ý nghĩa |
+|------|----------|---------|
+| `say = { note = "…", may_end_unsaid = true }` | không | Chỉ đi với `note` (`true` hoặc `false`; với `text` nói nguyên văn hay một giá trị khác, kỹ năng bị từ chối khi nạp). Giọng nói có thể bỏ câu đó, không nói, khi thời điểm đã qua trước lúc nó bắt đầu câu: từ lúc được hỏi, có người nói (`someone started talking`) hoặc khuôn mặt ở đèn rời khỏi tầm nhìn ít nhất một giây (`the person turned away`; không có ai lúc hỏi, khuôn mặt chỉ đến sau lúc hỏi, hoặc tệp presence của mắt đã cũ hay không đọc được thì không phải là rời đi) (`lamp_voice::say::moment_passed`, [speaking-first.md](../speaking-first.md)). Dịch vụ say trả lời `{"outcome":"unsaid","why":"…"}`; `done` của lần chạy ghi `say: unsaid (…)`, không bước nào của lần chạy được làm, và những gì lần bắt đầu đã tiêu được trả lại như với một lần ghi đang chờ lời đồng ý của chủ (`Engine::unwritten`): chỗ trong giờ và `gap` của nhóm `[budget]`, `cooldown` của trigger, lượt đếm `most_a_day` trong ngày và lượt theo dõi `[rest]`; nó đến lại lần sau trigger giữ. Nhật ký ghi `SKILL's note ended unsaid: its group's hour, cooldown, day's count and rest are given back`. Chọn thêm: kỹ năng không có khóa này gửi giọng nói đúng dòng như trước và được nói hoặc hết hạn như trước; không kỹ năng nào đi kèm sản phẩm dùng nó. Lần chạy kết thúc theo cách khác (đã nói, hết hạn) giữ lại lần bắt đầu của nó (`Engine::kept`), nên một lần kết thúc không nói sau đó không trả lại gì của nó. Kiểm thử: `a_note_ended_unsaid_gives_its_run_back`, `a_spoken_note_keeps_its_start`, `a_says_may_end_unsaid_needs_a_note_and_no_shipped_skill_has_it`, và phía giọng nói `say::tests::through_the_socket_a_note_that_may_end_unsaid_is_let_go`, `speak_up::tests::a_face_left_since_an_ask_only_once_gone_a_second` |
+
+Bảng đầy đủ các khóa `do.say` ở [skills.md](../skills.md).
+
 ## Khi nào màn trình diễn đèn dừng (`do.show`, #5744)
 
 Một màn trình diễn đèn (Light show, #1679) dừng trước khung kế tiếp, được

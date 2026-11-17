@@ -1033,6 +1033,30 @@ const MOST_SAY_EXPIRES_MS: u64 = 3_600_000;
 /// (`lamp_voice::say::MOST_WORDS_BYTES`).
 pub const MOST_WORDS_BYTES: usize = 900;
 
+/// The keys a `say` table of words may have (`say = { note = "…", … }`):
+/// docs/skill-format.schema.json lists the same (tests/it/format.rs).
+pub const SAY_TABLE_KEYS: [&str; 6] = [
+    "text",
+    "note",
+    "priority",
+    "expires",
+    "question",
+    "may_end_unsaid",
+];
+
+/// How the voice's `unsaid` outcome is written in a run's outcome
+/// ([`ended_unsaid`]).
+pub const UNSAID: &str = "say: unsaid";
+
+/// Whether a run's outcome, as lamp-skills writes it, holds its note let go
+/// unsaid by the voice, never begun, as the moment for it passed
+/// (`say.may_end_unsaid`, #6543): `say: unsaid (why)`.
+pub fn ended_unsaid(outcome: &str) -> bool {
+    outcome
+        .split("; ")
+        .any(|part| part == UNSAID || part.starts_with("say: unsaid ("))
+}
+
 /// The longest a news say (`say = { from = "tasks" }`) refused because the
 /// lamp is muted or listening is held, and asked again, before it is
 /// dropped (lamp-c0a4, 16 Nov 15:35: a task settled while the voice was
@@ -1411,9 +1435,10 @@ fn say_call(say: toml::Value) -> Result<(Call, Option<Vec<Words>>), String> {
             }
         }
         toml::Value::Table(table) => {
-            if let Some(key) = table.keys().find(|key| {
-                !["text", "note", "priority", "expires", "question"].contains(&key.as_str())
-            }) {
+            if let Some(key) = table
+                .keys()
+                .find(|key| !SAY_TABLE_KEYS.contains(&key.as_str()))
+            {
                 return Err(format!("{WHAT}: say.{key} is not known"));
             }
             let (words, exact) = match (table.get("text"), table.get("note")) {
@@ -1485,6 +1510,17 @@ fn say_call(say: toml::Value) -> Result<(Call, Option<Vec<Words>>), String> {
             if question && exact {
                 return Err("say.question goes with a note, never exact words".into());
             }
+            // A note the voice may let go, unsaid, once its moment has
+            // passed (#6543): someone heard, or the face gone, since it was
+            // asked. Its run is then given back ([`Engine::unwritten`]).
+            let may_end_unsaid = match table.get("may_end_unsaid") {
+                None => false,
+                Some(toml::Value::Boolean(may)) => *may,
+                Some(_) => return Err("say.may_end_unsaid is true or false".into()),
+            };
+            if may_end_unsaid && exact {
+                return Err("say.may_end_unsaid goes with a note, never exact words".into());
+            }
             // A note's one number from the reading that fired it (#6543,
             // B3), read leniently: exact words, and a note with any other
             // braces, are said as written.
@@ -1498,6 +1534,7 @@ fn say_call(say: toml::Value) -> Result<(Call, Option<Vec<Words>>), String> {
                         priority,
                         expires_ms,
                         question,
+                        may_end_unsaid,
                         count,
                     }
                 })
@@ -2632,6 +2669,16 @@ impl Skill {
             [(_, Step::Call(Call::ServiceWrite(_)))]
         )
     }
+
+    /// Whether a note of its own may end unsaid (`say.may_end_unsaid`,
+    /// #6543): its start is kept, to be given back if it does.
+    fn may_end_unsaid(&self) -> bool {
+        self.steps.iter().any(|(_, step)| match step {
+            Step::Call(Call::Words(words)) => words.may_end_unsaid,
+            Step::Lines(lines) => lines.iter().any(|words| words.may_end_unsaid),
+            _ => false,
+        })
+    }
 }
 
 /// The line a trigger's field must stay past for a while before the trigger
@@ -3179,6 +3226,9 @@ pub struct Words {
     /// `question = true`: a hello (a skill given `who`) whose note asks one
     /// question may ask it; the voice is told so (#5207).
     pub question: bool,
+    /// `may_end_unsaid = true`: a note the voice may let go, never begun,
+    /// once its moment has passed (#6543); the voice is told so.
+    pub may_end_unsaid: bool,
     /// A note's one number from the reading that fired its run (#6543):
     /// `words` is the note without it, and the run fills it ([`Count`]).
     pub count: Option<Count>,
@@ -3191,6 +3241,9 @@ impl Words {
         ask[self.key()] = json!(self.words);
         if self.question {
             ask["question"] = json!(true);
+        }
+        if self.may_end_unsaid {
+            ask["may_end_unsaid"] = json!(true);
         }
         ask
     }
@@ -7979,7 +8032,9 @@ impl Engine {
     }
 
     /// `skill`'s run was its write, told "not sent: waiting for the
-    /// owner's yes" ([`service_write::waiting`]): it did nothing, so what
+    /// owner's yes" ([`service_write::waiting`]), or its note that may end
+    /// unsaid was let go by the voice, never begun ([`ended_unsaid`],
+    /// #6543): it did nothing, so what
     /// its start spent is given back (lamp-9adf, 12 Nov: an unapproved mail
     /// held an approved skill of its group back for the hour). Its place in
     /// its group's hour and its gap, its cooldown, its day's count for
@@ -8035,6 +8090,14 @@ impl Engine {
             None => {}
         }
         true
+    }
+
+    /// `skill`'s run ended having done its part (a write sent, a note
+    /// spoken): its start stands, and what [`Engine::unwritten`] would give
+    /// back is forgotten, so a later run that ends unsaid without a start of
+    /// its own (a queued `each` item) gives back nothing of this one.
+    pub fn kept(&mut self, skill: &str) {
+        self.unwritten.remove(skill);
     }
 
     /// Until when `skill` rests after runs nobody noticed, if it does.
@@ -9898,8 +9961,9 @@ impl Engine {
                 }
                 if acts {
                     // A write's start, as it was before: given back if the
-                    // write waits for the owner's yes (#6066).
-                    if skill.writes_a_service() {
+                    // write waits for the owner's yes (#6066), or if a note
+                    // that may end unsaid does (#6543).
+                    if skill.writes_a_service() || skill.may_end_unsaid() {
                         self.unwritten.insert(
                             skill.name.clone(),
                             Spent {
@@ -11720,6 +11784,7 @@ mod tests {
                 priority: SAY_PRIORITY,
                 expires_ms: SAY_EXPIRES_MS,
                 question: false,
+                may_end_unsaid: false,
                 count: None,
             })]
         );
@@ -12437,6 +12502,109 @@ mod tests {
                 "policy {policy}"
             );
         }
+    }
+
+    /// #6543: a note that may end unsaid, let go by the voice as its moment
+    /// passed, spends nothing: its cooldown, its group's hour and gap, its
+    /// day's count and its `[rest]` count are given back, and it comes again
+    /// the next time its trigger holds. A note without it keeps what it
+    /// spent, as before; only an opted-in note tells the voice so.
+    #[test]
+    fn a_note_ended_unsaid_gives_its_run_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let note = |may: &str| {
+            format!(
+                "version = \"1.0.0\"\nmost_a_day = 1\n\
+                 [permissions]\ntopics = [\"room/presence\"]\nspeak = true\n\
+                 [trigger]\ntopic = \"room/presence\"\nfield = \"present\"\nequals = true\n\
+                 cooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n\
+                 [budget]\ngroup = \"wellbeing\"\nper_hour = 1\ngap = \"15m\"\n\
+                 [rest]\nafter_ignored = 1\nwithin = \"10s\"\n\
+                 [[do]]\nsay = {{ note = \"Ask if they want a sip of water.\"{may} }}\n"
+            )
+        };
+        let may = load(&write_skill(
+            dir.path(),
+            "sip",
+            &note(", may_end_unsaid = true"),
+        ))
+        .unwrap();
+        let plain = load(&write_skill(dir.path(), "sip-plain", &note(""))).unwrap();
+        let ask = |skill: &Skill| {
+            skill.steps.iter().find_map(|(_, step)| match step {
+                Step::Call(Call::Words(words)) => Some(words.ask()),
+                _ => None,
+            })
+        };
+        assert_eq!(ask(&may).unwrap()["may_end_unsaid"], true);
+        assert!(ask(&plain).unwrap().get("may_end_unsaid").is_none());
+        for (skill, gives_back) in [(may, true), (plain, false)] {
+            let mut engine = Engine::new(vec![skill.clone()], true);
+            let ran = |engine: &mut Engine, second: u64, present: bool| -> Vec<String> {
+                let now = second * 1_000_000;
+                let message = format!(r#"{{"present":{present}}}"#);
+                engine
+                    .observe("room/presence", now, message.as_bytes(), None)
+                    .into_iter()
+                    .filter(|run| !run.calls.is_empty() || run.ask.is_some())
+                    .map(|run| run.skill)
+                    .collect()
+            };
+            assert_eq!(ran(&mut engine, 0, true), std::slice::from_ref(&skill.name));
+            // The voice let its note go: "say: unsaid (someone started
+            // talking)".
+            assert!(ended_unsaid("say: unsaid (someone started talking)"));
+            assert_eq!(engine.unwritten(&skill.name), gives_back, "{}", skill.name);
+            // Given back once: a second unsaid end has nothing to give.
+            assert!(!engine.unwritten(&skill.name), "{}", skill.name);
+            // Not again while its trigger still holds.
+            assert!(ran(&mut engine, 5, true).is_empty(), "{}", skill.name);
+            ran(&mut engine, 20, false);
+            assert_eq!(
+                engine.resting_until(&skill.name, 20_000_000).is_none(),
+                gives_back,
+                "{}",
+                skill.name
+            );
+            // Back: its cooldown, gap, hour and day's one are its own again.
+            assert_eq!(
+                ran(&mut engine, 40, true).len(),
+                usize::from(gives_back),
+                "{}",
+                skill.name
+            );
+        }
+        assert!(!ended_unsaid("say: spoken"));
+        assert!(!ended_unsaid("say: expired"));
+        assert!(ended_unsaid(
+            "light: warm; say: unsaid (the person turned away)"
+        ));
+    }
+
+    /// #6543: an opted-in note that was spoken keeps its start: a later
+    /// unsaid end with no start of its own gives back nothing of it.
+    #[test]
+    fn a_spoken_note_keeps_its_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let skill = load(&write_skill(
+            dir.path(),
+            "sip",
+            "version = \"1.0.0\"\nmost_a_day = 1\n\
+             [permissions]\ntopics = [\"room/presence\"]\nspeak = true\n\
+             [trigger]\ntopic = \"room/presence\"\nfield = \"present\"\nequals = true\n\
+             cooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n\
+             [[do]]\nsay = { note = \"Ask if they want a sip of water.\", may_end_unsaid = true }\n",
+        ))
+        .unwrap();
+        let mut engine = Engine::new(vec![skill], true);
+        let ran = engine
+            .observe("room/presence", 0, br#"{"present":true}"#, None)
+            .into_iter()
+            .filter(|run| !run.calls.is_empty() || run.ask.is_some())
+            .count();
+        assert_eq!(ran, 1);
+        engine.kept("sip");
+        assert!(!engine.unwritten("sip"));
     }
 
     const PHOTO_BOOTH: &str = "version = \"1.0.0\"\ngrants = [\"camera\", \"light\"]\n\
