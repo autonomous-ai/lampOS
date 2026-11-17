@@ -9050,12 +9050,6 @@ async fn spoken(
                         Some(scope),
                     );
                 }
-                // `LAMP_KEEP_QUIETLY`: a quiet keep only on a line their own
-                // face alone was seen saying (the Reviewer-lead's 18:51 P2 on
-                // #5053); any other stays ask-first.
-                if crate::keep_quietly::on() {
-                    crate::keep_quietly::saw(request, &person, &speakers, pair.clone());
-                }
                 // Their face alone in view, none seen speaking it: the
                 // room's scope, but its reply may be told the owner's typed
                 // name (lamp-3e83; reviewer-three's P2 on #4090). A known
@@ -9164,6 +9158,26 @@ async fn spoken(
                         begun,
                         finishing,
                     );
+                // `LAMP_KEEP_QUIETLY`: a quiet keep only on a line their own
+                // face alone was seen saying (the Reviewer-lead's 18:51 P2 on
+                // #5053), or, with `LAMP_KEEP_QUIETLY_ONE_FACE` (the memory
+                // owner's call of 17 Nov: mouth detection blocks only a
+                // forget's yes), on one no face was seen speaking, their own
+                // face the one face in view or the line carried, and no other
+                // voice heard; any other stays ask-first.
+                if crate::keep_quietly::on() {
+                    let alone = crate::keep_quietly::alone(
+                        &speakers,
+                        own_face.is_some_and(|face| eyes.one_face_in_view(face, begun, finishing)),
+                        carried,
+                        no_other_voice_shown(&shared),
+                    );
+                    if crate::keep_quietly::saw(request, &person, &speakers, pair.clone(), alone) {
+                        eprintln!(
+                            "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view or the line carried in their conversation, no other voice heard: a quiet keep counts as theirs (LAMP_KEEP_QUIETLY_ONE_FACE)"
+                        );
+                    }
+                }
                 let theirs = carried
                     || !crate::speaking_faces::not_theirs(
                         &speakers,

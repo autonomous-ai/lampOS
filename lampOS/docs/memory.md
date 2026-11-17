@@ -1735,8 +1735,22 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   ask-first: no note, no limit on offers, and a `remember` it didn't ask
   for, that is no yes to the lamp's offer, writes nothing; the model is told
   `keep_quietly::NOT_SEEN` (nothing was kept, it may be someone else's, ask
-  them first, once), and the journal gets one line with no words. With the
-  switch, in a known person's own scope, on a line seen said by them:
+  them first, once), and the journal gets one line with no words.
+  **With `LAMP_KEEP_QUIETLY_ONE_FACE=on`** (on in the product unit, the
+  memory owner's call of 17 Nov, restating the single-user ruling of 10
+  Nov, "skip the mouth gate for memory": mouth detection blocks only a
+  forget's yes), a line no face was seen speaking counts as seen said by
+  them when their own known face is the only face in view through it (the
+  one-face count) or the line is carried in their conversation going on
+  (`LAMP_CONVERSATION_CARRIES`, no other face in view), and no other voice
+  was heard (`keep_quietly::alone`; the journal says "a quiet keep counts
+  as theirs (LAMP_KEEP_QUIETLY_ONE_FACE)"). The room's scope, an unknown or
+  another face seen speaking it, a second face in view, another voice and a
+  written turn stay ask-first; the heard-words check below still holds; and
+  the one-face forget's yes is unchanged. On lamp-06c1 (build 13706,
+  13:57:56) the owner's face alone in 34 of 34 looks, the line carried, had
+  a quiet keep refused as not seen. With the switch, in a known person's own
+  scope, on a line seen said by them:
   - **Words.** Beside the person's words the turn is told
     `keep_quietly::QUIET_NOTE`: a plain, lasting fact about their own life
     (a plan or a date, where they keep something) is kept by a `remember`

@@ -2450,6 +2450,8 @@ fn second_route_worker_environment(
         crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
         // A narrowed line named for its reply by the one-face count (5 Nov).
         crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
+        // A quiet keep theirs on their one face in view, no mouth (17 Nov).
+        crate::keep_quietly::ONE_FACE_ENVIRONMENT,
         // A one-face line's reminder reads are its person's (lamp-29e7).
         crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
         // Read by the second worker for the reply's owner-by-default (#3884).
@@ -2751,6 +2753,7 @@ mod tests {
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
             crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
+            crate::keep_quietly::ONE_FACE_ENVIRONMENT,
             crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
@@ -3799,6 +3802,7 @@ mod tests {
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT
                     || name == crate::second_provider::NAME_ONE_FACE_ENVIRONMENT
+                    || name == crate::keep_quietly::ONE_FACE_ENVIRONMENT
                     || name == crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
@@ -3935,6 +3939,7 @@ mod tests {
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KEEP_ANSWERS_AT_ONCE=on",
                     "LAMP_KEEP_QUIETLY=on",
+                    "LAMP_KEEP_QUIETLY_ONE_FACE=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
                     "LAMP_LEDGER_REFENCE=on",

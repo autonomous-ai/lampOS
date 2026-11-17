@@ -658,6 +658,8 @@ Environment=LAMP_MEMORY_REMEMBER_ONCE=on
 # offered to keep. probe-tools --keep on lamp-06c1 through the relay (3 Nov, the first head): offers 2/20 off, 0/20
 # on; facts kept 2/7 both. A re-measure at the fixed head is owed.
 Environment=LAMP_KEEP_QUIETLY=on
+# LAMP_KEEP_QUIETLY_ONE_FACE: its why and rules are its row in docs/switches.md (#7495).
+Environment=LAMP_KEEP_QUIETLY_ONE_FACE=on
 # What the room kept, and the earlier exchanges a turn is given, were said by whoever was in the room then, never
 # necessarily the one asking: on lamp-4ace on 26 Oct (lamp-voice 2a8273ef2's product unit, played), a fresh
 # session's "how do I take my coffee?", after a room's "I take my coffee black" kept by nobody, was answered as the
