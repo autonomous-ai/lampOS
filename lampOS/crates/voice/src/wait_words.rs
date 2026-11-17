@@ -109,10 +109,22 @@ pub fn words_in(text: &str) -> usize {
 /// mishearing "lamb"), a greeting, a short time and words that fill.
 /// "Stop it, please.", "Lamp, stop now.", "Hold on a second, Lamp.", "Wait
 /// a sec.", "Okay, that is enough.", "Stop telling the story." "No" is not
-/// among them: it asks (see [`ACKNOWLEDGEMENTS`]).
+/// among them: it asks (see [`ACKNOWLEDGEMENTS`]). "A" goes with a stop
+/// only before a short time ([`SHORT_TIMES`]).
 const WITH_A_STOP: &[&str] = &[
     "it", "please", "now", "lamp", "lamb", "hey", "hi", "talking", "telling", "story", "the",
-    "that", "that's", "is", "there", "just", "a", "one", "sec", "second", "moment", "minute",
+    "that", "that's", "is", "just", "sec", "second", "moment", "minute",
+];
+
+/// A short time asked for with a stop: "Wait a sec.", "Hold on a second."
+const SHORT_TIMES: &[&str] = &["sec", "second", "moment", "minute"];
+
+/// Words that open a question: after a stop word they ask, so "Wait, is
+/// that it" is no bare stop even when the transcript has no "?" (#7613,
+/// the reviewer's HOLD).
+const QUESTION_WORDS: &[&str] = &[
+    "is", "are", "what", "where", "who", "when", "why", "how", "which", "can", "could", "do",
+    "does", "did", "will", "would", "should",
 ];
 
 /// Whether `text` only tells the lamp to stop (the reviewer's P3 on #1277):
@@ -120,18 +132,39 @@ const WITH_A_STOP: &[&str] = &[
 /// ([`crate::stop_words::stop_phrase`]), and every other word one that asks
 /// nothing, a stop word, or one that only goes with a stop
 /// ([`WITH_A_STOP`]). "Stop.", "Okay, stop it, please." and "Hold on." do.
+/// A line that ends in "?", or has a question word ([`QUESTION_WORDS`])
+/// after its first stop word, asks: "Wait, is there a story?" and "Hold
+/// on, is that it" are no bare stop, "Okay, that is enough." is (#7613).
 /// "Wait, what about tomorrow?" asks something more and takes the turn as
 /// before, and "Don't stop." is no stop. In the loop a stop with the
 /// lamp's name, or one still going at its 1 s mark, is decided by `on`
 /// before its words come, and takes the turn as before (the seventh's P3
-/// on #1352).
+/// on #1352). It alone decides a bare stop: the second route's cut-in note
+/// reads it too ([`crate::stop_words::a_stop_and_more`], #7285).
 pub fn only_a_stop(text: &str) -> bool {
-    crate::stop_words::stop_phrase(text)
-        && crate::not_speech::plain_words(text).iter().all(|word| {
-            asks_nothing(word)
-                || crate::stop_words::stop_word(word)
-                || WITH_A_STOP.contains(&word.as_str())
-        })
+    if !crate::stop_words::stop_phrase(text) || text.trim_end().ends_with(['?', '？']) {
+        return false;
+    }
+    let words = crate::not_speech::plain_words(text);
+    let first_stop = words
+        .iter()
+        .position(|word| crate::stop_words::stop_word(word))
+        .unwrap_or(words.len());
+    if words[first_stop..]
+        .iter()
+        .any(|word| QUESTION_WORDS.contains(&word.as_str()))
+    {
+        return false;
+    }
+    words.iter().enumerate().all(|(at, word)| {
+        asks_nothing(word)
+            || crate::stop_words::stop_word(word)
+            || WITH_A_STOP.contains(&word.as_str())
+            || (word == "a"
+                && words
+                    .get(at + 1)
+                    .is_some_and(|next| SHORT_TIMES.contains(&next.as_str())))
+    })
 }
 
 /// What a person says to put the lamp off for now, each as its words: a
@@ -633,8 +666,22 @@ pub(crate) mod tests {
             "Hush, hush.",
             "Hold on a second, Lamp.",
             "Wait a sec.",
+            "Okay, that is enough.",
         ] {
             assert!(only_a_stop(said), "{said:?}");
+        }
+        // Questions after a stop take the turn (#7613, the reviewer's HOLD),
+        // with or without their "?".
+        for said in [
+            "Wait, is there a story?",
+            "Wait, is that the one?",
+            "Hold on, is that it?",
+            "Wait, is it now?",
+            "Wait, is there one?",
+            "Hold on, is that it",
+            "Wait a second?",
+        ] {
+            assert!(!only_a_stop(said), "{said:?}");
         }
         for said in [
             "Don't stop.",
