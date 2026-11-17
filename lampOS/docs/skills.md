@@ -1989,8 +1989,10 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   answer comes, one short fixed line is said to the owner, never the
   task's words nor lamp-tasks' message (`service_read::tell_failed`, the
   first builder's 21:25 on #7363). **In the conversation that asked for
-  the run** (a run now the owner asked for by voice, the line ready within
-  45 s of the ask, `task_sure::in_asking_conversation`), it is said then,
+  the run** (a run now the owner asked for by voice, or the voice model's
+  call of a skill's own tool whose run has a task, e.g. "run my bitcoin
+  price skill now" calling `btc_price`; the line ready within 45 s of the
+  ask, `task_sure::in_asking_conversation`), it is said then,
   as that conversation's answer, the way "<skill> is running now" was:
   exact words to the say service with `"answers": true`, and no read's
   gate (no face, no minute of quiet). The voice lets such a line through
@@ -2001,7 +2003,10 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   only with exact text. That record is kept in the coordinator, where the
   say service reads it: on the second route the run is made in the
   worker's process, which tells the coordinator `MadeRunNow` (skill name
-  only, `made_run::ran_of`) over its channel, and the coordinator keeps
+  only, `made_run::ran_of`: a run now's `{"run", "ran": true}`, or the
+  `{"task_run": NAME}` lamp-skills adds to its answer to the voice's call
+  of a skill's tool when it marks that run, `mark_voice_asked`; never
+  another peer's call) over its channel, and the coordinator keeps
   it (`made_run_now`, trace `made_run_now`); the Live worker tells it
   the same way (El's P1 on #7363). The record is keyed by the skill's
   name alone, so any say-socket caller naming that skill within those
