@@ -567,9 +567,15 @@ pub fn signed_out() {
 /// read: one read's bound (`gateway`'s 20 s) plus a margin.
 pub const LAMP_PLACE_GATEWAY_WITHIN: Duration = Duration::from_secs(25);
 
+/// With the kept session in use (`one` has [`KEPT_SWITCH`] on and Harness
+/// keeps program sessions), the gateway's approvals read is skipped:
+/// `harness ensure` and `reply` wait for the engine themselves and answer
+/// `ENGINE_NOT_READY`, and that read alone took 17 s on a loaded lamp, past
+/// its bound, so the kept session never opened (openharness#4393).
 pub fn lamp_place(
     slot: &crate::skill_task::SkillHarnessSlot,
     project: &std::path::Path,
+    one: Option<&OneSession>,
 ) -> Result<(Cli, Place), String> {
     use std::os::unix::fs::DirBuilderExt;
     let harness = slot.get().ok_or("Harness is not set up")?;
@@ -586,11 +592,14 @@ pub fn lamp_place(
             engine.argument()
         ));
     }
+    let cli = Cli::new(harness.config.clone(), harness.session.clone())
+        .map_err(|error| format!("Harness can't be asked: {error}"))?;
+    let kept = one.is_some_and(|one| one.kept_token(&cli).is_some());
     // The Gateway's approvals read takes about 10 s on a lamp even when warm
     // (`gateway::Serving`), and a success is kept per Gateway start, so this
     // bound covers one read; it runs on the keep-open thread, never on a
     // hand-over's way. A 1 s bound could never see a read through.
-    if let Some(mut gateway) = (harness.gateway)() {
+    if !kept && let Some(mut gateway) = (harness.gateway)() {
         gateway
             .before_launch_until(Instant::now() + LAMP_PLACE_GATEWAY_WITHIN, &|| false)
             .map_err(|why| format!("OpenClaw's gateway is not ready: {why}"))?;
@@ -601,8 +610,6 @@ pub fn lamp_place(
         .mode(0o700)
         .create(&folder)
         .map_err(|error| format!("its folder not made: {error}"))?;
-    let cli = Cli::new(harness.config.clone(), harness.session.clone())
-        .map_err(|error| format!("Harness can't be asked: {error}"))?;
     let folder = folder.to_str().ok_or("its folder is not a plain path")?;
     Ok((
         cli,
