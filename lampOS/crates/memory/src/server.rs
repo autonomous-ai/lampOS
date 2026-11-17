@@ -21,6 +21,16 @@
 //! time. A `forget_person` from either is told on `memory/forgot` as a
 //! `forget_all` is.
 //!
+//! A third socket, `linked.sock` (the linked-service memory plan, slice
+//! 1b; `LAMP_MEMORY_LINKED_SOCKET`, off unless set; `docs/memory-days.md`
+//! "Linked records"), can be opened beside it for the group `lampos-linked`:
+//! mode 0660, and it takes `linked_record` only ([`protocol::linked`]),
+//! whose owner memory finds itself. Its writer never waits long: one
+//! request a connection, [`LINKED_PATIENCE`] to send it and to take the
+//! answer, then the client is dropped. Every record it drops (no owner, a
+//! forget that wins, any other refusal, or late) is counted
+//! ([`LinkedDrops`]) and said in one journal line with the counts.
+//!
 //! A file `ready` beside the socket says the process has its store open and
 //! is taking requests. Both are removed when the server ends in good order.
 //! A process that is killed leaves both; the next one clears them as it
@@ -41,7 +51,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -49,6 +59,78 @@ use std::{
 /// How long a client is waited for: to send a whole request, and to take
 /// its answer.
 pub const PATIENCE: Duration = Duration::from_secs(2);
+
+/// How long a `linked.sock` client is waited for, to send its one request
+/// and to take its answer: short, so a stuck writer holds the voice's
+/// memory calls for no longer than this (the first builder's condition 3).
+pub const LINKED_PATIENCE: Duration = Duration::from_millis(250);
+
+/// The switch that opens `linked.sock` (with `--memory-days`): `on`, or off
+/// when unset, empty or `off`.
+pub const LINKED_SWITCH: &str = "LAMP_MEMORY_LINKED_SOCKET";
+/// The group `linked.sock` is owned by: who may write linked records.
+pub const LINKED_GROUP: &str = "lampos-linked";
+/// `linked.sock`'s name, beside the main socket.
+pub const LINKED_SOCKET_NAME: &str = "linked.sock";
+
+/// [`LINKED_SWITCH`]'s value: `Some(true)` for `on`, `Some(false)` for
+/// unset, empty or `off`; anything else is `None`, said, and the socket
+/// stays closed.
+pub fn linked_switch(value: Option<&str>) -> Option<bool> {
+    match value {
+        None | Some("" | "off") => Some(false),
+        Some("on") => Some(true),
+        Some(_) => None,
+    }
+}
+
+/// What `linked.sock` dropped, by why, since the server started: read by
+/// tests and said in the journal line of each drop.
+#[derive(Default, Debug)]
+pub struct LinkedDrops {
+    /// No known person's task row matched the record's task and run.
+    pub no_owner: AtomicU64,
+    /// A forget made after the record's deed took it.
+    pub forgotten: AtomicU64,
+    /// Any other refusal: not a `linked_record`, no source kind, a bad
+    /// field, a storage failure.
+    pub refused: AtomicU64,
+    /// The client did not send its request, or take its answer, in time.
+    pub late: AtomicU64,
+}
+
+impl LinkedDrops {
+    /// `no_owner=N forgotten=N refused=N late=N`.
+    pub fn line(&self) -> String {
+        format!(
+            "no_owner={} forgotten={} refused={} late={}",
+            self.no_owner.load(Ordering::Relaxed),
+            self.forgotten.load(Ordering::Relaxed),
+            self.refused.load(Ordering::Relaxed),
+            self.late.load(Ordering::Relaxed),
+        )
+    }
+
+    /// Counts one refusal by its `error`.
+    fn refused_with(&self, error: &str) {
+        match error {
+            "no_owner" => &self.no_owner,
+            "forgotten" => &self.forgotten,
+            _ => &self.refused,
+        }
+        .fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+/// Which socket a client came on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Door {
+    Main,
+    /// The app's: `forget_person` only.
+    Forget,
+    /// `linked.sock`: `linked_record` only.
+    Linked,
+}
 
 /// A single owner answers requests; expensive model work never enters here.
 pub trait Memory {
@@ -94,8 +176,11 @@ pub struct Server {
     stop: Arc<AtomicBool>,
     /// Where a forget is told (`memory/forgot`), with `--bus-root`.
     forgot: Option<Mutex<ForgotOut>>,
-    /// The app's narrow socket, and its path.
-    forget: Option<(UnixListener, PathBuf)>,
+    /// The narrow sockets (the app's, `linked.sock`), their paths and
+    /// which each is.
+    narrows: Vec<(UnixListener, PathBuf, Door)>,
+    /// What `linked.sock` dropped.
+    drops: Arc<LinkedDrops>,
 }
 
 /// Ends a running server from another thread.
@@ -229,7 +314,8 @@ impl Server {
             patience: PATIENCE,
             stop: Arc::new(AtomicBool::new(false)),
             forgot: None,
-            forget: None,
+            narrows: Vec::new(),
+            drops: Arc::default(),
         })
     }
 
@@ -253,18 +339,48 @@ impl Server {
     /// was, serving its own socket, so a narrow socket that can't be made
     /// (its group not memory's to give) never stops memory itself.
     pub fn open_forget_socket(&mut self, socket: &Path, group: u32) -> io::Result<()> {
+        self.open_narrow(socket, group, Door::Forget)
+    }
+
+    /// Open `linked.sock` too (slice 1b), mode 0660 and owned by the group
+    /// `group` (a gid, [`LINKED_GROUP`]'s on a lamp): it takes
+    /// `linked_record` only. As [`Self::forget_socket`].
+    pub fn linked_socket(mut self, socket: &Path, group: u32) -> io::Result<Self> {
+        self.open_linked_socket(socket, group)?;
+        Ok(self)
+    }
+
+    /// [`Self::linked_socket`] in place: on an error the server is as it
+    /// was, so a linked socket that can't be made never stops memory.
+    pub fn open_linked_socket(&mut self, socket: &Path, group: u32) -> io::Result<()> {
+        self.open_narrow(socket, group, Door::Linked)
+    }
+
+    /// What `linked.sock` has dropped so far.
+    pub fn linked_drops(&self) -> Arc<LinkedDrops> {
+        Arc::clone(&self.drops)
+    }
+
+    fn open_narrow(&mut self, socket: &Path, group: u32, door: Door) -> io::Result<()> {
         directory_of(socket)?;
-        if socket == self.socket {
+        if socket == self.socket || self.narrows.iter().any(|(_, path, _)| path == socket) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "the forget socket is not the memory socket",
+                "a narrow socket has a path of its own",
             ));
         }
-        let listener = listen(socket, "f", 0o660, Some(group), || Ok(()))?;
-        // Polled together: neither may block the loop on a client that left.
+        if self.narrows.iter().any(|(_, _, open)| *open == door) {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "that narrow socket is already open",
+            ));
+        }
+        let tag = if door == Door::Linked { "l" } else { "f" };
+        let listener = listen(socket, tag, 0o660, Some(group), || Ok(()))?;
+        // Polled together: none may block the loop on a client that left.
         listener.set_nonblocking(true)?;
         self.listener.set_nonblocking(true)?;
-        self.forget = Some((listener, socket.into()));
+        self.narrows.push((listener, socket.into(), door));
         Ok(())
     }
 
@@ -318,12 +434,17 @@ impl Server {
             health.serving();
         }
         loop {
-            let (accepted, narrow) = self.accept()?;
+            let (accepted, door) = self.accept()?;
             if self.stop.load(Ordering::Relaxed) {
                 return Ok(());
             }
             match accepted {
-                Ok((stream, _)) => self.serve(&stream, narrow, store, clock, log, health),
+                Ok((stream, _)) if door == Door::Linked => {
+                    self.serve_linked(&stream, store, clock, log, health);
+                }
+                Ok((stream, _)) => {
+                    self.serve(&stream, door == Door::Forget, store, clock, log, health);
+                }
                 Err(error)
                     if matches!(
                         error.kind(),
@@ -336,28 +457,35 @@ impl Server {
         }
     }
 
-    /// The next client, and whether it came on the narrow socket. With one
-    /// socket, a plain blocking accept; with two, whichever is ready first.
-    fn accept(&self) -> io::Result<(io::Result<(UnixStream, SocketAddr)>, bool)> {
-        let Some((forget, _)) = &self.forget else {
-            return Ok((self.listener.accept(), false));
-        };
-        let mut fds = [
-            PollFd::new(&self.listener, PollFlags::IN),
-            PollFd::new(forget, PollFlags::IN),
-        ];
+    /// The next client, and which socket it came on. With one socket, a
+    /// plain blocking accept; with more, whichever is ready first.
+    fn accept(&self) -> io::Result<(io::Result<(UnixStream, SocketAddr)>, Door)> {
+        if self.narrows.is_empty() {
+            return Ok((self.listener.accept(), Door::Main));
+        }
+        let mut fds: Vec<PollFd<'_>> = std::iter::once(&self.listener)
+            .chain(self.narrows.iter().map(|(listener, _, _)| listener))
+            .map(|listener| PollFd::new(listener, PollFlags::IN))
+            .collect();
         match rustix::event::poll(&mut fds, None) {
             Ok(_) => {}
             Err(rustix::io::Errno::INTR) => {
-                return Ok((Err(io::ErrorKind::Interrupted.into()), false));
+                return Ok((Err(io::ErrorKind::Interrupted.into()), Door::Main));
             }
             Err(error) => return Err(error.into()),
         }
-        // The main socket first: the stopper knocks there.
-        let (listener, narrow) = if !fds[0].revents().is_empty() {
-            (&self.listener, false)
-        } else {
-            (forget, true)
+        // The main socket first: the stopper knocks there. Then the narrow
+        // ones in the order they were opened.
+        let ready = fds
+            .iter()
+            .position(|fd| !fd.revents().is_empty())
+            .unwrap_or(0);
+        let (listener, door) = match ready {
+            0 => (&self.listener, Door::Main),
+            n => {
+                let (listener, _, door) = &self.narrows[n - 1];
+                (listener, *door)
+            }
         };
         // Both listeners are non-blocking here, so a client gone between
         // the poll and the accept never holds the loop. A stream accepted
@@ -367,7 +495,59 @@ impl Server {
             stream.set_nonblocking(false)?;
             Ok((stream, address))
         });
-        Ok((accepted, narrow))
+        Ok((accepted, door))
+    }
+
+    /// A `linked.sock` client: one request, read and answered within
+    /// [`LINKED_PATIENCE`] each, then the connection ends. What is not
+    /// kept is counted and said in one line with the counts.
+    fn serve_linked(
+        &self,
+        stream: &UnixStream,
+        store: &mut (impl Memory + ?Sized),
+        clock: &mut dyn FnMut() -> u64,
+        log: &mut dyn FnMut(&str),
+        health: Option<&crate::health::State>,
+    ) {
+        let drops = &self.drops;
+        let late = |log: &mut dyn FnMut(&str), what: &str| {
+            drops.late.fetch_add(1, Ordering::Relaxed);
+            log(&format!(
+                "linked socket: dropped late ({what}); {}",
+                drops.line()
+            ));
+        };
+        let answer = match self.line_within(stream, &mut Vec::new(), LINKED_PATIENCE) {
+            Line::Whole(line) => match protocol::linked(&line) {
+                Ok(line) => {
+                    let mut answer = self.answer(&line, store, clock, health);
+                    answer.log = format!("linked socket: {}", answer.log);
+                    answer
+                }
+                Err(refusal) => refusal,
+            },
+            Line::TooLong => protocol::too_long(),
+            Line::Late { .. } => return late(log, "no request"),
+            Line::Closed => return,
+        };
+        let refused = serde_json::from_str::<serde_json::Value>(&answer.line)
+            .ok()
+            .filter(|value| value["ok"] != true)
+            .map(|value| value["error"].as_str().unwrap_or("").to_owned());
+        match &refused {
+            Some(error) => {
+                drops.refused_with(error);
+                log(&format!("{}; dropped: {}", answer.log, drops.line()));
+            }
+            None => log(&answer.log),
+        }
+        let mut line = answer.line.into_bytes();
+        line.push(b'\n');
+        if self.send_within(stream, &line, LINKED_PATIENCE).is_err() && refused.is_none() {
+            // Kept, but its answer was not taken: the writer will count it
+            // dropped on its side; said here too.
+            late(log, "answer not taken");
+        }
     }
 
     /// Answer this client's requests until it closes, goes quiet or stops
@@ -453,8 +633,13 @@ impl Server {
 
     /// The client's next line. `held` is what has been read past the end
     /// of the last one.
-    fn line(&self, mut stream: &UnixStream, held: &mut Vec<u8>) -> Line {
-        let deadline = Instant::now() + self.patience;
+    fn line(&self, stream: &UnixStream, held: &mut Vec<u8>) -> Line {
+        self.line_within(stream, held, self.patience)
+    }
+
+    /// [`Self::line`], waiting `patience`.
+    fn line_within(&self, mut stream: &UnixStream, held: &mut Vec<u8>, patience: Duration) -> Line {
+        let deadline = Instant::now() + patience;
         let mut chunk = [0u8; 8192];
         // How much of `held` is known to have no line end in it, and
         // whether the line being read has already outgrown its limit.
@@ -503,8 +688,18 @@ impl Server {
 
     /// Write the whole answer, or give up when the client has not taken it
     /// in time.
-    fn send(&self, mut stream: &UnixStream, mut bytes: &[u8]) -> io::Result<()> {
-        let deadline = Instant::now() + self.patience;
+    fn send(&self, stream: &UnixStream, bytes: &[u8]) -> io::Result<()> {
+        self.send_within(stream, bytes, self.patience)
+    }
+
+    /// [`Self::send`], waiting `patience`.
+    fn send_within(
+        &self,
+        mut stream: &UnixStream,
+        mut bytes: &[u8],
+        patience: Duration,
+    ) -> io::Result<()> {
+        let deadline = Instant::now() + patience;
         while !bytes.is_empty() {
             let left = deadline.saturating_duration_since(Instant::now());
             if left.is_zero() {
@@ -537,8 +732,8 @@ impl Drop for Server {
     fn drop(&mut self) {
         let _ = fs::remove_file(&self.ready);
         let _ = fs::remove_file(&self.socket);
-        if let Some((_, forget)) = &self.forget {
-            let _ = fs::remove_file(forget);
+        for (_, narrow, _) in &self.narrows {
+            let _ = fs::remove_file(narrow);
         }
     }
 }
@@ -555,5 +750,18 @@ mod tests {
         assert_eq!(group_in(file, "lamp-ap"), None);
         assert_eq!(group_in(file, "broken"), None);
         assert_eq!(group_in(file, "x"), None);
+    }
+
+    /// `LAMP_MEMORY_LINKED_SOCKET`: off unless `on`; unset, empty and `off`
+    /// are off; anything else is said and stays off.
+    #[test]
+    fn the_linked_switch_is_off_unless_on() {
+        assert_eq!(linked_switch(None), Some(false));
+        assert_eq!(linked_switch(Some("")), Some(false));
+        assert_eq!(linked_switch(Some("off")), Some(false));
+        assert_eq!(linked_switch(Some("on")), Some(true));
+        for odd in ["On", "ON", "1", "true", "yes", " on"] {
+            assert_eq!(linked_switch(Some(odd)), None, "{odd}");
+        }
     }
 }

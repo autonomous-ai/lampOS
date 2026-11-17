@@ -332,6 +332,22 @@ enum Extra {
         #[serde(default)]
         deed_unix_ms: Option<u64>,
     },
+    /// The linked-service memory plan, slice 1b: an agent's record from
+    /// `linked.sock`, with no person; memory finds the owner from the task
+    /// row the voice wrote (`Days::linked_record_put`). Every field is
+    /// required, `source_kind` and `summary` among them; a blank summary
+    /// is refused `empty`.
+    LinkedRecord {
+        source_kind: String,
+        task: String,
+        run: String,
+        n: u32,
+        action: String,
+        status: String,
+        deed_unix_ms: u64,
+        summary: String,
+        source_ref: Value,
+    },
     /// `LAMP_SERVICE_RECORDS`: a known person's records, the latest change
     /// first (`Days::service_records`); with `about` (the voice's
     /// `LAMP_SERVICE_RECORDS_TOLD`, a recall's words), those its words
@@ -761,7 +777,7 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
         }),
     })
 }
-fn extra(store: &mut Days, request: Extra) -> Result<Value> {
+fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
     Ok(match request {
         Extra::AppendLinked {
             person,
@@ -1226,6 +1242,33 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             )?;
             json!({"ok":true,"status":kept})
         }
+        Extra::LinkedRecord {
+            source_kind,
+            task,
+            run,
+            n,
+            action,
+            status,
+            deed_unix_ms,
+            summary,
+            source_ref,
+        } => {
+            let (key, kept) = store.linked_record_put(
+                &crate::service_records::LinkedIn {
+                    source_kind,
+                    task,
+                    run,
+                    n,
+                    action,
+                    status,
+                    deed_unix_ms,
+                    summary,
+                    source_ref,
+                },
+                now,
+            )?;
+            json!({"ok":true,"status":kept,"key":key})
+        }
         Extra::ServiceRecords {
             person,
             limit,
@@ -1321,6 +1364,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "service_record",
             "service_records",
             "service_records_forget",
+            "linked_record",
             "service_contact",
             "service_contacts",
             "service_contacts_forget",
@@ -1366,6 +1410,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
                 store,
                 serde_json::from_value(parsed)
                     .map_err(|_| Error::new("bad_request", "invalid fields for this operation"))?,
+                now,
             )
         } else {
             legacy(

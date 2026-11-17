@@ -1,7 +1,7 @@
 // Shared application body; the ordinary binary supplies Reporter::start.
 use lamp_memory::{
     health::{CountSource, Reporter, State},
-    server::Server,
+    server::{self, Server},
     store::{LocalTime, Options, Store, private_dir},
     tiers,
 };
@@ -15,7 +15,7 @@ use std::{
 
 const USAGE: &str = "usage: lamp-memory --dir ABSOLUTE_DIR --socket ABSOLUTE_SOCKET_PATH [--keep-days N] [--utc-offset-minutes M | --zone system|NAME] [--memory-days [--taste-rules]] [--bus-root ABSOLUTE_DIR] [--forget-socket ABSOLUTE_SOCKET_PATH --forget-group NAME]";
 
-const HELP: &str = "Keeps what the lamp remembers under --dir, a directory only its owner can enter (made\nwith mode 0700 if it is not there; refused if its group or everyone can enter it).\nThe default stores a journal file for each local day and a kept file per person.\n--memory-days opts into SQLite, ranked search and linked observations, importing and\nremoving the old files before serving. That directory then requires --memory-days;\nno model is configured or called. See docs/memory-days.md before enabling it.\n--taste-rules (with --memory-days) keeps a known person's stated tastes (\"I love coffee\",\n\"tôi thích phở\") as observations in their own words, by code rules, with no model.\nAnswers one JSON object per line on --socket (mode 0600), with ready beside the\nsocket while taking requests. --keep-days N (default 30, at least 1): delete journal\ndays more than N days before today. --utc-offset-minutes M (default 0, -720 to 840):\nminutes east of UTC for day boundaries, the same all year. --zone system takes the\nlamp's own time zone (/etc/localtime, written at setup) at each moment, across daylight\nsaving and a zone setup changes while it runs; --zone NAME names one. Not both.\n--bus-root ABSOLUTE_DIR opts into a memory health report once a second. The bus\nis optional and cannot hold the request loop; without this flag no reports run.\nWith it, each forget of everything kept under a person is told on memory/forgot.\n--forget-socket ABSOLUTE_SOCKET_PATH --forget-group NAME (both or neither) opens a\nsecond socket, mode 0660 and owned by group NAME from /etc/group, that takes only\n{\"op\":\"forget_person\",\"person\":ID}: the app's removal of a person.\nSee docs/memory.md.";
+const HELP: &str = "Keeps what the lamp remembers under --dir, a directory only its owner can enter (made\nwith mode 0700 if it is not there; refused if its group or everyone can enter it).\nThe default stores a journal file for each local day and a kept file per person.\n--memory-days opts into SQLite, ranked search and linked observations, importing and\nremoving the old files before serving. That directory then requires --memory-days;\nno model is configured or called. See docs/memory-days.md before enabling it.\n--taste-rules (with --memory-days) keeps a known person's stated tastes (\"I love coffee\",\n\"tôi thích phở\") as observations in their own words, by code rules, with no model.\nAnswers one JSON object per line on --socket (mode 0600), with ready beside the\nsocket while taking requests. --keep-days N (default 30, at least 1): delete journal\ndays more than N days before today. --utc-offset-minutes M (default 0, -720 to 840):\nminutes east of UTC for day boundaries, the same all year. --zone system takes the\nlamp's own time zone (/etc/localtime, written at setup) at each moment, across daylight\nsaving and a zone setup changes while it runs; --zone NAME names one. Not both.\n--bus-root ABSOLUTE_DIR opts into a memory health report once a second. The bus\nis optional and cannot hold the request loop; without this flag no reports run.\nWith it, each forget of everything kept under a person is told on memory/forgot.\n--forget-socket ABSOLUTE_SOCKET_PATH --forget-group NAME (both or neither) opens a\nsecond socket, mode 0660 and owned by group NAME from /etc/group, that takes only\n{\"op\":\"forget_person\",\"person\":ID}: the app's removal of a person.\nLAMP_MEMORY_LINKED_SOCKET=on (with --memory-days; off unless set) opens linked.sock\nbeside --socket, mode 0660 for group lampos-linked, that takes only linked_record:\nan agent's record, kept for the owner of the task row it names (docs/memory-days.md).\nSee docs/memory.md.";
 
 #[derive(Debug, Eq, PartialEq)]
 struct Arguments {
@@ -203,6 +203,7 @@ fn run(
     {
         eprintln!("lamp-memory: the forget socket is not open: {error}");
     }
+    open_linked(arguments, &mut server, std::env::var(server::LINKED_SWITCH).ok());
     // Each forget of everything kept under a person is told on the bus
     // (`memory/forgot`), for the lamp's other parts to let theirs go too.
     if let Some(root) = arguments.bus_root.as_ref() {
@@ -233,6 +234,32 @@ fn run(
         reporter.finish(result.is_err());
     }
     result
+}
+
+/// `linked.sock` beside `--socket` (the linked-service memory plan, slice
+/// 1b), only with `LAMP_MEMORY_LINKED_SOCKET=on` and `--memory-days`, for
+/// the group `lampos-linked`. Off, nothing is said; on but not opened (no
+/// Days, no such group, a group memory's user can't give), it is said once
+/// and memory serves as always.
+fn open_linked(arguments: &Arguments, server: &mut Server, switch: Option<String>) {
+    match server::linked_switch(switch.as_deref()) {
+        Some(false) => {}
+        None => log("LAMP_MEMORY_LINKED_SOCKET is not on or off; the linked socket stays closed"),
+        Some(true) if !arguments.memory_days => {
+            log("LAMP_MEMORY_LINKED_SOCKET needs --memory-days; the linked socket stays closed");
+        }
+        Some(true) => {
+            let socket = arguments
+                .socket
+                .with_file_name(server::LINKED_SOCKET_NAME);
+            match server::group_named(server::LINKED_GROUP)
+                .and_then(|gid| server.open_linked_socket(&socket, gid))
+            {
+                Ok(()) => log(&format!("linked socket open at {}", socket.display())),
+                Err(error) => log(&format!("the linked socket is not open: {error}")),
+            }
+        }
+    }
 }
 
 /// The zone, or the offset (0 unless given): an unknown zone ends the start,

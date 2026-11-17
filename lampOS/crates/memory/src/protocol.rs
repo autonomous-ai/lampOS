@@ -632,6 +632,45 @@ pub fn narrow(line: &[u8]) -> Result<Vec<u8>, Answer> {
         .into_bytes())
 }
 
+/// What `linked.sock` lets through (the linked-service memory plan, slice
+/// 1b): a `linked_record` object that names its `source_kind` and no
+/// person, re-encoded so nothing but that object reaches the store; the
+/// store checks every field and finds the owner itself. Anything else is
+/// the refusal to send back, and the store is never asked.
+pub fn linked(line: &[u8]) -> Result<Vec<u8>, Answer> {
+    let refused = |error: &'static str, message: &str| {
+        let refusal = refuse(error, message);
+        Answer {
+            line: refusal.line(),
+            log: format!("linked socket: {}", refusal.outcome()),
+            storage_fault: false,
+            wrote: false,
+            forgot: None,
+        }
+    };
+    let value: serde_json::Value = serde_json::from_slice(line)
+        .map_err(|_| refused("not_allowed", "this socket takes linked_record only"))?;
+    let object = value
+        .as_object()
+        .filter(|object| {
+            object.get("op").and_then(serde_json::Value::as_str) == Some("linked_record")
+        })
+        .ok_or_else(|| refused("not_allowed", "this socket takes linked_record only"))?;
+    if object.contains_key("person") {
+        return Err(refused(
+            "not_allowed",
+            "a linked record names no person: memory finds its owner",
+        ));
+    }
+    if !object
+        .get("source_kind")
+        .is_some_and(serde_json::Value::is_string)
+    {
+        return Err(refused("bad_kind", "a linked record names its source kind"));
+    }
+    Ok(value.to_string().into_bytes())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -779,6 +818,57 @@ mod tests {
             );
             assert_eq!(refused.forgot, None);
             assert!(!refused.wrote && !refused.storage_fault);
+        }
+    }
+
+    /// `linked.sock` lets through a `linked_record` that names its source
+    /// kind and no person, and nothing else.
+    #[test]
+    fn the_linked_check_lets_through_a_linked_record_and_nothing_else() {
+        let record = serde_json::json!({"op":"linked_record","source_kind":"agent","task":"t-1","run":"r","n":0});
+        let through = linked(record.to_string().as_bytes())
+            .unwrap_or_else(|refused| panic!("{}", refused.line));
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&through).unwrap(),
+            record
+        );
+        let mut named = record.clone();
+        named["person"] = serde_json::json!("p-0123456789abcdef");
+        let mut kindless = record.clone();
+        kindless.as_object_mut().unwrap().remove("source_kind");
+        let mut kind_number = record.clone();
+        kind_number["source_kind"] = serde_json::json!(3);
+        for (line, error) in [
+            (named.to_string(), "not_allowed"),
+            (kindless.to_string(), "bad_kind"),
+            (kind_number.to_string(), "bad_kind"),
+            (
+                serde_json::json!({"op":"service_record","source_kind":"agent"}).to_string(),
+                "not_allowed",
+            ),
+            (
+                serde_json::json!({"op":"forget_person","person":"p-0123456789abcdef"}).to_string(),
+                "not_allowed",
+            ),
+            (
+                serde_json::json!({"op":"status"}).to_string(),
+                "not_allowed",
+            ),
+            ("not json".into(), "not_allowed"),
+            (serde_json::json!([1]).to_string(), "not_allowed"),
+        ] {
+            let refused = linked(line.as_bytes()).expect_err(&line);
+            assert!(
+                refused.line.contains(&format!(r#""error":"{error}""#)),
+                "{line}: {}",
+                refused.line
+            );
+            assert!(
+                refused.log.starts_with("linked socket: refused"),
+                "{}",
+                refused.log
+            );
+            assert!(!refused.wrote && !refused.storage_fault && refused.forgot.is_none());
         }
     }
 

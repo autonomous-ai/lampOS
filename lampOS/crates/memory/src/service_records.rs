@@ -158,6 +158,32 @@ pub struct RecordIn {
     pub deed_unix_ms: Option<u64>,
 }
 
+/// How far ahead of memory's own clock a linked record's deed may be:
+/// a deed later than that could pass a forget made after it arrived.
+pub const DEED_AHEAD_MS: u64 = 5_000;
+
+/// One record as `linked.sock` takes it (the linked-service memory plan,
+/// slice 1b): an agent's read in a skill run, sent by lamp-services. It
+/// names no person: memory finds the owner itself, from the task row the
+/// voice wrote for that run ([`Days::linked_record_put`]).
+#[derive(Debug, Clone)]
+pub struct LinkedIn {
+    /// Required; `agent` only (the voice writes tasks and reminders).
+    pub source_kind: String,
+    /// The key of the task row (`t-…`) whose `source_ref.session` is `run`.
+    pub task: String,
+    /// The skill run the read was made in.
+    pub run: String,
+    /// The read's number in its run: the record's key is `a-<run>-<n>`.
+    pub n: u32,
+    pub action: String,
+    pub status: String,
+    pub deed_unix_ms: u64,
+    pub summary: String,
+    /// `{service, id, session?, computer?}`; its `service` is the record's.
+    pub source_ref: Value,
+}
+
 /// `record`'s kind, checked.
 fn kind_of(record: &RecordIn) -> Result<&str> {
     let kind = record.source_kind.as_deref().unwrap_or("voice");
@@ -535,6 +561,108 @@ impl Days {
         Ok(status)
     }
 
+    /// Puts an agent's record from `linked.sock` under the owner memory
+    /// finds itself (the first builder's condition 1): the one known
+    /// person holding a `task` row keyed `record.task` whose
+    /// `source_ref.session` is `record.run`. No such row, or two people's,
+    /// is `no_owner`, and nothing is kept. The record goes through
+    /// [`Self::service_record_put`], so a forget wins by its deed
+    /// (condition 2) and its summary and pointer are bounded (condition
+    /// 5); a deed more than [`DEED_AHEAD_MS`] ahead of `now` is refused.
+    /// The record's key and the status kept.
+    pub fn linked_record_put(&mut self, record: &LinkedIn, now: u64) -> Result<(String, String)> {
+        if record.source_kind != "agent" {
+            return Err(Error::new(
+                "bad_kind",
+                "a linked record from this socket is an agent's",
+            ));
+        }
+        // A linked record says what was done: a blank summary leaves a
+        // forget about a thing no words to match (El's P2 on #7463).
+        if store::tidy(&record.summary, SUMMARY_BYTES).is_empty() {
+            return Err(Error::new(
+                "empty",
+                "a linked record says what was done in its summary",
+            ));
+        }
+        let key = format!("a-{}-{}", record.run, record.n);
+        if !key_ok(&record.run)
+            || !key_ok(&key)
+            || !key_ok(&record.task)
+            || !record.task.starts_with("t-")
+        {
+            return Err(Error::new(
+                "bad_key",
+                "a linked record names a task row's key (t-…) and a run that make a record key",
+            ));
+        }
+        if record.deed_unix_ms > now.saturating_add(DEED_AHEAD_MS) {
+            return Err(Error::new(
+                "bad_time",
+                "the deed's time is ahead of memory's clock",
+            ));
+        }
+        let service = record
+            .source_ref
+            .get("service")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        if service.trim().is_empty() {
+            return Err(Error::new(
+                "bad_source_ref",
+                "a linked record's source_ref names its service",
+            ));
+        }
+        let owners: Vec<(String, String)> = {
+            let mut statement = self.db.prepare(
+                "SELECT person, source_ref FROM service_records WHERE key=?1 AND source_kind='task'",
+            )?;
+            statement
+                .query_map([record.task.as_str()], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        let owner = match owners.as_slice() {
+            [(person, source_ref)]
+                if lamp_msgs::known::is_person_id(person)
+                    && serde_json::from_str::<Value>(source_ref)
+                        .ok()
+                        .and_then(|source| source.get("session")?.as_str().map(str::to_owned))
+                        .is_some_and(|session| session == record.run) =>
+            {
+                Person::new(person)
+            }
+            _ => None,
+        }
+        .ok_or_else(|| {
+            Error::new(
+                "no_owner",
+                "no known person's task row matches this task and run",
+            )
+        })?;
+        let status = self.service_record_put(
+            &owner,
+            &RecordIn {
+                key: key.clone(),
+                service,
+                action: record.action.clone(),
+                status: record.status.clone(),
+                reason: String::new(),
+                detail: None,
+                result_id: String::new(),
+                asked_unix_ms: record.deed_unix_ms,
+                changed_unix_ms: now.max(record.deed_unix_ms),
+                links: vec![record.task.clone()],
+                replaced_by: String::new(),
+                source_kind: Some("agent".to_owned()),
+                source_ref: Some(record.source_ref.clone()),
+                summary: Some(record.summary.clone()),
+                deed_unix_ms: Some(record.deed_unix_ms),
+            },
+        )?;
+        Ok((key, status))
+    }
+
     /// A record asked before the latest forget of `person`'s everything
     /// (or everyone's), or before a forget about a thing it matches, is
     /// refused: a change the voice sent before the forget and this store
@@ -589,6 +717,17 @@ impl Days {
         }
         if about.is_empty() {
             return Ok(());
+        }
+        // An agent's record with no summary, asked before a forget about a
+        // thing: with no words to match, it may be the very record that
+        // forget took, so it is refused (El's P2 on #7463).
+        if record.source_kind.as_deref() == Some("agent")
+            && record
+                .summary
+                .as_deref()
+                .is_none_or(|summary| store::tidy(summary, SUMMARY_BYTES).is_empty())
+        {
+            return refused();
         }
         let text = text();
         if about.iter().any(|subjects| about_any(subjects, &text)) {
@@ -1724,5 +1863,332 @@ mod tests {
         assert_eq!(reminder["source_kind"], "reminder");
         assert_eq!(reminder["source_ref"]["computer"], "c-1");
         assert_eq!(reminder["deed_unix_ms"], NOW);
+    }
+
+    /// The task row the voice writes for a known person's task, run as
+    /// `run` (slice 1b's owner check matches its `session`).
+    fn task_row(person: &str, key: &str, run: &str, deed: u64) -> Value {
+        let mut row = linked(person, key, "task", "Book the dentist", deed);
+        row["source_ref"] = json!({"service":"lamp-tasks","id":"7","session":run});
+        row
+    }
+
+    /// What lamp-services sends on `linked.sock` (slice 1b): an agent's
+    /// read in `run` of the task `task`, done at `deed`, with no person.
+    fn agent_read(task: &str, run: &str, n: u64, deed: u64) -> Value {
+        json!({
+            "op": "linked_record",
+            "source_kind": "agent",
+            "task": task,
+            "run": run,
+            "n": n,
+            "action": "search_mail",
+            "status": "done",
+            "deed_unix_ms": deed,
+            "summary": "Searched mail for the dentist",
+            "source_ref": {"service": "gmail", "id": "res-1", "session": run},
+        })
+    }
+
+    /// Slice 1b, condition 1: memory finds the owner itself. An agent's
+    /// record is kept under the person whose task row names its run, keyed
+    /// `a-<run>-<n>` and linked to that task row; the request names no
+    /// person and may not.
+    #[test]
+    fn a_linked_record_is_kept_for_the_owner_of_its_task_row() {
+        let (_scratch, mut store) = Scratch::new("linked-owner");
+        assert_eq!(
+            send(&mut store, task_row(OWNER, "t-tasks-7", "run-1", NOW))["ok"],
+            true
+        );
+        let kept = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 0, NOW + 10),
+            NOW + 20,
+        );
+        assert_eq!(
+            kept,
+            json!({"ok":true,"status":"done","key":"a-run-1-0"}),
+            "{kept}"
+        );
+        let rows = records(&mut store, OWNER);
+        let agent = rows.iter().find(|r| r["key"] == "a-run-1-0").unwrap();
+        assert_eq!(agent["source_kind"], "agent");
+        assert_eq!(agent["service"], "gmail");
+        assert_eq!(agent["action"], "search_mail");
+        assert_eq!(agent["links"], json!(["t-tasks-7"]));
+        assert_eq!(agent["summary"], "Searched mail for the dentist");
+        assert_eq!(agent["deed_unix_ms"], NOW + 10);
+        assert!(records(&mut store, OTHER).is_empty());
+        let mut named = agent_read("t-tasks-7", "run-1", 1, NOW + 10);
+        named["person"] = json!(OTHER);
+        assert_eq!(send(&mut store, named)["error"], "bad_request");
+    }
+
+    /// No task row, a task row of another run, a row of the same key that
+    /// is not a task, or a task key two people hold: no owner, nothing kept.
+    #[test]
+    fn a_linked_record_with_no_matching_task_row_is_refused() {
+        let (_scratch, mut store) = Scratch::new("linked-no-owner");
+        let no_owner = |store: &mut Days, request: Value| {
+            let answer = send_at(store, request, NOW + 20);
+            assert_eq!(answer["error"], "no_owner", "{answer}");
+        };
+        no_owner(&mut store, agent_read("t-tasks-7", "run-1", 0, NOW));
+        send(&mut store, task_row(OWNER, "t-tasks-7", "run-1", NOW));
+        no_owner(&mut store, agent_read("t-tasks-7", "run-2", 0, NOW));
+        no_owner(&mut store, agent_read("t-tasks-8", "run-1", 0, NOW));
+        send(&mut store, put(OWNER, "t-tasks-9", "done", "", NOW));
+        no_owner(&mut store, agent_read("t-tasks-9", "run-1", 0, NOW));
+        send(&mut store, task_row(OTHER, "t-tasks-7", "run-1", NOW));
+        no_owner(&mut store, agent_read("t-tasks-7", "run-1", 0, NOW));
+        let keys: Vec<Value> = records(&mut store, OWNER)
+            .iter()
+            .map(|r| r["key"].clone())
+            .collect();
+        assert!(
+            !keys
+                .iter()
+                .any(|key| key.as_str().unwrap().starts_with("a-"))
+        );
+    }
+
+    /// Condition 4: each request names its source kind, and this op takes
+    /// an agent's alone (tasks and reminders are the voice's to write).
+    #[test]
+    fn a_linked_record_names_its_kind_and_it_is_an_agents() {
+        let (_scratch, mut store) = Scratch::new("linked-kind");
+        send(&mut store, task_row(OWNER, "t-tasks-7", "run-1", NOW));
+        let mut unnamed = agent_read("t-tasks-7", "run-1", 0, NOW);
+        unnamed.as_object_mut().unwrap().remove("source_kind");
+        assert_eq!(send(&mut store, unnamed)["error"], "bad_request");
+        for kind in ["task", "reminder", "voice", "mail", ""] {
+            let mut other = agent_read("t-tasks-7", "run-1", 0, NOW);
+            other["source_kind"] = json!(kind);
+            assert_eq!(send(&mut store, other)["error"], "bad_kind", "{kind}");
+        }
+    }
+
+    /// Condition 2: a forget wins by the deed's time. After a forget of
+    /// everything the task row is gone, so nothing has an owner; with the
+    /// task row written again after it, a deed from before the forget is
+    /// still refused, and a deed more than a few seconds ahead of memory's
+    /// clock is refused rather than let pass a later forget.
+    #[test]
+    fn a_forget_wins_over_a_linked_record_by_its_deed() {
+        let (_scratch, mut store) = Scratch::new("linked-forget");
+        send(&mut store, task_row(OWNER, "t-tasks-7", "run-1", NOW));
+        send_at(
+            &mut store,
+            json!({"op":"forget_all","person":OWNER}),
+            NOW + 1_000,
+        );
+        let gone = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 0, NOW + 500),
+            NOW + 2_000,
+        );
+        assert_eq!(gone["error"], "no_owner", "{gone}");
+        send_at(
+            &mut store,
+            task_row(OWNER, "t-tasks-7", "run-1", NOW + 1_500),
+            NOW + 2_000,
+        );
+        let early = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 0, NOW + 500),
+            NOW + 2_000,
+        );
+        assert_eq!(early["error"], "forgotten", "{early}");
+        let ahead = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 1, NOW + 2_000 + 60_000),
+            NOW + 2_000,
+        );
+        assert_eq!(ahead["error"], "bad_time", "{ahead}");
+        let after = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 2, NOW + 1_800),
+            NOW + 2_000,
+        );
+        assert_eq!(after["ok"], true, "{after}");
+    }
+
+    /// Condition 5 and the key's shape: the summary is cut to its 160
+    /// bytes; a run or a task key that would not make a record key, a task
+    /// key not a task's (`t-`), and a `source_ref` past its bounds are
+    /// refused.
+    #[test]
+    fn a_linked_records_bounds_hold() {
+        let (_scratch, mut store) = Scratch::new("linked-bounds-1b");
+        send(&mut store, task_row(OWNER, "t-tasks-7", "run-1", NOW));
+        let mut long = agent_read("t-tasks-7", "run-1", 0, NOW);
+        long["summary"] = json!("é".repeat(200));
+        assert_eq!(send(&mut store, long)["ok"], true);
+        let kept = records(&mut store, OWNER);
+        let summary = kept.iter().find(|r| r["key"] == "a-run-1-0").unwrap()["summary"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(summary.len() <= super::SUMMARY_BYTES, "{}", summary.len());
+        for (task, run) in [
+            ("t-tasks-7", "run 1"),
+            ("t-tasks-7", ""),
+            ("t-tasks-7", &"r".repeat(61)),
+            ("tasks-7", "run-1"),
+            ("t-tasks/7", "run-1"),
+        ] {
+            let answer = send(&mut store, agent_read(task, run, 0, NOW));
+            assert_eq!(answer["error"], "bad_key", "{task} {run} {answer}");
+        }
+        let mut big = agent_read("t-tasks-7", "run-1", 3, NOW);
+        big["source_ref"]["id"] = json!("x".repeat(600));
+        assert_eq!(send(&mut store, big)["error"], "bad_source_ref");
+        let mut serviceless = agent_read("t-tasks-7", "run-1", 4, NOW);
+        serviceless["source_ref"]
+            .as_object_mut()
+            .unwrap()
+            .remove("service");
+        assert_eq!(send(&mut store, serviceless)["error"], "bad_source_ref");
+    }
+
+    /// A task row whose words share none with the agent's read (slice 1b's
+    /// P2 on #7463: the task row survives a forget about the read).
+    fn plain_task_row(person: &str, run: &str) -> Value {
+        let mut row = task_row(person, "t-tasks-7", run, NOW);
+        row["summary"] = json!("Plan the week");
+        row
+    }
+
+    /// A forget about a thing takes an agent's linked record whose summary
+    /// names it, and leaves its task row: a recall no longer finds it.
+    #[test]
+    fn a_forget_about_takes_an_agents_linked_record() {
+        let (_scratch, mut store) = Scratch::new("linked-forget-about");
+        send(&mut store, plain_task_row(OWNER, "run-1"));
+        let mut read = agent_read("t-tasks-7", "run-1", 0, NOW + 10);
+        read["summary"] = json!("Booked the dentist");
+        assert_eq!(send_at(&mut store, read, NOW + 20)["ok"], true);
+        let forgot = send_at(
+            &mut store,
+            json!({"op":"service_records_forget","person":OWNER,"about":[["dentist"]]}),
+            NOW + 1_000,
+        );
+        assert_eq!(forgot, json!({"ok":true,"removed":1}));
+        let left = records(&mut store, OWNER);
+        assert_eq!(left.len(), 1, "{left:?}");
+        assert_eq!(left[0]["key"], "t-tasks-7");
+        let found = send(
+            &mut store,
+            json!({"op":"service_records","person":OWNER,"about":"the dentist","limit":5}),
+        );
+        assert!(found["records"].as_array().unwrap().is_empty(), "{found}");
+    }
+
+    /// El's P2 on #7463: after a forget about an agent's record, a late
+    /// put of the same key asked before the forget never comes back, with
+    /// its summary, with an empty one, or with none. `linked.sock` refuses
+    /// a blank summary outright; the store refuses an agent's put with no
+    /// summary asked before any forget about a thing of its owner.
+    #[test]
+    fn a_late_summaryless_linked_record_stays_forgotten() {
+        let (_scratch, mut store) = Scratch::new("linked-late-blank");
+        send(&mut store, plain_task_row(OWNER, "run-1"));
+        let mut read = agent_read("t-tasks-7", "run-1", 0, NOW + 10);
+        read["summary"] = json!("Booked the dentist");
+        assert_eq!(send_at(&mut store, read.clone(), NOW + 20)["ok"], true);
+        send_at(
+            &mut store,
+            json!({"op":"service_records_forget","person":OWNER,"about":[["dentist"]]}),
+            NOW + 1_000,
+        );
+        assert_eq!(
+            send_at(&mut store, read.clone(), NOW + 2_000)["error"],
+            "forgotten"
+        );
+        for blank in [json!(""), json!("   ")] {
+            let mut late = read.clone();
+            late["summary"] = blank;
+            let answer = send_at(&mut store, late, NOW + 2_000);
+            assert_eq!(answer["error"], "empty", "{answer}");
+        }
+        let mut unsaid = read.clone();
+        unsaid.as_object_mut().unwrap().remove("summary");
+        assert_eq!(
+            send_at(&mut store, unsaid, NOW + 2_000)["error"],
+            "bad_request"
+        );
+        // The same row put straight to the store, as an agent's, asked
+        // before the forget: refused with an empty summary and with none.
+        let mut direct = linked(OWNER, "a-run-1-0", "agent", "", NOW + 10);
+        assert_eq!(
+            send_at(&mut store, direct.clone(), NOW + 2_000)["error"],
+            "forgotten"
+        );
+        direct.as_object_mut().unwrap().remove("summary");
+        assert_eq!(
+            send_at(&mut store, direct, NOW + 2_000)["error"],
+            "forgotten"
+        );
+        let keys: Vec<Value> = records(&mut store, OWNER)
+            .iter()
+            .map(|r| r["key"].clone())
+            .collect();
+        assert_eq!(keys, vec![json!("t-tasks-7")]);
+        // Asked after the forget, a read of the run is kept as before.
+        let mut fresh = agent_read("t-tasks-7", "run-1", 1, NOW + 1_500);
+        fresh["summary"] = json!("Called the dentist back");
+        assert_eq!(send_at(&mut store, fresh, NOW + 2_000)["ok"], true);
+    }
+
+    /// The app's removal of a person takes their agents' rows with the
+    /// rest, and a late read of that run, made before it, is not kept:
+    /// no owner while the task row is gone, forgotten once it is back.
+    #[test]
+    fn forget_person_removes_agent_rows() {
+        let (_scratch, mut store) = Scratch::new("linked-forget-person");
+        send(&mut store, task_row(OWNER, "t-tasks-7", "run-1", NOW));
+        send(&mut store, task_row(OTHER, "t-tasks-8", "run-2", NOW));
+        assert_eq!(
+            send_at(
+                &mut store,
+                agent_read("t-tasks-7", "run-1", 0, NOW + 10),
+                NOW + 20
+            )["ok"],
+            true
+        );
+        assert_eq!(
+            send_at(
+                &mut store,
+                agent_read("t-tasks-8", "run-2", 0, NOW + 10),
+                NOW + 20
+            )["ok"],
+            true
+        );
+        let forgot = send_at(
+            &mut store,
+            json!({"op":"forget_person","person":OWNER}),
+            NOW + 1_000,
+        );
+        assert_eq!(forgot["ok"], true, "{forgot}");
+        assert!(records(&mut store, OWNER).is_empty());
+        assert_eq!(records(&mut store, OTHER).len(), 2);
+        let late = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 1, NOW + 500),
+            NOW + 2_000,
+        );
+        assert_eq!(late["error"], "no_owner", "{late}");
+        send_at(
+            &mut store,
+            task_row(OWNER, "t-tasks-7", "run-1", NOW + 1_500),
+            NOW + 2_000,
+        );
+        let early = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 1, NOW + 500),
+            NOW + 2_000,
+        );
+        assert_eq!(early["error"], "forgotten", "{early}");
     }
 }
