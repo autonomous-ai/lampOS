@@ -1320,6 +1320,14 @@ class Lamp:
         return said if said in ("en", "vi", "ja", "zh", "ko") else "en"
 
     @property
+    def build(self) -> str | None:
+        """The lamp's build, from hello: the text the owner's app shows
+        (`143+ab12cd34ef56`), to quote in a bug report. None from a lamp that
+        says none (one from before this, or one without its update state)."""
+        said = self.info.get("build")
+        return said if isinstance(said, str) and said else None
+
+    @property
     def ring_pixels(self) -> int | None:
         """How many pixels the ring has, from hello's limits (none from a lamp
         before pixel lights)."""

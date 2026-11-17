@@ -99,6 +99,15 @@ test('the lamp\'s language comes from hello and is English when it says none', a
   }
 });
 
+test('the lamp\'s build comes from hello and is null when it says none', async () => {
+  for (const said of ['143+ab12cd34ef56', null]) {
+    await withLamp({ build: said }, async (lamp) => {
+      assert.equal(lamp.build, said);
+      assert.equal(lamp.info.build, said ?? undefined);
+    });
+  }
+});
+
 test('a wrong code is refused and nothing is kept', async (t) => {
   const fake = await started(t);
   const keyring = new Keyring(folder());

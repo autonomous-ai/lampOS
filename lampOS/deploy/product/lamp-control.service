@@ -71,6 +71,9 @@ StateDirectory=lampos-control
 StateDirectoryMode=0700
 RuntimeDirectory=lampos-control
 RuntimeDirectoryMode=0700
+# #5299: lamp-update's state, handed in for the build hello says (docs/control.md, "The build"); the blank SetCredential= is the fallback when the file is missing, as lamp-skills.service's.
+SetCredential=build:\n
+LoadCredential=build:/var/lib/lampos-update/state.json
 ProtectSystem=strict
 # The bus.
 ReadWritePaths=/run/lampos-bus

@@ -283,6 +283,10 @@ pub struct Door {
     /// The file the owner's language is read from at each welcome and hello
     /// (`language`); none, as in tests, says English.
     language_file: Option<PathBuf>,
+    /// The lamp's build, said in the hello's `lamp` when known, never in the
+    /// welcome (`crate::build`): the welcome goes to any connection before it
+    /// is known, and the hello's answer only after the signature check.
+    build: Option<String>,
     codes: Codes,
     /// The grants the owner chose with the code out.
     code_grants: BTreeSet<Grant>,
@@ -450,6 +454,7 @@ impl Door {
         Self {
             lamp: json!({"id": id, "name": name, "v": VERSION}),
             language_file: None,
+            build: None,
             codes: Codes::new(),
             code_grants: BTreeSet::new(),
             media_dropped: Vec::new(),
@@ -545,8 +550,16 @@ impl Door {
         self
     }
 
-    /// The `lamp` object the welcome and the hello carry: id, name, version
-    /// and the owner's language (always one of [`crate::language::CODES`]).
+    /// The lamp's build for the hello's `lamp` (`build`), never the welcome's;
+    /// none says nothing.
+    pub fn with_build(mut self, build: Option<String>) -> Self {
+        self.build = build;
+        self
+    }
+
+    /// The `lamp` object the welcome carries: id, name, version and the
+    /// owner's language (always one of [`crate::language::CODES`]). Never the
+    /// build: any connection gets it before it is paired or signed.
     fn lamp_info(&self) -> Value {
         let mut lamp = self.lamp.clone();
         let language = self
@@ -554,6 +567,16 @@ impl Door {
             .as_deref()
             .map_or(crate::language::CODES[0], crate::language::read);
         lamp["language"] = json!(language);
+        lamp
+    }
+
+    /// The `lamp` object the hello's answer carries, once the client is
+    /// known: [`Door::lamp_info`] and, when known, the build.
+    fn lamp_info_known(&self) -> Value {
+        let mut lamp = self.lamp_info();
+        if let Some(build) = &self.build {
+            lamp["build"] = json!(build);
+        }
         lamp
     }
 
@@ -1834,7 +1857,7 @@ impl Door {
         ok(
             re,
             json!({
-                "lamp": self.lamp_info(),
+                "lamp": self.lamp_info_known(),
                 "grants": grants,
                 "limits": limits,
             }),
@@ -3286,6 +3309,47 @@ mod tests {
             "unknown"
         );
         let _ = std::fs::remove_file(&file);
+    }
+
+    /// The build, when the unit handed it in, is said in the hello's `lamp`
+    /// only, after the signature check, and never in the welcome that any
+    /// connection gets first (Heron's P2 on #7528); with none the field is
+    /// not there at all (never null, never a made-up value), and nothing
+    /// else in `lamp` changes.
+    #[test]
+    fn only_the_hello_says_the_build_and_only_when_it_is_known() {
+        let computer = Computer::new(42);
+        let (door, _, mut fake) = paired(&computer, &[Grant::Light]);
+        let mut door = door;
+        fn said(door: &mut Door, computer: &Computer, fake: &mut Fake, at: u64) -> (Value, Value) {
+            let (mut session, welcome) = door.open();
+            let hello = door.handle(&mut session, &computer.hello_frame(&welcome), fake, S, at);
+            (welcome["lamp"].clone(), reply(&hello)["lamp"].clone())
+        }
+        let (welcome, hello) = said(&mut door, &computer, &mut fake, 1);
+        for lamp in [&welcome, &hello] {
+            assert!(lamp.get("build").is_none(), "no build, no field: {lamp}");
+            assert!(lamp["id"].is_string() && lamp["v"] == 1, "{lamp}");
+        }
+        let mut door = door.with_build(Some("143+ab12cd34ef56".to_owned()));
+        let (welcome, hello) = said(&mut door, &computer, &mut fake, 2);
+        assert!(
+            welcome.get("build").is_none(),
+            "never before the signature: {welcome}"
+        );
+        assert_eq!(hello["build"], "143+ab12cd34ef56");
+        // A hello that fails its signature does not say it either.
+        let (mut session, welcome) = door.open();
+        let bad = json!({"id": 9, "op": "hello", "client": pairing::client_id(&computer.key()), "sig": crate::runs::hello_sig()}).to_string();
+        let refused = door.handle(&mut session, &bad, &mut fake, S, 2);
+        assert!(welcome["lamp"].get("build").is_none());
+        assert!(
+            !reply(&refused).to_string().contains("143+ab12cd34ef56"),
+            "{refused:?}"
+        );
+        let mut door = door.with_build(None);
+        let (welcome, hello) = said(&mut door, &computer, &mut fake, 3);
+        assert!(welcome.get("build").is_none() && hello.get("build").is_none());
     }
 
     /// Hello's `hold_max_ms` keeps its meaning, a light's longest `for_ms`
