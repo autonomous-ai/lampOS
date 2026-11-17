@@ -1670,6 +1670,10 @@ pub type WordsHeard = Arc<dyn Fn(u64, &str) + Send + Sync>;
 /// Whether a call, by its request and name, is held as not said to the
 /// lamp ([`Engine::holding_calls`]).
 pub type CallHold = Arc<dyn Fn(u64, &str) -> bool + Send + Sync>;
+/// Whether a call of a spoken request, by its request, name and arguments,
+/// starts a made skill's said start on a line nothing shows was said to
+/// the lamp ([`Engine::holding_said_starts`]).
+pub type SaidHold = Arc<dyn Fn(u64, &str, &Value) -> bool + Send + Sync>;
 /// Whether a call of this name goes to the skills, whose answer alone can
 /// ask for a look ([`Engine::looking_for_skills`]).
 pub type SkillCall = Arc<dyn Fn(&str) -> bool + Send + Sync>;
@@ -2029,6 +2033,9 @@ struct Shared {
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
     hold: Option<CallHold>,
+    /// Said starts held as not said to the lamp
+    /// ([`Engine::holding_said_starts`]).
+    said_hold: Option<SaidHold>,
     /// Calls that wait for the Policy's decision ([`Engine::holding_for_the_policy`]).
     policy: Option<PolicyGate>,
     /// Told a spoken request's words before its chat ([`Engine::hearing_words`]).
@@ -4947,6 +4954,7 @@ impl Engine {
                 doing: None,
                 did: None,
                 hold: None,
+                said_hold: None,
                 policy: None,
                 words_heard: None,
                 look_by_call: false,
@@ -6933,6 +6941,18 @@ impl Engine {
     pub fn holding_calls(mut self, hold: CallHold) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.hold = Some(hold);
+        }
+        self
+    }
+
+    /// A call of a heard line that `hold` says starts a made skill's said
+    /// start where nothing shows the line was said to the lamp is held as
+    /// [`Self::holding_calls`] holds one: not run, and the model is told it
+    /// was not done (#7448, with `LAMP_MADE_SKILL_SAID` on; the first
+    /// builder at 20:55 on 17 Nov). Before any turn only.
+    pub fn holding_said_starts(mut self, hold: SaidHold) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.said_hold = Some(hold);
         }
         self
     }
@@ -18806,6 +18826,11 @@ async fn answer(
                         .hold
                         .as_ref()
                         .is_some_and(|hold| hold(request, &call.name))
+                        || heard
+                            && shared
+                                .said_hold
+                                .as_ref()
+                                .is_some_and(|hold| hold(request, &call.name, &call.args))
                 })
                 .collect();
             // The Policy's decisions about a spoken turn's calls (#800,
