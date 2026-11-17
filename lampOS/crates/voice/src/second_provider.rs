@@ -10863,12 +10863,22 @@ async fn spoken(
             }
         })
         .flatten();
-    // A line asked of the model as only the lamp's name, or with no words
-    // at all, answers no skill's say-back waiting for its answer: none is
-    // taken in it, its round is not forced to give one, and the wait goes
-    // on for the next line (`skill_write_yes::line_heard`; lamp-9adf,
-    // 17 Nov 13:58: a lone name put a made skill's code on).
-    crate::skill_write_yes::line_heard(request, text.trim().is_empty() || name_alone(&text));
+    // A line that is a call with nothing past it answers no skill's
+    // say-back waiting for its answer: none is taken in it, its round is
+    // not forced to give one, and the wait goes on for the next line
+    // (`skill_write_yes::line_heard`; lamp-9adf, 17 Nov 13:58: a lone name
+    // put a made skill's code on). A call as the route tells the model one
+    // (`called`, the coordinator's hearing of the name alone: "Hi Lamp",
+    // "Lamp ơi"), or as the coordinator reads a line of the name alone
+    // (`attention::only_the_name`: "Hello Lamp?"), or this route's own name
+    // alone, or no words at all.
+    crate::skill_write_yes::line_heard(
+        request,
+        called
+            || text.trim().is_empty()
+            || name_alone(&text)
+            || crate::attention::only_the_name(&text),
+    );
     let called = called.then(|| {
         eprintln!(
             "lamp-voice second: request {request}: only the lamp's name was said, and the model is told so"
