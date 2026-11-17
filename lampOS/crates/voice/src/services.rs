@@ -2263,6 +2263,16 @@ pub fn run(
             return (told, true);
         }
     };
+    // A linked service's read handed to the lamp's agent
+    // (`LAMP_SERVICES_TO_AGENT`, [`crate::agent_asks`]): every gate above
+    // held, on the second route alone; the voice reads nothing itself, and
+    // its model says one holding line.
+    if call.name == READ && judge.is_some() && crate::agent_asks::services_on() {
+        let whole = said_whole(private_room, seen_owner, owner_alone, || {
+            owner_likeness(judge.as_ref(), request, owner.as_deref())
+        });
+        return (read_by_agent(&call, request, whole, now), true);
+    }
     // A mail's names filled in from the owner's saved contacts, before it
     // is prepared (`LAMP_SERVICE_CONTACTS`): the read-back says the
     // address. A name with none saved prepares nothing.
@@ -2357,6 +2367,58 @@ pub fn run(
         return (crate::tools::unavailable(), false);
     }
     (told, answered)
+}
+
+/// The grant a read of the service the model named asks
+/// (`<code>-read`): a linked pair's code as its service's (`gmail-app` as
+/// `gmail`, `figma-api` as `figma`), only a service the lamp knows.
+pub fn read_grant(service: &str) -> Option<String> {
+    let code = service
+        .strip_suffix("-app")
+        .or_else(|| service.strip_suffix("-api"))
+        .unwrap_or(service);
+    let known = lamp_services::catalog::service(code).is_some()
+        && lamp_services::catalog::service(service).is_some();
+    known.then(|| format!("{code}-read"))
+}
+
+/// What the model is told of a read naming no service the lamp knows,
+/// with the reads handed to the agent.
+pub const NO_SUCH_SERVICE: &str = "Not done: that is not one of the services the lamp knows. Call services_connected and ask again with one it names.";
+
+/// A read gated through, handed to the lamp's agent with its service's
+/// read grant ([`crate::agent_asks::hand`]): the person's words heard in
+/// `request` and what the model asked for, told brief unless `whole`.
+fn read_by_agent(call: &ToolCall, request: u64, whole: bool, now: Instant) -> Value {
+    let service = call
+        .args
+        .get("service")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let Some(grant) = read_grant(service) else {
+        return json!({ "error": NO_SUCH_SERVICE });
+    };
+    let heard = crate::thread::THREAD
+        .lock()
+        .ok()
+        .and_then(|thread| thread.heard_for(request, now));
+    // What the model asked of the service, as a hint beside the words.
+    let model = format!("a read of their {service}: {}", call.args);
+    let told = crate::agent_asks::hand(crate::agent_asks::Asked {
+        ask: crate::agent_asks::ask_words(heard.as_deref(), Some(&model)),
+        grants: vec![grant],
+        brief: !whole,
+        whole_read: whole,
+    });
+    eprintln!(
+        "lamp-voice: request {request}: a read of {service} handed to the lamp's agent{}",
+        if told.get("error").is_some() {
+            ": not taken"
+        } else {
+            ""
+        }
+    );
+    told
 }
 
 /// The owner's own lines of the last ten minutes, and the line heard in
@@ -4947,6 +5009,87 @@ mod tests {
             }
         });
         (folder, calls)
+    }
+
+    /// `LAMP_SERVICES_TO_AGENT` (the owner's ruling, 17 Nov): on the second
+    /// route a gated read is handed to the lamp's agent with its service's
+    /// read grant, lamp-services never called, and the model told to say
+    /// one holding line; off, the read is the voice's own, as before; a
+    /// read refused by the gate is refused as before, never handed over.
+    #[test]
+    fn with_the_switch_a_read_goes_to_the_agent_and_off_it_is_the_voices() {
+        use std::io::{BufRead, BufReader, Write};
+        let _one = crate::agent_asks::ONE
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let read = call(READ, json!({"service":"gmail-app","what":"recent"}));
+        let quoted = json!({"source":"Gmail","quoted":[{"id":"1","from":"Ann","text":"Hi"}]});
+        judging_voices(std::sync::Arc::new(|_| None));
+        crate::person::set_private_room_for_test(Some(true));
+        ALONE_FOR_TEST.with(|alone| alone.set(Some(true)));
+        // Off: the voice reads it itself.
+        crate::agent_asks::set_on_here(Some((false, false)));
+        let (folder, calls) = services_saying("to-agent-off", quoted.clone());
+        let (told, answered) = run(&folder, &read, 7_301, true, None);
+        assert!(answered, "{told}");
+        assert_eq!(told["quoted"][0]["text"], "Hi", "{told}");
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        std::fs::remove_dir_all(folder).unwrap();
+        // On: handed to the agent on the tasks part's socket.
+        let tasks = std::env::temp_dir().join(format!("to-agent-tasks-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tasks);
+        std::fs::create_dir_all(&tasks).unwrap();
+        let listener = std::os::unix::net::UnixListener::bind(
+            tasks.join(crate::make_skill_agent::MAKE_SOCKET_NAME),
+        )
+        .unwrap();
+        let (sent, seen) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(stream.try_clone().unwrap())
+                .read_line(&mut line)
+                .unwrap();
+            sent.send(serde_json::from_str::<Value>(&line).unwrap())
+                .unwrap();
+            writeln!(
+                stream,
+                "{}",
+                json!({"ok": true, "answer": "One mail, from Ann."})
+            )
+            .unwrap();
+        });
+        crate::agent_asks::set_tasks_dir(tasks.clone());
+        crate::agent_asks::set_on_here(Some((true, false)));
+        let (folder, calls) = services_saying("to-agent-on", quoted);
+        let (told, answered) = run(&folder, &read, 7_302, true, None);
+        assert!(answered, "{told}");
+        assert_eq!(told["handed_to_agent"], true, "{told}");
+        assert_eq!(told["next"], crate::agent_asks::HOLDING_NEXT, "{told}");
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+        let line = seen
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
+        assert_eq!(line["op"], "voice_ask");
+        assert_eq!(line["grants"], json!(["gmail-read"]));
+        // The private room reads in full.
+        assert_eq!(line["brief"], false);
+        // A read the gate refuses (not heard live) is refused, not handed.
+        let (told, _) = run(&folder, &read, 7_303, false, None);
+        assert_eq!(told["error"], NOT_HEARD, "{told}");
+        // The one place freed once its answer was told.
+        crate::agent_asks::wait_free();
+        crate::agent_asks::set_on_here(None);
+        crate::person::set_private_room_for_test(None);
+        ALONE_FOR_TEST.with(|alone| alone.set(None));
+        assert_eq!(
+            read_grant("google_calendar").as_deref(),
+            Some("google_calendar-read")
+        );
+        assert_eq!(read_grant("figma-api").as_deref(), Some("figma-read"));
+        assert_eq!(read_grant("nothing"), None);
+        std::fs::remove_dir_all(folder).unwrap();
+        let _ = std::fs::remove_dir_all(tasks);
     }
 
     /// The private room (P2 on #5569): the second route still prepares a

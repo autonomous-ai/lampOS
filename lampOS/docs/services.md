@@ -2675,6 +2675,68 @@ never through an open socket.
   `the_settings_written_follow_the_switch`, and lamp-setup's
   `a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys`.
 
+### Reads through the lamp's agent (`LAMP_SERVICES_TO_AGENT`, off unless set)
+
+The owner's ruling of 17 Nov: connector work goes to the lamp's agent
+(Hermes), never the second route's own model. On lamp-a63e that day the
+second route's model sent Gmail an invalid `what` four times, and the owner
+heard "gmail read keeps erroring out". With the switch `on` in lamp-voice,
+lamp-tasks and lamp-control (and `LAMP_SERVICES`, `LAMP_AGENT_SERVICES` and
+`LAMP_SKILL_TASKS` on):
+
+- **The voice's gates hold first.** A `service_read` on the second route is
+  gated exactly as before (`services::gate`): heard live, the owner's own
+  line; a guest, the room, a scheduled run or a text are refused as before,
+  and nothing is handed over. The Live route is as before.
+- **The voice reads nothing itself.** The person's words heard in that
+  request, and what the model asked of the service as a hint, go to
+  lamp-tasks' make socket as one line, `{"op":"voice_ask","ask","grants":
+  ["<code>-read"],"brief","within_ms":120000}` (`agent_asks::hand`), on a
+  thread of its own. The model is answered at once,
+  `{"handed_to_agent":true,"next":…}`, and says one short holding line
+  ("Let me check."). One ask at a time: a second while one runs is told the
+  agent is still on the last one.
+- **The run** (`lamp_tasks::voice_ask`): the lamp's Hermes as a voice make
+  runs, in a fresh folder and home of its own (its memory and sessions
+  hidden), held off the network, the words in its rules file and never in
+  its arguments, ended at 120 s. lamp-control mints its token for exactly
+  that one grant (`{"mint":{"ask":["gmail-read"],"run"}}`, as the skill
+  `voice-ask`; `task_yes::KeptYes::ask_grants` takes one service's linked
+  grants and nothing else), ended with the run. Its home's config has
+  `mcp_servers.lamp-services`, so it reads through lamp-control and
+  lamp-services as any skill run's read is, quoted as data.
+- **Privacy as a read's.** A read the voice would cut for someone maybe in
+  view (`services::said_whole`) is asked brief: who and what about, never
+  what it says. A full read's answer is told only while the owner is still
+  alone in view (or in the private room); otherwise a fixed line asks them
+  to ask again alone. A privacy close drops an answer in flight.
+- **Told.** The agent's answer goes to the say service as a note the
+  lamp's model says in the conversation's language, its words quoted as
+  data (`agent_asks::told_note`); a run that failed, was refused or passed
+  its deadline says one fixed line, "I couldn't get that done just now.
+  Please ask me again in a little while." (`agent_asks::FAILED_LINE`).
+- **Not in this cut:** `service_write` (its read-back and spoken yes) and
+  `services_connected` stay the voice's own, as before.
+
+The path from the words to the first audio: the heard line, the second
+route's model round that calls `service_read` (as today), the gate
+(memory-only checks, under 10 ms), the hand-over (a thread spawned, no
+wait), then the model's one holding line: about 2 to 4 s, as today's
+service_read rounds, and without the read's own 1 to 20 s. To the answer:
+Hermes's start in a fresh home and its read, typically 20 to 90 s (a voice
+make's agent run took about 65 s on lamp-9adf), at most 120 s plus 10 s of
+grace before the fixed line; then the say service's next free moment.
+These are expected numbers, not measured on a lamp.
+
+Lines heard by the voice's own ask for the lamp's agent that is not a
+service's (`LAMP_HARD_ASKS_TO_AGENT`, [switches.md](switches.md)) take the
+same path with no grant and no token.
+
+Tests: lamp-voice's `agent_asks::tests` and
+`services::tests::with_the_switch_a_read_goes_to_the_agent_and_off_it_is_the_voices`,
+lamp-tasks' `voice_ask::tests`, and lamp-control's
+`task_yes::tests::a_live_ask_is_minted_one_services_grants_alone`.
+
 ## Refresh
 
 An OAuth link is renewed through the backend, as V1's `connector_refresh.go`
