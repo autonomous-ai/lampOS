@@ -323,6 +323,23 @@ asks the same, so a move or a cancel reads the event's time back as
 22:00 +07:00. Without it, on lamp-06c1 on 12 Nov, a move read back "now from
 2026-11-13T15:00:00Z" for a 22:00 +07:00 event.
 
+**A read-back says a time as the lamp says one** (`writes::Clock`): an
+event's create, move and cancel read-backs never carry RFC 3339. Each time
+is told in the lamp's own zone (the system zone, `lamp_local_time`) at that
+time's own instant's offset, so an April event read in November says its own
+hour across a daylight-saving change, on a 12-hour clock, against today: "today at
+10:00 pm", "tomorrow at 9:00 am", "yesterday at …", a weekday within the
+coming six days ("Saturday at 3:00 pm"), else its weekday and date
+("Friday 4 December at 3:00 pm", with the year when it is another one). An
+end on the same day says its clock alone ("today at 10:00 pm to 11:00 pm");
+an all-day event says "all day" and its day, or "all day from <first> to
+<last>" for several. With the zone unknown, a time is told at its own offset
+and every day as its date ("Tuesday 17 November 2026"), never as "today" on
+a guess. The RFC 3339 time stays in the
+call sent to Google. On lamp-06c1 on 17 Nov (build 13753) five of five move
+and cancel read-backs said "2026-11-17T22:00:00+07:00" aloud, because the
+voice is told to say `read_back` word for word.
+
 A call may name either Gmail code: `gmail` or `gmail-app` reaches whichever
 Gmail link the lamp has, because the voice's model mixes the two (on
 lamp-9adf on 4 Nov it named `gmail` in two of four sends and the lamp said
@@ -1203,7 +1220,8 @@ them within the 1,024 bytes its link takes.
   first reads that one event (`GET /calendar/v3/calendars/<calendar>/events/<id>`,
   on Calendar's read list), and reads back its title and time now, what
   changes and who is told: "Change the event "Hamburger party" on your Google
-  Calendar (primary), now from … to …: move it to … to …. Its guests, …, are
+  Calendar (primary), now from today at 10:00 pm to 11:00 pm: move it to
+  tomorrow at 9:00 am to 9:30 am. Its guests, …, are
   told by email. Seen by whoever your calendar is shared with." or "Delete
   the event "Hamburger party", now from … to …, from your Google Calendar
   (primary). … The lamp can't bring it back." The event's own text is the

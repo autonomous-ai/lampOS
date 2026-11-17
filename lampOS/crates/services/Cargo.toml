@@ -50,8 +50,11 @@ futures-util = { version = "=0.3.34", default-features = false, features = ["std
 # A skill's `skill.toml`, for the secrets it names (`skill_secrets`), as
 # lamp-skills reads it.
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
-# The lamp's own UTC offset, for the Calendar time fields' example.
+# The lamp's own UTC offset, for the Calendar time fields' example, and its
+# zone, in which a read-back says an event's time (`writes::Clock`).
 lamp-local-time = { path = "../local-time" }
+# The zone's own calendar for that (already built for lamp-local-time).
+jiff = "0.2"
 
 [dev-dependencies]
 tempfile = "3"

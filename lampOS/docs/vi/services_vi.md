@@ -351,6 +351,21 @@ cũng hỏi như vậy, nên một lần dời hay hủy đọc lại giờ củ
 22:00 +07:00. Thiếu nó, trên lamp-06c1 ngày 12/11, một lần dời đã đọc lại "now
 from 2026-11-13T15:00:00Z" cho một sự kiện 22:00 +07:00.
 
+**Lời đọc lại nói giờ như đèn nói một giờ** (`writes::Clock`): lời đọc lại
+khi tạo, dời hay hủy một sự kiện không bao giờ mang RFC 3339. Mỗi giờ được
+nói theo múi giờ của chính đèn (múi giờ hệ thống, `lamp_local_time`) ở độ lệch
+của chính thời điểm đó, nên một sự kiện tháng Tư đọc vào tháng Mười Một nói
+đúng giờ của nó qua một lần đổi giờ mùa hè, theo đồng hồ 12 giờ, so với hôm nay: "today at
+10:00 pm", "tomorrow at 9:00 am", "yesterday at …", một thứ trong sáu ngày
+tới ("Saturday at 3:00 pm"), còn lại là thứ và ngày ("Friday 4 December at
+3:00 pm", kèm năm khi là năm khác). Giờ kết thúc cùng ngày chỉ nói giờ
+("today at 10:00 pm to 11:00 pm"); sự kiện cả ngày nói "all day" và ngày của
+nó, hoặc "all day from <ngày đầu> to <ngày cuối>" khi kéo dài nhiều ngày. Khi
+không biết múi giờ, một giờ được nói theo độ lệch của chính nó và mọi ngày nói
+bằng ngày tháng ("Tuesday 17 November 2026"), không bao giờ đoán là "today". Giờ RFC 3339 vẫn nằm trong lệnh gửi cho Google. Trên lamp-06c1 ngày 17/11
+(bản 13753), năm trên năm lời đọc lại khi dời và hủy đã nói to
+"2026-11-17T22:00:00+07:00", vì giọng nói được bảo đọc `read_back` nguyên văn.
+
 Một lệnh gọi có thể gọi tên mã Gmail nào cũng được: `gmail` hay `gmail-app`
 đều đến liên kết Gmail mà đèn đang có, vì mô hình của giọng nói dùng lẫn hai
 tên (trên lamp-9adf ngày 4/11 nó gọi `gmail` ở hai trong bốn lần gửi và đèn
@@ -1273,7 +1288,8 @@ ghi không còn chỗ cho chúng trong 1.024 byte mà liên kết của nó nh�
   đọc đúng sự kiện đó (`GET /calendar/v3/calendars/<calendar>/events/<id>`,
   trong danh sách đọc của Calendar), rồi đọc lại tiêu đề và giờ hiện tại, điều
   gì thay đổi và ai được báo: "Change the event "Hamburger party" on your
-  Google Calendar (primary), now from … to …: move it to … to …. Its guests,
+  Google Calendar (primary), now from today at 10:00 pm to 11:00 pm: move it
+  to tomorrow at 9:00 am to 9:30 am. Its guests,
   …, are told by email. Seen by whoever your calendar is shared with." hoặc
   "Delete the event "Hamburger party", now from … to …, from your Google
   Calendar (primary). … The lamp can't bring it back." Chữ của chính sự kiện
