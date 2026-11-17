@@ -210,18 +210,37 @@ pub fn asks_about_keeping(answer: &str) -> bool {
 /// it may ask them once to say it themselves, with no explanation (rule 8:
 /// no lecture, no nagging).
 pub fn unseen_yes_told(name: &str) -> String {
-    let (what, example) = match name {
-        crate::known_faces::FORGET => ("their face", "Yes, forget my face."),
-        FORGET_EVERYTHING => ("everything about them", "Yes, forget everything."),
-        // A carried line's held keep: nothing was kept.
-        REMEMBER => {
-            return "(For you to know: that yes did not count, since you did not see them say it, so nothing was kept. If they want it kept, they can tell you again where you can see them. Do not say it is kept, and do not call remember for it now.)".to_owned();
-        }
-        _ => ("that", "Yes, forget that."),
-    };
+    // A carried line's held keep: nothing was kept.
+    if name == REMEMBER {
+        return "(For you to know: that yes did not count, since you did not see them say it, so nothing was kept. If they want it kept, they can tell you again where you can see them. Do not say it is kept, and do not call remember for it now.)".to_owned();
+    }
+    let (what, example) = forget_told_what(name);
     format!(
         "(For you to know: that yes did not count, so nothing was forgotten and {what} is still kept. If they want it, ask them once, in a few words, to say it themselves, for example \"{example}\". Do not explain why, and do not call {name} now.)"
     )
+}
+
+/// What the model is told when a held one-face forget's yes is dropped for
+/// no one known on the line (#7454: on lamp-06c1 on 17 Nov a yes not seen
+/// spoken was dropped, the model told nothing, and it could answer "Done,
+/// I've forgotten it."): as [`unseen_yes_told`], the yes did not count,
+/// nothing was forgotten and it is still kept, and they may say it facing
+/// the lamp.
+pub fn unknown_yes_told(name: &str) -> String {
+    let (what, example) = forget_told_what(name);
+    format!(
+        "(For you to know: that yes did not count, so nothing was forgotten and {what} is still kept. If they want it, ask them once, in a few words, to say it facing you, for example \"{example}\". Do not explain why, and do not call {name} now.)"
+    )
+}
+
+/// What a dropped yes's forget `name` keeps, and an example of saying it
+/// ([`unseen_yes_told`], [`unknown_yes_told`]).
+fn forget_told_what(name: &str) -> (&'static str, &'static str) {
+    match name {
+        crate::known_faces::FORGET => ("their face", "Yes, forget my face."),
+        FORGET_EVERYTHING => ("everything about them", "Yes, forget everything."),
+        _ => ("that", "Yes, forget that."),
+    }
 }
 
 /// What the model is told of a spoken `forget_everything`, which is always

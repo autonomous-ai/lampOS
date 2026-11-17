@@ -850,7 +850,13 @@ answer to that question, by that person, within its 30 s. A yes after its
 says why after "not the same person": "no one known on the line", "theirs,
 in a later session" or "another person" (`second_provider::not_theirs`, ids
 never said; Thirteen's row on #5627, a yes 42 s after the hold read as
-another person's). Any no, keep,
+another person's). A yes in time from no one known on the line (no face in
+view, an unknown face, a line carried in their conversation going on) is
+dropped and kept, and, as for an unseen yes, the model is told once that it
+did not count, that nothing was forgotten and it is still kept, and that it
+may ask them once to say it facing the lamp (`remember::unknown_yes_told`,
+#7454: on lamp-06c1 the model was told nothing and could say it was
+forgotten). Any no, keep,
 wait, "đừng" or a question is no yes. If the line is no longer theirs when
 the forget runs (another face or voice came in), nothing is forgotten and
 the model is told it is still kept; it never runs in the room's scope
