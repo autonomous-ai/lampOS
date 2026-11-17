@@ -2585,8 +2585,8 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
 
 ### The last 64 calls across all runs kept (`--run-calls`, slice 4 of the linked-service memory plan, off)
 
-The ring a later slice writes memory's `agent` records from (memory-days.md,
-"Linked records"). Nothing reads it yet, and no product unit passes the flag.
+The ring the voice writes memory's `agent` records from (slice 5, below).
+No product unit passes the flag.
 
 - **What is kept** (`run_calls.rs`). With `--run-calls`, each `service_read`
   and `service_write` a skill's run makes through lamp-control
@@ -2623,9 +2623,8 @@ The ring a later slice writes memory's `agent` records from (memory-days.md,
   program started again), so every call kept is given from the first. With
   the flag off it answers "a skill run's calls are not kept on this lamp
   (--run-calls)".
-- **Not done here.** The writer of memory's `agent` rows (slice 5): which
-  part pulls this ring and how it names the task row's `t-` key, which
-  lamp-services does not know (memory-days.md, "Linked records").
+- **Its reader.** The voice's agent rows (slice 5, below): it pulls this
+  ring and names each run's person itself; no `t-` task row is needed.
 - **Rollback.** Drop the flag, or an older build: nothing is kept and the
   call is "no such function". lamp-control's extra `run` is passed over.
   That `run` is on every service line lamp-control sends wherever
@@ -2643,6 +2642,68 @@ The ring a later slice writes memory's `agent` records from (memory-days.md,
   skill door each refuse it with their own words, as does the owner's call
   path asked as a skill; the owner gets the ring); in lamp-control,
   `services::tests` and `session::tests` (the run's id on the line).
+
+### A skill run's calls in its person's memory (`LAMP_SERVICE_RECORDS_AGENT`, slice 5 of the linked-service memory plan, off)
+
+The voice's side of the ring above: each call of a skill's run, read or
+write, kept as one `agent` record in the Days memory of the person the voice
+can name for that run (`lamp-voice` `service_records::agent_rows`), through
+the voice's linked outbox (memory-days.md, "The voice's linked outbox").
+
+- **Whose: the run is named by its held write's read-back.** lamp-control's
+  kept yes for a skill holds no person, and a skill's run is not a task the
+  voice handed over, so the one moment the voice knows who a run is for is
+  when it reads the run's held write back (`services::wait_for_run_yes`, to
+  the services' owner). That read-back, to a known person (`p-` id), names
+  the run: the held write in the pulled calls of the same skill and
+  catalog code, held at most two minutes before the read-back (the newest
+  such). From then every call of that run, before and after, is that
+  person's. A run never read back to a known person (a read-only run, a
+  write never read back, a read-back to nobody known) is dropped: its calls
+  are let go when older than a run lasts (30 min), counted and said in one
+  journal line, its run id and key only.
+- **The pull.** `run_calls_since` (above) every 5 s, 1 s at most a pull and
+  at most 4 pulls in a row while `more`, on a thread of its own
+  (`linked-agent-rows`), only while a read-back waits or a named run may
+  still call. A call already pulled is never kept twice (`after`, unless
+  `restarted`). At most 64 calls are held, 8 read-backs (each 3 min to be
+  matched) and 8 named runs (each 30 min, lamp-control's own bounds); the
+  oldest go first. In memory only.
+- **The record.** Key `a-<run>-<n>`, service the catalog code, action the
+  call's own word, `source_kind` `agent`, `source_ref`
+  `{service:"lamp-services", id:"<run>:<n>", session:"<run>"}` (the run stays
+  in the agent: a pointer only), the summary built from those fields alone
+  ("Your mail-count skill: gmail send_mail"), never content, which
+  lamp-services never kept. Deed and asked time: the call's own, so a
+  forget after the call wins in the memory too. A read is `done`, a refused
+  call `refused`, a skill's fixed write sent `done`.
+- **A held write gives one row.** `prepared` at its read-back, then, under
+  the same key, the yes's outcome as the send settles: `done` sent,
+  `cancelled` a no or a replaced write, `refused` not the owner's plain
+  yes, `failed` not sent. A held write of a named run that was never read
+  back writes nothing.
+- **Forgets.** A forget everything, of the person, or about a thing whose
+  service, action or summary a run's call matches, lets that run, its calls
+  and read-backs go before it is sent, as the linked outbox's own.
+- **Not done here.** No `t-` task row: a skill's run is started by
+  lamp-skills on the kept yes, never through the voice's Harness hand-over,
+  so it has no task row for `linked.sock`'s owner check (memory-days.md,
+  "Linked records: `linked.sock`"). These rows go over the voice's own
+  socket, with the person the voice named, and link to nothing. A run
+  that only reads is not named.
+- **Off.** Unless `LAMP_SERVICE_RECORDS_AGENT=on` beside
+  `LAMP_SERVICE_RECORDS=on`, on the second route
+  (`process::service_records_agent_worker_environment`), and lamp-services
+  given `--run-calls`: nothing is kept, and `run_calls_since` is never
+  asked. With the flag missing the pull is refused and nothing is written.
+- **Rollback.** Unset the switch: the voice pulls nothing; rows already
+  kept stay until forgotten, as `agent` records an older build passes over.
+- **Tests.** `service_records::agent_rows::tests`: the run mapped to the
+  person, the read-back before or after the pull, an unknown run dropped
+  (no person, another skill or code, out of the hold, counted when let
+  go), only the read-back run named, a held write gives one row (prepared
+  then its outcome, written once), the yes's outcomes, refused and sent
+  calls, a call not as given passed over, forgets, the bounds, off.
 
 ## The lamp's agent's connectors (`LAMP_AGENT_SERVICES`, on in the product)
 

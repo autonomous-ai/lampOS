@@ -610,7 +610,8 @@ mỗi thay đổi thành một `service_record` có `source_kind`, `source_ref`,
 (`lamp-voice` `service_records::linked`). Mỗi bên ghi đến cùng công tắc
 riêng: dòng việc Harness (`LAMP_SERVICE_RECORDS_TASKS`, lát 3,
 [tasks_vi.md](tasks_vi.md)); dòng lời nhắc (`LAMP_SERVICE_RECORDS_REMINDERS`,
-[schedule.md](../schedule.md)); dòng của agent đến sau (`_AGENT`). Khi
+[schedule.md](../schedule.md)); các lệnh gọi của lượt chạy kỹ năng
+(`LAMP_SERVICE_RECORDS_AGENT`, phần 5, [services_vi.md](services_vi.md)). Khi
 `LAMP_SERVICE_RECORDS` tắt thì không giữ gì.
 
 - **Giới hạn riêng.** Tối đa 16 thay đổi chờ, tách khỏi 32 của bản ghi

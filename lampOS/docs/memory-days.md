@@ -874,7 +874,8 @@ queues each change as a `service_record` with `source_kind`, `source_ref`,
 (`lamp-voice` `service_records::linked`). Each writer comes with its own
 switch: Harness task rows (`LAMP_SERVICE_RECORDS_TASKS`, slice 3,
 [tasks.md](tasks.md)); reminder rows (`LAMP_SERVICE_RECORDS_REMINDERS`,
-[schedule.md](schedule.md)); agent rows later (`_AGENT`). With
+[schedule.md](schedule.md)); a skill run's calls
+(`LAMP_SERVICE_RECORDS_AGENT`, slice 5, [services.md](services.md)). With
 `LAMP_SERVICE_RECORDS` off nothing is kept.
 
 - **Its own bound.** At most 16 changes wait, apart from the connector

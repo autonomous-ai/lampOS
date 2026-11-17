@@ -2701,9 +2701,8 @@ lẫn lượt chạy đều không giữ token nào.
 
 ### Giữ 64 lệnh gọi gần nhất của mọi lượt chạy (`--run-calls`, phần 4 của kế hoạch bộ nhớ dịch vụ liên kết, tắt)
 
-Vòng đệm mà một phần sau dùng để ghi các bản ghi `agent` của bộ nhớ
-(memory-days.md, "Linked records"). Chưa có gì đọc nó, và không unit nào
-của sản phẩm truyền cờ này.
+Vòng đệm mà giọng nói dùng để ghi các bản ghi `agent` của bộ nhớ (phần 5,
+bên dưới). Không unit nào của sản phẩm truyền cờ này.
 
 - **Những gì được giữ** (`run_calls.rs`). Với `--run-calls`, mỗi
   `service_read` và `service_write` mà lượt chạy của kỹ năng gọi qua
@@ -2741,9 +2740,9 @@ của sản phẩm truyền cờ này.
   khởi động (chương trình đã khởi động lại), nên mọi lệnh gọi đang giữ được
   đưa từ đầu. Khi tắt cờ, nó trả lời "a skill run's calls are not kept on
   this lamp (--run-calls)".
-- **Chưa làm ở đây.** Phần ghi các dòng `agent` của bộ nhớ (phần 5): phần
-  nào kéo vòng đệm này và nó nêu khoá `t-` của dòng việc thế nào, điều mà
-  lamp-services không biết (memory-days.md, "Linked records").
+- **Phần đọc nó.** Các dòng agent của giọng nói (phần 5, bên dưới): giọng
+  nói kéo vòng đệm này và tự gọi tên người của mỗi lượt chạy; không cần dòng
+  việc `t-`.
 - **Quay lui.** Bỏ cờ, hoặc một bản cũ hơn: không giữ gì và lệnh gọi là "no
   such function". Trường `run` thêm của lamp-control bị bỏ qua. Trường `run`
   đó có trên mọi dòng dịch vụ lamp-control gửi ở nơi `LAMP_SKILL_TASKS=on`
@@ -2762,6 +2761,73 @@ của sản phẩm truyền cờ này.
   năng mỗi cửa từ chối bằng lời riêng, đường gọi của chủ khi hỏi với tư cách
   kỹ năng cũng vậy; chủ nhận được vòng đệm); trong lamp-control,
   `services::tests` và `session::tests` (id của lượt chạy trên dòng).
+
+### Các lệnh gọi của lượt chạy kỹ năng trong bộ nhớ của người đó (`LAMP_SERVICE_RECORDS_AGENT`, phần 5 của kế hoạch bộ nhớ dịch vụ liên kết, tắt)
+
+Phía giọng nói của vòng đệm ở trên: mỗi lệnh gọi của lượt chạy kỹ năng, đọc
+hay ghi, được giữ thành một bản ghi `agent` trong bộ nhớ Days của người mà
+giọng nói gọi tên được cho lượt chạy đó (`lamp-voice`
+`service_records::agent_rows`), qua hộp thư liên kết của giọng nói
+(memory-days.md, "The voice's linked outbox").
+
+- **Của ai: lượt chạy được gọi tên bằng lần đọc lại lần ghi đang giữ của
+  nó.** Lời đồng ý lamp-control giữ cho một kỹ năng không có người nào, và
+  lượt chạy kỹ năng không phải việc giọng nói giao, nên lúc duy nhất giọng
+  nói biết lượt chạy là của ai là khi nó đọc lại lần ghi đang giữ của lượt
+  chạy (`services::wait_for_run_yes`, cho chủ của các dịch vụ). Lần đọc lại
+  đó, cho một người đã biết (id `p-`), gọi tên lượt chạy: lần ghi đang giữ
+  trong các lệnh gọi đã kéo, cùng kỹ năng và mã danh mục, giữ không quá hai
+  phút trước lần đọc lại (cái mới nhất). Từ đó mọi lệnh gọi của lượt chạy,
+  trước và sau, là của người đó. Lượt chạy không bao giờ được đọc lại cho
+  một người đã biết (lượt chạy chỉ đọc, lần ghi không được đọc lại, đọc lại
+  cho người chưa biết) bị bỏ: các lệnh gọi của nó bị bỏ khi cũ hơn thời gian
+  một lượt chạy (30 phút), được đếm và báo trong một dòng nhật ký, chỉ id
+  lượt chạy và khoá.
+- **Việc kéo.** `run_calls_since` (ở trên) mỗi 5 giây, mỗi lần kéo tối đa 1
+  giây và tối đa 4 lần liền khi còn `more`, trên một luồng riêng
+  (`linked-agent-rows`), chỉ khi có lần đọc lại đang chờ hoặc một lượt chạy
+  đã gọi tên còn có thể gọi. Một lệnh gọi đã kéo không bao giờ được giữ hai
+  lần (`after`, trừ khi `restarted`). Giữ tối đa 64 lệnh gọi, 8 lần đọc lại
+  (mỗi cái 3 phút để khớp) và 8 lượt chạy đã gọi tên (mỗi cái 30 phút, giới
+  hạn của chính lamp-control); cái cũ nhất bị bỏ trước. Chỉ trong bộ nhớ.
+- **Bản ghi.** Khoá `a-<run>-<n>`, dịch vụ là mã danh mục, hành động là từ
+  của chính lệnh gọi, `source_kind` `agent`, `source_ref`
+  `{service:"lamp-services", id:"<run>:<n>", session:"<run>"}` (lượt chạy ở
+  lại trong tác tử: chỉ là con trỏ), tóm tắt chỉ dựng từ các trường đó
+  ("Your mail-count skill: gmail send_mail"), không bao giờ có nội dung, thứ
+  lamp-services chưa từng giữ. Thời điểm việc và thời điểm hỏi: của chính
+  lệnh gọi, nên một lệnh quên sau lệnh gọi cũng thắng trong bộ nhớ. Lần đọc
+  là `done`, lệnh gọi bị từ chối là `refused`, lần ghi cố định của kỹ năng
+  đã gửi là `done`.
+- **Một lần ghi đang giữ cho một dòng.** `prepared` lúc đọc lại, rồi, cùng
+  khoá, kết quả của lời đồng ý khi việc gửi xong: `done` đã gửi,
+  `cancelled` một lời từ chối hay lần ghi bị thay, `refused` không phải lời
+  đồng ý rõ ràng của chủ, `failed` không gửi được. Lần ghi đang giữ của
+  một lượt chạy đã gọi tên mà không được đọc lại thì không ghi gì.
+- **Lệnh quên.** Quên tất cả, quên người đó, hay quên một điều mà dịch vụ,
+  hành động hoặc tóm tắt của một lệnh gọi trong lượt chạy khớp, bỏ lượt
+  chạy đó, các lệnh gọi và lần đọc lại của nó trước khi gửi, như của hộp thư
+  liên kết.
+- **Chưa làm ở đây.** Không có dòng việc `t-`: lượt chạy kỹ năng do
+  lamp-skills bắt đầu theo lời đồng ý đã giữ, không bao giờ qua việc giao
+  Harness của giọng nói, nên nó không có dòng việc cho kiểm tra chủ của
+  `linked.sock` (memory-days.md, "Linked records: `linked.sock`"). Các dòng
+  này đi qua socket của chính giọng nói, với người mà giọng nói đã gọi tên,
+  và không liên kết với gì. Lượt chạy chỉ đọc thì không được gọi tên.
+- **Tắt.** Trừ khi `LAMP_SERVICE_RECORDS_AGENT=on` bên cạnh
+  `LAMP_SERVICE_RECORDS=on`, trên tuyến thứ hai
+  (`process::service_records_agent_worker_environment`), và lamp-services
+  được truyền `--run-calls`: không giữ gì, và không bao giờ hỏi
+  `run_calls_since`. Thiếu cờ thì việc kéo bị từ chối và không ghi gì.
+- **Quay lui.** Bỏ công tắc: giọng nói không kéo gì; các dòng đã giữ ở lại
+  đến khi bị quên, là bản ghi `agent` mà bản cũ hơn bỏ qua.
+- **Kiểm thử.** `service_records::agent_rows::tests`: lượt chạy gắn với
+  người, lần đọc lại trước hay sau việc kéo, lượt chạy không biết bị bỏ
+  (không có người, kỹ năng hay mã khác, ngoài thời gian giữ, được đếm khi
+  bỏ), chỉ lượt chạy được đọc lại được gọi tên, một lần ghi đang giữ cho một
+  dòng (prepared rồi kết quả, ghi một lần), các kết quả của lời đồng ý,
+  lệnh gọi bị từ chối và đã gửi, lệnh gọi không đúng dạng bị bỏ qua, lệnh
+  quên, các giới hạn, tắt.
 
 ## Các kết nối của tác tử trên đèn (`LAMP_AGENT_SERVICES`, bật trong sản phẩm)
 
