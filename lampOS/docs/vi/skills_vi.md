@@ -3938,8 +3938,10 @@ trong hai chủ đề này trong `[permissions] topics` đều bị từ chối 
 `humans/doing_more` (mệt, việc ở bàn theo loại thô
 và ăn mừng, `lamp-seen` chỉ phát khi `LAMP_SEEN_MORE_DOINGS=on`) là một chủ
 đề riêng: kỹ năng ghi nó hiện quyền dùng `seen_more`, riêng tư và tách khỏi
-`seen`, nên kỹ năng được `humans/doing` không bao giờ nhận nó. Chưa kỹ năng
-nào đọc nó. Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
+`seen`, nên kỹ năng được `humans/doing` không bao giờ nhận nó. Ngồi thẳng lại
+đọc `desk_s` của nó: một `sooner` trên trigger nghiêng người, năm phút nghiêng
+người thay vì mười, sau 45 phút làm việc ở bàn được thấy trong lần ngồi này
+(`above = 2700`, chỉ khi `LAMP_YAWN_SOONER=on`); không có chủ đề, nó chạy như trước. Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
 lúc đến bàn khi chưa thấy gì, nên `[[while]] topic = "humans/doing" field =
 "drank_s_ago" above = 1799 unknown = "holds_stale"` vẫn đúng với người đèn
 chưa thấy uống, như khi chỉ có đồng hồ; mỗi giá trị `humans/posture` được

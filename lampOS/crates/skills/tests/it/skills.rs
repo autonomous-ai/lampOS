@@ -3824,7 +3824,8 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
             "room/activity",
             "humans/faces/tracked",
             "voice/state",
-            "humans/posture"
+            "humans/posture",
+            "humans/doing_more"
         ]
         .map(|topic| toml::Value::String(topic.to_owned()))
     );
@@ -13535,6 +13536,70 @@ fn with_the_switch_an_unsaid_nudge_gives_its_place_in_the_hour_back() {
             .iter()
             .all(|(minute, _)| *minute == 30 || *minute >= 90),
         "{before:?}"
+    );
+}
+
+/// #6543: 45 minutes of desk work seen this sitting (`desk_s` above 2700 on
+/// lamp-seen's `humans/doing_more`, the `seen_more` use) brings Sit back's
+/// word forward, five minutes leaned in, not ten, with `LAMP_YAWN_SOONER=on`.
+/// Below the line, without the topic, or with the switch off, it is as
+/// before.
+#[test]
+fn long_desk_work_seen_brings_sit_back_forward() {
+    let skill = load(&skills_root().join("sit-back")).unwrap();
+    let runs = |sooner: bool, desk_s: Option<u64>| {
+        let mut engine = Engine::new(vec![skill.clone()], true);
+        if sooner {
+            engine = engine.sooner();
+        }
+        // 10:00 local at 0 s.
+        engine.clock(0, 0, 36_000_000);
+        let mut at = Vec::new();
+        for second in 0..=70 * 60u64 {
+            let now = second * 1_000_000;
+            // At the desk 50 minutes, then leaned in.
+            let state = if second < 3_000 {
+                "at_desk"
+            } else {
+                "leaning_in"
+            };
+            let mut runs = Vec::new();
+            if let Some(desk_s) = desk_s.filter(|_| second % 30 == 0) {
+                let doing_more = format!(
+                    r#"{{"tired_s_ago":{second},"tired_seen":0,"drank_seen":0,"ate_seen":0,"desk_work_s_ago":0,"desk_work":"computer","desk_s":{desk_s},"celebrate_s_ago":{second}}}"#
+                );
+                runs.extend(engine.observe(
+                    "humans/doing_more",
+                    now,
+                    doing_more.as_bytes(),
+                    Some(90_000),
+                ));
+            }
+            runs.extend(engine.observe("voice/state", now, br#"{"state":"resting"}"#, None));
+            runs.extend(engine.observe("humans/faces/tracked", now, FACE.as_bytes(), None));
+            let activity = format!(r#"{{"state":"{state}","baseline":true,"sitting_s":{second}}}"#);
+            runs.extend(engine.observe("room/activity", now, activity.as_bytes(), None));
+            if runs.iter().any(|run| {
+                run.calls
+                    .iter()
+                    .any(|call| matches!(call, Call::Say(_) | Call::Words(_)))
+            }) {
+                at.push(second);
+            }
+        }
+        at
+    };
+    assert_eq!(runs(true, Some(2_800)), [3_300], "brought forward");
+    assert_eq!(
+        runs(true, Some(2_000)),
+        [3_600],
+        "below the line: as before"
+    );
+    assert_eq!(runs(true, None), [3_600], "no doing_more: as before");
+    assert_eq!(
+        runs(false, Some(2_800)),
+        [3_600],
+        "the switch off: as before"
     );
 }
 
