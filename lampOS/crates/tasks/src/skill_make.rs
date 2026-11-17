@@ -64,7 +64,9 @@
 //!   descriptor, `O_NOFOLLOW` (a regular file, never a link, at most
 //!   [`MOST_ANSWER_BYTES`]) once the run has ended and its whole process
 //!   group is gone, and the folder removed however the make ends. The
-//!   voice puts the answer through the same checks as DeepSeek's.
+//!   voice puts the answer through the same checks as DeepSeek's. A
+//!   gateway make with no answer file takes the agent's final chat answer
+//!   instead, only when it is a make's answer ([`make_answer`], #7427).
 //! - **The answers**: `{"ok":true,"started":true}` once the run is about
 //!   to start (so the voice says its waiting line only then), then
 //!   `{"ok":true,"answer"}`; or one refusal: `off`, `bad_request`,
@@ -652,6 +654,12 @@ fn answer_read(folder: &rustix::fd::OwnedFd) -> Option<String> {
     file.take(MOST_ANSWER_BYTES + 1)
         .read_to_string(&mut text)
         .ok()?;
+    answer_held(text)
+}
+
+/// An answer as a make holds it, from [`ANSWER_FILE`] or the agent's chat
+/// alike: not empty, and at most [`MOST_ANSWER_BYTES`].
+fn answer_held(text: String) -> Option<String> {
     (!text.trim().is_empty() && text.len() as u64 <= MOST_ANSWER_BYTES).then_some(text)
 }
 
@@ -661,6 +669,181 @@ fn answer_read(folder: &rustix::fd::OwnedFd) -> Option<String> {
 pub(crate) fn answer_in(folder: &Path) -> Option<String> {
     let fd = rustix::fs::open(folder, DIR_FLAGS, rustix::fs::Mode::empty()).ok()?;
     answer_read(&fd)
+}
+
+/// How an answer begins that makes nothing, as the rules ask for it and
+/// the voice reads it (`made_skill::CANNOT`).
+pub const CANNOT: &str = "cannot:";
+
+/// Where a gateway make's answer was taken from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AnswerFrom {
+    /// Its folder's [`ANSWER_FILE`].
+    File,
+    /// The agent's final chat answer, with no [`ANSWER_FILE`] (#7427).
+    Chat,
+}
+
+/// A gateway make's answer (#7245, #7427): its folder's [`ANSWER_FILE`]
+/// ([`answer_in`]) whenever there is one; else the agent's final chat
+/// answer `chat`, only when it is a make's answer ([`chat_answer`]). On
+/// lamp-c0a4 (OpenClaw, deepseek-flash) the agent put every make's answer
+/// in chat and wrote no file: a `cannot:` (13584), and a whole skill
+/// (17 Nov 09:35, `head-pat-next-event`), each dropped as `no_answer`.
+/// Any other chat answer is dropped, as before.
+pub(crate) fn make_answer(folder: &Path, chat: Option<&str>) -> Option<(String, AnswerFrom)> {
+    if let Some(text) = answer_in(folder) {
+        return Some((text, AnswerFrom::File));
+    }
+    chat.and_then(chat_answer)
+        .map(|text| (text, AnswerFrom::Chat))
+}
+
+/// The agent's chat answer when it is a make's answer: its `cannot:` line
+/// ([`chat_cannot`]), or the whole chat when it holds a skill's files
+/// ([`chat_skill`]); else none.
+pub(crate) fn chat_answer(chat: &str) -> Option<String> {
+    chat_cannot(chat).or_else(|| chat_skill(chat))
+}
+
+/// The agent's chat answer's `cannot:` line, held as [`answer_read`] holds
+/// the file: the first line only, beginning with [`CANNOT`] (any case,
+/// after blank space) and with a reason after it, no fenced block, not
+/// empty and at most [`MOST_ANSWER_BYTES`]; else none.
+pub(crate) fn chat_cannot(chat: &str) -> Option<String> {
+    let chat = chat.trim_start();
+    let line = chat.lines().next()?.trim_end();
+    let head = line.get(..CANNOT.len())?;
+    let reason = line[CANNOT.len()..].trim();
+    (head.eq_ignore_ascii_case(CANNOT)
+        && !reason.is_empty()
+        && !chat.contains("```")
+        && line.len() as u64 <= MOST_ANSWER_BYTES)
+        .then(|| line.to_owned())
+}
+
+/// The agent's whole chat answer when it holds a skill as `answer.md`
+/// does: held as the file is ([`answer_held`]: not empty, at most
+/// [`MOST_ANSWER_BYTES`]), with one closed fenced block that is
+/// `skill.toml` and one that is `SKILL.md` ([`skill_parts`]); else none.
+/// Words around the blocks are kept: the voice reads the blocks alone
+/// (`made_skill::files`), through the same checks and repairs as a file's.
+pub(crate) fn chat_skill(chat: &str) -> Option<String> {
+    let text = answer_held(chat.to_owned())?;
+    (skill_parts(&text) == (1, 1)).then_some(text)
+}
+
+/// Which of a skill's two files a fenced block is, read as the voice reads
+/// it (`made_skill::fence_named`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Part {
+    Toml,
+    Card,
+    /// No name: `SKILL.md` when it begins with front matter, else
+    /// `skill.toml`.
+    Bare,
+    /// A file of its code (`scripts/…`), or any other.
+    Other,
+}
+
+/// A fence line, indented or not: its mark, how many (three or more), and
+/// its info string, trimmed (`made_skill::fence`).
+fn fence(line: &str) -> Option<(u8, usize, &str)> {
+    let line = line.trim();
+    let mark = *line.as_bytes().first()?;
+    if mark != b'`' && mark != b'~' {
+        return None;
+    }
+    let run = line.bytes().take_while(|&b| b == mark).count();
+    (run >= 3).then(|| (mark, run, line[run..].trim()))
+}
+
+/// A fence's part and whether it names a file whole, from its info
+/// string's last word (`made_skill::fence_named`).
+fn fence_part(info: &str) -> (Part, bool) {
+    let word = info.split_whitespace().last().unwrap_or_default();
+    let word = word.rsplit_once('=').map_or(word, |(_, value)| value);
+    let word = word
+        .trim_matches(|c| matches!(c, '"' | '\'' | '*' | '`'))
+        .trim_end_matches(':');
+    if word.starts_with("scripts/") {
+        return (Part::Other, true);
+    }
+    match word.to_ascii_lowercase().as_str() {
+        "" => (Part::Bare, false),
+        "skill.toml" => (Part::Toml, true),
+        "skill.md" => (Part::Card, true),
+        "toml" => (Part::Toml, false),
+        "md" | "markdown" => (Part::Card, false),
+        _ => (Part::Other, false),
+    }
+}
+
+/// How many closed fenced blocks of `answer` are `skill.toml` and how many
+/// `SKILL.md`, its blocks found as the voice finds them
+/// (`made_skill::fenced`): a block closes on a bare fence of its mark at
+/// least as long, or at the end of a line; a fence naming another file
+/// whole, or any named fence in `skill.toml`, closes it and opens that
+/// one; in `SKILL.md` another named fence opens a block within it. A block
+/// left open at the end counts for neither.
+fn skill_parts(answer: &str) -> (usize, usize) {
+    let (mut toml, mut card) = (0, 0);
+    // The block open now: its part, mark, run, how many blocks within it
+    // are open, and whether it has begun (a bare one's first line).
+    let mut open: Option<(Part, u8, usize, usize, bool)> = None;
+    let mut lines = answer.lines();
+    let mut again = None;
+    while let Some(line) = again.take().or_else(|| lines.next()) {
+        let Some((mut part, mark, run, mut depth, mut begun)) = open.take() else {
+            if let Some((mark, run, info)) = fence(line) {
+                open = Some((fence_part(info).0, mark, run, 0, false));
+            }
+            continue;
+        };
+        let mut closed = false;
+        match fence(line) {
+            Some((_, _, "")) if depth > 0 => depth -= 1,
+            Some((this, length, "")) if this == mark && length >= run => closed = true,
+            Some((_, _, info)) if depth == 0 => {
+                let (named, whole) = fence_part(info);
+                // A file of its code always begins a block of its own.
+                let other_file = whole && (named != part || named == Part::Other);
+                if other_file || part == Part::Toml {
+                    closed = true;
+                    again = Some(line);
+                } else {
+                    depth += 1;
+                }
+            }
+            Some(_) => depth += 1,
+            None => {
+                let end = String::from_utf8(vec![mark; run]).unwrap_or_default();
+                let body = match line.trim_end().strip_suffix(end.as_str()) {
+                    Some(before) if depth == 0 && !before.trim().is_empty() => {
+                        closed = true;
+                        before
+                    }
+                    _ => line,
+                };
+                if part == Part::Bare && !begun && !body.trim().is_empty() {
+                    begun = true;
+                    if body.trim_start().starts_with("---") {
+                        part = Part::Card;
+                    }
+                }
+            }
+        }
+        if closed {
+            match part {
+                Part::Toml | Part::Bare => toml += 1,
+                Part::Card => card += 1,
+                Part::Other => {}
+            }
+        } else {
+            open = Some((part, mark, run, depth, begun));
+        }
+    }
+    (toml, card)
 }
 
 /// Make folders an earlier lamp-tasks left in `work` (stopped while a make
@@ -1720,6 +1903,123 @@ mod tests {
         assert_eq!(answer_read(&made.fd).as_deref(), Some("MINE"));
         drop(made);
         std::fs::remove_dir_all(&moved).unwrap();
+    }
+
+    /// A whole skill the agent wrote in chat, as answer.md would hold it
+    /// (lamp-c0a4, 17 Nov 09:35, OpenClaw deepseek-flash, 731 bytes).
+    const CHAT_SKILL: &str = "Here is the skill.\n\n\
+        ```toml skill.toml\nname = \"head-pat-next-event\"\n```\n\n\
+        ```markdown SKILL.md\n---\nname: head-pat-next-event\n---\nSays the next event.\n```\n\n\
+        ```python scripts/main.py\nprint(\"next\")\n```\n\nDone!";
+
+    /// The answer's text when it was taken from the agent's chat.
+    fn from_chat(folder: &Path, chat: &str) -> Option<String> {
+        match make_answer(folder, Some(chat)) {
+            Some((text, AnswerFrom::Chat)) => Some(text),
+            Some((_, AnswerFrom::File)) => panic!("taken from the file"),
+            None => None,
+        }
+    }
+
+    /// lamp-c0a4, 13584, OpenClaw: a make the agent can't do, said
+    /// `cannot:` in chat with no `answer.md`, is that line, so the person
+    /// hears why, not "try again".
+    #[test]
+    fn a_gateway_make_with_no_answer_file_takes_its_chat_cannot_line() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        let chat = "cannot: I can't do that yet: a skill can't read your phone's battery.\n\nAnything else?";
+        assert_eq!(
+            from_chat(&made.path, chat).as_deref(),
+            Some("cannot: I can't do that yet: a skill can't read your phone's battery.")
+        );
+        assert_eq!(
+            from_chat(&made.path, "  \nCANNOT: no light sensor.").as_deref(),
+            Some("CANNOT: no light sensor.")
+        );
+        // Held as the file is: a reason, no fenced block, within the bound.
+        let long = format!("cannot: {}", "x".repeat(MOST_ANSWER_BYTES as usize));
+        for chat in [
+            "cannot:",
+            "cannot:   ",
+            "cannot: no\n```toml\n```",
+            long.as_str(),
+        ] {
+            assert_eq!(make_answer(&made.path, Some(chat)), None, "{chat:?}");
+        }
+    }
+
+    /// lamp-c0a4, 17 Nov 09:35: a whole skill the agent wrote in chat,
+    /// with no `answer.md`, is the make's answer, words around it and all
+    /// (the voice reads its blocks), not `no_answer`.
+    #[test]
+    fn a_gateway_make_with_no_answer_file_takes_a_skill_said_in_chat() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        assert_eq!(
+            from_chat(&made.path, CHAT_SKILL).as_deref(),
+            Some(CHAT_SKILL)
+        );
+        // Fences by language, or bare (front matter is `SKILL.md`).
+        for chat in [
+            "```toml\nname = \"x\"\n```\n```md\n---\nname: x\n---\n```",
+            "```\nname = \"x\"\n```\n\n```\n---\nname: x\n---\nIt says.\n```",
+            "```skill.toml\nname = \"x\"\n```SKILL.md\n---\nname: x\n---\n```",
+        ] {
+            assert_eq!(
+                from_chat(&made.path, chat).as_deref(),
+                Some(chat),
+                "{chat:?}"
+            );
+        }
+        // An empty `answer.md` is none: the chat is taken.
+        std::fs::write(made.path.join(ANSWER_FILE), " \n").unwrap();
+        assert_eq!(
+            from_chat(&made.path, CHAT_SKILL).as_deref(),
+            Some(CHAT_SKILL)
+        );
+    }
+
+    /// Any other chat answer is still dropped: a make with no `answer.md`
+    /// stays `no_answer`.
+    #[test]
+    fn a_gateway_make_with_no_answer_file_drops_any_other_chat_answer() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        let big = format!("{CHAT_SKILL}\n{}", "x".repeat(MOST_ANSWER_BYTES as usize));
+        for chat in [
+            "I made it! ```toml\nname = \"x\"\n```",
+            "Done, the skill is ready.",
+            "Sorry, cannot: battery.",
+            "",
+            // One of a skill's two files only.
+            "```toml skill.toml\nname = \"x\"\n```",
+            "```python scripts/main.py\nprint(1)\n```",
+            // One of them twice.
+            "```toml\na = 1\n```\n```toml\nb = 2\n```\n```md\n---\n```",
+            // Cut off: SKILL.md never closed.
+            "```toml\nname = \"x\"\n```\n```md\n---\nname: x\n",
+            // Past the bound.
+            big.as_str(),
+        ] {
+            assert_eq!(make_answer(&made.path, Some(chat)), None, "{chat:?}");
+        }
+        assert_eq!(make_answer(&made.path, None), None);
+    }
+
+    /// `answer.md` wins over whatever the agent said in chat.
+    #[test]
+    fn a_gateway_make_with_an_answer_file_takes_the_file_over_its_chat() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        std::fs::write(made.path.join(ANSWER_FILE), "FILE").unwrap();
+        for chat in [Some("cannot: chat says no"), Some(CHAT_SKILL), None] {
+            assert_eq!(
+                make_answer(&made.path, chat),
+                Some(("FILE".to_owned(), AnswerFrom::File)),
+                "{chat:?}"
+            );
+        }
     }
 
     /// Stand-ins for lamp-update's wrapper and namespace script, with the

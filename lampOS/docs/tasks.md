@@ -3682,7 +3682,8 @@ path, with no second runner:
 - **The gateway make:** a fresh `make-<run id>` folder in the work folder,
   the rules in `rules.md`, sent as one turn through Harness's
   `harness new <engine>` in that folder (#7133's `HarnessRunner`, "A
-  skill's run on OpenClaw" below). `answer.md` is read back as above. No
+  skill's run on OpenClaw" below). `answer.md` is read back as above (with
+  none, the agent's chat answer, below). No
   token is minted and no skill-start run is opened (`gateway::open_start`
   is not called): a make has no grants. The Harness session and the folder
   are removed however the make ends: an answer, `cannot:`, past its
@@ -3692,6 +3693,38 @@ path, with no second runner:
   voice still puts the answer through its whole check and repairs.
 - **A `cannot:` answer** goes back to the voice as written, for #7234's
   fallback.
+- **An answer said in chat (`skill_make::make_answer`, #7245, #7427):**
+  with no `answer.md` (missing or empty), and only then, the agent's final
+  chat answer is read, and taken only when it is a make's answer
+  (`chat_answer`):
+  - **a `cannot:`** (`chat_cannot`): it begins with `cannot:` (any case,
+    after blank space) with a reason after it and holds no fenced block;
+    its first line alone is the answer, so the person hears the agent's
+    own reason instead of "try again";
+  - **a skill** (`chat_skill`): the whole chat, held as `answer.md` is
+    (not empty, at most 20 KiB), with exactly one closed fenced block that
+    is `skill.toml` and one that is `SKILL.md`, found as the voice finds
+    them (`made_skill::fenced`: named whole, by language `toml`/`md`, or
+    bare with front matter for `SKILL.md`); a `scripts/…` block may come
+    with them. Words around the blocks are kept, since the voice reads the
+    blocks alone. The voice then puts it through the same `files` check,
+    caps and repairs as a file's answer (lamp-voice depends on lamp-tasks,
+    so lamp-tasks keeps its own copy of the fence reading, as a gate only).
+
+  Any other chat answer (a skill's file missing or twice, a block left
+  open, past 20 KiB, or plain words) is dropped as before (`no_answer`).
+  `answer.md` always wins over chat. A chat answer taken is journaled:
+  `[lamp-tasks] skill task <run>: the make's answer was taken from the
+  agent's chat (no answer.md), <n> bytes`. On lamp-c0a4 (OpenClaw,
+  deepseek-flash) the agent put every make's answer in chat, never in
+  `answer.md`: 3 of 3 makes of a phone battery skill said `cannot:` (13584),
+  and on 17 Nov at 09:35:41 a whole, correct `head-pat-next-event` (731
+  bytes, `skill.toml`, `SKILL.md` and `scripts/main.py`) was dropped as
+  `no_answer`. Tests:
+  `a_gateway_make_with_no_answer_file_takes_its_chat_cannot_line`,
+  `a_gateway_make_with_no_answer_file_takes_a_skill_said_in_chat`,
+  `a_gateway_make_with_no_answer_file_drops_any_other_chat_answer`,
+  `a_gateway_make_with_an_answer_file_takes_the_file_over_its_chat`.
 - **One session (`LAMP_TASKS_ONE_SESSION`, #7258):** with it on, the make
   is to go into the one session as a message instead of a session of its
   own. The choice is one seam function, so #7258 takes it over there; a
