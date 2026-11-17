@@ -341,6 +341,11 @@ pub const LIMIT_AFTER: Duration = Duration::from_secs(120);
 /// After a run's first [`DOWN_LINE_LIMIT`], how long before a line that
 /// names the lamp hears it again (the first builder's ruling on #7362).
 pub const LIMIT_AGAIN_NAMED: Duration = Duration::from_secs(300);
+/// With `LAMP_LIMIT_LOCAL_ASKS`, how long after the last usage-limit
+/// refusal a line is taken as still at the limit, its chat not asked: after
+/// it, one line asks the chat again to find whether the limit has passed,
+/// as a held refusal tries once a minute (#4265; Heron on #7612).
+pub const LIMIT_TRY_AGAIN: Duration = Duration::from_secs(60);
 
 /// The down lines, in the order [`DownLine`] renders them at the start.
 pub(crate) const DOWN_LINES: [&str; 4] = [
@@ -3739,9 +3744,9 @@ struct DownLine {
     /// begun and no other refusal since, and when this run last said
     /// [`DOWN_LINE_LIMIT`] (#7346).
     refused_since: Mutex<Option<(tokio::time::Instant, Option<tokio::time::Instant>)>>,
-    /// The run of refusals is the usage limit: [`Self::refused`] last said
-    /// so, and no round has begun since.
-    limited: AtomicBool,
+    /// When [`Self::refused`] last took a refusal for the usage limit, with
+    /// no round begun since.
+    limited_at: Mutex<Option<tokio::time::Instant>>,
     rendering: AtomicBool,
     /// When the last was said, and whether it was [`DOWN_LINE_AGAIN`].
     said_at: Mutex<Option<(tokio::time::Instant, bool)>>,
@@ -3845,13 +3850,13 @@ impl DownLine {
         let mut since = self.refused_since.lock().ok()?;
         if status != 429 {
             *since = None;
-            self.limited.store(false, Ordering::Release);
+            self.set_limited(None);
             return None;
         }
         let now = tokio::time::Instant::now();
         let lasted = now.duration_since(since.get_or_insert((now, None)).0);
         let limited = word || lasted >= LIMIT_AFTER;
-        self.limited.store(limited, Ordering::Release);
+        self.set_limited(limited.then_some(now));
         limited.then_some(lasted)
     }
 
@@ -3860,13 +3865,33 @@ impl DownLine {
         if let Ok(mut since) = self.refused_since.lock() {
             *since = None;
         }
-        self.limited.store(false, Ordering::Release);
+        self.set_limited(None);
     }
 
-    /// Whether the last refusal was the usage limit and no round has begun
-    /// since ([`limit_local_ask`]).
+    fn set_limited(&self, at: Option<tokio::time::Instant>) {
+        if let Ok(mut limited_at) = self.limited_at.lock() {
+            *limited_at = at;
+        }
+    }
+
+    /// Whether the last refusal was the usage limit, less than
+    /// [`LIMIT_TRY_AGAIN`] ago, and no round has begun since
+    /// ([`limit_local_ask`]).
     fn limited(&self) -> bool {
-        self.limited.load(Ordering::Acquire)
+        self.limited_at
+            .lock()
+            .ok()
+            .and_then(|at| *at)
+            .is_some_and(|at| at.elapsed() < LIMIT_TRY_AGAIN)
+    }
+
+    /// How long this run of 429s has lasted ([`say_limit`]).
+    fn lasted(&self) -> Duration {
+        self.refused_since
+            .lock()
+            .ok()
+            .and_then(|since| *since)
+            .map_or(Duration::ZERO, |(at, _)| at.elapsed())
     }
 
     /// [`DOWN_LINE_LIMIT`]: `None` when not rendered yet (the slow line
@@ -16420,6 +16445,14 @@ async fn answer(
                 [crate::called::NOTE, crate::called::NOTE_HEARD_AS].contains(&note.as_str())
             })
             || crate::attention::marked_woken_by_name(request).is_some());
+    // `LAMP_LIMIT_LOCAL_ASKS` (#7346): only a line said to the lamp is
+    // acted on without the model: one named, or one not let out only as the
+    // conversation going on, which the model alone could judge not for it
+    // (Heron on #7612: "Louder." from the TV).
+    let limit_addressed = named
+        || !notes
+            .iter()
+            .any(|note| note == worker::CONVERSATION_ALONE || note == worker::FOLLOW_UP_NOTE);
     // Each round's prompt journaled for a cut-in (`LAMP_CUT_IN_PROMPT_LOG`).
     let logs_prompt = heard && shared.logs_prompt_of(request);
     let looking = matches!(asked, Asker::Written { looking: true, .. });
@@ -17485,8 +17518,8 @@ async fn answer(
         // (`LAMP_MEMORY_DONT_KNOW_RECALLS`).
         let mut dont_know_recalled = false;
         // `LAMP_LIMIT_LOCAL_ASKS` (#7346): a spoken line is tried as an ask
-        // with no model once at most, at the usage limit.
-        let mut limit_local = shared.limit_local && heard && !quoted;
+        // with no model at the usage limit, at round 1 only.
+        let limit_local = shared.limit_local && heard && !quoted;
         let mut round = 0;
         // The one round asked past MAX_ROUNDS, declaring no function: every
         // round so far ended in calls, so nothing they found was said yet
@@ -17552,13 +17585,19 @@ async fn answer(
                 shared.log_prompt((request, round), asked, told);
             }
             // Already at the usage limit: a plain light or volume ask is
-            // done at once, with no chat asked (`LAMP_LIMIT_LOCAL_ASKS`).
-            if round == 1 && limit_local && shared.down.as_ref().is_some_and(|down| down.limited())
+            // done at once, and any other line ends as the limit does, with
+            // no chat asked (`LAMP_LIMIT_LOCAL_ASKS`; Heron on #7612: the
+            // chat would only be refused again).
+            if round == 1
+                && limit_local
+                && let Some(down) = shared.down.as_ref().filter(|down| down.limited())
             {
-                limit_local = false;
-                if limit_local_ask(shared, request, &heard_words, scope.as_ref()).await? {
-                    return Err(Stop::Failed(Fault::RateLimited));
+                if !(limit_addressed
+                    && limit_local_ask(shared, request, &heard_words, scope.as_ref()).await?)
+                {
+                    say_limit(shared, (request, heard, named), down.lasted(), None).await?;
                 }
+                return Err(Stop::Failed(Fault::RateLimited));
             }
             let mut stream = match prepared.take() {
                 // The skill the heard words named: its call alone, at once.
@@ -17882,6 +17921,7 @@ async fn answer(
                                 // `LAMP_LIMIT_LOCAL_ASKS`: a plain light or
                                 // volume ask is done with no model instead.
                                 if limit_local
+                                    && limit_addressed
                                     && limit_local_ask(
                                         shared,
                                         request,
