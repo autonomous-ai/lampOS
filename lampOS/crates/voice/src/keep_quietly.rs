@@ -21,8 +21,14 @@
 //! line's sight, as #5070 gates a service write). A line not seen so stays
 //! ask-first: no note, no limit, and a `remember` it did not ask for, that
 //! is no yes to the lamp's offer, keeps nothing and the model is told to ask
-//! first ([`NOT_SEEN`]). With the switch on, in a known person's own scope,
-//! on a line seen said by them:
+//! first ([`NOT_SEEN`]). With `LAMP_KEEP_QUIETLY_ONE_FACE` on, the memory
+//! owner's call of 17 Nov ("skip the mouth gate for memory": mouth
+//! detection blocks only a forget's yes), their own face the only face in
+//! view through the line, or the line carried in their conversation, with
+//! no face seen speaking it and no other voice heard, counts as seen
+//! ([`alone`]); the room's scope, an unknown speaker, another face in view
+//! and a written turn stay ask-first. With the switch on, in a known
+//! person's own scope, on a line seen said by them:
 //!
 //! - **The words.** The spoken turn is told [`QUIET_NOTE`] beside the
 //!   person's words: a plain, lasting fact about their own life is kept by
@@ -87,6 +93,34 @@ pub(crate) fn set_on_for_test(on: bool) {
     ON_FOR_TEST.with(|cell| cell.set(on));
 }
 
+/// A known person's line counts as theirs for a quiet keep when their face
+/// is the only face in view, or the line is carried in their conversation,
+/// without their mouth seen ([`alone`]). Only the exact value `on`.
+pub const ONE_FACE_ENVIRONMENT: &str = "LAMP_KEEP_QUIETLY_ONE_FACE";
+static ONE_FACE_ON: OnceLock<bool> = OnceLock::new();
+
+#[cfg(test)]
+thread_local! {
+    /// [`ONE_FACE_ENVIRONMENT`] for one test's own thread
+    /// ([`set_one_face_for_test`]).
+    static ONE_FACE_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether [`ONE_FACE_ENVIRONMENT`] is on in this process, read once.
+pub fn one_face_on() -> bool {
+    #[cfg(test)]
+    if ONE_FACE_FOR_TEST.with(std::cell::Cell::get) {
+        return true;
+    }
+    *ONE_FACE_ON.get_or_init(|| std::env::var(ONE_FACE_ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// [`ONE_FACE_ENVIRONMENT`] on or off for the calling test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_one_face_for_test(on: bool) {
+    ONE_FACE_FOR_TEST.with(|cell| cell.set(on));
+}
+
 /// Told beside the person's words, in a known person's own scope, when the
 /// switch is on.
 pub const QUIET_NOTE: &str = "When the person you know at the lamp plainly tells you something lasting about their own life (a plan or a date, where they keep something), keep it quietly: call remember for it beside your answer, in their own words, without asking first, and do not say you kept it. Never keep health, money, or other people's private matters unless they clearly ask you to remember them. Never offer to keep something and never ask whether you should; if one word of it is really unclear, ask about that word once, and never again about the same thing.";
@@ -119,10 +153,20 @@ static SEEN: Mutex<VecDeque<(u64, String)>> = Mutex::new(VecDeque::new());
 /// Records whether `person` (a memory id) was seen saying request
 /// `request`'s line, from the line's sight: the faces seen speaking through
 /// it (`speakers`) and the known person with their face (`known`), read
-/// when it was heard. Seen only as `remember::speaker_of` names a speaker:
-/// their own face alone seen speaking it (#5070's signal). Their face
-/// merely in view, another face, two faces or a stale known file is not.
-pub fn saw(request: u64, person: &str, speakers: &[String], known: Option<(String, String)>) {
+/// when it was heard. Seen as `remember::speaker_of` names a speaker: their
+/// own face alone seen speaking it (#5070's signal). Their face merely in
+/// view, another face, two faces or a stale known file is not, unless
+/// `alone` ([`alone`]: no face seen speaking it, their own face the only
+/// face in view or the line carried in their conversation, no other voice)
+/// with [`ONE_FACE_ENVIRONMENT`] on. Returns whether it was recorded by
+/// `alone` only, for the journal.
+pub fn saw(
+    request: u64,
+    person: &str,
+    speakers: &[String],
+    known: Option<(String, String)>,
+    alone: bool,
+) -> bool {
     let line = crate::speaking_faces::LineSeen {
         request,
         speakers: speakers.to_vec(),
@@ -130,16 +174,33 @@ pub fn saw(request: u64, person: &str, speakers: &[String], known: Option<(Strin
         enrollment: None,
         by_voice: false,
     };
-    let seen = crate::remember::speaker_of(Some(&line)).as_deref() == Some(person);
+    let by_mouth = crate::remember::speaker_of(Some(&line)).as_deref() == Some(person);
+    let by_one_face = !by_mouth && alone && speakers.is_empty() && one_face_on();
     if let Ok(mut lines) = SEEN.lock() {
         lines.retain(|(of, _)| *of != request);
-        if seen {
+        if by_mouth || by_one_face {
             lines.push_back((request, person.to_owned()));
             while lines.len() > MOST_SEEN {
                 lines.pop_front();
             }
         }
     }
+    by_one_face
+}
+
+/// Whether a known person's line counts as theirs for a quiet keep without
+/// their mouth seen (`LAMP_KEEP_QUIETLY_ONE_FACE`, the memory owner's call
+/// of 17 Nov, restating their single-user ruling of 10 Nov: mouth
+/// detection blocks only a forget's yes). Only with no face seen speaking
+/// it (`speakers` empty: an unknown or another face seen speaking it is
+/// never theirs), no other voice heard in the conversation
+/// (`no_other_voice`, failing closed with no tracker), and either their own
+/// face the only face in view through it (`only_face`, by the one-face
+/// count: a second face, even silent, is not alone) or the line carried in
+/// their conversation going on (`carried`, `LAMP_CONVERSATION_CARRIES`,
+/// which needs no other face in view). Off: never.
+pub fn alone(speakers: &[String], only_face: bool, carried: bool, no_other_voice: bool) -> bool {
+    one_face_on() && speakers.is_empty() && no_other_voice && (only_face || carried)
 }
 
 /// Whether `person` was seen saying request `request`'s line ([`saw`]).
@@ -155,7 +216,19 @@ pub fn seen_saying(request: u64, person: &str) -> bool {
 /// [`own_for`], only for a line its person was seen saying
 /// ([`seen_saying`]): `None` keeps request `request` ask-first.
 pub fn own_seen(lease: Option<&crate::memory_scope::ScopeLease>, request: u64) -> Option<&str> {
-    own_for(lease).filter(|person| seen_saying(request, person))
+    own_seen_in(
+        lease.and_then(crate::memory_scope::ScopeLease::scope),
+        request,
+    )
+}
+
+/// [`own_seen`] for a scope: [`own`], only for a line its person was seen
+/// saying ([`seen_saying`]).
+pub fn own_seen_in(
+    scope: Option<&crate::memory_scope::ScopeSnapshot>,
+    request: u64,
+) -> Option<&str> {
+    own(scope).filter(|person| seen_saying(request, person))
 }
 
 /// [`QUIET_NOTE`] for request `request`'s spoken turn in `lease`, with the
@@ -1325,7 +1398,7 @@ mod tests {
         let request = 5_053_001;
         let fact = "I'm starting a new job at the bank on Monday.";
         // The owner's face in view, none seen speaking: a second voice.
-        saw(request, &mai, &[], known());
+        saw(request, &mai, &[], known(), false);
         assert!(!seen_saying(request, &mai));
         assert_eq!(
             refusal(fact, Some(fact), false, seen_saying(request, &mai)),
@@ -1333,12 +1406,12 @@ mod tests {
         );
         // Another face seen speaking it, or two: not seen either.
         for speakers in [&["b1/f2".to_owned()][..], &["b1/f1".into(), "b1/f2".into()]] {
-            saw(request, &mai, speakers, known());
+            saw(request, &mai, speakers, known(), false);
             assert!(!seen_saying(request, &mai), "{speakers:?}");
         }
         // Their own face alone seen saying it: a quiet keep of their heard
         // words, as before.
-        saw(request, &mai, &["b1/f1".to_owned()], known());
+        saw(request, &mai, &["b1/f1".to_owned()], known(), false);
         assert!(seen_saying(request, &mai));
         assert!(!seen_saying(request + 1, &mai));
         assert!(!seen_saying(request, "someone-else"));
@@ -1347,7 +1420,7 @@ mod tests {
             None
         );
         // Read again as not seen, it is forgotten.
-        saw(request, &mai, &[], known());
+        saw(request, &mai, &[], known(), false);
         assert!(!seen_saying(request, &mai));
         // Not seen, still ask-first as before: an asked keep, or a yes to
         // the lamp's offer, runs; a taken-back line or none keeps nothing.
@@ -1366,6 +1439,77 @@ mod tests {
         // Not seen: no note and no limit.
         assert_eq!(own_seen(None, request), None);
         assert_eq!(note_for(None, request), None);
+    }
+
+    /// The memory owner's call of 17 Nov (`LAMP_KEEP_QUIETLY_ONE_FACE`):
+    /// lamp-06c1, build 13706, 13:57:56, the owner's face alone in view (a
+    /// face in 34 of 34 looks), none seen speaking it, the line carried in
+    /// their conversation: a quiet keep was refused as not seen. With the
+    /// switch, their face the only face in view, or the line carried, counts
+    /// as theirs; a second face, a face seen speaking it that isn't theirs,
+    /// another voice and the room's scope stay ask-first, and a word not
+    /// heard still keeps nothing.
+    #[test]
+    fn the_one_face_in_view_not_seen_speaking_keeps_quietly_with_the_switch() {
+        let theirs = crate::memory_scope::ScopeSnapshot::of("Mai");
+        let room = crate::memory_scope::ScopeSnapshot::room();
+        let mai = theirs.person().unwrap().to_owned();
+        let known = || Some(("Mai".to_owned(), "b1/f1".to_owned()));
+        let request = 7_500_001;
+        let fact = "I'm starting a new job at the bank on Monday.";
+        // Off: their face alone in view, none seen speaking it, is not seen.
+        set_one_face_for_test(false);
+        assert!(!alone(&[], true, true, true));
+        assert!(!saw(request, &mai, &[], known(), true));
+        assert!(!seen_saying(request, &mai));
+        assert_eq!(own_seen_in(Some(&theirs), request), None);
+        set_one_face_for_test(true);
+        // Their face the one face in view, none seen speaking it: kept.
+        let one_face = alone(&[], true, false, true);
+        assert!(one_face);
+        assert!(saw(request, &mai, &[], known(), one_face));
+        assert!(seen_saying(request, &mai));
+        assert_eq!(own_seen_in(Some(&theirs), request), Some(mai.as_str()));
+        assert_eq!(
+            refusal(fact, Some(fact), false, seen_saying(request, &mai)),
+            None
+        );
+        // Carried in their conversation, no other face: kept too.
+        assert!(alone(&[], false, true, true));
+        // A second known face in view, not carried: still refused.
+        let two_faces = alone(&[], false, false, true);
+        assert!(!two_faces);
+        assert!(!saw(request, &mai, &[], known(), two_faces));
+        assert!(!seen_saying(request, &mai));
+        assert_eq!(
+            refusal(fact, Some(fact), false, seen_saying(request, &mai)),
+            Some(not_seen())
+        );
+        // Another face seen speaking it (an unknown one, or another known
+        // one), or another voice heard: never alone.
+        assert!(!alone(&["b1/f9".to_owned()], true, true, true));
+        assert!(!saw(request, &mai, &["b1/f9".to_owned()], known(), true));
+        assert!(!seen_saying(request, &mai));
+        assert!(!alone(&[], true, true, false));
+        // The room's scope: never a quiet keep, even recorded as theirs.
+        assert!(saw(request, &mai, &[], known(), true));
+        assert_eq!(own_seen_in(Some(&room), request), None);
+        assert_eq!(own_seen_in(None, request), None);
+        // A key word not heard: nothing kept, as with their mouth seen.
+        let line = "my favourite tea is jasmine";
+        assert_eq!(
+            refusal(
+                "My favorite food is jasmine.",
+                Some(line),
+                false,
+                seen_saying(request, &mai)
+            ),
+            Some(not_kept())
+        );
+        // Their mouth seen saying it: as before, with the switch or not.
+        assert!(!saw(request, &mai, &["b1/f1".to_owned()], known(), false));
+        assert!(seen_saying(request, &mai));
+        set_one_face_for_test(false);
     }
 
     /// Thirteen's P2: a quiet keep is kept only when every key word of its
