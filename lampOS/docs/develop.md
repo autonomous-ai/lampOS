@@ -282,8 +282,10 @@ lamp hello                         # connects and shows the grants
 The pin is checked after the TLS and WebSocket handshakes and before any
 protocol frame, so the code's proof never
 reaches another host. Then run `first.py` with no `LAMPOS_HOME`, against
-the real lamp. The lamp gives a small nod when a computer pairs, and the
-owner can revoke it at any time, which closes its connections at once.
+the real lamp. With the lamp's pairing cue on (`LAMP_CONTROL_PAIR_CUE`, off unless the unit
+sets it), the ring glows once when a computer pairs for the first time;
+otherwise the lamp shows nothing. The owner can revoke the computer at any
+time, which closes its connections at once.
 
 ## 4. An agent drives the lamp: lamp-mcp (1 minute)
 
