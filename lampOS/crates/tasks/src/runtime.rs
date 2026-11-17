@@ -5137,6 +5137,8 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     )
     .map_err(io::Error::other)?;
     engine.close_told(config.close_told);
+    // `LAMP_TASKS_ONE_SESSION` on (#7600), as `serve` opened it.
+    engine.keep_untold(crate::one_session::LAMP.get().is_some());
     engine.hermes_on_lamp(
         config
             .set_up_later

@@ -3644,8 +3644,8 @@ fn a_store_set_aside_is_said_until_its_file_is_gone() {
     s.stop();
     let mut store = released(&s);
     let mut newer: Value = serde_json::from_slice(&store.load().unwrap().unwrap()).unwrap();
-    // One past the engine's `SCHEMA` (7 since #6226's `openclaw`).
-    newer["schema"] = json!(8);
+    // One past the engine's `SCHEMA` (8 since #7600's `handed_on`).
+    newer["schema"] = json!(9);
     store.commit(&serde_json::to_vec(&newer).unwrap()).unwrap();
     drop(store);
     s.start();
@@ -3665,7 +3665,7 @@ fn a_store_set_aside_is_said_until_its_file_is_gone() {
         "Tasks set aside a store from a newer build; its tasks are not followed"
     );
     let kept = kept.expect("the kept file is named");
-    assert!(kept.starts_with("tasks.sqlite3.newer-8-"), "{kept}");
+    assert!(kept.starts_with("tasks.sqlite3.newer-9-"), "{kept}");
     // Restarted: the store opens well now, and the kept file is still said.
     s.stop();
     drop(released(&s));
