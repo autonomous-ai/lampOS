@@ -78,7 +78,11 @@ use std::time::{Duration, Instant};
 
 use std::path::PathBuf;
 
-use crate::harness::{Cli, Closed, EngineKind, Launch, LaunchOutcome, PaneSeen, Target, Typed};
+use std::path::Path;
+
+use crate::harness::{
+    Cli, Closed, EngineKind, Ensured, Launch, LaunchOutcome, PaneSeen, Target, Took, Typed,
+};
 
 /// The switch, in lamp-tasks' own environment: `on` exactly ([`on`]).
 pub const SWITCH: &str = "LAMP_TASKS_ONE_SESSION";
@@ -86,6 +90,48 @@ pub const SWITCH: &str = "LAMP_TASKS_ONE_SESSION";
 /// [`SWITCH`]'s value: `on` exactly; anything else is off.
 pub fn on(value: Option<&str>) -> bool {
     value == Some("on")
+}
+
+/// The kept session's switch (openharness#4393), in lamp-tasks' own
+/// environment: `on` exactly ([`on`]), and only with [`SWITCH`] on. On,
+/// and Harness keeping program sessions (`harness capabilities`), the pane
+/// is the lamp's own kept session: opened with `harness ensure`, typed into
+/// with an acknowledged `reply`, closed with `close --forget`. Else, or off,
+/// the pane is as before.
+pub const KEPT_SWITCH: &str = "LAMP_TASKS_KEPT_SESSION";
+/// The kept session's token file, in lamp-tasks' state folder: 0600, this
+/// user's, 32 random bytes as hex, kept across restarts. Only its path is
+/// passed to Harness, never its text, and never in any environment.
+pub const TOKEN_FILE: &str = "kept-session.token";
+/// The kept session's token, in random bytes (Harness takes 32 or more).
+const TOKEN_BYTES: usize = 32;
+
+/// The kept session's token file at `path` ([`TOKEN_FILE`]): kept as it is
+/// when it is a plain file of this user's, 0600, of 32 bytes or more; else
+/// written anew, 0600, in one rename. Its text is never journaled.
+pub fn token_file(path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    if let Ok(meta) = std::fs::symlink_metadata(path)
+        && meta.file_type().is_file()
+        && meta.permissions().mode() & 0o777 == 0o600
+        && meta.uid() == rustix::process::geteuid().as_raw()
+        && meta.len() >= TOKEN_BYTES as u64
+    {
+        return Ok(());
+    }
+    let mut bytes = [0u8; TOKEN_BYTES];
+    getrandom::fill(&mut bytes).map_err(|_| "no random bytes".to_string())?;
+    let text: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    crate::hermes_config::replace(path, &text).map_err(|error| error.kind().to_string())?;
+    eprintln!("tasks: one session: the kept session's token file made (0600)");
+    Ok(())
+}
+
+/// An engine a kept record names, as [`EngineKind::argument`] says it.
+fn engine_named(name: &str) -> Option<EngineKind> {
+    [EngineKind::Openclaw, EngineKind::Hermes]
+        .into_iter()
+        .find(|engine| engine.argument() == name)
 }
 
 /// The pane's folder in lamp-tasks' Harness project (beside each run's
@@ -194,6 +240,41 @@ pub trait PaneHarness {
     fn resume(&self, machine: &str, agent: &str) -> Result<String, String>;
     /// The agents `ps` lists live in `folder` on `machine`.
     fn live_in(&self, machine: &str, folder: &str) -> Result<Vec<String>, String>;
+    /// `harness capabilities`: whether Harness keeps program sessions
+    /// (openharness#4393); `None` when it could not be asked. The defaults
+    /// below are an older Harness's, which has none.
+    fn program_sessions(&self) -> Option<bool> {
+        Some(false)
+    }
+    /// `harness ensure` of the kept session `name` ([`Cli::ensure_kept`]).
+    fn ensure_kept(
+        &self,
+        _engine: EngineKind,
+        _name: &str,
+        _token: &Path,
+        _folder: &str,
+        _fresh: bool,
+    ) -> Result<Ensured, String> {
+        Err("unsupported".into())
+    }
+    /// An acknowledged `harness reply` into it ([`Cli::reply_kept`]).
+    fn reply_kept(&self, _name: &str, _token: &Path, _words: &str) -> Took {
+        Took::NotSent("unsupported".into())
+    }
+    /// `harness wait --after` an input it took ([`Cli::wait_kept`]).
+    fn wait_kept(
+        &self,
+        _name: &str,
+        _token: &Path,
+        _input: &str,
+        _cancel: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        Err("unsupported".into())
+    }
+    /// `harness close --forget` of it ([`Cli::close_kept`]).
+    fn close_kept(&self, _name: &str, _token: &Path) -> Result<(), String> {
+        Err("unsupported".into())
+    }
 }
 
 /// Whether `show`'s state (or its error) says the pane is gone: reopened,
@@ -231,6 +312,34 @@ impl PaneHarness for Cli {
     fn live_in(&self, machine: &str, folder: &str) -> Result<Vec<String>, String> {
         Cli::live_in(self, machine, folder)
     }
+    fn program_sessions(&self) -> Option<bool> {
+        Cli::program_sessions(self)
+    }
+    fn ensure_kept(
+        &self,
+        engine: EngineKind,
+        name: &str,
+        token: &Path,
+        folder: &str,
+        fresh: bool,
+    ) -> Result<Ensured, String> {
+        Cli::ensure_kept(self, engine, name, token, folder, fresh)
+    }
+    fn reply_kept(&self, name: &str, token: &Path, words: &str) -> Took {
+        Cli::reply_kept(self, name, token, words)
+    }
+    fn wait_kept(
+        &self,
+        name: &str,
+        token: &Path,
+        input: &str,
+        cancel: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        Cli::wait_kept(self, name, token, input, cancel)
+    }
+    fn close_kept(&self, name: &str, token: &Path) -> Result<(), String> {
+        Cli::close_kept(self, name, token)
+    }
 }
 
 /// The pane as it was opened.
@@ -243,8 +352,25 @@ struct Pane {
     /// Tokens estimated typed and read, 4 characters a token
     /// ([`ROTATE_TOKENS`]).
     tokens: u64,
+    /// The lamp's kept session (`harness ensure`, openharness#4393), not
+    /// a pane of `harness new`.
+    kept: bool,
+    /// The input the kept session last took (`harness reply`'s `inputId`),
+    /// for `harness wait --after`.
+    input: Option<String>,
 }
 impl Pane {
+    fn new(agent: &str, place: &Place, kept: bool) -> Self {
+        Pane {
+            agent: agent.to_owned(),
+            place: place.clone(),
+            turns: 0,
+            tokens: 0,
+            kept,
+            input: None,
+        }
+    }
+
     /// Usable as it is at `place`: there, and no rotation due.
     fn fresh_at(&self, place: &Place) -> bool {
         self.place.same_spot(place) && self.turns < ROTATE_TURNS && self.tokens < ROTATE_TOKENS
@@ -290,6 +416,13 @@ struct Inner {
     /// Counted at each [`OneSession::forget`]: [`OneSession::keep_open`]
     /// looks at the lamp again at once.
     woken: u64,
+    /// What `harness capabilities` said of program sessions, asked at the
+    /// first open with [`KEPT_SWITCH`] on and again after Harness's daemon
+    /// started again (an update among the reasons); `None` before.
+    programs: Option<bool>,
+    /// `harness ensure` said the engine was not ready, in a row: the next
+    /// open after [`NOT_READY_FIRST`], doubled up to [`NOT_READY_MOST`].
+    not_ready_opens: u32,
 }
 
 /// [`OneSession::keep_open`]'s own: when it looks at the lamp next, and
@@ -344,6 +477,8 @@ pub struct OneSession {
     /// then on goes the per-task way, until lamp-tasks starts again
     /// ([`OneSession::takes_reply`]).
     no_reply: AtomicBool,
+    /// [`KEPT_SWITCH`] on: the kept session's token file ([`TOKEN_FILE`]).
+    kept_token: Option<PathBuf>,
 }
 
 /// Why a run can't have the pane.
@@ -542,7 +677,11 @@ pub fn spoken_launch(
             // bounds (20 s on the lamp), still far below the old 120 s.
             let taken_until = Instant::now() + within.saturating_mul(4);
             let past = || ended() || Instant::now() >= taken_until;
-            if !one.wait_taken_while(harness, &place.machine, &agent, &launch.name, &past) {
+            // The kept session's reply returns only once the engine took
+            // the words (openharness#4393): no look needed.
+            if one.kept_now(&agent).is_none()
+                && !one.wait_taken_while(harness, &place.machine, &agent, &launch.name, &past)
+            {
                 eprintln!(
                     "tasks: {}: its words were not seen taken in {} ms",
                     launch.name,
@@ -651,7 +790,77 @@ impl OneSession {
             open_idle_within,
             spoken_bound: None,
             no_reply: AtomicBool::new(false),
+            kept_token: None,
         }
+    }
+
+    /// [`KEPT_SWITCH`] on: the pane is the lamp's kept session, its token
+    /// in `token` ([`TOKEN_FILE`]), once Harness keeps program sessions.
+    pub fn with_kept_session(mut self, token: PathBuf) -> Self {
+        self.kept_token = Some(token);
+        self
+    }
+
+    /// The kept session's token file, when [`KEPT_SWITCH`] is on and
+    /// Harness keeps program sessions: asked once (`harness capabilities`),
+    /// and again after Harness's daemon started again. An older Harness, or
+    /// one that could not be asked: `None`, and the pane as before.
+    fn kept_token(&self, harness: &dyn PaneHarness) -> Option<PathBuf> {
+        let file = self.kept_token.as_ref()?;
+        let known = self.lock().programs;
+        let programs = match known {
+            Some(programs) => programs,
+            None => {
+                let asked = harness.program_sessions();
+                if let Some(programs) = asked {
+                    self.lock().programs = Some(programs);
+                    eprintln!(
+                        "tasks: one session: {}",
+                        if programs {
+                            "Harness keeps program sessions; the pane is the kept session (openharness#4393)"
+                        } else {
+                            "Harness keeps no program sessions; the pane as before"
+                        }
+                    );
+                }
+                asked.unwrap_or(false)
+            }
+        };
+        programs.then(|| file.clone())
+    }
+
+    /// The kept session's name and token when `agent` is it.
+    fn kept_now(&self, agent: &str) -> Option<(String, PathBuf)> {
+        let token = self.kept_token.clone()?;
+        let inner = self.lock();
+        let pane = inner.pane.as_ref()?;
+        (pane.kept && pane.agent == agent).then(|| (name_for(pane.place.engine), token))
+    }
+
+    /// The kept session's token file removed (a sign-out, an engine
+    /// switch): the next kept session gets a token of its own.
+    fn forget_token(&self) {
+        if let Some(file) = &self.kept_token
+            && let Err(error) = std::fs::remove_file(file)
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            eprintln!(
+                "tasks: one session: {} not removed: {error}",
+                file.display()
+            );
+        }
+    }
+
+    /// The kept record ([`STATE_FILE`]) says the lamp's kept session, not a
+    /// pane of `harness new`.
+    fn kept_is_program(&self) -> bool {
+        let Some(file) = &self.state_file else {
+            return false;
+        };
+        std::fs::read_to_string(file)
+            .ok()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+            .is_some_and(|kept| kept["kept"].as_bool() == Some(true))
     }
 
     /// Whether the pane may be typed into: false once Harness refused a
@@ -705,8 +914,20 @@ impl OneSession {
     /// later start adopts it. A daemon restart is not this: Harness's
     /// restore brings the same pane back ([`OneSession::forget`]).
     pub fn drop_pane(&self, harness: &dyn PaneHarness, why: &str) {
+        self.drop_pane_as(harness, why, true);
+    }
+
+    /// [`OneSession::drop_pane`]; for the kept session (openharness#4393)
+    /// `harness close --forget`, which deletes its conversation, and with
+    /// `token` its token file too (a sign-out, an engine switch; not a turn
+    /// that ended unanswered). A kept session not closed is tried again at
+    /// the next look, never let go with its conversation still there.
+    fn drop_pane_as(&self, harness: &dyn PaneHarness, why: &str, token: bool) {
         let pane = self.lock().pane.take();
         let kept = self.kept();
+        let program = pane
+            .as_ref()
+            .map_or_else(|| self.kept_is_program(), |pane| pane.kept);
         let (agent, machine, engine) = match (&pane, kept) {
             (Some(pane), _) => (
                 pane.agent.clone(),
@@ -716,6 +937,28 @@ impl OneSession {
             (None, Some(kept)) => kept,
             (None, None) => return,
         };
+        if program
+            && let Some(file) = &self.kept_token
+            && let Some(kind) = engine_named(&engine)
+        {
+            if let Err(code) = harness.close_kept(&name_for(kind), file) {
+                eprintln!(
+                    "tasks: one session: the kept session {} not closed: {code}; tried again next",
+                    short(&agent)
+                );
+                self.lock().drop_due = Some(why.to_owned());
+                return;
+            }
+            self.closed_by_us(&agent, kind, false);
+            if token {
+                self.forget_token();
+            }
+            eprintln!(
+                "tasks: one session: dropped the kept session {} ({why}); its conversation forgotten",
+                short(&agent)
+            );
+            return;
+        }
         match harness.close_now(&machine, &agent) {
             Ok(_) => {}
             Err(code) => eprintln!("tasks: one session: {} not closed: {code}", short(&agent)),
@@ -760,17 +1003,19 @@ impl OneSession {
     /// A removal asked for ([`OneSession::drop_when_free`]) done now, if
     /// nothing holds the pane.
     pub fn drop_if_due(&self, harness: &dyn PaneHarness) -> bool {
-        let why = {
+        let (why, unanswered) = {
             let mut inner = self.lock();
             if inner.holder.is_some() && inner.holder != inner.closing_for {
                 return false;
             }
             match inner.drop_due.take() {
-                Some(why) => why,
+                Some(why) => (why, inner.closing_for.is_some()),
                 None => return false,
             }
         };
-        self.drop_pane(harness, &why);
+        // A turn that ended unanswered keeps the kept session's token: only
+        // a sign-out removes it.
+        self.drop_pane_as(harness, &why, !unanswered);
         let mut inner = self.lock();
         if let Some(id) = inner.closing_for.take()
             && inner.holder.as_deref() == Some(id.as_str())
@@ -808,11 +1053,22 @@ impl OneSession {
         let Some(file) = &self.state_file else {
             return;
         };
+        let (signed_in, program) = {
+            let inner = self.lock();
+            (
+                !inner.signed_out,
+                inner
+                    .pane
+                    .as_ref()
+                    .is_some_and(|pane| pane.kept && pane.agent == agent),
+            )
+        };
         let text = serde_json::json!({
             "agent": agent,
             "machine": place.machine,
             "engine": place.engine.argument(),
-            "signed_in": !self.lock().signed_out,
+            "signed_in": signed_in,
+            "kept": program,
         })
         .to_string();
         if let Err(error) = crate::hermes_config::replace(file, &text) {
@@ -1063,6 +1319,9 @@ impl OneSession {
         }
         inner.next_open = None;
         inner.failed_opens = 0;
+        inner.not_ready_opens = 0;
+        // A daemon started again may be a newer Harness: asked again.
+        inner.programs = None;
         inner.woken = inner.woken.wrapping_add(1);
     }
 
@@ -1176,6 +1435,7 @@ impl OneSession {
             if !self.takes_reply()
                 || (inner.pane.is_some() && !stale)
                 || inner.holder.is_some()
+                || inner.drop_due.is_some()
                 || inner.next_open.is_some_and(|next| Instant::now() < next)
             {
                 return;
@@ -1392,6 +1652,27 @@ impl OneSession {
                 None => None,
             }
         };
+        // The kept session rotated is left to `harness ensure --fresh`,
+        // which closes it and starts a new conversation; moved (another
+        // machine or engine), it is closed `--forget` and its token removed.
+        let stale = match stale {
+            Some(pane) if pane.kept => {
+                if !pane.place.same_spot(place)
+                    && let Some(file) = self.kept_token.clone()
+                {
+                    if let Err(code) = harness.close_kept(&name_for(pane.place.engine), &file) {
+                        eprintln!(
+                            "tasks: one session: the old kept session {} not closed: {code}",
+                            short(&pane.agent)
+                        );
+                    }
+                    self.closed_by_us(&pane.agent, pane.place.engine, false);
+                    self.forget_token();
+                }
+                None
+            }
+            stale => stale,
+        };
         // The stale one (rotated, or another machine or engine) is closed
         // where it was, best effort, and its conversation deleted.
         if let Some(pane) = stale {
@@ -1413,6 +1694,9 @@ impl OneSession {
         until: Instant,
         ended: &dyn Fn() -> bool,
     ) -> Result<String, String> {
+        if let Some(token) = self.kept_token(harness) {
+            return self.open_kept(harness, place, &token, until, ended);
+        }
         let began = Instant::now();
         let kept = self.kept();
         // The pane kept by its id (a lamp-tasks restart, or a reboot that
@@ -1450,12 +1734,7 @@ impl OneSession {
                 let mut inner = self.lock();
                 inner.reopen_why = None;
                 eprintln!("tasks: one session: {how} {} ({state})", short(&agent));
-                inner.pane = Some(Pane {
-                    agent: agent.clone(),
-                    place: place.clone(),
-                    turns: 0,
-                    tokens: 0,
-                });
+                inner.pane = Some(Pane::new(&agent, place, false));
                 inner.failed_opens = 0;
                 inner.next_open = None;
                 return Ok(agent);
@@ -1578,16 +1857,151 @@ impl OneSession {
             place.engine.argument(),
             began.elapsed().as_millis()
         );
-        inner.pane = Some(Pane {
-            agent: agent.clone(),
-            place: place.clone(),
-            turns: 0,
-            tokens: 0,
-        });
+        inner.pane = Some(Pane::new(&agent, place, false));
         inner.failed_opens = 0;
         inner.next_open = None;
         inner.home = Some(place.clone());
         Ok(agent)
+    }
+
+    /// The lamp's kept session (openharness#4393): `harness ensure` by its
+    /// name ([`name_for`]) and token, live, resumed (a pane that died, a
+    /// reboot) or new; `--fresh` at a rotation. A pane the old way kept
+    /// holds the name, so it is closed and deleted first. A new
+    /// conversation is given [`OPEN_PROMPT`] and its turn waited for, as a
+    /// `harness new`'s first turn is. `ENGINE_NOT_READY` backs off as with
+    /// no agent ready; `NAME_TAKEN` or `NOT_YOURS` sends the pane the old
+    /// way until Harness's daemon starts again.
+    fn open_kept(
+        &self,
+        harness: &dyn PaneHarness,
+        place: &Place,
+        token: &Path,
+        until: Instant,
+        ended: &dyn Fn() -> bool,
+    ) -> Result<String, String> {
+        let began = Instant::now();
+        if let Some((old, machine, engine)) = self.kept()
+            && !self.kept_is_program()
+        {
+            match harness.close_now(&machine, &old) {
+                Err(code)
+                    if code != crate::harness::CLOSE_UNKNOWN_HARNESS
+                        && code != "gone"
+                        && machine == place.machine =>
+                {
+                    eprintln!("tasks: one session: {} not closed: {code}", short(&old));
+                    return Err(self.open_failed(&format!("{} not closed", short(&old))));
+                }
+                Ok(_) | Err(_) => {}
+            }
+            self.closed_by_us(&old, engine_named(&engine).unwrap_or(place.engine), true);
+            eprintln!(
+                "tasks: one session: dropped {} (opened before the kept session)",
+                short(&old)
+            );
+        }
+        if let Err(why) = token_file(token) {
+            return Err(self.open_failed(&format!("its token file: {why}")));
+        }
+        let fresh = self.lock().reopen_why.as_deref() == Some("its rotation");
+        let name = name_for(place.engine);
+        let ensured = match harness.ensure_kept(place.engine, &name, token, &place.folder, fresh) {
+            Ok(ensured) => ensured,
+            Err(code) if code == "engine_not_ready" => {
+                return Err(self.not_ready("harness ensure: engine_not_ready"));
+            }
+            Err(code) if code == "name_taken" || code == "not_yours" => {
+                self.lock().programs = Some(false);
+                return Err(self.open_failed(&format!(
+                    "harness ensure: {code}; the pane the old way next"
+                )));
+            }
+            Err(code) => {
+                if code == "bad_token_file" {
+                    self.forget_token();
+                }
+                return Err(self.open_failed(&format!("harness ensure: {code}")));
+            }
+        };
+        let agent = ensured.agent_id.clone();
+        self.lock().pane = Some(Pane::new(&agent, place, true));
+        // Kept at once: the record says the kept session, so a sign-out
+        // while lamp-tasks is down still removes it.
+        self.keep(&agent, place);
+        if ensured.result == "new" {
+            self.first_words(harness, &name, token, until, ended);
+        }
+        let mut inner = self.lock();
+        if let Some(why) = inner.reopen_why.take() {
+            eprintln!("tasks: one session: reopened after {why}");
+        }
+        eprintln!(
+            "tasks: one session: kept session {} {} ({}, {}){} in {} ms",
+            ensured.result,
+            short(&agent),
+            place.engine.argument(),
+            ensured.state,
+            ensured
+                .why
+                .as_deref()
+                .map_or_else(String::new, |why| format!(", {why}")),
+            began.elapsed().as_millis()
+        );
+        inner.failed_opens = 0;
+        inner.not_ready_opens = 0;
+        inner.next_open = None;
+        inner.home = Some(place.clone());
+        Ok(agent)
+    }
+
+    /// A new kept session's first words ([`OPEN_PROMPT`]), taken and
+    /// waited for within `until`, so the first task finds it idle. Not a
+    /// turn; a failure is journaled only, and the first task waits instead.
+    fn first_words(
+        &self,
+        harness: &dyn PaneHarness,
+        name: &str,
+        token: &Path,
+        until: Instant,
+        ended: &dyn Fn() -> bool,
+    ) {
+        let input = match harness.reply_kept(name, token, OPEN_PROMPT) {
+            Took::Taken(input) => input,
+            other => {
+                eprintln!("tasks: one session: the kept session's first words not taken: {other:?}");
+                return;
+            }
+        };
+        let cancel = AtomicBool::new(false);
+        let until = until.min(Instant::now() + self.open_idle_within);
+        while Instant::now() < until && !ended() {
+            match harness.wait_kept(name, token, &input, &cancel) {
+                Ok(Some(state)) if state == "idle" => return,
+                Ok(Some(state)) => {
+                    eprintln!("tasks: one session: the kept session's first turn ended {state}");
+                    return;
+                }
+                Ok(None) => {}
+                Err(code) => {
+                    eprintln!("tasks: one session: harness wait --after: {code}");
+                    std::thread::sleep(self.look);
+                }
+            }
+        }
+    }
+
+    /// `harness ensure` said the engine is not ready: the next open after
+    /// [`NOT_READY_FIRST`], doubled at each in a row up to
+    /// [`NOT_READY_MOST`], as with no agent ready.
+    fn not_ready(&self, why: &str) -> String {
+        let mut inner = self.lock();
+        inner.not_ready_opens = inner.not_ready_opens.saturating_add(1);
+        let after = NOT_READY_FIRST
+            .saturating_mul(1 << (inner.not_ready_opens - 1).min(16))
+            .min(NOT_READY_MOST);
+        inner.next_open = Some(Instant::now() + after);
+        format!("{why}; tried again in {} s", after.as_secs())
     }
 
     /// The pane an uncertain `new` may have made: the agent `ps` lists
@@ -1697,6 +2111,44 @@ impl Turn<'_> {
                 }
                 Err(why) => return self.fallback(&why),
             };
+            // The kept session (openharness#4393): an acknowledged reply,
+            // counted only once the engine took it.
+            if let Some((name, token)) = self.one.kept_now(&agent) {
+                match harness.reply_kept(&name, &token, &text) {
+                    Took::Taken(input) => {
+                        let turns = self.counted(&agent, place, &text, Some(input));
+                        return Sent::Typed(turns);
+                    }
+                    // Busy, or its engine not ready yet: the task stays in
+                    // lamp-tasks' own queue, tried again until its end.
+                    Took::NotIdle | Took::EngineNotReady => {
+                        if ended() || Instant::now() >= until {
+                            return self.fallback("the kept session stayed busy until the run's end");
+                        }
+                        std::thread::sleep(self.one.look);
+                    }
+                    // Not running, or not taken in Harness's bound: ensured
+                    // again once (a died pane comes back resumed).
+                    Took::NotRunning | Took::Timeout if !reopened => {
+                        reopened = true;
+                        self.one
+                            .gone(&agent, "Harness did not take the words into the kept session");
+                    }
+                    Took::NotRunning | Took::Timeout => {
+                        return self.fallback("the kept session ensured again did not take them");
+                    }
+                    Took::NotSent(code) if code == "reply_off" => {
+                        self.one.no_reply_here();
+                        return Sent::NoReply;
+                    }
+                    Took::NotSent(code) => return self.fallback(&format!("harness reply: {code}")),
+                    Took::Uncertain(code) => {
+                        self.one.used(&agent, place);
+                        return Sent::Uncertain(code);
+                    }
+                }
+                continue;
+            }
             // Typed only into a pane idle with its last words taken.
             match harness.observe(&place.machine, &agent) {
                 Ok(seen) if seen.seen.state == "idle" && seen.taken => {}
@@ -1726,21 +2178,7 @@ impl Turn<'_> {
             }
             match harness.type_into(&place.machine, &agent, &text) {
                 Typed::Typed => {
-                    let mut inner = self.one.lock();
-                    let turns = inner.pane.as_mut().map_or(1, |pane| {
-                        pane.turns += 1;
-                        pane.tokens += tokens_in(&text);
-                        pane.turns
-                    });
-                    drop(inner);
-                    self.one.used(&agent, place);
-                    if turns > 1 {
-                        eprintln!(
-                            "tasks: one session: reused ({}) for {}",
-                            nth(turns),
-                            self.id
-                        );
-                    }
+                    let turns = self.counted(&agent, place, &text, None);
                     return Sent::Typed(turns);
                 }
                 Typed::NotIdle => {
@@ -1773,6 +2211,30 @@ impl Turn<'_> {
         }
     }
 
+    /// A turn typed: counted toward the rotation, with the input the kept
+    /// session took, if any.
+    fn counted(&self, agent: &str, place: &Place, text: &str, input: Option<String>) -> u64 {
+        let mut inner = self.one.lock();
+        let turns = inner.pane.as_mut().map_or(1, |pane| {
+            pane.turns += 1;
+            pane.tokens += tokens_in(text);
+            if input.is_some() {
+                pane.input = input;
+            }
+            pane.turns
+        });
+        drop(inner);
+        self.one.used(agent, place);
+        if turns > 1 {
+            eprintln!(
+                "tasks: one session: reused ({}) for {}",
+                nth(turns),
+                self.id
+            );
+        }
+        turns
+    }
+
     fn fallback(&self, why: &str) -> Sent {
         eprintln!("tasks: one session: {} not typed: {why}", self.id);
         Sent::NotTyped(why.to_owned())
@@ -1795,6 +2257,9 @@ impl Turn<'_> {
         let Some(agent) = self.one.agent() else {
             return Ended::Failed("the pane was let go".into());
         };
+        if let Some((name, token)) = self.one.kept_now(&agent) {
+            return self.wait_kept(harness, machine, &agent, (&name, &token), cancel, before_close);
+        }
         let mine = header(&self.id);
         loop {
             if cancel.load(Ordering::Acquire) {
@@ -1862,6 +2327,71 @@ impl Turn<'_> {
         }
     }
 
+    /// [`Turn::wait_end`] for the kept session (openharness#4393): `harness
+    /// wait --after` the input this turn's reply was taken as, so its idle
+    /// is this turn's end, then `show` for its answer.
+    fn wait_kept(
+        &self,
+        harness: &dyn PaneHarness,
+        machine: &str,
+        agent: &str,
+        (name, token): (&str, &Path),
+        cancel: &AtomicBool,
+        before_close: &dyn Fn(),
+    ) -> Ended {
+        let input = self.one.lock().pane.as_ref().and_then(|pane| pane.input.clone());
+        let Some(input) = input else {
+            return Ended::Failed("the kept session took no input for this turn".into());
+        };
+        loop {
+            if cancel.load(Ordering::Acquire) {
+                before_close();
+                return self.cancelled(harness, machine, agent);
+            }
+            match harness.wait_kept(name, token, &input, cancel) {
+                Ok(None) => {}
+                Ok(Some(state)) if state == "idle" => match harness.observe(machine, agent) {
+                    Ok(PaneSeen { seen, .. }) => {
+                        if let Some(pane) = self.one.lock().pane.as_mut() {
+                            pane.tokens += tokens_in(&seen.answer);
+                        }
+                        return Ended::Answered(seen.answer);
+                    }
+                    Err(code) if code == "gone" => {
+                        self.one.gone(agent, "Harness no longer has the pane");
+                        return Ended::Failed("the run ended as Harness says gone".into());
+                    }
+                    Err(_) => self.rest(cancel),
+                },
+                Ok(Some(state)) if state == "needs-input" => {
+                    let _ = harness.close_kept(name, token);
+                    self.one.closed_by_us(agent, EngineKind::Openclaw, false);
+                    self.one.gone(agent, "its turn asked something");
+                    eprintln!(
+                        "tasks: one session: {}'s turn asks something; the kept session closed --forget, ensured again next",
+                        self.id
+                    );
+                    return Ended::Failed(
+                        "the lamp's default agent stopped to ask something, and a skill's run has no one to answer, so it was ended".into(),
+                    );
+                }
+                Ok(Some(state)) => {
+                    self.one
+                        .gone(agent, &format!("Harness said it is {state}"));
+                    return Ended::Failed(format!("the run ended as Harness says {state}"));
+                }
+                Err(code) if code == "cancelled" => {
+                    before_close();
+                    return self.cancelled(harness, machine, agent);
+                }
+                Err(code) => {
+                    eprintln!("tasks: one session: harness wait --after: {code}");
+                    self.rest(cancel);
+                }
+            }
+        }
+    }
+
     fn rest(&self, cancel: &AtomicBool) {
         let until = Instant::now() + self.one.look;
         while Instant::now() < until && !cancel.load(Ordering::Acquire) {
@@ -1870,8 +2400,19 @@ impl Turn<'_> {
     }
 
     fn cancelled(&self, harness: &dyn PaneHarness, machine: &str, agent: &str) -> Ended {
-        let closed = harness.close_now(machine, agent);
-        self.one.closed_by_us(agent, EngineKind::Openclaw, true);
+        // The kept session: closed `--forget`, ensured anew next.
+        let closed = match self.one.kept_now(agent) {
+            Some((name, token)) => {
+                let closed = harness.close_kept(&name, &token).map(|()| Closed::Closed);
+                self.one.closed_by_us(agent, EngineKind::Openclaw, false);
+                closed
+            }
+            None => {
+                let closed = harness.close_now(machine, agent);
+                self.one.closed_by_us(agent, EngineKind::Openclaw, true);
+                closed
+            }
+        };
         self.one
             .gone(agent, &format!("{}'s turn was cancelled", self.id));
         match closed {
