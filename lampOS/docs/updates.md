@@ -2690,10 +2690,17 @@ build's is not written`.
 | product skills' files (`/var/lib/lampOS/skills/`) | not settings files | the folder install copies whole is placed by the round from `lamp-product-skills` ("The product's skills", above): a core skill's files put back, one turned on kept on |
 
 **Merged by key** (`apply::MERGED`, `apply::merge_own`): where Controls'
-file is the lamp's own and both it and the build's are JSON objects, each
-top-level key of the build's the lamp's lacks is added and every key the
-lamp has keeps its value, a lamp's head pins and their rest among them, as
-install keeps them. The file is written as install writes a lamp's own
+file is the lamp's own and both it and the build's are JSON objects, a
+top-level key of the build's the lamp's lacks is added, of the keys
+`MERGED` names for that file, and every key the lamp has keeps its value, a
+lamp's head pins and their rest among them. For `controls-pins.json` the
+one key is `privacy`, the section install's `own_pins_follow_build` adds:
+the build's other pin sections, `reset` (the product's factory-reset line
+100) among them, are never added, since they name lines of the product's
+wiring a board whose pins were set by hand may not share (#7123).
+For `controls.json` every key of the build's is added: each of its keys is
+one a lamp's own file must already have to be read, or an optional one;
+none names a line today. The file is written as install writes a lamp's own
 object (pretty JSON, a newline at the end) and said: `merged PATH: added
 the build's KEYS; this lamp's own values are kept`. Its record is not
 changed, so it stays the lamp's own and the next build's file never
@@ -2708,7 +2715,12 @@ Install's own key moves (the privacy section, the old guessed head pads,
 Tests (`crates/update/tests/round/install_settings.rs`):
 `a_round_over_an_older_installed_expression_gives_the_builds`,
 `a_lamps_own_pins_survive_a_round_and_gain_the_builds_new_keys`,
-`an_expression_changed_on_the_lamp_is_kept_whole_and_said`.
+`a_lamps_own_pins_without_a_reset_line_gain_privacy_and_never_the_builds_reset`,
+`an_expression_changed_on_the_lamp_is_kept_whole_and_said`; in
+`crates/update/src/apply.rs`:
+`own_pins_gain_only_privacy_and_a_put_back_restores_them`,
+`own_controls_gain_every_new_key_of_the_builds`,
+`an_own_file_not_an_object_and_a_removed_setting_are_not_merged`.
 
 ### Setup's reset plan (#806)
 
