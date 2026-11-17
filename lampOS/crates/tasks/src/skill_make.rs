@@ -1753,6 +1753,35 @@ mod tests {
         );
         assert_eq!(ran(false, "exit 0"), (Ok(0), None));
         assert!(matches!(ran(true, "exit 3"), (Err(_), None)));
+        // Left empty (the skill already said it aloud): nothing to tell.
+        assert_eq!(ran(true, &format!(": > {ANSWER_FILE}")), (Ok(0), None));
+        // 3,000 bytes are kept whole (lamp-tasks carries at most
+        // `MOST_TOLD_BYTES`, lamp-skills says about 400 characters of it);
+        // past the 20 KiB read, none, as a make's answer.
+        let long = ran(
+            true,
+            &format!("yes 'Bitcoin is at 91,204 dollars.' | head -c 3000 > {ANSWER_FILE}"),
+        );
+        assert_eq!(long.1.map(|answer| answer.len()), Some(3_000));
+        let over = ran(
+            true,
+            &format!(
+                "head -c {} /dev/zero | tr '\\0' a > {ANSWER_FILE}",
+                MOST_ANSWER_BYTES + 1
+            ),
+        );
+        assert_eq!(over, (Ok(0), None));
+        // Through a link: never followed.
+        let elsewhere = dir.path().join("elsewhere.md");
+        std::fs::write(&elsewhere, "Not the run's.").unwrap();
+        let linked = ran(
+            true,
+            &format!(
+                "rm -f {ANSWER_FILE}; ln -s {} {ANSWER_FILE}",
+                elsewhere.display()
+            ),
+        );
+        assert_eq!(linked, (Ok(0), None));
     }
 
     fn line(rules: &str, within_ms: u64) -> Vec<u8> {

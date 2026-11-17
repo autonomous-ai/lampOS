@@ -5051,7 +5051,14 @@ lamp's one read turn, one sentence a line as exact words (never a turn for
 the model, so what a mail says is never an instruction), the gate judged
 again before each, someone coming stopping it with "I'll tell you the rest
 later." The sentences are `task::told`'s: markdown's marks left out, each
-at most the say service's 900 bytes, at most 11. The skill needs no
+at most the say service's 900 bytes, all of them at most about 400
+characters (`task::MOST_TOLD_CHARS`, the first builder on #7591: a person
+answers in a sentence or two) and 10 sentences, cut at the last sentence
+end inside (at its words when the first sentence alone is longer), then
+"There's more; ask me if you want it." (`task::MORE_LINE`). The agent is
+asked for a short spoken answer, one to three sentences, and to leave it
+empty (a lone dash, or an empty `answer.md`) when the skill already said
+it aloud, which says nothing (Heron's P3 on #7591). The skill needs no
 `speak`: the owner's yes to its read grant covers it. The journal says
 only how many were said (`do.task: what its agent found: told N`), and
 before it how much of the agent's answer lamp-tasks' answer carried, its
