@@ -25,7 +25,10 @@ import json, os, re, sys
 # and #5486) didn't match: a full commit is 40 characters and the window was 24. A commit (7 to 40 hex, not all
 # digits) is read as one short word here, so the window fits it, and the commits the lifting words name are returned.
 COMMIT_RE = re.compile(r"`?\b(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b`?")
-LIFT_RE = re.compile(r"(?i)\bHOLD\b[^.\n]{0,24}\b(lifted|cleared)\b|\b(?:lift|clear)(?:ed|s|ing)? my (?:[0-9:x]+ )?HOLD(?: (?:on|at) \S+)?")
+# 18 Nov 01:1x (first builder): the SDK builder's "This lifts my READ-HOLD at 51d81222fa…" (#7474) and "This replaces my
+# READ-HOLD at ca1f6d61" (#7469) didn't match, and both sat out every train from 14:25 with two READ-OKs. "READ-HOLD"
+# is a HOLD here, and "replaces/replaced my … HOLD" in a READ-OK lifts it too.
+LIFT_RE = re.compile(r"(?i)\bHOLD\b[^.\n]{0,24}\b(lifted|cleared)\b|\b(?:lift(?:ed|s|ing)?|clear(?:ed|s|ing)?|replac(?:es|ed)) my (?:[0-9:x]+ )?(?:READ-)?HOLD(?: (?:on|at) \S+)?")
 
 
 def lifted_commits(text):
