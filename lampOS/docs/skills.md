@@ -6164,7 +6164,12 @@ bytes, as above):
   the like: a bare "API" or "URL" is not enough), never
   more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on` (on
   in the product, #7200); off, such a file is refused ("it reaches the internet, which a skill's
-  task can't on this lamp").
+  task can't on this lamp"). `net` never sits beside the camera, the
+  microphone, what the lamp says, its notes or a linked service's grant
+  (Heron's P1 on #7590): such a file is refused, nothing kept ("it reaches
+  the internet and also uses the camera, and one skill can't do both: make
+  it two skills"), as is a kept `skill.toml` naming the pair; docs/tasks.md,
+  "What a `net` run never holds, and its bounds".
 - **A linked service it uses gets that service's grants** (the owner's
   ruling, 13 Nov: anything that touches the connectors goes to the lamp's
   agent end to end), as a voice-made service skill's `do.task` carries
