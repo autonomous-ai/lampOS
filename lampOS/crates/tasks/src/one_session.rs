@@ -1168,15 +1168,8 @@ impl OneSession {
     /// A removal asked for ([`OneSession::drop_when_free`]) done now, if
     /// nothing holds the pane.
     pub fn drop_if_due(&self, harness: &dyn PaneHarness) -> bool {
-        let (why, unanswered) = {
-            let mut inner = self.lock();
-            if inner.holder.is_some() && inner.holder != inner.closing_for {
-                return false;
-            }
-            match inner.drop_due.take() {
-                Some(why) => (why, inner.closing_for.is_some()),
-                None => return false,
-            }
+        let Some((why, unanswered)) = self.take_due() else {
+            return false;
         };
         // A turn that ended unanswered keeps the kept session's token: only
         // a sign-out removes it.
@@ -1191,6 +1184,20 @@ impl OneSession {
         drop(inner);
         self.turned.notify_all();
         true
+    }
+
+    /// The removal asked for, taken if nothing holds the pane, and marked
+    /// under way in the same lock: a task waiting in [`OneSession::enter`]
+    /// that wakes between the two never sees neither (the drop due gone,
+    /// the drop not yet marked) and is never typed into the old pane.
+    fn take_due(&self) -> Option<(String, bool)> {
+        let mut inner = self.lock();
+        if inner.holder.is_some() && inner.holder != inner.closing_for {
+            return None;
+        }
+        let why = inner.drop_due.take()?;
+        inner.dropping = true;
+        Some((why, inner.closing_for.is_some()))
     }
 
     /// The pane kept: its agent, machine and engine, if any.
