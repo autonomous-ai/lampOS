@@ -1125,6 +1125,10 @@ fn worker_command(
             role,
             var(crate::service_records::redo::ENVIRONMENT).as_deref(),
         ))
+        .envs(service_records_tasks_worker_environment(
+            role,
+            var(crate::service_records::task_rows::ENVIRONMENT).as_deref(),
+        ))
         .envs(service_read_ids_worker_environment(
             role,
             var(crate::service_read_ids::ENVIRONMENT).as_deref(),
@@ -1760,6 +1764,18 @@ fn service_redo_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::service_records::redo::ENVIRONMENT, "on"))
+}
+
+// Harness task rows (the linked-service memory plan, slice 3), passed the
+// same narrow way: the exact `on`, to the second route alone, where the
+// hand-over's yes is heard. It acts only beside `LAMP_SERVICE_RECORDS`
+// (`service_records::task_rows::on`).
+fn service_records_tasks_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_records::task_rows::ENVIRONMENT, "on"))
 }
 
 // A calendar read's event ids kept for the next request (tracker row
@@ -3232,6 +3248,12 @@ mod tests {
                         "LAMP_SERVICE_REDO",
                         ["second"].as_slice(),
                     ),
+                    // Harness task rows: the second route alone.
+                    (
+                        service_records_tasks_worker_environment,
+                        "LAMP_SERVICE_RECORDS_TASKS",
+                        ["second"].as_slice(),
+                    ),
                     // A read's event ids kept: the second route alone.
                     (
                         service_read_ids_worker_environment,
@@ -3709,6 +3731,7 @@ mod tests {
                     crate::service_records::told::ENVIRONMENT,
                     crate::service_contacts::ENVIRONMENT,
                     crate::service_records::redo::ENVIRONMENT,
+                    crate::service_records::task_rows::ENVIRONMENT,
                     crate::service_read_ids::ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::keep_quietly::ENVIRONMENT,
@@ -4137,6 +4160,7 @@ mod tests {
                     "LAMP_SERVICE_CONTACTS=on",
                     "LAMP_SERVICE_READ_IDS_KEPT=on",
                     "LAMP_SERVICE_RECORDS=on",
+                    "LAMP_SERVICE_RECORDS_TASKS=on",
                     "LAMP_SERVICE_RECORDS_TOLD=on",
                     "LAMP_SERVICE_REDO=on",
                     "LAMP_SHORT_DONE=on",

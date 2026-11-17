@@ -6001,6 +6001,59 @@ in Piper's voice, `LAMP_SPOKEN_TO=off` as lamp-name didn't take Piper's
     clears it, so the note goes with it);
   - "yes, and also …" isn't shown cleanly yet.
 
+### Kept in the person's memory (linked records, slice 3, off unless `LAMP_SERVICE_RECORDS_TASKS=on`)
+
+Beside `LAMP_SERVICE_RECORDS`, on the second route only, work handed over
+on the lamp owner's heard yes is kept in their Days memory as one linked
+record, through the voice's linked outbox
+([memory-days.md](memory-days.md#the-voices-linked-outbox-slice-2-under-lamp_service_records))
+(`lamp-voice` `service_records::task_rows`):
+
+- **Whose.** The person whose yes started it, as the services find the
+  lamp's owner (`services::owner_of`): the model's `confirm_agent_task`
+  passes the line's owner, and a plain yes taken in code (#7027) the
+  owner the line's scope found. With no known person (`p-` id), nothing is
+  kept or followed. Only a task the voice itself started is ever written:
+  one it did not hand over, whatever the bus or the tasks part shows, gives
+  nothing. A skill's brief is the lamp's own make, never a row.
+- **What.** Key `t-<store>-<task>`, service `harness`, action `task`,
+  `source_kind` `task`, `source_ref` `{service:"lamp-tasks",
+  id:"<store>:<task>"}`. The summary is the work as asked (the task's
+  `text`), one line of at most 160 bytes; the agent's answer stays in the
+  tasks part (`get_observation`) and is never written.
+- **When.** `prepared` at the hand-over; then, from the task's newest
+  observation (`get_task`), `done` (idle), `failed` (failed, or a
+  hand-over never sent) or `cancelled` (stopped), each change once. A
+  question back (`needs-input`), work going on, or an unsure hand-over
+  writes nothing. Every row of a task carries its hand-over time as
+  `deed_unix_ms`, so a forget after it wins over a late outcome in the
+  memory too.
+- **Bounded.** At most 16 tasks are followed, the oldest let go first, each
+  for 12 h after its hand-over; one `get_task` a task every 10 s, at most
+  1.5 s each, on a thread of its own (`linked-task-rows`), never on a turn.
+  The map is in memory only: a task that settles after the voice restarts
+  keeps its `prepared` row.
+- **Forgets.** Forget everything (the person's or everyone's), or a forget
+  about a thing whose summary matches, lets the task go here too, before
+  the forget is sent; nothing in the tasks part is touched.
+- **Off.** Either switch off, nothing is kept, followed or asked. The Live
+  route has no such hook.
+- **Rollback.** Turn the switch off, or run an older voice: rows already
+  written stay until forgotten, and an older memory refuses the linked
+  fields, which the outbox lets go.
+
+Tests: `service_records::task_rows`'s
+`the_yes_person_is_mapped`, `no_known_person_keeps_nothing`,
+`an_unknown_or_forged_task_is_dropped`,
+`the_summary_is_at_most_160_bytes`,
+`an_outcome_is_written_once_with_the_hand_over_deed`,
+`outcomes_from_the_task`, `a_forget_lets_their_tasks_go`,
+`a_forget_about_lets_only_the_matching_tasks_go`,
+`followed_is_bounded_in_number_and_time`, `a_look_writes_what_settled`,
+`off_nothing_is_kept_or_followed`; and `agent_tasks`'s
+`a_hand_over_on_the_owners_yes_is_their_task_row` and the yes taken in
+code. Not yet played on a lamp.
+
 ### One yes for a read-back said in words (#5169; on in the product for a yes to a words-only read-back, #6547 A)
 
 Since #6547 A, with no switch and no off switch, a yes to the lamp's

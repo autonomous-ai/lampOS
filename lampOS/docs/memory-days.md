@@ -868,9 +868,10 @@ The voice's side of the write path for the records only it can name the
 person of: Harness tasks, agent writes and reminders (later slices). It
 queues each change as a `service_record` with `source_kind`, `source_ref`,
 `summary` and `deed_unix_ms`, over its own root socket
-(`lamp-voice` `service_records::linked`). Nothing puts to it yet: each
-writer comes with its own switch (`LAMP_SERVICE_RECORDS_TASKS`, `_AGENT`,
-`_REMINDERS`), and with `LAMP_SERVICE_RECORDS` off nothing is kept.
+(`lamp-voice` `service_records::linked`). Each writer comes with its own
+switch: Harness task rows (`LAMP_SERVICE_RECORDS_TASKS`, slice 3,
+[tasks.md](tasks.md)); agent and reminder rows later (`_AGENT`,
+`_REMINDERS`). With `LAMP_SERVICE_RECORDS` off nothing is kept.
 
 - **Its own bound.** At most 16 changes wait, apart from the connector
   records' 32, so a burst of task or reminder news never pushes out a
@@ -899,8 +900,11 @@ writer comes with its own switch (`LAMP_SERVICE_RECORDS_TASKS`, `_AGENT`,
   sent and again when answered, matching a forget about a thing on the
   change's service, action and summary; the memory refuses a deed from
   before a forget (slice 1).
-- **Rollback.** Nothing calls it, so an older voice differs only in having
-  no `linked_dropped` fact.
+- **Forgets reach the task rows.** The same forgets let the Harness tasks
+  followed for that person (or matching that thing) go, so a later outcome
+  is never written (slice 3).
+- **Rollback.** Only the task rows call it, behind their own switch, so an
+  older voice differs in having no `linked_dropped` fact and no task rows.
 
 ## Service contacts (`service_contact`, the voice's `LAMP_SERVICE_CONTACTS`)
 

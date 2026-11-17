@@ -21,9 +21,9 @@
 //!   forget is sent ([`unsent`], [`unsent_about`], called by the connector
 //!   records' own), and the memory refuses a deed from before a forget.
 //! - **Off.** With `LAMP_SERVICE_RECORDS` off nothing is kept
-//!   ([`Put::Off`]). Nothing puts here yet: each writer comes with its own
-//!   switch, in later slices (`LAMP_SERVICE_RECORDS_TASKS`, `_AGENT`,
-//!   `_REMINDERS`).
+//!   ([`Put::Off`]). Each writer comes with its own switch: Harness task
+//!   rows (`LAMP_SERVICE_RECORDS_TASKS`, [`super::task_rows`]); agent and
+//!   reminder rows in later slices (`_AGENT`, `_REMINDERS`).
 use super::{Status, tidy};
 use serde_json::{Value, json};
 use std::collections::VecDeque;
@@ -289,12 +289,14 @@ pub fn unsent(person: Option<&str>) {
             .waiting
             .retain(|change| person.is_some_and(|person| change.person != person));
     });
+    super::task_rows::forgot(person);
 }
 
 /// A forget about a thing of `person`'s is about to be sent, or was
 /// answered: the linked changes waiting whose service, action or summary
 /// `matches` go.
 pub fn unsent_about(person: &str, matches: impl Fn(&str) -> bool) {
+    super::task_rows::forgot_about(person, &matches);
     kept::outbox(|outbox| {
         outbox.waiting.retain(|change| {
             change.person != person

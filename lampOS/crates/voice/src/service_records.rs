@@ -229,7 +229,7 @@ pub fn on_for_test(on: bool) {
     kept::ON.with(|cell| cell.set(on));
 }
 
-fn unix_ms() -> u64 {
+pub(crate) fn unix_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |since| {
@@ -1171,6 +1171,7 @@ fn start_saver() {}
 
 pub mod linked;
 pub mod redo;
+pub mod task_rows;
 pub mod told;
 
 #[cfg(test)]

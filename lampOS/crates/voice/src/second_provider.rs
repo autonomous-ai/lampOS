@@ -1598,10 +1598,11 @@ pub type TaskNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
 /// task dropped and the note it gets, or nothing.
 pub type TaskDeclined = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 /// A heard line's whole plain yes to a task this voice prepared and read
-/// back (`crate::agent_tasks::yes_taken`, #7027): with its request and
-/// words, the task started in code and the note it gets, or nothing.
-/// Blocking: it asks the tasks part.
-pub type TaskYes = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
+/// back (`crate::agent_tasks::yes_taken`, #7027): with its request, words
+/// and the lamp's owner who said it (`services::owner_of`, for the task's
+/// linked record), the task started in code and the note it gets, or
+/// nothing. Blocking: it asks the tasks part.
+pub type TaskYes = Arc<dyn Fn(u64, &str, Option<&str>) -> Option<String> + Send + Sync>;
 /// [`TaskNote`] with the request's own words too: a new ask while a task
 /// waits replaces it (#6547 B, `crate::agent_tasks::pending_note`).
 pub type WaitingNote = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
@@ -10961,7 +10962,8 @@ async fn spoken(
                 && crate::services::plain_yes(&text) =>
         {
             let (yes, words) = (yes.clone(), text.clone());
-            tokio::task::spawn_blocking(move || yes(request, &words))
+            let person = crate::services::owner_of(scope.as_ref());
+            tokio::task::spawn_blocking(move || yes(request, &words, person.as_deref()))
                 .await
                 .ok()
                 .flatten()
