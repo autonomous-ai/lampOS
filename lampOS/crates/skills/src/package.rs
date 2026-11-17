@@ -362,6 +362,17 @@ pub fn skill_name_ok(name: &str) -> bool {
     plain_name(name) && !name.contains('_')
 }
 
+/// Names no skill is ever put on as: a live voice ask's run
+/// (`lamp_services::VOICE_ASK_SKILL`, Heron's P3 on #7509), whose token,
+/// service calls and say lines carry it; a real skill so named would share
+/// its counts and its say lines.
+pub const RESERVED_NAMES: [&str; 1] = [lamp_services::VOICE_ASK_SKILL];
+
+/// Whether `name` is one of [`RESERVED_NAMES`].
+pub fn name_reserved(name: &str) -> bool {
+    RESERVED_NAMES.contains(&name)
+}
+
 /// One part of a path in a skill: letters, digits, `-`, `_` and `.`, not
 /// beginning with a dot (hidden, as a Mac's `._NAME`), at most 100 bytes.
 fn part_ok(part: &str) -> bool {
@@ -2241,6 +2252,11 @@ fn put_in(
             "not installed: {name:?} is not a skill's name: 1 to 64 lowercase letters, digits and hyphens"
         ));
     }
+    if name_reserved(&name) {
+        return Err(format!(
+            "not installed: {name:?} is the lamp's own name, never a skill's"
+        ));
+    }
     let staged = hidden_place(skills, "install", &name);
     let made = (|| -> Result<String, String> {
         let failed = |error: io::Error| format!("not installed: {}: {error}", staged.display());
@@ -3373,6 +3389,41 @@ pub fn list(skills: &Path) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Heron's P3 on #7509: no skill is put on as a live voice ask's run
+    /// (`voice-ask`), whatever its folder holds; the same folder under
+    /// another name goes on.
+    #[test]
+    fn a_skill_is_never_put_on_as_the_voice_asks_name() {
+        assert!(name_reserved(lamp_services::VOICE_ASK_SKILL));
+        assert!(skill_name_ok("voice-ask") && !name_reserved("voice-asks"));
+        let dir = tempfile::tempdir().unwrap();
+        let skills = dir.path().join("skills");
+        fs::create_dir_all(&skills).unwrap();
+        for name in ["voice-ask", "voice-asks"] {
+            let folder = dir.path().join(name);
+            fs::create_dir_all(&folder).unwrap();
+            fs::write(
+                folder.join("skill.toml"),
+                "version = \"1.0.0\"\ndescription = \"x\"\n",
+            )
+            .unwrap();
+            let put = install(&skills, None, &folder);
+            if name == "voice-ask" {
+                let why = put.unwrap_err();
+                assert!(why.contains("never a skill's"), "{why}");
+                assert!(!skills.join(name).exists());
+            } else {
+                // Never refused for its name.
+                assert!(
+                    put.as_ref()
+                        .err()
+                        .is_none_or(|why| !why.contains("never a skill's")),
+                    "{put:?}"
+                );
+            }
+        }
+    }
 
     /// A pushed folder named `name` in `dev`, said as pushed by `client`.
     fn pushed_folder(dev: &Path, name: &str, client: &str) {
