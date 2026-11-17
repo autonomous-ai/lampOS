@@ -746,7 +746,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_HARNESS_HOLD_UPDATES` | A home lamp keeps the Harness it was given, a test lamp takes Harness's updates; both check it is up. |
 | `LAMP_TASKS_RESUME_CLOSED` | If the session you name for work was closed, the lamp reopens it and hands the work over. |
 | `LAMP_TASKS_STEPS` | The dev monitor page shows each step the lamp's own agent takes on a task, as it takes it. |
-| `LAMP_TASKS_ONE_SESSION` | Off in the product; the fallback is ready for a switch-on later. Once on, on an OpenClaw lamp your tasks and skills share one agent session, so the lamp no longer runs out of memory. |
+| `LAMP_TASKS_ONE_SESSION` | Not on yet: once on, an OpenClaw lamp's tasks and skills share one agent session to save memory. |
 | `LAMP_SECOND_SPEECH_SOCKET` | Nothing you'd notice: opens the speech connection early to try to start talking sooner. |
 | `LAMP_SECOND_SPEECH_SOCKET_MODEL` | Nothing you'd notice: picks the voice engine for the early speech connection, keeping one voice per answer. |
 | `LAMP_SECOND_CHAT_SECOND_TRY` | When a reply is slow to start, the lamp asks once more, so fewer turns end with "my thoughts are slow". |
