@@ -76,7 +76,14 @@ keeps an old state live longer. A header of another clock has expired. A
 state without `clock`, from a Controls build before it, is still read by
 the wall clock and is said once in the journal (`lamp-voice: privacy: the
 Controls state of publisher … says no clock`), not refused, since an update
-round can mix builds (queue #3997, C; [bus.md](bus.md)).
+round can mix builds (queue #3997, C; [bus.md](bus.md)). The boot id is Linux's
+`/proc/sys/kernel/random/boot_id`, and on a Mac the boot session uuid
+(`kern.bootsessionuuid`, read once through `/usr/sbin/sysctl`): one id, from
+`lamp_bus::kernel_boot_id`, that Controls' stamp (`lamp_controls::runtime::clock_id`)
+and the bus both use, so on a Mac the state is judged by CLOCK_MONOTONIC too, and
+a clock step or a sleep cannot make an old state look fresh. The "says no clock"
+line is said on a Mac only when that read failed (then the wall clock judges, as
+on any build without the id), never with a made-up id.
 Invalid types, publisher or reader changes, future/stale evidence, reordered
 messages, skipped Bus publications and receive overflow end this worker,
 with one allowance: until Controls' publisher finds the worker's new socket
