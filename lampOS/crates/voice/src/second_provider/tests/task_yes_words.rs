@@ -98,8 +98,8 @@ fn make_form(heard: &str) -> Value {
         .unwrap()
 }
 
-/// #6921 P3: the forced approval round is told only `approve_id` and
-/// `answer`, both required, so the forced call carries no make or edit
+/// #6921 P3: the forced approval round is told only `approve_id`,
+/// `answer` and `named` (#7545), all required, so the forced call carries no make or edit
 /// beside the answer; the answer's choices are kept. Without the force
 /// the form is told whole.
 #[test]
@@ -113,7 +113,7 @@ fn photo2_the_forced_round_is_told_only_the_approval_fields() {
         .map(String::as_str)
         .collect();
     told.sort_unstable();
-    assert_eq!(told, [yes::ANSWER, yes::APPROVE_ID]);
+    assert_eq!(told, [yes::ANSWER, yes::APPROVE_ID, yes::NAMED]);
     assert_eq!(form["required"], json!(yes::APPROVE_FIELDS));
     assert_eq!(form["properties"][yes::ANSWER]["enum"], json!(yes::ANSWERS));
     yes::clear_for_test();
@@ -148,14 +148,18 @@ fn went(heard: &str, rounds: Vec<Vec<net::Result<ChatEvent>>>) -> Went {
     let (seen, kept) = (ran.clone(), approved.clone());
     let tools: ToolRunner = Arc::new(move |request, heard, name, args| {
         let answer = match args[yes::APPROVE_ID].as_str() {
-            Some(id) if name == crate::made_skill::MAKE => {
-                yes::answered(id, request, args[yes::ANSWER].as_str()).unwrap_or_else(|| {
-                    yes::approve(id, request, heard, true, Instant::now(), |_| {
-                        *kept.lock().unwrap() += 1;
-                        Ok(json!({"kept": true}))
-                    })
+            Some(id) if name == crate::made_skill::MAKE => yes::answered(
+                id,
+                request,
+                args[yes::ANSWER].as_str(),
+                args[yes::NAMED].as_str(),
+            )
+            .unwrap_or_else(|| {
+                yes::approve(id, request, heard, true, Instant::now(), |_| {
+                    *kept.lock().unwrap() += 1;
+                    Ok(json!({"kept": true}))
                 })
-            }
+            }),
             _ => json!({"next": "Say: done."}),
         };
         seen.lock().unwrap().push((name, args, answer.clone()));
@@ -193,7 +197,7 @@ fn answers(id: &str, answer: &str) -> Vec<net::Result<ChatEvent>> {
         Ok(ChatEvent::ToolCalls(vec![call(
             "c1",
             crate::made_skill::MAKE,
-            json!({ yes::APPROVE_ID: id, yes::ANSWER: answer }),
+            json!({ yes::APPROVE_ID: id, yes::ANSWER: answer, yes::NAMED: yes::NAMED_NONE }),
         )])),
         Ok(ChatEvent::Done),
     ]
@@ -277,7 +281,7 @@ fn photo2_unclear_keeps_nothing_and_asks_once_more_only_once() {
     assert!(yes::awaited(Instant::now()));
     yes::lamp_said(1, "Sorry: may it go ahead?");
     assert_eq!(forced("Maybe."), None);
-    let again = yes::answered(&id, 2, Some("unclear")).unwrap();
+    let again = yes::answered(&id, 2, Some("unclear"), None).unwrap();
     assert_eq!(again["next"], yes::DECLINED_NEXT);
     assert!(!yes::awaited(Instant::now()));
     task_yes::set_on_here(None);
