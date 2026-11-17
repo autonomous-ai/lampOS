@@ -501,6 +501,14 @@ pub(crate) struct MadeFolder {
     fd: rustix::fd::OwnedFd,
 }
 
+impl MadeFolder {
+    /// `text` as the new file `name` in this folder (0600, never through a
+    /// link, never one there).
+    pub(crate) fn write(&self, name: &str, text: &str) -> std::io::Result<()> {
+        file_in(&self.fd, name, text)
+    }
+}
+
 impl Drop for MadeFolder {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.path);
@@ -1279,7 +1287,10 @@ impl Runner for MakeHermes {
         if self.hermes.folder != self.make_work || !(own || one_path) {
             return Err(NO_NAMESPACE.into());
         }
-        if self.egress.is_some() && !has(&self.ns, crate::egress::NS_LINE) {
+        if self.egress.is_some()
+            && !(has(&self.ns, crate::egress::NS_LINE)
+                && has(&self.ns, crate::egress::NS_OWN_SKILL_LINE))
+        {
             return Err(crate::egress::NO_EGRESS.into());
         }
         Ok(())

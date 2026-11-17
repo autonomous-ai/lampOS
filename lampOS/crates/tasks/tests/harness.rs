@@ -8680,10 +8680,11 @@ fn a_gateway_default_whose_start_never_ran_fails_and_hermes_is_as_before() {
 /// and Hermes's make lines.
 fn ns_with_net_runs() -> String {
     format!(
-        "{}{}\n  {} fail ;; esac\n{}",
+        "{}{}\n  {} fail ;; esac\n  {}\n{}",
         ns_with_runs(),
         lamp_tasks::egress::NS_LINE,
         lamp_tasks::egress::NS_SKILL_LINE,
+        lamp_tasks::egress::NS_OWN_SKILL_LINE,
         lamp_tasks::skill_make::ONE_PATH_NS_MAKE_LINES
     )
 }
