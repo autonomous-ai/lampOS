@@ -923,8 +923,13 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     }
     // The connected services' functions, before the executive's: never the
     // ones the executive or a skill names (`voices_own`).
+    // A recurring thing for the lamp to do is a skill to make, told in the
+    // reminders' and the read's own words (`LAMP_SKILL_RECURRING_TOLD`),
+    // only while `make_skill` is declared.
+    let recurring = settings.make_skill && crate::skill_recurring::on();
     if let Some(folder) = &settings.services {
-        tools.extend(crate::services::tools(folder));
+        let read = recurring.then_some(crate::skill_recurring::READ_TOLD);
+        tools.extend(crate::services::tools_told(folder, read));
     }
     if let Some(directory) = &settings.exec {
         let room = bound.saturating_sub(tools.len());
@@ -937,6 +942,9 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
                 })
                 .take(room),
         );
+    }
+    if recurring {
+        crate::skill_recurring::tell_reminders(&mut tools);
     }
     tools
 }
