@@ -564,6 +564,41 @@ impl Faces {
     pub fn check(&self) -> Result<(), Invalid> {
         self.faces.iter().try_for_each(Face::check)
     }
+
+    /// A message on `topic` as skills may see it (#7442, the Reviewer-lead's
+    /// P2 on #7450): on [`Self::TOPIC`], each face's `pitch` and `looking`
+    /// are taken out unless the face-expressions yes is kept at `yes_file`
+    /// ([`consent::read`]: missing or unreadable is no yes). Where a face
+    /// looks is for the lamp's own parts (the voice's said-to-me rule); a
+    /// skill can send what it reads off the lamp. Any other topic, a payload
+    /// with neither field, or not JSON, is passed as it came.
+    pub fn for_skills<'a>(
+        topic: &str,
+        payload: &'a [u8],
+        yes_file: &std::path::Path,
+    ) -> std::borrow::Cow<'a, [u8]> {
+        use std::borrow::Cow;
+        if topic != Self::TOPIC {
+            return Cow::Borrowed(payload);
+        }
+        let Ok(mut value) = serde_json::from_slice::<serde_json::Value>(payload) else {
+            return Cow::Borrowed(payload);
+        };
+        let mut had = false;
+        for face in value
+            .get_mut("faces")
+            .and_then(serde_json::Value::as_array_mut)
+            .into_iter()
+            .flatten()
+            .filter_map(serde_json::Value::as_object_mut)
+        {
+            had |= face.remove("pitch").is_some() | face.remove("looking").is_some();
+        }
+        if !had || consent::read(yes_file, consent::FACE_EXPRESSIONS).yes {
+            return Cow::Borrowed(payload);
+        }
+        Cow::Owned(serde_json::to_vec(&value).unwrap_or_default())
+    }
 }
 
 /// What was heard, or what was said, as text (`voice/heard`,
@@ -2845,6 +2880,48 @@ mod tests {
             let faces = Faces { faces: vec![wrong] };
             assert!(faces.check().unwrap_err().0.contains("face \"f7\""));
         }
+    }
+
+    /// #7442: skills see no `pitch` or `looking` without the face-expressions
+    /// yes (missing, a "no" or unreadable all count as none); with it, the
+    /// payload passes whole. Other topics and payloads without them pass too.
+    #[test]
+    fn skills_see_where_a_face_looks_only_with_the_expressions_yes() {
+        let folder = std::env::temp_dir().join(format!("msgs-gaze-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let yes = consent::file_in(&folder, consent::FACE_EXPRESSIONS).unwrap();
+        let gaze = br#"{"faces":[{"id":"f1","xmin":0.2,"ymin":0.2,"xmax":0.4,"ymax":0.5,"confidence":0.9,"facing":true,"pitch":0.6,"looking":false}]}"#;
+        let seen = |payload: &[u8]| {
+            serde_json::from_slice::<Faces>(&Faces::for_skills(Faces::TOPIC, payload, &yes))
+                .unwrap()
+                .faces
+                .remove(0)
+        };
+        for kept in [None, Some(r#"{"face_expressions":"no"}"#), Some("not json")] {
+            match kept {
+                Some(text) => std::fs::write(&yes, text).unwrap(),
+                None => drop(std::fs::remove_file(&yes)),
+            }
+            let face = seen(gaze);
+            assert_eq!((face.pitch, face.looking), (None, None), "{kept:?}");
+            assert_eq!(face.facing, Some(true), "{kept:?}");
+        }
+        std::fs::write(
+            &yes,
+            consent::bytes(consent::FACE_EXPRESSIONS, 1, consent::BY_VOICE),
+        )
+        .unwrap();
+        assert!(matches!(
+            Faces::for_skills(Faces::TOPIC, gaze, &yes),
+            std::borrow::Cow::Borrowed(_)
+        ));
+        let face = seen(gaze);
+        assert_eq!((face.pitch, face.looking), (Some(0.6), Some(false)));
+        std::fs::remove_file(&yes).unwrap();
+        let plain = br#"{"faces":[{"id":"f1","pitch":0.6}]}"#;
+        assert_eq!(&*Faces::for_skills("room/activity", plain, &yes), plain);
+        assert_eq!(&*Faces::for_skills(Faces::TOPIC, b"[1]", &yes), b"[1]");
+        std::fs::remove_dir_all(&folder).unwrap();
     }
 
     #[test]

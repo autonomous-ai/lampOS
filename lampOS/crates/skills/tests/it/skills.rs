@@ -2546,6 +2546,41 @@ fn runs_at(skill: &Path, messages: &[(u64, &str, &str)]) -> Vec<(u64, Vec<Call>)
     runs
 }
 
+/// #7442, the Reviewer-lead's P2 on #7450: a skill that would fire on a
+/// face's `looking` sees it only with the face-expressions yes, as the
+/// program hands it the faces (`Faces::for_skills`).
+#[test]
+fn a_skill_sees_where_a_face_looks_only_with_the_expressions_yes() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = skill_with(
+        dir.path(),
+        "gaze",
+        "[trigger]\ntopic = \"humans/faces/tracked\"\neach = \"faces\"\nkey = \"id\"\n\
+         field = \"looking\"\nequals = false\nwhen = \"appears\"\n\
+         [ask]\npolicy = \"news\"\n[[do]]\nbody = { gesture = \"nod\" }\n",
+    );
+    let yes = dir.path().join("face-expressions.json");
+    let away = r#"{"faces":[{"id":"a","xmin":0.25,"ymin":0.25,"xmax":0.75,"ymax":0.5,"confidence":0.9,"pitch":0.6,"looking":false}]}"#;
+    let toward = away.replace("false", "true");
+    // Looking at the lamp first, then away: what was there at the start is
+    // not news.
+    let seen = |yes: &Path| {
+        let [first, then] = [toward.as_bytes(), away.as_bytes()]
+            .map(|payload| Faces::for_skills(Faces::TOPIC, payload, yes).into_owned());
+        let text = |payload: &[u8]| String::from_utf8(payload.to_vec()).unwrap();
+        runs_at(
+            &skill,
+            &[
+                (0, Faces::TOPIC, &text(&first)),
+                (1, Faces::TOPIC, &text(&then)),
+            ],
+        )
+    };
+    assert!(seen(&yes).is_empty(), "no yes, no looking");
+    fs::write(&yes, r#"{"version":1,"face_expressions":"yes"}"#).unwrap();
+    assert_eq!(seen(&yes).len(), 1, "with the yes, looking");
+}
+
 /// Someone at the desk each minute from `from` to `to` seconds, gone for
 /// 30 s after each of `away`.
 fn sitting(from: u64, to: u64, away: &[u64]) -> Vec<(u64, &'static str, &'static str)> {

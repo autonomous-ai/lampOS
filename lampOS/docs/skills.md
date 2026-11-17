@@ -48,7 +48,11 @@ Senses are **topics** on the bus ([bus.md](bus.md), [msgs.md](msgs.md));
 actions are **services**, one JSON line in and one out on a socket.
 
 Topics a skill can read today: `humans/faces/tracked` (faces, a passing id,
-whether turned to the lamp), `voice/heard`, `voice/said`, `voice/state`,
+whether turned to the lamp; a face's `pitch` and `looking`, with the eyes'
+`LAMP_EYES_PITCH_GAZE=on`, only while the face-expressions yes is kept:
+without it, missing or unreadable, `lamp-skills` takes both out before any
+skill's trigger, condition or watch sees the faces, `Faces::for_skills`,
+#7442), `voice/heard`, `voice/said`, `voice/state`,
 `room/state`, `room/presence` (whether anyone is at the lamp, with the
 eyes' `LAMP_PRESENCE=on`, [presence.md](presence.md)), `name/heard`,
 `controls/touch`, `controls/gesture`,
