@@ -1956,7 +1956,9 @@ một byte (`crates/tasks/src/one_session.rs`).
   nói của giọng nói cho việc này là việc tiếp theo.
 - **Không reset sau lần chạy kỹ năng.** Những gì một lần chạy đã đọc vẫn
   ở lại trong phiên (giai đoạn này chỉ một người dùng, lý do 2 của lead).
-  Lần bắt đầu lại duy nhất là xoay vòng: pane mới sau 40 lượt
+  Pane của OpenClaw không bao giờ bị xoay theo số lượt: gateway của nó tự
+  nén phiên (`agents.defaults.compaction`), nên đèn giữ một hội thoại
+  (`rotation_due`). Chỉ engine không tự nén mới có pane mới sau 40 lượt
   (`ROTATE_TURNS`) hoặc 250k token (`ROTATE_TOKENS`), như gateway của
   Hermes xoay vòng (`runtimes/hermes/rotation.go`). Harness không cho biết
   số token, nên token được ước tính 4 ký tự một token từ lời đã gõ, câu
@@ -2109,8 +2111,8 @@ y như trên, kể cả đường lùi `reply_off`.
   rồi việc thất bại như trước. Kết thúc của một lần chạy kỹ năng là
   `harness wait lamp-one-openclaw --after <inputId>` (0 rảnh, rồi `show` lấy
   câu trả lời; 3 có câu hỏi, đóng `--forget`; 4 đã mất).
-- **Xoay vòng và gỡ bỏ.** Xoay vòng (40 lượt hoặc 250k token) là
-  `ensure --fresh`. Huỷ, câu hỏi không ai trả lời, đăng xuất hoặc đổi engine
+- **Xoay vòng và gỡ bỏ.** Phiên giữ lại của OpenClaw không bị xoay theo
+  số lượt (nó tự nén); khi có xoay vòng thì là `ensure --fresh`. Huỷ, câu hỏi không ai trả lời, đăng xuất hoặc đổi engine
   là `harness close lamp-one-openclaw --program-token-file … --forget`, xoá
   hội thoại; đăng xuất hoặc đổi engine xoá cả file token. Phiên chưa đóng
   được thì thử lại ở lần nhìn sau, và trong lúc đó không mở pane nào.
