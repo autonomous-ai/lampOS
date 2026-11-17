@@ -3589,8 +3589,9 @@ impl Run<'_, '_> {
     /// A signed build for a newer updater than this one: refused, with
     /// nothing fetched or written. With `LAMP_UPDATE_SELF=on`, when it
     /// carries a lamp-update of this channel's, newer than the build the
-    /// lamp runs and not put back before, that one alone is taken: then
-    /// `check` says so and a round with `--apply on` switches to it.
+    /// lamp runs and not one put back and still refused
+    /// ([`own::refused_for_good`]), that one alone is taken: then `check`
+    /// says so and a round with `--apply on` switches to it.
     fn too_old(&mut self, state: &State, too_old: TooOld) -> Outcome {
         let why = too_old.why();
         let Some(carried) = too_old.carried.as_ref() else {
@@ -3606,7 +3607,7 @@ impl Run<'_, '_> {
         if !self.config.self_switch
             || !ours
             || !newer
-            || own::refused_for_good(self.records.folder(), &carried.sha256)
+            || own::refused_for_good(self.records.folder(), &self.config.root, &carried.sha256)
         {
             return Outcome::Refused(why);
         }
@@ -3666,9 +3667,9 @@ impl Run<'_, '_> {
     /// Phase 1 of lamp-update's own switch (crate::own), once the parts run
     /// build `sequence`: its lamp-update installed beside, `self.json`
     /// written, then `update/current` moved. None when lamp-update already
-    /// runs that binary, the build has none, it was put back before, or
-    /// `update/current` is not install's link. What goes wrong is said, and
-    /// the parts' outcome stands.
+    /// runs that binary, the build has none, it was put back and is still
+    /// refused ([`own::how_refused`]), or `update/current` is not install's
+    /// link. What goes wrong is said, and the parts' outcome stands.
     fn own(&mut self, sequence: u64) -> Option<Outcome> {
         let manifest = self.seen.take().filter(|seen| seen.sequence == sequence)?;
         match self.own_switch(&manifest) {
@@ -3691,10 +3692,18 @@ impl Run<'_, '_> {
         let old = old.to_string_lossy().into_owned();
         if !unit::is_build_folder(&unit::folder(own::FOLDER, &old))
             || file_sha256(&link.join(own::BINARY)).is_ok_and(|sha| sha == file.sha256)
-            || own::refused_for_good(self.records.folder(), &file.sha256)
         {
             return Ok(None);
         }
+        // How the build stands with its put-backs is read once, here: what
+        // it says holds for the rest of this switch, whatever the clock
+        // does meanwhile.
+        let once_more =
+            match own::how_refused(self.records.folder(), &self.config.root, &file.sha256) {
+                own::Refused::ForGood => return Ok(None),
+                own::Refused::OnceMore(why) => Some(why),
+                own::Refused::No => None,
+            };
         own::recovery_ready(&self.config.root, self.world.systemd)?;
         let new_folder = unit::folder(own::FOLDER, &file.sha256);
         let there = self.config.on(&new_folder);
@@ -3748,14 +3757,26 @@ impl Run<'_, '_> {
             self.say("lamp-update's own switch waits: the settings writer was refreshed and has not proved itself yet");
             return Ok(None);
         }
-        // One put back across a reboot is tried once more (#2810), said.
-        if own::retry(self.records.folder(), &file.sha256)
-            .map_err(|error| format!("self-refused cannot be written: {error}"))?
+        // One put back once is tried once more, said with why (#2810,
+        // #6901): written as retried first, so a second put-back is final.
+        if let Some(why) = once_more
+            && own::retry(self.records.folder(), &file.sha256)
+                .map_err(|error| format!("self-refused cannot be written: {error}"))?
         {
-            self.say(&format!(
-                "lamp-update's build {} was put back after a reboot came in its minutes: it is tried once more, and a second put-back is final",
-                &file.sha256[..12]
-            ));
+            match why {
+                own::OnceMore::Reboot => self.say(&format!(
+                    "lamp-update's build {} was put back after a reboot came in its minutes: it is tried once more, and a second put-back is final",
+                    &file.sha256[..12]
+                )),
+                own::OnceMore::LaterBoot => self.say(&format!(
+                    "lamp-update's build {} was put back and the lamp is on a later boot now: it is tried once more, and a second put-back is final",
+                    &file.sha256[..12]
+                )),
+                own::OnceMore::Day => self.say(&format!(
+                    "lamp-update's build {} was put back 24 hours ago or more: it is tried once more, and a second put-back is final",
+                    &file.sha256[..12]
+                )),
+            }
         }
         own::note_began(self.records.folder(), &self.config.root, &file.sha256)
             .map_err(|error| format!("self-began cannot be written: {error}"))?;

@@ -707,7 +707,14 @@ right after the switch), `part_unwell` (a part not well after it) or `other`
 `update.check` with `{"retry": SEQUENCE}`, a whole number, which drops that
 build's refusal before the round, so the round takes it again. A sequence that
 is not refused is a plain check, and a build that is really unwell is refused
-again by the round itself, so a retry never loops. A `retry` that is not a
+again by the round itself, so a retry never loops. Any `retry`, of a refused
+sequence or not, also lets every lamp-update binary the lamp put back before
+be switched or climbed to again (#6901: lamp-update's `self-refused` is
+emptied before the round; [updates.md](updates.md), "A build put back is
+tried once more"), so a lamp whose rounds said only `… waiting for a newer
+updater` can be retried too; put back again, that binary is refused again by
+the round. While a switch of lamp-update's own is under way they stay
+refused, and a retry after it is settled lets them go. A `retry` that is not a
 whole number is refused, `retry must be the refused build's sequence, a whole
 number`, and nothing is sent. The same minute and the same refusals apply.
 

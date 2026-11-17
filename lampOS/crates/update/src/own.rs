@@ -15,9 +15,9 @@
 //! 3. `lamp-update-back`, at a fixed path no round writes itself (`install`
 //!    does, and the writer's one-shot unit refreshes it from a confirmed
 //!    lamp-update, crate::writer_swap), puts the link back when `self.json`
-//!    is still there and
-//!    lamp-update has failed (`OnFailure=`) or [`DEADLINE`] has passed (its
-//!    timer). The binary is refused from then on, and lamp-update started
+//!    is still there and lamp-update has failed (`OnFailure=`) or
+//!    [`DEADLINE`] has passed (its timer). The binary is refused from then
+//!    on, but for one more try ([`how_refused`]), and lamp-update started
 //!    again.
 //!
 //! `self.json` is read by a lamp-update-back as old as the lamp's install,
@@ -43,7 +43,7 @@ use std::{
     fs, io,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 /// The switch, in lamp-update.service's environment: `on`, or off.
@@ -156,6 +156,8 @@ fn written_unix_ms(records: &Path) -> Option<u64> {
 /// When that other build is already refused and the link's is not, a cut
 /// came inside [`settle`] after the link went back: the link names the old
 /// build, the put-back is done, and only the file is left to set aside.
+/// The owner's retry leaves `self-refused` as it is while the file is
+/// there ([`forget_refused`]), so that reading holds.
 pub fn known_builds(records: &Path, root: &Path) -> Option<Known> {
     let link = on_root(root, CURRENT);
     let written = fs::metadata(records.join(PENDING)).ok()?.modified().ok()?;
@@ -267,8 +269,10 @@ fn settle(records: &Path, root: &Path, say: &mut dyn FnMut(&str)) -> Result<Unre
 
 fn refuse(records: &Path, root: &Path, build: &str) -> Result<(), String> {
     // The boot it is put back on, first: the retry rule reads it beside
-    // the boot its switch began on (Tests' P2 on #4131). Not known, it is
-    // not noted, and the build is never tried again.
+    // the boot its switch began on (Tests' P2 on #4131) and the boot of
+    // the round that asks, and this file's own time as when it was put
+    // back (#6901). Not known, it is not noted, and the build is never
+    // tried again.
     if let Some(boot) = boot_id(root) {
         write_whole(
             &records.join(PUT_BACK),
@@ -296,8 +300,8 @@ fn end(records: &Path) -> io::Result<()> {
     }
 }
 
-/// The binaries put back, by SHA-256: never switched to again, unless
-/// once more ([`refused_for_good`]).
+/// The binaries put back, by SHA-256: not switched to again, unless once
+/// more ([`how_refused`]) or after the owner's retry ([`forget_refused`]).
 pub fn refused(records: &Path) -> Vec<String> {
     builds_in(&records.join(REFUSED))
 }
@@ -316,19 +320,66 @@ fn builds_in(path: &Path) -> Vec<String> {
         .collect()
 }
 
-/// Whether a build put back is never taken again (#2810). A put-back says
-/// only that the switch was not confirmed in time. A power cut or a reboot
-/// in its ten minutes reads the same as a build that can't run, and on a
-/// lamp with no clock of its own the jump of its clock at the next boot can
-/// pass the deadline before the confirming round runs. So a build whose
-/// switch began on one boot and was put back on another is tried once
-/// more. One put back on the boot it began on, or put back a second time,
-/// or by a `lamp-update-back` that notes no boot (one older than this
-/// rule), stays refused.
-pub fn refused_for_good(records: &Path, build: &str) -> bool {
-    refused(records).iter().any(|known| known == build)
-        && (retried(records).iter().any(|known| known == build)
-            || !put_back_on_another_boot(records, build))
+/// How long a build put back stays refused on the boot it was put back on,
+/// before it is tried once more (#6901): on the wall clock.
+pub const AGAIN_AFTER: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// Why a build put back is tried once more ([`how_refused`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OnceMore {
+    /// Its switch began on one boot and it was put back on another: a
+    /// reboot or a power cut came in its ten minutes (#2810).
+    Reboot,
+    /// The lamp is on a later boot than the one it was put back on (#6901).
+    LaterBoot,
+    /// [`AGAIN_AFTER`] has passed since it was put back (#6901).
+    Day,
+}
+
+/// How a build stands in `self-refused` ([`how_refused`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Refused {
+    /// Not in it: a round switches to the build.
+    No,
+    /// Put back once: a round tries it once more, and why.
+    OnceMore(OnceMore),
+    /// No round switches to it: for good, or, for one put back once with
+    /// its boot noted, until a later boot or [`AGAIN_AFTER`] has passed.
+    ForGood,
+}
+
+/// How a build put back stands (#2810, #6901). A put-back says only that
+/// the switch was not confirmed in time. A power cut or a reboot in its ten
+/// minutes reads the same as a build that can't run, and so does a Wi-Fi
+/// drop or a refused download; on a lamp with no clock of its own the jump
+/// of its clock at the next boot can pass the deadline before the
+/// confirming round runs. So a build put back once is tried once more as
+/// soon as one of these holds, the first that does being the reason:
+///
+/// 1. its switch began on one boot and it was put back on another;
+/// 2. the lamp is on a later boot than the one it was put back on;
+/// 3. [`AGAIN_AFTER`] has passed since it was put back.
+///
+/// Until then it stays refused. One put back a second time ([`retry`] wrote
+/// it to `self-retried` before its second try), or with no boot noted at
+/// its put-back (a boot that was not known, or a `lamp-update-back` older
+/// than #2810's rule), is refused for good: only the owner's retry
+/// ([`forget_refused`]) lets it go.
+pub fn how_refused(records: &Path, root: &Path, build: &str) -> Refused {
+    let is_in = |builds: Vec<String>| builds.iter().any(|known| known == build);
+    if !is_in(refused(records)) {
+        return Refused::No;
+    }
+    if is_in(retried(records)) {
+        return Refused::ForGood;
+    }
+    once_more(records, root, build).map_or(Refused::ForGood, Refused::OnceMore)
+}
+
+/// Whether no round takes a build put back, as things stand
+/// ([`how_refused`]).
+pub fn refused_for_good(records: &Path, root: &Path, build: &str) -> bool {
+    how_refused(records, root, build) == Refused::ForGood
 }
 
 /// This boot's id under `root`, when the kernel gives one.
@@ -339,7 +390,7 @@ pub fn boot_id(root: &Path) -> Option<String> {
 }
 
 /// Noted as a switch to `build` begins: the boot it begins on. Nothing is
-/// noted when the boot is not known, and then no retry is ever made.
+/// noted when the boot is not known.
 pub(crate) fn note_began(records: &Path, root: &Path, build: &str) -> io::Result<()> {
     let Some(boot) = boot_id(root) else {
         return Ok(());
@@ -351,20 +402,44 @@ pub(crate) fn note_began(records: &Path, root: &Path, build: &str) -> io::Result
     )
 }
 
-fn put_back_on_another_boot(records: &Path, build: &str) -> bool {
+/// Why a build put back once is tried once more now, if it is: from the
+/// boot noted at its put-back, the one noted as its switch began, this
+/// boot, and when it was put back. None while none of the three holds,
+/// and always without a boot noted at its put-back: that one is never
+/// tried again.
+fn once_more(records: &Path, root: &Path, build: &str) -> Option<OnceMore> {
     let noted = |file: &str| {
         let text = fs::read_to_string(records.join(file)).ok()?;
         let (noted, boot) = text.trim().split_once(' ')?;
         (noted == build).then(|| boot.to_owned())
     };
-    matches!((noted(BEGAN), noted(PUT_BACK)), (Some(began), Some(back)) if began != back)
+    let back = noted(PUT_BACK)?;
+    if noted(BEGAN).is_some_and(|began| began != back) {
+        return Some(OnceMore::Reboot);
+    }
+    // A boot that is not known now is no later boot.
+    if boot_id(root).is_some_and(|now| now != back) {
+        return Some(OnceMore::LaterBoot);
+    }
+    since_put_back(records)
+        .is_some_and(|since| since >= AGAIN_AFTER)
+        .then_some(OnceMore::Day)
 }
 
-/// A build put back once, taken again: written to `self-retried` first,
-/// then taken out of `self-refused`, so a cut between the two leaves it
-/// refused for good rather than tried for ever. When `lamp-update-back`
-/// puts it back again it writes it to `self-refused` again, as it always
-/// has. Nothing for a build not refused.
+/// How long ago `self-put-back` was written, by the file's own time on the
+/// wall clock: a `lamp-update-back` already on a lamp writes no time into
+/// it, and needs no new record for this rule (#6901). None when that time
+/// is after now: the clock went back since, which is no time passed.
+fn since_put_back(records: &Path) -> Option<Duration> {
+    let at = fs::metadata(records.join(PUT_BACK)).ok()?.modified().ok()?;
+    SystemTime::now().duration_since(at).ok()
+}
+
+/// A build put back once, taken again ([`Refused::OnceMore`]): written to
+/// `self-retried` first, then taken out of `self-refused`, so a cut between
+/// the two leaves it refused for good rather than tried for ever. When
+/// `lamp-update-back` puts it back again it writes it to `self-refused`
+/// again, as it always has. Nothing for a build not refused.
 pub(crate) fn retry(records: &Path, build: &str) -> io::Result<bool> {
     let refused = refused(records);
     if !refused.iter().any(|known| known == build) {
@@ -387,6 +462,40 @@ pub(crate) fn retry(records: &Path, build: &str) -> io::Result<bool> {
     };
     write_whole(&records.join(REFUSED), text.as_bytes(), 0o600)?;
     Ok(true)
+}
+
+/// What the owner's retry did with `self-refused` ([`forget_refused`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Forgot {
+    /// Emptied: how many builds it held, which a round switches to again.
+    Builds(usize),
+    /// Left as it is, with how many builds it holds: a switch of
+    /// lamp-update's own is under way.
+    Left(usize),
+}
+
+/// The owner's retry from the app (#6901): every build leaves
+/// `self-refused`, so a round switches to any of them again; how many
+/// there were. `self-retried` is left as it is: put back again, a build
+/// that had its one more try is refused for good at once, until the owner
+/// retries again. The caller holds the records' lock.
+///
+/// Not while a switch of lamp-update's own is under way (`self.json` is
+/// there, readable or not): the list is left as it is, for a retry after
+/// the switch is settled. The put-back of a `self.json` that cannot be read
+/// tells a put-back already done from one still to do by the failed build
+/// being in this list ([`known_builds`]). Emptied after its link went back
+/// and before its file was set aside, the next start would take the good
+/// build for the failed one.
+pub fn forget_refused(records: &Path) -> io::Result<Forgot> {
+    let builds = refused(records).len();
+    if !matches!(waiting(records), Ok(None)) {
+        return Ok(Forgot::Left(builds));
+    }
+    if builds > 0 {
+        write_whole(&records.join(REFUSED), b"", 0o600)?;
+    }
+    Ok(Forgot::Builds(builds))
 }
 
 fn link_names(root: &Path, build: &str) -> bool {
@@ -803,5 +912,120 @@ mod tests {
             reexec(root.path(), &exe, &records, None),
             Reexec::To { build, .. } if build == B
         ));
+    }
+
+    /// The records of a lamp where build A's switch began on boot `began`
+    /// and was put back on boot `back`, the lamp now on boot `now`. None is
+    /// a boot the kernel gave no id for.
+    fn put_back_on(
+        began: Option<&str>,
+        back: Option<&str>,
+        now: Option<&str>,
+    ) -> (tempfile::TempDir, PathBuf) {
+        let root = tempfile::tempdir().unwrap();
+        let records = root.path().join("records");
+        fs::create_dir_all(&records).unwrap();
+        let boot = |id: Option<&str>| {
+            let path = on_root(root.path(), BOOT_ID);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, id.unwrap_or_default()).unwrap();
+        };
+        boot(began);
+        note_began(&records, root.path(), A).unwrap();
+        boot(back);
+        refuse(&records, root.path(), A).unwrap();
+        boot(now);
+        (root, records)
+    }
+
+    /// `self-put-back` as if written `ago` before now.
+    fn put_back_ago(records: &Path, ago: Duration) {
+        fs::File::options()
+            .write(true)
+            .open(records.join(PUT_BACK))
+            .unwrap()
+            .set_modified(SystemTime::now() - ago)
+            .unwrap();
+    }
+
+    #[test]
+    fn a_build_put_back_once_is_tried_once_more_for_the_first_reason_that_holds() {
+        let how = |began, back, now, ago: Option<Duration>| {
+            let (root, records) = put_back_on(began, back, now);
+            if let Some(ago) = ago {
+                put_back_ago(&records, ago);
+            }
+            how_refused(&records, root.path(), A)
+        };
+        let (a, b, c) = (Some("boot-a"), Some("boot-b"), Some("boot-c"));
+        let day = Some(AGAIN_AFTER);
+        let short = Some(AGAIN_AFTER - Duration::from_secs(3600));
+        // On the boot it was put back on, before the day is over: refused.
+        assert_eq!(how(a, a, a, None), Refused::ForGood);
+        assert_eq!(how(a, a, a, short), Refused::ForGood);
+        // A reboot in its minutes comes first, whatever else holds.
+        assert_eq!(how(a, b, b, None), Refused::OnceMore(OnceMore::Reboot));
+        assert_eq!(how(a, b, c, day), Refused::OnceMore(OnceMore::Reboot));
+        // Then a later boot, the day over or not.
+        assert_eq!(how(a, a, b, None), Refused::OnceMore(OnceMore::LaterBoot));
+        assert_eq!(how(a, a, b, day), Refused::OnceMore(OnceMore::LaterBoot));
+        // Then the day, on the boot it was put back on.
+        assert_eq!(how(a, a, a, day), Refused::OnceMore(OnceMore::Day));
+        // A boot not known now is no later boot; the day still counts.
+        assert_eq!(how(a, a, None, None), Refused::ForGood);
+        assert_eq!(how(a, a, None, day), Refused::OnceMore(OnceMore::Day));
+        // The boot its switch began on not noted: the put-back's is enough.
+        assert_eq!(how(None, a, a, None), Refused::ForGood);
+        assert_eq!(
+            how(None, a, b, None),
+            Refused::OnceMore(OnceMore::LaterBoot)
+        );
+        // No boot noted at its put-back: for good, on any boot.
+        assert_eq!(how(a, None, b, None), Refused::ForGood);
+    }
+
+    #[test]
+    fn a_second_put_back_is_final_until_the_owners_retry() {
+        let (root, records) = put_back_on(Some("boot-a"), Some("boot-a"), Some("boot-b"));
+        let boot = |id: &str| fs::write(on_root(root.path(), BOOT_ID), id).unwrap();
+        // A build never put back is not refused.
+        assert_eq!(how_refused(&records, root.path(), B), Refused::No);
+        assert!(!refused_for_good(&records, root.path(), B));
+        // Tried once more and put back again: final, on a later boot and a
+        // day later too.
+        assert!(!refused_for_good(&records, root.path(), A));
+        assert!(retry(&records, A).unwrap());
+        assert_eq!(how_refused(&records, root.path(), A), Refused::No);
+        refuse(&records, root.path(), A).unwrap();
+        boot("boot-c");
+        put_back_ago(&records, AGAIN_AFTER);
+        assert!(refused_for_good(&records, root.path(), A));
+        // The owner's retry lets it go, and leaves it tried once more.
+        assert_eq!(forget_refused(&records).unwrap(), Forgot::Builds(1));
+        assert_eq!(how_refused(&records, root.path(), A), Refused::No);
+        assert_eq!(retried(&records), [A]);
+        assert_eq!(forget_refused(&records).unwrap(), Forgot::Builds(0));
+        // Put back after it: final again.
+        refuse(&records, root.path(), A).unwrap();
+        boot("boot-d");
+        put_back_ago(&records, AGAIN_AFTER);
+        assert!(refused_for_good(&records, root.path(), A));
+    }
+
+    #[test]
+    fn the_owners_retry_leaves_the_builds_put_back_while_a_switch_is_under_way() {
+        let (_root, records) = put_back_on(Some("boot-a"), Some("boot-a"), Some("boot-a"));
+        // Waiting to be confirmed.
+        begin(&records, A, B).unwrap();
+        assert_eq!(forget_refused(&records).unwrap(), Forgot::Left(1));
+        assert_eq!(refused(&records), [A]);
+        // A `self.json` that cannot be read is a switch not settled yet.
+        fs::write(records.join(PENDING), "{\"version\": 1, \"old\": \"").unwrap();
+        assert_eq!(forget_refused(&records).unwrap(), Forgot::Left(1));
+        assert_eq!(refused(&records), [A]);
+        // Settled: the builds are let go.
+        end(&records).unwrap();
+        assert_eq!(forget_refused(&records).unwrap(), Forgot::Builds(1));
+        assert!(refused(&records).is_empty());
     }
 }

@@ -135,9 +135,10 @@ impl AppCheck {
 
     /// A wait ended by the app's check: the owner's retries it carried
     /// ([`Self::take_retries`]) drop their refusals before the round, with
-    /// either wait. The wait with the first update after setup on
-    /// ([`Self::wait_or`]) once dropped them, so a refused build was never
-    /// retried on a product lamp (#6800).
+    /// either wait, and let lamp-update's own builds put back before be
+    /// tried again (#6901, [`drop_refusals`]). The wait with the first
+    /// update after setup on ([`Self::wait_or`]) once dropped them, so a
+    /// refused build was never retried on a product lamp (#6800).
     pub fn retry_asked(&mut self, records: &crate::records::Records, say: &mut dyn FnMut(&str)) {
         let retries = self.take_retries();
         drop_refusals(records, &retries, say);
@@ -236,11 +237,21 @@ impl AppCheck {
 /// ignored, and the round is a plain check. A build that is really unwell is
 /// refused again by the round itself, so a retry never loops. Said, one line
 /// each.
+///
+/// A retry also lets every build of lamp-update's own that was put back be
+/// tried again (#6901, [`crate::own::forget_refused`]), whichever build it
+/// names: a build whose lamp-update was put back is refused by every round
+/// ("waiting for a newer updater") with no refusal in the state to drop.
+/// Said in one line, with how many, when there was one. One put back again
+/// is refused again by the round itself. While a switch of lamp-update's own
+/// is under way they are left refused, and said so: the put-back of that
+/// switch may read the list, and a retry after it is settled lets them go.
 pub fn drop_refusals(
     records: &crate::records::Records,
     sequences: &[u64],
     say: &mut dyn FnMut(&str),
 ) {
+    use crate::own::Forgot;
     if sequences.is_empty() {
         return;
     }
@@ -250,24 +261,35 @@ pub fn drop_refusals(
         say("a retry of a refused build: another lamp-update is at work, so it is a plain check");
         return;
     };
-    let Ok(mut state) = records.state(say) else {
-        return;
-    };
-    let mut dropped = false;
-    for sequence in sequences {
-        if state.forget_refusal(*sequence) {
-            say(&format!(
-                "the owner asked to retry build {sequence}: its refusal is dropped"
-            ));
-            dropped = true;
-        } else {
-            say(&format!(
-                "the owner asked to retry build {sequence}: it is not refused, so a plain check"
-            ));
+    if let Ok(mut state) = records.state(say) {
+        let mut dropped = false;
+        for sequence in sequences {
+            if state.forget_refusal(*sequence) {
+                say(&format!(
+                    "the owner asked to retry build {sequence}: its refusal is dropped"
+                ));
+                dropped = true;
+            } else {
+                say(&format!(
+                    "the owner asked to retry build {sequence}: it is not refused, so a plain check"
+                ));
+            }
+        }
+        if dropped && let Err(error) = records.save_state(&state) {
+            say(&format!("the refusals could not be saved: {error}"));
         }
     }
-    if dropped && let Err(error) = records.save_state(&state) {
-        say(&format!("the refusals could not be saved: {error}"));
+    match crate::own::forget_refused(records.folder()) {
+        Ok(Forgot::Builds(0) | Forgot::Left(0)) => {}
+        Ok(Forgot::Builds(builds)) => say(&format!(
+            "the owner asked to retry: {builds} of lamp-update's own builds put back before may be tried again"
+        )),
+        Ok(Forgot::Left(_)) => say(
+            "the owner asked to retry: lamp-update's own switch is under way, so its builds put back before stay refused; a retry after it is settled lets them go",
+        ),
+        Err(error) => say(&format!(
+            "the owner asked to retry: self-refused cannot be written: {error}"
+        )),
     }
 }
 
@@ -548,5 +570,53 @@ mod tests {
                 .any(|line| line == "the owner asked to retry build 12587: its refusal is dropped"),
             "{told:?}"
         );
+    }
+
+    /// #6901: the owner's retry also lets lamp-update's own builds that were
+    /// put back be tried again. A lamp whose updater could not climb said
+    /// "waiting for a newer updater" every round, with no refusal in the
+    /// state for the retry to drop. `self-refused` is emptied and said;
+    /// `self-retried` is left, so a build tried once more before is refused
+    /// for good again when it is put back again. A plain check lets none go.
+    #[test]
+    fn a_retry_lets_lamp_updates_own_builds_put_back_be_tried_again() {
+        let once = "a".repeat(64);
+        let twice = "b".repeat(64);
+        let root = tempfile::tempdir().unwrap();
+        let folder = tempfile::tempdir().unwrap();
+        let records = crate::records::Records::new(folder.path().to_path_buf());
+        let refused = folder.path().join("self-refused");
+        std::fs::write(&refused, format!("{once}\n{twice}\n")).unwrap();
+        std::fs::write(folder.path().join("self-retried"), format!("{twice}\n")).unwrap();
+        let mut check = AppCheck::new(root.path(), &mut |_| {}).looking_every(LOOK);
+        let mut cloud = cloud(&Bus::new(root.path()).unwrap());
+        let mut ears = Waits::default();
+        // Build 12728 is not refused in the state: its updater was.
+        cloud
+            .publish_json(0, &UpdateCheck { retry: Some(12728) })
+            .unwrap();
+        let mut due = |_: &mut dyn FnMut(&str)| false;
+        let woken = check.wait_or(&mut ears, Duration::from_secs(2), &mut |_| {}, &mut due);
+        assert!(matches!(woken, Woken::Asked));
+        let mut told = Vec::new();
+        check.retry_asked(&records, &mut |line| told.push(line.to_owned()));
+        assert_eq!(
+            told,
+            [
+                "the owner asked to retry build 12728: it is not refused, so a plain check",
+                "the owner asked to retry: 2 of lamp-update's own builds put back before may be tried again",
+            ]
+        );
+        assert!(crate::own::refused(folder.path()).is_empty());
+        assert_eq!(crate::own::retried(folder.path()), [twice.as_str()]);
+
+        // A plain check carries no retry: a build put back stays refused.
+        std::fs::write(&refused, format!("{twice}\n")).unwrap();
+        cloud.publish_json(0, &UpdateCheck::default()).unwrap();
+        assert!(check.asked(Instant::now() + UpdateCheck::AGAIN_AFTER));
+        told.clear();
+        check.retry_asked(&records, &mut |line| told.push(line.to_owned()));
+        assert!(told.is_empty(), "{told:?}");
+        assert_eq!(crate::own::refused(folder.path()), [twice]);
     }
 }
