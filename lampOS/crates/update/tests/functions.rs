@@ -78,9 +78,8 @@ const PRODUCT_FUNCTIONS: usize = 48;
 
 /// The lamp's own with `LAMP_HARD_ASKS_TO_AGENT` on (off in the product, a
 /// lamp's drop-in): [`PRODUCT_FUNCTIONS`] and the lamp's agent's
-/// `ask_agent` (Heron's P2 7 on #7509). With the route's 3 that is one
-/// past the bound of 48, so the chat route's cut takes its first, the
-/// search's fetch (`chat_cut`), and nothing of the lamp's own.
+/// `ask_agent` (Heron's P2 7 on #7509). With the route's 4 that is 53,
+/// within the bound of 64 (#7433), so nothing is cut.
 const HARD_ASKS_FUNCTIONS: usize = PRODUCT_FUNCTIONS + 1;
 
 /// Every `Environment=` of a voice unit's `[Service]`.
@@ -363,9 +362,8 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
 
 /// Heron's P2 7 on #7509: with `LAMP_HARD_ASKS_TO_AGENT` on, `ask_agent`
 /// is counted among the lamp's own ([`HARD_ASKS_FUNCTIONS`]) and a product
-/// chat request still stays within the bound: the search's fetch, the
-/// lowest of the chat route's cut, is the one left out, never the actions
-/// part's, `use_skill` or the search.
+/// chat request still stays within the bound, nothing left out: the
+/// actions part's, `use_skill` and the route's own all told.
 #[test]
 fn with_hard_asks_on_the_lamps_agent_is_counted_within_the_bound() {
     let Product {
@@ -386,6 +384,7 @@ fn with_hard_asks_on_the_lamps_agent_is_counted_within_the_bound() {
     let routes_own = [
         lamp_voice::second_provider::net::search::NAME,
         lamp_voice::second_provider::net::search::FETCH,
+        lamp_voice::second_provider::net::weather::NAME,
         lamp_voice::second_provider::LOOK_CALL,
     ];
     let lamps = chat
@@ -393,16 +392,12 @@ fn with_hard_asks_on_the_lamps_agent_is_counted_within_the_bound() {
         .filter(|name| !routes_own.contains(&name.as_str()))
         .count();
     assert_eq!(lamps, HARD_ASKS_FUNCTIONS, "{chat:?}");
-    assert!(
-        !chat
-            .iter()
-            .any(|told| told == lamp_voice::second_provider::net::search::FETCH),
-        "{chat:?}"
-    );
-    for name in executive.iter().map(|function| function.name).chain([
-        lamp_voice::use_skill::NAME,
-        lamp_voice::second_provider::net::search::NAME,
-    ]) {
+    for name in executive
+        .iter()
+        .map(|function| function.name)
+        .chain([lamp_voice::use_skill::NAME])
+        .chain(routes_own)
+    {
         assert!(chat.iter().any(|told| told == name), "{name}: {chat:?}");
     }
 }

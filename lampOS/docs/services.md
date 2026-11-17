@@ -2677,8 +2677,9 @@ never through an open socket.
 
 ### Reads through the lamp's agent (`LAMP_SERVICES_TO_AGENT`, off unless set)
 
-The owner's ruling of 17 Nov: connector work goes to the lamp's agent
-(Hermes), never the second route's own model. On lamp-a63e that day the
+The owner's ruling of 17 Nov: connector work goes to the lamp's agent,
+never the second route's own model; and (~17:55) that agent is the lamp's
+default, Hermes or OpenClaw, never pinned to Hermes. On lamp-a63e that day the
 second route's model sent Gmail an invalid `what` four times, and the owner
 heard "gmail read keeps erroring out". With the switch `on` in lamp-voice,
 lamp-tasks and lamp-control (and `LAMP_SERVICES`, `LAMP_AGENT_SERVICES` and
@@ -2700,7 +2701,22 @@ lamp-tasks and lamp-control (and `LAMP_SERVICES`, `LAMP_AGENT_SERVICES` and
   summary (`Thread::private_for`). An unlinked service is told "isn't
   linked" as lamp-services tells it (`services_connected` asked first; when
   it can't say, the read is handed over).
-- **The run** (`lamp_tasks::voice_ask`): the lamp's Hermes as a voice make
+- **The agent** (`lamp_tasks::voice_ask`): the lamp's default agent, picked
+  at each ask as a voice make on the one run path picks it
+  (`skill_make::MakeGateway`, `HarnessRunner::make_agent`: the agent's
+  wrapper data and `default_agent_takes_runs`). On a lamp whose default is
+  OpenClaw, a read is refused `no_services` before any token is minted:
+  OpenClaw's gateway keeps the lamp's network and has no per-run
+  lamp-services MCP server or token, so a read can't be held off the
+  network or reach the services through lamp-control there yet. The voice
+  then says a fixed line, "Your lamp's agent can't read your linked
+  services yet, so I can't get that for you." (`agent_asks::NO_SERVICES_LINE`),
+  and reads nothing itself; nothing falls back to DeepSeek. What is
+  missing: a held-off OpenClaw run (a namespace per turn, as Hermes's
+  wrapper gives a make) and a per-run MCP entry its gateway reads. Harness
+  not looked yet on a lamp whose default isn't Hermes: refused `not_ready`,
+  never run on Hermes.
+- **The run on Hermes:** the lamp's Hermes as a voice make
   runs, in a fresh folder and home of its own (its memory and sessions
   hidden), held off the network, the words in its rules file and never in
   its arguments, ended at 120 s. lamp-control mints its token for exactly
@@ -2750,7 +2766,7 @@ route's model round that calls `service_read` (as today), the gate
 (memory-only checks, under 10 ms), the hand-over (a thread spawned, no
 wait), then the model's one holding line: about 2 to 4 s, as today's
 service_read rounds, and without the read's own 1 to 20 s. To the answer:
-Hermes's start in a fresh home and its read, typically 20 to 90 s (a voice
+the agent's start (Hermes in a fresh home) and its read, typically 20 to 90 s (a voice
 make's agent run took about 65 s on lamp-9adf), at most 120 s plus 10 s of
 grace before the fixed line; then the say service's next free moment.
 These are expected numbers, not measured on a lamp.
@@ -2767,7 +2783,10 @@ Tests: lamp-voice's `agent_asks::tests`, `say::alone_guard::tests`,
 `say::tests::the_agents_answer_is_quoted_and_held_to_the_owner_seen_alone`,
 `services::tests::with_the_switch_a_read_goes_to_the_agent_and_off_it_is_the_voices`
 and `services::tests::a_forget_drops_an_ask_with_the_lamps_agent`,
-lamp-tasks' `voice_ask::tests`, lamp-control's
+lamp-tasks' `voice_ask::tests` and the `harness` tests
+`a_read_on_an_openclaw_default_is_refused_plainly_and_nothing_runs` and
+`a_hermes_default_runs_the_lamps_hermes_and_an_unlooked_openclaw_is_not_ready`,
+lamp-control's
 `task_yes::tests::a_live_ask_is_minted_one_services_grants_alone`,
 lamp-skills' `package::tests::a_skill_is_never_put_on_as_the_voice_asks_name`,
 and lamp-update's `functions` test

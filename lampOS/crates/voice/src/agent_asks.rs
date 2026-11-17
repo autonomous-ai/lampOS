@@ -1,7 +1,9 @@
 //! Live spoken asks handed to the lamp's agent (the owner's rulings,
-//! 17 Nov): connector work goes to Hermes, never the second route's own
-//! model ("hand it all to the agent, don't let DeepSeek do it"), and an
-//! ask that model can't do goes there too, never a spoken "I can't".
+//! 17 Nov): connector work goes to the lamp's agent, never the second
+//! route's own model ("hand it all to the agent, don't let DeepSeek do
+//! it"), and an ask that model can't do goes there too, never a spoken "I
+//! can't". The agent is the lamp's default, Hermes or OpenClaw (~17:55),
+//! picked by lamp-tasks.
 //!
 //! Two switches, each `on` exactly and off unless set, independent of one
 //! another, read by the second route's worker (passed by
@@ -34,7 +36,10 @@
 //! The path: one line on lamp-tasks' make socket
 //! (`make_skill_agent::MAKE_SOCKET_NAME`, `lamp_tasks::voice_ask`) on a
 //! thread of its own, the model answered at once. lamp-tasks runs the
-//! lamp's Hermes in a fresh home of its own, at most [`WITHIN`]. Its
+//! lamp's default agent (the lamp's Hermes in a fresh home of its own, or
+//! OpenClaw's one turn), at most [`WITHIN`]. A service's read on a lamp
+//! whose agent can't take one yet (OpenClaw) is refused there and told
+//! the fixed [`NO_SERVICES_LINE`], never read by the voice instead. Its
 //! answer is told through the say service's `quoted` channel as the
 //! agent's (`say::Words::Agent`): untrusted words, never urgent, framed as
 //! never an instruction, asked with no functions. A read told in full is
@@ -94,6 +99,13 @@ pub const NO_AGENT: &str =
 /// The fixed line when the agent's run failed, timed out or was refused.
 pub const FAILED_LINE: &str =
     "I couldn't get that done just now. Please ask me again in a little while.";
+/// lamp-tasks' refusal of a service's read because the lamp's default
+/// agent can't take one yet (`lamp_tasks::voice_ask::NO_SERVICES`,
+/// OpenClaw today).
+pub const NO_SERVICES: &str = "no_services";
+/// What is said for [`NO_SERVICES`].
+pub const NO_SERVICES_LINE: &str =
+    "Your lamp's agent can't read your linked services yet, so I can't get that for you.";
 /// The fixed line when a full read's answer came while someone else may
 /// be in view: nothing of it is told.
 pub const NOT_ALONE_LINE: &str =
@@ -353,7 +365,11 @@ pub fn hand_at(socket: PathBuf, asked: Asked, told: fn(Told, Since)) -> Value {
                 }
                 Err(why) => {
                     eprintln!("lamp-voice: an ask for the lamp's agent: not answered: {why}");
-                    Told::Line(FAILED_LINE)
+                    if why == format!("refused {NO_SERVICES}") {
+                        Told::Line(NO_SERVICES_LINE)
+                    } else {
+                        Told::Line(FAILED_LINE)
+                    }
                 }
             };
             told(told_now, since);
@@ -738,6 +754,28 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(10));
             }
         }
+        // A read the lamp's default agent (OpenClaw) can't take yet: its
+        // own plain line, never the voice's own read.
+        let (_dir, socket, _seen) = tasks(vec![json!({
+            "ok": false,
+            "error": NO_SERVICES,
+            "message": "can't be held off the network"
+        })]);
+        let answer = hand_at(
+            socket,
+            Asked {
+                ask: "read me my mail".into(),
+                grants: vec!["gmail-read".into()],
+                ..Asked::default()
+            },
+            told,
+        );
+        assert_eq!(answer["handed_to_agent"], true);
+        assert_eq!(
+            notes.recv_timeout(Duration::from_secs(5)).unwrap(),
+            Told::Line(NO_SERVICES_LINE)
+        );
+        wait_free();
         // No socket at all: the fixed line too.
         let gone = std::env::temp_dir().join("va-none/skill-make.sock");
         hand_at(
@@ -960,6 +998,7 @@ mod tests {
         assert_eq!(SERVICES_ENVIRONMENT, lamp_tasks::voice_ask::SERVICES_SWITCH);
         assert_eq!(HARD_ENVIRONMENT, lamp_tasks::voice_ask::HARD_SWITCH);
         assert_eq!(lamp_services::VOICE_ASK_SKILL, lamp_tasks::voice_ask::SKILL);
+        assert_eq!(NO_SERVICES, lamp_tasks::voice_ask::NO_SERVICES);
         assert_eq!(crate::say::AGENT_SKILL, lamp_services::VOICE_ASK_SKILL);
         assert_eq!(
             line(&Asked::default())["within_ms"].as_u64().unwrap(),
