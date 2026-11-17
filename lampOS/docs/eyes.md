@@ -2171,20 +2171,26 @@ process, shows there before any trial waits for it. For each face:
 #### Pitch and gaze (`LAMP_EYES_PITCH_GAZE=on`, #7442)
 
 **Pitch** ([`facing::pitch_deg`](../crates/eyes/src/facing.rs)) comes from
-the same five marks as the turn: the nose's drop below the point between
-the eyes, square to the eye line (a head tilted over reads the same), over
-the eyes' distance, which is first taken back by the turn's cosine (a
-turned head's eyes look closer together, which is not a nose dropping).
-A head tipped by `t` gives `r = 0.57 cos t + 0.5 sin t`, solved for `t`:
-the nose sits 0.57 eye distances below the eyes on a level face
-(`LEVEL_NOSE_DROP`, from InsightFace's ArcFace five-point template, the
-mean frontal face recognisers align to: that template reads level within
-2 degrees) and its tip 0.5 in front of them (`NOSE_DEPTH`, a guess). So a
-level face reads 0, and the zero is set by `LEVEL_NOSE_DROP`, to be
-checked on this lamp's YuNet on the row. A face too small for a turn, or
-turned past 60 degrees, has no pitch. Known ceiling: `r` peaks about 41
-degrees down, so a head bowed past about 57 degrees reads back inside the
-window. The window the voice may use is `MAX_PITCH_UP_DEG` 20 to
+the same five marks as the turn: the nose's drop `r` and the mouth
+corners' midpoint's drop `m` below the point between the eyes, square to
+the eye line (a head tilted over reads the same). A head tipped by `t`
+gives `r = 0.57 cos t + 0.5 sin t` and `m = 1.15 cos t + 0.2 sin t`; the
+two are solved for `cos t` and `sin t`, and `t` is their angle. That has
+one answer for every bow, so a phone's deep bow (60, 75 degrees) reads
+deeper, never back inside the window as the nose alone did past about 41
+degrees (the Reviewer-lead's P3 on #7450). Only the ratio counts, so the
+face's size and a turn's narrowing fall out. On a level face the nose sits
+0.57 eye distances below the eyes and the mouth corners 1.15
+(`LEVEL_NOSE_DROP`, `LEVEL_MOUTH_DROP`, from InsightFace's ArcFace
+five-point template, the mean frontal face recognisers align to: that
+template reads level within 2 degrees); the nose's tip stands 0.5 in front
+of the eyes and the mouth 0.2 (`NOSE_DEPTH`, `MOUTH_DEPTH`, guesses). So a
+level face reads 0, to be checked on this lamp's YuNet on the row. A face
+too small for a turn, or turned past 60 degrees, has no pitch (not
+measured). Marks no head could make (a mark not a number, the eyes on one
+another, the mouth above the eyes with the nose below) read `LOST_DEG`,
+90 degrees down: outside the window, so a lost pitch never counts as
+facing. The window the voice may use is `MAX_PITCH_UP_DEG` 20 to
 `MAX_PITCH_DOWN_DEG` 25 (`facing::pitch_within`); authored, to be set on
 the row.
 

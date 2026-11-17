@@ -460,7 +460,8 @@ pub struct Face {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub facing: Option<bool>,
     /// How far the head is tipped, in radians, if that was estimated: 0
-    /// level, positive tipped down, as ROS has pitch. Only with the eyes'
+    /// level, positive tipped down, as ROS has pitch; π/2 when the marks
+    /// could not be read (lost: never facing). Only with the eyes'
     /// `LAMP_EYES_PITCH_GAZE=on` (#7442); a reader that does not know it
     /// ignores it.
     #[serde(default, skip_serializing_if = "Option::is_none")]

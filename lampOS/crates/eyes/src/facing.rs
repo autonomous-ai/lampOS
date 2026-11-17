@@ -72,9 +72,21 @@ pub const LEVEL_NOSE_DROP: f32 = 0.57;
 /// distance between them: a head tipped down swings it down, tipped up,
 /// up. An anthropometric guess (about 30 mm against 63 mm), for the row.
 pub const NOSE_DEPTH: f32 = 0.5;
-/// Pitch is measured only up to this turn: past it the eyes' distance,
-/// taken back by the turn's cosine, says too little.
+/// How far below the eye line the mouth corners' midpoint sits on a level
+/// face, in eye distances: the same ArcFace template (corners at y 92.37
+/// and 92.20, 40.69 below the eyes' 51.60).
+pub const LEVEL_MOUTH_DROP: f32 = 1.15;
+/// How far in front of the eyes the mouth corners stand, in eye distances:
+/// less than the nose's tip. A guess, for the row.
+pub const MOUTH_DEPTH: f32 = 0.2;
+/// Pitch is measured only up to this turn: past it the marks crowd into
+/// one side of the face and say too little.
 pub const PITCH_MOST_YAW_DEG: f32 = 60.0;
+/// What [`pitch_deg`] gives for marks no head could make (a mark not a
+/// number, the eyes on top of one another, the mouth above the eyes with
+/// the nose below them): straight down, outside every window, so a lost
+/// pitch never counts as facing. Not the same as not measured (`None`).
+pub const LOST_DEG: f32 = 90.0;
 /// A face tipped further down than this is not facing the lamp: a head
 /// bent to a phone or the desk (#7442). Authored, to be set on the row.
 pub const MAX_PITCH_DOWN_DEG: f32 = 25.0;
@@ -85,37 +97,51 @@ pub const MAX_PITCH_UP_DEG: f32 = 20.0;
 /// How far the head is tipped, in degrees: positive down, negative up, as
 /// ROS has pitch (REP 103: about the head's left axis, nose down positive).
 /// `marks` are YuNet's five: the eye on the left of the picture, the eye on
-/// the right, the nose, and the two mouth corners (not used).
+/// the right, the nose, and the two mouth corners.
 ///
-/// The nose's drop below the point between the eyes, square to the eye
-/// line (so a head tilted over reads the same), over the eyes' distance,
-/// is `r`. The eyes' distance shrinks with the turn, so it is taken back
-/// by the turn's cosine first ([`yaw_deg`]). A head tipped by `t` drops a
-/// nose [`LEVEL_NOSE_DROP`] below and [`NOSE_DEPTH`] in front of the eyes
-/// to `r = LEVEL_NOSE_DROP cos t + NOSE_DEPTH sin t`, solved here for `t`;
-/// so a level face, `r` = [`LEVEL_NOSE_DROP`], reads 0. None when a mark
-/// is not a number, the eyes are on top of one another, or the head is
-/// turned past [`PITCH_MOST_YAW_DEG`].
+/// The nose's drop `r` and the mouth corners' midpoint's drop `m` below the
+/// point between the eyes, square to the eye line (so a head tilted over
+/// reads the same). A head tipped by `t` gives, with `c = cos t` and
+/// `s = sin t`, `r = LEVEL_NOSE_DROP c + NOSE_DEPTH s` and
+/// `m = LEVEL_MOUTH_DROP c + MOUTH_DEPTH s`: two lines in `c` and `s`,
+/// solved for them, and `t = atan2(s, c)`. That is one answer for every
+/// bow, so the reading rises with it to straight down (the nose alone
+/// folded back past about 41 degrees: the Reviewer-lead's P3 on #7450).
+/// Only the ratio of `s` to `c` counts, so the face's size and the turn's
+/// narrowing of it (both drops alike) fall out. A level face, `r` and `m`
+/// at [`LEVEL_NOSE_DROP`] and [`LEVEL_MOUTH_DROP`] eye distances, reads 0.
 ///
-/// ponytail: `r` peaks at about 41 degrees down and falls after it, so a
-/// head bowed further reads less: still outside [`MAX_PITCH_DOWN_DEG`] to
-/// about 57, inside it past that. The mouth corners' drop shrinks as the
-/// nose's grows and would tell the two apart, if the row finds such bows.
+/// [`LOST_DEG`] for marks no head could make, `c` not over 0 among them;
+/// None, not measured, for a head turned past [`PITCH_MOST_YAW_DEG`].
 pub fn pitch_deg(marks: &[(f32, f32); 5]) -> Option<f32> {
-    let yaw = yaw_deg(marks)?;
-    if yaw > PITCH_MOST_YAW_DEG {
-        return None;
-    }
     let (first, second, nose) = (marks[0], marks[1], marks[2]);
     let (across, down) = (second.0 - first.0, second.1 - first.1);
     let apart = across.hypot(down);
+    if marks
+        .iter()
+        .any(|mark| !mark.0.is_finite() || !mark.1.is_finite())
+        || apart < 1e-6
+    {
+        return Some(LOST_DEG);
+    }
+    if yaw_deg(marks)? > PITCH_MOST_YAW_DEG {
+        return None;
+    }
     let between = ((first.0 + second.0) / 2.0, (first.1 + second.1) / 2.0);
     // Square to the eye line, toward the bottom of the picture.
-    let drop = ((nose.0 - between.0) * -down + (nose.1 - between.1) * across) / apart;
-    let ratio = drop * yaw.to_radians().cos() / apart;
-    let reach = LEVEL_NOSE_DROP.hypot(NOSE_DEPTH);
-    let offset = LEVEL_NOSE_DROP.atan2(NOSE_DEPTH);
-    Some(((ratio / reach).clamp(-1.0, 1.0).asin() - offset).to_degrees())
+    let drop = |at: (f32, f32)| (at.0 - between.0) * -down + (at.1 - between.1) * across;
+    let mouth = (
+        (marks[3].0 + marks[4].0) / 2.0,
+        (marks[3].1 + marks[4].1) / 2.0,
+    );
+    let (r, m) = (drop(nose), drop(mouth));
+    let det = LEVEL_NOSE_DROP * MOUTH_DEPTH - NOSE_DEPTH * LEVEL_MOUTH_DROP;
+    let c = (r * MOUTH_DEPTH - NOSE_DEPTH * m) / det;
+    let s = (LEVEL_NOSE_DROP * m - LEVEL_MOUTH_DROP * r) / det;
+    if c <= 0.0 {
+        return Some(LOST_DEG);
+    }
+    Some(s.atan2(c).to_degrees())
 }
 
 /// Whether a face tipped `pitch` degrees ([`pitch_deg`]) is inside the
@@ -230,16 +256,18 @@ mod tests {
     }
 
     /// Marks of a face with its eyes 40 apart, level, its head tipped
-    /// `tip` degrees (down positive) by the model [`pitch_deg`] inverts.
+    /// `tip` degrees (down positive) by the model [`pitch_deg`] inverts:
+    /// the nose and the mouth corners each dropped by their own depth.
     fn tipped(tip: f32) -> [(f32, f32); 5] {
-        let tip = tip.to_radians();
-        let drop = 40.0 * (LEVEL_NOSE_DROP * tip.cos() + NOSE_DEPTH * tip.sin());
+        let (sin, cos) = tip.to_radians().sin_cos();
+        let nose = 40.0 * (LEVEL_NOSE_DROP * cos + NOSE_DEPTH * sin);
+        let mouth = 40.0 * (LEVEL_MOUTH_DROP * cos + MOUTH_DEPTH * sin);
         [
             (30.0, 40.0),
             (70.0, 40.0),
-            (50.0, 40.0 + drop),
-            (35.0, 80.0),
-            (65.0, 80.0),
+            (50.0, 40.0 + nose),
+            (35.0, 40.0 + mouth),
+            (65.0, 40.0 + mouth),
         ]
     }
 
@@ -272,11 +300,50 @@ mod tests {
         assert!(!pitch_within(pitch_deg(&tipped(-25.0)).unwrap()));
         assert!(pitch_within(pitch_deg(&tipped(15.0)).unwrap()));
         assert!(pitch_within(pitch_deg(&tipped(-15.0)).unwrap()));
-        // Past the fold at about 41 degrees the reading comes back up, but
-        // stays outside the window to about 57 (the known ceiling).
-        for tip in [45.0, 50.0, 55.0] {
-            assert!(!pitch_within(pitch_deg(&tipped(tip)).unwrap()), "{tip}");
+    }
+
+    /// The Reviewer-lead's P3 on #7450: the nose alone folds past about 41
+    /// degrees down, so a phone's deep bow read back inside the window. With
+    /// the mouth too, the reading rises with the bow all the way down.
+    #[test]
+    fn a_deep_bow_reads_deeper_never_back_inside_the_window() {
+        let tips = [0.0, 20.0, 45.0, 60.0, 75.0];
+        let reads: Vec<f32> = tips
+            .iter()
+            .map(|&tip| pitch_deg(&tipped(tip)).unwrap())
+            .collect();
+        assert!(reads.windows(2).all(|pair| pair[0] < pair[1]), "{reads:?}");
+        for (read, tip) in reads.iter().zip(tips) {
+            assert!((read - tip).abs() < 0.01, "{tip}: {read}");
         }
+        assert!(!pitch_within(reads[3]) && !pitch_within(reads[4]));
+        // Head far back too: never back inside.
+        let up = pitch_deg(&tipped(-60.0)).unwrap();
+        assert!((up + 60.0).abs() < 0.01 && !pitch_within(up), "{up}");
+    }
+
+    /// Marks that can't be a face read as lost, outside the window: never
+    /// facing. Only a turn past sixty is not measured at all.
+    #[test]
+    fn marks_that_cannot_be_read_are_lost_and_not_facing() {
+        assert!(!pitch_within(LOST_DEG));
+        let mut nan_nose = tipped(0.0);
+        nan_nose[2].1 = f32::NAN;
+        let mut nan_mouth = tipped(0.0);
+        nan_mouth[4].0 = f32::NAN;
+        let mut no_eyes = tipped(0.0);
+        no_eyes[1] = no_eyes[0];
+        // The mouth above the eyes and the nose below them: no head does it.
+        let mut flipped = tipped(0.0);
+        flipped[3].1 = 10.0;
+        flipped[4].1 = 10.0;
+        for marks in [nan_nose, nan_mouth, no_eyes, flipped] {
+            assert_eq!(pitch_deg(&marks), Some(LOST_DEG), "{marks:?}");
+        }
+        // Turned past sixty: not measured.
+        let mut side_on = tipped(0.0);
+        side_on[2].0 = 69.0;
+        assert_eq!(pitch_deg(&side_on), None);
     }
 
     #[test]
@@ -298,22 +365,12 @@ mod tests {
             (30.0, 40.0),
             (30.0 + apart, 40.0),
             (30.0 + apart / 2.0 + along, 40.0 + 40.0 * LEVEL_NOSE_DROP),
-            (0.0, 0.0),
-            (0.0, 0.0),
+            (30.0, 40.0 + 40.0 * LEVEL_MOUTH_DROP),
+            (30.0 + apart, 40.0 + 40.0 * LEVEL_MOUTH_DROP),
         ];
         assert!((yaw_deg(&turned).unwrap() - 40.0).abs() < 0.01);
         let read = pitch_deg(&turned).unwrap();
         assert!(read.abs() < 0.01, "{read}");
-        // Turned past sixty: not measured. No number, no eyes: none.
-        let mut side_on = tipped(0.0);
-        side_on[2].0 = 69.0;
-        assert_eq!(pitch_deg(&side_on), None);
-        let mut broken = tipped(0.0);
-        broken[2].1 = f32::NAN;
-        assert_eq!(pitch_deg(&broken), None);
-        let mut none = tipped(0.0);
-        none[1] = none[0];
-        assert_eq!(pitch_deg(&none), None);
     }
 
     #[test]
