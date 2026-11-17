@@ -1184,7 +1184,13 @@ lý do sau "not the same person": "no one known on the line" (không ai được
 nhận ra trên câu), "theirs, in a later session" (của họ, ở phiên sau) hoặc
 "another person" (người khác) (`second_provider::not_theirs`, không bao giờ
 ghi id; hàng của Thirteen trên #5627, một lời «có» 42 giây sau khi giữ bị đọc
-là của người khác). Bất kỳ lời «không», «giữ», «khoan»,
+là của người khác). Một lời «có» kịp lúc mà không ai được nhận ra trên câu
+(không có mặt trong khung, một khuôn mặt lạ, một câu được mang theo trong cuộc
+trò chuyện đang diễn ra của họ) bị bỏ và điều ấy vẫn được giữ; như với lời
+«có» không thấy miệng, mô hình được báo một lần rằng lời ấy không tính, không
+gì bị quên và điều ấy vẫn được giữ, và nó có thể hỏi họ một lần nói lại khi
+nhìn vào đèn (`remember::unknown_yes_told`, #7454: trên lamp-06c1 mô hình
+không được báo gì và có thể nói là đã quên). Bất kỳ lời «không», «giữ», «khoan»,
 «đừng» hay một câu hỏi đều không phải lời «có». Nếu lúc lệnh quên chạy câu
 không còn là của họ (một khuôn mặt hay giọng khác xuất hiện), không gì bị quên
 và mô hình được báo điều ấy vẫn được giữ; nó không bao giờ chạy trong phạm vi
