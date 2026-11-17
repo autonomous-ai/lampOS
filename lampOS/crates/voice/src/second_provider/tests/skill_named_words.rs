@@ -1127,3 +1127,33 @@ fn a_made_skill_its_words_start_is_heard_first_with_no_line_of_the_lamps() {
     );
     assert_eq!(went.said, ["Photo booth didn't run today."]);
 }
+
+/// #7587 (P2b on 992eddcc10): the skill the heard words ran in code is the
+/// turn's own `use_skill` call, with no copy of it added: with
+/// `LAMP_ACTION_CLAIM_SKILLS` off, "Done." after it is said as before;
+/// with it on, "the photo booth skill is started" stands beside that run.
+#[test]
+fn a_skill_named_runs_call_backs_its_start_and_off_is_unchanged() {
+    let went = went_with("photo booth", vec![said("Done.")], booth_told(), |engine| {
+        engine.checking_action_claims(true)
+    });
+    assert_eq!(went.said, ["Done."], "{:?}", went.ran);
+    assert_eq!(went.chats, 1);
+    let started = "Okay, the photo booth skill is started.";
+    let went = went_with(
+        "Run photo booth.",
+        vec![said(started)],
+        booth_told(),
+        |engine| {
+            engine
+                .checking_action_claims(true)
+                .checking_skill_claims(true)
+                .knowing_skill_names(Arc::new(|| crate::action_claim::KnownSkills {
+                    names: vec!["photo-booth".to_owned()],
+                    off: Vec::new(),
+                }))
+        },
+    );
+    assert_eq!(went.said, [started], "{:?}", went.ran);
+    assert_eq!(went.chats, 1);
+}

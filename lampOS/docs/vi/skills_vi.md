@@ -1556,15 +1556,19 @@ trên một câu yêu cầu thay đổi kỹ năng (`action_claim::asks_a_skill_
 dạng câu hỏi, câu trả lời mở đầu, trần hoặc sau một lời dẫn, bằng một kỹ năng
 được nói là đã gỡ, tắt, bật, tạo, khởi động hay đang chạy
 (`action_claim::SKILL_SAID`, `BARE_SKILL_SAID`), kết thúc ở cuối câu và không
-bao giờ với dấu '?', chỉ bị giữ khi cả hai điều sau đúng: (a) câu đầu tiên gọi
-đúng tên một kỹ năng người dùng ĐÃ TẠO (`made.json`, `made_remove::names`), so
-sánh chữ thường và bỏ khoảng trắng, gạch nối, gạch dưới
-(`action_claim::made_named`: "moon time", "moon-time" và `moon_time` là một);
-và (b) lượt không có lời gọi đúng loại cho kỹ năng đó
-(`action_claim::backs_skill`): gỡ, tắt, bật hay tạo cần một `make_skill` có
-đối số, so sánh cùng cách, chứa tên đó ("moon time scale" chứa "moon time"),
-hoặc một lời đồng ý (`approve_id`); khởi động hay đang chạy cần `run` của
-`make_skill` hay `skill` của `use_skill` chứa tên đó. Khi bị giữ, mô hình được
+bao giờ với dấu '?', chỉ bị giữ khi cả hai điều sau đúng: (a) toàn bộ chủ ngữ
+của câu (`action_claim::claim_subject`: các từ trước "is", "was" hay "has",
+hoặc sau "I" và động từ, trong mệnh đề đầu tiên có động từ của câu nói, bỏ
+"the", "my", "your", "skill" và "app"; "the stretch reminder" không phải
+"stretch") đúng là tên một kỹ năng người dùng ĐÃ TẠO (`made.json`,
+`made_remove::names`), so sánh chữ thường và bỏ khoảng trắng, gạch nối, gạch
+dưới (`action_claim::made_named`: "moon time", "moon-time" và `moon_time` là
+một); và (b) lượt không có lời gọi đúng loại cho kỹ năng đó
+(`action_claim::backs_skill`): gỡ, tắt hay bật cần một `make_skill` có đối số,
+so sánh cùng cách, chứa chủ ngữ đó ("moon time scale" chứa "moon time"), hoặc
+một lời đồng ý (`approve_id`); khởi động hay đang chạy cần `run` của
+`make_skill` hay `skill` của `use_skill` chứa tên đó. Một kỹ năng đã tạo được
+nói là đã tạo thì không bao giờ bị giữ: nó vẫn ở đó. Khi bị giữ, mô hình được
 hỏi lại một lần với cùng ghi chú, rồi đèn nói "Sorry, I didn't do that. Could
 you ask me again?". Một kỹ năng đã tạo được nói là đã tắt mà tệp `off` của
 `lamp-skills` cho thấy vốn đã tắt, hay đã bật mà tệp cho thấy đang bật, kể một
@@ -1582,13 +1586,15 @@ xét, từ các tệp của chính đèn. Chỉ đọc câu trả lời tiếng 
 `a_claim_naming_no_made_skill_is_none`,
 `a_made_skill_said_on_or_off_is_judged_by_its_state`,
 `a_made_skill_said_started_stands_beside_its_run`,
+`a_claims_whole_subject_picks_the_made_skill`,
 `talk_about_skills_is_no_skill_claim`,
 `second_provider::tests::action_claim::a_skill_said_removed_with_no_make_is_asked_again_then_not_done`,
 `a_skill_change_beside_its_make_and_talk_about_skills_are_said_as_they_came`,
 `a_skill_said_started_beside_its_use_skill_is_said_as_it_came`,
 `a_bare_state_naming_no_skill_is_said_as_it_came`,
 `a_skill_said_off_that_is_off_already_is_said_as_it_came`,
-`a_skill_said_removed_beside_only_a_light_call_is_held`. Câu không gọi tên
+`a_skill_said_removed_beside_only_a_light_call_is_held`,
+`second_provider::tests::skill_named_words::a_skill_named_runs_call_backs_its_start_and_off_is_unchanged`. Câu không gọi tên
 kỹ năng nào ("Moon time is removed.") đứng được bên cạnh bất kỳ lời gọi nào,
 vì một lời nhắc bị huỷ cũng có thể được nói là đã gỡ. Lời đồng ý gỡ là chính
 lời gọi `make_skill` có `approve_id`, nên câu "đã gỡ" sau đó được nói. Như các

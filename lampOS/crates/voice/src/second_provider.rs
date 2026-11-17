@@ -16653,11 +16653,6 @@ async fn answer(
                 args,
             });
         let named_by_words = named_call.is_some();
-        // The skill the heard words ran in code, by its function's name, for
-        // a start said after it (`LAMP_ACTION_CLAIM_SKILLS`, #7587).
-        let named_skill: Option<String> = named_call
-            .as_ref()
-            .map(|call| crate::skill_named::function_of(&call.name, &call.args).to_owned());
         let mut skill_ran: Option<((String, Value), Value)> = None;
         if let Some(call) = &named_call {
             let function = crate::skill_named::function_of(&call.name, &call.args);
@@ -16778,17 +16773,6 @@ async fn answer(
         // I didn't do that." after the app's MAKE IT, three of three).
         if made_said {
             turn_called.push((crate::made_skill::MAKE.to_owned(), Value::Null));
-        }
-        // And a skill asked by its name, run in code as round 1
-        // (`LAMP_SKILL_NAMED`), is the turn's `use_skill`, whatever its
-        // function's name: "Okay, the focus mode skill is on." after it
-        // stands (`LAMP_ACTION_CLAIM_SKILLS`, Twelve's adversarial P2 on
-        // #7587).
-        if let Some(skill) = &named_skill {
-            turn_called.push((
-                crate::use_skill::NAME.to_owned(),
-                serde_json::json!({ "skill": skill }),
-            ));
         }
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round

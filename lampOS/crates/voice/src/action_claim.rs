@@ -156,15 +156,17 @@
 //! skill's change ([`asks_a_skill_change`]) and not as a question, a reply
 //! that opens (bare or after a lead-in) with one of [`SKILL_SAID`]'s or
 //! [`BARE_SKILL_SAID`]'s runs is held ([`skill_claim`]) only when (a) its
-//! first sentence names one of the person's MADE skills (`made.json`) by its
-//! exact name, compared lower case with spaces, hyphens and underscores
-//! dropped ([`made_named`]), and (b) the turn has no call of its kind for
-//! that skill ([`backs_skill`]): removed, turned off, turned on or made need
-//! a `make_skill` whose argument holds that name ("moon time scale" holds
-//! "moon time") or a yes (`approve_id`); started or running a `make_skill`
-//! `run` or `use_skill` `skill` that holds it. A made skill said off that the
-//! off file shows off already, or on that it shows on, tells a true state
-//! and is never held. Everything else stands: core and installed skills,
+//! subject, the whole of it ([`claim_subject`]: "the moon time skill" is
+//! "moon time", "the stretch reminder" is no "stretch"), is one of the
+//! person's MADE skills (`made.json`) by its exact name, compared lower case
+//! with spaces, hyphens and underscores dropped ([`made_named`]), and (b)
+//! the turn has no call of its kind for that skill ([`backs_skill`]):
+//! removed, turned off or turned on need a `make_skill` whose argument holds
+//! that name ("moon time scale" holds "moon time") or a yes
+//! (`approve_id`); started or running a `make_skill` `run` or `use_skill`
+//! `skill` that holds it. A made skill said made is never held (it is
+//! there), nor one said off that the off file shows off already, or on that
+//! it shows on: true states. Everything else stands: core and installed skills,
 //! near names, bare states naming no made skill ("Okay, the stove is turned
 //! off."), and "You have three skills.".
 
@@ -901,12 +903,14 @@ fn skill_act(kind: Claim, reply: &str) -> Option<SkillAct> {
     match kind {
         Claim::SkillOn => Some(SkillAct::On),
         Claim::SkillStarted => Some(SkillAct::Started),
-        Claim::Skill => words_of(reply).iter().find_map(|word| match word.as_str() {
-            "removed" | "deleted" | "uninstalled" => Some(SkillAct::Removed),
-            "off" | "disabled" => Some(SkillAct::Off),
-            "made" | "created" => Some(SkillAct::Made),
-            _ => None,
-        }),
+        Claim::Skill => normalised(reply)
+            .split(|c: char| !c.is_alphanumeric())
+            .find_map(|word| match word {
+                "removed" | "deleted" | "uninstalled" => Some(SkillAct::Removed),
+                "off" | "disabled" => Some(SkillAct::Off),
+                "made" | "created" => Some(SkillAct::Made),
+                _ => None,
+            }),
         _ => None,
     }
 }
@@ -920,30 +924,104 @@ fn flat(name: &str) -> String {
         .collect()
 }
 
-/// The words of `reply`'s first sentence, as [`normalised`] reads them.
-fn words_of(reply: &str) -> Vec<String> {
+/// Words a claim's verb is told by: the clause [`claim_subject`] reads is
+/// the first that holds one.
+const SKILL_VERBS: [&str; 13] = [
+    "removed",
+    "deleted",
+    "uninstalled",
+    "turned",
+    "switched",
+    "disabled",
+    "enabled",
+    "made",
+    "created",
+    "started",
+    "running",
+    "off",
+    "on",
+];
+
+/// Words around a skill's name that are no part of it.
+const AROUND_A_NAME: [&str; 5] = ["the", "my", "your", "skill", "app"];
+
+/// Words said after a skill's name that are no part of it ("I removed moon
+/// time earlier.").
+const AFTER_A_NAME: [&str; 8] = [
+    "earlier",
+    "already",
+    "yesterday",
+    "before",
+    "just",
+    "now",
+    "again",
+    "back",
+];
+
+/// The subject of the skill claim in `reply` (the coordinator's P1 on
+/// 992eddcc10): in the first clause, between sentence marks and commas,
+/// that holds a claim's verb ([`SKILL_VERBS`]; "Okay. Moon time is
+/// removed." reads the second), the words before "is", "was" or "has"
+/// ("The moon time skill is off."), or after "I", "I've" or "I have", its
+/// verb and an "off" or "on" ("I've turned off the CloudFact skill.", "I
+/// turned the CloudFact skill back on."), to "skill", "off" or "on"; "the",
+/// "my", "your", "skill" and "app" ([`AROUND_A_NAME`]) and a trailing
+/// "earlier" or "already" ([`AFTER_A_NAME`]) left out. Never a part of it.
+fn claim_subject(reply: &str) -> Vec<String> {
     let text = normalised(reply);
-    text.split(['.', '!', '?'])
-        .next()
-        .unwrap_or_default()
-        .split(|c: char| !c.is_alphanumeric() && c != '\'' && c != '-' && c != '_')
-        .filter(|word| !word.is_empty())
+    let Some(clause) = text
+        .split(['.', '!', '?', ',', ';', ':', '\u{2014}', '\u{2013}'])
+        .map(|clause| {
+            clause
+                .split(|c: char| !c.is_alphanumeric() && c != '\'' && c != '-' && c != '_')
+                .filter(|word| !word.is_empty())
+                .collect::<Vec<_>>()
+        })
+        .find(|words| words.iter().any(|word| SKILL_VERBS.contains(word)))
+    else {
+        return Vec::new();
+    };
+    let mut subject: Vec<&str> = match clause.as_slice() {
+        ["i" | "i've", "have", _verb, rest @ ..] | ["i" | "i've", _verb, rest @ ..] => {
+            let rest = match rest {
+                ["off" | "on", rest @ ..] => rest,
+                rest => rest,
+            };
+            rest.iter()
+                .take_while(|word| !matches!(**word, "skill" | "off" | "on"))
+                .copied()
+                .collect()
+        }
+        words => words
+            .iter()
+            .take_while(|word| !matches!(**word, "is" | "was" | "has"))
+            .copied()
+            .collect(),
+    };
+    while subject
+        .last()
+        .is_some_and(|word| AFTER_A_NAME.contains(word))
+    {
+        subject.pop();
+    }
+    subject
+        .into_iter()
+        .filter(|word| !AROUND_A_NAME.contains(word))
         .map(str::to_owned)
         .collect()
 }
 
-/// The made skill of `names` that `reply`'s first sentence names by its
-/// exact name ([`flat`]: a run of its words equal to the name), if any.
+/// The made skill of `names` the claim in `reply` is about: its whole
+/// subject ([`claim_subject`]), [`flat`], equal to the name's. Never a part
+/// of the subject ("the stretch reminder" is not "stretch").
 fn made_named<'a>(reply: &str, names: &'a [String]) -> Option<&'a str> {
-    let words = words_of(reply);
+    let subject = flat(&claim_subject(reply).concat());
+    if subject.is_empty() {
+        return None;
+    }
     names
         .iter()
-        .find(|name| {
-            let name = flat(name);
-            !name.is_empty()
-                && (1..=words.len())
-                    .any(|size| words.windows(size).any(|run| flat(&run.concat()) == name))
-        })
+        .find(|name| flat(name) == subject)
         .map(String::as_str)
 }
 
@@ -981,64 +1059,12 @@ pub fn skill_claim(reply: &str, ended: bool, known: &KnownSkills) -> Option<Opti
     }
 }
 
-/// Words that are never a skill's name in a claim: what [`backs_skill`]
-/// leaves out of the reply before it looks for the name in a call's
-/// argument.
-const NOT_A_NAME: [&str; 37] = [
-    "i",
-    "i've",
-    "have",
-    "has",
-    "been",
-    "is",
-    "was",
-    "it",
-    "it's",
-    "its",
-    "the",
-    "my",
-    "your",
-    "a",
-    "an",
-    "okay",
-    "ok",
-    "sure",
-    "done",
-    "all",
-    "right",
-    "skill",
-    "removed",
-    "deleted",
-    "uninstalled",
-    "turned",
-    "switched",
-    "off",
-    "on",
-    "back",
-    "again",
-    "now",
-    "made",
-    "created",
-    "started",
-    "running",
-    "enabled",
-];
-
-/// Whether the call's argument `arg` holds the skill `reply` names: a run of
-/// the reply's words, its other words left out ([`NOT_A_NAME`]), whose
-/// [`flat`] form `arg`'s holds ("moon time scale" holds "moon time").
+/// Whether the call's argument `arg` holds the skill `reply`'s claim is
+/// about: its whole subject ([`claim_subject`]), [`flat`], inside `arg`'s
+/// ("moon time scale" holds "moon time").
 fn holds_the_name(reply: &str, arg: &str) -> bool {
-    let arg = flat(arg);
-    words_of(reply)
-        .split(|word| NOT_A_NAME.contains(&word.as_str()))
-        .any(|named| {
-            (1..=named.len()).any(|size| {
-                named.windows(size).any(|run| {
-                    let run = flat(&run.concat());
-                    run.chars().count() >= 3 && arg.contains(&run)
-                })
-            })
-        })
+    let subject = flat(&claim_subject(reply).concat());
+    !subject.is_empty() && flat(arg).contains(&subject)
 }
 
 /// Whether `reply` asks for a skill's change: a remove, a turn off or on,
@@ -4748,9 +4774,17 @@ pub(crate) mod tests {
     /// core-like name and a short one among them.
     fn known() -> KnownSkills {
         KnownSkills {
-            names: ["moon-time", "cloudfact", "focus_mode", "reminders", "time"]
-                .map(str::to_owned)
-                .to_vec(),
+            names: [
+                "time",
+                "moon-time",
+                "cloudfact",
+                "focus_mode",
+                "reminders",
+                "stretch",
+                "fan",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
             off: Vec::new(),
         }
     }
@@ -4771,6 +4805,8 @@ pub(crate) mod tests {
             ("The moon time skill is removed.", "moon-time"),
             ("I removed the moon time skill.", "the moon time skill"),
             ("Okay, I deleted moon time.", "moon time"),
+            // P3 on 992eddcc10: the claim's sentence is read, not the first.
+            ("Okay. Moon time is removed.", "moon time"),
         ] {
             assert_eq!(
                 claim_on(reply, true, false, false, false, Some(&names)),
@@ -4828,7 +4864,8 @@ pub(crate) mod tests {
     }
 
     /// The rule of #7601: a claim naming no made skill by its exact name is
-    /// never held: a core or installed skill, a near name, a bare state.
+    /// never held: a core or installed skill, a near name, a bare state, a
+    /// made name inside a longer subject.
     #[test]
     fn a_claim_naming_no_made_skill_is_none() {
         let names = known();
@@ -4843,6 +4880,10 @@ pub(crate) mod tests {
             "Okay, the guard mode skill is started.",
             "The photo booth skill is removed.",
             "Moon tide is removed.",
+            // P1 on 992eddcc10: a made skill's name inside a longer subject.
+            "I've deleted the stretch reminder.",
+            "The fan timer is turned off.",
+            "I removed moon time earlier today.",
         ] {
             assert_eq!(
                 claim_on(reply, true, false, false, false, Some(&names)),
@@ -4978,5 +5019,58 @@ pub(crate) mod tests {
                 "{reply}"
             );
         }
+    }
+
+    /// P2a on 992eddcc10: with "time" made before "moon-time", "Moon time
+    /// is turned off." is about moon time, whole: held for it, backed by
+    /// its own turn-off, not by one of "time".
+    #[test]
+    fn a_claims_whole_subject_picks_the_made_skill() {
+        let names = known();
+        assert_eq!(
+            made_named("Moon time is turned off.", &names.names),
+            Some("moon-time")
+        );
+        let reversed: Vec<String> = names.names.iter().rev().cloned().collect();
+        assert_eq!(
+            made_named("Moon time is turned off.", &reversed),
+            Some("moon-time")
+        );
+        assert_eq!(
+            made_named("Time is turned off.", &names.names),
+            Some("time")
+        );
+        for (reply, subject) in [
+            ("I've turned off the CloudFact skill.", vec!["cloudfact"]),
+            ("I turned the CloudFact skill back on.", vec!["cloudfact"]),
+            (
+                "Your moon time skill has been removed.",
+                vec!["moon", "time"],
+            ),
+            ("Okay. Moon time is removed.", vec!["moon", "time"]),
+            ("I removed moon time earlier.", vec!["moon", "time"]),
+            (
+                "I've deleted the stretch reminder.",
+                vec!["stretch", "reminder"],
+            ),
+        ] {
+            assert_eq!(claim_subject(reply), subject, "{reply}");
+        }
+        let time_off = serde_json::json!({ "turn_off": "time" });
+        let moon_off = serde_json::json!({ "turn_off": "moon time" });
+        assert!(!stands_on(
+            Claim::Skill,
+            "Moon time is turned off.",
+            false,
+            [(crate::made_skill::MAKE, &time_off)],
+            &[]
+        ));
+        assert!(stands_on(
+            Claim::Skill,
+            "Moon time is turned off.",
+            false,
+            [(crate::made_skill::MAKE, &moon_off)],
+            &[]
+        ));
     }
 }
