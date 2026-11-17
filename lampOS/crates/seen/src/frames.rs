@@ -23,10 +23,22 @@
 //! sending stops ([`Sink::stopped`]): the ring's mark
 //! ([`crate::mark::Marked`]) wraps the sink there, so no frame is asked for
 //! or passed, to `Discard` too, unless the ring said it drew the mark.
+//!
+//! The link is read by a thread of its own ([`Drained`]), never by the
+//! serve loop: the camera closes a reader that leaves a frame unread for
+//! 0.5 s (`STALL_DEADLINE_US`), its kernel buffer holds about 16 KiB, and a
+//! frame of the eyes' full look is several times that, so a loop that
+//! reads once a 100 ms tick, and longer while a frame is scaled for
+//! sending, took the frame too slowly and lost the link mid-burst. The
+//! thread copies a whole frame into one slot of its own, which the next
+//! step takes and wipes; a loss, the gate closing or a stop wipes it too.
 use crate::gate::Closed;
 use lamp_camera::frames::{FrameClient, FrameMeta};
 use lamp_turn_owner::CameraGrant;
 use std::io;
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::thread::JoinHandle;
+use std::time::Duration;
 use zeroize::Zeroize;
 
 /// The newest frame asked for may be at most this old when the camera
@@ -68,6 +80,171 @@ impl Source for FrameClient {
     }
     fn disconnect(&mut self) {
         FrameClient::disconnect(self)
+    }
+}
+
+/// How often the reader thread reads the link while a frame is asked for:
+/// a frame of a few hundred KiB, 16 KiB a read, comes well within the
+/// camera's 0.5 s.
+pub const DRAIN_EVERY: Duration = Duration::from_millis(2);
+/// How long the reader thread waits with nothing asked for, unless a
+/// request or a stop wakes it.
+const IDLE_WAIT: Duration = Duration::from_millis(100);
+
+/// What the reader thread and the serve loop share.
+struct Shared<S> {
+    source: S,
+    /// The thread's one copy: a whole frame, until the next step takes it.
+    jpeg: Vec<u8>,
+    frame: Option<FrameMeta>,
+    /// The link failed while the thread read it: told at the next step.
+    failed: Option<io::Error>,
+    stop: bool,
+}
+
+impl<S: Source> Shared<S> {
+    fn wipe(&mut self) {
+        self.jpeg.zeroize();
+        self.frame = None;
+    }
+}
+
+/// A [`Source`] whose link is read by a thread of its own, so it is
+/// drained however long the serve loop's step takes (the camera's
+/// 0.5 s stall rule). The thread only reads while a request is out, and
+/// only until a whole frame has come; that frame waits in one slot,
+/// copied, for the next [`Source::poll`], which moves it into the
+/// taker's buffer and wipes the slot. A failure drops the connection at
+/// once and is said at the next step; a disconnect (the gate closing, a
+/// loss, a stop) wipes the slot. Dropped, the thread stops and the slot
+/// is wiped.
+pub struct Drained<S: Source> {
+    shared: Arc<(Mutex<Shared<S>>, Condvar)>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl<S: Source + Send + 'static> Drained<S> {
+    pub fn new(source: S) -> io::Result<Self> {
+        let shared = Arc::new((
+            Mutex::new(Shared {
+                source,
+                jpeg: Vec::new(),
+                frame: None,
+                failed: None,
+                stop: false,
+            }),
+            Condvar::new(),
+        ));
+        let theirs = Arc::clone(&shared);
+        let thread = std::thread::Builder::new()
+            .name("seen-frames".into())
+            .spawn(move || drain(&theirs))?;
+        Ok(Self {
+            shared,
+            thread: Some(thread),
+        })
+    }
+}
+
+impl<S: Source> Drained<S> {
+    fn lock(&self) -> MutexGuard<'_, Shared<S>> {
+        self.shared
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
+
+/// The reader thread: reads while a request is out and no whole frame
+/// waits, every [`DRAIN_EVERY`].
+fn drain<S: Source>(shared: &(Mutex<Shared<S>>, Condvar)) {
+    let (lock, wake) = shared;
+    let mut held = lock
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    while !held.stop {
+        let reading = held.failed.is_none()
+            && held.frame.is_none()
+            && held.source.connected()
+            && held.source.outstanding().is_some();
+        if reading {
+            let state = &mut *held;
+            match state.source.poll(&mut state.jpeg) {
+                Ok(Some(meta)) => state.frame = Some(meta),
+                Ok(None) => {}
+                Err(error) => {
+                    state.source.disconnect();
+                    state.wipe();
+                    state.failed = Some(error);
+                }
+            }
+        }
+        let wait = if reading { DRAIN_EVERY } else { IDLE_WAIT };
+        held = wake
+            .wait_timeout(held, wait)
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .0;
+    }
+}
+
+impl<S: Source> Source for Drained<S> {
+    fn connected(&self) -> bool {
+        let held = self.lock();
+        // A failure not yet said keeps it "connected" until the step's
+        // poll says it.
+        held.source.connected() || held.failed.is_some() || held.frame.is_some()
+    }
+    fn connect(&mut self) -> io::Result<bool> {
+        let mut held = self.lock();
+        if let Some(error) = held.failed.take() {
+            return Err(error);
+        }
+        held.source.connect()
+    }
+    fn outstanding(&self) -> Option<u64> {
+        let held = self.lock();
+        held.source
+            .outstanding()
+            .or(held.frame.as_ref().map(|meta| meta.request))
+    }
+    fn request(&mut self, max_age_us: u32) -> io::Result<u64> {
+        let id = self.lock().source.request(max_age_us)?;
+        self.shared.1.notify_all();
+        Ok(id)
+    }
+    fn poll(&mut self, jpeg: &mut Vec<u8>) -> io::Result<Option<FrameMeta>> {
+        let mut held = self.lock();
+        if let Some(error) = held.failed.take() {
+            return Err(error);
+        }
+        let Some(meta) = held.frame.take() else {
+            return Ok(None);
+        };
+        jpeg.clear();
+        jpeg.extend_from_slice(&held.jpeg);
+        held.jpeg.zeroize();
+        Ok(Some(meta))
+    }
+    fn disconnect(&mut self) {
+        let mut held = self.lock();
+        held.source.disconnect();
+        held.wipe();
+        held.failed = None;
+    }
+}
+
+impl<S: Source> Drop for Drained<S> {
+    fn drop(&mut self) {
+        {
+            let mut held = self.lock();
+            held.stop = true;
+            held.source.disconnect();
+            held.wipe();
+        }
+        self.shared.1.notify_all();
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
     }
 }
 

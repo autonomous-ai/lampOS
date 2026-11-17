@@ -24,7 +24,7 @@ use lamp_seen::{
     activity::{self, Activity},
     burst::Pace,
     endpoint::Endpoint,
-    frames::{self, Sink, Taker},
+    frames::{self, Drained, Sink, Taker},
     gate, hold, keep, link,
     mark::{BusRing, Marked},
     opt_in,
@@ -318,7 +318,7 @@ fn said_word(said: opt_in::Said) -> &'static str {
     }
 }
 
-type Frames = (Taker<FrameClient>, Marked<BusRing, Outlet>);
+type Frames = (Taker<Drained<FrameClient>>, Marked<BusRing, Outlet>);
 
 fn health(publisher: &mut Publisher, gate: Result<(), gate::Closed>, frames: Option<&Frames>) {
     let activity = frames.and_then(|(_, marked)| marked.inner().activity.as_deref());
@@ -503,14 +503,16 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
     let mut frames: Option<Frames> = match config.frames.clone().or(from_file).as_ref() {
         None => None,
         Some((socket, own, controller)) => Some((
+            // Read on a thread of its own, so the link is drained however
+            // long a step takes (the camera's 0.5 s stall rule).
             Taker::with_every(
-                FrameClient::new(
+                Drained::new(FrameClient::new(
                     socket,
                     Role::Perception,
                     *own,
                     *controller,
                     lamp_camera::MAX_FRAME_BYTES,
-                ),
+                ))?,
                 every_us,
             ),
             Marked::new(BusRing::on(&bus, boot_clock_id())?, outlet),
