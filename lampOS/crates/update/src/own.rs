@@ -74,6 +74,11 @@ const BEGAN: &str = "self-began";
 const PUT_BACK: &str = "self-put-back";
 /// The kernel's id of this boot, new at every start.
 pub const BOOT_ID: &str = "/proc/sys/kernel/random/boot_id";
+/// The boot's own clock, `/proc/uptime`'s first field, which a setting of
+/// the wall clock never moves (#6901: on lamp-ee17 on 17 Nov a boot whose
+/// clock was behind until timesyncd set it made a switch "too late" by the
+/// jump alone).
+pub const UPTIME: &str = "/proc/uptime";
 
 /// Whether the switch is on, from its value.
 pub fn on(value: Option<&str>) -> bool {
@@ -363,17 +368,37 @@ pub fn boot_id(root: &Path) -> Option<String> {
     (!id.is_empty() && id.len() <= 64).then(|| id.to_owned())
 }
 
-/// Noted as a switch to `build` begins: the boot it begins on. Nothing is
-/// noted when the boot is not known, and then no retry is ever made.
+/// [`UPTIME`] in ms, when it can be read.
+fn uptime_ms(root: &Path) -> Option<u64> {
+    let text = fs::read_to_string(on_root(root, UPTIME)).ok()?;
+    let seconds: f64 = text.split_whitespace().next()?.parse().ok()?;
+    (seconds.is_finite() && seconds >= 0.0).then_some((seconds * 1000.0) as u64)
+}
+
+/// How long ago the switch to `build` began, on the boot's own clock: only
+/// on the boot it began on, and only when `self-began` noted the uptime
+/// then ([`note_began`]). Otherwise the wall clock judges, as before.
+fn began_ago_ms(records: &Path, root: &Path, build: &str) -> Option<u64> {
+    let (boot, at) = noted(records, BEGAN, build)?;
+    if boot_id(root)? != boot {
+        return None;
+    }
+    Some(uptime_ms(root)?.saturating_sub(at?))
+}
+
+/// Noted as a switch to `build` begins: the boot it begins on, and the
+/// boot's own clock then when it can be read ([`began_ago_ms`]; a reader
+/// older than that reads the first two words only). Nothing is noted when
+/// the boot is not known, and then no retry is ever made.
 pub(crate) fn note_began(records: &Path, root: &Path, build: &str) -> io::Result<()> {
     let Some(boot) = boot_id(root) else {
         return Ok(());
     };
-    write_whole(
-        &records.join(BEGAN),
-        format!("{build} {boot}\n").as_bytes(),
-        0o600,
-    )
+    let line = match uptime_ms(root) {
+        Some(up) => format!("{build} {boot} {up}\n"),
+        None => format!("{build} {boot}\n"),
+    };
+    write_whole(&records.join(BEGAN), line.as_bytes(), 0o600)
 }
 
 fn put_back_on_another_boot(records: &Path, build: &str) -> bool {
@@ -591,7 +616,12 @@ pub fn back(
             return settle(records, root, say).map(Back::Unreadable);
         }
     };
-    let late = late(pending.at_unix_ms);
+    // On the boot its switch began on, the boot's own clock judges: a wall
+    // clock set after a boot behind never makes it late by itself (#6901).
+    let late = began_ago_ms(records, root, &pending.new).map_or_else(
+        || late(pending.at_unix_ms),
+        |ago| ago >= DEADLINE.as_millis() as u64,
+    );
     if running && !late {
         return Ok(Back::Waiting);
     }
@@ -777,6 +807,64 @@ mod tests {
         fs::remove_file(records.join(RETRIED)).unwrap();
         booted(root, "boot-a");
         assert!(refused_for_good(&records, root, B, u64::MAX));
+    }
+
+    /// The boot's own clock under `root`, `seconds` since it began.
+    fn up(root: &Path, seconds: &str) {
+        let path = on_root(root, UPTIME);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, format!("{seconds} 0.00\n")).unwrap();
+    }
+
+    /// #6901: on lamp-ee17 on 17 Nov a boot's wall clock was behind until
+    /// timesyncd set it, and the jump alone made a switch "too late". On the
+    /// boot the switch began on the boot's own clock judges the deadline; on
+    /// another boot, or with no uptime noted by an older updater, the wall
+    /// clock judges as before.
+    #[test]
+    fn a_switch_on_its_own_boot_is_judged_by_the_boot_clock_not_a_set_wall_clock() {
+        let (root, _, records) = lamp(B, B);
+        let root = root.path();
+        let running = UnitState {
+            active: "active".into(),
+            sub: "running".into(),
+            ..UnitState::default()
+        };
+        let back_at = |now: u64| back(&records, root, now, &running, &mut |_| {}).unwrap();
+        let minute = 60 * 1000;
+        let day = 24 * 60 * minute;
+        booted(root, "boot-a");
+        up(root, "100.00");
+        note_began(&records, root, B).unwrap();
+        begin(&records, A, B).unwrap();
+        let at = pending(&records).unwrap().unwrap().at_unix_ms;
+        // Two minutes on the boot's clock, a day on a wall clock set since.
+        up(root, "220.00");
+        assert_eq!(back_at(at + day), Back::Waiting);
+        // Ten minutes on the boot's clock: late, whatever the wall clock says.
+        up(root, "700.00");
+        assert!(
+            matches!(back_at(at), Back::PutBack(_)),
+            "{:?}",
+            pending(&records)
+        );
+        // Another boot than the one it began on: the wall clock, as before.
+        std::os::unix::fs::symlink(B, on_root(root, CURRENT)).ok();
+        up(root, "100.00");
+        note_began(&records, root, B).unwrap();
+        begin(&records, A, B).unwrap();
+        let at = pending(&records).unwrap().unwrap().at_unix_ms;
+        booted(root, "boot-b");
+        up(root, "5.00");
+        assert_eq!(back_at(at + minute), Back::Waiting);
+        assert!(matches!(back_at(at + 11 * minute), Back::PutBack(_)));
+        // An older updater's note, with no uptime: the wall clock, as before.
+        booted(root, "boot-a");
+        fs::write(records.join(BEGAN), format!("{B} boot-a\n")).unwrap();
+        begin(&records, A, B).unwrap();
+        let at = pending(&records).unwrap().unwrap().at_unix_ms;
+        up(root, "99999.00");
+        assert_eq!(back_at(at + minute), Back::Waiting);
     }
 
     /// #6901: the owner's retry lets every refused binary go once more. One

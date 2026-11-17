@@ -1750,6 +1750,12 @@ build could carry it units or settings.
    last result when it starts again (#1683's update alerts). The line comes
    after `self.json` is removed, so a cut between the two leaves the
    put-back done with no line, and `update/status` says the end before it.
+   The 10 min run on the boot's own clock (`/proc/uptime`, which
+   `self-began` notes as its third word since #6901) when the boot is the
+   one the switch began on: a wall clock set after a boot that was behind
+   (timesyncd's first sync) never makes a switch late by itself, as it did
+   on lamp-ee17 on 17 Nov. On another boot, or with a `self-began` an older
+   updater wrote (two words), the wall clock judges, as before.
    Logging first would log it twice when `back` runs again. The window is a
    few calls either way. An unreadable `self.json` it puts back logs the
    same. A helper copied from a build
