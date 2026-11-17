@@ -1273,7 +1273,11 @@ lamp-memory reads `LAMP_MEMORY_TIERS` at start (#4746/#4747; the design is
 - **Off:** a `--memory-days` start with the switch off, or set to an unknown
   value, removes a `memory-tiers.d` an earlier `shadow` or `on` left, since
   no forget made while off would reach it: `tiers off: a left tiered copy
-  removed stores= files=`, counts only. Days' answers are unchanged.
+  removed stores= files=`, counts only. Days' answers are unchanged. A copy
+  that can't be removed (a permission trouble) is said as `could not be
+  removed` and counted in health for the process's life: the report warns
+  "a left tiered copy could not be removed; a forget does not reach it",
+  with `tiers_left_kept`.
 
 How it is wired (`crates/memory/src/tiers.rs`, `tiers_log.rs`):
 
