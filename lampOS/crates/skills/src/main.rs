@@ -5810,9 +5810,11 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             );
             found.set(lamp_skills::task::told(&answer));
             refused.set(lamp_skills::task::refusal_said(&answer));
+            // #7351's line stays behind its own switch: a run is now marked
+            // asked either way (#7354), so the mark alone no longer gates it.
             not_ready.set(lamp_skills::task::not_ready_line(
                 &answer,
-                asked.is_some(),
+                not_ready_asked(asked, lamp_voice::told_when_asked::on()),
                 lamp_voice::skill_words::since_boot_ms(),
             ));
             lamp_skills::service_write::agent_answered(&answer)
@@ -5925,6 +5927,13 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
 /// How long the waiting line may wait to be said (#7354): a "getting
 /// ready" said after the run has begun would be stale.
 const GATEWAY_WAIT_EXPIRES_MS: u64 = 8_000;
+
+/// Whether #7351's not-ready line may be said for this run: only a run
+/// its owner asked by voice and only with `LAMP_TOLD_WHEN_ASKED` on, as
+/// before #7354, which now marks a run asked by voice either way.
+fn not_ready_asked(asked: Option<u64>, told_when_asked: bool) -> bool {
+    asked.is_some() && told_when_asked
+}
 
 /// The say request of the waiting line for a run its owner asked by voice
 /// at `asked` (#7354, [`lamp_skills::task::GATEWAY_WAIT_LINE`]), or why it
@@ -6568,6 +6577,21 @@ fn say_ask(call: &Call, who: bool, made: bool) -> Option<serde_json::Value> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn with_every_switch_off_a_run_asked_by_voice_is_not_told_the_lamp_is_getting_ready() {
+        // #7351's line keeps its own switch: the mark #7354 sets either way
+        // does not say it with `LAMP_TOLD_WHEN_ASKED` off.
+        assert!(!super::not_ready_asked(Some(1_000), false));
+        assert!(!super::not_ready_asked(None, false));
+        assert!(!super::not_ready_asked(None, true));
+        assert!(super::not_ready_asked(Some(1_000), true));
+        let source = include_str!("main.rs");
+        assert!(source.contains(concat!(
+            "not_ready_asked(asked, lamp_voice::",
+            "told_when_asked::on())"
+        )));
+    }
+
     use super::*;
 
     /// No `--push-dir` or `--dev-dir` is today's paths; a given one is used.
