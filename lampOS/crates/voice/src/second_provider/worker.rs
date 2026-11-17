@@ -4182,9 +4182,11 @@ pub fn serve(
         engine = engine.declining_a_task_waiting(Arc::new(move |request, words: &str| {
             crate::agent_tasks::declined(&place, request, words)
         }));
-        engine = engine.taking_a_task_yes(Arc::new(move |request, words: &str| {
-            crate::agent_tasks::yes_taken(&yes_place, request, words)
-        }));
+        engine = engine.taking_a_task_yes(Arc::new(
+            move |request, words: &str, person: Option<&str>| {
+                crate::agent_tasks::yes_taken(&yes_place, request, words, person)
+            },
+        ));
     }
     if let Some(place) = named_agent {
         engine = engine.catching_named_agents(Arc::new(move |words: &str| {

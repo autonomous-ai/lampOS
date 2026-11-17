@@ -259,6 +259,60 @@ tuyến thứ hai (`second_provider/tests/task_yes_in_code.rs`)
 `a_yes_over_the_lamps_voice_is_not_taken_in_code`,
 `a_typed_yes_is_not_taken_in_code`. Chưa được phát thử trên đèn.
 
+### Giữ trong bộ nhớ của người dùng (bản ghi liên kết, lát 3, tắt trừ khi `LAMP_SERVICE_RECORDS_TASKS=on`)
+
+Cùng với `LAMP_SERVICE_RECORDS`, chỉ trên tuyến thứ hai, việc được giao trên
+tiếng "có" nghe được của chủ đèn được giữ trong bộ nhớ Days của họ thành một
+bản ghi liên kết, qua hộp chờ liên kết của voice
+([memory-days_vi.md](memory-days_vi.md)) (`lamp-voice`
+`service_records::task_rows`):
+
+- **Của ai.** Người có tiếng "có" đã bắt đầu việc, theo cách các dịch vụ
+  nhận ra chủ đèn (`services::owner_of`): `confirm_agent_task` của mô hình
+  truyền chủ đèn của câu đó, còn tiếng "có" đơn thuần nhận trong code
+  (#7027) truyền chủ đèn mà phạm vi của câu tìm ra. Không có người đã biết
+  (id `p-`) thì không giữ hay theo dõi gì. Chỉ việc do chính voice bắt đầu
+  mới được ghi: việc nó không giao, dù bus hay phần tasks cho thấy gì, đều
+  không cho ra gì. Bản mô tả kỹ năng là việc đèn tự làm, không bao giờ là
+  một dòng.
+- **Ghi gì.** Khóa `t-<store>-<task>`, dịch vụ `harness`, hành động `task`,
+  `source_kind` `task`, `source_ref` `{service:"lamp-tasks",
+  id:"<store>:<task>"}`. Tóm tắt là việc như đã nhờ (`text` của việc), một
+  dòng tối đa 160 byte; câu trả lời của agent ở lại phần tasks
+  (`get_observation`) và không bao giờ được ghi.
+- **Khi nào.** `prepared` lúc giao; rồi, từ lần quan sát mới nhất của việc
+  (`get_task`), `done` (idle), `failed` (failed, hay lần giao không bao giờ
+  được gửi) hoặc `cancelled` (stopped), mỗi thay đổi một lần. Một câu hỏi
+  ngược lại (`needs-input`), việc đang chạy, hay lần giao chưa chắc thì
+  không ghi gì. Mọi dòng của một việc mang thời điểm giao làm
+  `deed_unix_ms`, nên lần quên sau đó cũng thắng kết quả đến muộn trong
+  memory.
+- **Có giới hạn.** Theo dõi tối đa 16 việc, việc cũ nhất bị bỏ trước, mỗi
+  việc trong 12 giờ sau khi giao; mỗi việc một `get_task` mỗi 10 giây, tối
+  đa 1,5 giây mỗi lần, trên luồng riêng (`linked-task-rows`), không bao giờ
+  trên một lượt. Bản đồ chỉ nằm trong bộ nhớ: việc xong sau khi voice khởi
+  động lại giữ dòng `prepared`.
+- **Quên.** Quên tất cả (của người đó hay của mọi người), hay quên về một
+  điều khớp với tóm tắt, cũng bỏ theo dõi việc ở đây, trước khi gửi lần
+  quên; không đụng tới gì trong phần tasks.
+- **Tắt.** Một trong hai công tắc tắt thì không giữ, theo dõi hay hỏi gì.
+  Tuyến Live chưa có móc này.
+- **Quay về bản cũ.** Tắt công tắc, hoặc chạy voice cũ: các dòng đã ghi ở
+  lại tới khi bị quên, và memory cũ từ chối các trường liên kết, hộp chờ bỏ
+  chúng.
+
+Kiểm thử: trong `service_records::task_rows` là
+`the_yes_person_is_mapped`, `no_known_person_keeps_nothing`,
+`an_unknown_or_forged_task_is_dropped`,
+`the_summary_is_at_most_160_bytes`,
+`an_outcome_is_written_once_with_the_hand_over_deed`,
+`outcomes_from_the_task`, `a_forget_lets_their_tasks_go`,
+`a_forget_about_lets_only_the_matching_tasks_go`,
+`followed_is_bounded_in_number_and_time`, `a_look_writes_what_settled`,
+`off_nothing_is_kept_or_followed`; và trong `agent_tasks` là
+`a_hand_over_on_the_owners_yes_is_their_task_row` cùng tiếng "có" nhận
+trong code. Chưa được phát thử trên đèn.
+
 ## Việc của một kỹ năng trên Hermes của đèn (#6306, PR 3 của #6071, tắt trừ khi `LAMP_SKILL_TASKS=on`, bật trong sản phẩm)
 
 Bước `do.task` của một kỹ năng (#6305, docs/skills.md, "A skill's task")

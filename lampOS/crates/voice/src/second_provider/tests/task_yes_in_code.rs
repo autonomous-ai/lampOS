@@ -142,9 +142,11 @@ fn went(
         Arc::new(Instant::now),
     )
     .announcing(false)
-    .taking_a_task_yes(Arc::new(move |request, words: &str| {
-        tasks::yes_taken(&yes_place, request, words)
-    }))
+    .taking_a_task_yes(Arc::new(
+        move |request, words: &str, person: Option<&str>| {
+            tasks::yes_taken(&yes_place, request, words, person)
+        },
+    ))
     .declining_a_task_waiting(Arc::new(move |request, words: &str| {
         tasks::declined(&no_place, request, words)
     }));
