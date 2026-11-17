@@ -346,6 +346,23 @@ pub fn drop_wait(id: &str) -> bool {
     })
 }
 
+/// The remove waiting for the made skill `skill`'s yes (#6960) dropped,
+/// any other wait kept: the person turned that skill off or on by voice
+/// instead (#7445, Twelve's P2 on #7453: "Remove coffee time?", "no, just
+/// turn it off" left the remove waiting, and a later yes could take it).
+/// Whether one was.
+pub fn drop_remove_of(skill: &str) -> bool {
+    kept::waiting(|waiting| {
+        let removes = waiting
+            .as_ref()
+            .is_some_and(|waiting| waiting.asks.remove && waiting.asks.skill == skill);
+        if removes {
+            *waiting = None;
+        }
+        removes
+    })
+}
+
 /// Where the second route's worker keeps the made skill with code whose
 /// spoken yes it awaits ([`code_yes_awaited_told`]): the app's make status
 /// is answered by the outer voice process (`app_make::status`, its socket

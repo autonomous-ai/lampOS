@@ -661,7 +661,8 @@ pub fn tool() -> lamp_gemini::Tool {
     // `made` alone; whether a line asks any, or a read-back, is the
     // model's judgment.
     // With `LAMP_MADE_SKILL_OFF_SAID` on (#7445), the same sentence tells
-    // a turn-off, a pause or a stop from a remove, in as many bytes.
+    // a turn-off, a pause or a stop from a remove, two bytes longer (151 to
+    // 149), still within the link's 1,024 with every switch on.
     description.push_str(if made_skill::off_said_on() {
         TURN_OFF_TOLD
     } else {
