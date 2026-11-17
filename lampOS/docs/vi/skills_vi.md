@@ -2175,8 +2175,12 @@ cả hai người viết.
   nó (lamp-tasks chỉ tạo một lần một, `busy`; lần chạy lỗi, `run_failed`;
   `no_answer`; không trả lời trong 90 giây) và thất bại của DeepSeek giữ
   nguyên, người dùng nghe câu của agent thay cho lời khuyên "Try asking for
-  one thing" (mục A3, 16/11): "The lamp's agent is busy; ask me again in a
-  minute.", "The lamp's agent didn't answer in time; try again." hoặc "The
+  one thing" (mục A3, 16/11): "Another skill is being made right now; ask
+  me again in a minute." (bận: luôn nói câu này, dù DeepSeek trả lời gì;
+  lamp-9adf, 17/11 18:19, một lần giao lúc bận bị nói thành "I couldn't make
+  that: I couldn't make that one."; một lần sửa mà agent không trả lời cũng
+  nói câu của agent, không bao giờ "the lamp's model didn't answer"), "The
+  lamp's agent didn't answer in time; try again." hoặc "The
   lamp's agent couldn't make it just now; try again."; khi rốt cuộc không
   có agent (`NoAgent`), câu nói rõ cái thiếu, không bao giờ "try again":
   "I couldn't make that one: this lamp has no agent set up to make it."
@@ -2217,10 +2221,28 @@ cả hai người viết.
   lamp-9adf, 12/11 18:10, "every morning at eight, check the weather and tell
   me if I need an umbrella" được giữ là của DeepSeek, một skill chỉ nói
   "Check the weather now, please."
-- **`cannot:` của chính agent không bao giờ được nói nguyên văn.** Đèn nói
-  câu cố định của nó, "I couldn't make that one."
-  (`make_skill_agent::CANNOT_LINE`); với `LAMP_MAKE_NO_CANNOT=on` lời của nó
-  vẫn bị bỏ, và lần tạo trở thành một việc cho agent (bên dưới).
+- **Skill chỉ nói rằng nó không làm được thì không bao giờ được giữ.** Prompt
+  dành "I can't do that yet:" cho câu trả lời `cannot:` một dòng, không bao
+  giờ cho lời của một bước say. Skill mà mọi bước là say bắt đầu bằng phần
+  đầu đó hoặc bằng `cannot:` (`made_skill::says_it_cannot`, chính phần đầu
+  của prompt, không phải danh sách từ) được đọc là `cannot:` của mô hình
+  với lời của say đó (`made_skill::cannot_in_a_say`, trong `kept` của lần
+  tạo, của DeepSeek hay agent): nó đi tới agent, hoặc với
+  `LAMP_MAKE_NO_CANNOT=on` thành việc của agent, và khi tắt thì bị từ chối
+  bằng chính lời đó ("I can't do that yet: checking the gold price for
+  you."). Say như vậy bên cạnh bước khác bị bước kiểm tra từ chối
+  (`made_skill::SAYS_IT_CANNOT`) và được sửa để bỏ phần đó. Trên lamp-9adf,
+  17/11, "tell me the gold price every evening at six" được giữ là một say
+  như vậy, nói mỗi tối.
+- **`cannot:` của chính agent không bao giờ được nói nguyên văn.** Đèn nói lý
+  do `cannot:` của chính DeepSeek khi câu trả lời trước lần giao là một
+  `cannot:`, trong một câu, nếu không thì câu của nó có lý do, "I couldn't
+  make that one: the lamp's agent found no way for a skill to do it."
+  (`make_skill_agent::CANNOT_LINE`). Câu đã nói là không tạo được thì không
+  bao giờ bị thêm phần đầu lần nữa (`made_skill::not_made_line`; lamp-9adf,
+  17/11: "I couldn't make that: I couldn't make that one."). Với
+  `LAMP_MAKE_NO_CANNOT=on` lời của nó vẫn bị bỏ, và lần tạo trở thành một
+  việc cho agent (bên dưới).
 - **Không có "couldn't" khi `LAMP_MAKE_NO_CANNOT=on`** (chủ sở hữu, 16/11:
   "Every task must be doable; no 'couldn't' here"; #7234;
   `crate::make_no_cannot`; tắt trừ khi là `on`, chỉ lamp-voice đọc, không có
@@ -2590,7 +2612,9 @@ cả hai người viết.
   ứng dụng hiện lời hỏi là `making`. Kỹ năng được giữ được bật ngay như mọi
   lần MAKE IT (kỹ năng có mã riêng như trước, `app_make::put_on_line`), và
   kỹ năng không tạo được vẫn được nói và báo cho ứng dụng như trước;
-  `cannot:` riêng của agent là "I couldn't make that one.". Khi công tắc
+  `cannot:` riêng của agent là lý do `cannot:` của DeepSeek khi có, nếu
+  không thì "I couldn't make that one: the lamp's agent found no way for a
+  skill to do it.". Khi công tắc
   tắt, không có phần tasks hoặc không có Hermes, nó vẫn do DeepSeek như
   trước, với các lần sửa của nó. Có Hermes nhưng agent không nhận lần tạo
   (không có lần chạy tạo: không có socket tạo, `no_namespace` hay

@@ -3822,8 +3822,10 @@ path, with no second runner:
     its first line alone is the answer. With the chat cut, only a first
     line that ended before the cut (a line break follows it). The voice
     takes it as the agent's `cannot:`, as from a file: it never says the
-    agent's words, but its own fixed line, "I couldn't make that one."
-    (`make_skill_agent::CANNOT_LINE`), or with `LAMP_MAKE_NO_CANNOT` on it
+    agent's words, but DeepSeek's own `cannot:` reason when it gave one, else
+    its own line, "I couldn't make that one: the lamp's agent found no way
+    for a skill to do it." (`make_skill_agent::CANNOT_LINE`), or with
+    `LAMP_MAKE_NO_CANNOT` on it
     makes the request one task for the agent; either is said instead of
     "try again";
   - **a skill** (`chat_skill`): the whole chat, never a cut one, with

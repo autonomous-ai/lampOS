@@ -1677,8 +1677,9 @@ pub const NOT_KEPT_TRY: &str = "Something went wrong keeping it. Please try agai
 /// ([`crate::make_skill_agent::not_made_try`]): lamp-tasks makes one at a
 /// time (`busy`), the agent gave no answer within its 90 s, or its run
 /// failed. Never [`NOT_MADE_TRY`]'s tip to ask for one thing, which is
-/// about the ask.
-pub const AGENT_BUSY_TRY: &str = "The lamp's agent is busy; ask me again in a minute.";
+/// about the ask. Busy says why: another skill is being made (lamp-9adf,
+/// 17 Nov 18:19: a busy hand-over was said as "I couldn't make that one").
+pub const AGENT_BUSY_TRY: &str = "Another skill is being made right now; ask me again in a minute.";
 pub const AGENT_LATE_TRY: &str = "The lamp's agent didn't answer in time; try again.";
 pub const AGENT_FAILED_TRY: &str = "The lamp's agent couldn't make it just now; try again.";
 /// The lamp has no agent to hand the make to after all (no `lamp` target
@@ -1716,6 +1717,7 @@ pub const NOT_READY_LINE: &str = "I'm still getting ready. Give me a minute and 
 pub fn plain_reason(why: &str) -> String {
     let why = why.trim();
     if why.starts_with(CANT_YET)
+        || why.starts_with(COULDNT_MAKE)
         || why.starts_with(ALREADY_HAVE)
         || why.starts_with(NAME_TAKEN_HEAD)
         || [NOT_MADE_TRY, NOT_KEPT_TRY].contains(&why)
@@ -1744,8 +1746,11 @@ const NAME_TAKEN_HEAD: &str = "a skill called ";
 pub fn not_made_line(why: &str) -> String {
     let why = why.trim();
     // What it can't do yet is said as itself (#6066), as are the lines
-    // whole already.
+    // whole already. One that already says it couldn't be made is never
+    // headed again (lamp-9adf, 17 Nov 18:19: "I couldn't make that: I
+    // couldn't make that one.").
     if why.starts_with(CANT_YET)
+        || why.starts_with(COULDNT_MAKE)
         || why.starts_with(ALREADY_HAVE)
         || [NOT_MADE_TRY, NOT_KEPT_TRY, NOT_READY_LINE].contains(&why)
         || AGENT_TRIES.contains(&why)
@@ -1765,6 +1770,62 @@ pub fn not_made_line(why: &str) -> String {
 
 /// How [`not_made_line`] begins.
 pub const NOT_MADE_HEAD: &str = "I couldn't make that:";
+
+/// How a line that already says a skill couldn't be made begins (the
+/// lamp's own, as [`NOT_MADE_TRY`], [`AGENT_MISSING`] and
+/// `make_skill_agent::CANNOT_LINE`): [`not_made_line`] says it as it is.
+const COULDNT_MAKE: &str = "I couldn't make";
+
+/// Why a made skill is refused when a say of it says it can't do what was
+/// asked ([`says_it_cannot`]), as the journal has it.
+pub const SAYS_IT_CANNOT: &str = "a say of it said it can't do what was asked";
+
+/// A say of a made skill's `toml` that is the model's word that the skill
+/// can't do what was asked: its text begins with [`CANT_YET`] or
+/// [`CANNOT`], the head the making prompt keeps for its one-line `cannot:`
+/// answer and never for words a skill says. Its text, and whether every
+/// step of the skill is such a say, so the skill does nothing but say it
+/// can't (lamp-9adf, 17 Nov: "tell me the gold price every evening at six"
+/// was kept as one say, "I can't do that yet: checking the gold price for
+/// you.", said each evening). Structural, never a word list: only the
+/// prompt's own head is looked for, where it may not be.
+pub fn says_it_cannot(toml: &str) -> Option<(String, bool)> {
+    let table: toml::Table = toml::from_str(toml).ok()?;
+    let steps = table.get("do")?.as_array()?;
+    let head = |text: &str| {
+        let text = text.trim_start().replace('\u{2019}', "'");
+        [CANT_YET, CANNOT]
+            .iter()
+            .any(|head| after_word(&text, head).is_some())
+    };
+    let inability = |step: &toml::Value| {
+        step.get("say")
+            .and_then(|say| say.get("text"))
+            .and_then(toml::Value::as_str)
+            .filter(|text| head(text))
+            .map(|text| text.trim().to_owned())
+    };
+    let text = steps.iter().find_map(inability)?;
+    let only = steps.iter().all(|step| inability(step).is_some());
+    Some((text, only))
+}
+
+/// A whole answer of the making model (`answer`, its fenced blocks) whose
+/// skill only says it can't do what was asked ([`says_it_cannot`]), read
+/// as the model's one-line `cannot:` answer with that say's words, as the
+/// prompt asks for it: so it is never kept, goes to the lamp's agent or,
+/// with `LAMP_MAKE_NO_CANNOT` on, becomes its task, and off is refused
+/// with those words. Any other answer, none.
+pub fn cannot_in_a_say(answer: &str) -> Option<String> {
+    if says_cannot(answer) {
+        return None;
+    }
+    let files = files(answer).ok()?;
+    match says_it_cannot(&files.toml)? {
+        (text, true) => Some(format!("{CANNOT} {text}")),
+        (_, false) => None,
+    }
+}
 
 /// The two files of the model's answer: exactly one fenced block named
 /// `skill.toml` and one named `SKILL.md` (its info string's last word, in
@@ -8218,6 +8279,25 @@ pub fn keep_asked(
             None => "blinking".to_owned(),
         });
     }
+    // A say of the model's word that the skill can't do it (lamp-9adf, 17
+    // Nov: the gold price kept as a say of "I can't do that yet: ..."):
+    // never kept. The voice's makes read a skill of only such says as the
+    // model's `cannot:` before this (`cannot_in_a_say`); here, beside other
+    // steps, its lines go to a repair, to leave that part out and name it.
+    // The say's words may echo the request: never the journaled reason.
+    if let Some((text, only)) = says_it_cannot(&files.toml) {
+        eprintln!("lamp-voice: a made skill was not kept: a say of it says it can't");
+        return Err(Refused(
+            SAYS_IT_CANNOT.into(),
+            (!only).then(|| {
+                format!(
+                    "say \"{text}\" tells the person the skill can't do something: a skill \
+                     never says so; leave that step out and name what was left out in a \
+                     {LEFT_OUT} line, or answer one line, {CANNOT} and one short sentence"
+                )
+            }),
+        ));
+    }
     let (_, uses) = capped(&files.toml)?;
     // A say that only tells the person to do what they asked the lamp to
     // do is no skill of it (lamp-9adf, 12 Nov 18:10): refused with its
@@ -10389,6 +10469,83 @@ light = { dim = 1 }
 
     fn answer(toml: &str, card: &str) -> String {
         format!("Here it is.\n\n```skill.toml\n{toml}```\n\n```markdown SKILL.md\n{card}```\n")
+    }
+
+    /// lamp-9adf, 17 Nov 18:19 and 18:2x: "I couldn't make that: I couldn't
+    /// make that one." A line that already says it couldn't be made is said
+    /// as it is, never headed again.
+    #[test]
+    fn a_line_that_says_it_couldnt_be_made_is_never_headed_again() {
+        for line in [
+            crate::make_skill_agent::CANNOT_LINE,
+            NOT_MADE_TRY,
+            AGENT_MISSING,
+            AGENT_BUSY_TRY,
+        ] {
+            assert_eq!(not_made_line(line), line);
+            assert_eq!(not_made_line(&plain_reason(line)), line);
+        }
+        let reason = "a skill can't reach a printer on your home network.";
+        assert_eq!(not_made_line(reason), format!("{NOT_MADE_HEAD} {reason}"));
+    }
+
+    /// lamp-9adf, 17 Nov: the gold price kept as a say of "I can't do that
+    /// yet: checking the gold price for you.". A skill whose steps only say
+    /// it can't is the model's `cannot:` with those words; beside another
+    /// step, the say is refused for a repair; the check is the prompt's own
+    /// head, in any case and with a curly apostrophe, never a word list.
+    #[test]
+    fn a_say_of_what_a_skill_cant_do_is_never_kept() {
+        let cant = "I can't do that yet: checking the gold price for you.";
+        let only = TOML.replace(
+            "[[do]]\nlight = { dim = 1 }\n",
+            &format!("[[do]]\nsay = {{ text = \"{cant}\" }}\n"),
+        );
+        assert_ne!(only, TOML);
+        assert_eq!(says_it_cannot(&only), Some((cant.to_owned(), true)));
+        assert_eq!(
+            cannot_in_a_say(&answer(&only, CARD)),
+            Some(format!("{CANNOT} {cant}"))
+        );
+        let curly = only
+            .replace("can't", "can\u{2019}t")
+            .replace("I can", "i CAN");
+        assert!(says_it_cannot(&curly).is_some_and(|(_, only)| only));
+        let mixed = format!("{TOML}\n[[do]]\nsay = {{ text = \"cannot: checking prices.\" }}\n");
+        assert_eq!(
+            says_it_cannot(&mixed),
+            Some(("cannot: checking prices.".to_owned(), false))
+        );
+        assert_eq!(cannot_in_a_say(&answer(&mixed, CARD)), None);
+        // Any other say, or the model's own one-line `cannot:`, is none.
+        let said = TOML.replace(
+            "[[do]]\nlight = { dim = 1 }\n",
+            "[[do]]\nsay = { text = \"Time to wind down. I can't wait for tomorrow.\" }\n",
+        );
+        assert_eq!(says_it_cannot(&said), None);
+        assert_eq!(says_it_cannot(TOML), None);
+        assert_eq!(cannot_in_a_say(&format!("{CANNOT} {cant}")), None);
+        // Kept anyway, beside another step: refused, its lines for a repair.
+        let root = std::env::temp_dir().join(format!("made-cant-say-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let keeping = name_keeping(&root);
+        let refused = keep_asked(
+            &answer(&mixed, CARD),
+            false,
+            "local:1:1",
+            &keeping,
+            &Asked {
+                request: "dim the light at ten",
+                own: Vec::new(),
+                heard: None,
+                judge: None,
+            },
+        )
+        .unwrap_err();
+        assert_eq!(refused.0, SAYS_IT_CANNOT);
+        assert!(refused.1.is_some_and(|lines| lines.contains(LEFT_OUT)));
+        assert!(entries(&keeping.directory).is_empty());
+        let _ = fs::remove_dir_all(&root);
     }
 
     /// The brief and the longest request fit in [`MOST_BRIEF_BYTES`], so a
