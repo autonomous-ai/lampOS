@@ -271,7 +271,7 @@ pub fn set_said_here(on: Option<bool>) {
 
 /// The switch for a made skill started by its own words (the owner, 16
 /// Nov: "Every task must be doable; no 'couldn't' here"): `on` only, off
-/// unless set, in no product unit yet. On, a request that names words to
+/// unless set, on in the product. On, a request that names words to
 /// start it ("when I say send my test note, email me ...") is made with
 /// `asks = [...]`, those words, beside any step a made skill may have (a
 /// fixed write, a `do.task` for the lamp's agent, its code, the light...);
@@ -284,8 +284,9 @@ pub fn set_said_here(on: Option<bool>) {
 /// `asks` too (`crate::upload_agent::files`). Off, a made skill never gives
 /// `asks` (tidied out or refused [`MADE_ASKS`]) and everything is as
 /// before. Read by both routes, the app's make, the manage helper,
-/// lamp-skills and lamp-cloud: set it alike in `lamp-voice`,
-/// `lamp-skills`, `lamp-skills-manage@` and `lamp-cloud`.
+/// lamp-skills, lamp-cloud and lamp-control (each loads such a skill):
+/// set it alike in `lamp-voice`, `lamp-skills`, `lamp-skills-manage@`,
+/// `lamp-cloud` and `lamp-control`, as the product does.
 pub const ASKS_ENVIRONMENT: &str = "LAMP_MADE_SKILL_ASKS";
 
 thread_local! {

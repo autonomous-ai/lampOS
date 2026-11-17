@@ -1,5 +1,5 @@
 //! A made skill with code of its own that is not on is never said to be on
-//! (`LAMP_MADE_NOT_ON_TOLD`, #7270; off unless set, in no unit).
+//! (`LAMP_MADE_NOT_ON_TOLD`, #7270; off unless set, on in the product's lamp-voice).
 //!
 //! On lamp-9adf (16 Nov, build 13383) a voice make the lamp's agent wrote
 //! took about four minutes, and its say-back ended "It waits for you to

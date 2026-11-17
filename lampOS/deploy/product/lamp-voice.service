@@ -396,6 +396,8 @@ Environment=LAMP_MAKE_SKILL_AGENT=on
 # On the one run path too (#7245): a make DeepSeek fails goes to the lamp's agent when lamp-tasks says it takes
 # runs, OpenClaw as well as Hermes, through `harness new <engine>` (docs/tasks.md). Off: Hermes only, as before.
 Environment=LAMP_MAKE_AGENT_ONE_PATH=on
+# #7270, docs/skills.md; owner, 16 Nov
+Environment=LAMP_MADE_NOT_ON_TOLD=on
 Environment=LAMP_APP_MAKE_SKILL=on
 # A skill added from a file in the app, on a spoken yes (#5080): lamp-cloud hands it over the app-make socket,
 # the same line in lamp-cloud.service; it never starts on its own.
@@ -434,6 +436,8 @@ Environment=LAMP_AGENT_SERVICES=on
 # what the check refuses is left out and said, no limits added unless asked, a say as often as asked (at least a
 # minute); passed to the provider and second routes. The same line in lamp-skills and lamp-skills-manage@.
 Environment=LAMP_MADE_SKILL_LOOSE=on
+# #7233, docs/skills.md; also in lamp-skills, -manage@, -cloud, -control
+Environment=LAMP_MADE_SKILL_ASKS=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill

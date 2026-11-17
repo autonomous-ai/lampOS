@@ -1983,8 +1983,8 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   stays counted. On lamp-9adf on 15 Nov, a presence skill refused `busy`
   spent the day's last run, and the skill that came due 4 s later found
   none.
-  With `LAMP_SKILL_TASK_SURE=on` (`lamp-skills` alone, off unless set, in
-  no product unit; `task_sure`), two more things. **A failed run is told**
+  With `LAMP_SKILL_TASK_SURE=on` (`lamp-skills` alone, off unless set, on
+  in the product; `task_sure`), two more things. **A failed run is told**
   (`task_sure::failed_line`): when lamp-tasks answers `ok:false`, or no
   answer comes, one short fixed line is said to the owner behind a told
   answer's gate (below: the owner alone, quiet hours, the lamp's one read
@@ -4398,7 +4398,8 @@ and put on. Any other turn claiming a make with no call is still held. Test:
 `a_not_made_notes_made_claim_is_held`.
 
 A made skill with code of its own that is not on is never said to be on
-(`LAMP_MADE_NOT_ON_TOLD=on`, #7270; off unless set, in no unit;
+(`LAMP_MADE_NOT_ON_TOLD=on`, #7270; off unless set, on in the product's
+lamp-voice;
 `crate::made_not_on`). On lamp-9adf (16 Nov, build 13383) a voice make the
 lamp's agent wrote took about four minutes; its say-back ended "It waits for
 you to agree before it runs any code.", and the person's "Yeah." came over
@@ -6501,7 +6502,8 @@ description beginning with the `when` line).
 
 #### A start by the person's own words (`LAMP_MADE_SKILL_ASKS=on`, off)
 
-Off unless `LAMP_MADE_SKILL_ASKS=on`, and in no product unit yet (#7233;
+Off unless `LAMP_MADE_SKILL_ASKS=on`; on in the product, in lamp-voice,
+lamp-skills, its manage helper, lamp-cloud and lamp-control (#7233;
 the owner, 16 Nov: "Every task must be doable; no 'couldn't' here"). A
 skill made here, by voice or in the app, may be started by words the
 person names for it, for any step a made skill may have: a fixed write

@@ -1544,8 +1544,8 @@ lại. Kiểm thử:
 `a_not_made_notes_made_claim_is_held`.
 
 Một kỹ năng tự tạo có code riêng mà chưa bật thì không bao giờ được nói là đã
-bật (`LAMP_MADE_NOT_ON_TOLD=on`, #7270; tắt trừ khi được đặt, không có trong
-unit nào; `crate::made_not_on`). Trên lamp-9adf (16/11, bản 13383) một lần tạo
+bật (`LAMP_MADE_NOT_ON_TOLD=on`, #7270; tắt trừ khi được đặt, bật trong
+lamp-voice của sản phẩm; `crate::made_not_on`). Trên lamp-9adf (16/11, bản 13383) một lần tạo
 bằng giọng nói do agent của đèn viết mất khoảng bốn phút; câu đọc lại kết thúc
 bằng "It waits for you to agree before it runs any code.", và câu "Yeah." của
 người dùng đến hơn 200 s sau những lời đó, quá 120 s chờ
@@ -3016,9 +3016,9 @@ của lamp-skills.
 
 ## Bắt đầu bằng chính lời của người dùng (`LAMP_MADE_SKILL_ASKS=on`, tắt)
 
-Tắt nếu không đặt `LAMP_MADE_SKILL_ASKS=on`, và chưa có trong unit sản phẩm
-nào (#7233; chủ đèn, 16/11: "Every task must be doable; no 'couldn't'
-here"). Một kỹ năng tạo tại đây, bằng giọng nói hay trong app, có thể được
+Tắt nếu không đặt `LAMP_MADE_SKILL_ASKS=on`, bật trong sản phẩm, ở lamp-voice,
+lamp-skills, helper quản lý của nó, lamp-cloud và lamp-control (#7233;
+chủ đèn, 16/11: "Every task must be doable; no 'couldn't' here"). Một kỹ năng tạo tại đây, bằng giọng nói hay trong app, có thể được
 bắt đầu bằng những từ người dùng đặt cho nó, với bất kỳ bước nào một kỹ
 năng tự tạo có: một lần ghi cố định (`do.write`, gửi Gmail), một `do.task`
 giao cho agent của đèn kèm grant, code riêng của nó, hoặc các bước của
@@ -3937,7 +3937,7 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   Trên lamp-9adf ngày 15/11, một kỹ năng hiện diện bị từ chối `busy` đã tiêu
   lần chạy cuối của ngày, và kỹ năng đến lượt 4 giây sau không còn lần nào.
   Với `LAMP_SKILL_TASK_SURE=on` (chỉ `lamp-skills`, tắt nếu không đặt,
-  không unit sản phẩm nào đặt; `task_sure`), thêm hai điều. **Lần chạy
+  bật trong sản phẩm; `task_sure`), thêm hai điều. **Lần chạy
   thất bại được nói ra** (`task_sure::failed_line`): khi lamp-tasks trả lời
   `ok:false`, hoặc không có trả lời, đèn nói với chủ đèn một câu ngắn cố
   định, sau cổng của câu trả lời cần nói (dưới: chủ đèn một mình, giờ yên
