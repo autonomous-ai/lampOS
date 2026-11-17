@@ -2241,8 +2241,15 @@ cả hai người viết.
   agent nào chạy ("it asks for a linked service (<code>): no agent on the
   lamp to make it: told so, DeepSeek not asked"); và mọi lần tạo khác mà
   DeepSeek thất bại sau các lần sửa ("DeepSeek failed and there is no
-  agent on the lamp to hand it to: told so"). Khi tắt, chỉ Hermes được
-  giao lần tạo, như trên, và đèn không có agent thì DeepSeek tự tạo.
+  agent on the lamp to hand it to: told so"). Chỉ khi lamp-tasks trả lời
+  danh sách target mà không có target `lamp` thì mới là không có agent
+  (`agent_tasks::surely_no_lamp_target`, mỗi lần tạo hỏi target một lần,
+  `Agent::lamp_agent`): lần đọc target thất bại (lamp-tasks tắt, đang khởi
+  động lại, chậm, hoặc trả lời `ok:false`) là chưa biết, không bao giờ
+  `AGENT_MISSING`, và DeepSeek tự tạo với các lần sửa của nó, như trước
+  ("the tasks part didn't say its targets: DeepSeek makes it alone, as
+  before"). Khi tắt, chỉ Hermes được giao lần tạo, như trên, và đèn không
+  có agent thì DeepSeek tự tạo.
 - **Mạng của nó: `LAMP_MAKE_AGENT_NET`** (không unit nào đặt; yêu cầu của
   chủ sở hữu, 12/11, quyết định của first builder,
   12/11 19:14). Mặc định lần chạy giữ mạng, như agent của V1, và gọi mô hình qua

@@ -1408,6 +1408,18 @@ pub(crate) fn lamp_engines_in(answer: &Value) -> Option<Vec<String>> {
     Some(engines)
 }
 
+/// Whether the targets answer says for sure there is no agent on the lamp
+/// (#7375): the tasks part answered `ok` with its targets, and none is the
+/// lamp's own. A tasks part that is down, slow or refused (`ok:false`), or
+/// an answer with no targets list, says nothing either way: `false`. A
+/// `lamp` target with an engine that is no plain id is not sure either.
+pub(crate) fn surely_no_lamp_target(answer: &Value) -> bool {
+    answer.get("ok") == Some(&json!(true))
+        && answer["targets"]
+            .as_array()
+            .is_some_and(|targets| !targets.iter().any(|target| target["alias"] == LAMP_TARGET))
+}
+
 /// The lamp's own target in the targets answer (#5978, #6226): the name
 /// the person calls its default engine by, or `None` without it.
 pub(crate) fn lamp_target_in(answer: &Value) -> Option<&'static str> {
@@ -12798,6 +12810,29 @@ pub(crate) mod tests {
             lamp_engines_in(&json!({"ok":true,"targets":[{"alias":"office","engine":"claude"}]})),
             None
         );
+    }
+
+    /// #7375: only a tasks part that answered its targets with no `lamp`
+    /// one says there is surely no agent; a refused, empty or odd answer
+    /// says nothing, nor does a `lamp` target with a bad engine.
+    #[test]
+    fn no_lamp_target_is_sure_only_from_an_answered_targets_list() {
+        assert!(surely_no_lamp_target(&json!({"ok":true,"targets":[]})));
+        assert!(surely_no_lamp_target(
+            &json!({"ok":true,"targets":[{"alias":"office","engine":"claude"}]})
+        ));
+        for unsure in [
+            json!({"ok":true,"targets":[{"alias":"lamp","engine":"hermes"}]}),
+            json!({"ok":true,"targets":[{"alias":"lamp","engine":""}]}),
+            json!({"ok":false,"error":"busy"}),
+            json!({"ok":false,"targets":[]}),
+            json!({"ok":true}),
+            json!({"ok":true,"targets":"lamp"}),
+            json!({"ok":"true","targets":[]}),
+            Value::Null,
+        ] {
+            assert!(!surely_no_lamp_target(&unsure), "{unsure}");
+        }
     }
 
     /// #6492: an engine is said by its known name, else its id with a
