@@ -6528,8 +6528,8 @@ function with no trigger), and `lamp-cloud`'s
 
 #### A start said to the lamp (`LAMP_MADE_SKILL_SAID=on`, off)
 
-Off unless `LAMP_MADE_SKILL_SAID=on`, and in no product unit (#6526, the
-first builder's design). A skill made here, by voice or in the app
+Off unless `LAMP_MADE_SKILL_SAID=on`; on in the product, in lamp-voice and
+lamp-skills' manage helper (#6526, the first builder's design). A skill made here, by voice or in the app
 (`made_skill::keep_asked`), may start on a request said to the lamp, never
 on room talk: "when I'm working or in a meeting, I tell the lamp I'm busy,
 and it turns red". `lamp-voice` reads it (and gives the exact `on` to its
