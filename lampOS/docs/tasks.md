@@ -4666,6 +4666,7 @@ its `reply_off` fallback included.
   (a died pane comes back resumed), then the task fails as before. A skill
   run's end is `harness wait lamp-one-openclaw --after <inputId>` (0 idle,
   then `show` for the answer; 3 an ask, closed `--forget`; 4 gone).
+- **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again, one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before. Each `ensure` answered `ENGINE_NOT_READY` is tried again every 5 s for up to 45 s before the long backoff.
 - **Rotation and removal.** OpenClaw's kept session is not rotated by
   count (it compacts itself); a rotation, where one is due, is
   `ensure --fresh`. A cancel, an ask no one answers, a sign-out or an engine
