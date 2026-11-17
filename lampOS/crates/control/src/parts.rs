@@ -1823,9 +1823,16 @@ mod tests {
         let take = |topic: &str, payload: Value| {
             watch.lock().unwrap().take(topic, &payload, 1_000_000);
         };
+        // A dim room (level 1, under the pulse's least): left quiet, not raised.
         take(
             "light/state",
             json!({"on": true, "colour": "warm", "level": 1}),
+        );
+        lamp.pair_cue();
+        assert!(ring.0.lock().unwrap().is_empty(), "a dim room gets no cue");
+        take(
+            "light/state",
+            json!({"on": true, "colour": "warm", "level": 2}),
         );
         lamp.pair_cue();
         let asked = ring.0.lock().unwrap().clone();
@@ -1836,7 +1843,7 @@ mod tests {
         assert_eq!(request.claim.clock_id, "boot");
         assert_eq!(request.claim.until_us, booted_61s_ago() + PAIR_CUE_HOLD_US);
         assert_eq!(PAIR_CUE_HOLD_US, 4_500_000);
-        // The person's own warm, raised to the pulse's least level, not a colour of ours.
+        // The person's own warm at their own level, not a colour of ours.
         assert_eq!(
             (
                 request.light.colour.as_str(),
