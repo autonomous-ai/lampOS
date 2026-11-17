@@ -387,7 +387,9 @@ const NOTES_RULES: &str = " To keep something for later (\"write it down\", \"ke
      \"save it to a file\"), its code keeps a note with lamp.notes.set, grant notes; its next \
      run reads it back with lamp.notes.get. A note is no file the person opens: a say calls it \
      a note the lamp keeps, and never says it wrote, saved or keeps a file or a note unless its \
-     code calls lamp.notes.set.";
+     code calls lamp.notes.set. Its task's words and its say say what it keeps and when it \
+     reads it back (\"I'll keep three facts about apples, and read them to you when you say \
+     'apple file'\"), never a file the person can open.";
 
 /// The request [`AGENT_SERVICES_EXAMPLE`] is made for.
 const AGENT_SERVICES_ASKED: &str = "every morning at eight, read me my new mail";
@@ -3655,6 +3657,7 @@ pub(crate) mod tests {
             "await lamp.notes.get(key)",
             "A note is no file the person opens",
             "unless its code calls lamp.notes.set",
+            "never a file the person can open",
         ] {
             assert!(on.contains(part), "{part}: {on}");
         }

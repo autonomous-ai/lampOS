@@ -4722,6 +4722,63 @@ pub fn script_sdk() -> String {
     )
 }
 
+/// lamp-control's answer to "forget everything" (#7245): every made
+/// skill's notes deleted (`{"notes_forget_skills": true}` on its owner's
+/// socket, [`crate::skill_task_yes::CONTROL_SOCKET`]).
+pub const NOTES_FORGET_SKILLS: &str = "notes_forget_skills";
+
+/// Every made skill's notes forgotten by lamp-control at `control`
+/// (#7245's "forget everything").
+pub fn forget_all_notes_by(control: &Path) -> Result<(), String> {
+    let answer = crate::tools::reached(
+        control,
+        &serde_json::json!({ NOTES_FORGET_SKILLS: true }),
+        Duration::from_secs(2),
+    )
+    .ok_or("lamp-control couldn't be reached")?
+    .ok_or("lamp-control didn't answer in time")?;
+    match answer.get("error").and_then(serde_json::Value::as_str) {
+        Some(why) => Err(why.to_owned()),
+        None => Ok(()),
+    }
+}
+
+/// [`forget_all_notes_by`] off the voice's turn, with [`notes_on`] alone:
+/// off, nothing is sent. A failure is journaled.
+pub fn forget_all_notes_soon() {
+    if !notes_on() {
+        return;
+    }
+    std::thread::spawn(|| {
+        let control = Path::new(crate::skill_task_yes::CONTROL_SOCKET);
+        if let Err(why) = forget_all_notes_by(control) {
+            eprintln!("lamp-voice: made skills' notes were not forgotten: {why}");
+        }
+    });
+}
+
+/// Words that tell the person a kept note is a file they can open
+/// (#7245, First's ruling: a note is read back by the skill, never opened).
+const OPEN_WORDS: [&str; 4] = ["open", "download", "folder", "document"];
+
+/// The first say or task text of `toml` that promises a file the person
+/// can open ("a file you can open"): a note is no such thing.
+pub fn promises_a_file_to_open(toml: &str) -> Option<String> {
+    let table: toml::Table = toml::from_str(toml).ok()?;
+    let steps = table.get("do")?.as_array()?;
+    steps
+        .iter()
+        .filter_map(|step| {
+            say_text(step.get("say")?)
+                .or_else(|| Some(step.get("task")?.get("task")?.as_str()?.to_owned()))
+        })
+        .find(|text| {
+            let words = words_of(text);
+            words.iter().any(|word| word == "file" || word == "files")
+                && words.iter().any(|word| OPEN_WORDS.contains(&word.as_str()))
+        })
+}
+
 /// Why a made skill is refused when a say claims a file or a note its code
 /// never keeps (#7245: on c0a4, 17 Nov, "Writing three facts about apples
 /// into a file." with no step that wrote one).
@@ -8330,6 +8387,18 @@ pub fn keep_asked(
     // A say that claims a file or a note its code never keeps (#7245),
     // with the notes switch alone: off, the check is as before.
     if notes_on()
+        && let Some(text) = promises_a_file_to_open(&files.toml)
+    {
+        eprintln!("lamp-voice: a made skill was not kept: it promises a file to open");
+        return Err(Refused(
+            CLAIMS_A_FILE.into(),
+            Some(format!(
+                "\"{text}\" promises a file the person can open, but a note is kept by the \
+                 skill and read back by it: say what it keeps and when it reads it back"
+            )),
+        ));
+    }
+    if notes_on()
         && let Some(text) = claims_a_file(&files.toml, &files.scripts)
     {
         eprintln!("lamp-voice: a made skill was not kept: its say claims a file no step writes");
@@ -10409,6 +10478,44 @@ mod tests {
     /// A say that hands the ask back as an instruction (lamp-9adf, 12 Nov
     /// 18:10) is caught; a reminder the person asked to be told, or words
     /// they gave to say, is not.
+    // #7245: "forget everything" sends lamp-control one line, only with
+    // the notes switch on.
+    #[test]
+    fn forget_all_notes_sends_its_one_line() {
+        use std::io::{BufRead as _, Write as _};
+        let socket =
+            std::env::temp_dir().join(format!("lamp-voice-7245-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            (&stream).write_all(b"{\"forgot\":2}\n").unwrap();
+            line
+        });
+        assert_eq!(forget_all_notes_by(&socket), Ok(()));
+        let line: serde_json::Value = serde_json::from_str(&served.join().unwrap()).unwrap();
+        assert_eq!(line, serde_json::json!({"notes_forget_skills": true}));
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    // #7245: the say-back of a skill that keeps notes says notes, never a
+    // file (First's ruling): its grant's words.
+    #[test]
+    fn a_notes_grant_is_said_back_as_notes_never_a_file() {
+        let said = GRANTS.iter().find(|(name, _)| *name == "notes").unwrap().1;
+        assert!(said.contains("notes"), "{said}");
+        assert!(
+            !words_of(said)
+                .iter()
+                .any(|word| word == "file" || word == "files"),
+            "{said}"
+        );
+    }
+
     // #7245: c0a4, 17 Nov, a say-only skill claimed a file it never wrote.
     #[test]
     fn a_say_claiming_a_file_with_no_notes_call_is_caught() {
@@ -10428,6 +10535,11 @@ mod tests {
         // A say naming no file is not held to it.
         let plain = "[[do]]\nsay = { text = \"Three facts about apples.\" }\n";
         assert_eq!(claims_a_file(plain, &[]), None);
+        // A note is no file to open (First's ruling on #7245).
+        let opens = "[[do]]\ntask = { task = \"keep apple facts in a file you can open\", run = \"scripts/main.py\" }\n";
+        assert!(promises_a_file_to_open(opens).is_some());
+        let true_words = "[[do]]\nsay = { text = \"I'll keep three facts about apples, and read them to you when you say apple file.\" }\n";
+        assert_eq!(promises_a_file_to_open(true_words), None);
         // "profile" is no "file".
         let profile = "[[do]]\nsay = { text = \"Your profile looks good.\" }\n";
         assert_eq!(claims_a_file(profile, &[]), None);

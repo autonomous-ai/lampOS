@@ -806,6 +806,23 @@ impl Door {
         })
     }
 
+    /// A made skill's notes forgotten (#7245): the skill `Some(name)`'s
+    /// (its remove, `task_yes_forget`), or every made skill's (`None`,
+    /// "forget everything"). How many skills' notes went; none with notes
+    /// off.
+    pub fn forget_skill_notes(&self, skill: Option<&str>) -> usize {
+        let Some(notes) = &self.notes else {
+            return 0;
+        };
+        match skill {
+            Some(skill) => {
+                notes.forget(&crate::runs::skill_notes_client(skill));
+                1
+            }
+            None => notes.forget_skills(),
+        }
+    }
+
     /// The owner revokes `client`: its leases end, told. Whether it was
     /// paired. The server closes its connections at once; a frame that
     /// beats it is refused.

@@ -3692,8 +3692,12 @@ gone ([switches.md](switches.md)). What happens:
      notes store under the skill's own client (`runs::skill_notes_client`),
      which its next run reads back; never a file the person opens. A say
      that claims a file or a note with no `lamp.notes.set` in its code is
-     refused for a repair (`made_skill::CLAIMS_A_FILE`). Off, byte for byte
-     as before.
+     refused for a repair (`made_skill::CLAIMS_A_FILE`), as is a say or a
+     task's words promising a file the person can open: the say-back says
+     what it keeps and when it reads it back. A skill's remove
+     (`task_yes_forget`) deletes its notes; a heard "forget everything"
+     sends lamp-control `notes_forget_skills`, deleting every made skill's
+     notes. Off, byte for byte as before.
    - **Offered to the voice** (#6749 B): with the switch on, the
      `make_skill` function's description (`make_skill_local::CODE_TOLD`)
      says a made skill may carry its own Python script, run by its task

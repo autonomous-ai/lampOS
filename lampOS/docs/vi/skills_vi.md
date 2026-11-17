@@ -704,7 +704,12 @@ sau:
      (`runs::skill_notes_client`), lần chạy sau đọc lại được; không bao giờ
      là một tệp người dùng mở được. Một câu nói tự nhận đã ghi tệp hay ghi
      chú mà mã không gọi `lamp.notes.set` bị từ chối để sửa lại
-     (`made_skill::CLAIMS_A_FILE`). Khi tắt, giữ nguyên từng byte như trước.
+     (`made_skill::CLAIMS_A_FILE`), cũng như một câu nói hay lời của task hứa
+     một tệp người dùng mở được: lời đọc lại nói rõ nó giữ gì và khi nào đọc
+     lại. Gỡ một kỹ năng (`task_yes_forget`) xóa ghi chú của nó; một câu
+     "forget everything" được nghe sẽ gửi lamp-control `notes_forget_skills`,
+     xóa ghi chú của mọi kỹ năng tự tạo. Khi tắt, giữ nguyên từng byte như
+     trước.
    - **Được mời cho giọng nói** (#6749 B): khi bật công tắc, mô tả của
      hàm `make_skill` (`make_skill_local::CODE_TOLD`) nói rằng một kỹ năng
      tự tạo có thể mang script Python riêng, chạy bởi task của nó khi người

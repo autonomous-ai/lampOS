@@ -43,6 +43,8 @@ pub const VALUE_MOST_BYTES: usize = 16 * 1024;
 pub const KEYS_MOST: usize = 256;
 /// The most bytes one computer's keys and values take in all.
 pub const TOTAL_MOST_BYTES: usize = 256 * 1024;
+/// How a made skill's notes client begins (`crate::runs::skill_notes_client`).
+pub const SKILL_PREFIX: &str = "n_";
 /// The file's own format version.
 const FILE_VERSION: u64 = 1;
 
@@ -203,6 +205,35 @@ impl Notes {
         inner.kept.remove(client);
         *inner.epoch.entry(client.to_owned()).or_default() += 1;
         remove_files(&self.folder, client);
+    }
+
+    /// Every made skill's notes forgotten ([`Self::forget`] of each
+    /// `n_` client, `crate::runs::skill_notes_client`; #7245's "forget
+    /// everything"): those in memory and those only on disk. A paired
+    /// computer's (`c_`) are kept. How many skills' notes went.
+    pub fn forget_skills(&self) -> usize {
+        let mut clients: HashSet<String> = {
+            let inner = self.inner.lock().expect("notes");
+            inner
+                .kept
+                .keys()
+                .filter(|client| client.starts_with(SKILL_PREFIX))
+                .cloned()
+                .collect()
+        };
+        if let Ok(entries) = std::fs::read_dir(&self.folder) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                let client = name.split('.').next().unwrap_or_default();
+                if client.starts_with(SKILL_PREFIX) && crate::sounds::safe_client(client) {
+                    clients.insert(client.to_owned());
+                }
+            }
+        }
+        for client in &clients {
+            self.forget(client);
+        }
+        clients.len()
     }
 
     /// `client`'s notes, read from their file the first time they are asked
@@ -456,6 +487,28 @@ mod tests {
     fn refused(error: Error) -> String {
         assert_eq!(error.code, ErrorCode::Refused, "{}", error.why);
         error.why
+    }
+
+    // #7245: "forget everything" takes every made skill's notes, on disk
+    // and in memory, and no paired computer's.
+    #[test]
+    fn forget_skills_takes_every_skills_notes_and_no_computers() {
+        let dir = Dir::new("skills");
+        let notes = Notes::new(dir.0.clone());
+        let one = crate::runs::skill_notes_client("apple-facts");
+        let two = crate::runs::skill_notes_client("plant-log");
+        notes.put(&one, "facts", &json!(["a", "b", "c"])).unwrap();
+        notes.put(&two, "days", &json!(3)).unwrap();
+        notes.put(A, "mood", &json!("calm")).unwrap();
+        // One only on disk: a restart's notes, not yet read.
+        let fresh = Notes::new(dir.0.clone());
+        fresh.put(&two, "days", &json!(4)).unwrap();
+        assert_eq!(notes.forget_skills(), 2);
+        assert_eq!(notes.get(&one, "facts").unwrap(), None);
+        assert_eq!(Notes::new(dir.0.clone()).get(&two, "days").unwrap(), None);
+        assert!(!Notes::path(&dir.0, &one).unwrap().exists());
+        assert!(!Notes::path(&dir.0, &two).unwrap().exists());
+        assert_eq!(notes.get(A, "mood").unwrap(), Some(json!("calm")));
     }
 
     #[test]
