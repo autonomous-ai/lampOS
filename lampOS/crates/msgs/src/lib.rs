@@ -108,6 +108,8 @@ mod seems;
 pub use seems::*;
 mod doing;
 pub use doing::*;
+mod devices;
+pub use devices::*;
 
 mod activity;
 pub use activity::*;
@@ -2656,6 +2658,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(activity_topics())
         .chain(seems_topics())
         .chain(doing_topics())
+        .chain(devices_topics())
         .chain(speaker_state_topics())
         .find_map(|(name, declaration)| (name == topic).then_some(declaration))
 }

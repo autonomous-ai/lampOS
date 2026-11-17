@@ -242,6 +242,25 @@ went", "a named text sent unnamed: an earlier send was still
 unacknowledged", "a named text held as unnamed: the broker was away". The journal says one line
 a piece, the skill and the count, never the text.
 
+### The owner's desk and Hydrate bottles (`devices.*`, #7470)
+
+With `LAMP_DEVICES=on` (off unless set, `LAMP_CLOUD` too) the lamp asks the
+cloud about the owner's desks and Hydrates, the first kinds the lamp sends up
+as questions. Each ask goes on the lamp's own channel in its envelope
+(`{"type":"data","device":"lamp","id":<its id>,"kind":…,"data":{…,"req_id"}}`):
+`devices.list.get`, `devices.state.get` `{device_id}` and `devices.command`
+`{device_id, command, data}` (`goto_height` `{value:"110"}`, 60 to 132 cm, or
+`stop`). The cloud's reply comes down as `cmd:"data"` with the same `req_id`:
+`devices.list`, `devices.state`, `devices.command.result` (`ok`, `refused` or
+`error`; `ok` means handed to the desk, not that it moved), and its news as
+`devices.event` (`hydrate.sip`; `desk.height` later). The cloud checks that the
+lamp's owner owns the device; the lamp holds no token. `lamp-cloud` takes the
+asks from the voice's `devices/ask` and puts the replies on `devices/answer`
+and the news on `devices/event` ([msgs.md](msgs.md), "The devices contract"):
+only a device the last list gave is asked about, a `stop` goes first and
+cancels commands still waiting, an ask not answered in 8 s is answered
+`timeout`, and none is kept for a reconnect (`crates/cloud/src/devices.rs`).
+
 ### The light: V1's colours on this lamp's
 
 V1's resting light is any `[r, g, b]`. This lamp's light is the person's
