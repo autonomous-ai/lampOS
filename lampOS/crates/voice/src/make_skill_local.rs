@@ -323,13 +323,24 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
              you.\"); never a say telling the person to check, look up or read it themselves."
         )
     };
+    // With the lamp's agent reading linked services, a daily read of one
+    // reads as a reminder at a time to a strict agent, which then answered
+    // the reminder's cannot (#7245: 2 of 3 played calendar makes on
+    // lamp-c0a4 with only `unread`). Off, nothing is added.
+    let at_a_time = if agent {
+        " A read or a send of the person's mail, calendar or another linked service \
+         at a time each day, on named days or on the words they name is no reminder and \
+         no cannot: it is a skill made as told below, that time its clock trigger."
+    } else {
+        ""
+    };
     format!(
         "You write skills for a lamp. Answer exactly as the request says, with {blocks} \
          and nothing else. Use only the keys and values the request names, written as \
          in this example, which the lamp's check takes:\n\n{EXAMPLE}\n\nThe example shows \
          the form only: never answer with it. A reminder at a time or every so often is the \
          lamp's own timer, not a skill; a skill runs at a time only each day or on named \
-         days of the week, by the clock trigger below. A skill made on this lamp may do whatever the lamp can do: make what \
+         days of the week, by the clock trigger below.{at_a_time} A skill made on this lamp may do whatever the lamp can do: make what \
          the request asks with the light, the head, a few exact words it says, its hum, or \
          {may_also}, on one of the triggers below. {more} {BLINK} To speak, a skill has speak = \
          true in [permissions], {cooldown}, and one [[do]] step say = {{ text = \
@@ -6744,6 +6755,21 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         assert!(system_for(true, true).contains("anything from the internet"));
         assert!(system_for(true, false).contains(clause));
+        made_skill::set_scripts_here(None);
+    }
+
+    /// #7245: with `LAMP_AGENT_SERVICES` on, a linked service's read at a
+    /// time each day is told to be a skill, never the reminder's cannot,
+    /// before the reminder's ask-instead line; off, nothing is added.
+    #[test]
+    fn agent_services_say_a_daily_service_read_is_no_reminder() {
+        made_skill::set_scripts_here(Some(true));
+        let rule = "is no reminder and no cannot: it is a skill made as told below";
+        let on = system_for(true, true);
+        let at = on.find(rule).expect("the daily service rule");
+        assert!(at < on.find("Ask me for a reminder instead").unwrap());
+        assert!(on.contains("linked service at a time each day"));
+        assert!(!system_for(true, false).contains(rule));
         made_skill::set_scripts_here(None);
     }
 
