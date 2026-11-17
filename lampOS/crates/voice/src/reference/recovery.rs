@@ -232,6 +232,33 @@ impl ReferenceAssembly {
         })
     }
 
+    /// How old a start notice's stamps may be when it is taken. Capture-
+    /// clocked with recovery, the reference is paired with the capture by
+    /// count through the ring the prime filled, and the start's stamps feed
+    /// only the delay hint; a notice the worker took late, held up by load,
+    /// pairs as an on-time one would. There it may be as old as the
+    /// reference may stay untrusted, and no older. With the fixed margin
+    /// the start sets the count's origin, and without recovery any doubt is
+    /// a fault: there it is the 40 ms every reference has.
+    pub(super) fn start_age_bound_us(&self) -> u64 {
+        match (&self.recovery, &self.clock) {
+            (Some(state), Some(_)) => state.policy.untrusted_deadline_us,
+            _ => MAX_REFERENCE_AGE_US,
+        }
+    }
+
+    /// A start notice taken older than 40 ms, and used.
+    pub(super) fn note_late_start(&mut self, late_us: u64) {
+        if let Some(state) = self.recovery.as_mut() {
+            state.counts.late_starts = state.counts.late_starts.saturating_add(1);
+        }
+        eprintln!(
+            "lamp-voice: reference: the speaker's clock start was taken {} ms late and is used: \
+             the capture-clocked count does not read it",
+            late_us / 1_000
+        );
+    }
+
     /// The next change of trust to report, oldest first.
     pub fn take_status(&mut self) -> Option<ReferenceStatus> {
         self.recovery.as_mut()?.events.pop_front()
@@ -271,7 +298,8 @@ impl ReferenceAssembly {
         echo: &mut EchoProcessor,
     ) -> Result<Option<u16>> {
         // Starting a stream is not recovered: before the clock has started
-        // every rule is the strict one.
+        // every rule is the strict one. Only a start notice taken late is
+        // let through, capture-clocked, by `started` (`start_age_bound_us`).
         if self.recovery.is_none() || self.timing.clock_started_at_us.is_none() {
             let delay = self.before_capture(capture_delayed_frames, now)?;
             self.render_for_capture(now, echo)?;

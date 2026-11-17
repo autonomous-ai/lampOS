@@ -672,6 +672,9 @@ pub struct RecoveryCounts {
     pub late_packets: u64,
     /// Packets at or before one already seen, which were not used.
     pub ignored_packets: u64,
+    /// Capture-clocked: start notices taken older than 40 ms, and used,
+    /// because only the delay hint reads their stamps.
+    pub late_starts: u64,
 }
 
 /// How the capture-clocked reference stands. The state of this software,
