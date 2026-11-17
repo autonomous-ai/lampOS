@@ -183,6 +183,11 @@ time go in, a `Health` comes out):
   its start. `warn` when none does ("the head reads no touch") or while a pad
   touched since the start is left out (controls.md, "Said when no pad is
   there").
+- **The dev monitor** is its own item, `dev monitor`, sent by lamp-cloud
+  only while the owner's dev monitor is on (#7432, cloud.md, "The dev
+  monitor"): `ok`, "on since 3 h 12 min ago, off by itself in 20 h 48 min".
+  Off, lamp-cloud says it stopped on purpose (above), so the item goes; it
+  turns itself off a day after it was turned on.
 - **The lamp's level** is the worst item's, and `stale` at least when a
   part is missing.
 - **The lamp's message** is empty when the level is ok. Otherwise it is

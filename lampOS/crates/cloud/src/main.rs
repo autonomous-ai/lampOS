@@ -366,6 +366,15 @@ fn main() -> ExitCode {
     if let Some(socket) = &lamp.make_skill {
         lamp_cloud::make_skill::watch(socket.clone());
     }
+    // The dev monitor said in the lamp's health while on, and off by itself
+    // after its day (#7432).
+    if let Some(place) = &lamp.monitor {
+        lamp_cloud::monitor::keep(
+            place.clone(),
+            lamp.bus.clone(),
+            lamp_cloud::settings::SOCKET.into(),
+        );
+    }
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

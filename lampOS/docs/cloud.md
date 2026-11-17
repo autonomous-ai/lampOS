@@ -211,7 +211,7 @@ lamp says so.
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters), `language.set` (`{"language": "en" \| "vi" \| "ja" \| "zh" \| "ko"}`, #4473) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}`, `{"name"}` or `{"language"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
 | `control.set` (`{"on": true}` or `{"on": false}`, exactly that one field) | with `LAMP_SETTINGS_CHANGE=on` (the owner's developer setting, [control.md](control.md) "Running the door"): V1's `starting` at once, then `success` or `failure` with why; anything but one boolean `on` fails at once, "on must be true or false, and the only field". **On** on a lamp that has not had the installer's step (a channel update never makes users) first has the root helper make the agent's group `lamp-agents`, its user `lampagent` and the folder `/run/lampos-agent` from fixed constants (`docs/setup.md`), as the owner's tap; the app can show "Setting up the agent's user…" while it waits; a step that fails is refused in words and nothing is written. On: `success` with `{"on": true}` once root's helper has written lamp-control's drop-in, and the door opens within moments after it (or once an update in progress finishes). Off: the door is closed before `success` (`{"on": false, "closed": true}`; `"closed": false` with a `note` if lamp-control would not stop, the door then possibly open until the lamp next restarts), or `failure`, "an update is installing: try again in a few minutes", with nothing changed. Off with developer access already off: `success` with `{"on": false}`. Without the switch, V1's "not on this lamp" |
 | `control.set_agent` (`{"on": true}` or `{"on": false}`, exactly that one field; **no user is ever named**) | with `LAMP_SETTINGS_CHANGE=on` (the owner's local agent switch, [control.md](control.md) "The local agent"): V1's `starting` at once, then `success` with `{"on": bool}` or `failure` with why; anything but one boolean `on` fails at once, "on must be true or false, and the only field". Root's change helper (`{"local_agent": bool}`, [setup.md](setup.md)) writes or removes lamp-control's second drop-in with fixed text and restarts lamp-control; on is refused with the helper's words while developer access is off ("turn developer access on first: the local agent's socket is the developer door's"). Listed in `system.info`'s `can` with the other settings kinds |
-| `monitor.set` (`{"on": bool, "request_id"?}`, no other field; its result says the `request_id` back in `data.request_id`, #7432), `monitor.get` (`{}`), `monitor.link` (`{"seal_to", "request_id"}`) | with `LAMP_APP_MONITOR=on` beside `LAMP_SETTINGS_CHANGE=on` (the owner's dev monitor, #5883, "The dev monitor" below): `monitor.set` as `control.set`, for lamp-peek: `starting`, then `success` with `{"on": true}` once root's helper wrote lamp-peek's drop-in (the page opens within moments, or once an update finishes), or with `{"on": false, "closed": true}` once lamp-peek has stopped (`"closed": false` with a `note` if it would not stop); `monitor.get` answers `{"on": bool}` at once from the drop-in; `monitor.link` answers a one-time link sealed to the app's key, `{"sealed": {"v", "enc", "ct"}, "until_unix_ms"}`, or why not ("the dev monitor is off on this lamp: turn it on first"). Without the switch, V1's "not on this lamp" |
+| `monitor.set` (`{"on": bool, "request_id"?}`, no other field; its result says the `request_id` back in `data.request_id`, #7432), `monitor.get` (`{}`), `monitor.link` (`{"seal_to", "request_id"}`) | with `LAMP_APP_MONITOR=on` beside `LAMP_SETTINGS_CHANGE=on` (the owner's dev monitor, #5883, "The dev monitor" below): `monitor.set` as `control.set`, for lamp-peek: `starting`, then `success` with `{"on": true}` once root's helper wrote lamp-peek's drop-in (the page opens within moments, or once an update finishes), or with `{"on": false, "closed": true}` once lamp-peek has stopped (`"closed": false` with a `note` if it would not stop); `monitor.get` answers `{"on": bool}` at once from the drop-in, with `since_unix_ms` and `off_at_unix_ms` while on, or `went_off_by_itself_unix_ms` once it turned itself off after its day (#7432); `monitor.link` answers a one-time link sealed to the app's key, `{"sealed": {"v", "enc", "ct"}, "until_unix_ms"}`, or why not ("the dev monitor is off on this lamp: turn it on first"). Without the switch, V1's "not on this lamp" |
 | `owner.place` (`{"lat", "lon", "name", "set_at"}`, `set_at` ISO 8601 UTC), `owner.place.clear` (`{}`) | with `LAMP_OWNER_PLACE=on` beside `LAMP_SETTINGS_CHANGE=on` (#4333, [owner-place.md](owner-place.md), "The owner's place" below): rounded here to about a kilometre and handed to root's helper as the names are; `starting` at once, then `success` with what was kept (`{"name", "lat", "lon", "set_at"}`) or `{"cleared": true}` (also when none was kept), or `failure` with why; a request that doesn't fit fails at once. `name` is an area name (sub-locality and locality from the phone's geocoder), never a street address; `lat`/`lon` is where the lamp stands, set by the person at setup or with Update now, never resent as the phone moves, rounded by the app to 2 decimals. Listed in `can` only with the switch. Without it, `owner.place` gets V1's "not on this lamp", and `owner.place.clear` is still taken, unlisted (#4356) |
 | `voice.set` (`{"provider"?, "voice", "language"?, "speed"?}`, V1's `tts.set` shape), `character.set` (`{"text"}`) | with `LAMP_CHOSEN_VOICE=on` beside `LAMP_SETTINGS_CHANGE=on` (#5394, [chosen-voice.md](chosen-voice.md)): checked here and handed to root's helper as the names are; `starting` at once, then `success` with `{"provider": "elevenlabs", "voice", "speed": 1.0}` or `{"text"}`, or `failure` with why. `provider` absent or `elevenlabs`; `voice` one of the lamp's voices (every name in `lamp-2-tts-catalog`), `""` for the default; `language` and `speed` are taken and left alone. `text` plain, one line, at most 200 characters, `""` clears. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `voice.get` (`{}`) | with the same switch (#5394): answered at once with what the lamp keeps, read from `/etc/lampOS/setup/voice` and `character` as `language` is read, writing nothing: `{"provider": "elevenlabs", "voice", "text"}`, `""` for none kept and for a kept value that does not fit the rules (the default voice, no words, as the voice takes them). Listed in `can` only with the switch; without it, V1's "not on this lamp" |
@@ -3140,7 +3140,26 @@ lamp".
   `lampos.target`, and it exits at once without the drop-in. The reset
   wipes the drop-in.
 - **`monitor.get`** (`{}`) reads the drop-in: `{"on": true}` only while it
-  holds exactly what the helper writes.
+  holds exactly what the helper writes, then with `since_unix_ms` (the
+  drop-in's time, when it was turned on) and `off_at_unix_ms` (when it turns
+  itself off). Off, `{"on": false}`, with `went_off_by_itself_unix_ms` once it
+  turned itself off and until it is on again, so the app can tell the owner
+  when it went off.
+- **Said in the lamp's health, and off after a day** (#7432). While it is on,
+  lamp-cloud says so on `diagnostics` every 2 s as the part `dev monitor`
+  (`ok`, so the lamp's level is untouched): "on since 3 h 12 min ago, off by
+  itself in 20 h 48 min" ([health.md](health.md)); once off, it says it
+  stopped on purpose, so the item goes. A day after the drop-in was written
+  (its file time) lamp-cloud asks root's helper `{"monitor": false}`, as the
+  app's off, says "the dev monitor was on for its day: turned off" in its
+  journal, and keeps when in `monitor-off` in its state folder; a helper that
+  refuses is asked again a minute later. Turned on again, it has a new day; on
+  again while still on keeps the day it has. `LAMP_APP_MONITOR_DAY_S` (whole
+  seconds, 60 to 86400; anything else is a day) is a shorter day for a lamp
+  row only. A clock set back counts as just on. While lamp-cloud is stopped
+  the item goes stale and nothing turns it off; it is turned off at the next
+  look after lamp-cloud starts. The app is not pushed a notice: it reads
+  `monitor.get`.
 - **`monitor.link`** (`{"seal_to", "request_id"}`, both as `control.code`'s)
   asks lamp-peek's admin socket (`/run/lampos-peek/admin.sock`, lampos and
   root only, waited on 2 s) for a code, good once for 5 minutes, and answers
@@ -3166,9 +3185,11 @@ lamp".
   (the first builder on #5883).
 
 Tests: `monitor::tests` (the switch, the set's line, the get from the
-drop-in, the link sealed, bound to the lamp and the request and refused
-before a code is made, lamp-peek giving none, a socket that appears late
-waited for and one that never does refused once the wait passes); setup's
+drop-in with since when and when it went off, the day and its row knob, the
+health line, the turn-off through the helper kept and asked again, the link
+sealed, bound to the lamp and the request and refused before a code is made,
+lamp-peek giving none, a socket that appears late waited for and one that
+never does refused once the wait passes); setup's
 `the_dev_monitor_writes_lamp_peeks_drop_in_and_the_reset_forgets_it` and
 `the_dev_monitor_starts_once_unlocked_and_stops_before_the_reply`.
 
