@@ -144,6 +144,14 @@ fn grants_ok(grants: &[String]) -> Result<(), String> {
             Err(_) => return Err(format!("grants: {grant:?} is not a grant")),
         }
     }
+    // `net` never beside a private grant (Heron's P1 on #7590): no yes is
+    // kept for a pair no run may hold.
+    if let Some(private) = lamp_skills::task::private_beside_net(grants) {
+        return Err(format!(
+            "grants: net beside {private}: {}",
+            lamp_skills::task::NET_BESIDE_PRIVATE
+        ));
+    }
     Ok(())
 }
 
@@ -622,14 +630,22 @@ mod tests {
         lamp_voice::skill_task_yes::set_net_here(Some(false));
         assert!(record(json!(["camera", "net"]), &"a".repeat(64))["error"].is_string());
         lamp_voice::skill_task_yes::set_net_here(Some(true));
-        let booth = task_skill(&skills, "photo-booth", r#"["camera", "light", "net"]"#);
+        let booth = task_skill(&skills, "photo-booth", r#"["light", "speak", "net"]"#);
         let sha256 = lamp_skills::task::folder_sha256(&booth).unwrap();
         assert_eq!(
             record(json!(["net", "net"]), &sha256)["error"],
             "grants: net is listed twice"
         );
+        // Never beside a private grant (Heron's P1 on #7590).
+        let refused = record(json!(["camera", "light", "net"]), &sha256);
+        assert!(
+            refused["error"]
+                .as_str()
+                .is_some_and(|why| why.contains(lamp_skills::task::NET_BESIDE_PRIVATE)),
+            "{refused}"
+        );
         assert_eq!(
-            record(json!(["camera", "light", "net"]), &sha256),
+            record(json!(["light", "speak", "net"]), &sha256),
             json!({"recorded": true})
         );
         let kept = KeptYes {
@@ -640,11 +656,11 @@ mod tests {
         };
         assert_eq!(
             kept.grants("photo-booth").unwrap(),
-            BTreeSet::from([Grant::Camera, Grant::Light])
+            BTreeSet::from([Grant::Light, Grant::Speak])
         );
         // A yes without `net` for a folder that declares it asks again.
         assert_eq!(
-            record(json!(["camera", "light"]), &sha256),
+            record(json!(["light", "speak"]), &sha256),
             json!({"recorded": true})
         );
         assert_eq!(kept.grants("photo-booth").unwrap_err(), CHANGED);
@@ -712,6 +728,34 @@ mod tests {
             kept.grants("bitcoin-daily").unwrap(),
             BTreeSet::from([Grant::Speak])
         );
+        lamp_voice::skill_task_yes::set_net_here(None);
+    }
+
+    /// Heron's P1 on #7590: no yes is kept for `net` beside a private
+    /// grant (the camera, the microphone, what the lamp says, its notes, a
+    /// service's read or write); each alone still is, and `net` beside the
+    /// lamp's voice too.
+    #[test]
+    fn no_yes_names_net_beside_a_private_grant() {
+        lamp_voice::skill_task_yes::set_net_here(Some(true));
+        let of = |grants: &[&str]| {
+            grants_ok(&grants.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>())
+        };
+        for private in ["camera", "microphone", "speech", "notes"] {
+            assert_eq!(of(&[private]), Ok(()), "{private}");
+            for pair in [[private, "net"], ["net", private]] {
+                let why = of(&pair).unwrap_err();
+                assert!(
+                    why.contains(lamp_skills::task::NET_BESIDE_PRIVATE),
+                    "{pair:?}: {why}"
+                );
+            }
+        }
+        // A service's grant is never one of this part's own, with `net` or
+        // without it.
+        assert!(of(&["gmail-read", "net"]).is_err());
+        assert_eq!(of(&["speak", "net"]), Ok(()));
+        assert_eq!(of(&["light", "speak", "net"]), Ok(()));
         lamp_voice::skill_task_yes::set_net_here(None);
     }
 

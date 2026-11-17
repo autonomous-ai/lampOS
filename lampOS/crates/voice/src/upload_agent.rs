@@ -78,6 +78,30 @@ pub const FROM: &str = "a file added in the app";
 /// What a file that names a web API is told with `LAMP_TASK_NET` off.
 pub const NO_NET: &str =
     "it reaches the internet, which a skill's task can't on this lamp (LAMP_TASK_NET is off)";
+/// What a file is told whose grants name the internet beside a private
+/// one (a linked service, the camera, the microphone, what the lamp says,
+/// its notes: [`crate::skill_task_yes::private_grant`]), with `private`
+/// said in the say-back's words: one run never holds both (Heron's P1 on
+/// #7590).
+pub fn net_beside_private(private: &str) -> String {
+    let words = crate::skill_task_yes::service_words(private)
+        .or_else(|| crate::skill_task_yes::grant_words(private).map(str::to_owned))
+        .unwrap_or_else(|| private.to_owned());
+    format!(
+        "it reaches the internet and also {words}, and one skill can't do both: \
+         make it two skills"
+    )
+}
+
+/// The private grant `grants` names beside `net`, refused in
+/// [`net_beside_private`]'s words.
+fn refuse_net_beside_private<S: AsRef<str>>(grants: &[S]) -> Result<(), Refused> {
+    match crate::skill_task_yes::private_beside_net(grants) {
+        Some(private) => Err(Refused::new(net_beside_private(private))),
+        None => Ok(()),
+    }
+}
+
 /// What a file that uses a linked service is told with
 /// `LAMP_AGENT_SERVICES` off.
 pub const NO_SERVICES: &str = "it uses your linked services, which a skill's task can't on this \
@@ -585,6 +609,7 @@ pub fn files_with(card: &str, asks: &[String]) -> Result<(Files, Vec<String>), R
     if !crate::made_skill::agent_services_here() && !services_read(&card).is_empty() {
         return Err(Refused::new(NO_SERVICES));
     }
+    refuse_net_beside_private(&grants)?;
     let task: String = cut(&description, MOST_TASK_BYTES)
         .chars()
         .map(|c| if c.is_control() { ' ' } else { c })
@@ -740,6 +765,7 @@ pub fn capped_with(text: &str, services: bool) -> Result<(String, made_skill::Us
             _ => {}
         }
     }
+    refuse_net_beside_private(&seen)?;
     // Its keys' names (`LAMP_SKILL_SECRETS`): plain variables' names,
     // once each, never a value; read whichever way the switch is, so a
     // skill kept with it on still loads with it off.

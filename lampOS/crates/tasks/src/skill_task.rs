@@ -252,6 +252,34 @@ pub const NET_SWITCH: &str = "LAMP_TASK_NET";
 /// The task grant that gives the run the public web: never lamp-control's own,
 /// so never in a one-run token; checked by the owner's yes as any grant.
 pub const NET_GRANT: &str = "net";
+/// The grants that reach what is the person's own: a linked service's
+/// read or write (`*-read`, `*-write`), the camera, the microphone, what
+/// the lamp says and its notes. A run granted [`NET_GRANT`] holds none of
+/// them (Heron's P1 on #7590): private data, untrusted text and a way out
+/// never share one run. A skill that needs both is two skills. Checked here ([`HandOver::check`]), at load by lamp-skills and
+/// the upload, and by lamp-control's yes.
+pub const PRIVATE_GRANTS: [&str; 4] = ["camera", "microphone", "speech", "notes"];
+/// Said when a skill's grants name [`NET_GRANT`] beside one of
+/// [`PRIVATE_GRANTS`] or a service's.
+pub const NET_BESIDE_PRIVATE: &str = "a skill that reaches the internet can't also use your linked services, the camera, the microphone, what the lamp says or its notes: make it two skills";
+
+/// Whether `grant` is one a run granted [`NET_GRANT`] never holds:
+/// [`PRIVATE_GRANTS`], or any service's read or write.
+pub fn private_grant(grant: &str) -> bool {
+    PRIVATE_GRANTS.contains(&grant) || grant.ends_with("-read") || grant.ends_with("-write")
+}
+
+/// The first of `grants` that may not sit beside [`NET_GRANT`] there
+/// ([`private_grant`]), when `grants` names it; `None` otherwise.
+pub fn private_beside_net<S: AsRef<str>>(grants: &[S]) -> Option<&str> {
+    if !grants.iter().any(|grant| grant.as_ref() == NET_GRANT) {
+        return None;
+    }
+    grants
+        .iter()
+        .map(AsRef::as_ref)
+        .find(|grant| private_grant(grant))
+}
 /// An agent skill's `run` (`lamp_voice::upload_agent::INSTRUCTIONS`,
 /// `LAMP_UPLOAD_TO_AGENT`): a file added in the app, kept whole, which
 /// Hermes follows rather than runs.
@@ -392,6 +420,9 @@ impl HandOver {
             if !name_ok(grant) || !known || !seen.insert(grant) {
                 return Err("a grant is unknown, written twice or `skills`");
             }
+        }
+        if private_beside_net(&self.grants).is_some() {
+            return Err(NET_BESIDE_PRIVATE);
         }
         Ok(())
     }
@@ -1352,6 +1383,22 @@ pub fn answer_for(
         if let Some(folder) = &fresh {
             made.env.extend(crate::skill_make::home_env(&folder.path));
             made.start_in = Some(folder.path.clone());
+            // A run granted `net` sees only its own skill's folder: named
+            // here, found by the namespace script by the run's id
+            // (Heron's P3 on #7590).
+            if keeps_net {
+                folder
+                    .write(
+                        crate::egress::OWN_SKILL_FILE,
+                        &format!("{}\n", hand.folder.display()),
+                    )
+                    .map_err(|error| {
+                        refusal(
+                            "run_failed",
+                            &format!("the run's own skill folder was not named: {}", error.kind()),
+                        )
+                    })?;
+            }
         }
         if !values.is_empty() {
             let file = made
@@ -2501,7 +2548,8 @@ pub const ONE_PATH_EGRESS_LINES: [&str; 3] = [
 /// its id ([`ONE_PATH_EGRESS_LINES`]) and its data takes a make's home
 /// ([`crate::skill_make::ONE_PATH_HOME_LINE`], Hermes's alone), and the
 /// namespace shows a `skill-<run id>` egress socket
-/// ([`crate::egress::NS_LINE`], [`crate::egress::NS_SKILL_LINE`]) and that
+/// ([`crate::egress::NS_LINE`], [`crate::egress::NS_SKILL_LINE`]), shows
+/// it only its own skill's folder ([`crate::egress::NS_OWN_SKILL_LINE`]) and that
 /// home with the lasting one hidden
 /// ([`crate::skill_make::ONE_PATH_NS_MAKE_LINES`]).
 pub fn takes_net_runs(wrapper: &str, script: &str) -> bool {
@@ -2511,6 +2559,7 @@ pub fn takes_net_runs(wrapper: &str, script: &str) -> bool {
         && wrapper.contains(crate::skill_make::ONE_PATH_HOME_LINE)
         && script.contains(crate::egress::NS_LINE)
         && script.contains(crate::egress::NS_SKILL_LINE)
+        && script.contains(crate::egress::NS_OWN_SKILL_LINE)
         && script.contains(crate::skill_make::ONE_PATH_NS_MAKE_LINES)
 }
 
@@ -5405,14 +5454,14 @@ mod tests {
             |asked| json!({"agreed": asked["task_yes_check"]["sha256"] == SHA}),
             2,
         );
-        let grants = vec!["camera".to_owned(), NET_GRANT.to_owned()];
+        let grants = vec!["light".to_owned(), NET_GRANT.to_owned()];
         assert!(tokens.net_agreed("photo-booth", SHA, &grants));
         assert!(!tokens.net_agreed("photo-booth", &"0".repeat(64), &grants));
         // No `net` in the grants: never asked, never agreed.
-        assert!(!tokens.net_agreed("photo-booth", SHA, &["camera".to_owned()]));
+        assert!(!tokens.net_agreed("photo-booth", SHA, &["light".to_owned()]));
         assert_eq!(
             served.join().unwrap()[0],
-            json!({"task_yes_check": {"name": "photo-booth", "sha256": SHA, "grants": ["camera", "net"]}})
+            json!({"task_yes_check": {"name": "photo-booth", "sha256": SHA, "grants": ["light", "net"]}})
         );
     }
 
@@ -7409,12 +7458,18 @@ mod tests {
             ONE_PATH_EGRESS_LINES[2]
         )));
         let ns = format!(
-            "{}\n{}\n{}",
+            "{}\n{}\n{}\n{}",
             crate::egress::NS_LINE,
             crate::egress::NS_SKILL_LINE,
+            crate::egress::NS_OWN_SKILL_LINE,
             crate::skill_make::ONE_PATH_NS_MAKE_LINES
         );
         assert!(takes_net_runs(ONE_PATH_HERMES, &ns));
+        // A script that would show a net run every skill's folder: refused.
+        assert!(!takes_net_runs(
+            ONE_PATH_HERMES,
+            &ns.replace(crate::egress::NS_OWN_SKILL_LINE, "")
+        ));
         assert!(!takes_net_runs(ONE_PATH_CLAUDE, &ns));
         assert!(!takes_net_runs(
             ONE_PATH_HERMES,
@@ -7422,19 +7477,78 @@ mod tests {
         ));
     }
 
+    /// Heron's P1 on #7590: a hand-over granted `net` beside a private
+    /// grant (a service's read or write, the camera, the microphone, what
+    /// the lamp says, its notes) is refused, nothing minted or run; each of
+    /// them alone still passes, and `net` beside the lamp's voice too.
+    #[test]
+    fn a_hand_over_never_holds_net_beside_a_private_grant() {
+        let parse = |grants: Value| {
+            HandOver::parse_with(&line(|value| value["grants"] = grants), skills(), true)
+        };
+        for private in [
+            "gmail-read",
+            "gmail-write",
+            "google_calendar-read",
+            "camera",
+            "microphone",
+            "speech",
+            "notes",
+        ] {
+            assert!(private_grant(private), "{private}");
+            assert!(parse(json!([private])).is_ok(), "{private}");
+            for pair in [
+                json!([private, NET_GRANT]),
+                json!([NET_GRANT, "light", private]),
+            ] {
+                let (code, why) = parse(pair.clone()).unwrap_err();
+                assert_eq!(
+                    (code, why.as_str()),
+                    ("bad_request", NET_BESIDE_PRIVATE),
+                    "{pair}"
+                );
+            }
+        }
+        assert!(parse(json!(["speak", NET_GRANT])).is_ok());
+        assert!(parse(json!(["light", "speak", "body", NET_GRANT])).is_ok());
+        assert!(!private_grant("speak") && !private_grant(NET_GRANT) && !private_grant("look"));
+        // lamp-tasks refuses it before any token is asked for.
+        let tokens = FakeTokens {
+            net_yes: true,
+            ..FakeTokens::default()
+        };
+        let work = tempfile::tempdir().unwrap();
+        let (held, open) = (where_runner(), where_runner());
+        let agent = Agent {
+            net: Some(&open),
+            held: None,
+            work: Some(work.path()),
+            services: false,
+            keys: None,
+        };
+        let pair = line(|value| value["grants"] = json!(["camera", NET_GRANT]));
+        let told = answer_agent(&pair, true, skills(), &tokens, &held, &agent);
+        assert_eq!(told["error"], "bad_request", "{told}");
+        assert!(tokens.minted.borrow().is_empty());
+        assert!(open.started.borrow().is_empty() && held.started.borrow().is_empty());
+    }
+
     /// LAMP_TASK_NET: a run granted `net` goes through the make's net
     /// runner, held as every run with its own egress socket; one with no
     /// `net` goes through the skill's. With the switch off, `net` is no
     /// grant and the line is refused. The token never names `net`, so a yes
-    /// for camera and light mints for a line of camera, light and net.
+    /// for light and speak mints for a line of light, speak and net.
     #[test]
     fn the_net_grant_is_held_with_its_way_out_and_no_grant_has_none() {
         assert!(net_on(Some("on")) && !net_on(Some("yes")) && !net_on(None));
         let work = tempfile::tempdir().unwrap();
-        let with_net = line(|value| value["grants"] = json!(["camera", "light", NET_GRANT]));
+        let with_net = line(|value| value["grants"] = json!(["light", "speak", NET_GRANT]));
         // lamp-control's yes doesn't name `net`: refused, nothing run, the
         // token ended.
-        let no_net_yes = FakeTokens::default();
+        let no_net_yes = FakeTokens {
+            yes: Some(vec!["light".into(), "speak".into()]),
+            ..FakeTokens::default()
+        };
         let (held, open) = (where_runner(), where_runner());
         let agent = Agent {
             net: Some(&open),
@@ -7449,6 +7563,7 @@ mod tests {
         assert_eq!(no_net_yes.ended.borrow().len(), 1);
         assert!(no_net_yes.live.borrow().is_empty());
         let tokens = FakeTokens {
+            yes: Some(vec!["light".into(), "speak".into()]),
             net_yes: true,
             ..FakeTokens::default()
         };
@@ -7465,7 +7580,8 @@ mod tests {
         assert_eq!(open.started.borrow().len(), 1);
         assert!(held.started.borrow().is_empty());
         // No `net`: held, though the switch is on.
-        let told = answer_agent(&line(|_| {}), true, skills(), &tokens, &held, &agent);
+        let no_net = line(|value| value["grants"] = json!(["light", "speak"]));
+        let told = answer_agent(&no_net, true, skills(), &tokens, &held, &agent);
         assert_eq!(told["ok"], true, "{told}");
         assert_eq!(
             (held.started.borrow().len(), open.started.borrow().len()),
@@ -7537,9 +7653,11 @@ mod tests {
         let ns = dir.path().join("hermes-ns");
         let ns_with = |line: &str| std::fs::write(&ns, format!("{NS_HOME_LINE}{line}\n")).unwrap();
         let script = format!(
-            "env > {seen}.env; if [ -S \"{egress}/$LAMP_NS_EGRESS.sock\" ]; then echo there > {seen}.sock; fi",
+            "env > {seen}.env; if [ -S \"{egress}/$LAMP_NS_EGRESS.sock\" ]; then echo there > {seen}.sock; fi; \
+             cat \"${{HOME%/home}}/{own}\" > {seen}.own 2>/dev/null || rm -f {seen}.own",
             seen = seen.display(),
-            egress = egress.display()
+            egress = egress.display(),
+            own = crate::egress::OWN_SKILL_FILE,
         );
         let stand_in = |runner: &mut crate::skill_make::MakeHermes| {
             runner.hermes.program = PathBuf::from("/bin/sh");
@@ -7570,10 +7688,16 @@ mod tests {
         let reset = || {
             let _ = std::fs::remove_file(seen.with_extension("env"));
             let _ = std::fs::remove_file(seen.with_extension("sock"));
+            let _ = std::fs::remove_file(seen.with_extension("own"));
         };
         let with_net = line(|value| value["grants"] = json!(["light", NET_GRANT]));
         // No yes naming `net`: refused, nothing run, no socket ever made.
-        ns_with(crate::egress::NS_LINE);
+        let ns_net = format!(
+            "{}\n{}",
+            crate::egress::NS_LINE,
+            crate::egress::NS_OWN_SKILL_LINE
+        );
+        ns_with(&ns_net);
         let no_yes = FakeTokens {
             yes: Some(vec!["light".into()]),
             ..FakeTokens::default()
@@ -7598,8 +7722,23 @@ mod tests {
             .expect("named its egress");
         assert!(crate::egress::plain_name(name), "{name}");
         assert!(seen.with_extension("sock").exists(), "there while it ran");
+        // Its own skill's folder named in its run's folder while it ran
+        // (Heron's P3 on #7590): the namespace shows that one alone.
+        assert_eq!(
+            std::fs::read_to_string(seen.with_extension("own")).unwrap(),
+            format!("{SKILLS}/photo-booth\n")
+        );
         assert_eq!(sockets(), 0, "gone after");
         assert_eq!(std::fs::read_dir(&work).unwrap().count(), 0);
+        // A namespace script that would show it every skill's folder:
+        // refused, nothing run.
+        reset();
+        ns_with(crate::egress::NS_LINE);
+        let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
+        assert_eq!(told["error"], NO_NET, "{told}");
+        assert_eq!(told["message"], crate::egress::NO_EGRESS);
+        assert!(!ran());
+        assert_eq!(sockets(), 0);
         // A namespace script with no egress line: refused, nothing run.
         reset();
         ns_with("");
@@ -7609,7 +7748,8 @@ mod tests {
         assert!(!ran());
         assert_eq!(sockets(), 0);
         // A run without `net` (an agent skill's, through the held make
-        // runner): held, no egress, no variable, nothing made.
+        // runner): held, no egress, no variable, nothing made, no folder
+        // named.
         reset();
         let agent_line = line(|value| {
             value["run"] = json!(AGENT_INSTRUCTIONS);
@@ -7621,6 +7761,7 @@ mod tests {
         assert!(env.lines().any(|line| line == "LAMP_NS_NET=run"), "{env}");
         assert!(!env.contains("LAMP_NS_EGRESS"), "{env}");
         assert!(!seen.with_extension("sock").exists());
+        assert!(!seen.with_extension("own").exists());
         assert_eq!(sockets(), 0);
     }
 

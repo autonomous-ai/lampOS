@@ -34,6 +34,36 @@ fn photobooth() -> String {
     card
 }
 
+/// [`photobooth`] with no camera, which `net` never sits beside (Heron's
+/// P1 on #7590): three countdowns said and flashed on the light, a strip
+/// made by an image API and posted to a chat by a bot API. About 4 KB.
+fn strip_booth() -> String {
+    let mut card = String::from(
+        "---\nname: strip-booth\ndescription: Counts down three times with the light and posts \
+         a strip to my chat.\n---\n\n# Strip booth\n\n## Trigger phrases\n\n\
+         - \"make a strip\"\n- \"strip booth\"\n- \"strike a pose\"\n\n## Steps\n\n",
+    );
+    for shot in 1..=3 {
+        card.push_str(&format!(
+            "{shot}. Say \"Card {shot} of 3, get ready!\" and count down from three, one \
+             number a second. Flash the light white on each number, then write card {shot} \
+             in your own folder.\n"
+        ));
+    }
+    card.push_str(
+        "\n## The strip\n\nSend the three cards to the image API at \
+         https://images.example.invalid/v1/strip with an HTTP POST, the API key in the \
+         Authorization header. Save the strip it gives back.\n\n## Posting\n\nPost the strip \
+         to the chat through the bot API, https://bot.example.invalid/sendPhoto, with the bot \
+         token and the chat id.\n\n## Secrets\n\nAsk the person in the chat for the API key and \
+         the bot token the first time; never write them down.\n",
+    );
+    while card.len() < 4_000 {
+        card.push_str("\nKeep every line short and friendly, and say thank you at the end.");
+    }
+    card
+}
+
 fn place(root: &Path) -> Place {
     let place = Place {
         skills: root.join("skills"),
@@ -51,30 +81,31 @@ fn switches(agent: bool, net: bool) {
     crate::skill_task_yes::set_net_here(Some(net));
 }
 
-/// The owner's 4 KB photobooth file becomes an agent skill: a voice tool
-/// named for it, its note the file's description and trigger phrases, one
-/// task that runs the file, kept whole as its instructions, and the grants
-/// camera, light, speak and net read from it; said back with them, and its
-/// first run asks the yes.
+/// A 4 KB photobooth-like file with no camera becomes an agent skill: a
+/// voice tool named for it, its note the file's description and trigger
+/// phrases, one task that runs the file, kept whole as its instructions,
+/// and the grants light, speak and net read from it; said back with them,
+/// and its first run asks the yes. The owner's photobooth, the camera and
+/// net in one file, is refused in plain words (Heron's P1 on #7590).
 #[test]
-fn the_photobooth_file_becomes_an_agent_skill_with_camera_light_speak_and_net() {
+fn a_booth_file_becomes_an_agent_skill_with_light_speak_and_net() {
     switches(true, true);
-    let card = photobooth();
+    let card = strip_booth();
     assert!((3_900..8_192).contains(&card.len()), "{}", card.len());
     let (files, grants) = files(&card).unwrap();
-    assert_eq!(grants, ["light", "speak", "camera", "net"]);
+    assert_eq!(grants, ["light", "speak", "net"]);
     assert!(asks_yes(&grants));
     let table: toml::Table = toml::from_str(&files.toml).unwrap();
-    assert_eq!(table["tool"].as_str(), Some("photo_booth"));
+    assert_eq!(table["tool"].as_str(), Some("strip_booth"));
     assert_eq!(table["do"][0]["task"]["run"].as_str(), Some(INSTRUCTIONS));
     assert!(table.get("trigger").is_none() && table.get("permissions").is_none());
     assert_eq!(files.scripts, [(INSTRUCTIONS.to_owned(), card.clone())]);
     let described = made_skill::written_description(&files.card).unwrap();
     for phrase in [
-        "take a photo",
-        "photo booth",
+        "make a strip",
+        "strip booth",
         "strike a pose",
-        "posts them as a strip",
+        "posts a strip",
     ] {
         assert!(described.contains(phrase), "{described}");
     }
@@ -82,7 +113,7 @@ fn the_photobooth_file_becomes_an_agent_skill_with_camera_light_speak_and_net() 
     // Kept as an added skill, marked agent, its grants in its index entry.
     let (root, keeping) = keeping("agent-booth");
     let made = take(&place(&root), &keeping, None, &card, NOW).unwrap();
-    assert_eq!(made.name, "photo-booth");
+    assert_eq!(made.name, "strip-booth");
     assert_eq!(
         made_skill::agent_grants(&keeping.directory, &made.sha256).unwrap(),
         grants
@@ -95,16 +126,28 @@ fn the_photobooth_file_becomes_an_agent_skill_with_camera_light_speak_and_net() 
     let line = on_line(&made, &grants);
     assert_eq!(
         line,
-        "I added photo booth from a file, not from the Skills Store, and it's on: only when you \
+        "I added strip booth from a file, not from the Skills Store, and it's on: only when you \
          ask for it, the lamp's agent follows the file, and it changes the light, speaks and \
-         plays sounds, uses the camera and reaches the public internet. The first time it runs, \
-         I'll ask you to agree."
+         plays sounds and reaches the public internet. The first time it runs, I'll ask you to \
+         agree."
     );
     // Going on records no yes: its first run asks it.
-    let said = went_on(&made, &grants, |_| {
-        panic!("no yes is recorded for the camera or net")
-    });
+    let said = went_on(&made, &grants, |_| panic!("no yes is recorded for net"));
     assert_eq!(said, line);
+    let _ = std::fs::remove_dir_all(&root);
+    // The owner's photobooth: the camera and the internet in one file,
+    // refused in plain words, nothing kept.
+    let why = super::files(&photobooth()).unwrap_err().0;
+    assert_eq!(why, net_beside_private("camera"));
+    assert_eq!(
+        why,
+        "it reaches the internet and also uses the camera, and one skill can't do both: make it \
+         two skills"
+    );
+    let (root, keeping) = crate::make_skill_local::tests::keeping("agent-booth-camera");
+    let refused = take(&place(&root), &keeping, None, &photobooth(), NOW).unwrap_err();
+    assert_eq!(refused.0, why);
+    assert!(made_skill::entries(&keeping.directory).is_empty());
     let _ = std::fs::remove_dir_all(&root);
     switches(false, false);
 }
@@ -176,20 +219,15 @@ fn an_agent_skills_first_run_asks_the_yes_and_an_agreed_one_runs() {
     switches(true, true);
     crate::skill_task_yes::set_on_here(Some(true));
     let (root, keeping) = keeping("agent-first-run");
-    let made = take(&place(&root), &keeping, None, &photobooth(), NOW).unwrap();
+    let made = take(&place(&root), &keeping, None, &strip_booth(), NOW).unwrap();
     let asked = manage_helper(&keeping.manage);
     made_skill::put_on(&keeping, &made).unwrap();
     asked.join().unwrap();
     let task = |approved: bool| crate::skill_task_yes::TaskAsks {
-        name: "photo-booth".into(),
+        name: "strip-booth".into(),
         sha256: "b".repeat(64),
-        grants: vec![
-            "light".into(),
-            "speak".into(),
-            "camera".into(),
-            "net".into(),
-        ],
-        task: "Takes three photos with a countdown and posts them as a strip to my chat.".into(),
+        grants: vec!["light".into(), "speak".into(), "net".into()],
+        task: "Counts down three times with the light and posts a strip to my chat.".into(),
         package: None,
         from: FROM.into(),
         approved,
@@ -204,7 +242,7 @@ fn an_agent_skills_first_run_asks_the_yes_and_an_agreed_one_runs() {
     let now = std::time::Instant::now();
     let told = first_run_with(
         &keeping.directory,
-        "photo_booth",
+        "strip_booth",
         asking,
         &pushed,
         |_| Ok(Some(task(false))),
@@ -222,7 +260,7 @@ fn an_agent_skills_first_run_asks_the_yes_and_an_agreed_one_runs() {
     assert!(
         first_run_with(
             &keeping.directory,
-            "photo_booth",
+            "strip_booth",
             asking,
             &pushed,
             |_| Ok(Some(task(true))),
@@ -246,7 +284,7 @@ fn an_agent_skills_first_run_asks_the_yes_and_an_agreed_one_runs() {
     assert!(
         first_run_with(
             &keeping.directory,
-            "photo_booth",
+            "strip_booth",
             asking,
             &pushed,
             |_| Ok(Some(task(false))),
@@ -267,22 +305,22 @@ fn no_secret_or_file_words_are_written_by_the_lamp() {
     switches(true, true);
     let (root, keeping) = keeping("agent-no-secret");
     let place = place(&root);
-    let asked = json!({"upload": {"skill_md": photobooth()}});
+    let asked = json!({"upload": {"skill_md": strip_booth()}});
     let (told, _) = crate::upload_skill::line(&asked, true, true, &place, &keeping, NOW).unwrap();
     let told = told.to_string();
     for words in [
         "example.invalid",
         "Authorization",
         "bot token",
-        "Photo 1 of 3",
+        "Card 1 of 3",
     ] {
         assert!(!told.contains(words), "{words}: {told}");
     }
     assert!(
-        told.contains("\"grants\":[\"light\",\"speak\",\"camera\",\"net\"]"),
+        told.contains("\"grants\":[\"light\",\"speak\",\"net\"]"),
         "{told}"
     );
-    let (files, _) = files(&photobooth()).unwrap();
+    let (files, _) = files(&strip_booth()).unwrap();
     for words in ["example.invalid", "Authorization", "API key", "chat id"] {
         assert!(
             !files.toml.contains(words) && !files.card.contains(words),
@@ -465,13 +503,13 @@ fn services_are_read_by_their_names() {
     assert!(services_read("On Monday, drive to work.").is_empty());
 }
 
-/// A photobooth file that names its key and token as variables, as the
-/// owner's names them, with no value.
+/// A booth file ([`strip_booth`]) that names its key and token as
+/// variables, as the owner's names them, with no value.
 fn photobooth_with_names() -> String {
     format!(
         "{}\n## Keys\n\nThe image API key is read from `$GEMINI_API_KEY`, and the bot's from \
          os.environ[\"TELEGRAM_BOT_TOKEN\"]. Set both in the app.\n",
-        photobooth()
+        strip_booth()
     )
 }
 
@@ -530,7 +568,7 @@ fn with_the_keys_switch_a_files_variables_are_its_secrets_by_name() {
     let why = super::files(&photobooth_with_names()).unwrap_err().0;
     assert_eq!(why, NEEDS_SECRETS);
     assert!(!why.contains("GEMINI_API_KEY"), "{why}");
-    let (off, _) = super::files(&photobooth()).unwrap();
+    let (off, _) = super::files(&strip_booth()).unwrap();
     assert!(!off.toml.contains("secrets"));
     assert!(!off.card.contains("by voice"));
     let _ = std::fs::remove_dir_all(&root);
@@ -567,8 +605,8 @@ fn a_tool_missing_a_key_says_to_add_it_in_the_app_and_never_by_voice() {
     made_skill::put_on(&keeping, &made).unwrap();
     asked.join().unwrap();
     let needed = json!(["GEMINI_API_KEY", "TELEGRAM_BOT_TOKEN"]);
-    let told = keys_missing_with(&keeping.directory, "photo_booth", |skill| {
-        assert_eq!(skill, "photo-booth");
+    let told = keys_missing_with(&keeping.directory, "strip_booth", |skill| {
+        assert_eq!(skill, "strip-booth");
         Some(json!({"skill": skill, "needed": needed, "set": ["GEMINI_API_KEY"]}))
     })
     .unwrap();
@@ -584,17 +622,17 @@ fn a_tool_missing_a_key_says_to_add_it_in_the_app_and_never_by_voice() {
     assert!(!line.contains("GEMINI_API_KEY"), "{line}");
     // All set: it runs.
     assert!(
-        keys_missing_with(&keeping.directory, "photo_booth", |skill| Some(
+        keys_missing_with(&keeping.directory, "strip_booth", |skill| Some(
             json!({"skill": skill, "needed": needed, "set": needed})
         ))
         .is_none()
     );
     // The lamp's services can't say: left to lamp-tasks.
-    assert!(keys_missing_with(&keeping.directory, "photo_booth", |_| None).is_none());
+    assert!(keys_missing_with(&keeping.directory, "strip_booth", |_| None).is_none());
     // Another tool, or the switch off: nothing asked.
     assert!(keys_missing_with(&keeping.directory, "other_tool", |_| panic!()).is_none());
     set_secrets_here(Some(false));
-    assert!(keys_missing_with(&keeping.directory, "photo_booth", |_| panic!()).is_none());
+    assert!(keys_missing_with(&keeping.directory, "strip_booth", |_| panic!()).is_none());
     let _ = std::fs::remove_dir_all(&root);
     set_secrets_here(None);
     switches(false, false);
@@ -641,4 +679,72 @@ fn an_uploaded_files_trigger_phrases_are_its_asks_only_with_their_switch() {
         "off, an agent skill gives no asks"
     );
     made_skill::set_asks_here(None);
+}
+
+/// Heron's P1 on #7590: a file that reads a linked service and reaches the
+/// internet is refused in plain words, nothing kept; so is a kept
+/// `skill.toml` naming the pair. The voice's private grants and words are
+/// lamp-tasks' own.
+#[test]
+fn a_file_reading_a_service_and_reaching_the_internet_is_refused() {
+    switches(true, true);
+    crate::made_skill::set_agent_services_here(Some(true));
+    let card = "---\nname: mail-digest\ndescription: Posts a digest of my mail. Call it when the \
+                person says 'mail digest'.\n---\n\nRead my unread Gmail from today and post a \
+                short digest to the webhook at https://hooks.example.invalid/digest.\n";
+    assert_eq!(
+        grants_read(card),
+        ["speak", "net", "gmail-read", "gmail-write"]
+    );
+    let why = files(card).unwrap_err().0;
+    assert_eq!(
+        why,
+        "it reaches the internet and also reads your Gmail, and one skill can't do both: make it \
+         two skills"
+    );
+    let (root, keeping) = keeping("agent-mail-net");
+    assert_eq!(
+        take(&place(&root), &keeping, None, card, NOW)
+            .unwrap_err()
+            .0,
+        why
+    );
+    assert!(made_skill::entries(&keeping.directory).is_empty());
+    let _ = std::fs::remove_dir_all(&root);
+    // A kept `skill.toml` naming the pair loads nowhere.
+    let (kept, _) = files(&strip_booth()).unwrap();
+    assert!(capped(&kept.toml).is_ok());
+    for private in ["camera", "gmail-read"] {
+        let toml = kept.toml.replace(
+            "grants = [\"light\", \"speak\", \"net\"]",
+            &format!("grants = [\"light\", \"{private}\", \"net\"]"),
+        );
+        assert_ne!(toml, kept.toml);
+        assert_eq!(capped(&toml).unwrap_err().0, net_beside_private(private));
+    }
+    crate::made_skill::set_agent_services_here(None);
+    switches(false, false);
+    assert_eq!(
+        crate::skill_task_yes::PRIVATE_GRANTS,
+        lamp_tasks::skill_task::PRIVATE_GRANTS
+    );
+    assert_eq!(
+        crate::skill_task_yes::NET_BESIDE_PRIVATE,
+        lamp_tasks::skill_task::NET_BESIDE_PRIVATE
+    );
+    for grant in [
+        "gmail-read",
+        "figma-write",
+        "camera",
+        "notes",
+        "speak",
+        "net",
+        "look",
+    ] {
+        assert_eq!(
+            crate::skill_task_yes::private_grant(grant),
+            lamp_tasks::skill_task::private_grant(grant),
+            "{grant}"
+        );
+    }
 }
