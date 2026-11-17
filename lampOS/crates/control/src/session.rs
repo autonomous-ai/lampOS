@@ -39,6 +39,10 @@ pub trait Parts {
     /// Ends `client`'s camera or microphone stream, and nothing else of
     /// it: its pairing no longer grants that one (Thirteen's P2 on #4521).
     fn media_end(&mut self, _client: &str, _media: Media) {}
+    /// A new computer was let in and the lamp should show it once
+    /// (`LAMP_CONTROL_PAIR_CUE`): a soft pulse on the ring, nothing else. Called
+    /// after the pairing's reply has been sent, never before it.
+    fn pair_cue(&mut self) {}
     /// Whether `client`'s camera or microphone stream that made a frame
     /// still runs: a picture or a block already queued for it goes only then
     /// (Thirteen's P3 on #4521). With a `turn`, only that very stream: a
@@ -257,6 +261,10 @@ pub struct Outcome {
     /// a `listen.set`), waited for off the door's lock and sent to this
     /// connection only.
     pub later: Option<Later>,
+    /// A computer was paired for the first time (a new key, not a re-pair)
+    /// while no computer holds the light: the lamp may show it once, after
+    /// this outcome's reply has gone (`LAMP_CONTROL_PAIR_CUE`).
+    pub cue: bool,
 }
 
 /// The door: pairing, the paired clients, the leases and the rates, shared
@@ -1522,7 +1530,11 @@ impl Door {
                 self.media_dropped.push((id.clone(), media));
             }
         }
-        ok(re, json!({"client": id, "grants": grants}))
+        // A new key, and nobody holding the light: the lamp may glow once.
+        let new_computer = before.is_none();
+        let mut outcome = ok(re, json!({"client": id, "grants": grants}));
+        outcome.cue = new_computer && self.leases.holder(Part::Light, now_us).is_none();
+        outcome
     }
 
     fn hello(
@@ -2030,6 +2042,62 @@ mod tests {
         );
         assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
         (door, session, fake)
+    }
+
+    /// The pairing cue (#7471): a computer paired for the first time says the
+    /// lamp may glow once; the same key paired again, with the same grants or
+    /// others, does not; and neither does a new one while a computer holds the
+    /// light. The reply is the same either way: the cue is no part of it.
+    #[test]
+    fn a_new_computer_asks_for_the_cue_and_a_re_pair_or_a_held_light_does_not() {
+        let first = Computer::new(51);
+        let mut door = Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None);
+        let mut fake = Fake::default();
+        let pair =
+            |door: &mut Door, fake: &mut Fake, computer: &Computer, grants: &[Grant], at: u64| {
+                let code = door.issue_code(grants.iter().copied().collect(), at);
+                let (mut session, welcome) = door.open();
+                door.handle(
+                    &mut session,
+                    &computer.pair_frame(&code, &welcome),
+                    fake,
+                    at,
+                    1,
+                )
+            };
+        let new = pair(&mut door, &mut fake, &first, &[Grant::Light], S);
+        assert_eq!(reply(&new)["ok"], true, "{new:?}");
+        assert!(new.cue, "a key paired for the first time asks for the cue");
+        // One pairing try a second: each a few seconds after the last.
+        let again = pair(&mut door, &mut fake, &first, &[Grant::Light], 5 * S);
+        assert_eq!(reply(&again)["ok"], true, "{again:?}");
+        assert!(!again.cue, "the same key paired again asks for nothing");
+        let changed = pair(
+            &mut door,
+            &mut fake,
+            &first,
+            &[Grant::Light, Grant::Speak],
+            10 * S,
+        );
+        assert_eq!(reply(&changed)["ok"], true, "{changed:?}");
+        assert!(!changed.cue, "nor with other grants: nobody new came in");
+        // The reply says nothing of the cue: the same fields for a new key and a re-pair.
+        let fields = |outcome: &Outcome| {
+            reply(outcome)
+                .as_object()
+                .map(|reply| reply.keys().cloned().collect::<Vec<_>>())
+        };
+        assert_eq!(fields(&new), fields(&again));
+        assert!(fields(&new).is_some_and(|keys| !keys.iter().any(|key| key.contains("cue"))));
+        // A computer holds the light: a new one pairs, and the cue is not asked.
+        let holder = pairing::client_id(&first.key());
+        door.leases
+            .take(&holder, &[Part::Light], 30_000, 15 * S)
+            .unwrap();
+        let second = Computer::new(52);
+        let held = pair(&mut door, &mut fake, &second, &[Grant::Light], 20 * S);
+        assert_eq!(reply(&held)["ok"], true, "{held:?}");
+        assert!(!held.cue, "a held light is never taken for a cue");
     }
 
     /// Thirteen's P2 on #4521: a computer re-paired without the camera has
