@@ -1373,6 +1373,14 @@ impl Runner for NetRunner {
         }
     }
 
+    /// By the one run path, as the lamp's Harness runner keeps its agent's
+    /// last answer, so a `net` run tells what it found
+    /// ([`crate::skill_task::tells_answer`]); the make's net runner keeps
+    /// none.
+    fn answers(&self) -> bool {
+        self.by_one_path().is_some_and(Runner::answers)
+    }
+
     fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
         match self.by_one_path() {
             Some(harness) => harness.run(run, end_token),
@@ -1602,6 +1610,35 @@ mod tests {
     use crate::skill_task::{ADMIN_SOCKET, HERMES, NET_ENV, NET_RUN, TOKEN_ENV, WRAPPER_NET_LINES};
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::fs::PermissionsExt;
+
+    /// A `net` run's runner keeps its agent's answer, so the run tells it,
+    /// only by the one run path (the lamp's Harness runner); the make's net
+    /// runner keeps none.
+    #[test]
+    fn a_net_runner_keeps_an_answer_only_by_the_one_run_path() {
+        let home = Path::new("/var/lib/lampos-tasks");
+        let mut harness = crate::skill_task::HarnessRunner::lamp(home, Default::default());
+        harness.default_agent = true;
+        let by_path = NetRunner {
+            make: net_runner(home),
+            one_path: Some(Arc::new(harness)),
+        };
+        assert!(by_path.answers());
+        let mut off = crate::skill_task::HarnessRunner::lamp(home, Default::default());
+        off.default_agent = false;
+        for runner in [
+            NetRunner {
+                make: net_runner(home),
+                one_path: Some(Arc::new(off)),
+            },
+            NetRunner {
+                make: net_runner(home),
+                one_path: None,
+            },
+        ] {
+            assert!(!runner.answers());
+        }
+    }
 
     fn line(rules: &str, within_ms: u64) -> Vec<u8> {
         json!({"op":"skill_make","rules":rules,"within_ms":within_ms})

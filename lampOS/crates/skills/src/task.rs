@@ -52,13 +52,14 @@
 //! - **The hand-over** ([`HandOver::line`]): one line to lamp-tasks
 //!   (`--tasks-socket`, #6306), answered when the run ends. The other steps
 //!   of the skill (light, cue, say) run at once beside it.
-//! - **What its agent found** ([`told`]): a run granted a linked service's
-//!   read ends with the agent's last answer in lamp-tasks' answer
-//!   (`lamp_tasks::skill_task::tells_answer`, `LAMP_AGENT_SERVICES` on
-//!   there), which is said to the owner sentence by sentence as exact
-//!   words, behind a read's gate and turn
-//!   (`crate::service_read::tell`). Nothing else of a run is told; the
-//!   journal says only how many sentences were said.
+//! - **What its agent found** ([`told`]): a run whose runner keeps its
+//!   agent's last answer (Harness's, whatever its grants; never a fixed
+//!   write's) ends with it in lamp-tasks' answer
+//!   (`lamp_tasks::skill_task::tells_answer`), which is said to the owner
+//!   sentence by sentence as exact words, never a turn for the model,
+//!   behind a read's gate and turn (`crate::service_read::tell`). Nothing
+//!   else of a run is told; the journal says only how many sentences were
+//!   said.
 //! - **Off**, a `do.task` loads and hands nothing over, and the journal
 //!   says why ([`OFF`]); the skill's other steps still run.
 use crate::package;

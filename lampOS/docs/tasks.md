@@ -2893,21 +2893,30 @@ for each run, and is answered once the run ends
   first out, each at most 15 minutes from when it began to wait) and is handed over again when the run going ends, so two
   skills due at one minute both run, one after the other. Nothing here
   changes for it.
-- **What its agent found** (`tells_answer`): with `LAMP_AGENT_SERVICES=on`
-  here, a run granted a linked service's read (`gmail-read`) through a
-  runner that keeps its agent's answer (`Runner::answers`: Harness's, not
-  for a run it starts with no Harness) that ended well answers
+- **What its agent found** (`tells_answer`): every task's run, whatever
+  its grants (the owner, 17 Nov: the agent's results are read freely, not
+  only a linked service's), through a runner that keeps its agent's
+  answer (`Runner::answers`: Harness's, not for a run it starts with no
+  Harness; a `net` run's `NetRunner` by the one run path, as it goes
+  through that Harness runner) that ended well answers
   `{"ok":true,"id":N,"answer":"..."}`, the agent's last
   answer as the run's end `show` gave it (`--chars 4000`, `Cli::shown_end`;
   for a `stopped` end, the `show` that found its session bound), every run
   of whitespace or control characters one space, at most 3,000 bytes
   (`told_answer`, `MOST_TOLD_BYTES`). Its words, and only such a run's
-  (`SkillRun::prompt_telling`), end with `TELL_LINE`, so the agent ends
-  with a few plain sentences for the owner; a run in a fresh home through
-  the make's runner (an agent skill's, a `net` one's or one given keys),
-  which keeps no answer, is never told its answer is said. lamp-skills says
-  them to the owner (docs/skills.md, "A linked service as a task for the
-  lamp's agent"). On lamp-9adf, 15 Nov (build 13135), a voice-made
+  (`SkillRun::prompt_telling`, a keyed run's too), end with `TELL_LINE`,
+  so the agent ends with a few plain sentences for the owner; a run in a
+  fresh home through the make's runner (an agent skill's, one given keys,
+  or a `net` one's without the one run path), which keeps no answer, is
+  never told its answer is said, nor is a fixed write's run. lamp-skills
+  says them to the owner as exact words, never a turn for the model, so
+  text from the open web is never an instruction (docs/skills.md, "A
+  linked service as a task for the lamp's agent"). Nothing tracks whether
+  the run's own script already spoke through lamp-control's `say`, so such
+  a run's answer is said too. On lamp-9adf, 17 Nov (build 13929,
+  `LAMP_TASK_NET=on`), an uploaded `btc-price` granted `speak` and `net`
+  reached api.coinbase.com, kept its agent's 220-byte answer, and said
+  nothing: `nothing: not a run that tells`. On lamp-9adf, 15 Nov (build 13135), a voice-made
   `morning-unread-mail` ran 19 Gmail reads and ended idle, and nothing was
   said: the answer was read by that `show` and dropped. Any other run's
   answer is as before; the journal never has the answer. It has the
@@ -2920,7 +2929,9 @@ for each run, and is answered once the run ends
   lamp-skills says what lamp-tasks' answer carried (docs/skills.md). On
   lamp-9adf, 16 Nov, a run's end `show` gave 360 bytes and nothing was
   said (#7180), which these lines place. Tests:
-  `a_service_reads_ended_answer_carries_what_its_agent_found`,
+  `every_runs_ended_answer_carries_what_its_agent_found`,
+  `a_net_runs_ended_answer_carries_what_its_agent_found`,
+  `skill_make::tests::a_net_runner_keeps_an_answer_only_by_the_one_run_path`,
   `a_skill_runs_end_keeps_its_agents_last_answer`,
   `an_agent_run_granted_a_service_has_the_lamps_connectors_in_its_fresh_home`.
 - **A one-run token** (the first builder's 12:45 conditions on #6071): for

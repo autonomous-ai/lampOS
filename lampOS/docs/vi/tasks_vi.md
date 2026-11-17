@@ -305,23 +305,31 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   trước ra trước, mỗi cái tối đa 15 phút từ lúc bắt đầu chờ) rồi được giao lại khi lần chạy đang diễn ra kết thúc, nên hai kỹ
   năng đến hạn cùng một phút đều chạy, lần lượt. Ở đây không có gì thay đổi
   vì nó.
-- **Điều agent tìm thấy** (`tells_answer`): khi `LAMP_AGENT_SERVICES=on` ở
-  đây, một lần chạy được cấp quyền đọc một dịch vụ đã liên kết
-  (`gmail-read`) qua một runner giữ câu trả lời của agent
+- **Điều agent tìm thấy** (`tells_answer`): mọi lần chạy task, dù được cấp
+  quyền gì (chủ đèn, 17/11: kết quả của agent được đọc tự do, không chỉ
+  của dịch vụ đã liên kết), qua một runner giữ câu trả lời của agent
   (`Runner::answers`: runner của Harness, trừ lần chạy nó khởi động không
-  có Harness) mà kết thúc tốt sẽ trả lời
+  có Harness; `NetRunner` của một lần chạy `net` theo đường chạy duy nhất,
+  vì nó đi qua runner Harness đó) mà kết thúc tốt sẽ trả lời
   `{"ok":true,"id":N,"answer":"..."}`, là câu trả lời cuối của agent theo
   lệnh `show` lúc kết thúc lần chạy (`--chars 4000`, `Cli::shown_end`; với
   kết thúc `stopped`, là `show` đã thấy phiên được gắn), mỗi dãy khoảng
   trắng hoặc ký tự điều khiển thành một dấu cách, tối đa 3.000 byte
   (`told_answer`, `MOST_TOLD_BYTES`). Lời giao việc của lần chạy đó, và
-  chỉ của nó (`SkillRun::prompt_telling`), kết thúc bằng `TELL_LINE`, để
-  agent kết thúc bằng vài câu đơn giản cho chủ; một lần chạy trong home
-  mới qua runner của việc làm skill (của một agent skill, một lần chạy
-  `net` hoặc một lần chạy được cấp khóa), vốn không giữ câu trả lời, không
-  bao giờ được bảo rằng câu trả lời của nó sẽ được nói.
-  lamp-skills nói chúng cho chủ (docs/vi/skills_vi.md, "Dịch vụ đã liên kết
-  thành task cho agent của đèn"). Trên lamp-9adf, 15/11 (build 13135), một
+  chỉ của nó (`SkillRun::prompt_telling`, cả lần chạy được cấp khóa), kết
+  thúc bằng `TELL_LINE`, để agent kết thúc bằng vài câu đơn giản cho chủ;
+  một lần chạy trong home mới qua runner của việc làm skill (của một agent
+  skill, một lần chạy được cấp khóa, hoặc một lần chạy `net` không có
+  đường chạy duy nhất), vốn không giữ câu trả lời, không bao giờ được bảo
+  rằng câu trả lời của nó sẽ được nói, lần chạy ghi cố định cũng vậy.
+  lamp-skills nói chúng cho chủ nguyên văn, không bao giờ thành một lượt
+  của model, nên chữ từ web mở không bao giờ là chỉ dẫn (docs/vi/skills_vi.md,
+  "Dịch vụ đã liên kết thành task cho agent của đèn"). Không có gì theo dõi
+  việc script của lần chạy đã tự nói qua `say` của lamp-control hay chưa,
+  nên câu trả lời của lần chạy đó cũng được nói. Trên lamp-9adf, 17/11
+  (build 13929, `LAMP_TASK_NET=on`), một `btc-price` tải lên được cấp
+  `speak` và `net` đã tới api.coinbase.com, giữ câu trả lời 220 byte của
+  agent, mà không nói gì: `nothing: not a run that tells`. Trên lamp-9adf, 15/11 (build 13135), một
   `morning-unread-mail` làm bằng giọng nói đã đọc Gmail 19 lần và kết thúc
   idle, mà không nói gì: câu trả lời được `show` đó đọc rồi bỏ đi. Câu trả
   lời của mọi lần chạy khác vẫn như trước; nhật ký không bao giờ ghi câu
@@ -335,7 +343,9 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   theo gì (docs/vi/skills_vi.md). Trên lamp-9adf, 16/11, `show` lúc kết
   thúc một lần chạy cho 360 byte mà không nói gì (#7180); các dòng này chỉ
   ra nó mất ở đâu. Test:
-  `a_service_reads_ended_answer_carries_what_its_agent_found`,
+  `every_runs_ended_answer_carries_what_its_agent_found`,
+  `a_net_runs_ended_answer_carries_what_its_agent_found`,
+  `skill_make::tests::a_net_runner_keeps_an_answer_only_by_the_one_run_path`,
   `a_skill_runs_end_keeps_its_agents_last_answer`,
   `an_agent_run_granted_a_service_has_the_lamps_connectors_in_its_fresh_home`.
 - **Token một lần chạy** (điều kiện 12:45 của người xây dựng đầu tiên trên

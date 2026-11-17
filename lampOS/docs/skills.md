@@ -4977,11 +4977,13 @@ task's words given as data. Tests:
 **What the agent found is said to the owner** (the make rules' "comes back
 as the lamp's task news" had no path: on lamp-9adf, 15 Nov, build 13135,
 `morning-unread-mail` read Gmail 19 times, ended idle, and nothing was
-said). A run granted a linked service's read ends with the agent's last
-answer in lamp-tasks' answer (docs/tasks.md, "What its agent found";
-`LAMP_AGENT_SERVICES=on` in lamp-tasks, as in the product), only through a
-runner that keeps it (Harness's: a run started with no Harness or in a
-fresh home keeps none, so it is never told its answer is said), and
+said). Every task's run, whatever its grants (a linked service's read, a
+`net` read of the web, or none; the owner, 17 Nov), ends with the agent's
+last answer in lamp-tasks' answer (docs/tasks.md, "What its agent found"),
+only through a runner that keeps it (Harness's, a `net` run's by the one
+run path: a run started with no Harness or in a make's fresh home keeps
+none, so it is never told its answer is said; a fixed write's never
+tells), and
 `lamp-skills` says it to the owner as a `do.read`'s lines are said
 (`service_read::tell`): behind the same gate (the owner's known face alone
 in view and steady 5 s, no voice for a minute, not private or paused, not
