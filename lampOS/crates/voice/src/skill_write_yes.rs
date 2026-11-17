@@ -179,6 +179,30 @@ pub fn wait_for_yes_noted(asks: Asks, request: u64, now: Instant) -> String {
     wait_for_yes_with(asks, request, now, true)
 }
 
+/// The wait a voice make of `request` began, whose turn was cut while it
+/// ran, made [`Waiting::noted`]: its say-back is said through the say
+/// service (`second_provider::worker::made_running`), as an app's make's
+/// is, so the person's yes answers no call of the model's either, and the
+/// next line is forced to answer it ([`approve_force`]). On c0a4 (17 Nov
+/// 19:43, build 13838, #7245) a 116 s OpenClaw make outlived its turn, its
+/// say-back was said so, and the "yes" after it was told the approve_id but
+/// called nothing, so the skill was never kept. Whether one was.
+pub fn said_by_the_say_service(request: u64) -> bool {
+    kept::waiting(|waiting| {
+        let Some(waiting) = waiting
+            .as_mut()
+            .filter(|waiting| waiting.request == request)
+        else {
+            return false;
+        };
+        waiting.noted = true;
+        eprintln!(
+            "lamp-voice: request {request}: its made skill's say-back goes through the say service: the next line must answer its wait"
+        );
+        true
+    })
+}
+
 fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> String {
     let id = format!(
         "yes-{:08x}",
@@ -1646,6 +1670,35 @@ mod tests {
         assert!(!approve_forced_now(now));
         let note = waiting_note(26, now).unwrap();
         assert!(!note.contains("always give answer"), "{note}");
+    }
+
+    /// #7245, c0a4 17 Nov 19:43: a voice make with code outlived its turn
+    /// (116 s on OpenClaw), its wait began in request 1, and its say-back
+    /// was said through the say service in request 2. The "yes" of request
+    /// 3 answers no call of the model's, as an app's make's: forced to
+    /// answer the wait, and told to give its answer. Only the cut make's
+    /// own wait is so.
+    #[test]
+    fn a_voice_makes_yes_after_its_say_back_through_the_say_service_is_forced() {
+        let now = Instant::now();
+        let code = Asks {
+            code: true,
+            writes: Vec::new(),
+            ..asks("fruit-note", &[])
+        };
+        let id = wait_for_yes(code.clone(), 1, now);
+        assert!(!said_by_the_say_service(2), "another request's make");
+        assert!(said_by_the_say_service(1));
+        lamp_said(2, SAY_BACK);
+        assert!(answer_awaited(3, now));
+        assert!(approve_forced_now(now), "the yes of request 3 is forced");
+        let note = waiting_note(3, now).unwrap();
+        assert!(note.contains(&id), "{note}");
+        assert!(note.contains("always give answer"), "{note}");
+        // A voice make whose turn waited: never forced, as before.
+        wait_for_yes(code, 4, now);
+        lamp_said(4, SAY_BACK);
+        assert!(!approve_forced_now(now));
     }
 
     /// App Only's P1 on #6142: a say-back cut, summed up or missing a
