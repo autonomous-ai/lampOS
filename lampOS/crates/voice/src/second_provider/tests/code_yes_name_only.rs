@@ -1,10 +1,11 @@
-//! A line that is only the lamp's name answers no made skill's say-back
-//! (#6307; lamp-9adf, 17 Nov 13:58): an app's make with code of its own,
-//! morning-mail-nine, reading Gmail, was said back and its yes awaited;
-//! the next line, a lone "Hello?" heard as the name, was asked as a call,
-//! its round forced to call `make_skill`, and the model's yes put the code
-//! on ("It's on now"). No answer is taken in such a line, its round is not
-//! forced, and the wait stays for the next real line.
+//! A line that is a call with nothing past it answers no made skill's
+//! say-back (#6307; lamp-9adf, 17 Nov 13:58): an app's make with code of
+//! its own, morning-mail-nine, reading Gmail, was said back and its yes
+//! awaited; the next line, a lone "Hello?" heard as the name, was asked as
+//! a call, its round forced to call `make_skill`, and the model's yes put
+//! the code on ("It's on now"). No answer is taken in such a line, its
+//! round is not forced, and the wait stays for the next real line, whose
+//! round is forced as before.
 use super::*;
 use crate::skill_write_yes as yes;
 
@@ -34,14 +35,16 @@ fn said_back() -> String {
     id
 }
 
-/// `heard` asked in `request`, the model's rounds `rounds`; the runner's
-/// `make_skill` with an `approve_id` is answered as the voice's own is
-/// (`make_skill_local::answer`): a no or unclear first, else the yes with
-/// every guard. What each call was told, and how many times the code was
-/// put on.
+/// `heard` asked in `request` (`called`: the coordinator heard it as the
+/// lamp's name alone, `ProviderInput::Called`), the model's rounds
+/// `rounds`; the runner's `make_skill` with an `approve_id` is answered as
+/// the voice's own is (`make_skill_local::answer`): a no or unclear first,
+/// else the yes with every guard. What each call was told, and how many
+/// times the code was put on.
 fn went(
     heard: &str,
     request: u64,
+    called: bool,
     rounds: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> (Vec<Value>, usize) {
     let script = Arc::new(Script {
@@ -81,6 +84,12 @@ fn went(
         .block_on(async {
             engine.submit(start(request));
             engine.submit(audio(request, 1));
+            if called {
+                engine.submit(ProviderInput::Called {
+                    request,
+                    privacy_generation: 1,
+                });
+            }
             engine.submit(end(request));
             turn(&mut engine).await
         });
@@ -106,45 +115,98 @@ fn answers(id: &str, answer: &str) -> Vec<net::Result<ChatEvent>> {
     ]
 }
 
-/// The lamp's name alone, its model's `make_skill` a yes: the code stays
-/// off, the wait stays open, and its round is not forced; the yes on the
-/// next real line is taken.
+/// Whether the second route's chat, `make_skill` declared and the force on
+/// as the lamp runs it, forces `make_skill` for the person's line `heard`
+/// now (`skill_write_yes::approve_force`).
+fn forced(heard: &str) -> bool {
+    let declared = vec![crate::make_skill_local::tool()];
+    let chat = net::Chat::deepseek(
+        "deepseek-chat",
+        "k",
+        Arc::new(move || declared.clone()),
+        false,
+    )
+    .unwrap();
+    chat.forcing(yes::approve_force());
+    let line = [Message::system("You are a lamp."), Message::user(heard)];
+    chat.wire(&line).2.get("tool_choice")
+        == Some(&json!({"type": "function", "function": {"name": crate::made_skill::MAKE}}))
+}
+
+/// A model that calls `make_skill` only when its round is forced, and
+/// otherwise answers in words: the yes of `heard` reaches the wait only
+/// when code makes the call.
+fn only_when_forced(id: &str, heard: &str, words: &str) -> Vec<Vec<net::Result<ChatEvent>>> {
+    if forced(heard) {
+        vec![answers(id, "yes"), said(words)]
+    } else {
+        vec![said(words)]
+    }
+}
+
+/// A call with nothing past it, its model's `make_skill` a yes: the code
+/// stays off, the wait stays open, and its round is not forced. The lamp's
+/// own answer to the call stands not between the say-back and the next
+/// line: that line's round is forced, and a model that calls `make_skill`
+/// only when forced puts the code on by its yes. A call as the route's own
+/// name alone ("Lamp.", "Hey Lamp?"), as the coordinator reads the name
+/// alone ("Hi Lamp", "Hello Lamp?"), or as the coordinator heard it, its
+/// words past the name ("Hi Lamp", "Hello Lamp?", "Lamp ơi").
 #[test]
-fn the_lamps_name_alone_is_no_yes_to_a_code_skill_said_back() {
-    for name in ["Lamp.", "Hey Lamp?"] {
+fn a_call_with_nothing_past_it_is_no_yes_to_a_code_skill_said_back() {
+    for (name, called) in [
+        ("Lamp.", false),
+        ("Hey Lamp?", false),
+        ("Hi Lamp", false),
+        ("Hello Lamp?", false),
+        ("Hi Lamp", true),
+        ("Hello Lamp?", true),
+        ("Lamp ơi", true),
+    ] {
         let id = said_back();
         assert!(yes::approve_forced_now(Instant::now()));
-        let (told, on) = went(name, 1, vec![answers(&id, "yes"), said("Yes? I'm here.")]);
-        assert_eq!(on, 0, "{name}: the code went on: {told:?}");
-        assert_eq!(told.len(), 1, "{name}: {told:?}");
-        assert_eq!(told[0]["approved"], false, "{name}: {told:?}");
+        let (told, on) = went(
+            name,
+            1,
+            called,
+            vec![answers(&id, "yes"), said("Yes? I'm here.")],
+        );
+        assert_eq!(on, 0, "{name} {called}: the code went on: {told:?}");
+        assert_eq!(told.len(), 1, "{name} {called}: {told:?}");
+        assert_eq!(told[0]["approved"], false, "{name} {called}: {told:?}");
         assert_eq!(
             told[0]["error"],
             yes::NAME_ONLY_NOT_TAKEN,
-            "{name}: {told:?}"
+            "{name} {called}: {told:?}"
         );
-        assert!(yes::waits(&id), "{name}: the wait ended");
+        assert!(yes::waits(&id), "{name} {called}: the wait ended");
         // Its own round is not forced, and its note gives no approve_id.
-        assert!(!yes::approve_forced_now(Instant::now()), "{name}");
+        assert!(!yes::approve_forced_now(Instant::now()), "{name} {called}");
+        assert!(!forced(name), "{name} {called}");
         let note = yes::waiting_note(1, Instant::now()).unwrap();
-        assert!(!note.contains(&id), "{name}: {note}");
+        assert!(!note.contains(&id), "{name} {called}: {note}");
         // A no or unclear in it is no answer either.
         for answer in ["no", "unclear"] {
             let told = yes::answered(&id, 1, Some(answer)).unwrap();
             assert_eq!(told["error"], yes::NAME_ONLY_NOT_TAKEN, "{name}: {told}");
-            assert!(yes::waits(&id), "{name}: {answer} ended the wait");
+            assert!(yes::waits(&id), "{name} {called}: {answer} ended the wait");
         }
-        // The lamp answers the call; the yes on the next real line still
-        // puts the code on.
+        // The lamp answers the call. The next real line is heard (as the
+        // route marks it before its chat): its round is forced again, and
+        // it is the answer the say-back awaits.
         yes::lamp_said(1, "Yes? I'm here.");
+        yes::line_heard(2, false);
+        assert!(yes::approve_forced_now(Instant::now()), "{name} {called}");
+        assert!(yes::answer_awaited(2, Instant::now()), "{name} {called}");
         let (told, on) = went(
-            "Yes, turn it on.",
+            "Yes.",
             2,
-            vec![answers(&id, "yes"), said("It's on now.")],
+            false,
+            only_when_forced(&id, "Yes.", "It's on now."),
         );
-        assert_eq!(on, 1, "{name}: {told:?}");
-        assert_eq!(told[0]["approved"], true, "{name}: {told:?}");
-        assert!(!yes::waits(&id), "{name}");
+        assert_eq!(on, 1, "{name} {called}: {told:?}");
+        assert_eq!(told[0]["approved"], true, "{name} {called}: {told:?}");
+        assert!(!yes::waits(&id), "{name} {called}");
     }
 }
 
@@ -152,8 +214,15 @@ fn the_lamps_name_alone_is_no_yes_to_a_code_skill_said_back() {
 /// taken in it.
 #[test]
 fn a_line_with_words_still_carries_the_yes() {
-    let id = said_back();
-    let (told, on) = went("Yes.", 1, vec![answers(&id, "yes"), said("It's on now.")]);
-    assert_eq!(on, 1, "{told:?}");
-    assert_eq!(told[0]["approved"], true, "{told:?}");
+    for heard in ["Yes.", "Yes, turn it on."] {
+        let id = said_back();
+        let (told, on) = went(
+            heard,
+            1,
+            false,
+            vec![answers(&id, "yes"), said("It's on now.")],
+        );
+        assert_eq!(on, 1, "{heard}: {told:?}");
+        assert_eq!(told[0]["approved"], true, "{heard}: {told:?}");
+    }
 }
