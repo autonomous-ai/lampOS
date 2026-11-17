@@ -550,6 +550,10 @@ pub trait Room {
     fn say_note(&mut self, _note: &str) -> Result<(), String> {
         Err("no note can be said here".into())
     }
+    /// The lamp's and the skill's quiet hours lifted until `until_ms`
+    /// (#7180's lift for an answer the owner asked for by voice). None by
+    /// default.
+    fn lift_quiet(&mut self, _until_ms: u64) {}
     /// With [`LINK_NOTE_ENVIRONMENT`] on and somewhere to keep it: whether
     /// this skill was told already that its service isn't linked. `None`,
     /// the default: nothing is told, as before.
@@ -645,6 +649,21 @@ pub fn tell_note(note: &str, within: Duration, room: &mut impl Room) -> String {
         taken.end(room.now_ms());
     }
     outcome
+}
+
+/// A skill's run lamp-tasks refused as the lamp's agent isn't running,
+/// told as `note` ([`tell_note`], within [`REFUSAL_WAIT`]): one the owner
+/// asked for by voice at `asked` (unix ms), refused at `ready_ms` within
+/// five minutes of it, lifts the quiet hours for it as a told answer does
+/// (`lamp_voice::told_when_asked::lifted_until`, #7180; SubDarren's P2 on
+/// #7588); a trigger's run keeps them.
+pub fn tell_refusal(note: &str, asked: Option<u64>, ready_ms: u64, room: &mut impl Room) -> String {
+    if let Some(until) =
+        asked.and_then(|asked| lamp_voice::told_when_asked::lifted_until(asked, ready_ms))
+    {
+        room.lift_quiet(until);
+    }
+    tell_note(note, REFUSAL_WAIT, room)
 }
 
 /// Waits up to [`WAIT`] for the gate to stay open [`STEADY`] and the
@@ -875,6 +894,8 @@ mod tests {
         said_at: Vec<u64>,
         /// [`Room::waits`]'s words, in turn.
         waits: Vec<String>,
+        /// [`Room::lift_quiet`]'s: the quiet seen lifted until then.
+        quiet_until: Option<u64>,
     }
 
     impl Lamp {
@@ -894,6 +915,7 @@ mod tests {
                 other_ends_at: None,
                 said_at: Vec::new(),
                 waits: Vec::new(),
+                quiet_until: None,
             }
         }
     }
@@ -917,8 +939,11 @@ mod tests {
                 }
                 return alone();
             }
-            let seen = self.seen[self.looked.min(self.seen.len() - 1)].clone();
+            let mut seen = self.seen[self.looked.min(self.seen.len() - 1)].clone();
             self.looked += 1;
+            if self.quiet_until.is_some_and(|until| self.now <= until) {
+                seen.quiet = false;
+            }
             seen
         }
         fn now_ms(&mut self) -> u64 {
@@ -950,6 +975,9 @@ mod tests {
             self.said.push(format!("note: {note}"));
             self.said_at.push(self.now);
             Ok(())
+        }
+        fn lift_quiet(&mut self, until_ms: u64) {
+            self.quiet_until = Some(until_ms);
         }
         fn link_note(&mut self) -> Option<bool> {
             self.noted
@@ -1006,6 +1034,39 @@ mod tests {
             (REFUSAL_WAIT.as_millis() as u64..WAIT.as_millis() as u64).contains(&waited),
             "{waited}"
         );
+    }
+
+    /// SubDarren's P2 on #7588: in quiet hours, a refusal of a run the owner
+    /// asked for by voice a minute before is said, the quiet lifted for it;
+    /// one asked six minutes before, or a trigger's run, waits out the half
+    /// hour unsaid.
+    #[test]
+    fn a_voice_asked_refusal_is_told_in_quiet_hours() {
+        let quiet = Seen {
+            quiet: true,
+            ..alone()
+        };
+        let now = 10_000_000;
+        let room = || {
+            let mut lamp = Lamp::new(vec![quiet.clone()], json!({}));
+            lamp.now = now;
+            lamp
+        };
+        let mut asked = room();
+        assert_eq!(
+            tell_refusal("Say it.", Some(now - 60_000), now, &mut asked),
+            "told"
+        );
+        assert_eq!(asked.said, ["note: Say it."]);
+        for ask in [Some(now - 6 * 60_000), None] {
+            let mut lamp = room();
+            assert_eq!(
+                tell_refusal("Say it.", ask, now, &mut lamp),
+                "skipped: quiet hours",
+                "{ask:?}"
+            );
+            assert!(lamp.said.is_empty());
+        }
     }
 
     /// What a skill's task's agent found is said behind a read's gate: the

@@ -5843,11 +5843,8 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
                     let what = "refused as its agent isn't running";
                     match take_not_started_turn(asked.is_some(), now) {
                         Some(previous) => {
-                            lift_quiet_for_ask(&mut room, &skill, asked, what, now);
-                            let told = lamp_skills::service_read::tell_note(
-                                &note,
-                                lamp_skills::service_read::REFUSAL_WAIT,
-                                &mut room,
+                            let told = lamp_skills::service_read::tell_refusal(
+                                &note, asked, now, &mut room,
                             );
                             if !told.starts_with("told") {
                                 give_back_not_started_turn(previous, now);
@@ -5899,7 +5896,6 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
 /// write held lamp-tasks, which then refused it as busy.
 static HANDING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
-/// What a run now's refusal says while another hand-over is under way.
 /// When a refusal as the lamp's agent isn't running was last told, unix
 /// ms, 0 for none ([`lamp_skills::task::not_started_told`]).
 static NOT_STARTED_TOLD: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -5954,6 +5950,7 @@ fn give_back_not_started_turn(previous: u64, now_ms: u64) {
     let _ = NOT_STARTED_TOLD.compare_exchange(now_ms, previous, SeqCst, SeqCst);
 }
 
+/// What a run now's refusal says while another hand-over is under way.
 const HANDING_BUSY: &str =
     "another skill's task is running on the lamp now, and one runs at a time";
 
@@ -6202,6 +6199,10 @@ impl lamp_skills::service_read::Room for LampRoom {
         } else {
             Err(answer["error"].as_str().unwrap_or("refused").to_owned())
         }
+    }
+
+    fn lift_quiet(&mut self, until_ms: u64) {
+        self.quiet_lifted = Some(until_ms);
     }
 
     fn say_note(&mut self, note: &str) -> Result<(), String> {
