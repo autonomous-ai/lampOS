@@ -3447,14 +3447,25 @@ impl Runner for HarnessRunner {
                 }
                 let ended = ended_as(&state, agent);
                 // A make's answer is its folder's `answer.md`, read before
-                // its guard removes the folder (#7245). Failing closed: a
-                // gateway agent's run whose launcher never claimed its
-                // start, or whose fence never said it started the script,
-                // never ran the skill's script.
+                // its guard removes the folder (#7245), or, with none, its
+                // chat answer when that is a make's answer: a `cannot:` line
+                // or a skill's files (`make_answer`, #7427).
+                // Failing closed: a gateway agent's run whose launcher
+                // never claimed its start, or whose fence never said it
+                // started the script, never ran the skill's script.
                 let ended = if self.makes {
                     if ended.is_ok()
-                        && let Some(text) = crate::skill_make::answer_in(&started.folder)
+                        && let Some((text, from)) =
+                            crate::skill_make::make_answer(&started.folder, answer.as_deref())
                     {
+                        if from == crate::skill_make::AnswerFrom::Chat {
+                            eprintln!(
+                                "[lamp-tasks] skill task {}: the make's answer was taken from the agent's chat (no {}), {} bytes",
+                                run.run,
+                                crate::skill_make::ANSWER_FILE,
+                                text.len()
+                            );
+                        }
                         let _ = run.answer.set(text);
                     }
                     ended
@@ -3484,7 +3495,7 @@ impl Runner for HarnessRunner {
                 );
                 // Kept for the hand-over's answer; told only by a run that
                 // tells it ([`tells_answer`]). Never a make's: its answer is
-                // its file's alone.
+                // its file's, or its chat's when that is a make's answer (above).
                 if ended.is_ok()
                     && !self.makes
                     && let Some(answer) = answer

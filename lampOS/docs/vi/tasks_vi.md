@@ -1166,7 +1166,7 @@ OpenClaw, qua đường chạy chung, không có runner thứ hai:
   làm việc, luật trong `rules.md`, gửi thành một lượt qua
   `harness new <engine>` của Harness trong thư mục đó (`HarnessRunner` của
   #7133, "Lần chạy kỹ năng trên OpenClaw" bên dưới). `answer.md` được đọc
-  lại như trên. Không token nào được tạo và không lần chạy skill-start nào
+  lại như trên (khi không có, câu trả lời chat của agent, bên dưới). Không token nào được tạo và không lần chạy skill-start nào
   được mở (không gọi `gateway::open_start`): lần tạo không có quyền nào.
   Phiên Harness và thư mục bị xoá dù lần tạo kết thúc thế nào: có câu trả
   lời, `cannot:`, quá hạn hay lỗi.
@@ -1176,6 +1176,38 @@ OpenClaw, qua đường chạy chung, không có runner thứ hai:
   của nó.
 - **Câu trả lời `cannot:`** được trả về giọng nói nguyên văn, cho phương án
   dự phòng của #7234.
+- **Câu trả lời nói trong chat (`skill_make::make_answer`, #7245, #7427):**
+  khi không có `answer.md` (thiếu hoặc rỗng), và chỉ khi đó, câu trả lời
+  chat cuối cùng của agent được đọc, và chỉ được nhận khi nó là câu trả lời
+  của một lần tạo (`chat_answer`):
+  - **một `cannot:`** (`chat_cannot`): nó bắt đầu bằng `cannot:` (không
+    phân biệt hoa thường, sau khoảng trắng), có lý do theo sau và không có
+    khối fenced nào; chỉ dòng đầu của nó là câu trả lời, để người dùng nghe
+    lý do của chính agent thay vì "try again";
+  - **một kỹ năng** (`chat_skill`): toàn bộ chat, được giữ như `answer.md`
+    (không rỗng, tối đa 20 KiB), với đúng một khối fenced đã đóng là
+    `skill.toml` và một khối là `SKILL.md`, được tìm như giọng nói tìm
+    chúng (`made_skill::fenced`: đặt tên đầy đủ, theo ngôn ngữ `toml`/`md`,
+    hoặc khối trần có front matter là `SKILL.md`); có thể kèm khối
+    `scripts/…`. Lời quanh các khối được giữ nguyên, vì giọng nói chỉ đọc
+    các khối. Sau đó giọng nói đưa nó qua cùng kiểm tra `files`, giới hạn
+    và sửa như câu trả lời từ tệp (lamp-voice phụ thuộc lamp-tasks, nên
+    lamp-tasks giữ bản riêng của cách đọc fence, chỉ để làm cổng).
+
+  Mọi câu trả lời chat khác (thiếu hoặc lặp một tệp của kỹ năng, một khối
+  không đóng, quá 20 KiB, hoặc chỉ là lời) vẫn bị bỏ như trước
+  (`no_answer`). `answer.md` luôn thắng chat. Câu trả lời chat được nhận
+  thì được ghi nhật ký: `[lamp-tasks] skill task <run>: the make's answer
+  was taken from the agent's chat (no answer.md), <n> bytes`. Trên
+  lamp-c0a4 (OpenClaw, deepseek-flash) agent đặt mọi câu trả lời tạo kỹ
+  năng trong chat, không bao giờ trong `answer.md`: 3/3 lần tạo kỹ năng pin
+  điện thoại nói `cannot:` (13584), và ngày 17/11 lúc 09:35:41 một kỹ năng
+  `head-pat-next-event` đầy đủ, đúng (731 byte, `skill.toml`, `SKILL.md` và
+  `scripts/main.py`) bị bỏ thành `no_answer`. Test:
+  `a_gateway_make_with_no_answer_file_takes_its_chat_cannot_line`,
+  `a_gateway_make_with_no_answer_file_takes_a_skill_said_in_chat`,
+  `a_gateway_make_with_no_answer_file_drops_any_other_chat_answer`,
+  `a_gateway_make_with_an_answer_file_takes_the_file_over_its_chat`.
 - **Một phiên (`LAMP_TASKS_ONE_SESSION`, #7258):** khi bật, lần tạo sẽ vào
   phiên chung dưới dạng một tin nhắn thay vì phiên riêng. Lựa chọn nằm ở
   một hàm seam duy nhất, để #7258 tiếp quản tại đó; mỗi lần tạo một phiên
