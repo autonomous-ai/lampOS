@@ -37,6 +37,13 @@ A subscriber binds as `<...>.new` and links that to its `.sock` name, the
 only names publishers look at: a socket's file is there a moment before the
 socket can be sent to, and on the Mac 61 of 400 bound directly were removed
 as dead by a publisher that looked with every message.
+A subscriber's file is removed when it is dropped, and a publisher that is
+refused removes it. One that ends without its Drop (an `exec`, a crash, a
+kill) leaves it, and a process that `exec`s keeps its pid and counts from 0
+again (`lamp-update` does, onto each new build). So a subscriber that finds
+its name taken (`.new` or `.sock`) connects to it: refused, nobody is bound
+there, and it removes the file and takes the name; answered, it takes the
+next count, and after 8 it fails with `no free socket name` (#7439).
 
 A publisher's entry in `pubs/` is a file whose time says when the
 publisher last showed that it was alive. It is empty unless the publisher
