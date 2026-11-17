@@ -855,6 +855,11 @@ pub const WINDOW_FROM_START_ENVIRONMENT: &str = "LAMP_WINDOW_FROM_START";
 /// [`worker::Heeding::renewing_busy_follow_ups`], [`Engine::cueing_every_tool`], #7332).
 pub const BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT: &str = "LAMP_BUSY_FOLLOW_UP_RENEWS";
 
+/// With `LAMP_BUSY_FOLLOW_UP_RENEWS=on`, a follow-up no face was seen
+/// speaking renews the caller's call too (`LAMP_BUSY_NO_FACE_RENEWS=on`,
+/// [`worker::Heeding::renewing_no_face_follow_ups`], #7332).
+pub const BUSY_NO_FACE_RENEWS_ENVIRONMENT: &str = "LAMP_BUSY_NO_FACE_RENEWS";
+
 /// Where the worker reads whether the lamp's name at a line's start
 /// ([`crate::attention::NAME_AT_THE_START_US`]) is dated from the line's usual
 /// start, not its soft start's lead (`on`, and nothing else;
