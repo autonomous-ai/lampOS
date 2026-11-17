@@ -2402,18 +2402,28 @@ fn made_and_journaled_by(
     // repairs. Without either, DeepSeek's repairs stay as they are; for
     // the app's MAKE IT they stay too when the agent doesn't take it.
     // Hermes alone: only it has a namespace runner for a make today.
-    let seen = agent.map(|agent| (agent, agent.engine()));
-    let engine = seen.and_then(|(agent, seen)| Some((agent, agent.takes(seen?)?)));
-    // With the one run path (#7245), a lamp with no agent at all (no `lamp`
-    // target): a make the agent would have taken is told so in one
-    // sentence ([`made_skill::AGENT_MISSING`], the first builder's point 3
-    // on #6811 for #7375), never made by DeepSeek alone as a task for an
-    // agent that isn't there. Off, as before.
-    let missing = matches!(seen, Some((agent, None)) if agent.one_path);
+    // One targets ask per make: the lamp's agent, and whether there is
+    // surely none.
+    let seen = agent.map(|agent| (agent, agent.lamp_agent()));
+    let engine = seen.and_then(|(agent, (seen, _))| Some((agent, agent.takes(seen?)?)));
+    // With the one run path (#7245), a lamp with no agent at all (lamp-tasks
+    // answered its targets with no `lamp` one): a make the agent would have
+    // taken is told so in one sentence ([`made_skill::AGENT_MISSING`], the
+    // first builder's point 3 on #6811 for #7375), never made by DeepSeek
+    // alone as a task for an agent that isn't there. A targets read that
+    // failed (lamp-tasks down, restarting, slow or refusing) is not known
+    // to be no agent: DeepSeek makes it alone, as before. Off, as before.
+    let missing = matches!(seen, Some((agent, (None, true))) if agent.one_path);
+    let unknown = matches!(seen, Some((agent, (None, false))) if agent.one_path);
     if missing {
         eprintln!(
             "lamp-voice: a skill made here: no agent on the lamp (no lamp target): DeepSeek \
              makes only what it can keep alone"
+        );
+    } else if unknown {
+        eprintln!(
+            "lamp-voice: a skill made here: the tasks part didn't say its targets: DeepSeek \
+             makes it alone, as before"
         );
     } else if agent.is_some() && engine.is_none() {
         eprintln!(
@@ -6202,6 +6212,83 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(served.join().unwrap(), 1);
         services_through_agent(None);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7375 (the P2 of an adversarial read): with the one run path on and
+    /// lamp-tasks not saying its targets (refused `ok:false`, or no socket
+    /// as while it restarts), the lamp is not known to have no agent: a
+    /// make DeepSeek fails is told today's failure, as with no agent at
+    /// all, never AGENT_MISSING.
+    #[test]
+    fn with_the_one_path_and_the_targets_unknown_a_failed_make_is_not_told_no_agent() {
+        let (root, keeping) = keeping("one-path-targets-unknown");
+        let (url, served) = service(vec![(200, faces()); 1 + MOST_REPAIRS]);
+        let today = made_by(&keeping, url, None, NOW);
+        assert!(today.get("made").is_none(), "{today}");
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
+        let refused = crate::make_skill_agent::tests::stub(
+            Some(crate::make_skill_agent::tests::UNANSWERED),
+            std::sync::Arc::new(|_: &str| None),
+        );
+        let (_gone, gone) = crate::make_skill_agent::tests::no_socket();
+        for (n, base) in [refused.agent(), gone].into_iter().enumerate() {
+            let on = crate::make_skill_agent::Agent {
+                one_path: true,
+                ..base
+            };
+            let (url, served) = service(vec![(200, faces()); 1 + MOST_REPAIRS]);
+            let told = made_by(&keeping, url, Some(&on), NOW + 1 + n as u64);
+            assert!(told.get("made").is_none(), "{told}");
+            assert_eq!(told["error"], today["error"], "{n}: {told}");
+            assert!(
+                !told["error"]
+                    .as_str()
+                    .unwrap()
+                    .contains(made_skill::AGENT_MISSING),
+                "{n}: {told}"
+            );
+            assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS, "{n}");
+        }
+        assert_eq!(refused.hand_overs(), 0);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7375: with the one run path on, a service skill made as a task for
+    /// the agent and lamp-tasks not saying its targets, a make asking for
+    /// a linked service is not refused at once: DeepSeek is asked and
+    /// makes it, as before.
+    #[test]
+    fn with_the_one_path_and_the_targets_unknown_a_service_make_is_not_refused_at_once() {
+        const MAIL: &str = "every morning at eight, read me my new mail";
+        services_through_agent(Some(true));
+        let refused = crate::make_skill_agent::tests::stub(
+            Some(crate::make_skill_agent::tests::UNANSWERED),
+            std::sync::Arc::new(|_: &str| None),
+        );
+        let (_gone, gone) = crate::make_skill_agent::tests::no_socket();
+        for (n, base) in [refused.agent(), gone].into_iter().enumerate() {
+            let (root, keeping) = keeping(&format!("one-path-targets-unknown-service-{n}"));
+            let on = crate::make_skill_agent::Agent {
+                one_path: true,
+                ..base
+            };
+            let (url, served) = service(vec![(200, good())]);
+            let told = make_with_by(
+                0,
+                None,
+                MAIL,
+                &keeping,
+                chat_at(url),
+                NOW + n as u64,
+                || None,
+                Some(&on),
+            );
+            assert_eq!(told["made"], "evening-dim", "{n}: {told}");
+            assert_eq!(served.join().unwrap(), 1, "{n}");
+            let _ = std::fs::remove_dir_all(&root);
+        }
+        assert_eq!(refused.hand_overs(), 0);
+        services_through_agent(None);
     }
 
     /// Each of the brief's own refusals is a sentence the system prompt
