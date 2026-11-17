@@ -657,6 +657,40 @@ fn reply_timeout_typed_gives_the_input_to_follow() {
     );
 }
 
+/// p4393.5: every TIMEOUT that is not cancelled carries an input to follow,
+/// also when nothing answered, its Enter was withheld or its paste failed.
+#[test]
+fn reply_timeout_not_cancelled_always_gives_the_input_to_follow() {
+    for why in ["no_answer", "enter_withheld", "paste_failed"] {
+        let rig = Rig::program();
+        let id = rig.ensure(&[]).1["id"].clone();
+        rig.plan(json!({"reply":{"program":true,"timeout":why},"wait":{"program":true}}));
+        let (exit, said) = rig.reply("task");
+        assert_eq!((exit, refusal(&said)), (124, "TIMEOUT"), "{why}");
+        assert_eq!(said["cancelled"], false, "{why}");
+        let input = said["inputId"].as_str().expect("an inputId").to_owned();
+        assert!(input.starts_with("program:"), "{why}: {input}");
+        let (exit, said) = rig.wait(&input);
+        assert_eq!(
+            parsed(exit, &said, &id),
+            Ok(vec![(id.as_str().unwrap().to_owned(), "idle".to_owned())]),
+            "{why}"
+        );
+    }
+}
+
+/// p4393.5: a close the engine cannot take yet is `ENGINE_NOT_READY`,
+/// exit 5, and the session is left as it was.
+#[test]
+fn a_refused_close_is_engine_not_ready_and_changes_nothing() {
+    let rig = Rig::program();
+    rig.ensure(&[]);
+    rig.plan(json!({"close":{"program":true,"not_ready":true}}));
+    let (exit, said) = rig.close(&[]);
+    assert_eq!((exit, refusal(&said)), (5, "ENGINE_NOT_READY"));
+    assert_eq!(rig.sessions()["sessions"]["lamp"]["state"], "idle");
+}
+
 #[test]
 fn reply_and_close_with_another_token_are_not_yours() {
     let rig = Rig::program();

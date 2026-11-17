@@ -322,8 +322,11 @@ pub fn main() -> io::Result<()> {
 /// with `"why": TEXT`
 /// the engine cannot continue a closed session and a new one starts; with
 /// `"daemon_start_ms": N` the daemon was down and started in N ms. `reply`
-/// with `"timeout": "cancelled"` types nothing, with `"timeout": "typed"`
-/// types and is not seen to start. `wait` with `"ends": "person" |
+/// with `"timeout": "cancelled"` types nothing; with `"timeout"` set to
+/// `"typed"`, `"no_answer"`, `"enter_withheld"` or `"paste_failed"` it takes
+/// the input and says `cancelled:false` with an `inputId` `wait --after`
+/// follows (p4393.5). `close` with `"not_ready": true` refuses
+/// `ENGINE_NOT_READY` and changes nothing (p4393.5). `wait` with `"ends": "person" |
 /// "stopped" | "timeout"` ends so. `"exits": {"CODE": N}` sets a refusal's
 /// exit. Without a token, `ensure`, `resume`, `reply` and `close` on a
 /// program-owned harness are `NOT_YOURS`; `resume` is answered only to
@@ -805,7 +808,14 @@ mod program {
                 if let Some(inputs) = session["inputs"].as_array_mut() {
                     inputs.push(json!({"inputId":input_id,"takenAt":taken_at,"text":text}));
                 }
-                if step["timeout"] == "typed" {
+                // p4393.5: every TIMEOUT that is not `cancelled` carries an
+                // input id `wait --after` can follow, whether the words were
+                // typed and not seen to start, never answered, or their Enter
+                // was withheld or their paste failed.
+                if matches!(
+                    step["timeout"].as_str(),
+                    Some("typed" | "no_answer" | "enter_withheld" | "paste_failed")
+                ) {
                     return Err(Refusal {
                         beside: Some(json!({"cancelled":false,"inputId":input_id})),
                         ..refusal(
@@ -885,6 +895,16 @@ mod program {
                 let name = first_word(args).ok_or_else(usage)?.to_owned();
                 let hash = hash_for(state, args, Some(&name))?;
                 let session = owned(state, &name, &hash)?;
+                // p4393.5: a close the engine cannot take yet is refused
+                // (exit 5) and changes nothing.
+                if step["not_ready"] == true {
+                    return Err(refusal(
+                        "ENGINE_NOT_READY",
+                        format!(
+                            "{name}'s engine cannot be closed yet. Nothing was changed; try again."
+                        ),
+                    ));
+                }
                 session["state"] = json!("stopped");
                 Ok((
                     json!({
