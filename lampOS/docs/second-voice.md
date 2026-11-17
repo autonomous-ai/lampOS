@@ -4444,6 +4444,24 @@ after a take-over, but now for every turn:
   `the_renewed_call_carries_only_the_caller`. Not yet shown on a lamp: the first builder's
   row (the person's follow-ups answered three of three, the colleague
   track's lines answered none, first audio on tool turns before and after).
+- **A follow-up no face was seen speaking renews the call too, with
+  `LAMP_BUSY_NO_FACE_RENEWS=on`** (off unless set, needs
+  `LAMP_BUSY_FOLLOW_UP_RENEWS=on`, #7332). On lamp-74ff on 17 Nov (13706,
+  the renewal on), in a busy room, the owner's r47 to r49 were a
+  back-and-forth with the lamp, each cut by the next, r49 declined
+  (`not_for_me`); no face was seen speaking any of them, so none renewed
+  the call (`spoken_by_the_caller_alone` needs the caller's one face), and
+  r50, r52 and r53 were held 22 to 38 s after the call ("a busy room, and
+  nothing shows it was called"). With the switch, `renews_for_the_caller`
+  takes no face seen speaking as the caller's too, for both the renewal
+  and the lines the renewed call carries (`Heeding::call_for`); a line
+  also needs no other voice (`seen.other_voice`) to renew. Another face, or
+  two, seen speaking it still renews nothing and is judged by the call
+  alone. Its cost: a colleague whose face the eyes miss can renew or be
+  carried by the owner's call. Journal at start: `in a busy room a
+  follow-up no face was seen speaking renews the caller's call too`.
+  Latency: none, bookkeeping at the verdict. Test (fails with the switch
+  off): `a_no_face_follow_up_renews_the_call`.
 - **A decline says nothing and starts no conversation, with
   `LAMP_DECLINE_SILENT=on`** (off unless set, #3945). Two gaps it closes.
   Words the model streams before its `not_for_me` call ("Sure, I'll stay
