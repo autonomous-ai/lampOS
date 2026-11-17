@@ -2,8 +2,9 @@
 
 With `LAMP_HOLDING_ANSWER=on`, a Gemini reply to heard input that ends after
 saying only a short holding phrase can receive one written continuation on the same
-session: “Go on: you said you would, so say it now.” The switch is off by
-default. This repairs the conversation already in progress; it starts no
+session: “Go on: you said you would, so say it now.” The switch is off
+unless set; the product's `lamp-voice.service` sets it (#7458, the “Let me
+check.” dead-end). This repairs the conversation already in progress; it starts no
 independent skill or background conversation.
 
 ## What exists and what is reused
