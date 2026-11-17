@@ -109,6 +109,179 @@ pub fn bytes(key: &str, at_unix_s: u64, by: &str) -> Vec<u8> {
     serde_json::to_vec(&Value::Object(object)).unwrap_or_default()
 }
 
+/// The app's desk noticing mark (#6543, `docs/cloud.md`, "Desk noticing
+/// from the app"), beside the yes in [`FOLDER`]:
+/// `{"version":1,"after_unix_ms":N}`. A `desk_noticing.set` yes is kept only
+/// with a `request_id` (the app's send time in Unix ms) above `N`, so a
+/// resent or late yes never lands after a later "no". Root's helper raises
+/// it to each app request's id it takes; the voice's stop and any forget
+/// raise it to the lamp's own now. Written whole and renamed into place,
+/// in the yes's mode, only under [`MarkLock`]; only the helper reads it.
+/// The reset's plan removes it with the yes.
+pub const SEEN_ACTIVITY_MARK: &str = "seen-activity-mark.json";
+
+/// The lock beside the mark (Twelve's P2 on #7551): an empty file, held
+/// with `flock` by every writer of the yes or the mark across its check and
+/// write, so a "no" (the voice's stop, the app's off, a forget) and an app
+/// yes never interleave. Kept: it holds nothing.
+pub const SEEN_ACTIVITY_LOCK: &str = "seen-activity-mark.lock";
+
+/// How far past the lamp's own now an app's `request_id` may be (Twelve's
+/// P2 on #7551): a day, generous for a phone's clock. One beyond it (an app
+/// sending microseconds, a phone years ahead) is no send time: a yes is
+/// refused, and an off raises the mark only to the lamp's now, so the mark
+/// never runs ahead of the clock and refuses every later yes.
+pub const REQUEST_AHEAD_MOST_MS: u64 = 24 * 60 * 60 * 1000;
+
+/// The mark's file in `folder`.
+pub fn mark_in(folder: &Path) -> PathBuf {
+    folder.join(SEEN_ACTIVITY_MARK)
+}
+
+/// Opened as root opens a file another may have placed: no link followed,
+/// never blocked on a FIFO.
+fn careful() -> i32 {
+    use rustix::fs::OFlags;
+    (OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC).bits() as i32
+}
+
+/// The mark at `path`: 0 when there is none; `None` when it is there but
+/// unreadable, not a plain file or not the mark's shape, so a yes is
+/// refused, the safe side. Opened with `O_NOFOLLOW | O_NONBLOCK`, as the
+/// writer is careful to be.
+pub fn read_mark(path: &Path) -> Option<u64> {
+    use std::os::unix::fs::OpenOptionsExt;
+    let file = match std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(careful())
+        .open(path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Some(0),
+        Err(_) => return None,
+    };
+    if !file.metadata().ok()?.is_file() {
+        return None;
+    }
+    let mut text = String::new();
+    if file.take(MOST_BYTES + 1).read_to_string(&mut text).is_err()
+        || text.len() as u64 > MOST_BYTES
+    {
+        return None;
+    }
+    serde_json::from_str::<Value>(&text)
+        .ok()
+        .and_then(|value| value.get("after_unix_ms").and_then(Value::as_u64))
+}
+
+/// Now, in Unix milliseconds, on the lamp's clock.
+pub fn now_unix_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| {
+            u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
+        })
+}
+
+/// An app's `request_id` past [`REQUEST_AHEAD_MOST_MS`] of the lamp's now.
+pub fn too_far_ahead(request_id: u64) -> bool {
+    request_id > now_unix_ms().saturating_add(REQUEST_AHEAD_MOST_MS)
+}
+
+/// The mark's lock in a consent folder, held until dropped: whoever holds
+/// it reads the mark, raises it, and keeps or removes the yes beside it
+/// with no other writer between. Another open of the same lock waits, in
+/// this process too, so a holder raises through [`MarkLock::raise`], never
+/// [`raise_mark`].
+#[derive(Debug)]
+pub struct MarkLock {
+    _held: std::fs::File,
+    mark: PathBuf,
+}
+
+/// Take the mark's lock in `folder`, waiting for any other holder: the
+/// lock file made if missing (`O_NOFOLLOW`, never a link or a FIFO), in the
+/// yes's mode, 0640 and the folder's group, or 0600 where the folder is
+/// root's.
+pub fn lock_mark(folder: &Path) -> std::io::Result<MarkLock> {
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+    let group = Some(std::fs::metadata(folder)?.gid()).filter(|group| *group != 0);
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .mode(if group.is_some() { 0o640 } else { 0o600 })
+        .custom_flags(careful())
+        .open(folder.join(SEEN_ACTIVITY_LOCK))?;
+    let made = file.metadata()?;
+    if !made.is_file() {
+        return Err(std::io::Error::other("the mark's lock is not a plain file"));
+    }
+    if group.is_some_and(|group| made.gid() != group) {
+        std::os::unix::fs::fchown(&file, None, group)?;
+    }
+    file.lock()?;
+    Ok(MarkLock {
+        _held: file,
+        mark: mark_in(folder),
+    })
+}
+
+impl MarkLock {
+    /// The mark, as [`read_mark`] reads it.
+    pub fn read(&self) -> Option<u64> {
+        read_mark(&self.mark)
+    }
+
+    /// Raise the mark to `at_ms`: read then written under this lock, never
+    /// lowered (one unreadable is replaced), written whole beside it and
+    /// renamed into place, in the lock's mode. What it holds after.
+    pub fn raise(&self, at_ms: u64) -> std::io::Result<u64> {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let path = &self.mark;
+        let folder = path
+            .parent()
+            .ok_or_else(|| std::io::Error::other("the mark has no folder"))?;
+        let read = read_mark(path);
+        let mark = read.unwrap_or(0).max(at_ms);
+        if read == Some(mark) {
+            return Ok(mark);
+        }
+        let group = Some(std::fs::metadata(folder)?.gid()).filter(|group| *group != 0);
+        // One name, written only under the lock.
+        let next = path.with_extension("mark-next");
+        let _ = std::fs::remove_file(&next);
+        let result = (|| {
+            let mut file = std::fs::OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&next)?;
+            let mode = if group.is_some() { 0o640 } else { 0o600 };
+            file.set_permissions(std::fs::Permissions::from_mode(mode))?;
+            if group.is_some() {
+                std::os::unix::fs::fchown(&file, None, group)?;
+            }
+            let text = serde_json::json!({"version": 1, "after_unix_ms": mark}).to_string();
+            std::io::Write::write_all(&mut file, text.as_bytes())?;
+            file.sync_all()?;
+            std::fs::rename(&next, path)?;
+            std::fs::File::open(folder)?.sync_all()
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&next);
+        }
+        result.map(|()| mark)
+    }
+}
+
+/// Raise the mark at `path` to `at_ms` under its lock ([`lock_mark`] in its
+/// folder, taken and let go here): [`MarkLock::raise`]. What it holds after.
+pub fn raise_mark(path: &Path, at_ms: u64) -> std::io::Result<u64> {
+    let folder = path
+        .parent()
+        .ok_or_else(|| std::io::Error::other("the mark has no folder"))?;
+    lock_mark(folder)?.raise(at_ms)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,5 +321,118 @@ mod tests {
             Some(folder.join("seen-activity.json"))
         );
         let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// #6543: the desk noticing mark is 0 when missing, refused when
+    /// garbled, only ever raised, and replaces a garbled one.
+    #[test]
+    fn the_desk_noticing_mark_only_rises() {
+        let folder = std::env::temp_dir().join(format!("msgs-mark-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let mark = mark_in(&folder);
+        assert_eq!(read_mark(&mark), Some(0));
+        assert_eq!(raise_mark(&mark, 20).unwrap(), 20);
+        assert_eq!(
+            std::fs::read_to_string(&mark).unwrap(),
+            r#"{"after_unix_ms":20,"version":1}"#
+        );
+        assert_eq!(raise_mark(&mark, 10).unwrap(), 20);
+        assert_eq!(read_mark(&mark), Some(20));
+        assert_eq!(raise_mark(&mark, 30).unwrap(), 30);
+        std::fs::write(&mark, "not a mark").unwrap();
+        assert_eq!(read_mark(&mark), None);
+        assert_eq!(raise_mark(&mark, 5).unwrap(), 5);
+        assert_eq!(read_mark(&mark), Some(5));
+        assert!(now_unix_ms() > 1_700_000_000_000);
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// Twelve's P3 on #7551: the mark is read as it is written, no link
+    /// followed and no FIFO waited on; either refuses a yes. The lock is
+    /// made in the yes's mode and refuses a link in its place.
+    #[test]
+    fn the_mark_and_its_lock_follow_no_link_and_wait_on_no_fifo() {
+        use std::os::unix::fs::PermissionsExt;
+        let folder = std::env::temp_dir().join(format!("msgs-careful-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let mark = mark_in(&folder);
+        let elsewhere = folder.join("elsewhere.json");
+        std::fs::write(&elsewhere, r#"{"version":1,"after_unix_ms":1}"#).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, &mark).unwrap();
+        assert_eq!(read_mark(&mark), None);
+        std::fs::remove_file(&mark).unwrap();
+        assert!(
+            std::process::Command::new("mkfifo")
+                .arg(&mark)
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert_eq!(read_mark(&mark), None);
+        std::fs::remove_file(&mark).unwrap();
+        let lock = folder.join(SEEN_ACTIVITY_LOCK);
+        std::os::unix::fs::symlink(&elsewhere, &lock).unwrap();
+        assert!(lock_mark(&folder).is_err());
+        std::fs::remove_file(&lock).unwrap();
+        let held = lock_mark(&folder).unwrap();
+        let group = std::os::unix::fs::MetadataExt::gid(&std::fs::metadata(&folder).unwrap());
+        let mode = std::fs::metadata(&lock).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, if group == 0 { 0o600 } else { 0o640 });
+        assert_eq!(held.raise(4).unwrap(), 4);
+        assert_eq!(held.read(), Some(4));
+        drop(held);
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// Twelve's P2 on #7551: a raise waits for the lock's holder, so the
+    /// holder's check and write are never split; raises from many writers at
+    /// once leave the highest.
+    #[test]
+    fn a_raise_waits_for_the_locks_holder() {
+        let folder = std::env::temp_dir().join(format!("msgs-lock-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let mark = mark_in(&folder);
+        let held = lock_mark(&folder).unwrap();
+        let waiting = {
+            let mark = mark.clone();
+            std::thread::spawn(move || raise_mark(&mark, 50).unwrap())
+        };
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        assert!(!waiting.is_finished());
+        assert_eq!(held.read(), Some(0));
+        assert_eq!(held.raise(70).unwrap(), 70);
+        drop(held);
+        assert_eq!(waiting.join().unwrap(), 70);
+        let writers: Vec<_> = (1..=8_u64)
+            .map(|writer| {
+                let mark = mark.clone();
+                std::thread::spawn(move || {
+                    for step in 0..20 {
+                        raise_mark(&mark, 100 + writer * 20 + step).unwrap();
+                    }
+                })
+            })
+            .collect();
+        for writer in writers {
+            writer.join().unwrap();
+        }
+        assert_eq!(read_mark(&mark), Some(100 + 8 * 20 + 19));
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// #6543: the app's desk noticing yes is the voice's seen activity yes
+    /// byte for byte but for `by`.
+    #[test]
+    fn the_apps_seen_activity_yes_is_the_voices_but_for_by() {
+        let app = String::from_utf8(bytes(SEEN_ACTIVITY, 11, BY_APP)).unwrap();
+        let voice = String::from_utf8(bytes(SEEN_ACTIVITY, 11, BY_VOICE)).unwrap();
+        assert_eq!(
+            voice,
+            r#"{"at_unix_s":11,"by":"voice","seen_activity":"yes","version":1}"#
+        );
+        assert_eq!(app, voice.replace(r#""by":"voice""#, r#""by":"app""#));
     }
 }

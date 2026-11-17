@@ -27,7 +27,12 @@
 //! (`lamp_msgs::consent`): `seen-activity.json` beside them, written whole
 //! by the same writer (`onboarding::storage::keep_yes`), 0640
 //! `root:lampos`, `"by":"voice"`. Anyone's "stop" turns it off, the safe
-//! side, and so does any forget ([`forgotten`]) and setup's reset.
+//! side, and so does any forget ([`forgotten`]) and setup's reset. A stop
+//! and a forget also raise the app's mark beside it to the lamp's now
+//! ([`lamp_msgs::consent::SEEN_ACTIVITY_MARK`], Heron's P2 on #7551), so no
+//! desk noticing yes the app sent before it lands after it: the mark raised
+//! and the yes removed under the mark's lock, which root's helper holds
+//! across its own check and write (Twelve's P2 on #7551).
 //! lamp-seen only reads the file, and says the lines back itself, on and
 //! off, so the model is told to add nothing to them.
 use lamp_gemini::{Tool, ToolCall};
@@ -382,7 +387,11 @@ fn run_at(
             }
         };
     }
-    match remove(path) {
+    let lock = lock_beside(path);
+    raise_mark_beside(lock.as_ref(), path, lamp_msgs::consent::now_unix_ms());
+    let removed = remove(path);
+    drop(lock);
+    match removed {
         Ok(true) => {
             eprintln!("lamp-voice: the yes to seen activity is taken back by voice");
             json!({"ok": true, "note": STOPPED})
@@ -395,6 +404,36 @@ fn run_at(
             );
             json!({"ok": false, "note": NOT_KEPT})
         }
+    }
+}
+
+/// The mark's lock in the folder of the yes at `path`, held across a "no"'s
+/// raise and removal (Twelve's P2 on #7551), so root's helper never keeps an
+/// app yes it checked before it. One not taken is said in the journal; the
+/// yes is removed all the same, the safe side.
+fn lock_beside(path: &Path) -> Option<lamp_msgs::consent::MarkLock> {
+    let folder = path.parent()?;
+    lamp_msgs::consent::lock_mark(folder)
+        .inspect_err(|error| {
+            eprintln!(
+                "lamp-voice: the app's mark could not be locked in {}: {error}",
+                folder.display()
+            );
+        })
+        .ok()
+}
+
+/// A "no" at the lamp at `at_ms`: the app's mark beside the yes at `path`
+/// raised to it under `lock`, so the helper refuses any desk noticing yes
+/// the app sent before. A mark not written (or no lock) is said in the
+/// journal; the yes is removed all the same.
+fn raise_mark_beside(lock: Option<&lamp_msgs::consent::MarkLock>, path: &Path, at_ms: u64) {
+    let Some(lock) = lock else { return };
+    if let Err(error) = lock.raise(at_ms) {
+        eprintln!(
+            "lamp-voice: the app's mark could not be raised beside {}: {error}",
+            path.display()
+        );
     }
 }
 
@@ -413,9 +452,21 @@ fn remove(path: &Path) -> io::Result<bool> {
 
 /// Any forget, whoever asked (`remember.rs`'s `forget` and
 /// `forget_everything`), takes back the yes at `path` (#6543): said in the
-/// journal only when there was one. With none there, nothing changes.
+/// journal only when there was one, and the app's mark raised to now when
+/// there was one or a mark is kept. With neither there, nothing changes.
 pub fn forgotten(path: &Path) {
-    match remove(path) {
+    // The mark only where the app's switch has been used or a yes is kept:
+    // a forget on a lamp without seen activity writes nothing.
+    let marked = path
+        .parent()
+        .is_some_and(|folder| lamp_msgs::consent::mark_in(folder).exists());
+    let lock = (marked || path.exists())
+        .then(|| lock_beside(path))
+        .flatten();
+    raise_mark_beside(lock.as_ref(), path, lamp_msgs::consent::now_unix_ms());
+    let removed = remove(path);
+    drop(lock);
+    match removed {
         Ok(true) => eprintln!("lamp-voice provider: a forget removed {}", path.display()),
         Ok(false) => {}
         Err(error) => eprintln!(
@@ -708,12 +759,19 @@ mod tests {
         let path = file_in(&folder);
         run_at(&path, LOOK, true, true, 7, || None);
         assert!(path.exists());
-        // Anyone's stop, the owner's or not, with no offer.
+        // Anyone's stop, the owner's or not, with no offer: the app's mark
+        // raised to the lamp's now (Heron's P2 on #7551), so the helper
+        // refuses any desk noticing yes the app sent before it.
+        let mark = lamp_msgs::consent::mark_in(&folder);
+        assert_eq!(lamp_msgs::consent::read_mark(&mark), Some(0));
+        let before = lamp_msgs::consent::now_unix_ms();
         assert_eq!(
             run_at(&path, STOP, false, false, 9, || panic!("no write")),
             json!({"ok": true, "note": STOPPED})
         );
         assert!(!path.exists());
+        let stopped = lamp_msgs::consent::read_mark(&mark).unwrap();
+        assert!(stopped >= before && stopped <= lamp_msgs::consent::now_unix_ms());
         assert_eq!(
             run_at(&path, STOP, false, false, 9, || None),
             json!({"ok": true, "note": NOT_LOOKING})
@@ -728,8 +786,12 @@ mod tests {
             ),
         )
         .unwrap();
+        // A forget raises it too; a mark already later stays.
+        lamp_msgs::consent::raise_mark(&mark, 1).unwrap();
+        let before = lamp_msgs::consent::now_unix_ms();
         forgotten(&path);
         assert!(!path.exists());
+        assert!(lamp_msgs::consent::read_mark(&mark).unwrap() >= before.max(stopped));
         forgotten(&path);
         // A removal that fails says not done.
         std::fs::create_dir(&path).unwrap();
@@ -737,6 +799,41 @@ mod tests {
             run_at(&path, STOP, true, true, 9, || None),
             json!({"ok": false, "note": NOT_KEPT})
         );
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// Twelve's P2 on #7551: the stop raises the mark and removes the yes
+    /// under the mark's lock, so while root's helper holds it (its check and
+    /// write of an app yes) the stop waits, then takes the yes back. A forget
+    /// on a lamp with neither a yes nor a mark makes no lock either.
+    #[test]
+    fn a_stop_waits_for_the_helpers_lock() {
+        let folder = folder("lock");
+        let path = file_in(&folder);
+        forgotten(&path);
+        assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 0);
+        let mark = lamp_msgs::consent::mark_in(&folder);
+        let helper = lamp_msgs::consent::lock_mark(&folder).unwrap();
+        std::thread::scope(|scope| {
+            let stop = scope.spawn(|| run_at(&path, STOP, false, false, 9, || None));
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            assert!(!stop.is_finished());
+            // The helper's app yes, checked and kept under its lock.
+            helper.raise(10).unwrap();
+            std::fs::write(
+                &path,
+                lamp_msgs::consent::bytes(
+                    lamp_msgs::consent::SEEN_ACTIVITY,
+                    5,
+                    lamp_msgs::consent::BY_APP,
+                ),
+            )
+            .unwrap();
+            drop(helper);
+            assert_eq!(stop.join().unwrap(), json!({"ok": true, "note": STOPPED}));
+        });
+        assert!(!path.exists());
+        assert!(lamp_msgs::consent::read_mark(&mark).unwrap() > 10);
         let _ = std::fs::remove_dir_all(folder);
     }
 }

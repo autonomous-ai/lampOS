@@ -84,6 +84,7 @@ fn real(skills: Option<skills::Places>) -> Real {
         services: None,
         control: None,
         consent: None,
+        desk_noticing: None,
         monitor: None,
         devices: None,
         upload: None,

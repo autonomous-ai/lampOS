@@ -134,6 +134,9 @@ pub struct Real {
     /// The owner's face expressions and room sounds yeses from the app,
     /// with `LAMP_APP_CONSENT=on` (#5500, `crate::consent`).
     pub consent: Option<crate::consent::Place>,
+    /// The owner's desk noticing switch from the app, with
+    /// `LAMP_SEEN_ACTIVITY=on` (#6543, `crate::consent::DESK_KINDS`).
+    pub desk_noticing: Option<crate::consent::Place>,
     /// The owner's dev monitor, with `LAMP_APP_MONITOR=on` (#5883,
     /// `crate::monitor`).
     pub monitor: Option<crate::monitor::Place>,
@@ -893,6 +896,9 @@ impl Lamp for Real {
     fn consent(&self) -> Option<crate::consent::Place> {
         self.consent.clone()
     }
+    fn desk_noticing(&self) -> Option<crate::consent::Place> {
+        self.desk_noticing.clone()
+    }
 
     fn monitor(&self) -> Option<crate::monitor::Place> {
         self.monitor.clone()
@@ -1168,6 +1174,7 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            desk_noticing: None,
             monitor: None,
             devices: None,
             upload: None,
@@ -1255,6 +1262,7 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            desk_noticing: None,
             monitor: None,
             devices: None,
             upload: None,
@@ -1351,6 +1359,7 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            desk_noticing: None,
             monitor: None,
             devices: None,
             upload: None,
@@ -1460,6 +1469,7 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            desk_noticing: None,
             monitor: None,
             devices: None,
             upload: None,
