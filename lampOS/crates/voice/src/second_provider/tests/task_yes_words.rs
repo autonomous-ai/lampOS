@@ -210,7 +210,7 @@ fn photo2_a_yes_after_a_task_said_back_unasked_is_forced_to_the_approval_and_kep
     let form = crate::make_skill_local::tool().parameters.unwrap();
     assert_eq!(
         form["properties"][yes::ANSWER]["enum"],
-        json!(["yes", "no", "unclear"])
+        json!(["yes", "no", "unclear", "new_ask"])
     );
     let went = went(
         "Yes.",

@@ -213,3 +213,98 @@ fn no_force_before_the_question_is_said_whole() {
     yes::clear_for_test();
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// The forced round's `make_skill` for the person's line `heard`: its
+/// declared parameters, cut to the wait's fields.
+fn forced_parameters(heard: &str) -> Value {
+    let declared = vec![crate::make_skill_local::tool()];
+    let chat = crate::second_provider::net::Chat::deepseek(
+        "deepseek-chat",
+        "k",
+        Arc::new(move || declared.clone()),
+        false,
+    )
+    .unwrap();
+    chat.forcing(yes::approve_force());
+    let line = [Message::system("You are a lamp."), Message::user(heard)];
+    let body = chat.wire(&line).2;
+    body["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["function"]["name"] == crate::made_skill::MAKE)
+        .map(|tool| tool["function"]["parameters"].clone())
+        .unwrap()
+}
+
+/// lamp-9adf, 17 Nov 18:12: after "Remove mail count?", "Lamp, remove the
+/// joke time skill" named another skill, was forced to a yes, no or
+/// unclear, and was taken as the yes: mail count was lost. The forced
+/// round may now answer that the line is a new ask (`new_ask`), the
+/// model's judgment, never a list of words.
+#[test]
+fn the_forced_round_may_answer_that_the_line_is_a_new_ask() {
+    let (root, _keeping, _id) =
+        asked_to_remove("remove-words-new-ask-offered", Some("Remove moon fact?"));
+    assert_eq!(forced("Remove the evening dim skill."), make_skill_forced());
+    // As on the lamps, where a made skill's writes are on and the answer
+    // is declared.
+    crate::made_skill::set_writes_here(Some(true));
+    let parameters = forced_parameters("Remove the evening dim skill.");
+    crate::made_skill::set_writes_here(None);
+    assert_eq!(
+        parameters["required"],
+        json!([yes::APPROVE_ID, yes::ANSWER]),
+        "{parameters}"
+    );
+    let answer = &parameters["properties"][yes::ANSWER];
+    let offered: Vec<&str> = answer["enum"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    assert!(offered.contains(&"new_ask"), "{answer}");
+    let told = answer["description"].as_str().unwrap();
+    assert!(told.contains("new_ask"), "{told}");
+    assert!(told.contains("another skill"), "{told}");
+    // The note each later line is told of the wait says so too.
+    let note = yes::waiting_note(1, Instant::now()).unwrap();
+    assert!(note.contains("\"new_ask\""), "{note}");
+    yes::clear_for_test();
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// The same line answered `new_ask`: nothing is removed, the wait is
+/// dropped, and the model is let to say it left moon fact as it is and to
+/// answer the new ask in its next round (here, a remove of evening dim).
+#[test]
+fn a_new_ask_after_remove_moon_fact_keeps_it_and_is_answered() {
+    let (root, keeping, id) = asked_to_remove("remove-words-new-ask", Some("Remove moon fact?"));
+    let (told, helper) = went(
+        &keeping,
+        "Remove the evening dim skill.",
+        vec![
+            answers(&id, "new_ask"),
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c2",
+                    crate::made_skill::MAKE,
+                    json!({ crate::made_remove::REMOVE: "evening dim" }),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            said("I left moon fact as it is. Remove evening dim?"),
+        ],
+    );
+    assert_eq!(told.len(), 2, "{told:?}");
+    assert_eq!(told[0]["approved"], false, "{told:?}");
+    assert_eq!(told[0]["left"], "moon-fact", "{told:?}");
+    let next = told[0]["next"].as_str().unwrap();
+    assert!(next.contains("left moon fact as it is"), "{next}");
+    assert!(!next.to_lowercase().contains("call nothing"), "{next}");
+    assert!(helper.is_empty(), "{helper:?}");
+    assert_eq!(kept(&keeping), ["moon-fact", "evening-dim"]);
+    assert!(!yes::awaited(Instant::now()));
+    let _ = std::fs::remove_dir_all(&root);
+}
