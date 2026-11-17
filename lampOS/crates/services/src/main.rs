@@ -1,4 +1,4 @@
-//! `lamp-services [--enable] [--store DIR] [--run DIR]`: the person's linked
+//! `lamp-services [--enable] [--store DIR] [--run DIR] [--run-calls]`: the person's linked
 //! services, on the admin socket (`<run>/admin.sock`, lamp-cloud only) and
 //! the voice's tools folder (`<run>/tools/`, lamp-voice only). Off unless
 //! `LAMP_SERVICES=on` (a drop-in on its unit, as in lamp-cloud's and the
@@ -9,6 +9,9 @@
 //! (`mcp_server`, `LAMP_AGENT_SERVICES`), started by Hermes in a skill's
 //! run: it holds no service token and reaches the services only through
 //! lamp-control's control socket with the run's one-run token.
+//! `--run-calls` keeps the last 64 calls across all skill runs, no
+//! content, for the voice's `run_calls_since` (`run_calls`, the linked-service memory plan,
+//! slice 4); off without it.
 use lamp_services::{
     CALENDAR_EDITS_ENVIRONMENT, CALENDAR_EVENT_SEARCH_ENVIRONMENT, DRAFT_EDITS_ENVIRONMENT,
     ENVIRONMENT, LINKED_TOOLS_ENVIRONMENT, SKILL_READS_ENVIRONMENT, SKILL_TASKS_ENVIRONMENT,
@@ -18,7 +21,7 @@ use lamp_services::{
     net::Https,
     on,
     refresh::Backend,
-    serve, skill_secrets, skill_writes, store, tools,
+    run_calls, serve, skill_secrets, skill_writes, store, tools,
 };
 use std::{
     fs, io,
@@ -28,8 +31,7 @@ use std::{
     sync::Arc,
 };
 
-const USAGE: &str =
-    "usage: lamp-services [--enable] [--store DIR] [--run DIR] (LAMP_SERVICES=on is --enable)";
+const USAGE: &str = "usage: lamp-services [--enable] [--store DIR] [--run DIR] [--run-calls] (LAMP_SERVICES=on is --enable)";
 
 fn say(line: &str) {
     eprintln!("lamp-services: {line}");
@@ -74,10 +76,12 @@ fn main() -> ExitCode {
     let mut enable = on(std::env::var(ENVIRONMENT).ok().as_deref());
     let mut store = PathBuf::from(store::DIR);
     let mut run = PathBuf::from("/run/lampos-services");
+    let mut run_calls_on = false;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--enable" => enable = true,
+            run_calls::FLAG => run_calls_on = true,
             "--store" | "--run" => {
                 let Some(value) = args.next() else {
                     say(USAGE);
@@ -171,6 +175,11 @@ fn main() -> ExitCode {
     if skill_secrets {
         say("a skill's keys on: kept from the app, given to its run by lamp-tasks alone");
     }
+    // The last 64 calls across all skill runs, no content, for the voice
+    // (slice 4).
+    if run_calls_on {
+        say("skill runs' calls kept: the last 64 across all runs, no content, for the voice alone");
+    }
     let services = serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
         .with_skill_reads(skill_reads)
         .with_skill_writes(skill_writes)
@@ -179,7 +188,8 @@ fn main() -> ExitCode {
         .with_calendar_edits(calendar_edits)
         .with_calendar_event_search(event_search)
         .with_draft_edits(draft_edits)
-        .with_skill_secrets(skill_secrets);
+        .with_skill_secrets(skill_secrets)
+        .with_run_calls(run_calls_on);
     let tools_dir = run.join("tools");
     let edits = tools::Edits {
         calendar: calendar_edits,

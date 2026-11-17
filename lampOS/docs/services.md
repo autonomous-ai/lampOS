@@ -137,6 +137,7 @@ connected apps.
 | `LAMP_SKILL_WRITES=on` (#6066; on in the product's four units since 11 Nov) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
 | `LAMP_SKILL_TASKS=on` (#6432; on in the product units) | `lamp-services`, `lamp-control` (and `lamp-tasks`, which runs the task) and `lamp-voice` | A skill's run reaches no service: lamp-control answers `service.read` and `service.write` `off`, `lamp-services` refuses the `lamp-control.service` cgroup on its tools socket and the voice's `run_write_waiting`, and the voice reads no run's write back ("A skill's run on the lamp's Hermes", below) |
+| `lamp-services --run-calls` (the linked-service memory plan, slice 4; in no product unit) | `lamp-services` | No skill run's calls are kept and the voice's `run_calls_since` is refused ("The last 64 calls across all runs kept", below) |
 | `LAMP_SERVICE_READ_IDS_KEPT=on` (tracker row C132; on in the product's lamp-voice unit, beside #6410) | `lamp-voice`'s second route, with `LAMP_SERVICES=on` | A calendar read keeps nothing: a move or cancel of an event from an earlier conversation reads in each request and is refused by the after-read rule there ("After a read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
@@ -2581,6 +2582,67 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   yes sends it, a no drops it, a spoken no drops the hold at once, the
   switch off ignores it, no "sent" without done); in lamp-control, `session::tests` (the switch off, no grant, the
   wrong kind, a paired computer, a granted read) and `protocol::tests`.
+
+### The last 64 calls across all runs kept (`--run-calls`, slice 4 of the linked-service memory plan, off)
+
+The ring a later slice writes memory's `agent` records from (memory-days.md,
+"Linked records"). Nothing reads it yet, and no product unit passes the flag.
+
+- **What is kept** (`run_calls.rs`). With `--run-calls`, each `service_read`
+  and `service_write` a skill's run makes through lamp-control
+  (`Services::run_tool`) is kept as it was answered: `n` (from 1, one more
+  for each call kept since start), `run`, `skill`, `tool`, `service` (the
+  catalog code it names, `null` for a name the lamp can't link), `action`
+  (a read's `what`, a write's `action`, kept only when it is one of the
+  catalog's own words for that tool and service: a read's kinds,
+  `reads::kinds`, from `reads::WHATS`; a write's actions, `writes::actions`,
+  from `writes::ACTIONS` with Calendar's and Gmail's edits; anything else,
+  a run model's free text included, or a call naming no service the lamp
+  can link, is `other`), `status` (`read`, `held`, `sent` for a
+  fixed write through the agent, `refused`) and `at_unix_ms`. **Never its
+  content:** no query, text, recipient, subject, id or result. A line
+  naming no run (or one over 64 bytes, or not of letters, digits, `-`, `_`
+  and `.`, as lamp-control's `runs::plain` takes a run id), or a call that
+  is not a read or a write, keeps nothing. The last 64 calls across all
+  runs are kept, one ring, in memory only, the oldest dropped first: a busy
+  run pushes another's calls out, and that shows only as `missed`. A
+  restart starts it empty. Keeping one takes only the ring's lock, never a wait on anything
+  else, so a run's answer is not held up.
+- **The run's id.** lamp-control now puts its run's id beside each call
+  it sends on (`"run"`, `lamp_control::services::Services::line`), with
+  the skill. An older lamp-services passes over it.
+- **The voice's call** (its own on the tools socket, never offered to its
+  model, refused to a run, a made skill and anyone else):
+  `{"op":"call","name":"run_calls_since","args":{"after":N}}` answers
+  `{"calls":[...],"last","more","missed","restarted"}`, the calls after
+  number `N`, oldest first, as many as fit 3 KiB of `calls` (inside the
+  tools socket's 4 KB answer, and so under the plan's 8 KiB a pull).
+  `last` is the newest given (or `N` when none), for the next pull; `more`
+  says calls were left for it; `missed` how many after `N` were already
+  dropped; `restarted` that `N` is past the newest kept since start (this
+  program started again), so every call kept is given from the first. With
+  the flag off it answers "a skill run's calls are not kept on this lamp
+  (--run-calls)".
+- **Not done here.** The writer of memory's `agent` rows (slice 5): which
+  part pulls this ring and how it names the task row's `t-` key, which
+  lamp-services does not know (memory-days.md, "Linked records").
+- **Rollback.** Drop the flag, or an older build: nothing is kept and the
+  call is "no such function". lamp-control's extra `run` is passed over.
+  That `run` is on every service line lamp-control sends wherever
+  `LAMP_SKILL_TASKS=on` (the product path); with the flag off lamp-services
+  reads nothing of it, so it is inert.
+- **Tests.** `run_calls::tests` (the last 64 kept and a late pull's
+  `missed`, no content field and free words as `other`, a dotted run id
+  kept, only the catalog's words for the tool and service kept, each answer
+  bounded over several pulls, a restart said),
+  `serve::tests::a_runs_calls_are_kept_without_content_for_the_voice` (off
+  keeps nothing; a read, a held write, a refused write and a name not
+  linked kept as answered, with no query, address, subject or text; no run,
+  nothing kept; a run or a made skill can't pull) and
+  `serve::tests::only_the_voice_pulls_run_calls` (the run door and the
+  skill door each refuse it with their own words, as does the owner's call
+  path asked as a skill; the owner gets the ring); in lamp-control,
+  `services::tests` and `session::tests` (the run's id on the line).
 
 ## The lamp's agent's connectors (`LAMP_AGENT_SERVICES`, on in the product)
 
