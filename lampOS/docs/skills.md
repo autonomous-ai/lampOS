@@ -1947,7 +1947,12 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   said on the next "desk check" that it was "already approved and is
   running" and called nothing). In a busy room the yes is heard within the
   thread's 45 s from the end of the say-back as played, not from its start
-  (#6749 C, docs/second-voice.md). Bounds (`task-asks.json` in lamp-skills' `--state-dir`): a
+  (#6749 C, docs/second-voice.md). With `LAMP_SKILL_YES_CARRY=on` (off by
+  default, #7148), a yes no face was seen saying is carried as the known
+  person's for 45 s from that same end, not from the start of their last
+  exchange, and a short one is read by the short-line rule (#7422);
+  another face or a second face in view still refuses it
+  (docs/second-voice.md). Bounds (`task-asks.json` in lamp-skills' `--state-dir`): a
   folder's SHA-256 said aloud is asked again no sooner than a day later; at
   most 3 asks said across every skill in any 24 hours; one the voice did
   not say (refused, dropped, expired, the voice not reached; one played to

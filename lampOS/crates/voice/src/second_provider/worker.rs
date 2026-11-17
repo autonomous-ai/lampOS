@@ -3753,6 +3753,17 @@ pub fn serve(
             );
             engine = engine.answering_held_words_seen(true);
         }
+        // A skill's yes awaited after its say-back is carried 45 s from
+        // that say-back's end as played, and a short one read by the
+        // short-line rule (#7148).
+        if std::env::var(crate::second_provider::SKILL_YES_CARRY_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a skill's awaited yes no face was seen saying is carried 45 s from the end of its say-back as played, and a short one read by the short-line rule (LAMP_SKILL_YES_CARRY)"
+            );
+            engine = engine.carrying_skill_yes_from_question(true);
+        }
     }
     // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
     // forget's yes counts only from the held person's face seen saying it.

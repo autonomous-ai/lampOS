@@ -6053,6 +6053,27 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   journal: `request N: no face was seen speaking it, in their conversation
   going on, no other face in view: told from that conversation, never
   memory's (LAMP_CONVERSATION_CARRIES)`.
+  **A skill's yes, from the lamp's question** (`LAMP_SKILL_YES_CARRY=on`,
+  with `LAMP_CONVERSATION_CARRIES`; off by default, #7148): while a skill's
+  yes is awaited after its say-back (`skill_write_yes::answer_awaited`,
+  #6749 C), the carry's 45 s count from the end of that say-back as played
+  (`skill_write_yes::played_until` and `asked_until`, from the played end
+  `Did::Said` reports; `Thread::going_on_asked`), not from the start of
+  the person's last exchange, when the say-back's exchange is still the
+  newest; a say-back still playing counts from now. With no face found
+  saying it, the line is read again by #7422's short-line rule
+  (`SpeakingFaces::short_line_speakers_with_boot`,
+  `second_provider::skill_yes_speakers`): a one-word yes their face was read
+  saying in under three looks is theirs, seen, and another face's is that
+  face's. Everything else of the carry stays (no other face in view, their
+  face within 5 s, another face seen saying it, another person's exchange
+  between, a later narrow or another voice). On lamp-9adf (build 13162,
+  15 Nov) an agent's make took 34 to 42 s and its say-back about 30 s
+  more, so the unseen "Yes." 36 to 40 s after it was past 45 s from the
+  person's last exchange and kept as the room's, while #6749 C's thread
+  window still held it open. Risk, as the carry's: an unseen yes, from the
+  known face alone in view with no other voice, turns on a skill with code.
+  Off: counted from the exchange, as before.
   **What `named_alone` means.** It is not "their mouth was seen saying
   it": no face was seen speaking the line (no face read speaking in at
   least half its looks), while their known face was the only face in view

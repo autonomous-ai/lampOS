@@ -521,12 +521,24 @@ impl SpeakingFaces {
     /// A lost id the eyes say a face follows as of `to` is that face's
     /// ([`Looks::links_at`], #4885).
     pub fn speakers_with_boot(&self, from: Instant, to: Instant) -> Speakers {
+        self.speakers_with_boot_padded(from, to, short_line_from_environment())
+    }
+
+    /// As [`Self::speakers_with_boot`], a line shorter than
+    /// [`SHORT_LINE_WINDOW`] always judged by the short-line rule
+    /// ([`Self::line_counted`]), whatever [`SHORT_LINE_ENVIRONMENT`] says:
+    /// for a held face rename's yes with `LAMP_NAME_LEARN_FIX` (#7419).
+    pub fn short_line_speakers_with_boot(&self, from: Instant, to: Instant) -> Speakers {
+        self.speakers_with_boot_padded(from, to, true)
+    }
+
+    fn speakers_with_boot_padded(&self, from: Instant, to: Instant, padded: bool) -> Speakers {
         let links = self
             .looks
             .lock()
             .map(|looks| looks.links_at(to))
             .unwrap_or_default();
-        let rules = (short_line_from_environment(), read_looks_from_environment());
+        let rules = (padded, read_looks_from_environment());
         self.line_counted(from, to, rules, |look, ids| {
             let mut ids: Vec<String> = ids
                 .iter()
