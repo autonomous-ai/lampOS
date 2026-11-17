@@ -496,11 +496,18 @@ pub fn from_voice(cgroup: &str) -> bool {
 }
 
 /// Whether the peer with `pid` (its `SO_PEERCRED`) is the voice, by its
-/// cgroup; never on a system without `/proc`.
+/// cgroup, read only from the process that connected ([`crate::peer`]: its
+/// start time must be the same before and after the cgroup is read and no
+/// later than the time of the accept, which narrows the pid-recycle window
+/// and does not close it); never on a system without `/proc`, and never on
+/// anything unreadable. Call it straight after the accept.
 pub fn peer_is_voice(pid: Option<i32>) -> bool {
-    pid.filter(|pid| *pid > 0)
-        .and_then(|pid| std::fs::read_to_string(format!("/proc/{pid}/cgroup")).ok())
-        .is_some_and(|cgroup| from_voice(&cgroup))
+    peer_is_voice_with(pid, &|path: &str| std::fs::read_to_string(path).ok())
+}
+
+/// [`peer_is_voice`] over `read`, a `/proc` file's text or none.
+pub fn peer_is_voice_with(pid: Option<i32>, read: &dyn Fn(&str) -> Option<String>) -> bool {
+    crate::peer::cgroup_with(pid, read).is_some_and(|cgroup| from_voice(&cgroup))
 }
 
 /// The answer on the owner's socket to a yes request in `asked`, kept in
