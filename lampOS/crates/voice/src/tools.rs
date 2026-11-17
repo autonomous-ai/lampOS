@@ -926,6 +926,11 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     }
     if let Some(place) = &settings.tasks {
         tools.extend(crate::agent_tasks::tools(place));
+        // An ask handed to the lamp's agent (`LAMP_HARD_ASKS_TO_AGENT`,
+        // the second route's worker alone): off, nothing more.
+        if crate::agent_asks::hard_on() {
+            tools.push(crate::agent_asks::tool());
+        }
     }
     // A skill made by the lamp's own model: its function is the voice's
     // own, with or without the tasks part. It goes on as soon as it is
@@ -1033,6 +1038,7 @@ pub(crate) fn voices_own(name: &str) -> bool {
         || name == THE_TIME
         || crate::remember::is_tool(name)
         || crate::agent_tasks::is_tool(name)
+        || crate::agent_asks::is_tool(name)
         || crate::known_faces::is_tool(name)
         || crate::photo_faces::is_tool(name)
         || crate::marked::is_tool(name)
@@ -1172,6 +1178,10 @@ pub enum Route {
     /// folder ([`crate::services`]): held to the voice's own rules, and
     /// waited for [`crate::services::DEADLINE`].
     Services(PathBuf),
+    /// An ask handed to the lamp's agent ([`crate::agent_asks`],
+    /// `LAMP_HARD_ASKS_TO_AGENT`): answered at once with the holding line,
+    /// the agent's answer told when it comes.
+    AgentAsk,
     /// Nobody here runs that.
     Nobody,
 }
@@ -1288,6 +1298,13 @@ pub fn route(settings: &Settings, name: &str) -> Route {
             .services
             .clone()
             .map_or(Route::Nobody, Route::Services);
+    }
+    if crate::agent_asks::is_tool(name) {
+        return if settings.tasks.is_some() && crate::agent_asks::hard_on() {
+            Route::AgentAsk
+        } else {
+            Route::Nobody
+        };
     }
     if crate::sleep_asked::is_tool(name) {
         return if settings.sleep_asked {
@@ -2751,6 +2768,10 @@ fn run_call_with_scope(
         Route::Services(folder) => (
             "the services",
             crate::services::run(folder, call, request, heard, lease),
+        ),
+        Route::AgentAsk => (
+            "the lamp's agent",
+            (crate::agent_asks::run(call, request, heard), true),
         ),
         Route::SeenActivity(posture) => (
             "the seen activity yes",
@@ -5202,6 +5223,40 @@ mod tests {
             Route::Nobody
         );
         assert!(declared(&Settings::default()).is_empty());
+        // `LAMP_HARD_ASKS_TO_AGENT` (17 Nov): off, no `ask_agent` and
+        // nobody runs it; on, it is offered beside the tasks part's and
+        // routed to the lamp's agent, never with no tasks part.
+        let names = |settings: &Settings| -> Vec<String> {
+            declared(settings)
+                .into_iter()
+                .map(|tool| tool.name)
+                .collect()
+        };
+        crate::agent_asks::set_on_here(Some((true, false)));
+        assert!(!names(&with).contains(&crate::agent_asks::TOOL.to_owned()));
+        assert_eq!(route(&with, crate::agent_asks::TOOL), Route::Nobody);
+        crate::agent_asks::set_on_here(Some((false, true)));
+        assert_eq!(
+            names(&with).last().map(String::as_str),
+            Some(crate::agent_asks::TOOL)
+        );
+        assert_eq!(route(&with, crate::agent_asks::TOOL), Route::AgentAsk);
+        assert_eq!(
+            route(&Settings::default(), crate::agent_asks::TOOL),
+            Route::Nobody
+        );
+        assert!(declared(&Settings::default()).is_empty());
+        // Not heard live: nothing is handed over.
+        let ask = ToolCall {
+            id: "1".into(),
+            name: crate::agent_asks::TOOL.into(),
+            args: serde_json::json!({"ask": "plan a three-day trip to Hue"}),
+        };
+        assert_eq!(
+            crate::agent_asks::run(&ask, 9, false)["error"],
+            crate::services::NOT_HEARD
+        );
+        crate::agent_asks::set_on_here(None);
     }
 
     #[test]

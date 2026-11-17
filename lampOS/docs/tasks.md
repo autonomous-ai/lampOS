@@ -3778,6 +3778,26 @@ engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
 line that stays true round after round is logged once. Skill runs still go
 to Hermes alone (`HarnessRunner`, above).
 
+### A live spoken ask on the make socket (`voice_ask`, off unless set)
+
+The owner's rulings of 17 Nov: a linked service's live read, and an ask the
+second route's model can't do, go to the lamp's agent. The make socket takes
+a second kind of line from lamp-voice, `{"op":"voice_ask","ask","grants",
+"brief","within_ms"}` (`lamp_tasks::voice_ask`), answered as a make is
+(`started`, then `answer` or a refusal), with its own one place beside a
+make's. With no grant it is taken only with `LAMP_HARD_ASKS_TO_AGENT=on`,
+on the make's runner (the network as `LAMP_MAKE_AGENT_NET` says); with one
+service's `<code>-read` grant only with `LAMP_SERVICES_TO_AGENT=on` and
+`LAMP_AGENT_SERVICES=on`, held off the network, on a token lamp-control
+mints for exactly that grant (`{"mint":{"ask":[...]}}`), its fresh home's
+config with `mcp_servers.lamp-services`. Either way a fresh folder and home
+of its own, the person's words in its rules file (never its arguments), its
+answer read from `answer.md`, whitespace folded and at most 3,000 bytes,
+the folder removed and the token ended however it ends, at most 120 s.
+Off, the line is refused `off` and makes are as before
+([services.md](services.md), "Reads through the lamp's agent";
+[switches.md](switches.md)).
+
 ### A voice make on OpenClaw, through the one run path (`LAMP_MAKE_AGENT_ONE_PATH`, on, #7245)
 
 On lamp-c0a4 (build 13333, OpenClaw the default, 16 Nov 11:46) a make

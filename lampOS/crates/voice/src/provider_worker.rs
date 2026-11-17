@@ -4211,6 +4211,7 @@ impl ToolDesk {
             | Route::ReportsStop(_)
             | Route::Devices(_)
             | Route::SeenActivity(_)
+            | Route::AgentAsk
             | Route::Nobody => {
                 let (sent, sent_us) = tell(&crate::tools::unavailable());
                 self.line(
