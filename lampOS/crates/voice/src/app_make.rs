@@ -734,7 +734,7 @@ pub fn say_waiting_at(socket: &Path, line: &str, within_ms: u64) {
 /// written, at `priority`, not begun after `within_ms`: its answers, read until the
 /// outcome. The receiver's sender is dropped, with no outcome, when the
 /// socket isn't there or goes quiet past the ask's wait.
-pub(crate) fn socket_ask(
+fn socket_ask(
     socket: &Path,
     words: &str,
     note: bool,

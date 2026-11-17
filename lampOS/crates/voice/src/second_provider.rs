@@ -5087,8 +5087,6 @@ impl Engine {
             // A write read back and waiting for its send goes too
             // (Thirteen's P2 on #5968).
             crate::services::forget_waiting();
-            // And an ask with the lamp's agent is never told (`agent_asks`).
-            crate::agent_asks::forget();
             if self.shared.remember_speaker {
                 crate::remember_speaker::forget();
                 if let Some(eyes) = &self.shared.enrollment_sight {
@@ -10462,6 +10460,9 @@ async fn spoken(
         // 45 s of conversation).
         // Its own exchange is covered however late the line is written.
         crate::thread::close_now(Some(request));
+        // An ask with the lamp's agent is stopped too: its answer is never
+        // told, and is cancelled if it already waits (Heron's P2 4 on #7509).
+        crate::agent_asks::forget();
         // A reminder's ring this line cut is held, not rung once more.
         let _ = shared.emit(ProviderOutput::StopAnswered { request }).await;
         say_fixed(

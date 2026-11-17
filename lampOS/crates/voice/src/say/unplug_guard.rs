@@ -13,17 +13,42 @@ const BODY_FRESH_US: u64 = 500_000;
 // packet has not expired. Normal monitoring is every 20 ms.
 const MONITOR_FRESH_US: u64 = 100_000;
 
+/// Why an unplug say is cut or refused once its proof fails.
+pub(super) const LOST: &str = "unplug_authority_lost";
+
+/// A say's authority: valid until an atomic deadline its client worker
+/// keeps renewing, and the reason it is cut or refused once that passes
+/// (the unplug proof's [`LOST`], or `super::alone_guard::NOT_ALONE`).
 #[derive(Clone)]
-pub(super) struct Guard(Arc<AtomicU64>);
+pub(super) struct Guard(Arc<AtomicU64>, &'static str);
 impl Guard {
+    /// A guard that is not valid yet, cut or refused with `why`.
+    pub(super) fn new(why: &'static str) -> Self {
+        Self(Arc::new(AtomicU64::new(0)), why)
+    }
+
     #[cfg(test)]
     pub(super) fn for_test(deadline: u64) -> (Self, Arc<AtomicU64>) {
         let shared = Arc::new(AtomicU64::new(deadline));
-        (Self(Arc::clone(&shared)), shared)
+        (Self(Arc::clone(&shared), LOST), shared)
     }
 
     pub(super) fn valid(&self, now_us: u64) -> bool {
         now_us < self.0.load(Ordering::Acquire)
+    }
+
+    /// Why its say is cut or refused once it is no longer valid.
+    pub(super) fn why(&self) -> &'static str {
+        self.1
+    }
+
+    /// Valid until `deadline_us`; 0 ends it.
+    pub(super) fn set(&self, deadline_us: u64) {
+        self.0.store(deadline_us, Ordering::Release);
+    }
+
+    fn deadline(&self) -> u64 {
+        self.0.load(Ordering::Acquire)
     }
 }
 
@@ -45,7 +70,7 @@ impl Monitor {
         let mut monitor = Self {
             bus,
             request: request.to_owned(),
-            guard: Guard(Arc::new(AtomicU64::new(0))),
+            guard: Guard::new(LOST),
             failed: false,
         };
         monitor.read();
@@ -71,7 +96,7 @@ impl Monitor {
     }
 
     fn read(&mut self) {
-        let previous_deadline = self.guard.0.load(Ordering::Acquire);
+        let previous_deadline = self.guard.deadline();
         let deadline = self
             .bus
             .latest(State::TOPIC)
@@ -93,14 +118,14 @@ impl Monitor {
             return;
         }
         match deadline {
-            Some(deadline) => self.guard.0.store(deadline, Ordering::Release),
+            Some(deadline) => self.guard.set(deadline),
             None => self.invalidate(),
         }
     }
 
     fn invalidate(&mut self) {
         self.failed = true;
-        self.guard.0.store(0, Ordering::Release);
+        self.guard.set(0);
     }
 }
 impl Drop for Monitor {
@@ -158,7 +183,7 @@ mod tests {
         let make = || Monitor {
             bus: Bus::new("/tmp/unused-say-guard-bus").unwrap(),
             request: "one".into(),
-            guard: Guard(Arc::new(AtomicU64::new(u64::MAX))),
+            guard: Guard(Arc::new(AtomicU64::new(u64::MAX)), LOST),
             failed: false,
         };
         let mut monitor = make();
@@ -196,7 +221,7 @@ mod tests {
         let mut monitor = Monitor {
             bus,
             request: "one".into(),
-            guard: Guard(Arc::new(AtomicU64::new(0))),
+            guard: Guard::new(LOST),
             failed: false,
         };
         monitor.read();
@@ -255,7 +280,7 @@ mod tests {
 
     #[test]
     fn guard_expires_without_another_worker_read_and_revokes_all_clones() {
-        let guard = Guard(Arc::new(AtomicU64::new(100)));
+        let guard = Guard(Arc::new(AtomicU64::new(100)), LOST);
         let ticket = guard.clone();
         assert!(ticket.valid(99));
         assert!(!ticket.valid(100));
