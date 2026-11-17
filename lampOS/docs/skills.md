@@ -1918,8 +1918,12 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   thing asked), keeps nothing, ends the wait, and the model is told to say
   NAME stays as it was, then to do what that line asked
   (`skill_write_yes::new_ask_next`, for a remove `remove_left_next`), so a
-  new ask is never forced into a yes. The forced round is told only
-  `approve_id` and `answer` of `make_skill`'s form, both required
+  new ask is never forced into a yes. A `yes` is bound to its skill
+  (#7545): `named`, the skill the line names or `none`, must be the
+  waiting skill's own name or `none`, else the yes is read as `new_ask`;
+  a forced `yes` with no `named` reads as `unclear` ("Removed by voice",
+  "A yes bound to its skill"). The forced round is told only
+  `approve_id`, `answer` and `named` of `make_skill`'s form, all required
   (`skill_write_yes::APPROVE_FIELDS`, #6921), so the forced call carries no
   make or edit beside the answer. A `no` or `unclear` is read before the
   owner check, so anyone's (a guest's too) ends or re-asks the owner's
@@ -4505,8 +4509,23 @@ code (`made_remove::asked`):
   only. The person's next
   line has its round 1 forced to `make_skill`
   (`skill_write_yes::approve_force`, as a skill's task's answer is), with
-  `approve_id` and `answer` (`yes`, `no`, `unclear` or `new_ask`, left out
-  read as `unclear`): code decides when, the model what they answered.
+  `approve_id`, `answer` (`yes`, `no`, `unclear` or `new_ask`, left out
+  read as `unclear`) and `named`: code decides when, the model what they
+  answered.
+- **A yes bound to its skill** (#7545, Twelve's and El's HOLDs on #7561).
+  The forced form also takes `named` (`skill_write_yes::NAMED`), the
+  skill the person's line names, its name alone as they said it, or
+  `none`. The model fills it; code reads a `yes` whose `named` is neither
+  `none` nor the waiting skill's own name (`made_remove::same_name`: the
+  whole name, as a made skill's name is written, within a quarter of its
+  letters, never a run inside longer words, so "moon fact" is not "moon")
+  as a `new_ask` (below), so a yes never removes another skill than the
+  one asked about, whatever label the model gave the line. A forced
+  wait's `yes` with no `named` reads as `unclear`. The same holds for a
+  skill's task and an app's make with code, whose forced form is the
+  same. The journal: "… was a new ask, not an answer (a yes naming
+  OTHER, not NAME): nothing kept, the wait dropped", or "a yes to NAME's
+  wait named no skill: read as unclear".
 - **Only an answer to that question.** A line that answers nothing asked
   but asks something new (another skill named, another thing asked) is
   the model's `new_ask` (`skill_write_yes::NEW_ASK`), told in `answer`'s
@@ -4534,7 +4553,11 @@ code (`made_remove::asked`):
   SHA-256 is said not removed. Taken off but `made.json` not written, the
   lamp says NAME "is off the lamp, but still listed among the skills they
   made", and the journal says so too (`"still_listed"`). The lamp says "NAME is removed."
-  (`skill_write_yes::removed_next`). `no` keeps it and ends the wait ("NAME
+  (`skill_write_yes::removed_next`); if the same line asked for more
+  ("Yes, and remove the joke one too", El's P2 on #7561), the model does
+  that in the same turn, as for any line, so it is never lost: another
+  remove gets its own question and wait, and nothing more is removed
+  without its own yes. `no` keeps it and ends the wait ("NAME
   stays", `remove_declined_next`); `unclear` asks once more, short, "remove
   NAME, yes or no?" (`remove_unclear_next`), and a second `unclear` keeps it.
 - **No extra round trip.** The match reads two local folders and the made
@@ -4566,9 +4589,14 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `a_no_after_remove_moon_fact_keeps_it`,
 `no_force_before_the_question_is_said_whole`,
 `the_forced_round_may_answer_that_the_line_is_a_new_ask`,
-`a_new_ask_after_remove_moon_fact_keeps_it_and_is_answered`; and
+`a_new_ask_after_remove_moon_fact_keeps_it_and_is_answered`,
+`a_yes_naming_another_skill_removes_nothing_and_is_answered`,
+`a_yes_with_a_second_remove_removes_the_asked_one_and_asks_the_other`; and
 `made_remove::tests::a_new_ask_after_the_question_drops_the_remove_and_keeps_it`,
-`skill_write_yes::tests::a_new_ask_ends_a_tasks_wait_agreeing_nothing`.
+`a_yes_naming_another_skill_removes_nothing`,
+`a_yes_is_taken_only_for_the_asked_skill`,
+`skill_write_yes::tests::a_new_ask_ends_a_tasks_wait_agreeing_nothing`,
+`a_yes_naming_another_skill_agrees_nothing_on_a_tasks_wait`.
 
 **Turned off and on by voice** (#7445, with `LAMP_MADE_SKILL_OFF_SAID` on
 alone: on lamp-9adf, build 13252, "Lamp, turn off the coffee time skill"

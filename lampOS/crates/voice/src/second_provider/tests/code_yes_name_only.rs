@@ -57,14 +57,18 @@ fn went(
     let (seen, put_on) = (told.clone(), on.clone());
     let tools: ToolRunner = Arc::new(move |request, heard, name, args| {
         let answer = match args[yes::APPROVE_ID].as_str() {
-            Some(id) if name == crate::made_skill::MAKE => {
-                yes::answered(id, request, args[yes::ANSWER].as_str()).unwrap_or_else(|| {
-                    yes::approve(id, request, heard, true, Instant::now(), |_| {
-                        *put_on.lock().unwrap() += 1;
-                        Ok(json!({"task": true}))
-                    })
+            Some(id) if name == crate::made_skill::MAKE => yes::answered(
+                id,
+                request,
+                args[yes::ANSWER].as_str(),
+                args[yes::NAMED].as_str(),
+            )
+            .unwrap_or_else(|| {
+                yes::approve(id, request, heard, true, Instant::now(), |_| {
+                    *put_on.lock().unwrap() += 1;
+                    Ok(json!({"task": true}))
                 })
-            }
+            }),
             _ => json!({"next": "Say: done."}),
         };
         seen.lock().unwrap().push(answer.clone());
@@ -109,7 +113,7 @@ fn answers(id: &str, answer: &str) -> Vec<net::Result<ChatEvent>> {
         Ok(ChatEvent::ToolCalls(vec![call(
             "c1",
             crate::made_skill::MAKE,
-            json!({ yes::APPROVE_ID: id, yes::ANSWER: answer }),
+            json!({ yes::APPROVE_ID: id, yes::ANSWER: answer, yes::NAMED: yes::NAMED_NONE }),
         )])),
         Ok(ChatEvent::Done),
     ]
@@ -187,7 +191,7 @@ fn a_call_with_nothing_past_it_is_no_yes_to_a_code_skill_said_back() {
         assert!(!note.contains(&id), "{name} {called}: {note}");
         // A no or unclear in it is no answer either.
         for answer in ["no", "unclear"] {
-            let told = yes::answered(&id, 1, Some(answer)).unwrap();
+            let told = yes::answered(&id, 1, Some(answer), None).unwrap();
             assert_eq!(told["error"], yes::NAME_ONLY_NOT_TAKEN, "{name}: {told}");
             assert!(yes::waits(&id), "{name} {called}: {answer} ended the wait");
         }
