@@ -686,9 +686,15 @@ fn a_refused_close_is_engine_not_ready_and_changes_nothing() {
     let rig = Rig::program();
     rig.ensure(&[]);
     rig.plan(json!({"close":{"program":true,"not_ready":true}}));
+    let before = rig.sessions()["sessions"]["lamp"].clone();
+    // Ownership is checked first: another token is NOT_YOURS, never told
+    // whether the engine is ready.
+    rig.token("other", &[b'z'; 40], 0o600);
+    let (exit, said) = rig.close_with("other", &[]);
+    assert_eq!((exit, refusal(&said)), (5, "NOT_YOURS"));
     let (exit, said) = rig.close(&[]);
     assert_eq!((exit, refusal(&said)), (5, "ENGINE_NOT_READY"));
-    assert_eq!(rig.sessions()["sessions"]["lamp"]["state"], "idle");
+    assert_eq!(rig.sessions()["sessions"]["lamp"], before);
 }
 
 #[test]

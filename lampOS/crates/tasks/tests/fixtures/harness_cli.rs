@@ -326,8 +326,8 @@ pub fn main() -> io::Result<()> {
 /// `"typed"`, `"no_answer"`, `"enter_withheld"` or `"paste_failed"` it takes
 /// the input and says `cancelled:false` with an `inputId` `wait --after`
 /// follows (p4393.5). `close` with `"not_ready": true` refuses
-/// `ENGINE_NOT_READY` and changes nothing (p4393.5). `wait` with `"ends": "person" |
-/// "stopped" | "timeout"` ends so. `"exits": {"CODE": N}` sets a refusal's
+/// `ENGINE_NOT_READY` and changes nothing (p4393.5). `wait` with
+/// `"ends": "person" | "stopped" | "timeout"` ends so. `"exits": {"CODE": N}` sets a refusal's
 /// exit. Without a token, `ensure`, `resume`, `reply` and `close` on a
 /// program-owned harness are `NOT_YOURS`; `resume` is answered only to
 /// refuse.
