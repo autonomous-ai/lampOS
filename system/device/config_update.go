@@ -393,6 +393,10 @@ func applyVoicePipelineFields(c *config.Config, data domain.UpdateConfigRequest,
 		ch.wake = !slices.Equal(c.WakePhrases, next)
 		c.WakePhrases = next
 	}
+	// Clear before set so a new key wins when both are sent.
+	if data.ClearDeepgramAPIKey {
+		c.DeepgramAPIKey = ""
+	}
 	if data.DeepgramAPIKey != "" {
 		c.DeepgramAPIKey = data.DeepgramAPIKey
 	}

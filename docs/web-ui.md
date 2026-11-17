@@ -315,6 +315,11 @@ Four rules enforce the invariant:
   PATCH-style, where `""` means "not sent". The cleared key is pushed live to
   HAL as the *resolved* value (`GetTTSAPIKey()`), because HAL's
   `/voice/tts/config` reads an empty key as "keep the current one".
+- Switching STT back from Deepgram to Autonomous sends
+  `clear_deepgram_api_key: true` for the same PATCH reason. HAL picks Deepgram
+  whenever `deepgram_api_key` is set, so a key left behind kept the device on
+  Deepgram. Clearing it changes a HAL boot field, so HAL restarts into
+  `AutonomousSTT`.
 
 Keys typed but not yet saved are cached per provider **in the browser tab only**
 (a `useRef` in `TTSSection`), so flipping providers before saving doesn't force a

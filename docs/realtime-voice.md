@@ -155,7 +155,9 @@ need HAL 0.1.305 or later.
 Arabic uses `stt_language: "ar"` (`LANG_AR` in `hal/presets.py`); every regional
 code such as `ar-SA`, `ar-EG` or `ar_AE` normalizes to `ar`, while a code that only
 starts with the letters (`arn`) does not. With Arabic selected, STT runs Deepgram
-Nova-3 with `language=ar`, the language gate accepts Arabic speech (AmberNet label
+Nova-3 with `language=ar` (both `AutonomousSTT` and a device-owned `DeepgramSTT`:
+`deepgram_options()` sends every non-English language to `nova-3-general`, since
+the default `flux-general-en` is English-only), the language gate accepts Arabic speech (AmberNet label
 `ar`), Gemini Live gets `ar` (the code is passed through unchanged), and the agent
 is told to reply in Arabic. The robot's own phrases (retry, listening, reboot, mic
 toggle, head pat, music cues, fillers, OTA notice, wake and rename prompts, the

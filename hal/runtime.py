@@ -578,7 +578,12 @@ async def lifespan(app: FastAPI):
                         bool(dgk), DeepgramSTT is not None, AutonomousSTT is not None, agent_name)
             stt_keywords = state._stt_boost_terms()
             if dgk and DeepgramSTT:
-                stt_provider = DeepgramSTT(api_key=dgk, keywords=stt_keywords)
+                from hal.drivers.voice.stt.deepgram import deepgram_options
+
+                stt_provider = DeepgramSTT(
+                    api_key=dgk, keywords=stt_keywords,
+                    **deepgram_options(os_cfg.get("stt_language"), os_cfg.get("stt_model")),
+                )
             elif stt_key and stt_url and AutonomousSTT:
                 stt_model = (os_cfg.get("stt_model") or "").strip() or None
                 stt_language = normalize_language(os_cfg.get("stt_language")) or None

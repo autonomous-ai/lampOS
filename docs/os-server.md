@@ -1225,7 +1225,9 @@ The catalog covers all **21 local intents**, plus `none` to defer:
 - Audio/media: `volume_up`, `volume_down`, `mute_speaker`, `unmute_speaker`,
   `music_stop`, and `stop_talking`.
 - Camera/servo: `servo_track` and `servo_track_stop`.
-- Device clock: `what_time` (current local time only).
+- Device clock: `what_time` (current local time only). The reply follows the
+  device language (`i18n.TimeOfDay`, e.g. Korean "지금은 오후 3시 4분이에요."), since
+  jev also routes non-English questions to it.
 
 Hardware candidates require positively declared device capabilities, checked
 both before inference and immediately before execution. Missing or unknown body

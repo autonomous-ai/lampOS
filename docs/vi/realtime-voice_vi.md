@@ -145,7 +145,10 @@ làm voice ID, ElevenLabs từ chối, nên giọng tiếng Hàn cần HAL 0.1.3
 
 Tiếng Ả Rập dùng `stt_language: "ar"` (`LANG_AR` trong `hal/presets.py`); mọi mã vùng
 như `ar-SA`, `ar-EG` hay `ar_AE` được chuẩn hóa về `ar`, còn mã chỉ bắt đầu bằng các
-chữ đó (`arn`) thì không. Khi chọn Arabic, STT chạy Deepgram Nova-3 với `language=ar`,
+chữ đó (`arn`) thì không. Khi chọn Arabic, STT chạy Deepgram Nova-3 với `language=ar`
+(cả `AutonomousSTT` lẫn `DeepgramSTT` dùng key riêng của thiết bị: `deepgram_options()`
+đưa mọi ngôn ngữ không phải tiếng Anh sang `nova-3-general`, vì model mặc định
+`flux-general-en` chỉ nghe tiếng Anh),
 language gate nhận lời nói tiếng Ả Rập (nhãn AmberNet `ar`), Gemini Live nhận `ar`
 (mã được truyền nguyên), và agent được yêu cầu trả lời bằng tiếng Ả Rập. Các câu của
 robot (nói lại, đang nghe, khởi động lại, bật/tắt mic, xoa đầu, câu chờ nhạc, filler,

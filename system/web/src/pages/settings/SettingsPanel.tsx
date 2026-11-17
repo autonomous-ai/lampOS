@@ -628,7 +628,8 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
         if (sttLoaded.apiKey || sttApiKey) body.stt_api_key = "";
       } else {
         if (sttApiKey) body.stt_api_key = sttApiKey;
-        if (sttLoaded.deepgram || deepgramApiKey) body.deepgram_api_key = "";
+        // Switching back to Autonomous must delete the stored Deepgram key, or HAL keeps choosing Deepgram.
+        if (sttLoaded.deepgram || deepgramApiKey) body.clear_deepgram_api_key = true;
       }
       if (channel === "telegram") {
         body.telegram_user_id = teleUserId;
@@ -650,6 +651,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
       }
       await updateDeviceConfig(body);
       setLlmModeApplyPending(false);
+      if (body.clear_deepgram_api_key) setSttLoaded((prev) => ({ ...prev, deepgram: false }));
       setTtsLoaded({
         apiKey: body.clear_tts_api_key ? false : (ttsLoaded.apiKey || !!ttsApiKey),
         baseUrl: !!ttsBaseUrl,

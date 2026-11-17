@@ -1,8 +1,9 @@
 package intent
 
 import (
-	"fmt"
 	"time"
+
+	"go.autonomous.ai/os/system/lib/i18n"
 )
 
 var miscRules = []rule{
@@ -10,9 +11,8 @@ var miscRules = []rule{
 		name:  "what_time",
 		match: anyOf("what time", "whats the time", "what's the time"),
 		exec: func(string) *Result {
-			now := time.Now()
-			text := fmt.Sprintf("It's %s.", now.Format("3:04 PM"))
-			return &Result{TTSText: text, Actions: []string{"time.Now()"}}
+			// Answer in the device language; jev routes non-English questions here too.
+			return &Result{TTSText: i18n.TimeOfDay(time.Now()), Actions: []string{"time.Now()"}}
 		},
 	},
 }
