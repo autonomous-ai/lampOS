@@ -10680,6 +10680,9 @@ async fn spoken(
                 "lamp-voice second: request {request} is held, so request {}'s words, cut short by it, are answered in its place",
                 carried.request
             );
+            // An offer of seen activity given in the cut words goes with
+            // them, held to being played whole in this request (#6543).
+            crate::seen_yes::answered_in_place(carried.request, request);
             put_in_flight(
                 &shared,
                 Carried {
@@ -11397,6 +11400,7 @@ async fn answered_if_declined(
         carried.request
     );
     crate::services::answered_in_place(request);
+    crate::seen_yes::answered_in_place(carried.request, request);
     unsay_carried(shared, request, &carried);
     let owner = carried.memory_write_owner.clone();
     put_in_flight(

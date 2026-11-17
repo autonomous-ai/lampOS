@@ -4768,7 +4768,10 @@ after a take-over, but now for every turn:
   finished, each call with its result, go with its words, and a held line
   answering them only goes on from them: `request M goes on from K messages
   of the cut answer's finished rounds`. A round still waiting on a call is
-  not carried. Words joined with new ones start again (#5026, lamp-0529,
+  not carried. A seen activity offer the cut answer gave goes with its
+  words (`seen_yes::answered_in_place`, #6543): the line answering them
+  must play the disclosure whole itself, and the line after it answers the
+  offer. Words joined with new ones start again (#5026, lamp-0529,
   3 Nov: a search, a page and a second search were lost to a 0-word line,
   and the answer came from the model's memory). A connected service's send
   (`service_write` with its `send_id`, `services::may_send`) is the one call
