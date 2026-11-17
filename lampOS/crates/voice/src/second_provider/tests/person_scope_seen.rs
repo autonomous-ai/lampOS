@@ -123,6 +123,8 @@ fn feed_faces(
                 faces: in_view
                     .iter()
                     .map(|&(id, speaks)| lamp_msgs::Face {
+                        pitch: None,
+                        looking: None,
                         id: id.to_owned(),
                         xmin: 0.1,
                         ymin: 0.1,
@@ -2394,6 +2396,8 @@ async fn the_carry_window_counts_from_the_lines_start_not_its_end() {
         let t0 = now - span;
         let face = |id: &str| lamp_msgs::Faces {
             faces: vec![lamp_msgs::Face {
+                pitch: None,
+                looking: None,
                 id: id.to_owned(),
                 xmin: 0.1,
                 ymin: 0.1,

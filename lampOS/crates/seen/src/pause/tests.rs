@@ -57,6 +57,8 @@ fn state(asleep: bool) -> ExpressionState {
 /// A face `id` whose box is 0.2 across, its left edge at `x`.
 fn face(id: &str, x: f32) -> Face {
     Face {
+        pitch: None,
+        looking: None,
         id: id.into(),
         xmin: x,
         ymin: 0.3,

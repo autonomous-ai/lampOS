@@ -45,6 +45,8 @@ fn frame(face: &str) -> lamp_msgs::Faces {
     use lamp_msgs::{Face, Speaking, SpeakingState};
     lamp_msgs::Faces {
         faces: vec![Face {
+            pitch: None,
+            looking: None,
             id: face.to_owned(),
             xmin: 0.2,
             ymin: 0.2,

@@ -1325,6 +1325,8 @@ mod tests {
             .unwrap();
         let mut room = crate::bus_out::RoomOut::on(&root).unwrap();
         let face = || lamp_msgs::Face {
+            pitch: None,
+            looking: None,
             id: "f".into(),
             xmin: 0.4,
             ymin: 0.0,

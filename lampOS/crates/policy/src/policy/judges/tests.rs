@@ -135,6 +135,8 @@ fn busy_weak_name_is_not_a_call_but_sure_name_conversation_text_and_fresh_pose_a
 
 fn face(facing: Option<bool>, height: f32) -> Face {
     Face {
+        pitch: None,
+        looking: None,
         speaking: None,
         id: "authored".into(),
         xmin: 0.1,

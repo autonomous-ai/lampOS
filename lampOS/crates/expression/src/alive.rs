@@ -1765,6 +1765,8 @@ mod routine_tests {
         Faces {
             faces: if present {
                 vec![Face {
+                    pitch: None,
+                    looking: None,
                     id: "face".into(),
                     xmin: 0.1,
                     ymin: 0.1,

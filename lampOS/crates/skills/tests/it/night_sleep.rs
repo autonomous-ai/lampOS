@@ -440,6 +440,8 @@ impl Night {
 
 fn face() -> Face {
     Face {
+        pitch: None,
+        looking: None,
         id: "face-one".into(),
         xmin: 0.4,
         ymin: 0.3,

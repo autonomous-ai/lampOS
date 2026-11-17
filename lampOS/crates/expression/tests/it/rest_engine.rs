@@ -251,6 +251,8 @@ fn hold_shows_listening_and_fresh_gaze_on_the_next_tick() {
         stamp,
         value: Faces {
             faces: vec![Face {
+                pitch: None,
+                looking: None,
                 speaking: None,
                 id: "speaker".into(),
                 xmin: 0.5,

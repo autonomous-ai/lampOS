@@ -202,6 +202,8 @@ async fn run_all(turns: &[Turn], on: bool, cut: Cut, cut_ask: Option<(usize, boo
                     let faces = lamp_msgs::Faces {
                         faces: ["f1", "f2"]
                             .map(|id| lamp_msgs::Face {
+                                pitch: None,
+                                looking: None,
                                 id: id.to_owned(),
                                 xmin: 0.1,
                                 ymin: 0.1,
@@ -566,6 +568,8 @@ async fn a_rename_the_trigger_asks_is_held_and_a_yes_renames_and_a_no_does_not()
         )
         .unwrap();
     let face = lamp_msgs::Face {
+        pitch: None,
+        looking: None,
         id: "f1".into(),
         xmin: 0.4,
         ymin: 0.0,

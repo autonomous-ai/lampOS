@@ -376,6 +376,8 @@ async fn start_processing_keeps_its_fence_across_an_early_callback() {
                     ("start-fence", frame),
                     &lamp_msgs::Faces {
                         faces: vec![lamp_msgs::Face {
+                            pitch: None,
+                            looking: None,
                             id: "f1".into(),
                             xmin: 0.1,
                             ymin: 0.1,
