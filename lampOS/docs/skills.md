@@ -5000,7 +5000,10 @@ length only (`do.task: lamp-tasks' answer carries N bytes of its agent's
 answer`, or `no agent's answer`; #7180). A gate found shut as the wait
 begins, a read's or a told answer's, is said once with its reason
 (`skill:<name>: waits for its gate: quiet hours`, `Room::waits`), so an
-answer held in quiet hours leaves a line (#7180). Its end is said as before
+answer held in quiet hours leaves a line (#7180); each change of that reason
+while it waits is said once more, at most one a second
+(`service_read::SAY_WHY_EVERY`), never each look, so a wait that holds on
+shows which condition held (lamp-9adf, 17 Nov). Its end is said as before
 (`told N`, or `skipped: quiet hours` after the hour); while it waits it is
 kept in the state folder's `task-telling.json` (its skill and when it
 began, never a word of it), so one a restart of lamp-skills drops unsaid is
