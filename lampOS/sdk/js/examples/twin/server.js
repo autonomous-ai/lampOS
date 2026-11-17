@@ -27,6 +27,7 @@ import { WebSocketServer } from 'ws';
 import { Keyring, Lamp, LampError, SPEAKER_EVENTS, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
 import { limitsOf } from './reach.js';
+import { linked } from './link.js';
 import { checked, cleanScratch, cleanScratchNotes, cleanScratchSkill, describe, findControl, findStimulus, logIt, stopRainbow } from './controls.js';
 import { endHandler, watchParent } from './twin-end.js';
 import { chooseLan, hostOk, newToken, originOk, parseUrl, tokenOk } from './guard.js';
@@ -71,7 +72,12 @@ if (!existsSync(glbPath) || readFileSync(glbPath).toString('latin1', 0, 4) !== '
 const NAMES = model.joints.map((joint) => joint.name);
 const DEG_A_COUNT = 360 / 4096;
 
-const { lamp, sim, fakeLamp } = options.fake ? await fakeBody() : real ? { lamp: await Lamp.connect(undefined, { keyring: realKeyring }) } : { lamp: await Lamp.connect() };
+// The one word the page server says of the lamp's connection, to its own terminal and to every page once `tell` exists (below).
+let announce = (text) => console.error(`try-it: ${text}`);
+// A real lamp's connection is kept (link.js): it ends with a reason said, is made again, and what the page listens to is listened to again.
+const { lamp, sim, fakeLamp } = options.fake ? await fakeBody() : real
+  ? { lamp: await linked(() => Lamp.connect(undefined, { keyring: realKeyring }), { say: (text) => announce(text), onUp: () => reconnected(), onEnd: () => process.kill(process.pid, 'SIGTERM') }) }
+  : { lamp: await Lamp.connect() };
 const runFlags = real ? { camera: Boolean(options.camera), microphone: Boolean(options.microphone) } : undefined;
 const realHost = real ? realKeyring.pairing()?.host ?? '' : '';
 const pages = new Set();
@@ -80,6 +86,7 @@ const tell = (message) => {
   for (const page of pages) page.send(text);
 };
 let last = null;
+announce = (text) => { console.error(`try-it: ${text}`); tell({ type: 'said', text }); };
 // `--ring-file PATH`: the virtual desktop lamp's ring (lamp-sim's DIR/ring.json: `on`, `colour`, `level`, 32 `#rrggbb` pixels as drawn
 // at that moment, and the `pattern` while one moves), put in the light's `shows` for what the lamp does not say itself: the twin then
 // draws the ring pixel by pixel, moving. It reads a file beside the lamp, not the lamp's door; it goes with the field it stands in
@@ -149,6 +156,13 @@ console.log(bodyGrant ? `body.state subscribed on ${options.fake ? 'a simulated 
 // One lease at a time, taken at the first drag and given back 3 s after the last.
 let lease = null;
 let letGo = null;
+// The lamp ended a connection and this one is new: the lamp ended the leases of the old one (docs/control.md), so none is held, and the
+// limits are asked again.
+function reconnected() {
+  clearTimeout(letGo);
+  lease = null;
+  readLimits();
+}
 async function drag(joint, deg, final = false) {
   if (!NAMES.includes(joint) || !Number.isFinite(deg)) return;
   try {
