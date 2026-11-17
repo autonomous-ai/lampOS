@@ -18,6 +18,10 @@ pub const CALL_SOCKET: &str = "call.sock";
 pub const CONNECTED: &str = "services_connected";
 pub const READ: &str = "service_read";
 pub const WRITE: &str = "service_write";
+/// How `service_read`'s `what` opens: then each service's kinds of read
+/// ([`reads::kinds`]), as `gmail: recent, search, …`.
+pub const KINDS_OPEN: &str =
+    "One kind of read, the word alone, of the named service's own, never other words: ";
 
 fn codes() -> Vec<&'static str> {
     catalog::SERVICES
@@ -138,11 +142,38 @@ fn catalog_for(offset_minutes: Option<i32>, edits: Edits, linked: Option<&[Strin
         })
         .collect();
     if !mcp.is_empty() {
-        let call = "tools, call {tool, arguments}";
-        fields_named(call, &mut read_fields);
+        fields_named(reads::MCP_WHATS, &mut read_fields);
         fields_named(writes::MCP_ACTIONS, &mut write_fields);
-        whats.push(format!("{mcp}: {call}"));
+        whats.push(format!("{mcp}: {}", reads::MCP_WHATS));
     }
+    // Each service's kinds of read, the words a refusal names (#7498), on
+    // `what` itself: the description's list may be cut for its bound.
+    let mut kinds_by_service: Vec<String> = Vec::new();
+    let mut every_kind: Vec<&str> = Vec::new();
+    let mut mcp_kinds: Option<Vec<&str>> = None;
+    for code in &codes {
+        let kinds = reads::kinds(code);
+        if kinds.is_empty() {
+            continue;
+        }
+        for kind in &kinds {
+            if !every_kind.contains(kind) {
+                every_kind.push(kind);
+            }
+        }
+        match catalog::service(code).and_then(|service| service.mcp) {
+            Some(_) => mcp_kinds = Some(kinds),
+            None => kinds_by_service.push(format!("{code}: {}", kinds.join(", "))),
+        }
+    }
+    if let Some(kinds) = mcp_kinds {
+        kinds_by_service.push(format!("{mcp}: {}", kinds.join(", ")));
+    }
+    let what = json!({
+        "type": "string",
+        "enum": every_kind,
+        "description": format!("{KINDS_OPEN}{}.", kinds_by_service.join("; ")),
+    });
     let mut actions: Vec<String> = writes::ACTIONS
         .iter()
         .filter(|(code, _)| shown(code))
@@ -195,7 +226,7 @@ fn catalog_for(offset_minutes: Option<i32>, edits: Edits, linked: Option<&[Strin
                 "type": "object",
                 "properties": {
                     "service": {"type": "string", "enum": codes},
-                    "what": string("What to read, as listed for the service."),
+                    "what": what,
                     "query": string("Search words, or a number to find; for gmail as its own search takes them."),
                     "id": string("An id a search or a list gave; to read a mail or its attachment, search first for its id."),
                     "name": string("For attachment: its name, as message listed it."),
@@ -599,10 +630,21 @@ mod tests {
                 "action", "cc", "said", "send_id", "service", "subject", "text", "to"
             ]
         );
-        // The fields kept are the ones every service has, unchanged.
+        // `what` names its kinds alone (#7498).
+        assert_eq!(
+            read["parameters"]["properties"]["what"],
+            json!({
+                "type": "string",
+                "enum": ["recent", "search", "drafts", "message", "attachment"],
+                "description": format!(
+                    "{KINDS_OPEN}gmail: recent, search, drafts, message, attachment."
+                ),
+            })
+        );
+        // The other fields kept are the ones every service has, unchanged.
         for (at, tool) in gmail["tools"].as_array().unwrap().iter().enumerate() {
             for (field, about) in tool["parameters"]["properties"].as_object().unwrap() {
-                if field != "service" {
+                if field != "service" && field != "what" {
                     assert_eq!(&all["tools"][at]["parameters"]["properties"][field], about);
                 }
             }
