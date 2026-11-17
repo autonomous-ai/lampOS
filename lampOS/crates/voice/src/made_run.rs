@@ -72,6 +72,37 @@ pub fn speaks_itself(told: &Value) -> bool {
     told["ran"] == true && told["says"] == true
 }
 
+/// How long after its run now a made skill's exact line, asked as the
+/// answer to that conversation (the say service's `answers`), is said as
+/// one: the conversation still going on (`crate::thread::GOING_ON_FOR`).
+/// lamp-skills asks it so only within this of the ask
+/// (`lamp_skills::task_sure`, the first builder's 21:25 on #7363).
+pub const ANSWERS_WITHIN: std::time::Duration = crate::thread::GOING_ON_FOR;
+
+/// The made skills run now by the owner's voice, each with when: the say
+/// service's own record, so no other asker can stand for a run's answer.
+static RAN_NOW: std::sync::Mutex<Vec<(String, std::time::Instant)>> =
+    std::sync::Mutex::new(Vec::new());
+
+/// `skill` run now by the owner's voice at `at`.
+pub(crate) fn ran_now(skill: &str, at: std::time::Instant) {
+    let mut ran = RAN_NOW.lock().unwrap_or_else(|poison| poison.into_inner());
+    ran.retain(|(name, when)| {
+        name != skill && at.saturating_duration_since(*when) <= ANSWERS_WITHIN
+    });
+    ran.push((skill.to_owned(), at));
+}
+
+/// Whether `skill`'s line may answer the conversation that ran it at `now`:
+/// run now by the owner's voice within [`ANSWERS_WITHIN`].
+pub fn answers_now(skill: &str, now: std::time::Instant) -> bool {
+    RAN_NOW
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .iter()
+        .any(|(name, at)| name == skill && now.saturating_duration_since(*at) <= ANSWERS_WITHIN)
+}
+
 /// The most of their skills' names said when none is near.
 const NAMED_MOST: usize = 3;
 
@@ -209,6 +240,7 @@ pub fn asked(
     }
     match run(&made) {
         Ok(says) => {
+            ran_now(&made, std::time::Instant::now());
             eprintln!("lamp-voice: request {request}: a made skill run now, as its owner asked");
             json!({
                 RUN: made,

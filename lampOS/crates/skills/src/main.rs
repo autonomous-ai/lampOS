@@ -3162,10 +3162,12 @@ fn run_now_call(
         return;
     }
     engine.ran_now(&skill, now_us);
-    // Its told answer may lift the quiet (#7180): a run now is the
-    // owner's own spoken ask, the voice's alone ([`listen`]); marked only
-    // for a run with a task, whose own hand-over takes it.
-    if lamp_voice::told_when_asked::on()
+    // Its told answer may lift the quiet (#7180), and with
+    // `LAMP_SKILL_TASK_SURE` its failure is said in the conversation that
+    // asked (#7363): a run now is the owner's own spoken ask, the voice's
+    // alone ([`listen`]); marked only for a run with a task, whose own
+    // hand-over takes it.
+    if (lamp_voice::told_when_asked::on() || lamp_skills::task_sure::on())
         && run.calls.iter().any(|call| matches!(call, Call::Task(_)))
     {
         lamp_skills::task::asked_by_voice(&skill, now_ms);
@@ -5716,7 +5718,11 @@ fn tasks_refused(skill: &str, calls: &[Call], tasks: &Tasks) -> Option<String> {
 /// thread; off, as before.
 fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut room: LampRoom) {
     // This run's own: a run now asked by voice, never a trigger's after it.
-    let asked = lamp_skills::task::take_asked_by_voice(skill);
+    // Its quiet lifted and its not-ready line only with
+    // `LAMP_TOLD_WHEN_ASKED` (#7180), as before; its failure answered in
+    // the asking conversation only with `LAMP_SKILL_TASK_SURE` (#7363).
+    let asked_at = lamp_skills::task::take_asked_by_voice(skill);
+    let asked = asked_at.filter(|_| lamp_voice::told_when_asked::on());
     let Some((folder, grants)) = tasks.of.get(skill).cloned() else {
         eprintln!("lamp-skills: skill:{skill}: do.task: not handed over: its folder is not known");
         return;
@@ -5845,13 +5851,18 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             _ => tried.failed(),
         };
         // What its agent found, or with the switch on, why it didn't run
-        // (once: a refusal or the not-ready line said above is that).
+        // (once: a refusal or the not-ready line said above is that). Its
+        // failure is said in the conversation that asked for the run while
+        // it goes on, else as news (`lamp_skills::service_read::tell_failed`).
+        let asking = sure && lamp_skills::task_sure::in_asking_conversation(asked_at, unix_ms());
         let told = match (found.take(), failed) {
-            (Some(lines), _) => Some((lines, "what its agent found")),
-            (None, Some(line)) if refused.is_none() => Some((vec![line], "what became of its run")),
+            (Some(lines), _) => Some((lines, "what its agent found", None)),
+            (None, Some(line)) if refused.is_none() => {
+                Some((vec![], "what became of its run", Some(line)))
+            }
             (None, _) => None,
         };
-        if let Some((lines, what)) = told {
+        if let Some((lines, what, failed)) = told {
             // Kept as waiting till its end, so a restart that drops it
             // unsaid leaves a line at the next start (#7180).
             let began = unix_ms();
@@ -5878,7 +5889,10 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
                     ),
                 }
             }
-            let told = lamp_skills::service_read::tell(&lines, &mut room);
+            let told = match &failed {
+                Some(line) => lamp_skills::service_read::tell_failed(line, asking, &mut room),
+                None => lamp_skills::service_read::tell(&lines, &mut room),
+            };
             eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {told}");
             if let Some(state) = &state
                 && let Err(error) = lamp_skills::task::telling_ends(state, &skill, began)
@@ -6160,6 +6174,23 @@ impl lamp_skills::service_read::Room for LampRoom {
         let outcome = say(&self.say, "say", &self.skill, exact_words(text), &[], || {});
         match outcome.strip_prefix("say: ") {
             Some("spoken") => Ok(()),
+            Some(other) => Err(other.to_owned()),
+            None => Err(outcome),
+        }
+    }
+
+    fn answer(&mut self, text: &str) -> Result<(), String> {
+        // Exact words, as the answer to the conversation that ran it now
+        // (#7363): the voice lets it through that conversation only while
+        // its own record of the run says so (`lamp_voice::made_run`).
+        let asking = json!({"text": text, "exact": true, "answers": true,
+                            "priority": lamp_skills::SAY_PRIORITY});
+        let mut begun = false;
+        let outcome = say(&self.say, "say", &self.skill, asking, &[], || begun = true);
+        match outcome.strip_prefix("say: ") {
+            Some("spoken") => Ok(()),
+            // Begun and cut: heard in part, never said again as news.
+            Some(_) if begun => Ok(()),
             Some(other) => Err(other.to_owned()),
             None => Err(outcome),
         }

@@ -298,8 +298,11 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   một kỹ năng khác đang chạy: mỗi lúc chỉ chạy một việc). Với
   `LAMP_SKILL_TASK_SURE=on` ở lamp-skills (tắt nếu không đặt, bật
   trong sản phẩm; docs/skills.md, "A skill's task"), lamp-skills nói lời
-  từ chối hay lần chạy thất bại với chủ đèn bằng một câu cố định sau cổng
-  của câu trả lời cần nói, không bao giờ là lời của tác vụ hay message
+  từ chối hay lần chạy thất bại với chủ đèn bằng một câu cố định (trong
+  cuộc trò chuyện đã yêu cầu một lần chạy ngay bằng giọng nói, nói ngay như
+  câu trả lời; ngoài ra là tin tức, sau cổng của câu trả lời cần nói, lần
+  tới chủ đèn được thấy trong vòng 30 phút, bỏ vào giờ yên lặng; #7363),
+  không bao giờ là lời của tác vụ hay message
   này, và lần chạy bị từ chối `busy` chờ đến lượt trong hàng duy nhất của
   lamp-skills (tối đa 4 cái trong hàng, tính cả cái đang được giao, vào
   trước ra trước, mỗi cái tối đa 15 phút từ lúc bắt đầu chờ) rồi được giao lại khi lần chạy đang diễn ra kết thúc, nên hai kỹ
