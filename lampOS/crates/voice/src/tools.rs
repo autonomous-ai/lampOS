@@ -2066,7 +2066,8 @@ fn run_spoken_call_inner(
         if let Some(told) = crate::upload_agent::first_run(&call.name, request, heard, lease) {
             return ("the agent skill's yes", ToolAnswer::plain(told), true);
         }
-        let (answer, answered) = ask_with_context(directory, call, ASK_DEADLINE, context);
+        let call = stop_as_heard(directory, call, request, heard);
+        let (answer, answered) = ask_with_context(directory, &call, ASK_DEADLINE, context);
         ("the executive", answer, answered)
     } else {
         let (whom, (mut told, answered)) = run_call_with_scope(route, call, request, heard, lease);
@@ -2702,7 +2703,14 @@ fn run_call_with_scope(
             }
             ("the memory", (told, answered))
         }
-        Route::Executive(directory) => ("the executive", ask(directory, call, deadline)),
+        Route::Executive(directory) => (
+            "the executive",
+            ask(
+                directory,
+                &stop_as_heard(directory, call, request, heard),
+                deadline,
+            ),
+        ),
         // A session of theirs, named, only for the lamp's owner, heard, as
         // the services hold it (#6274); a look stops with the request.
         Route::Tasks(place) => (
@@ -3033,6 +3041,28 @@ fn run_call_with_scope(
 pub fn ask(directory: &Path, call: &ToolCall, deadline: Duration) -> (Value, bool) {
     let (answer, answered) = ask_with_context(directory, call, deadline, None);
     (answer.told, answered)
+}
+
+/// `call` as the person's own words for `request` scope it, when it is a
+/// shared stop's snooze, off or on offering kinds in `directory`'s tools
+/// file ([`crate::stop_scope`], #7473: the owner's call, the lamp reads the
+/// words); otherwise as it is. Nothing is read for any other call.
+fn stop_as_heard(directory: &Path, call: &ToolCall, request: u64, heard: bool) -> ToolCall {
+    if !heard || !crate::stop_scope::may_be_stop(call) {
+        return call.clone();
+    }
+    let words = crate::stop_scope::heard_words(request, heard);
+    match crate::stop_scope::scoped(
+        call,
+        &catalog(&directory.join(CATALOG_FILE)),
+        words.as_deref(),
+    ) {
+        Some((scoped, line)) => {
+            eprintln!("lamp-voice: {} for request {request}: {line}", call.name);
+            scoped
+        }
+        None => call.clone(),
+    }
 }
 
 fn ask_with_context(
@@ -4341,6 +4371,40 @@ mod tests {
             json!({"op":"call","name":"set_timer","args":{"text":"Tea","seconds":60}})
         );
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #7473, the owner's call: a shared stop offering kinds goes to the
+    /// skills with the scope the person's own words set, over the model's
+    /// `kind`; a line nobody spoke goes as the model made it.
+    #[test]
+    fn a_shared_stop_goes_with_the_scope_the_words_set() {
+        let tools = json!({"tools":[{
+            "name":"wellbeing_nudges",
+            "description":"When someone asks you to stop a wellbeing nudge.",
+            "parameters":{"type":"object","properties":{
+                "all":{"type":"boolean"},
+                "how":{"type":"string","enum":["snooze","off","on"]},
+                "kind":{"type":"string","enum":["eyes","water"]}}}}]});
+        let call = ToolCall {
+            id: "provider-call-1".into(),
+            name: "wellbeing_nudges".into(),
+            args: json!({"how":"off","kind":"eyes"}),
+        };
+        for (heard, sent) in [
+            (true, json!({"how":"off","kind":["water","eyes"]})),
+            (false, json!({"how":"off","kind":"eyes"})),
+        ] {
+            let dir = schedule_directory("stop-scope");
+            std::fs::write(dir.join(CATALOG_FILE), tools.to_string()).unwrap();
+            let served = executive(&dir, b"{\"ok\":true,\"result\":{}}\n", Duration::ZERO);
+            crate::stop_scope::set_heard_here(Some(Some("Stop the water and eye nudges.")));
+            let (_, (_, answered)) =
+                run_call_with_scope(&Route::Executive(dir.clone()), &call, 9, heard, None);
+            crate::stop_scope::set_heard_here(None);
+            assert!(answered);
+            assert_eq!(served.join().unwrap()["args"], sent, "heard {heard}");
+            std::fs::remove_dir_all(dir).unwrap();
+        }
     }
 
     /// #7335's row: with `LAMP_SKILL_STATE_TOLD`, `make_skill`'s list of

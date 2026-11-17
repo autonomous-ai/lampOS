@@ -5651,6 +5651,116 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   `lamp_control::task_yes::yes_for_token`) và kết quả qua Task news là của
   #6304 và #6306.
 
+## Một `[stop]` dùng chung gọi tên một loại (`[stop] kind`, #6543)
+
+Các kỹ năng của một nhóm `[budget]` dùng chung một hàm `[stop]` (như
+`wellbeing_nudges`). Gọi không có `all` thì dừng kỹ năng chạy hoặc được hỏi
+sau cùng, có `all` (hoặc khi chưa kỹ năng nào chạy) thì dừng tất cả, như
+trước. Từ #7473, lời của `all` và `about` của các kỹ năng wellbeing nói với
+mô hình: "the nudges" (số nhiều, hoặc nói chung) là `all`, còn "that one"
+hay "this nudge" (số ít) mới bỏ `all` để dừng cái sau cùng (trước đó, trên
+lamp-06c1, "stop the nudges" chỉ dừng cái sau cùng). Nay một kỹ năng có thể khai `kind` trong `[stop]`: một chữ thường,
+rồi chữ thường, chữ số và gạch nối đơn ở giữa, tối đa 32 byte, là từ mà hàm dùng chung gọi
+kỹ năng đó, bên cạnh tên của nó ("đừng nhắc tôi về chuyện uống nước nữa").
+Khi có ít nhất một kỹ năng dùng chung khai `kind`, hàm có thêm `kind`, một
+từ trong danh sách (`kind` của mỗi kỹ năng dùng chung đang bật, hoặc tên của nó,
+xếp theo thứ tự chữ cái); qua `use_skill`, dòng của nó nói "Its kind is one of
+…" và `kind` của lời gọi được chuyển tiếp. Khi có loại, mô tả của hàm là
+`about` rồi đến `STOP_KIND_LEAD`, "When they name a kind ('stop the water
+nudge', 'no more eye nudges'), give that kind: never all, and never the one
+that came last.", và lời của `kind` bảo đưa loại mỗi khi người dùng gọi tên
+một loại, số ít hay số nhiều (#7473: trên lamp-06c1, chỉ được nghe `about`,
+mô hình dừng cái sau cùng cho "snooze only the eyes nudges", 3 trên 3);
+không có loại thì mô tả là `about`, từng byte. Tám kỹ năng wellbeing khai loại của mình (#7473, HOLD của Heron): `water`, `eyes`, `stand-up`, `break`, `meal`, `sit-back`, `wind-down` và `focus`, nên trên sản phẩm hàm luôn có `kind`, và `about` của chúng nói `all` là cho "the nudges" khi không gọi tên loại nào, nên "no more eye nudges" chỉ dừng nhắc mắt.
+
+**Đèn đọc lời người nói** (#7473, quyết định của chủ sản phẩm, 19/11: trên
+lamp-06c1 mô hình không đưa `kind` lẫn `all`, 0 trên 7), đọc chặt để một câu
+bình thường không bao giờ chọn phạm vi (HOLD trên #7473, c7007369316). Khi
+hàm dừng dùng chung có loại được gọi với `snooze`, `off` hay `on` cho một
+câu người nói, trực tiếp hay qua `use_skill`, giọng nói
+(`lamp_voice::stop_scope`) đọc chính lời của lượt đó
+(`Thread::heard_in_own_line`, câu được giữ cho request đó, không bao giờ là
+câu khác) trước khi lời gọi tới lamp-skills, không gọi mô hình lần nữa:
+
+- **Trước hết, lời nhắc nói về loại nào**: từ của một loại đứng ngay sau
+  "about", "about my" hay "for my" (`ABOUT_WORDS`; "stop the nudges about
+  drinking water", "turn off the nudges for my posture", "snooze the
+  reminders about my eyes"), và các loại nối với nó bằng "and" hay "or",
+  cho `kind` đó. "for" đứng một mình là chỉ thời gian nên không đọc ("stop
+  the nudges for this evening" là tất cả; HOLD thứ ba trên #7473,
+  c7008469040).
+- **Sau đó, nói chung** (`ALL_WORDS`: "the nudges", "all nudges", "all
+  the nudges", "all of them", "everything", "all reminders"): `all` là true,
+  bỏ `kind`, dù có từ chỉ loại ở gần ("Snooze everything for an hour, I need
+  to focus", "Stop the nudges while I eat").
+- **Không thì, một loại gọi tên lời nhắc**: từ của loại (`KIND_WORDS`, một
+  bảng duy nhất: water: "water", "drink", "drinking", "sip"; eyes: "eye",
+  "eyes", "screen"; stand-up: "stand", "standing", "stand up"; break:
+  "break", "breaks"; sit-back: "posture", "sit back", "slouch"; wind-down:
+  "wind down", "bedtime", "evening"; meal: "meal", "eat", "food", "lunch",
+  "dinner"; focus: "focus") đứng ngay trước "nudge", "reminder" hay "one"
+  (số ít hay số nhiều, `NOUNS`), hoặc trước từ của một loại khác như vậy,
+  sau "and" hay "or" ("the water and eye nudges", danh sách cả hai,
+  `["water","eyes"]`). Chỉ các loại hàm có, trọn từ, không phân biệt hoa
+  thường. Cho `kind` đó, bỏ `all`. Từ chỉ loại ở chỗ khác không gọi tên gì
+  ("I need to focus", "this evening", "I can't stand these reminders").
+- **Còn lại**, kể cả "it", "that one", "this one": giữ nguyên lời gọi của
+  mô hình (`kind`, `all`, hay không có cả hai, tức cái sau cùng), nên `all`
+  của mô hình vẫn là tất cả trừ khi một loại gọi tên lời nhắc: "Turn it all
+  off" và "stop all of it" giữ `all` của mô hình (không thêm cụm nào vào
+  bảng từ của chủ sản phẩm). Câu loại trừ một loại, "except", "but" hay
+  "not" trong vòng ba từ trước từ của một loại (`BUT_WORDS`: "stop all the
+  nudges except water", "everything but the water one"), cũng giữ lời gọi
+  của mô hình.
+
+Chỉ đọc loại gọi tên lời nhắc, nên tiếng nói chuyện trong phòng lẫn vào câu
+trên Live (`Thread::hold_line` lấy lời nghe mới nhất) chỉ thêm loại khi nó
+như "the dinner nudges", và nhật ký ghi điều đã đặt.
+
+Một phạm vi rõ thì thay phạm vi của mô hình. Câu không ai nói, cách
+`[stop.done]` và hàm dừng không có loại thì như mô hình gửi. **Hiện chỉ đọc
+tiếng Anh**: câu bằng ngôn ngữ khác không khớp gì, nên đèn tiếng Việt giữ lời
+gọi của mô hình; từ tiếng Việt sẽ thêm sau khi chủ sản phẩm duyệt bảng từ.
+Nhật ký ghi "the heard words set kind=… all=… (the model sent kind=… all=…)".
+`kind` của lời gọi có thể là danh sách như vậy:
+kỹ năng của từng loại; loại không thuộc kỹ năng nào (loại cũ) bị bỏ ra và
+các loại còn lại vẫn dừng, lời trả về chỉ gọi tên chúng; danh sách không có
+loại nào đúng, danh sách rỗng, hay có từ rỗng hoặc không phải chữ thì không
+đổi gì. Lời trả về gọi
+đúng những gì đã đổi, mỗi kỹ năng bằng `kind` của nó (không có thì bằng
+tên), và khi chỉ một số đổi thì nói rõ: "Done: none of the eyes nudges until
+tomorrow morning. Only those: every other nudge is as it was, so never say
+all of them. Tell them so in a few words." (#7473: "the rest your eyes
+nudges" bị nói lại thành "the water nudges and the rest", và chỉ cái sau
+cùng bị nói thành "no nudges at all"); tất cả thì là "the wellbeing nudges".
+Test: các test của `lamp_voice::stop_scope` và
+`a_shared_stop_goes_with_the_scope_the_words_set` của `lamp_voice::tools`.
+
+Gọi với một loại thì chỉ dừng
+(hoặc hoãn, hoặc bật lại) các kỹ năng của loại đó, so với các `kind` đã khai
+trước, và chỉ so với tên kỹ năng khi không `kind` khai nào khớp (một loại
+trùng tên kỹ năng khác chỉ dừng loại đó; một loại rỗng bị từ chối, "Nothing
+changed: the kind is empty. …"), không phân biệt chữ hoa
+và gạch nối, gạch dưới hay khoảng trắng, không đọc `all`, lời nói tên kỹ
+năng hoặc loại đó. Một loại không phải của kỹ năng nào thì không đổi gì, và
+mô hình được báo "Nothing changed: none of these is "naps". The kinds are
+drinks, meals, tired; or leave the kind out." Tắt theo loại được giữ trong
+cùng tệp `off`, mỗi dòng là tên một kỹ năng, như mọi lần tắt khác, nên vẫn
+tắt sau khi khởi động lại. Không kỹ năng nào khai `kind` thì hàm như trước,
+từng byte, lời gọi không có loại cũng như trước, và lời gọi có `kind` bị từ
+chối bằng "Say how: snooze, off or on." như trước; qua `use_skill`, một kỹ
+năng có lựa chọn hoặc có/không của chính nó tên `kind` vẫn nhận nó như trước, và chỉ một hàm dừng (`how` là ba cách, rồi tới cách `[stop.done]` nếu có)
+mới có loại. Số công cụ của phiên
+không đổi. Test: `a_shared_stop_named_with_a_kind_stops_only_that_kind`,
+`a_kind_turned_off_is_kept_across_a_restart`,
+`a_shared_stop_with_no_kind_declared_refuses_a_kind`,
+`a_kind_matches_declared_kinds_before_names` (`crates/skills/tests/it/skills.rs`)
+và `a_shared_stops_kind_is_passed_on_and_offered_only_when_taken`,
+`a_skills_own_parameter_named_kind_passes_through`,
+`a_stray_key_on_a_kinded_skill_names_kind`
+(`lamp_voice::use_skill`). Bản đầy đủ ở [skills.md](../skills.md), hàng
+`[stop]`.
+
 ## Chủ đề người ở bàn đang làm gì (#6543, chưa có bên phát)
 
 Đã khai báo cho #6543 (nhận biết qua đám mây), chưa có phần nào phát:

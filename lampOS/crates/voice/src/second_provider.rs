@@ -514,8 +514,9 @@ pub(crate) fn without_kept_calls(history: &[Message]) -> Option<(Vec<Message>, u
 /// back by the model itself, no call, three rows of three).
 ///
 /// A skill's call through [`crate::use_skill::NAME`] is kept with its
-/// `skill`, `choice` and `flag` only, [`SKILL_KEPT_FIELDS`] (a skill's
-/// name, a word from its own list, a yes-or-no; never the person's words),
+/// `skill`, `choice`, `flag` and `kind` only, [`SKILL_KEPT_FIELDS`] (a
+/// skill's name, a word from its own list, a yes-or-no, a word from its
+/// kinds; never the person's words),
 /// and only when every field it has is one of those (#7076: on lamp-52e6 on
 /// 14 Nov a second "Lamp, I'm unplugging you now." 8 s after a
 /// prepare-unplug run was answered in words, `calls=none`: the earlier
@@ -564,7 +565,7 @@ pub(crate) fn kept_args(name: &str, args: &serde_json::Value) -> Option<serde_js
 pub(crate) const WRITE_KEPT_FIELDS: [&str; 3] = ["service", "action", "send_id"];
 
 /// The only fields a kept `use_skill` call may have ([`kept_args`]).
-pub(crate) const SKILL_KEPT_FIELDS: [&str; 3] = ["skill", "choice", "flag"];
+pub(crate) const SKILL_KEPT_FIELDS: [&str; 4] = ["skill", "choice", "flag", "kind"];
 
 /// A kept skill's call, as told in a later turn's history ([`kept_result`]):
 /// it ran then, and a new ask for it is a call of its own (#7076).
