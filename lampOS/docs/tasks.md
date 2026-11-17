@@ -3968,6 +3968,29 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   and a skill has one yes, so an agreed check is the owner's yes to `net`
   for the folder as it is. Off, `net` is refused as an unknown grant
   (`bad_request`) before any token.
+- **What a `net` run never holds, and its bounds** (Heron's P1 and P3s on
+  #7590, the first builder's 23:22 calls):
+  - `net` is never granted beside a private grant: a service's read or
+    write (`*-read`, `*-write`), `camera`, `microphone`, `speech` or
+    `notes` (`skill_task::PRIVATE_GRANTS`, `skill_task_yes::private_grant`).
+    The pair is refused at load (lamp-skills' `grants_of`), at an upload
+    (`upload_agent::files` and its kept `skill.toml`'s check, said plainly:
+    "it reaches the internet and also reads your Gmail, and one skill can't
+    do both: make it two skills"), in lamp-control's yes (`grants_ok`) and
+    in lamp-tasks' hand-over (`HandOver::check`, `bad_request`, nothing
+    minted). A skill that needs both is two skills.
+  - A `net` run sees only its own skill's folder, never another skill's:
+    lamp-tasks names it in the run's own folder, `make-<run id>/skill-folder`
+    (`egress::OWN_SKILL_FILE`), and the namespace script stages that folder
+    alone of `/var/lib/lampOS/skills` and `skills-dev`
+    (`hermes_install::OWN_SKILL_LINES`); a script without that line
+    (`egress::NS_OWN_SKILL_LINE`) gets no `net` run (`no_net`).
+  - There is no byte bound on a `net` run's traffic beyond its 16 pipes, 60 s
+    idle and the run's deadline.
+  - A `net` run's DNS questions go to the lamp's resolver, usually the home
+    router.
+  - The yes to `net` is taken back only by removing the skill; a run already
+    going keeps its way out to its end.
 - **A skill made by voice or in the app that needs the internet**
   (lamp-voice with `LAMP_TASK_NET`, `LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`
   and `LAMP_UPLOAD_TO_AGENT` on, `make_no_cannot::net_by_agent`): the
