@@ -6223,9 +6223,14 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    no `[ask]` and no topics; its steps as the rules above give them. The
    prompt says a skill can't yet hear what is said in the room "other than
    the words the person names to start it", and the agent's service rules
-   name them beside the lamp's own triggers. They stand in place of a
-   `[said]` start (`LAMP_MADE_SKILL_SAID`), which is not told with this
-   switch on. The brief says "one [trigger] as listed, or asks as above".
+   name them beside the lamp's own triggers. The brief says "one
+   [trigger] as listed, or asks as above". With `LAMP_MADE_SKILL_SAID=on`
+   too, both starts are told: the `[said]` rules, then these, the prompt
+   saying a skill can't yet hear what is said in the room "other than a
+   request told to the lamp (a [said] start) or the words the person names
+   to start it (asks), both below", and the brief "one [trigger] listed,
+   [said]/asks as above", written short so the longest brief with every
+   switch on stays within 1,160 bytes.
 2. **Held by the cap** (`made_skill::made_asks`, in `held`): an array of 1
    to 3 strings, each at most 60 characters, 2 to 8 words of letters,
    digits and apostrophes with one space between (as lamp-skills takes any

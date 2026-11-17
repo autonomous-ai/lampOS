@@ -976,8 +976,12 @@ pub fn brief_for(request: &str, reads: bool, agent: bool) -> Result<String, &'st
     // A start said to the lamp as the system prompt says it (#6526), only
     // with its switch: off, the brief never offers it. On, it stands where
     // the desk's presence is named, which the system prompt says too, so
-    // the longest brief stays within [`MOST_BRIEF_BYTES`].
-    let trigger = if asks_on() {
+    // the longest brief stays within [`MOST_BRIEF_BYTES`]. With the
+    // person's own words on too ([`ASKS_ENVIRONMENT`]), both stand there,
+    // written short so the longest brief with all on still fits.
+    let trigger = if asks_on() && said_on() {
+        "one [trigger] listed, [said]/asks as above"
+    } else if asks_on() {
         "one [trigger] as listed, or asks as above"
     } else if said_on() {
         "one [trigger] as listed or [said] as above"
