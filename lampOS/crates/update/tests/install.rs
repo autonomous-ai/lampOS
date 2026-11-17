@@ -2583,6 +2583,39 @@ fn the_product_loads_the_skills_present_values_in_all_three_units() {
     }
 }
 
+/// A skill asked about by voice is answered from the lamp's own records
+/// (`LAMP_SKILL_STATE_TOLD`, #7335), and with it the voice tells a skill on
+/// by its `[present]` spacing as lamp-skills runs it (`LAMP_NUDGES_PRESENT`,
+/// #5207): both `on`, once each, in lamp-voice, the only part of the voice
+/// that reads them (Twelve's P2 on #7364).
+#[test]
+fn the_voice_tells_a_skills_state_and_its_present_spacing() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for name in [
+        lamp_voice::skill_about::ENVIRONMENT,
+        lamp_voice::skill_about::PRESENT_ENVIRONMENT,
+    ] {
+        let line = format!("Environment={name}=on");
+        assert_eq!(
+            service.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice sets {line} once"
+        );
+    }
+    assert_eq!(
+        [
+            lamp_voice::skill_about::ENVIRONMENT,
+            lamp_voice::skill_about::PRESENT_ENVIRONMENT,
+        ],
+        ["LAMP_SKILL_STATE_TOLD", "LAMP_NUDGES_PRESENT"]
+    );
+}
+
 /// Each second-route turn is told the light as `light/state` says it now
 /// (`LAMP_LIGHT_TOLD`): on lamp-52e6 at 9928 (4 Nov), "what colour is the
 /// light?" was answered "White" three times while the light was warm at
