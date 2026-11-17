@@ -959,57 +959,27 @@ fn queued_spoken_tasks_go_first_and_know_their_place() {
     assert_eq!(run.join().unwrap(), Ok(()));
 }
 
-/// The rotation, Hermes' own bounds: after [`ROTATE_TURNS`] turns a fresh
-/// pane (the old one closed, never adopted again); a long answer counts
-/// toward [`ROTATE_TOKENS`] too.
+/// OpenClaw compacts its own sessions, so its pane is never rotated by
+/// count: past [`ROTATE_TURNS`] turns and a 250k-token answer it is still
+/// the one pane. Only an engine with no compaction (Hermes) has the bounds.
 #[test]
-fn the_pane_rotates_after_its_turns_or_tokens() {
+fn an_openclaw_pane_is_never_rotated_by_count() {
     assert_eq!((ROTATE_TURNS, ROTATE_TOKENS), (40, 250_000));
+    assert!(!rotation_due(EngineKind::Openclaw, u64::MAX, u64::MAX));
+    assert!(rotation_due(EngineKind::Hermes, ROTATE_TURNS, 0));
+    assert!(rotation_due(EngineKind::Hermes, 0, ROTATE_TOKENS));
+    assert!(!rotation_due(EngineKind::Hermes, ROTATE_TURNS - 1, ROTATE_TOKENS - 1));
     let dir = tempfile::tempdir().unwrap();
-    let deleted = Arc::new(Mutex::new(Vec::new()));
-    let seen = deleted.clone();
-    let one = kept_session(dir.path()).with_session_delete(Box::new(move |key| {
-        seen.lock().unwrap().push(key.to_owned());
-        Ok(())
-    }));
+    let one = kept_session(dir.path()).with_session_delete(Box::new(|_| Ok(())));
     let fake = Fake::default();
-    for n in 0..ROTATE_TURNS {
+    for n in 0..=ROTATE_TURNS + 5 {
         one_turn(&one, &fake, &format!("task-{n}"));
     }
-    assert_eq!(fake.count("new"), 1);
-    one_turn(&one, &fake, "task-40");
-    assert_eq!(fake.count("new"), 2, "rotated at its 41st turn");
-    assert_eq!(fake.count("close"), 1);
-    assert_eq!(fake.count("resume"), 0, "the old one not adopted");
-    assert_eq!(one.agent(), Some(agent_of(2)));
-    assert_eq!(
-        *deleted.lock().unwrap(),
-        vec![format!("agent:main:harness-{}", agent_of(1))],
-        "the rotated pane's conversation deleted"
-    );
-    // A spoken task's answer, read by the store, counts too.
-    let (one, fake) = (
-        session().with_session_delete(Box::new(|_| Ok(()))),
-        Fake::default(),
-    );
-    one.open_if_due(&fake, &place());
     one.count_answer(&"y".repeat(1_000_001));
     one_turn(&one, &fake, "after");
-    assert_eq!(fake.count("new"), 2, "rotated on the spoken answer");
-    // Tokens: one turn of 1,000,001 characters (250,001 tokens).
-    let (one, fake) = (
-        session().with_session_delete(Box::new(|_| Ok(()))),
-        Fake::default(),
-    );
-    let turn = one.enter("big", Kind::Skill, far(), &|| false).unwrap();
-    let words = "x".repeat(1_000_001);
-    assert!(matches!(
-        turn.send(&fake, &place(), &words, far(), &|| false),
-        Sent::Typed(1)
-    ));
-    drop(turn);
-    one_turn(&one, &fake, "next");
-    assert_eq!(fake.count("new"), 2);
+    assert_eq!(fake.count("new"), 1, "the same pane all along");
+    assert_eq!(fake.count("close"), 0);
+    assert_eq!(one.agent(), Some(agent_of(1)));
 }
 
 /// The open's first-turn wait ends with the run's own end, and with
@@ -1915,16 +1885,19 @@ fn the_kept_session_busy_or_not_running_is_waited_or_ensured_again() {
     ));
 }
 
-/// A rotation is `ensure --fresh`; a sign-out closes it `--forget` and
+/// OpenClaw's kept session is not rotated by count; a sign-out closes it `--forget` and
 /// removes its token and record.
 #[test]
-fn the_kept_session_rotates_fresh_and_a_sign_out_forgets_it() {
+fn the_kept_session_is_never_rotated_and_a_sign_out_forgets_it() {
     let dir = tempfile::tempdir().unwrap();
     let (one, fake) = kept_on(dir.path());
     for n in 0..=ROTATE_TURNS {
         one_turn(&one, &fake, &format!("task-{n}"));
     }
-    assert!(fake.calls().contains(&"ensure lamp-one-openclaw --fresh".to_owned()));
+    assert!(
+        !fake.calls().iter().any(|call| call.ends_with("--fresh")),
+        "OpenClaw compacts: no fresh conversation by count"
+    );
     assert_eq!(fake.count("close"), 0);
     one.drop_when_free("the lamp signed out");
     one.tend(&fake, &place(), &|| false);
