@@ -2232,15 +2232,16 @@ impl Cli {
                 // Exit 0 with no `taken`: the words may be there.
                 None => Took::Uncertain("reply_uncertain".into()),
             },
-            Ok(reply) => match program_refusal(&reply.stdout, reply.code, "reply_failed").as_str()
-            {
-                "not_idle" => Took::NotIdle,
-                "not_running" => Took::NotRunning,
-                "engine_not_ready" => Took::EngineNotReady,
-                "timeout" => timed_out(&reply.stdout),
-                "reply_off" => Took::NotSent("reply_off".into()),
-                refused => Took::NotSent(format!("reply_{refused}")),
-            },
+            Ok(reply) => {
+                match program_refusal(&reply.stdout, reply.code, "reply_failed").as_str() {
+                    "not_idle" => Took::NotIdle,
+                    "not_running" => Took::NotRunning,
+                    "engine_not_ready" => Took::EngineNotReady,
+                    "timeout" => timed_out(&reply.stdout),
+                    "reply_off" => Took::NotSent("reply_off".into()),
+                    refused => Took::NotSent(format!("reply_{refused}")),
+                }
+            }
             Err(error) if error.spawned => Took::Uncertain("reply_uncertain".into()),
             Err(error) => Took::NotSent(format!("reply_{}", error.code)),
         }
