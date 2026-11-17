@@ -1390,6 +1390,10 @@ fn worker_command(
             role,
             var(crate::made_skill::UNRELATED_ENVIRONMENT).as_deref(),
         ))
+        .envs(made_notes_worker_environment(
+            role,
+            var(crate::made_skill::NOTES_ENVIRONMENT).as_deref(),
+        ))
         .envs(onboarding_worker_environment(
             role,
             var(crate::onboarding::ENVIRONMENT).as_deref(),
@@ -1595,6 +1599,19 @@ fn made_asks_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::made_skill::ASKS_ENVIRONMENT, "on"))
+}
+
+// A made skill's notes (#7245, `made_skill::notes_on`), passed the same
+// narrow way: the exact `on`, to the two routes whose `make_skill` tells
+// the model the notes calls and takes a notes grant. Unpassed, lamp-c0a4's
+// makes on 18 Nov had no notes calls in their prompt and kept OpenClaw's
+// `notes-write` as it came.
+fn made_notes_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::NOTES_ENVIRONMENT, "on"))
 }
 
 // A made skill turned off and on by voice (#7445,
@@ -2986,6 +3003,10 @@ mod tests {
             ),
             (
                 crate::made_skill::UNRELATED_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::NOTES_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
         ] {

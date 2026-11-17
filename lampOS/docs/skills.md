@@ -3690,7 +3690,12 @@ gone ([switches.md](switches.md)). What happens:
      `lamp.notes.set(key, value)` and `lamp.notes.get(key)` (grant `notes`,
      `made_skill::SCRIPT_NOTES_SDK`): a small note kept in lamp-control's
      notes store under the skill's own client (`runs::skill_notes_client`),
-     which its next run reads back; never a file the person opens. A say
+     which its next run reads back; never a file the person opens. The
+     prompt says that the SDK has those two calls, so such a skill can be
+     made, and, with `LAMP_MADE_SKILL_ASKS` on too, that a skill started
+     by the person's own words is started by its asks, not by hearing the
+     room (`NOTES_ASKS_RULES`; on lamp-c0a4, 18 Nov, OpenClaw refused
+     "when I say fruit notes ..." with "the SDK has no notes call"). A say
      that claims a file or a note with no `lamp.notes.set` in its code is
      refused for a repair (`made_skill::CLAIMS_A_FILE`), as is a say or a
      task's words promising a file the person can open: the say-back says

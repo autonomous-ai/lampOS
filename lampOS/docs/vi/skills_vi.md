@@ -702,7 +702,12 @@ sau:
      `made_skill::SCRIPT_NOTES_SDK`): một ghi chú nhỏ giữ trong kho notes
      của lamp-control dưới client riêng của kỹ năng
      (`runs::skill_notes_client`), lần chạy sau đọc lại được; không bao giờ
-     là một tệp người dùng mở được. Một câu nói tự nhận đã ghi tệp hay ghi
+     là một tệp người dùng mở được. Lời nhắc nói rõ SDK có hai lệnh đó, nên
+     kỹ năng như vậy làm được, và khi `LAMP_MADE_SKILL_ASKS` cũng bật, một
+     kỹ năng khởi động bằng chính lời người dùng nói là khởi động bằng
+     `asks` của nó, không phải nghe trong phòng (`NOTES_ASKS_RULES`; trên
+     lamp-c0a4, 18/11, OpenClaw đã từ chối "when I say fruit notes ..." với
+     lý do "SDK không có lệnh ghi chú"). Một câu nói tự nhận đã ghi tệp hay ghi
      chú mà mã không gọi `lamp.notes.set` bị từ chối để sửa lại
      (`made_skill::CLAIMS_A_FILE`), cũng như một câu nói hay lời của task hứa
      một tệp người dùng mở được: lời đọc lại nói rõ nó giữ gì và khi nào đọc

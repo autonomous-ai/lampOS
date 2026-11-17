@@ -367,10 +367,10 @@ fn code_rules() -> String {
          steps run at once; what the code finds comes back as the lamp's task news. The lamp \
          says back what it uses and waits for the person's yes before it runs any code.{notes}",
         sdk = made_skill::script_sdk(),
-        notes = if made_skill::notes_on() {
-            NOTES_RULES
-        } else {
-            ""
+        notes = match (made_skill::notes_on(), made_skill::asks_on()) {
+            (true, true) => format!("{NOTES_RULES}{NOTES_ASKS_RULES}"),
+            (true, false) => NOTES_RULES.to_owned(),
+            (false, _) => String::new(),
         },
         most = made_skill::MOST_SCRIPTS,
         each = made_skill::MOST_SCRIPT_BYTES / 1024,
@@ -389,7 +389,16 @@ const NOTES_RULES: &str = " To keep something for later (\"write it down\", \"ke
      a note the lamp keeps, and never says it wrote, saved or keeps a file or a note unless its \
      code calls lamp.notes.set. Its task's words and its say say what it keeps and when it \
      reads it back (\"I'll keep three facts about apples, and read them to you when you say \
-     'apple file'\"), never a file the person can open.";
+     'apple file'\"), never a file the person can open. The SDK above has \
+     lamp.notes.set and lamp.notes.get, so a skill that writes something down and reads it \
+     back can be made.";
+
+/// With [`NOTES_RULES`] and [`made_skill::asks_on`] alone: a skill started
+/// by the person's own words is no hearing of the room (lamp-c0a4, 18 Nov
+/// 03:5x: OpenClaw took "when I say fruit notes" for it). Asks off, the
+/// model is told nothing of asks, so nothing here names them.
+const NOTES_ASKS_RULES: &str = " A skill that starts when the person says its words (\"when I \
+     say fruit notes\") is started by its asks, never by hearing the room.";
 
 /// The request [`AGENT_SERVICES_EXAMPLE`] is made for.
 const AGENT_SERVICES_ASKED: &str = "every morning at eight, read me my new mail";
@@ -3658,9 +3667,21 @@ pub(crate) mod tests {
             "A note is no file the person opens",
             "unless its code calls lamp.notes.set",
             "never a file the person can open",
+            // lamp-c0a4, 18 Nov 03:5x: OpenClaw answered `cannot:` twice,
+            // its transcript saying "the SDK has no notes call" and taking
+            // "when I say fruit notes" for hearing the room.
+            "The SDK above has lamp.notes.set and lamp.notes.get",
         ] {
             assert!(on.contains(part), "{part}: {on}");
         }
+        // Named words aren't hearing, said only with asks on (the
+        // adversarial read's P1: off, the model is told nothing of asks).
+        let heard = "is started by its asks, never by hearing the room";
+        made_skill::set_asks_here(Some(false));
+        assert!(!system_for(false, false).contains(heard));
+        made_skill::set_asks_here(Some(true));
+        assert!(system_for(false, false).contains(heard));
+        made_skill::set_asks_here(None);
         assert!(
             made_skill::script_sdk().ends_with("await lamp.close(); last, asyncio.run(main())")
         );

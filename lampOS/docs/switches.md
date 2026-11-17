@@ -1113,6 +1113,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_MADE_SKILL_LOOSE` | A skill you make keeps what it can do and runs as often as you asked, with no daily cap you didn't set. |
 | `LAMP_MADE_SKILL_SAID` | A skill you make can start when you tell the lamp something, like "I'm busy", never on what the room says. |
 | `LAMP_MADE_SKILL_ASKS` | A skill you make can be started by the words you choose for it, whatever it does. |
+| `LAMP_MADE_NOTES` | A skill you make by voice can keep a short note and read it back the next time it runs. |
 | `LAMP_MADE_SKILL_OFF_SAID` | You can turn a skill you made off and back on by voice; it is never removed for that. |
 | `LAMP_MADE_UNRELATED_REFUSED` | The lamp asks you again rather than make a skill that does something you didn't ask for. |
 | `LAMP_VOICE_DAY_TALLY` | Nothing you would notice: the lamp keeps count of the thinking, hearing and speaking it has used today. |
