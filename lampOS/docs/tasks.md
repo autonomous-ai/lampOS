@@ -4648,8 +4648,8 @@ Harness's daemon starts again, lamp-tasks asks `harness capabilities
 (the first builds with program sessions have none) is asked `harness ensure
 --help`: `--program-token-file` in its help is yes. Neither, an older
 Harness: the one session is exactly as above, its `reply_off` fallback
-included. Proven on lamp-c0a4 (17 Nov) with Harness 0.6.58-p4393.5, signed
-in and signed out.
+included. Proven on lamp-c0a4 (17 Nov) on Harness 0.6.58-p4393.5, signed
+in and signed out, and on 0.6.60, signed in (#7507's ROW).
 
 - **Token.** `kept-session.token` in lamp-tasks' store folder: 0600, this
   user's, 32 random bytes as hex, made once and kept across restarts (made
@@ -4679,8 +4679,9 @@ in and signed out.
   engine took them (`{"state":"taken","inputId":"program:<uuid>"}`); only
   then is the turn counted, and a spoken task joined with no look at
   `show`. The 60 s hold is past Harness's own 30 s default: the first reply
-  after the engine starts took 21 to 34 s on lamp-c0a4, a later one 1 to
-  4 s. Words whose first character is `!` or `/` (OpenClaw's TUI would take
+  after the engine starts took 21 to 34 s on lamp-c0a4, and 47.5 s for the
+  first words into a new kept session on 0.6.60 (#7507's ROW), so the hold
+  has about 13 s to spare; a later one 1 to 4 s. Words whose first character is `!` or `/` (OpenClaw's TUI would take
   them as a shell or TUI command) get `Task: ` before them. `NOT_IDLE` and
   `ENGINE_NOT_READY` keep the task in lamp-tasks' own queue, tried again
   until its end. A `TIMEOUT` with `cancelled: true` typed nothing and is
@@ -4690,7 +4691,7 @@ in and signed out.
   back `resumed` with the same id and its conversation, then the task fails
   as before. The turn's end is `harness wait lamp-one-openclaw --after
   <inputId>` (0 idle, then `show` for the answer; 3 an ask; 4 gone).
-- **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again, one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before.
+- **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again (a first message's is not: any answer but `taken` leaves it uncertain, `type_first_message`), one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before.
 - **Rotation and removal.** OpenClaw's kept session is not rotated by
   count (its gateway compacts the session itself, `agents.defaults.compaction`);
   a rotation, where one is due, is `ensure --fresh`. A cancel, an ask no one

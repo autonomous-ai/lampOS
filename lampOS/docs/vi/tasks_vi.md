@@ -2090,7 +2090,7 @@ sau khi daemon của Harness khởi động lại, lamp-tasks hỏi `harness cap
 `harness ensure --help`: có `--program-token-file` trong phần help là có. Không có cả hai, tức
 Harness cũ: phiên duy nhất y như trên, kể cả đường lùi `reply_off`. Đã chứng
 minh trên lamp-c0a4 (17/11) với Harness 0.6.58-p4393.5, cả khi đăng nhập lẫn
-khi đăng xuất.
+khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
 
 - **Token.** `kept-session.token` trong thư mục store của lamp-tasks: 0600,
   của user này, 32 byte ngẫu nhiên dạng hex, tạo một lần và giữ qua các lần
@@ -2121,7 +2121,9 @@ khi đăng xuất.
   (`{"state":"taken","inputId":"program:<uuid>"}`); chỉ khi đó lượt mới được
   đếm, và việc nói được join mà không cần nhìn `show`. Mức chờ 60 s dài hơn
   mặc định 30 s của chính Harness: reply đầu tiên sau khi engine khởi động
-  mất 21 tới 34 s trên lamp-c0a4, các lần sau 1 tới 4 s. Lời có ký tự đầu là
+  mất 21 tới 34 s trên lamp-c0a4, và 47,5 s cho lời đầu tiên vào một phiên
+  được giữ mới trên 0.6.60 (ROW của #7507), nên mức chờ còn dư khoảng 13 s;
+  các lần sau 1 tới 4 s. Lời có ký tự đầu là
   `!` hoặc `/` (TUI của OpenClaw sẽ coi là lệnh shell hoặc lệnh TUI) được
   thêm `Task: ` phía trước. `NOT_IDLE` và `ENGINE_NOT_READY` giữ việc trong
   hàng đợi của lamp-tasks, thử lại tới hạn của nó. Một `TIMEOUT` với
@@ -2136,7 +2138,8 @@ khi đăng xuất.
   reply vào một phiên của người dùng (pane duy nhất của `harness new`,
   `--reply-named`, một phiên resumed, một tin nhắn đầu tiên) chỉ được tính là
   đã giao khi có `taken` kèm `inputId`; một `TIMEOUT` với `cancelled: true`
-  được gõ lại, một `TIMEOUT` với `cancelled: false` và có `inputId` đã được gõ
+  được gõ lại (trừ tin nhắn đầu tiên: mọi câu trả lời khác `taken` đều để nó
+  ở trạng thái không chắc chắn, `type_first_message`), một `TIMEOUT` với `cancelled: false` và có `inputId` đã được gõ
   và không bao giờ gửi lại, và lượt của pane duy nhất kết thúc bằng
   `harness wait --after <inputId>`. Câu trả lời của Harness cũ được đọc như
   trước.
