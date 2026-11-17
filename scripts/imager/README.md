@@ -140,7 +140,7 @@ make sd-card-flash-raw DEVICE_TYPE=lamp-v2 DISK=N
 | `LAMPOS_MODELS_DIR` | *(unset)* | The models release's files (`gh release download models-2026-10-16 -R autonomous-ai/lampOS -D <dir>`). `install` fetches each model in `lampOS/deploy/product/models.json` itself; one it cannot (that release is still a draft, so its public links answer 404) is placed from here by the same size and SHA-256 checks, and a second `install` records it. Without it, a model install could not fetch fails the build |
 | `LAMPOS_CHANNEL_URL` | `https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/` | The product channel, the one `lamp-update.service` follows on the lamp |
 | `VARIANT` | `standard` | Which of `lampOS/deploy/image/shipped.json`'s variants (`standard`, `pro`, `pro-xvf3800`, `pro-respeaker-lite`) |
-| `OUT_IMG_SIZE` | `8G` | The raw image; resize-once fills the card at first boot |
+| `OUT_IMG_SIZE` | `12G` | The raw image; resize-once fills the card at first boot |
 | `AP_BAND`, `COUNTRY_CODE`, `COMPRESS` | as V1 | as V1 |
 
 ```
@@ -168,7 +168,7 @@ image left by an earlier build stays under its old name. A compressed build
 requires its compressed output and renames it for a nonstandard variant;
 a missing selected output fails instead of reporting the other format.
 `OUT_IMG_SIZE` is forwarded to the build container; unset keeps the script's
-8G default. Standard images remove an inherited hardware-profile marker, as
+12G default (a card of 12 GB at least). Standard images remove an inherited hardware-profile marker, as
 V1 does; nonstandard images write the selected variant.
 
 The source-level checks run without Docker, mounts, network access or a lamp:

@@ -1267,6 +1267,7 @@ lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setu
 lamp-update harness-off
 lamp-update harness-on
 lamp-update harness-install
+lamp-update agents-preinstall
 lamp-update back
 lamp-update apply
 lamp-update writer-probe
@@ -1288,6 +1289,10 @@ it at boot (#1676), `harness-off` undoes install's Harness at boot, and only tha
 `check-units` says whether a lamp runs exactly the product's units: both
 in `docs/install.md` (step 9, and "Checking a lamp runs the product's
 units").
+
+`agents-preinstall` runs only while an image is built, in the image's own
+root after `install --setup on`: it puts Harness, Hermes and OpenClaw on the
+image as a round would (#7274, `docs/install.md`, Phase 4b).
 
 `install` puts lampOS on a blank lamp from the newest build: every product
 part through its `current` link, the product units, users and zone, the
