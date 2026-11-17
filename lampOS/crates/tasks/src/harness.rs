@@ -463,6 +463,9 @@ pub struct Ensured {
     pub state: String,
     /// Why a `new` and not a `resumed`, when Harness says.
     pub why: Option<String>,
+    /// The engine's own session (`engineSession`; OpenClaw's
+    /// `agent:main:harness-<id>`), when Harness names one.
+    pub engine_session: Option<String>,
 }
 
 /// How a `harness reply` with the program's token went (openharness#4393):
@@ -485,6 +488,9 @@ pub enum Took {
     Uncertain(String),
 }
 
+/// How long an acknowledged `harness reply` is given: Harness's own bound
+/// is 30 s by default, in two windows, and it answers `TIMEOUT` itself.
+pub const REPLY_KEPT_TIMEOUT: Duration = Duration::from_secs(75);
 /// How long `harness ensure` is given: it starts the daemon and waits
 /// for the engine itself (OpenClaw's gateway, 27 to 50 s after a boot).
 pub const ENSURE_TIMEOUT: Duration = Duration::from_secs(120);
@@ -2059,9 +2065,12 @@ impl Cli {
 
     /// `LAMP_TASKS_KEPT_SESSION` (openharness#4393): whether this Harness
     /// keeps sessions a program owns, from `harness capabilities --json`
-    /// (`programSessions` 1 or more). An older Harness has no such verb and
-    /// refuses it: `Some(false)`. `None` when it could not be asked (a
-    /// timeout, a spawn failure), so it is asked again at the next open.
+    /// (`programSessions` 1 or more). A Harness without that verb (the
+    /// first builds with program sessions have none) is asked `harness
+    /// ensure --help`: exit 0 with `--program-token-file` in its help is
+    /// yes. Both absent, an older Harness: `Some(false)`. `None` when it
+    /// could not be asked (a timeout, a spawn failure), so it is asked
+    /// again at the next open.
     pub fn program_sessions(&self) -> Option<bool> {
         let reply = self
             .run(
@@ -2069,11 +2078,25 @@ impl Cli {
                 self.config.read_timeout,
             )
             .ok()?;
-        if !reply.success {
-            return Some(false);
+        if reply.success
+            && let Ok(read) = serde_json::from_slice::<Value>(&reply.stdout)
+            && read.get("programSessions").is_some()
+        {
+            return Some(read["programSessions"].as_u64().is_some_and(|n| n >= 1));
         }
-        let read = serde_json::from_slice::<Value>(&reply.stdout).ok()?;
-        Some(read["programSessions"].as_u64().is_some_and(|n| n >= 1))
+        let help = self
+            .run(
+                &["ensure".into(), "--help".into()],
+                self.config.read_timeout,
+            )
+            .ok()?;
+        const FLAG: &[u8] = b"--program-token-file";
+        Some(
+            help.success
+                && [&help.stdout, &help.stderr]
+                    .iter()
+                    .any(|said| said.windows(FLAG.len()).any(|window| window == FLAG)),
+        )
     }
 
     /// `harness ensure <engine> <folder> --name <name> --program-token-file
@@ -2120,7 +2143,10 @@ impl Cli {
     /// `harness reply <name> --program-token-file <token> --json --
     /// <words>` (openharness#4393): returns once the engine took the words
     /// (`{"state":"taken","inputId"}`), or why not. One try under the
-    /// operation lock; never typed twice here.
+    /// operation lock; never typed twice here. A `TIMEOUT` that says
+    /// `cancelled: false` with an `inputId` was typed: taken as that input,
+    /// to be waited after, never typed again; `cancelled: true` typed
+    /// nothing; one that says neither may have been typed.
     pub fn reply_kept(&self, name: &str, token: &Path, words: &str) -> Took {
         if !self::token(name, 64) {
             return Took::NotSent("invalid_name".into());
@@ -2132,6 +2158,7 @@ impl Cli {
         {
             return Took::NotSent("invalid_prompt".into());
         }
+        let words = plain_start(words);
         let Ok(_guard) = self.operation.try_lock() else {
             return Took::NotSent("busy".into());
         };
@@ -2143,9 +2170,9 @@ impl Cli {
                 token.into(),
                 "--json".into(),
                 "--".into(),
-                words.into(),
+                words.as_ref().into(),
             ],
-            self.config.launch_timeout,
+            REPLY_KEPT_TIMEOUT.max(self.config.launch_timeout),
         );
         match reply {
             Ok(reply) if reply.success => match taken_input(&reply.stdout) {
@@ -2158,7 +2185,7 @@ impl Cli {
                 "not_idle" => Took::NotIdle,
                 "not_running" => Took::NotRunning,
                 "engine_not_ready" => Took::EngineNotReady,
-                "timeout" => Took::Timeout,
+                "timeout" => timed_out(&reply.stdout),
                 "reply_off" => Took::NotSent("reply_off".into()),
                 refused => Took::NotSent(format!("reply_{refused}")),
             },
@@ -2209,10 +2236,11 @@ impl Cli {
         }
     }
 
-    /// `harness close <name> --program-token-file <token> --forget --json`
-    /// (openharness#4393): the kept session closed and its conversation
-    /// deleted, the engine's own session too where Harness can. One
-    /// Harness no longer has (`UNKNOWN_HARNESS`, `GONE`) is closed already.
+    /// `harness close <name> --program-token-file <token> --json`
+    /// (openharness#4393): the kept session closed. Its conversation stays
+    /// in the engine's own store (`--forget` is not built yet), so the
+    /// caller deletes it. One Harness no longer has (`UNKNOWN_HARNESS`,
+    /// `GONE`) is closed already.
     pub fn close_kept(&self, name: &str, token: &Path) -> Result<(), String> {
         if !self::token(name, 64) {
             return Err("invalid_name".into());
@@ -2225,7 +2253,6 @@ impl Cli {
                     name.into(),
                     "--program-token-file".into(),
                     token.into(),
-                    "--forget".into(),
                     "--json".into(),
                 ],
                 CLOSE_BUDGET,
@@ -6450,7 +6477,48 @@ fn parse_ensured(bytes: &[u8], name: &str) -> Option<Ensured> {
         why: reply["why"]
             .as_str()
             .map(|why| cut_at_word(why, MOST_LOOK_ABOUT_CHARS)),
+        engine_session: reply["engineSession"]
+            .as_str()
+            .filter(|session| {
+                !session.is_empty()
+                    && session.len() <= 128
+                    && session.bytes().all(|byte| {
+                        byte.is_ascii_alphanumeric() || matches!(byte, b':' | b'_' | b'-' | b'.')
+                    })
+            })
+            .map(str::to_owned),
     })
+}
+
+/// Words for the kept session that start with a plain word: OpenClaw's
+/// TUI takes words whose first non-space character is `!` (a local shell
+/// command, which stops the pane on an "Allow local shell commands?"
+/// question) or `/` (a TUI command) as its own, so those get `Task: `
+/// before them (openharness#4393).
+pub fn plain_start(words: &str) -> std::borrow::Cow<'_, str> {
+    match words.trim_start().chars().next() {
+        Some('!' | '/') => format!("Task: {words}").into(),
+        _ => words.into(),
+    }
+}
+
+/// A `TIMEOUT` of an acknowledged reply: `cancelled: true`, nothing typed
+/// ([`Took::Timeout`], safe to try again); `cancelled: false` with an
+/// `inputId`, typed ([`Took::Taken`], waited after, never typed again);
+/// anything else may have been typed ([`Took::Uncertain`]).
+fn timed_out(bytes: &[u8]) -> Took {
+    let reply = serde_json::from_slice::<Value>(bytes).unwrap_or_default();
+    match reply["cancelled"].as_bool() {
+        Some(true) => Took::Timeout,
+        Some(false) => reply["inputId"]
+            .as_str()
+            .filter(|input| token(input, 128))
+            .map_or_else(
+                || Took::Uncertain("reply_timeout_typed".into()),
+                |input| Took::Taken(input.to_owned()),
+            ),
+        None => Took::Uncertain("reply_timeout_unknown".into()),
+    }
 }
 
 /// The input id of a `harness reply --json` the engine took
