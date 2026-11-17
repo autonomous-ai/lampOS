@@ -988,6 +988,97 @@ fn a_run_with_its_egress_socket_is_named_its_way_out_and_one_without_is_not() {
     );
 }
 
+/// A skill's run on the one run path given its keys (lamp-tasks'
+/// `LAMP_SKILL_SECRETS`): its keys file in its own folder, found by its
+/// run id, is read once and deleted before the agent starts, so the keys
+/// are in the agent's environment alone, never in its argv or the
+/// wrapper's output; a second start finds none; a caller's own file
+/// elsewhere, a link at its place, or a file not read ends the run.
+#[test]
+fn a_runs_keys_file_is_read_once_deleted_and_never_in_argv() {
+    const KEY: &str = "k3y-v4lue-'quoted' $(id) `id`";
+    assert_eq!(
+        one_path_text(&hermes_install::agent())
+            .unwrap()
+            .matches(ONE_PATH_KEY_LINES)
+            .count(),
+        1
+    );
+    let text = one_path_text(&agent_of("eng").unwrap()).unwrap();
+    let lamp = lamp_of("eng", &text);
+    let keys_of = |run: &str, text: &str| {
+        let folder = lamp.top.join(format!("project/lamp/make-{run}"));
+        fs::create_dir_all(&folder).unwrap();
+        let file = folder.join(".run-env");
+        fs::write(&file, text).unwrap();
+        fs::set_permissions(&file, fs::Permissions::from_mode(0o400)).unwrap();
+        file
+    };
+    let quoted = format!("'{}'", KEY.replace('\'', "'\\''"));
+    let file = keys_of(
+        "run-1",
+        &format!("export WEB_API_KEY={quoted}\nexport HOOK_URL='https://example.test/h'\n"),
+    );
+    let token = lamp.token_file("run-1");
+    let folder = lamp.folder("run-1");
+    let out = lamp.run_in(&folder, &[], &lamp.path());
+    assert!(out.status.success(), "{out:?}");
+    assert!(!file.exists(), "the keys file is deleted");
+    assert!(!token.exists());
+    let env = lamp.read("env").unwrap();
+    let lines: Vec<&str> = env.lines().collect();
+    for line in [
+        format!("WEB_API_KEY={KEY}"),
+        "HOOK_URL=https://example.test/h".to_owned(),
+        format!("{TOKEN_ENV}={TOKEN}"),
+    ] {
+        assert!(lines.contains(&line.as_str()), "{line}: {env}");
+    }
+    let argv = lamp.read("argv").unwrap();
+    for said in [
+        argv.as_str(),
+        &String::from_utf8_lossy(&out.stdout),
+        &String::from_utf8_lossy(&out.stderr),
+    ] {
+        assert!(!said.contains("k3y-v4lue"), "{said}");
+    }
+    // Once only: a second start finds no token and no keys.
+    let again = lamp.run_in(&folder, &[], &lamp.path());
+    assert!(!again.status.success());
+    assert!(lamp.read("env").is_none());
+
+    // No keys file: none, and the caller's own variables pass as before.
+    lamp.token_file("run-2");
+    let out = lamp.run_in(&lamp.folder("run-2"), &[], &lamp.path());
+    assert!(out.status.success(), "{out:?}");
+    assert!(!lamp.read("env").unwrap().contains("WEB_API_KEY"));
+
+    // Not a run's folder: a keys file is never looked for.
+    let other = keys_of("", "export WEB_API_KEY='x'\n");
+    let out = lamp.run(&[], &lamp.path());
+    assert!(out.status.success(), "{out:?}");
+    assert!(other.exists());
+    assert!(!lamp.read("env").unwrap().contains("WEB_API_KEY"));
+
+    // A link at its place: never read, deleted, nothing runs.
+    let target = lamp.top.join("elsewhere/keys");
+    fs::write(&target, "export WEB_API_KEY='linked'\n").unwrap();
+    fs::create_dir_all(lamp.top.join("project/lamp/make-run-3")).unwrap();
+    let link = lamp.top.join("project/lamp/make-run-3/.run-env");
+    symlink(&target, &link).unwrap();
+    let token = lamp.token_file("run-3");
+    let out = lamp.run_in(&lamp.folder("run-3"), &[], &lamp.path());
+    assert!(!out.status.success());
+    assert!(lamp.read("argv").is_none());
+    assert!(fs::symlink_metadata(&link).is_err(), "the link is gone");
+    assert!(target.exists(), "what it pointed at is not touched");
+    assert!(!token.exists());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("eng: the keys of run run-3 are not read"),
+        "{out:?}"
+    );
+}
+
 /// (#6685) With the one run path, the namespace script takes the agent's
 /// home from its wrapper: every edit found once for every switch, the home
 /// checked against the agents' homes (its own under [`HOMES`], or its own in

@@ -4065,12 +4065,48 @@ hand-over, before its token is minted (`skill_task::answer_with`, `Agent::keys`)
   values are never in the token, the arguments, the run's words (which
   name the variables and say never to print, write, send or say one), a
   journal line (counts only) or the skill's folder.
+- **Read once on the one run path** (a `net` run with lamp-update's one
+  run path, which `skill_make::NetRunner` hands to the lamp's own Harness
+  runner, `HarnessRunner`): Harness passes the agent's wrapper none of
+  lamp-tasks' variables, so lamp-tasks starts no shell of its own there.
+  The file stays in the run's own folder, and the wrapper finds it by the
+  run's id, as it does the token file and the way out
+  (`agent_ns::wrapper::ONE_PATH_KEY_LINES` in lamp-update,
+  `skill_task::ONE_PATH_KEY_LINES` here):
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-<run-id>/.run-env`,
+  only in a run, only a regular file in a folder that is no link. It is
+  read once (`. "$K"`, sourced, never an argument), deleted whatever came of
+  the read, and a file not read ends the run, all right after the run's
+  token is read and before the agent's data, its way out or its namespace
+  runs. So the keys are in the agent's environment alone, and the agent,
+  which sees its own folder inside the namespace, finds no file there.
+  lamp-tasks removes the file again after the run, and the folder with it.
+- **Refused where the keys can't reach the agent**, before Harness is
+  asked and before any token file or task file is written, so the run's
+  words never promise keys it doesn't have (`HarnessRunner::keys_reach`,
+  `skill_task::KEYS_REFUSED`, "a run given its keys can't be given them
+  on this lamp yet (...), so nothing was started", answered `run_failed`):
+  a wrapper without the key lines (lamp-update's round hasn't run,
+  `skill_task::takes_keyed_runs`), a gateway agent (OpenClaw: its turns
+  never start through the wrapper), a keys file anywhere but
+  `make-<run id>/.run-env`, or a lamp off the one run path in the Harness
+  runner. A `net` refusal (`no_net`) is said first when both apply. This
+  keeps keyed `net` skills (a web API or webhook) working on the product's
+  one run path rather than refusing them: the file never leaves the run's
+  own folder, which goes with the run.
 
 Tests: `skill_keys::tests` (the answer read whole or not at all, the file
 0400 and quoted, the launch reading it once and deleting it before the
 program, a missing name said, a `skill.toml` naming `secrets` seen),
 `skill_task::tests::a_runs_keys_reach_it_only_in_its_environment_file_and_a_missing_one_runs_nothing`,
-`the_lamps_runner_reads_the_keys_file_once_and_deletes_it_before_the_run`.
+`the_lamps_runner_reads_the_keys_file_once_and_deletes_it_before_the_run`,
+`harness::a_keyed_net_run_by_the_one_run_path_gives_its_keys_through_the_wrapper_alone`
+(through `NetRunner`: the file in the run's own folder as Harness starts
+it, the wrapper's own key lines putting the key in the environment and
+deleting the file, no Harness call carrying it; and each refusal), and
+lamp-update's `agent_ns::wrapper::tests::a_runs_keys_file_is_read_once_deleted_and_never_in_argv`
+(the real wrapper: the key in the agent's environment, never in its argv
+or output, the file gone, a second start given none, a link refused).
 
 ## A skill's run on OpenClaw (#6685, #7133, the lead's decision, 15 Nov)
 
