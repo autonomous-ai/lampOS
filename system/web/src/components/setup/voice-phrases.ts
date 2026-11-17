@@ -16,6 +16,11 @@ export const VOICE_PHRASES_BY_LANG: Record<string, string[]> = {
     "오늘은 새로운 일을 시작하기에 딱 좋은 날이에요. 앞으로가 기대돼요.",
     "아침에 따뜻한 커피 한 잔을 마시면 상쾌한 기분으로 하루를 시작할 수 있어요.",
   ],
+  ar: [
+    "مرحباً، أنا أسجّل صوتي حتى تتعرّف عليّ عندما نتحدث.",
+    "اليوم يوم رائع لبدء شيء جديد، وأنا متحمس لما هو قادم.",
+    "عندما أشرب فنجان قهوة دافئاً في الصباح، أبدأ يومي بنشاط وراحة.",
+  ],
   vi: [
     "Xin chào, mình đang đăng ký giọng nói để bạn nhận ra mình khi nói chuyện.",
     "Hôm nay là một ngày tuyệt vời, mình rất mong chờ những điều mới mẻ phía trước.",
@@ -37,6 +42,7 @@ export const VOICE_INTRO_BY_LANG: Record<string, string> = {
   en: "Stand near the robot. When recording starts, read the 3 sentences in a normal voice. The robot's mic captures you — your laptop mic is not used.",
   ja: "ロボットの近くに立ってください。録音が始まったら、次の3つの文を普段どおりの声で読んでください。録音にはロボットのマイクを使用します。パソコンのマイクは使用しません。",
   ko: "로봇 가까이에 서 주세요. 녹음이 시작되면 아래 3문장을 평소 목소리로 읽어 주세요. 녹음은 로봇의 마이크로 하며, 노트북 마이크는 사용하지 않아요.",
+  ar: "قف بالقرب من الروبوت. عندما يبدأ التسجيل، اقرأ الجمل الثلاث بصوتك العادي. يسجّل ميكروفون الروبوت صوتك، ولا يُستخدم ميكروفون الحاسوب.",
   vi: "Đứng gần robot. Khi bắt đầu ghi âm, đọc 3 câu sau với giọng bình thường. Mic của robot sẽ thu âm bạn — không dùng mic của máy tính.",
   "zh-CN": "站在机器人附近。开始录音后，用正常语速朗读这 3 句话。机器人的麦克风会录下你的声音 — 不使用电脑麦克风。",
   "zh-TW": "站在機器人附近。開始錄音後，用正常語速朗讀這 3 句話。機器人的麥克風會錄下你的聲音 — 不使用電腦麥克風。",

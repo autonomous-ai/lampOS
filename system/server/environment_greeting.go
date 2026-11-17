@@ -32,6 +32,8 @@ func environmentGreetingGuidance() string {
 		return "添付の環境データは準備状況の確認を通過しています。environmentスキルに従い、必要に応じて有用な測定値を1〜2個、短い一文で挨拶に添えてください。1回の測定から傾向や安全性を推測したり、全項目を読み上げたり、センサーを待つためにツールを呼び出したりしないでください。"
 	case i18n.LangKO:
 		return "첨부된 환경 데이터는 준비 상태 확인을 통과했습니다. environment 스킬에 따라, 필요하면 유용한 측정값 한두 개를 짧은 한 문장으로 인사에 덧붙이세요. 한 번의 측정으로 추세나 안전성을 추측하거나, 모든 값을 읽어 주거나, 센서를 기다리려고 도구를 호출하지 마세요."
+	case i18n.LangAR:
+		return "بيانات البيئة المرفقة اجتازت فحص الجاهزية. وفقاً لمهارة environment، يمكنك عند الحاجة إضافة جملة قصيرة واحدة إلى التحية تذكر فيها قراءة أو قراءتين مفيدتين. لا تستنتج اتجاهاً أو مستوى أمان من قراءة واحدة، ولا تقرأ كل القيم، ولا تستدعِ أدوات لانتظار المستشعر."
 	case i18n.LangVI:
 		return "Dữ liệu môi trường kèm theo đã đủ điều kiện sử dụng. Theo skill environment, có thể thêm tối đa một câu ngắn về 1–2 số đo hữu ích vào lời chào. Không suy ra xu hướng hay mức an toàn từ một mẫu, không đọc toàn bộ bảng và không gọi thêm công cụ để chờ sensor."
 	case i18n.LangZhCN:

@@ -77,6 +77,8 @@ Fields come from `SetupRequest` in `system/domain/device.go`. `device_id`, `llm_
 
 Japanese uses `stt_language: "ja"`. Setup offers Japanese (日本語), Japanese voice enrollment phrases and six curated ElevenLabs voices; the default is Shizuka. See [Japanese voice catalog](realtime-voice.md#japanese-language-and-elevenlabs-voices).
 
+Arabic uses `stt_language: "ar"`. Setup offers Arabic (العربية), Arabic voice enrollment phrases shown right to left and six curated ElevenLabs voices; the default is Salma. See [Arabic language and voices](realtime-voice.md#arabic-language-and-elevenlabs-voices).
+
 Korean uses `stt_language: "ko"`. Setup offers Korean (한국어), Korean voice enrollment phrases and six curated ElevenLabs voices; the default is Anna Kim. See [Korean language and voices](realtime-voice.md#korean-language-and-elevenlabs-voices).
 
 **Response:** Returns immediately `{"status": 1}`. Setup runs async in a goroutine after 2s delay.

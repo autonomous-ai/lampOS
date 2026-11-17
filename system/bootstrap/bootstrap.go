@@ -366,13 +366,15 @@ func resolveSTTLanguage() string {
 	return strings.TrimSpace(c.STTLanguage)
 }
 
-// otaUpdateStartPhrase returns the localized "device is updating" phrase (vi/zh/ja/ko/en).
+// otaUpdateStartPhrase returns the localized "device is updating" phrase (vi/zh/ja/ko/ar/en).
 func otaUpdateStartPhrase(lang string) string {
 	switch {
 	case strings.HasPrefix(strings.ToLower(strings.TrimSpace(lang)), "ja"):
 		return "デバイスを更新しています。少し時間がかかりますので、そのままお待ちください。"
 	case strings.HasPrefix(strings.ToLower(strings.TrimSpace(lang)), "ko"):
 		return "기기를 업데이트하고 있어요. 잠시 시간이 걸리니 조금만 기다려 주세요."
+	case isArabic(lang):
+		return "يتم تحديث الجهاز الآن. سيستغرق ذلك بعض الوقت، يرجى الانتظار."
 	case strings.HasPrefix(lang, "vi"):
 		return "Thiết bị đang cập nhật, sẽ mất một chút thời gian, vui lòng chờ trong khi cập nhật."
 	case strings.HasPrefix(lang, "zh"):
@@ -889,4 +891,10 @@ func normalizeVersion(raw string) string {
 		return ""
 	}
 	return strings.TrimSpace(fields[len(fields)-1])
+}
+
+// isArabic reports whether lang is Arabic or a regional Arabic code (ar-SA, ar_EG).
+func isArabic(lang string) bool {
+	l := strings.ToLower(strings.TrimSpace(lang))
+	return l == "ar" || strings.HasPrefix(l, "ar-") || strings.HasPrefix(l, "ar_")
 }

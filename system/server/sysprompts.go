@@ -26,6 +26,10 @@ func wakeGreetingPrompt(agentRuntime, deviceType string, capabilities map[string
 		return "[system] 방금 깨어났어요. 사용자에게 짧게 인사하세요. " +
 			"기기 스킬을 사용할 수 있습니다. 동작이나 기기 관련 요청에는 해당 스킬의 지침을 사용하세요. " +
 			"이전 대화의 언어와 상관없이 한국어로 답하세요." + contextTags
+	case i18n.LangAR:
+		return "[system] استيقظت للتو. حيِّ المستخدم بإيجاز. " +
+			"مهارات الجهاز متاحة؛ استخدم تعليمات المهارة المناسبة لطلبات الحركة أو الطلبات المتعلقة بالجهاز. " +
+			"أجب باللغة العربية بغض النظر عن لغة المحادثة السابقة." + contextTags
 	case i18n.LangVI:
 		return "[system] Bạn vừa thức dậy. Chào hỏi chủ nhân ngắn gọn. " +
 			"Các skill của thiết bị đã sẵn sàng; với yêu cầu hành động hoặc liên quan đến thiết bị, hãy dùng hướng dẫn của skill phù hợp. " +

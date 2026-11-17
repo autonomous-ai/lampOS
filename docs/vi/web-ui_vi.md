@@ -63,6 +63,14 @@ chọn sẵn Korean trong Setup. Khi voice đã lưu là giọng Hàn nhưng ng�
 bộ lọc mở sẵn ở Korean thay vì Auto để voice đã lưu vẫn hiện. Một dòng ghi chú cho biết giọng tiếng Hàn cần HAL
 0.1.305 trở lên.
 
+**Arabic (العربية)** (`stt_language: "ar"`) có ở cùng các chỗ đó. Bộ lọc Voice liệt kê
+Salma, Sara, Farah, Mona, Haytham và Anas (mặc định Salma), Test Voice gửi câu mẫu tiếng
+Ả Rập, My Voice hiện câu đăng ký tiếng Ả Rập, và trang chat có nhãn tiếng Ả Rập. Câu
+đăng ký và bong bóng chat dùng `dir="auto"`, nên chữ Ả Rập chạy từ phải sang trái còn
+phần còn lại của trang vẫn trái sang phải. Trình duyệt đặt tiếng Ả Rập sẽ chọn sẵn
+Arabic trong Setup, voice Ả Rập đã lưu giữ bộ lọc ở Arabic, và một dòng ghi chú cho biết
+tiếng Ả Rập cần HAL 0.1.308 trở lên.
+
 ### 1.1 Tiêu đề tab trình duyệt
 
 Tiêu đề tab trình duyệt (`document.title`) hiển thị đúng theo page/tab đang focus, để mở nhiều tab thiết bị vẫn phân biệt được. Dùng hook chung `useDocumentTitle` (`system/web/src/hooks/useDocumentTitle.ts`); format: `Lamp · <segment>[· <sub-segment>]`.

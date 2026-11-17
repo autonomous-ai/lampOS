@@ -165,6 +165,13 @@ Khi wake word đang bật, cú click cũng **được tính như một wake even
 
 Hành vi attention/wake ở trên áp dụng cho `voice_input_mode: "automatic"`, là mặc định. Chọn **Tap to talk** trong General (hoặc MQTT `voice.input_mode`) để chủ động chạm bắt đầu/kết thúc khi Harness OFF. Chế độ này giữ lựa chọn wake đã lưu nhưng bỏ qua wake gate và mọi trigger focus cho tới khi trở về automatic.
 
+`POST /voice/tap` (HAL) chạy y như một lần chạm ngắn trên máy, để test thiết bị
+tap-to-talk từ xa: lần gọi đầu bắt đầu nghe, lần sau kết thúc và gửi đoạn ghi âm,
+còn ở chế độ automatic thì chạy hành động single-click bình thường. Route trả
+`{"status": "ok", "listening": true|false}`. Chỉ bắt đầu nói sau khi log HAL có
+`Autonomous STT connected` (khoảng 1 giây sau lần gọi); âm thanh trước đó không được
+nhận dạng.
+
 Tap ngắn GPIO và MPR121 đi qua `physical_short_tap`: tap đầu bắt đầu thu và upload song song tới STT và realtime; tap tiếp theo dừng thu cục bộ và công bố endpoint realtime trước tone kết thúc, không chờ STT chốt hay nhận diện người nói. Realtime trả lời hoặc delegate đến main agent, fallback sang transcript STT sẵn có dưới dạng `voice_command` khi realtime tắt/không khả dụng. Gemini/OpenAI stream với commit thủ công; Pipecat stream nhưng giữ bước chốt STT nội bộ; GPT Live không có manual commit nên giữ audio tới tap kết thúc. Mỗi lần nhả ngắn riêng biệt đều được tính, kể cả hai tap trong cửa sổ multi-click thông thường; không phát lời Listening trì hoãn. Tone sẵn sàng ngắn 40 ms và hiệu ứng listening xuất hiện sau frame mic đầu tiên, không chờ STT kết nối. Lời nói được giữ trong buffer lúc kết nối trong giới hạn thời lượng bản ghi (mặc định 30 giây). Tone kết thúc xác nhận input đã dừng trước khi STT chốt transcript; không phải xác nhận gửi thành công. Tap kết thúc trong lúc STT kết nối vẫn giữ lời nói đã thu để gửi khi kết nối thành công. Im lặng không gửi. Timeout (mặc định 30 giây), lỗi recorder, privacy/stop hoặc đổi route Harness làm hủy bản ghi; hủy trước tap kết thúc hợp lệ ngăn commit và reset audio đã upload trên provider. STT chậm hoặc lỗi không hủy realtime. Tap trước khi mic cục bộ sẵn sàng hủy và không gửi.
 
 Sau tone dừng cục bộ, recorder được giải phóng độc lập với bước STT chốt kết quả. Tap mới có thể bắt đầu bản ghi tiếp theo khi lượt trước còn đang chốt. Tối đa hai lượt chưa hoàn tất được giữ chỗ; nếu cả hai đều bận, bản ghi mới bị từ chối trước tone sẵn sàng. Lời trả lời từ runtime đợi đến khi bản ghi đóng, tránh nói đè lên câu tiếp theo. Worker realtime của từng lượt chạy model tuần tự theo thứ tự thu, độc lập với FIFO dispatch STT nơi transcript, identity, đồng bộ OS đã xử lý hoặc fallback có thể hoàn tất sau. Hai đường cùng chịu giới hạn hai lượt giữ chỗ và không chặn luồng thu.

@@ -63,6 +63,14 @@ browser set to Korean preselects Korean in Setup. When the saved voice is Korean
 but the robot language is not, the filter opens on Korean instead of Auto, so the
 saved voice stays visible. A note says Korean voices need HAL 0.1.305 or later.
 
+**Arabic (العربية)** (`stt_language: "ar"`) is offered in the same places. The Voice
+filter lists Salma, Sara, Farah, Mona, Haytham and Anas (default Salma), Test Voice
+sends an Arabic sample, My Voice shows Arabic enrollment sentences, and the chat page
+has Arabic labels. Enrollment sentences and chat bubbles use `dir="auto"`, so Arabic
+text runs right to left while the rest of the page stays left to right. A browser
+set to Arabic preselects Arabic in Setup, a saved Arabic voice keeps the filter on
+Arabic, and a note says Arabic needs HAL 0.1.308 or later.
+
 ### 1.1 Browser Tab Title
 
 The browser tab title (`document.title`) reflects the focused page/tab so multiple device tabs are distinguishable. Driven by the shared `useDocumentTitle` hook (`system/web/src/hooks/useDocumentTitle.ts`); format is `Lamp · <segment>[· <sub-segment>]`.

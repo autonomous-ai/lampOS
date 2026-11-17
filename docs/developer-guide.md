@@ -364,6 +364,7 @@ for the decorator (e.g. `@router.post("/voice/speak"`) in the same file.
 | Route module | `hal/routes/voice.py` |
 | `POST /voice/speak` — one-shot say (interrupts current speech) | `voice.py:310` — `def speak_text(req: SpeakRequest)` |
 | `POST /voice/speak-queue` — say after current speech finishes | `voice.py:463` — `def speak_queue_text(req: SpeakRequest)` |
+| `POST /voice/tap` — one short tap: start or finish a tap-to-talk capture (remote testing) | `voice.py` — `def voice_tap()` |
 | `POST /tts/stop` — cut off the currently-playing sentence | `voice.py:515` — `def stop_tts()` |
 | `SpeakRequest` schema (text, voice, provider, interruptible, cached…) | `hal/models.py:327` |
 

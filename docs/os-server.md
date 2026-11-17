@@ -43,9 +43,11 @@ Local Japanese chitchat requires a complete phrase after punctuation and wake-wo
 normalization; questions such as `何している？` continue to the agent. If HAL cannot
 list voices, the ElevenLabs fallback still filters by the requested language,
 using Rachel for English and Shizuka for Japanese. An empty language returns all
-48 curated voices; unknown languages use the English pool. `ko` returns the six
+54 curated voices; unknown languages use the English pool. `ko` returns the six
 Korean voices (default Anna Kim). See
 [Korean language and voices](realtime-voice.md#korean-language-and-elevenlabs-voices).
+`ar` and regional Arabic codes return the six Arabic voices (default Salma). See
+[Arabic language and voices](realtime-voice.md#arabic-language-and-elevenlabs-voices).
 See [Japanese voice selection](realtime-voice.md#japanese-language-and-elevenlabs-voices).
 
 Ambient LED restoration delegates to HAL `/led/restore` after the quiet window. OS does not choose a fallback color or breathing effect; each device declares `ambient_led.resting` in `presets.json`. HAL preserves explicit user off/color and active overlay ownership.

@@ -524,6 +524,7 @@ const TTS_DEMO_PHRASES: Record<string, string> = {
   en: "[laugh] Hey! How are you doing today?",
   ja: "[laugh] こんにちは！今日はどんな一日ですか？",
   ko: "[laugh] 안녕하세요! 오늘 하루 어떠세요?",
+  ar: "[laugh] مرحباً! كيف حالك اليوم؟",
   vi: "[laugh] Chào bạn, hôm nay bạn thế nào?",
   "zh-CN": "[laugh] 嗨，你今天怎么样？",
   "zh-TW": "[laugh] 嗨，你今天怎麼樣？",

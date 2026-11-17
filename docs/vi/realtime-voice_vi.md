@@ -141,6 +141,41 @@ Intern 2 (âm thanh đầu tiên khoảng 1,2 giây, tương đương các nhóm
 HAL đổi tên giọng sang ID. HAL trước 0.1.305 không biết các tên này và gửi chính tên
 làm voice ID, ElevenLabs từ chối, nên giọng tiếng Hàn cần HAL 0.1.305 trở lên.
 
+## Tiếng Ả Rập và giọng ElevenLabs
+
+Tiếng Ả Rập dùng `stt_language: "ar"` (`LANG_AR` trong `hal/presets.py`); mọi mã vùng
+như `ar-SA`, `ar-EG` hay `ar_AE` được chuẩn hóa về `ar`, còn mã chỉ bắt đầu bằng các
+chữ đó (`arn`) thì không. Khi chọn Arabic, STT chạy Deepgram Nova-3 với `language=ar`,
+language gate nhận lời nói tiếng Ả Rập (nhãn AmberNet `ar`), Gemini Live nhận `ar`
+(mã được truyền nguyên), và agent được yêu cầu trả lời bằng tiếng Ả Rập. Các câu của
+robot (nói lại, đang nghe, khởi động lại, bật/tắt mic, xoa đầu, câu chờ nhạc, filler,
+thông báo OTA, prompt khi thức dậy và khi đổi tên, câu giới thiệu tập radio-drama) đều
+có bản tiếng Ả Rập. Chitchat cục bộ khớp nguyên câu như tiếng Nhật và tiếng Hàn, vì
+tiếng Ả Rập gắn tiền tố và hậu tố vào từ; trước khi so khớp, dấu phụ và tatweel bị bỏ,
+alef, alef maqsura và ta marbuta được quy về một dạng, nên `شكراً` khớp `شكرا`. `شكراً`
+được trả lời tại chỗ, còn `شكراً، كم الساعة الآن؟` được gửi cho agent. Bộ lọc CoT leak
+coi tiếng Ả Rập là chữ không phải Latin, như tiếng Nhật và tiếng Hàn, khi tìm đoạn suy
+luận tiếng Anh lọt vào câu trả lời.
+
+Nhóm ElevenLabs `ar` dùng chung cho HAL HTTP và WebSocket. Sáu giọng sau được chọn từ
+[danh mục tiếng Ả Rập chính thức của ElevenLabs](https://elevenlabs.io/text-to-speech/arabic)
+ngày 2026-11-12, bỏ các giọng phương ngữ Maroc (Darija) và tên trùng. Từng giọng đã
+được tổng hợp qua proxy Autonomous trên một Intern 2: khoảng 0,25 giây tới âm thanh
+đầu tiên khi đã nóng, tương đương nhóm tiếng Hàn; lần gọi đầu tiên của mỗi giọng có
+thể mất 4–9 giây.
+
+| Giọng | Đặc điểm (nhãn ElevenLabs) | ElevenLabs voice ID |
+|---|---|---|
+| Salma (mặc định) | Tích cực, chuyên nghiệp, ấm | `a1KZUXKFVFDOb33I1uqr` |
+| Sara | Nhẹ, điềm tĩnh, dịu dàng | `jAAHNNqlbAX9iWjJPEtE` |
+| Farah | Mượt, điềm tĩnh, ấm | `4wf10lgibMnboGJGCLrP` |
+| Mona | Tiếng Ả Rập chuẩn hiện đại, trung niên | `tavIIPLplRB883FzWU0V` |
+| Haytham | Năng động, ấm, vui vẻ | `IES4nrmZdUBHByLBde0P` |
+| Anas | Điềm tĩnh, cuốn hút, rõ ràng | `R6nda3uM038xEEKi7GFl` |
+
+HAL trước 0.1.308 không biết các tên này và ngôn ngữ `ar`, nên tiếng Ả Rập cần HAL
+0.1.308 trở lên.
+
 Lớp giọng nói speech-to-speech độ trễ thấp, chạy **song song** với pipeline STT
 → agent thông thường. Model realtime xử lý hội thoại tán gẫu trực tiếp (trả lời
 âm thanh dưới 1 giây) và **delegate** (chuyển giao) những gì cần đến agent chính

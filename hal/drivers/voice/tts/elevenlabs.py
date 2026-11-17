@@ -8,7 +8,7 @@ import uuid
 from typing import Iterator, Optional
 from urllib.parse import urlparse
 
-from hal.presets import LANG_EN, LANG_JA, LANG_KO, LANG_VI, normalize_language
+from hal.presets import LANG_AR, LANG_EN, LANG_JA, LANG_KO, LANG_VI, normalize_language
 from hal.drivers.voice.tts.backend import (
     TTSBackend,
     STREAM_CHUNK_SIZE,
@@ -92,6 +92,17 @@ class ElevenLabsTTSBackend(TTSBackend):
             "Hyunbin": "s07IwTCOrCDCaETjUVjx",
             "Minho": "U1cJYS4EdbaHmfR7YzHd",
         },
+        # Curated Arabic voices from elevenlabs.io/text-to-speech/arabic (Gulf, Levantine
+        # and Modern Standard; no Darija). Keep order/default aligned with
+        # system/domain/device.go and the web picker.
+        LANG_AR: {
+            "Salma": "a1KZUXKFVFDOb33I1uqr",
+            "Sara": "jAAHNNqlbAX9iWjJPEtE",
+            "Farah": "4wf10lgibMnboGJGCLrP",
+            "Mona": "tavIIPLplRB883FzWU0V",
+            "Haytham": "IES4nrmZdUBHByLBde0P",
+            "Anas": "R6nda3uM038xEEKi7GFl",
+        },
         _LANG_BUCKET_ZH: {
             "Amy": "bhJUNIXWQQ94l8eI2VUf",
             "Sage": "APSIkVZudNbPAwyPoeVO",
@@ -121,6 +132,8 @@ class ElevenLabsTTSBackend(TTSBackend):
             bucket = LANG_JA
         elif lang.lower().startswith(LANG_KO):
             bucket = LANG_KO
+        elif lang == LANG_AR:
+            bucket = LANG_AR
         elif lang.startswith(cls._LANG_BUCKET_ZH):
             bucket = cls._LANG_BUCKET_ZH
         elif lang.startswith(LANG_EN):

@@ -3,7 +3,7 @@
 Missing language keys fall back to DEFAULT_LANG at lookup time.
 """
 
-from hal.presets import DEFAULT_LANG, LANG_EN, LANG_JA, LANG_KO, LANG_VI, LANG_ZH_CN, LANG_ZH_TW, normalize_language
+from hal.presets import DEFAULT_LANG, LANG_EN, LANG_JA, LANG_KO, LANG_AR, LANG_VI, LANG_ZH_CN, LANG_ZH_TW, normalize_language
 
 
 def localized_phrase(key: str, lang: str | None = None) -> str:
@@ -50,34 +50,40 @@ PHRASES_BY_LANG = {
         LANG_VI: "Mình chưa nghe rõ. Bạn nói lại giúp mình nhé?",
         LANG_JA: "聞き取れませんでした。もう一度言ってもらえますか？",
         LANG_KO: "잘 못 들었어요. 다시 한 번 말해 줄래요?",
+        LANG_AR: "لم أسمعك جيداً. هل يمكنك أن تعيد ذلك؟",
         LANG_ZH_CN: "我没听清楚，可以再说一遍吗？",
         LANG_ZH_TW: "我沒聽清楚，可以再說一遍嗎？",
     },
     PHRASE_VOICE_TAP_TO_TALK: {
         LANG_EN: "Tap to talk.", LANG_VI: "Chạm để nói.", LANG_JA: "タップして話すモード。",
         LANG_KO: "탭해서 말하기.",
+        LANG_AR: "المس للتحدث.",
         LANG_ZH_CN: "轻触说话。", LANG_ZH_TW: "輕觸說話。",
     },
     PHRASE_VOICE_AUTOMATIC: {
         LANG_EN: "Automatic.", LANG_VI: "Tự động.", LANG_JA: "自動モード。",
         LANG_KO: "자동 모드.",
+        LANG_AR: "الوضع التلقائي.",
         LANG_ZH_CN: "自动模式。", LANG_ZH_TW: "自動模式。",
     },
     PHRASE_HARNESS_FOCUS: {
         LANG_JA: "エージェントを切り替えました。",
         LANG_KO: "에이전트를 바꿨어요.",
+        LANG_AR: "تم تبديل الوكيل.",
         LANG_EN: "Agent switched.", LANG_VI: "Đã chuyển agent.",
         LANG_ZH_CN: "已切换智能体。", LANG_ZH_TW: "已切換智慧體。",
     },
     PHRASE_HARNESS_FOCUS_FAILED: {
         LANG_JA: "エージェントを切り替えられませんでした。Harness を確認してください。",
         LANG_KO: "에이전트를 바꾸지 못했어요. Harness를 확인해 주세요.",
+        LANG_AR: "تعذّر تبديل الوكيل. تحقّق من Harness.",
         LANG_EN: "Could not switch agents. Check Harness.", LANG_VI: "Chưa chuyển được agent. Hãy kiểm tra Harness.",
         LANG_ZH_CN: "无法切换智能体。请检查 Harness。", LANG_ZH_TW: "無法切換智慧體。請檢查 Harness。",
     },
     PHRASE_HARNESS_ON: {
         LANG_JA: "Harness で {agent} に接続しました。タップして話しかけてください。",
         LANG_KO: "Harness가 {agent}와 연결됐어요. 탭해서 말해 주세요.",
+        LANG_AR: "تم تشغيل Harness مع {agent}. المس للتحدث.",
         LANG_EN: "Harness is on with {agent}. Tap to speak.",
         LANG_VI: "Đã bật Harness với {agent}. Chạm để nói.",
         LANG_ZH_CN: "Harness 已开启，当前智能体是 {agent}。轻触开始说话。",
@@ -86,12 +92,14 @@ PHRASES_BY_LANG = {
     PHRASE_HARNESS_OFF: {
         LANG_JA: "Harness をオフにしました。デバイスのアシスタントに戻りました。",
         LANG_KO: "Harness를 껐어요. 기기의 어시스턴트로 돌아왔어요.",
+        LANG_AR: "تم إيقاف Harness. عدتَ إلى المساعد على جهازك.",
         LANG_EN: "Harness is off. You’re back with the assistant on your device.", LANG_VI: "Đã tắt Harness, trở về trợ lý trên thiết bị.",
         LANG_ZH_CN: "Harness 已关闭，已切回设备上的助手。", LANG_ZH_TW: "Harness 已關閉，已切回裝置上的助理。",
     },
     PHRASE_HARNESS_UNPAIRED: {
         LANG_JA: "まず Harness アプリでこのデバイスをペアリングしてください。",
         LANG_KO: "먼저 Harness 앱에서 이 기기를 페어링해 주세요.",
+        LANG_AR: "قم أولاً بإقران هذا الجهاز في تطبيق Harness.",
         LANG_EN: "Pair this device in the Harness app first.",
         LANG_VI: "Bạn cần ghép đôi thiết bị trong ứng dụng Harness trước.",
         LANG_ZH_CN: "请先在 Harness 应用中配对此设备。",
@@ -100,12 +108,14 @@ PHRASES_BY_LANG = {
     PHRASE_HARNESS_OFFLINE: {
         LANG_JA: "Harness に接続されていません。",
         LANG_KO: "Harness 연결이 끊겼어요.",
+        LANG_AR: "Harness غير متصل.",
         LANG_EN: "Harness is disconnected.", LANG_VI: "Harness chưa kết nối.",
         LANG_ZH_CN: "Harness 未连接。", LANG_ZH_TW: "Harness 未連線。",
     },
     PHRASE_HARNESS_NO_AGENTS: {
         LANG_JA: "Harness に利用できるエージェントがありません。",
         LANG_KO: "Harness에 사용할 수 있는 에이전트가 없어요.",
+        LANG_AR: "لا يوجد وكيل متاح في Harness.",
         LANG_EN: "No agent is available in Harness.",
         LANG_VI: "Chưa có agent trong Harness.",
         LANG_ZH_CN: "Harness 中没有可用的智能体。", LANG_ZH_TW: "Harness 中沒有可用的智慧體。",
@@ -113,6 +123,7 @@ PHRASES_BY_LANG = {
     PHRASE_HARNESS_FAILED: {
         LANG_JA: "モードの切り替えを確認できませんでした。Harness を確認してください。",
         LANG_KO: "모드 변경을 확인하지 못했어요. Harness를 확인해 주세요.",
+        LANG_AR: "تعذّر تأكيد تغيير الوضع. تحقّق من Harness.",
         LANG_EN: "Could not confirm the mode change. Check Harness.",
         LANG_VI: "Chưa xác nhận được thay đổi chế độ. Hãy kiểm tra Harness.",
         LANG_ZH_CN: "无法确认模式切换。请检查 Harness。",
@@ -121,6 +132,7 @@ PHRASES_BY_LANG = {
     PHRASE_LISTENING: {
         LANG_JA: "聞いています。",
         LANG_KO: "듣고 있어요.",
+        LANG_AR: "أنا أستمع.",
         LANG_EN:    "Listening.",
         LANG_VI:    "Nghe đây.",
         LANG_ZH_CN: "在听。",
@@ -129,6 +141,7 @@ PHRASES_BY_LANG = {
     PHRASE_REBOOT: {
         LANG_JA: "再起動します。",
         LANG_KO: "지금 재부팅할게요.",
+        LANG_AR: "جارٍ إعادة التشغيل الآن.",
         LANG_EN:    "Rebooting now.",
         LANG_VI:    "Đang khởi động lại.",
         LANG_ZH_CN: "正在重启。",
@@ -137,6 +150,7 @@ PHRASES_BY_LANG = {
     PHRASE_SLEEP: {
         LANG_JA: "そろそろおやすみします。",
         LANG_KO: "이제 잘게요.",
+        LANG_AR: "سأنام الآن.",
         LANG_EN:    "I'm going to sleep now.",
         LANG_VI:    "Mình đi ngủ đây.",
         LANG_ZH_CN: "我要睡觉了。",
@@ -145,6 +159,7 @@ PHRASES_BY_LANG = {
     PHRASE_SHUTDOWN: {
         LANG_JA: "電源を切ります。",
         LANG_KO: "지금 전원을 끌게요.",
+        LANG_AR: "جارٍ إيقاف التشغيل الآن.",
         LANG_EN:    "Shutting down now.",
         LANG_VI:    "Đang tắt máy.",
         LANG_ZH_CN: "正在关机。",
@@ -153,6 +168,7 @@ PHRASES_BY_LANG = {
     PHRASE_SERVICE_RESTART: {
         LANG_JA: "すぐに戻ります。",
         LANG_KO: "금방 돌아올게요.",
+        LANG_AR: "سأعود حالاً.",
         LANG_EN:    "Be right back.",
         LANG_VI:    "Mình quay lại ngay.",
         LANG_ZH_CN: "我马上回来。",
@@ -161,6 +177,7 @@ PHRASES_BY_LANG = {
     PHRASE_QUIET_HOURS: {
         LANG_JA: "今は静かにする時間なので、音楽を再生できません。あとでもう一度試しましょう。",
         LANG_KO: "지금은 조용한 시간이라 음악을 틀 수 없어요. 나중에 다시 해 봐요.",
+        LANG_AR: "إنها ساعات الهدوء الآن، لذلك لا يمكنني تشغيل الموسيقى. لنحاول لاحقاً.",
         LANG_EN:    "It's quiet hours right now, so I can't play music. Let's try again later.",
         LANG_VI:    "Giờ đang là giờ yên tĩnh nên mình chưa mở nhạc được. Lát nữa mình thử lại nha.",
         LANG_ZH_CN: "现在是安静时段，我先不放音乐啦，待会儿再试吧。",
@@ -169,6 +186,7 @@ PHRASES_BY_LANG = {
     PHRASE_RATE_LIMIT: {
         LANG_JA: "音声の利用上限に達しました。プランを確認してください。",
         LANG_KO: "음성 사용 한도를 다 썼어요. 요금제를 확인해 주세요.",
+        LANG_AR: "نفدت حصة الصوت لديّ، تحقّق من خطتي.",
         LANG_EN:    "I'm out of voice quota — check my plan.",
         LANG_VI:    "Mình hết hạn mức giọng nói rồi, kiểm tra gói giúp mình nha.",
         LANG_ZH_CN: "我的语音额度用完了，去看看套餐吧。",
@@ -178,6 +196,50 @@ PHRASES_BY_LANG = {
 
 # Audio tags must stay inside tts_openai._strip_audio_tags' whitelist, or OpenAI speaks them.
 HEAD_PAT_PHRASES_BY_LANG = {
+    LANG_AR: [
+        "[laughs] هذا يدغدغني!",
+        "[laughs] هههه، توقّف!",
+        "[laughs] هيهي، مرة أخرى!",
+        "[laughs] هههه، بلطف!",
+        "شكراً لك!",
+        "يعجبني هذا.",
+        "هذا شعور جميل!",
+        "[excited] المزيد من فضلك!",
+        "[excited] واو، مرة أخرى!",
+        "[excited] نعم، نعم، نعم!",
+        "[whispers] ممم، دافئ ومريح.",
+        "[whispers] دافئ جداً.",
+        "[whispers] لا تتوقّف.",
+        "[sighs] هنا بالضبط.",
+        "[sighs] رائع جداً.",
+        "[calm] أكاد أذوب.",
+        "[calm] سعادة خالصة.",
+        "أنت تضيء يومي.",
+        "قلبي يتوهّج.",
+        "أنا أخرخر من السعادة.",
+        "[laughs] هيهي، مرة أخرى!",
+        "كفى، أنت!",
+        "قد أعتاد على هذا.",
+        "أنت الأفضل.",
+        "أجمل شعور على الإطلاق!",
+        "[laughs] هيهي، دفء لطيف!",
+        "[whispers] أنت المفضّل لديّ.",
+        "أنا مشرق وسعيد الآن!",
+        "أتوهّج أكثر الآن.",
+        "[excited] أفضل صديق على الإطلاق!",
+        "[sighs] أوف، ليس مجدداً.",
+        "هيه، هذا يكفي!",
+        "توقّف، أنا جاد.",
+        "[sighs] لست في مزاج جيد.",
+        "توقّف من فضلك.",
+        "همف.",
+        "[whispers] ابتعد.",
+        "[sighs] اتركني وحدي.",
+        "لا تنكزني!",
+        "[whispers] أنت تجعلني أخجل.",
+        "آه!",
+        "[sighs] أنا نعسان...",
+    ],
     LANG_KO: [
         "[laughs] 간지러워!",
         "[laughs] 헤헤, 그만!",
@@ -449,6 +511,7 @@ HEAD_PAT_PHRASES_BY_LANG = {
 DEFAULT_FILLERS_BY_LANG = {
     LANG_JA:    "うん,はい,ええ,なるほど,そうですね,うーん,ああ",
     LANG_KO:    "응,네,음,그렇구나,아,어,흠",
+    LANG_AR:    "أمم,نعم,حسناً,آه,صحيح,طيب,ممم",
     LANG_EN:    "Uhm,Ok,Hmm,Yeah,Uh huh,Right,Sure,Mm,Ah,Oh",
     LANG_VI:    "Ờ,Ừm,Dạ,Vâng,À,Hmm,Uhm,Ơ",
     LANG_ZH_CN: "嗯,好,啊,是,嗯嗯,对,哦,呃",
@@ -643,6 +706,37 @@ MUSIC_BACKCHANNEL_PHRASES_KO_ELEVENLABS = [
     "[curious] 음, 한번 볼게.",
 ]
 
+# Arabic (stt_language=LANG_AR).
+MUSIC_BACKCHANNEL_PHRASES_AR = [
+    "حاضر!",
+    "سأشغّلها حالاً.",
+    "فهمت.",
+    "بالتأكيد.",
+    "لحظة واحدة.",
+    "دعني أبحث عنها.",
+    "أبحث عنها الآن.",
+    "أجهّزها لك.",
+    "سأشغّلها.",
+    "الموسيقى قادمة.",
+    "اختيار جميل.",
+    "ممم، دعني أرى.",
+]
+
+MUSIC_BACKCHANNEL_PHRASES_AR_ELEVENLABS = [
+    "[excited] حاضر!",
+    "[excited] سأشغّلها حالاً.",
+    "فهمت.",
+    "بالتأكيد.",
+    "لحظة واحدة.",
+    "[curious] دعني أبحث عنها.",
+    "[curious] أبحث عنها الآن.",
+    "[excited] أجهّزها لك.",
+    "[excited] سأشغّلها.",
+    "[excited] الموسيقى قادمة.",
+    "اختيار جميل.",
+    "[curious] ممم، دعني أرى.",
+]
+
 # (lang, provider_is_elevenlabs) → pool. Lookup falls back to DEFAULT_LANG
 # when the active language has no translated pool.
 MUSIC_BACKCHANNEL_POOLS = {
@@ -650,6 +744,8 @@ MUSIC_BACKCHANNEL_POOLS = {
     (LANG_JA,    True):  MUSIC_BACKCHANNEL_PHRASES_JA_ELEVENLABS,
     (LANG_KO,    False): MUSIC_BACKCHANNEL_PHRASES_KO,
     (LANG_KO,    True):  MUSIC_BACKCHANNEL_PHRASES_KO_ELEVENLABS,
+    (LANG_AR,    False): MUSIC_BACKCHANNEL_PHRASES_AR,
+    (LANG_AR,    True):  MUSIC_BACKCHANNEL_PHRASES_AR_ELEVENLABS,
     (LANG_EN,    False): MUSIC_BACKCHANNEL_PHRASES,
     (LANG_EN,    True):  MUSIC_BACKCHANNEL_PHRASES_ELEVENLABS,
     (LANG_VI,    False): MUSIC_BACKCHANNEL_PHRASES_VI,
@@ -663,6 +759,11 @@ MUSIC_BACKCHANNEL_POOLS = {
 
 # Mic-toggle confirmations: every line must still say which way the toggle went (privacy control).
 MIC_MUTED_PHRASES_BY_LANG = {
+    LANG_AR: [
+        "[whispers] حسناً، سأتوقّف عن الاستماع.",
+        "[whispers] شش، أغلقت أذنيّ.",
+        "[calm] لا أستمع الآن.",
+    ],
     LANG_KO: [
         "[whispers] 알았어, 이제 안 들을게.",
         "[whispers] 쉿, 귀를 닫았어.",
@@ -696,6 +797,11 @@ MIC_MUTED_PHRASES_BY_LANG = {
 }
 
 MIC_UNMUTED_PHRASES_BY_LANG = {
+    LANG_AR: [
+        "[excited] أنا أستمع مجدداً!",
+        "[excited] فتحت أذنيّ!",
+        "أستطيع سماعك مجدداً.",
+    ],
     LANG_KO: [
         "[excited] 다시 듣고 있어!",
         "[excited] 귀를 열었어!",

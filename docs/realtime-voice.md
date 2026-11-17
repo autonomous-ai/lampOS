@@ -150,6 +150,43 @@ HAL maps a voice name to its ID. HAL before 0.1.305 does not know these names an
 sends the name itself as the voice ID, which ElevenLabs rejects, so Korean voices
 need HAL 0.1.305 or later.
 
+## Arabic language and ElevenLabs voices
+
+Arabic uses `stt_language: "ar"` (`LANG_AR` in `hal/presets.py`); every regional
+code such as `ar-SA`, `ar-EG` or `ar_AE` normalizes to `ar`, while a code that only
+starts with the letters (`arn`) does not. With Arabic selected, STT runs Deepgram
+Nova-3 with `language=ar`, the language gate accepts Arabic speech (AmberNet label
+`ar`), Gemini Live gets `ar` (the code is passed through unchanged), and the agent
+is told to reply in Arabic. The robot's own phrases (retry, listening, reboot, mic
+toggle, head pat, music cues, fillers, OTA notice, wake and rename prompts, the
+radio-drama episode announcement) have Arabic versions. Local chitchat matches the
+whole utterance, like Japanese and Korean, because Arabic attaches prefixes and
+suffixes to words; before matching, diacritics and tatweel are removed and alef,
+alef maqsura and ta marbuta are folded, so `شكراً` matches `شكرا`. `شكراً` gets a
+local reply, while `شكراً، كم الساعة الآن؟` goes to the agent. The CoT leak filter
+treats Arabic as a non-Latin script, like Japanese and Korean, when it looks for
+English reasoning leaked into a reply.
+
+The ElevenLabs `ar` bucket is shared by HAL HTTP and WebSocket. The following six
+voices were selected from the
+[official ElevenLabs Arabic catalog](https://elevenlabs.io/text-to-speech/arabic)
+on 2026-11-12, skipping the Moroccan Darija voices and repeated names. Each one was
+synthesized through the Autonomous proxy on an Intern 2: about 0.25 s to first
+audio once warm, the same as the Korean bucket; the very first request for a voice
+can take 4–9 s.
+
+| Voice | Character (ElevenLabs label) | ElevenLabs voice ID |
+|---|---|---|
+| Salma (default) | Positive, professional and warm | `a1KZUXKFVFDOb33I1uqr` |
+| Sara | Soft, calm and gentle | `jAAHNNqlbAX9iWjJPEtE` |
+| Farah | Smooth, calm and warm | `4wf10lgibMnboGJGCLrP` |
+| Mona | Modern Standard Arabic, middle-aged | `tavIIPLplRB883FzWU0V` |
+| Haytham | Energetic, warm and cheerful | `IES4nrmZdUBHByLBde0P` |
+| Anas | Calm, attractive and clear | `R6nda3uM038xEEKi7GFl` |
+
+HAL before 0.1.308 does not know these names or the `ar` language, so Arabic needs
+HAL 0.1.308 or later.
+
 Low-latency, speech-to-speech voice layer that runs **in parallel** with the
 normal STT → agent pipeline. The realtime model handles casual conversation
 directly (sub-second audio replies) and **delegates** anything that needs the

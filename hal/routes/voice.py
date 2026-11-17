@@ -474,6 +474,21 @@ def stop_tts():
     return {"status": "ok"}
 
 
+@router.post("/voice/tap")
+def voice_tap():
+    """Act exactly like one short tap on the device, for remote testing.
+
+    In tap-to-talk the first call starts listening and the next one finishes the
+    capture and sends it; in automatic mode it runs the normal single-click action.
+    """
+    from hal.drivers.device_tap_actions import physical_short_tap
+
+    physical_short_tap(source="api", announce=False)
+    voice = state.voice_service
+    listening = bool(voice and getattr(voice, "device_input", None) and voice.device_input.active)
+    return {"status": "ok", "listening": listening}
+
+
 @router.post("/voice/wake-focus", response_model=StatusResponse)
 def grant_wake_focus(source: str = "os"):
     """Open the wake-word follow-up window without a spoken wake phrase (e.g. after the boot greeting)."""
