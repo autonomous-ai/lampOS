@@ -347,6 +347,40 @@ unset V
 }
 /// [`egress_lines`]'s text.
 pub const ONE_PATH_EGRESS_LINES: &str = egress_lines!();
+
+/// The one run path's keys for a skill's run (lamp-tasks'
+/// `LAMP_SKILL_SECRETS`), after the run lines and before anything else,
+/// the same for every agent: Harness passes the wrapper none of lamp-tasks'
+/// variables, so the run's keys file is found by its run id, as its token
+/// file and way out are. lamp-tasks writes it in the run's own folder,
+/// `<lamp-tasks' work folder>/lamp/make-<run-id>/.run-env`
+/// (`lamp_tasks::skill_keys::ENV_FILE`, 0400, `export NAME='value'` a line,
+/// each value one quoted shell word). Only in a run, and only when there:
+/// a file (never a link, in a folder that is no link) is read once, then
+/// deleted whatever came of the read, before the agent's data or
+/// namespace runs, so the keys are in the agent's environment alone, never
+/// an argument, a log line or a file the agent can read; one not read ends
+/// the run. lamp-tasks gives a run its keys on the one run path only once
+/// it finds these lines (`lamp_tasks::skill_task::ONE_PATH_KEY_LINES`), and
+/// removes the folder when the run ends, however it ends.
+macro_rules! key_lines {
+    () => {
+        r#"# A skill's run given its keys (#7200): lamp-tasks writes them in the run's own folder, found by its id,
+# /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-<run-id>/.run-env; read once and deleted here before anything runs,
+# so they are in the agent's environment alone, never an argument. Anything there not read ends it.
+K=/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-$R/.run-env
+if [ -n "$R" ] && { [ -e "$K" ] || [ -L "$K" ]; }; then
+  s=1
+  [ -f "$K" ] && [ ! -L "$K" ] && [ ! -L "${K%/.run-env}" ] && . "$K" && s=0
+  rm -f -- "$K" || fail "the keys file of run $R is not deleted"
+  [ "$s" = 0 ] || fail "the keys of run $R are not read"
+fi
+unset K s
+"#
+    };
+}
+/// [`key_lines`]'s text.
+pub const ONE_PATH_KEY_LINES: &str = key_lines!();
 /// The line after the agent's own lines in [`ONE_PATH_RUN`]: a run given
 /// its way out ([`ONE_PATH_EGRESS_LINES`]) whose agent took no make's home
 /// (`LAMP_NS_MAKE`, set only by its data) ends before anything runs, so a
@@ -358,7 +392,8 @@ pub const ONE_PATH_EGRESS_GUARD: &str = "[ -z \"${LAMP_NS_EGRESS-}\" ] || [ -n \
 /// bytes for every agent, naming none. The caller's token and network
 /// switch are dropped; the run lines ([`hermes_install::ONE_RUN_LINES`])
 /// read a run's token file first, so a wrapper that fails later leaves
-/// none behind; then a run's way out, when lamp-tasks made one
+/// none behind; then a run's keys file, read once and deleted
+/// ([`ONE_PATH_KEY_LINES`]); then a run's way out, when lamp-tasks made one
 /// ([`ONE_PATH_EGRESS_LINES`]); then the agent's own lines (`agent_env`,
 /// and `agent_run_env` in a run) and [`ONE_PATH_EGRESS_GUARD`]; `--net`
 /// only in a run; the agent's program
@@ -373,6 +408,7 @@ pub const ONE_PATH_RUN: &str = concat!(
 unset LAMP_CONTROL_TOKEN LAMP_NS_NET
 "#,
     hermes_install::one_run_lines!(),
+    key_lines!(),
     egress_lines!(),
     r#"agent_env
 [ -z "$R" ] || agent_run_env

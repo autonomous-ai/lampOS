@@ -47,6 +47,17 @@ if [ -n "$R" ]; then
   unset C
   export LAMP_CONTROL_TOKEN LAMP_CONTROL_SOCKET PYTHONPATH LAMP_NS_NET
 fi
+# A skill's run given its keys (#7200): lamp-tasks writes them in the run's own folder, found by its id,
+# /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-<run-id>/.run-env; read once and deleted here before anything runs,
+# so they are in the agent's environment alone, never an argument. Anything there not read ends it.
+K=/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-$R/.run-env
+if [ -n "$R" ] && { [ -e "$K" ] || [ -L "$K" ]; }; then
+  s=1
+  [ -f "$K" ] && [ ! -L "$K" ] && [ ! -L "${K%/.run-env}" ] && . "$K" && s=0
+  rm -f -- "$K" || fail "the keys file of run $R is not deleted"
+  [ "$s" = 0 ] || fail "the keys of run $R are not read"
+fi
+unset K s
 # A skill's run granted the internet (#7200): lamp-tasks makes its egress socket /run/lampos-tasks/egress/skill-<run-id>.sock
 # and its fresh home /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-<run-id>/home before it starts the run; Harness
 # passes none of lamp-tasks' variables, so both are found by the run's id. Anything else at the socket's place ends it.
