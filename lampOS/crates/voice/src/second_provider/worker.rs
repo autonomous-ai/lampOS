@@ -4360,8 +4360,8 @@ pub fn serve(
     }
     engine = engine.checking_skill_claims(action_claims && skill_claims);
     if action_claims && skill_claims {
-        // The person's skills, made and installed, read from the lamp's own
-        // folders when a turn's claims are judged (El's P2 on #7601).
+        // The person's made skills, read from the made skills' index when a
+        // turn's claims are judged (#7601).
         // And those turned off, in `lamp-skills`' `off` file.
         let keeping = crate::made_skill::Keeping::when(true);
         engine = engine.knowing_skill_names(Arc::new(move || crate::action_claim::KnownSkills {

@@ -1556,7 +1556,7 @@ pub type ReadBackAsked = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 /// its name and arguments, or none (`crate::skill_named::heard`, #6772).
 pub type SkillNamed = Arc<dyn Fn(&str) -> Option<(String, Value)> + Send + Sync>;
 
-/// The person's skills, made and installed, and those turned off, read
+/// The person's made skills, and those turned off, read
 /// when a turn's skill claims are judged (`LAMP_ACTION_CLAIM_SKILLS`,
 /// #7587): [`crate::action_claim::KnownSkills`].
 pub type SkillNames = Arc<dyn Fn() -> crate::action_claim::KnownSkills + Send + Sync>;
@@ -6054,10 +6054,9 @@ impl Engine {
     }
 
     /// Where [`Engine::checking_skill_claims`] reads the person's skills'
-    /// names, and those turned off: a skill said changed with no "skill" in
-    /// its words ("Moon time is removed.") is a claim only when it names
-    /// one, and one said off that is off already is none (El's P2 on
-    /// #7601).
+    /// made skills' names, and those turned off: a skill claim is held only
+    /// when it names a made skill by its exact name, and one said off that
+    /// is off, or on that is on, is never held (#7601).
     /// Read once a turn the claims are judged, local files only. Before
     /// any turn only.
     pub fn knowing_skill_names(mut self, names: SkillNames) -> Self {

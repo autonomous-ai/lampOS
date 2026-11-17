@@ -1551,41 +1551,37 @@ bị nghe thành "… moon time scale" và được đáp "Moon time is removed.
 có lời gọi `make_skill`, và sau một lần tạo thất bại thì "CloudFact is
 removed." cũng không có lời gọi nào: cả hai kỹ năng vẫn còn. Khi bật công tắc,
 trên một câu yêu cầu thay đổi kỹ năng (`action_claim::asks_a_skill_change`: có
-"remove", "delete", "uninstall", "turn", "switch", "disable", "enable",
-"start", "stop", "run", "make", "create" hoặc "put") và không hỏi dạng câu
-hỏi, câu trả lời mở đầu, trần hoặc sau một lời dẫn, bằng một kỹ năng gọi rõ là
-"skill" được nói là đã gỡ, tắt hay tạo (`Claim::Skill`: "The moon time skill
-is off now.", "I removed the moon time skill."), đã bật hay bật lại
-(`Claim::SkillOn`), hoặc đã khởi động hay đang chạy (`Claim::SkillStarted`:
-"Okay, the focus mode skill is started."), kết thúc ở cuối câu và không bao
-giờ với dấu '?', bị giữ lại như mọi hành động được nói là đã làm: mô hình được
+"remove", "delete", "uninstall", "cancel", "turn", "switch", "disable",
+"enable", "start", "stop", "run", "make", "create" hoặc "put") và không hỏi
+dạng câu hỏi, câu trả lời mở đầu, trần hoặc sau một lời dẫn, bằng một kỹ năng
+được nói là đã gỡ, tắt, bật, tạo, khởi động hay đang chạy
+(`action_claim::SKILL_SAID`, `BARE_SKILL_SAID`), kết thúc ở cuối câu và không
+bao giờ với dấu '?', chỉ bị giữ khi cả hai điều sau đúng: (a) câu đầu tiên gọi
+đúng tên một kỹ năng người dùng ĐÃ TẠO (`made.json`, `made_remove::names`), so
+sánh chữ thường và bỏ khoảng trắng, gạch nối, gạch dưới
+(`action_claim::made_named`: "moon time", "moon-time" và `moon_time` là một);
+và (b) lượt không có lời gọi đúng loại cho kỹ năng đó
+(`action_claim::backs_skill`): gỡ, tắt, bật hay tạo cần một `make_skill` có
+đối số, so sánh cùng cách, chứa tên đó ("moon time scale" chứa "moon time"),
+hoặc một lời đồng ý (`approve_id`); khởi động hay đang chạy cần `run` của
+`make_skill` hay `skill` của `use_skill` chứa tên đó. Khi bị giữ, mô hình được
 hỏi lại một lần với cùng ghi chú, rồi đèn nói "Sorry, I didn't do that. Could
-you ask me again?". Nói không có chữ "skill" (`action_claim::BARE_SKILL_SAID`:
-"Moon time is removed.", "CloudFact is turned off.", "I removed moon time
-earlier."), câu chỉ là lời nói đã làm khi câu đầu tiên gọi tên một kỹ năng của
-người dùng, tự tạo hay đã cài (`action_claim::known_skill`, theo cách viết như
-khi gỡ tìm kỹ năng, `made_remove::apart` và `near`; "earlier", "already",
-"yesterday", "before", "just" và "now" không thuộc tên): "Okay, the stove is
-turned off." được nói như nó đến. Một kỹ năng được nói là đã tắt mà vốn đã tắt,
-do công tắc trong ứng dụng hay một lượt trước (tệp `off` của `lamp-skills`,
-`skill_about::turned_off`), kể một trạng thái đúng và không phải lời nói đã
-làm: "CloudFact is turned off." sau khi ứng dụng đã tắt nó được nói như nó
-đến. Tên và các kỹ năng đã tắt được đọc một lần mỗi lượt được xét, từ các thư
-mục của chính đèn (`made_remove::names`). Mỗi câu chỉ đứng được bên
-cạnh một lời gọi xác nhận nó cho đúng kỹ năng đó (`action_claim::backs_skill`):
-gỡ hay tắt bên cạnh `make_skill` gỡ (`{"remove": NAME}`) hay tắt (`turn_off`)
-kỹ năng đó; bật bên cạnh lời gọi bật nó (`turn_on`); khởi động bên cạnh
-`use_skill` của nó, hoặc vòng chạy trong code của một kỹ năng được gọi tên
-(`LAMP_SKILL_NAMED`); tạo bên cạnh một lần tạo (một `make_skill` không gọi tên
-kỹ năng nào, hoặc ghi chú của đèn về nó) hay một lời đồng ý (`approve_id`),
-lời đồng ý cũng xác nhận bật và, với lời đồng ý gỡ, xác nhận gỡ. `use_skill`
-chạy một kỹ năng chứ không bao giờ bật nó; lời gọi cho kỹ năng khác, hay loại
-khác (một lời gọi đèn bên cạnh "Moon time is removed."), không xác nhận gì. "You have three skills.", "I can make
-a skill for that." và "CloudFact was never actually made." không phải lời nói
-đã làm. Chỉ đọc câu trả lời tiếng Anh, và chỉ câu mở đầu. Kiểm thử:
-`action_claim::tests::a_skill_said_removed_with_no_make_is_a_claim`,
-`a_bare_state_naming_no_skill_is_no_claim`,
-`a_skill_said_started_stands_beside_its_use_skill`,
+you ask me again?". Một kỹ năng đã tạo được nói là đã tắt mà tệp `off` của
+`lamp-skills` cho thấy vốn đã tắt, hay đã bật mà tệp cho thấy đang bật, kể một
+trạng thái đúng và không bao giờ bị giữ (`skill_about::turned_off`). Mọi thứ
+khác đứng được: kỹ năng lõi và kỹ năng đã cài, tên gần giống, trạng thái trần
+không gọi tên kỹ năng đã tạo nào ("Okay, the stove is turned off.", "I've
+deleted the reminder."), việc khởi động một kỹ năng có hàm mang tên khác ("the
+guard mode skill is started" bên cạnh `keep_watch`), "You have three
+skills.", "I can make a skill for that." và "CloudFact was never actually
+made.". Một lời gọi đèn bên cạnh "Moon time is removed." không xác nhận gì,
+nên câu đó bị giữ. Tên và các kỹ năng đã tắt được đọc một lần mỗi lượt được
+xét, từ các tệp của chính đèn. Chỉ đọc câu trả lời tiếng Anh, và chỉ câu mở
+đầu. Kiểm thử:
+`action_claim::tests::a_made_skill_said_removed_with_no_make_is_a_claim`,
+`a_claim_naming_no_made_skill_is_none`,
+`a_made_skill_said_on_or_off_is_judged_by_its_state`,
+`a_made_skill_said_started_stands_beside_its_run`,
 `talk_about_skills_is_no_skill_claim`,
 `second_provider::tests::action_claim::a_skill_said_removed_with_no_make_is_asked_again_then_not_done`,
 `a_skill_change_beside_its_make_and_talk_about_skills_are_said_as_they_came`,

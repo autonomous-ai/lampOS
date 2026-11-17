@@ -179,16 +179,11 @@ fn others(keeping: &Keeping, made: &[(String, String)]) -> Vec<String> {
     others
 }
 
-/// Every skill's name on the lamp, made or not: what a skill claim with no
-/// "skill" in its words must name to count
-/// (`action_claim::known_skill`, #7587).
+/// The person's made skills' names (the made skills' index), each once:
+/// the only skills a skill claim is held for (`action_claim::skill_claim`,
+/// #7587).
 pub fn names(keeping: &Keeping) -> Vec<String> {
-    let made = made(keeping);
-    let others = others(keeping, &made);
-    made.into_iter()
-        .map(|(name, _)| name)
-        .chain(others)
-        .collect()
+    made(keeping).into_iter().map(|(name, _)| name).collect()
 }
 
 /// Whether every word of `short` lies inside `long`'s words, in a row

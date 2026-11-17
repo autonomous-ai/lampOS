@@ -4394,41 +4394,36 @@ product's `lamp-voice.service`, and nothing without
 heard as "… moon time scale" and answered "Moon time is removed." with no
 `make_skill` call, and after a failed make "CloudFact is removed." with none:
 both skills stayed. With the switch, on a line that asks for a skill's change
-(`action_claim::asks_a_skill_change`: "remove", "delete", "uninstall", "turn",
-"switch", "disable", "enable", "start", "stop", "run", "make", "create" or
-"put" in it) and not asked as a question, a reply that opens, bare or after a
-lead-in, with a skill so named said removed, off or made (`Claim::Skill`:
-"The moon time skill is off now.", "I removed the moon time skill."), turned
-on, enabled or back on (`Claim::SkillOn`), or started or running
-(`Claim::SkillStarted`: "Okay, the focus mode skill is started."), closing at
-its sentence's end and never on a '?', is held like any claimed action: asked
-once more with the same note, then said as "Sorry, I didn't do that. Could you
-ask me again?". Said with no "skill" (`action_claim::BARE_SKILL_SAID`: "Moon
-time is removed.", "CloudFact is turned off.", "I removed moon time
-earlier."), it is a claim only when its first sentence names one of the
-person's skills, made or installed (`action_claim::known_skill`, by spelling as
-a remove finds one, `made_remove::apart` and `near`; "earlier", "already",
-"yesterday", "before", "just" and "now" are no part of a name): "Okay, the
-stove is turned off." is said as it came. A skill said off that is off
-already, by the app's switch or an earlier turn (`lamp-skills`' `off` file,
-`skill_about::turned_off`), tells a true state and is no claim: "CloudFact is
-turned off." after the app turned it off is said as it came. The names and the
-off ones are read once a judged turn from the lamp's own folders
-(`made_remove::names`). Each stands only
-beside a call that backs it for that skill (`action_claim::backs_skill`):
-removed or off beside a `make_skill` removing (`{"remove": NAME}`) or turning
-off (`turn_off`) that skill; on beside one turning it on (`turn_on`); started
-beside a `use_skill` of it, or the in-code round of a skill asked by its name
-(`LAMP_SKILL_NAMED`); made beside a make (a `make_skill` naming no skill, or
-the lamp's note of one) or a yes (`approve_id`), which also backs on and, for
-a remove's yes, removed. A `use_skill` runs a skill and never puts one on; a
-call for another skill, or of another kind (a light call beside "Moon time is
-removed."), backs nothing. "You have three skills.", "I can make a skill for that."
-and "CloudFact was never actually made." are no claims. Only English replies
-are read, and only the reply's opening sentence. Tests:
-`action_claim::tests::a_skill_said_removed_with_no_make_is_a_claim`,
-`a_bare_state_naming_no_skill_is_no_claim`,
-`a_skill_said_started_stands_beside_its_use_skill`,
+(`action_claim::asks_a_skill_change`: "remove", "delete", "uninstall",
+"cancel", "turn", "switch", "disable", "enable", "start", "stop", "run",
+"make", "create" or "put" in it) and not asked as a question, a reply that
+opens, bare or after a lead-in, with a skill said removed, off, on, made,
+started or running (`action_claim::SKILL_SAID`, `BARE_SKILL_SAID`), closing at
+its sentence's end and never on a '?', is held only when both hold:
+(a) its first sentence names one of the person's MADE skills (`made.json`,
+`made_remove::names`) by its exact name, compared lower case with spaces,
+hyphens and underscores dropped (`action_claim::made_named`: "moon time",
+"moon-time" and `moon_time` are one); and (b) the turn has no call of its kind
+for that skill (`action_claim::backs_skill`): removed, turned off, turned on
+or made need a `make_skill` whose argument, compared the same way, holds that
+name ("moon time scale" holds "moon time"), or a yes (`approve_id`); started
+or running need a `make_skill` `run` or a `use_skill` `skill` that holds it.
+Held, it is asked once more with the same note, then said as "Sorry, I didn't
+do that. Could you ask me again?". A made skill said off that `lamp-skills`'
+`off` file shows off already, or on that it shows on, tells a true state and is
+never held (`skill_about::turned_off`). Everything else stands: core and
+installed skills, near names, bare states naming no made skill ("Okay, the
+stove is turned off.", "I've deleted the reminder."), a start of a skill whose
+function has another name ("the guard mode skill is started" beside
+`keep_watch`), "You have three skills.", "I can make a skill for that." and
+"CloudFact was never actually made.". A light call beside "Moon time is
+removed." backs nothing, so it is held. The names and the off ones are read
+once a judged turn from the lamp's own files. Only English replies are read,
+and only the reply's opening sentence. Tests:
+`action_claim::tests::a_made_skill_said_removed_with_no_make_is_a_claim`,
+`a_claim_naming_no_made_skill_is_none`,
+`a_made_skill_said_on_or_off_is_judged_by_its_state`,
+`a_made_skill_said_started_stands_beside_its_run`,
 `talk_about_skills_is_no_skill_claim`,
 `second_provider::tests::action_claim::a_skill_said_removed_with_no_make_is_asked_again_then_not_done`,
 `a_skill_change_beside_its_make_and_talk_about_skills_are_said_as_they_came`,

@@ -160,7 +160,7 @@ fn went_doing(
             .map(|name| (*name).to_owned())
             .collect();
         Arc::new(move || crate::action_claim::KnownSkills {
-            names: ["moon time", "CloudFact", "focus mode"]
+            names: ["moon-time", "cloudfact", "focus_mode"]
                 .map(str::to_owned)
                 .to_vec(),
             off: off.clone(),
@@ -2219,9 +2219,14 @@ fn a_skill_said_started_beside_its_use_skill_is_said_as_it_came() {
         "{went:?}"
     );
     let reply = "I turned the CloudFact skill back on.";
-    let went = skills(
+    let went = went_doing(
+        true,
+        false,
+        false,
+        Some(&["cloudfact"]),
         true,
         "Turn CloudFact back on.",
+        false,
         calling_with(crate::use_skill::NAME, json!({ "skill": "cloudfact" })),
         vec![saying(reply), saying(reply)],
     );

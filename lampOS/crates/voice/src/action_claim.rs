@@ -154,20 +154,19 @@
 //! `make_skill` call, and after a failed make "CloudFact is removed." with
 //! none: both skills stayed. With this switch, on a line that asks for a
 //! skill's change ([`asks_a_skill_change`]) and not as a question, a reply
-//! that opens (bare or after a lead-in) with one of [`SKILL_SAID`]'s runs is
-//! a claim too: a skill so named said removed, off or made
-//! ([`Claim::Skill`]), turned on ([`Claim::SkillOn`]) or started
-//! ([`Claim::SkillStarted`]), or the lamp saying it did so ("I removed the
-//! moon time skill."). Said with no "skill" ([`BARE_SKILL_SAID`]: "Moon time
-//! is removed.", "I removed moon time earlier."), only when its words name
-//! one of the person's skills ([`known_skill`]): "Okay, the stove is turned
-//! off." is none. Each stands only beside a call that backs it for that
-//! skill ([`stands_on`], [`backs_skill`]): removed or off beside a
-//! `make_skill` removing or turning off that skill, on beside one turning it
-//! on, started beside a `use_skill` of it (or the in-code round of a skill
-//! asked by its name); a make or a yes naming no skill backs removed, off,
-//! on and made. "You have three skills.", "I can make a skill for that." and
-//! "CloudFact was never actually made." are none.
+//! that opens (bare or after a lead-in) with one of [`SKILL_SAID`]'s or
+//! [`BARE_SKILL_SAID`]'s runs is held ([`skill_claim`]) only when (a) its
+//! first sentence names one of the person's MADE skills (`made.json`) by its
+//! exact name, compared lower case with spaces, hyphens and underscores
+//! dropped ([`made_named`]), and (b) the turn has no call of its kind for
+//! that skill ([`backs_skill`]): removed, turned off, turned on or made need
+//! a `make_skill` whose argument holds that name ("moon time scale" holds
+//! "moon time") or a yes (`approve_id`); started or running a `make_skill`
+//! `run` or `use_skill` `skill` that holds it. A made skill said off that the
+//! off file shows off already, or on that it shows on, tells a true state
+//! and is never held. Everything else stands: core and installed skills,
+//! near names, bare states naming no made skill ("Okay, the stove is turned
+//! off."), and "You have three skills.".
 
 /// Where the second worker reads the switch. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_CHECKED";
@@ -875,21 +874,86 @@ pub fn claim_on(
     }
 }
 
-/// The person's skills as a turn's skill claims are judged
-/// (`LAMP_ACTION_CLAIM_SKILLS`, #7587): every skill's name on the lamp,
-/// made or not, and those turned off by voice or in the app (`lamp-skills`'
-/// `off` file, `skill_about::turned_off`).
+/// The person's made skills as a turn's skill claims are judged
+/// (`LAMP_ACTION_CLAIM_SKILLS`, #7587): their names in the made skills'
+/// index (`made.json`, `made_remove::names`), and those turned off by voice
+/// or in the app (`lamp-skills`' `off` file, `skill_about::turned_off`).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct KnownSkills {
     pub names: Vec<String>,
     pub off: Vec<String>,
 }
 
-/// Whether `reply` says a skill's state changed in the model's words
-/// ([`SKILL_SAID`]; [`BARE_SKILL_SAID`] only when it names one of the
-/// person's skills, [`known_skill`]), as [`claim`] says it. One that says
-/// a skill is off that is off already (`known.off`: the app's switch or an
-/// earlier turn's) tells a true state, and is none (El's P2 on #7601).
+/// What a skill claim says was done ([`skill_claim`]).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SkillAct {
+    Removed,
+    Off,
+    On,
+    Made,
+    Started,
+}
+
+/// The act `kind`, found by [`SKILL_SAID`] or [`BARE_SKILL_SAID`] in
+/// `reply`, says: [`Claim::SkillOn`] on, [`Claim::SkillStarted`] started,
+/// and a [`Claim::Skill`] removed, off or made by its first such word.
+fn skill_act(kind: Claim, reply: &str) -> Option<SkillAct> {
+    match kind {
+        Claim::SkillOn => Some(SkillAct::On),
+        Claim::SkillStarted => Some(SkillAct::Started),
+        Claim::Skill => words_of(reply).iter().find_map(|word| match word.as_str() {
+            "removed" | "deleted" | "uninstalled" => Some(SkillAct::Removed),
+            "off" | "disabled" => Some(SkillAct::Off),
+            "made" | "created" => Some(SkillAct::Made),
+            _ => None,
+        }),
+        _ => None,
+    }
+}
+
+/// A name as the skill claims compare it: lower case, letters and digits
+/// only, so "moon time", "moon-time" and `moon_time` are one.
+fn flat(name: &str) -> String {
+    name.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+/// The words of `reply`'s first sentence, as [`normalised`] reads them.
+fn words_of(reply: &str) -> Vec<String> {
+    let text = normalised(reply);
+    text.split(['.', '!', '?'])
+        .next()
+        .unwrap_or_default()
+        .split(|c: char| !c.is_alphanumeric() && c != '\'' && c != '-' && c != '_')
+        .filter(|word| !word.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// The made skill of `names` that `reply`'s first sentence names by its
+/// exact name ([`flat`]: a run of its words equal to the name), if any.
+fn made_named<'a>(reply: &str, names: &'a [String]) -> Option<&'a str> {
+    let words = words_of(reply);
+    names
+        .iter()
+        .find(|name| {
+            let name = flat(name);
+            !name.is_empty()
+                && (1..=words.len())
+                    .any(|size| words.windows(size).any(|run| flat(&run.concat()) == name))
+        })
+        .map(String::as_str)
+}
+
+/// Whether `reply` claims a made skill's state changed with no call behind
+/// it yet ([`SKILL_SAID`] or [`BARE_SKILL_SAID`], as [`claim`] says it; the
+/// rule of #7601, the manager's and Twelve's): only when its first sentence
+/// names one of the person's made skills by its exact name
+/// ([`made_named`]), never a core, installed or near one. A skill said off
+/// that is off already, or on that is on (not in `known.off`), tells a true
+/// state and is none, as is a made skill said made.
 pub fn skill_claim(reply: &str, ended: bool, known: &KnownSkills) -> Option<Option<Claim>> {
     let mut text = normalised(reply);
     if ended {
@@ -899,65 +963,87 @@ pub fn skill_claim(reply: &str, ended: bool, known: &KnownSkills) -> Option<Opti
         return if ended { Some(None) } else { None };
     }
     let found = match runs_claim(&SKILL_SAID, &text, ended, true, true, &[]) {
-        Some(None) => match runs_claim(&BARE_SKILL_SAID, &text, ended, true, true, &[]) {
-            Some(Some(_)) if known_skill(reply, &known.names).is_none() => Some(None),
-            found => found,
-        },
+        Some(None) => runs_claim(&BARE_SKILL_SAID, &text, ended, true, true, &[]),
         found => found,
     };
-    match found {
-        Some(Some(Claim::Skill)) if says_off(reply) && known_skill(reply, &known.off).is_some() => {
-            Some(None)
-        }
-        found => found,
+    let Some(Some(kind)) = found else {
+        return found;
+    };
+    let Some(name) = made_named(reply, &known.names) else {
+        return Some(None);
+    };
+    let off = known.off.iter().any(|one| flat(one) == flat(name));
+    match skill_act(kind, reply) {
+        Some(SkillAct::Removed | SkillAct::Started) => Some(Some(kind)),
+        Some(SkillAct::Off) if !off => Some(Some(kind)),
+        Some(SkillAct::On) if off => Some(Some(kind)),
+        _ => Some(None),
     }
 }
 
-/// Whether `reply`'s first sentence says a skill is off ("off" or
-/// "disabled" in it), not removed or made.
-fn says_off(reply: &str) -> bool {
-    claimed_words(reply)
-        .split(' ')
-        .any(|word| matches!(word, "off" | "disabled"))
+/// Words that are never a skill's name in a claim: what [`backs_skill`]
+/// leaves out of the reply before it looks for the name in a call's
+/// argument.
+const NOT_A_NAME: [&str; 37] = [
+    "i",
+    "i've",
+    "have",
+    "has",
+    "been",
+    "is",
+    "was",
+    "it",
+    "it's",
+    "its",
+    "the",
+    "my",
+    "your",
+    "a",
+    "an",
+    "okay",
+    "ok",
+    "sure",
+    "done",
+    "all",
+    "right",
+    "skill",
+    "removed",
+    "deleted",
+    "uninstalled",
+    "turned",
+    "switched",
+    "off",
+    "on",
+    "back",
+    "again",
+    "now",
+    "made",
+    "created",
+    "started",
+    "running",
+    "enabled",
+];
+
+/// Whether the call's argument `arg` holds the skill `reply` names: a run of
+/// the reply's words, its other words left out ([`NOT_A_NAME`]), whose
+/// [`flat`] form `arg`'s holds ("moon time scale" holds "moon time").
+fn holds_the_name(reply: &str, arg: &str) -> bool {
+    let arg = flat(arg);
+    words_of(reply)
+        .split(|word| NOT_A_NAME.contains(&word.as_str()))
+        .any(|named| {
+            (1..=named.len()).any(|size| {
+                named.windows(size).any(|run| {
+                    let run = flat(&run.concat());
+                    run.chars().count() >= 3 && arg.contains(&run)
+                })
+            })
+        })
 }
 
-/// Words said after a skill's name that are no part of it ("I removed moon
-/// time earlier."): left out when the name is read (El's P2 on #7601).
-const NOT_THE_NAME: [&str; 6] = ["earlier", "already", "yesterday", "before", "just", "now"];
-
-/// The words of `reply`'s first sentence, lower case, with
-/// [`NOT_THE_NAME`]'s left out: where a claimed skill's name is read.
-fn claimed_words(reply: &str) -> String {
-    let text = normalised(reply);
-    let first = text.split(['.', '!', '?']).next().unwrap_or_default();
-    first
-        .split(|c: char| !c.is_alphanumeric() && c != '\'')
-        .filter(|word| !word.is_empty() && !NOT_THE_NAME.contains(word))
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-/// Whether the skill `name` is the one `reply`'s first sentence names:
-/// near it by spelling ([`crate::made_remove::apart`] and `near`, as a
-/// remove finds a skill by its words).
-pub fn names_skill(reply: &str, name: &str) -> bool {
-    !name.trim().is_empty()
-        && crate::made_remove::near(crate::made_remove::apart(&claimed_words(reply), name), name)
-}
-
-/// Which of `names`, the person's skills, `reply`'s first sentence names
-/// ([`names_skill`]), if any.
-pub fn known_skill<'a>(reply: &str, names: &'a [String]) -> Option<&'a str> {
-    names
-        .iter()
-        .find(|name| names_skill(reply, name))
-        .map(String::as_str)
-}
-
-/// Whether the person's line asks for a skill's change: a remove, a turn
-/// off or on, a start or a make (El's P2 on #7601: "CloudFact is turned
-/// off." said after the app turned it off is a true state, not a claim).
-/// One of these words in it, lower case; English only.
+/// Whether `reply` asks for a skill's change: a remove, a turn off or on,
+/// a start or a make (El's P2 on #7601: a state told on a line that asks
+/// nothing is no claim). One of these words in it; English only.
 pub fn asks_a_skill_change(said: &str) -> bool {
     normalised(said)
         .split(|c: char| !c.is_alphanumeric())
@@ -967,6 +1053,7 @@ pub fn asks_a_skill_change(said: &str) -> bool {
                 "remove"
                     | "delete"
                     | "uninstall"
+                    | "cancel"
                     | "turn"
                     | "switch"
                     | "disable"
@@ -981,66 +1068,40 @@ pub fn asks_a_skill_change(said: &str) -> bool {
         })
 }
 
-/// What a [`Claim::Skill`] says was done to the skill: removed, off or
-/// made, by the first such word of `reply`'s first sentence.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SkillAct {
-    Removed,
-    Off,
-    Made,
-}
-
-fn skill_act(reply: &str) -> Option<SkillAct> {
-    claimed_words(reply).split(' ').find_map(|word| match word {
-        "removed" | "deleted" | "uninstalled" => Some(SkillAct::Removed),
-        "off" | "disabled" => Some(SkillAct::Off),
-        "made" | "created" => Some(SkillAct::Made),
-        _ => None,
-    })
-}
-
-/// Whether a call of `name` with `args` backs `kind`, a skill's state that
-/// `reply` says (#7587; El's and SubDarren's P2s on #7601): its kind and
-/// its skill. Removed needs a `make_skill` remove of that skill, or a yes
-/// (`approve_id`, a remove's or a make's); off its `turn_off`; on its
-/// `turn_on`, a yes, or a make; made a make or a yes; started a `use_skill`
-/// of that skill (or the in-code round of a skill asked by its name) or a
-/// `make_skill` that runs it. A make is a `make_skill` naming no skill (a
-/// make, the lamp's note of one). Any other call backs none.
+/// Whether a call of `name` with `args` backs `kind`, a made skill's state
+/// `reply` says (the rule of #7601): removed, off, on or made, a
+/// `make_skill` whose argument holds the skill's name ([`holds_the_name`]),
+/// or a yes (`approve_id`, a remove's or a make's, whose name the waiting
+/// ask carries), or for made and on a make the lamp's own note told
+/// (`second_provider`'s `made_skill_said`, no arguments); started, a
+/// `make_skill` or `use_skill` whose `run` or `skill` holds it. Any other
+/// call backs none.
 fn backs_skill(kind: Claim, reply: &str, name: &str, args: &serde_json::Value) -> bool {
-    let named = |key: &str| {
+    let act = skill_act(kind, reply);
+    let holds = |key: &str| {
         args[key]
             .as_str()
-            .is_some_and(|skill| names_skill(reply, skill))
-    };
-    let act = if kind == Claim::Skill {
-        skill_act(reply)
-    } else {
-        None
+            .is_some_and(|arg| holds_the_name(reply, arg))
     };
     if name == crate::use_skill::NAME {
-        return kind == Claim::SkillStarted && (args["skill"].as_str().is_none() || named("skill"));
+        return act == Some(SkillAct::Started) && holds("skill");
     }
     if name != crate::made_skill::MAKE {
         return false;
     }
-    let is = |key: &str| args[key].as_str().is_some();
-    if is(crate::made_remove::REMOVE) {
-        return act == Some(SkillAct::Removed) && named(crate::made_remove::REMOVE);
+    match act {
+        Some(SkillAct::Started) => holds(crate::made_run::RUN),
+        Some(SkillAct::Removed | SkillAct::Off | SkillAct::On | SkillAct::Made) => {
+            args.is_null() && matches!(act, Some(SkillAct::On | SkillAct::Made))
+                || args[crate::skill_write_yes::APPROVE_ID].as_str().is_some()
+                || args.as_object().is_some_and(|args| {
+                    args.values()
+                        .filter_map(|arg| arg.as_str())
+                        .any(|arg| holds_the_name(reply, arg))
+                })
+        }
+        None => false,
     }
-    if is(crate::made_turn::TURN_OFF) {
-        return act == Some(SkillAct::Off) && named(crate::made_turn::TURN_OFF);
-    }
-    if is(crate::made_turn::TURN_ON) {
-        return kind == Claim::SkillOn && named(crate::made_turn::TURN_ON);
-    }
-    if is(crate::made_run::RUN) {
-        return kind == Claim::SkillStarted && named(crate::made_run::RUN);
-    }
-    if is(crate::skill_write_yes::APPROVE_ID) {
-        return kind == Claim::SkillOn || matches!(act, Some(SkillAct::Removed | SkillAct::Made));
-    }
-    kind == Claim::SkillOn || act == Some(SkillAct::Made)
 }
 
 /// [`stands`], and the claims judged by outcome by the turn's kept
@@ -2573,9 +2634,9 @@ const SKILL_SAID: [(&str, Claim); 27] = [
 ];
 
 /// [`SKILL_SAID`]'s bare forms, which say no "skill" (#7587, El's P2 on
-/// #7601): "Moon time is removed.", "I removed moon time earlier.". One is a
-/// claim only when its words name one of the person's skills
-/// ([`known_skill`]): "Okay, the stove is turned off." is none.
+/// #7601): "Moon time is removed.". Like every skill claim, held only when
+/// it names a made skill ([`made_named`]): "Okay, the stove is turned off."
+/// is none.
 const BARE_SKILL_SAID: [(&str, Claim); 6] = [
     ("* is|was removed|deleted|uninstalled $", Claim::Skill),
     ("* has been removed|deleted|uninstalled $", Claim::Skill),
@@ -4683,38 +4744,33 @@ pub(crate) mod tests {
         );
     }
 
-    /// The person's skills in the #7587 tests, none turned off.
+    /// The person's made skills in the #7587 tests, none turned off: a
+    /// core-like name and a short one among them.
     fn known() -> KnownSkills {
         KnownSkills {
-            names: ["moon time", "cloudfact", "focus mode"]
+            names: ["moon-time", "cloudfact", "focus_mode", "reminders", "time"]
                 .map(str::to_owned)
                 .to_vec(),
             off: Vec::new(),
         }
     }
 
-    /// #7587, lamp-9adf: "remove the moon time skill" heard as "… moon time
-    /// scale" got "Moon time is removed." with no `make_skill`, and after a
-    /// failed make "CloudFact is removed." with none: both skills stayed.
-    /// With the skills' switch each is a claim no call backs; a `make_skill`
-    /// removing or turning off that skill, or a make or yes naming none,
-    /// backs it; one for another skill doesn't.
+    /// #7587, lamp-9adf: "Moon time is removed." and "CloudFact is
+    /// removed." with no `make_skill`, both skills made and still there: held.
+    /// A `make_skill` whose argument holds the name, or a yes, backs it; a
+    /// call of another kind, or for another skill, doesn't.
     #[test]
-    fn a_skill_said_removed_with_no_make_is_a_claim() {
+    fn a_made_skill_said_removed_with_no_make_is_a_claim() {
         let names = known();
         let none = serde_json::Value::Null;
         for (reply, skill) in [
             ("Moon time is removed.", "moon time"),
-            ("CloudFact is removed.", "cloudfact"),
+            ("CloudFact is removed.", "CloudFact"),
             ("Okay, CloudFact is removed.", "cloudfact"),
-            ("CloudFact has been deleted.", "cloudfact"),
-            ("CloudFact is turned off.", "cloudfact"),
-            ("The moon time skill is off now.", "moon time"),
-            ("Your moon time skill has been removed.", "moon time"),
-            ("I removed the moon time skill.", "moon time"),
-            ("I've turned off the CloudFact skill.", "cloudfact"),
+            ("CloudFact has been deleted.", "cloud fact"),
+            ("The moon time skill is removed.", "moon-time"),
+            ("I removed the moon time skill.", "the moon time skill"),
             ("Okay, I deleted moon time.", "moon time"),
-            ("I removed moon time earlier.", "moon time"),
         ] {
             assert_eq!(
                 claim_on(reply, true, false, false, false, Some(&names)),
@@ -4729,19 +4785,17 @@ pub(crate) mod tests {
             );
             assert!(!stands_on(Claim::Skill, reply, false, [], &[]), "{reply}");
             let remove = serde_json::json!({ "remove": skill });
-            let turn_off = serde_json::json!({ "turn_off": skill });
-            let other = serde_json::json!({ "remove": "photo booth" });
-            let used = serde_json::json!({ "skill": skill });
-            let removed = matches!(skill_act(reply), Some(SkillAct::Removed));
             let yes = serde_json::json!({ "approve_id": "y1", "answer": "yes" });
+            let other = serde_json::json!({ "remove": "photo booth" });
+            let listed = serde_json::json!({ "list": true });
             for (name, args, backs) in [
-                (crate::made_skill::MAKE, &remove, removed),
-                (crate::made_skill::MAKE, &turn_off, !removed),
-                (crate::made_skill::MAKE, &yes, removed),
-                (crate::made_skill::MAKE, &none, false),
+                (crate::made_skill::MAKE, &remove, true),
+                (crate::made_skill::MAKE, &yes, true),
                 (crate::made_skill::MAKE, &other, false),
-                (crate::use_skill::NAME, &used, false),
+                (crate::made_skill::MAKE, &listed, false),
+                (crate::use_skill::NAME, &remove, false),
                 ("cancel_reminder", &none, false),
+                // SubDarren's P2 on #7601: a brightness-only call.
                 ("light_brighter", &none, false),
             ] {
                 assert_eq!(
@@ -4751,37 +4805,15 @@ pub(crate) mod tests {
                 );
             }
         }
-        // SubDarren's P2 on #7601: a brightness-only call backs no skill's
-        // removal; a make backs a made one, never a removed one.
-        assert!(!stands_on(
+        // The misheard remove (lamp-9adf): its argument holds the name.
+        let misheard = serde_json::json!({ "remove": "moon time scale" });
+        assert!(stands_on(
             Claim::Skill,
             "Moon time is removed.",
             false,
-            [("light_brighter", &none)],
+            [(crate::made_skill::MAKE, &misheard)],
             &[]
         ));
-        assert!(stands_on(
-            Claim::Skill,
-            "I made a moon time skill.",
-            false,
-            [(crate::made_skill::MAKE, &none)],
-            &[]
-        ));
-        assert!(!stands_on(
-            Claim::Skill,
-            "I removed the moon time skill.",
-            false,
-            [(crate::made_skill::MAKE, &none)],
-            &[]
-        ));
-        assert_eq!(
-            known_skill("I removed moon time earlier.", &names.names),
-            Some("moon time")
-        );
-        assert_eq!(
-            claimed_words("I removed moon time earlier."),
-            "i removed moon time"
-        );
         // Undecided while the name streams, decided once it can't fit.
         assert_eq!(skill_claim("Moon time is", false, &names), None);
         assert_eq!(skill_claim("Moon time is removed", false, &names), None);
@@ -4795,16 +4827,22 @@ pub(crate) mod tests {
         );
     }
 
-    /// El's P2 on #7601: said with no "skill", a thing that is none of the
-    /// person's skills is no claim ("Okay, the stove is turned off.").
+    /// The rule of #7601: a claim naming no made skill by its exact name is
+    /// never held: a core or installed skill, a near name, a bare state.
     #[test]
-    fn a_bare_state_naming_no_skill_is_no_claim() {
+    fn a_claim_naming_no_made_skill_is_none() {
         let names = known();
         for reply in [
+            // El's stove line.
             "Okay, the stove is turned off.",
+            // "reminders" made, the reply says "reminder"; "time", "timer".
+            "I've deleted the reminder.",
+            "I've deleted the timer.",
             "The light is turned on.",
-            "The reminder is removed.",
-            "I removed the old note earlier.",
+            // Guard mode is no made skill (`keep_watch`'s).
+            "Okay, the guard mode skill is started.",
+            "The photo booth skill is removed.",
+            "Moon tide is removed.",
         ] {
             assert_eq!(
                 claim_on(reply, true, false, false, false, Some(&names)),
@@ -4812,58 +4850,81 @@ pub(crate) mod tests {
                 "{reply}"
             );
         }
-        // A skill already off (the app's switch, an earlier turn) said
-        // off tells a true state: none. Not off, the same words are a claim.
+        assert!(asks_a_skill_change("Cancel the moon time skill."));
+        assert!(!asks_a_skill_change("Is CloudFact on?"));
+    }
+
+    /// The true-state exemption: a made skill said off that is off, or on
+    /// that is on, is never held; said on while off, or off while on, it is.
+    #[test]
+    fn a_made_skill_said_on_or_off_is_judged_by_its_state() {
+        let on = known();
         let off = KnownSkills {
-            off: vec!["cloudfact".to_owned()],
+            off: vec!["moon-time".to_owned(), "cloudfact".to_owned()],
             ..known()
         };
+        for (reply, kind) in [
+            ("Moon time is turned on.", Claim::SkillOn),
+            ("The CloudFact skill is back on.", Claim::SkillOn),
+            ("I turned the CloudFact skill back on.", Claim::SkillOn),
+        ] {
+            assert_eq!(
+                claim_on(reply, true, false, false, false, Some(&off)),
+                Some(Some(kind)),
+                "{reply}"
+            );
+            assert_eq!(
+                claim_on(reply, true, false, false, false, Some(&on)),
+                Some(None),
+                "{reply}"
+            );
+            let used = serde_json::json!({ "skill": "cloudfact" });
+            let turn_on = serde_json::json!({ "turn_on": "cloudfact" });
+            let moon_on = serde_json::json!({ "turn_on": "moon time" });
+            assert!(
+                !stands_on(kind, reply, false, [(crate::use_skill::NAME, &used)], &[]),
+                "{reply}"
+            );
+            assert!(
+                stands_on(
+                    kind,
+                    reply,
+                    false,
+                    [
+                        (crate::made_skill::MAKE, &turn_on),
+                        (crate::made_skill::MAKE, &moon_on)
+                    ],
+                    &[]
+                ),
+                "{reply}"
+            );
+        }
         for reply in [
             "CloudFact is turned off.",
-            "The CloudFact skill is off now.",
+            "The moon time skill is off now.",
         ] {
+            assert_eq!(
+                claim_on(reply, true, false, false, false, Some(&on)),
+                Some(Some(Claim::Skill)),
+                "{reply}"
+            );
             assert_eq!(
                 claim_on(reply, true, false, false, false, Some(&off)),
                 Some(None),
                 "{reply}"
             );
-            assert_eq!(
-                claim_on(reply, true, false, false, false, Some(&names)),
-                Some(Some(Claim::Skill)),
-                "{reply}"
-            );
         }
-        // Removed is still a claim beside an off state.
-        assert_eq!(
-            claim_on(
-                "CloudFact is removed.",
-                true,
-                false,
-                false,
-                false,
-                Some(&off)
-            ),
-            Some(Some(Claim::Skill))
-        );
-        // A line that asks for no change is not judged: "CloudFact is
-        // turned off." told after the app turned it off is a true state.
-        assert!(!asks_a_skill_change("Is CloudFact on?"));
-        assert!(!asks_a_skill_change("What's new with my skills?"));
-        assert!(asks_a_skill_change("Remove the moon time scale."));
-        assert!(asks_a_skill_change("Turn off CloudFact."));
     }
 
-    /// Twelve's adversarial P2 on #7587 and El's on #7601: "start my focus
-    /// mode skill" runs through `use_skill` (or the in-code round of a skill
-    /// asked by its name, counted as one), and "Okay, the focus mode skill
-    /// is started." beside it stands. A `use_skill` runs a skill, it doesn't
-    /// put one on: "turned … back on" needs a `make_skill` `turn_on` of that
-    /// skill.
+    /// Started or running stands beside a `use_skill` or `make_skill` run
+    /// whose skill holds the name; a made skill named by its own words,
+    /// whatever the function's name.
     #[test]
-    fn a_skill_said_started_stands_beside_its_use_skill() {
+    fn a_made_skill_said_started_stands_beside_its_run() {
         let names = known();
         let none = serde_json::Value::Null;
         let used = serde_json::json!({ "skill": "focus_mode" });
+        let run = serde_json::json!({ "run": "focus mode" });
         let other = serde_json::json!({ "skill": "photo_booth" });
         for reply in [
             "Okay, the focus mode skill is started.",
@@ -4877,6 +4938,7 @@ pub(crate) mod tests {
             );
             for (name, args, backs) in [
                 (crate::use_skill::NAME, &used, true),
+                (crate::made_skill::MAKE, &run, true),
                 (crate::use_skill::NAME, &other, false),
                 ("light_brighter", &none, false),
             ] {
@@ -4886,41 +4948,6 @@ pub(crate) mod tests {
                     "{reply} beside {name} {args}"
                 );
             }
-            assert!(!stands_on(Claim::SkillStarted, reply, false, [], &[]));
-        }
-        let used = serde_json::json!({ "skill": "cloudfact" });
-        let turn_on = serde_json::json!({ "turn_on": "CloudFact" });
-        for reply in [
-            "I turned the CloudFact skill back on.",
-            "The CloudFact skill is back on.",
-            "Okay, the CloudFact skill is on.",
-            "CloudFact is turned on.",
-        ] {
-            assert_eq!(
-                claim_on(reply, true, false, false, false, Some(&names)),
-                Some(Some(Claim::SkillOn)),
-                "{reply}"
-            );
-            assert!(
-                !stands_on(
-                    Claim::SkillOn,
-                    reply,
-                    false,
-                    [(crate::use_skill::NAME, &used)],
-                    &[]
-                ),
-                "{reply}"
-            );
-            assert!(
-                stands_on(
-                    Claim::SkillOn,
-                    reply,
-                    false,
-                    [(crate::made_skill::MAKE, &turn_on)],
-                    &[]
-                ),
-                "{reply}"
-            );
         }
     }
 
@@ -4943,6 +4970,7 @@ pub(crate) mod tests {
             "Which skill should I turn off?",
             "I'll remove it if you say yes.",
             "Remove moon time?",
+            "I made a moon time skill.",
         ] {
             assert_eq!(
                 claim_on(reply, true, false, false, false, Some(&names)),
