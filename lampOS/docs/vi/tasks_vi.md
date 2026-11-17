@@ -1377,8 +1377,13 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
 - **Điều lần chạy có `net` không bao giờ giữ, và giới hạn của nó** (P1 và các
   P3 của Heron trên #7590, quyết định 23:22 của người xây dựng đầu tiên):
   - `net` không bao giờ được cấp cùng một quyền riêng tư: quyền đọc hay ghi
-    của dịch vụ (`*-read`, `*-write`), `camera`, `microphone`, `speech` hay
-    `notes` (`skill_task::PRIVATE_GRANTS`, `skill_task_yes::private_grant`).
+    của dịch vụ (`*-read`, `*-write`), `camera`, `microphone`, `speech`,
+    `notes` hay `look` (có ai ở đó không, tức nhà có trống không: quyết định
+    của người xây dựng đầu tiên trên #7590, 18/11 02:01)
+    (`skill_task::PRIVATE_GRANTS`, `skill_task_yes::private_grant`). `air`
+    không thuộc số đó: nó được đi cùng `net`, và lời đồng ý khi đó nói rõ
+    ("…, so its air readings can go to the internet",
+    `skill_task_yes::AIR_BESIDE_NET`).
     Cặp đó bị từ chối khi nạp (`grants_of` của lamp-skills), khi tải lên
     (`upload_agent::files` và phần kiểm tra `skill.toml` đã giữ, nói rõ
     bằng lời), trong lời đồng ý của lamp-control (`grants_ok`) và trong lần
