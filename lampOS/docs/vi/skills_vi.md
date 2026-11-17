@@ -3933,7 +3933,9 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   định, không bao giờ là lời của tác vụ hay lời của lamp-tasks
   (`service_read::tell_failed`, quyết định của first builder lúc 21:25 trên
   #7363). **Trong cuộc trò chuyện đã yêu cầu lần chạy** (một lần chạy ngay
-  mà chủ đèn yêu cầu bằng giọng nói, câu sẵn sàng trong vòng 45 giây sau
+  mà chủ đèn yêu cầu bằng giọng nói, hoặc lời gọi của model giọng nói tới
+  tool riêng của một kỹ năng có task, ví dụ "run my bitcoin price skill
+  now" gọi `btc_price`; câu sẵn sàng trong vòng 45 giây sau
   lời yêu cầu, `task_sure::in_asking_conversation`), câu được nói ngay lúc
   đó, như câu trả lời của cuộc trò chuyện ấy, giống cách "<skill> is running
   now" đã được nói: lời chính xác gửi tới dịch vụ say với `"answers": true`,
@@ -3945,7 +3947,11 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   nếu không, câu chờ như mọi câu chính xác khác; `answers` chỉ đi với text
   chính xác. Bản ghi đó được giữ ở coordinator, nơi dịch vụ say đọc nó: ở
   route thứ hai, lần chạy diễn ra trong tiến trình của worker, worker báo
-  coordinator `MadeRunNow` (chỉ tên kỹ năng, `made_run::ran_of`) qua kênh
+  coordinator `MadeRunNow` (chỉ tên kỹ năng, `made_run::ran_of`: `{"run",
+  "ran": true}` của lần chạy ngay, hoặc `{"task_run": NAME}` mà lamp-skills
+  thêm vào câu trả lời cho lời gọi tool của kỹ năng từ giọng nói khi đánh
+  dấu lần chạy đó, `mark_voice_asked`; không bao giờ cho lời gọi từ bên
+  khác) qua kênh
   của nó, và coordinator giữ lại (`made_run_now`, trace `made_run_now`);
   worker Live báo cùng cách (P1 của El trên #7363). Bản ghi chỉ theo tên
   kỹ năng, nên mọi bên gọi say socket nêu tên kỹ năng đó trong 45 giây ấy

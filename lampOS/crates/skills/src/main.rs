@@ -2387,7 +2387,7 @@ fn privacy_now(watching: &mut Watching, runner: &Runner) -> Outs {
 /// told how, and what the watch does done. Held to lamp-cloud's deadline
 /// again first ([`watch::let_go`]): the op may have waited in the loop too,
 /// and one let go turns nothing.
-fn app_call((name, args, _, reply, admission): ToolAsk, out: &mut Publisher, runner: &Runner) {
+fn app_call((name, args, _, reply, admission, _): ToolAsk, out: &mut Publisher, runner: &Runner) {
     let late = watch::let_go(
         &name,
         args[watch::DEADLINE].as_u64(),
@@ -2437,7 +2437,7 @@ fn app_call((name, args, _, reply, admission): ToolAsk, out: &mut Publisher, run
 /// A watch's tool called: committed first, so a caller that gave up turns
 /// nothing; then turned on or off, the model told what to say, and what the
 /// watch does done.
-fn watch_call((name, args, _, reply, admission): ToolAsk, out: &mut Publisher, runner: &Runner) {
+fn watch_call((name, args, _, reply, admission, _): ToolAsk, out: &mut Publisher, runner: &Runner) {
     if !admission.commit() {
         eprintln!("lamp-skills: {name} with {args} not run: the caller gave up");
         return;
@@ -3029,19 +3029,40 @@ fn give_up_late(waiting: &mut HashMap<u64, (lamp_skills::Run, Instant)>, out: &m
     }
 }
 
-/// A call of a skill's tool from the voice, its arguments, and where its
-/// answer goes.
+/// A call of a skill's tool from the voice, its arguments, where its
+/// answer goes, and whether the peer that asked it is the voice.
 type ToolAsk = (
     String,
     serde_json::Value,
     Option<RequestedAudioContext>,
     mpsc::Sender<serde_json::Value>,
     Admission,
+    bool,
 );
 
 /// The name a made skill's run now is asked by on the main loop, from the
 /// call socket's `run` op alone ([`listen`]): no tool's call can name it.
 const RUN_NOW: &str = "skills.run_now";
+
+/// Whether a run asked by voice is marked at all: `LAMP_TOLD_WHEN_ASKED`
+/// (#7180) or `LAMP_SKILL_TASK_SURE` (#7363).
+fn voice_asked_switched() -> bool {
+    lamp_voice::told_when_asked::on() || lamp_skills::task_sure::on()
+}
+
+/// Marks `skill`'s run, its steps `calls`, as asked by voice at `now_ms`
+/// when the voice asked it (`voice`), a switch is on (`switched`) and it
+/// has a task, whose own hand-over takes the mark
+/// ([`lamp_skills::task::take_asked_by_voice`]): a run now
+/// ([`run_now_call`]) or the model's call of the skill's tool
+/// ([`tool_call`]) alike. True when marked.
+fn mark_voice_asked(skill: &str, calls: &[Call], voice: bool, switched: bool, now_ms: u64) -> bool {
+    let marked = voice && switched && calls.iter().any(|call| matches!(call, Call::Task(_)));
+    if marked {
+        lamp_skills::task::asked_by_voice(skill, now_ms);
+    }
+    marked
+}
 
 /// Why a run now of `skill`, its steps `calls`, would make nothing, in
 /// words the lamp can say, or none: its last run under way (`busy`); a
@@ -3118,7 +3139,7 @@ fn run_now_refused(
 /// never what it found. Refused, the voice is told why and nothing is
 /// made, counted or said.
 fn run_now_call(
-    (_, args, _, reply, admission): ToolAsk,
+    (_, args, _, reply, admission, _): ToolAsk,
     engine: &mut Engine,
     runs: &mut Runs,
     out: &mut Publisher,
@@ -3167,11 +3188,7 @@ fn run_now_call(
     // asked (#7363): a run now is the owner's own spoken ask, the voice's
     // alone ([`listen`]); marked only for a run with a task, whose own
     // hand-over takes it.
-    if (lamp_voice::told_when_asked::on() || lamp_skills::task_sure::on())
-        && run.calls.iter().any(|call| matches!(call, Call::Task(_)))
-    {
-        lamp_skills::task::asked_by_voice(&skill, now_ms);
-    }
+    mark_voice_asked(&skill, &run.calls, true, voice_asked_switched(), now_ms);
     eprintln!("lamp-skills: skill:{skill}: run now, as its owner asked by voice");
     // Whether it speaks its own words (a made skill's exact text, the only
     // say the voice takes of one): the voice then adds no line of its own
@@ -3192,7 +3209,7 @@ fn run_now_call(
 /// the light are made (#1146). The say is the model's and the look the
 /// voice's, asked in the answer; the body and the light are made here.
 fn tool_call(
-    (name, args, context, reply, admission): ToolAsk,
+    (name, args, context, reply, admission, voice): ToolAsk,
     engine: &mut Engine,
     busy: &mut HashSet<String>,
     out: &mut Publisher,
@@ -3200,17 +3217,17 @@ fn tool_call(
     audio: &Arc<Mutex<Authority>>,
 ) {
     if name == lamp_skills::unplug::STAY_TOOL {
-        return stay_call((name, args, None, reply, admission), engine, runner);
+        return stay_call((name, args, None, reply, admission, voice), engine, runner);
     }
     // The owner's app's guard.on or guard.off (#2562): only ever from the
     // call socket's `guard` op, which no tool's call can name.
     if name == watch::APP_ON || name == watch::APP_OFF {
-        return app_call((name, args, None, reply, admission), out, runner);
+        return app_call((name, args, None, reply, admission, voice), out, runner);
     }
     // A watch's tool turns its watch, with no steps (guard mode, #1685).
     let watched_tool = runner.watching.borrow().watches.owner(&name).is_some();
     if watched_tool {
-        return watch_call((name, args, None, reply, admission), out, runner);
+        return watch_call((name, args, None, reply, admission, voice), out, runner);
     }
     let refuse = |why: &str| {
         if admission.commit() {
@@ -3457,7 +3474,18 @@ fn tool_call(
     // the voice asks the eyes as the answer's first audio plays, and by
     // then the head is on its way down over the page (#941, #1146). Any
     // other call is answered at once.
-    let told = told(&run.calls);
+    let mut told = told(&run.calls);
+    // A fresh run of a skill with a task, the voice's model's call (the
+    // owner's spoken ask, lamp-9adf 18 Nov: "run my bitcoin price skill
+    // now" called `btc_price`): marked as `run_now_call`'s, so its failure
+    // answers the asking conversation and its answer lifts the quiet
+    // (#7363); the voice is told which run, to let that answer through.
+    if !nothing
+        && !under_way
+        && mark_voice_asked(&run.skill, &made, voice, voice_asked_switched(), unix_ms())
+    {
+        told[lamp_voice::made_run::TASK_RUN] = json!(run.skill);
+    }
     let looks = run.calls.contains(&Call::Look);
     if !looks {
         let _ = reply.send(told.clone());
@@ -3824,6 +3852,7 @@ fn listen(
                             context.clone(),
                             reply,
                             admission.clone(),
+                            voice,
                         ))
                         .is_ok()
                     })
@@ -3921,7 +3950,7 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
 /// "Never mind": refused at once unless the unplug skill is loaded with its
 /// grants and the latch can be cancelled now; the line and the cancel follow
 /// on their own thread.
-fn stay_call((name, args, _, reply, admission): ToolAsk, engine: &Engine, runner: &Runner) {
+fn stay_call((name, args, _, reply, admission, _): ToolAsk, engine: &Engine, runner: &Runner) {
     use lamp_skills::unplug;
     // The skill granted the operation speaks the line, whatever its name.
     let granted = engine
@@ -6859,6 +6888,87 @@ mod tests {
         ] {
             assert_eq!(answer_outcome(lost, false), Ok(()), "{lost}");
         }
+    }
+
+    /// lamp-9adf, 18 Nov 02:0x: "Lamp, run my bitcoin price skill now." was
+    /// the model's call of `btc_price`, not a run now; its task wasn't
+    /// handed (lamp-tasks unreachable) and its failure was dropped at quiet
+    /// hours. A voice's call of a skill's tool whose run has a task is
+    /// marked as a run now is, so `hand_task` takes it and its failure
+    /// answers the conversation at once; another peer's call, a run with no
+    /// task, or both switches off, is not (#7363).
+    #[test]
+    fn a_skill_tools_run_the_voice_asked_answers_its_failure_in_the_conversation() {
+        let task = Call::Task(Box::new(lamp_skills::task::TaskStep {
+            task: "Find the bitcoin price".into(),
+            run: "scripts/main.py".into(),
+            quiet: None,
+        }));
+        let now = unix_ms() - 2_000;
+        for (skill, calls, voice, switched) in [
+            ("btc-peer", vec![task.clone()], false, true),
+            ("btc-off", vec![task.clone()], true, false),
+            ("btc-no-task", vec![Call::AfterSay], true, true),
+        ] {
+            assert!(!mark_voice_asked(skill, &calls, voice, switched, now));
+            assert_eq!(lamp_skills::task::take_asked_by_voice(skill), None);
+        }
+        assert!(mark_voice_asked("btc-price", &[task], true, true, now));
+        let asked_at = lamp_skills::task::take_asked_by_voice("btc-price");
+        assert_eq!(asked_at, Some(now));
+        assert!(lamp_skills::task_sure::in_asking_conversation(
+            asked_at,
+            unix_ms()
+        ));
+        // Quiet now, no lift of its own: the failure is answered at once in
+        // the conversation all the same, never left to the read's gate.
+        let dir = tempfile::Builder::new()
+            .prefix("bt")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let say_path = dir.path().join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&say_path).unwrap();
+        let voice = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            let mut stream = &stream;
+            writeln!(stream, "{}", json!({"event": "begun", "at_us": 1})).unwrap();
+            writeln!(stream, "{}", json!({"outcome": "spoken"})).unwrap();
+            serde_json::from_str::<serde_json::Value>(&line).unwrap()
+        });
+        let local = Arc::new(lamp_local_time::LocalTime::Offset(0));
+        let minute = local.minute_of_day(unix_ms());
+        let mut room = LampRoom {
+            skill: "btc-price".into(),
+            say: say_path,
+            services: dir.path().join("call.sock"),
+            bus: Bus::new(dir.path().join("bus")).unwrap(),
+            known_file: None,
+            owner: None,
+            local_time: Some(local),
+            quiet: Some((minute, (minute + 2) % (24 * 60))),
+            quiet_lifted: None,
+        };
+        let not_taken = Err(lamp_skills::service_write::Unrun::NotTaken(
+            "lamp-tasks couldn't be reached".into(),
+        ));
+        let line = lamp_skills::task_sure::failed_line("btc-price", &not_taken);
+        let told = tell_its_run(
+            "btc-price",
+            None,
+            line,
+            false,
+            None,
+            asked_at,
+            true,
+            None,
+            &mut room,
+        );
+        assert_eq!(told.as_deref(), Some("said in the asking conversation"));
+        let ask = voice.join().unwrap();
+        assert_eq!(ask["skill"], "btc-price");
+        assert_eq!(ask["answers"], true);
     }
 
     /// #5288's gate: a line on `voice/heard`, an event the bus keeps no
