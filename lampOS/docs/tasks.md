@@ -3995,7 +3995,10 @@ one runner (a fresh home per run, the token as a file) with no new rules:
     (`egress::OWN_SKILL_FILE`), and the namespace script stages that folder
     alone of `/var/lib/lampOS/skills` and `skills-dev`
     (`hermes_install::OWN_SKILL_LINES`); a script without that line
-    (`egress::NS_OWN_SKILL_LINE`) gets no `net` run (`no_net`).
+    (`egress::NS_OWN_SKILL_LINE`) gets no `net` run (`no_net`). Of lamp-tasks'
+    work folder it sees only its own run's folder, `lamp/make-<run id>`,
+    over an empty tmpfs on the rest, so nothing another run left there can
+    be read and sent (Heron's P2 at `2533a4f02b`).
   - There is no byte bound on a `net` run's traffic beyond its 16 pipes, 60 s
     idle and the run's deadline.
   - A `net` run's DNS questions go to the lamp's resolver, usually the home
