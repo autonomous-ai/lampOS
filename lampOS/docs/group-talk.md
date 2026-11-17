@@ -244,7 +244,9 @@ everything `on` does, and:
 - words back that only tell the lamp to stop (`only_a_stop`): a stop
   phrase by the stop words' own list (`stop_words::stop_phrase`), and
   nothing more that asks. That covers "Stop.", "Okay, stop it, please.",
-  "Hold on." and "Wait.". The sound is let go and never asked of the model,
+  "Hold on.", "Wait." and, with the lamp's name or a short time, "Hold on
+  a second, Lamp." and "Wait a sec." (`WITH_A_STOP`; the second route's
+  cut-in note reads a bare stop by the same predicate, #7285). The sound is let go and never asked of the model,
   and the answer it waits for is stopped on the next pass, as a stop said
   over the lamp's speech stops it (`hand_control_cancel` with
   `spoken_stop`). It's recorded as `input_let_go_answer_waits` with `why:

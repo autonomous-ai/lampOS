@@ -541,24 +541,13 @@ pub fn stop_word(word: &str) -> bool {
             .any(|(first, second)| word == *first || word == *second)
 }
 
-/// Words a line that only asks the lamp to stop or wait may carry beside
-/// its stop words ([`a_stop_and_more`]): the lamp's name, a greeting, and
-/// words that fill ("Hold on a second, Lamp.", "Okay, stop it.", "Okay,
-/// that is enough.", "Stop telling the story.").
-const BESIDE_A_STOP: &[&str] = &[
-    "lamp", "lamb", "hey", "hi", "oh", "ok", "okay", "please", "just", "a", "one", "sec", "second",
-    "moment", "minute", "it", "there", "now", "that", "that's", "is", "no", "um", "uh", "the",
-    "story", "telling", "talking",
-];
-
 /// Whether `heard` tells the lamp to stop or wait ([`stop_phrase`]) and asks
 /// something more beside it: "Hold on, hey Lamp, make the light a little
-/// warmer." (#7285), not "Hold on." nor "Okay, that is enough.".
+/// warmer." (#7285), not "Hold on." nor "Hold on a second, Lamp.". A bare
+/// stop is decided in one place, [`crate::wait_words::only_a_stop`], so the
+/// cut-in's note and the answer wait never read a line two ways.
 pub fn a_stop_and_more(heard: &str) -> bool {
-    stop_phrase(heard)
-        && words(heard)
-            .iter()
-            .any(|word| !stop_word(word) && !BESIDE_A_STOP.contains(&word.as_str()))
+    stop_phrase(heard) && !crate::wait_words::only_a_stop(heard)
 }
 
 /// Whether what was heard tells the lamp to stop, when the lamp itself has

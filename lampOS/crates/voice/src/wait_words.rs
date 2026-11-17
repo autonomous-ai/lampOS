@@ -105,9 +105,15 @@ pub fn words_in(text: &str) -> usize {
         .sum()
 }
 
-/// Words said with a stop that ask nothing more: "Stop it, please.",
-/// "Lamp, stop now."
-const WITH_A_STOP: &[&str] = &["it", "please", "now", "lamp", "hey", "talking", "that"];
+/// Words said with a stop that ask nothing more: the lamp's name (and its
+/// mishearing "lamb"), a greeting, a short time and words that fill.
+/// "Stop it, please.", "Lamp, stop now.", "Hold on a second, Lamp.", "Wait
+/// a sec.", "Okay, that is enough.", "Stop telling the story." "No" is not
+/// among them: it asks (see [`ACKNOWLEDGEMENTS`]).
+const WITH_A_STOP: &[&str] = &[
+    "it", "please", "now", "lamp", "lamb", "hey", "hi", "talking", "telling", "story", "the",
+    "that", "that's", "is", "there", "just", "a", "one", "sec", "second", "moment", "minute",
+];
 
 /// Whether `text` only tells the lamp to stop (the reviewer's P3 on #1277):
 /// a stop phrase by the stop words' own list
@@ -625,6 +631,8 @@ pub(crate) mod tests {
             "Wait.",
             "Uh, enough.",
             "Hush, hush.",
+            "Hold on a second, Lamp.",
+            "Wait a sec.",
         ] {
             assert!(only_a_stop(said), "{said:?}");
         }

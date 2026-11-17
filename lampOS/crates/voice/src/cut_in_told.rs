@@ -168,24 +168,35 @@ mod tests {
             ),
             ASKED_MORE
         );
-        for asks in [
-            "Hold on, hey Lamp, make the light a little warmer.",
-            "Hold on. Hey, Lamp. Make the light a little warm.",
-            "Wait… make the light warmer",
-            "Wait, what time is it?",
+        // One predicate decides a bare stop (`wait_words::only_a_stop`, the
+        // answer wait's too): a stop with a name, filler or a short time is
+        // told the whole note, a stop with anything else said is not.
+        for (heard, told) in [
+            (
+                "Hold on, hey Lamp, make the light a little warmer.",
+                ASKED_MORE,
+            ),
+            (
+                "Hold on. Hey, Lamp. Make the light a little warm.",
+                ASKED_MORE,
+            ),
+            ("Hold on, make the light warmer", ASKED_MORE),
+            ("Wait… make the light warmer", ASKED_MORE),
+            ("Wait, what time is it?", ASKED_MORE),
+            // Says why they stop it: answered as said ("Sure, take your
+            // time."), not with the set "Okay, I'll stop.".
+            ("Hold on, I'm thinking.", ASKED_MORE),
+            ("Hold on.", NOTE),
+            ("Wait, wait.", NOTE),
+            ("Wait a sec.", NOTE),
+            ("Wait a minute, Lamp.", NOTE),
+            ("Hold on a second, Lamp.", NOTE),
+            ("Okay, that is enough", NOTE),
+            ("Stop telling the story.", NOTE),
+            ("What's two plus two?", NOTE),
+            ("Don't stop, make it warmer.", NOTE),
         ] {
-            assert_eq!(note(asks), ASKED_MORE, "{asks}");
-        }
-        for stop in [
-            "Hold on.",
-            "Wait, wait.",
-            "Okay, that is enough",
-            "Hold on a second, Lamp.",
-            "Stop telling the story.",
-            "What's two plus two?",
-            "Don't stop, make it warmer.",
-        ] {
-            assert_eq!(note(stop), NOTE, "{stop}");
+            assert_eq!(note(heard), told, "{heard}");
         }
     }
 
