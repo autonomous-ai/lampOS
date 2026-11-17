@@ -600,7 +600,7 @@ pub fn recall_told(
             if !record.result_id.is_empty() {
                 told["result_id"] = json!(record.result_id);
             }
-            if super::redo::on() && !is_read(&record) {
+            if (super::redo::on() && !is_read(&record)) || super::source::on() {
                 told["key"] = json!(record.key);
             }
             if let Some(found) = found {

@@ -1172,6 +1172,7 @@ fn start_saver() {}
 pub mod linked;
 pub mod redo;
 pub mod reminder_rows;
+pub mod source;
 pub mod task_rows;
 pub mod told;
 

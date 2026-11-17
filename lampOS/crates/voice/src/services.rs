@@ -544,6 +544,18 @@ pub fn after_read(request: u64) -> bool {
     kept::read_in(|reads| reads.contains(&request))
 }
 
+/// A linked service's data told in `request` by another tool (a record's
+/// source fetched, `LAMP_SERVICE_RECORDS_SOURCE`), marked as a read's is:
+/// nothing but another read runs after it ([`after_read`]), and its
+/// exchange is kept out of the thread and the running summary
+/// (`Thread::private_for`).
+pub(crate) fn read_told(request: u64) {
+    read_answered(request);
+    if let Ok(mut thread) = crate::thread::THREAD.lock() {
+        thread.private_for(request);
+    }
+}
+
 fn read_answered(request: u64) {
     kept::read_in(|reads| {
         if !reads.contains(&request) {

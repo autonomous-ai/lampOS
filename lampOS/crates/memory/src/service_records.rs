@@ -750,6 +750,18 @@ impl Days {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    /// `person`'s record of `key`, whatever its age: none, or one (the
+    /// voice's `record_source`, the linked-service memory plan, slice 7).
+    /// Another person's key is none, as a key never kept is.
+    pub fn service_record_keyed(&self, person: &Person, key: &str) -> Result<Vec<Value>> {
+        owner_only(person)?;
+        let mut statement = self.db.prepare(&format!(
+            "SELECT {COLUMNS} FROM service_records WHERE person=?1 AND key=?2"
+        ))?;
+        let rows = statement.query_map(params![person.as_str(), key], listed)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
     /// `person`'s records whose words match `about` (a recall's words, the
     /// voice's `LAMP_SERVICE_RECORDS_TOLD`), whatever their age: the most
     /// words matched first, then the latest change; at most `limit` (and
@@ -2190,5 +2202,53 @@ mod tests {
             NOW + 2_000,
         );
         assert_eq!(early["error"], "forgotten", "{early}");
+    }
+
+    /// The voice's `record_source` (slice 7) reads one record by its key:
+    /// the person's own alone, whatever its age; after a forget about a
+    /// thing only the matching key is gone, and after a forget everything
+    /// none is found.
+    #[test]
+    fn a_record_is_read_by_its_key_and_forgets_take_it() {
+        let (_scratch, mut store) = Scratch::new("keyed");
+        send(
+            &mut store,
+            linked(OWNER, "t-s-1", "task", "Booked the dentist", NOW),
+        );
+        send(
+            &mut store,
+            linked(OWNER, "t-s-2", "task", "Ordered printer paper", NOW),
+        );
+        send(&mut store, linked(OTHER, "t-s-3", "task", "Their own", NOW));
+        let keyed = |store: &mut Days, person: &str, key: &str| {
+            let answer = send(
+                store,
+                json!({"op":"service_records","person":person,"key":key}),
+            );
+            assert_eq!(answer["ok"], true, "{answer}");
+            answer["records"].as_array().unwrap().clone()
+        };
+        let one = keyed(&mut store, OWNER, "t-s-1");
+        assert_eq!(one.len(), 1);
+        assert_eq!(one[0]["source_kind"], "task");
+        assert_eq!(one[0]["source_ref"]["service"], "lamp-tasks");
+        assert_eq!(one[0]["summary"], "Booked the dentist");
+        // Another person's key is not found.
+        assert!(keyed(&mut store, OWNER, "t-s-3").is_empty());
+        assert!(keyed(&mut store, OWNER, "t-s-9").is_empty());
+        send_at(
+            &mut store,
+            json!({"op":"service_records_forget","person":OWNER,"about":[["dentist"]]}),
+            NOW + 1_000,
+        );
+        assert!(keyed(&mut store, OWNER, "t-s-1").is_empty());
+        assert_eq!(keyed(&mut store, OWNER, "t-s-2").len(), 1);
+        send_at(
+            &mut store,
+            json!({"op":"forget_all","person":OWNER}),
+            NOW + 2_000,
+        );
+        assert!(keyed(&mut store, OWNER, "t-s-2").is_empty());
+        assert_eq!(keyed(&mut store, OTHER, "t-s-3").len(), 1);
     }
 }

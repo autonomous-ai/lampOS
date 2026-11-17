@@ -958,6 +958,10 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     }
     if settings.memory.is_some() {
         tools.extend(crate::remember::tools());
+        // A record's source fetched (`LAMP_SERVICE_RECORDS_SOURCE`).
+        if crate::service_records::source::on() {
+            tools.push(crate::service_records::source::tool());
+        }
     }
     if let Some(place) = &settings.tasks {
         tools.extend(crate::agent_tasks::tools(place));
@@ -1312,6 +1316,20 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     if is_schedule_tool(name) {
         return match (&settings.exec, settings.schedule_tools) {
             (Some(directory), true) => Route::Schedule(directory.clone()),
+            _ => Route::Nobody,
+        };
+    }
+    // A record's source (`LAMP_SERVICE_RECORDS_SOURCE`): the memory's
+    // route, which keeps it out of the journal ([`keeps_out`]), with the
+    // tasks part's directory; run by `service_records::source`.
+    if crate::service_records::source::is_tool(name) {
+        return match (&settings.memory, crate::service_records::source::on()) {
+            (Some(socket), true) => Route::Memory(
+                socket.clone(),
+                None,
+                None,
+                settings.tasks.as_ref().map(|place| place.directory.clone()),
+            ),
             _ => Route::Nobody,
         };
     }
@@ -1737,6 +1755,10 @@ pub fn answer_typed(settings: &Settings, call: &ToolCall, request: u64) -> Value
         return json!({"error": MOVES_ONLY_AT_THE_LAMP});
     }
     match route {
+        // A text is no heard owner's line: no record's source is fetched.
+        Route::Memory(..) if crate::service_records::source::is_tool(&call.name) => {
+            json!({"found": false, "reason": crate::service_records::source::NOT_YOURS})
+        }
         Route::Memory(socket, ..) => {
             if crate::remember::is_forget(&call.name) {
                 crate::remember_speaker::forget();
@@ -2171,6 +2193,20 @@ fn run_call_with_scope(
 ) -> (&'static str, (Value, bool)) {
     if !scope_current(lease, request) {
         return ("nobody", (unavailable(), false));
+    }
+    if let Route::Memory(socket, _, _, tasks) = route
+        && crate::service_records::source::is_tool(&call.name)
+    {
+        return (
+            "the record's source",
+            crate::service_records::source::run(
+                socket,
+                tasks.as_deref(),
+                &call.args,
+                request,
+                lease,
+            ),
+        );
     }
     // Once a linked service's read answered in this request, nothing else
     // in it runs but another read: a mail's or a page's words never become
