@@ -207,6 +207,12 @@ pub const KEEP_OPEN_EVERY: Duration = Duration::from_secs(2);
 /// [`NOT_READY_MOST`], or at once when a trigger fires (Harness's daemon
 /// started, the lamp's machine or default engine changed).
 pub const NOT_READY_FIRST: Duration = Duration::from_secs(60);
+
+/// The kept session left with no task this long is dropped as at a
+/// sign-out (closed, its OpenClaw session deleted, its token removed) and a
+/// fresh one opened: OpenClaw's kept session is never rotated by count, so
+/// this bounds how long one conversation lives.
+pub const KEPT_IDLE_MAX: Duration = Duration::from_secs(2 * 60 * 60);
 /// The longest wait between two looks with no agent ready.
 pub const NOT_READY_MOST: Duration = Duration::from_secs(600);
 /// What a run refused with a full queue is told, answered as lamp-tasks'
@@ -405,6 +411,8 @@ struct Pane {
     /// The kept session's engine session (`harness ensure`'s
     /// `engineSession`), deleted from OpenClaw's store when it is closed.
     session: Option<String>,
+    /// Its open, or the last turn typed into it ([`KEPT_IDLE_MAX`]).
+    used: Instant,
 }
 impl Pane {
     fn new(agent: &str, place: &Place, kept: bool) -> Self {
@@ -416,6 +424,7 @@ impl Pane {
             kept,
             input: None,
             session: None,
+            used: Instant::now(),
         }
     }
 
@@ -517,6 +526,8 @@ pub struct OneSession {
     queue_wait: Duration,
     look: Duration,
     open_idle_within: Duration,
+    /// [`KEPT_IDLE_MAX`], shorter in tests.
+    kept_idle_max: Duration,
     /// A spoken task's wait for the pane on the tasks-harness worker, and
     /// lamp-tasks' stop ([`OneSession::with_spoken_bound`]).
     spoken_bound: Option<(Duration, Arc<AtomicBool>)>,
@@ -580,6 +591,13 @@ pub fn signed_out() {
     if let Some(one) = LAMP.get() {
         eprintln!("tasks: one session: the lamp signed out; its pane is removed");
         one.drop_when_free("the lamp signed out");
+    }
+}
+
+/// The owner's "forget everything" (#6274) on the lamp's one session.
+pub fn forgotten() {
+    if let Some(one) = LAMP.get() {
+        one.forget_conversation();
     }
 }
 
@@ -843,6 +861,7 @@ impl OneSession {
             queue_wait,
             look,
             open_idle_within,
+            kept_idle_max: KEPT_IDLE_MAX,
             spoken_bound: None,
             no_reply: AtomicBool::new(false),
             kept_token: None,
@@ -1108,6 +1127,23 @@ impl OneSession {
         self.kept().is_some_and(|(_, kept_machine, kept_engine)| {
             kept_machine != machine || kept_engine != engine
         })
+    }
+
+    /// The owner asked to forget: the pane removed at the next look once
+    /// free, as at a sign-out (the kept session closed, its OpenClaw
+    /// session deleted, its token removed), and a new one opened right
+    /// after it in the same look, so the next task recalls nothing and
+    /// waits for no open.
+    pub fn forget_conversation(&self) {
+        eprintln!(
+            "tasks: one session: the kept session dropped (the owner asked to forget); a new one opens"
+        );
+        let mut inner = self.lock();
+        inner.drop_due = Some("the owner asked to forget".to_owned());
+        inner.next_open = None;
+        inner.failed_opens = 0;
+        inner.not_ready_opens = 0;
+        inner.woken = inner.woken.wrapping_add(1);
     }
 
     /// The pane to be removed for good at the next look (a sign-out:
@@ -1626,6 +1662,18 @@ impl OneSession {
         let (held, open, due) = {
             let mut inner = self.lock();
             inner.signed_out = signed_out;
+            let idle = inner
+                .pane
+                .as_ref()
+                .is_some_and(|pane| pane.kept && pane.used.elapsed() >= self.kept_idle_max);
+            if idle && inner.holder.is_none() && inner.drop_due.is_none() {
+                eprintln!(
+                    "tasks: one session: the kept session dropped (no task for {} min); a new one opens",
+                    self.kept_idle_max.as_secs() / 60
+                );
+                inner.drop_due = Some("left with no task".to_owned());
+                inner.next_open = None;
+            }
             (
                 inner.holder.is_some() && inner.holder != inner.closing_for,
                 inner.pane.is_some(),
@@ -2407,6 +2455,7 @@ impl Turn<'_> {
         let mut inner = self.one.lock();
         let turns = inner.pane.as_mut().map_or(1, |pane| {
             pane.turns += 1;
+            pane.used = Instant::now();
             pane.tokens += tokens_in(text);
             pane.input = input;
             pane.turns
