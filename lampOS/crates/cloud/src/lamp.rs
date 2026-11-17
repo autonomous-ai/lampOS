@@ -705,6 +705,10 @@ impl Lamp for Real {
             "level": health.level,
             "message": health.message,
             "stale": message.expired,
+            // Every part, worst first, and the parts never heard from, for
+            // the app's Lamp health page (#7447).
+            "items": health.items,
+            "missing": health.missing,
         }))
     }
 
