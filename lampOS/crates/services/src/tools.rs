@@ -79,6 +79,9 @@ pub struct Edits {
     /// Gmail's `update_draft` and `delete_draft`
     /// (`LAMP_GMAIL_DRAFT_EDITS=on`).
     pub drafts: bool,
+    /// Google Calendar's `events` read takes `query`, the person's words
+    /// (`LAMP_CALENDAR_EVENT_SEARCH=on`, tracker row C132).
+    pub event_search: bool,
 }
 
 /// The three functions, with the lamp's own offset now.
@@ -318,6 +321,15 @@ fn catalog_for(offset_minutes: Option<i32>, edits: Edits, linked: Option<&[Strin
             tools["tools"][2]["parameters"]["properties"]["event_id"] = event_id;
         }
     }
+    if edits.event_search && shown("google_calendar") {
+        // The calendar's read by words (tracker row C132), told in the
+        // field: the read's description has no room for it.
+        tools["tools"][1]["parameters"]["properties"]["query"] =
+            string(reads::CALENDAR_SEARCH_QUERY);
+        if !read_fields.iter().any(|field| field == "query") {
+            read_fields.push("query".into());
+        }
+    }
     if linked.is_some() {
         let all = tools["tools"].as_array_mut().expect("the three functions");
         keep_fields(&mut all[1], &["service", "what"], &read_fields);
@@ -487,6 +499,7 @@ mod tests {
             Edits {
                 calendar: true,
                 drafts: false,
+                ..Default::default()
             },
             None,
         );
@@ -516,6 +529,7 @@ mod tests {
             Edits {
                 calendar: true,
                 drafts: false,
+                ..Default::default()
             },
         )
         .unwrap();
@@ -537,6 +551,7 @@ mod tests {
             Edits {
                 calendar: true,
                 drafts: false,
+                ..Default::default()
             },
             None,
         )
@@ -547,6 +562,7 @@ mod tests {
             Edits {
                 calendar: true,
                 drafts: true,
+                ..Default::default()
             },
             None,
         );
@@ -668,6 +684,7 @@ mod tests {
         let edits = Edits {
             calendar: true,
             drafts: true,
+            ..Default::default()
         };
         let github = catalog_for(Some(420), edits, Some(&linked(&["github"]))).to_string();
         for never in ["event_id", "draft_id", "update_event", "update_draft"] {
@@ -712,6 +729,39 @@ mod tests {
         );
     }
 
+    /// Tracker row C132: the read's `query` tells of the calendar's search
+    /// only with `LAMP_CALENDAR_EVENT_SEARCH` on, and with only the calendar
+    /// linked the read keeps its `query` field then alone. The read's
+    /// description is the same, switch on or off.
+    #[test]
+    fn a_calendar_search_is_offered_only_with_its_switch() {
+        let read = |edits: Edits, linked: Option<&[String]>| {
+            catalog_for(Some(420), edits, linked)["tools"][1].clone()
+        };
+        let query = |read: &Value| read["parameters"]["properties"]["query"]["description"].clone();
+        let on = Edits {
+            event_search: true,
+            ..Default::default()
+        };
+        let off = read(Edits::default(), None);
+        let searched = read(on, None);
+        assert_eq!(off["description"], searched["description"]);
+        assert!(!query(&off).to_string().contains("google_calendar"));
+        assert_eq!(query(&searched), reads::CALENDAR_SEARCH_QUERY);
+        let calendar = [String::from("google_calendar")];
+        let alone = read(Edits::default(), Some(&calendar));
+        assert!(alone["parameters"]["properties"].get("query").is_none());
+        let alone = read(on, Some(&calendar));
+        assert_eq!(query(&alone), reads::CALENDAR_SEARCH_QUERY);
+        // Gmail alone is not told of it.
+        let gmail = [String::from("gmail")];
+        assert!(
+            !query(&read(on, Some(&gmail)))
+                .to_string()
+                .contains("google_calendar")
+        );
+    }
+
     /// Every service linked names what the switch off names.
     #[test]
     fn every_service_linked_is_the_whole_catalog() {
@@ -719,6 +769,7 @@ mod tests {
         let edits = Edits {
             calendar: true,
             drafts: true,
+            ..Default::default()
         };
         assert_eq!(
             catalog_for(Some(420), edits, Some(&every)),
