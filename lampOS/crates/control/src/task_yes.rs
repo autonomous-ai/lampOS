@@ -281,9 +281,10 @@ pub fn services_to_agent_on() -> bool {
 pub const ASKS_OFF: &str =
     "a live ask's linked services are off on this lamp (LAMP_SERVICES_TO_AGENT is not on)";
 
-/// The most grants a live ask's run is minted: one service's read and
-/// write.
-pub const MOST_ASK_GRANTS: usize = 2;
+/// The most grants a live ask's run is minted: one service's read. A
+/// `-write` is never minted for an ask in this cut (Heron's P2 5 on
+/// #7509): writes come with their own gates later.
+pub const MOST_ASK_GRANTS: usize = 1;
 
 /// A made skill's fixed write run through the lamp's agent (the owner's
 /// ruling, 13 Nov): `on` only, here and in lamp-skills, lamp-tasks and
@@ -327,8 +328,8 @@ impl KeptYes {
 impl crate::runs::SkillYes for KeptYes {
     /// A live ask's grants (`{"mint": {"ask": [...]}}`): with the tasks'
     /// switch and [`KeptYes::services_to_agent`] on, one to
-    /// [`MOST_ASK_GRANTS`] linked service grants (`<code>-read`,
-    /// `<code>-write`) of one service, each once. Nothing else is ever
+    /// [`MOST_ASK_GRANTS`] linked service read grants (`<code>-read`) of
+    /// one service, each once; never a `-write`. Nothing else is ever
     /// minted for an ask: no body, light, camera or microphone. The voice
     /// held the ask to the owner's own heard line before lamp-tasks, which
     /// takes it from lamp-voice alone, asked for it.
@@ -340,12 +341,17 @@ impl crate::runs::SkillYes for KeptYes {
             return Err(ASKS_OFF.into());
         }
         if asked.is_empty() || asked.len() > MOST_ASK_GRANTS {
-            return Err(format!("ask: 1 to {MOST_ASK_GRANTS} linked service grants"));
+            return Err(format!(
+                "ask: 1 to {MOST_ASK_GRANTS} linked service read grants"
+            ));
         }
         let mut grants = BTreeSet::new();
         let mut code = None;
         for grant in asked {
             match serde_json::from_value::<Grant>(Value::String(grant.clone())) {
+                Ok(Grant::Service(service)) if service.access != crate::protocol::Access::Read => {
+                    return Err(format!("ask: {grant} is not a read; an ask reads only"));
+                }
                 Ok(Grant::Service(service))
                     if *code.get_or_insert(service.code) == service.code =>
                 {
@@ -1191,7 +1197,7 @@ mod tests {
     }
 
     /// `LAMP_SERVICES_TO_AGENT` (the owner's ruling, 17 Nov): a live ask is
-    /// minted one service's linked grants alone, only with the switch and
+    /// minted one service's linked read grant alone, only with the switch and
     /// the tasks' switch on; anything else, none.
     #[test]
     fn a_live_ask_is_minted_one_services_grants_alone() {
@@ -1214,13 +1220,6 @@ mod tests {
             BTreeSet::from([read])
         );
         assert_eq!(
-            kept(true, true)
-                .ask_grants(&asked(&["gmail-read", "gmail-write"]))
-                .unwrap()
-                .len(),
-            2
-        );
-        assert_eq!(
             kept(true, false)
                 .ask_grants(&asked(&["gmail-read"]))
                 .unwrap_err(),
@@ -1240,6 +1239,11 @@ mod tests {
             asked(&["gmail-read", "calendar-read"]),
             asked(&["gmail-read", "gmail-write", "calendar-read"]),
             asked(&["nothing-read"]),
+            // Reads only (Heron's P2 5 on #7509): a write, alone or beside
+            // its read, is never minted for an ask.
+            asked(&["gmail-write"]),
+            asked(&["gmail-read", "gmail-write"]),
+            asked(&["google_calendar-write"]),
         ] {
             assert!(
                 kept(true, true).ask_grants(&refused).is_err(),
