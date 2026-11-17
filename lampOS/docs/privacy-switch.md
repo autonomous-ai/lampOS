@@ -486,9 +486,14 @@ lamp, for the voice to decide whether a line was said to it: the
 Blendshape V2 model runs on the same 2 s timing, only its eye-look scores
 are kept to give `looking` on `humans/faces/tracked`, and every other score
 is dropped at once. The eyes write it nowhere: it lives only on the
-lamp's bus (its newest message in `/run`, gone at a reboot), no product
-service records or sends it off the lamp, and nothing of how the face
-seems is read (eyes.md, "Pitch and gaze"). The voice's
+lamp's bus (its newest message in `/run`, gone at a reboot), and nothing
+of how the face seems is read (eyes.md, "Pitch and gaze"). Skills, which
+can send what they read off the lamp, see neither `looking` nor `pitch`
+without the yes: `lamp-skills` takes both out of `humans/faces/tracked`
+before any skill sees it unless the yes file holds a yes (missing or
+unreadable is no; `Faces::for_skills`, the Reviewer-lead's P2 on #7450).
+The lamp's own parts, such as the voice deciding whether a line was said
+to it, read them on the lamp. The voice's
 onboarding writes it: with `LAMP_FACE_EXPRESSIONS_ASK=on` it asks once
 whether the lamp may notice whether people look happy or upset, to
 answer more warmly (never said aloud, no picture of a face kept), and keeps

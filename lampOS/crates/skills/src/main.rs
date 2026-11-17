@@ -607,6 +607,10 @@ fn publish(out: &mut Publisher, mut event: SkillEvent) {
     }
 }
 
+/// The face-expressions yes's file (`lamp_msgs::consent`), read for where a
+/// face looks before a skill sees it (#7442).
+const FACE_EXPRESSIONS_YES: &str = "/var/lib/lampOS/consent/face-expressions.json";
+
 /// The light shown now, if the ring's owner has said within 3 s (as the
 /// actions part counts it).
 fn light_now(bus: &Bus) -> Option<Light> {
@@ -1746,10 +1750,17 @@ fn observe(
             _ => Some((boot.clone(), turn)),
         };
     }
+    // Where a face looks only with the face-expressions yes (#7442): a skill
+    // can send what it reads off the lamp.
+    let payload = lamp_msgs::Faces::for_skills(
+        &message.header.topic,
+        &message.payload,
+        Path::new(FACE_EXPRESSIONS_YES),
+    );
     let made = engine.observe(
         &message.header.topic,
         now_us,
-        &message.payload,
+        &payload,
         message.header.expires_ms,
     );
     say_dropped(engine);
@@ -1757,7 +1768,7 @@ fn observe(
         let mut watching = runner.watching.borrow_mut();
         let outs = watching.watches.observe(
             &message.header.topic,
-            &message.payload,
+            &payload,
             now_us,
             local_minute(runner),
         );
