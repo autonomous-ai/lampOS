@@ -6564,15 +6564,42 @@ made skill is refused at install.
    with `keep = true`, the person's light, as Light scenes' are: set by
    lamp-skills as the call runs and never given back. `SKILL.md` keeps the
    model's name and is marked `made: here` and its maker, with the
-   description "Use it WHEN, a request said to you, never talk in the
-   room: it turns the light COLOUR.", the `when` line first, so a short
-   `use_skill` line keeps it. A name a skill on the lamp has gets the
-   first free one, as a written skill's.
+   description "Use it WHEN, said to you, never talk in the room you only
+   overhear; their telling you so is the ask, even a plain statement with
+   nothing asked: it turns the light COLOUR." (`made_skill::SAID_TO_YOU`
+   after the `when` line), the `when` line first, so a short `use_skill`
+   line keeps it. A name a skill on the lamp has gets the first free one,
+   as a written skill's.
 3. **Offered to the voice** as a `use_skill` choice ([tools.md](tools.md),
    `LAMP_USE_SKILL=on`) by that line: the voice's model picks it on a
    request it already hears after the name, the same way it picks the
    product skills. No new listening, no transcript kept, no phrase matched
-   on room sound.
+   on room sound. A telling is the ask: on lamp-9adf (17 Nov, #7448's row)
+   "Lamp, I'm busy." and "Lamp, I am in a meeting now." got no call 4 times
+   in 4 under the first description ("a request said to you, never talk in
+   the room"), answered in words ("I'll keep quiet and let you work.", once
+   "turning red now" with nothing called), the model reading a statement
+   as no ask. So while a said start is among the skills offered
+   (`made_skill::is_said`, its description's `SAID_TO_YOU`), with the
+   switch on, `use_skill`'s description ends "A skill whose line says
+   'said to you' is called when what someone tells you is what its line
+   says, even a plain statement with nothing asked."
+   (`use_skill::SAID_CALLED`), and the skills' lines end, within their
+   4,096 bytes, "A line that says 'said to you' is a skill the person
+   made to act when they tell you something: when what they tell you is
+   what that line says, even a plain statement of how they are or what
+   they are doing, with nothing asked, call use_skill for it before you
+   answer; that is how they asked for it. Only that call does what its
+   line says: never answer it in words alone, and never say it is done
+   without the call." (`use_skill::SAID_TOLD`), on both routes. The model
+   judges the match; no word of the person's line is matched in code.
+   Off, or with no said start offered, the function and the lines are as
+   before, byte for byte. A said start made before this keeps its first
+   description and is not told so: make it again. The action-claim check
+   (`LAMP_ACTION_CLAIM_CHECKED`, [second-voice.md](second-voice.md)) does
+   not hold such words ("turning red now" after a lead-in, "I'll keep
+   quiet"): its runs are the light's, volume's and Schedule's own, and
+   widening them is not part of this.
 4. **Said back exactly as it does** (`Said::said_back`): "When you tell me
    you're busy, I'll turn red." (" at level N" before the stop when a
    level was asked), and it goes on at once, as a made skill does, with
@@ -6598,6 +6625,7 @@ Tests: `made_skill::tests::with_its_switch_off_a_said_start_is_refused_as_before
 `a_said_start_is_offered_through_use_skill_with_its_when_line` and
 `nothing_starts_a_said_start_without_a_request_to_the_lamp`;
 `make_skill_local::tests::a_said_start_is_told_to_the_maker_only_with_its_switch`;
+`use_skill::tests::a_said_start_is_told_as_called_on_a_plain_statement_only_with_its_switch`;
 and lamp-skills'
 `made::a_said_start_passes_the_real_checker_and_loads_as_a_function_with_its_when_line`
 (the real checker packs it; the helper refuses it with the switch off; on,
