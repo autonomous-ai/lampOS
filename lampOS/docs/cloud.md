@@ -3082,6 +3082,12 @@ adds the key itself (`lamp_cloud::hermes_llm`).
 - **Billing:** Hermes' requests go on the voice's key, so the relay bills
   and attributes them to the lamp exactly as it does the voice's own
   DeepSeek turns; it can't tell the two apart.
+- **The relay's day used** (#7342, off unless `LAMP_SKILL_RUNS_VOICE_SHARE`
+  is set): the forwarder reads each answer's `X-Usage-Day-Used` and each
+  chat answer's `usage` and keeps them in `day-used.json` in its state
+  folder, for lamp-skills' bound on skills' runs, with one journal line a
+  chat answer of its numbers. It still forwards every request as before
+  (docs/tasks.md, "Skills' runs and the voice's share of the day").
 - **The relay:** `<relay>` is the voice's DeepSeek: `second.json`'s
   `deepseek_base_url`, else the company relay's DeepSeek under its
   `llm_base_url` (`…/api/v1/ai/v1/deepseek`, as `second_config.rs`'s
