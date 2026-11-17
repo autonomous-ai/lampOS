@@ -8839,6 +8839,216 @@ fn a_net_run_by_the_one_run_path_gets_its_egress_socket_before_harness_new() {
     refused(runner, &rig, "LAMP_TASK_NET is off in lamp-tasks");
 }
 
+/// LAMP_SKILL_SECRETS with a run granted `net`: through
+/// [`lamp_tasks::skill_make::NetRunner`] by the one run path, a run given its
+/// keys goes through Harness as every run, its keys file left in its own
+/// folder, `make-<run id>/.run-env`, where lamp-update's wrapper reads it
+/// once by the run's id: the wrapper's own key lines, run on that file as
+/// Harness's start would, put the key in the agent's environment and
+/// delete the file, and nothing Harness was asked (the prompt included)
+/// carries the key. A wrapper without those lines, a keys file elsewhere,
+/// a gateway default, or a lamp off the one run path: refused in
+/// [`skill_task::KEYS_REFUSED`]'s words before Harness is asked, no token
+/// file, no way out left.
+#[test]
+fn a_keyed_net_run_by_the_one_run_path_gives_its_keys_through_the_wrapper_alone() {
+    const VALUE: &str = "k3y-v4lue-0123456789";
+    let egress_of = |rig: &Rig| lamp_tasks::egress::Grant {
+        dir: rig.root.path().join("egress"),
+        ..lamp_tasks::egress::Grant::lamp()
+    };
+    // The run's own folder, as lamp-tasks makes it, with its keys file.
+    let keyed_run = |rig: &Rig, net: bool| {
+        let folder = rig.root.path().join("work/make-task-1");
+        fs::create_dir_all(folder.join("home")).unwrap();
+        let file = lamp_tasks::skill_keys::write_env_file(
+            &folder,
+            &[("WEB_API_KEY".into(), VALUE.into())],
+        )
+        .unwrap();
+        let mut run = skill_run(Duration::from_secs(20));
+        run.net = net;
+        run.start_in = Some(folder);
+        run.env_file = Some(file.clone());
+        (run, file)
+    };
+    // The one run path wrapper's own key lines, its folder moved into the rig.
+    let start = ONE_PATH_HERMES
+        .find(skill_task::ONE_PATH_KEY_LINES[0])
+        .unwrap();
+    let end = start + ONE_PATH_HERMES[start..].find("unset K s\n").unwrap();
+    let key_lines = &ONE_PATH_HERMES[start..end];
+    assert!(skill_task::takes_keyed_runs(ONE_PATH_HERMES));
+    assert!(skill_task::takes_keyed_runs(ONE_PATH_CLAUDE));
+
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        // Slow enough to start the wrapper's key lines while Harness starts it.
+        "new":{"default":true,"delay_ms":600},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let mut harness = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_net_runs()),
+    );
+    harness.egress = Some(egress_of(&rig));
+    let runner = lamp_tasks::skill_make::NetRunner {
+        make: lamp_tasks::skill_make::net_runner(rig.root.path()),
+        one_path: Some(Arc::new(harness)),
+    };
+    let (run, file) = keyed_run(&rig, true);
+    let script = format!(
+        "fail() {{ echo \"hermes: $1\" >&2; exit 1; }}\nR=task-1\n{}env\n",
+        key_lines.replace(
+            "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp",
+            rig.root.path().join("work").to_str().unwrap()
+        )
+    );
+    let token = rig.root.path().join("runs/task-1");
+    let done = AtomicBool::new(false);
+    let started = Mutex::new(None);
+    let ran = thread::scope(|scope| {
+        scope.spawn(|| {
+            // Once the run's token file is there, Harness is starting it:
+            // the wrapper reads its keys then.
+            while !done.load(Ordering::Acquire) {
+                if token.exists() && file.exists() {
+                    let out = std::process::Command::new("/bin/sh")
+                        .arg("-c")
+                        .arg(&script)
+                        .env_clear()
+                        .env("PATH", "/usr/bin:/bin")
+                        .output()
+                        .unwrap();
+                    *started.lock().unwrap() = Some(out);
+                    break;
+                }
+                thread::sleep(Duration::from_millis(5));
+            }
+        });
+        let ran = runner.run(&run, &|| {});
+        done.store(true, Ordering::Release);
+        ran
+    });
+    assert_eq!(ran, Ok(0));
+    let out = started
+        .lock()
+        .unwrap()
+        .take()
+        .expect("the keys file was there at the start");
+    assert!(out.status.success(), "{out:?}");
+    let env = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        env.lines()
+            .any(|line| line == format!("WEB_API_KEY={VALUE}")),
+        "{env}"
+    );
+    assert!(!String::from_utf8_lossy(&out.stderr).contains(VALUE));
+    assert!(!file.exists(), "read once and deleted");
+    let calls = rig.calls();
+    assert!(calls.iter().any(|call| call["args"][0] == "new"));
+    for call in &calls {
+        assert!(!call.to_string().contains(VALUE), "{call}");
+    }
+    assert!(!run.prompt.contains(VALUE));
+    nothing_left(&rig);
+
+    let refused = |runner: &dyn Runner, rig: &Rig, run: &SkillRun, why: &str| {
+        let said = runner.run(run, &|| {}).unwrap_err();
+        assert!(said.starts_with(skill_task::KEYS_REFUSED), "{said}");
+        assert!(said.contains(why), "{why}: {said}");
+        assert!(!said.contains(VALUE));
+        assert!(rig.calls().iter().all(|call| call["args"][0] != "new"));
+        assert!(
+            !rig.root.path().join("runs/task-1").exists(),
+            "no token file"
+        );
+        assert!(
+            !rig.root.path().join("egress/skill-task-1.sock").exists(),
+            "no way out left"
+        );
+    };
+    // A wrapper without the lines that read its keys.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let older = ONE_PATH_HERMES.replacen(skill_task::ONE_PATH_KEY_LINES[1], "", 1);
+    let mut harness = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", &older)],
+        Some(&ns_with_net_runs()),
+    );
+    harness.egress = Some(egress_of(&rig));
+    let (run, _) = keyed_run(&rig, true);
+    refused(
+        &harness,
+        &rig,
+        &run,
+        "has no wrapper line that reads a run's keys by its id",
+    );
+    // A keys file not in the run's own folder.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut harness = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_net_runs()),
+    );
+    harness.egress = Some(egress_of(&rig));
+    let (mut run, _) = keyed_run(&rig, true);
+    let elsewhere = rig.root.path().join("work/make-task-2");
+    fs::create_dir_all(&elsewhere).unwrap();
+    run.env_file = Some(
+        lamp_tasks::skill_keys::write_env_file(&elsewhere, &[("WEB_API_KEY".into(), VALUE.into())])
+            .unwrap(),
+    );
+    refused(
+        &harness,
+        &rig,
+        &run,
+        "its keys file is not in the run's own folder",
+    );
+    // A gateway default (OpenClaw): its turns never start through the wrapper.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let harness = one_path_runner(
+        &rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+        Some("#!/bin/sh\n"),
+    );
+    let (run, _) = keyed_run(&rig, false);
+    refused(
+        &harness,
+        &rig,
+        &run,
+        "the lamp's default agent (openclaw) runs its turns in its gateway",
+    );
+    // Off the one run path: Hermes's own wrapper reads no keys by a run's id.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let harness = skill_runner_with(&rig, Some(EngineKind::Hermes), Some(EngineKind::Hermes));
+    let (run, _) = keyed_run(&rig, false);
+    refused(
+        &harness,
+        &rig,
+        &run,
+        "the lamp's Hermes isn't on lamp-update's one run path yet",
+    );
+}
+
 /// A Gateway probe for a skill's run: ready from look `ready_from` (never
 /// with none); each look notes whether Harness was already asked `new`.
 struct SkillProbe {

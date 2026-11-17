@@ -14,8 +14,11 @@
 //!   own fresh folder, 0400, lamp-tasks' user's (the run's), one
 //!   `export NAME='value'` a line. The run is started through
 //!   [`LAUNCH`]: `/bin/sh` reads it once, deletes it, and only then starts
-//!   the lamp's Hermes, so the values are in its environment alone. The
-//!   folder goes when the run ends, however it ends.
+//!   the lamp's Hermes, so the values are in its environment alone. On the
+//!   one run path (a `net` run through Harness), the agent's wrapper reads
+//!   and deletes it the same way, found by the run's id
+//!   ([`crate::skill_task::ONE_PATH_KEY_LINES`]), or the run is refused
+//!   before it starts. The folder goes when the run ends, however it ends.
 //! - **Never elsewhere**: not in the run's token, its arguments, its words,
 //!   its transcript, the skill's folder or a journal line ([`RunKeys`]'s
 //!   `Debug` says the names alone).

@@ -785,7 +785,10 @@ pub struct SkillRun {
     pub start_in: Option<PathBuf>,
     /// The run's environment file of its keys (`LAMP_SKILL_SECRETS`,
     /// `crate::skill_keys`), in its own folder: read once and deleted by
-    /// [`crate::skill_keys::LAUNCH`] before Hermes starts. None: no keys.
+    /// [`crate::skill_keys::LAUNCH`] before Hermes starts ([`HermesRunner`]),
+    /// or, on the one run path ([`HarnessRunner`]), by its agent's wrapper,
+    /// which finds it by the run's id ([`ONE_PATH_KEY_LINES`]); a runner
+    /// that can't give them refuses the run before it starts. None: no keys.
     pub env_file: Option<PathBuf>,
     /// The agent's last answer, as Harness showed it once the run ended
     /// well: set by the Harness runner, read only for a run that tells it
@@ -2492,7 +2495,85 @@ pub fn net_refused(why: &str) -> String {
     format!("{NET_REFUSED} ({why}), so nothing was started")
 }
 
+/// The one run path wrapper's lines that give a run its keys
+/// (`LAMP_SKILL_SECRETS`, [`SkillRun::env_file`]) by its run id
+/// (`lamp_update::agent_ns::wrapper::ONE_PATH_KEY_LINES`, held in it by a
+/// test): Harness passes the wrapper none of lamp-tasks' variables, so the
+/// keys file in the run's own folder, `make-<run id>/.run-env`, is read
+/// once and deleted by the wrapper before the agent starts.
+pub const ONE_PATH_KEY_LINES: [&str; 2] = [
+    "K=/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-$R/.run-env\n",
+    "  [ -f \"$K\" ] && [ ! -L \"$K\" ] && [ ! -L \"${K%/.run-env}\" ] && . \"$K\" && s=0\n  rm -f -- \"$K\" || fail \"the keys file of run $R is not deleted\"\n",
+];
+
+/// Whether a one run path wrapper's text reads a run's keys file by its
+/// run id ([`ONE_PATH_KEY_LINES`]).
+pub fn takes_keyed_runs(wrapper: &str) -> bool {
+    ONE_PATH_KEY_LINES.iter().all(|line| wrapper.contains(line))
+}
+
+/// How every refusal of a run given its keys begins, when they can't reach
+/// its agent's environment: nothing of it is started, so its words never
+/// promise keys it doesn't have.
+pub const KEYS_REFUSED: &str = "a run given its keys can't be given them on this lamp yet";
+
+/// A run given its keys refused for `why`: [`KEYS_REFUSED`], then why.
+pub fn keys_refused(why: &str) -> String {
+    format!("{KEYS_REFUSED} ({why}), so nothing was started")
+}
+
 impl HarnessRunner {
+    /// Whether a run given its keys ([`SkillRun::env_file`]) can have them
+    /// in its agent's environment on the one run path, checked before the
+    /// agent starts: only a per-run agent (`gateway`: a gateway agent's
+    /// turns never start through the wrapper) whose wrapper reads the keys
+    /// file by the run's id ([`takes_keyed_runs`]), and only with the file
+    /// where that wrapper looks, `make-<run id>/.run-env`. Refused in
+    /// [`KEYS_REFUSED`]'s words otherwise. A run with no keys: nothing to
+    /// check.
+    fn keys_reach(
+        &self,
+        run: &SkillRun,
+        engine: crate::harness::EngineKind,
+        gateway: bool,
+    ) -> Result<(), String> {
+        let Some(file) = &run.env_file else {
+            return Ok(());
+        };
+        let name = engine.argument();
+        let refused = |why: String| {
+            let why = keys_refused(&why);
+            eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
+            Err(why)
+        };
+        if gateway {
+            return refused(format!(
+                "the lamp's default agent ({name}) runs its turns in its gateway, which no one run's keys reach"
+            ));
+        }
+        let wrapper = self
+            .wrappers
+            .as_ref()
+            .and_then(|wrappers| std::fs::read_to_string(wrappers.join(name)).ok());
+        if !wrapper.as_deref().is_some_and(takes_keyed_runs) {
+            return refused(format!(
+                "the lamp's default agent ({name}) has no wrapper line that reads a run's keys by its id: lamp-update's round hasn't run"
+            ));
+        }
+        let own = format!("{}{}", crate::skill_make::FOLDER_HEAD, run.run);
+        let in_own_folder = file
+            .file_name()
+            .is_some_and(|file| file == crate::skill_keys::ENV_FILE)
+            && file
+                .parent()
+                .and_then(Path::file_name)
+                .is_some_and(|folder| folder == own.as_str());
+        if !in_own_folder {
+            return refused("its keys file is not in the run's own folder".into());
+        }
+        Ok(())
+    }
+
     /// The way out of a run granted `net` on the one run path, made before
     /// the agent starts: refused for a gateway agent (`gateway`: its turns
     /// run in its gateway's namespaces, shared by every turn, which no one
@@ -2714,6 +2795,9 @@ impl HarnessRunner {
         // written, found by the wrapper's task entry by the run's id, and
         // removed after the run's guard.
         let _way_out = self.way_out(run, engine, false, began + run.deadline)?;
+        // A run given its keys: read by the wrapper's run lines from its own
+        // folder, or refused before anything of it is written.
+        self.keys_reach(run, engine, false)?;
         let token = run
             .env
             .iter()
@@ -3232,10 +3316,21 @@ impl Runner for HarnessRunner {
         // removed after the run's guard closed its session. Only by the
         // one run path; refused in words otherwise.
         let _way_out = if by_one_path {
-            self.way_out(run, engine, by_start, began + run.deadline)?
+            let way_out = self.way_out(run, engine, by_start, began + run.deadline)?;
+            // A run given its keys: they reach its agent only through the
+            // one run path's wrapper, or it is refused here, its way out
+            // removed with it and nothing started.
+            self.keys_reach(run, engine, by_start)?;
+            way_out
         } else if run.net {
             let why = net_refused(
                 "the lamp's Hermes isn't on lamp-update's one run path yet, whose wrapper finds a run's way out by its id",
+            );
+            eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
+            return Err(why);
+        } else if run.env_file.is_some() {
+            let why = keys_refused(
+                "the lamp's Hermes isn't on lamp-update's one run path yet, whose wrapper reads a run's keys by its id",
             );
             eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
             return Err(why);
