@@ -10683,6 +10683,11 @@ impl Heeding {
                 said,
                 turned && !signs.going_on,
             ),
+            read_silent: self
+                .eyes
+                .as_ref()
+                .zip(line_between(said.0, said.1))
+                .is_some_and(|((eyes, _), (from, to))| eyes.read_silent_between(from, to)),
         };
         let crate::said_to_me::Said::Held(held) = crate::said_to_me::judge(line) else {
             return false;
@@ -27724,13 +27729,59 @@ mod tests {
             None,
             "a yes waits, facing"
         );
-        assert!(
-            yes(&unread, going_on, false).is_some(),
-            "none waits, going on"
-        );
+        // A mouth never read is unknown, which blocks nothing (the first
+        // builder's HOLD on #7457), waiting yes or not.
+        assert_eq!(yes(&unread, going_on, false), None, "none waits, going on");
         assert!(
             yes(&speaking, (1, false), false).is_some(),
             "none waits, facing"
+        );
+    }
+
+    /// The first builder's HOLD on #7457 (19:07): in a conversation a short
+    /// line no face was seen speaking is held only when a face was in view
+    /// and read silent (the owner's lip smack, #7442). No face in view, no
+    /// eyes, or a mouth never read is unknown, and unknown blocks nothing:
+    /// "Pasta." from across the kitchen, setup's "Jay." said looking at a
+    /// phone.
+    #[test]
+    fn with_said_to_me_a_short_reply_in_a_conversation_is_held_only_read_silent() {
+        use lamp_msgs::SpeakingState::{No, Unknown};
+        let judged =
+            |states: Option<&[Option<lamp_msgs::SpeakingState>]>, eyes_on: bool, words: &str| {
+                let (now, now_us) = (Instant::now(), monotonic_us());
+                let mut heeding = super::Heeding::new(true, false, None, None);
+                heeding.as_the_only_voice(false, true, false);
+                if eyes_on {
+                    let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+                    if let Some(states) = states {
+                        turned_face_looks(&eyes, now, 200, states, &mut 0);
+                    }
+                    heeding.seeing_speaking_faces(eyes, None);
+                }
+                heeding.hearing_only_said_to_me();
+                let signs = super::Signs {
+                    going_on: true,
+                    ..turned_signs(crate::room_told::Room::Unknown)
+                };
+                let verdict = heeding.heed_signs(9, (now_us, now_us + 2_200_000), words, signs);
+                *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+                verdict
+            };
+        // 1. No face in view: stands.
+        assert_eq!(judged(None, true, "Pasta."), None, "no face in view");
+        // 2. No eyes at all: stands.
+        assert_eq!(judged(None, false, "Pasta."), None, "no eyes");
+        // 3. A face in view read silent: the lip smack is held.
+        assert!(
+            judged(Some(&[Some(No)]), true, "Mm.").is_some(),
+            "a face read silent"
+        );
+        // 4. Setup's name answer with the face's mouth never read: stands.
+        assert_eq!(
+            judged(Some(&[Some(Unknown)]), true, "Jay."),
+            None,
+            "setup's name, no mouth read"
         );
     }
 

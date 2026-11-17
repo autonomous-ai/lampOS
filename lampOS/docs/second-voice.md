@@ -5715,7 +5715,9 @@ after a take-over, but now for every turn:
   reaches `held_rename::take` and the other holds; when its name is heard
   or written in it;
   when it is in a live conversation (the window), unless it is 0 to 2 words
-  no face was seen speaking; or when a face turned to the lamp is facing it
+  no face was seen speaking while a face in view was read silent
+  (`SpeakingFaces::read_silent_between`; no face, no eyes or a mouth never
+  read is unknown and blocks nothing); or when a face turned to the lamp is facing it
   (head pitch from 20 degrees up to 25 degrees down, `said_to_me::PITCH_DEG`
   as the eyes' `facing` window, and not looking away: the newest `pitch`
   and `looking` of the one turned face read speaking, both from that face in
