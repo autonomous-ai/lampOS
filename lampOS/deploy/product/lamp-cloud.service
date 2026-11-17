@@ -101,6 +101,8 @@ Environment=LAMP_UPLOAD_TO_AGENT=on
 # A skill's keys given in the app (#6686, docs/skills.md "Its keys, given in the app"): skills.secrets, skills.secret_set
 # and skills.secret_unset, handed to lamp-services' admin socket; the same line there, in lamp-voice and lamp-tasks.
 Environment=LAMP_SKILL_SECRETS=on
+# A skill's task reaches the public web (80/443) with its owner's spoken yes (#7200).
+Environment=LAMP_TASK_NET=on
 Environment=LAMP_APP_UPDATE=on
 # The lamp's agents for the app (#6240): `engines` in update.status and engines.install for a missing Hermes,
 # on in the product by the owner's rule of 11 Nov; `off` here takes it away.
