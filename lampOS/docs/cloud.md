@@ -1102,7 +1102,11 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   folder with its `.pushed.json`, read from there (never a link, never a name the
   lamp's own folder has): shown with `can_remove` and `can_turn_off` false, and
   `camera_allowed` the owner's yes to its seeing the picture (null when it asks
-  none). It is what `skills.share` also takes, when it is on, loads, and is not
+  none), and **`pushed_by`** `{"computer", "client"}`, the paired computer that
+  pushed it as its `.pushed.json` says (the name the owner saw at pairing, at
+  most 64 bytes, and its id as `control.clients` lists it), so the app can say
+  where it came from and list it under that computer; every other row leaves
+  `pushed_by` out. It is what `skills.share` also takes, when it is on, loads, and is not
   held. `skills.list` and each `skills.share` read the whole `skills-dev` folder
   with `load_each` (the list is capped by `MOST_SKILLS`): fine at today's sizes,
   to look at again if that folder grows. A core skill that says `made: here` is still
