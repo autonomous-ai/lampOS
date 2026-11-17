@@ -3419,6 +3419,17 @@ gone ([switches.md](switches.md)). What happens:
      is held whatever its length, its name or a question, with
      `LAMP_SECOND_OWN_ECHO` on or off and in the private room; its request
      is kept and an approval in it refused.
+   - **The name alone answers nothing** (`skill_write_yes::line_heard`;
+     lamp-9adf, 17 Nov 13:58): a line the second route asks of the model
+     as only the lamp's name, or with no words at all (the same line it
+     tells the model was a call), carries no answer to any wait here, yes,
+     no or unclear: `make_skill` with the `approve_id` in it is answered
+     `skill_write_yes::NAME_ONLY_NOT_TAKEN`, nothing changes, its round is
+     not forced to answer, its note gives no `approve_id`, and the wait
+     goes on for the next line. State, not words: the route already judged
+     the line a call. On 9adf an app's make with code (Gmail) said back,
+     then a lone "Hello?" heard as the name, was put on by the forced
+     round's yes.
    - **Read back, and agreed to then** (the owner, 11 Nov;
      `make_skill_local::read_back`): a write skill still waiting for its
      yes (its make's turn cut, no answer then, or a "no") is heard again

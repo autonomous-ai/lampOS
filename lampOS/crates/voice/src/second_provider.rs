@@ -10863,6 +10863,12 @@ async fn spoken(
             }
         })
         .flatten();
+    // A line asked of the model as only the lamp's name, or with no words
+    // at all, answers no skill's say-back waiting for its answer: none is
+    // taken in it, its round is not forced to give one, and the wait goes
+    // on for the next line (`skill_write_yes::line_heard`; lamp-9adf,
+    // 17 Nov 13:58: a lone name put a made skill's code on).
+    crate::skill_write_yes::line_heard(request, text.trim().is_empty() || name_alone(&text));
     let called = called.then(|| {
         eprintln!(
             "lamp-voice second: request {request}: only the lamp's name was said, and the model is told so"
