@@ -2129,6 +2129,22 @@ fn a_task_entering_during_a_removal_waits_for_it() {
     assert!(one.enter("task-d", Kind::Skill, far(), &|| false).is_ok());
 }
 
+/// The removal is marked under way in the same lock it is taken in: no
+/// task enters between taking the drop due and starting the drop.
+#[test]
+fn no_task_enters_between_taking_a_drop_and_starting_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one_turn(&one, &fake, "task-0");
+    one.drop_when_free("the owner asked to forget");
+    assert!(one.take_due().is_some());
+    let soon = Instant::now() + Duration::from_millis(50);
+    assert!(
+        one.enter("task-e", Kind::Skill, soon, &|| false).is_err(),
+        "a drop taken is under way at once"
+    );
+}
+
 /// A kept session left with no task for [`KEPT_IDLE_MAX`] is dropped the
 /// same way (closed, deleted, token removed) and a fresh one opened.
 #[test]
