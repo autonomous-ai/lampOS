@@ -114,6 +114,10 @@ const NOT_PASSED: &[(&str, &str)] = &[
     ("LAMP_USE_SKILL", "the coordinator's, given as an argument"),
     ("LAMP_REPORTS", "the coordinator's, given as an argument"),
     (
+        "LAMP_DEVICES",
+        "the coordinator's, given as an argument (--devices, #7470)",
+    ),
+    (
         "LAMP_SLEEP_ASKED",
         "the coordinator's, given as an argument (--sleep-asked, #3748)",
     ),
