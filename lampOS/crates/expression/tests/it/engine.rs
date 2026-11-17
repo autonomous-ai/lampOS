@@ -706,6 +706,8 @@ fn busy_room_restrains_unsolicited_motion_but_never_infers_concentration() {
 fn largest_fresh_face_is_a_normalized_target_without_invented_geometry() {
     let mut engine = engine();
     let face = |id: &str, min: f32, max: f32| Face {
+        pitch: None,
+        looking: None,
         speaking: None,
         id: id.into(),
         xmin: min,

@@ -14452,6 +14452,8 @@ mod tests {
                 crate::scenario_clock::monotonic_us(),
                 &lamp_msgs::Faces {
                     faces: vec![lamp_msgs::Face {
+                        pitch: None,
+                        looking: None,
                         id: "f".into(),
                         xmin: 0.4,
                         ymin: 0.0,
@@ -14550,6 +14552,8 @@ mod tests {
                 &lamp_msgs::Faces {
                     faces: (0..faces)
                         .map(|_| lamp_msgs::Face {
+                            pitch: None,
+                            looking: None,
                             id: "f".into(),
                             xmin: 0.4,
                             ymin: 0.0,
@@ -15566,6 +15570,8 @@ mod tests {
             let faces = lamp_msgs::Faces {
                 faces: if in_view {
                     vec![lamp_msgs::Face {
+                        pitch: None,
+                        looking: None,
                         id: "at-the-desk".into(),
                         xmin: 0.4,
                         ymin: 0.0,
@@ -15812,6 +15818,8 @@ mod tests {
         let mut look = |turned: bool| {
             let faces = lamp_msgs::Faces {
                 faces: vec![lamp_msgs::Face {
+                    pitch: None,
+                    looking: None,
                     id: "at-the-desk".into(),
                     xmin: 0.4,
                     ymin: 0.0,
@@ -15906,6 +15914,8 @@ mod tests {
             .unwrap();
         let faces = lamp_msgs::Faces {
             faces: vec![lamp_msgs::Face {
+                pitch: None,
+                looking: None,
                 id: "at-the-desk".into(),
                 xmin: 0.4,
                 ymin: 0.0,
@@ -15981,6 +15991,8 @@ mod tests {
             )
             .unwrap();
         let face = |id: &str, facing: bool| lamp_msgs::Face {
+            pitch: None,
+            looking: None,
             id: id.into(),
             xmin: 0.4,
             ymin: 0.0,
@@ -16197,6 +16209,8 @@ mod tests {
                 .into_iter()
                 .take(count)
                 .map(|(id, facing)| lamp_msgs::Face {
+                    pitch: None,
+                    looking: None,
                     id: id.into(),
                     xmin: 0.4,
                     ymin: 0.0,
@@ -17492,6 +17506,8 @@ mod tests {
                 self.seq += 1;
                 let faces = Faces {
                     faces: vec![Face {
+                        pitch: None,
+                        looking: None,
                         id: face.to_owned(),
                         xmin: 0.2,
                         ymin: 0.2,
@@ -17570,6 +17586,8 @@ mod tests {
         // A short root: a Unix socket's address holds 103 bytes.
         let root = std::path::PathBuf::from(format!("/tmp/lnw-{}", std::process::id()));
         let face = |id: &str| lamp_msgs::Face {
+            pitch: None,
+            looking: None,
             id: id.into(),
             xmin: 0.2,
             ymin: 0.2,
@@ -19856,6 +19874,8 @@ mod tests {
             // ">f2": f2 turned to the lamp.
             let speaking = |id: &str| Faces {
                 faces: vec![Face {
+                    pitch: None,
+                    looking: None,
                     id: id.trim_start_matches('>').to_owned(),
                     xmin: 0.2,
                     ymin: 0.2,
@@ -20772,6 +20792,8 @@ mod tests {
         use lamp_msgs::{Face, Faces, Speaking, SpeakingState};
         let other = Faces {
             faces: vec![Face {
+                pitch: None,
+                looking: None,
                 id: "f2".to_owned(),
                 xmin: 0.2,
                 ymin: 0.2,
@@ -20874,6 +20896,8 @@ mod tests {
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
         let speaking = |id: &str| Faces {
             faces: vec![Face {
+                pitch: None,
+                looking: None,
                 id: id.to_owned(),
                 xmin: 0.2,
                 ymin: 0.2,
@@ -20963,6 +20987,8 @@ mod tests {
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
         let speaking = |id: &str, turned: bool| Faces {
             faces: vec![Face {
+                pitch: None,
+                looking: None,
                 id: id.to_owned(),
                 xmin: 0.2,
                 ymin: 0.2,
@@ -21051,6 +21077,8 @@ mod tests {
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
         let speaking = Faces {
             faces: vec![Face {
+                pitch: None,
+                looking: None,
                 id: "f1".to_owned(),
                 xmin: 0.2,
                 ymin: 0.2,
@@ -24347,6 +24375,8 @@ mod tests {
             .unwrap();
         let face = |facing: bool| lamp_msgs::Faces {
             faces: vec![lamp_msgs::Face {
+                pitch: None,
+                looking: None,
                 id: "f".into(),
                 xmin: 0.4,
                 ymin: 0.0,
@@ -27219,6 +27249,8 @@ mod tests {
             for look in 0..5u64 {
                 let faces = Faces {
                     faces: vec![Face {
+                        pitch: None,
+                        looking: None,
                         id: "f1".into(),
                         xmin: 0.4,
                         ymin: 0.3,
@@ -27305,6 +27337,8 @@ mod tests {
             *seq += 1;
             let faces = Faces {
                 faces: vec![Face {
+                    pitch: None,
+                    looking: None,
                     id: "f1".into(),
                     xmin: 0.4,
                     ymin: 0.3,
@@ -27794,6 +27828,8 @@ mod tests {
         // line with none is told by a look that lives 1 ms, waited out
         // (it failed under load when every look lived 300 ms, 29 Oct).
         let face = |n: usize| Face {
+            pitch: None,
+            looking: None,
             speaking: None,
             id: format!("f{n}"),
             xmin: 0.4,
@@ -28050,6 +28086,8 @@ mod tests {
             let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
             let (now, now_us) = (Instant::now(), monotonic_us());
             let face = |id: &str, facing: bool, state: SpeakingState| Face {
+                pitch: None,
+                looking: None,
                 id: id.into(),
                 xmin: 0.4,
                 ymin: 0.3,
@@ -28134,6 +28172,8 @@ mod tests {
                     monotonic_us(),
                     &Faces {
                         faces: vec![Face {
+                            pitch: None,
+                            looking: None,
                             id: "f0".into(),
                             xmin: 0.4,
                             ymin: 0.2,
@@ -28212,6 +28252,8 @@ mod tests {
                     for look in 0..8u64 {
                         let still = Faces {
                             faces: vec![Face {
+                                pitch: None,
+                                looking: None,
                                 id: "f0".into(),
                                 xmin: 0.4,
                                 ymin: 0.2,
@@ -28241,6 +28283,8 @@ mod tests {
                         .iter()
                         .enumerate()
                         .map(|(n, (height, facing))| Face {
+                            pitch: None,
+                            looking: None,
                             id: format!("f{n}"),
                             xmin: 0.4,
                             ymin: 0.2,
@@ -28454,6 +28498,8 @@ mod tests {
                     &Faces {
                         faces: (0..in_view)
                             .map(|n| Face {
+                                pitch: None,
+                                looking: None,
                                 speaking: None,
                                 id: format!("f{n}"),
                                 xmin: 0.4,
@@ -28665,6 +28711,8 @@ mod tests {
                     &Faces {
                         faces: (0..start.in_view)
                             .map(|n| Face {
+                                pitch: None,
+                                looking: None,
                                 speaking: None,
                                 id: format!("f{n}"),
                                 xmin: 0.4,
@@ -29577,6 +29625,8 @@ mod tests {
                 .iter()
                 .enumerate()
                 .map(|(at, id)| Face {
+                    pitch: None,
+                    looking: None,
                     id: (*id).to_owned(),
                     xmin: 0.1 + 0.4 * at as f32,
                     ymin: 0.2,
@@ -32048,6 +32098,8 @@ mod memory_observer {
             .unwrap();
         let mut look = |count: usize| {
             let face = |n: usize| lamp_msgs::Face {
+                pitch: None,
+                looking: None,
                 id: format!("f{n}"),
                 xmin: 0.4,
                 ymin: 0.0,

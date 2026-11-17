@@ -99,6 +99,8 @@ fn controls() -> ControlsState {
 
 fn face(id: &str) -> Face {
     Face {
+        pitch: None,
+        looking: None,
         speaking: None,
         id: id.into(),
         xmin: 0.2,

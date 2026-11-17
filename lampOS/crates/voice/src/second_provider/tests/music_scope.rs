@@ -30,6 +30,8 @@ fn show_speaker(eyes: &SpeakingFaces, speaker: &str) {
     let faces = lamp_msgs::Faces {
         faces: ["f1", "f2"]
             .map(|id| lamp_msgs::Face {
+                pitch: None,
+                looking: None,
                 id: id.to_owned(),
                 xmin: 0.1,
                 ymin: 0.1,

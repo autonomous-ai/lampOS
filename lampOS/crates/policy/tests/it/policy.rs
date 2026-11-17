@@ -1444,6 +1444,8 @@ fn how_the_room_is_and_who_the_eyes_see_are_taken_from_the_bus() {
     )
     .unwrap();
     let face = |id: &str, ymin: f32, ymax: f32, facing: bool| Face {
+        pitch: None,
+        looking: None,
         speaking: None,
         id: id.into(),
         xmin: 0.4,

@@ -13496,6 +13496,8 @@ mod tests {
     #[test]
     fn the_nearest_face_is_its_framing() {
         let face = |xmin: f32, ymin: f32, side: f32| lamp_msgs::Face {
+            pitch: None,
+            looking: None,
             speaking: None,
             id: "f".into(),
             xmin,

@@ -1363,6 +1363,8 @@ mod tests {
     fn an_unseen_line_carries_only_soon_after_their_face_was_in_view() {
         let within = crate::second_provider::CARRY_UNSEEN_WITHIN;
         let face = Face {
+            pitch: None,
+            looking: None,
             id: "f1".to_owned(),
             xmin: 0.1,
             ymin: 0.1,
@@ -1403,6 +1405,8 @@ mod tests {
     #[test]
     fn no_other_face_in_view_needs_a_look_and_no_face_but_theirs() {
         let face = |id: &str| Face {
+            pitch: None,
+            looking: None,
             id: id.to_owned(),
             xmin: 0.1,
             ymin: 0.1,
@@ -1483,6 +1487,8 @@ mod tests {
     #[test]
     fn faces_not_at_the_desk_are_no_other_face() {
         let face = |id: &str, width: f32, confidence: f32| Face {
+            pitch: None,
+            looking: None,
             id: id.to_owned(),
             xmin: 0.3,
             ymin: 0.2,
@@ -1559,6 +1565,8 @@ mod tests {
     #[test]
     fn one_face_in_view_needs_their_face_in_enough_looks_and_no_other_in_any() {
         let face = |id: &str| Face {
+            pitch: None,
+            looking: None,
             id: id.to_owned(),
             xmin: 0.1,
             ymin: 0.1,
@@ -1687,6 +1695,8 @@ mod tests {
             faces: speaking
                 .iter()
                 .map(|(id, state)| Face {
+                    pitch: None,
+                    looking: None,
                     id: (*id).to_owned(),
                     xmin: 0.2,
                     ymin: 0.2,
@@ -2881,6 +2891,8 @@ mod tests {
     fn a_short_line_is_judged_over_the_eyes_window_with_the_switch() {
         use SpeakingState::{No, Unknown, Yes};
         let face = |id: &str, state: SpeakingState| Face {
+            pitch: None,
+            looking: None,
             id: id.to_owned(),
             xmin: 0.1,
             ymin: 0.1,

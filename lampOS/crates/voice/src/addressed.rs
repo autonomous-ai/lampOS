@@ -277,6 +277,8 @@ mod tests {
 
     fn face(height: f32, facing: Option<bool>) -> Face {
         Face {
+            pitch: None,
+            looking: None,
             speaking: None,
             id: "f".into(),
             // From the top edge, so that the height is exact.
