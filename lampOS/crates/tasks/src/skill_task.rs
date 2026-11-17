@@ -3223,11 +3223,15 @@ impl Runner for HarnessRunner {
         let _ = self.stopping.set(stop);
     }
 
-    /// Kept from `harness show` once a run ends well; a run that starts
-    /// with no Harness ([`Self::without_harness`]) keeps none, nor does a
-    /// make (its answer is its file's alone).
+    /// Kept from `harness show` once a run ends well; never a make's (its
+    /// answer is its file's alone). Not read from the path a run takes
+    /// ([`Self::without_harness`]): that is read again at the run's start,
+    /// and in lamp-tasks' first minute it can read no Harness at the
+    /// hand-over and Harness at the start (lamp-9adf, 18 Nov, 46 s after a
+    /// restart: an `answer=894` dropped as `not a run that tells`). A run
+    /// that starts with no Harness keeps no answer, so it tells nothing.
     fn answers(&self) -> bool {
-        !self.makes && self.without_harness(None).is_none()
+        !self.makes
     }
 
     fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
@@ -6798,6 +6802,55 @@ mod tests {
             makes: false,
             egress: None,
         }
+    }
+
+    /// A Harness runner's run tells what its agent found whatever path its
+    /// hand-over reads: one that reads no Harness then (signed out, the
+    /// default agent taking runs) and goes through Harness by its start
+    /// (signed in) keeps Harness's answer, so it is told (lamp-9adf, 18 Nov,
+    /// 46 s after a restart). A make's never tells through it.
+    #[test]
+    fn a_harness_runner_tells_whatever_path_its_hand_over_reads() {
+        use std::sync::atomic::AtomicBool;
+        let dir = tempfile::tempdir().unwrap();
+        let top = std::fs::canonicalize(dir.path()).unwrap();
+        let mut runner = local_runner(
+            &top,
+            HarnessHere::SignedOut,
+            true,
+            Some(&local_wrapper(":")),
+        );
+        let signed_in = std::sync::Arc::new(AtomicBool::new(false));
+        let read = signed_in.clone();
+        let no_harness = NoHarnessSlot::default();
+        let _ = no_harness.set(NoHarness {
+            here: Box::new(move || {
+                if read.load(Ordering::Acquire) {
+                    HarnessHere::SignedIn
+                } else {
+                    HarnessHere::SignedOut
+                }
+            }),
+            default_engine: Box::new(|| Some(crate::harness::EngineKind::Hermes)),
+            home: top.clone(),
+        });
+        runner.no_harness = no_harness;
+        assert!(
+            runner.without_harness(None).is_some(),
+            "the hand-over reads no Harness"
+        );
+        assert!(
+            tells_answer(&runner),
+            "a run that tells, read with no Harness"
+        );
+        signed_in.store(true, Ordering::Release);
+        assert!(
+            runner.without_harness(None).is_none(),
+            "its start goes through Harness"
+        );
+        assert!(tells_answer(&runner), "a run that tells, read with Harness");
+        runner.makes = true;
+        assert!(!tells_answer(&runner), "a make's never");
     }
 
     /// An approvals read standing in for the gateway's: agent main's

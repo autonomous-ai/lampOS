@@ -2896,9 +2896,10 @@ for each run, and is answered once the run ends
 - **What its agent found** (`tells_answer`): every task's run, whatever
   its grants (the owner, 17 Nov: the agent's results are read freely, not
   only a linked service's), through a runner that keeps its agent's
-  answer (`Runner::answers`: Harness's, not for a run it starts with no
-  Harness; a `net` run's `NetRunner` by the one run path, as it goes
-  through that Harness runner) that ended well answers
+  answer (`Runner::answers`: Harness's, whichever path its run then
+  takes, as that path is read again at the run's start; a `net` run's
+  `NetRunner` by the one run path, as it goes through that Harness
+  runner) that ended well answers
   `{"ok":true,"id":N,"answer":"..."}`, the agent's last
   answer as the run's end `show` gave it (`--chars 4000`, `Cli::shown_end`;
   for a `stopped` end, the `show` that found its session bound), every run
@@ -2919,7 +2920,13 @@ for each run, and is answered once the run ends
   read as a make's answer is: a regular file, never through a link, not
   empty, at most 20 KiB; `its agent's answer: N bytes kept` or `none in
   its answer.md`), so it is told as Harness's is. A fixed write's run
-  never tells, nor a run Harness's runner starts with no Harness. lamp-skills
+  never tells, nor a run Harness's runner starts with no Harness: its
+  words end with `TELL_LINE` too, but it keeps no answer (`nothing`).
+  Read once at the hand-over, that path dropped a kept answer: on
+  lamp-9adf, 18 Nov, 46 s after lamp-tasks restarted, an uploaded skill's
+  `net` run read no Harness at its hand-over, went through Harness at its
+  start (`answer=894`, `894 bytes kept`) and logged `nothing: not a run
+  that tells`; the same skill told 45 bytes at 03:06. lamp-skills
   says them to the owner as exact words, never a turn for the model, so
   text from the open web is never an instruction (docs/skills.md, "A
   linked service as a task for the lamp's agent"), at most about 400
@@ -2946,6 +2953,7 @@ for each run, and is answered once the run ends
   said (#7180), which these lines place. Tests:
   `every_runs_ended_answer_carries_what_its_agent_found`,
   `a_net_runs_ended_answer_carries_what_its_agent_found`,
+  `a_harness_runner_tells_whatever_path_its_hand_over_reads`,
   `an_agent_skills_and_a_keyed_runs_ended_answers_carry_what_their_agent_found`,
   `skill_make::tests::a_net_runner_keeps_an_answer_by_either_path`,
   `skill_make::tests::a_makes_runner_keeps_a_telling_runs_answer_from_its_folder`,
