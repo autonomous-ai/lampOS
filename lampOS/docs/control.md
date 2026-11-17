@@ -1357,8 +1357,8 @@ on the lamp that run on their own".
 - **`skill.list` and `skill.remove`** need `skills` too, and see only this
   computer's own pushes. Each is a request to root's helper, so each is
   bounded before it is asked: 6 a minute (`limits.manage`), one at a time
-  for a computer, and 4 at once on the lamp; past either, `busy`. The owner turns any of them off or removes it in
-  the app.
+  for a computer, and 4 at once on the lamp; past either, `busy`. The owner turns a computer's pushed skills off
+  by revoking the computer in the app; the Skills page lists them without a switch or a remove.
 - **On the lamp:** `lamp-control` gathers the parts in memory (one push
   on the lamp at a time, so 1 MiB at most) and, once whole and matching its
   SHA-256, keeps the package in its state folder as `push/package.tar`,
