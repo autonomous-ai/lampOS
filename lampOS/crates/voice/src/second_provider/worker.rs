@@ -27711,6 +27711,27 @@ mod tests {
             judged(true, false, &still, going_on, "And tomorrow in Hanoi?"),
             None
         );
+        // While the lamp waits for a yes (a held rename, forget or save),
+        // "Yes." is said to it: in a conversation with its mouth unread, or
+        // facing it seen speaking; with none waiting, held as before.
+        let unread = [Some(Unknown)];
+        let yes = |states: &[_], at, awaited| {
+            crate::said_to_me::awaiting_yes(awaited, || judged(true, false, states, at, "Yes."))
+        };
+        assert_eq!(yes(&unread, going_on, true), None, "a yes waits, going on");
+        assert_eq!(
+            yes(&speaking, (1, false), true),
+            None,
+            "a yes waits, facing"
+        );
+        assert!(
+            yes(&unread, going_on, false).is_some(),
+            "none waits, going on"
+        );
+        assert!(
+            yes(&speaking, (1, false), false).is_some(),
+            "none waits, facing"
+        );
     }
 
     /// `LAMP_SAID_TO_ME` with the eyes' pitch and gaze (#7442): a question

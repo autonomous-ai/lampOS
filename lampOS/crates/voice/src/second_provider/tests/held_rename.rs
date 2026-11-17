@@ -66,13 +66,19 @@ async fn run(turns: &[Turn], on: bool) -> Ran {
 
 /// [`run`], with one turn cut ([`Cut`]) while its forget waits to return.
 async fn run_cut(turns: &[Turn], on: bool, cut: Cut) -> Ran {
-    run_all(turns, on, cut, None).await
+    run_all(turns, on, cut, None, None).await
 }
 
 /// [`run_cut`]; with `cut_ask`, the answer of the turn at that index is cut
 /// by the next line with none of it played (`LAMP_SAID_AS_HEARD`), and
-/// `LAMP_NAME_LEARN_FIX` is as given.
-async fn run_all(turns: &[Turn], on: bool, cut: Cut, cut_ask: Option<(usize, bool)>) -> Ran {
+/// `LAMP_NAME_LEARN_FIX` is as given; with `heed`, each line is judged by it.
+async fn run_all(
+    turns: &[Turn],
+    on: bool,
+    cut: Cut,
+    cut_ask: Option<(usize, bool)>,
+    heed: Option<Heed>,
+) -> Ran {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
     let first = 19_000 + 100 * NEXT.fetch_add(1, Ordering::Relaxed);
@@ -171,6 +177,9 @@ async fn run_all(turns: &[Turn], on: bool, cut: Cut, cut_ask: Option<(usize, boo
                 .filter(|(at, _)| first + *at as u64 == request)
                 .map(|_| crate::said_as_heard::CUT.to_owned())
         }));
+    if let Some(heed) = heed {
+        engine = engine.heeding(heed);
+    }
     engine.memory_camera(true, 1);
     eyes.look(
         Instant::now(),
@@ -367,6 +376,29 @@ async fn the_29e7_yeses_run_the_held_rename_with_no_call() {
         ),
     ];
     assert_eq!(run(&request_61, true).await.sent, renamed());
+}
+
+/// `LAMP_SAID_TO_ME` (#7442): the rule judging the yes to a held rename is
+/// told a yes waits, so a bare "Yes." is said to the lamp and runs the
+/// rename; the ask before it was judged with none waiting. A rule holding a
+/// short line unless a yes waits, as `said_to_me::judge` holds one unseen
+/// in a conversation, stands for it (the rule itself:
+/// `worker::tests::with_said_to_me_a_line_facing_the_lamp_needs_its_face_seen_speaking`).
+/// The rename's own sight check still wants the asker's face on the yes.
+#[tokio::test]
+async fn the_rule_is_told_a_held_rename_waits_for_its_yes() {
+    let seen: Arc<Mutex<Vec<bool>>> = Arc::default();
+    let told = seen.clone();
+    let heed: Heed = Arc::new(move |_, _, heard, _, _| {
+        let awaited = crate::said_to_me::yes_awaited();
+        told.lock().unwrap().push(awaited);
+        (heard.split_whitespace().count() <= crate::said_to_me::SHORT_WORDS && !awaited)
+            .then_some("held: no face seen speaking it")
+    });
+    let turns: [Turn; 2] = [ASKS, ("Yes.", Lamp::Says("Done."), &["f1"])];
+    let ran = run_all(&turns, true, Cut::None, None, Some(heed)).await;
+    assert_eq!(*seen.lock().unwrap(), [false, true]);
+    assert_eq!(ran.sent, renamed());
 }
 
 /// The model also calls the rename after the yes: renamed exactly once.
@@ -805,10 +837,10 @@ async fn a_rename_question_cut_before_its_name_keeps_the_hold() {
             .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
             .any(|content| content.contains("was cut before they heard it"))
     };
-    let on = run_all(&turns, true, Cut::None, Some((0, true))).await;
+    let on = run_all(&turns, true, Cut::None, Some((0, true)), None).await;
     assert!(asked_again(&on), "the model is told to ask again");
     assert_eq!(on.sent, renamed());
-    let off = run_all(&turns, true, Cut::None, Some((0, false))).await;
+    let off = run_all(&turns, true, Cut::None, Some((0, false)), None).await;
     assert!(!asked_again(&off));
     assert!(off.sent.is_empty(), "{:?}", off.sent);
 }
